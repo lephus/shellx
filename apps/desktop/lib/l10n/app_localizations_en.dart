@@ -3874,4 +3874,261 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiFileMissing => 'This file is not there any more.';
+
+  @override
+  String get toolsGroup => 'Tools';
+
+  @override
+  String get toolAdd => 'Add tool';
+
+  @override
+  String toolOpenCommand(String name) {
+    return 'Open tool: $name';
+  }
+
+  @override
+  String get toolLocal => 'On this computer';
+
+  @override
+  String get toolRemote => 'Not on this computer';
+
+  @override
+  String get toolUnencrypted => 'not encrypted';
+
+  @override
+  String toolAway(String host) {
+    return 'On $host';
+  }
+
+  @override
+  String get toolBackToTool => 'Back to tool';
+
+  @override
+  String get toolPhoneOn => 'Phone: on';
+
+  @override
+  String get toolPhoneOff => 'Phone: off';
+
+  @override
+  String get toolPhoneOnlyLocal =>
+      'Only http tools on this computer can open on a phone.';
+
+  @override
+  String get toolAlsoPhone => '· on phone too';
+
+  @override
+  String get toolExpand => 'Expand';
+
+  @override
+  String get toolCollapse => 'Restore';
+
+  @override
+  String get toolOpenInBrowser => 'Open in browser';
+
+  @override
+  String toolRefused(String hostPort) {
+    return 'Nothing is running at $hostPort. Start your tool\'s server and the page will appear.';
+  }
+
+  @override
+  String toolLoadFailed(String reason) {
+    return 'The page couldn\'t load: $reason';
+  }
+
+  @override
+  String get toolAtsBlocked =>
+      'macOS doesn\'t allow this http page inside ShellX.';
+
+  @override
+  String get toolCrashed => 'The page stopped.';
+
+  @override
+  String get toolDownloadBlocked =>
+      'This tool wants to download a file. Open it in your browser to download.';
+
+  @override
+  String toolDeleteConfirm(String name) {
+    return 'Delete the tool \"$name\"? Its page closes. Its web data stays.';
+  }
+
+  @override
+  String get toolClearData => 'Clear tool data…';
+
+  @override
+  String get toolClearDataConfirm =>
+      'Sign every tool out and clear its cookies and storage?';
+
+  @override
+  String get toolEmbedSetting => 'Show tools in ShellX';
+
+  @override
+  String get toolEmbedAuto => 'Automatic';
+
+  @override
+  String get toolEmbedOn => 'Always';
+
+  @override
+  String get toolEmbedOff => 'No, open in browser';
+
+  @override
+  String toolCovered(String name) {
+    return '$name — hidden while a menu is open';
+  }
+
+  @override
+  String toolTooMany(String name) {
+    return 'Closed \"$name\" to keep ShellX light. Click to load it again.';
+  }
+
+  @override
+  String toolJsAlertTitle(String name) {
+    return '$name says';
+  }
+
+  @override
+  String get actionToggleTools => 'Show or hide tools';
+
+  @override
+  String get actionAddTool => 'Add tool…';
+
+  @override
+  String get toolDialogAddTitle => 'Add a tool';
+
+  @override
+  String get toolDialogEditTitle => 'Edit tool';
+
+  @override
+  String get toolDialogName => 'Name';
+
+  @override
+  String get toolDialogNameHint => 'Task board';
+
+  @override
+  String get toolDialogUrl => 'URL';
+
+  @override
+  String get toolDialogUrlHint => 'http://localhost:4000';
+
+  @override
+  String get toolSuggestionsTitle => 'Running ports ShellX can see:';
+
+  @override
+  String toolSuggestion(int port, String process) {
+    return 'localhost:$port · $process';
+  }
+
+  @override
+  String get toolSuggestionsNone =>
+      'No running ports yet. Start your tool\'s server in a terminal or ask the agent to.';
+
+  @override
+  String get toolDialogPhone => 'Allow on phone';
+
+  @override
+  String get toolDialogPhoneNote =>
+      'Through the relay, end-to-end encrypted. The phone can reach this URL only.';
+
+  @override
+  String get toolDialogAdd => 'Add';
+
+  @override
+  String get toolDialogSave => 'Save';
+
+  @override
+  String get toolUrlNotHttp => 'The URL must start with http:// or https://';
+
+  @override
+  String get toolUrlUserinfo =>
+      'The URL can\'t contain a user name or password';
+
+  @override
+  String get toolUrlBackslash => 'The URL can\'t contain a backslash (\\)';
+
+  @override
+  String get toolUrlNoHost => 'The URL needs a host, like localhost:4000';
+
+  @override
+  String get toolUrlBadPort => 'The port must be a number from 1 to 65535';
+
+  @override
+  String get toolUrlTooLong => 'The URL is longer than 2048 characters';
+
+  @override
+  String toolLimitReached(int count) {
+    return 'This project already has $count tools.';
+  }
+
+  @override
+  String get toolBack => 'Back';
+
+  @override
+  String get toolReload => 'Reload';
+
+  @override
+  String get toolStop => 'Stop';
+
+  @override
+  String get toolMore => 'More';
+
+  @override
+  String get toolEditMenu => 'Edit tool…';
+
+  @override
+  String get toolCopyUrl => 'Copy URL';
+
+  @override
+  String get toolCloseDock => 'Close tools';
+
+  @override
+  String get toolClose => 'Close tool';
+
+  @override
+  String get toolMenuOpen => 'Open';
+
+  @override
+  String get toolMenuEdit => 'Edit…';
+
+  @override
+  String get toolMenuDelete => 'Delete…';
+
+  @override
+  String get toolDeleteAction => 'Delete';
+
+  @override
+  String get toolClearDataAction => 'Clear';
+
+  @override
+  String get toolClearDataNote => 'Your tools stay; you sign in to them again.';
+
+  @override
+  String get toolDataLabel => 'Tool data';
+
+  @override
+  String get toolNeedsWebView2 => 'Microsoft Edge WebView2 Runtime is needed.';
+
+  @override
+  String get toolReasonDns => 'the address was not found';
+
+  @override
+  String get toolReasonTimeout => 'it took too long';
+
+  @override
+  String get toolReasonCertificate => 'the certificate is not valid';
+
+  @override
+  String get toolReasonUnreachable => 'the network can\'t be reached';
+
+  @override
+  String get toolReasonOther => 'something went wrong';
+
+  @override
+  String toolDockLabel(String name) {
+    return 'Tools: $name';
+  }
+
+  @override
+  String get toolHandleLabel => 'Tools width';
+
+  @override
+  String get toolOk => 'OK';
 }

@@ -6089,6 +6089,462 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This file is not there any more.'**
   String get aiFileMissing;
+
+  /// No description provided for @toolsGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools'**
+  String get toolsGroup;
+
+  /// No description provided for @toolAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add tool'**
+  String get toolAdd;
+
+  /// No description provided for @toolOpenCommand.
+  ///
+  /// In en, this message translates to:
+  /// **'Open tool: {name}'**
+  String toolOpenCommand(String name);
+
+  /// No description provided for @toolLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'On this computer'**
+  String get toolLocal;
+
+  /// No description provided for @toolRemote.
+  ///
+  /// In en, this message translates to:
+  /// **'Not on this computer'**
+  String get toolRemote;
+
+  /// No description provided for @toolUnencrypted.
+  ///
+  /// In en, this message translates to:
+  /// **'not encrypted'**
+  String get toolUnencrypted;
+
+  /// No description provided for @toolAway.
+  ///
+  /// In en, this message translates to:
+  /// **'On {host}'**
+  String toolAway(String host);
+
+  /// No description provided for @toolBackToTool.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to tool'**
+  String get toolBackToTool;
+
+  /// No description provided for @toolPhoneOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone: on'**
+  String get toolPhoneOn;
+
+  /// No description provided for @toolPhoneOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone: off'**
+  String get toolPhoneOff;
+
+  /// No description provided for @toolPhoneOnlyLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Only http tools on this computer can open on a phone.'**
+  String get toolPhoneOnlyLocal;
+
+  /// No description provided for @toolAlsoPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'· on phone too'**
+  String get toolAlsoPhone;
+
+  /// No description provided for @toolExpand.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand'**
+  String get toolExpand;
+
+  /// No description provided for @toolCollapse.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get toolCollapse;
+
+  /// No description provided for @toolOpenInBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get toolOpenInBrowser;
+
+  /// No description provided for @toolRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing is running at {hostPort}. Start your tool\'s server and the page will appear.'**
+  String toolRefused(String hostPort);
+
+  /// No description provided for @toolLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The page couldn\'t load: {reason}'**
+  String toolLoadFailed(String reason);
+
+  /// No description provided for @toolAtsBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'macOS doesn\'t allow this http page inside ShellX.'**
+  String get toolAtsBlocked;
+
+  /// No description provided for @toolCrashed.
+  ///
+  /// In en, this message translates to:
+  /// **'The page stopped.'**
+  String get toolCrashed;
+
+  /// No description provided for @toolDownloadBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'This tool wants to download a file. Open it in your browser to download.'**
+  String get toolDownloadBlocked;
+
+  /// No description provided for @toolDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the tool \"{name}\"? Its page closes. Its web data stays.'**
+  String toolDeleteConfirm(String name);
+
+  /// No description provided for @toolClearData.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear tool data…'**
+  String get toolClearData;
+
+  /// No description provided for @toolClearDataConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign every tool out and clear its cookies and storage?'**
+  String get toolClearDataConfirm;
+
+  /// No description provided for @toolEmbedSetting.
+  ///
+  /// In en, this message translates to:
+  /// **'Show tools in ShellX'**
+  String get toolEmbedSetting;
+
+  /// No description provided for @toolEmbedAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get toolEmbedAuto;
+
+  /// No description provided for @toolEmbedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Always'**
+  String get toolEmbedOn;
+
+  /// No description provided for @toolEmbedOff.
+  ///
+  /// In en, this message translates to:
+  /// **'No, open in browser'**
+  String get toolEmbedOff;
+
+  /// No description provided for @toolCovered.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} — hidden while a menu is open'**
+  String toolCovered(String name);
+
+  /// No description provided for @toolTooMany.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed \"{name}\" to keep ShellX light. Click to load it again.'**
+  String toolTooMany(String name);
+
+  /// No description provided for @toolJsAlertTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} says'**
+  String toolJsAlertTitle(String name);
+
+  /// No description provided for @actionToggleTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Show or hide tools'**
+  String get actionToggleTools;
+
+  /// No description provided for @actionAddTool.
+  ///
+  /// In en, this message translates to:
+  /// **'Add tool…'**
+  String get actionAddTool;
+
+  /// No description provided for @toolDialogAddTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a tool'**
+  String get toolDialogAddTitle;
+
+  /// No description provided for @toolDialogEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit tool'**
+  String get toolDialogEditTitle;
+
+  /// No description provided for @toolDialogName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get toolDialogName;
+
+  /// No description provided for @toolDialogNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Task board'**
+  String get toolDialogNameHint;
+
+  /// No description provided for @toolDialogUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'URL'**
+  String get toolDialogUrl;
+
+  /// No description provided for @toolDialogUrlHint.
+  ///
+  /// In en, this message translates to:
+  /// **'http://localhost:4000'**
+  String get toolDialogUrlHint;
+
+  /// No description provided for @toolSuggestionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Running ports ShellX can see:'**
+  String get toolSuggestionsTitle;
+
+  /// No description provided for @toolSuggestion.
+  ///
+  /// In en, this message translates to:
+  /// **'localhost:{port} · {process}'**
+  String toolSuggestion(int port, String process);
+
+  /// No description provided for @toolSuggestionsNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No running ports yet. Start your tool\'s server in a terminal or ask the agent to.'**
+  String get toolSuggestionsNone;
+
+  /// No description provided for @toolDialogPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow on phone'**
+  String get toolDialogPhone;
+
+  /// No description provided for @toolDialogPhoneNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Through the relay, end-to-end encrypted. The phone can reach this URL only.'**
+  String get toolDialogPhoneNote;
+
+  /// No description provided for @toolDialogAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get toolDialogAdd;
+
+  /// No description provided for @toolDialogSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get toolDialogSave;
+
+  /// No description provided for @toolUrlNotHttp.
+  ///
+  /// In en, this message translates to:
+  /// **'The URL must start with http:// or https://'**
+  String get toolUrlNotHttp;
+
+  /// No description provided for @toolUrlUserinfo.
+  ///
+  /// In en, this message translates to:
+  /// **'The URL can\'t contain a user name or password'**
+  String get toolUrlUserinfo;
+
+  /// No description provided for @toolUrlBackslash.
+  ///
+  /// In en, this message translates to:
+  /// **'The URL can\'t contain a backslash (\\)'**
+  String get toolUrlBackslash;
+
+  /// No description provided for @toolUrlNoHost.
+  ///
+  /// In en, this message translates to:
+  /// **'The URL needs a host, like localhost:4000'**
+  String get toolUrlNoHost;
+
+  /// No description provided for @toolUrlBadPort.
+  ///
+  /// In en, this message translates to:
+  /// **'The port must be a number from 1 to 65535'**
+  String get toolUrlBadPort;
+
+  /// No description provided for @toolUrlTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'The URL is longer than 2048 characters'**
+  String get toolUrlTooLong;
+
+  /// No description provided for @toolLimitReached.
+  ///
+  /// In en, this message translates to:
+  /// **'This project already has {count} tools.'**
+  String toolLimitReached(int count);
+
+  /// No description provided for @toolBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get toolBack;
+
+  /// No description provided for @toolReload.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get toolReload;
+
+  /// No description provided for @toolStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get toolStop;
+
+  /// No description provided for @toolMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get toolMore;
+
+  /// No description provided for @toolEditMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit tool…'**
+  String get toolEditMenu;
+
+  /// No description provided for @toolCopyUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy URL'**
+  String get toolCopyUrl;
+
+  /// No description provided for @toolCloseDock.
+  ///
+  /// In en, this message translates to:
+  /// **'Close tools'**
+  String get toolCloseDock;
+
+  /// No description provided for @toolClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close tool'**
+  String get toolClose;
+
+  /// No description provided for @toolMenuOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get toolMenuOpen;
+
+  /// No description provided for @toolMenuEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit…'**
+  String get toolMenuEdit;
+
+  /// No description provided for @toolMenuDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete…'**
+  String get toolMenuDelete;
+
+  /// No description provided for @toolDeleteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get toolDeleteAction;
+
+  /// No description provided for @toolClearDataAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get toolClearDataAction;
+
+  /// No description provided for @toolClearDataNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Your tools stay; you sign in to them again.'**
+  String get toolClearDataNote;
+
+  /// No description provided for @toolDataLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool data'**
+  String get toolDataLabel;
+
+  /// No description provided for @toolNeedsWebView2.
+  ///
+  /// In en, this message translates to:
+  /// **'Microsoft Edge WebView2 Runtime is needed.'**
+  String get toolNeedsWebView2;
+
+  /// No description provided for @toolReasonDns.
+  ///
+  /// In en, this message translates to:
+  /// **'the address was not found'**
+  String get toolReasonDns;
+
+  /// No description provided for @toolReasonTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'it took too long'**
+  String get toolReasonTimeout;
+
+  /// No description provided for @toolReasonCertificate.
+  ///
+  /// In en, this message translates to:
+  /// **'the certificate is not valid'**
+  String get toolReasonCertificate;
+
+  /// No description provided for @toolReasonUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'the network can\'t be reached'**
+  String get toolReasonUnreachable;
+
+  /// No description provided for @toolReasonOther.
+  ///
+  /// In en, this message translates to:
+  /// **'something went wrong'**
+  String get toolReasonOther;
+
+  /// No description provided for @toolDockLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools: {name}'**
+  String toolDockLabel(String name);
+
+  /// No description provided for @toolHandleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools width'**
+  String get toolHandleLabel;
+
+  /// No description provided for @toolOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get toolOk;
 }
 
 class _AppLocalizationsDelegate
