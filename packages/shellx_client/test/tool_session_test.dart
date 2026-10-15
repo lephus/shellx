@@ -14,10 +14,17 @@ import 'support/tool_pipe.dart';
 const _id = 'k3f9za7q1m';
 
 /// The head of the answer to [lines] (one HTTP/1.1 request) on a raw socket
-/// to 127.0.0.1:[port], line by line as it was sent: the status line, then
-/// each header line (`name: value`).
-Future<List<String>> _rawHead(int port, List<String> lines) async {
-  final socket = await Socket.connect(InternetAddress.loopbackIPv4, port);
+/// to [address] (127.0.0.1 unless given) and [port], line by line as it was
+/// sent: the status line, then each header line (`name: value`).
+Future<List<String>> _rawHead(
+  int port,
+  List<String> lines, {
+  InternetAddress? address,
+}) async {
+  final socket = await Socket.connect(
+    address ?? InternetAddress.loopbackIPv4,
+    port,
+  );
   final bytes = <int>[];
   final head = Completer<void>();
   final subscription = socket.listen(
@@ -186,21 +193,16 @@ void main() {
   /// Whether the test opened a page (the policy's own test opens none).
   var opened = false;
 
-  /// The tool on [::1] only and the proxy reaching [::1] only, so the phone
-  /// can hold 127.0.0.1 on the tool's own port (one machine plays both).
-  Future<void> openSamePort({
-    Map<String, Future<void> Function(HttpRequest)> routes = const {},
+  /// Opens the page of [tool], which the test made: the desktop's proxy
+  /// reaching tools by [connectTestTool], the phone's session, a webview.
+  Future<void> openPage({
     List<Map<String, Object?>> Function(TestTool tool)? catalog,
     List<Duration> retry = kToolRetryDelays,
     Duration headTimeout = kToolHeadTimeout,
   }) async {
     opened = true;
-    tool = await TestTool.start(
-      routes: routes,
-      address: InternetAddress.loopbackIPv6,
-    );
-    proxy = ToolProxy(connect: ipv6Only, headTimeout: headTimeout);
-    proxy.serve(catalogOf(catalog?.call(tool) ?? [tool.entry(host: '[::1]')]));
+    proxy = ToolProxy(connect: connectTestTool, headTimeout: headTimeout);
+    proxy.serve(catalogOf(catalog?.call(tool) ?? [tool.entry()]));
     pipe = ToolPipe(proxy);
     session = ToolSession(
       tool: _id,
@@ -216,6 +218,21 @@ void main() {
     await until(() => events.whereType<ToolLoad>().isNotEmpty);
   }
 
+  /// Same-port mode (E2, R21) with one machine playing both sides: the
+  /// window lists a port free on 127.0.0.1 and [::1], which the phone holds
+  /// on both; the desktop's connect takes it to where the tool listens
+  /// ([TestTool.samePort], [connectTestTool]).
+  Future<void> openSamePort({
+    Map<String, Future<void> Function(HttpRequest)> routes = const {},
+    List<Map<String, Object?>> Function(TestTool tool)? catalog,
+    List<Duration> retry = kToolRetryDelays,
+    Duration headTimeout = kToolHeadTimeout,
+  }) async {
+    opened = true;
+    tool = await TestTool.samePort(routes: routes);
+    await openPage(catalog: catalog, retry: retry, headTimeout: headTimeout);
+  }
+
   Uri at(String path, {int? port}) =>
       Uri.parse('http://localhost:${port ?? session.servedPort}$path');
 
@@ -223,9 +240,7 @@ void main() {
   /// its gate cookie set; it cleans up after itself.
   Future<({ToolSession page, Webview view, _Desktop desktop})>
   openScripted() async {
-    final free = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
-    final port = free.port;
-    await free.close();
+    final port = await freeLoopbackPort();
     final desktop = _Desktop(port, _script);
     final page = ToolSession(
       tool: _id,
@@ -495,8 +510,10 @@ void main() {
       await webview.enter(events.whereType<ToolLoad>().single.url);
       final request = webview.request(at('/events'));
       await until(() => held.isNotEmpty);
+      // Listened to before the page is left: it may fail meanwhile.
+      final cut = expectLater(request, throwsA(anything));
       await session.close();
-      await expectLater(request, throwsA(anything));
+      await cut;
       expect(session.phase, ToolPhase.closed);
     });
   });
@@ -527,10 +544,7 @@ void main() {
       expect(failed.status, 502);
       expect(failed.text, contains('localhost:$port'));
       await until(() => session.phase == ToolPhase.refused);
-      tool = await TestTool.start(
-        address: InternetAddress.loopbackIPv6,
-        port: port,
-      );
+      tool = await TestTool.samePort(port: port);
       await until(() => session.phase == ToolPhase.ready);
       expect(events.last, isA<ToolReload>());
     });
@@ -539,15 +553,12 @@ void main() {
   test('the other tools of the workspace on their own ports (E4); one '
       'turned off answers 502 and is told', () async {
     late TestTool api;
-    await openSamePort(catalog: (tool) => [tool.entry(host: '[::1]')]);
-    api = await TestTool.start(address: InternetAddress.loopbackIPv6);
+    await openSamePort(catalog: (tool) => [tool.entry()]);
+    api = await TestTool.samePort();
     addTearDown(api.close);
     await session.close();
     proxy.serve(
-      catalogOf([
-        tool.entry(host: '[::1]'),
-        api.entry(id: 'api0000001', name: 'API', host: '[::1]'),
-      ]),
+      catalogOf([tool.entry(), api.entry(id: 'api0000001', name: 'API')]),
     );
     events.clear();
     session = ToolSession(
@@ -578,7 +589,7 @@ void main() {
       },
     );
     expect(preflight.status, 200);
-    proxy.serve(catalogOf([tool.entry(host: '[::1]')], off: ['api0000001']));
+    proxy.serve(catalogOf([tool.entry()], off: ['api0000001']));
     final off = await webview.request(at('/v1', port: api.port));
     expect(off.status, 502);
     await until(() => events.whereType<ToolSiblingOff>().isNotEmpty);
@@ -777,12 +788,12 @@ void main() {
 
     test('with another tool of the workspace served (E4): both ports, '
         'ascending', () async {
-      final api = await TestTool.start(address: InternetAddress.loopbackIPv6);
+      final api = await TestTool.samePort();
       addTearDown(api.close);
       await openSamePort(
         catalog: (tool) => [
-          tool.entry(host: '[::1]'),
-          api.entry(id: 'api0000001', name: 'API', host: '[::1]'),
+          tool.entry(),
+          api.entry(id: 'api0000001', name: 'API'),
         ],
       );
       expect(session.origins, hasLength(2));
@@ -1011,6 +1022,74 @@ void main() {
         [for (final end in desktop.ends) (end.id, end.code)],
         [for (final request in desktop.requests) (request.id, 'aborted')],
       );
+    });
+  });
+
+  /// Ruling I1: the webview tries `localhost` on ::1 first, so a port is
+  /// served only when this phone holds it on every loopback address it has
+  /// (an app holding [::1]:P would get the entry URL's nonce and every
+  /// request carrying the gate cookie, RF 5).
+  group('every loopback address, or not at all (I1)', () {
+    test('another app holds the tool\'s port on [::1]: the page goes to an '
+        'alias P′ held on 127.0.0.1 and [::1], and the phone keeps nothing '
+        'on P', () async {
+      opened = true;
+      tool = await TestTool.samePort();
+      final other = await ServerSocket.bind(
+        InternetAddress.loopbackIPv6,
+        tool.port,
+        v6Only: true,
+      );
+      addTearDown(other.close);
+      await openPage();
+      final alias = session.alias;
+      expect(alias, isNotNull, reason: 'P is not wholly the phone\'s');
+      expect(alias, isNot(tool.port));
+      for (final address in [
+        InternetAddress.loopbackIPv4,
+        InternetAddress.loopbackIPv6,
+      ]) {
+        final head = await _rawHead(alias!, [
+          'GET / HTTP/1.1',
+          'host: localhost:$alias',
+        ], address: address);
+        expect(head.first, startsWith('HTTP/1.1 403'), reason: address.address);
+      }
+      await expectLater(
+        Socket.connect(InternetAddress.loopbackIPv4, tool.port),
+        throwsA(isA<SocketException>()),
+      );
+      final page = await webview.enter(events.whereType<ToolLoad>().single.url);
+      expect(page.status, 200);
+      expect(tool.hits.single.headers['host'], ['localhost:${tool.port}']);
+    });
+
+    test('another app holds a sibling\'s port on [::1]: that tool is not '
+        'served — not in the origins, not in the policy (E4)', () async {
+      final api = await TestTool.samePort();
+      addTearDown(api.close);
+      final other = await ServerSocket.bind(
+        InternetAddress.loopbackIPv6,
+        api.port,
+        v6Only: true,
+      );
+      addTearDown(other.close);
+      await openSamePort(
+        catalog: (tool) => [
+          tool.entry(),
+          api.entry(id: 'api0000001', name: 'API'),
+        ],
+      );
+      expect(session.origins, {'http://localhost:${tool.port}'});
+      final page = await webview.enter(events.whereType<ToolLoad>().single.url);
+      expect(page.headers['content-security-policy'], [
+        toolContentSecurityPolicy([tool.port]),
+      ]);
+      await expectLater(
+        Socket.connect(InternetAddress.loopbackIPv4, api.port),
+        throwsA(isA<SocketException>()),
+      );
+      expect(api.hits, isEmpty);
     });
   });
 }

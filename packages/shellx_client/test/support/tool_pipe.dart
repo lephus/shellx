@@ -84,8 +84,11 @@ final class ToolPipe {
   }
 }
 
-/// Reaches [::1] only: the desktop's side of a test where the phone's server
-/// holds 127.0.0.1 on the same port (one machine plays both).
+/// Reaches [::1] only. The phone serves a port only when it holds it on
+/// 127.0.0.1 and [::1] (the webview tries `localhost` on ::1 first), so a
+/// tool listening on [::1] keeps the phone off its port: alias mode (E3).
+/// For same-port mode (E2) on one machine use `TestTool.samePort` with
+/// `connectTestTool` (`test_tool.dart`).
 Future<Socket> ipv6Only(int port) =>
     Socket.connect(InternetAddress.loopbackIPv6, port);
 
