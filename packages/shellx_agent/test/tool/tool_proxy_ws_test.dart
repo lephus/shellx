@@ -170,7 +170,18 @@ void main() {
   );
 
   test('a message over the limit closes with 1009, either way (E10)', () async {
-    await setUpWith(withProxy: ToolProxy(maxWsMessage: 1000));
+    final bigClosed = Completer<int?>();
+    await setUpWith(
+      withProxy: ToolProxy(maxWsMessage: 1000),
+      routes: {
+        // A tool that sends a message over the limit once it is open.
+        '/big': (request) async {
+          final ws = await WebSocketTransformer.upgrade(request);
+          ws.listen(null, onDone: () => bigClosed.complete(ws.closeCode));
+          ws.add(Uint8List(1001));
+        },
+      },
+    );
     final a = await open();
     say(a, Uint8List(1001));
     await phone.ended(a);
@@ -178,18 +189,12 @@ void main() {
     await until(() => tool.wsClosed.isNotEmpty);
     expect(tool.wsClosed.single.$1, 1009);
 
-    final b = await open();
-    // The tool echoes 900 bytes, then a message over the limit.
-    say(b, Uint8List(900));
-    await until(() => phone.wsPieces(b).isNotEmpty);
-    phone.send(
-      ToolWsMessage(id: b, data: Uint8List(600), text: false, fin: false),
-    );
-    phone.send(
-      ToolWsMessage(id: b, data: Uint8List(600), text: false, fin: true),
-    );
+    final b = phone.request(_id, target: '/big', ws: true);
+    expect((await phone.response(b)).status, 101);
     await phone.ended(b);
+    expect(phone.wsPieces(b), isEmpty, reason: 'never sent on, not a piece');
     expect(phone.endOf(b)?.wsCode, 1009);
+    expect(await bigClosed.future.timeout(const Duration(seconds: 10)), 1009);
   });
 
   test('more than 16 WebSockets: busy', () async {

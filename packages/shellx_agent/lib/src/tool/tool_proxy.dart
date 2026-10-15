@@ -387,6 +387,45 @@ sealed class _Stream {
   /// Drops what is held toward the tool.
   void release();
 
+  /// The tool's answer to the phone as HTTP, for a request and for a refused
+  /// upgrade alike: its head ([forwardResponseHead]; over the limits ends
+  /// `too_large`), then its body within the windows. [bodyless]: the head
+  /// ends the stream. The body's outlet, null when no body follows.
+  ToolBytesOut? _forward(HttpClientResponse response, {bool bodyless = false}) {
+    final head = forwardResponseHead(
+      flatHeaders(response.headers),
+      tool,
+      alias: request.alias,
+    );
+    if (head == null) {
+      _drop(response);
+      abort(ToolCode.tooLarge);
+      return null;
+    }
+    send(
+      ToolResponse(
+        id: id,
+        status: response.statusCode,
+        head: head,
+        end: bodyless,
+      ),
+    );
+    if (bodyless) {
+      _drop(response);
+      _finish();
+      return null;
+    }
+    return ToolBytesOut(
+      id: id,
+      source: response,
+      window: window,
+      pacer: proxy.pacer,
+      send: send,
+      onError: (_) => abort(ToolCode.aborted),
+      onDone: _finish,
+    )..start();
+  }
+
   /// The stream is over (both ways): forget it.
   void _finish() {
     ended = true;
@@ -458,37 +497,15 @@ final class _HttpStream extends _Stream {
       _drop(response);
       return;
     }
-    final head = forwardResponseHead(
-      flatHeaders(response.headers),
-      tool,
-      alias: request.alias,
-    );
-    if (head == null) {
-      _drop(response);
-      abort(ToolCode.tooLarge);
-      return;
-    }
     final status = response.statusCode;
-    final bodyless =
-        request.method.toUpperCase() == 'HEAD' ||
-        status == 204 ||
-        status == 304 ||
-        (status >= 100 && status < 200);
-    send(ToolResponse(id: id, status: status, head: head, end: bodyless));
-    if (bodyless) {
-      _drop(response);
-      _finish();
-      return;
-    }
-    _response = ToolBytesOut(
-      id: id,
-      source: response,
-      window: window,
-      pacer: proxy.pacer,
-      send: send,
-      onError: (_) => abort(ToolCode.aborted),
-      onDone: _finish,
-    )..start();
+    _response = _forward(
+      response,
+      bodyless:
+          request.method.toUpperCase() == 'HEAD' ||
+          status == 204 ||
+          status == 304 ||
+          (status >= 100 && status < 200),
+    );
   }
 
   @override
@@ -648,28 +665,7 @@ final class _WsStream extends _Stream {
 
   /// The tool did not upgrade: the phone gets its answer as plain HTTP.
   void _refused(HttpClientResponse response) {
-    final head = forwardResponseHead(
-      flatHeaders(response.headers),
-      tool,
-      alias: request.alias,
-    );
-    if (head == null) {
-      _drop(response);
-      abort(ToolCode.tooLarge);
-      return;
-    }
-    send(
-      ToolResponse(id: id, status: response.statusCode, head: head, end: false),
-    );
-    _refusal = ToolBytesOut(
-      id: id,
-      source: response,
-      window: window,
-      pacer: proxy.pacer,
-      send: send,
-      onError: (_) => abort(ToolCode.aborted),
-      onDone: _finish,
-    )..start();
+    _refusal = _forward(response);
   }
 
   /// The tool closed: the phone hears its code.
