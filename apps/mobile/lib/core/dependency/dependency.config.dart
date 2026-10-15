@@ -20,6 +20,7 @@ import 'package:shellx_core/shellx_core.dart' as _i145;
 import '../../features/ai/data/image_picker_source.dart' as _i152;
 import '../../features/ai/domain/ai_drafts.dart' as _i267;
 import '../../features/ai/domain/ai_image_source.dart' as _i264;
+import '../../features/ai/presentation/controllers/ai_dictation.dart' as _i293;
 import '../../features/ai/presentation/controllers/ai_session_controller.dart'
     as _i800;
 import '../../features/auth/presentation/controllers/login_controller.dart'
@@ -151,6 +152,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.factory<_i907.DeleteAccountController>(
       () => _i907.DeleteAccountController(gh<_i351.SessionHolder>()),
+    );
+    gh.factory<_i293.AiDictation>(
+      () => _i293.AiDictation(gh<_i498.SpeechInput>(), gh<_i351.AppSettings>()),
     );
     gh.factory<_i495.VoiceComposerController>(
       () => _i495.VoiceComposerController(

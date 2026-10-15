@@ -491,6 +491,8 @@ class AiQueueRow extends StatelessWidget {
 /// while images wait Send stays (no Stop in its place). [upload] shows them going out. [suggestions] are the
 /// computer's files for the `@` being typed: a tap hands one to [onSuggestion]. [note] is one line above the field:
 /// why the last images did not go, a voice problem.
+///
+/// V2-2b B14: with [onMic], the mic of the session's dictation, filled while it [listening].
 class AiComposer extends StatefulWidget {
   const AiComposer({
     super.key,
@@ -511,6 +513,8 @@ class AiComposer extends StatefulWidget {
     this.suggestions = const [],
     this.onSuggestion,
     this.note,
+    this.listening = false,
+    this.onMic,
   });
 
   final TextEditingController controller;
@@ -542,6 +546,12 @@ class AiComposer extends StatefulWidget {
 
   /// A line above the field; null: none.
   final String? note;
+
+  /// V2-2b B14: the dictation hears (the mic is filled; a tap stops it).
+  final bool listening;
+
+  /// The mic; null: none.
+  final VoidCallback? onMic;
 
   @override
   State<AiComposer> createState() => _AiComposerState();
@@ -663,6 +673,20 @@ class _AiComposerState extends State<AiComposer> with _Settling {
                 ),
               ),
               4.sizedWidth,
+              if (widget.onMic != null)
+                widget.listening
+                    ? IconButton.filled(
+                        key: const Key('ai.mic'),
+                        tooltip: s.voiceStopTooltip,
+                        icon: const Icon(Icons.mic),
+                        onPressed: widget.onMic,
+                      )
+                    : IconButton(
+                        key: const Key('ai.mic'),
+                        tooltip: s.aiMicTooltip,
+                        icon: Icon(Icons.mic_none, color: colors.secondaryText),
+                        onPressed: widget.onMic,
+                      ),
               if (widget.canForceStop)
                 IconButton(
                   key: const Key('ai.forceStop'),

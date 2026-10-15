@@ -3777,6 +3777,16 @@ class S {
       args: [],
     );
   }
+
+  /// `Speak a message`
+  String get aiMicTooltip {
+    return Intl.message(
+      'Speak a message',
+      name: 'aiMicTooltip',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

@@ -664,6 +664,7 @@
   "aiPickFailed": "Couldn't open the photos. Check ShellX's access in Settings.",
   "aiRemoveImage": "Remove image",
   "aiUploading": "Sending images…",
+  "aiMicTooltip": "Speak a message",
   "pickerTools": "Tools",
   "toolRowSub": "{workspace} · localhost:{port}",
   "@toolRowSub": {"placeholders": {"workspace": {"type": "String"}, "port": {"type": "int"}}},

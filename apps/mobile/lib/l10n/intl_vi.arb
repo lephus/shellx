@@ -426,6 +426,7 @@
   "aiPickFailed": "Không mở được ảnh. Hãy kiểm tra quyền của ShellX trong Cài đặt.",
   "aiRemoveImage": "Bỏ ảnh",
   "aiUploading": "Đang gửi ảnh…",
+  "aiMicTooltip": "Nói tin nhắn",
   "pickerTools": "Tool",
   "toolRowSub": "{workspace} · localhost:{port}",
   "toolsEmpty": "Chưa có tool nào bật cho điện thoại. Trên máy tính: thanh của tool › 📱 Điện thoại.",

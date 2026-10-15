@@ -134,6 +134,15 @@ void main() {
         expect(line(strings, 'NSCameraUsageDescription'), contains(words), reason: language);
       }
     });
+
+    test('V2-2b B15: the microphone and speech recognition prompts speak of AI sessions too', () {
+      for (final (language, words) in [('vi', 'phiên AI'), ('en', 'AI session')]) {
+        final strings = readFile('ios/Runner/$language.lproj/InfoPlist.strings');
+        expect(line(strings, 'NSMicrophoneUsageDescription'), contains(words), reason: language);
+        expect(line(strings, 'NSSpeechRecognitionUsageDescription'), contains(words), reason: language);
+      }
+      expect(readFile('ios/Runner/Info.plist'), contains('your terminal or an AI session'));
+    });
   });
 
   group('Android', () {

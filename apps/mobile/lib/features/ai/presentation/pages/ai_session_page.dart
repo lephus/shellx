@@ -7,6 +7,7 @@ import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_attachments.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_image_source.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
+import 'package:shellx_mobile/features/ai/presentation/controllers/ai_dictation.dart';
 import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_controller.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_attach_sheet.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_chooser.dart';
@@ -17,6 +18,9 @@ import 'package:shellx_mobile/features/ai/presentation/widgets/ai_history_sheet.
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_items.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_timeline.dart';
 import 'package:shellx_mobile/features/app/connection_banner.dart';
+import 'package:shellx_mobile/features/voice/domain/voice_locale.dart';
+import 'package:shellx_mobile/features/voice/presentation/controllers/voice_composer_controller.dart'
+    show VoiceIssue, VoicePhase;
 import 'package:shellx_mobile/shared/shared.dart';
 
 /// V2-2 §5.2: one AI session of a computer — the conversation, then the
@@ -65,6 +69,13 @@ class _AiSessionPageState extends State<AiSessionPage> {
   /// go, a picker that did not open); null: nothing.
   String? _note;
 
+  /// V2-2b B14: speaking into the field. Made at the first tap of the mic (a page that never hears needs no
+  /// recognizer), it lives as long as the page.
+  AiDictation? _dictation;
+
+  /// Stops the dictation once the session is not live (a lost channel, a session closed).
+  late final void Function() _stopWhenNotLive;
+
   /// V2-2b B16: the whole form of a question too big for the mirror is on its way.
   var _loadingForm = false;
 
@@ -77,15 +88,23 @@ class _AiSessionPageState extends State<AiSessionPage> {
     // The clock of the turn runs only while the app is on screen: `inactive` (the notification shade, a
     // dialog of the system) still shows it, `hidden` and `paused` do not.
     _lifecycle = AppLifecycleListener(
-      onStateChange: (state) => _controller.setForeground(
-        state == AppLifecycleState.resumed || state == AppLifecycleState.inactive,
-      ),
+      onStateChange: (state) {
+        _controller.setForeground(state == AppLifecycleState.resumed || state == AppLifecycleState.inactive);
+        // B14: the mic hears only while the app is in front (a call, the shade, the background stop it).
+        if (state != AppLifecycleState.resumed) _dictation?.stop();
+      },
     );
+    _stopWhenNotLive = effect(() {
+      _controller.version.value;
+      if (_controller.linkState != AiLinkState.live) untracked(() => _dictation?.stop());
+    });
   }
 
   @override
   void dispose() {
     _lifecycle.dispose();
+    _stopWhenNotLive();
+    _dictation?.dispose();
     _suggestTimer?.cancel();
     _text.removeListener(_lookForMention);
     _text.removeListener(_keepDraft);
@@ -124,6 +143,8 @@ class _AiSessionPageState extends State<AiSessionPage> {
   }
 
   Future<void> _send() async {
+    // B14: a message that goes takes the mic's words with it; what it would hear next is for a new one.
+    _dictation?.stop();
     final text = _text.text;
     final images = List.of(_images);
     // B13: the files still mentioned in the text go with it; a mention deleted from the text does not.
@@ -222,6 +243,20 @@ class _AiSessionPageState extends State<AiSessionPage> {
       if (!mounted || ask != _suggestAsks || AiMentions.tokenAt(_text.value)?.query != token.query) return;
       setState(() => _suggestions = paths.take(AiMentions.maxSuggestions).toList());
     });
+  }
+
+  /// V2-2b B14: the mic. Its first tap makes the dictation; "gửi" sends when the session can take the message and
+  /// there is one (text or images).
+  Future<void> _mic() async {
+    final language = Localizations.localeOf(context).languageCode;
+    final dictation = _dictation ??= getIt<AiDictation>()
+      ..attach(
+        text: _text,
+        canSend: () => _controller.canSend && (_text.text.trim().isNotEmpty || _images.isNotEmpty),
+        onSend: () => unawaited(_send()),
+      );
+    setState(() {}); // the mic follows the dictation's phase from now on
+    await dictation.toggle(language);
   }
 
   /// A suggestion picked: `@path ` in place of the token, remembered for the message.
@@ -524,11 +559,24 @@ class _AiSessionPageState extends State<AiSessionPage> {
           upload: _controller.upload.value,
           suggestions: _suggestions,
           onSuggestion: _pickSuggestion,
-          note: _note,
+          note: _note ?? _voiceIssue(S.of(context), _dictation),
+          listening: _dictation?.phase.value == VoicePhase.listening,
+          onMic: _mic,
         ),
       ],
     );
   }
+
+  /// What the composer says of a voice problem, in the terminal's words; null: none.
+  static String? _voiceIssue(S s, AiDictation? dictation) => switch (dictation?.issue.value) {
+    null => null,
+    VoiceIssue.noPermission => s.voiceNoPermission,
+    VoiceIssue.unsupported => s.voiceUnsupported,
+    VoiceIssue.localeUnavailable =>
+      dictation!.locale.value == VoiceLocale.vi ? s.voiceLocaleUnavailableVi : s.voiceLocaleUnavailableEn,
+    VoiceIssue.network => s.voiceNetwork,
+    VoiceIssue.failed => s.voiceFailed,
+  };
 
   /// The question the computer waits for, as the form to answer it: its card when the phone holds it,
   /// else one without a form, which is answered on the computer (it can still be declined). A form too big

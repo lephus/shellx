@@ -277,6 +277,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiJumpLatest": MessageLookupByLibrary.simpleMessage("Latest"),
     "aiLoadEarlier": MessageLookupByLibrary.simpleMessage("Load earlier"),
     "aiLoadingParts": m5,
+    "aiMicTooltip": MessageLookupByLibrary.simpleMessage("Speak a message"),
     "aiModeAcceptEdits": MessageLookupByLibrary.simpleMessage("Edit files"),
     "aiModeAuto": MessageLookupByLibrary.simpleMessage("Auto"),
     "aiModeBypass": MessageLookupByLibrary.simpleMessage("Bypass permissions"),
