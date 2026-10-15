@@ -168,14 +168,11 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       ..ensureVisualUpdate();
   }
 
-  /// V2-3 §8: a content area too narrow for the dock beside the panes shows
-  /// it only expanded, so a dock the window has just opened opens expanded
-  /// there (its bar, and Restore, are on screen only then). Decided on the
-  /// width last laid out: never during a layout.
-  void _expandIfNarrow() {
+  /// V2-3 §8: [ws]'s dock shows expanded but has no room beside the panes,
+  /// in the content area as last laid out (read outside any layout).
+  bool _onlyExpanded(String ws) {
     final box = _toolAreaKey.currentContext?.findRenderObject();
-    if (box is! RenderBox || !box.hasSize) return;
-    final ws = _tools.currentWorkspace();
+    if (box is! RenderBox || !box.hasSize) return false;
     final dock = ref.read(toolDockProvider).of(ws);
     final embedded = ref.read(toolsEmbeddedProvider);
     bool shows(bool zoom) => toolDockLayout(
@@ -183,7 +180,15 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       dock: dock.copyWith(zoom: zoom),
       embedded: embedded,
     ).showsDock;
-    if (shows(true) && !shows(false)) {
+    return shows(true) && !shows(false);
+  }
+
+  /// V2-3 §8: a content area too narrow for the dock beside the panes shows
+  /// it only expanded, so a dock the window has just opened opens expanded
+  /// there (its bar, and Restore, are on screen only then).
+  void _expandIfNarrow() {
+    final ws = _tools.currentWorkspace();
+    if (_onlyExpanded(ws)) {
       ref.read(toolDockProvider.notifier).setZoom(ws, true);
     }
   }
@@ -631,6 +636,14 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       // V2-3 D10, D20: ⌘⇧B, the AI header's tool button.
       ToggleToolsIntent: run<ToggleToolsIntent>((_) {
         closePanel();
+        // §8: an open dock the narrow width hides reads as closed: it shows,
+        // expanded, instead of closing.
+        final ws = _tools.currentWorkspace();
+        if (!ref.read(toolDockProvider).of(ws).zoom && _onlyExpanded(ws)) {
+          ref.read(toolDockProvider.notifier).setZoom(ws, true);
+          _focusDock();
+          return;
+        }
         unawaited(() async {
           final result = await _tools.toggle(context);
           if (!mounted) return;

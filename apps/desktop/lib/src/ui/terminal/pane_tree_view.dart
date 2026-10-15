@@ -32,6 +32,7 @@ import '../../terminal/terminal_search.dart' show SearchMatch;
 import '../../terminal/terminal_style.dart';
 import '../../config/config_controller.dart';
 import '../../terminal/terminal_tabs.dart';
+import '../../tools/tool_dock.dart' show toolDockProvider;
 import '../ai/ai_pane_view.dart';
 import '../theme/shellx_desktop_theme.dart';
 import '../window_focus.dart'
@@ -350,6 +351,10 @@ class _PaneTreeViewState extends ConsumerState<PaneTreeView> {
                         (tab.zoomedPaneId == null || tab.zoomedPaneId == id) &&
                         !ref.watch(
                           windowRouterProvider.select((w) => w.dialogOpen),
+                        ) &&
+                        // V2-3 R14: not under a workspace shown without a tab.
+                        ref.watch(
+                          toolDockProvider.select((d) => d.loose == null),
                         ),
                     remote: PaneInput.isRemote(pane),
                     // A11 final review: a click is the pointer's, not copy

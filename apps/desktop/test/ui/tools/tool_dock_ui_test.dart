@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/browser/browser_engine.dart';
 import 'package:shellx_desktop/src/config/keybind_trigger.dart';
+import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
 import 'package:shellx_desktop/src/terminal/pane_layout.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/tab_attention.dart';
@@ -15,6 +16,7 @@ import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
 import 'package:shellx_desktop/src/ui/tools/tool_area.dart';
 
 import '../../support/config_workspace.dart';
+import '../../support/fake_local_sessions.dart';
 import '../../support/tool_harness.dart';
 
 void main() {
@@ -347,7 +349,7 @@ void main() {
   testWidgets('a click on the row of the tab still selected under a '
       'workspace shown without a tab ends it: the panes show again; until '
       'then no pane or tab command reaches that tab (R14, D4)', (t) async {
-    await rig.pump(t);
+    await rig.pump(t, config: 'command = Lint = npm run lint\n');
     final tabs = rig.container.read(terminalTabsProvider.notifier);
     final first = rig.container.read(terminalTabsProvider).selectedId!;
     await tabs.openTab();
@@ -403,6 +405,22 @@ void main() {
     expect(find.text('Move tab to B'), findsNothing);
     expect(find.textContaining('Move pane to tab'), findsNothing);
     await closePalette();
+    // D35: a user command runs nothing out of sight; it answers as with no
+    // live terminal.
+    final covered = rig.container.read(terminalTabsProvider).selected!;
+    Actions.invoke(
+      t.element(find.byType(ToolArea)),
+      const RunUserCommandIntent('Lint'),
+    );
+    await t.pump();
+    await t.pump();
+    expect(
+      rig.container.read(terminalTabsProvider).notice,
+      isA<NoTerminalForCommandNotice>(),
+    );
+    final local =
+        rig.container.read(localSessionsProvider) as FakeLocalSessions;
+    expect(local.views[covered.focusedPaneId]!.writes, isEmpty);
     // The same tab again: no selection change for the dock to hear.
     await t.tap(find.byKey(ValueKey('tab.$under')));
     await t.pumpAndSettle();
@@ -468,6 +486,74 @@ void main() {
     expect(find.byKey(const ValueKey('tool.dockSlot')), findsNothing);
     expect(t.getRect(find.byKey(const ValueKey('tool.panesSlot'))).width, 579);
     expect(engine.disposed, isFalse, reason: 'D5: kept');
+    // D10: hidden by the width, the dock reads as closed: ⌘⇧B shows it
+    // again, expanded and with the keyboard; ⌘⇧B again closes it.
+    Future<void> toggleTools() async {
+      await t.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await t.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await t.sendKeyEvent(LogicalKeyboardKey.keyB);
+      await t.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await t.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await t.pumpAndSettle();
+    }
+
+    await toggleTools();
+    expect(find.byKey(const ValueKey('tool.dockSlot')), findsOneWidget);
+    expect(
+      t.getRect(find.byKey(const ValueKey('tool.dockSlot'))),
+      t.getRect(find.byType(ToolArea)),
+    );
+    final page = t.state<TerminalWorkspacePageState>(
+      find.byType(TerminalWorkspacePage),
+    );
+    expect(page.toolDockFocus.hasPrimaryFocus, isTrue);
+    await toggleTools();
+    expect(find.byKey(const ValueKey('tool.dockSlot')), findsNothing);
+    expect(
+      rig.container.read(toolDockProvider).of(kDefaultWorkspaceId).open,
+      isFalse,
+    );
+    expect(engine.loads, hasLength(1));
+    await disposeWorkspace(t, rig.container);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('a file dropped on the panel of a workspace shown without a '
+      'tab types nothing into the covered terminal, and the workspace stays '
+      'shown (R14)', (t) async {
+    await rig.pump(t);
+    final local =
+        rig.container.read(localSessionsProvider) as FakeLocalSessions;
+    final pane = rig.container.read(terminalTabsProvider).selected!;
+    final writes = local.views[pane.focusedPaneId]!.writes;
+    // As the platform reports a drop through desktop_drop's channel.
+    Future<void> drop(Offset at, String path) async {
+      const channel = MethodChannel('desktop_drop');
+      Future<void> send(String method, Object arguments) =>
+          t.binding.defaultBinaryMessenger.handlePlatformMessage(
+            channel.name,
+            channel.codec.encodeMethodCall(MethodCall(method, arguments)),
+            (_) {},
+          );
+      await send('entered', [at.dx, at.dy]);
+      await send('performOperation', [path]);
+      await t.pump();
+      await t.pump();
+    }
+
+    // A drop reaches the pane while it shows.
+    await drop(t.getCenter(find.byKey(const ValueKey('tool.panesSlot'))), '/a');
+    expect(writes.join(), '/a ');
+    final ws = rig.container
+        .read(sidebarWorkspacesProvider.notifier)
+        .createFor(name: 'B');
+    final tool = rig.add(ws, 'localhost:1');
+    await t.pumpAndSettle();
+    await openTool(t, tool.id);
+    expect(rig.container.read(toolDockProvider).loose, ws);
+    await drop(t.getCenter(find.byKey(const Key('tool.loose'))), '/b');
+    await t.pumpAndSettle();
+    expect(writes.join(), '/a ');
+    expect(rig.container.read(toolDockProvider).loose, ws);
     await disposeWorkspace(t, rig.container);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 

@@ -148,12 +148,16 @@ mixin WorkspaceConfig<W extends ConsumerStatefulWidget> on ConsumerState<W> {
         .firstOrNull;
     if (command == null) return;
     closePanel();
-    final ran = runUserCommand(
-      ref.read(terminalTabsProvider),
-      command,
-      sender: ref.read(pasteSenderProvider),
-      tabs: () => ref.read(terminalTabsProvider),
-    );
+    // V2-3 R14: the terminal under a workspace shown without a tab is out of
+    // sight: nothing runs there, as with no live terminal.
+    final ran = ref.read(toolDockProvider).loose != null
+        ? CommandRun.noTerminal
+        : runUserCommand(
+            ref.read(terminalTabsProvider),
+            command,
+            sender: ref.read(pasteSenderProvider),
+            tabs: () => ref.read(terminalTabsProvider),
+          );
     if (ran == CommandRun.noTerminal) {
       ref
           .read(terminalTabsProvider.notifier)
