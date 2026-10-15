@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:shellx_client/shellx_client.dart';
+import 'package:shellx_core/shellx_core.dart' show kToolReservedPrefix;
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/tools/domain/tool_navigation.dart';
 import 'package:shellx_mobile/features/tools/presentation/tool_web_engine.dart';
@@ -12,9 +13,31 @@ enum ToolNotice { noDownloads, siblingOff }
 /// After this long a page still loading says how many requests it made (V2-4 E20).
 const Duration kToolSlowAfter = Duration(seconds: 3);
 
+/// Makes a web view that reports to [callbacks] (the page does: it has the injection and asks before
+/// another site opens in the browser).
+typedef ToolEngineFactory = ToolWebEngine Function(ToolWebCallbacks callbacks);
+
+/// The page's `alert`, `confirm` and `prompt` as the app shows them, titled with the tool's name.
+final class ToolDialogs {
+  const ToolDialogs({required this.alert, required this.confirm, required this.prompt});
+
+  final Future<void> Function(String message) alert;
+  final Future<bool> Function(String message) confirm;
+  final Future<String?> Function(String message, String? value) prompt;
+}
+
+final _blank = Uri.parse('about:blank');
+
 /// V2-4 E13, E15, E16: one tool on the phone. It serves the tool while the page is open and the app
 /// is in the foreground, drives the web view (the entry URL, reloads), and says where the page is.
 /// Nothing it carries is ever logged.
+///
+/// NB1: every serve (the first, or a new one after a pause or a change) has a new secret, and cookies
+/// ignore ports, so a serve's entry page is shown in a web view of its own: the old one is sent to
+/// `about:blank` (its scripts and requests stop before the new entry sets the new cookie) and dropped.
+/// The history of a web view therefore only holds pages of the serve that owns the current secret,
+/// and neither the user's back nor the page's own `history.back()` can reach a port this session no
+/// longer serves.
 @injectable
 class ToolPageController extends Controller {
   ToolPageController(@factoryParam this.agentId, @factoryParam this.tool, SessionHolder session)
@@ -24,13 +47,20 @@ class ToolPageController extends Controller {
   final ToolInfo tool;
   final ShellxBackend? _backend;
   ToolPageSession? _page;
-  ToolWebEngine? _engine;
+  ToolEngineFactory? _newEngine;
+  ToolDialogs? _dialogs;
   StreamSubscription<void>? _changes;
   StreamSubscription<ToolPageEvent>? _events;
   final _notices = StreamController<(ToolNotice, int?)>.broadcast(sync: true);
   Timer? _slow;
   bool _foreground = true;
   bool _disposed = false;
+
+  /// NB1: how many web views were made; a web view is heard only while it is the latest.
+  int _generation = 0;
+
+  /// Whether anything was loaded in the current web view (the first entry load may use a blank one).
+  bool _used = false;
 
   /// C1: the main-frame address this page last let through, until its page has finished, failed or the
   /// app loaded something itself; how many times it was let through, and whether a page has started
@@ -39,11 +69,7 @@ class ToolPageController extends Controller {
   int _passes = 0;
   bool _startedSincePass = false;
 
-  /// I1: the port of the first load. Once a load came on another port (an E13 resume, E3) the web
-  /// view's history holds pages of two ports.
-  int? _historyPort;
-  bool _historySplit = false;
-
+  final Signal<ToolWebEngine?> _engine = signal(null);
   final Signal<ToolPhase> _phase = signal(ToolPhase.opening);
   final Signal<int?> _alias = signal(null);
   final Signal<int> _progress = signal(0);
@@ -52,6 +78,9 @@ class ToolPageController extends Controller {
   final Signal<int?> _slowRequests = signal(null);
 
   ShellxBackend? get backend => _backend;
+
+  /// The web view of the current serve (null before [start]); a new serve has a new one (NB1).
+  ReadonlySignal<ToolWebEngine?> get engine => _engine;
   ReadonlySignal<ToolPhase> get phase => _phase;
 
   /// The port this phone serves the tool on when it is not the tool's own (E3).
@@ -59,7 +88,7 @@ class ToolPageController extends Controller {
   ReadonlySignal<int> get progress => _progress;
   ReadonlySignal<bool> get loading => _loading;
 
-  /// Until the first page is in: "Đang tải qua đường hầm…".
+  /// Until the first page of the current web view is in: "Đang tải qua đường hầm…".
   ReadonlySignal<bool> get firstLoad => _firstLoad;
 
   /// The requests of a page loading for more than [kToolSlowAfter]; null otherwise.
@@ -68,9 +97,14 @@ class ToolPageController extends Controller {
   /// Toasts for the page: a download it cannot take, a tool of the workspace that is off.
   Stream<(ToolNotice, int?)> get notices => _notices.stream;
 
-  /// Serves the tool and shows it in [engine]; [texts] are the server's own answers.
-  void start(ToolWebEngine engine, ToolHostTexts texts) {
-    _engine = engine;
+  ToolWebEngine? get _current => _engine.peek();
+
+  /// Serves the tool and shows it in web views made by [newEngine]; [dialogs] are the page's own, [texts]
+  /// are the server's own answers.
+  void start(ToolEngineFactory newEngine, ToolDialogs dialogs, ToolHostTexts texts) {
+    _newEngine = newEngine;
+    _dialogs = dialogs;
+    _set(_engine, _makeEngine());
     final backend = _backend;
     if (backend == null) return _set(_phase, ToolPhase.closed);
     final MachineSession machine;
@@ -86,6 +120,44 @@ class ToolPageController extends Controller {
     _sync();
   }
 
+  ToolWebEngine _makeEngine() {
+    final generation = ++_generation;
+    _used = false;
+    return _newEngine!(_callbacks(generation));
+  }
+
+  /// What a web view reports to, for as long as it is the latest one made. A retired web view (NB1) is on
+  /// its way out: what it reports changes nothing, it shows no dialog, and it can only go blank.
+  ToolWebCallbacks _callbacks(int generation) {
+    bool latest() => generation == _generation;
+    return ToolWebCallbacks(
+      decide: (url, mainFrame) => latest() ? decide(url, mainFrame) : _retiredDecision(url),
+      onProgress: (percent) {
+        if (latest()) progressed(percent);
+      },
+      onPageStarted: () {
+        if (latest()) pageStarted();
+      },
+      onPageFinished: () {
+        if (latest()) pageFinished();
+      },
+      onLoadError: (mainFrame) {
+        if (latest()) loadFailed(mainFrame);
+      },
+      onCrashed: () {
+        if (latest()) crashed();
+      },
+      onFileChooser: () {
+        if (latest()) fileChooser();
+      },
+      alert: (message) => latest() ? _dialogs!.alert(message) : Future<void>.value(),
+      confirm: (message) => latest() ? _dialogs!.confirm(message) : Future<bool>.value(false),
+      prompt: (message, value) => latest() ? _dialogs!.prompt(message, value) : Future<String?>.value(),
+    );
+  }
+
+  static ToolNavigation _retiredDecision(String url) => url == 'about:blank' ? const ToolGo() : const ToolBlock();
+
   void _sync() {
     final page = _page;
     if (page == null) return;
@@ -97,17 +169,50 @@ class ToolPageController extends Controller {
     switch (event) {
       case ToolLoad(:final url):
         _forgetPassed();
-        _historyPort ??= url.port;
-        if (url.port != _historyPort) _historySplit = true;
-        unawaited(_engine?.load(url));
+        if (url.path == '${kToolReservedPrefix}enter') {
+          _showEntry(url);
+        } else {
+          _load(url); // "Về trang đầu": the start page of the serve the web view already shows
+        }
       case ToolReload():
         _forgetPassed();
-        unawaited(_engine?.reload());
+        unawaited(_current?.reload());
       case ToolSiblingOff(:final port):
         _notices.add((ToolNotice.siblingOff, port));
       case ToolDownloadBlocked():
         _notices.add((ToolNotice.noDownloads, null));
     }
+  }
+
+  void _load(Uri url) {
+    _used = true;
+    unawaited(_current?.load(url));
+  }
+
+  /// NB1: the entry URL of a serve (a first serve, or a new one, each with a new secret) is loaded in a
+  /// web view that has shown nothing before: the first one, if nothing was loaded in it yet, else a fresh
+  /// one, after the current one went blank and was dropped.
+  void _showEntry(Uri url) {
+    final old = _current;
+    if (old == null) return;
+    if (_used) {
+      unawaited(old.load(_blank));
+      _generation++;
+      old.dispose();
+      _set(_engine, _makeEngine());
+      _resetLoad();
+    }
+    _load(url);
+  }
+
+  /// A web view with no page yet: nothing is loading, and the first-load cover is up again.
+  void _resetLoad() {
+    _slow?.cancel();
+    _slow = null;
+    _set(_loading, false);
+    _set(_slowRequests, null);
+    _set(_progress, 0);
+    _set(_firstLoad, true);
   }
 
   /// [ToolWebCallbacks.decide]: E12 against what this phone serves now, and (on Android) C1: a main-frame
@@ -182,14 +287,14 @@ class ToolPageController extends Controller {
   /// E12: the web content process stopped: the page loads again.
   void crashed() {
     _forgetPassed();
-    unawaited(_engine?.reload());
+    unawaited(_current?.reload());
   }
 
   void fileChooser() => _notices.add((ToolNotice.noDownloads, null));
 
   Future<void> reload() async {
     _forgetPassed();
-    await _engine?.reload();
+    await _current?.reload();
   }
 
   /// "Về trang đầu".
@@ -197,12 +302,12 @@ class ToolPageController extends Controller {
 
   /// Android back: a page back in the web view first; false when there is none (the page closes).
   ///
-  /// I1: only while the page is shown and its history is of one port. Chromium's web view never hands
-  /// back or forward to the navigation policy, so going back through a history that holds pages of
-  /// an earlier port would load them from whatever listens there now, with the gate cookies of every
-  /// port (cookies ignore ports); and behind a cover each press would walk the hidden history.
+  /// I1: only while the page is shown. Chromium's web view never hands back or forward to the navigation
+  /// policy, so behind a cover each press would walk the hidden history; and NB2: only while the session
+  /// serves. Every serve has a web view of its own (NB1), so what is behind the back is never a page of
+  /// an earlier serve.
   Future<bool> back() async {
-    final engine = _engine;
+    final engine = _current;
     if (engine == null || !_backInPage || !await engine.canGoBack()) return false;
     await engine.goBack();
     return true;
@@ -213,11 +318,12 @@ class ToolPageController extends Controller {
   /// at ports nothing of ours serves (NB2).
   bool get _backInPage {
     final phase = _phase.peek();
-    return !_historySplit && _page?.servedPort != null && (phase == ToolPhase.ready || phase == ToolPhase.reconnecting);
+    return _page?.servedPort != null && (phase == ToolPhase.ready || phase == ToolPhase.reconnecting);
   }
 
-  /// E13: served only while the app is in the foreground (Apple TN2277); back in it, served again
-  /// (the port may change) and loaded.
+  /// E13: served only while the app is in the foreground (Apple TN2277), and the web view goes blank so
+  /// that the page stops with it; back in the foreground, served again (the port may change) and loaded in
+  /// a fresh web view (NB1).
   void setForeground(bool foreground) {
     if (_foreground == foreground || _disposed) return;
     _foreground = foreground;
@@ -227,17 +333,20 @@ class ToolPageController extends Controller {
       page.resume();
     } else {
       unawaited(page.pause());
+      if (_used) unawaited(_current?.load(_blank));
     }
   }
 
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _generation++;
     _slow?.cancel();
     unawaited(_changes?.cancel());
     unawaited(_events?.cancel());
     unawaited(_page?.close());
     unawaited(_notices.close());
+    _current?.dispose();
   }
 
   void _set<T>(Signal<T> s, T value) {

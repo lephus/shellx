@@ -57,6 +57,8 @@ abstract interface class ToolWebEngine {
   /// Asks the user, then opens [url] in the phone's browser (set by the page).
   set askExternal(Future<void> Function(Uri url) ask);
   Widget view();
+
+  /// The page shows this web view no more: a new serve has a web view of its own (NB1), or the page is left.
   void dispose();
 }
 
