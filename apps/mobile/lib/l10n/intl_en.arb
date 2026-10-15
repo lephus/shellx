@@ -633,5 +633,11 @@
   "@aiPlan": {"placeholders": {"done": {"type": "int"}, "total": {"type": "int"}}},
   "aiFromPhone": "from phone",
   "aiReattached": "Reconnected after ShellX restarted.",
-  "aiOpenList": "Open the session list"
+  "aiOpenList": "Open the session list",
+  "aiConfigTitle": "Mode and model",
+  "aiConfigMode": "Mode",
+  "aiConfigModel": "Model",
+  "aiConfigEffort": "Thinking",
+  "aiConfigMore": "More choices on the computer.",
+  "aiConfigOnComputer": "Choose this on the computer."
 }

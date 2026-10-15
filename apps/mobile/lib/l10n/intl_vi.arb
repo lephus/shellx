@@ -398,5 +398,11 @@
   "aiPlan": "Kế hoạch · {done}/{total}",
   "aiFromPhone": "từ điện thoại",
   "aiReattached": "Đã nối lại sau khi ShellX khởi động lại.",
-  "aiOpenList": "Mở danh sách phiên"
+  "aiOpenList": "Mở danh sách phiên",
+  "aiConfigTitle": "Chế độ và model",
+  "aiConfigMode": "Chế độ",
+  "aiConfigModel": "Model",
+  "aiConfigEffort": "Mức suy nghĩ",
+  "aiConfigMore": "Còn lựa chọn khác trên máy tính.",
+  "aiConfigOnComputer": "Chọn mục này trên máy tính."
 }

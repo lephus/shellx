@@ -572,6 +572,31 @@ class FakeAiMachine implements AiMachine {
     await _request();
     return openedSid;
   }
+
+  /// V2-2b B11: what [config] answers, and the choices set (session, option, value) and modes set.
+  AiConfigView configValue = const AiConfigView();
+  int configCalls = 0;
+  final List<(String, String, Object)> configSets = [];
+  final List<(String, String)> modeSets = [];
+
+  @override
+  Future<AiConfigView> config(String sid) async {
+    configCalls++;
+    await _request();
+    return configValue;
+  }
+
+  @override
+  Future<void> setConfig(String sid, String id, Object value) async {
+    configSets.add((sid, id, value));
+    await _request();
+  }
+
+  @override
+  Future<void> setMode(String sid, String modeId) async {
+    modeSets.add((sid, modeId));
+    await _request();
+  }
 }
 
 /// Scriptable [ShellxBackend]. [unpair] (whether or not [unpairError] is set) and an `untrusted`

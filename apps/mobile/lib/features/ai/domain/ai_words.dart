@@ -66,13 +66,20 @@ abstract final class AiWords {
   };
 
   /// V2-1 D11: Claude's known mode ids in the app's words; others as sent.
-  static String? mode(S s, MirrorHead head) => switch (head.modeId) {
+  static String? mode(S s, MirrorHead head) {
+    final id = head.modeId;
+    return id == null ? head.modeName : modeName(s, id, head.modeName);
+  }
+
+  /// V2-1 D11, V2-2b B11: mode [id] in the app's words when it is one of Claude's known ids, else [name] (the
+  /// agent's own).
+  static String? modeName(S s, String id, String? name) => switch (id) {
     'default' => s.aiModeDefault,
     'acceptEdits' => s.aiModeAcceptEdits,
     'plan' => s.aiModePlan,
     'auto' => s.aiModeAuto,
     'bypassPermissions' => s.aiModeBypass,
-    _ => head.modeName,
+    _ => name,
   };
 
   /// The last part of [path] ("src/main.ts" → "main.ts"), both separators.

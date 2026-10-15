@@ -6,6 +6,7 @@ import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
 import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_controller.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_chooser.dart';
+import 'package:shellx_mobile/features/ai/presentation/widgets/ai_config_sheet.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_dock.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_timeline.dart';
 import 'package:shellx_mobile/features/app/connection_banner.dart';
@@ -150,10 +151,17 @@ class _AiSessionPageState extends State<AiSessionPage> {
       // A closed session runs nothing: no state colour either.
       state: head == null || closed ? null : AiWords.headState(head),
       onBack: () => context.router.maybePop(),
+      // V2-2b B11: "Chế độ và model", while the session is live and the computer offers it.
+      onSubtitle: head != null && _controller.linkState == AiLinkState.live && _controller.can(AiFeature.config)
+          ? _openConfig
+          : null,
       // V2-2b B17, B20: the "⋯" menu, each entry only while the computer offers it (Tasks 15 and 25 add theirs).
       menu: [],
     );
   }
+
+  /// V2-2b B11.
+  void _openConfig() => unawaited(showAiConfigSheet(context, controller: _controller));
 
   String _subtitle(S s, MirrorHead head) {
     // A closed session is not "running", whatever it was doing when it closed: it says "closed" (the strip
@@ -168,6 +176,7 @@ class _AiSessionPageState extends State<AiSessionPage> {
       head.agentName,
       counting ? '$state · ${AiWords.clock(_controller.now.value.difference(turn.startedAt))}' : state,
       ?AiWords.mode(s, head),
+      ?head.modelName,
       if (head.usage case final u? when u.size > 0) s.aiContext(u.percent),
     ];
     return parts.join(' · ');
@@ -367,8 +376,6 @@ class _Header extends StatelessWidget {
     required this.subtitle,
     required this.state,
     required this.onBack,
-    // Task 11 passes it ("Chế độ và model").
-    // ignore: unused_element_parameter
     this.onSubtitle,
     this.menu = const [],
   });
