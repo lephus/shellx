@@ -5,6 +5,7 @@ resolution: workspace
 environment:
   sdk: ^3.11.0
 dependencies:
+  cryptography: ^2.9.0
   meta: ^1.16.0
   shellx_acp: any
   shellx_ai: any
