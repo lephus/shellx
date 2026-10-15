@@ -224,13 +224,15 @@ final class E2eWorld {
   ///
   /// By default sessions run `/bin/sh` without hooks or notifications;
   /// [shell], [shellEnvironment], [shellIntegration] and [notifications]
-  /// (built from the agent's signed-in API) change that.
+  /// (built from the agent's signed-in API) change that. With [tools] the
+  /// agent serves personal web tools to phones (V2-4); the caller owns it.
   static Future<E2eWorld> create(
     Uri baseUri, {
     ShellResolver? shell,
     Map<String, String>? shellEnvironment,
     ShellIntegration? shellIntegration,
     AgentNotifications Function(ShellxApi agentApi)? notifications,
+    ToolEndpoint? tools,
   }) async {
     final world = E2eWorld._();
     try {
@@ -240,6 +242,7 @@ final class E2eWorld {
         shellEnvironment: shellEnvironment,
         shellIntegration: shellIntegration,
         notifications: notifications,
+        tools: tools,
       );
     } catch (_) {
       await world.dispose();
@@ -254,6 +257,7 @@ final class E2eWorld {
     Map<String, String>? shellEnvironment,
     ShellIntegration? shellIntegration,
     AgentNotifications Function(ShellxApi agentApi)? notifications,
+    ToolEndpoint? tools,
   }) async {
     final random = Random.secure();
     final tag = List.generate(
@@ -300,6 +304,7 @@ final class E2eWorld {
       shells: sessions,
       desktop: desktop,
       desktopSharing: () => sharing.enabled,
+      tools: tools,
     );
     _sessionsCreated = true;
     agentConnector = DroppableConnector();
