@@ -35,10 +35,35 @@ if (-not $iscc) {
 }
 if (-not $iscc) { throw 'Inno Setup 6 ISCC.exe not found after installing it' }
 
+if ($AppIcon -and -not (Test-Path $AppIcon)) { throw "AppIcon $AppIcon not found" }
 $defines = @("/DAppVersion=$Version", "/DSourceDir=$SourceDir", "/DOutputDir=$OutputDir")
 if ($AppIcon) { $defines += "/DAppIcon=$AppIcon" }
-& $iscc.FullName @defines (Join-Path $PSScriptRoot 'shellx.iss')
-if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
+
+# ISCC prints progress on stdout and its "Error on line N in <file>: <message>" on stderr; both are
+# merged and echoed so the error sits right under the last status line in the log, and the error
+# line is repeated in the thrown message (the job's annotation). With SetupIconFile set, a failed
+# EndUpdateResource is fatal (without it ISCC ignores the failure): on a runner that is usually an
+# antivirus scan of the freshly written Setup.e32.tmp / setup .exe, so a resource update error is
+# retried a few times; any other error fails at once.
+$attempt = 0
+while ($true) {
+  $attempt++
+  $saved = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'  # stderr lines are output here, not terminating errors
+  $log = & $iscc.FullName @defines (Join-Path $PSScriptRoot 'shellx.iss') 2>&1 | ForEach-Object { "$_" }
+  $code = $LASTEXITCODE
+  $ErrorActionPreference = $saved
+  $log | ForEach-Object { Write-Host $_ }
+  if ($code -eq 0) { break }
+  $errorLine = ($log | Where-Object { $_ -match '^Error' } | Select-Object -Last 1)
+  if (-not $errorLine) { $errorLine = '(ISCC printed no error line)' }
+  if ($attempt -lt 3 -and $errorLine -match 'Resource update error') {
+    Write-Host "ISCC attempt $attempt failed with a resource update error; retrying in 10 s"
+    Start-Sleep -Seconds 10
+    continue
+  }
+  throw "ISCC failed with exit code ${code}: $errorLine"
+}
 
 $setup = Join-Path $OutputDir "ShellX-Setup-$Version.exe"
 if (-not (Test-Path $setup)) { throw "ISCC did not produce $setup" }

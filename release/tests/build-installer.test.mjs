@@ -19,3 +19,10 @@ test('the DLL check runs before ISCC is invoked', () => {
   const isccIndex = script.indexOf('& $iscc.FullName');
   assert.ok(dllCheckIndex > -1 && isccIndex > -1 && dllCheckIndex < isccIndex);
 });
+
+test('a failed compile names ISCC\'s own error line, and only resource update errors are retried', () => {
+  assert.match(script, /2>&1/);
+  assert.match(script, /Where-Object \{ \$_ -match '\^Error' \}/);
+  assert.match(script, /throw "ISCC failed with exit code \$\{code\}: \$errorLine"/);
+  assert.match(script, /\$attempt -lt 3 -and \$errorLine -match 'Resource update error'/);
+});
