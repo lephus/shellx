@@ -70,10 +70,21 @@ Future<int> _freeLoopbackPort() async {
   }
 }
 
-/// V2-4 §8 and success criterion 7 over a real relay (run with
+/// V2-4 §8 and success criteria 5 and 7 over a real relay (run with
 /// `SHELLX_E2E_RELAY=http://127.0.0.1:8787` while `npm run dev` runs in
-/// `relay/`): the relay's 500 frames a second and its frame size are real
-/// here.
+/// `relay/`): 50 MB arrive whole (RF 3) and the channel, a terminal, a
+/// WebSocket and the page all go on (criterion 7); turned off is off
+/// (criterion 5). The relay's 500 frames a second and its frame size are real
+/// here, and it closes a connection that goes over them; but this test cannot
+/// pin RF 2, the frame rate: one stream moves about 3 MB/s through the
+/// channel (about 60 frames a second), far under 500 and under both limiters,
+/// so it would pass without them. RF 2 is pinned where it can fail: the
+/// pacer (Task 3, shellx_core/test/protocol/tool_flow_test.dart), the 50 MB
+/// proxy test (Task 5, shellx_agent/test/tool/tool_proxy_http_test.dart: at
+/// most 150 frames and 8 MiB a second), the phone's outbox (Task 8,
+/// shellx_client/test/tools_test.dart: at most 100 frames a second) and, from
+/// a page down to the wire, the last test of
+/// shellx_client/test/tools_e2e_test.dart.
 void main() {
   test('50 MB through the tunnel: whole, the channel and a terminal stay; '
       'a WebSocket echoes; turned off, the page says so', () async {

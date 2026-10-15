@@ -1,6 +1,7 @@
 @Timeout(Duration(minutes: 2))
 library;
 
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -15,7 +16,7 @@ import 'support/fake_relay.dart';
 import 'support/harness.dart'
     show TestKeys, TabRecorder, agentId, phoneId, phonePairingId, userId;
 import 'support/test_tool.dart';
-import 'support/tool_pipe.dart' show Webview, until;
+import 'support/tool_pipe.dart' show Page, Webview, until;
 
 const _id = 'k3f9za7q1m';
 
@@ -62,6 +63,35 @@ final class _Wire {
       );
 }
 
+/// The proxy as the session router sees it, noting when each tool message of
+/// the phone reaches the computer and how big it is: the phone's messages as
+/// messages, whatever frames carried them.
+final class _CountedTools implements ToolEndpoint {
+  _CountedTools(this._inner);
+
+  final ToolEndpoint _inner;
+  final arrivals = <(Duration, int)>[];
+  final _clock = Stopwatch()..start();
+
+  @override
+  Stream<OutboundMessage> get outbound => _inner.outbound;
+
+  @override
+  bool get serving => _inner.serving;
+
+  @override
+  void handle(String mobileId, ToolMessage message) {
+    arrivals.add((_clock.elapsed, encodeBatch([message]).length));
+    _inner.handle(mobileId, message);
+  }
+
+  @override
+  void phoneGone(String mobileId) => _inner.phoneGone(mobileId);
+
+  @override
+  void allPhonesGone() => _inner.allPhonesGone();
+}
+
 /// The largest of [frames], in bytes.
 int _largest(Iterable<(Duration, int)> frames) =>
     frames.fold(0, (largest, f) => max(largest, f.$2));
@@ -99,6 +129,9 @@ final class _World {
 
   final relay = FakeRelay();
   late final ToolProxy proxy;
+
+  /// [proxy] as the agent's router has it: counts the phone's tool messages.
+  late final _CountedTools counted;
   late final FakePtyFactory ptys;
   late final AgentService agent;
   late final ClientService phone;
@@ -134,6 +167,7 @@ final class _World {
     w.ptys = FakePtyFactory();
     final ids = sessionIdAllocator(Random(7));
     w.proxy = ToolProxy(connect: connectTestTool);
+    w.counted = _CountedTools(w.proxy);
     final router = SessionRouter(
       shells: SessionManager(
         ptyFactory: w.ptys,
@@ -144,7 +178,7 @@ final class _World {
       ),
       desktop: DesktopSessionManager(nextId: ids),
       desktopSharing: () => true,
-      tools: w.proxy,
+      tools: w.counted,
     );
     w.agent = AgentService(
       relay: RelayConnection(
@@ -277,9 +311,9 @@ void main() {
     await session.close();
   });
 
-  test('8 MB through the tunnel: whole, no frame over 64 KiB, the computer '
-      'well under the relay\'s 500 frames a second, and a terminal still '
-      'answers (RF 1, RF 2, criterion 7)', () async {
+  test('8 MB through the tunnel: whole (RF 3), no frame over 64 KiB (RF 1) '
+      'and a terminal still answers while it runs (criterion 7); the frame '
+      'rates only record headroom', () async {
     const size = 8 * 1000 * 1000;
     final body = Uint8List.fromList(
       List.generate(size, (i) => (i * 131 + (i >> 9)) & 0xFF),
@@ -347,9 +381,19 @@ void main() {
     expect(page.body.length, size);
     expect(_firstDifference(page.body, body), -1);
 
-    // Frames, as the relay would see them: none over 64 KiB, and the computer
-    // (and the phone) well under 500 a second (the proxy keeps to 150, the
-    // phone to 100, plus what the terminal needs).
+    // Frames, as the relay would see them. RF 1 is pinned here: no frame over
+    // 64 KiB, measured at the socket. The rates only record headroom, they
+    // cannot catch a regression of a limiter: one stream moves about 3 MB/s
+    // through this channel (about 60 frames a second), under the desktop's
+    // 150 frames and 8 MiB a second and the phone's 100 frames a second, and
+    // small messages go out at most once in 16 ms on both sides, so no
+    // workload here comes near 250 a second, with the limiters or without.
+    // RF 2 is pinned where it can fail: the pacer (Task 3,
+    // shellx_core/test/protocol/tool_flow_test.dart), the 50 MB proxy test
+    // (Task 5, shellx_agent/test/tool/tool_proxy_http_test.dart: at most 150
+    // frames and 8 MiB a second), the phone's outbox (Task 8,
+    // shellx_client/test/tools_test.dart: at most 100 frames a second) and,
+    // from a page down to the wire, the last test of this file.
     final sent = w.agentWire.frames.skip(agentStart).toList();
     final sentByPhone = w.phoneWire.frames.skip(phoneStart).toList();
     // The tap saw the download: 8 MB cannot go in fewer.
@@ -360,13 +404,118 @@ void main() {
     expect(
       _busiestSecond(sent),
       lessThan(250),
-      reason: 'the relay closes the computer at 500 a second',
+      reason: 'headroom: the relay closes the computer at 500 a second',
     );
     expect(
       _busiestSecond(sentByPhone),
       lessThan(250),
-      reason: 'the relay closes the phone at 500 a second',
+      reason: 'headroom: the relay closes the phone at 500 a second',
     );
+    await session.close();
+  });
+
+  test('a page of 120 small requests: every answer right, none refused, and '
+      'the phone puts no more than 110 frames in any second on the wire '
+      '(E8, E10, RF 2)', () async {
+    const requests = 120; // E10: 120 stream opens at once, then 60 a second
+    const parallel = 24; // under the phone's 32 HTTP streams (E10)
+    final tool = await TestTool.samePort(
+      routes: {
+        for (var i = 0; i < requests; i++)
+          '/api/$i': (request) async {
+            final sent = await utf8.decodeStream(request);
+            request.response
+              ..headers.contentType = ContentType.text
+              ..write('${request.uri.path}:$sent');
+            await request.response.close();
+          },
+      },
+    );
+    final w = await _World.start(keys);
+    final webview = Webview();
+    addTearDown(() async {
+      webview.close();
+      await w.stop();
+      await tool.close();
+    });
+    w.proxy.serve(catalogOf([tool.entry()]));
+    final session = ToolSession(
+      tool: _id,
+      port: tool.port,
+      path: '/',
+      link: w.machine.tools,
+    );
+    addTearDown(session.close);
+    final events = <ToolPageEvent>[];
+    session.events.listen(events.add);
+    session.start();
+    await until(() => events.whereType<ToolLoad>().isNotEmpty);
+    // Same-port mode (E2): the tool's own port, no alias.
+    final served = session.servedPort!;
+    expect(served, tool.port);
+    expect(session.alias, isNull);
+    await webview.enter(events.whereType<ToolLoad>().single.url);
+
+    // The page calls its API [requests] times, [parallel] at a time, each
+    // with a small JSON body: the phone sends three tool messages for each
+    // (tool.req, the body, its end) as fast as the computer answers.
+    final phoneStart = w.phoneWire.frames.length;
+    final messagesStart = w.counted.arrivals.length;
+    final answers = <int, Page>{};
+    var next = 0;
+    Future<void> client() async {
+      while (next < requests) {
+        final i = next++;
+        final body = utf8.encode('{"n":$i}');
+        answers[i] = await webview.request(
+          Uri.parse('http://localhost:$served/api/$i'),
+          method: 'POST',
+          headers: {
+            'origin': 'http://localhost:$served',
+            'content-type': 'application/json',
+            'content-length': '${body.length}',
+          },
+          body: body,
+        );
+      }
+    }
+
+    await Future.wait([for (var c = 0; c < parallel; c++) client()]);
+
+    // Every answer is its own: the right status, the path and the body it
+    // sent (one stream is never taken for another), none refused as busy.
+    final wrong = [
+      for (var i = 0; i < requests; i++)
+        if (answers[i]?.status != 200 || answers[i]?.text != '/api/$i:{"n":$i}')
+          '#$i: ${answers[i]?.status} ${answers[i]?.text}',
+    ];
+    expect(wrong, isEmpty);
+    expect(
+      tool.hits.where((h) => h.uri.path.startsWith('/api/')).length,
+      requests,
+    );
+
+    // The bound can bind: in one second the page made the phone send more
+    // tool messages (counted as they reach the computer) than the relay's
+    // budget lets it send frames. The frames that carried them stay within 100
+    // a second and a burst of 10 (R10): the outbox collects messages for
+    // 16 ms and sends the lot as one frame. This pins the outbox as a whole,
+    // from a page to the wire: it fails when the outbox is bypassed, not when
+    // only its 16 ms collection or only its frame budget goes (the other
+    // still holds the rate here); Task 8's tools_test.dart pins each.
+    final messages = w.counted.arrivals.skip(messagesStart).toList();
+    final frames = w.phoneWire.frames.skip(phoneStart).toList();
+    expect(
+      _busiestSecond(messages),
+      greaterThan(110),
+      reason: 'the page was too slow for the bound to bind',
+    );
+    expect(
+      _busiestSecond(frames),
+      lessThanOrEqualTo(110),
+      reason: 'the phone sent more frames in one second than its budget',
+    );
+    expect(_largest(frames), lessThanOrEqualTo(kMaxFrameBytes));
     await session.close();
   });
 }
