@@ -175,6 +175,8 @@ void main() {
       ),
       'new window',
     );
+    await t.pump(const Duration(milliseconds: 500));
+    await Future<void>.delayed(const Duration(milliseconds: 500));
     // The new window never loaded in the tool.
     expect(urlIs('/other'), isFalse);
   });
@@ -311,5 +313,13 @@ void main() {
     await t.pump(const Duration(milliseconds: 100));
     expect(events.whereType<LoadStarted>(), isEmpty, reason: 'no reload');
     expect(events.whereType<LoadFailed>(), isEmpty);
+    // Still live, still on /: only such an engine answers with the title.
+    events.clear();
+    await engine.reload();
+    await until(
+      t,
+      () => events.any((e) => e is TitleChanged && e.title == 'Tool title'),
+      'page still live',
+    );
   });
 }
