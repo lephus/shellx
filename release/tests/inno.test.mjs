@@ -126,3 +126,13 @@ test('uninstall stops shellx-mux first, then the UI without /T (A5b D21)', () =>
   assert.match(iss, /Parameters: "\/F \/T \/IM ""shellx-mux\.exe"""[^\n]*\n[^\n]*Parameters: "\/F \/IM ""\{#AppExeName\}"""/);
   assert.match(iss, /\[UninstallDelete\][^[]*Name: "\{localappdata\}\\ShellX\\restore"/);
 });
+
+test('no line starts with "[" unless it is a whole section tag (ISCC: "Invalid section tag")', () => {
+  // ISCC reads every line whose first non-blank character is "[" as a section tag, even inside a
+  // [Code] comment, and aborts unless the first "]" ends the line. A wrapped comment that put
+  // "[UninstallDelete])" at the start of a line broke the release once.
+  const bad = iss.split(/\r?\n/)
+    .map((line, i) => ({ n: i + 1, text: line.trim() }))
+    .filter(({ text }) => text.startsWith('[') && !/^\[[^\]]+\]$/.test(text));
+  assert.deepEqual(bad, []);
+});

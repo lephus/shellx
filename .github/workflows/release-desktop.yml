@@ -311,11 +311,6 @@ jobs:
       - name: Build installer with Inno Setup
         run: |
           $out = Join-Path $env:GITHUB_WORKSPACE 'dist'
-          # Defender scanning the setup .exe while ISCC writes its icon resources makes
-          # EndUpdateResource fail, which is fatal once SetupIconFile is set (ISCC's own advice is
-          # to exclude the output folder). Best effort: the runner is a throwaway VM.
-          New-Item -ItemType Directory -Force -Path $out | Out-Null
-          try { Add-MpPreference -ExclusionPath $out -ErrorAction Stop } catch { Write-Host "Defender exclusion not set: $_" }
           $icon = Join-Path $env:GITHUB_WORKSPACE 'apps\desktop\windows\runner\resources\app_icon.ico'
           ./release/windows/build-installer.ps1 -Version $env:VERSION -SourceDir $env:RELEASE_DIR -OutputDir $out -AppIcon $icon
           "SETUP_EXE=$(Join-Path $out "ShellX-Setup-$env:VERSION.exe")" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8

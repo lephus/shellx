@@ -133,9 +133,9 @@ var
   ResultCode: Integer;
 begin
   { A5a I1: ask a running agent to quit first. It watches quit.signal in its single-instance
-    folder (path_provider's application-support directory, %APPDATA%\pro.shellx\ShellX, as in
-    [UninstallDelete]) and quits as for the Windows Restart Manager: it saves its sessions as a
-    clean exit, so the next launch restores them without the "closed unexpectedly" strip. }
+    folder (path_provider's application-support directory, %APPDATA%\pro.shellx\ShellX, as
+    in [UninstallDelete]) and quits as for the Windows Restart Manager: it saves its sessions as
+    a clean exit, so the next launch restores them without the "closed unexpectedly" strip. }
   if ShellXRunning() then
   begin
     if SaveStringToFile(ExpandConstant('{userappdata}\pro.shellx\ShellX\quit.signal'), 'update', False) then
