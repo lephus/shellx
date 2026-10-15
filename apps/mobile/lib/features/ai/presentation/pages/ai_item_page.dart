@@ -196,7 +196,7 @@ class _AiItemPageState extends State<AiItemPage> {
     final colors = context.colors;
     return switch (row) {
       _Line(:final text) => Text(
-        text.length > kShownLineChars ? '${text.substring(0, kShownLineChars)}…' : text,
+        clipLine(text),
         style: TextStyle(fontFamily: FontFamily.jetBrainsMono, fontSize: 12, height: 1.35, color: colors.primaryText),
       ),
       _Diff(:final line) => AiDiffLineRow(line: line),

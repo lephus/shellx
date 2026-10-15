@@ -272,21 +272,45 @@ class AiSessionController extends Controller {
     }
   }
 
-  /// V2-2b B16: the forms of questions too big for the mirror, loaded in full by their id.
-  final Map<int, ElicitationRequest> _forms = {};
+  /// V2-2b B16: the whole form of the question the computer waits for, when its card was too big for the
+  /// mirror and [loadForm] brought it: the question (its id and its card) and the form. A form is its
+  /// question's alone: one question waits at a time, so this is dropped as soon as the computer waits for
+  /// anything else, and when the page follows its session to another sid (ask ids start again with each run
+  /// of ShellX, so a new question there may carry the id of an old one).
+  ({int ask, int item, ElicitationRequest request})? _form;
 
-  /// The form of question [ask] once [loadForm] brought it; null before.
-  ElicitationRequest? formOf(int ask) => _forms[ask];
+  /// Whether the computer waits for question [ask], whose card is [item].
+  bool _waitsFor(int ask, int item) {
+    final waiting = head?.ask;
+    return waiting != null && waiting.id == ask && waiting.item == item;
+  }
+
+  /// The form of question [ask] once [loadForm] brought it, while the computer waits for that very question;
+  /// null before, and after.
+  ElicitationRequest? formOf(int ask) {
+    final form = _form;
+    return form != null && form.ask == ask && _waitsFor(form.ask, form.item) ? form.request : null;
+  }
 
   /// V2-2b B16: the whole form of question [ask] (card [index]), so that it is answered here like any other
   /// (with one tap; the computer checks the values with the form). Null when loaded, else the failure code.
+  /// Also null, and nothing kept, when the answer comes to a page that follows another session by then or to
+  /// a question the computer no longer waits for: it is not for what the page shows.
   Future<String?> loadForm(int ask, int index) async {
+    final sid = _sid;
     final full = await loadFull(index, (_, _) {});
+    if (_sid != sid || !_waitsFor(ask, index)) return null;
     final request = full.view?.request;
     if (request == null) return full.code ?? 'refused';
-    _forms[ask] = request;
+    _form = (ask: ask, item: index, request: request);
     _set(_version, _version.peek() + 1);
     return null;
+  }
+
+  /// A loaded form goes with its question.
+  void _dropFormUnlessWaiting() {
+    final form = _form;
+    if (form != null && !_waitsFor(form.ask, form.item)) _form = null;
   }
 
   void dispose() {
@@ -403,6 +427,7 @@ class AiSessionController extends Controller {
       _follow(machine.ai.attach(_sid));
     }
     _remember();
+    _dropFormUnlessWaiting();
     _syncTick();
     if (_over) {
       // A session that is over takes its draft with it (the drafts are bounded, but need not hold this one).
@@ -452,6 +477,7 @@ class AiSessionController extends Controller {
     _changes = null;
     old?.detach(); // closed already: only let go
     _sid = newSid;
+    _form = null; // the old session's: nothing there is a question here, whatever id it carries
     _findAgainTimer?.cancel();
     _findAgainTimer = null;
     _findAgainOver = false;

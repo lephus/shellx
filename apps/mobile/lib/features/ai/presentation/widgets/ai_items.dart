@@ -134,13 +134,10 @@ class _AgentText extends StatelessWidget {
   const _AgentText(this.item);
   final MirrorText item;
 
+  // V2-2b B16: "Xem đủ" goes under the hint of what the markdown cut, by its own limits and nothing else.
   @override
-  Widget build(BuildContext context) {
-    final cut = item.fullLength != null || item.text.length > kShownAnswerChars;
-    final markdown = AiMarkdown(text: item.text, truncated: item.fullLength != null);
-    if (!cut) return markdown;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [markdown, _ViewAll(item.index)]);
-  }
+  Widget build(BuildContext context) =>
+      AiMarkdown(text: item.text, truncated: item.fullLength != null, cutAction: _ViewAll(item.index));
 }
 
 /// Folded by default (V2-1 §4.2).
@@ -175,9 +172,13 @@ class _ThoughtState extends State<_Thought> {
             ),
           ),
         ),
-        if (_open) AiMarkdown(text: widget.item.text, dim: true, truncated: widget.item.fullLength != null),
-        if (_open && (widget.item.fullLength != null || widget.item.text.length > kShownAnswerChars))
-          _ViewAll(widget.item.index),
+        if (_open)
+          AiMarkdown(
+            text: widget.item.text,
+            dim: true,
+            truncated: widget.item.fullLength != null,
+            cutAction: _ViewAll(widget.item.index),
+          ),
       ],
     );
   }
@@ -604,17 +605,15 @@ TextStyle aiDiffLineStyle(BuildContext context, String mark) {
 }
 
 /// One diff line on a row of its own (V2-2b B16: the full view builds only the rows on screen). A line
-/// longer than [kShownLineChars] is cut, "…" after it.
+/// longer than [kShownLineChars] is cut, "…" after it ([clipLine]).
 class AiDiffLineRow extends StatelessWidget {
   const AiDiffLineRow({super.key, required this.line});
 
   final DiffLine line;
 
   @override
-  Widget build(BuildContext context) {
-    final text = line.text.length > kShownLineChars ? '${line.text.substring(0, kShownLineChars)}…' : line.text;
-    return Text('${line.mark} $text', style: aiDiffLineStyle(context, line.mark));
-  }
+  Widget build(BuildContext context) =>
+      Text('${line.mark} ${clipLine(line.text)}', style: aiDiffLineStyle(context, line.mark));
 }
 
 class _Output extends StatelessWidget {

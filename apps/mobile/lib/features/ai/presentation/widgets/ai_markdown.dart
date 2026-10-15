@@ -15,7 +15,7 @@ import 'package:shellx_mobile/shared/shared.dart';
 /// paragraph, list item and table cell (125 ms against 19 ms to build a hundred blocks). The timeline
 /// wraps the whole conversation in one `SelectionArea`, which selects it all.
 class AiMarkdown extends StatefulWidget {
-  const AiMarkdown({super.key, required this.text, this.dim = false, this.truncated = false});
+  const AiMarkdown({super.key, required this.text, this.dim = false, this.truncated = false, this.cutAction});
 
   final String text;
 
@@ -24,6 +24,10 @@ class AiMarkdown extends StatefulWidget {
 
   /// The computer sent only the start of this text (an older page of a long answer).
   final bool truncated;
+
+  /// V2-2b B16: what goes under the hint when the text is cut (here, or by the computer: [truncated]) — the
+  /// "Xem đủ" button. Shown exactly when the hint is, so that what the phone cut is decided in this one place.
+  final Widget? cutAction;
 
   @override
   State<AiMarkdown> createState() => _AiMarkdownState();
@@ -56,7 +60,7 @@ class _AiMarkdownState extends State<AiMarkdown> {
             padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
             child: _Block(key: ValueKey(i), text: block, dim: widget.dim),
           ),
-        if (_plan.cut || widget.truncated)
+        if (_plan.cut || widget.truncated) ...[
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
@@ -64,6 +68,8 @@ class _AiMarkdownState extends State<AiMarkdown> {
               style: context.typo.paragraph13.copyWith(color: context.colors.secondaryText),
             ),
           ),
+          ?widget.cutAction,
+        ],
       ],
     );
   }
