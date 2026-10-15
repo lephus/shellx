@@ -280,6 +280,10 @@ class FakeMachineSession implements MachineSession {
   /// V2-2: the machine's AI sessions.
   @override
   final FakeAiMachine ai = FakeAiMachine();
+
+  /// V2-4: the machine's tools.
+  @override
+  final FakeToolMachine tools = FakeToolMachine();
 }
 
 /// A mirrored AI session for tests (V2-2). Fed like the real one: a desktop-side [AiSubscription]
@@ -539,6 +543,142 @@ class FakeAiMachine implements AiMachine {
     opened.add((agent, folder));
     await _request();
     return openedSid;
+  }
+}
+
+/// Scriptable [ToolMachine] (V2-4): the list as a test sets it, and the pages it made.
+class FakeToolMachine implements ToolMachine {
+  bool? supportedValue;
+  ToolListing? listingValue;
+  final StreamController<ToolListing> _listings = StreamController<ToolListing>.broadcast(sync: true);
+  int watchCalls = 0;
+  int unwatchCalls = 0;
+  bool watching = false;
+
+  /// Every page made, in order, and the texts each was given.
+  final List<FakeToolPage> pages = [];
+  final List<ToolHostTexts> texts = [];
+
+  /// A list from the computer: it has tools.
+  void emitListing(ToolListing listing) {
+    supportedValue = true;
+    listingValue = listing;
+    _listings.add(listing);
+  }
+
+  @override
+  bool? get supported => supportedValue;
+
+  @override
+  ToolListing? get listing => listingValue;
+
+  @override
+  Stream<ToolListing> get listings => _listings.stream;
+
+  @override
+  Future<void> watch() async {
+    watchCalls++;
+    watching = true;
+  }
+
+  @override
+  void unwatch() {
+    unwatchCalls++;
+    watching = false;
+  }
+
+  @override
+  ToolPageSession page(ToolInfo tool, ToolHostTexts texts) {
+    this.texts.add(texts);
+    final page = FakeToolPage(tool);
+    pages.add(page);
+    return page;
+  }
+}
+
+/// Scriptable [ToolPageSession]: a test sets the phase and says what the page must do.
+class FakeToolPage implements ToolPageSession {
+  FakeToolPage(this.tool);
+
+  final ToolInfo tool;
+  ToolPhase phaseValue = ToolPhase.opening;
+  int? servedPortValue;
+  int requestsValue = 0;
+  final StreamController<void> _changes = StreamController<void>.broadcast(sync: true);
+  final StreamController<ToolPageEvent> _events = StreamController<ToolPageEvent>.broadcast(sync: true);
+  int starts = 0;
+  int homes = 0;
+  int pauses = 0;
+  int resumes = 0;
+  int closes = 0;
+  int resets = 0;
+
+  void setPhase(ToolPhase phase) {
+    phaseValue = phase;
+    _changes.add(null);
+  }
+
+  /// Served on [port] ([tool]'s own by default) and told to load its entry URL.
+  void ready({int? port}) {
+    servedPortValue = port ?? tool.port;
+    setPhase(ToolPhase.ready);
+    _events.add(ToolLoad(Uri.parse('http://localhost:$servedPortValue/__shellx/enter?n=x&to=%2F')));
+  }
+
+  void emit(ToolPageEvent event) => _events.add(event);
+
+  @override
+  ToolPhase get phase => phaseValue;
+
+  @override
+  Stream<void> get changes => _changes.stream;
+
+  @override
+  Stream<ToolPageEvent> get events => _events.stream;
+
+  @override
+  int get port => tool.port;
+
+  @override
+  int? get servedPort => servedPortValue;
+
+  @override
+  int? get alias {
+    final served = servedPortValue;
+    return served != null && served != tool.port ? served : null;
+  }
+
+  @override
+  Set<String> get origins => {if (servedPortValue != null) 'http://localhost:$servedPortValue'};
+
+  @override
+  int get requests => requestsValue;
+
+  @override
+  void resetRequests() {
+    resets++;
+    requestsValue = 0;
+  }
+
+  @override
+  void start() => starts++;
+
+  @override
+  void home() => homes++;
+
+  @override
+  Future<void> pause() async {
+    pauses++;
+    setPhase(ToolPhase.paused);
+  }
+
+  @override
+  void resume() => resumes++;
+
+  @override
+  Future<void> close() async {
+    closes++;
+    phaseValue = ToolPhase.closed;
   }
 }
 

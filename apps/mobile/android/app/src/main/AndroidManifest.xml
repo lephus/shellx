@@ -8,7 +8,9 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
 
-    <!-- allowBackup=false: secure storage must not be restored onto another install
+    <!-- networkSecurityConfig (V2-4 E14): cleartext only to this phone's own loopback, where a
+         tool page is served; the relay, FCM and every link stay HTTPS-only.
+         allowBackup=false: secure storage must not be restored onto another install
          (spec §5.1: a reinstall generates a new device key). The backup rules exclude
          everything as well: from Android 12, allowBackup no longer stops a device-to-device
          transfer, which dataExtractionRules does. -->
@@ -18,7 +20,8 @@
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:fullBackupContent="@xml/backup_rules"
-        android:dataExtractionRules="@xml/data_extraction_rules">
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -72,6 +75,11 @@
         <intent>
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="https"/>
+        </intent>
+        <!-- V2-4 E12: a tool page's link to another http site opens in the browser. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="http"/>
         </intent>
         <!-- Android 11+ package visibility: lets the app find the speech recognizer. -->
         <intent>

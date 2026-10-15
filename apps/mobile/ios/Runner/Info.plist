@@ -32,9 +32,15 @@
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>https</string>
+		<string>http</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>ShellX uses the camera to scan the pairing QR code shown on your computer.</string>
 	<key>NSFaceIDUsageDescription</key>

@@ -57,6 +57,13 @@ dependencies:
   # Voice input (voice spec V4), BSD-3-Clause. Pinned exactly: 7.5.0+ needs Dart ^3.12 / Flutter 3.44.
   speech_to_text: 7.4.0
   url_launcher: ^6.3.2
+  # V2-4 E12: the tool page. Pinned exactly: the newest that run on Flutter 3.41.4 / Dart 3.11
+  # (webview_flutter_android 4.12.1+ and webview_flutter_wkwebview 3.26+ need Dart 3.12). Bump the
+  # three together with Flutter. The platform packages are direct dependencies for their own
+  # settings (file chooser, geolocation off).
+  webview_flutter: 4.14.1
+  webview_flutter_android: 4.12.0
+  webview_flutter_wkwebview: 3.25.1
   # xterm 4.0.0, the copy apps/desktop patches (third_party/xterm/SHELLX_PATCHES.md; the patch is
   # macOS-only). The terminal works around 4.0.0's cursor-key, modifier and paste handling, which a
   # newer version may change.

@@ -109,6 +109,9 @@ abstract interface class MachineSession {
   /// V2-2: the machine's AI sessions.
   AiMachine get ai;
 
+  /// V2-4: the machine's personal web tools.
+  ToolMachine get tools;
+
   /// Removes the tab and ends its [TabHandle.events]. An attached tab also
   /// closes its session on the machine: at once, or — without a channel —
   /// right after the next channel is installed. A desktop tab
@@ -181,6 +184,64 @@ abstract interface class AiMachine {
 
   /// A new session; its sid.
   Future<String> open(String agent, String folder);
+}
+
+/// App-side view of one open tool page ([ToolSession] in `shellx_client`, V2-4): while it is
+/// started, the phone serves the tool on its own loopback (only to the page's web view: E11) and
+/// carries every request to the computer. Never logs what it carries.
+abstract interface class ToolPageSession {
+  ToolPhase get phase;
+
+  /// After every change of [phase].
+  Stream<void> get changes;
+
+  /// What the web view must do: load the entry URL, reload; what to tell the user.
+  Stream<ToolPageEvent> get events;
+
+  /// The tool's port on the computer.
+  int get port;
+
+  /// The port this phone serves it on (null while nothing is served); [alias] when it is not
+  /// [port] (E3: the tool's port is taken on this phone).
+  int? get servedPort;
+  int? get alias;
+
+  /// The origins this phone serves (`http://localhost:<port>`): the web view stays on them (E12).
+  Set<String> get origins;
+
+  /// Requests served since [resetRequests] (E20).
+  int get requests;
+  void resetRequests();
+
+  /// Asks the computer and serves the tool.
+  void start();
+
+  /// "Về trang đầu".
+  void home();
+
+  /// The app went to the background (E13): nothing is served until [resume].
+  Future<void> pause();
+  void resume();
+
+  /// The page was left: nothing is served, the computer is told.
+  Future<void> close();
+}
+
+/// App-side view of a machine's tools ([MachineTools] in `shellx_client`, V2-4).
+abstract interface class ToolMachine {
+  /// From the computer's answer to a list of its sessions: null before the first one, false for a
+  /// computer without tools for phones.
+  bool? get supported;
+  ToolListing? get listing;
+  Stream<ToolListing> get listings;
+
+  /// Keeps [listing] current (one switch, like [AiMachine.watch]).
+  Future<void> watch();
+  void unwatch();
+
+  /// A page for [tool] that serves nothing until [ToolPageSession.start]; [texts] are the plain
+  /// answers the phone's server gives itself, in the phone's language.
+  ToolPageSession page(ToolInfo tool, ToolHostTexts texts);
 }
 
 /// Everything the signed-in UI needs from `shellx_core` + `shellx_client`.
