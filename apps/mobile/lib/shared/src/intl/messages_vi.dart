@@ -221,6 +221,16 @@ class MessageLookup extends MessageLookupByLibrary {
       "Điện thoại không đọc được phiên AI này. Xem trên máy tính.",
     ),
     "aiComposerHint": m1,
+    "aiConfigEffort": MessageLookupByLibrary.simpleMessage("Mức suy nghĩ"),
+    "aiConfigMode": MessageLookupByLibrary.simpleMessage("Chế độ"),
+    "aiConfigModel": MessageLookupByLibrary.simpleMessage("Model"),
+    "aiConfigMore": MessageLookupByLibrary.simpleMessage(
+      "Còn lựa chọn khác trên máy tính.",
+    ),
+    "aiConfigOnComputer": MessageLookupByLibrary.simpleMessage(
+      "Chọn mục này trên máy tính.",
+    ),
+    "aiConfigTitle": MessageLookupByLibrary.simpleMessage("Chế độ và model"),
     "aiContext": m2,
     "aiCreated": MessageLookupByLibrary.simpleMessage("tệp mới"),
     "aiCutLines": m3,

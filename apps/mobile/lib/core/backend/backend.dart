@@ -198,6 +198,16 @@ abstract interface class AiMachine {
 
   /// A new session; its sid.
   Future<String> open(String agent, String folder);
+
+  /// V2-2b B11: the mode, model and thinking choices of [sid] this phone may make; `unsupported` when the
+  /// computer cannot (R15).
+  Future<AiConfigView> config(String sid);
+
+  /// V2-2b B11: one choice of "Chế độ và model" (a choice's value, or a bool for a switch).
+  Future<void> setConfig(String sid, String id, Object value);
+
+  /// V2-2b B11: the mode of an agent with only modes.
+  Future<void> setMode(String sid, String modeId);
 }
 
 /// App-side view of one open tool page ([ToolSession] in `shellx_client`, V2-4): while it is

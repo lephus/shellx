@@ -229,6 +229,16 @@ class MessageLookup extends MessageLookupByLibrary {
       "The phone cannot read this AI session. See it on the computer.",
     ),
     "aiComposerHint": m1,
+    "aiConfigEffort": MessageLookupByLibrary.simpleMessage("Thinking"),
+    "aiConfigMode": MessageLookupByLibrary.simpleMessage("Mode"),
+    "aiConfigModel": MessageLookupByLibrary.simpleMessage("Model"),
+    "aiConfigMore": MessageLookupByLibrary.simpleMessage(
+      "More choices on the computer.",
+    ),
+    "aiConfigOnComputer": MessageLookupByLibrary.simpleMessage(
+      "Choose this on the computer.",
+    ),
+    "aiConfigTitle": MessageLookupByLibrary.simpleMessage("Mode and model"),
     "aiContext": m2,
     "aiCreated": MessageLookupByLibrary.simpleMessage("new file"),
     "aiCutLines": m3,

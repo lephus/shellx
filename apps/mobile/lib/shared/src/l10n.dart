@@ -3540,6 +3540,51 @@ class S {
       args: [],
     );
   }
+
+  /// `Mode and model`
+  String get aiConfigTitle {
+    return Intl.message(
+      'Mode and model',
+      name: 'aiConfigTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Mode`
+  String get aiConfigMode {
+    return Intl.message('Mode', name: 'aiConfigMode', desc: '', args: []);
+  }
+
+  /// `Model`
+  String get aiConfigModel {
+    return Intl.message('Model', name: 'aiConfigModel', desc: '', args: []);
+  }
+
+  /// `Thinking`
+  String get aiConfigEffort {
+    return Intl.message('Thinking', name: 'aiConfigEffort', desc: '', args: []);
+  }
+
+  /// `More choices on the computer.`
+  String get aiConfigMore {
+    return Intl.message(
+      'More choices on the computer.',
+      name: 'aiConfigMore',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Choose this on the computer.`
+  String get aiConfigOnComputer {
+    return Intl.message(
+      'Choose this on the computer.',
+      name: 'aiConfigOnComputer',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

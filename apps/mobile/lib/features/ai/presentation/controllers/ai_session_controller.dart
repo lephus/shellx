@@ -242,6 +242,24 @@ class AiSessionController extends Controller {
   /// "Tải thêm".
   void loadEarlier() => _link?.loadEarlier();
 
+  /// V2-2b B11: the choices of "Chế độ và model", or why they cannot be had (a code for [AiWords.failure]).
+  Future<({AiConfigView? view, String? code})> loadConfig() async {
+    final machine = _machine;
+    if (machine == null) return (view: null, code: 'refused');
+    try {
+      return (view: await machine.ai.config(sid), code: null);
+    } catch (error) {
+      return (view: null, code: _failure(error));
+    }
+  }
+
+  /// V2-2b B11: one choice of an option (one explicit tap, one request, never sent again): null when the
+  /// computer took it, else the failure code (`on_computer`: chosen on the computer only).
+  Future<String?> setConfig(String id, Object value) => _simple(() => _machine!.ai.setConfig(sid, id, value));
+
+  /// V2-2b B11: the mode of an agent with only modes; as [setConfig].
+  Future<String?> setMode(String modeId) => _simple(() => _machine!.ai.setMode(sid, modeId));
+
   void dispose() {
     if (_disposed) return;
     _disposed = true;

@@ -321,6 +321,15 @@ final class _AiMachineAdapter implements AiMachine {
 
   @override
   Future<String> open(String agent, String folder) => _ai.open(agent, folder);
+
+  @override
+  Future<AiConfigView> config(String sid) => _ai.config(sid);
+
+  @override
+  Future<void> setConfig(String sid, String id, Object value) => _ai.setConfig(sid, id, value);
+
+  @override
+  Future<void> setMode(String sid, String modeId) => _ai.setMode(sid, modeId);
 }
 
 final class _AiSessionAdapter implements AiSessionHandle {
