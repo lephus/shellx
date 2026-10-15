@@ -47,6 +47,12 @@ abstract final class MuxType {
   /// service ignores the window's three; an older window never gets one.
   static const aiIn = 'ai.in', aiGone = 'ai.gone', aiOut = 'ai.out';
   static const aiServe = 'ai.serve', aiPush = 'ai.push';
+
+  /// V2-4 E5 (additive): the tools phones may open (`tool.serve`, `{b: JSON
+  /// bytes}`, window → service, never answered). The service's proxy serves
+  /// them and keeps the last list when the window goes. An older service
+  /// ignores it; an older window never sends it.
+  static const toolServe = 'tool.serve';
 }
 
 abstract final class MuxError {

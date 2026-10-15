@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import '../remote/session_launch.dart';
 import '../session/local_sessions.dart';
 import '../term/term_frames.dart';
+import '../tool/tool_catalog.dart';
+import '../tool/tool_proxy.dart';
 import 'cli_host.dart';
 import 'cli_wire.dart';
 import 'mux_ai.dart';
@@ -60,6 +62,10 @@ final class MuxServer {
   /// V2-2 D1: phones' `ai.*` messages for the attached window; null: the
   /// window's `ai.*` messages are ignored (like an older service).
   MuxAiForwarder? ai;
+
+  /// V2-4 E5: the proxy the window's `tool.serve` lists go to; null: they are
+  /// ignored (like an older service).
+  ToolProxy? tools;
 
   /// D11: stop streaming a view above this many unacked bytes; resume
   /// (with `view.reset`) below [resumeBelow].
@@ -382,6 +388,13 @@ final class _UiLink {
     }
     if (m.type == MuxType.aiOut || m.type == MuxType.aiPush) {
       server.ai?.fromUi(this, m);
+      return;
+    }
+    // V2-4 E5: kept when the window goes (tools stay open like shells).
+    if (m.type == MuxType.toolServe) {
+      final body = m.get<Uint8List>('b');
+      final catalog = body == null ? null : ToolCatalog.fromServeBody(body);
+      if (catalog != null) server.tools?.serve(catalog);
       return;
     }
     _primed = true;
