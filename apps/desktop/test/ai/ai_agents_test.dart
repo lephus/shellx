@@ -164,4 +164,37 @@ void main() {
     expect(rememberedConfig(settings, 'gemini'), isEmpty);
     expect(rememberedConfig(settings, 'claude'), {'model': 'opus'});
   });
+
+  test('V2-2b F19: an option named like a no-approval mode is never '
+      'remembered nor re-applied, whatever its value, even from a line an '
+      'older version stored; any other option is', () async {
+    await rememberConfig(settings, 'gemini', 'model', 'pro');
+    for (final (id, value) in <(String, Object)>[
+      ('yolo', 'on'),
+      ('yolo', 'off'),
+      ('yolo', true),
+      ('yolo', false),
+      ('clearAndBypass', 'enabled'),
+      ('allow-all-tools', 'none'),
+    ]) {
+      await rememberConfig(settings, 'gemini', id, value);
+      expect(settings.getStrings(SettingKeys.aiAgentConfig), [
+        'gemini\tmodel\t"pro"',
+      ], reason: '$id=$value');
+    }
+    expect(rememberedConfig(settings, 'gemini'), {'model': 'pro'});
+    // Lines an older version could have written, off values and on: none
+    // applies to a new session.
+    await settings.setStrings(SettingKeys.aiAgentConfig, [
+      'gemini\tyolo\t"on"',
+      'gemini\tclearAndBypass\t"off"',
+      'gemini\tYOLO-mode\tfalse',
+      'gemini\tallow-all-tools\ttrue',
+      'gemini\tmodel\t"pro"',
+      'codex\tyolo\t"off"',
+      'codex\tmodel\t"gpt"',
+    ]);
+    expect(rememberedConfig(settings, 'gemini'), {'model': 'pro'});
+    expect(rememberedConfig(settings, 'codex'), {'model': 'gpt'});
+  });
 }

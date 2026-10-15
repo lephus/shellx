@@ -72,11 +72,26 @@ bool aiIsNoApprovalMode(Object? value) {
   return _noApproval.contains(id) || _noApprovalWords.any(id.contains);
 }
 
-/// [aiIsNoApprovalMode] for a setting of the agent: [value] is one, or a
-/// switch ([value] `true`) that is named like one (`yolo`).
+/// The values that leave an option off, in the spelling of [_normal].
+const _offValues = {'off', 'false', 'no', 'disabled', '0', 'none'};
+
+/// V2-2b F19: whether [value] leaves an option off: `false`, or text that
+/// says `off`, `false`, `no`, `disabled`, `0` or `none` — with any case and
+/// any marks between the letters, as [aiIsNoApprovalMode] reads an id
+/// (`Off`, `FALSE`, ` Disabled `). Anything else (`on`, `true`, `always`,
+/// nothing) is not.
+bool _isOff(Object? value) =>
+    value == false || (value is String && _offValues.contains(_normal(value)));
+
+/// [aiIsNoApprovalMode] for a setting of the agent: [value] is one, or the
+/// option is named like one ([configId]) and [value] is not an off value
+/// (`false`; `off`, `false`, `no`, `disabled`, `0`, `none` in any spelling).
+/// So a switch named `yolo` turns it on when set to `true`, and a select
+/// named `yolo` (V2-2b F19) when set to `on`, `always` or any choice but an
+/// off one. It fails closed: a value that is not an off value counts as on.
 bool aiTurnsOnNoApproval({required String configId, required Object? value}) =>
     aiIsNoApprovalMode(value) ||
-    (value == true && aiIsNoApprovalMode(configId));
+    (aiIsNoApprovalMode(configId) && !_isOff(value));
 
 /// V2-1 D10, R6: whether picking permission [option] turns on a mode acting
 /// without asking: an answer that is not a reject and whose id is one

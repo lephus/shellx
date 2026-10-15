@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_ai/host.dart';
 import 'package:shellx_ai/testing.dart';
 import 'package:shellx_desktop/src/ai/ai_agents.dart';
+import 'package:shellx_desktop/src/platform/settings_store.dart';
 import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart'
     show settingsStoreProvider;
 import 'package:shellx_desktop/src/ui/ai/ai_dock.dart';
@@ -192,6 +193,52 @@ void main() {
     expect(rememberedConfig(c.read(settingsStoreProvider), 'claude'), {
       'mode': 'read-only',
     });
+    await runtime.dispose();
+  });
+
+  testWidgets('V2-2b F19: a select named like a no-approval mode ("yolo" with '
+      'on / off) asks first when turned on (Cancel sends and remembers '
+      'nothing), not when turned off, and is never remembered', (t) async {
+    final (fakes, runtime, c) = await dock(
+      t,
+      const FakeScenario(
+        configOptions: [
+          {
+            'id': 'yolo',
+            'name': 'YOLO',
+            'type': 'select',
+            'currentValue': 'off',
+            'options': [
+              {'value': 'on', 'name': 'On'},
+              {'value': 'off', 'name': 'Off'},
+            ],
+          },
+        ],
+      ),
+    );
+    final store = c.read(settingsStoreProvider);
+    List<String> sets() => [
+      for (final r in fakes.agent().received)
+        if (r.startsWith('session/set_config')) r,
+    ];
+    await pick(t, 'yolo', 'on');
+    expect(find.text('Turn on “Bypass permissions”?'), findsOneWidget);
+    await t.tap(find.byKey(const Key('ai.bypass.cancel')));
+    await t.pumpAndSettle();
+    expect(sets(), isEmpty);
+    expect(store.getStrings(SettingKeys.aiAgentConfig), isEmpty);
+    await pick(t, 'yolo', 'on');
+    await t.tap(find.byKey(const Key('ai.bypass.on')));
+    await t.pumpAndSettle();
+    expect(sets(), ['session/set_config_option:yolo=on']);
+    await pick(t, 'yolo', 'off');
+    expect(find.text('Turn on “Bypass permissions”?'), findsNothing);
+    expect(sets(), [
+      'session/set_config_option:yolo=on',
+      'session/set_config_option:yolo=off',
+    ]);
+    expect(store.getStrings(SettingKeys.aiAgentConfig), isEmpty);
+    expect(rememberedConfig(store, 'claude'), isEmpty);
     await runtime.dispose();
   });
 
