@@ -3,6 +3,7 @@ import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/lock/presentation/biometric_method.dart';
 import 'package:shellx_mobile/features/notifications/domain/push_messaging.dart';
 import 'package:shellx_mobile/features/settings/presentation/controllers/settings_controller.dart';
+import 'package:shellx_mobile/features/tools/presentation/tool_web_engine.dart';
 import 'package:shellx_mobile/shared/shared.dart';
 
 /// Spec §9.2 #5 and the design's "Cài đặt": grouped cards — Terminal (font size with a live
@@ -39,6 +40,17 @@ class _SettingsPageState extends State<SettingsPage> {
       confirmLabel: strings.settingsUnpair,
     );
     if (confirmed) await _controller.unpair(machine.agentId);
+  }
+
+  /// V2-4 E12: the tool pages keep their logins; this signs every tool out (asks first).
+  Future<void> _clearToolData() async {
+    final strings = S.of(context);
+    final confirmed = await showConfirmDialog(
+      context,
+      message: strings.toolClearDataPhoneConfirm,
+      confirmLabel: strings.toolClearDataPhone,
+    );
+    if (confirmed) await getIt<ToolWebData>().clear();
   }
 
   void _showLicenses() {
@@ -256,6 +268,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 trailing: Icon(Icons.chevron_right, color: colors.secondaryText),
                 onTap: _showLicenses,
               ),
+              Divider(height: 1, color: colors.divider),
+              _Row(key: const Key('settings.clearToolData'), title: strings.toolClearDataPhone, onTap: _clearToolData),
             ],
           ),
           _Group(
@@ -390,6 +404,7 @@ class _Group extends StatelessWidget {
 /// `.ri`: one 50 pt row of a settings card.
 class _Row extends StatelessWidget {
   const _Row({
+    super.key,
     required this.title,
     this.leading,
     this.trailing,

@@ -15,6 +15,7 @@ import 'package:shellx_mobile/features/notifications/presentation/push_controlle
 import 'package:shellx_mobile/features/settings/presentation/controllers/delete_account_controller.dart';
 import 'package:shellx_mobile/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
+import 'package:shellx_mobile/features/tools/presentation/tool_web_engine.dart';
 import 'package:shellx_mobile/shared/shared.dart';
 
 import '../../support/app_harness.dart';
@@ -22,6 +23,7 @@ import '../../support/fake_biometrics.dart';
 import '../../support/fake_links.dart';
 import '../../support/fake_popup_handler.dart';
 import '../../support/fake_push.dart';
+import '../../support/fake_tool_engine.dart';
 import '../../support/fakes.dart';
 
 void main() {
@@ -106,6 +108,25 @@ void main() {
     await tester.pumpAndSettle();
     await openPushed(tester);
   }
+
+  testWidgets('V2-4 E12: "Xóa dữ liệu của tool" asks first, then signs every tool out', (tester) async {
+    final data = FakeToolWebData();
+    getIt.registerSingleton<ToolWebData>(data);
+    await openSettings(tester);
+    final row = find.byKey(const Key('settings.clearToolData'));
+    await tester.scrollUntilVisible(row, 200);
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    expect(find.text('Đăng xuất mọi tool và xóa cookie, bộ nhớ của chúng?'), findsOneWidget);
+    await tester.tap(find.text('Hủy'));
+    await tester.pumpAndSettle();
+    expect(data.clears, 0);
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Xóa dữ liệu của tool').last);
+    await tester.pumpAndSettle();
+    expect(data.clears, 1);
+  });
 
   group('A11 D31: keep the terminal size', () {
     testWidgets('the switch is off, explains itself and stores the choice', (tester) async {

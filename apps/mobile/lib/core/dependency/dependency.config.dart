@@ -15,6 +15,7 @@ import 'package:get_it/get_it.dart' as _i174;
 import 'package:injectable/injectable.dart' as _i526;
 import 'package:package_info_plus/package_info_plus.dart' as _i655;
 import 'package:shared_preferences/shared_preferences.dart' as _i460;
+import 'package:shellx_client/shellx_client.dart' as _i976;
 import 'package:shellx_core/shellx_core.dart' as _i145;
 
 import '../../features/ai/domain/ai_drafts.dart' as _i267;
@@ -43,6 +44,9 @@ import '../../features/terminal/presentation/controllers/terminal_page_controlle
     as _i229;
 import '../../features/terminal/presentation/controllers/terminal_workspace.dart'
     as _i667;
+import '../../features/tools/presentation/controllers/tool_page_controller.dart'
+    as _i620;
+import '../../features/tools/presentation/tool_web_engine.dart' as _i495;
 import '../../features/voice/data/speech_to_text_input.dart' as _i546;
 import '../../features/voice/domain/speech_input.dart' as _i498;
 import '../../features/voice/presentation/controllers/voice_composer_controller.dart'
@@ -96,9 +100,11 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i505.VersionGate>(
       () => _i505.VersionGate(gh<_i145.ShellxApi>(), gh<_i655.PackageInfo>()),
     );
+    gh.lazySingleton<_i495.ToolWebData>(() => _i495.WebViewToolData());
     gh.lazySingleton<_i870.BiometricAuthenticator>(
       () => _i870.LocalAuthBiometricAuthenticator(),
     );
+    gh.factory<_i495.ToolWebEngine>(() => _i495.WebViewToolEngine());
     gh.lazySingleton<_i618.ExternalLinks>(() => _i618.UrlLauncherLinks());
     await gh.lazySingletonAsync<_i145.KeyValueStore>(
       () => module.keyValueStore(gh<_i460.SharedPreferences>()),
@@ -162,6 +168,10 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i498.SpeechInput>(),
         gh<_i351.AppSettings>(),
       ),
+    );
+    gh.factoryParam<_i620.ToolPageController, String, _i976.ToolInfo>(
+      (agentId, tool) =>
+          _i620.ToolPageController(agentId, tool, gh<_i351.SessionHolder>()),
     );
     gh.factory<_i313.AuthGuard>(
       () => _i313.AuthGuard(gh<_i56.SessionHolder>()),
