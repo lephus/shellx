@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/remote.dart';
 import 'package:shellx_mobile/core/core.dart';
+import 'package:shellx_mobile/features/ai/domain/ai_attachments.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
 import 'package:shellx_mobile/shared/shared.dart';
 
@@ -484,6 +485,12 @@ class AiQueueRow extends StatelessWidget {
 /// of a sentence. Stop, when it takes the place of Send (a queued message went
 /// and the field is empty, or the turn has just begun), waits 400 ms before it
 /// answers: the second tap of a double tap on Send must not stop the turn.
+///
+/// V2-2b B12, B13: with [onAttach], an attach button (the page asks: photo library or camera) and the [images] of
+/// the next message as thumbnails above the field, each with × ([onRemoveImage]); images alone make a message, and
+/// while images wait Send stays (no Stop in its place). [upload] shows them going out. [suggestions] are the
+/// computer's files for the `@` being typed: a tap hands one to [onSuggestion]. [note] is one line above the field:
+/// why the last images did not go, a voice problem.
 class AiComposer extends StatefulWidget {
   const AiComposer({
     super.key,
@@ -497,6 +504,13 @@ class AiComposer extends StatefulWidget {
     required this.onSend,
     required this.onStop,
     required this.onForceStop,
+    this.images = const [],
+    this.onAttach,
+    this.onRemoveImage,
+    this.upload,
+    this.suggestions = const [],
+    this.onSuggestion,
+    this.note,
   });
 
   final TextEditingController controller;
@@ -512,6 +526,23 @@ class AiComposer extends StatefulWidget {
   final VoidCallback onStop;
   final VoidCallback onForceStop;
 
+  /// V2-2b B12: the images of the next message, in the order picked.
+  final List<AiPickedImage> images;
+
+  /// The attach button (the computer takes images); null: no button.
+  final VoidCallback? onAttach;
+  final ValueChanged<AiPickedImage>? onRemoveImage;
+
+  /// The parts of the images the computer took so far, while they go out; null otherwise.
+  final ({int sent, int parts})? upload;
+
+  /// V2-2b B13: the computer's files for the `@` being typed (at most [AiMentions.maxSuggestions] are shown).
+  final List<String> suggestions;
+  final ValueChanged<String>? onSuggestion;
+
+  /// A line above the field; null: none.
+  final String? note;
+
   @override
   State<AiComposer> createState() => _AiComposerState();
 }
@@ -520,7 +551,8 @@ class _AiComposerState extends State<AiComposer> with _Settling {
   /// Whether Stop was on screen at the last look: it waits when it comes (not while it stays).
   var _stopShown = false;
 
-  bool get _wantsStop => widget.running && widget.controller.text.trim().isEmpty;
+  /// Stop takes the place of Send only when there is nothing to send: no text and no image.
+  bool get _wantsStop => widget.running && widget.controller.text.trim().isEmpty && widget.images.isEmpty;
 
   @override
   void initState() {
@@ -562,61 +594,224 @@ class _AiComposerState extends State<AiComposer> with _Settling {
     final s = S.of(context);
     final colors = context.colors;
     final hasText = widget.controller.text.trim().isNotEmpty;
+    final hasImages = widget.images.isNotEmpty;
     final showStop = _wantsStop;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Expanded(
-            child: TextField(
-              key: const Key('ai.composer'),
-              controller: widget.controller,
-              minLines: 1,
-              maxLines: 6,
-              textInputAction: TextInputAction.newline,
-              keyboardType: TextInputType.multiline,
-              decoration: InputDecoration(
-                hintText: s.aiComposerHint(widget.agentName),
-                filled: true,
-                fillColor: colors.surface,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide(color: colors.divider),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide(color: colors.divider),
-                ),
+    final upload = widget.upload;
+    final note = widget.note;
+    final onSuggestion = widget.onSuggestion;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (widget.suggestions.isNotEmpty && onSuggestion != null)
+          _Suggestions(paths: widget.suggestions, onPick: onSuggestion),
+        if (hasImages) _ImageRow(images: widget.images, onRemove: widget.sending ? null : widget.onRemoveImage),
+        if (upload != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Semantics(
+              label: s.aiUploading,
+              child: LinearProgressIndicator(
+                key: const Key('ai.upload'),
+                value: upload.parts == 0 ? 0 : upload.sent / upload.parts,
               ),
             ),
           ),
-          4.sizedWidth,
-          if (widget.canForceStop)
-            IconButton(
-              key: const Key('ai.forceStop'),
-              tooltip: s.aiForceStop,
-              icon: Icon(Icons.dangerous_outlined, color: colors.error),
-              onPressed: widget.onForceStop,
+        if (note != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 12, 0),
+            child: Text(
+              note,
+              key: const Key('ai.composer.note'),
+              style: context.typo.paragraph13.copyWith(color: colors.error),
             ),
-          if (showStop)
-            IconButton.filledTonal(
-              key: const Key('ai.stop'),
-              tooltip: widget.stopping ? s.aiStopping : s.aiStop,
-              icon: widget.stopping
-                  ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.stop_rounded),
-              onPressed: widget.stopping || !settled ? null : widget.onStop,
-            )
-          else
-            IconButton.filled(
-              key: const Key('ai.send'),
-              tooltip: widget.running ? s.aiQueue : s.aiSend,
-              icon: widget.sending
-                  ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Icon(widget.running ? Icons.playlist_add : Icons.arrow_upward),
-              onPressed: widget.canSend && hasText && !widget.sending ? widget.onSend : null,
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (widget.onAttach != null)
+                IconButton(
+                  key: const Key('ai.attach'),
+                  tooltip: s.aiAttach,
+                  icon: Icon(Icons.add_photo_alternate_outlined, color: colors.secondaryText),
+                  onPressed: widget.sending || widget.images.length >= kAiImagesMax ? null : widget.onAttach,
+                ),
+              Expanded(
+                child: TextField(
+                  key: const Key('ai.composer'),
+                  controller: widget.controller,
+                  minLines: 1,
+                  maxLines: 6,
+                  textInputAction: TextInputAction.newline,
+                  keyboardType: TextInputType.multiline,
+                  decoration: InputDecoration(
+                    hintText: s.aiComposerHint(widget.agentName),
+                    filled: true,
+                    fillColor: colors.surface,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: BorderSide(color: colors.divider),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: BorderSide(color: colors.divider),
+                    ),
+                  ),
+                ),
+              ),
+              4.sizedWidth,
+              if (widget.canForceStop)
+                IconButton(
+                  key: const Key('ai.forceStop'),
+                  tooltip: s.aiForceStop,
+                  icon: Icon(Icons.dangerous_outlined, color: colors.error),
+                  onPressed: widget.onForceStop,
+                ),
+              if (showStop)
+                IconButton.filledTonal(
+                  key: const Key('ai.stop'),
+                  tooltip: widget.stopping ? s.aiStopping : s.aiStop,
+                  icon: widget.stopping
+                      ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.stop_rounded),
+                  onPressed: widget.stopping || !settled ? null : widget.onStop,
+                )
+              else
+                IconButton.filled(
+                  key: const Key('ai.send'),
+                  tooltip: widget.running ? s.aiQueue : s.aiSend,
+                  icon: widget.sending
+                      ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Icon(widget.running ? Icons.playlist_add : Icons.arrow_upward),
+                  onPressed: widget.canSend && (hasText || hasImages) && !widget.sending ? widget.onSend : null,
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// V2-2b B12: the images of the next message as thumbnails, in the order picked; × takes one out (not while they
+/// go out: [onRemove] null). A thumbnail that does not decode shows an image icon instead.
+class _ImageRow extends StatelessWidget {
+  const _ImageRow({required this.images, required this.onRemove});
+
+  final List<AiPickedImage> images;
+  final ValueChanged<AiPickedImage>? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final colors = context.colors;
+    final remove = onRemove;
+    return SizedBox(
+      key: const Key('ai.images'),
+      height: 74,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+        itemCount: images.length,
+        separatorBuilder: (_, _) => 10.sizedWidth,
+        itemBuilder: (context, i) {
+          final image = images[i];
+          return SizedBox(
+            key: Key('ai.image.$i'),
+            width: 64,
+            height: 64,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.memory(
+                      image.bytes,
+                      fit: BoxFit.cover,
+                      cacheWidth: 192,
+                      gaplessPlayback: true,
+                      errorBuilder: (_, _, _) => ColoredBox(
+                        color: colors.divider,
+                        child: Icon(Icons.image_outlined, color: colors.secondaryText),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 2,
+                  right: 2,
+                  child: IconButton(
+                    key: Key('ai.image.remove.$i'),
+                    tooltip: s.aiRemoveImage,
+                    iconSize: 16,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+                    style: IconButton.styleFrom(backgroundColor: colors.surface.withValues(alpha: 0.9)),
+                    onPressed: remove == null ? null : () => remove(image),
+                    icon: Icon(Icons.close, color: colors.primaryText),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// V2-2b B13: the computer's files for the `@` being typed, best first; a tap takes one. Four rows show at once, the
+/// rest scroll.
+class _Suggestions extends StatelessWidget {
+  const _Suggestions({required this.paths, required this.onPick});
+
+  final List<String> paths;
+  final ValueChanged<String> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final dim = context.typo.paragraph13.copyWith(color: colors.secondaryText, fontFamily: FontFamily.jetBrainsMono);
+    final bright = context.typo.paragraph13.bold.copyWith(
+      color: colors.primaryText,
+      fontFamily: FontFamily.jetBrainsMono,
+    );
+    return Container(
+      key: const Key('ai.suggest'),
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      constraints: const BoxConstraints(maxHeight: 4 * 44 + 2),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.divider),
+      ),
+      child: ListView(
+        shrinkWrap: true,
+        padding: EdgeInsets.zero,
+        children: [
+          for (final path in paths.take(AiMentions.maxSuggestions))
+            InkWell(
+              key: Key('ai.suggest.$path'),
+              onTap: () => onPick(path),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: path.substring(0, path.lastIndexOf('/') + 1), style: dim),
+                        TextSpan(text: path.substring(path.lastIndexOf('/') + 1), style: bright),
+                      ],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
             ),
         ],
       ),

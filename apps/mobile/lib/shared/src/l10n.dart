@@ -3665,6 +3665,118 @@ class S {
       args: [],
     );
   }
+
+  /// `Add photos`
+  String get aiAttach {
+    return Intl.message('Add photos', name: 'aiAttach', desc: '', args: []);
+  }
+
+  /// `Photo library`
+  String get aiAttachPhoto {
+    return Intl.message(
+      'Photo library',
+      name: 'aiAttachPhoto',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Camera`
+  String get aiTakePhoto {
+    return Intl.message('Camera', name: 'aiTakePhoto', desc: '', args: []);
+  }
+
+  /// `{n, plural, one{1 image} other{{n} images}}`
+  String aiImagesCount(int n) {
+    return Intl.plural(
+      n,
+      one: '1 image',
+      other: '$n images',
+      name: 'aiImagesCount',
+      desc: '',
+      args: [n],
+    );
+  }
+
+  /// `The image wasn't sent. Retry`
+  String get aiImageFailed {
+    return Intl.message(
+      'The image wasn\'t sent. Retry',
+      name: 'aiImageFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{agent} doesn't take images.`
+  String aiNoImages(String agent) {
+    return Intl.message(
+      '$agent doesn\'t take images.',
+      name: 'aiNoImages',
+      desc: '',
+      args: [agent],
+    );
+  }
+
+  /// `Only JPEG, PNG, GIF or WebP images can be sent.`
+  String get aiImageType {
+    return Intl.message(
+      'Only JPEG, PNG, GIF or WebP images can be sent.',
+      name: 'aiImageType',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This image is over 10 MB.`
+  String get aiImageTooBig {
+    return Intl.message(
+      'This image is over 10 MB.',
+      name: 'aiImageTooBig',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `One message can carry at most 20 MB of images.`
+  String get aiImagesTooMuch {
+    return Intl.message(
+      'One message can carry at most 20 MB of images.',
+      name: 'aiImagesTooMuch',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Couldn't open the photos. Check ShellX's access in Settings.`
+  String get aiPickFailed {
+    return Intl.message(
+      'Couldn\'t open the photos. Check ShellX\'s access in Settings.',
+      name: 'aiPickFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Remove image`
+  String get aiRemoveImage {
+    return Intl.message(
+      'Remove image',
+      name: 'aiRemoveImage',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Sending images…`
+  String get aiUploading {
+    return Intl.message(
+      'Sending images…',
+      name: 'aiUploading',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

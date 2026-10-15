@@ -120,6 +120,20 @@ void main() {
       }
       expect(readFile('ios/Runner/vi.lproj/InfoPlist.strings'), contains('ShellX dùng micro'));
     });
+
+    /// The line of [key] in [strings] (an `InfoPlist.strings`).
+    String line(String strings, String key) => strings.split('\n').firstWhere((l) => l.startsWith('"$key" = "'));
+
+    test('V2-2b B12: photos for AI sessions — the camera says so, and the photo library prompt is there in both '
+        'languages (App Store policy; image_picker never shows it without metadata)', () {
+      final plist = readFile('ios/Runner/Info.plist');
+      expect(plist, contains('<key>NSPhotoLibraryUsageDescription</key>'));
+      for (final (language, words) in [('vi', 'phiên AI'), ('en', 'AI session')]) {
+        final strings = readFile('ios/Runner/$language.lproj/InfoPlist.strings');
+        expect(line(strings, 'NSPhotoLibraryUsageDescription'), contains(words), reason: language);
+        expect(line(strings, 'NSCameraUsageDescription'), contains(words), reason: language);
+      }
+    });
   });
 
   group('Android', () {

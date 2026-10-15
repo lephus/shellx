@@ -534,10 +534,59 @@ class FakeAiMachine implements AiMachine {
     return session(sid);
   }
 
+  /// V2-2b B12, B13: the images and files of each prompt, in the order of [prompts].
+  final List<List<int>> promptBlobs = [];
+  final List<List<String>> promptFiles = [];
+
   @override
-  Future<void> prompt(String sid, String text) async {
+  Future<void> prompt(String sid, String text, {List<int> blobs = const [], List<String> files = const []}) async {
     prompts.add((sid, text));
+    promptBlobs.add(blobs);
+    promptFiles.add(files);
     await _request();
+  }
+
+  var _blobIds = 0;
+
+  /// Every image upload: its number, type and size.
+  final List<(int, String, int)> uploads = [];
+
+  /// Set: uploads fail with it (a lost channel, a refusal), before any part.
+  Object? uploadError;
+
+  /// Set: an upload waits for it before its parts go (the progress shows meanwhile).
+  Completer<void>? uploadGate;
+
+  @override
+  int newBlobId() => ++_blobIds;
+
+  /// Like `MachineAi.uploadImage`: parts of [kAiMaxBlobPartBytes], each one reported as taken.
+  @override
+  Future<void> uploadImage(
+    int blob,
+    String mime,
+    Uint8List bytes, {
+    void Function(int sent, int parts)? onProgress,
+  }) async {
+    uploads.add((blob, mime, bytes.length));
+    final error = uploadError;
+    if (error != null) throw error;
+    await uploadGate?.future;
+    final parts = bytes.isEmpty ? 1 : (bytes.length + kAiMaxBlobPartBytes - 1) ~/ kAiMaxBlobPartBytes;
+    for (var sent = 1; sent <= parts; sent++) {
+      onProgress?.call(sent, parts);
+    }
+  }
+
+  /// What [files] answers, and every query it was asked.
+  List<String> fileHits = const [];
+  final List<(String, String)> fileQueries = [];
+
+  @override
+  Future<List<String>> files(String sid, String query) async {
+    fileQueries.add((sid, query));
+    await _request();
+    return fileHits;
   }
 
   @override

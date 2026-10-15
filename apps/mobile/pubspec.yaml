@@ -50,6 +50,9 @@ dependencies:
   # V2-2: the AI session model and wire format (pure Dart), and the markdown of agent answers.
   # flutter_markdown_plus is pinned exactly like the desktop's (V2-1b D17).
   flutter_markdown_plus: 1.0.12
+  # V2-2b B12: photos for AI sessions (the system photo picker and camera). Pinned exactly: 1.2.4 is the newest
+  # that resolves on Flutter 3.41.4 / Dart 3.11.
+  image_picker: 1.2.4
   shellx_acp: any
   shellx_ai: any
   shellx_client: any
