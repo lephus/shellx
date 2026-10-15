@@ -376,10 +376,6 @@ void main() {
         },
         {
           'm': phone,
-          'b': encodeCbor({'t': 'ai.future', 'x': 1}),
-        },
-        {
-          'm': phone,
           'b': encodeCbor({'t': 'ai.result'}),
         },
         {'m': 7, 'b': result},
