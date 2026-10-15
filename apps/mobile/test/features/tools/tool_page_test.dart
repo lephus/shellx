@@ -323,4 +323,52 @@ void main() {
     expect(page().closes, 1);
     expect(engine.disposed, isTrue);
   });
+
+  // I1: Android's web view never hands "back" to the navigation policy, so the page only walks its
+  // history while it is shown and while that history is of one port.
+  testWidgets('back goes back in the page under the reconnecting strip, and after a load on the same port (I1)', (
+    tester,
+  ) async {
+    await open(tester);
+    await shown(tester);
+    page().ready(); // the same port again (a reload of the entry page)
+    page().setPhase(ToolPhase.reconnecting);
+    await tester.pump();
+    engine.canGoBackValue = true;
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(engine.goBacks, 1);
+    expect(find.text('Bảng việc'), findsOneWidget);
+    expect(page().closes, 0);
+  });
+
+  testWidgets('back leaves the page while a cover hides it: the hidden history is not walked (I1)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    page().setPhase(ToolPhase.disabled);
+    await tester.pump();
+    engine.canGoBackValue = true;
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(engine.goBacks, 0);
+    expect(find.text('Bảng việc'), findsNothing);
+    expect(page().closes, 1);
+  });
+
+  testWidgets('back leaves the page for good once a load came on another port (I1)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    // An E13 resume on another port, then back on the first one: the history still holds pages of both.
+    page().ready(port: 49152);
+    page().ready();
+    engine.callbacks.onPageStarted();
+    engine.callbacks.onPageFinished();
+    await tester.pump();
+    engine.canGoBackValue = true;
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(engine.goBacks, 0);
+    expect(find.text('Bảng việc'), findsNothing);
+    expect(page().closes, 1);
+  });
 }
