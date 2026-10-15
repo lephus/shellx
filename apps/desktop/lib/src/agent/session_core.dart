@@ -79,4 +79,10 @@ final class SessionCore {
   /// window's hub in-process, the forwarder to the window in the
   /// background service). Until then phones hear "unavailable".
   final ai = AiEndpointSlot();
+
+  /// V2-4 E5: where phones' `tool.*` messages go. Every runtime's router
+  /// uses it; the process that holds the relay sets its target to its tool
+  /// proxy (the window in-process, the background service otherwise). Until
+  /// then it does not serve: phones see no Tool group.
+  final tools = ToolEndpointSlot();
 }
