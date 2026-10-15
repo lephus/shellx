@@ -487,10 +487,6 @@ void main() {
           'b': Uint8List.fromList([0xff, 0xff]),
         },
         {'m': phone, 'b': encodeCbor('ai.list')},
-        {
-          'm': phone,
-          'b': encodeCbor({'t': 'ai.future'}),
-        },
         {'m': phone, 'b': encodeCbor(const SessionReset(id: 1).toMap())},
         {'m': 7, 'b': list},
       ];
@@ -499,6 +495,21 @@ void main() {
       }
       await pumpEventQueue();
       expect(hub.calls, isEmpty);
+    });
+
+    test('an ai.in of a kind this version does not know reaches the hub as '
+        'an AiRaw (V2-2b B2), which the hub answers', () async {
+      daemon.send(
+        MuxMessage(
+          MuxType.aiIn,
+          fields: {
+            'm': phone,
+            'b': encodeCbor({'t': 'ai.future', 'rid': 3}),
+          },
+        ),
+      );
+      await pumpEventQueue();
+      expect(hub.calls, ['handle $phone ai.future']);
     });
 
     test('what the hub says goes to the service as ai.out, however big a '

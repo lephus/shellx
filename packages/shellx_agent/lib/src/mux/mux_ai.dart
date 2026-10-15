@@ -27,9 +27,11 @@ AiMessage? _carried(MuxMessage m) {
   }
 }
 
-/// The kinds a desktop sends to a phone; every other kind only ever goes the
-/// other way. Exhaustive: a new kind must be placed here.
-bool _towardsPhone(AiMessage m) => switch (m) {
+/// Which way a kind goes: true for the kinds a desktop sends to a phone,
+/// false for the kinds a phone sends; null for a kind this version does not
+/// know ([AiRaw], V2-2b B2), which goes the way it came. Exhaustive: a new
+/// kind must be placed here.
+bool? _towardsPhone(AiMessage m) => switch (m) {
   AiListResult() ||
   AiSnapshot() ||
   AiUpdate() ||
@@ -45,7 +47,18 @@ bool _towardsPhone(AiMessage m) => switch (m) {
   AiCancel() ||
   AiForceStop() ||
   AiUnqueue() ||
-  AiOpen() => false,
+  AiOpen() ||
+  AiConfigGet() ||
+  AiConfigSet() ||
+  AiBlob() ||
+  AiFiles() ||
+  AiItemPart() ||
+  AiHistory() ||
+  AiFolder() ||
+  AiChanges() ||
+  AiDiff() ||
+  AiRevert() => false,
+  AiRaw() => null,
 };
 
 /// The longest session id the service keeps for a phone: the hub's own limit
@@ -116,7 +129,7 @@ final class MuxAiForwarder implements AiEndpoint {
         final mobileId = m.get<String>('m');
         final message = _carried(m);
         if (mobileId == null || message == null) return;
-        if (!_towardsPhone(message)) return;
+        if (_towardsPhone(message) != true) return;
         if (message is AiClosed) _attached[mobileId]?.remove(message.sid);
         _emit(mobileId, message);
       case MuxType.aiPush:
@@ -135,7 +148,7 @@ final class MuxAiForwarder implements AiEndpoint {
   void handle(String mobileId, AiMessage message) {
     // The router passes every kind: a phone does not send the desktop's (the
     // hub ignores them too), so they go nowhere.
-    if (_towardsPhone(message)) return;
+    if (_towardsPhone(message) == true) return;
     final ui = _ui;
     switch (message) {
       case AiList():

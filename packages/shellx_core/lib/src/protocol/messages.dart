@@ -90,7 +90,8 @@ sealed class AppMessage {
         message: f.string('message'),
         id: f.optionalInteger('id'),
       ),
-      // V2-2: never fatal, see [AiMessage].
+      // V2-2: never fatal, see [AiMessage]; a kind this version does not
+      // know is an [AiRaw] (V2-2b B2).
       _ when t.startsWith('ai.') => AiMessage._fromMap(t, f),
       _ => null,
     };
@@ -619,9 +620,12 @@ final class ErrorMessage extends AppMessage {
   };
 }
 
-/// Encodes 1..n messages as a CBOR array of maps.
-Uint8List encodeBatch(List<AppMessage> messages) =>
-    encodeCbor([for (final message in messages) message.toMap()]);
+/// Encodes 1..n messages as a CBOR array of maps. An `ai.*` message read
+/// from the wire goes out as it came ([AiMessage.wire], V2-2b B2).
+Uint8List encodeBatch(List<AppMessage> messages) => encodeCbor([
+  for (final message in messages)
+    message is AiMessage ? message.wire : message.toMap(),
+]);
 
 /// Decodes a CBOR array of maps, skipping messages whose "t" is unknown.
 /// Throws [FormatException] if [bytes] is not a CBOR array of maps or a
@@ -679,6 +683,35 @@ final class _Fields {
     final value = _map[key];
     if (value == null || value is Uint8List) return value as Uint8List?;
     throw FormatException('$_type: "$key" must be a byte string');
+  }
+
+  /// V2-2b: an optional list of integers; a list holding anything else is
+  /// malformed.
+  List<int>? optionalIntegers(String key) {
+    final value = _map[key];
+    if (value == null) return null;
+    if (value is List && value.every((e) => e is int)) {
+      return [for (final e in value) e as int];
+    }
+    throw FormatException('$_type: "$key" must be a list of integers');
+  }
+
+  /// V2-2b: an optional list of strings; a list holding anything else is
+  /// malformed.
+  List<String>? optionalStrings(String key) {
+    final value = _map[key];
+    if (value == null) return null;
+    if (value is List && value.every((e) => e is String)) {
+      return [for (final e in value) e as String];
+    }
+    throw FormatException('$_type: "$key" must be a list of strings');
+  }
+
+  /// V2-2b B2: [key] when it is a [T], else null; never throws (the fields
+  /// of a kind this version does not know).
+  T? loose<T>(String key) {
+    final value = _map[key];
+    return value is T ? value : null;
   }
 
   T _get<T>(String key) {
