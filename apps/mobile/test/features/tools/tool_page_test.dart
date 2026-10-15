@@ -177,17 +177,31 @@ void main() {
 
   // C1: on Android the plugin loads whatever the policy lets through, and a link the web view will not
   // render (a download, a PDF) comes back to the same policy; let through again, it goes round for ever.
+  // iOS has no such loop (WebKit never re-enters the policy for a download), so the guard is Android's.
   const download = 'http://localhost:5173/files/report.zip';
+  const manual = 'http://localhost:5173/manual.pdf#page=4';
+  final android = TargetPlatformVariant.only(TargetPlatform.android);
+  final ios = TargetPlatformVariant.only(TargetPlatform.iOS);
 
-  testWidgets('an address let through that comes back before any page start is a download: stopped, one toast (C1)', (
-    tester,
-  ) async {
+  testWidgets(
+    'an address let through that comes back before any page start is a download: stopped, one toast (C1)',
+    (tester) async {
+      await open(tester);
+      await shown(tester);
+      expect(engine.callbacks.decide(download, true), isA<ToolGo>());
+      expect(engine.callbacks.decide(download, true), isA<ToolBlock>());
+      expect(popups.infos, ['Tải tệp chưa làm được trên điện thoại.']);
+    },
+    variant: android,
+  );
+
+  testWidgets('a PDF address with a fragment is a download too: stopped, one toast (C1)', (tester) async {
     await open(tester);
     await shown(tester);
-    expect(engine.callbacks.decide(download, true), isA<ToolGo>());
-    expect(engine.callbacks.decide(download, true), isA<ToolBlock>());
+    expect(engine.callbacks.decide(manual, true), isA<ToolGo>());
+    expect(engine.callbacks.decide(manual, true), isA<ToolBlock>());
     expect(popups.infos, ['Tải tệp chưa làm được trên điện thoại.']);
-  });
+  }, variant: android);
 
   testWidgets('after a page start the same address goes on again (C1)', (tester) async {
     await open(tester);
@@ -196,7 +210,7 @@ void main() {
     engine.callbacks.onPageStarted();
     expect(engine.callbacks.decide(download, true), isA<ToolGo>());
     expect(popups.infos, isEmpty);
-  });
+  }, variant: android);
 
   testWidgets('a page started twice and never finished that comes back a third time is a download too (C1)', (
     tester,
@@ -209,34 +223,29 @@ void main() {
     engine.callbacks.onPageStarted();
     expect(engine.callbacks.decide(download, true), isA<ToolBlock>());
     expect(popups.infos, ['Tải tệp chưa làm được trên điện thoại.']);
-  });
+  }, variant: android);
 
   testWidgets('a finished page forgets what it let through: a reload after a redirect goes on (C1)', (tester) async {
     await open(tester);
     await shown(tester);
-    // iOS asks the policy for the entry URL, for the redirect it answers with, and again for a reload.
     expect(engine.callbacks.decide('http://localhost:5173/__shellx/enter?n=x', true), isA<ToolGo>());
     engine.callbacks.onPageStarted();
     expect(engine.callbacks.decide('http://localhost:5173/', true), isA<ToolGo>());
     engine.callbacks.onPageFinished();
     expect(engine.callbacks.decide('http://localhost:5173/', true), isA<ToolGo>());
     expect(popups.infos, isEmpty);
-  });
+  }, variant: android);
 
-  testWidgets('links within a page, frames and about:blank are never stopped (C1)', (tester) async {
+  testWidgets('frames and about:blank are never stopped (C1)', (tester) async {
     await open(tester);
     await shown(tester);
-    for (final (url, mainFrame) in [
-      ('http://localhost:5173/#/board', true),
-      ('http://localhost:5173/files/report.zip', false),
-      ('about:blank', true),
-    ]) {
+    for (final (url, mainFrame) in [(download, false), (manual, false), ('about:blank', true)]) {
       for (var i = 0; i < 4; i++) {
         expect(engine.callbacks.decide(url, mainFrame), isA<ToolGo>(), reason: '$url, time $i');
       }
     }
     expect(popups.infos, isEmpty);
-  });
+  }, variant: android);
 
   testWidgets('a load the app makes itself is no re-entry (C1)', (tester) async {
     await open(tester);
@@ -248,7 +257,20 @@ void main() {
     page().emit(const ToolReload());
     expect(engine.callbacks.decide(download, true), isA<ToolGo>());
     expect(popups.infos, isEmpty);
-  });
+  }, variant: android);
+
+  testWidgets('on iOS there is no guard: WebKit asks the policy for a #/route link again and again (C1)', (
+    tester,
+  ) async {
+    await open(tester);
+    await shown(tester);
+    for (final url in [download, manual, 'http://localhost:5173/#/board']) {
+      for (var i = 0; i < 4; i++) {
+        expect(engine.callbacks.decide(url, true), isA<ToolGo>(), reason: '$url, time $i');
+      }
+    }
+    expect(popups.infos, isEmpty);
+  }, variant: ios);
 
   // I3: iOS reports a page that failed to load only as an error and never as finished.
   testWidgets('a page that fails to load ends the load: no progress line, no slow line, no cover (I3)', (
@@ -289,7 +311,7 @@ void main() {
     engine.callbacks.onLoadError(true);
     expect(engine.callbacks.decide(download, true), isA<ToolGo>());
     expect(popups.infos, isEmpty);
-  });
+  }, variant: android);
 
   testWidgets('the page\'s dialogs are the app\'s and name the tool (E12)', (tester) async {
     await open(tester);

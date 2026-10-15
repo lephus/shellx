@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/tools/domain/tool_navigation.dart';
@@ -109,8 +110,8 @@ class ToolPageController extends Controller {
     }
   }
 
-  /// [ToolWebCallbacks.decide]: E12 against what this phone serves now, and C1: a main-frame address
-  /// let through that comes back to the policy before any page has started is a download (or a
+  /// [ToolWebCallbacks.decide]: E12 against what this phone serves now, and (on Android) C1: a main-frame
+  /// address let through that comes back to the policy before any page has started is a download (or a
   /// response the web view will not render) and is stopped, with the "no downloads" toast.
   ///
   /// Why: on Android the plugin loads whatever the policy lets through, and hands a download to the
@@ -118,12 +119,16 @@ class ToolPageController extends Controller {
   /// request would go to the computer for ever. Where the web view reports a page start for such an
   /// attempt (it fires when a navigation begins) the first re-entry cannot be told from a link
   /// followed again, so an address let through twice and never finished is stopped the third time.
-  /// A finished or failed page, a load the app makes itself, a different address, a frame, a link
-  /// within a page (a fragment) and `about:blank` forget or skip all of this.
+  /// A finished or failed page, a load the app makes itself, a different address, a frame and
+  /// `about:blank` forget or skip all of this. A fragment is no exception: same-page fragment links
+  /// never reach Android's policy, and `manual.pdf#page=4` is as much a download as `manual.pdf`.
+  ///
+  /// Not on iOS: WebKit never re-enters the policy for a download, and it asks the policy for every
+  /// `#/route` link of a page, so the same address coming back there is a user following a link again.
   ToolNavigation decide(String url, bool mainFrame) {
     final decision = toolNavigation(url, mainFrame: mainFrame, origins: _page?.origins ?? const {});
     if (decision is ToolOtherLocal) _notices.add((ToolNotice.siblingOff, decision.port));
-    if (mainFrame && decision is ToolGo && url != 'about:blank' && !(Uri.tryParse(url)?.hasFragment ?? false)) {
+    if (defaultTargetPlatform == TargetPlatform.android && mainFrame && decision is ToolGo && url != 'about:blank') {
       if (_passed == url && (!_startedSincePass || _passes >= 2)) {
         _notices.add((ToolNotice.noDownloads, null));
         return const ToolBlock();
