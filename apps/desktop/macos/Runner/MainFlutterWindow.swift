@@ -4,6 +4,9 @@ import ServiceManagement
 import window_manager
 
 class MainFlutterWindow: NSWindow {
+  // A6 Task 7: UI path only; the daemon has no view controller (D35).
+  private var browserNative: BrowserNative?
+
   override func awakeFromNib() {
     // A5b D2: the daemon has no view controller (and so no second engine).
     if isDaemon {
@@ -19,6 +22,7 @@ class MainFlutterWindow: NSWindow {
     LaunchAtLoginChannel.register(
       messenger: flutterViewController.engine.binaryMessenger)
     AppChannel.register(messenger: flutterViewController.engine.binaryMessenger)
+    browserNative = BrowserNative(controller: flutterViewController)
 
     super.awakeFromNib()
   }
