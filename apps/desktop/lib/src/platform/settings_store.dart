@@ -110,6 +110,10 @@ abstract final class SettingKeys {
   /// `agent<TAB>config<TAB>json value` per element. UI-owned.
   static const String aiAgentConfig = 'ai_agent_config';
 
+  /// V2-3 D2: the personal tools of every workspace, one JSON object
+  /// `{id, ws, name, url, phone}` per element. UI-owned.
+  static const String workspaceTools = 'workspace_tools';
+
   static const Set<String> all = {
     remoteAccess,
     keepAwake,
@@ -145,6 +149,7 @@ abstract final class SettingKeys {
     aiDefaultAgent,
     aiCustomAgents,
     aiAgentConfig,
+    workspaceTools,
   };
 }
 
@@ -201,6 +206,7 @@ abstract final class UiSettingKeys {
     SettingKeys.aiDefaultAgent,
     SettingKeys.aiCustomAgents,
     SettingKeys.aiAgentConfig,
+    SettingKeys.workspaceTools,
   };
 }
 

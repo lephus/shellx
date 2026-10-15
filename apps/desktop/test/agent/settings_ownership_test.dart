@@ -67,6 +67,8 @@ const _expectedUi = {
   'ai_default_agent',
   'ai_custom_agents',
   'ai_agent_config',
+  // V2-3 D2: the tools live in the window (V2-4 reads them there too).
+  'workspace_tools',
 };
 
 final class _Listener implements MuxListener {
@@ -91,7 +93,7 @@ void main() {
   test('the decision for every current key is the recorded one', () {
     expect(DaemonSettingKeys.all, _expectedDaemon);
     expect(UiSettingKeys.all, _expectedUi);
-    expect(SettingKeys.all, hasLength(34));
+    expect(SettingKeys.all, hasLength(35));
     expect(
       SettingKeys.quitKeepsSessionsExplained,
       'quit_keeps_sessions_explained',
