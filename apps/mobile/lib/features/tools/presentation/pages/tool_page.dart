@@ -55,6 +55,7 @@ class _ToolPageState extends State<ToolPage> {
           onProgress: _controller.progressed,
           onPageStarted: _controller.pageStarted,
           onPageFinished: _controller.pageFinished,
+          onLoadError: _controller.loadFailed,
           onCrashed: _controller.crashed,
           onFileChooser: _controller.fileChooser,
           alert: _alert,

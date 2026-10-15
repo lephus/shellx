@@ -12,6 +12,7 @@ final class ToolWebCallbacks {
     required this.onProgress,
     required this.onPageStarted,
     required this.onPageFinished,
+    required this.onLoadError,
     required this.onCrashed,
     required this.onFileChooser,
     required this.alert,
@@ -24,6 +25,10 @@ final class ToolWebCallbacks {
   final void Function(int percent) onProgress;
   final void Function() onPageStarted;
   final void Function() onPageFinished;
+
+  /// A load failed: [mainFrame] is true for the page itself, false for something inside it (an image,
+  /// a script). iOS tells a page that did not load only through this, never as finished.
+  final void Function(bool mainFrame) onLoadError;
 
   /// The web content process stopped: the page reloads.
   final void Function() onCrashed;
@@ -87,7 +92,12 @@ final class WebViewToolEngine implements ToolWebEngine {
           onPageStarted: (_) => callbacks.onPageStarted(),
           onPageFinished: (_) => callbacks.onPageFinished(),
           onWebResourceError: (error) {
-            if (error.errorType == WebResourceErrorType.webContentProcessTerminated) callbacks.onCrashed();
+            if (error.errorType == WebResourceErrorType.webContentProcessTerminated) {
+              callbacks.onCrashed();
+            } else {
+              // No frame given: the page's own, so that a load that would never end does end.
+              callbacks.onLoadError(error.isForMainFrame ?? true);
+            }
           },
         ),
       ),
