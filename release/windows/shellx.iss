@@ -118,6 +118,11 @@ begin
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
 end;
 
+{ Not one of Inno Setup's support functions (ISCC: "Unknown identifier 'GetTickCount'"): imported
+  from kernel32, as Examples\CodeDll.iss imports Windows API functions. }
+function GetTickCount: DWord;
+external 'GetTickCount@kernel32.dll stdcall';
+
 { Waits up to QuitWaitMs, looking every QuitPollMs, until ShellX.exe is gone. }
 procedure WaitForShellXToQuit();
 var

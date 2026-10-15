@@ -136,3 +136,7 @@ test('no line starts with "[" unless it is a whole section tag (ISCC: "Invalid s
     .filter(({ text }) => text.startsWith('[') && !/^\[[^\]]+\]$/.test(text));
   assert.deepEqual(bad, []);
 });
+
+test('[Code] imports GetTickCount from kernel32 (it is not an Inno Setup support function)', () => {
+  assert.match(iss, /^function GetTickCount: DWord;\nexternal 'GetTickCount@kernel32\.dll stdcall';$/m);
+});
