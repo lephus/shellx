@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math' show min;
+import 'dart:math' show Random, min;
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
@@ -248,8 +248,19 @@ final class MachineAi {
   final _pending = <int, _Pending>{};
   var _nextRid = 1;
 
-  /// V2-2b B12, R17: the number of the next image this phone uploads.
-  var _nextBlob = 1;
+  /// V2-2b B12, R17, F33: the number of the next image this phone uploads.
+  /// It starts at a number of this run's own (random, in [1, 2^30)) and goes
+  /// on by one: an app started again within the 2 minutes the computer keeps
+  /// an image, before it saw the old channel go, would otherwise begin at the
+  /// same number, and the computer — which keeps an image already whole as it
+  /// came — would answer the new parts ok and send the previous run's image
+  /// with the prompt.
+  var _nextBlob = Random.secure().nextInt((1 << 30) - 1) + 1;
+
+  /// V2-2b F32: the channels lost so far. An upload that began before one is
+  /// over: the computer dropped its parts when the phone left, and nothing is
+  /// uploaded on a new channel by itself (R23).
+  var _lostChannels = 0;
 
   /// Image parts in flight at once (V2-2b B12).
   static const int _partsInFlight = 4;
@@ -329,16 +340,21 @@ final class MachineAi {
         : _feature(AiFeature.blob, sid, make);
   }
 
-  /// V2-2b B12, R17: a number for the next image this phone uploads, never
-  /// the same twice for this machine.
+  /// V2-2b B12, R17, F33: a number for the next image this phone uploads:
+  /// never the same twice for this machine, and not the numbers an earlier
+  /// run of the app used (the first is random, the rest follow it).
   int newBlobId() => _nextBlob++;
 
   /// V2-2b B12: uploads image [blob] — [bytes] of type [mime] — in parts of
   /// at most [kAiMaxBlobPartBytes], at most four in flight; [onProgress]
   /// after each part the computer took. A part the computer is too busy for
   /// goes again after a moment, three times at most. Throws like every
-  /// request; a lost channel fails it, and the caller uploads the image again
-  /// (never the prompt by itself, V2-2 D13).
+  /// request. The upload is over (F32) when a part failed — nothing more is
+  /// sent, also by the parts waiting to ask again — and when a channel is
+  /// lost, even while every part waits: it fails with
+  /// [MachineConnectionException] and sends nothing on the new channel. The
+  /// caller uploads the image again, on the user's next Send (never the prompt
+  /// by itself, V2-2 D13, R23).
   Future<void> uploadImage(
     int blob,
     String mime,
@@ -351,19 +367,44 @@ final class MachineAi {
     }
     final parts =
         (bytes.length + kAiMaxBlobPartBytes - 1) ~/ kAiMaxBlobPartBytes;
+    final lost = _lostChannels;
     var next = 0;
     var sent = 0;
     var failed = false;
-    Future<void> worker() async {
-      while (!failed && next < parts) {
-        final part = next++;
-        final from = part * kAiMaxBlobPartBytes;
-        final data = bytes.sublist(
-          from,
-          min(from + kAiMaxBlobPartBytes, bytes.length),
+
+    /// F32: whether the upload goes on, asked before every part and after
+    /// every wait to ask again. False once a part failed; and it throws once
+    /// a channel was lost since the upload began (the computer dropped every
+    /// part when the phone left: a part sent now would begin an image that
+    /// is never whole).
+    bool goesOn() {
+      if (_lostChannels != lost) {
+        throw const MachineConnectionException(
+          MachineConnectionFailure.agentOffline,
         );
+      }
+      return !failed;
+    }
+
+    Future<void> worker() async {
+      while (next < parts) {
         try {
-          await _blobPart(blob, part, parts, part == 0 ? mime : null, data);
+          if (!goesOn()) return;
+          final part = next++;
+          final from = part * kAiMaxBlobPartBytes;
+          final data = bytes.sublist(
+            from,
+            min(from + kAiMaxBlobPartBytes, bytes.length),
+          );
+          final taken = await _blobPart(
+            blob,
+            part,
+            parts,
+            part == 0 ? mime : null,
+            data,
+            goesOn,
+          );
+          if (!taken) return;
         } on Object {
           failed = true;
           rethrow;
@@ -378,12 +419,16 @@ final class MachineAi {
   }
 
   /// One part of an upload; `busy` waits and asks again, three times at most.
-  Future<void> _blobPart(
+  /// After each wait [goesOn] (F32) decides whether the part is still wanted:
+  /// it throws, or says no — then nothing is sent, and the answer is false.
+  /// True: the computer took the part.
+  Future<bool> _blobPart(
     int blob,
     int part,
     int parts,
     String? mime,
     Uint8List data,
+    bool Function() goesOn,
   ) async {
     for (var attempt = 0; ; attempt++) {
       try {
@@ -399,10 +444,11 @@ final class MachineAi {
             data: data,
           ),
         );
-        return;
+        return true;
       } on AiRequestException catch (e) {
         if (e.code != 'busy' || attempt >= 3) rethrow;
         await Future<void>.delayed(const Duration(milliseconds: 500));
+        if (!goesOn()) return false;
       }
     }
   }
@@ -664,9 +710,11 @@ final class MachineAi {
 
   /// The channel is gone: requests in flight fail (and are never sent again,
   /// the user sees the new state and asks again), mirrors wait for the next
-  /// channel.
+  /// channel, and an image upload that began before is over (F32), also one
+  /// whose parts are all waiting to ask again.
   @internal
   void channelLost() {
+    _lostChannels++;
     for (final link in [..._links.values]) {
       link._lost();
     }
