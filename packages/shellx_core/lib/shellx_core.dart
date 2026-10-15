@@ -12,6 +12,7 @@ export 'src/noise/noise_key_pair.dart';
 export 'src/noise/handshake.dart';
 export 'src/protocol/handshake_payloads.dart';
 export 'src/protocol/messages.dart';
+export 'src/protocol/batches.dart';
 export 'src/channel/payload.dart';
 export 'src/channel/secure_channel.dart';
 export 'src/pairing/pairing_uri.dart';

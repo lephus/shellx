@@ -149,20 +149,6 @@ void main() {
     });
   });
 
-  test('splitIntoBatches measures encoded sizes', () {
-    final small = [for (var i = 0; i < 50; i++) SessionAttached(id: i)];
-    expect(splitIntoBatches(small), hasLength(1));
-    final big = [for (var i = 0; i < 7; i++) output(0, 16 * 1024)];
-    final batches = splitIntoBatches(big);
-    expect([for (final b in batches) b.length], [3, 3, 1]);
-    for (final batch in batches) {
-      expect(
-        encodeBatch(batch).length,
-        lessThanOrEqualTo(kMaxSealedBatchBytes),
-      );
-    }
-  });
-
   test('batches are sealed and sent in order', () {
     fakeAsync((async) {
       final (agentSide, phoneSide) = drive(async, securePair());
