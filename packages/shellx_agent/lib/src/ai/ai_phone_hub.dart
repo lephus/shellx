@@ -40,12 +40,22 @@ final class AiSessionEntry with Redacted {
   final AiRemoteState? unavailable;
 }
 
+/// What a phone sends (V2-2 D7, V2-2b B24): its text. The window makes the
+/// agent's blocks of it and sends them as the phone's
+/// (`PromptSource.phone`), so the computer shows who wrote it.
+final class AiPhonePrompt with Redacted {
+  const AiPhonePrompt(this.text);
+
+  final String text;
+}
+
 /// What a phone may do to a running session (V2-1a `AiRuntime`).
 abstract interface class AiControl {
   AiSessionState get state;
 
-  /// Sends or queues (V2-1 D16); false when it cannot be taken.
-  Future<bool> send(List<ContentBlock> prompt);
+  /// Sends or queues [prompt] as the phone's (V2-1 D16, V2-2b B24); false
+  /// when it cannot be taken.
+  Future<bool> send(AiPhonePrompt prompt);
   void cancel();
   Future<void> forceStop();
 
@@ -1117,7 +1127,7 @@ final class AiPhoneHub implements AiEndpoint {
         code = 'too_large';
       } else if (control.state.queue.length >= AiSessionState.maxQueue) {
         code = 'queue_full';
-      } else if (!await control.send([TextBlock(text)])) {
+      } else if (!await control.send(AiPhonePrompt(text))) {
         code = 'refused';
       }
     } on Object {

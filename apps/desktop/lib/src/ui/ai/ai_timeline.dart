@@ -206,7 +206,9 @@ class AiUserMessage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          l10n.aiYou,
+          // V2-2b B24: a prompt written on a paired phone says so.
+          item.source == PromptSource.phone ? l10n.aiYouFromPhone : l10n.aiYou,
+          key: const Key('ai.user.label'),
           style: ShellxText.caption.copyWith(
             color: ShellxDesktopColors.textSecondary,
           ),

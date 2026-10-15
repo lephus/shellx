@@ -273,8 +273,11 @@ final class _RuntimeControl implements AiControl {
   @override
   AiSessionState get state => _runtime.state;
 
+  /// V2-2b B24: the computer shows it as the phone's ("Bạn · từ điện
+  /// thoại").
   @override
-  Future<bool> send(List<ContentBlock> prompt) => _runtime.send(prompt);
+  Future<bool> send(AiPhonePrompt prompt) =>
+      _runtime.send([TextBlock(prompt.text)], source: PromptSource.phone);
 
   @override
   void cancel() => _runtime.cancel();

@@ -190,7 +190,7 @@ final class _Control implements AiControl {
   final answers = <(int, String)>[];
 
   @override
-  Future<bool> send(List<ContentBlock> prompt) async => true;
+  Future<bool> send(AiPhonePrompt prompt) async => true;
   @override
   void cancel() {}
   @override

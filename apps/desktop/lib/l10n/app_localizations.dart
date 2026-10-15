@@ -4998,6 +4998,12 @@ abstract class AppLocalizations {
   /// **'You'**
   String get aiYou;
 
+  /// No description provided for @aiYouFromPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'You · from your phone'**
+  String get aiYouFromPhone;
+
   /// No description provided for @aiThinking.
   ///
   /// In en, this message translates to:

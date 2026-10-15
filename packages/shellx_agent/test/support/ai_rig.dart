@@ -16,6 +16,9 @@ final class FakeAiControl implements AiControl {
   @override
   final AiSessionState state;
   final sent = <String>[];
+
+  /// Every prompt as it came (V2-2b: what a phone sends with its text).
+  final prompts = <AiPhonePrompt>[];
   final permissions = <(int, String)>[];
   final asks = <(int, ElicitationResponse)>[];
   var cancels = 0;
@@ -42,17 +45,20 @@ final class FakeAiControl implements AiControl {
     if (refusal != null) throw refusal;
   }
 
+  /// Like `AiRuntime.send` for a phone: the prompt is the phone's (B24).
   @override
-  Future<bool> send(List<ContentBlock> prompt) async {
+  Future<bool> send(AiPhonePrompt prompt) async {
     final gate = hold;
     if (gate != null) await gate.future;
     _fail();
     if (!accept) return false;
-    sent.add(blockText(prompt));
+    sent.add(prompt.text);
+    prompts.add(prompt);
+    final blocks = [TextBlock(prompt.text)];
     if (state.turn == null) {
-      state.beginTurn(prompt, aiT0);
+      state.beginTurn(blocks, aiT0, source: PromptSource.phone);
     } else {
-      state.enqueue(prompt);
+      state.enqueue(blocks, source: PromptSource.phone);
     }
     return true;
   }

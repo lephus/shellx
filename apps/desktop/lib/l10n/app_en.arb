@@ -1268,6 +1268,7 @@
   "aiLogEmpty": "(empty)",
   "aiResumeLoading": "Loading the conversation…",
   "aiYou": "You",
+  "aiYouFromPhone": "You · from your phone",
   "aiThinking": "Thinking",
   "aiToolRead": "Read",
   "aiToolEdit": "Edit",

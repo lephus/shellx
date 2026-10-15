@@ -27,6 +27,7 @@ final class MirrorText extends MirrorItem {
     this.kind,
     this.text, {
     this.fullLength,
+    this.fromPhone = false,
   });
 
   final MirrorTextKind kind;
@@ -35,6 +36,10 @@ final class MirrorText extends MirrorItem {
   /// Set when an earlier page brought only the start of a long text: its
   /// whole length (the rest is read on the computer).
   final int? fullLength;
+
+  /// V2-2b B24: a user's prompt written on a phone (`src`), not at the
+  /// computer.
+  final bool fromPhone;
 }
 
 /// What happened to a tool call's permission request.
@@ -543,6 +548,7 @@ final class AiMirror with Redacted {
           MirrorTextKind.values.byName(kind!),
           at == 0 ? add : before + add,
           fullLength: jInt(r, 'clip'),
+          fromPhone: jString(r, 'src') == 'phone',
         );
       case 'tool':
         final out = jMap(r, 'out');

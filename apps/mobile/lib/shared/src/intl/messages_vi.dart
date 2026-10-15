@@ -234,6 +234,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiFromComputerOnly": MessageLookupByLibrary.simpleMessage(
       "Quá lớn để xem trên điện thoại. Xem trên máy tính.",
     ),
+    "aiFromPhone": MessageLookupByLibrary.simpleMessage("từ điện thoại"),
     "aiGroup": MessageLookupByLibrary.simpleMessage("Phiên AI"),
     "aiItemOnComputer": MessageLookupByLibrary.simpleMessage(
       "Điện thoại chưa hỗ trợ loại mục này. Xem trên máy tính.",

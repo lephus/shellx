@@ -3138,6 +3138,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get aiYou => 'Bạn';
 
   @override
+  String get aiYouFromPhone => 'Bạn · từ điện thoại';
+
+  @override
   String get aiThinking => 'Suy nghĩ';
 
   @override

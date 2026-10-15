@@ -631,6 +631,7 @@
   "@aiContext": {"placeholders": {"percent": {"type": "int"}}},
   "aiPlan": "Plan · {done}/{total}",
   "@aiPlan": {"placeholders": {"done": {"type": "int"}, "total": {"type": "int"}}},
+  "aiFromPhone": "from phone",
   "pickerTools": "Tools",
   "toolRowSub": "{workspace} · localhost:{port}",
   "@toolRowSub": {"placeholders": {"workspace": {"type": "String"}, "port": {"type": "int"}}},

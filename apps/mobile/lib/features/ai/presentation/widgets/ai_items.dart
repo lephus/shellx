@@ -66,6 +66,16 @@ class _UserBubble extends StatelessWidget {
               // Plain text: the timeline's one SelectionArea makes it selectable, without an editor of its own.
               Text(shown.text, style: context.typo.paragraph.copyWith(color: colors.primaryText)),
               if (shown.cut || item.fullLength != null) _Hint(S.of(context).aiCutText),
+              // V2-2b B24: written on a phone (this one or another), as the computer says too.
+              if (item.fromPhone)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    S.of(context).aiFromPhone,
+                    key: const Key('ai.user.fromPhone'),
+                    style: context.typo.metadata12.copyWith(color: colors.secondaryText),
+                  ),
+                ),
             ],
           ),
         ),
