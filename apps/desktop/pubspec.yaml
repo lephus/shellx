@@ -54,6 +54,10 @@ dependencies:
   shellx_ai: any
   shellx_core: any
   tray_manager: ^0.5.3
+  # V2-3 D6: WKWebView as a platform view on macOS (tools). Pinned exactly:
+  # wkwebview 3.26+ needs Flutter 3.44 / Dart 3.12.
+  webview_flutter: 4.14.1
+  webview_flutter_wkwebview: 3.25.1
   win32: ^5.15.0
   window_manager: ^0.5.2
   # xterm 4.0.0 (same version as apps/mobile, A1 D12), vendored for one
