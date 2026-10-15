@@ -270,6 +270,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiJumpLatest": MessageLookupByLibrary.simpleMessage("Mới nhất"),
     "aiLoadEarlier": MessageLookupByLibrary.simpleMessage("Tải thêm"),
     "aiLoadingParts": m5,
+    "aiMicTooltip": MessageLookupByLibrary.simpleMessage("Nói tin nhắn"),
     "aiModeAcceptEdits": MessageLookupByLibrary.simpleMessage("Tự sửa tệp"),
     "aiModeAuto": MessageLookupByLibrary.simpleMessage("Tự động"),
     "aiModeBypass": MessageLookupByLibrary.simpleMessage("Bỏ qua mọi quyền"),

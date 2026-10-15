@@ -425,5 +425,6 @@
   "aiImagesTooMuch": "Một tin chỉ mang được tối đa 20 MB ảnh.",
   "aiPickFailed": "Không mở được ảnh. Hãy kiểm tra quyền của ShellX trong Cài đặt.",
   "aiRemoveImage": "Bỏ ảnh",
-  "aiUploading": "Đang gửi ảnh…"
+  "aiUploading": "Đang gửi ảnh…",
+  "aiMicTooltip": "Nói tin nhắn"
 }

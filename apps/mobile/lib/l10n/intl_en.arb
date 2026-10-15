@@ -663,5 +663,6 @@
   "aiImagesTooMuch": "One message can carry at most 20 MB of images.",
   "aiPickFailed": "Couldn't open the photos. Check ShellX's access in Settings.",
   "aiRemoveImage": "Remove image",
-  "aiUploading": "Sending images…"
+  "aiUploading": "Sending images…",
+  "aiMicTooltip": "Speak a message"
 }
