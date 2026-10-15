@@ -655,8 +655,18 @@ final class ToolSession {
       );
   }
 
-  /// Answers [request] here, with [text] as a plain body when given.
-  Future<void> _answer(HttpRequest request, int status, [String? text]) async {
+  /// Answers [request] here, with [text] as a plain body when given. The
+  /// request is read to its end before the response is closed — by [read]
+  /// when a stream reads it already (a second `listen` throws), else drained
+  /// here — so a webview still sending a body takes the answer (dart:io
+  /// drops a connection whose request it did not read). Whatever happens to
+  /// the request, the response is closed.
+  Future<void> _answer(
+    HttpRequest request,
+    int status, [
+    String? text,
+    Future<void>? read,
+  ]) async {
     final response = request.response;
     try {
       response.statusCode = status;
@@ -673,15 +683,24 @@ final class ToolSession {
         response.contentLength = bytes.length;
         response.add(bytes);
       }
-      await request.drain<void>().catchError((Object _) {});
+    } on Object {
+      return; // the webview went away
+    }
+    try {
+      await (read ?? request.drain<void>());
+    } on Object {
+      // The webview went away while sending.
+    }
+    try {
       await response.close();
     } on Object {
       // The webview went away meanwhile.
     }
   }
 
-  /// What a stream that ended before its response answers the webview.
-  Future<void> _answerEnd(HttpRequest request, _Served served, String? code) {
+  /// What [stream], ended before its response, answers the webview.
+  Future<void> _answerEnd(_Stream stream, String? code) {
+    final served = stream.served;
     final c = toolEndCode(code) ?? ToolCode.aborted;
     if (served.main &&
         (c == ToolCode.refused ||
@@ -694,33 +713,26 @@ final class ToolSession {
       _events.add(ToolSiblingOff(served.port));
     }
     return switch (c) {
-      ToolCode.refused => _answer(
-        request,
+      ToolCode.refused => stream.reply(
         HttpStatus.badGateway,
         texts.refused(served.main ? _port : served.port),
       ),
       ToolCode.disabled || ToolCode.gone =>
         served.main
-            ? _answer(request, HttpStatus.badGateway, texts.disabled)
-            : _answer(
-                request,
+            ? stream.reply(HttpStatus.badGateway, texts.disabled)
+            : stream.reply(
                 HttpStatus.badGateway,
                 texts.siblingOff(served.port),
               ),
-      ToolCode.busy => _answer(request, HttpStatus.serviceUnavailable),
-      ToolCode.tooLarge => _answer(
-        request,
-        HttpStatus.badGateway,
-        texts.tooLarge,
-      ),
-      ToolCode.timeout => _answer(request, HttpStatus.gatewayTimeout),
-      ToolCode.unavailable || ToolCode.desktopClosed => _answer(
-        request,
+      ToolCode.busy => stream.reply(HttpStatus.serviceUnavailable),
+      ToolCode.tooLarge => stream.reply(HttpStatus.badGateway, texts.tooLarge),
+      ToolCode.timeout => stream.reply(HttpStatus.gatewayTimeout),
+      ToolCode.unavailable || ToolCode.desktopClosed => stream.reply(
         HttpStatus.serviceUnavailable,
         texts.needsDesktop,
       ),
-      ToolCode.badRequest => _answer(request, HttpStatus.badRequest),
-      _ => _answer(request, HttpStatus.badGateway),
+      ToolCode.badRequest => stream.reply(HttpStatus.badRequest),
+      _ => stream.reply(HttpStatus.badGateway),
     };
   }
 
@@ -772,6 +784,14 @@ sealed class _Stream implements ToolStreamListener {
 
   void start();
 
+  /// Completes once the request was read to its end, when this stream reads
+  /// it; null when nothing does (an answer drains it then).
+  Future<void>? get read => null;
+
+  /// Answers the webview here, before any response of the tool.
+  Future<void> reply(int status, [String? text]) =>
+      session._answer(request, status, text, read);
+
   /// Ended here (page left, app paused): the computer is told.
   void abort() {
     if (done) return;
@@ -798,7 +818,7 @@ sealed class _Stream implements ToolStreamListener {
     if (responded) {
       cut();
     } else {
-      unawaited(session._answer(request, HttpStatus.badGateway));
+      unawaited(reply(HttpStatus.badGateway));
     }
   }
 }
@@ -817,15 +837,48 @@ final class _HttpStream extends _Stream {
   ToolBytesOut? _body;
   ToolBytesIn? _answer;
 
+  /// The webview's request, read by this stream from [start] on.
+  StreamSubscription<List<int>>? _upload;
+  final _read = Completer<void>();
+
+  @override
+  Future<void> get read => _read.future;
+
+  void _readAll() {
+    if (!_read.isCompleted) _read.complete();
+  }
+
   @override
   void start() {
-    if (!hasBody) {
-      unawaited(request.drain<void>().catchError((Object _) {}));
-      return;
-    }
+    final source = hasBody ? StreamController<List<int>>(sync: true) : null;
+    final upload = _upload = request.listen(
+      source?.add,
+      onError: (Object error) {
+        _readAll();
+        source?.addError(error);
+      },
+      onDone: () {
+        _readAll();
+        unawaited(source?.close());
+      },
+      cancelOnError: true,
+    );
+    if (source == null) return; // no body: read to its end
+    // The outlet reads the body through [source], pausing the request with
+    // it. Once the outlet stops (the stream is over, or the body too large)
+    // what is left is read and dropped, so a webview still sending finishes
+    // and takes the answer: cancelling the request itself would make dart:io
+    // drop the connection before the answer is out.
+    source
+      ..onPause = upload.pause
+      ..onResume = upload.resume
+      ..onCancel = () {
+        upload.onData(null);
+        if (upload.isPaused) upload.resume();
+      };
     _body = ToolBytesOut(
       id: id,
-      source: request,
+      source: source.stream,
       window: window,
       pacer: const ToolUnpaced(),
       send: link.enqueue,
@@ -834,10 +887,32 @@ final class _HttpStream extends _Stream {
         if (done) return;
         link.enqueue(ToolEnd(id: id, code: ToolCode.aborted));
         forget();
-        unawaited(session._answer(request, HttpStatus.requestEntityTooLarge));
+        if (responded) {
+          cut(); // the tool's answer is under way: it is cut
+        } else {
+          unawaited(reply(HttpStatus.requestEntityTooLarge));
+        }
       },
       onError: (_) => abort(),
     )..start();
+  }
+
+  /// Every end of the stream stops the body's outlet (it would otherwise
+  /// wait on the shared credit, holding its buffer and the request).
+  @override
+  void forget() {
+    _body?.cancel();
+    super.forget();
+  }
+
+  /// Closes the forwarded [response] once the request was read to its end.
+  Future<void> _close(HttpResponse response) async {
+    await read;
+    try {
+      await response.close();
+    } on Object {
+      // The webview went away.
+    }
   }
 
   @override
@@ -848,7 +923,7 @@ final class _HttpStream extends _Stream {
     final status = message.status;
     if (status < 100 || status > 599 || status == 101) {
       forget();
-      unawaited(session._answer(request, HttpStatus.badGateway));
+      unawaited(reply(HttpStatus.badGateway));
       return;
     }
     response.statusCode = status;
@@ -881,7 +956,7 @@ final class _HttpStream extends _Stream {
     }
     if (message.end || head || noBody) {
       forget();
-      unawaited(response.close().catchError((Object _) => response));
+      unawaited(_close(response));
       return;
     }
     final inlet = _answer = ToolBytesIn(
@@ -890,8 +965,8 @@ final class _HttpStream extends _Stream {
     unawaited(
       response
           .addStream(inlet.stream)
-          .then((_) => response.close())
-          .catchError((Object _) => response),
+          .then((_) => _close(response))
+          .catchError((Object _) {}),
     );
   }
 
@@ -921,7 +996,7 @@ final class _HttpStream extends _Stream {
     if (responded) {
       cut();
     } else {
-      unawaited(session._answerEnd(request, served, message.code));
+      unawaited(session._answerEnd(this, message.code));
     }
   }
 
@@ -930,7 +1005,11 @@ final class _HttpStream extends _Stream {
     _body?.cancel();
     _answer?.fail(const SocketException('cut'));
     if (!responded) {
-      unawaited(session._answer(request, HttpStatus.badGateway));
+      unawaited(reply(HttpStatus.badGateway));
+    } else {
+      // The response is cut: its connection goes, the request with it.
+      unawaited(_upload?.cancel());
+      _readAll();
     }
   }
 }
@@ -1113,7 +1192,7 @@ final class _WsStream extends _Stream {
     if (done) return;
     forget();
     if (!responded) {
-      unawaited(session._answerEnd(request, served, message.code));
+      unawaited(session._answerEnd(this, message.code));
       return;
     }
     if (_ws == null) {
@@ -1136,7 +1215,7 @@ final class _WsStream extends _Stream {
     if (ws != null) {
       _closeWebview(WebSocketStatus.goingAway, null);
     } else if (!responded) {
-      unawaited(session._answer(request, HttpStatus.badGateway));
+      unawaited(reply(HttpStatus.badGateway));
     }
   }
 }
