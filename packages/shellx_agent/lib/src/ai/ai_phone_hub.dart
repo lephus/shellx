@@ -77,6 +77,11 @@ abstract interface class AiControl {
 
   /// V2-2b B11: sets the legacy mode [modeId]; as [setConfig].
   Future<void> setMode(String modeId);
+
+  /// V2-2b B17: a page of the agent's earlier sessions in this folder
+  /// (`session/list` from [cursor]); null when the agent does not offer it or
+  /// did not answer.
+  Future<ListSessionsResult?> listSessions({String? cursor});
 }
 
 /// An [AiControl] will not do what a phone asks, for a reason of the
@@ -120,8 +125,17 @@ abstract interface class AiSessionSource {
 
   /// A new AI tab with agent [agentId] in folder [folderKey] (from
   /// [folders]), not selected, its agent started; its pane id, or null
-  /// when either is not offered.
-  Future<int?> open(String agentId, String folderKey);
+  /// when either is not offered. With [resume] (V2-2b B17) the tab reopens
+  /// that earlier session of the agent (`session/load`), as the desktop's
+  /// History does.
+  Future<int?> open(String agentId, String folderKey, {String? resume});
+
+  /// V2-2b B18: AI pane [paneId], which has no folder yet, runs in folder
+  /// [folderKey] (one of [folders]), as the tab's own "Use this folder"
+  /// does. False when the pane has a folder, is gone, or the key is not
+  /// offered now. Its runtime is made, and its agent started, when a phone
+  /// attaches or the pane shows (V2-2 D15).
+  Future<bool> chooseFolder(int paneId, String folderKey);
 
   /// The user is looking at pane [paneId] on the computer now (window
   /// focused, pane focused): no push for its request (V2-2 D11) until the
@@ -303,6 +317,13 @@ final class _Phone {
   /// the old one clears nothing of the new one.
   final seqs = <String, int>{};
 
+  /// V2-2b B17: what this phone was not sent yet of an agent's history page
+  /// longer than [kAiHistoryPage]: the session it is about, the hub's own
+  /// cursor that asks for it, the sessions, and the agent's cursor after
+  /// them. Only the last one is kept.
+  ({String sid, String cursor, List<SessionSummary> rest, String? next})?
+  historyRest;
+
   /// V2-2b B16: the items made in full for this phone, by `sid/index`, the
   /// one asked for last at the end ([_FullItem]).
   final items = <String, _FullItem>{};
@@ -417,6 +438,8 @@ final class AiPhoneHub implements AiEndpoint {
     AiFeature.pushAnswer,
     AiFeature.config,
     AiFeature.item,
+    AiFeature.history,
+    AiFeature.folder,
   };
 
   /// What this hub's listings name ([offered]; a test may say otherwise).
@@ -447,6 +470,9 @@ final class AiPhoneHub implements AiEndpoint {
   final _watched = <int, _Watch>{};
   final _generations = Expando<int>();
   var _nextGeneration = 1;
+
+  /// V2-2b B17: numbers the hub's own history cursors (`shellx-rest-<n>`).
+  var _nextHistoryRest = 1;
   final _flushTimers = <String, Timer>{};
   final _lastFlush = <String, DateTime>{};
   Timer? _listTimer;
@@ -526,8 +552,8 @@ final class AiPhoneHub implements AiEndpoint {
           c.state.removeQueued(queued);
           return null;
         });
-      case AiOpen(:final rid, :final agent, :final folder):
-        unawaited(_open(mobileId, phone, rid, agent, folder));
+      case AiOpen():
+        unawaited(_open(mobileId, phone, message));
       // V2-2b requests answer `refused` until the task of their feature
       // replaces their two lines here with the request's handler.
       case AiConfigGet(:final sid, :final rid):
@@ -540,10 +566,10 @@ final class AiPhoneHub implements AiEndpoint {
         _refuse(mobileId, rid);
       case AiItemPart():
         _fullItem(mobileId, phone, message);
-      case AiHistory(:final rid):
-        _refuse(mobileId, rid);
-      case AiFolder(:final rid):
-        _refuse(mobileId, rid);
+      case AiHistory():
+        _history(mobileId, phone, message);
+      case AiFolder():
+        unawaited(_folder(mobileId, phone, message));
       case AiChanges(:final rid):
         _refuse(mobileId, rid);
       case AiDiff(:final rid):
@@ -1290,22 +1316,21 @@ final class AiPhoneHub implements AiEndpoint {
   }
 
   /// Only an agent the computer lists as ready, in a folder it offers (V2-2
-  /// D9): the phone's words are checked here, not left to the window. The
-  /// answer goes to [phone] only, like a prompt's.
-  Future<void> _open(
-    String mobileId,
-    _Phone phone,
-    int rid,
-    String agent,
-    String folder,
-  ) async {
+  /// D9): the phone's words are checked here, not left to the window. With
+  /// [AiOpen.resume] (V2-2b B17) the new tab reopens that earlier session:
+  /// an id of at most [kAiAcpIdBytes] (no history page gives a longer one).
+  /// The answer goes to [phone] only, like a prompt's.
+  Future<void> _open(String mobileId, _Phone phone, AiOpen o) async {
     int? paneId;
     try {
-      final choice = _source.agents.where((a) => a.id == agent).firstOrNull;
+      final resume = o.resume;
+      final choice = _source.agents.where((a) => a.id == o.agent).firstOrNull;
       if (choice != null &&
           choice.ready &&
-          _source.folders.any((f) => f.key == folder)) {
-        paneId = await _source.open(agent, folder);
+          _source.folders.any((f) => f.key == o.folder) &&
+          (resume == null ||
+              (resume.isNotEmpty && utf8Length(resume) <= kAiAcpIdBytes))) {
+        paneId = await _source.open(o.agent, o.folder, resume: resume);
         if (paneId != null) _rescan();
       }
     } on Object {
@@ -1314,7 +1339,7 @@ final class AiPhoneHub implements AiEndpoint {
     _send(
       mobileId,
       AiResult(
-        rid: rid,
+        rid: o.rid,
         ok: paneId != null,
         code: paneId == null ? 'refused' : null,
         sid: paneId == null ? null : sidOf(paneId),
