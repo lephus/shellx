@@ -105,6 +105,8 @@ class AiHeader extends ConsumerWidget {
     required this.onTerminal,
     this.onZoom,
     required this.onMore,
+    this.onTools,
+    this.toolsOn = false,
   });
 
   final int paneId;
@@ -119,6 +121,11 @@ class AiHeader extends ConsumerWidget {
 
   /// ⋯, with the point under the button (global) for the menu.
   final void Function(Offset at) onMore;
+
+  /// V2-3 D4: 🧩 shows or hides the workspace's tools; [toolsOn] while
+  /// they show.
+  final VoidCallback? onTools;
+  final bool toolsOn;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -210,6 +217,14 @@ class AiHeader extends ConsumerWidget {
               ),
             ),
             const Spacer(),
+            if (onTools case final tools?)
+              button(
+                Icons.extension_outlined,
+                l10n.actionToggleTools,
+                tools,
+                const Key('ai.tools'),
+                on: toolsOn,
+              ),
             if (onHistory case final open?)
               button(
                 Icons.history,

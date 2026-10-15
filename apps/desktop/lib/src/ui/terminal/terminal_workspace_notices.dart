@@ -17,6 +17,7 @@ import '../../terminal/global_search.dart' show GlobalHit;
 import '../../terminal/sidebar_workspaces.dart'
     show settingsStoreProvider, sidebarWorkspacesProvider;
 import '../../terminal/terminal_tabs.dart';
+import '../../tools/tool_registry.dart';
 import '../config/command_palette.dart';
 import '../config/config_problems_panel.dart';
 import '../config/config_ui_request.dart';
@@ -27,6 +28,7 @@ import '../onboarding/whats_new_card.dart';
 import '../settings/settings_overlay.dart';
 import '../window_router.dart';
 import '../theme/shellx_desktop_theme.dart';
+import '../tools/tool_actions.dart';
 import 'key_sequence.dart';
 import 'terminal_intents.dart';
 import 'shortcut_labels.dart';
@@ -117,8 +119,34 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
           },
         ),
         ..._moveEntries(l10n),
+        ..._toolEntries(l10n),
       ];
     });
+  }
+
+  /// V2-3 D4: "Open tool: {name}" for every tool, the shown workspace's
+  /// first; the workspace's name under it while there are several.
+  List<PaletteEntry> _toolEntries(AppLocalizations l10n) {
+    final tools = ref.read(toolRegistryProvider);
+    if (tools.isEmpty) return const [];
+    final side = ref.read(sidebarWorkspacesProvider);
+    final here = ToolActions(ref).currentWorkspace();
+    return [
+      for (final t in [
+        ...tools.where((t) => t.ws == here),
+        ...tools.where((t) => t.ws != here),
+      ])
+        PaletteEntry(
+          id: 'tool:${t.id}',
+          title: l10n.toolOpenCommand(t.name),
+          subtitle: side.showHeaders
+              ? side.workspace(t.ws)?.displayName(l10n)
+              : null,
+          kind: PaletteKind.action,
+          shortcut: null,
+          intent: OpenToolIntent(t.id),
+        ),
+    ];
   }
 
   /// A11 D20: "Move tab to {workspace}" for each other workspace and "Move
@@ -185,7 +213,8 @@ mixin WorkspaceConfigUi<W extends ConsumerStatefulWidget> on ConsumerState<W> {
       },
     );
     _openIntents = {for (final e in entries) describeIntent(e.intent)};
-    return [...entries, ..._moveEntries(AppLocalizations.of(context))];
+    final l10n = AppLocalizations.of(context);
+    return [...entries, ..._moveEntries(l10n), ..._toolEntries(l10n)];
   }
 
   /// Enter or a click: close first (the keyboard goes back where it was),

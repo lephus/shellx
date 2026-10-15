@@ -31,18 +31,26 @@ import '../../terminal/tab_attention.dart';
 import '../../terminal/terminal_font_size.dart';
 import '../../remote/ssh_actions.dart';
 import '../../terminal/terminal_tabs.dart';
+import '../../tools/tool_dock.dart';
+import '../../tools/tool_embed.dart';
+import '../../tools/tool_keys.dart';
+import '../../tools/tool_pages.dart';
 import '../theme/shellx_desktop_theme.dart';
+import '../tools/tool_actions.dart';
+import '../tools/tool_area.dart';
 import '../config/agent_command_approval.dart';
 import '../window_focus.dart';
 import '../window_router.dart';
 import 'click_select.dart' show selectionText;
 import 'close_tab.dart';
 import 'copy_mode_controller.dart';
+import 'key_sequence.dart' show keySequenceProvider;
 import 'key_sequence_host.dart';
 import 'notifications_panel.dart';
 import 'remote_marks.dart' show remoteAnnouncementBetween;
 import 'session_sidebar.dart';
 import 'shortcut_labels.dart';
+import 'terminal_overlays.dart' show EmptyTerminalState;
 import 'terminal_pane.dart';
 import 'terminal_shortcuts.dart';
 import 'terminal_workspace_config.dart';
@@ -76,7 +84,13 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
   /// The abnormal-end strip's "Close" (UI-A5 §4).
   final restoreStripFocus = FocusNode(debugLabel: 'restore strip');
   final daemonStripFocus = FocusNode(debugLabel: 'service strip');
+
+  /// V2-3 D10: the tool dock. Its own node being the primary focus means
+  /// the page has the keyboard.
+  final toolDockFocus = FocusNode(debugLabel: 'tool dock');
   final sidebarScroll = ScrollController();
+
+  late final _tools = ToolActions(ref);
 
   /// The notifications panel is open (UI-A4 §5).
   bool panelOpen = false;
@@ -120,10 +134,74 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     WidgetsBinding.instance
       ..addPostFrameCallback((_) {
         if (!mounted) return;
-        final empty = ref.read(terminalTabsProvider).tabs.isEmpty;
+        // V2-3 D4: a workspace shown without a tab offers "Open new tab".
+        final empty =
+            ref.read(terminalTabsProvider).tabs.isEmpty ||
+            ref.read(toolDockProvider).loose != null;
         (empty ? emptyFocus : terminalFocus).requestFocus();
       })
       ..ensureVisualUpdate();
+  }
+
+  /// V2-3 D4, D10: the keyboard into the dock (its page), after the frame
+  /// that builds it.
+  void _focusDock() {
+    WidgetsBinding.instance
+      ..addPostFrameCallback((_) {
+        if (mounted && toolDockFocus.context != null) {
+          toolDockFocus.requestFocus();
+        }
+      })
+      ..ensureVisualUpdate();
+  }
+
+  /// V2-3 D4: a workspace shown without a tab: no pane command applies.
+  bool get _loose => ref.read(toolDockProvider).loose != null;
+
+  /// V2-3 R14: a tab chosen ends the workspace shown without a tab — the
+  /// tab still selected under it too, whose selection then does not change
+  /// (so the docks hear nothing of it).
+  void _tabChosen() => ref.read(toolDockProvider.notifier).clearLoose();
+
+  /// V2-3 D10: the shown workspace's dock is on screen.
+  bool get _dockShown {
+    final ws = _tools.currentWorkspace();
+    final dock = ref.read(toolDockProvider).of(ws);
+    return ref.read(toolsEmbeddedProvider) &&
+        dock.open &&
+        toolDockFocus.context != null;
+  }
+
+  /// V2-3 D10: a chord the page handed back runs as if pressed here; the
+  /// first step of a sequence waits for its second step here (the page
+  /// gives the keyboard back to Flutter for it).
+  void _onToolChord(String chord) {
+    final bindings = ref.read(shellxConfigProvider).bindings;
+    switch (resolveToolChord(bindings, chord)) {
+      case ToolChordIntent(:final intent):
+        invokeIntent(intent);
+      case ToolChordPrefix(:final prefix):
+        if (ref.read(keySequenceProvider.notifier).arm(prefix)) {
+          final ws = _tools.currentWorkspace();
+          final active = ref.read(toolDockProvider).of(ws).active;
+          final page = active == null
+              ? null
+              : ref.read(toolPagesProvider.notifier).existing(active);
+          unawaited(page?.engine.releaseFocus());
+        }
+      case null:
+        break;
+    }
+  }
+
+  /// V2-3 D10: ⌘W in the dock closes the chip on show (the last one closes
+  /// the dock).
+  void _closeToolChip() {
+    final ws = _tools.currentWorkspace();
+    final dock = ref.read(toolDockProvider.notifier);
+    final active = ref.read(toolDockProvider).of(ws).active;
+    if (active != null) dock.closeTool(ws, active);
+    if (!ref.read(toolDockProvider).of(ws).open) focusTerminal();
   }
 
   /// ⌘⇧I, the bell.
@@ -212,15 +290,17 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
 
   // AltGr (Windows: Ctrl + right Alt) is handled once, for every window
   // shortcut, by [WindowAction] (A9 D26).
-  bool _split(Intent intent) => ref.read(terminalTabsProvider).selected != null;
+  bool _split(Intent intent) =>
+      !_loose && ref.read(terminalTabsProvider).selected != null;
 
   /// The pane chords apply only to a split tab; otherwise the key reaches
   /// the shell, like ⌘C without a selection.
   bool _isSplit(Intent intent) =>
-      ref.read(terminalTabsProvider).selected?.isSplit ?? false;
+      !_loose && (ref.read(terminalTabsProvider).selected?.isSplit ?? false);
 
   /// A11 D20 `break_pane`: a split tab's pane; V2-1 B10: not an AI tab's.
   bool _canBreakPane(Intent intent) {
+    if (_loose) return false;
     final selected = ref.read(terminalTabsProvider).selected;
     return selected != null && selected.isSplit && !selected.isAi;
   }
@@ -337,25 +417,43 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       // open; they close it first.
       NewTabIntent: run<NewTabIntent>((_) {
         closePanel();
-        unawaited(ref.read(sshActionsProvider).newTab());
+        // V2-3 D4: in a workspace shown without a tab, the tab goes there.
+        final loose = ref.read(toolDockProvider).loose;
+        unawaited(
+          loose != null
+              ? ref.read(aiOpenerProvider).newTabIn(loose)
+              : ref.read(sshActionsProvider).newTab(),
+        );
         focusTerminal();
       }),
       // V2-1 D5: ⌘⇧E, the sidebar's button, the `+` menu, the palette.
       NewAiSessionIntent: run<NewAiSessionIntent>((_) {
         closePanel();
-        ref.read(aiOpenerProvider).newSession();
+        ref
+            .read(aiOpenerProvider)
+            .newSession(workspaceId: ref.read(toolDockProvider).loose);
         focusTerminal();
       }),
       // V2-1 D5: a terminal tab, whatever `new-tab-kind` says.
       NewTerminalTabIntent: run<NewTerminalTabIntent>((_) {
         closePanel();
         unawaited(
-          workspaces.openTabIn(ref.read(sidebarWorkspacesProvider).currentId),
+          workspaces.openTabIn(
+            ref.read(toolDockProvider).loose ??
+                ref.read(sidebarWorkspacesProvider).currentId,
+          ),
         );
         focusTerminal();
       }),
       CloseTabIntent: run<CloseTabIntent>((_) {
         closePanel();
+        // V2-3 D10: in the dock, ⌘W closes the tool on show.
+        if (toolDockFocus.hasFocus) {
+          _closeToolChip();
+          return;
+        }
+        // D4: nothing of the covered tab closes from a tab-less workspace.
+        if (_loose) return;
         // UI-A2 §4: an open name field (maybe another tab's) is saved
         // first; losing the focus commits it.
         if (ref.read(sidebarWorkspacesProvider).renaming != null) {
@@ -375,6 +473,9 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       SelectTabIntent: run<SelectTabIntent>((intent) {
         closePanel();
         workspaces.selectVisible(intent.position);
+        // R14: only a place that has a tab chooses one.
+        final visible = ref.read(sidebarWorkspacesProvider).visibleTabIds;
+        if (intent.position <= visible.length) _tabChosen();
         focusTerminal();
       }),
       // A3 P3 (D3, D9-D12). Disabled, a chord reaches the shell; like the
@@ -383,13 +484,27 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         closePanel();
         unawaited(_splitPane(intent.axis));
       }, enabled: _split),
-      FocusPaneIntent: run<FocusPaneIntent>((intent) {
-        closePanel();
-        if (tabs.focusDirection(intent.direction)) {
-          focusTerminal();
-          _announceFocusedPane();
-        }
-      }, enabled: _isSplit),
+      // V2-3 D10: right from the rightmost pane into the dock, left from the
+      // dock back to the panes.
+      FocusPaneIntent: run<FocusPaneIntent>(
+        (intent) {
+          closePanel();
+          if (toolDockFocus.hasFocus) {
+            if (intent.direction == PaneDirection.left) focusTerminal();
+            return;
+          }
+          if (_isSplit(intent) && tabs.focusDirection(intent.direction)) {
+            focusTerminal();
+            _announceFocusedPane();
+          } else if (intent.direction == PaneDirection.right && _dockShown) {
+            _focusDock();
+          }
+        },
+        enabled: (intent) =>
+            _isSplit(intent) ||
+            toolDockFocus.hasFocus ||
+            (intent.direction == PaneDirection.right && _dockShown),
+      ),
       TogglePaneZoomIntent: run<TogglePaneZoomIntent>((_) {
         closePanel();
         final l10n = AppLocalizations.of(context);
@@ -445,14 +560,22 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
         workspaces.moveTab(tab.id, intent.workspaceId);
         focusTerminal();
       }, enabled: (_) => ref.read(terminalTabsProvider).selected != null),
+      // R14: a step chooses a tab whenever one is in sight (the same one,
+      // with a single tab).
       NextTabIntent: run<NextTabIntent>((_) {
         closePanel();
         workspaces.step(1);
+        if (ref.read(sidebarWorkspacesProvider).visibleTabIds.isNotEmpty) {
+          _tabChosen();
+        }
         focusTerminal();
       }),
       PreviousTabIntent: run<PreviousTabIntent>((_) {
         closePanel();
         workspaces.step(-1);
+        if (ref.read(sidebarWorkspacesProvider).visibleTabIds.isNotEmpty) {
+          _tabChosen();
+        }
         focusTerminal();
       }),
       // The new workspace's name field takes the keyboard (D15); it hands
@@ -460,6 +583,39 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       NewWorkspaceIntent: run<NewWorkspaceIntent>((_) {
         closePanel();
         unawaited(workspaces.create());
+      }),
+      // V2-3 D10, D20: ⌘⇧B, the AI header's tool button.
+      ToggleToolsIntent: run<ToggleToolsIntent>((_) {
+        closePanel();
+        unawaited(() async {
+          final result = await _tools.toggle(context);
+          if (!mounted) return;
+          switch (result) {
+            case ToolToggle.opened:
+              _focusDock();
+            case ToolToggle.closed:
+              focusTerminal();
+            case ToolToggle.asked || ToolToggle.nothing:
+              break;
+          }
+        }());
+      }),
+      // V2-3 D4, D21: a new tool of the shown workspace, opened at once
+      // (criterion 1).
+      AddToolIntent: run<AddToolIntent>((_) {
+        closePanel();
+        unawaited(() async {
+          final tool = await _tools.add(context, _tools.currentWorkspace());
+          if (tool == null || !mounted) return;
+          if (await _tools.open(tool.id) && mounted) _focusDock();
+        }());
+      }),
+      // V2-3 D4: the sidebar's rows, the palette, Settings › Projects.
+      OpenToolIntent: run<OpenToolIntent>((intent) {
+        closePanel();
+        unawaited(() async {
+          if (await _tools.open(intent.toolId) && mounted) _focusDock();
+        }());
       }),
       ToggleNotificationsPanelIntent: run<ToggleNotificationsPanelIntent>(
         (_) => togglePanel(),
@@ -611,7 +767,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
   /// V2-1 D2: the selected tab's focused pane is a terminal pane (not the
   /// AI pane): find, copy mode and select-all apply.
   bool _terminalFocused() =>
-      ref.read(terminalTabsProvider).selected?.focused != null;
+      !_loose && ref.read(terminalTabsProvider).selected?.focused != null;
 
   /// A10 D4: the find bar of the selected tab's focused pane, if open.
   FindSession? _focusedFind() {
@@ -643,7 +799,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
   /// panes behave alike.
   Future<void> _paste() async {
     final tab = ref.read(terminalTabsProvider).selected;
-    if (tab == null) return;
+    if (tab == null || _loose) return;
     final paneId = tab.focusedPaneId;
     // A11 D13: a paste (the menu's too) is for the program, not for copy
     // mode: the mode ends first.
@@ -781,6 +937,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     stripFocus.dispose();
     restoreStripFocus.dispose();
     daemonStripFocus.dispose();
+    toolDockFocus.dispose();
     sidebarScroll.dispose();
     super.dispose();
   }
@@ -850,6 +1007,14 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       defaultTargetPlatform,
       ref.watch(shellxConfigProvider.select((s) => s.bindings)),
     );
+    // V2-3 D7: anything over the window (the panel, an A9 overlay, a
+    // dialog, a menu) covers the tool page; a page Flutter cannot draw over
+    // (Windows) hides meanwhile.
+    final covered =
+        panelOpen ||
+        overlay != null ||
+        ref.watch(windowRouterProvider.select((w) => w.dialogOpen)) ||
+        !(ModalRoute.isCurrentOf(context) ?? true);
     return Shortcuts(
       shortcuts: overlayBlocksShortcuts ? const {} : _workspaceShortcuts!,
       child: Actions(
@@ -867,7 +1032,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
                 Positioned.fill(
                   child: ExcludeSemantics(
                     excluding: panelOpen || overlay != null,
-                    child: _body(),
+                    child: _body(covered),
                   ),
                 ),
                 // UI-A4 §5.3: a click outside closes the panel (and only that).
@@ -929,7 +1094,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     );
   }
 
-  Widget _body() => Row(
+  Widget _body(bool covered) => Row(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       SizedBox(
@@ -939,6 +1104,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
           scrollController: sidebarScroll,
           onSelected: (id) {
             ref.read(terminalTabsProvider.notifier).select(id);
+            _tabChosen(); // R14
             focusTerminal();
           },
           onClose: closeTab,
@@ -949,22 +1115,39 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
       ),
       const VerticalDivider(width: 1),
       Expanded(
-        child: TerminalPane(
-          terminalFocus: terminalFocus,
-          emptyFocus: emptyFocus,
-          stripFocus: stripFocus,
-          restoreStripFocus: restoreStripFocus,
-          daemonStripFocus: daemonStripFocus,
-          shortcuts: overlayBlocksShortcuts ? const {} : terminalShortcuts,
-          onKeyEvent: _terminalKey,
-          onShowConfigProblems: () => openOverlay(A9Overlay.problems),
-          onReviewAgentCommand: (command) => unawaited(
-            reviewAgentCommand(ref, AppLocalizations.of(context), command),
+        // V2-3 D3: the tool dock is a third column, beside the panes.
+        child: ToolArea(
+          dockFocus: toolDockFocus,
+          covered: covered,
+          onChord: _onToolChord,
+          onLeave: focusTerminal,
+          loosePanel: (ws) => ColoredBox(
+            key: const Key('tool.loose'),
+            color: ShellxDesktopColors.bgTerminal,
+            child: EmptyTerminalState(
+              buttonFocus: emptyFocus,
+              onOpen: () => unawaited(
+                ref.read(sidebarWorkspacesProvider.notifier).openTabIn(ws),
+              ),
+            ),
           ),
-          onClosePane: (id) {
-            final tab = ref.read(terminalTabsProvider).tabOfSession(id);
-            if (tab != null) unawaited(closePane(tab, id));
-          },
+          panes: TerminalPane(
+            terminalFocus: terminalFocus,
+            emptyFocus: emptyFocus,
+            stripFocus: stripFocus,
+            restoreStripFocus: restoreStripFocus,
+            daemonStripFocus: daemonStripFocus,
+            shortcuts: overlayBlocksShortcuts ? const {} : terminalShortcuts,
+            onKeyEvent: _terminalKey,
+            onShowConfigProblems: () => openOverlay(A9Overlay.problems),
+            onReviewAgentCommand: (command) => unawaited(
+              reviewAgentCommand(ref, AppLocalizations.of(context), command),
+            ),
+            onClosePane: (id) {
+              final tab = ref.read(terminalTabsProvider).tabOfSession(id);
+              if (tab != null) unawaited(closePane(tab, id));
+            },
+          ),
         ),
       ),
     ],
