@@ -208,9 +208,12 @@ class ToolPageController extends Controller {
     return true;
   }
 
+  /// Shown (not behind a cover) and served: a lost channel lifts the cover, but with the servers closed
+  /// (after "disabled", "gone", "unavailable", or a lost channel right after a resume) the history points
+  /// at ports nothing of ours serves (NB2).
   bool get _backInPage {
     final phase = _phase.peek();
-    return !_historySplit && (phase == ToolPhase.ready || phase == ToolPhase.reconnecting);
+    return !_historySplit && _page?.servedPort != null && (phase == ToolPhase.ready || phase == ToolPhase.reconnecting);
   }
 
   /// E13: served only while the app is in the foreground (Apple TN2277); back in it, served again
