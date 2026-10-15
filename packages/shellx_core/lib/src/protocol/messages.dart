@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import '../util/cbor_values.dart';
 
 part 'ai_messages.dart';
+part 'tool_messages.dart';
 
 sealed class AppMessage {
   const AppMessage();
@@ -36,6 +37,7 @@ sealed class AppMessage {
         ],
         desktopSharing: f.optionalBoolean('desktop_sharing'),
         ai: f.optionalInteger('ai'),
+        tools: f.optionalInteger('tools'),
       ),
       'session.open' => SessionOpen(
         cols: f.integer('cols'),
@@ -92,6 +94,8 @@ sealed class AppMessage {
       ),
       // V2-2: never fatal, see [AiMessage].
       _ when t.startsWith('ai.') => AiMessage._fromMap(t, f),
+      // V2-4: never fatal either, see [ToolMessage].
+      _ when t.startsWith('tool.') => ToolMessage._fromMap(t, f),
       _ => null,
     };
   }
@@ -288,13 +292,24 @@ final class SessionInfo {
 }
 
 final class SessionListResult extends AppMessage {
-  const SessionListResult(this.sessions, {this.desktopSharing, this.ai});
+  const SessionListResult(
+    this.sessions, {
+    this.desktopSharing,
+    this.ai,
+    this.tools,
+  });
   final List<SessionInfo> sessions;
 
   /// V2-2 D3: the `ai.*` protocol this desktop speaks ([kAiProtocol]); only
   /// in answers to `session.list {desktop: true}`, only written when set.
   /// Null: a desktop without AI sessions for phones (every older one).
   final int? ai;
+
+  /// V2-4 E6: the `tool.*` protocol this desktop speaks ([kToolProtocol]);
+  /// only in answers to `session.list {desktop: true}`, only when the process
+  /// that holds the relay has a tool proxy, only written when set. Null: a
+  /// desktop without tools for phones (every older one).
+  final int? tools;
 
   /// Whether terminal sharing is on (spec §8); only in answers to
   /// `session.list {desktop: true}`. Null means an agent without terminal
@@ -308,6 +323,7 @@ final class SessionListResult extends AppMessage {
     'sessions': [for (final session in sessions) session.toMap()],
     if (desktopSharing != null) 'desktop_sharing': desktopSharing,
     if (ai != null) 'ai': ai,
+    if (tools != null) 'tools': tools,
   };
 }
 
