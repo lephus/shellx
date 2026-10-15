@@ -47,6 +47,30 @@ final class _Listener implements ToolStreamListener {
   void onLost() => heard.add('lost');
 }
 
+/// Throws from every call, as a stream over a closed sink would; records the
+/// calls.
+final class _Throwing implements ToolStreamListener {
+  final calls = <String>[];
+
+  void _boom(String call) {
+    calls.add(call);
+    throw StateError('Bad state: $call after the sink was closed');
+  }
+
+  @override
+  void onResponse(ToolResponse message) => _boom('response');
+  @override
+  void onData(ToolData message) => _boom('data');
+  @override
+  void onWsMessage(ToolWsMessage message) => _boom('ws');
+  @override
+  void onAck(int total) => _boom('ack $total');
+  @override
+  void onEnd(ToolEnd message) => _boom('end');
+  @override
+  void onLost() => _boom('lost');
+}
+
 ToolCatalog _catalog() => ToolCatalog.fromServeBody(
   ToolCatalog.serveBody([
     {
@@ -61,6 +85,9 @@ ToolCatalog _catalog() => ToolCatalog.fromServeBody(
 
 int _framesFromPhone(Harness h) =>
     h.relay.delivered.where((d) => d.from == phoneId).length;
+
+int _framesToPhone(Harness h) =>
+    h.relay.delivered.where((d) => d.to == phoneId).length;
 
 /// V2-4 E6, E8, E19: the phone's `MachineTools` over the real encrypted
 /// channel and the fake relay.
@@ -371,6 +398,109 @@ void main() {
         ),
       );
       expect(serving.map((s) => s.id), ['a']);
+    });
+  });
+
+  // A tool page's stream (over dart:io sinks) may throw; that must never cost
+  // the channel's other traffic (terminals, AI) or its teardown.
+  group('a stream that throws is isolated (E18)', () {
+    test('every call of a throwing stream is isolated: the rest of its sealed '
+        'batch, other streams and a terminal, is still handled', () {
+      fakeAsync((async) {
+        final spy = _Spy();
+        final h = Harness(async, keys, tools: spy);
+        final tools = h.phoneMachine.tools;
+        final tab = h.run(h.phoneMachine.openSession(cols: 80, rows: 24));
+        final recorder = TabRecorder(tab);
+        final bad = _Throwing();
+        final good = _Listener();
+        tools.listen(1, bad);
+        tools.listen(2, good);
+        settle(async);
+        final before = _framesToPhone(h);
+        // One instant: the agent seals all of it in one batch, in this order.
+        spy.say(const ToolResponse(id: 1, status: 200, head: [], end: false));
+        spy.say(ToolData(id: 1, data: Uint8List(1), end: false));
+        spy.say(
+          ToolWsMessage(id: 1, data: Uint8List(1), text: true, fin: true),
+        );
+        spy.say(const ToolAck([1, 5, 2, 6])); // the first pair throws
+        spy.say(const ToolEnd(id: 1, code: 'gone'));
+        spy.say(ToolData(id: 2, data: Uint8List(1), end: false));
+        h.pty.emit('after the throws\r\n');
+        settle(async);
+        expect(_framesToPhone(h) - before, 1, reason: 'one sealed batch');
+        expect(bad.calls, ['response', 'data', 'ws', 'ack 5', 'end']);
+        expect(good.heard, ['ack 6', 'data']);
+        expect(recorder.text, contains('after the throws'));
+      });
+    });
+
+    test('a stream that throws in onLost: the others still hear it, links '
+        'say so, an open in flight fails, the machine is idle (as on any '
+        'loss)', () {
+      fakeAsync((async) {
+        final spy = _Spy();
+        final h = Harness(async, keys, tools: spy);
+        final machine = h.phoneMachine;
+        final tools = machine.tools;
+        final links = <bool>[];
+        tools.links.listen(links.add);
+        h.run(machine.connect());
+        settle(async);
+        final bad = _Throwing();
+        final others = [_Listener(), _Listener()];
+        tools.listen(1, bad); // first in line, the others come after it
+        tools.listen(2, others[0]);
+        tools.listen(3, others[1]);
+        ToolSendWindow(tools.credit).onSent(1000);
+        Object? failure;
+        tools.open('k3f9za7q1m').catchError((Object e) {
+          failure = e;
+          return const ToolOpened(rid: 0, ok: false);
+        });
+        Object? listFailure;
+        machine.listSessions().catchError((Object e) {
+          listFailure = e;
+          return <SessionInfo>[];
+        });
+        async.flushMicrotasks(); // both are in flight
+        h.disconnectPhone();
+        settle(async);
+        expect(bad.calls, ['lost']);
+        for (final other in others) {
+          expect(other.heard, ['lost']);
+        }
+        expect(links.last, isFalse);
+        expect(failure, isA<MachineConnectionException>());
+        expect(tools.credit.inFlight, 0);
+        // The client's own teardown ran to the end, too.
+        expect(listFailure, isA<MachineConnectionException>());
+        expect(machine.state, isA<MachineIdle>());
+      });
+    });
+
+    test('a stream that throws in onLost does not keep an unpair from '
+        'finishing', () {
+      fakeAsync((async) {
+        final spy = _Spy();
+        final h = Harness(async, keys, tools: spy);
+        final machine = h.phoneMachine;
+        final tools = machine.tools;
+        h.run(machine.connect());
+        settle(async);
+        final bad = _Throwing();
+        final other = _Listener();
+        tools.listen(1, bad);
+        tools.listen(2, other);
+        var linksClosed = false;
+        tools.links.listen((_) {}, onDone: () => linksClosed = true);
+        h.run(h.phone.unpair(agentId)); // would throw bad's error
+        settle(async);
+        expect(other.heard, ['lost']);
+        expect(linksClosed, isTrue);
+        expect(tools.enqueue(const ToolList()), isFalse);
+      });
     });
   });
 }

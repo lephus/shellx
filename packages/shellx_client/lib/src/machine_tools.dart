@@ -138,7 +138,9 @@ Object? _json(Uint8List body) {
   }
 }
 
-/// What a stream of a tool page hears from the computer.
+/// What a stream of a tool page hears from the computer. Implementations must
+/// not throw: [MachineTools] isolates every call (a throw is dropped, never
+/// logged), so one stream cannot take the channel's other traffic down.
 abstract interface class ToolStreamListener {
   void onResponse(ToolResponse message);
   void onData(ToolData message);
@@ -152,6 +154,24 @@ abstract interface class ToolStreamListener {
 
   /// The channel is gone: the stream is over.
   void onLost();
+}
+
+/// Runs [call] on [listener] (if any) so that a throw ends only that call: a
+/// stream must neither stop the rest of the sealed batch it heard this in
+/// (terminal output and AI follow) nor abort a channel loss, which would leave
+/// the machine half torn down. The error is dropped, never printed, logged or
+/// passed to the zone: it may carry content (E18), as every error on the
+/// client's inbox chain is dropped.
+void _tell(
+  ToolStreamListener? listener,
+  void Function(ToolStreamListener listener) call,
+) {
+  if (listener == null) return;
+  try {
+    call(listener);
+  } catch (_) {
+    // Dropped on purpose, see above.
+  }
 }
 
 /// V2-4 E8: tool frames per second this phone sends at most (of the relay's
@@ -360,19 +380,20 @@ final class MachineTools {
       case ToolOpened(:final rid):
         _opens.remove(rid)?.complete(message);
       case ToolResponse(:final id):
-        _streams[id]?.onResponse(message);
+        _tell(_streams[id], (s) => s.onResponse(message));
       case ToolData(:final id):
-        _streams[id]?.onData(message);
+        _tell(_streams[id], (s) => s.onData(message));
       case ToolWsMessage(:final id):
-        _streams[id]?.onWsMessage(message);
+        _tell(_streams[id], (s) => s.onWsMessage(message));
       case ToolAck(:final acks):
         for (var i = 0; i + 1 < acks.length; i += 2) {
-          _streams[acks[i]]?.onAck(acks[i + 1]);
+          final total = acks[i + 1];
+          _tell(_streams[acks[i]], (s) => s.onAck(total));
         }
       case ToolEnd(:final id):
         final listener = _streams.remove(id);
         acks.forget(id);
-        listener?.onEnd(message);
+        _tell(listener, (s) => s.onEnd(message));
       case ToolList() || ToolOpen() || ToolClose() || ToolRequest():
         break; // a phone's own kinds never come from the computer
     }
@@ -409,7 +430,7 @@ final class MachineTools {
     final streams = [..._streams.values];
     _streams.clear();
     for (final stream in streams) {
-      stream.onLost();
+      _tell(stream, (s) => s.onLost());
     }
     if (!_disposed) _links.add(false);
   }
