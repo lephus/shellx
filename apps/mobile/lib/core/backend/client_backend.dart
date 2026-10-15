@@ -298,7 +298,22 @@ final class _AiMachineAdapter implements AiMachine {
   }
 
   @override
-  Future<void> prompt(String sid, String text) => _ai.prompt(sid, text);
+  Future<void> prompt(String sid, String text, {List<int> blobs = const [], List<String> files = const []}) =>
+      _ai.prompt(sid, text, blobs: blobs, files: files);
+
+  @override
+  int newBlobId() => _ai.newBlobId();
+
+  @override
+  Future<void> uploadImage(
+    int blob,
+    String mime,
+    Uint8List bytes, {
+    void Function(int sent, int parts)? onProgress,
+  }) => _ai.uploadImage(blob, mime, bytes, onProgress: onProgress);
+
+  @override
+  Future<List<String>> files(String sid, String query) => _ai.files(sid, query);
 
   @override
   Future<void> answerPermission(String sid, int permission, String option) =>

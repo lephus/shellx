@@ -88,7 +88,7 @@ class AiItemRouteArgs {
 /// [_i2.AiSessionPage]
 class AiSessionRoute extends _i12.PageRouteInfo<AiSessionRouteArgs> {
   AiSessionRoute({
-    _i13.Key? key,
+    _i14.Key? key,
     required String agentId,
     required String machineName,
     required String sid,
@@ -128,7 +128,7 @@ class AiSessionRouteArgs {
     required this.sid,
   });
 
-  final _i13.Key? key;
+  final _i14.Key? key;
 
   final String agentId;
 

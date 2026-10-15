@@ -226,6 +226,21 @@ void main() {
     },
   );
 
+  test('V2-2b B12, B13: images and files go through the client, which refuses them at once for a computer that '
+      'never offered them, sending nothing (R15)', () async {
+    await pin(agentA, publicKey: (await NoiseKeyPair.generate()).publicKey);
+    final backend = await start();
+    addTearDown(backend.dispose);
+    final ai = backend.machine(agentA).ai;
+    Matcher unsupported() => throwsA(isA<AiRequestException>().having((e) => e.code, 'code', 'unsupported'));
+    final blob = ai.newBlobId();
+    expect(ai.newBlobId(), isNot(blob));
+    await expectLater(ai.uploadImage(blob, 'image/png', Uint8List(8)), unsupported());
+    await expectLater(ai.files('e.1', 'sr'), unsupported());
+    await expectLater(ai.prompt('e.1', 'hi', blobs: [blob]), unsupported());
+    await expectLater(ai.prompt('e.1', 'hi', files: const ['src/a.ts']), unsupported());
+  });
+
   group('watching the AI list', () {
     /// What the machine does when the relay comes back, after the list was watched while the relay was
     /// down (and, with [unwatch], not watched any more): the handshakes it starts, and the frames it

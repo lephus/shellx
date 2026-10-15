@@ -5,6 +5,7 @@ import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/remote.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_mobile/core/core.dart';
+import 'package:shellx_mobile/features/ai/domain/ai_attachments.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_drafts.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
@@ -97,6 +98,7 @@ class AiSessionController extends Controller {
   final Signal<int?> _answering = signal(null);
   final Signal<bool> _stopping = signal(false);
   final Signal<DateTime> _now = signal(DateTime.now());
+  final Signal<({int sent, int parts})?> _upload = signal(null);
   final Signal<bool> _reattached = signal(false);
 
   /// The session shown: the one the page was opened for, or the one it was found again as after the
@@ -134,6 +136,9 @@ class AiSessionController extends Controller {
 
   /// Ticks every second while a turn runs on a live link, with the app on screen ("Đang chạy · 0:12").
   ReadonlySignal<DateTime> get now => _now;
+
+  /// V2-2b B12: while the images of a message go up, the parts the computer took of all of them; null otherwise.
+  ReadonlySignal<({int sent, int parts})?> get upload => _upload;
 
   /// B22: the session was found again under another sid after the computer restarted ShellX ("Đã nối lại
   /// sau khi ShellX khởi động lại."), until the user sends something.
@@ -180,22 +185,63 @@ class AiSessionController extends Controller {
   /// The page's text field may send: live, the computer takes prompts.
   bool get canSend => !_closed.peek() && linkState == AiLinkState.live && (head?.canSend ?? false) && !_sending.peek();
 
-  /// Sends [text] (queued on the computer while a turn runs). Null when
-  /// taken; else the failure code. A message that failed on the way may have
-  /// landed ([AiWords.outcomeUnknown]): it is never sent again by itself.
-  Future<String?> send(String text) async {
+  /// Sends [text] (queued on the computer while a turn runs) with [images] (V2-2b B12) and the [files] it
+  /// mentions (B13). Null when taken; else the failure code. The images go up first, one blob each: when one does
+  /// not ([AiWords.imageFailed]) the message is not sent at all, and nothing is tried again by itself — the images
+  /// and the text stay for the user's next tap. A message that failed on the way may have landed
+  /// ([AiWords.outcomeUnknown]): it is never sent again by itself (V2-2 D13).
+  Future<String?> send(String text, {List<AiPickedImage> images = const [], List<String> files = const []}) async {
     final machine = _machine;
-    if (machine == null || text.trim().isEmpty) return 'refused';
+    if (machine == null || (text.trim().isEmpty && images.isEmpty)) return 'refused';
     if (_sending.peek()) return AiWords.inFlight;
+    // The message goes to the session the user sent it from, whatever the page follows by the time the images are up.
+    final sid = _sid;
     _set(_reattached, false);
     _set(_sending, true);
     try {
-      await machine.ai.prompt(_sid, text);
+      final blobs = <int>[];
+      if (images.isNotEmpty) {
+        final total = images.fold<int>(0, (n, image) => n + image.parts);
+        var done = 0;
+        _set(_upload, (sent: 0, parts: total));
+        try {
+          for (final image in images) {
+            final blob = machine.ai.newBlobId();
+            await machine.ai.uploadImage(
+              blob,
+              image.mime,
+              image.bytes,
+              onProgress: (sent, _) => _set(_upload, (sent: done + sent, parts: total)),
+            );
+            done += image.parts;
+            blobs.add(blob);
+          }
+        } catch (error) {
+          if (kDebugMode) debugPrint('AI image upload error: ${error.runtimeType}');
+          return AiWords.imageFailed;
+        } finally {
+          _set(_upload, null);
+        }
+      }
+      await machine.ai.prompt(sid, text, blobs: blobs, files: files);
       return null;
     } catch (error) {
       return _failure(error);
     } finally {
       _set(_sending, false);
+    }
+  }
+
+  /// V2-2b B13: the computer's files matching [query] for `@`, at most 8; none when the computer does not offer
+  /// them, the link is not live or the request fails (a suggestion is no answer the user waits for).
+  Future<List<String>> files(String query) async {
+    final machine = _machine;
+    if (machine == null || !can(AiFeature.files) || linkState != AiLinkState.live) return const [];
+    try {
+      return await machine.ai.files(sid, query);
+    } catch (error) {
+      if (kDebugMode) debugPrint('AI files error: ${error.runtimeType}');
+      return const [];
     }
   }
 

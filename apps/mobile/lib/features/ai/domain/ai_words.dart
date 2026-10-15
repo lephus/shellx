@@ -179,6 +179,10 @@ abstract final class AiWords {
   /// The same kind of request is already on its way: nothing to say, the first one will.
   static const String inFlight = 'in_flight';
 
+  /// V2-2b B12: an image of the message did not reach the computer, so the message was not sent: the images and
+  /// the text stay, and Send tries again (only when the user taps it).
+  static const String imageFailed = 'image_failed';
+
   /// V2-2b B16: a full item that kept changing while it loaded (`MachineAi.fullItem`).
   static const String changing = 'changing';
 
@@ -187,12 +191,13 @@ abstract final class AiWords {
 
   /// What a failed request shows (`ai.result` codes, V2-2 §4.6, and the codes above); null when
   /// nothing needs saying (a stop that came after the turn ended: the
-  /// header already shows it). [answer]: the request was an answer.
+  /// header already shows it). [answer]: the request was an answer. [agent]: the session's agent, named by
+  /// `no_images`.
   ///
   /// `not_found` and `unavailable` are also how a request in flight ends when its session closes or the
   /// window quits. A lost channel is no code but a `MachineConnectionException`: the caller makes
   /// [outcomeUnknown] of it (or [untrusted] / [updateRequired], which are the machine's words).
-  static String? failure(S s, String code, {bool answer = false}) => switch (code) {
+  static String? failure(S s, String code, {bool answer = false, String? agent}) => switch (code) {
     'stale' => answer ? s.aiAnsweredElsewhere : null,
     'queue_full' => s.aiQueueFull,
     // A prompt may be 32 KB; the answer to a question, a message of the channel, 48 KB.
@@ -210,6 +215,9 @@ abstract final class AiWords {
     untrusted => ErrorText(s).machine(MachineConnectionFailure.untrusted),
     updateRequired => ErrorText(s).machine(MachineConnectionFailure.protocolUnsupported),
     inFlight => null,
+    // V2-2b B12: the agent said it takes no images (`promptCapabilities.image`); an image that did not go up.
+    'no_images' => s.aiNoImages(agent ?? ''),
+    imageFailed => s.aiImageFailed,
     // No code to show: [error] is no word of the computer's, only "something on this side".
     error => s.somethingWentWrong,
     // V2-2b B1: the computer cannot do this yet (an older ShellX there, or its background service).

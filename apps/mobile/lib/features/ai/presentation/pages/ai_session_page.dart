@@ -1,10 +1,14 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:shellx_ai/remote.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_mobile/core/core.dart';
+import 'package:shellx_mobile/features/ai/domain/ai_attachments.dart';
+import 'package:shellx_mobile/features/ai/domain/ai_image_source.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
 import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_controller.dart';
+import 'package:shellx_mobile/features/ai/presentation/widgets/ai_attach_sheet.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_chooser.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_config_sheet.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_dock.dart';
@@ -44,6 +48,23 @@ class _AiSessionPageState extends State<AiSessionPage> {
   late final AppLifecycleListener _lifecycle;
   String _kept = '';
 
+  /// V2-2b B12: the images of the next message. In memory only, like the draft's text, and not kept when the page
+  /// is left.
+  final List<AiPickedImage> _images = [];
+
+  /// V2-2b B13: the files picked from the `@` suggestions; those still mentioned in the text go with the message.
+  final Set<String> _mentions = {};
+
+  /// The computer's files for the `@` being typed; asked [_suggestPause] after the last keystroke.
+  List<String> _suggestions = const [];
+  Timer? _suggestTimer;
+  var _suggestAsks = 0;
+  static const Duration _suggestPause = Duration(milliseconds: 150);
+
+  /// What the composer says of the last images (a type or size the computer does not take, an upload that did not
+  /// go, a picker that did not open); null: nothing.
+  String? _note;
+
   /// V2-2b B16: the whole form of a question too big for the mirror is on its way.
   var _loadingForm = false;
 
@@ -52,6 +73,7 @@ class _AiSessionPageState extends State<AiSessionPage> {
     super.initState();
     _kept = _text.text;
     _text.addListener(_keepDraft);
+    _text.addListener(_lookForMention);
     // The clock of the turn runs only while the app is on screen: `inactive` (the notification shade, a
     // dialog of the system) still shows it, `hidden` and `paused` do not.
     _lifecycle = AppLifecycleListener(
@@ -64,6 +86,8 @@ class _AiSessionPageState extends State<AiSessionPage> {
   @override
   void dispose() {
     _lifecycle.dispose();
+    _suggestTimer?.cancel();
+    _text.removeListener(_lookForMention);
     _text.removeListener(_keepDraft);
     _controller.dispose();
     _text.dispose();
@@ -95,29 +119,113 @@ class _AiSessionPageState extends State<AiSessionPage> {
 
   void _say(String? code, {bool answer = false}) {
     if (code == null || !mounted) return;
-    final text = AiWords.failure(S.of(context), code, answer: answer);
+    final text = AiWords.failure(S.of(context), code, answer: answer, agent: _controller.head?.agentName);
     if (text != null) _controller.popupHandler.showError(title: text);
   }
 
   Future<void> _send() async {
     final text = _text.text;
+    final images = List.of(_images);
+    // B13: the files still mentioned in the text go with it; a mention deleted from the text does not.
+    final files = _controller.can(AiFeature.files) ? AiMentions.stillMentioned(text, _mentions) : const <String>[];
     // While it is on its way the message is no draft: a page opened again before the answer comes back
     // must not start with it (and send it twice). A message that did not go is put back below.
     _controller.keepDraft('');
-    final code = await _controller.send(text);
+    final code = await _controller.send(text, images: images, files: files);
     if (!mounted) {
       // The page was left while the message was on its way. Gone, it is nobody's draft; refused, it is the
       // user's again, unless a page opened since has a draft of its own.
       if (code != null && _controller.draft.isEmpty) _controller.keepDraft(text);
       return;
     }
-    // The text stays when the message did not go (or may not have): the user decides what to do.
+    // The text and the images stay when the message did not go (or may not have): the user decides what to do.
     if (code == null) {
       if (_text.text == text) _text.clear();
+      setState(() {
+        _images.removeWhere(images.contains);
+        _mentions.clear();
+        _note = null;
+      });
     } else {
       _controller.keepDraft(_text.text);
-      _say(code);
+      if (code == AiWords.imageFailed) {
+        setState(() => _note = S.of(context).aiImageFailed);
+      } else {
+        _say(code);
+      }
     }
+  }
+
+  /// The bytes of the images already in the next message.
+  int get _imageBytes => _images.fold(0, (n, image) => n + image.bytes.length);
+
+  /// V2-2b B12: photos from the library or the camera join the next message — five at most and 20 MB in all (F34),
+  /// of a type and a size the computer takes (a photo that is not says why, in the composer).
+  Future<void> _attach() async {
+    final s = S.of(context);
+    final room = kAiImagesMax - _images.length;
+    if (room <= 0) return;
+    final origin = await showAiAttachSheet(context);
+    if (origin == null || !mounted) return;
+    final List<Uint8List> picked;
+    try {
+      final source = getIt<AiImageSource>();
+      picked = switch (origin) {
+        AiImageOrigin.library => await source.pickPhotos(limit: room),
+        AiImageOrigin.camera => [?await source.takePhoto()],
+      };
+    } catch (error) {
+      if (kDebugMode) debugPrint('AI image pick error: ${error.runtimeType}');
+      if (mounted) setState(() => _note = s.aiPickFailed);
+      return;
+    }
+    if (!mounted || picked.isEmpty) return;
+    final taken = aiTakePicked(
+      picked,
+      room: kAiImagesMax - _images.length,
+      bytesLeft: kAiMessageImageBytes - _imageBytes,
+    );
+    setState(() {
+      _images.addAll(taken.images);
+      _note = switch (taken.problem) {
+        AiImageProblem.type => s.aiImageType,
+        AiImageProblem.size => s.aiImageTooBig,
+        AiImageProblem.total => s.aiImagesTooMuch,
+        null => null,
+      };
+    });
+  }
+
+  void _removeImage(AiPickedImage image) => setState(() {
+    _images.remove(image);
+    _note = null;
+  });
+
+  /// V2-2b B13: an `@query` at the cursor asks the computer for its files after a pause; anything else clears them.
+  void _lookForMention() {
+    _suggestTimer?.cancel();
+    final token = AiMentions.tokenAt(_text.value);
+    if (token == null || !_controller.can(AiFeature.files)) {
+      _suggestAsks++; // an answer still on its way is for a token that is gone
+      if (_suggestions.isNotEmpty) setState(() => _suggestions = const []);
+      return;
+    }
+    _suggestTimer = Timer(_suggestPause, () async {
+      final ask = ++_suggestAsks;
+      final paths = await _controller.files(token.query);
+      // Only for the token still at the cursor.
+      if (!mounted || ask != _suggestAsks || AiMentions.tokenAt(_text.value)?.query != token.query) return;
+      setState(() => _suggestions = paths.take(AiMentions.maxSuggestions).toList());
+    });
+  }
+
+  /// A suggestion picked: `@path ` in place of the token, remembered for the message.
+  void _pickSuggestion(String path) {
+    final token = AiMentions.tokenAt(_text.value);
+    if (token == null) return;
+    _mentions.add(path);
+    _text.value = AiMentions.insert(_text.value, token, path);
+    setState(() => _suggestions = const []);
   }
 
   /// V2-2b B17: "Lịch sử phiên" — an earlier session picked there opens on the computer in a new AI tab (not shown
@@ -404,6 +512,14 @@ class _AiSessionPageState extends State<AiSessionPage> {
           onSend: _send,
           onStop: () async => _say(await _controller.stop()),
           onForceStop: () async => _say(await _controller.forceStop()),
+          // V2-2b B12, B13: only towards a computer that takes them.
+          images: _images,
+          onAttach: _controller.can(AiFeature.blob) ? _attach : null,
+          onRemoveImage: _removeImage,
+          upload: _controller.upload.value,
+          suggestions: _suggestions,
+          onSuggestion: _pickSuggestion,
+          note: _note,
         ),
       ],
     );

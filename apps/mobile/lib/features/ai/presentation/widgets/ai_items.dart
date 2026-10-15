@@ -88,6 +88,7 @@ class _UserBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final colors = context.colors;
     final shown = clipForDisplay(item.text, maxChars: kShownTextChars, maxLines: null);
     return Align(
@@ -109,9 +110,28 @@ class _UserBubble extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Plain text: the timeline's one SelectionArea makes it selectable, without an editor of its own.
-              Text(shown.text, style: context.typo.paragraph.copyWith(color: colors.primaryText)),
-              if (shown.cut || item.fullLength != null) ...[_Hint(S.of(context).aiCutText), _ViewAll(item.index)],
+              // Plain text: the timeline's one SelectionArea makes it selectable, without an editor of its own. A
+              // message of images alone has none.
+              if (shown.text.isNotEmpty)
+                Text(shown.text, style: context.typo.paragraph.copyWith(color: colors.primaryText)),
+              if (shown.cut || item.fullLength != null) ...[_Hint(s.aiCutText), _ViewAll(item.index)],
+              // V2-2b B12: the images went to the computer with the message; the phone keeps none of them.
+              if (item.images > 0)
+                Padding(
+                  padding: EdgeInsets.only(top: shown.text.isEmpty ? 0 : 6),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.image_outlined, size: 16, color: colors.secondaryText),
+                      4.sizedWidth,
+                      Text(
+                        s.aiImagesCount(item.images),
+                        key: const Key('ai.user.images'),
+                        style: context.typo.metadata12.copyWith(color: colors.secondaryText),
+                      ),
+                    ],
+                  ),
+                ),
               // V2-2b B24: written on a phone (this one or another), as the computer says too.
               if (item.fromPhone)
                 Padding(

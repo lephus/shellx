@@ -413,5 +413,17 @@
   "aiHistoryEmpty": "Chưa có phiên nào trước đây trong thư mục này.",
   "aiHistoryNotReady": "Lịch sử hiện khi agent đang chạy.",
   "aiUseFolder": "Dùng thư mục này",
-  "aiChooseFolder": "Chọn thư mục cho phiên này"
+  "aiChooseFolder": "Chọn thư mục cho phiên này",
+  "aiAttach": "Thêm ảnh",
+  "aiAttachPhoto": "Thư viện ảnh",
+  "aiTakePhoto": "Chụp ảnh",
+  "aiImagesCount": "{n, plural, other{{n} ảnh}}",
+  "aiImageFailed": "Ảnh chưa gửi được. Thử lại",
+  "aiNoImages": "{agent} không nhận ảnh.",
+  "aiImageType": "Chỉ gửi được ảnh JPEG, PNG, GIF hoặc WebP.",
+  "aiImageTooBig": "Ảnh này lớn hơn 10 MB.",
+  "aiImagesTooMuch": "Một tin chỉ mang được tối đa 20 MB ảnh.",
+  "aiPickFailed": "Không mở được ảnh. Hãy kiểm tra quyền của ShellX trong Cài đặt.",
+  "aiRemoveImage": "Bỏ ảnh",
+  "aiUploading": "Đang gửi ảnh…"
 }

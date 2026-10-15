@@ -17,7 +17,9 @@ import 'package:package_info_plus/package_info_plus.dart' as _i655;
 import 'package:shared_preferences/shared_preferences.dart' as _i460;
 import 'package:shellx_core/shellx_core.dart' as _i145;
 
+import '../../features/ai/data/image_picker_source.dart' as _i152;
 import '../../features/ai/domain/ai_drafts.dart' as _i267;
+import '../../features/ai/domain/ai_image_source.dart' as _i264;
 import '../../features/ai/presentation/controllers/ai_session_controller.dart'
     as _i800;
 import '../../features/auth/presentation/controllers/login_controller.dart'
@@ -96,6 +98,7 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i505.VersionGate>(
       () => _i505.VersionGate(gh<_i145.ShellxApi>(), gh<_i655.PackageInfo>()),
     );
+    gh.lazySingleton<_i264.AiImageSource>(() => _i152.ImagePickerSource());
     gh.lazySingleton<_i870.BiometricAuthenticator>(
       () => _i870.LocalAuthBiometricAuthenticator(),
     );

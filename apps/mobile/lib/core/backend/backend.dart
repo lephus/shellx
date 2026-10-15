@@ -186,7 +186,23 @@ abstract interface class AiMachine {
   /// current as the last time the list was watched.
   void unwatch();
   AiSessionHandle attach(String sid);
-  Future<void> prompt(String sid, String text);
+
+  /// [blobs]: images uploaded with [uploadImage] for this message (V2-2b B12); [files]: paths [files] offered and
+  /// still mentioned in [text] (B13). Each list is sent only to a computer that takes it (`unsupported`
+  /// otherwise, sending nothing).
+  Future<void> prompt(String sid, String text, {List<int> blobs = const [], List<String> files = const []});
+
+  /// V2-2b B12: a number for the next image this phone uploads (its own, never the same twice while the app runs).
+  int newBlobId();
+
+  /// V2-2b B12: sends [bytes] as image [blob] in parts, [onProgress] after each part the computer took ([sent] of
+  /// [parts]). Throws like a request: [AiRequestException] (`unsupported`, `too_large`, `busy`…) or
+  /// [MachineConnectionException]; nothing is sent again by itself.
+  Future<void> uploadImage(int blob, String mime, Uint8List bytes, {void Function(int sent, int parts)? onProgress});
+
+  /// V2-2b B13: the files of session [sid]'s folder matching [query], for `@` (at most 8, relative paths).
+  Future<List<String>> files(String sid, String query);
+
   Future<void> answerPermission(String sid, int permission, String option);
   Future<void> answerAsk(String sid, int ask, ElicitationResponse response);
   Future<void> cancel(String sid);
