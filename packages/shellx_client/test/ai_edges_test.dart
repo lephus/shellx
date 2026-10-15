@@ -204,6 +204,12 @@ final class _Control implements AiControl {
 
   @override
   void answerAsk(int id, ElicitationResponse response) {}
+
+  @override
+  Future<void> setConfig(String id, Object value) async {}
+
+  @override
+  Future<void> setMode(String modeId) async {}
 }
 
 /// A window with one AI session (`ep.-1`) whose runtime can be replaced.

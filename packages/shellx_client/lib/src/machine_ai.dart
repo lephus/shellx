@@ -370,6 +370,38 @@ final class MachineAi {
     return sid;
   }
 
+  /// V2-2b B11: the mode, model and thinking choices of [sid] this phone may
+  /// make. Throws [AiRequestException] (`unsupported` at once, sending
+  /// nothing, when the computer cannot: R15) or [MachineConnectionException].
+  Future<AiConfigView> config(String sid) async {
+    final result = await _feature(
+      AiFeature.config,
+      sid,
+      (rid) => AiConfigGet(sid: sid, rid: rid),
+    );
+    return AiConfigView.fromJson(decodeBody(result.body) ?? const {});
+  }
+
+  /// V2-2b B11: sets option [id] of [sid] to [value] (a choice's value, or a
+  /// bool for a switch). One explicit tap, one request: never sent again.
+  Future<void> setConfig(String sid, String id, Object value) => _feature(
+    AiFeature.config,
+    sid,
+    (rid) => AiConfigSet(
+      sid: sid,
+      rid: rid,
+      body: encodeBody({'id': id, 'value': value}),
+    ),
+  );
+
+  /// V2-2b B11: sets the mode of [sid] for an agent with only modes.
+  Future<void> setMode(String sid, String modeId) => _feature(
+    AiFeature.config,
+    sid,
+    (rid) =>
+        AiConfigSet(sid: sid, rid: rid, body: encodeBody({'mode': modeId})),
+  );
+
   // -------------------------------------------------- from MachineClient --
 
   /// The answer to a `session.list {desktop: true}`: the only kind that says
@@ -557,7 +589,6 @@ final class MachineAi {
   /// else it goes like every request, and its [AiResult] (with its
   /// [AiResult.body]) is the caller's to read.
   // The first feature's request (V2-2b Task 10) is its first caller.
-  // ignore: unused_element
   Future<AiResult> _feature(
     String feature,
     String? sid,

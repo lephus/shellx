@@ -11,6 +11,8 @@ import 'package:shellx_core/shellx_core.dart';
 import '../session/agent_sessions.dart';
 import 'ai_endpoint.dart';
 
+part 'ai_phone_hub_requests.dart';
+
 /// One AI session of the window, as the hub needs it (V2-2 D2).
 final class AiSessionEntry with Redacted {
   const AiSessionEntry({
@@ -64,6 +66,17 @@ abstract interface class AiControl {
 
   /// Throws [AiRefused] for an answer the window takes only on the computer.
   void answerAsk(int id, ElicitationResponse response);
+
+  /// V2-2b B11: sets option [id] to [value] (a choice's value, or a bool for
+  /// a switch) as the computer's chip does: sent to the agent, then
+  /// remembered for its next sessions. The hub checked it against what the
+  /// session offers; throws [AiRefused] (`on_computer`) for a value acting
+  /// without asking (checked again), and what the agent answered when it
+  /// said no.
+  Future<void> setConfig(String id, Object value);
+
+  /// V2-2b B11: sets the legacy mode [modeId]; as [setConfig].
+  Future<void> setMode(String modeId);
 }
 
 /// An [AiControl] will not do what a phone asks, for a reason of the
@@ -72,10 +85,14 @@ abstract interface class AiControl {
 /// question there: `on_computer` (an option that turns on a mode acting
 /// without asking, V2-1 R6, V2-2 D13).
 final class AiRefused implements Exception {
-  const AiRefused(this.code);
+  const AiRefused(this.code, {this.body});
 
   /// An `ai.result` code: a short snake_case word.
   final String code;
+
+  /// V2-2b B4: what the phone needs to know with the code (JSON), e.g. the
+  /// files a revert would touch (`confirm`); null: nothing.
+  final Uint8List? body;
 
   @override
   String toString() => 'AiRefused($code)';
@@ -391,7 +408,11 @@ final class AiPhoneHub implements AiEndpoint {
   /// V2-2b B1: what this hub does beyond V2-2a ([AiFeature] words), named in
   /// every listing (`f`). Each feature's task adds its word when the hub and
   /// the window both do it.
-  static const Set<String> offered = {AiFeature.acpHead, AiFeature.pushAnswer};
+  static const Set<String> offered = {
+    AiFeature.acpHead,
+    AiFeature.pushAnswer,
+    AiFeature.config,
+  };
 
   /// What this hub's listings name ([offered]; a test may say otherwise).
   final Set<String> features;
@@ -504,10 +525,10 @@ final class AiPhoneHub implements AiEndpoint {
         unawaited(_open(mobileId, phone, rid, agent, folder));
       // V2-2b requests answer `refused` until the task of their feature
       // replaces their two lines here with the request's handler.
-      case AiConfigGet(:final rid):
-        _refuse(mobileId, rid);
-      case AiConfigSet(:final rid):
-        _refuse(mobileId, rid);
+      case AiConfigGet(:final sid, :final rid):
+        _configGet(mobileId, phone, sid, rid);
+      case AiConfigSet():
+        _configSet(mobileId, phone, message);
       case AiBlob(:final rid):
         _refuse(mobileId, rid);
       case AiFiles(:final rid):
