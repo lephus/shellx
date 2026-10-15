@@ -59,7 +59,9 @@ subsets) for headings, JetBrains Mono for terminal text.
   are live, set `googlePlayUrl` to `https://play.google.com/store/apps/details?id=pro.shellx.mobile`
   and `appStoreUrl` to the App Store listing URL (`https://apps.apple.com/app/id` followed by the
   numeric Apple ID that App Store Connect assigns to `pro.shellx.mobile`).
-- `supportEmail` — shown in the footer. The legal pages name `support@shellx.pro` in their text.
+- `supportEmail` — shown in the footer and in the home page's Contact section (`#contact`, linked
+  from the menu on screens 48rem and wider). The legal pages write the address into their text;
+  change them too if it changes.
 
 Legal text lives in `src/pages/privacy.md`, `src/pages/terms.md` and the English versions in
 `src/pages/en/`. Change both languages together and update `updated:` in the front matter. The

@@ -200,6 +200,18 @@ const steps = [t.step1, t.step2, t.step3];
     </div>
   </section>
 
+  <section class="wrap section narrow" id="contact" aria-labelledby="contact-h">
+    <div class="contact" data-reveal>
+      <h2 id="contact-h">{t.contactHeading}</h2>
+      <p class="muted">{t.contactLead}</p>
+      <a class="btn btn-ghost" href={`mailto:${supportEmail}`}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18v12H3zM3 7l9 6 9-6" /></svg>
+        {supportEmail}
+      </a>
+    </div>
+  </section>
+
   <section class="wrap section" id="download" aria-labelledby="download-h">
     <div class="final">
       <div class="blob b4" aria-hidden="true"></div>
@@ -392,6 +404,12 @@ const steps = [t.step1, t.step2, t.step3];
   .ans p { margin: 0; overflow-wrap: anywhere; }
   :global(.motion) .faq details[open] .ans { animation: open 0.35s var(--ease); }
   @keyframes open { from { opacity: 0; transform: translateY(-6px); } }
+
+  .contact { text-align: center; padding: 2.5rem 1.5rem; border-radius: 22px; background: var(--card);
+             border: 1px solid var(--border); }
+  .contact h2 { font-size: clamp(1.6rem, 3.5vw, 2.2rem); margin-bottom: 0.5rem; }
+  .contact .muted { font-size: 1.08rem; margin: 0 auto 1.5rem; max-width: 32rem; }
+  .contact .btn { gap: 0.6rem; overflow-wrap: anywhere; }
 
   .final {
     position: relative; overflow: hidden; text-align: center; padding: 4rem 1.5rem 2rem; border-radius: 28px;

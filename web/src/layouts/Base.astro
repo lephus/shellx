@@ -83,6 +83,7 @@ const home = pathFor(lang, 'home');
           <a href={`${home}#security`}>{t.securityHeading}</a>
           <a href={pathFor(lang, 'guides')}>{t.guidesNav}</a>
           <a href={`${home}#faq`}>FAQ</a>
+          <a class="nav-wide" href={`${home}#contact`}>{t.contactHeading}</a>
         </nav>
         <a class="lang-switch" href={switchHref} hreflang={other} lang={other}>{other.toUpperCase()}</a>
         <a class="btn btn-primary btn-sm" href={`${home}#download`}>{t.download}</a>
@@ -196,6 +197,8 @@ const home = pathFor(lang, 'home');
   .top-nav a, .lang-switch { color: var(--muted); text-decoration: none; font-size: 0.95rem; }
   .top-nav a:hover, .lang-switch:hover { color: var(--fg); }
   .lang-switch { font-family: var(--mono); font-size: 0.85rem; padding: 0.5rem; }
+  /* A fifth menu item would wrap the header on tablets; the footer still links the address. */
+  @media (max-width: 48rem) { .top-nav .nav-wide { display: none; } }
   @media (max-width: 40rem) {
     .top-nav { display: none; }
     .lang-switch { margin-left: auto; }
