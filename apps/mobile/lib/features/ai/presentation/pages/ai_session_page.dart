@@ -8,6 +8,7 @@ import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_co
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_chooser.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_config_sheet.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_dock.dart';
+import 'package:shellx_mobile/features/ai/presentation/widgets/ai_items.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_timeline.dart';
 import 'package:shellx_mobile/features/app/connection_banner.dart';
 import 'package:shellx_mobile/shared/shared.dart';
@@ -40,6 +41,9 @@ class _AiSessionPageState extends State<AiSessionPage> {
   final _jumpTo = ValueNotifier<int?>(null);
   late final AppLifecycleListener _lifecycle;
   String _kept = '';
+
+  /// V2-2b B16: the whole form of a question too big for the mirror is on its way.
+  var _loadingForm = false;
 
   @override
   void initState() {
@@ -272,13 +276,17 @@ class _AiSessionPageState extends State<AiSessionPage> {
       children: [
         if (unavailable != null) _Strip(key: const Key('ai.unavailable'), text: AiWords.state(s, unavailable)),
         Expanded(
-          child: AiTimeline(
-            mirror: mirror,
-            version: version,
-            agentName: head?.agentName ?? '',
-            onLoadEarlier: link == AiLinkState.live ? _controller.loadEarlier : null,
-            jumpTo: _jumpTo,
-            clock: _controller.now,
+          // V2-2b B16: "Xem đủ" on what the phone shows cut, when the computer offers it.
+          child: AiItemActions(
+            onViewAll: _controller.can(AiFeature.item) ? _viewAll : null,
+            child: AiTimeline(
+              mirror: mirror,
+              version: version,
+              agentName: head?.agentName ?? '',
+              onLoadEarlier: link == AiLinkState.live ? _controller.loadEarlier : null,
+              jumpTo: _jumpTo,
+              clock: _controller.now,
+            ),
           ),
         ),
       ],
@@ -317,11 +325,16 @@ class _AiSessionPageState extends State<AiSessionPage> {
         )
       else if (ask != null)
         AiAskPanel(
-          key: ValueKey(ask.id),
+          // A form loaded in full is another panel: its fields start from their own defaults.
+          key: ValueKey((ask.id, ask.request != null)),
           ask: ask,
           agentName: head.agentName,
           busy: busy,
           onAnswer: (r) async => _say(await _controller.answerAsk(ask.id, r), answer: true),
+          // V2-2b B16: a question too big for the mirror is loaded in full, then answered here.
+          onLoadForm: ask.request == null && head.ask?.item != null && !_loadingForm && _controller.can(AiFeature.item)
+              ? () => unawaited(_loadForm(ask.id, head.ask!.item!))
+              : null,
         ),
       if (head.queue.isNotEmpty)
         AiQueueRow(
@@ -357,13 +370,44 @@ class _AiSessionPageState extends State<AiSessionPage> {
   }
 
   /// The question the computer waits for, as the form to answer it: its card when the phone holds it,
-  /// else one without a form, which is answered on the computer (it can still be declined).
+  /// else one without a form, which is answered on the computer (it can still be declined). A form too big
+  /// for the mirror that was loaded in full (V2-2b B16) is the form.
   MirrorAsk? _waitingAsk(MirrorHead head, AiMirror mirror) {
     final ref = head.ask;
     if (ref == null) return null;
     final card = ref.item == null ? null : mirror.at(ref.item!);
-    if (card is MirrorAsk) return card.open ? card : null;
-    return MirrorAsk(ref.item ?? -1, 0, 0, id: ref.id, status: 'open');
+    final MirrorAsk ask;
+    if (card is MirrorAsk) {
+      if (!card.open) return null;
+      ask = card;
+    } else {
+      ask = MirrorAsk(ref.item ?? -1, 0, 0, id: ref.id, status: 'open');
+    }
+    final form = ask.request == null ? _controller.formOf(ask.id) : null;
+    return form == null ? ask : MirrorAsk(ask.index, ask.rev, ask.turn, id: ask.id, status: ask.status, request: form);
+  }
+
+  /// V2-2b B16: item [index] in full, on its own page.
+  void _viewAll(int index) {
+    final title = _itemTitle(S.of(context), _controller.mirror?.at(index), _controller.head?.agentName ?? '');
+    unawaited(context.router.push(AiItemRoute(title: title, load: (onPart) => _controller.loadFull(index, onPart))));
+  }
+
+  static String _itemTitle(S s, MirrorItem? item, String agent) => switch (item) {
+    MirrorTool() => AiWords.toolTitle(s, item),
+    MirrorAsk() => s.aiAskTitle(agent),
+    MirrorText(kind: MirrorTextKind.thought) => s.aiThought,
+    MirrorText(kind: MirrorTextKind.agent) => agent,
+    _ => s.aiViewAll,
+  };
+
+  /// V2-2b B16: the whole form of question [ask] (card [index]).
+  Future<void> _loadForm(int ask, int index) async {
+    setState(() => _loadingForm = true);
+    final code = await _controller.loadForm(ask, index);
+    if (!mounted) return;
+    setState(() => _loadingForm = false);
+    _say(code == AiWords.outcomeUnknown ? 'offline' : code);
   }
 }
 

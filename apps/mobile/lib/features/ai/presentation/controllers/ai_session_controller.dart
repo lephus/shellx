@@ -260,6 +260,35 @@ class AiSessionController extends Controller {
   /// V2-2b B11: the mode of an agent with only modes; as [setConfig].
   Future<String?> setMode(String modeId) => _simple(() => _machine!.ai.setMode(sid, modeId));
 
+  /// V2-2b B16: item [index] in full for "Xem đủ", a slice at a time ([onPart]; an error it throws ends the
+  /// load: the page left), or the failure code.
+  Future<({AiFullView? view, String? code})> loadFull(int index, void Function(int part, int parts) onPart) async {
+    final machine = _machine;
+    if (machine == null) return (view: null, code: 'refused');
+    try {
+      return (view: await machine.ai.fullItem(sid, index, onPart: onPart), code: null);
+    } catch (error) {
+      return (view: null, code: _failure(error));
+    }
+  }
+
+  /// V2-2b B16: the forms of questions too big for the mirror, loaded in full by their id.
+  final Map<int, ElicitationRequest> _forms = {};
+
+  /// The form of question [ask] once [loadForm] brought it; null before.
+  ElicitationRequest? formOf(int ask) => _forms[ask];
+
+  /// V2-2b B16: the whole form of question [ask] (card [index]), so that it is answered here like any other
+  /// (with one tap; the computer checks the values with the form). Null when loaded, else the failure code.
+  Future<String?> loadForm(int ask, int index) async {
+    final full = await loadFull(index, (_, _) {});
+    final request = full.view?.request;
+    if (request == null) return full.code ?? 'refused';
+    _forms[ask] = request;
+    _set(_version, _version.peek() + 1);
+    return null;
+  }
+
   void dispose() {
     if (_disposed) return;
     _disposed = true;

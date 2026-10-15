@@ -97,6 +97,9 @@ const int kShownInputChars = 4096;
 /// Lines of one piece of output or one side of a diff.
 const int kShownLines = 1000;
 
+/// V2-2b B16: one line of a full item, as its row shows it (a line has no length).
+const int kShownLineChars = 4000;
+
 /// [text] cut to what the phone lays out: at most [maxChars] UTF-16 units and [maxLines] lines (null:
 /// any number), never in the middle of a surrogate pair. [cut] says whether anything is left out;
 /// [text] is then the start of the original. A text within both limits comes back as it is (no copy).

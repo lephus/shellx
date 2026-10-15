@@ -230,12 +230,17 @@ class AiAskPanel extends StatefulWidget {
     required this.agentName,
     required this.busy,
     required this.onAnswer,
+    this.onLoadForm,
   });
 
   final MirrorAsk ask;
   final String agentName;
   final bool busy;
   final ValueChanged<ElicitationResponse> onAnswer;
+
+  /// V2-2b B16: loads the whole form of a question too big for the mirror ("Xem đủ"), after which the page
+  /// shows it with its form; null when the computer does not offer it (or it is loading).
+  final VoidCallback? onLoadForm;
 
   @override
   State<AiAskPanel> createState() => _AiAskPanelState();
@@ -311,12 +316,21 @@ class _AiAskPanelState extends State<AiAskPanel> with _Settling {
               4.sizedHeight,
               Text(request?.message ?? '', style: context.typo.subHeader15.copyWith(color: colors.primaryText)),
               8.sizedHeight,
-              if (form == null)
+              if (form == null) ...[
                 Text(
                   request is ElicitationForm ? s.aiAskUnsupported : s.aiAskOnComputer,
                   style: context.typo.paragraph13.copyWith(color: colors.secondaryText),
-                )
-              else
+                ),
+                if (request == null && widget.onLoadForm != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      key: const Key('ai.ask.viewAll'),
+                      onPressed: waits ? null : widget.onLoadForm,
+                      child: Text(s.aiViewAll),
+                    ),
+                  ),
+              ] else
                 // Keyed by the question: the fields of another one start from their own values.
                 KeyedSubtree(
                   key: ValueKey(widget.ask.id),

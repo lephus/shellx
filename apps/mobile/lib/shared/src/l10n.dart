@@ -3585,6 +3585,31 @@ class S {
       args: [],
     );
   }
+
+  /// `View all`
+  String get aiViewAll {
+    return Intl.message('View all', name: 'aiViewAll', desc: '', args: []);
+  }
+
+  /// `Loading {part}/{parts}`
+  String aiLoadingParts(int part, int parts) {
+    return Intl.message(
+      'Loading $part/$parts',
+      name: 'aiLoadingParts',
+      desc: '',
+      args: [part, parts],
+    );
+  }
+
+  /// `It is still changing on the computer. Try again in a moment.`
+  String get aiItemChanging {
+    return Intl.message(
+      'It is still changing on the computer. Try again in a moment.',
+      name: 'aiItemChanging',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

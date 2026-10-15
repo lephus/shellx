@@ -179,6 +179,9 @@ abstract final class AiWords {
   /// The same kind of request is already on its way: nothing to say, the first one will.
   static const String inFlight = 'in_flight';
 
+  /// V2-2b B16: a full item that kept changing while it loaded (`MachineAi.fullItem`).
+  static const String changing = 'changing';
+
   /// Anything else that went wrong on this side.
   static const String error = 'error';
 
@@ -211,6 +214,9 @@ abstract final class AiWords {
     error => s.somethingWentWrong,
     // V2-2b B1: the computer cannot do this yet (an older ShellX there, or its background service).
     'unsupported' => s.aiUpdateDesktop,
+    // V2-2b B16: a full item too big for the phone, or one that kept changing while it loaded.
+    'too_big' => s.aiFromComputerOnly,
+    changing => s.aiItemChanging,
     _ => s.aiRequestFailed(code),
   };
 

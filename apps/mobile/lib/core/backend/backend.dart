@@ -205,6 +205,10 @@ abstract interface class AiMachine {
 
   /// V2-2b B11: the mode of an agent with only modes.
   Future<void> setMode(String sid, String modeId);
+
+  /// V2-2b B16: item [index] of [sid] in full, a slice at a time ([onPart] after each, 1-based; an error it
+  /// throws ends the load). `too_big`: read it on the computer; `changing`: it kept changing while it loaded.
+  Future<AiFullView> fullItem(String sid, int index, {void Function(int part, int parts)? onPart});
 }
 
 /// Everything the signed-in UI needs from `shellx_core` + `shellx_client`.
