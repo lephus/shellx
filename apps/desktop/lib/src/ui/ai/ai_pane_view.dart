@@ -15,11 +15,14 @@ import '../../ai/ai_project_files.dart';
 import '../../ai/ai_runtimes.dart';
 import '../../config/settings_schema.dart' show SettingPage;
 import '../../terminal/clipboard_media.dart' show clipboardMediaProvider;
+import '../../terminal/sidebar_workspaces.dart' show sidebarWorkspacesProvider;
 import '../../terminal/terminal_tabs.dart';
+import '../../tools/tool_dock.dart';
 import '../config/config_ui_request.dart';
 import '../settings/settings_start_page.dart';
 import '../terminal/shellx_menu.dart';
-import '../terminal/terminal_intents.dart' show TogglePaneZoomIntent;
+import '../terminal/terminal_intents.dart'
+    show TogglePaneZoomIntent, ToggleToolsIntent;
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_changes_panel.dart';
 import 'ai_dock.dart';
@@ -529,6 +532,20 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
       );
     }
     final tabs = ref.read(terminalTabsProvider.notifier);
+    // V2-3 D4: the tools of this tab's workspace; their dock opening closes
+    // the Changes/Files panel (the user can open it again).
+    final ws = ref.watch(
+      sidebarWorkspacesProvider.select((s) => s.workspaceOf(widget.tab.id)),
+    );
+    final toolsOn = ref.watch(
+      toolDockProvider.select((d) => ws != null && d.of(ws).open),
+    );
+    ref.listen<bool>(
+      toolDockProvider.select((d) => ws != null && d.of(ws).open),
+      (was, open) {
+        if (open && was == false && _ui.panelOpen) _ui.togglePanel();
+      },
+    );
     Widget header(AiHeaderView view) => ListenableBuilder(
       listenable: _ui,
       builder: (context, _) => AiHeader(
@@ -545,6 +562,8 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
         onTerminal: () => unawaited(tabs.openAiTerminal(widget.tab.id)),
         onZoom: widget.tab.isSplit ? _zoom : null,
         onMore: (at) => unawaited(_more(at)),
+        onTools: () => Actions.maybeInvoke(context, const ToggleToolsIntent()),
+        toolsOn: toolsOn,
       ),
     );
     final content = Semantics(
