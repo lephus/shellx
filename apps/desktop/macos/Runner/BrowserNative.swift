@@ -1,3 +1,4 @@
+import Carbon
 import Cocoa
 import FlutterMacOS
 import WebKit
@@ -20,6 +21,10 @@ final class BrowserNative: NSObject {
   private var downloadGuards: [Int64: DownloadGuard] = [:]
   private var keyMonitor: Any?
   private var mouseMonitor: Any?
+  /// Flutter's layout map ([layoutMap]) of the current input source: built
+  /// at the first chord a page hands back, dropped when the input source
+  /// changes (Flutter's keyboard manager rebuilds its own then).
+  private var layout: [UInt16: String]?
 
   init(controller: FlutterViewController) {
     self.controller = controller
@@ -30,10 +35,14 @@ final class BrowserNative: NSObject {
     channel.setMethodCallHandler { [weak self] call, result in
       self?.handle(call, result) ?? result(nil)
     }
+    DistributedNotificationCenter.default().addObserver(
+      self, selector: #selector(inputSourceChanged),
+      name: NSNotification.Name(kTISNotifySelectedKeyboardInputSourceChanged as String),
+      object: nil, suspensionBehavior: .deliverImmediately)
     keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
       [weak self] event in
       guard let self, let id = self.toolWebViewId(firstResponderOf: event),
-        let chord = BrowserNative.chord(event),
+        let chord = BrowserNative.chord(event, layout: self.currentLayout()),
         self.forwarded[id]?.contains(chord) == true
       else { return event }
       self.channel.invokeMethod("shortcut", arguments: ["id": id, "chord": chord])
@@ -57,6 +66,16 @@ final class BrowserNative: NSObject {
   deinit {
     if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
     if let mouseMonitor { NSEvent.removeMonitor(mouseMonitor) }
+    DistributedNotificationCenter.default().removeObserver(self)
+  }
+
+  @objc private func inputSourceChanged() { layout = nil }
+
+  private func currentLayout() -> [UInt16: String] {
+    if let layout { return layout }
+    let built = BrowserNative.currentLayoutData().map(BrowserNative.layoutMap) ?? [:]
+    layout = built
+    return built
   }
 
   /// The WKWebView behind a Dart `WebKitWebViewController.webViewIdentifier`
@@ -107,7 +126,8 @@ final class BrowserNative: NSObject {
   ]
 
   /// What the US layout types on each typewriter key (ANSI key codes
-  /// 0x00–0x32; Return, Tab and Space are named keys).
+  /// 0x00–0x32; Return, Tab and Space are named keys): Flutter's layout
+  /// goals (`kLayoutGoals`), letters and digits mandatory.
   static let usCharacters: [UInt16: String] = [
     0x00: "a", 0x01: "s", 0x02: "d", 0x03: "f", 0x04: "h", 0x05: "g",
     0x06: "z", 0x07: "x", 0x08: "c", 0x09: "v", 0x0B: "b", 0x0C: "q",
@@ -119,50 +139,17 @@ final class BrowserNative: NSObject {
     0x2C: "/", 0x2D: "n", 0x2E: "m", 0x2F: ".", 0x32: "`",
   ]
 
-  /// The key of [event] as Dart's `chordConfigText` writes it; nil for a
-  /// key Dart has no name for.
-  static func keyName(_ event: NSEvent) -> String? {
-    keyName(
-      code: event.keyCode,
-      unshifted: event.characters(byApplyingModifiers: []),
-      shifted: event.characters(byApplyingModifiers: .shift))
-  }
-
-  /// D10: a key named as Flutter names its logical key, so a chord pressed
-  /// in a page is the keymap's chord on any layout. Named keys go by key
-  /// code. A typewriter key (0x00–0x32) is, in this order:
-  /// (a) the ASCII letter or digit it types without Shift, else with Shift
-  ///     (AZERTY's and Czech's digit rows give 1…0);
-  /// (b) when it types nothing in Latin-1 with or without Shift (Russian,
-  ///     Greek), the US key at its place: ⌘T is "t";
-  /// (c) else what it types without Shift, as every other key: ⌘⇧= is "=".
-  static func keyName(code: UInt16, unshifted: String?, shifted: String?) -> String? {
+  /// D10: the key [code] as Dart's `chordConfigText` writes it, so a chord
+  /// pressed in a page is the keymap's chord on any layout; nil for a key
+  /// Dart has no name for. Named keys go by key code; a typewriter key by
+  /// Flutter's [layout] map ([layoutMap]); any other key by what it types
+  /// without Shift, as before. Flutter's own last resort reads it with
+  /// Shift; here ⌘⇧= stays "=", the keymap's spelling.
+  static func keyName(code: UInt16, unshifted: String?, layout: [UInt16: String]) -> String? {
     if let named = namedKeys[code] { return named }
-    if code <= 0x32 {
-      if let c = asciiAlnum(unshifted?.lowercased()) ?? asciiAlnum(shifted) {
-        return c
-      }
-      if !latin1(unshifted), !latin1(shifted), let us = usCharacters[code] {
-        return characterName(us)
-      }
-    }
+    if let mapped = layout[code] { return mapped.isEmpty ? nil : mapped }
     guard let raw = unshifted, raw.count == 1 else { return nil }
     return characterName(raw.lowercased())
-  }
-
-  /// An ASCII letter or digit as typed (Flutter's layout goals: a–z, 0–9).
-  static func asciiAlnum(_ c: String?) -> String? {
-    guard let c, c.unicodeScalars.count == 1,
-      let v = c.unicodeScalars.first?.value,
-      (0x61...0x7a).contains(v) || (0x30...0x39).contains(v)
-    else { return nil }
-    return c
-  }
-
-  /// Latin-1 as Flutter's layout check counts it: no character counts too.
-  static func latin1(_ c: String?) -> Bool {
-    guard let v = c?.unicodeScalars.first?.value else { return true }
-    return v < 0x100
   }
 
   /// One character as Dart's `chordConfigText` writes it: punctuation by
@@ -179,11 +166,99 @@ final class BrowserNative: NSObject {
     return c  // a layout's own letter (ö, é), as Dart writes it
   }
 
+  /// Flutter's other layout goals: a punctuation key's US name, Space, and
+  /// IntlBackslash (0x0A), which Dart cannot name ("").
+  static func usGoalName(_ code: UInt16) -> String? {
+    if code == 0x0A { return "" }
+    if code == 0x31 { return "space" }
+    guard let us = usCharacters[code] else { return nil }
+    return punctuation[us]
+  }
+
+  /// Flutter's layout map for one keyboard layout, ported from the pinned
+  /// engine (FlutterKeyboardManager.mm `buildLayout`): typewriter key code →
+  /// the config name of the logical key Flutter gives it ("" for one Dart
+  /// cannot name). In key-code order, a key takes the first letter or digit
+  /// it types, unshifted then shifted, that no earlier key took (a dead key
+  /// types none); else, a punctuation key that types nothing in Latin-1 (a
+  /// dead key is not Latin-1) takes its US name. Then each letter or digit
+  /// no key types goes to its US key, over whatever that key had.
+  static func layoutMap(_ data: Data) -> [UInt16: String] {
+    data.withUnsafeBytes { bytes -> [UInt16: String] in
+      guard let layout = bytes.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self)
+      else { return [:] }
+      var goals: [UInt32: (code: UInt16, name: String)] = [:]
+      for (code, us) in usCharacters {
+        guard let v = us.unicodeScalars.first?.value,
+          (0x30...0x39).contains(v) || (0x61...0x7a).contains(v)
+        else { continue }
+        goals[v] = (code, us)
+      }
+      var map: [UInt16: String] = [:]
+      for code in UInt16(0)...0x32 {
+        let clues = [clue(layout, code, shift: false), clue(layout, code, shift: true)]
+        for clue in clues where !clue.dead {
+          if let goal = goals.removeValue(forKey: clue.char) {
+            map[code] = goal.name
+            break
+          }
+        }
+        let latin1 = clues.contains { $0.char < 0x100 && !$0.dead }
+        if map[code] == nil, !latin1, let name = usGoalName(code) { map[code] = name }
+      }
+      for goal in goals.values { map[goal.code] = goal.name }
+      return map
+    }
+  }
+
+  /// What [code] types on [layout], as Flutter reads it (FlutterKeyboardLayout
+  /// `lookUpLayoutForKeyCode`): one printable UTF-16 unit, else 0; a dead
+  /// key gives what it types when pressed twice.
+  static func clue(
+    _ layout: UnsafePointer<UCKeyboardLayout>, _ code: UInt16, shift: Bool
+  ) -> (char: UInt32, dead: Bool) {
+    let modifiers = (UInt32(shift ? shiftKey : 0) >> 8) & 0xFF
+    let keyboard = UInt32(LMGetKbdLast())
+    var state: UInt32 = 0
+    var length = 0
+    var char: UniChar = 0
+    func translate() -> OSStatus {
+      UCKeyTranslate(
+        layout, code, UInt16(kUCKeyActionDown), modifiers, keyboard,
+        OptionBits(kUCKeyTranslateNoDeadKeysBit), &state, 1, &length, &char)
+    }
+    var status = translate()
+    var dead = false
+    if status == noErr, length == 0, state != 0 {
+      dead = true
+      status = translate()
+    }
+    guard status == noErr, length == 1, char >= 0x20, char != 0x7F else { return (0, false) }
+    return (UInt32(char), dead)
+  }
+
+  /// The current input source's key layout, as Flutter reads it; an input
+  /// method without one (Japanese) gives its keyboard layout's.
+  static func currentLayoutData() -> Data? {
+    for copy in [TISCopyCurrentKeyboardInputSource, TISCopyCurrentKeyboardLayoutInputSource] {
+      if let source = copy()?.takeRetainedValue(),
+        let data = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData)
+      {
+        return Unmanaged<CFData>.fromOpaque(data).takeUnretainedValue() as Data
+      }
+    }
+    return nil
+  }
+
   /// [event] as Dart's `chordConfigText` writes a chord: ctrl, alt, shift,
   /// super, then the key.
-  static func chord(_ event: NSEvent) -> String? {
+  static func chord(_ event: NSEvent, layout: [UInt16: String]) -> String? {
     let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-    guard let key = keyName(event) else { return nil }
+    guard
+      let key = keyName(
+        code: event.keyCode, unshifted: event.characters(byApplyingModifiers: []),
+        layout: layout)
+    else { return nil }
     var parts: [String] = []
     if flags.contains(.control) { parts.append("ctrl") }
     if flags.contains(.option) { parts.append("alt") }
