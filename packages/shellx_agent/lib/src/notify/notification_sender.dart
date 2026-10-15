@@ -9,10 +9,18 @@ final class AgentNotification {
     required this.title,
     required this.body,
     this.data = const {},
+    this.category,
+    this.tag,
   });
   final String title;
   final String body;
   final Map<String, String> data;
+
+  /// V2-2b B6: the buttons the phone shows (`ai_perm`), and the tag of the
+  /// notification (Android) a notification with buttons takes the place of;
+  /// null: none. An older relay ignores both.
+  final String? category;
+  final String? tag;
 
   @override
   String toString() => 'AgentNotification($title, $body, $data)';
@@ -126,7 +134,13 @@ final class NotificationSender {
         max = max * 3 ~/ 4;
         body = _clip(n.body, max);
       }
-      final sent = await _api.sendNotification(title, body, data: n.data);
+      final sent = await _api.sendNotification(
+        title,
+        body,
+        data: n.data,
+        category: n.category,
+        tag: n.tag,
+      );
       if (sent == 0) {
         _pausedUntil = _now().add(pauseWhenUnheard);
         _log?.call(

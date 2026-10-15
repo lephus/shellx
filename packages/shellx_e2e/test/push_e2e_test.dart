@@ -23,6 +23,12 @@ final int fcmPort =
     int.tryParse(Platform.environment['SHELLX_E2E_FAKE_FCM_PORT'] ?? '') ??
     8788;
 
+/// V2-2b B6: set to `1` when the relay runs from the `v2-2b-relay` branch: an
+/// AI permission push then also carries the iOS category and the Android tag.
+/// A relay without them still passes everything else on (the data included).
+final bool expectActions =
+    Platform.environment['SHELLX_E2E_EXPECT_ACTIONS'] == '1';
+
 /// Plays Google: the OAuth token endpoint and FCM's `messages:send`.
 final class FakeFcm {
   FakeFcm._(this._server) {
@@ -156,6 +162,82 @@ void main() {
               'the fake FCM variables (relay/README.md, "Push notifications")'
         : !File('/bin/zsh').existsSync()
         ? 'needs /bin/zsh'
+        : null,
+  );
+
+  test(
+    'an AI permission push carries its answers to the fake FCM: the request '
+    'id and the two option ids in data and, through a relay of V2-2b, the '
+    'iOS category and the Android tag (V2-2b B6, B7)',
+    () async {
+      final fcm = await FakeFcm.start(fcmPort);
+      addTearDown(fcm.close);
+      AgentNotifications? notices;
+      final world = await E2eWorld.create(
+        Uri.parse(relayUrl!),
+        notifications: (api) => notices = AgentNotifications(
+          NotificationsConfig(
+            api: api,
+            threshold: () => null,
+            machineName: () => 'e2e-agent',
+            locale: () => 'vi_VN',
+          ),
+        ),
+      );
+      addTearDown(world.dispose);
+      await world.pair(world.phone);
+      await world.phone.api.registerPushToken(
+        'fcm-token-of-e2e-phone',
+        PushPlatform.ios,
+      );
+
+      notices!.aiNotice(
+        const AiPush(
+          kind: AiPushKind.needsInput,
+          agentName: 'Claude',
+          sid: 'k3f9za.-12',
+          detail: 'Sửa src/main.ts',
+          permission: 41,
+          allow: 'allow',
+          reject: 'reject',
+        ),
+      );
+      await waitUntil(
+        () => fcm.messages.isNotEmpty,
+        timeout: const Duration(seconds: 20),
+        reason:
+            'the fake FCM got nothing (relay started with the FCM_* '
+            'variables?)',
+      );
+      final message = fcm.messages.single;
+      expect(message['token'], 'fcm-token-of-e2e-phone');
+      expect(message['notification'], {
+        'title': 'e2e-agent · Claude',
+        'body': 'Cần bạn trả lời: Sửa src/main.ts',
+      });
+      expect(message['data'], {
+        'kind': 'ai',
+        'ai_session': 'k3f9za.-12',
+        'perm': '41',
+        'allow': 'allow',
+        'reject': 'reject',
+        'agent_id': world.agentId,
+      });
+      if (expectActions) {
+        expect(message['apns'], {
+          'payload': {
+            'aps': {'sound': 'default', 'category': 'ai_perm'},
+          },
+        });
+        expect(message['android'], {
+          'priority': 'high',
+          'notification': {'tag': 'ai-k3f9za--12-41'},
+        });
+      }
+    },
+    skip: relayUrl == null
+        ? 'Set SHELLX_E2E_RELAY=http://127.0.0.1:8787 and start the relay with '
+              'the fake FCM variables (relay/README.md, "Push notifications")'
         : null,
   );
 }

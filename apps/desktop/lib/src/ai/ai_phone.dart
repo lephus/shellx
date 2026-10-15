@@ -18,7 +18,6 @@ import '../terminal/sidebar_workspaces.dart';
 import '../terminal/terminal_tabs.dart';
 import '../ui/window_focus.dart';
 import 'ai_agents.dart';
-import 'ai_no_approval.dart';
 import 'ai_runtimes.dart';
 
 /// V2-2 D2: the window's AI sessions as the phone hub sees them, over

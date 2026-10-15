@@ -475,6 +475,35 @@ void main() {
       expect(recorder.lastJson, {'title': 'a', 'body': 'b'});
     });
 
+    test('sendNotification posts the category and the tag of an AI '
+        'permission push (V2-2b B6)', () async {
+      final recorder = _Recorder((_) => _json({'sent': 1}, 202));
+      await recorder
+          .api(token: 't')
+          .sendNotification(
+            'MacBook · Claude',
+            'Cần bạn trả lời: Sửa src/main.ts',
+            data: {'kind': 'ai', 'ai_session': 'k3f9za.-12', 'perm': '41'},
+            category: 'ai_perm',
+            tag: 'ai-k3f9za--12-41',
+          );
+      expect(recorder.lastJson, {
+        'title': 'MacBook · Claude',
+        'body': 'Cần bạn trả lời: Sửa src/main.ts',
+        'data': {'kind': 'ai', 'ai_session': 'k3f9za.-12', 'perm': '41'},
+        'category': 'ai_perm',
+        'tag': 'ai-k3f9za--12-41',
+      });
+    });
+
+    test('sendNotification writes a category or a tag only when given one '
+        '(a relay before V2-2b got neither)', () async {
+      final recorder = _Recorder((_) => _json({'sent': 1}, 202));
+      await recorder.api(token: 't').sendNotification('a', 'b', tag: 'x');
+      expect(recorder.lastJson, {'title': 'a', 'body': 'b', 'tag': 'x'});
+      expect(recorder.lastJson.containsKey('category'), isFalse);
+    });
+
     test('sendNotification maps 503 push_unavailable and 429', () async {
       final unavailable = _Recorder(
         (_) => _error(503, 'push_unavailable', 'not configured'),

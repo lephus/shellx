@@ -119,6 +119,14 @@ abstract interface class AiSessionSource {
 
 enum AiPushKind { needsInput, done }
 
+/// V2-2b B6: the notification category whose buttons ("Từ chối" / "Cho
+/// phép") the phone shows for an AI permission request.
+const String kAiPermissionCategory = 'ai_perm';
+
+/// V2-2b B7: the longest option id a push carries as data (the relay's limit
+/// on a data value, in characters).
+const int kAiPushValueChars = 256;
+
 /// A push the hub asks for (V2-2 D11); worded by the agent side's
 /// `AgentNotifications.aiNotice`.
 final class AiPush with Redacted {
@@ -130,6 +138,9 @@ final class AiPush with Redacted {
     this.question = false,
     this.turn,
     this.elapsed,
+    this.permission,
+    this.allow,
+    this.reject,
   });
 
   final AiPushKind kind;
@@ -147,9 +158,39 @@ final class AiPush with Redacted {
   final int? turn;
   final Duration? elapsed;
 
-  /// For `ai.push` (window → background service). `question` is a later
-  /// key: an older service skips it and, with no detail, says only "needs
-  /// your answer".
+  /// V2-2b B7: the permission request the push is about (its id, one of the
+  /// window's run, B3) and the two answers its buttons give: an "allow once"
+  /// and a "reject once" option id ([aiPushChoices]). All three, or none.
+  final int? permission;
+  final String? allow;
+  final String? reject;
+
+  static final _tagPattern = RegExp(r'^[A-Za-z0-9_.:-]{1,64}$');
+
+  /// V2-2b B7: the notification's tag, `ai-<epoch>-<pane>-<request>` (the
+  /// session id with `-` for its dot): what the Android app puts its
+  /// notification with buttons in the place of. Null without a [permission],
+  /// or when it would not be 1..64 of `[A-Za-z0-9_.:-]` (the relay's rule: a
+  /// tag it refuses would cost the whole push).
+  String? get tag {
+    final id = permission;
+    if (id == null) return null;
+    final tag = 'ai-${sid.replaceAll('.', '-')}-$id';
+    return _tagPattern.hasMatch(tag) ? tag : null;
+  }
+
+  /// The push may carry answer buttons: a [permission], two option ids of
+  /// 1..[kAiPushValueChars] characters, and a [tag].
+  bool get answerable =>
+      permission != null && _fits(allow) && _fits(reject) && tag != null;
+
+  static bool _fits(String? id) =>
+      id != null && id.isNotEmpty && id.runes.length <= kAiPushValueChars;
+
+  /// For `ai.push` (window → background service). `question`, `perm`,
+  /// `allow` and `reject` are later keys: an older service skips them —
+  /// without a detail it says only "needs your answer", without the answers
+  /// it sends the push without buttons.
   Map<String, Object?> toFields() => {
     'kind': kind.name,
     'name': agentName,
@@ -158,6 +199,11 @@ final class AiPush with Redacted {
     if (question) 'question': true,
     'turn': ?turn,
     if (elapsed != null) 'ms': elapsed!.inMilliseconds,
+    if (permission != null && allow != null && reject != null) ...{
+      'perm': permission,
+      'allow': allow,
+      'reject': reject,
+    },
   };
 
   static AiPush? fromFields(Map<String, Object?> f) {
@@ -170,6 +216,11 @@ final class AiPush with Redacted {
     final detail = f['detail'];
     final turn = f['turn'];
     final ms = f['ms'];
+    final perm = f['perm'];
+    final allow = f['allow'];
+    final reject = f['reject'];
+    // All three, or none of them.
+    final answers = perm is int && allow is String && reject is String;
     return AiPush(
       kind: kind,
       agentName: name,
@@ -178,8 +229,38 @@ final class AiPush with Redacted {
       question: f['question'] == true,
       turn: turn is int ? turn : null,
       elapsed: ms is int ? Duration(milliseconds: ms) : null,
+      permission: answers ? perm : null,
+      allow: answers ? allow : null,
+      reject: answers ? reject : null,
     );
   }
+}
+
+/// V2-2b B7: the two answers the push of permission [p] may offer as
+/// buttons — the first "allow once" that turns on no mode acting without
+/// asking ([aiOptionEnablesNoApproval]) and the first "reject once" — or
+/// null, for a push without buttons, when either is missing or an id would
+/// not fit the push's data (1..[kAiPushValueChars] characters). Never an
+/// "always" answer: it changes what happens next, which is no button's to do
+/// (V2-2 D13).
+({String allow, String reject})? aiPushChoices(PendingPermission p) {
+  bool fits(String id) => id.isNotEmpty && id.runes.length <= kAiPushValueChars;
+  final allow = p.request.options
+      .where(
+        (o) =>
+            o.kind == PermissionKind.allowOnce && !aiOptionEnablesNoApproval(o),
+      )
+      .firstOrNull;
+  final reject = p.request.options
+      .where((o) => o.kind == PermissionKind.rejectOnce)
+      .firstOrNull;
+  if (allow == null ||
+      reject == null ||
+      !fits(allow.optionId) ||
+      !fits(reject.optionId)) {
+    return null;
+  }
+  return (allow: allow.optionId, reject: reject.optionId);
 }
 
 typedef AiPushSink = void Function(AiPush push);
@@ -310,7 +391,7 @@ final class AiPhoneHub implements AiEndpoint {
   /// V2-2b B1: what this hub does beyond V2-2a ([AiFeature] words), named in
   /// every listing (`f`). Each feature's task adds its word when the hub and
   /// the window both do it.
-  static const Set<String> offered = {AiFeature.acpHead};
+  static const Set<String> offered = {AiFeature.acpHead, AiFeature.pushAnswer};
 
   /// What this hub's listings name ([offered]; a test may say otherwise).
   final Set<String> features;
@@ -767,8 +848,10 @@ final class AiPhoneHub implements AiEndpoint {
       ..needsPushedAt = now
       ..pushed.add(request);
     // A permission is named by its action title (N3); a question by nothing
-    // of what it asks (M2).
+    // of what it asks (M2). A permission's push also carries the two answers
+    // its buttons give (V2-2b B7); a question's has none.
     final permission = w.state.currentPermission;
+    final choices = permission == null ? null : aiPushChoices(permission);
     _sendPush(
       push,
       AiPush(
@@ -777,6 +860,9 @@ final class AiPhoneHub implements AiEndpoint {
         sid: sid,
         detail: permission == null ? null : clipText(permission.title, 240),
         question: permission == null,
+        permission: choices == null ? null : permission!.id,
+        allow: choices?.allow,
+        reject: choices?.reject,
       ),
     );
   }

@@ -54,7 +54,11 @@ final class AgentNotifications {
 
   /// V2-2 D11: an AI session needs the user, or finished a long turn
   /// (title `<machine> · <agent>`). The phone opens that session from
-  /// `ai_session`; an older phone opens the machine. Never throws.
+  /// `ai_session`; an older phone opens the machine. V2-2b B7: a permission
+  /// request with its two answers ([AiPush.answerable]) also carries its id
+  /// and the two option ids in `data` (`perm`, `allow`, `reject`), and asks
+  /// for the buttons (`category: ai_perm`) and the request's [AiPush.tag]; a
+  /// question, a finished turn and any other push have none. Never throws.
   void aiNotice(AiPush push) {
     try {
       NotificationText text;
@@ -80,11 +84,25 @@ final class AgentNotifications {
           push.elapsed ?? Duration.zero,
         ),
       };
+      final buttons =
+          push.kind == AiPushKind.needsInput &&
+          !push.question &&
+          push.answerable;
       sender.send(
         AgentNotification(
           title: text.title(machine, push.agentName),
           body: body,
-          data: {'kind': 'ai', 'ai_session': push.sid},
+          data: {
+            'kind': 'ai',
+            'ai_session': push.sid,
+            if (buttons) ...{
+              'perm': '${push.permission}',
+              'allow': push.allow!,
+              'reject': push.reject!,
+            },
+          },
+          category: buttons ? kAiPermissionCategory : null,
+          tag: buttons ? push.tag : null,
         ),
       );
     } catch (_) {
