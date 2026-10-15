@@ -70,6 +70,7 @@ String fileSettingText(
   'new-tab-kind' => c.newTabKind.name,
   'ai-agent-claude' => c.aiAgentClaude ? 'on' : 'off',
   'ai-checkpoint-days' => '${c.aiCheckpointDays}',
+  'tool-embed' => c.toolEmbed.name,
   'link-editor' => c.linkEditor.name,
   'pr-status' => '${c.prStatus}',
   'global-hotkey' =>

@@ -587,6 +587,26 @@ final List<SettingDef> kSettings = List.unmodifiable([
       SettingSample('on', 'on'),
     ],
   ),
+  // V2-3 D7, D22: where tools open (Settings › Projects, last).
+  SettingDef(
+    id: 'tool-embed',
+    owner: SettingOwner.file,
+    page: SettingPage.projects,
+    control: SettingControl.segmented,
+    fileKey: 'tool-embed',
+    label: (l) => l.toolEmbedSetting,
+    keywords: const ['tool', 'web', 'browser', 'localhost', 'trình duyệt'],
+    choices: [
+      SettingChoice('auto', (l) => l.toolEmbedAuto),
+      SettingChoice('on', (l) => l.toolEmbedOn),
+      SettingChoice('off', (l) => l.toolEmbedOff),
+    ],
+    sampleValues: const [
+      SettingSample('off', 'off'),
+      SettingSample('on', 'on'),
+      SettingSample('auto', 'auto'),
+    ],
+  ),
   // V2-1 D12: how long restore points are kept.
   SettingDef(
     id: 'ai-checkpoint-days',

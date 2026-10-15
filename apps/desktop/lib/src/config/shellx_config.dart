@@ -48,6 +48,12 @@ enum AgentResume { ask, off }
 /// button and the startup tab open. The names are the wire values.
 enum NewTabKind { terminal, ai }
 
+/// V2-3 D7 `tool-embed`: where a tool opens. `auto` shows it in ShellX on
+/// macOS and in the system browser on Windows (until the §11.2 check); `on`
+/// always in ShellX; `off` always in the browser. The names are the wire
+/// values.
+enum ToolEmbed { auto, on, off }
+
 /// `link-editor`: where ⌘-click (Ctrl-click on Windows) opens a file path
 /// found in a local pane. `auto` = the first installed of Cursor, VS Code,
 /// Zed; `finder` = only reveal it in Finder / Explorer (A10 D7, as before).
@@ -134,6 +140,7 @@ final class ShellxConfig {
     this.confirmClose = ConfirmClose.whenRunning,
     this.agentResume = AgentResume.ask,
     this.newTabKind = NewTabKind.terminal,
+    this.toolEmbed = ToolEmbed.auto,
     this.aiAgentClaude = true,
     this.aiCheckpointDays = kAiCheckpointDaysDefault,
     this.linkEditor = LinkEditor.auto,
@@ -181,6 +188,9 @@ final class ShellxConfig {
 
   /// `new-tab-kind` (ShellX file only, V2-1 D4): `terminal` by default.
   final NewTabKind newTabKind;
+
+  /// `tool-embed` (ShellX file only, V2-3 D7): `auto` by default.
+  final ToolEmbed toolEmbed;
 
   /// `ai-agent-claude = on | off` (ShellX file only, V2-1 D21): off hides
   /// Claude from the AI interface everywhere.
@@ -307,6 +317,7 @@ final class _Builder {
   var confirmClose = ConfirmClose.whenRunning;
   var agentResume = AgentResume.ask;
   var newTabKind = NewTabKind.terminal;
+  var toolEmbed = ToolEmbed.auto;
   var aiAgentClaude = true;
   var aiCheckpointDays = kAiCheckpointDaysDefault;
   var linkEditor = LinkEditor.auto;
@@ -604,6 +615,15 @@ final class _Builder {
         };
         if (kind == null) return _badValue(e, g, 'terminal, ai');
         newTabKind = kind;
+      case 'tool-embed':
+        final mode = switch (v) {
+          '' || 'auto' => ToolEmbed.auto,
+          'on' => ToolEmbed.on,
+          'off' => ToolEmbed.off,
+          _ => null,
+        };
+        if (mode == null) return _badValue(e, g, 'auto, on, off');
+        toolEmbed = mode;
       case 'ai-agent-claude':
         final on = switch (v) {
           '' || 'on' || 'true' => true,
@@ -810,6 +830,7 @@ final class _Builder {
     confirmClose: confirmClose,
     agentResume: agentResume,
     newTabKind: newTabKind,
+    toolEmbed: toolEmbed,
     aiAgentClaude: aiAgentClaude,
     aiCheckpointDays: aiCheckpointDays,
     linkEditor: linkEditor,

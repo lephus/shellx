@@ -86,6 +86,7 @@ List<Map<String, String>> configShowValues(ConfigState s) {
     v('new-tab-kind', c.newTabKind.name),
     v('ai-agent-claude', c.aiAgentClaude ? 'on' : 'off'),
     v('ai-checkpoint-days', '${c.aiCheckpointDays}'),
+    v('tool-embed', c.toolEmbed.name),
     v('link-editor', c.linkEditor.name),
     v('pr-status', '${c.prStatus}'),
     v('agent-event-command', c.agentEventCommand),
