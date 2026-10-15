@@ -206,6 +206,9 @@ final class _MachineSessionAdapter implements MachineSession {
   late final AiMachine ai = _AiMachineAdapter(_client.ai);
 
   @override
+  late final ToolMachine tools = _ToolMachineAdapter(_client.tools);
+
+  @override
   void input(int id, Uint8List data) => _client.input(id, data);
 
   @override
@@ -327,4 +330,77 @@ final class _AiSessionAdapter implements AiSessionHandle {
 
   @override
   void loadEarlier() => _link.loadEarlier();
+}
+
+final class _ToolMachineAdapter implements ToolMachine {
+  _ToolMachineAdapter(this._tools);
+
+  final MachineTools _tools;
+
+  @override
+  bool? get supported => _tools.supported;
+
+  @override
+  ToolListing? get listing => _tools.listing;
+
+  @override
+  Stream<ToolListing> get listings => _tools.listings;
+
+  @override
+  Future<void> watch() => _tools.watch();
+
+  @override
+  void unwatch() => _tools.unwatch();
+
+  @override
+  ToolPageSession page(ToolInfo tool, ToolHostTexts texts) =>
+      _ToolPageAdapter(ToolSession(tool: tool.id, port: tool.port, path: tool.path, link: _tools, texts: texts));
+}
+
+final class _ToolPageAdapter implements ToolPageSession {
+  _ToolPageAdapter(this._session);
+
+  final ToolSession _session;
+
+  @override
+  ToolPhase get phase => _session.phase;
+
+  @override
+  Stream<void> get changes => _session.changes;
+
+  @override
+  Stream<ToolPageEvent> get events => _session.events;
+
+  @override
+  int get port => _session.port;
+
+  @override
+  int? get servedPort => _session.servedPort;
+
+  @override
+  int? get alias => _session.alias;
+
+  @override
+  Set<String> get origins => _session.origins;
+
+  @override
+  int get requests => _session.requests;
+
+  @override
+  void resetRequests() => _session.resetRequests();
+
+  @override
+  void start() => _session.start();
+
+  @override
+  void home() => _session.home();
+
+  @override
+  Future<void> pause() => _session.pause();
+
+  @override
+  void resume() => _session.resume();
+
+  @override
+  Future<void> close() => _session.close();
 }

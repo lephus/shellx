@@ -83,6 +83,16 @@ void main() {
       );
     });
 
+    test('V2-4 E14: ATS allows the local network (a tool page on localhost); http links can open', () {
+      final plist = readFile('ios/Runner/Info.plist');
+      expect(
+        plist,
+        contains('<key>NSAppTransportSecurity</key>\n\t<dict>\n\t\t<key>NSAllowsLocalNetworking</key>\n\t\t<true/>'),
+      );
+      expect(plist, isNot(contains('NSAllowsArbitraryLoads')));
+      expect(plist, contains('<string>http</string>'));
+    });
+
     test('microphone and speech recognition prompts: Info.plist and both languages', () {
       final plist = readFile('ios/Runner/Info.plist');
       expect(plist, contains('<key>NSMicrophoneUsageDescription</key>'));
@@ -165,6 +175,18 @@ void main() {
       expect(readFile('android/app/src/main/res/values-night/styles.xml'), contains('Theme.AppCompat'));
     });
 
+    test('V2-4 E14: cleartext only to localhost and 127.0.0.1, through the network security config', () {
+      final manifest = readFile('android/app/src/main/AndroidManifest.xml');
+      expect(manifest, contains('android:networkSecurityConfig="@xml/network_security_config"'));
+      expect(manifest, isNot(contains('usesCleartextTraffic')));
+      final config = readFile('android/app/src/main/res/xml/network_security_config.xml');
+      expect(config, contains('<base-config cleartextTrafficPermitted="false" />'));
+      expect(config, contains('<domain-config cleartextTrafficPermitted="true">'));
+      final domains = RegExp(r'<domain[^>]*>([^<]+)</domain>').allMatches(config).map((m) => m.group(1)).toList();
+      expect(domains, ['localhost', '127.0.0.1']);
+      expect(manifest, contains('<data android:scheme="http"/>'));
+    });
+
     test('voice input: RECORD_AUDIO and the speech recognition service query', () {
       final manifest = readFile('android/app/src/main/AndroidManifest.xml');
       expect(manifest, contains('android.permission.RECORD_AUDIO'));
@@ -207,6 +229,10 @@ void main() {
     final pubspec = readFile('pubspec.yaml');
     expect(pubspec, contains('\n  xterm:\n    path: ../../third_party/xterm\n'));
     expect(pubspec, contains('\n  signals_flutter: 6.3.1\n'));
+    // V2-4 E12: the newest webview packages on Flutter 3.41.4.
+    expect(pubspec, contains('\n  webview_flutter: 4.14.1\n'));
+    expect(pubspec, contains('\n  webview_flutter_android: 4.12.0\n'));
+    expect(pubspec, contains('\n  webview_flutter_wkwebview: 3.25.1\n'));
   });
 
   test('JetBrains Mono and both OFL licenses are bundled', () {
