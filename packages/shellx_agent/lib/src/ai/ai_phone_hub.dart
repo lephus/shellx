@@ -401,6 +401,31 @@ final class AiPhoneHub implements AiEndpoint {
         });
       case AiOpen(:final rid, :final agent, :final folder):
         unawaited(_open(mobileId, phone, rid, agent, folder));
+      // V2-2b requests answer `refused` until the task of their feature
+      // replaces their two lines here with the request's handler.
+      case AiConfigGet(:final rid):
+        _refuse(mobileId, rid);
+      case AiConfigSet(:final rid):
+        _refuse(mobileId, rid);
+      case AiBlob(:final rid):
+        _refuse(mobileId, rid);
+      case AiFiles(:final rid):
+        _refuse(mobileId, rid);
+      case AiItemPart(:final rid):
+        _refuse(mobileId, rid);
+      case AiHistory(:final rid):
+        _refuse(mobileId, rid);
+      case AiFolder(:final rid):
+        _refuse(mobileId, rid);
+      case AiChanges(:final rid):
+        _refuse(mobileId, rid);
+      case AiDiff(:final rid):
+        _refuse(mobileId, rid);
+      case AiRevert(:final rid):
+        _refuse(mobileId, rid);
+      case AiRaw(:final rid):
+        // A newer phone's request (V2-2b B2) gets its one answer too.
+        if (rid != null) _refuse(mobileId, rid);
       case AiListResult() ||
           AiSnapshot() ||
           AiUpdate() ||
@@ -1180,13 +1205,28 @@ final class AiPhoneHub implements AiEndpoint {
     return true;
   }
 
+  /// A request this window does not take: its one answer (V2-2 D7).
+  void _refuse(String mobileId, int rid) =>
+      _send(mobileId, AiResult(rid: rid, ok: false, code: 'refused'));
+
   static int? _ridOf(AiMessage m) => switch (m) {
     AiPrompt(:final rid) ||
     AiAnswer(:final rid) ||
     AiCancel(:final rid) ||
     AiForceStop(:final rid) ||
     AiUnqueue(:final rid) ||
-    AiOpen(:final rid) => rid,
+    AiOpen(:final rid) ||
+    AiConfigGet(:final rid) ||
+    AiConfigSet(:final rid) ||
+    AiBlob(:final rid) ||
+    AiFiles(:final rid) ||
+    AiItemPart(:final rid) ||
+    AiHistory(:final rid) ||
+    AiFolder(:final rid) ||
+    AiChanges(:final rid) ||
+    AiDiff(:final rid) ||
+    AiRevert(:final rid) => rid,
+    AiRaw(:final rid) => rid,
     _ => null,
   };
 

@@ -125,7 +125,8 @@ void main() {
     }
   });
 
-  test('a malformed or unknown ai.* message is skipped, never fatal', () {
+  test('a malformed ai.* message is skipped, never fatal; an unknown kind '
+      'is read as an AiRaw (V2-2b B2)', () {
     final bytes = encodeCbor([
       {'t': 'ack', 'id': 1, 'seq': 2},
       {'t': 'ai.prompt', 'sid': 5, 'rid': 1, 'text': 'x'}, // sid not a string
@@ -133,10 +134,9 @@ void main() {
       {'t': 'ai.future', 'x': 1},
       {'t': 'session.reset', 'id': 1},
     ]);
-    expect(decodeBatch(bytes), [
-      const AckMessage(id: 1, seq: 2),
-      const SessionReset(id: 1),
-    ]);
+    final decoded = decodeBatch(bytes);
+    expect(decoded.map((m) => m.type), ['ack', 'ai.future', 'session.reset']);
+    expect(decoded[1], isA<AiRaw>());
   });
 
   test('a body of any depth stays one byte string (depth 3 on the wire)', () {
@@ -166,9 +166,9 @@ void main() {
         desktopSharing: true,
         ai: kAiProtocol,
       );
-      expect(with1.toMap()['ai'], 1);
+      expect(with1.toMap()['ai'], kAiProtocol);
       final decoded = decodeBatch(encodeBatch([with1])).single;
-      expect((decoded as SessionListResult).ai, 1);
+      expect((decoded as SessionListResult).ai, kAiProtocol);
     });
 
     test('an older desktop sends none: null', () {
