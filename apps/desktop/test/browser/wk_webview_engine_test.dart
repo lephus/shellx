@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/src/browser/browser_engine.dart';
 import 'package:shellx_desktop/src/browser/engines/wk_webview_engine.dart';
+import 'package:shellx_desktop/src/tools/tool_navigation.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -146,8 +147,32 @@ void main() {
         );
     await inbound('newWindow', {'id': 3, 'url': ''});
     await inbound('download', {'id': 3, 'url': ''});
+    // A `blob:` or `data:` download link: BrowserNative sends no URL.
+    await inbound('download', {'id': 3});
     expect(windows, [null]);
-    expect((events.single as DownloadBlocked).url, isNull);
+    expect(events.map((e) => (e as DownloadBlocked).url), [null, null]);
+  });
+
+  test('a new window (window.open, or a target=_blank link) goes outside '
+      'for web, mail and phone, and nowhere else (D9)', () {
+    for (final url in [
+      'https://docs.example.com/',
+      'mailto:a@b.c',
+      'tel:+84123',
+    ]) {
+      final event = newWindowEvent(toolNavigation, Uri.parse(url));
+      expect(event, isA<OpenOutside>(), reason: url);
+      expect((event as OpenOutside).url, Uri.parse(url));
+      expect(event.newWindow, isTrue);
+    }
+    for (final url in ['javascript:alert(1)', 'file:///x', 'data:,x']) {
+      expect(
+        newWindowEvent(toolNavigation, Uri.parse(url)),
+        isA<NavigationBlocked>(),
+        reason: url,
+      );
+    }
+    expect(newWindowEvent(toolNavigation, null), isA<NavigationBlocked>());
   });
 
   test('the Web Inspector is best effort: below macOS 13.3 the plugin '
