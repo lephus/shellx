@@ -6,6 +6,16 @@ import 'timeline.dart';
 
 enum AgentPhase { stopped, starting, needsAuth, ready, running, failed }
 
+/// V2-2b B3: the id of the next permission, question or queued prompt — one
+/// counter for the whole run of the process, shared by every
+/// [AiSessionState]. A phone names a request by (session id, request id), and
+/// a session id outlives the runtime it names: a pane whose runtime is
+/// replaced (a folder chosen again, its agent switched off and on) gets a new
+/// state. With a counter per state, the new runtime's first request would be
+/// 0 again, and a late answer to the old runtime's request 0 would land on
+/// it. Never goes back in a run.
+var _nextRequestId = 0;
+
 /// The turn in progress.
 final class ActiveTurn with Redacted {
   ActiveTurn(this.index, this.startedAt);
@@ -87,7 +97,6 @@ final class AiSessionState with Redacted {
   /// Goes up on every change.
   int version = 0;
   final _listeners = <void Function()>[];
-  var _nextId = 0;
 
   AgentCapabilities get capabilities =>
       agent?.capabilities ?? const AgentCapabilities();
@@ -233,7 +242,7 @@ final class AiSessionState with Redacted {
   PendingPermission addPermission(PermissionRequest request, DateTime at) {
     final item = timeline.toolFor(request.toolCallId, request.toolCall, at)
       ..awaitingPermission = true;
-    final p = PendingPermission(_nextId++, request, item);
+    final p = PendingPermission(_nextRequestId++, request, item);
     permissions.add(p);
     touch();
     return p;
@@ -262,7 +271,7 @@ final class AiSessionState with Redacted {
   PendingAsk? addAsk(ElicitationRequest request, {bool autoDeclined = false}) {
     final item = AskItem(
       timeline.turn,
-      _nextId++,
+      _nextRequestId++,
       request,
       autoDeclined: autoDeclined,
     );
@@ -327,7 +336,7 @@ final class AiSessionState with Redacted {
   /// Null when [maxQueue] prompts already wait.
   QueuedPrompt? enqueue(List<ContentBlock> blocks) {
     if (queue.length >= maxQueue) return null;
-    final q = QueuedPrompt(_nextId++, [...blocks]);
+    final q = QueuedPrompt(_nextRequestId++, [...blocks]);
     queue.add(q);
     touch();
     return q;
