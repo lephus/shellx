@@ -81,14 +81,18 @@ final class ToolActions {
     _dock.showLoose(ws);
   }
 
-  /// D10, D20: ⌘⇧B on the shown workspace.
+  /// D10, D20: ⌘⇧B on the shown workspace. Not embedded there is nothing to
+  /// show: with no tool it asks for one and opens it in the browser (R20),
+  /// with a tool it does nothing.
   Future<ToolToggle> toggle(BuildContext context) async {
     final ws = currentWorkspace();
     final tools = _registry.inWorkspace(ws);
     if (!_embedded) {
       if (tools.isNotEmpty) return ToolToggle.nothing;
       final added = await add(context, ws);
-      return added == null ? ToolToggle.nothing : ToolToggle.asked;
+      if (added == null) return ToolToggle.nothing;
+      await open(added.id);
+      return ToolToggle.asked;
     }
     final dock = ref.read(toolDockProvider).of(ws);
     if (dock.open) {

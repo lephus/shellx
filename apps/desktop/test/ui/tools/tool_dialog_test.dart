@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -28,13 +29,16 @@ void main() {
   setUp(() => rig = ToolRig());
 
   /// The dialog alone; what Add does with it is the window's (Task 13).
-  Future<ToolDraft?> Function() openDialog(WidgetTester t) {
+  Future<ToolDraft?> Function() openDialog(
+    WidgetTester t, {
+    String ws = kDefaultWorkspaceId,
+  }) {
     ToolDraft? result;
     var done = false;
     unawaited(
       showToolDialog(
         t.element(find.byType(TerminalWorkspacePage)),
-        ws: kDefaultWorkspaceId,
+        ws: ws,
       ).then((r) {
         result = r;
         done = true;
@@ -50,6 +54,15 @@ void main() {
   Future<void> shown(WidgetTester t) async {
     await t.pumpAndSettle();
     expect(find.byKey(const Key('tool.dialog')), findsOneWidget);
+  }
+
+  /// The terminal pane of tab [tab] listens on [port], in a `node` process.
+  void listens(int tab, int port) {
+    final local =
+        rig.container.read(localSessionsProvider) as FakeLocalSessions;
+    local.replace(local.summary(tab, ports: [port]));
+    rig.probe.ports[100] = {port};
+    rig.probe.table[100] = (parent: 1, name: 'node');
   }
 
   /// The window's tool commands over the rig's providers, and a context in
@@ -213,6 +226,84 @@ void main() {
     await disposeWorkspace(t, rig.container);
   });
 
+  group('Add tool: the phone note and the picked name (§4.2, D12, D15)', () {
+    const note =
+        'Through the relay, end-to-end encrypted. '
+        'The phone can reach this URL only.';
+    const refusal = 'Only http tools on this computer can open on a phone.';
+
+    testWidgets('the note shows until a URL is typed that a phone may not '
+        'open; the box is off without a URL', (t) async {
+      await rig.pump(t);
+      openDialog(t);
+      await shown(t);
+      CheckboxListTile box() => t.widget<CheckboxListTile>(
+        find.byKey(const Key('tool.dialog.phone')),
+      );
+      expect(find.text(note), findsOneWidget);
+      expect(find.text(refusal), findsNothing);
+      expect(box().onChanged, isNull, reason: 'no URL yet');
+      await t.enterText(
+        find.byKey(const Key('tool.dialog.url')),
+        'http://example.com',
+      );
+      await t.pump();
+      expect(find.text(refusal), findsOneWidget);
+      expect(find.text(note), findsNothing);
+      expect(box().onChanged, isNull);
+      await t.enterText(
+        find.byKey(const Key('tool.dialog.url')),
+        'localhost:5173',
+      );
+      await t.pump();
+      expect(find.text(note), findsOneWidget);
+      expect(find.text(refusal), findsNothing);
+      expect(box().onChanged, isNotNull);
+      await disposeWorkspace(t, rig.container);
+    });
+
+    testWidgets('a pick names the tool after the project folder of the '
+        'workspace', (t) async {
+      await rig.pump(t);
+      final side = rig.container.read(sidebarWorkspacesProvider.notifier);
+      final ws = side.createFor(name: 'Board');
+      await side.openTabIn(ws);
+      side.setRoot(ws, '/Users/me/projects/kanban');
+      listens(
+        rig.container.read(sidebarWorkspacesProvider).tabsOf(ws).single,
+        5173,
+      );
+      await t.pumpAndSettle();
+      final closed = openDialog(t, ws: ws);
+      await shown(t);
+      await t.tap(find.byKey(const Key('tool.suggestion.5173')));
+      await t.pump();
+      await t.tap(find.byKey(const Key('tool.dialog.save')));
+      final draft = (await closed())!;
+      expect(
+        [draft.name, draft.url],
+        ['kanban', 'http://localhost:5173/'],
+        reason: 'the folder, not the process ("node")',
+      );
+      await disposeWorkspace(t, rig.container);
+    });
+
+    testWidgets('a pick keeps the name that was typed', (t) async {
+      await rig.pump(t);
+      listens(rig.container.read(terminalTabsProvider).tabs.single.id, 5173);
+      await t.pumpAndSettle();
+      final closed = openDialog(t);
+      await shown(t);
+      await t.enterText(find.byKey(const Key('tool.dialog.name')), 'My board');
+      await t.tap(find.byKey(const Key('tool.suggestion.5173')));
+      await t.pump();
+      await t.tap(find.byKey(const Key('tool.dialog.save')));
+      final draft = (await closed())!;
+      expect([draft.name, draft.url], ['My board', 'http://localhost:5173/']);
+      await disposeWorkspace(t, rig.container);
+    });
+  });
+
   // The commands and dialogs around the dialog, which the window's own tests
   // (the dock, the sidebar rows) do not reach.
 
@@ -300,6 +391,42 @@ void main() {
       expect(find.byKey(const Key('tool.js')), findsOneWidget);
       Navigator.of(t.element(find.byKey(const Key('tool.js')))).pop();
       expect(await answer(), isNull);
+      await disposeWorkspace(t, rig.container);
+    });
+
+    testWidgets('a long text is cut at 2 000 units, never inside a surrogate '
+        'pair', (t) async {
+      await rig.pump(t);
+      for (final (message, kept) in [
+        // The emoji would straddle the cut: it goes whole.
+        ('${'a' * 1999}😀b', '${'a' * 1999}…'),
+        // It fits before the cut: it stays whole.
+        ('${'a' * 1998}😀b', '${'a' * 1998}😀…'),
+        // Not over the limit: nothing is cut.
+        ('${'a' * 1998}😀', '${'a' * 1998}😀'),
+      ]) {
+        final answer = asks(
+          t,
+          BrowserJsDialog(kind: BrowserJsDialogKind.alert, message: message),
+        );
+        await t.pumpAndSettle();
+        final shown = t
+            .widget<SelectableText>(
+              find.descendant(
+                of: find.byKey(const Key('tool.js')),
+                matching: find.byType(SelectableText),
+              ),
+            )
+            .data!;
+        expect(shown, kept);
+        expect(
+          utf8.decode(utf8.encode(shown)),
+          shown,
+          reason: 'no lone surrogate (Flutter cannot paint one)',
+        );
+        await t.tap(find.byKey(const Key('tool.js.ok')));
+        await answer();
+      }
       await disposeWorkspace(t, rig.container);
     });
   });
@@ -440,23 +567,39 @@ void main() {
     });
 
     testWidgets('without embedding it asks only when the workspace has no '
-        'tool', (t) async {
+        'tool, and opens what it added in the browser (R20, D20)', (t) async {
       await rig.pump(t, config: 'tool-embed = off');
       final w = await window(t);
+      final opener = rig.harness.urlOpener;
+      // Cancelled: nothing is added, nothing opens.
       var toggled = w.actions.toggle(w.context);
+      await shown(t);
+      await t.tap(find.byKey(const Key('tool.dialog.cancel')));
+      expect(await toggled, ToolToggle.nothing);
+      expect(rig.container.read(toolRegistryProvider), isEmpty);
+      expect(opener.webLinks, isEmpty);
+      // Added: the tool opens, in the browser.
+      toggled = w.actions.toggle(w.context);
       await addFromDialog(t, 'localhost:5000');
       expect(await toggled, ToolToggle.asked);
-      expect(rig.container.read(toolRegistryProvider), hasLength(1));
+      final tool = rig.container.read(toolRegistryProvider).single;
       expect(
         rig.container.read(toolDockProvider).of(kDefaultWorkspaceId).open,
         isFalse,
         reason: 'nothing is shown inside ShellX',
       );
-      expect(rig.harness.urlOpener.webLinks, isEmpty);
+      expect(
+        opener.webLinks,
+        [tool.uri],
+        reason:
+            'R20: adding from the window opens the tool; D20: in the browser',
+      );
+      // With a tool, there is nothing to ask or show.
       toggled = w.actions.toggle(w.context);
       await t.pumpAndSettle();
       expect(find.byKey(const Key('tool.dialog')), findsNothing);
       expect(await toggled, ToolToggle.nothing);
+      expect(opener.webLinks, hasLength(1));
       await disposeWorkspace(t, rig.container);
     });
   });

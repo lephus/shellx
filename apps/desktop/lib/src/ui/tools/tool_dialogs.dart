@@ -91,6 +91,10 @@ class _ToolDialogState extends ConsumerState<ToolDialog> {
     ToolUrlBad() => false,
   };
 
+  /// D15's reason shows for a URL that was typed and that a phone may not
+  /// open. With the field empty, §4.2's note stays (the box is off).
+  bool get _phoneRefused => _url.text.trim().isNotEmpty && !_phoneAllowed;
+
   bool get _full =>
       _adding &&
       ref.read(toolRegistryProvider.notifier).inWorkspace(widget.ws).length >=
@@ -168,7 +172,7 @@ class _ToolDialogState extends ConsumerState<ToolDialog> {
             ],
             const SizedBox(height: ShellxSpace.s8),
             Tooltip(
-              message: _phoneAllowed ? '' : l10n.toolPhoneOnlyLocal,
+              message: _phoneRefused ? l10n.toolPhoneOnlyLocal : '',
               child: CheckboxListTile(
                 key: const Key('tool.dialog.phone'),
                 contentPadding: EdgeInsets.zero,
@@ -180,9 +184,9 @@ class _ToolDialogState extends ConsumerState<ToolDialog> {
                     : null,
                 title: Text(l10n.toolDialogPhone),
                 subtitle: Text(
-                  _phoneAllowed
-                      ? l10n.toolDialogPhoneNote
-                      : l10n.toolPhoneOnlyLocal,
+                  _phoneRefused
+                      ? l10n.toolPhoneOnlyLocal
+                      : l10n.toolDialogPhoneNote,
                   style: ShellxText.caption.copyWith(
                     color: ShellxDesktopColors.textSecondary,
                   ),
@@ -293,6 +297,18 @@ Future<Object?> showToolJsDialog(
   builder: (_) => _ToolJsDialog(name: toolName, dialog: dialog),
 );
 
+/// A page's dialog text as shown: at most 2 000 UTF-16 units, then "…". The
+/// cut never falls between the two halves of a surrogate pair (an emoji):
+/// Flutter cannot paint half of one and throws.
+String _clippedMessage(String message) {
+  const limit = 2000;
+  if (message.length <= limit) return message;
+  var end = limit;
+  final last = message.codeUnitAt(end - 1);
+  if (last >= 0xD800 && last <= 0xDBFF) end--;
+  return '${message.substring(0, end)}…';
+}
+
 class _ToolJsDialog extends StatefulWidget {
   const _ToolJsDialog({required this.name, required this.dialog});
   final String name;
@@ -317,10 +333,7 @@ class _ToolJsDialogState extends State<_ToolJsDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final kind = widget.dialog.kind;
-    final message = widget.dialog.message;
-    final shown = message.length > 2000
-        ? '${message.substring(0, 2000)}…'
-        : message;
+    final shown = _clippedMessage(widget.dialog.message);
     Object? cancel() => switch (kind) {
       BrowserJsDialogKind.alert => null,
       BrowserJsDialogKind.confirm => false,
