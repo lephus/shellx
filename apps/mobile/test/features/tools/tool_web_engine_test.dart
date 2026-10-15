@@ -1,8 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:shellx_mobile/features/tools/domain/tool_navigation.dart';
 import 'package:shellx_mobile/features/tools/presentation/tool_web_engine.dart';
 import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
+// The same implementation import as the app's (webview_flutter_wkwebview is pinned exactly, R15).
+// ignore: implementation_imports
+import 'package:webview_flutter_wkwebview/src/common/web_kit.g.dart'
+    show PigeonInstanceManager, PigeonOverrides, WKWebsiteDataStore, WebsiteDataType;
 
 /// The web view platform the engine runs on in these tests: it records every call the engine makes on
 /// the platform controller and the navigation delegate, and anything it was not written to expect is
@@ -84,9 +89,51 @@ class _FakeController with MockPlatformInterfaceMixin implements PlatformWebView
   }
 
   @override
+  Future<void> clearCache() async {
+    calls.add('clearCache');
+  }
+
+  @override
+  Future<void> clearLocalStorage() async {
+    calls.add('clearLocalStorage');
+  }
+
+  @override
   dynamic noSuchMethod(Invocation invocation) {
     calls.add('UNEXPECTED:${invocation.memberName}');
     return Future<void>.value();
+  }
+}
+
+class _FakeCookies with MockPlatformInterfaceMixin implements PlatformWebViewCookieManager {
+  final calls = <String>[];
+
+  @override
+  Future<bool> clearCookies() async {
+    calls.add('clearCookies');
+    return true;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    calls.add('UNEXPECTED:${invocation.memberName}');
+    return Future<void>.value();
+  }
+}
+
+/// The default WebKit data store, replaced through the plugin's own test hook ([PigeonOverrides]): it
+/// records what it is asked to remove.
+class _FakeStore extends WKWebsiteDataStore {
+  _FakeStore() : super.pigeon_detached(pigeon_instanceManager: PigeonInstanceManager(onWeakReferenceRemoved: (_) {}));
+
+  final types = <List<WebsiteDataType>>[];
+  final since = <double>[];
+
+  @override
+  Future<bool> removeDataOfTypes(List<WebsiteDataType> dataTypes, double modificationTimeInSecondsSinceEpoch) async {
+    types.add(dataTypes);
+    since.add(modificationTimeInSecondsSinceEpoch);
+    return true;
   }
 }
 
@@ -138,10 +185,15 @@ class _FakeDelegate with MockPlatformInterfaceMixin implements PlatformNavigatio
 class _FakePlatform extends WebViewPlatform {
   final controller = _FakeController();
   final delegate = _FakeDelegate();
+  final cookies = _FakeCookies();
 
   @override
   PlatformWebViewController createPlatformWebViewController(PlatformWebViewControllerCreationParams params) =>
       controller;
+
+  @override
+  PlatformWebViewCookieManager createPlatformCookieManager(PlatformWebViewCookieManagerCreationParams params) =>
+      cookies;
 
   @override
   PlatformNavigationDelegate createPlatformNavigationDelegate(PlatformNavigationDelegateCreationParams params) =>
@@ -330,5 +382,64 @@ void main() {
     expect(platform.controller.loads.last.path, '/__shellx/enter');
     expect(platform.controller.reloads, 1);
     expect(platform.controller.calls, containsAll(['loadRequest', 'reload', 'canGoBack', 'goBack']));
+  });
+
+  // Settings › "Xóa dữ liệu của tool" (R22, I4): on iOS the three public calls reach only some kinds of
+  // website data (cookies; the caches; local storage), so IndexedDB, WebSQL and session storage would
+  // keep a tool signed in; the web view's own store is asked to remove every kind.
+  group('WebViewToolData', () {
+    List<String> storageCalls() => platform.controller.calls.where((call) => call.startsWith('clear')).toList();
+
+    test('on iOS: the three public calls, then every kind of website data', () async {
+      final removed = <List<WebsiteDataType>>[];
+      await WebViewToolData.using(isIOS: true, removeWebsiteData: (types) async => removed.add(types)).clear();
+      expect(platform.cookies.calls, ['clearCookies']);
+      expect(storageCalls(), ['clearCache', 'clearLocalStorage']);
+      expect(removed, hasLength(1));
+      expect(removed.single, WebsiteDataType.values);
+      expect(
+        removed.single,
+        hasLength(8),
+        reason:
+            'cookies, both caches, offline caches, local and session storage, '
+            'WebSQL and IndexedDB',
+      );
+    });
+
+    test('on Android: the three public calls only (its storage call clears every origin)', () async {
+      final removed = <List<WebsiteDataType>>[];
+      await WebViewToolData.using(isIOS: false, removeWebsiteData: (types) async => removed.add(types)).clear();
+      expect(platform.cookies.calls, ['clearCookies']);
+      expect(storageCalls(), ['clearCache', 'clearLocalStorage']);
+      expect(removed, isEmpty);
+    });
+
+    test('the default on iOS asks the default WebKit store for every kind since the beginning of time', () async {
+      final store = _FakeStore();
+      PigeonOverrides.wKWebsiteDataStore_defaultDataStore = store;
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() {
+        PigeonOverrides.wKWebsiteDataStore_defaultDataStore = null;
+        debugDefaultTargetPlatformOverride = null;
+      });
+      await WebViewToolData().clear();
+      expect(platform.cookies.calls, ['clearCookies']);
+      expect(storageCalls(), ['clearCache', 'clearLocalStorage']);
+      expect(store.types, [WebsiteDataType.values]);
+      expect(store.since, [0]);
+    });
+
+    test('the default off iOS asks the WebKit store for nothing', () async {
+      final store = _FakeStore();
+      PigeonOverrides.wKWebsiteDataStore_defaultDataStore = store;
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() {
+        PigeonOverrides.wKWebsiteDataStore_defaultDataStore = null;
+        debugDefaultTargetPlatformOverride = null;
+      });
+      await WebViewToolData().clear();
+      expect(storageCalls(), ['clearCache', 'clearLocalStorage']);
+      expect(store.types, isEmpty);
+    });
   });
 }

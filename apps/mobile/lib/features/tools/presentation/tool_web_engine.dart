@@ -1,9 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, visibleForTesting;
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/tools/domain/tool_navigation.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
+// Stable: pubspec pins webview_flutter_wkwebview: 3.25.1 exactly (R15); its public API cannot remove every kind.
+// ignore: implementation_imports
+import 'package:webview_flutter_wkwebview/src/common/web_kit.g.dart' show WKWebsiteDataStore, WebsiteDataType;
 
 /// What the tool page hears from its web view (V2-4 E12).
 final class ToolWebCallbacks {
@@ -145,13 +149,37 @@ abstract interface class ToolWebData {
   Future<void> clear();
 }
 
+/// R22's three public calls (cookies, cache, local storage) on both platforms, and on iOS I4: those reach
+/// only some kinds of website data there (cookies; memory, disk and app caches; local storage), so a tool
+/// that keeps its login in IndexedDB, WebSQL or session storage would stay signed in. WebKit's own data
+/// store is asked to remove every kind. Android's storage call already clears every origin.
 @LazySingleton(as: ToolWebData)
 final class WebViewToolData implements ToolWebData {
+  WebViewToolData()
+    : this.using(isIOS: defaultTargetPlatform == TargetPlatform.iOS, removeWebsiteData: _removeFromStore);
+
+  /// For tests: whether this is iOS, and what removes [WebsiteDataType]s from the web view's data store.
+  @visibleForTesting
+  WebViewToolData.using({
+    required bool isIOS,
+    required Future<void> Function(List<WebsiteDataType> types) removeWebsiteData,
+  }) : _isIOS = isIOS,
+       _removeWebsiteData = removeWebsiteData;
+
+  final bool _isIOS;
+  final Future<void> Function(List<WebsiteDataType> types) _removeWebsiteData;
+
+  /// Everything of [types] since the beginning of time (0), from the store the tool pages use.
+  static Future<void> _removeFromStore(List<WebsiteDataType> types) async {
+    await WKWebsiteDataStore.defaultDataStore.removeDataOfTypes(types, 0);
+  }
+
   @override
   Future<void> clear() async {
     await WebViewCookieManager().clearCookies();
     final controller = WebViewController();
     await controller.clearCache();
     await controller.clearLocalStorage();
+    if (_isIOS) await _removeWebsiteData(WebsiteDataType.values);
   }
 }
