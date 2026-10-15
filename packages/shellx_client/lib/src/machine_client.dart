@@ -8,6 +8,7 @@ import 'package:shellx_core/shellx_core.dart';
 import 'client_tab.dart';
 import 'client_types.dart';
 import 'machine_ai.dart';
+import 'machine_tools.dart';
 
 /// A `session.open` waiting for its answer. `session.open` has no request
 /// id: the agent answers requests in order, so answers are matched to the
@@ -85,6 +86,14 @@ final class MachineClient {
 
   /// V2-2: the machine's AI sessions (listing, mirrors, requests).
   late final MachineAi ai = MachineAi(
+    send: _send,
+    connect: connect,
+    timeout: _timeout,
+  );
+
+  /// V2-4: the machine's tools for phones (listing, opening, the tunnel's
+  /// outbox).
+  late final MachineTools tools = MachineTools(
     send: _send,
     connect: connect,
     timeout: _timeout,
@@ -341,6 +350,7 @@ final class MachineClient {
   void shutdown() {
     _channelLost();
     ai.dispose();
+    tools.dispose();
     _pendingCloses.clear();
     for (final tab in _tabs.values) {
       tab.dispose();
@@ -438,6 +448,7 @@ final class MachineClient {
     _sendPendingCloses();
     _setState(const MachineReady());
     ai.channelReady();
+    tools.channelReady();
     // Whoever asked for this channel, stale tabs re-attach on it.
     unawaited(_resume());
     return true;
@@ -547,7 +558,10 @@ final class MachineClient {
         if (desktopSharing != null) _desktopSharing = desktopSharing;
         if (_pendingLists.isEmpty) return;
         final pending = _pendingLists.removeAt(0);
-        if (pending.desktop) ai.noteListResult(message);
+        if (pending.desktop) {
+          ai.noteListResult(message);
+          tools.noteListResult(message);
+        }
         pending.retires.forEach(_pendingOpens.remove);
         if (!pending.abandoned) pending.completer.complete(sessions);
       case SessionOpened(:final id, :final index, :final shell):
@@ -600,6 +614,8 @@ final class MachineClient {
         _tabs[id]?.handleDetached(reason);
       case AiMessage():
         ai.handle(message);
+      case ToolMessage():
+        tools.handle(message);
       case ErrorMessage(:final code, :final message, :final id):
         final error = AppErrorException(code, message);
         if (id == null) {
@@ -721,7 +737,8 @@ final class MachineClient {
     if (_pinnedKey() == null) return; // Untrusted or unpaired: nothing to do.
     if (!_tabs.values.any(_isStale) &&
         _pendingCloses.isEmpty &&
-        !ai.wantsChannel) {
+        !ai.wantsChannel &&
+        !tools.wantsChannel) {
       return;
     }
     try {
@@ -761,6 +778,7 @@ final class MachineClient {
     _losses++;
     _attachedHere.clear();
     ai.channelLost();
+    tools.channelLost();
     for (final tab in _tabs.values) {
       tab.dropHeldInput(); // Typed before an outage: never run after it.
     }
