@@ -686,6 +686,16 @@ class S {
     );
   }
 
+  /// `Requires version {version} or newer.`
+  String updateRequiredVersion(String version) {
+    return Intl.message(
+      'Requires version $version or newer.',
+      name: 'updateRequiredVersion',
+      desc: '',
+      args: [version],
+    );
+  }
+
   /// `Open the App Store`
   String get openAppStore {
     return Intl.message(

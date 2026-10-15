@@ -4,6 +4,7 @@ import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:toastification/toastification.dart';
 import 'package:shellx_mobile/core/core.dart';
+import 'package:shellx_mobile/features/app/update_enforcer.dart';
 import 'package:shellx_mobile/features/lock/presentation/app_lock_controller.dart';
 import 'package:shellx_mobile/features/lock/presentation/lock_gate.dart';
 import 'package:shellx_mobile/features/notifications/presentation/push_controller.dart';
@@ -27,6 +28,9 @@ class _RootAppState extends State<RootApp> {
   /// Optional: a launch that stopped before it was registered runs without push.
   final PushController? push = getIt.isRegistered<PushController>() ? getIt<PushController>() : null;
 
+  /// Optional like [push]: without it the version is checked at launch only.
+  final UpdateEnforcer? updates = getIt.isRegistered<UpdateEnforcer>() ? getIt<UpdateEnforcer>() : null;
+
   @override
   void initState() {
     super.initState();
@@ -36,6 +40,9 @@ class _RootAppState extends State<RootApp> {
 
   void _onForeground() {
     session.onForeground();
+    // Contract §5: the version gate again (throttled), over whatever page is open.
+    final updates = this.updates;
+    if (updates != null) unawaited(updates.onForeground());
     // The permission may have been changed in the system settings meanwhile.
     final push = this.push;
     if (push != null) unawaited(push.refreshPermission());

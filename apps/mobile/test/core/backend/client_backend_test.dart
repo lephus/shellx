@@ -79,6 +79,8 @@ void main() {
     // after the first backoff (at least 500 ms), so the dial counts here are exact.
     expect(dials.single.uri, Uri.parse('ws://127.0.0.1:8787/v1/ws'));
     expect(dials.single.headers['Authorization'], 'Bearer token-1');
+    // The relay records the app version from the upgrade (force update, contract §1).
+    expect(dials.single.headers[clientVersionHeader], '1.0.0');
     expect(backend.relayState, isNot(RelayConnectionState.stopped));
 
     await backend.suspend();

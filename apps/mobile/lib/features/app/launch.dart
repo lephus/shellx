@@ -8,15 +8,8 @@ Future<void> prepareLaunch() async {
   // Spec §14: the version gate runs on every launch; an outdated app never starts the relay.
   final versionGate = getIt<VersionGate>();
   await versionGate.check();
-  if (versionGate.requiredVersion.peek() == null) {
-    try {
-      await getIt<SessionHolder>().restore();
-    } catch (error) {
-      // A Keychain/Keystore read that fails: the app opens signed out, on the login page, and
-      // still locks below.
-      if (kDebugMode) debugPrint('restore error: ${error.runtimeType}');
-    }
-  }
+  // A session that cannot be restored still locks below.
+  if (versionGate.requiredVersion.peek() == null) await restoreSession(getIt<SessionHolder>());
   // Spec §5.6: locked when the app opens (if enabled).
   final lock = getIt<AppLockController>();
   try {
@@ -27,4 +20,15 @@ Future<void> prepareLaunch() async {
     if (kDebugMode) debugPrint('detectKind error: ${error.runtimeType}');
   }
   lock.lockOnLaunch();
+}
+
+/// The saved session and its relay, once the version gate lets the app through (at launch, or
+/// later in `UpdateEnforcer`). Never throws.
+Future<void> restoreSession(SessionHolder session) async {
+  try {
+    await session.restore();
+  } catch (error) {
+    // A Keychain/Keystore read that fails: the app opens signed out, on the login page.
+    if (kDebugMode) debugPrint('restore error: ${error.runtimeType}');
+  }
 }

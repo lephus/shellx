@@ -65,6 +65,8 @@ final class ClientBackend implements ShellxBackend {
       wsUri: relayWebSocketUri(relayBaseUri),
       token: () => api.token,
       connector: connector,
+      // The WebSocket upgrade names this app's `x.y.z` too, like every REST request.
+      clientVersion: appVersion,
     );
     final pinned = PinnedStore(store, userId: userId);
     final client = ClientService(

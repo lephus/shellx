@@ -154,15 +154,17 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m63(terms, privacy) => "By creating an account you agree to the ${terms} and the ${privacy}.";
 
-  static String m64(length) => "Password must be at least ${length} characters.";
+  static String m64(version) => "Requires version ${version} or newer.";
 
-  static String m65(length) => "Must be at most ${length} characters.";
+  static String m65(length) => "Password must be at least ${length} characters.";
 
-  static String m66(length) => "Must be at least ${length} characters.";
+  static String m66(length) => "Must be at most ${length} characters.";
 
-  static String m67(lines) => "Showing the last ${lines} lines";
+  static String m67(length) => "Must be at least ${length} characters.";
 
-  static String m68(target) => "To: ${target}";
+  static String m68(lines) => "Showing the last ${lines} lines";
+
+  static String m69(target) => "To: ${target}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -760,6 +762,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "updateRequiredTitle": MessageLookupByLibrary.simpleMessage(
       "App update required",
     ),
+    "updateRequiredVersion": m64,
     "validationEmailInvalid": MessageLookupByLibrary.simpleMessage(
       "Please enter a valid email address.",
     ),
@@ -775,7 +778,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationPasswordLowercase": MessageLookupByLibrary.simpleMessage(
       "Password must contain at least one lowercase letter.",
     ),
-    "validationPasswordMinLength": m64,
+    "validationPasswordMinLength": m65,
     "validationPasswordNotMatch": MessageLookupByLibrary.simpleMessage(
       "Passwords do not match.",
     ),
@@ -794,8 +797,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationPhoneRequired": MessageLookupByLibrary.simpleMessage(
       "Phone number is required.",
     ),
-    "validationTextMaxLength": m65,
-    "validationTextMinLength": m66,
+    "validationTextMaxLength": m66,
+    "validationTextMinLength": m67,
     "validationTextRequired": MessageLookupByLibrary.simpleMessage(
       "This field is required.",
     ),
@@ -806,7 +809,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "viewAsTextRefresh": MessageLookupByLibrary.simpleMessage("Refresh"),
     "viewAsTextTitle": MessageLookupByLibrary.simpleMessage("Terminal text"),
     "viewAsTextTooltip": MessageLookupByLibrary.simpleMessage("View as text"),
-    "viewAsTextTruncated": m67,
+    "viewAsTextTruncated": m68,
     "voiceClose": MessageLookupByLibrary.simpleMessage("Close"),
     "voiceDetached": MessageLookupByLibrary.simpleMessage(
       "This session was disconnected from the phone — reattach to send",
@@ -852,7 +855,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "voiceSend": MessageLookupByLibrary.simpleMessage("Send"),
     "voiceSendEnter": MessageLookupByLibrary.simpleMessage("Send Enter"),
     "voiceStopTooltip": MessageLookupByLibrary.simpleMessage("Stop listening"),
-    "voiceTarget": m68,
+    "voiceTarget": m69,
     "voiceUnsupported": MessageLookupByLibrary.simpleMessage(
       "Speech recognition isn\'t available on this phone",
     ),

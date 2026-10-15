@@ -128,6 +128,14 @@
   },
   "updateRequiredTitle": "App update required",
   "updateRequiredBody": "This version can no longer connect to your computers. Update to keep using ShellX.",
+  "updateRequiredVersion": "Requires version {version} or newer.",
+  "@updateRequiredVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "openAppStore": "Open the App Store",
   "openPlayStore": "Open Google Play",
   "lockTitle": "ShellX is locked",

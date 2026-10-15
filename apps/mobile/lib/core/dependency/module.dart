@@ -42,8 +42,10 @@ abstract class Module {
   Future<PushMessaging> get pushMessaging => startPushMessaging();
 
   /// REST goes only through `shellx_core` (`package:http`), never through a second HTTP stack.
+  /// Every request names this app's `x.y.z` (the relay records it per device).
   @lazySingleton
-  ShellxApi get api => ShellxApi(baseUri: AppConfig.relayBaseUri);
+  ShellxApi api(PackageInfo packageInfo) =>
+      ShellxApi(baseUri: AppConfig.relayBaseUri, clientVersion: packageInfo.version);
 
   @injectable
   BuildContext context(AppRouter appRouter) {

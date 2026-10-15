@@ -20,6 +20,7 @@ import 'package:shellx_core/shellx_core.dart' as _i145;
 import '../../features/ai/domain/ai_drafts.dart' as _i267;
 import '../../features/ai/presentation/controllers/ai_session_controller.dart'
     as _i800;
+import '../../features/app/update_enforcer.dart' as _i377;
 import '../../features/auth/presentation/controllers/login_controller.dart'
     as _i729;
 import '../../features/auth/presentation/controllers/register_controller.dart'
@@ -90,9 +91,11 @@ extension GetItInjectableX on _i174.GetIt {
       () => module.pushMessaging,
       preResolve: true,
     );
-    gh.lazySingleton<_i145.ShellxApi>(() => module.api);
     gh.lazySingleton<_i267.AiDrafts>(() => _i267.AiDrafts());
     gh.lazySingleton<_i498.SpeechInput>(() => _i546.SpeechToTextInput());
+    gh.lazySingleton<_i145.ShellxApi>(
+      () => module.api(gh<_i655.PackageInfo>()),
+    );
     gh.lazySingleton<_i505.VersionGate>(
       () => _i505.VersionGate(gh<_i145.ShellxApi>(), gh<_i655.PackageInfo>()),
     );
@@ -197,6 +200,13 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i351.AppRouter>(),
       )..initialize(),
       dispose: (i) => i.dispose(),
+    );
+    gh.lazySingleton<_i377.UpdateEnforcer>(
+      () => _i377.UpdateEnforcer.create(
+        gh<_i351.VersionGate>(),
+        gh<_i351.AppRouter>(),
+        gh<_i351.SessionHolder>(),
+      ),
     );
     gh.lazySingleton<_i539.MachineNavigator>(
       () => _i539.RouterMachineNavigator(gh<_i351.AppRouter>()),

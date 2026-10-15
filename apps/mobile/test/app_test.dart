@@ -21,6 +21,7 @@ import 'package:shellx_mobile/features/app/app.dart';
 import 'package:shellx_mobile/features/app/font_licenses.dart';
 import 'package:shellx_mobile/features/app/launch.dart';
 import 'package:shellx_mobile/features/app/splash_page.dart';
+import 'package:shellx_mobile/features/app/update_enforcer.dart';
 import 'package:shellx_mobile/features/auth/presentation/controllers/login_controller.dart';
 import 'package:shellx_mobile/features/auth/presentation/controllers/register_controller.dart';
 import 'package:shellx_mobile/features/lock/presentation/app_lock_controller.dart';
@@ -120,10 +121,10 @@ void main() {
       events: events,
       pendingUnpairs: pendingUnpairs,
     );
-    final versionGate = VersionGate(api, packageInfo);
     // Loaded at launch, as dependency injection does before the first frame.
     settings = AppSettings(store);
     clock = DateTime(2026, 9, 26, 9);
+    final versionGate = VersionGate(api, packageInfo, now: () => clock);
     lock = AppLockController(
       authenticator: biometrics,
       isEnabled: () => settings.biometricLock.peek(),
@@ -149,6 +150,7 @@ void main() {
       ..registerSingleton<AppLockController>(lock)
       ..registerSingleton<AppRouter>(router)
       ..registerSingleton<PushController>(push)
+      ..registerSingleton<UpdateEnforcer>(UpdateEnforcer(gate: versionGate, router: router, session: session))
       ..registerFactory<LoginController>(() => LoginController(session))
       ..registerFactory<RegisterController>(() => RegisterController(session))
       ..registerFactory<MachineListController>(() => MachineListController.create(session, registry, push, settings))
@@ -699,6 +701,87 @@ void main() {
     await tester.pumpAndSettle();
     expect(backend.resumeCalls, 1);
     expect(find.text('Your computers'), findsOneWidget);
+  });
+
+  group('force update (contract §5)', () {
+    /// The app goes to the background and comes back after [away].
+    Future<void> returnAfter(WidgetTester tester, Duration away) async {
+      for (final state in [AppLifecycleState.inactive, AppLifecycleState.hidden, AppLifecycleState.paused]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      clock = clock.add(away);
+      for (final state in [AppLifecycleState.hidden, AppLifecycleState.inactive, AppLifecycleState.resumed]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('found too old on a return: only the update page, no way back; let through later, the app again', (
+      tester,
+    ) async {
+      await launch(tester);
+      await signIn(tester);
+      await openTerminal(tester);
+      relay.minMobile = '2.0.0';
+
+      // 5 minutes after the launch's check: not checked yet.
+      await returnAfter(tester, const Duration(minutes: 5));
+      expect(stack(), [MachineListRoute.name, TerminalRoute.name]);
+
+      await returnAfter(tester, const Duration(minutes: 5));
+      expect(stack(), [UpdateRequiredRoute.name]);
+      expect(find.text('App update required'), findsOneWidget);
+      expect(find.text('Requires version 2.0.0 or newer.'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(stack(), [UpdateRequiredRoute.name]);
+
+      // The admin lowered min_mobile: the same session goes on.
+      relay.minMobile = '1.0.0';
+      await returnAfter(tester, const Duration(minutes: 10));
+      expect(stack(), [MachineListRoute.name]);
+      expect(find.text('Your computers'), findsOneWidget);
+      expect(backends.backends, hasLength(1));
+    });
+
+    testWidgets('a blocked launch let through later restores the saved session and opens the machine list', (
+      tester,
+    ) async {
+      await AuthStorageImpl(store).save(
+        const AccountSession(userId: testUserId, deviceId: testDeviceId, token: 'saved', email: 'me@example.com'),
+      );
+      relay.minMobile = '2.0.0';
+      await launch(tester);
+      expect(stack(), [UpdateRequiredRoute.name]);
+      expect(backends.backends, isEmpty);
+
+      relay.minMobile = '1.0.0';
+      await returnAfter(tester, const Duration(minutes: 10));
+      expect(stack(), [MachineListRoute.name]);
+      expect(find.text('MacBook-Pro'), findsOneWidget);
+      expect(backends.backends, hasLength(1));
+    });
+
+    testWidgets('signed out, let through later: the login page', (tester) async {
+      relay.minMobile = '2.0.0';
+      await launch(tester);
+      expect(stack(), [UpdateRequiredRoute.name]);
+
+      relay.minMobile = '1.0.0';
+      await returnAfter(tester, const Duration(minutes: 10));
+      expect(stack(), [LoginRoute.name]);
+    });
+
+    testWidgets('an unreachable relay on a return blocks nothing', (tester) async {
+      await launch(tester);
+      await signIn(tester);
+      relay
+        ..minMobile = '2.0.0'
+        ..versionOffline = true;
+      await returnAfter(tester, const Duration(minutes: 10));
+      expect(stack(), [MachineListRoute.name]);
+      expect(find.text('Your computers'), findsOneWidget);
+    });
   });
 
   test('both font licences are registered for the licences page', () async {

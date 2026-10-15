@@ -149,15 +149,17 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m63(terms, privacy) => "Khi tạo tài khoản, bạn đồng ý với ${terms} và ${privacy}.";
 
-  static String m64(length) => "Mật khẩu phải có ít nhất ${length} ký tự.";
+  static String m64(version) => "Cần phiên bản ${version} trở lên.";
 
-  static String m65(length) => "Tối đa ${length} ký tự.";
+  static String m65(length) => "Mật khẩu phải có ít nhất ${length} ký tự.";
 
-  static String m66(length) => "Phải có ít nhất ${length} ký tự.";
+  static String m66(length) => "Tối đa ${length} ký tự.";
 
-  static String m67(lines) => "Hiển thị ${lines} dòng cuối";
+  static String m67(length) => "Phải có ít nhất ${length} ký tự.";
 
-  static String m68(target) => "Gửi tới: ${target}";
+  static String m68(lines) => "Hiển thị ${lines} dòng cuối";
+
+  static String m69(target) => "Gửi tới: ${target}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -749,6 +751,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "updateRequiredTitle": MessageLookupByLibrary.simpleMessage(
       "Cần cập nhật app",
     ),
+    "updateRequiredVersion": m64,
     "validationEmailInvalid": MessageLookupByLibrary.simpleMessage(
       "Hãy nhập địa chỉ email hợp lệ.",
     ),
@@ -764,7 +767,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationPasswordLowercase": MessageLookupByLibrary.simpleMessage(
       "Mật khẩu phải có ít nhất một chữ thường.",
     ),
-    "validationPasswordMinLength": m64,
+    "validationPasswordMinLength": m65,
     "validationPasswordNotMatch": MessageLookupByLibrary.simpleMessage(
       "Mật khẩu không khớp.",
     ),
@@ -783,8 +786,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationPhoneRequired": MessageLookupByLibrary.simpleMessage(
       "Cần nhập số điện thoại.",
     ),
-    "validationTextMaxLength": m65,
-    "validationTextMinLength": m66,
+    "validationTextMaxLength": m66,
+    "validationTextMinLength": m67,
     "validationTextRequired": MessageLookupByLibrary.simpleMessage(
       "Trường này là bắt buộc.",
     ),
@@ -797,7 +800,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "viewAsTextTooltip": MessageLookupByLibrary.simpleMessage(
       "Xem dạng văn bản",
     ),
-    "viewAsTextTruncated": m67,
+    "viewAsTextTruncated": m68,
     "voiceClose": MessageLookupByLibrary.simpleMessage("Đóng"),
     "voiceDetached": MessageLookupByLibrary.simpleMessage(
       "Phiên đã ngắt khỏi điện thoại — gắn lại để gửi",
@@ -843,7 +846,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "voiceSend": MessageLookupByLibrary.simpleMessage("Gửi"),
     "voiceSendEnter": MessageLookupByLibrary.simpleMessage("Gửi phím Enter"),
     "voiceStopTooltip": MessageLookupByLibrary.simpleMessage("Dừng nghe"),
-    "voiceTarget": m68,
+    "voiceTarget": m69,
     "voiceUnsupported": MessageLookupByLibrary.simpleMessage(
       "Máy này không hỗ trợ nhận dạng giọng nói",
     ),

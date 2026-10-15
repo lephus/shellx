@@ -69,6 +69,7 @@
   "errorSpawnFailed": "Không mở được shell: {reason}",
   "updateRequiredTitle": "Cần cập nhật app",
   "updateRequiredBody": "Phiên bản này không còn kết nối được với máy của bạn. Cập nhật để dùng tiếp.",
+  "updateRequiredVersion": "Cần phiên bản {version} trở lên.",
   "openAppStore": "Mở App Store",
   "openPlayStore": "Mở Google Play",
   "lockTitle": "ShellX đang khóa",
