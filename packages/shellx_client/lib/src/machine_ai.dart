@@ -51,6 +51,9 @@ const int _maxReattach = 3;
 const int _itemRestarts = 3;
 const int _maxItemParts = 512;
 
+/// V2-2b B13: the longest `@` query the computer takes (a token, not a text).
+const int _maxFileQueryBytes = 200;
+
 /// This phone's mirror of one AI session (V2-2 D5). Kept across channel
 /// losses: on a new channel it re-attaches with what it holds, so only
 /// what changed comes back.
@@ -327,17 +330,47 @@ final class MachineAi {
   }
 
   /// Sends [text] to [sid] (queued there while a turn runs), with the images
-  /// this phone uploaded ([blobs], V2-2b B12): at most [kAiImagesMax], sent
-  /// only to a computer that takes them (B1).
-  Future<void> prompt(String sid, String text, {List<int> blobs = const []}) {
-    if (utf8Length(text) > kAiMaxPromptBytes || blobs.length > kAiImagesMax) {
+  /// this phone uploaded ([blobs], V2-2b B12) and the files `@` offered
+  /// ([files], B13: paths relative to the session's folder). Images and
+  /// files go only to a computer that takes them (B1, R15: `unsupported`);
+  /// past the limits, `too_large` — nothing is sent either way.
+  Future<void> prompt(
+    String sid,
+    String text, {
+    List<int> blobs = const [],
+    List<String> files = const [],
+  }) {
+    if (utf8Length(text) > kAiMaxPromptBytes ||
+        blobs.length > kAiImagesMax ||
+        files.length > kAiMaxPromptFiles ||
+        files.any((f) => utf8Length(f) > kAiMaxPathBytes)) {
       return Future.error(const AiRequestException('too_large'));
     }
-    AiMessage make(int rid) =>
-        AiPrompt(sid: sid, rid: rid, text: text, blobs: blobs);
-    return blobs.isEmpty
-        ? _request(sid, make)
-        : _feature(AiFeature.blob, sid, make);
+    if ((blobs.isNotEmpty && !can(AiFeature.blob)) ||
+        (files.isNotEmpty && !can(AiFeature.files))) {
+      return Future.error(const AiRequestException('unsupported'));
+    }
+    return _request(
+      sid,
+      (rid) =>
+          AiPrompt(sid: sid, rid: rid, text: text, blobs: blobs, files: files),
+    );
+  }
+
+  /// V2-2b B13: at most eight files of [sid]'s folder matching [query],
+  /// best first (paths relative to the folder), for `@`. A query over
+  /// [_maxFileQueryBytes] is `too_large` at once, nothing sent: the computer
+  /// refuses it too, and a long one would make the channel drop.
+  Future<List<String>> files(String sid, String query) async {
+    if (utf8Length(query) > _maxFileQueryBytes) {
+      throw const AiRequestException('too_large');
+    }
+    final result = await _feature(
+      AiFeature.files,
+      sid,
+      (rid) => AiFiles(sid: sid, rid: rid, query: query),
+    );
+    return jStrings(decodeBody(result.body) ?? const {}, 'files');
   }
 
   /// V2-2b B12, R17, F33: a number for the next image this phone uploads:
