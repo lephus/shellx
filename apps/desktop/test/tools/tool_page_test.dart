@@ -21,18 +21,21 @@ void main() {
   final knocks = <String>[];
   var portUp = false;
 
-  ToolPage page(ToolEntry t, {DateTime Function()? now}) => ToolPage(
-    tool: t,
-    engine: (d) {
-      dialogs = d;
-      return engine = FakeBrowserEngine();
-    },
-    knock: (host, port) async {
-      knocks.add('$host:$port');
-      return portUp;
-    },
-    now: now ?? DateTime.now,
-  );
+  ToolPage page(ToolEntry t, {DateTime Function()? now, ToolKnock? knock}) =>
+      ToolPage(
+        tool: t,
+        engine: (d) {
+          dialogs = d;
+          return engine = FakeBrowserEngine();
+        },
+        knock:
+            knock ??
+            (host, port) async {
+              knocks.add('$host:$port');
+              return portUp;
+            },
+        now: now ?? DateTime.now,
+      );
 
   setUp(() {
     knocks.clear();
@@ -112,11 +115,88 @@ void main() {
     });
   });
 
+  test('after an edit to a URL that is not up yet, every recovery loads it: '
+      'the retry, the knock, Reload, a crash (D23, ruling)', () {
+    fakeAsync((async) {
+      final b = Uri.parse('http://localhost:5174/');
+      final p = page(tool('localhost:5173'));
+      p.setShown(true);
+      engine.emit(UrlChanged(Uri.parse('http://localhost:5173/')));
+      engine.emit(const LoadFinished());
+      p.retarget(p.tool.copyWith(url: 'http://localhost:5174/'));
+      // WebKit may report the page left behind as the address again.
+      engine.emit(UrlChanged(Uri.parse('http://localhost:5173/')));
+      engine.emit(const LoadFailed(BrowserLoadErrorKind.refused));
+      var loads = engine.loads.length;
+      async.elapse(const Duration(seconds: 1));
+      expect(engine.loads.sublist(loads), [b], reason: 'the retry');
+      engine.emit(const LoadFailed(BrowserLoadErrorKind.refused));
+      knocks.clear();
+      async.elapse(const Duration(seconds: 1));
+      expect(knocks, ['localhost:5174'], reason: "the new URL's port");
+      loads = engine.loads.length;
+      unawaited(p.reload());
+      engine.emit(const LoadFailed(BrowserLoadErrorKind.crashed));
+      expect(engine.loads.sublist(loads), [b, b], reason: 'Reload, a crash');
+    });
+  });
+
+  test('a knock still out for a URL edited away loads nothing when its port '
+      'answers (D23, ruling)', () {
+    fakeAsync((async) {
+      final oldPort = Completer<bool>();
+      final p = page(
+        tool('localhost:5173'),
+        knock: (host, port) {
+          knocks.add('$host:$port');
+          return port == 5173 ? oldPort.future : Future.value(false);
+        },
+      );
+      p.setShown(true);
+      engine.emit(const LoadFailed(BrowserLoadErrorKind.refused));
+      async.elapse(const Duration(seconds: 1));
+      engine.emit(const LoadFailed(BrowserLoadErrorKind.refused));
+      async.elapse(const Duration(seconds: 1));
+      expect(knocks, ['localhost:5173'], reason: 'out, no answer yet');
+      p.retarget(p.tool.copyWith(url: 'http://localhost:5174/'));
+      engine.emit(const LoadFailed(BrowserLoadErrorKind.refused));
+      final loads = engine.loads.length;
+      oldPort.complete(true);
+      async.flushMicrotasks();
+      expect(engine.loads, hasLength(loads), reason: 'the old URL stays');
+    });
+  });
+
+  test('refused after "Back to tool", the retry loads the tool; refused on '
+      "the page's own link, the page it was on (D9, D13, ruling)", () {
+    fakeAsync((async) {
+      final t = Uri.parse('http://localhost:4000/');
+      final p = page(tool('localhost:4000'));
+      p.setShown(true);
+      engine.emit(UrlChanged(Uri.parse('https://sso.example.com/login')));
+      engine.emit(const LoadFinished());
+      unawaited(p.backToTool());
+      engine.emit(const LoadFailed(BrowserLoadErrorKind.refused));
+      var loads = engine.loads.length;
+      async.elapse(const Duration(seconds: 1));
+      expect(engine.loads.sublist(loads), [t], reason: 'the tool, not SSO');
+      // Up again at /deep; then a link of the page's own is refused.
+      final deep = Uri.parse('http://localhost:4000/deep');
+      engine.emit(UrlChanged(deep));
+      engine.emit(const LoadFinished());
+      engine.emit(const LoadFailed(BrowserLoadErrorKind.refused));
+      loads = engine.loads.length;
+      async.elapse(const Duration(seconds: 1));
+      expect(engine.loads.sublist(loads), [deep], reason: 'the page it was on');
+    });
+  });
+
   test('a crash reloads once by itself; the next one shows "stopped" '
       '(D13)', () {
     final p = page(tool('localhost:5173'));
     p.setShown(true);
     engine.emit(UrlChanged(Uri.parse('http://localhost:5173/deep')));
+    engine.emit(const LoadFinished());
     engine.emit(const LoadFailed(BrowserLoadErrorKind.crashed));
     expect(engine.loads.last, Uri.parse('http://localhost:5173/deep'));
     expect(p.state.error, isNull);

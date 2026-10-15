@@ -125,6 +125,10 @@ final class ToolPage extends ChangeNotifier {
 
   /// What the last load asked for (a retry loads it again).
   Uri? _target;
+
+  /// A load the app asked for ([_load]) has not finished yet: no
+  /// [LoadFinished] since ([_recoveryUrl]).
+  bool _loadPending = false;
   int _attempt = 0;
   int _crashes = 0;
   Timer? _retry;
@@ -177,7 +181,7 @@ final class ToolPage extends ChangeNotifier {
     _attempt = 0;
     _stopRetrying();
     if (_state.error != null || !_state.started) {
-      await _load(_state.url ?? _target ?? _tool.uri);
+      await _load(_recoveryUrl);
     } else {
       _set(_state.copyWith(download: null));
       await engine.reload();
@@ -204,8 +208,20 @@ final class ToolPage extends ChangeNotifier {
 
   void dismissDownload() => _set(_state.copyWith(download: null));
 
+  /// What a recovery loads (a D13 retry, the R9 knock, the crash reload,
+  /// the panels' "Reload"): the URL that failed. Until a load the app asked
+  /// for finishes, that is its URL — the new one after an edit (D23), the
+  /// tool after D9 "Về tool" — whatever the engine reports meanwhile; after
+  /// it, the page's own address (a link, ↻, a crash).
+  Uri get _recoveryUrl {
+    final target = _target;
+    if (_loadPending && target != null) return target;
+    return _state.url ?? target ?? _tool.uri;
+  }
+
   Future<void> _load(Uri url) async {
     _target = url;
+    _loadPending = true;
     _stopRetrying();
     _set(
       _state.copyWith(
@@ -224,6 +240,7 @@ final class ToolPage extends ChangeNotifier {
         _set(_state.copyWith(loading: true, error: null, download: null));
       case LoadFinished():
         _attempt = 0;
+        _loadPending = false;
         _stopRetrying();
         _set(_state.copyWith(loading: false, error: null));
       case UrlChanged(:final url):
@@ -249,7 +266,7 @@ final class ToolPage extends ChangeNotifier {
     if (kind == BrowserLoadErrorKind.crashed && _crashes == 0) {
       // D13: the page's process died: one reload by itself.
       _crashes++;
-      unawaited(_load(_state.url ?? _target ?? _tool.uri));
+      unawaited(_load(_recoveryUrl));
       return;
     }
     _set(_state.copyWith(loading: false, error: kind));
@@ -260,9 +277,9 @@ final class ToolPage extends ChangeNotifier {
     _retry?.cancel();
     _retry = Timer(toolRetryDelay(_attempt), () {
       _attempt++;
-      unawaited(_load(_state.url ?? _target ?? _tool.uri));
+      unawaited(_load(_recoveryUrl));
     });
-    final target = _state.url ?? _target ?? _tool.uri;
+    final target = _recoveryUrl;
     if (isLocalToolHost(target.host)) {
       _knocker?.cancel();
       _knocker = Timer.periodic(kToolKnockEvery, (_) => _knockOnce(target));
@@ -274,10 +291,12 @@ final class ToolPage extends ChangeNotifier {
     _knocking = true;
     try {
       final up = await _knock(target.host, target.port);
+      // Still what a recovery loads: never a URL edited away meanwhile.
       if (up &&
           !_disposed &&
           _shown &&
-          _state.error == BrowserLoadErrorKind.refused) {
+          _state.error == BrowserLoadErrorKind.refused &&
+          target == _recoveryUrl) {
         unawaited(_load(target));
       }
     } finally {
