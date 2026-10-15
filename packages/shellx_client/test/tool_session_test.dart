@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_client/shellx_client.dart';
@@ -46,6 +47,91 @@ List<String> _policies(List<String> head) => [
       line.substring(line.indexOf(':') + 1).trim(),
 ];
 
+/// A stand-in for the computer, for the answers the real proxy gives only
+/// in rare cases: it serves the page's tool on [port] and answers each
+/// request at once with what [script] gives. It takes no body (never
+/// acknowledges), so an upload stays within the windows.
+final class _Desktop {
+  _Desktop(this.port, this.script) {
+    tools = MachineTools(
+      send: _fromPhone,
+      connect: () async {},
+      timeout: const Duration(seconds: 5),
+    )..channelReady();
+  }
+
+  final int port;
+  final List<ToolMessage> Function(ToolRequest request) script;
+  late final MachineTools tools;
+  final requests = <ToolRequest>[];
+
+  bool _fromPhone(List<AppMessage> batch) {
+    final messages = decodeBatch(encodeBatch(batch));
+    scheduleMicrotask(() {
+      for (final message in messages) {
+        var replies = const <ToolMessage>[];
+        switch (message) {
+          case ToolOpen(:final rid, :final tool):
+            final serving = {
+              'v': 1,
+              'tools': [
+                {'id': tool, 'port': port, 'path': '/'},
+              ],
+            };
+            replies = [
+              ToolOpened(
+                rid: rid,
+                ok: true,
+                body: Uint8List.fromList(utf8.encode(jsonEncode(serving))),
+              ),
+            ];
+          case final ToolRequest request:
+            requests.add(request);
+            replies = script(request);
+          default:
+            break;
+        }
+        for (final reply in replies) {
+          tools.handle(decodeBatch(encodeBatch([reply])).single as ToolMessage);
+        }
+      }
+    });
+    return true;
+  }
+}
+
+/// What the stand-in computer sends for a request: `/end/<code>` ends it
+/// with that code before any response; `/early` answers in full (`early`)
+/// whatever the body; `/bad-status` answers a status no HTTP response has;
+/// `/hold` gets nothing; anything else 204.
+List<ToolMessage> _script(ToolRequest request) {
+  final id = request.id;
+  final target = request.target;
+  if (target.startsWith('/end/')) {
+    return [ToolEnd(id: id, code: target.substring(5))];
+  }
+  return switch (target) {
+    '/early' => [
+      ToolResponse(
+        id: id,
+        status: 200,
+        head: const ['content-type', 'text/plain'],
+        end: false,
+      ),
+      ToolData(
+        id: id,
+        data: Uint8List.fromList(utf8.encode('early')),
+        end: true,
+      ),
+    ],
+    '/bad-status' => [
+      ToolResponse(id: id, status: 42, head: const [], end: true),
+    ],
+    '/hold' => const [],
+    _ => [ToolResponse(id: id, status: 204, head: const [], end: true)],
+  };
+}
+
 /// V2-4 E2, E3, E4, E11, E13, §8: the phone's loopback server for one open
 /// tool, with real sockets: a tool, the desktop's proxy, the phone's
 /// session, and a webview stand-in.
@@ -66,13 +152,14 @@ void main() {
     Map<String, Future<void> Function(HttpRequest)> routes = const {},
     List<Map<String, Object?>> Function(TestTool tool)? catalog,
     List<Duration> retry = kToolRetryDelays,
+    Duration headTimeout = kToolHeadTimeout,
   }) async {
     opened = true;
     tool = await TestTool.start(
       routes: routes,
       address: InternetAddress.loopbackIPv6,
     );
-    proxy = ToolProxy(connect: ipv6Only);
+    proxy = ToolProxy(connect: ipv6Only, headTimeout: headTimeout);
     proxy.serve(catalogOf(catalog?.call(tool) ?? [tool.entry(host: '[::1]')]));
     pipe = ToolPipe(proxy);
     session = ToolSession(
@@ -91,6 +178,35 @@ void main() {
 
   Uri at(String path, {int? port}) =>
       Uri.parse('http://localhost:${port ?? session.servedPort}$path');
+
+  /// A page served against the stand-in computer ([_Desktop], [_script]),
+  /// its gate cookie set; it cleans up after itself.
+  Future<({ToolSession page, Webview view, _Desktop desktop})>
+  openScripted() async {
+    final free = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final port = free.port;
+    await free.close();
+    final desktop = _Desktop(port, _script);
+    final page = ToolSession(
+      tool: _id,
+      port: port,
+      path: '/',
+      link: desktop.tools,
+    );
+    final view = Webview();
+    addTearDown(() async {
+      await page.close();
+      view.close();
+    });
+    final loads = <ToolLoad>[];
+    page.events.listen((event) {
+      if (event is ToolLoad) loads.add(event);
+    });
+    page.start();
+    await until(() => loads.isNotEmpty);
+    expect((await view.request(loads.single.url)).status, 303);
+    return (page: page, view: view, desktop: desktop);
+  }
 
   tearDown(() async {
     if (!opened) return;
@@ -651,6 +767,147 @@ void main() {
       final fromApi = await webview.request(at('/v1', port: api.port));
       expect(fromApi.status, 200);
       expect(fromApi.headers['content-security-policy'], [policy]);
+    });
+  });
+
+  /// Controller ruling R-C2-2: an answer the phone gives once a stream has
+  /// read the request must still be sent and closed (E10, E16).
+  group('the phone\'s answers once a stream started', () {
+    test('the computer ends a request before its response: the webview gets '
+        'the answer at once, with one ShellX policy', () async {
+      final (:page, :view, desktop: _) = await openScripted();
+      final policy = toolContentSecurityPolicy([page.servedPort!]);
+      const statuses = {
+        ToolCode.busy: 503,
+        ToolCode.timeout: 504,
+        ToolCode.badRequest: 400,
+        ToolCode.aborted: 502,
+        'a_newer_word': 502,
+        ToolCode.tooLarge: 502,
+        ToolCode.refused: 502,
+        ToolCode.disabled: 502,
+        ToolCode.gone: 502,
+        ToolCode.unavailable: 503,
+        ToolCode.desktopClosed: 503,
+      };
+      for (final MapEntry(key: code, value: status) in statuses.entries) {
+        final answer = await view
+            .request(Uri.parse('http://localhost:${page.servedPort}/end/$code'))
+            .timeout(const Duration(seconds: 2));
+        expect(answer.status, status, reason: code);
+        expect(answer.headers['content-security-policy'], [
+          policy,
+        ], reason: code);
+      }
+    });
+
+    test('an answer the phone gives finishes its response: the next request '
+        'on the same connection is served', () async {
+      final (:page, :view, desktop: _) = await openScripted();
+      final port = page.servedPort!;
+      final text = const ToolHostTexts().refused(page.port);
+      final socket = await Socket.connect(InternetAddress.loopbackIPv4, port);
+      addTearDown(socket.destroy);
+      final received = StringBuffer();
+      socket.listen(
+        (bytes) => received.write(String.fromCharCodes(bytes)),
+        onError: (Object _) {},
+      );
+      void ask() => socket.write(
+        'GET /end/refused HTTP/1.1\r\nhost: localhost:$port\r\n'
+        'cookie: ${view.cookieHeader}\r\n\r\n',
+      );
+      int answers() => 'HTTP/1.1 502'.allMatches('$received').length;
+      ask();
+      await until(() => answers() == 1 && '$received'.endsWith(text));
+      ask();
+      await until(
+        () => answers() == 2 && '$received'.endsWith(text),
+        timeout: const Duration(seconds: 2),
+      );
+    });
+
+    test('the channel goes while a request waits for its response: 502 at '
+        'once (R18)', () async {
+      final held = <HttpResponse>[];
+      await openSamePort(
+        routes: {'/slow': (request) async => held.add(request.response)},
+      );
+      await webview.enter(events.whereType<ToolLoad>().single.url);
+      final policy = toolContentSecurityPolicy([session.servedPort!]);
+      final waiting = webview.request(at('/slow'));
+      await until(() => held.isNotEmpty);
+      pipe.drop();
+      final answer = await waiting.timeout(const Duration(seconds: 2));
+      expect(answer.status, 502);
+      expect(answer.headers['content-security-policy'], [policy]);
+    });
+
+    test('the tool takes longer than the computer waits for a head: 504 '
+        '(E10)', () async {
+      final held = <HttpResponse>[];
+      await openSamePort(
+        routes: {'/slow': (request) async => held.add(request.response)},
+        headTimeout: const Duration(milliseconds: 200),
+      );
+      await webview.enter(events.whereType<ToolLoad>().single.url);
+      final policy = toolContentSecurityPolicy([session.servedPort!]);
+      final answer = await webview
+          .request(at('/slow'))
+          .timeout(const Duration(seconds: 3));
+      expect(answer.status, 504);
+      expect(answer.headers['content-security-policy'], [policy]);
+    });
+  });
+
+  /// Controller ruling R-C2-3: every end of a stream stops its request-body
+  /// outlet; what is left of the body is read and dropped, so a webview
+  /// still sending finishes and takes the answer.
+  group('an upload the stream no longer sends', () {
+    final upload = Uint8List(2 * 1024 * 1024);
+
+    test('the computer ends it before a response, or answers a status no '
+        'response has: the answer reaches the webview', () async {
+      final (:page, :view, desktop: _) = await openScripted();
+      const paths = {'/end/busy': 503, '/end/refused': 502, '/bad-status': 502};
+      for (final MapEntry(key: path, value: status) in paths.entries) {
+        final answer = await view
+            .request(
+              Uri.parse('http://localhost:${page.servedPort}$path'),
+              method: 'POST',
+              body: upload,
+            )
+            .timeout(const Duration(seconds: 5));
+        expect(answer.status, status, reason: path);
+      }
+    });
+
+    test('the tool answers in full while the page still uploads: the '
+        'response arrives whole', () async {
+      final (:page, :view, desktop: _) = await openScripted();
+      final answer = await view
+          .request(
+            Uri.parse('http://localhost:${page.servedPort}/early'),
+            method: 'POST',
+            body: upload,
+          )
+          .timeout(const Duration(seconds: 5));
+      expect(answer.status, 200);
+      expect(answer.text, 'early');
+    });
+
+    test('the channel goes during an upload: 502', () async {
+      final (:page, :view, :desktop) = await openScripted();
+      final waiting = view
+          .request(
+            Uri.parse('http://localhost:${page.servedPort}/hold'),
+            method: 'POST',
+            body: upload,
+          )
+          .timeout(const Duration(seconds: 5));
+      await until(() => desktop.requests.any((r) => r.target == '/hold'));
+      desktop.tools.channelLost();
+      expect((await waiting).status, 502);
     });
   });
 }
