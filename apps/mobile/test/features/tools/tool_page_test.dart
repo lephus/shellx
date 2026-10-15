@@ -187,10 +187,20 @@ void main() {
     expect(await confirmed, isTrue);
     final typed = engine.callbacks.prompt('Tên?', 'An');
     await tester.pumpAndSettle();
+    expect(find.text('Bảng việc nhắn'), findsOneWidget);
+    expect(find.text('Tên?'), findsOneWidget);
     await tester.enterText(find.byKey(const Key('tool.dialogField')), 'Bình');
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
     expect(await typed, 'Bình');
+    // The third kind is titled with the tool's name too.
+    final alerted = engine.callbacks.alert('Đã lưu.');
+    await tester.pumpAndSettle();
+    expect(find.text('Bảng việc nhắn'), findsOneWidget);
+    expect(find.text('Đã lưu.'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await alerted;
   });
 
   testWidgets('downloads and file choosers are not on the phone yet: a toast (E12)', (tester) async {
