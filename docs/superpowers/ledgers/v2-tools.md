@@ -1,0 +1,38 @@
+# V2 tools — execution ledger (branch v2-3, merged into shellx-v2 by the controller)
+
+## V2-3 (tools, desktop) — execution
+
+- Baseline at eb0b6dc (130d8aa plus the V2-3 plan commit; no apps/ or packages/ change): desktop analyze clean, `+3574 ~10`; shellx_agent analyze clean, `+916`.
+
+## V2-3 (tools, desktop) — planning rulings
+
+Plan: `docs/superpowers/plans/2026-10-15-v2-3-tools-desktop.md` (spec `docs/superpowers/specs/2026-10-15-v2-3-tools-desktop-design.md`). Task 1's `ToolEntry` / `parseToolUrl` / `ToolRegistry` are the interface V2-4 consumes.
+
+Ruling R1: URL field — trim; no scheme → http:// (host:port counts as no scheme); http/https only; no userinfo, `\` or control characters; host [a-z0-9._-] or IPv6; port 1–65535; fragment dropped; empty path → /; ≤ 2048 — cost if wrong: IDN hosts typed in punycode.
+Ruling R2: strings the spec does not list (URL errors, limit, bar and menu labels, D13 reasons, a11y labels, OK, clear-data note) follow its wording, EN + VI pinned — cost if wrong: some strings reworded.
+Ruling R3: no runScript/capturePng/channel/bootstrap in BrowserEngine at all; a source scan pins it — cost if wrong: A6's full browser adds them back.
+Ruling R4: macOS new windows and downloads caught by native delegate proxies (NewWindowGuard, DownloadGuard) around the plugin's — cost if wrong: a plugin upgrade re-checks BrowserNative.swift.
+Ruling R5: top-level file: is refused by WebKit itself; the D9 policy blocks the other schemes — cost if wrong: none.
+Ruling R6: Windows uses WinWebViewController (visibility, focus, clearCache, data folder); its JS dialogs and downloads stay WebView2's — cost if wrong: Edge-style alerts and downloads when tool-embed = on.
+Ruling R7: copy/paste/cut/select all/undo/redo and terminal-only actions (edit_line, text/csi/esc, ignore) stay with the page; every other window chord forwards — cost if wrong: a text: macro is dead while a page has the keyboard.
+Ruling R8: a forwarded first step arms the sequence and gives the keyboard to Flutter — cost if wrong: one click back into the page.
+Ruling R9: while "nothing is running" shows a local tool, a 1 s TCP knock loads the page as soon as the port answers — cost if wrong: one local connect per second.
+Ruling R10: more than 5 JS dialogs in 10 s answer themselves (dismiss/false/null), never "yes" — cost if wrong: a chatty page gets "no".
+Ruling R11: tool rows are not arrow-key stops; group folding lasts for the run — cost if wrong: keyboard users open tools from the palette.
+Ruling R12: agent pids recorded by the desktop runtime factory (a copy of AiHost.runtime with a recording launch); shellx_ai untouched — cost if wrong: 20 lines to keep in step.
+Ruling R13: no suggestions from SSH or exited panes; process names read once when the dialog opens — cost if wrong: forwarded ports typed by hand.
+Ruling R14: a workspace without tabs shows "loose" (its dock beside an empty area, pane commands off, ⌘T opens there), not restored — cost if wrong: its dock reappears only when a tool is opened.
+Ruling R15: an unloaded page loads again whenever it is shown again — cost if wrong: none.
+Ruling R16: Windows clear data = clearCache() on a live page, else delete %LOCALAPPDATA%\ShellX\tools — cost if wrong: data outside browsing data stays until a clear with no page open.
+Ruling R17: the palette lists every tool of every workspace, shown workspace first — cost if wrong: a long palette.
+Ruling R18: Copy URL copies the tool's URL; ↗ opens the page's current URL — cost if wrong: the current URL via ↗.
+Ruling R19: agent-skills/ not updated (out of scope); follow-up — cost if wrong: agents do not know tools yet.
+Ruling R20: adding from the window opens the tool; from Settings it does not — cost if wrong: one click.
+Ruling R21: SettingKeys.all 34 → 35 (workspace_tools); theirs + 1 if V2-2b/V2-4 land keys first — cost if wrong: a count test.
+Ruling R22: toString() is ToolEntry(…) (shared interface name) for spec D24's Tool(…) — cost if wrong: none.
+Ruling R23: no watchPhoneTools(); V2-4 watches toolRegistryProvider — cost if wrong: none.
+Ruling R24: the macOS integration test runs as a built app in a throw-away worktree (bundle id pro.shellx.desktop.itest, temporary HOME), not flutter test -d macos — cost if wrong: a minute of build per run.
+Ruling R25: a retry loads the URL again, never reload() (WebKit reloads about:blank after a failed first load) — cost if wrong: none.
+Ruling R26: workspace_tools is a window key (UiSettingKeys); the background service never touches it — cost if wrong: none.
+Ruling R27: browser_url.dart comes over unchanged (D6) for A6's browser; tools use isLocalToolHost (V2-3 D11: *.localhost and 0.0.0.0 count as this computer) — cost if wrong: two local-host rules until A6 resumes.
+Ruling R28: Safari's Web Inspector reaches a tool page (setInspectable, macOS 13.3+) — cost if wrong: someone at the user's own session can inspect the user's own tool.
