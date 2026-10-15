@@ -15,11 +15,16 @@ import '../../support/fakes.dart';
 
 const _tool = ToolInfo(id: 'k3f9za7q1m', name: 'Bảng việc', ws: 'shop-web', port: 5173, path: '/', group: 'ws:a');
 
+/// The web views the page asked for, in order (a new serve has a web view of its own).
+late FakeToolWebEngines engines;
+
+/// The web view the page shows now.
+FakeToolWebEngine get engine => engines.current;
+
 /// V2-4 E12, E13, E15, E16, E20: the tool page with a stand-in web view.
 void main() {
   late FakeBackend backend;
   late FakeMachineSession machine;
-  late FakeToolWebEngine engine;
   late FakePopupHandler popups;
   late FakeExternalLinks links;
 
@@ -27,13 +32,13 @@ void main() {
     backend = FakeBackend(pinnedList: [pinned(agentA)]);
     machine = backend.addMachine(agentA);
     final session = FakeSessionHolder(backend);
-    engine = FakeToolWebEngine();
+    engines = FakeToolWebEngines();
     popups = FakePopupHandler();
     links = FakeExternalLinks();
     getIt
       ..registerSingleton<PopupHandler>(popups)
       ..registerSingleton<ExternalLinks>(links)
-      ..registerFactory<ToolWebEngine>(() => engine)
+      ..registerFactory<ToolWebEngine>(engines.next)
       ..registerFactoryParam<ToolPageController, String, ToolInfo>(
         (agentId, tool) => ToolPageController(agentId, tool, session),
       );
@@ -82,6 +87,7 @@ void main() {
     page().ready();
     await tester.pump();
     expect(engine.loads.single.path, '/__shellx/enter');
+    expect(engines.made, hasLength(1), reason: 'the first entry load uses the web view the page started with');
     expect(find.text('Đang tải qua đường hầm…'), findsOneWidget, reason: 'until the first page is in');
     engine.callbacks.onPageStarted();
     engine.callbacks.onProgress(40);
@@ -389,12 +395,11 @@ void main() {
 
   // I1: Android's web view never hands "back" to the navigation policy, so the page only walks its
   // history while it is shown and while that history is of one port.
-  testWidgets('back goes back in the page under the reconnecting strip, and after a load on the same port (I1)', (
+  testWidgets('back goes back in the page under the reconnecting strip while the session serves (I1)', (
     tester,
   ) async {
     await open(tester);
     await shown(tester);
-    page().ready(); // the same port again (a reload of the entry page)
     page().setPhase(ToolPhase.reconnecting);
     await tester.pump();
     engine.canGoBackValue = true;
@@ -429,21 +434,23 @@ void main() {
     });
   }
 
-  testWidgets('back leaves the page for good once a load came on another port (I1)', (tester) async {
+  testWidgets('back leaves after a re-serve on another port: the fresh web view has no history (NB1)', (tester) async {
     await open(tester);
     await shown(tester);
-    // An E13 resume on another port, then back on the first one: the history still holds pages of both.
+    final first = engine;
+    first.canGoBackValue = true; // pages of the old port, which another app may hold by now
     page().ready(port: 49152);
-    page().ready();
+    await tester.pump();
     engine.callbacks.onPageStarted();
     engine.callbacks.onPageFinished();
     await tester.pump();
-    engine.canGoBackValue = true;
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
+    expect(first.goBacks, 0);
     expect(engine.goBacks, 0);
     expect(find.text('Bảng việc'), findsNothing);
     expect(page().closes, 1);
+    expect(engines.made.map((web) => web.disposed), [true, true], reason: 'leaving disposes the web view it shows');
   });
 
   // NB2: the strip lifts a cover once the link drops, but with the servers closed (after "disabled", "gone",
@@ -461,4 +468,158 @@ void main() {
     expect(find.text('Bảng việc'), findsNothing);
     expect(page().closes, 1);
   });
+
+  // NB1: every serve (a first serve or a re-serve) has a new secret, and cookies ignore ports, so its page gets a
+  // web view of its own: the history of an earlier serve is never there to walk (by the user's back, or by the
+  // page's own history.back()), and the old page's scripts stop before the new entry sets the new cookie.
+  testWidgets('"Về trang đầu" and a reload keep the web view: only a new serve gets a new one (NB1)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    page().emit(ToolLoad(Uri.parse('http://localhost:5173/'))); // the start page: not an entry URL
+    page().emit(const ToolReload());
+    await tester.pump();
+    expect(engines.made, hasLength(1));
+    expect(engines.log, ['web1 load localhost:5173/__shellx/enter', 'web1 load localhost:5173/', 'web1 reload']);
+  });
+
+  testWidgets(
+    'a re-serve gets a web view of its own: the old one goes blank first, then the entry loads in a fresh one (NB1)',
+    (
+      tester,
+    ) async {
+      await open(tester);
+      await shown(tester);
+      final first = engine;
+      page().ready(port: 49152);
+      await tester.pump();
+      expect(engines.made, hasLength(2));
+      expect(engines.log, [
+        'web1 load localhost:5173/__shellx/enter',
+        'web1 load about:blank',
+        'web1 dispose',
+        'web2 load localhost:49152/__shellx/enter',
+      ]);
+      expect(first.disposed, isTrue);
+      expect(engine.disposed, isFalse);
+      expect(engines.made.map((web) => web.viewStates), [1, 1], reason: 'a platform view is never reused');
+      expect(find.text('web2'), findsOneWidget);
+      expect(find.text('web1'), findsNothing);
+    },
+  );
+
+  testWidgets('pausing blanks the web view; the next serve gets a fresh one (E13, NB1)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    expect(page().pauses, 1);
+    expect(engines.log.last, 'web1 load about:blank');
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(page().resumes, 1);
+    page().ready(port: 49152); // served again, on another port: a new secret and its entry URL
+    await tester.pump();
+    expect(engines.made, hasLength(2));
+    expect(engines.made.first.disposed, isTrue);
+    expect(engine.loads.single.port, 49152);
+  });
+
+  testWidgets('a pause before anything is loaded leaves the blank web view alone (NB1)', (tester) async {
+    await open(tester);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    await tester.pump();
+    expect(page().pauses, 1);
+    expect(engines.log, isEmpty);
+  });
+
+  testWidgets(
+    'what a retired web view reports is ignored: its page finishing does not lift the cover of the new one (NB1)',
+    (
+      tester,
+    ) async {
+      await open(tester);
+      await shown(tester);
+      final retired = engine;
+      page().ready(port: 49152);
+      await tester.pump();
+      expect(find.text('Đang tải qua đường hầm…'), findsOneWidget, reason: 'the fresh web view has no page yet');
+      retired.callbacks.onPageStarted();
+      retired.callbacks.onProgress(50);
+      retired.callbacks.onPageFinished();
+      retired.callbacks.onLoadError(true);
+      retired.callbacks.onCrashed();
+      retired.callbacks.onFileChooser();
+      await tester.pump();
+      expect(find.text('Đang tải qua đường hầm…'), findsOneWidget);
+      expect(find.byKey(const Key('tool.progress')), findsNothing);
+      expect(retired.reloads, 0);
+      expect(popups.infos, isEmpty);
+      // It may only go blank, and it shows nothing.
+      expect(retired.callbacks.decide('about:blank', true), isA<ToolGo>());
+      expect(retired.callbacks.decide('http://localhost:5173/x', true), isA<ToolBlock>());
+      expect(retired.callbacks.decide('http://localhost:49152/x', true), isA<ToolBlock>());
+      expect(retired.callbacks.decide('https://accounts.example.com/sso', true), isA<ToolBlock>());
+      await retired.callbacks.alert('hi');
+      expect(await retired.callbacks.confirm('sure?'), isFalse);
+      expect(await retired.callbacks.prompt('name?', 'An'), isNull);
+      expect(find.byKey(const Key('tool.dialog')), findsNothing);
+      expect(popups.infos, isEmpty);
+      // The page of the fresh web view lifts the cover.
+      engine.callbacks.onPageStarted();
+      engine.callbacks.onPageFinished();
+      await tester.pump();
+      expect(find.text('Đang tải qua đường hầm…'), findsNothing);
+    },
+  );
+
+  testWidgets('a fresh web view starts with nothing loading: no progress line, no slow line, no timer (NB1)', (
+    tester,
+  ) async {
+    await open(tester);
+    await shown(tester);
+    engine.callbacks.onPageStarted();
+    await tester.pump(const Duration(milliseconds: 3600));
+    expect(find.byKey(const Key('tool.progress')), findsOneWidget);
+    expect(find.byKey(const Key('tool.slow')), findsOneWidget);
+    page().ready(port: 49152);
+    await tester.pump();
+    expect(find.byKey(const Key('tool.progress')), findsNothing);
+    expect(find.byKey(const Key('tool.slow')), findsNothing);
+    await tester.pump(const Duration(seconds: 5));
+    expect(find.byKey(const Key('tool.slow')), findsNothing, reason: 'the old web view\'s timer is gone');
+  });
+
+  testWidgets(
+    'the fresh web view is wired like the first: it asks before another site opens, its dialogs are the app\'s (NB1)',
+    (
+      tester,
+    ) async {
+      await open(tester);
+      await shown(tester);
+      page().ready(port: 49152);
+      await tester.pump();
+      engine.callbacks.onPageStarted();
+      engine.callbacks.onPageFinished();
+      await tester.pumpAndSettle();
+      final decision = engine.callbacks.decide('https://accounts.example.com/sso', true);
+      expect(decision, isA<ToolAskExternal>());
+      unawaited(engine.ask((decision as ToolAskExternal).url));
+      await tester.pumpAndSettle();
+      expect(find.text('Mở accounts.example.com bằng trình duyệt?'), findsOneWidget);
+      await tester.tap(find.text('Mở'));
+      await tester.pumpAndSettle();
+      expect(links.opened.single.toString(), 'https://accounts.example.com/sso');
+      final confirmed = engine.callbacks.confirm('Xóa thẻ?');
+      await tester.pumpAndSettle();
+      expect(find.text('Bảng việc nhắn'), findsOneWidget);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      expect(await confirmed, isTrue);
+    },
+  );
 }

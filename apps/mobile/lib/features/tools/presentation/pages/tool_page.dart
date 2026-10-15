@@ -11,7 +11,7 @@ import 'package:shellx_mobile/shared/shared.dart';
 /// V2-4 E15: one tool of the computer, over the machine's page: a bar (‹, the name, "localhost:5173 ·
 /// qua máy tính", ↻, ⋯), a thin progress line, and the page in a web view. The states of E16 cover
 /// the web view; a lost channel keeps the page under a strip. Android back goes back in the page
-/// first.
+/// first. Every serve has a web view of its own (NB1), which the controller makes through [_newEngine].
 @RoutePage()
 class ToolPage extends StatefulWidget {
   const ToolPage({super.key, required this.agentId, required this.tool});
@@ -25,7 +25,6 @@ class ToolPage extends StatefulWidget {
 
 class _ToolPageState extends State<ToolPage> {
   late final ToolPageController _controller = getIt<ToolPageController>(param1: widget.agentId, param2: widget.tool);
-  late final ToolWebEngine _engine = getIt<ToolWebEngine>();
   late final AppLifecycleListener _lifecycle;
   StreamSubscription<(ToolNotice, int?)>? _notices;
   bool _started = false;
@@ -47,31 +46,24 @@ class _ToolPageState extends State<ToolPage> {
     if (_started) return;
     _started = true;
     _notices = _controller.notices.listen(_notice);
-    _engine
-      ..askExternal = _askExternal
-      ..attach(
-        ToolWebCallbacks(
-          decide: _controller.decide,
-          onProgress: _controller.progressed,
-          onPageStarted: _controller.pageStarted,
-          onPageFinished: _controller.pageFinished,
-          onLoadError: _controller.loadFailed,
-          onCrashed: _controller.crashed,
-          onFileChooser: _controller.fileChooser,
-          alert: _alert,
-          confirm: _confirm,
-          prompt: _prompt,
-        ),
-      );
-    _controller.start(_engine, AppToolTexts(S.of(context)));
+    _controller.start(
+      _newEngine,
+      ToolDialogs(alert: _alert, confirm: _confirm, prompt: _prompt),
+      AppToolTexts(S.of(context)),
+    );
   }
+
+  /// A web view for a serve (NB1): the injected engine, asking before another site opens in the browser,
+  /// reporting to [callbacks].
+  ToolWebEngine _newEngine(ToolWebCallbacks callbacks) => getIt<ToolWebEngine>()
+    ..askExternal = _askExternal
+    ..attach(callbacks);
 
   @override
   void dispose() {
     _lifecycle.dispose();
     unawaited(_notices?.cancel());
     _controller.dispose();
-    _engine.dispose();
     super.dispose();
   }
 
@@ -182,7 +174,7 @@ class _ToolPageState extends State<ToolPage> {
               Expanded(
                 child: Stack(
                   children: [
-                    Positioned.fill(child: _engine.view()),
+                    Positioned.fill(child: Watch(_web)),
                     Positioned.fill(child: Watch(_cover)),
                   ],
                 ),
@@ -192,6 +184,13 @@ class _ToolPageState extends State<ToolPage> {
         ),
       ),
     );
+  }
+
+  /// The web view of the current serve; a key per web view, so that a platform view is never reused by the
+  /// next one (NB1).
+  Widget _web(BuildContext context) {
+    final engine = _controller.engine.value;
+    return engine == null ? const SizedBox.shrink() : KeyedSubtree(key: ObjectKey(engine), child: engine.view());
   }
 
   Widget _bar(BuildContext context) {
