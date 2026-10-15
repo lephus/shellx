@@ -198,7 +198,7 @@ final class DesktopAiSource implements AiSessionSource {
           runtime.state.sessionId == null) {
         unawaited(runtime.start());
       }
-      return _RuntimeControl(runtime);
+      return _RuntimeControl(_ref, runtime);
     } on Object catch (error) {
       debugPrint('ShellX: AI session for a phone failed: ${error.runtimeType}');
       return null;
@@ -265,8 +265,9 @@ final class DesktopAiSource implements AiSessionSource {
 
 /// A pane's runtime as the hub drives it for a phone.
 final class _RuntimeControl implements AiControl {
-  _RuntimeControl(this._runtime);
+  _RuntimeControl(this._ref, this._runtime);
 
+  final Ref _ref;
   final AiRuntime _runtime;
 
   @override
@@ -307,6 +308,33 @@ final class _RuntimeControl implements AiControl {
   @override
   void answerAsk(int id, ElicitationResponse response) =>
       _runtime.answerAsk(id, response);
+
+  /// V2-2b B11: a choice from the phone, as the composer's chip makes it —
+  /// sent to the agent, then remembered for its next sessions. The hub
+  /// checked it against what the session offers; checked again here, so no
+  /// way round the hub sets a mode acting without asking: that is made on the
+  /// computer, after its question (R16, V2-1 R6).
+  @override
+  Future<void> setConfig(String id, Object value) async {
+    if (aiTurnsOnNoApproval(configId: id, value: value)) {
+      throw const AiRefused('on_computer');
+    }
+    await _runtime.setConfig(id, value);
+    await rememberConfig(
+      _ref.read(settingsStoreProvider),
+      _runtime.state.agentId,
+      id,
+      value,
+    );
+  }
+
+  /// V2-2b B11: a legacy mode from the phone; as [setConfig] (the computer's
+  /// mode chip remembers none).
+  @override
+  Future<void> setMode(String modeId) async {
+    if (aiIsNoApprovalMode(modeId)) throw const AiRefused('on_computer');
+    await _runtime.setMode(modeId);
+  }
 }
 
 /// V2-2 D11: where the hub's pushes go — the agent side's notifications

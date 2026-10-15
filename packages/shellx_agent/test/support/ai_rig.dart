@@ -90,6 +90,34 @@ final class FakeAiControl implements AiControl {
     asks.add((id, response));
     state.resolveAsk(id, response);
   }
+
+  /// V2-2b B11: the choices set, in order.
+  final configs = <(String, Object)>[];
+  final modes = <String>[];
+
+  /// Set: `setConfig` and `setMode` throw it (the agent said no).
+  Object? failConfig;
+
+  @override
+  Future<void> setConfig(String id, Object value) async {
+    final error = failConfig;
+    if (error != null) throw error;
+    configs.add((id, value));
+    state.configOptions = [
+      for (final o in state.configOptions ?? const <ConfigOption>[])
+        o.id == id ? o.withValue(value) : o,
+    ];
+    state.touch();
+  }
+
+  @override
+  Future<void> setMode(String modeId) async {
+    final error = failConfig;
+    if (error != null) throw error;
+    modes.add(modeId);
+    state.modes = state.modes?.withCurrent(modeId);
+    state.touch();
+  }
 }
 
 /// A window with AI sessions on plain states.
