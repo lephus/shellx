@@ -428,4 +428,76 @@ void main() {
     expect(rig.container.read(terminalTabsProvider).tabs, hasLength(2));
     await disposeWorkspace(t, rig.container);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('with no tab at all, "Open new tab" gets the keyboard: the '
+      'empty pane\'s once ⌘⇧B closes the dock; the loose panel\'s own by F6 '
+      'and from the dock, where Enter opens a tab in that workspace (D4, '
+      'D10, D18)', (t) async {
+    await rig.pump(t);
+    rig.container
+        .read(terminalTabsProvider.notifier)
+        .close(rig.container.read(terminalTabsProvider).tabs.single.id);
+    await t.pumpAndSettle();
+    final page = t.state<TerminalWorkspacePageState>(
+      find.byType(TerminalWorkspacePage),
+    );
+    final ws = rig.container
+        .read(sidebarWorkspacesProvider.notifier)
+        .createFor(name: 'B');
+    final tool = rig.add(ws, 'localhost:1');
+    await t.pumpAndSettle();
+    bool focusIn(Finder finder) {
+      final focused = FocusManager.instance.primaryFocus?.context;
+      return focused != null &&
+          find
+              .descendant(
+                of: finder,
+                matching: find.byElementPredicate((e) => identical(e, focused)),
+              )
+              .evaluate()
+              .isNotEmpty;
+    }
+
+    await openTool(t, tool.id);
+    expect(rig.container.read(toolDockProvider).loose, ws);
+    await t.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await t.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await t.sendKeyEvent(LogicalKeyboardKey.keyB);
+    await t.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await t.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await t.pumpAndSettle();
+    expect(rig.container.read(toolDockProvider).loose, isNull);
+    expect(page.emptyFocus.hasPrimaryFocus, isTrue);
+
+    // The dock again. F6 goes to the content region, the loose panel;
+    // ⌘⌥→ enters the dock, ⌘⌥← leaves it for the loose panel again.
+    await openTool(t, tool.id);
+    expect(rig.container.read(toolDockProvider).loose, ws);
+    expect(page.toolDockFocus.hasPrimaryFocus, isTrue);
+    await t.sendKeyEvent(LogicalKeyboardKey.f6);
+    await t.pumpAndSettle();
+    expect(focusIn(find.byKey(const Key('tool.loose'))), isTrue);
+    Future<void> focusPane(LogicalKeyboardKey arrow) async {
+      await t.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await t.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await t.sendKeyEvent(arrow);
+      await t.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      await t.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await t.pumpAndSettle();
+    }
+
+    await focusPane(LogicalKeyboardKey.arrowRight);
+    expect(page.toolDockFocus.hasPrimaryFocus, isTrue);
+    await focusPane(LogicalKeyboardKey.arrowLeft);
+    expect(focusIn(find.byKey(const Key('tool.loose'))), isTrue);
+    await t.sendKeyEvent(LogicalKeyboardKey.enter);
+    await t.pumpAndSettle();
+    final selected = rig.container.read(terminalTabsProvider).selectedId!;
+    expect(
+      rig.container.read(sidebarWorkspacesProvider).workspaceOf(selected),
+      ws,
+    );
+    expect(rig.container.read(toolDockProvider).loose, isNull);
+    await disposeWorkspace(t, rig.container);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 }

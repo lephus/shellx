@@ -88,6 +88,11 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
   /// V2-3 D10: the tool dock. Its own node being the primary focus means
   /// the page has the keyboard.
   final toolDockFocus = FocusNode(debugLabel: 'tool dock');
+
+  /// V2-3 D4: "Open new tab" of a workspace shown without a tab. A node of
+  /// its own: with no tab at all, the panes' empty state under it holds
+  /// [emptyFocus].
+  final looseFocus = FocusNode(debugLabel: 'open new tab (tools)');
   final sidebarScroll = ScrollController();
 
   late final _tools = ToolActions(ref);
@@ -134,11 +139,14 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     WidgetsBinding.instance
       ..addPostFrameCallback((_) {
         if (!mounted) return;
-        // V2-3 D4: a workspace shown without a tab offers "Open new tab".
-        final empty =
-            ref.read(terminalTabsProvider).tabs.isEmpty ||
-            ref.read(toolDockProvider).loose != null;
-        (empty ? emptyFocus : terminalFocus).requestFocus();
+        // V2-3 D4: a workspace shown without a tab offers its own "Open
+        // new tab".
+        final node = _loose
+            ? looseFocus
+            : ref.read(terminalTabsProvider).tabs.isEmpty
+            ? emptyFocus
+            : terminalFocus;
+        node.requestFocus();
       })
       ..ensureVisualUpdate();
   }
@@ -388,7 +396,8 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     final daemonStrip = ref.read(daemonStateProvider).strip != null;
     final noTab = ref.read(terminalTabsProvider).tabs.isEmpty;
     final regions = [
-      noTab ? emptyFocus : terminalFocus,
+      // V2-3 D4: a workspace shown without a tab covers the panes.
+      _loose ? looseFocus : (noTab ? emptyFocus : terminalFocus),
       if (!noTab) sidebarFocus, // an empty list is no stop (UI §3.6)
       if (signedOut) stripFocus,
       if (restoreStrip) restoreStripFocus,
@@ -938,6 +947,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
     restoreStripFocus.dispose();
     daemonStripFocus.dispose();
     toolDockFocus.dispose();
+    looseFocus.dispose();
     sidebarScroll.dispose();
     super.dispose();
   }
@@ -1125,7 +1135,7 @@ class TerminalWorkspacePageState extends ConsumerState<TerminalWorkspacePage>
             key: const Key('tool.loose'),
             color: ShellxDesktopColors.bgTerminal,
             child: EmptyTerminalState(
-              buttonFocus: emptyFocus,
+              buttonFocus: looseFocus,
               onOpen: () => unawaited(
                 ref.read(sidebarWorkspacesProvider.notifier).openTabIn(ws),
               ),
