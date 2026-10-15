@@ -7,16 +7,25 @@ import 'package:http/http.dart' as http;
 import '../protocol/handshake_payloads.dart';
 import 'models.dart';
 
+/// The header carrying the app's own `x.y.z` to the relay (REST and the
+/// WebSocket upgrade). Informational only: the relay records it per device.
+const String clientVersionHeader = 'X-ShellX-Version';
+
 /// REST client for the relay API (spec section 10.2).
 ///
 /// Every failure is reported as [ApiException]: HTTP errors carry the relay's
 /// `{"error": {"code", "message"}}`; transport failures and requests that
 /// get no response within 20 seconds have status 0 and code `network`.
 final class ShellxApi {
-  ShellxApi({required Uri baseUri, http.Client? httpClient})
+  ShellxApi({required Uri baseUri, http.Client? httpClient, this.clientVersion})
     : _baseUri = baseUri,
       _http = httpClient ?? http.Client(),
       _ownsHttp = httpClient == null;
+
+  /// This app's `x.y.z`, sent as [clientVersionHeader] on every request so
+  /// the relay can record which version each device runs (admin page).
+  /// Null sends nothing.
+  final String? clientVersion;
 
   static const Duration _timeout = Duration(seconds: 20);
 
@@ -262,6 +271,8 @@ final class ShellxApi {
   }) async {
     final request = http.Request(method, _endpoint(path, query));
     request.headers['Accept'] = 'application/json';
+    final version = clientVersion;
+    if (version != null) request.headers[clientVersionHeader] = version;
     if (authenticated) {
       final current = token;
       if (current == null) {

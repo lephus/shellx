@@ -53,9 +53,14 @@ final class _Recorder {
   final FutureOr<http.Response> Function(http.Request request) handler;
   final requests = <http.Request>[];
 
-  ShellxApi api({String base = 'https://relay.shellx.pro', String? token}) {
+  ShellxApi api({
+    String base = 'https://relay.shellx.pro',
+    String? token,
+    String? clientVersion,
+  }) {
     return ShellxApi(
       baseUri: Uri.parse(base),
+      clientVersion: clientVersion,
       httpClient: MockClient((request) async {
         requests.add(request);
         return handler(request);
@@ -521,6 +526,20 @@ void main() {
     test('PushPlatform wire names', () {
       expect(PushPlatform.android.wire, 'android');
       expect(PushPlatform.ios.wire, 'ios');
+    });
+  });
+
+  group('X-ShellX-Version', () {
+    test('is sent on every request when the app gives its version', () async {
+      final recorder = _Recorder((_) => _json(<Object?>[], 200));
+      await recorder.api(token: 'tok', clientVersion: '1.4.2').devices();
+      expect(recorder.last.headers['X-ShellX-Version'], '1.4.2');
+    });
+
+    test('is not sent without a version', () async {
+      final recorder = _Recorder((_) => _json(<Object?>[], 200));
+      await recorder.api(token: 'tok').devices();
+      expect(recorder.last.headers.containsKey('X-ShellX-Version'), isFalse);
     });
   });
 

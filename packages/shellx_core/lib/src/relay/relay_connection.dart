@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import '../api/shellx_api.dart' show clientVersionHeader;
 import 'frames.dart';
 
 /// Minimal WebSocket surface used by [RelayConnection]; faked in tests.
@@ -154,7 +155,9 @@ final class RelayConnection {
     Backoff? backoff,
     Duration pingInterval = const Duration(seconds: 30),
     Duration pongTimeout = const Duration(seconds: 10),
+    String? clientVersion,
   }) : _wsUri = wsUri,
+       _clientVersion = clientVersion,
        _token = token,
        _connector = connector,
        _backoff = backoff ?? Backoff(),
@@ -164,6 +167,9 @@ final class RelayConnection {
   static const Duration connectTimeout = Duration(seconds: 15);
 
   final Uri _wsUri;
+
+  /// Sent as `X-ShellX-Version` on the upgrade (see [clientVersionHeader]).
+  final String? _clientVersion;
   final String? Function() _token;
   final RelaySocketConnector _connector;
   final Backoff _backoff;
@@ -330,7 +336,10 @@ final class RelayConnection {
     // stale-dial wait above already set it).
     _setState(RelayConnectionState.connecting);
     final pending = Future.sync(
-      () => _connector(_wsUri, {'Authorization': 'Bearer $token'}),
+      () => _connector(_wsUri, {
+        'Authorization': 'Bearer $token',
+        clientVersionHeader: ?_clientVersion,
+      }),
     );
     _dialing = pending;
     void clearDialing(Object? _) {

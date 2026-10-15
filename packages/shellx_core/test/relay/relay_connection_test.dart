@@ -151,6 +151,23 @@ void main() {
     });
   });
 
+  test('sends X-ShellX-Version on the upgrade when a version is given', () {
+    fakeAsync((async) {
+      final connector = FakeConnector();
+      RelayConnection(
+        wsUri: _wsUri,
+        token: () => 'tok-123',
+        connector: connector.call,
+        clientVersion: '1.2.3',
+      ).start();
+      async.flushMicrotasks();
+      expect(connector.headers.single, {
+        'Authorization': 'Bearer tok-123',
+        'X-ShellX-Version': '1.2.3',
+      });
+    });
+  });
+
   test('reads the token again on every attempt', () {
     fakeAsync((async) {
       var token = 'first';
