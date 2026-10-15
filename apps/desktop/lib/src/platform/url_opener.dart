@@ -21,6 +21,12 @@ abstract interface class UrlOpener {
   /// builds.
   Future<void> openWebLink(Uri uri);
 
+  /// V2-3 D9: a tool page's `mailto:` or `tel:` link, handed to the
+  /// system's mail or phone app. Throws [ArgumentError] for any other
+  /// scheme, a link of more than 2 048 characters or one with a control
+  /// character, without running a command.
+  Future<void> openMailOrPhone(Uri uri);
+
   /// A10 D7: shows [path] (absolute) selected in Finder / Explorer — a
   /// folder too, so a `.app` bundle is never launched. Never runs the file. Throws [ArgumentError] for a path that is
   /// not absolute or holds a control character.
@@ -44,7 +50,8 @@ abstract interface class UrlOpener {
 ///
 /// Opens only absolute `https` URLs, plus [fullDiskAccessPane] on macOS,
 /// plus `http://localhost:<port>/` through [openLocalPort], plus the
-/// `cursor:` / `vscode:` / `zed:` file URLs [openInEditor] builds; anything else
+/// `cursor:` / `vscode:` / `zed:` file URLs [openInEditor] builds, plus the
+/// `mailto:` / `tel:` links [openMailOrPhone] takes; anything else
 /// throws [ArgumentError] without running a command. Windows'
 /// `url.dll,FileProtocolHandler` runs `file:` and UNC executables, and
 /// macOS `open` opens any app or file (and reads a leading `-` as an
@@ -99,6 +106,22 @@ final class SystemUrlOpener implements UrlOpener {
       await _run('rundll32', ['url.dll,FileProtocolHandler', uri.toString()]);
     } else {
       await _run('/usr/bin/open', [uri.toString()]);
+    }
+  }
+
+  @override
+  Future<void> openMailOrPhone(Uri uri) async {
+    final text = uri.toString();
+    final scheme = uri.scheme.toLowerCase();
+    if ((scheme != 'mailto' && scheme != 'tel') ||
+        text.length > 2048 ||
+        RegExp(r'[\u0000-\u001f\u007f]').hasMatch(text)) {
+      throw ArgumentError.value(scheme, 'uri', 'Only mailto: and tel: open');
+    }
+    if (_isWindows) {
+      await _run('rundll32', ['url.dll,FileProtocolHandler', text]);
+    } else {
+      await _run('/usr/bin/open', [text]);
     }
   }
 
