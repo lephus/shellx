@@ -42,7 +42,7 @@ Uint8List _body(List<String> ids, {List<String> off = const []}) =>
 void main() {
   late SessionRig rig;
   late TestListener listener;
-  late MuxServer server;
+  MuxServer? server;
   late ToolProxy proxy;
   late List<ToolMessage> toPhone;
 
@@ -56,7 +56,8 @@ void main() {
 
   tearDown(() async {
     proxy.close();
-    await server.close();
+    await server?.close();
+    server = null;
   });
 
   List<String> listed() {
@@ -73,7 +74,7 @@ void main() {
       self: _self,
       onQuit: () async {},
     )..tools = proxy;
-    server.serve(listener);
+    server!.serve(listener);
     proxy.handle(_phone, const ToolList());
     expect(toPhone.whereType<ToolListResult>().single.available, isFalse);
 
