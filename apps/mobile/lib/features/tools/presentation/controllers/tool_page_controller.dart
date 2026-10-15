@@ -38,6 +38,11 @@ class ToolPageController extends Controller {
   int _passes = 0;
   bool _startedSincePass = false;
 
+  /// I1: the port of the first load. Once a load came on another port (an E13 resume, E3) the web
+  /// view's history holds pages of two ports.
+  int? _historyPort;
+  bool _historySplit = false;
+
   final Signal<ToolPhase> _phase = signal(ToolPhase.opening);
   final Signal<int?> _alias = signal(null);
   final Signal<int> _progress = signal(0);
@@ -91,6 +96,8 @@ class ToolPageController extends Controller {
     switch (event) {
       case ToolLoad(:final url):
         _forgetPassed();
+        _historyPort ??= url.port;
+        if (url.port != _historyPort) _historySplit = true;
         unawaited(_engine?.load(url));
       case ToolReload():
         _forgetPassed();
@@ -176,11 +183,21 @@ class ToolPageController extends Controller {
   void home() => _page?.home();
 
   /// Android back: a page back in the web view first; false when there is none (the page closes).
+  ///
+  /// I1: only while the page is shown and its history is of one port. Chromium's web view never hands
+  /// back or forward to the navigation policy, so going back through a history that holds pages of
+  /// an earlier port would load them from whatever listens there now, with the gate cookies of every
+  /// port (cookies ignore ports); and behind a cover each press would walk the hidden history.
   Future<bool> back() async {
     final engine = _engine;
-    if (engine == null || !await engine.canGoBack()) return false;
+    if (engine == null || !_backInPage || !await engine.canGoBack()) return false;
     await engine.goBack();
     return true;
+  }
+
+  bool get _backInPage {
+    final phase = _phase.peek();
+    return !_historySplit && (phase == ToolPhase.ready || phase == ToolPhase.reconnecting);
   }
 
   /// E13: served only while the app is in the foreground (Apple TN2277); back in it, served again
