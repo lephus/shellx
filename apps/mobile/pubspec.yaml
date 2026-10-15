@@ -77,7 +77,11 @@ dev_dependencies:
   fake_async: ^1.3.3
   flutter_lints: ^6.0.0
   http: ^1.6.0
+  # V2-4 E12: the tool page's web view engine is tested against a fake web view platform. Both come
+  # with webview_flutter (their versions follow its pin); declared like the shared_preferences one.
+  plugin_platform_interface: ^2.1.8
   shared_preferences_platform_interface: ^2.4.1
+  webview_flutter_platform_interface: ^2.15.1
 
   # Code generators, pinned exactly: their output is committed and CI checks it is fresh.
   auto_route_generator: 10.5.0
