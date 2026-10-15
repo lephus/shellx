@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'package:shellx_agent/shellx_agent.dart';
+import 'package:shellx_ai/remote.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:test/test.dart';
 
@@ -7,18 +9,31 @@ import '../support/ai_rig.dart';
 
 const _phone = 'b0000000-0000-4000-8000-000000000002';
 
-/// One of each V2-2b request, with rids 1 to 10.
-List<AiMessage> _requests() => [
-  const AiConfigGet(sid: 'ep.-1', rid: 1),
-  AiConfigSet(sid: 'ep.-1', rid: 2, body: Uint8List.fromList([0x7B, 0x7D])),
-  AiBlob(rid: 3, blob: 1, part: 0, parts: 1, data: Uint8List(4)),
-  const AiFiles(sid: 'ep.-1', rid: 4, query: 'a'),
-  const AiItemPart(sid: 'ep.-1', rid: 5, index: 0, part: 0),
-  const AiHistory(sid: 'ep.-1', rid: 6),
-  const AiFolder(sid: 'ep.-1', rid: 7, folder: 'ws:a'),
-  const AiChanges(sid: 'ep.-1', rid: 8),
-  const AiDiff(sid: 'ep.-1', rid: 9, path: 'a.ts'),
-  const AiRevert(sid: 'ep.-1', rid: 10),
+/// One of each V2-2b request (rids 1 to 10), with the feature whose task
+/// makes the hub take it.
+List<(int, AiMessage, String)> _requests() => [
+  (1, const AiConfigGet(sid: 'ep.-1', rid: 1), AiFeature.config),
+  (
+    2,
+    AiConfigSet(sid: 'ep.-1', rid: 2, body: Uint8List.fromList([0x7B, 0x7D])),
+    AiFeature.config,
+  ),
+  (
+    3,
+    AiBlob(rid: 3, blob: 1, part: 0, parts: 1, data: Uint8List(4)),
+    AiFeature.blob,
+  ),
+  (4, const AiFiles(sid: 'ep.-1', rid: 4, query: 'a'), AiFeature.files),
+  (
+    5,
+    const AiItemPart(sid: 'ep.-1', rid: 5, index: 0, part: 0),
+    AiFeature.item,
+  ),
+  (6, const AiHistory(sid: 'ep.-1', rid: 6), AiFeature.history),
+  (7, const AiFolder(sid: 'ep.-1', rid: 7, folder: 'ws:a'), AiFeature.folder),
+  (8, const AiChanges(sid: 'ep.-1', rid: 8), AiFeature.changes),
+  (9, const AiDiff(sid: 'ep.-1', rid: 9, path: 'a.ts'), AiFeature.changes),
+  (10, const AiRevert(sid: 'ep.-1', rid: 10), AiFeature.revert),
 ];
 
 /// What [map] decodes to: an `ai.*` kind this version does not know is an
@@ -26,21 +41,27 @@ List<AiMessage> _requests() => [
 AiMessage _read(Map<String, Object?> map) =>
     decodeBatch(encodeCbor([map])).single as AiMessage;
 
-/// V2-2b B1, B2, B4 (R4): until its feature lands, a V2-2b request gets its
-/// one answer, `refused`; so does a newer phone's request (an [AiRaw] with a
-/// `rid`). None of them escapes the request budget.
+/// V2-2b B1, B2, B4 (R4): until its feature lands (its word in
+/// [AiPhoneHub.offered]), a V2-2b request gets its one answer, `refused`; so
+/// does a newer phone's request (an [AiRaw] with a `rid`). None of them
+/// escapes the request budget.
 void main() {
-  test('every V2-2b request is answered refused, once, with its rid', () {
+  test('a V2-2b request whose feature the hub does not offer yet is answered '
+      'refused, once, with its rid', () {
     final rig = HubRig()..source.add(-1);
-    for (final m in _requests()) {
-      rig.hub.handle(_phone, m);
+    final waiting = [
+      for (final (rid, message, feature) in _requests())
+        if (!AiPhoneHub.offered.contains(feature)) (rid, message),
+    ];
+    for (final (_, message) in waiting) {
+      rig.hub.handle(_phone, message);
     }
     expect(
       [
         for (final r in rig.to(_phone).whereType<AiResult>())
           (r.rid, r.ok, r.code),
       ],
-      [for (var rid = 1; rid <= 10; rid++) (rid, false, 'refused')],
+      [for (final (rid, _) in waiting) (rid, false, 'refused')],
     );
   });
 

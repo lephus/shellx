@@ -188,3 +188,15 @@ List<int> jInts(Map<String, Object?> m, String key) {
   final v = m[key];
   return v is List ? [for (final e in v) e is int ? e : -1] : const [];
 }
+
+/// V2-2b: the strings of list [key]; anything else in it is skipped, and a
+/// key that is no list reads as empty.
+List<String> jStrings(Map<String, Object?> m, String key) {
+  final v = m[key];
+  return v is List
+      ? [
+          for (final e in v)
+            if (e is String) e,
+        ]
+      : const [];
+}

@@ -29,11 +29,13 @@ final class SessionRouter implements AgentSessions {
     required bool Function() desktopSharing,
     AiEndpoint? ai,
     ToolEndpoint? tools,
+    int aiProtocol = kAiProtocol,
   }) : _shells = shells,
        _desktop = desktop,
        _desktopSharing = desktopSharing,
        _ai = ai,
-       _tools = tools {
+       _tools = tools,
+       _aiProtocol = aiProtocol {
     shells.receivesDriver = _receivesDriver;
     _subscriptions.addAll([
       shells.outbound.listen(_outbound.add),
@@ -52,6 +54,10 @@ final class SessionRouter implements AgentSessions {
   /// V2-4 E5: where `tool.*` messages go; null: this agent has no tools for
   /// phones (they are ignored, `session.list.result` carries no `tools`).
   final ToolEndpoint? _tools;
+
+  /// V2-2b B1: the `ai` this router reports with an endpoint — the
+  /// [kAiProtocol] of this process; a test plays an older desktop with 1.
+  final int _aiProtocol;
 
   final _subscriptions = <StreamSubscription<Object?>>[];
 
@@ -97,7 +103,7 @@ final class SessionRouter implements AgentSessions {
             desktopSharing: desktop ? _desktopSharing() : null,
             // V2-2 D3: only to a phone that knows `desktop` (a new decoder);
             // an older one skips the key anyway.
-            ai: desktop && _ai != null ? kAiProtocol : null,
+            ai: desktop && _ai != null ? _aiProtocol : null,
             // V2-4 E6: and only while this process serves tools.
             tools: desktop && (_tools?.serving ?? false) ? kToolProtocol : null,
           ),
