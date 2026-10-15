@@ -1,0 +1,177 @@
+import 'package:flutter/gestures.dart' show kSecondaryButton;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
+import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
+import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
+import 'package:shellx_desktop/src/tools/tool_dock.dart';
+import 'package:shellx_desktop/src/tools/tool_registry.dart';
+import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
+import 'package:shellx_desktop/src/ui/terminal/workspace_header.dart';
+import 'package:shellx_desktop/src/ui/window_router.dart';
+
+import '../../support/config_workspace.dart';
+import '../../support/fake_local_sessions.dart';
+import '../../support/tool_harness.dart';
+
+void main() {
+  late ToolRig rig;
+  setUp(() => rig = ToolRig());
+
+  testWidgets('each workspace\'s tools sit under it in a foldable group; '
+      '"· on phone too"; the row on show is lit (D21)', (t) async {
+    await rig.pump(t);
+    final a = rig.add(kDefaultWorkspaceId, 'localhost:4000', name: 'Board');
+    rig.container
+        .read(toolRegistryProvider.notifier)
+        .update(a.copyWith(phone: true));
+    final ws2 = rig.container
+        .read(sidebarWorkspacesProvider.notifier)
+        .createFor(name: 'Shop');
+    final b = rig.add(ws2, 'https://grafana.example.com', name: 'Grafana');
+    await t.pumpAndSettle();
+    expect(find.byKey(Key('sidebar.tool.${a.id}')), findsOneWidget);
+    expect(find.byKey(Key('sidebar.tool.${b.id}')), findsOneWidget);
+    expect(find.text('localhost:4000 · on phone too'), findsOneWidget);
+    expect(find.text('grafana.example.com:443'), findsOneWidget);
+    await t.tap(find.byKey(const Key('sidebar.tools.$kDefaultWorkspaceId')));
+    await t.pumpAndSettle();
+    expect(find.byKey(Key('sidebar.tool.${a.id}')), findsNothing);
+    await t.tap(find.byKey(const Key('sidebar.tools.$kDefaultWorkspaceId')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(Key('sidebar.tool.${a.id}')));
+    await t.pumpAndSettle();
+    expect(
+      find.ancestor(
+        of: find.byKey(Key('sidebar.tool.${a.id}')),
+        matching: find.byWidgetPredicate(
+          (w) => w is Semantics && w.properties.selected == true,
+        ),
+      ),
+      findsOneWidget,
+    );
+    await disposeWorkspace(t, rig.container);
+  });
+
+  testWidgets('right-click: Delete asks, then the tool, its chip and its '
+      'page go (D21, D23)', (t) async {
+    await rig.pump(t);
+    final a = rig.add(kDefaultWorkspaceId, 'localhost:4000', name: 'Board');
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(Key('sidebar.tool.${a.id}')));
+    await t.pumpAndSettle();
+    await t.tap(
+      find.byKey(Key('sidebar.tool.${a.id}')),
+      buttons: kSecondaryButton,
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('tool.row.menu.delete')));
+    await t.pumpAndSettle();
+    final confirm = rig.container.read(windowRouterProvider).confirm!;
+    expect(
+      confirm.title,
+      'Delete the tool "Board"? Its page closes. Its web data stays.',
+    );
+    confirm.complete(true);
+    await t.pumpAndSettle();
+    expect(rig.container.read(toolRegistryProvider), isEmpty);
+    expect(rig.engines[a.id]!.disposed, isTrue);
+    expect(
+      rig.container.read(toolDockProvider).of(kDefaultWorkspaceId).open,
+      isFalse,
+    );
+    await disposeWorkspace(t, rig.container);
+  });
+
+  testWidgets('"Add tool" sits beside "New AI session" at the foot (D21)', (
+    t,
+  ) async {
+    await rig.pump(t);
+    final ai = t.getRect(find.byKey(const Key('sidebar.newAi')));
+    final add = t.getRect(find.byKey(const Key('sidebar.addTool')));
+    expect(add.top, ai.top);
+    expect(add.left, greaterThan(ai.left));
+    await disposeWorkspace(t, rig.container);
+  });
+
+  testWidgets('criterion 1: "Add tool", a suggestion, Add — the dock is '
+      'open on the page in three clicks (D12, D21)', (t) async {
+    await rig.pump(t);
+    rig.probe.ports[7] = {5173};
+    rig.probe.table[7] = (parent: 1, name: 'vite');
+    final local =
+        rig.container.read(localSessionsProvider) as FakeLocalSessions;
+    final session = rig.container.read(terminalTabsProvider).tabs.single.id;
+    local.replace(local.summary(session, ports: [5173]));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('sidebar.addTool')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('tool.suggestion.5173')));
+    await t.pump();
+    await t.tap(find.byKey(const Key('tool.dialog.save')));
+    await t.pumpAndSettle();
+    final tool = rig.container.read(toolRegistryProvider).single;
+    expect(find.byKey(const ValueKey('tool.dockSlot')), findsOneWidget);
+    expect(rig.engines[tool.id]!.loads, [Uri.parse('http://localhost:5173/')]);
+    await disposeWorkspace(t, rig.container);
+  });
+
+  testWidgets('tools that open in the browser show ↗ on their row (D20)', (
+    t,
+  ) async {
+    await rig.pump(t, config: 'tool-embed = off\n');
+    final tool = rig.add(kDefaultWorkspaceId, 'localhost:1');
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('sidebar.tool.browserMark')), findsOneWidget);
+    await t.tap(find.byKey(Key('sidebar.tool.${tool.id}')));
+    await t.pumpAndSettle();
+    expect(rig.harness.urlOpener.webLinks, [Uri.parse('http://localhost:1/')]);
+    await disposeWorkspace(t, rig.container);
+  });
+
+  testWidgets('the list\'s arrows end a workspace shown without a tab when '
+      'they choose a tab, even the one already selected — not on a header; '
+      'tool rows are no arrow-key stop (R14, R11)', (t) async {
+    await rig.pump(t);
+    final page = t.state<TerminalWorkspacePageState>(
+      find.byType(TerminalWorkspacePage),
+    );
+    final underneath = rig.container.read(terminalTabsProvider).selectedId!;
+    final ws = rig.container
+        .read(sidebarWorkspacesProvider.notifier)
+        .createFor(name: 'B');
+    final tool = rig.add(ws, 'localhost:1');
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(Key('sidebar.tool.${tool.id}')));
+    await t.pumpAndSettle();
+    expect(rig.container.read(toolDockProvider).loose, ws);
+    expect(rig.container.read(terminalTabsProvider).selectedId, underneath);
+
+    // The list's keyboard, its cursor on the tab selected underneath.
+    page.sidebarFocus.requestFocus();
+    await t.pump();
+    final cursorOnB = find.byWidgetPredicate(
+      (w) => w is WorkspaceHeader && w.focused && w.workspaceId == ws,
+    );
+
+    // ↓ onto the other workspace's header chooses no tab.
+    await t.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await t.pump();
+    expect(cursorOnB, findsOneWidget);
+    expect(rig.container.read(toolDockProvider).loose, ws);
+    // ↓ again: its tool row is no stop, so the cursor stays on the header.
+    await t.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await t.pump();
+    expect(cursorOnB, findsOneWidget);
+    expect(rig.container.read(toolDockProvider).loose, ws);
+    // ↑ chooses the tab selected underneath. Selecting it again changes
+    // nothing in the tabs, so the dock's own listener never sees it.
+    await t.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await t.pump();
+    expect(cursorOnB, findsNothing);
+    expect(rig.container.read(terminalTabsProvider).selectedId, underneath);
+    expect(rig.container.read(toolDockProvider).loose, isNull);
+    await disposeWorkspace(t, rig.container);
+  });
+}
