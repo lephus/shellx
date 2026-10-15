@@ -383,18 +383,29 @@ void main() {
     expect(page().closes, 0);
   });
 
-  testWidgets('back leaves the page while a cover hides it: the hidden history is not walked (I1)', (tester) async {
-    await open(tester);
-    await shown(tester);
-    page().setPhase(ToolPhase.disabled);
-    await tester.pump();
-    engine.canGoBackValue = true;
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(engine.goBacks, 0);
-    expect(find.text('Bảng việc'), findsNothing);
-    expect(page().closes, 1);
-  });
+  for (final phase in [
+    ToolPhase.opening,
+    ToolPhase.busy,
+    ToolPhase.refused,
+    ToolPhase.disabled,
+    ToolPhase.gone,
+    ToolPhase.unavailable,
+  ]) {
+    testWidgets('back leaves the page while a ${phase.name} cover hides it: the hidden history is not walked (I1)', (
+      tester,
+    ) async {
+      await open(tester);
+      await shown(tester);
+      page().setPhase(phase);
+      await tester.pump();
+      engine.canGoBackValue = true;
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(engine.goBacks, 0);
+      expect(find.text('Bảng việc'), findsNothing);
+      expect(page().closes, 1);
+    });
+  }
 
   testWidgets('back leaves the page for good once a load came on another port (I1)', (tester) async {
     await open(tester);
