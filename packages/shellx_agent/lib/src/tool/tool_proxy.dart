@@ -159,11 +159,18 @@ final class ToolProxy implements ToolEndpoint {
 
   void _sendListing(_Phone phone) {
     final catalog = _catalog;
+    final available = catalog != null;
     final body = catalog?.listingBody() ?? emptyToolListingBody;
     final listed = phone.listed;
-    if (listed != null && _same(listed, body)) return;
-    phone.listed = body;
-    _emit(phone, ToolListResult(available: catalog != null, body: body));
+    // An empty list has the bytes of "no list yet": only `available` tells
+    // them apart.
+    if (listed != null &&
+        listed.available == available &&
+        _same(listed.body, body)) {
+      return;
+    }
+    phone.listed = (available: available, body: body);
+    _emit(phone, ToolListResult(available: available, body: body));
   }
 
   static bool _same(Uint8List a, Uint8List b) {
@@ -214,6 +221,9 @@ final class ToolProxy implements ToolEndpoint {
     final alias = request.alias;
     if (!isToolMethod(request.method) ||
         !isToolTarget(request.target) ||
+        // Never `//` (an authority), also as sent: building the URL removes
+        // dot segments, and "/a/../..//host" becomes "//host".
+        toolUri(tool, request.target).path.startsWith('//') ||
         !isToolHead(request.head) ||
         (alias != null && (alias < 1 || alias > 65535)) ||
         (request.ws && request.method.toUpperCase() != 'GET')) {
@@ -267,7 +277,9 @@ final class _Phone {
   final String id;
   final ToolProxy proxy;
   bool listing = false;
-  Uint8List? listed;
+
+  /// The list it was last sent (null: send it even when unchanged).
+  ({bool available, Uint8List body})? listed;
   bool live = true;
 
   /// Desktop → phone bytes in flight over all its streams (E7).
@@ -346,7 +358,16 @@ sealed class _Stream {
   bool acked(int total);
 
   void send(ToolMessage message) {
-    if (window.inFlight == 0) _sinceAck.reset();
+    // A stall is timed from the first piece in flight since everything was
+    // acknowledged, not from an ack long before it (SSE, an idle WebSocket).
+    // The outlets count a piece in [window] before they hand it here, so
+    // nothing was in flight before it when it is all that is.
+    final piece = switch (message) {
+      ToolData(:final data) => data.length,
+      ToolWsMessage(:final data) => toolWsPieceCost(data.length),
+      _ => 0,
+    };
+    if (window.inFlight == piece) _sinceAck.reset();
     proxy._emit(phone, message);
   }
 
