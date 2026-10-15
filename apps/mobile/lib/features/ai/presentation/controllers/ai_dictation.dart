@@ -15,8 +15,11 @@ import 'package:shellx_mobile/features/voice/presentation/controllers/voice_comp
 /// stops when the page says so: the session is not live or closed, the page leaves, the app is not in front.
 ///
 /// One listen at a time. A listen is "active" from [SpeechInput.start] until its final result, an error or [stop];
-/// what any other listen reports is ignored, so a late result never reaches a field it was not meant for. Nothing
-/// heard is ever logged.
+/// what any other listen reports is ignored, so a late result never reaches a field it was not meant for.
+///
+/// A user edit ends the listen (F41): the dictation remembers the text it last showed, and a field that differs from
+/// it when the listen next reports was typed in. The listen is cancelled, the field stays exactly as the user left it,
+/// and nothing that listen hears afterwards (words, "gửi", "huỷ") touches or sends it. Nothing heard is ever logged.
 @injectable
 class AiDictation {
   AiDictation(this._speech, this._settings) {
@@ -37,6 +40,10 @@ class AiDictation {
 
   /// The field's text when the listen started (trimmed); what is heard goes after it.
   String _committed = '';
+
+  /// The field's text as this listen last left it (as it was when the listen began, untrimmed): a field that differs
+  /// was typed in by the user (F41).
+  String _shown = '';
   String? _localeId;
   bool _active = false;
   bool _starting = false;
@@ -46,7 +53,8 @@ class AiDictation {
   /// This listen has shown it started (status, partial or final): an earlier listen's late `done` must not end it.
   bool _started = false;
 
-  /// [stop] came while a listen was being set up (permission, locale): it does not start. Cleared by [toggle].
+  /// [stop] came while a listen was being set up (permission, locale): it does not start, but what the system answered
+  /// (a refusal, a language the phone lacks) is still said (F40). Cleared by [toggle].
   bool _stopped = false;
   bool _disposed = false;
 
@@ -99,19 +107,23 @@ class AiDictation {
     try {
       _issue.value = null;
       final permission = await _speech.ensurePermission();
-      if (_disposed || _stopped) return;
+      if (_disposed) return;
       if (permission != SpeechPermission.granted) {
         _issue.value = permission == SpeechPermission.denied ? VoiceIssue.noPermission : VoiceIssue.unsupported;
         return;
       }
       final localeId = await _speech.resolveLocale(_locale.peek());
-      if (_disposed || _stopped) return;
+      if (_disposed) return;
       if (localeId == null) {
         _issue.value = VoiceIssue.localeUnavailable;
         return;
       }
+      // F40: the system's prompt takes the app out of the front, and the page stops the dictation then. That stop ends
+      // the setup only here, after what was answered (a refusal, a language the phone lacks) has been said above.
+      if (_stopped) return;
       _localeId = localeId;
       _committed = _text!.text.trim();
+      _shown = _text!.text;
       _heard = false;
       _started = false;
       _onDeviceAttempt = _speech.tryOnDeviceFirst;
@@ -125,6 +137,12 @@ class AiDictation {
 
   void _onEvent(SpeechEvent event) {
     if (_disposed || !_active) return;
+    // F41: a field that is not what this listen last showed was typed in. The listen is over, whatever it reports, and
+    // the field stays as the user left it.
+    if (_text?.text != _shown) {
+      _cancelListen();
+      return;
+    }
     switch (event) {
       case SpeechPartial(:final text):
         _heard = true;
@@ -197,6 +215,7 @@ class AiDictation {
   void _show(String value) {
     final text = _text;
     if (text == null) return;
+    _shown = value;
     text.value = TextEditingValue(
       text: value,
       selection: TextSelection.collapsed(offset: value.length),
