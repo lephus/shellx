@@ -25,3 +25,17 @@
 - **R21 — one machine plays both sides in tests:** the tool listens on [::1] and the proxy reaches [::1] only (`ToolProxy(connect: …)`), so the phone's server can hold 127.0.0.1 on the tool's own port (same-port mode, E2); alias mode is tested with the tool on 127.0.0.1. *Cost if wrong:* none (production uses `connectToolPort`).
 - **R22 — Settings › "Xóa dữ liệu của tool"** asks first, then clears the web view's cookies, cache and local storage (the app's web views are only tool pages). The new row moves "Đăng xuất" below the fold of `test/app_test.dart`'s phone: that test now scrolls rows until they can be tapped (`.hitTestable()`). *Cost if wrong:* none.
 - **R23 — the tool page is one page at a time:** a `ToolRoute` is pushed over the machine page, and leaving it closes its servers, so two machines' tools never compete for one port in practice (§7). *Cost if wrong:* opening a second machine's tool on the same port while the first page is still open would take another port (E3) instead of closing the first.
+
+## Execution rulings
+
+> **Ruling (top-level, CSP):** the phone's loopback tool server adds **one** `Content-Security-Policy` header to **every** response it sends. That covers forwarded tool responses, the 101 it completes, and its own 303/403/413/502/503/504 answers and refusals. It never replaces or merges a tool's own CSP header; browsers enforce each policy. Value:
+> `default-src 'self' <S> https: wss: data: blob: 'unsafe-inline' 'unsafe-eval'; form-action 'self' <H> https:`
+> Take every port Q this server instance listens on for the open tool page: the tool's own port or its E3 alias P′, plus E4's other served tools. In ascending order, S lists `http://localhost:Q ws://localhost:Q` and H lists `http://localhost:Q`, space-separated. Never add `upgrade-insecure-requests`.
+> — **why:** cookies ignore ports. The webview therefore sends the gate cookie `__shellx_<P>` and the tool's own cookies to any `localhost` port a page requests. An app on the phone listening on that port gets the 128-bit secret and passes E11's gate, which spec §9 Review Focus 5 forbids. In E3 alias mode, the app holding P is exactly such an app. The policy blocks every subresource, fetch, WebSocket, frame, worker and form request to a localhost port this server does not serve. E12's navigation policy already keeps top-level navigations to other origins out of the webview. An `https:`/`wss:` request to localhost fails certificate validation before any cookie is sent. `'unsafe-inline' 'unsafe-eval'` keep dev servers working (Vite's inline preamble, Next.js eval source maps); a tool's own stricter CSP still applies on top.
+> — **tests:**
+>   - The builder: ports [8000, 5173] → the exact string, ascending.
+>   - Every response path carries exactly one ShellX CSP header, including a forwarded response that has its own CSP header (both present).
+>   - In alias mode the header lists P′ and not P.
+> — **cost if wrong:** on the phone, a tool page cannot load plain-`http` resources from other hosts, nor localhost ports the phone does not serve. In alias mode that includes the original port P; the spec's E3 banner already says those links may not work. A tool enabled while a page is open is reachable from it only after a reload. Tools that need such loads are used on the computer.
+
+Made by the top-level controller on 2026-10-15 for Task 9; built as `toolContentSecurityPolicy` plus one header on every response of `ToolSession`.
