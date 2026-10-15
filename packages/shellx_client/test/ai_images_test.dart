@@ -188,6 +188,96 @@ void main() {
     });
   });
 
+  test('a channel lost while the parts wait out busy ends the upload: no part '
+      'is sent on the new channel (F32, R23)', () {
+    fakeAsync((async) {
+      final desktop = ScriptedDesktop(features: {AiFeature.blob}); // holds
+      final h = Harness(async, keys, ai: desktop);
+      final ai = readyAi(h);
+      Object? error;
+      ai
+          .uploadImage(
+            ai.newBlobId(),
+            'image/png',
+            _bytes(6 * kAiMaxBlobPartBytes),
+          )
+          .then(
+            (_) {},
+            onError: (Object e) {
+              error = e;
+            },
+          );
+      settle(async);
+      final inFlight = desktop.got<AiBlob>();
+      expect(inFlight, hasLength(4), reason: 'four in flight');
+      // The burst is spent: all four get busy and wait 500 ms to ask again.
+      for (final part in inFlight) {
+        desktop.say(AiResult(rid: part.rid, ok: false, code: 'busy'));
+      }
+      settle(async); // the answers come; the four wait
+      // The channel goes within that wait, with no request in flight to fail,
+      // and a new one is there before they ask again; the computer dropped
+      // every part when the phone left. (A relay outage would not do here: the
+      // relay reconnects after 500 to 1000 ms, never within the wait, and the
+      // parts would fail to connect by themselves.)
+      h.run(h.phoneMachine.dropChannel());
+      expect(error, isNull, reason: 'nothing was in flight to fail');
+      settle(async, const Duration(milliseconds: 200));
+      expect(
+        h.phoneMachine.state,
+        isA<MachineReady>(),
+        reason: 'the channel is back before the parts ask again',
+      );
+      settle(async, const Duration(seconds: 2));
+      expect(
+        error,
+        isA<MachineConnectionException>().having(
+          (e) => e.failure,
+          'failure',
+          MachineConnectionFailure.agentOffline,
+        ),
+      );
+      expect(
+        desktop.got<AiBlob>(),
+        hasLength(4),
+        reason: 'none after the loss',
+      );
+      expect(h.phoneMachine.state, isA<MachineReady>());
+    });
+  });
+
+  test('a refusal while the other parts wait out busy: none of them is sent '
+      'again, no new one begins (F32)', () {
+    fakeAsync((async) {
+      final desktop = ScriptedDesktop(features: {AiFeature.blob}); // holds
+      final h = Harness(async, keys, ai: desktop);
+      final ai = readyAi(h);
+      Object? error;
+      ai
+          .uploadImage(
+            ai.newBlobId(),
+            'image/png',
+            _bytes(6 * kAiMaxBlobPartBytes),
+          )
+          .then(
+            (_) {},
+            onError: (Object e) {
+              error = e;
+            },
+          );
+      settle(async);
+      final inFlight = desktop.got<AiBlob>();
+      expect(inFlight, hasLength(4), reason: 'four in flight');
+      for (final k in [0, 2, 3]) {
+        desktop.say(AiResult(rid: inFlight[k].rid, ok: false, code: 'busy'));
+      }
+      desktop.say(AiResult(rid: inFlight[1].rid, ok: false, code: 'too_large'));
+      settle(async, const Duration(seconds: 2));
+      expect(error, _aiError('too_large'));
+      expect(desktop.got<AiBlob>(), hasLength(4), reason: 'none sent again');
+    });
+  });
+
   test('a prompt names its images; none, or too many, or too big, sends '
       'nothing', () {
     fakeAsync((async) {
@@ -250,5 +340,23 @@ void main() {
       final ids = [for (var i = 0; i < 5; i++) ai.newBlobId()];
       expect(ids.toSet(), hasLength(5));
     });
+  });
+
+  test('blob numbers follow each other from a start of their own: a run that '
+      'begins within the 2 minutes the computer keeps an image does not '
+      'reuse its numbers (F33)', () {
+    MachineAi bare() => MachineAi(
+      send: (_) => false,
+      connect: () async {},
+      timeout: const Duration(seconds: 1),
+    );
+    final ai = bare();
+    final ids = [for (var i = 0; i < 5; i++) ai.newBlobId()];
+    expect([
+      for (var i = 1; i < ids.length; i++) ids[i] - ids[i - 1],
+    ], everyElement(1));
+    expect(ids.first, inInclusiveRange(1, (1 << 30) - 1));
+    // Another run starts elsewhere (a collision: 2^-30).
+    expect(bare().newBlobId(), isNot(ids.first));
   });
 }
