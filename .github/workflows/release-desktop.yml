@@ -70,8 +70,17 @@ jobs:
     environment: release
     env:
       DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
-      HAS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 != '' && secrets.MACOS_CERTIFICATE_PASSWORD != '' }}
-      HAS_NOTARY_LOGIN: ${{ secrets.APPLE_API_KEY_P8_BASE64 != '' || secrets.APPLE_APP_SPECIFIC_PASSWORD != '' }}
+      # Only whether each one is set, never a value. A secret of the release Environment, or a
+      # repository/organization secret, all show up here; a *variable* of the same name does not.
+      SECRET_MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 != '' }}
+      SECRET_MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD != '' }}
+      SECRET_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD != '' }}
+      SECRET_APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 != '' }}
+      SECRET_APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID != '' }}
+      SECRET_APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID != '' }}
+      VARIABLE_MACOS_CERTIFICATE_P12_BASE64: ${{ vars.MACOS_CERTIFICATE_P12_BASE64 != '' }}
+      VARIABLE_MACOS_CERTIFICATE_PASSWORD: ${{ vars.MACOS_CERTIFICATE_PASSWORD != '' }}
+      VARIABLE_APPLE_APP_SPECIFIC_PASSWORD: ${{ vars.APPLE_APP_SPECIFIC_PASSWORD != '' }}
     steps:
       - name: Check the macOS signing secrets of the release Environment
         run: |
@@ -79,10 +88,37 @@ jobs:
             echo "Dry run: no secrets needed"
             exit 0
           fi
-          if [[ "$HAS_CERTIFICATE" != 'true' || "$HAS_NOTARY_LOGIN" != 'true' ]]; then
-            echo "::error::the GitHub Environment 'release' lacks MACOS_CERTIFICATE_P12_BASE64 / MACOS_CERTIFICATE_PASSWORD (Developer ID of team $APPLE_TEAM_ID) or APPLE_APP_SPECIFIC_PASSWORD; see release/README.md, 'GitHub secrets'. Nothing was built."
+          missing=()
+          for name in MACOS_CERTIFICATE_P12_BASE64 MACOS_CERTIFICATE_PASSWORD APPLE_APP_SPECIFIC_PASSWORD \
+            APPLE_API_KEY_P8_BASE64 APPLE_API_KEY_ID APPLE_API_ISSUER_ID; do
+            secret="SECRET_$name"
+            variable="VARIABLE_$name"
+            if [[ "${!secret:-}" == 'true' ]]; then
+              echo "  $name: set"
+            elif [[ "${!variable:-}" == 'true' ]]; then
+              echo "::error::$name is a *variable*, not a secret: delete it under Variables and add it again under Secrets (Settings → Environments → release)"
+              missing+=("$name")
+            else
+              echo "  $name: missing"
+              missing+=("$name")
+            fi
+          done
+          needed=(MACOS_CERTIFICATE_P12_BASE64 MACOS_CERTIFICATE_PASSWORD)
+          # Notarization: the App Store Connect API key when its file is set, else the app-specific password.
+          if [[ "$SECRET_APPLE_API_KEY_P8_BASE64" == 'true' ]]; then
+            needed+=(APPLE_API_KEY_ID APPLE_API_ISSUER_ID)
+          else
+            needed+=(APPLE_APP_SPECIFIC_PASSWORD)
+          fi
+          lacking=()
+          for name in "${needed[@]}"; do
+            if [[ " ${missing[*]} " == *" $name "* ]]; then lacking+=("$name"); fi
+          done
+          if (( ${#lacking[@]} > 0 )); then
+            echo "::error::a real release needs these secrets in the GitHub Environment 'release' (Settings → Environments → release → Environment secrets; Developer ID of team $APPLE_TEAM_ID): ${lacking[*]}. See release/README.md, 'GitHub secrets'. Nothing was built."
             exit 1
           fi
+          echo "All macOS signing secrets are present."
 
   macos:
     name: macOS dmg
