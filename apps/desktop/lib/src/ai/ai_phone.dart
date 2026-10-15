@@ -312,13 +312,15 @@ final class _RuntimeControl implements AiControl {
   /// V2-2b B11: a choice from the phone, as the composer's chip makes it —
   /// sent to the agent, then remembered for its next sessions. The hub
   /// checked it against what the session offers; checked again here, so no
-  /// way round the hub sets a mode acting without asking: that is made on the
-  /// computer, after its question (R16, V2-1 R6).
+  /// way round the hub sets a mode acting without asking, nor any value of an
+  /// option named like one (a select too: `yolo` with `on` / `off`): that is
+  /// made on the computer, after its question (R16, V2-1 R6).
   @override
   Future<void> setConfig(String id, Object value) async {
     if (aiTurnsOnNoApproval(configId: id, value: value)) {
       throw const AiRefused('on_computer');
     }
+    if (aiIsNoApprovalMode(id)) throw const AiRefused('on_computer');
     await _runtime.setConfig(id, value);
     await rememberConfig(
       _ref.read(settingsStoreProvider),

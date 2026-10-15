@@ -71,8 +71,8 @@ abstract interface class AiControl {
   /// a switch) as the computer's chip does: sent to the agent, then
   /// remembered for its next sessions. The hub checked it against what the
   /// session offers; throws [AiRefused] (`on_computer`) for a value acting
-  /// without asking (checked again), and what the agent answered when it
-  /// said no.
+  /// without asking, or any value of an option named like one (checked
+  /// again), and what the agent answered when it said no.
   Future<void> setConfig(String id, Object value);
 
   /// V2-2b B11: sets the legacy mode [modeId]; as [setConfig].

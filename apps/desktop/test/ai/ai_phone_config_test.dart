@@ -47,6 +47,20 @@ const _claudeOptions = <Map<String, Object?>>[
   },
 ];
 
+/// A select named like a mode acting without asking (R16): none of its values
+/// is set from a phone.
+const _yoloSelect = <String, Object?>{
+  'id': 'yolo',
+  'name': 'Yolo',
+  'category': 'model_config',
+  'type': 'select',
+  'currentValue': 'off',
+  'options': [
+    {'value': 'on', 'name': 'On'},
+    {'value': 'off', 'name': 'Off'},
+  ],
+};
+
 /// A second source over the same window, to drive a control directly.
 final _source = Provider<DesktopAiSource>((ref) {
   final source = DesktopAiSource(ref);
@@ -168,6 +182,25 @@ void main() {
       );
     },
   );
+
+  test('R16: an option named like such a mode — a select too — is the '
+      'computer\'s whatever the value: the window\'s control refuses it, '
+      'nothing reaches the agent, nothing is remembered', () async {
+    boot(const FakeScenario(configOptions: [..._claudeOptions, _yoloSelect]));
+    final (tab, _) = await running();
+    final control = c.read(_source).control(tab.ai!.id)!;
+    for (final value in ['on', 'off']) {
+      await expectLater(
+        control.setConfig('yolo', value),
+        throwsA(isA<AiRefused>().having((r) => r.code, 'code', 'on_computer')),
+      );
+    }
+    expect(
+      fakes.agent().received.where((m) => m.startsWith('session/set_')),
+      isEmpty,
+    );
+    expect(rememberedConfig(c.read(settingsStoreProvider), 'claude'), isEmpty);
+  });
 
   test('an agent with only modes: its modes, without one acting without '
       'asking; a mode is set as the mode chip sets it', () async {

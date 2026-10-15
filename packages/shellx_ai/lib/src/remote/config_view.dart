@@ -201,17 +201,20 @@ bool _sendable(String id) =>
 /// V2-2b B11, R16: what a phone may change of [s]: the options of
 /// [kAiConfigCategories] with the choices that turn on no mode acting
 /// without asking ([aiTurnsOnNoApproval]: Claude's `bypassPermissions`, and
-/// any id that merely says it); a switch named like such a mode is not
-/// offered at all. Names are cut to [kAiConfigNameChars] characters, choices
-/// to [kAiConfigChoices]; an id longer than [kAiConfigIdBytes] is not
-/// offered. The legacy modes only for an agent without config options, as on
-/// the computer.
+/// any id that merely says it); an option named like such a mode — a switch,
+/// or a select too (`yolo` with `on` / `off`) — is not offered at all. Names
+/// are cut to [kAiConfigNameChars] characters, choices to [kAiConfigChoices];
+/// an id longer than [kAiConfigIdBytes] is not offered. The legacy modes only
+/// for an agent without config options, as on the computer.
 AiConfigView aiConfigViewOf(AiSessionState s) {
   final options = <AiConfigOptionView>[];
   for (final o in s.configOptions ?? const <ConfigOption>[]) {
     final category = o.category;
     if (category == null || !kAiConfigCategories.contains(category)) continue;
     if (!_sendable(o.id)) continue;
+    // Named like a mode acting without asking, whatever its kind: none of
+    // its values is the phone's to pick (R16).
+    if (aiIsNoApprovalMode(o.id)) continue;
     switch (o.kind) {
       case ConfigKind.select:
         final all = [
@@ -322,12 +325,14 @@ Uint8List encodeConfigView(AiConfigView view) {
 
 /// V2-2b B11, R16: whether a phone may set option [id] of [s] to [value] now:
 /// null when it may; `on_computer` for a value that turns on a mode acting
-/// without asking, or for a switch named like one — whatever the phone was
-/// offered, and whatever the agent offers now; `refused` for an option or a
-/// value the phone is not offered now.
+/// without asking, or for an option named like one (a switch or a select,
+/// whatever the value) — whatever the phone was offered, and whatever the
+/// agent offers now; `refused` for an option or a value the phone is not
+/// offered now.
 String? aiConfigRefusal(AiSessionState s, String id, Object? value) {
   if (value is! String && value is! bool) return 'refused';
   if (aiTurnsOnNoApproval(configId: id, value: value)) return 'on_computer';
+  if (aiIsNoApprovalMode(id)) return 'on_computer'; // named like one
   final option = (s.configOptions ?? const <ConfigOption>[])
       .where((o) => o.id == id)
       .firstOrNull;

@@ -66,6 +66,19 @@ AiSessionState _state([List<Map<String, Object?>> options = _claude]) =>
     AiSessionState(agentId: 'claude', agentName: 'Claude', cwd: '/p')
       ..configOptions = [for (final j in options) ?ConfigOption.fromJson(j)];
 
+/// An agent with only legacy modes (Gemini CLI's), one of them acting
+/// without asking.
+AiSessionState _gemini() =>
+    AiSessionState(agentId: 'gemini', agentName: 'Gemini', cwd: '/p')
+      ..modes = SessionModes.fromJson({
+        'currentModeId': 'default',
+        'availableModes': [
+          {'id': 'default', 'name': 'Default'},
+          {'id': 'autoEdit', 'name': 'Auto edit'},
+          {'id': 'yolo', 'name': 'YOLO'},
+        ],
+      });
+
 AiConfigView _roundTrip(AiConfigView view) =>
     AiConfigView.fromJson(decodeBody(encodeConfigView(view))!);
 
@@ -125,6 +138,32 @@ void main() {
     expect(view.options.single.choices.map((c) => c.value), ['default']);
   });
 
+  test('R16: an option named like such a mode — a select too — is never '
+      'offered, and setting it is the computer\'s whatever the value', () {
+    final s = _state([
+      ..._claude,
+      {
+        'id': 'yolo',
+        'name': 'Yolo',
+        'category': 'model_config',
+        'type': 'select',
+        'currentValue': 'off',
+        'options': [
+          {'value': 'on', 'name': 'On'},
+          {'value': 'off', 'name': 'Off'},
+        ],
+      },
+    ]);
+    expect(aiConfigViewOf(s).options.map((o) => o.id), [
+      'mode',
+      'model',
+      'effort',
+      'fast',
+    ]);
+    expect(aiConfigRefusal(s, 'yolo', 'on'), 'on_computer');
+    expect(aiConfigRefusal(s, 'yolo', 'off'), 'on_computer');
+  });
+
   test('names cut to 60 characters, 40 choices at most (more), and an id too '
       'long to send is not offered', () {
     final view = aiConfigViewOf(
@@ -153,15 +192,7 @@ void main() {
 
   test('legacy modes only for an agent without config options; a no-approval '
       'mode left out', () {
-    final s = AiSessionState(agentId: 'gemini', agentName: 'Gemini', cwd: '/p')
-      ..modes = SessionModes.fromJson({
-        'currentModeId': 'default',
-        'availableModes': [
-          {'id': 'default', 'name': 'Default'},
-          {'id': 'autoEdit', 'name': 'Auto edit'},
-          {'id': 'yolo', 'name': 'YOLO'},
-        ],
-      });
+    final s = _gemini();
     final view = _roundTrip(aiConfigViewOf(s));
     expect(view.options, isEmpty);
     expect(view.modes!.current, 'default');
@@ -275,7 +306,13 @@ void main() {
 
   test('toString never shows a name or a value', () {
     final view = aiConfigViewOf(_state());
-    for (final o in [view, ...view.options, ...view.options.first.choices]) {
+    final modes = aiConfigViewOf(_gemini()).modes!;
+    for (final o in [
+      view,
+      ...view.options,
+      ...view.options.first.choices,
+      modes,
+    ]) {
       expect(o.toString(), '…');
     }
   });
