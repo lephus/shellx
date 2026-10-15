@@ -5,6 +5,7 @@ library;
 
 export 'src/remote/acp_out.dart';
 export 'src/remote/config_view.dart';
+export 'src/remote/full_view.dart';
 export 'src/remote/item_codec.dart' show encodeHead, encodeItem, itemText;
 export 'src/remote/listing.dart';
 export 'src/remote/mirror.dart';

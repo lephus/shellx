@@ -302,6 +302,10 @@ final class _Phone {
   /// subscription goes on from it, so `seq` never goes back and a late ack of
   /// the old one clears nothing of the new one.
   final seqs = <String, int>{};
+
+  /// V2-2b B16: the items made in full for this phone, by `sid/index`, the
+  /// one asked for last at the end ([_FullItem]).
+  final items = <String, _FullItem>{};
   double tokens = _AiBudget.burst;
   DateTime refilled = DateTime.fromMillisecondsSinceEpoch(0);
 }
@@ -412,6 +416,7 @@ final class AiPhoneHub implements AiEndpoint {
     AiFeature.acpHead,
     AiFeature.pushAnswer,
     AiFeature.config,
+    AiFeature.item,
   };
 
   /// What this hub's listings name ([offered]; a test may say otherwise).
@@ -533,8 +538,8 @@ final class AiPhoneHub implements AiEndpoint {
         _refuse(mobileId, rid);
       case AiFiles(:final rid):
         _refuse(mobileId, rid);
-      case AiItemPart(:final rid):
-        _refuse(mobileId, rid);
+      case AiItemPart():
+        _fullItem(mobileId, phone, message);
       case AiHistory(:final rid):
         _refuse(mobileId, rid);
       case AiFolder(:final rid):
