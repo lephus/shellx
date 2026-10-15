@@ -179,16 +179,30 @@ final class ShellxApi {
   /// Fails with `503 push_unavailable` when the relay has no Firebase
   /// configuration, `429 rate_limited` past 120 per hour, `404` on a relay
   /// without push support.
+  ///
+  /// V2-2b B6: [category] (`ai_perm`) makes the phone show the buttons of an
+  /// AI permission request, [tag] lets an Android phone put a notification
+  /// with buttons in the place of this one. A relay older than V2-2b ignores
+  /// both; a newer one refuses a category it does not know or a tag that is
+  /// not 1..64 of `[A-Za-z0-9_.:-]` (`400 bad_request`).
   Future<int> sendNotification(
     String title,
     String body, {
     Map<String, String>? data,
+    String? category,
+    String? tag,
   }) async {
     final response = await _send(
       'POST',
       '/v1/notifications',
       authenticated: true,
-      body: {'title': title, 'body': body, 'data': ?data},
+      body: {
+        'title': title,
+        'body': body,
+        'data': ?data,
+        'category': ?category,
+        'tag': ?tag,
+      },
     );
     return _parse(
       response,

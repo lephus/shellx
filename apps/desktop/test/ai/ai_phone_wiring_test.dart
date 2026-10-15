@@ -315,8 +315,9 @@ void main() {
       ],
     );
 
-    /// A session of [c] that nobody shows starts to need the user; its sid.
-    Future<String> needsInput(ProviderContainer c) async {
+    /// A session of [c] that nobody shows starts to need the user; its sid
+    /// and the id of the permission it waits for.
+    Future<(String, int)> needsInput(ProviderContainer c) async {
       final ai = openTestAiTab(c, cwd: testAiCwd, select: false);
       final runtime = c
           .read(aiRuntimesProvider.notifier)
@@ -324,16 +325,31 @@ void main() {
       await runtime.start();
       unawaited(runtime.send([const TextBlock('go')]));
       await _until(() => runtime.state.currentPermission != null);
-      return c.read(aiPhoneHubProvider).sidOf(ai.ai!.id);
+      return (
+        c.read(aiPhoneHubProvider).sidOf(ai.ai!.id),
+        runtime.state.currentPermission!.id,
+      );
     }
 
-    void expectPushed(List<http.Request> posts, String sid) {
+    /// V2-2b B7: Claude's permission offers "allow once", "allow always"
+    /// (`allow-with-updates`) and "reject once"; its push carries the first
+    /// and the last as the answers of its buttons, never the "always" one.
+    void expectPushed(List<http.Request> posts, (String, int) request) {
+      final (sid, perm) = request;
       final post = posts.single;
       expect(post.url.path, '/v1/notifications');
       final body = jsonDecode(post.body) as Map<String, dynamic>;
       expect(body['title'], 'MacBook-Pro · Claude');
       expect(body['body'], 'Cần bạn trả lời: Sửa src/main.ts');
-      expect(body['data'], {'kind': 'ai', 'ai_session': sid});
+      expect(body['data'], {
+        'kind': 'ai',
+        'ai_session': sid,
+        'perm': '$perm',
+        'allow': 'allow-once',
+        'reject': 'reject',
+      });
+      expect(body['category'], 'ai_perm');
+      expect(body['tag'], 'ai-${sid.replaceAll('.', '-')}-$perm');
     }
 
     test('in-process: this process\'s own', () async {
@@ -343,10 +359,10 @@ void main() {
         aiPushSinkFor(daemonMode: false, notifications: core.notifications),
       ]);
       startAiPhone(c, slot: core.ai);
-      final sid = await needsInput(c);
+      final request = await needsInput(c);
       await _until(() => posts.isNotEmpty);
       await core.notifications!.sender.idle;
-      expectPushed(posts, sid);
+      expectPushed(posts, request);
     });
 
     test('in-process with push notifications off: none', () async {
@@ -367,10 +383,10 @@ void main() {
       c.read(daemonLinkProvider.notifier).set(link);
       startAiPhone(c);
       await pumpEventQueue();
-      final sid = await needsInput(c);
+      final request = await needsInput(c);
       await _until(() => posts.isNotEmpty);
       await service.notifications!.sender.idle;
-      expectPushed(posts, sid);
+      expectPushed(posts, request);
     });
   });
 }
