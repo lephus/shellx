@@ -3515,6 +3515,11 @@ class S {
       args: [done, total],
     );
   }
+
+  /// `from phone`
+  String get aiFromPhone {
+    return Intl.message('from phone', name: 'aiFromPhone', desc: '', args: []);
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

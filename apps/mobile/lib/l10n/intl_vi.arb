@@ -395,5 +395,6 @@
   "aiModeAuto": "Tự động",
   "aiModeBypass": "Bỏ qua mọi quyền",
   "aiContext": "Ngữ cảnh {percent}%",
-  "aiPlan": "Kế hoạch · {done}/{total}"
+  "aiPlan": "Kế hoạch · {done}/{total}",
+  "aiFromPhone": "từ điện thoại"
 }

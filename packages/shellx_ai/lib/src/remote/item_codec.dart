@@ -50,6 +50,8 @@ String? itemText(TimelineItem item) => switch (item) {
       'at': start,
       'add': text.substring(start, end),
       if (goesOn && clip) 'clip': text.length,
+      // V2-2b B24: a phone's prompt says so (an older phone skips the key).
+      if (item is UserItem && item.source == PromptSource.phone) 'src': 'phone',
     },
     end,
   );

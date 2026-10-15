@@ -135,6 +135,26 @@ void main() {
     },
   );
 
+  test('a prompt from the phone is the phone\'s on the computer (V2-2b '
+      'B24)', () async {
+    boot(
+      FakeScenario(
+        turns: [
+          [FakeSteps.text('ok')],
+        ],
+      ),
+    );
+    final ai = openTestAiTab(c, cwd: testAiCwd, select: false);
+    final sid = hub.sidOf(ai.ai!.id);
+    hub.handle(_phone, AiAttach(sid: sid));
+    await until(() => stateOf(ai).phase == AgentPhase.ready);
+    hub.handle(_phone, AiPrompt(sid: sid, rid: 1, text: 'Sửa a.ts'));
+    await until(() => stateOf(ai).timeline.items.any((i) => i is TurnEndItem));
+    final user = stateOf(ai).timeline.items.whereType<UserItem>().single;
+    expect((user.text, user.source), ('Sửa a.ts', PromptSource.phone));
+    expect(fakes.agent().received, contains('session/prompt:Sửa a.ts'));
+  });
+
   test('pushes only while nobody shows the session (D11)', () async {
     boot(
       FakeScenario(

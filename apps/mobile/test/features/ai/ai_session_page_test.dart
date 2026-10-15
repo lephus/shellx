@@ -110,6 +110,20 @@ void main() {
     return ai;
   }
 
+  testWidgets('a prompt written on a phone says so under it, and only it (V2-2b B24)', (tester) async {
+    final ai = machine.ai.session(sid);
+    ai.desktop
+      ..beginTurn(const [TextBlock('Ở máy tính')], DateTime.now())
+      ..endTurn(outcome: TurnOutcome.finished, at: DateTime.now())
+      ..beginTurn(const [TextBlock('Sửa lỗi')], DateTime.now(), source: PromptSource.phone);
+    await open(tester);
+    // The first prompt is the title too.
+    expect(find.text('Ở máy tính'), findsWidgets);
+    expect(find.text('Sửa lỗi'), findsOneWidget);
+    expect(find.byKey(const Key('ai.user.fromPhone')), findsOneWidget);
+    expect(find.text('từ điện thoại'), findsOneWidget);
+  });
+
   testWidgets('the conversation as the desktop holds it; the status in the header', (tester) async {
     final ai = machine.ai.session(sid);
     ai.desktop.beginTurn(const [TextBlock('Thêm nút đăng xuất')], DateTime.now());

@@ -630,5 +630,6 @@
   "aiContext": "Context {percent}%",
   "@aiContext": {"placeholders": {"percent": {"type": "int"}}},
   "aiPlan": "Plan · {done}/{total}",
-  "@aiPlan": {"placeholders": {"done": {"type": "int"}, "total": {"type": "int"}}}
+  "@aiPlan": {"placeholders": {"done": {"type": "int"}, "total": {"type": "int"}}},
+  "aiFromPhone": "from phone"
 }

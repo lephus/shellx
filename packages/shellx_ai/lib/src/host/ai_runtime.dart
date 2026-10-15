@@ -443,17 +443,22 @@ final class AiRuntime with Redacted {
   // -------------------------------------------------------------- turns --
 
   /// Sends [prompt], or queues it while a turn runs or the agent starts
-  /// (at most 5, spec D16). False when it cannot be taken.
-  Future<bool> send(List<ContentBlock> prompt) async {
+  /// (at most 5, spec D16). False when it cannot be taken. [source]: who
+  /// wrote it (V2-2b B24); the timeline keeps it with the prompt, queued or
+  /// not.
+  Future<bool> send(
+    List<ContentBlock> prompt, {
+    PromptSource source = PromptSource.computer,
+  }) async {
     if (_disposed) return false;
     switch (state.phase) {
       case AgentPhase.ready:
-        unawaited(_runTurn(prompt));
+        unawaited(_runTurn(prompt, source));
         return true;
       case AgentPhase.running || AgentPhase.starting:
-        return state.enqueue(prompt) != null;
+        return state.enqueue(prompt, source: source) != null;
       case AgentPhase.stopped:
-        if (state.enqueue(prompt) == null) return false;
+        if (state.enqueue(prompt, source: source) == null) return false;
         unawaited(start());
         return true;
       case AgentPhase.needsAuth || AgentPhase.failed:
@@ -461,11 +466,11 @@ final class AiRuntime with Redacted {
     }
   }
 
-  Future<void> _runTurn(List<ContentBlock> prompt) async {
+  Future<void> _runTurn(List<ContentBlock> prompt, PromptSource source) async {
     final client = _client;
     final sid = state.sessionId;
     if (client == null || sid == null) return;
-    final turn = state.beginTurn(prompt, _now());
+    final turn = state.beginTurn(prompt, _now(), source: source);
     final cancelled = _turnCancel = Completer<Checkpoint?>();
     _status(AiStatus.running);
     final warmup = _warmup;
@@ -562,7 +567,7 @@ final class AiRuntime with Redacted {
     if (state.phase != AgentPhase.ready || _client == null) return false;
     final next = state.takeQueued();
     if (next == null) return false;
-    unawaited(_runTurn(next.blocks));
+    unawaited(_runTurn(next.blocks, next.source));
     return true;
   }
 

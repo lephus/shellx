@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shellx_acp/shellx_acp.dart';
+import 'package:shellx_ai/shellx_ai.dart' show PromptSource;
 
 import '../../../l10n/app_localizations.dart';
 import '../theme/shellx_desktop_theme.dart';
@@ -54,9 +55,10 @@ class AiDock extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       for (final q in s.queue)
-                        _Queued(
+                        AiQueuedRow(
                           key: ValueKey(q.id),
                           text: q.text,
+                          fromPhone: q.source == PromptSource.phone,
                           onRemove: () => s.removeQueued(q.id),
                         ),
                     ],
@@ -163,15 +165,26 @@ class _AiPlanBarState extends State<AiPlanBar> {
   }
 }
 
-class _Queued extends StatelessWidget {
-  const _Queued({super.key, required this.text, required this.onRemove});
+/// One queued prompt (D16): "Queued: “…” — sent when this turn ends", led by
+/// "You · from your phone" when a paired phone sent it (V2-2b B24), and ×.
+class AiQueuedRow extends StatelessWidget {
+  const AiQueuedRow({
+    super.key,
+    required this.text,
+    required this.onRemove,
+    this.fromPhone = false,
+  });
   final String text;
   final VoidCallback onRemove;
+  final bool fromPhone;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final short = text.length > 60 ? '${text.substring(0, 60)}…' : text;
+    final style = ShellxText.small.copyWith(
+      color: ShellxDesktopColors.textSecondary,
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: ShellxSpace.s16),
       child: Row(
@@ -183,13 +196,21 @@ class _Queued extends StatelessWidget {
           ),
           const SizedBox(width: ShellxSpace.s6),
           Expanded(
-            child: Text(
-              l10n.aiQueued(short),
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  if (fromPhone)
+                    TextSpan(
+                      text: '${l10n.aiYouFromPhone} · ',
+                      style: style.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  TextSpan(text: l10n.aiQueued(short)),
+                ],
+              ),
+              key: const Key('ai.queued.text'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: ShellxText.small.copyWith(
-                color: ShellxDesktopColors.textSecondary,
-              ),
+              style: style,
             ),
           ),
           IconButton(

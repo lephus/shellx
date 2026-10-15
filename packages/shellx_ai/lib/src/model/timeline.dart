@@ -13,12 +13,24 @@ sealed class TimelineItem with Redacted {
   int rev = 0;
 }
 
+/// V2-2b B24: who wrote a prompt — the user at the computer, or the user
+/// on a paired phone (the window's phone hub sends it).
+enum PromptSource { computer, phone }
+
 final class UserItem extends TimelineItem {
-  UserItem(super.turn, List<ContentBlock> blocks, {this.messageId})
-    : blocks = [...blocks];
+  UserItem(
+    super.turn,
+    List<ContentBlock> blocks, {
+    this.messageId,
+    this.source = PromptSource.computer,
+  }) : blocks = [...blocks];
 
   final List<ContentBlock> blocks;
   final String? messageId;
+
+  /// Where the prompt was written (B24). A conversation replayed by
+  /// `session/load` does not say: its prompts read as the computer's.
+  final PromptSource source;
 
   String get text => blockText(blocks);
 }
@@ -155,9 +167,13 @@ final class Timeline with Redacted {
 
   void add(TimelineItem item) => items.add(item);
 
-  UserItem startTurn(List<ContentBlock> prompt, {String? messageId}) {
+  UserItem startTurn(
+    List<ContentBlock> prompt, {
+    String? messageId,
+    PromptSource source = PromptSource.computer,
+  }) {
     turn++;
-    final item = UserItem(turn, prompt, messageId: messageId);
+    final item = UserItem(turn, prompt, messageId: messageId, source: source);
     items.add(item);
     return item;
   }

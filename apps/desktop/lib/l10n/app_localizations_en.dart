@@ -3236,6 +3236,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiYou => 'You';
 
   @override
+  String get aiYouFromPhone => 'You · from your phone';
+
+  @override
   String get aiThinking => 'Thinking';
 
   @override

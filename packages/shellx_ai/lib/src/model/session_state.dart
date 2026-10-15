@@ -54,10 +54,13 @@ final class PendingAsk with Redacted {
 
 /// A prompt sent while a turn runs; it goes out when the turn ends (D16).
 final class QueuedPrompt with Redacted {
-  QueuedPrompt(this.id, this.blocks);
+  QueuedPrompt(this.id, this.blocks, {this.source = PromptSource.computer});
 
   final int id;
   final List<ContentBlock> blocks;
+
+  /// Who wrote it (V2-2b B24); its turn starts with the same.
+  final PromptSource source;
 
   String get text => blockText(blocks);
 }
@@ -197,9 +200,14 @@ final class AiSessionState with Redacted {
     touch();
   }
 
-  /// Starts a turn: the prompt joins the timeline.
-  ActiveTurn beginTurn(List<ContentBlock> prompt, DateTime at) {
-    timeline.startTurn(prompt);
+  /// Starts a turn: the prompt joins the timeline, as written by [source]
+  /// (V2-2b B24).
+  ActiveTurn beginTurn(
+    List<ContentBlock> prompt,
+    DateTime at, {
+    PromptSource source = PromptSource.computer,
+  }) {
+    timeline.startTurn(prompt, source: source);
     final t = ActiveTurn(timeline.turn, at);
     turn = t;
     phase = AgentPhase.running;
@@ -333,10 +341,14 @@ final class AiSessionState with Redacted {
     if (changed) touch();
   }
 
-  /// Null when [maxQueue] prompts already wait.
-  QueuedPrompt? enqueue(List<ContentBlock> blocks) {
+  /// Null when [maxQueue] prompts already wait. [source]: who wrote it
+  /// (V2-2b B24).
+  QueuedPrompt? enqueue(
+    List<ContentBlock> blocks, {
+    PromptSource source = PromptSource.computer,
+  }) {
     if (queue.length >= maxQueue) return null;
-    final q = QueuedPrompt(_nextRequestId++, [...blocks]);
+    final q = QueuedPrompt(_nextRequestId++, [...blocks], source: source);
     queue.add(q);
     touch();
     return q;

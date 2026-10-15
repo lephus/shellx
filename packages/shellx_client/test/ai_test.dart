@@ -22,9 +22,9 @@ final class _Control implements AiControl {
   final answers = <(int, String)>[];
 
   @override
-  Future<bool> send(List<ContentBlock> prompt) async {
-    prompts.add(blockText(prompt));
-    state.beginTurn(prompt, _t0);
+  Future<bool> send(AiPhonePrompt prompt) async {
+    prompts.add(prompt.text);
+    state.beginTurn([TextBlock(prompt.text)], _t0, source: PromptSource.phone);
     return true;
   }
 

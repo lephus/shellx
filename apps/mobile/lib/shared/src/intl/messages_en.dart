@@ -224,6 +224,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiFromComputerOnly": MessageLookupByLibrary.simpleMessage(
       "Too large for the phone. Open it on the computer.",
     ),
+    "aiFromPhone": MessageLookupByLibrary.simpleMessage("from phone"),
     "aiGroup": MessageLookupByLibrary.simpleMessage("AI sessions"),
     "aiItemOnComputer": MessageLookupByLibrary.simpleMessage(
       "This kind of item is not supported on the phone yet. See it on the computer.",
