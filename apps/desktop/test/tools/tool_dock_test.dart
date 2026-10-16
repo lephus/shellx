@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show TargetPlatform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_desktop/l10n/app_localizations.dart';
 import 'package:shellx_desktop/src/agent/desktop_services.dart'
@@ -12,6 +14,7 @@ import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/tools/tool_dock.dart';
 import 'package:shellx_desktop/src/tools/tool_dock_state.dart';
+import 'package:shellx_desktop/src/tools/tool_embed.dart';
 import 'package:shellx_desktop/src/tools/tool_entry.dart';
 import 'package:shellx_desktop/src/tools/tool_registry.dart';
 
@@ -21,9 +24,10 @@ void main() {
   late ProviderContainer c;
   var next = 0;
 
-  setUp(() {
-    next = 0;
-    c = ProviderContainer.test(
+  /// The dock controller over a fresh window; `tool-embed = auto` embeds
+  /// (macOS) unless [extra] says otherwise.
+  ProviderContainer start({List<Override> extra = const []}) {
+    final container = ProviderContainer.test(
       overrides: [
         localSessionsProvider.overrideWithValue(FakeLocalSessions()),
         settingsStoreProvider.overrideWithValue(InMemorySettingsStore()),
@@ -34,10 +38,18 @@ void main() {
         toolIdSourceProvider.overrideWithValue(
           () => 'tool${(next++).toString().padLeft(6, '0')}',
         ),
+        toolPlatformProvider.overrideWithValue(TargetPlatform.macOS),
+        ...extra,
       ],
     );
-    c.read(sidebarWorkspacesProvider);
-    c.read(toolDockProvider);
+    container.read(sidebarWorkspacesProvider);
+    container.read(toolDockProvider);
+    return container;
+  }
+
+  setUp(() {
+    next = 0;
+    c = start();
   });
 
   ToolDockController dock() => c.read(toolDockProvider.notifier);
@@ -193,6 +205,45 @@ void main() {
       ..dispose();
     await Future<void>.delayed(Duration.zero);
     expect(other.getStrings(SettingKeys.workspaceTools), hasLength(3));
+  });
+
+  test('the panes are covered by the shown workspace\'s dock zoomed, or by '
+      'a workspace shown without a tab; never by a dock beside them or by '
+      'another workspace\'s (V2-3 D3, D4)', () async {
+    bool covered() => c.read(toolPanesCoveredProvider);
+    final side = c.read(sidebarWorkspacesProvider.notifier);
+    await c.read(terminalTabsProvider.notifier).openTab();
+    final a = add(kDefaultWorkspaceId, 1);
+    expect(covered(), isFalse, reason: 'no dock');
+    dock().open(kDefaultWorkspaceId, a.id);
+    expect(covered(), isFalse, reason: 'beside the panes');
+    dock().setZoom(kDefaultWorkspaceId, true);
+    expect(covered(), isTrue, reason: 'zoomed');
+    final ws2 = side.createFor(name: 'B');
+    final b = add(ws2, 2);
+    dock().open(ws2, b.id);
+    dock().setZoom(ws2, true);
+    dock().setZoom(kDefaultWorkspaceId, false);
+    expect(covered(), isFalse, reason: "another workspace's dock");
+    dock().showLoose(ws2);
+    expect(covered(), isTrue, reason: 'loose, its dock zoomed');
+    dock().setZoom(ws2, false);
+    expect(covered(), isTrue, reason: 'loose, its dock beside');
+    dock().clearLoose();
+    expect(covered(), isFalse);
+    dock().close(kDefaultWorkspaceId);
+    expect(covered(), isFalse, reason: 'closed');
+
+    // `tool-embed = off`: no dock is drawn, zoomed or not.
+    final off = start(extra: [toolsEmbeddedProvider.overrideWithValue(false)]);
+    await off.read(terminalTabsProvider.notifier).openTab();
+    final t = off
+        .read(toolRegistryProvider.notifier)
+        .add(ws: kDefaultWorkspaceId, name: '', url: 'localhost:3')!;
+    off.read(toolDockProvider.notifier)
+      ..open(kDefaultWorkspaceId, t.id)
+      ..setZoom(kDefaultWorkspaceId, true);
+    expect(off.read(toolPanesCoveredProvider), isFalse);
   });
 
   test('ToolDocks.toString() shows a count only (D24)', () {

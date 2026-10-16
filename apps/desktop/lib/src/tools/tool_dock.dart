@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../terminal/sidebar_workspaces.dart';
 import '../terminal/terminal_tabs.dart';
+import '../ui/window_focus.dart' show ProviderReader;
 import 'tool_dock_state.dart';
+import 'tool_embed.dart';
 import 'tool_entry.dart';
 import 'tool_registry.dart';
 
@@ -52,6 +54,53 @@ const Object _keep = Object();
 
 final toolDockProvider = NotifierProvider<ToolDockController, ToolDocks>(
   ToolDockController.new,
+);
+
+/// D3, D4: the workspace whose dock the window shows — the one shown
+/// without a tab ([ToolDocks.loose]), else the selected tab's ([selectedId]),
+/// else the current one.
+String dockWorkspaceOf(
+  ToolDocks docks,
+  int? selectedId,
+  SidebarState sidebar,
+) =>
+    docks.loose ??
+    (selectedId == null ? null : sidebar.workspaceOf(selectedId)) ??
+    sidebar.currentId;
+
+/// D3, D4: the selected tab's panes are covered — by the panel of a
+/// workspace shown without a tab, or by the shown workspace's dock ([shown])
+/// zoomed over them. Exactly what `ToolArea` draws over the panes. A covered
+/// pane is not in view (A4's "seen", A12's "watched") and takes no drop.
+bool toolPanesCovered(
+  ToolDocks docks, {
+  required ToolDockState shown,
+  required bool embedded,
+}) => docks.loose != null || toolDockCoversPanes(shown, embedded: embedded);
+
+/// [toolPanesCovered] for the window as it is, read from its sources with
+/// [read] (`ref.read`, `ref.watch` or `container.read`). Inside a listener
+/// of one of those sources read it this way, not through
+/// [toolPanesCoveredProvider]: a derived provider can still give the old
+/// value there (see `windowActiveProvider`).
+bool readToolPanesCovered(ProviderReader read) {
+  final docks = read(toolDockProvider);
+  final ws = dockWorkspaceOf(
+    docks,
+    read(terminalTabsProvider.select((s) => s.selectedId)),
+    read(sidebarWorkspacesProvider),
+  );
+  return toolPanesCovered(
+    docks,
+    shown: docks.of(ws),
+    embedded: read(toolsEmbeddedProvider),
+  );
+}
+
+/// [toolPanesCovered] as a provider: listen to it to hear the panes being
+/// covered or shown again.
+final toolPanesCoveredProvider = Provider<bool>(
+  (ref) => readToolPanesCovered(ref.watch),
 );
 
 /// V2-3 D3–D5, D14: the docks. A deleted tool leaves every dock; a deleted
