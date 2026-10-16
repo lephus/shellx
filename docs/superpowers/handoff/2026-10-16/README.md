@@ -26,14 +26,12 @@ Bảng mã commit chính xác lúc dừng nằm ở cuối file, mục "Trạng 
 ### V2-2b: xong
 Đã review, sửa, review lại và gộp vào `shellx-v2` (16/10 ~16:20). Còn để lại (follow-up): ký tự surrogate lẻ trong `detail`/`agentName` của push chưa kiểm; trang phiên mà lần liệt kê đầu lỗi trên kênh còn mở chỉ liệt kê lại ở kênh sau. Chi tiết: `sdd/v2-2b/handoff-20-26.md` (mục "Final update").
 
-### V2-5a: tên app và giao diện mới
-- Viết nốt plan `docs/superpowers/plans/2026-10-16-v2-5a-name-and-design-system.md`. Các task còn "UNFINISHED" đã có dàn ý.
-- Code. Hai việc đầu tiên:
-  - thử nạp SF Mono của hệ thống trên Mac và iPhone, với 5 điều kiện đạt/không đạt; không đạt thì dùng JetBrains Mono;
-  - ⚠ tài khoản Keychain của kho khoá bí mật desktop lấy theo bundle id. App thật giữ `pro.shellx.desktop`; bản thử dùng tài khoản riêng. Phải xong việc này trước mọi lần chạy cả app.
-
-### V2-5b và V2-5c
-Viết plan sau khi plan 5a xong, vì hai plan này dùng tên component và icon của 5a. Sau đó code. 5b có thể tách thành nhánh desktop và nhánh điện thoại sau bước giao thức.
+### V2-5: plan đã đủ, chưa code
+Ba plan nằm trong `docs/superpowers/plans/` (16/10 ~16:50, viết theo yêu cầu "làm nhanh trong khoảng 1 tiếng"):
+- `2026-10-16-v2-5a-name-and-design-system.md`: 16 việc. Việc 1–4 viết đầy đủ, code đã chạy thử trên bản `v2-5a-wip-union`. Việc 5–16 ở mức gọn: file, interface, giá trị chính xác, test, lệnh; code đầy đủ chỉ ở phần native, bảo mật, logic khó. Hai việc đầu là thử SF Mono và ⚠ Keychain theo bundle id; việc Keychain phải xong trước mọi lần chạy cả app.
+- `2026-10-16-v2-5b-ai-assistant.md`: 26 việc. Việc 1–7 làm trên `v2-5b` (giao thức). Sau đó tách song song `v2-5b-desktop` (việc 8–20) và `v2-5b-phone` (việc 21–25). Việc 26 gộp lại. Tên của 5a theo bản đã gộp (P0).
+- `2026-10-16-v2-5c-voice-conversation.md`: 14 việc. Việc 1–10 không đụng file của 5b, chạy song song với 5b được. Việc 11–13 làm sau khi 5b gộp. Bản `flutter_tts` 4.2.5 và `audio_session` ghim khi `pub get` (R2).
+- Thứ tự: 5a → (5b ∥ 5c việc 1–10) → 5c việc 11–14. Mỗi plan có sổ riêng `docs/superpowers/ledgers/v2-5{a,b,c}.md`, được tạo ở việc đầu tiên.
 
 ### Kiểm tay trên máy thật
 Danh sách gom từ các file `handoff-*.md` và từ mục "⚠ Kiểm tay" trong các spec:
