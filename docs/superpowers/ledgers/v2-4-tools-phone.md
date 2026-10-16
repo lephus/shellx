@@ -37,5 +37,23 @@
 >   - Every response path carries exactly one ShellX CSP header, including a forwarded response that has its own CSP header (both present).
 >   - In alias mode the header lists P′ and not P.
 > — **cost if wrong:** on the phone, a tool page cannot load plain-`http` resources from other hosts, nor localhost ports the phone does not serve. In alias mode that includes the original port P; the spec's E3 banner already says those links may not work. A tool enabled while a page is open is reachable from it only after a reload. Tools that need such loads are used on the computer.
+> Amended by S1.
 
 Made by the top-level controller on 2026-10-15 for Task 9; built as `toolContentSecurityPolicy` plus one header on every response of `ToolSession`.
+
+> **Ruling S1 (top-level):** the phone's CSP drops `https:` from `form-action`. The value becomes `default-src 'self' <S> https: wss: data: blob: 'unsafe-inline' 'unsafe-eval'; form-action 'self' <H>`; everything else is unchanged. Update the builder's exact-string tests.
+> — **why:** Android never passes POST navigations to the navigation policy, so a tool form posting to an https site would open that site inside the tool web view without E12's question. An `onPageStarted` guard would act only after the POST body was already sent. CSP `form-action` blocks the submission, and its redirects, before anything leaves.
+> — **cost if wrong:** a tool page's form that posts to a remote https site fails on the phone (fetch/XHR to https is still allowed).
+
+> **Ruling S2 (top-level):** the phone serves a port on IPv4 alone only when `NetworkInterface.list(includeLoopback: true)` lists no `::1` address. Otherwise, a port is served only when it is bound on both `127.0.0.1` and `::1`.
+> - If the tool's port P cannot be bound on both, alias mode (E3) picks a port that binds on both, with a bounded number of attempts.
+> - If none binds, the page shows the closest existing E16-style error string. If none fits, add one EN+VI pair.
+> - Never fall back to IPv4-only because a `::1` bind failed.
+> — **why:** an app on the phone holding `[::1]`'s ephemeral ports could force the IPv4-only fallback and then receive `localhost` requests, with the gate cookie, on `[::1]`. An app cannot remove the `::1` address itself.
+> — **tests:** with an injected interface list and binder:
+>   - `::1` present and bind refused → no IPv4-only serving; alias tried, then the error;
+>   - `::1` absent → IPv4-only allowed;
+>   - both bound → same-port mode.
+> — **cost if wrong:** a device whose IPv6 loopback exists but refuses binds cannot open tools; it shows the error instead.
+
+Made by the top-level controller on 2026-10-16 for Task 14b; built as `toolContentSecurityPolicy` with `form-action 'self' <H>` alone, an interface check at every serve (`::1` listed, or a list that cannot be read, means both addresses or nothing) with the interface lister and the binder as seams of `ToolSession` (`interfaces`, `bind`) in place of the `[::1]:0` probe, and `ToolPhase.noPort`, shown as `toolNoPortPhone` and tried again like `refused` (R-C3-1).

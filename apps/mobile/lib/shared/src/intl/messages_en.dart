@@ -791,6 +791,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "toolNoDownloads": MessageLookupByLibrary.simpleMessage(
       "Downloads don\'t work on the phone yet.",
     ),
+    "toolNoPortPhone": MessageLookupByLibrary.simpleMessage(
+      "This phone couldn\'t open a local port for the tool.",
+    ),
     "toolOpenExternal": m65,
     "toolOtherPort": m66,
     "toolReconnecting": MessageLookupByLibrary.simpleMessage("Reconnecting…"),

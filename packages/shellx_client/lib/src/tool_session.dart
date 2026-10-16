@@ -22,6 +22,11 @@ enum ToolPhase {
   /// itself (1, 2, 4, 8 s, then every 10 s).
   refused,
 
+  /// This phone could not hold a port for the tool on every loopback
+  /// address it has (S2): nothing is served; tried again by itself, like
+  /// [refused].
+  noPort,
+
   /// Its phone flag was turned off.
   disabled,
 
@@ -88,7 +93,8 @@ class ToolHostTexts {
   String get tooLarge => "The tool's response is too large.";
 }
 
-/// The delays between tries while the tool's port refuses (V2-3 D13).
+/// The delays between tries while the tool's port refuses (V2-3 D13), or
+/// while this phone has no port for it (S2).
 const List<Duration> kToolRetryDelays = [
   Duration(seconds: 1),
   Duration(seconds: 2),
@@ -118,18 +124,23 @@ String webSocketAccept(String key) => base64Encode(
   const DartSha1().hashSync(utf8.encode('$key$_webSocketGuid')).bytes,
 );
 
-/// The top-level CSP ruling: the one `Content-Security-Policy` the phone's
-/// server adds to every response of a tool page, for [ports] (every port it
-/// serves for that page: the tool's own or its alias P′ (E3), and the other
-/// tools of its workspace (E4)), deduplicated and in ascending order.
+/// The top-level CSP ruling, amended by S1: the one `Content-Security-Policy`
+/// the phone's server adds to every response of a tool page, for [ports]
+/// (every port it serves for that page: the tool's own or its alias P′ (E3),
+/// and the other tools of its workspace (E4)), deduplicated and in ascending
+/// order.
 ///
 /// Cookies ignore ports: the webview would send the gate cookie (and the
 /// tool's own cookies) to any `localhost` port a page asks for, and an app
 /// on the phone listening there would get the secret (spec §9 Review Focus
-/// 5). The policy keeps every subresource, fetch, WebSocket, frame, worker
-/// and form of the page on the served ports, on `https:`/`wss:` (a
-/// localhost certificate fails before a cookie is sent), and on `data:` and
-/// `blob:`. `'unsafe-inline' 'unsafe-eval'` keep dev servers working (Vite's
+/// 5). The policy keeps every subresource, fetch, WebSocket, frame and
+/// worker of the page on the served ports, on `https:`/`wss:` (a localhost
+/// certificate fails before a cookie is sent), and on `data:` and `blob:`.
+/// Forms go only to the served ports (S1): Android never shows a POST
+/// navigation to the navigation policy, so a form posting to an https site
+/// would open that site inside the tool's webview without E12's question;
+/// `form-action` stops the submission, and its redirects, before anything
+/// leaves. `'unsafe-inline' 'unsafe-eval'` keep dev servers working (Vite's
 /// inline preamble, eval source maps); a tool's own, stricter policy still
 /// applies beside it. Never `upgrade-insecure-requests`.
 String toolContentSecurityPolicy(Iterable<int> ports) {
@@ -140,9 +151,24 @@ String toolContentSecurityPolicy(Iterable<int> ports) {
     "https: wss: data: blob: 'unsafe-inline' 'unsafe-eval';",
     "form-action 'self'",
     for (final q in served) 'http://localhost:$q',
-    'https:',
   ].join(' ');
 }
+
+/// How a [ToolSession] lists this phone's network interfaces, loopback
+/// included (S2): [NetworkInterface.list] by default.
+typedef ToolInterfaces = Future<List<NetworkInterface>> Function();
+
+/// How a [ToolSession] binds one loopback address (S2): [HttpServer.bind] by
+/// default.
+typedef ToolBind =
+    Future<HttpServer> Function(
+      InternetAddress address,
+      int port, {
+      required bool v6Only,
+    });
+
+Future<List<NetworkInterface>> _listInterfaces() =>
+    NetworkInterface.list(includeLoopback: true);
 
 /// V2-4 E2, E3, E11, E13: the phone's side of one open tool. It serves the
 /// tool (and the other tools of its workspace, E4) on this phone's loopback
@@ -150,7 +176,8 @@ String toolContentSecurityPolicy(Iterable<int> ports) {
 /// every request through [link] to the computer. Only the page's webview
 /// gets in: a one-time entry URL ([ToolLoad]) sets an HttpOnly, SameSite
 /// gate cookie, and every request must carry it and name a loopback host.
-/// Pure Dart (`dart:io`); never logs what it carries.
+/// Pure Dart (`dart:io`); never logs what it carries. A test may give its
+/// own interface list and binder (S2).
 final class ToolSession {
   ToolSession({
     required this.tool,
@@ -162,8 +189,12 @@ final class ToolSession {
     this.maxRequestBody = kToolMaxRequestBodyBytes,
     this.maxWsMessage = kToolMaxWsMessageBytes,
     this.retryDelays = kToolRetryDelays,
+    ToolInterfaces interfaces = _listInterfaces,
+    ToolBind bind = HttpServer.bind,
   }) : _port = port,
-       _path = path;
+       _path = path,
+       _interfaces = interfaces,
+       _bindOne = bind;
 
   /// The tool's id (never its URL: E1).
   final String tool;
@@ -174,6 +205,8 @@ final class ToolSession {
   final int maxWsMessage;
   final List<Duration> retryDelays;
 
+  final ToolInterfaces _interfaces;
+  final ToolBind _bindOne;
   final int _port;
   String _path;
   ToolPhase _phase = ToolPhase.opening;
@@ -346,7 +379,6 @@ final class ToolSession {
       _set(ToolPhase.gone);
       return;
     }
-    _tries = 0;
     _path = main.path;
     final wasReady = _phase == ToolPhase.ready;
     if (_servers.isEmpty) {
@@ -356,13 +388,17 @@ final class ToolSession {
         return;
       }
       if (_servers.isEmpty) {
-        _set(ToolPhase.refused); // no port at all on this phone
+        // S2: no port on every loopback address of this phone. Tried again
+        // by itself, the delays growing as refused's do (R-C3-1).
+        _set(ToolPhase.noPort);
         _scheduleRetry();
         return;
       }
+      _tries = 0;
       _set(ToolPhase.ready);
       _events.add(ToolLoad(_entryUrl()));
     } else {
+      _tries = 0;
       _set(ToolPhase.ready);
       if (!wasReady) _events.add(const ToolReload());
     }
@@ -406,63 +442,69 @@ final class ToolSession {
 
   /// Binds the tool on its port (or another, E3) and each other tool of the
   /// workspace on its own port when it is free (E4): a port is the phone's
-  /// only when it holds it on every loopback address it has.
+  /// only when it holds it on every loopback address it has (S2). Nothing is
+  /// served when the tool itself gets no such port.
   Future<void> _serve(List<ToolServing> serving) async {
     _secret = _random();
-    final ipv6 = await _hasIpv6Loopback();
+    final addresses = await _loopbacks();
     final main = serving.first;
     final own =
-        await _bind(main.port, ipv6: ipv6) ?? await _bindAnyPort(ipv6: ipv6);
+        await _bind(main.port, addresses) ?? await _bindAnyPort(addresses);
     if (own == null) return;
     _servers.add(_Served(this, main.id, own, main: true));
     for (final other in serving.skip(1)) {
-      final servers = await _bind(other.port, ipv6: ipv6);
+      final servers = await _bind(other.port, addresses);
       if (servers != null) _servers.add(_Served(this, other.id, servers));
     }
   }
 
-  /// Whether this phone has an IPv6 loopback: [::1] can be bound at all
-  /// (never judged from why a bind of a given port failed).
-  static Future<bool> _hasIpv6Loopback() async {
+  /// S2: the loopback addresses this phone has, asked at every serve:
+  /// 127.0.0.1, and [::1] unless its interface list shows none (a list that
+  /// cannot be read counts as showing it, R-C3-2). Never judged from a bind:
+  /// an app holding [::1]'s ports would then have the phone serve 127.0.0.1
+  /// alone and get `localhost` requests, the gate cookie with them, on
+  /// [::1]; an app cannot remove the address itself.
+  Future<List<InternetAddress>> _loopbacks() async {
+    var ipv6 = true;
     try {
-      final probe = await ServerSocket.bind(
-        InternetAddress.loopbackIPv6,
-        0,
-        v6Only: true,
+      final interfaces = await _interfaces();
+      ipv6 = interfaces.any(
+        (each) => each.addresses.contains(InternetAddress.loopbackIPv6),
       );
-      await probe.close();
-      return true;
-    } on SocketException {
-      return false;
+    } on Object {
+      // Not known: counted as listed (R-C3-2).
     }
+    return [
+      InternetAddress.loopbackIPv4,
+      if (ipv6) InternetAddress.loopbackIPv6,
+    ];
   }
 
-  /// [port] on 127.0.0.1 and, when this phone has an IPv6 loopback ([ipv6]),
-  /// on [::1] too; never any other address (E11). The webview tries
-  /// `localhost` on ::1 first: an app holding [::1]:[port] would get the
-  /// entry URL's nonce and every request carrying the gate cookie, so then
-  /// the port is not this phone's to serve. Null when the port cannot be had
-  /// on every one of them.
-  Future<List<HttpServer>?> _bind(int port, {required bool ipv6}) async {
-    final HttpServer v4;
-    try {
-      v4 = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
-    } on SocketException {
-      return null;
-    }
-    final servers = [v4];
-    if (ipv6) {
+  /// [port] on every one of [addresses] ([::1] with `v6Only`), never on any
+  /// other address (E11). The webview tries `localhost` on ::1 first: an app
+  /// holding [::1]:[port] would get the entry URL's nonce and every request
+  /// carrying the gate cookie, so then the port is not this phone's to
+  /// serve. Null when the port cannot be had on every one of them; what was
+  /// bound for it is closed then (never 127.0.0.1 alone, S2).
+  Future<List<HttpServer>?> _bind(
+    int port,
+    List<InternetAddress> addresses,
+  ) async {
+    final servers = <HttpServer>[];
+    for (final address in addresses) {
       try {
         servers.add(
-          await HttpServer.bind(
-            InternetAddress.loopbackIPv6,
-            v4.port,
-            v6Only: true,
+          await _bindOne(
+            address,
+            servers.isEmpty ? port : servers.first.port,
+            v6Only: address.type == InternetAddressType.IPv6,
           ),
         );
       } on SocketException {
-        await v4.close(force: true);
-        return null; // another app holds it on [::1]
+        for (final server in servers) {
+          await server.close(force: true);
+        }
+        return null; // another app holds it there
       }
     }
     for (final server in servers) {
@@ -475,11 +517,13 @@ final class ToolSession {
     return servers;
   }
 
-  /// E3's P′: an ephemeral port held on every loopback address, a fresh one
-  /// whenever [::1] of the one 127.0.0.1 gave is taken.
-  Future<List<HttpServer>?> _bindAnyPort({required bool ipv6}) async {
+  /// E3's P′: an ephemeral port held on every one of [addresses], a fresh
+  /// one whenever [::1] refuses the one 127.0.0.1 gave; 16 tries at most.
+  Future<List<HttpServer>?> _bindAnyPort(
+    List<InternetAddress> addresses,
+  ) async {
     for (var tries = 0; tries < 16; tries++) {
-      final servers = await _bind(0, ipv6: ipv6);
+      final servers = await _bind(0, addresses);
       if (servers != null) return servers;
     }
     return null;

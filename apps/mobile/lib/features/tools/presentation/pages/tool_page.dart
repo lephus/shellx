@@ -319,6 +319,7 @@ class _ToolPageState extends State<ToolPage> {
       ToolPhase.opening || ToolPhase.busy => ('tool.loading', s.toolLoadingTunnel, true),
       ToolPhase.ready when _controller.firstLoad.value => ('tool.loading', s.toolLoadingTunnel, true),
       ToolPhase.refused => ('tool.refused', s.toolRefusedPhone(widget.tool.port), true),
+      ToolPhase.noPort => ('tool.noPort', s.toolNoPortPhone, true),
       ToolPhase.disabled => ('tool.disabled', s.toolDisabled, false),
       ToolPhase.gone => ('tool.gone', s.toolGone, false),
       ToolPhase.unavailable => ('tool.unavailable', s.toolNeedsDesktop, false),
