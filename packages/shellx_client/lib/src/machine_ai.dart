@@ -675,6 +675,55 @@ final class MachineAi {
     throw const AiRequestException('changing');
   }
 
+  /// V2-2b B19: the files changed since [turn] began (null: since the
+  /// session's first turn), as the computer's Changes panel shows them.
+  /// Throws [AiRequestException] — `unsupported`, sending nothing, when the
+  /// computer cannot (R15) — or [MachineConnectionException].
+  Future<AiChangesView> changes(String sid, {int? turn}) async {
+    final result = await _feature(
+      AiFeature.changes,
+      sid,
+      (rid) => AiChanges(sid: sid, rid: rid, turn: turn),
+    );
+    return AiChangesView.fromJson(decodeBody(result.body) ?? const {});
+  }
+
+  /// V2-2b B19: the diff of [path] (one of [changes]' files) since [turn]
+  /// began: an `ai.diff` body — its region (read it with `aiFileDiffOf`),
+  /// or `{"binary": true}` / `{"missing": true}`.
+  Future<Map<String, Object?>> diff(
+    String sid,
+    String path, {
+    int? turn,
+  }) async {
+    // The computer refuses one this long anyway (R18); a longer message is
+    // not worth sending.
+    if (utf8Length(path) > kAiMaxPathBytes) {
+      throw const AiRequestException('refused');
+    }
+    final result = await _feature(
+      AiFeature.changes,
+      sid,
+      (rid) => AiDiff(sid: sid, rid: rid, turn: turn, path: path),
+    );
+    return decodeBody(result.body) ?? const {};
+  }
+
+  /// V2-2b B19: puts the files changed since [turn] began back (null: since
+  /// the session's first turn); how many files went back. Only ever sent by
+  /// a tap, once: a lost channel fails it and nothing sends it again (V2-2
+  /// D13). When files changed after the turn the computer asks first:
+  /// [AiRequestException] `confirm` with an `AiRevertConfirm` as its body —
+  /// ask the user, then call again with [keep] `clean` or `all`.
+  Future<int> revert(String sid, {int? turn, String? keep}) async {
+    final result = await _feature(
+      AiFeature.revert,
+      sid,
+      (rid) => AiRevert(sid: sid, rid: rid, turn: turn, keep: keep),
+    );
+    return jInt(decodeBody(result.body) ?? const {}, 'reverted') ?? 0;
+  }
+
   // -------------------------------------------------- from MachineClient --
 
   /// The answer to a `session.list {desktop: true}`: the only kind that says

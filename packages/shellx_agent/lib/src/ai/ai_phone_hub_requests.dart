@@ -291,6 +291,60 @@ extension _AiPhoneRequests on AiPhoneHub {
     }
     _send(mobileId, AiResult(rid: f.rid, ok: code == null, code: code), phone);
   }
+
+  /// V2-2b B19: the changes of [m]'s turn (null: the whole session), as the
+  /// window's Changes panel shows them now.
+  void _phoneChanges(String mobileId, _Phone phone, AiChanges m) => unawaited(
+    _ask(
+      mobileId,
+      phone,
+      m.sid,
+      m.rid,
+      (c) async => _Reply.ok(encodeChangesView(await c.changes(turn: m.turn))),
+    ),
+  );
+
+  /// V2-2b B19, R18: one file's diff. A path no window could have offered is
+  /// refused here, before the window is asked; the window checks that it is
+  /// one of the changes now.
+  void _phoneDiff(String mobileId, _Phone phone, AiDiff m) {
+    if (!_isRelativePath(m.path)) {
+      _send(mobileId, AiResult(rid: m.rid, ok: false, code: 'refused'), phone);
+      return;
+    }
+    unawaited(
+      _ask(
+        mobileId,
+        phone,
+        m.sid,
+        m.rid,
+        (c) async =>
+            _Reply.ok(encodeBody(await c.diff(turn: m.turn, path: m.path))),
+      ),
+    );
+  }
+
+  /// V2-2b B19: a revert, worked out again by the window now: `busy_turn`
+  /// while a turn runs, `undo_off`, `confirm` (with the files changed after
+  /// the turn) unless [AiRevert.keep] says what to do with them.
+  void _phoneRevert(String mobileId, _Phone phone, AiRevert m) {
+    final keep = m.keep;
+    if (keep != null && keep != 'clean' && keep != 'all') {
+      _send(mobileId, AiResult(rid: m.rid, ok: false, code: 'refused'), phone);
+      return;
+    }
+    unawaited(
+      _ask(
+        mobileId,
+        phone,
+        m.sid,
+        m.rid,
+        (c) async => _Reply.ok(
+          encodeBody({'reverted': await c.revert(turn: m.turn, keep: keep)}),
+        ),
+      ),
+    );
+  }
 }
 
 /// V2-2b B13: the longest `@` query a phone may ask (a token, not a text).
@@ -302,8 +356,9 @@ const int _maxFilesShown = 8;
 final _drive = RegExp('^[A-Za-z]:');
 
 /// V2-2b R18: whether [path] names a file inside a session's folder as `@`
-/// offers it — relative, `/` between its parts and none of them empty, `.`
-/// or `..`, at most [kAiMaxPathBytes]. The window checks it again (offered,
+/// offers it (B13) or the Changes panel lists it (B19) — relative, `/`
+/// between its parts and none of them empty, `.` or `..`, at most
+/// [kAiMaxPathBytes]. The window checks it again (offered or changed now,
 /// inside the folder, there).
 bool _isRelativePath(String path) {
   if (path.isEmpty ||

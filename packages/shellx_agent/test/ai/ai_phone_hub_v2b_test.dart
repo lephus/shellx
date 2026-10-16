@@ -41,28 +41,20 @@ List<(int, AiMessage, String)> _requests() => [
 AiMessage _read(Map<String, Object?> map) =>
     decodeBatch(encodeCbor([map])).single as AiMessage;
 
-/// V2-2b B1, B2, B4 (R4): until its feature lands (its word in
-/// [AiPhoneHub.offered]), a V2-2b request gets its one answer, `refused`; so
-/// does a newer phone's request (an [AiRaw] with a `rid`). None of them
-/// escapes the request budget.
+/// V2-2b B1, B2, B4 (R4): every V2-2b request has its handler, its feature
+/// named in [AiPhoneHub.offered]; a newer phone's request (an [AiRaw] with a
+/// `rid`) gets its one answer, `refused`. None of them escapes the request
+/// budget.
 void main() {
-  test('a V2-2b request whose feature the hub does not offer yet is answered '
-      'refused, once, with its rid', () {
-    final rig = HubRig()..source.add(-1);
-    final waiting = [
-      for (final (rid, message, feature) in _requests())
-        if (!AiPhoneHub.offered.contains(feature)) (rid, message),
-    ];
-    for (final (_, message) in waiting) {
-      rig.hub.handle(_phone, message);
+  test('the feature of every V2-2b request kind is named in every listing '
+      '(B1)', () {
+    for (final (_, message, feature) in _requests()) {
+      expect(
+        AiPhoneHub.offered,
+        contains(feature),
+        reason: '${message.runtimeType}',
+      );
     }
-    expect(
-      [
-        for (final r in rig.to(_phone).whereType<AiResult>())
-          (r.rid, r.ok, r.code),
-      ],
-      [for (final (rid, _) in waiting) (rid, false, 'refused')],
-    );
   });
 
   test('a newer phone\'s request (an AiRaw) gets its one answer when it has '

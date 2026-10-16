@@ -3595,6 +3595,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String aiRevertedFromPhone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Reverted $count files (from your phone).',
+      one: 'Reverted 1 file (from your phone).',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get aiRevertFailed => 'The revert did not work.';
 
   @override

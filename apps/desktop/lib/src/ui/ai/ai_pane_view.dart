@@ -11,6 +11,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../ai/ai_agents.dart';
 import '../../ai/ai_frame_notifier.dart';
 import '../../ai/ai_host_provider.dart';
+import '../../ai/ai_phone_reverts.dart';
 import '../../ai/ai_project_files.dart';
 import '../../ai/ai_runtimes.dart';
 import '../../config/settings_schema.dart' show SettingPage;
@@ -98,6 +99,9 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
   /// "Choose folder" on a "folder gone" card (§6).
   var _choosing = false;
 
+  /// V2-2b B19, R12: the reverts phones make; this pane says its own.
+  StreamSubscription<AiPhoneRevert>? _phoneReverts;
+
   /// D14: the pane reopens a session (a restored tab, History): "Resume
   /// session" shows while it loads. A new folder starts a new session
   /// ([_useFolder]), and nothing is being resumed then.
@@ -122,7 +126,23 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
     };
     widget.focusNode?.addListener(_onWindowFocus);
     _ui.addListener(_onUi);
+    _phoneReverts = ref
+        .read(aiPhoneRevertsProvider)
+        .stream
+        .listen(_onPhoneRevert);
     _attachSoon();
+  }
+
+  /// V2-2b B19, R12: a phone reverted files of this pane's session. The
+  /// Changes panel opens on its note, as after a revert made here, and reads
+  /// the project again.
+  void _onPhoneRevert(AiPhoneRevert revert) {
+    if (!mounted || revert.paneId != widget.pane.id) return;
+    _ui.openPanel();
+    _ui.note.value = AppLocalizations.of(
+      context,
+    ).aiRevertedFromPhone(revert.count);
+    _ui.changesChanged();
   }
 
   @override
@@ -146,6 +166,7 @@ class _AiPaneViewState extends ConsumerState<AiPaneView> {
 
   @override
   void dispose() {
+    unawaited(_phoneReverts?.cancel());
     widget.focusNode?.removeListener(_onWindowFocus);
     _ui.removeListener(_onUi);
     _frames?.dispose();

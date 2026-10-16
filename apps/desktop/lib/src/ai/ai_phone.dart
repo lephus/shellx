@@ -23,7 +23,10 @@ import 'ai_agents.dart';
 import 'ai_image_encode.dart';
 import 'ai_off_thread.dart';
 import 'ai_phone_files.dart';
+import 'ai_phone_reverts.dart';
+import 'ai_project_files.dart';
 import 'ai_runtimes.dart';
+import 'ai_undo.dart';
 
 /// V2-2 D2: the window's AI sessions as the phone hub sees them, over
 /// V2-1b's tab list and runtimes. Nothing here starts an agent except a
@@ -203,7 +206,7 @@ final class DesktopAiSource implements AiSessionSource {
           runtime.state.sessionId == null) {
         unawaited(runtime.start());
       }
-      return _RuntimeControl(_ref, runtime);
+      return _RuntimeControl(_ref, paneId, runtime);
     } on Object catch (error) {
       debugPrint('ShellX: AI session for a phone failed: ${error.runtimeType}');
       return null;
@@ -294,9 +297,12 @@ final class DesktopAiSource implements AiSessionSource {
 
 /// A pane's runtime as the hub drives it for a phone.
 final class _RuntimeControl implements AiControl {
-  _RuntimeControl(this._ref, this._runtime);
+  _RuntimeControl(this._ref, this._paneId, this._runtime);
 
   final Ref _ref;
+
+  /// The AI pane whose runtime this is: its pane says what a phone reverted.
+  final int _paneId;
   final AiRuntime _runtime;
 
   @override
@@ -427,7 +433,136 @@ final class _RuntimeControl implements AiControl {
     if (aiIsNoApprovalMode(modeId)) throw const AiRefused('on_computer');
     await _runtime.setMode(modeId);
   }
+
+  /// The turn whose restore point a phone's [turn] means: that one, else
+  /// the session's first; null when it has none (undo was off).
+  int? _restoreTurn(int? turn) {
+    final from = turn ?? aiTurnsOf(_runtime.state).first;
+    return from == null || _runtime.checkpointOf(from) == null ? null : from;
+  }
+
+  /// V2-2b B19: what the Changes panel shows of [turn] (null: the session),
+  /// read now — the same reads (`AiChangesPanel._load`).
+  @override
+  Future<AiChangesView> changes({int? turn}) async {
+    final s = _runtime.state;
+    final turns = aiTurnsOf(s);
+    AiChangesView view([
+      List<FileChange> files = const [],
+      Set<String> after = const {},
+    ]) => AiChangesView(
+      scope: turn == null ? 'session' : 'turn',
+      turn: turn,
+      files: [for (final c in files) AiChangedFile.of(c)],
+      after: [
+        for (final c in files)
+          if (after.contains(c.path)) c.path,
+      ],
+      first: turns.first,
+      last: turns.last,
+      done: turns.lastFinished,
+      // Why there is nothing to undo, while no turn has a restore point.
+      off: turns.last == null ? aiUndoOffOf(s)?.reason.name : null,
+    );
+    if (_restoreTurn(turn) == null) return view();
+    final files = turn == null
+        ? await _runtime.sessionChanges()
+        : await _runtime.changesSince(turn);
+    // git did not answer: said, not an empty list.
+    if (files == null) throw const AiRefused('refused');
+    final last = turn ?? turns.lastFinished;
+    final after = last == null ? null : await _runtime.changedAfterTurn(last);
+    return view(files, after ?? const {});
+  }
+
+  /// V2-2b B19, R18: one file's diff — a file of the changes as they are
+  /// now, so inside the session folder — as the desktop's diff overlay reads
+  /// it: before the turn against the disk, 1 MiB at most.
+  @override
+  Future<Map<String, Object?>> diff({int? turn, required String path}) async {
+    final from = _restoreTurn(turn);
+    if (from == null) throw const AiRefused('undo_off');
+    final files = turn == null
+        ? await _runtime.sessionChanges()
+        : await _runtime.changesSince(turn);
+    if (files == null) throw const AiRefused('refused');
+    if (!files.any((c) => c.path == path)) throw const AiRefused('refused');
+    final before = aiFileContentOf(await _runtime.fileBefore(from, path));
+    final now = await _ref
+        .read(aiProjectFilesProvider)
+        .read(p.join(_runtime.state.cwd, path));
+    if (before is AiFileBinary || now is AiFileBinary) {
+      return {'path': path, 'binary': true};
+    }
+    if (before is AiFileTooLarge || now is AiFileTooLarge) {
+      throw const AiRefused('too_big');
+    }
+    if (before is AiFileMissing && now is AiFileMissing) {
+      return {'path': path, 'missing': true};
+    }
+    final texts = (
+      path,
+      before is AiFileText ? before.text : null,
+      now is AiFileText ? now.text : '',
+    );
+    // Smoothness: the hub runs on the UI isolate, and a long file is cut off
+    // it, as the diff overlay's lines are.
+    final body = (texts.$2?.length ?? 0) + texts.$3.length > _inlineDiffChars
+        ? await _ref.read(aiOffThreadProvider)(_fileDiffBody, texts)
+        : _fileDiffBody(texts);
+    if (body == null) throw const AiRefused('too_big');
+    return body;
+  }
+
+  /// V2-2b B19: [AiUndo], as the panel's "Revert turn" — worked out again
+  /// now, since what the phone saw may be old (RF4) — with the question of
+  /// B14 asked through the phone (`confirm`). The pane says what went back.
+  @override
+  Future<int> revert({int? turn, String? keep}) async {
+    if (_runtime.state.turn != null) throw const AiRefused('busy_turn');
+    if (_restoreTurn(turn) == null) throw const AiRefused('undo_off');
+    final undo = AiUndo(_runtime);
+    final AiUndoPlan plan;
+    switch (await undo.plan(turn: turn)) {
+      case AiUndoBusy():
+        throw const AiRefused('busy_turn');
+      case AiUndoFailed():
+        throw const AiRefused('refused');
+      case AiUndoNothing():
+        return 0;
+      case final AiUndoPlan planned:
+        plan = planned;
+    }
+    final touched = plan.touched;
+    if (touched.isNotEmpty && keep == null) {
+      throw AiRefused(
+        'confirm',
+        body: encodeRevertConfirm(
+          touched: touched,
+          someClean: plan.someClean,
+          total: plan.paths.length,
+        ),
+      );
+    }
+    final done = await undo.apply(plan, keepTouched: keep == 'clean');
+    if (!done.ok) throw AiRefused(done.busy ? 'busy_turn' : 'refused');
+    final reverts = _ref.read(aiPhoneRevertsProvider);
+    if (done.count > 0 && !reverts.isClosed) {
+      reverts.add((paneId: _paneId, count: done.count));
+    }
+    return done.count;
+  }
 }
+
+/// V2-2b B19: above this many characters in its two texts, the region of a
+/// phone's diff is cut off the UI isolate (a file of 1 MiB whose every line
+/// changed is ~100 ms of it; one of 64 KiB, a few).
+const int _inlineDiffChars = 64 * 1024;
+
+/// [aiFileDiffBody] of `(path, old text, new text)`: one argument, top-level,
+/// so that it can run on another isolate ([OffThread]).
+Map<String, Object?>? _fileDiffBody((String, String?, String) texts) =>
+    aiFileDiffBody(path: texts.$1, oldText: texts.$2, newText: texts.$3);
 
 /// V2-2 D11: where the hub's pushes go — the agent side's notifications
 /// in-process, the background service in its mode (`ai.push`). `main.dart`
