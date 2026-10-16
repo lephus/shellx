@@ -1943,8 +1943,10 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
             child: const AiIntroCard(),
           ),
           // V2-1 D5: "New AI session" at the foot of the sidebar, and V2-3
-          // D21 "Add tool" beside it. Not Tab stops (⌘⇧E and the palette are
-          // the keyboard's ways): Tab keeps going sidebar → strip → terminal.
+          // D21 "Add tool" beside it as an icon button: the sidebar is 220 px,
+          // too narrow for both labels, and the AI button keeps its whole
+          // one. Not Tab stops (⌘⇧E and the palette are the keyboard's
+          // ways): Tab keeps going sidebar → strip → terminal.
           FocusTraversalGroup(
             descendantsAreTraversable: false,
             child: Padding(
@@ -1956,7 +1958,7 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
               ),
               child: Row(
                 children: [
-                  Flexible(
+                  Expanded(
                     child: Tooltip(
                       message: switch (newAiSessionShortcutLabel()) {
                         final shortcut? => l10n.aiNewSessionTooltip(shortcut),
@@ -1981,20 +1983,25 @@ class _SessionSidebarState extends ConsumerState<SessionSidebar> {
                       ),
                     ),
                   ),
-                  Flexible(
-                    child: TextButton.icon(
+                  // The label names the button for a screen reader (D18); the
+                  // tooltip is for the pointer, so it stays out of semantics.
+                  // An IconButton ignores the theme's density, a TextButton
+                  // does not: the density keeps the two the same height.
+                  Tooltip(
+                    message: l10n.toolAdd,
+                    excludeFromSemantics: true,
+                    child: IconButton(
                       key: const Key('sidebar.addTool'),
-                      style: TextButton.styleFrom(
-                        alignment: Alignment.centerLeft,
+                      style: IconButton.styleFrom(
                         foregroundColor: ShellxDesktopColors.textSecondary,
                       ),
+                      visualDensity: Theme.of(context).visualDensity,
+                      iconSize: ShellxSizes.icon,
                       onPressed: () =>
                           Actions.maybeInvoke(context, const AddToolIntent()),
-                      icon: const Icon(Icons.extension_outlined, size: 14),
-                      label: Text(
-                        l10n.toolAdd,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      icon: Icon(
+                        Icons.extension_outlined,
+                        semanticLabel: l10n.toolAdd,
                       ),
                     ),
                   ),

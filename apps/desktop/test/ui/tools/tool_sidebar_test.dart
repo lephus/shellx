@@ -85,14 +85,36 @@ void main() {
     await disposeWorkspace(t, rig.container);
   });
 
-  testWidgets('"Add tool" sits beside "New AI session" at the foot (D21)', (
-    t,
-  ) async {
+  testWidgets('"Add tool" sits beside "New AI session" at the foot: the AI '
+      'button keeps room for its whole label and "Add tool" is a small icon '
+      'button with a tooltip and a label (D21, D18)', (t) async {
+    final semantics = t.ensureSemantics();
     await rig.pump(t);
-    final ai = t.getRect(find.byKey(const Key('sidebar.newAi')));
-    final add = t.getRect(find.byKey(const Key('sidebar.addTool')));
+    final aiButton = find.byKey(const Key('sidebar.newAi'));
+    final addButton = find.byKey(const Key('sidebar.addTool'));
+    final ai = t.getRect(aiButton);
+    final add = t.getRect(addButton);
     expect(add.top, ai.top);
     expect(add.left, greaterThan(ai.left));
+    expect(
+      add.left,
+      greaterThanOrEqualTo(ai.right),
+      reason: 'beside, not over',
+    );
+    // The sidebar is 220 px, so its footer row is 204: "New AI session"
+    // needs about 152 px of button with the system font, and "Add tool" is
+    // an icon on the right.
+    expect(ai.width, greaterThanOrEqualTo(150));
+    expect(add.width, lessThanOrEqualTo(48));
+    expect(
+      find.ancestor(of: addButton, matching: find.byTooltip('Add tool')),
+      findsOneWidget,
+    );
+    expect(
+      t.getSemantics(addButton),
+      isSemantics(label: 'Add tool', isButton: true),
+    );
+    semantics.dispose();
     await disposeWorkspace(t, rig.container);
   });
 
