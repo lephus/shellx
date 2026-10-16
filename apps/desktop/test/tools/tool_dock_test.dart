@@ -246,6 +246,78 @@ void main() {
     expect(off.read(toolPanesCoveredProvider), isFalse);
   });
 
+  group('§8: the last tab of the shown workspace closes', () {
+    /// The default workspace's tab, then B's only tab (selected, shown).
+    Future<({int a, int b, String ws})> twoWorkspaces(
+      ProviderContainer c,
+    ) async {
+      final tabs = c.read(terminalTabsProvider.notifier);
+      await tabs.openTab();
+      final a = c.read(terminalTabsProvider).selectedId!;
+      final ws = c
+          .read(sidebarWorkspacesProvider.notifier)
+          .createFor(name: 'B');
+      await c.read(sidebarWorkspacesProvider.notifier).openTabIn(ws);
+      final b = c.read(terminalTabsProvider).selectedId!;
+      expect(c.read(sidebarWorkspacesProvider).workspaceOf(b), ws);
+      return (a: a, b: b, ws: ws);
+    }
+
+    test('with its dock open, that workspace stays shown without a tab '
+        '(loose), after the next tab\'s selection (D4)', () async {
+      final (:a, :b, :ws) = await twoWorkspaces(c);
+      dock().open(ws, add(ws, 1).id);
+      c.read(terminalTabsProvider.notifier).close(b);
+      expect(c.read(terminalTabsProvider).selectedId, a);
+      expect(docks().loose, ws);
+      expect(docks().of(ws).open, isTrue);
+    });
+
+    test('with its dock closed, or tools not embedded, the next tab shows '
+        '(A2)', () async {
+      final (a: _, :b, :ws) = await twoWorkspaces(c);
+      dock()
+        ..open(ws, add(ws, 1).id)
+        ..close(ws);
+      c.read(terminalTabsProvider.notifier).close(b);
+      expect(docks().loose, isNull);
+
+      final off = start(
+        extra: [toolsEmbeddedProvider.overrideWithValue(false)],
+      );
+      final two = await twoWorkspaces(off);
+      final tool = off
+          .read(toolRegistryProvider.notifier)
+          .add(ws: two.ws, name: '', url: 'localhost:2')!;
+      off.read(toolDockProvider.notifier).open(two.ws, tool.id);
+      off.read(terminalTabsProvider.notifier).close(two.b);
+      expect(off.read(toolDockProvider).loose, isNull);
+    });
+
+    test('a workspace that was not shown stays as it is; a selected tab '
+        'moved to another workspace is that one\'s', () async {
+      final (:a, :b, :ws) = await twoWorkspaces(c);
+      final side = c.read(sidebarWorkspacesProvider.notifier);
+      final tabs = c.read(terminalTabsProvider.notifier);
+      dock().open(ws, add(ws, 1).id);
+      // B's only tab closes while the default workspace's tab is shown.
+      tabs.select(a);
+      tabs.close(b);
+      expect(docks().loose, isNull);
+      // A tab of B, selected, moved to C: C is the workspace shown, and the
+      // one its closing leaves without a tab.
+      await side.openTabIn(ws);
+      final moved = c.read(terminalTabsProvider).selectedId!;
+      final c3 = side.createFor(name: 'C');
+      dock().open(c3, add(c3, 2).id);
+      side.moveTab(moved, c3);
+      expect(c.read(sidebarWorkspacesProvider).tabsOf(ws), isEmpty);
+      tabs.close(moved);
+      expect(c.read(terminalTabsProvider).selectedId, a);
+      expect(docks().loose, c3);
+    });
+  });
+
   test('ToolDocks.toString() shows a count only (D24)', () {
     final ws2 = c.read(sidebarWorkspacesProvider.notifier).createFor(name: 'B');
     final a = add(kDefaultWorkspaceId, 1), b = add(ws2, 2);

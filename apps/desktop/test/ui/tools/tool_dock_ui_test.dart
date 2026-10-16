@@ -787,6 +787,59 @@ void main() {
     await disposeWorkspace(t, rig.container);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
+  testWidgets('closing the last tab of the shown workspace keeps its open '
+      'dock on screen beside an empty area — the same page, no reload; with '
+      'its dock closed the next tab shows, as before (§8, D4)', (t) async {
+    await rig.pump(t);
+    final first = rig.container.read(terminalTabsProvider).selectedId!;
+    final side = rig.container.read(sidebarWorkspacesProvider.notifier);
+    final tabs = rig.container.read(terminalTabsProvider.notifier);
+    final ws = side.createFor(name: 'B');
+    await side.openTabIn(ws);
+    await t.pumpAndSettle();
+    final b = rig.container.read(terminalTabsProvider).selectedId!;
+    expect(rig.container.read(sidebarWorkspacesProvider).workspaceOf(b), ws);
+    final tool = rig.add(ws, 'localhost:1');
+    await t.pumpAndSettle();
+    await openTool(t, tool.id);
+    final engine = rig.engines[tool.id]!;
+    expect(engine.loads, hasLength(1));
+    tabs.close(b);
+    await t.pumpAndSettle();
+    expect(
+      rig.container.read(terminalTabsProvider).selectedId,
+      first,
+      reason: "A2's successor, selected underneath",
+    );
+    expect(rig.container.read(toolDockProvider).loose, ws);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('tool.loose')),
+        matching: find.text('Open new tab'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(ValueKey('tool.dock.$ws')), findsOneWidget);
+    expect(rig.made, 1);
+    expect(engine.disposed, isFalse);
+    expect(engine.builds, 1, reason: 'the same view');
+    expect(engine.loads, hasLength(1));
+    expect(engine.calls, isNot(contains('reload')));
+    // A tab in B again, then its dock closed: A2's behaviour stays.
+    await side.openTabIn(ws);
+    await t.pumpAndSettle();
+    final again = rig.container.read(terminalTabsProvider).selectedId!;
+    expect(rig.container.read(toolDockProvider).loose, isNull);
+    rig.container.read(toolDockProvider.notifier).close(ws);
+    await t.pumpAndSettle();
+    tabs.close(again);
+    await t.pumpAndSettle();
+    expect(rig.container.read(terminalTabsProvider).selectedId, first);
+    expect(rig.container.read(toolDockProvider).loose, isNull);
+    expect(find.byKey(const Key('tool.loose')), findsNothing);
+    await disposeWorkspace(t, rig.container);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
   testWidgets('Review Focus 1: another workspace\'s tab and back keep the '
       'same page — one engine, one load, no reload (§10)', (t) async {
     await rig.pump(t);

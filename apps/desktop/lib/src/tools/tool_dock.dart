@@ -113,6 +113,11 @@ class ToolDockController extends Notifier<ToolDocks> {
   /// however it got there — kept after its chip closed.
   final _lastViewed = <String, String>{};
 
+  /// §8: the selected tab and the workspace it is in, as last seen, so a
+  /// close of that tab still knows the workspace it left (the sidebar may
+  /// let go of the tab before the selection moves on).
+  ({int tab, String ws})? _selected;
+
   @override
   ToolDocks build() {
     ref.listen<List<ToolEntry>>(toolRegistryProvider, (before, after) {
@@ -135,15 +140,59 @@ class ToolDockController extends Notifier<ToolDocks> {
       if (state.loose != null && after.tabsOf(state.loose!).isNotEmpty) {
         state = state.copyWith(loose: null);
       }
+      // §8: the selected tab's workspace kept current (a tab placed after
+      // its selection, a tab moved), never swapped for another tab's.
+      final id = ref.read(terminalTabsProvider).selectedId;
+      final ws = id == null ? null : after.workspaceOf(id);
+      final was = _selected;
+      if (id != null && ws != null && (was == null || was.tab == id)) {
+        _selected = (tab: id, ws: ws);
+      }
     });
-    ref.listen<int?>(terminalTabsProvider.select((s) => s.selectedId), (_, id) {
+    ref.listen<int?>(terminalTabsProvider.select((s) => s.selectedId), (
+      before,
+      id,
+    ) {
+      final emptied = _emptiedBy(before);
+      _track(id);
       if (id == null) return;
       final ws = ref.read(sidebarWorkspacesProvider).workspaceOf(id);
       if (ws != null) _lastTab[ws] = id;
       if (state.loose != null) state = state.copyWith(loose: null);
+      // §8 "Đóng tab cuối của workspace": the shown workspace's last tab
+      // closed with its dock open — the dock stays on screen beside an
+      // empty area (D4's loose), once the next tab is selected (A2) and the
+      // line above has ended any loose.
+      if (emptied != null) state = state.copyWith(loose: emptied);
     });
+    _track(ref.read(terminalTabsProvider).selectedId);
     scheduleMicrotask(_pruneOrphans);
     return const ToolDocks();
+  }
+
+  void _track(int? id) {
+    final ws = id == null
+        ? null
+        : ref.read(sidebarWorkspacesProvider).workspaceOf(id);
+    _selected = id == null || ws == null ? null : (tab: id, ws: ws);
+  }
+
+  /// §8: the workspace that the selected tab [closed] just left without a
+  /// tab while it was shown, when that workspace's dock is open and tools
+  /// show in ShellX; null otherwise (a switch, a tab left there, a closed
+  /// dock, tools in the browser, another workspace shown loose).
+  String? _emptiedBy(int? closed) {
+    final was = _selected;
+    if (closed == null || was == null || was.tab != closed) return null;
+    if (state.loose != null) return null;
+    final live = {for (final t in ref.read(terminalTabsProvider).tabs) t.id};
+    if (live.contains(closed)) return null;
+    final sidebar = ref.read(sidebarWorkspacesProvider);
+    if (sidebar.workspace(was.ws) == null) return null;
+    if (sidebar.tabsOf(was.ws).any(live.contains)) return null;
+    final dock = state.of(was.ws);
+    if (!dock.open || dock.tools.isEmpty) return null;
+    return ref.read(toolsEmbeddedProvider) ? was.ws : null;
   }
 
   /// D4: the tab of [ws] the user was last in, if it is still there.
