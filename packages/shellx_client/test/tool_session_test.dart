@@ -125,6 +125,9 @@ final class _Desktop {
   /// What the phone acknowledged (`tool.ack`'s `[id, total, …]`), in order.
   final acked = <List<int>>[];
 
+  /// The pages the phone left (`tool.close`), in order.
+  final closes = <ToolClose>[];
+
   bool _fromPhone(List<AppMessage> batch) {
     final messages = decodeBatch(encodeBatch(batch));
     scheduleMicrotask(() {
@@ -154,6 +157,8 @@ final class _Desktop {
             ends.add(end);
           case ToolAck(:final acks):
             acked.add(acks);
+          case final ToolClose close:
+            closes.add(close);
           default:
             break;
         }
@@ -262,11 +267,15 @@ typedef _Ask = ({InternetAddress address, int port, bool v6Only});
 /// S2's injected binder: a real [HttpServer.bind], unless [refuse] says
 /// another app holds that address and port (then a [SocketException], as a
 /// held port gives). It keeps every bind asked, in order, and every port it
-/// gave on 127.0.0.1.
+/// gave on 127.0.0.1. A bind [hold] names is made, then answered only once
+/// [release] completes: a bind still under way ([holding] meanwhile).
 final class _Binder {
-  _Binder({this.refuse});
+  _Binder({this.refuse, this.hold});
 
   final bool Function(InternetAddress address, int port)? refuse;
+  final bool Function(InternetAddress address, int port)? hold;
+  final release = Completer<void>();
+  var holding = false;
   final asked = <_Ask>[];
   final given = <int>[];
 
@@ -281,6 +290,10 @@ final class _Binder {
     }
     final server = await HttpServer.bind(address, port, v6Only: v6Only);
     if (address == InternetAddress.loopbackIPv4) given.add(server.port);
+    if (hold?.call(address, port) ?? false) {
+      holding = true;
+      await release.future;
+    }
     return server;
   }
 }
@@ -1661,6 +1674,191 @@ void main() {
       expect(page.phase, ToolPhase.ready);
       expect(page.servedPort, p);
       expect(tries(), 3);
+    });
+  });
+
+  /// Review M1 and M2 (ledger L359, L382, L472, L522): a pause or a close
+  /// that comes while the page is being served. What a serve under way
+  /// binds afterwards is closed at once; a close is final and tells the
+  /// computer once; a resume during a pause still under way serves again
+  /// once that pause is over.
+  group('a pause or a close while the page is served (M1, M2)', () {
+    final v4 = InternetAddress.loopbackIPv4;
+    final v6 = InternetAddress.loopbackIPv6;
+
+    /// The tool's port and a sibling's, both free on both addresses.
+    Future<(int, int)> twoPorts() async {
+      final p = await freeLoopbackPort();
+      var s = await freeLoopbackPort();
+      while (s == p) {
+        s = await freeLoopbackPort();
+      }
+      return (p, s);
+    }
+
+    /// Nothing listens on [address]:[port] (a close under way has a second
+    /// to finish).
+    Future<void> refused(InternetAddress address, int port) async {
+      final deadline = DateTime.now().add(const Duration(seconds: 2));
+      while (true) {
+        try {
+          (await Socket.connect(address, port)).destroy();
+        } on SocketException {
+          return;
+        }
+        if (DateTime.now().isAfter(deadline)) {
+          fail('${address.address}:$port is still bound');
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+    }
+
+    /// A page of the stand-in computer's tool on [p], with a sibling on
+    /// [s], whose [::1] bind of [s] is held by [binder]; started.
+    ({ToolSession page, _Desktop desktop, List<ToolLoad> loads}) start(
+      _Binder binder,
+      int p,
+      int s,
+    ) {
+      final desktop = _Desktop(p, _script, siblings: {'api0000001': s});
+      final page = ToolSession(
+        tool: _id,
+        port: p,
+        path: '/',
+        link: desktop.tools,
+        interfaces: _listing([v4, v6]),
+        bind: binder.bind,
+      );
+      addTearDown(page.close);
+      final loads = <ToolLoad>[];
+      page.events.listen((event) {
+        if (event is ToolLoad) loads.add(event);
+      });
+      page.start();
+      return (page: page, desktop: desktop, loads: loads);
+    }
+
+    test('close() while a sibling binds: nothing stays bound, the page says '
+        'closed from then on, and the computer is told', () async {
+      final (p, s) = await twoPorts();
+      final binder = _Binder(
+        hold: (address, port) => address == v6 && port == s,
+      );
+      final (:page, :desktop, :loads) = start(binder, p, s);
+      await until(() => binder.holding);
+      final phases = <ToolPhase>[];
+      page.changes.listen((_) => phases.add(page.phase));
+      final closing = page.close();
+      binder.release.complete();
+      await closing;
+      expect(phases, [ToolPhase.closed], reason: 'final from the call on');
+      expect(loads, isEmpty, reason: 'no entry on the sibling\'s port');
+      for (final port in [p, s]) {
+        for (final address in [v4, v6]) {
+          await refused(address, port);
+        }
+      }
+      await until(() => desktop.closes.isNotEmpty);
+    });
+
+    test('a second close() sends no second tool.close', () async {
+      final (:page, view: _, :desktop) = await openScripted();
+      final first = page.close();
+      final second = page.close();
+      await first;
+      await second;
+      expect(page.phase, ToolPhase.closed);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(desktop.closes, hasLength(1));
+    });
+
+    test('pause() while a sibling binds, then resume(): served on the tool\'s '
+        'port and the sibling\'s, nothing stale', () async {
+      final (p, s) = await twoPorts();
+      final binder = _Binder(
+        hold: (address, port) => address == v6 && port == s,
+      );
+      final (:page, desktop: _, :loads) = start(binder, p, s);
+      await until(() => binder.holding);
+      final pausing = page.pause();
+      binder.release.complete();
+      await pausing;
+      expect(page.phase, ToolPhase.paused);
+      expect(
+        page.servedPort,
+        isNull,
+        reason: 'nothing served in the background',
+      );
+      expect(loads, isEmpty);
+      for (final address in [v4, v6]) {
+        await refused(address, s);
+      }
+      page.resume();
+      await until(() => loads.isNotEmpty);
+      expect(page.phase, ToolPhase.ready);
+      expect(page.servedPort, p);
+      expect(page.origins, {'http://localhost:$p', 'http://localhost:$s'});
+      expect(loads.single.url.port, p);
+    });
+
+    test('resume() while a pause is still under way: served again once it '
+        'is over', () async {
+      final (:page, :view, desktop: _) = await openScripted();
+      final loads = <ToolLoad>[];
+      page.events.listen((event) {
+        if (event is ToolLoad) loads.add(event);
+      });
+      final pausing = page.pause();
+      page.resume();
+      await pausing;
+      await until(() => loads.isNotEmpty, timeout: const Duration(seconds: 3));
+      expect(page.phase, ToolPhase.ready);
+      expect((await view.request(loads.single.url)).status, 303);
+    });
+
+    // pause() and close() say their phase at once; a check of the computer
+    // still under way (here one that fails with the channel) never
+    // overwrites it, and nothing is served in the background.
+    for (final leave in ['pause', 'close']) {
+      test('a check under way when the page is left by $leave(), the channel '
+          'going with it: the page stays ${leave}d', () async {
+        final (:page, view: _, :desktop) = await openScripted();
+        // The list changes: the page asks the computer again.
+        desktop.tools.handle(
+          ToolListResult(
+            available: true,
+            body: Uint8List.fromList(utf8.encode('{"v":1,"tools":[]}')),
+          ),
+        );
+        final leaving = leave == 'pause' ? page.pause() : page.close();
+        desktop.tools.channelLost();
+        await leaving;
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        final left = leave == 'pause' ? ToolPhase.paused : ToolPhase.closed;
+        expect(page.phase, left);
+        desktop.tools.channelReady(); // a channel again, still left
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        expect(page.phase, left);
+        expect(page.servedPort, isNull);
+      });
+    }
+
+    test('pause(), resume(), pause() while the first pause is under way: the '
+        'last word holds, nothing is served', () async {
+      final (:page, view: _, desktop: _) = await openScripted();
+      final loads = <ToolLoad>[];
+      page.events.listen((event) {
+        if (event is ToolLoad) loads.add(event);
+      });
+      final pausing = page.pause();
+      page.resume();
+      final again = page.pause();
+      await pausing;
+      await again;
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(page.phase, ToolPhase.paused);
+      expect(page.servedPort, isNull);
+      expect(loads, isEmpty);
     });
   });
 
