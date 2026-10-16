@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -174,17 +175,35 @@ void _tell(
   }
 }
 
+/// An open waiting its turn ([MachineTools.acquireOpen]).
+final class _OpenWait {
+  _OpenWait(this.send);
+  final void Function() send;
+}
+
 /// V2-4 E8: tool frames per second this phone sends at most (of the relay's
 /// 500 per device), and at once.
 const int kToolPhoneFramesPerSecond = 100;
 const int kToolPhoneFrameBurst = 10;
 
+/// V2-4 I3 (final review): the stream opens (`tool.open`, and `tool.req` for
+/// HTTP and WebSocket alike) this phone sends at once, then a second, granted
+/// in order. The computer keeps E10 as written: past 120 opens at once and
+/// 60 a second it answers `busy`, a 503 for the page. So the phone paces its
+/// own and a request waits its turn on the phone (the web view's request
+/// stays pending): E20 expects a dev page of many modules to load slowly the
+/// first time, never to break. These numbers sit under E10's to leave room
+/// for transit bunching (opens sent apart may reach the computer together).
+const int kToolPhoneOpenBurst = 100;
+const int kToolPhoneOpensPerSecond = 50;
+
 /// The personal web tools of one machine (V2-4): their list, opening one,
 /// the streams of the open tool page, and the tool outbox (E8) every `tool.*`
 /// message goes through: collected for [flushInterval], split with
 /// [splitIntoBatches], at most [kToolPhoneFramesPerSecond] frames a second;
-/// acknowledgements of every stream in one `tool.ack` per 50 ms. Part of
-/// [MachineClient]. Never logs what it carries.
+/// acknowledgements of every stream in one `tool.ack` per 50 ms. Every stream
+/// open waits its turn ([acquireOpen], I3). Part of [MachineClient]. Never
+/// logs what it carries.
 final class MachineTools {
   @internal
   MachineTools({
@@ -236,6 +255,15 @@ final class MachineTools {
   int _frames;
   Timer? _refill;
 
+  // The stream opens (I3): one token comes back every [_openEvery], up to
+  // [kToolPhoneOpenBurst]; the opens waiting for one, in order.
+  static const _openEvery = Duration(
+    microseconds: 1000000 ~/ kToolPhoneOpensPerSecond,
+  );
+  int _opensLeft = kToolPhoneOpenBurst;
+  Timer? _openRefill;
+  final _openWaits = Queue<_OpenWait>();
+
   /// Pages keeping the channel: an open tool page wants it back after a loss.
   int _holders = 0;
 
@@ -282,27 +310,74 @@ final class MachineTools {
   }
 
   /// `tool.open` [tool] (an id from the list): the computer checks its flag
-  /// and tries its port. Connects first; throws
-  /// [MachineConnectionException] like every request.
+  /// and tries its port. Connects first, then waits its turn like every
+  /// stream open ([acquireOpen]); throws [MachineConnectionException] like
+  /// every request.
   Future<ToolOpened> open(String tool) async {
     await _connect();
     final rid = _nextRid++;
     final done = _opens[rid] = Completer<ToolOpened>();
-    if (!enqueue(ToolOpen(rid: rid, tool: tool))) {
-      _opens.remove(rid);
-      throw const MachineConnectionException(
-        MachineConnectionFailure.agentOffline,
-      );
-    }
+    final withdraw = acquireOpen(() {
+      if (!identical(_opens[rid], done)) return; // over meanwhile
+      if (!enqueue(ToolOpen(rid: rid, tool: tool))) {
+        _opens.remove(rid);
+        done.completeError(
+          const MachineConnectionException(
+            MachineConnectionFailure.agentOffline,
+          ),
+        );
+      }
+    });
     return done.future.timeout(
       _timeout,
       onTimeout: () {
+        withdraw();
         _opens.remove(rid);
         throw const MachineConnectionException(
           MachineConnectionFailure.timeout,
         );
       },
     );
+  }
+
+  /// I3: [send] runs once this phone may open one more stream (`tool.open`,
+  /// `tool.req`): at once when a token is there and no open waits, else in
+  /// turn, [kToolPhoneOpensPerSecond] a second after the first
+  /// [kToolPhoneOpenBurst]. The returned function withdraws an open not
+  /// granted yet (its stream ended meanwhile: its message never goes). A
+  /// lost channel drops every open that waits, and the next channel starts
+  /// with every token (the computer forgets this phone's budget too).
+  void Function() acquireOpen(void Function() send) {
+    if (_openWaits.isEmpty && _opensLeft > 0) {
+      _takeOpen();
+      send();
+      return () {};
+    }
+    final wait = _OpenWait(send);
+    _openWaits.add(wait);
+    return () => _openWaits.remove(wait);
+  }
+
+  void _takeOpen() {
+    _opensLeft--;
+    _openRefill ??= Timer.periodic(_openEvery, (_) {
+      _opensLeft++;
+      while (_opensLeft > 0 && _openWaits.isNotEmpty) {
+        _opensLeft--;
+        final wait = _openWaits.removeFirst();
+        // Isolated, as a stream's calls are ([_tell]): one open that throws
+        // must not hold back the others. Dropped, never logged (E18).
+        try {
+          wait.send();
+        } catch (_) {
+          // Dropped on purpose, see above.
+        }
+      }
+      if (_opensLeft >= kToolPhoneOpenBurst) {
+        _openRefill?.cancel();
+        _openRefill = null;
+      }
+    });
   }
 
   /// A new stream number on this channel.
@@ -407,8 +482,9 @@ final class MachineTools {
     _links.add(true);
   }
 
-  /// The channel is gone: opens in flight fail (never sent again), every
-  /// stream ends, nothing queued goes out.
+  /// The channel is gone: opens in flight fail (never sent again), opens
+  /// waiting their turn are dropped, every stream ends, nothing queued goes
+  /// out.
   @internal
   void channelLost() {
     _connected = false;
@@ -417,6 +493,10 @@ final class MachineTools {
     _refill?.cancel();
     _refill = null;
     _frames = _frameBurst;
+    _openRefill?.cancel();
+    _openRefill = null;
+    _opensLeft = kToolPhoneOpenBurst;
+    _openWaits.clear();
     _outbox.clear();
     acks.clear();
     credit = ToolCredit();

@@ -401,6 +401,103 @@ void main() {
     });
   });
 
+  // Review I3: the computer answers `busy` past E10's 120 stream opens at
+  // once and 60 a second; the phone keeps its own under that (100 at once,
+  // then 50 a second), in order, so a page's burst of modules waits on the
+  // phone instead of failing.
+  group('stream opens wait their turn on the phone (I3)', () {
+    ToolRequest request(int id) => ToolRequest(
+      id: id,
+      tool: 'k3f9za7q1m',
+      method: 'GET',
+      target: '/',
+      head: const [],
+      ws: false,
+      end: true,
+    );
+
+    /// A machine's tools on a channel whose frames go to [sent].
+    MachineTools machineTools(List<AppMessage> sent) => MachineTools(
+      send: (batch) {
+        sent.addAll(batch);
+        return true;
+      },
+      connect: () async {},
+      timeout: const Duration(seconds: 5),
+    )..channelReady();
+
+    test('150 at once: 100 go at once, the rest at 50 a second, in order, '
+        'none lost; one withdrawn while it waits never goes', () {
+      fakeAsync((async) {
+        final sent = <AppMessage>[];
+        final tools = machineTools(sent);
+        final granted = <int>[];
+        final withdraw = <int, void Function()>{};
+        for (var i = 1; i <= 150; i++) {
+          withdraw[i] = tools.acquireOpen(() {
+            granted.add(i);
+            tools.enqueue(request(i));
+          });
+        }
+        expect(granted, [for (var i = 1; i <= 100; i++) i], reason: 'at once');
+        withdraw[120]!(); // its stream ended while it waited
+        async.elapse(const Duration(milliseconds: 500));
+        expect(granted, hasLength(100 + 25), reason: '50 a second');
+        async.elapse(const Duration(seconds: 1));
+        final expected = [
+          for (var i = 1; i <= 150; i++)
+            if (i != 120) i,
+        ];
+        expect(granted, expected);
+        expect([for (final m in sent.whereType<ToolRequest>()) m.id], expected);
+        tools.dispose();
+        expect(async.pendingTimers, isEmpty);
+      });
+    });
+
+    test('a lost channel drops the opens that wait and leaves no timer; the '
+        'next channel starts with every token', () {
+      fakeAsync((async) {
+        final tools = machineTools([]);
+        final granted = <int>[];
+        for (var i = 1; i <= 110; i++) {
+          tools.acquireOpen(() => granted.add(i));
+        }
+        expect(granted, hasLength(100));
+        tools.channelLost();
+        expect(async.pendingTimers, isEmpty, reason: 'nothing outlives it');
+        async.elapse(const Duration(seconds: 1));
+        expect(granted, hasLength(100), reason: 'the waiting ones are gone');
+        tools.channelReady();
+        for (var i = 111; i <= 210; i++) {
+          tools.acquireOpen(() => granted.add(i));
+        }
+        expect(granted, hasLength(200), reason: 'a new channel: 100 at once');
+        tools.dispose();
+      });
+    });
+
+    test('tool.open waits its turn like a request', () {
+      fakeAsync((async) {
+        final sent = <AppMessage>[];
+        final tools = machineTools(sent);
+        for (var i = 1; i <= 100; i++) {
+          tools.acquireOpen(() {});
+        }
+        ToolOpened? opened;
+        tools.open('k3f9za7q1m').then((answer) => opened = answer);
+        async.elapse(const Duration(milliseconds: 17));
+        expect(sent.whereType<ToolOpen>(), isEmpty, reason: 'no token yet');
+        async.elapse(const Duration(milliseconds: 20));
+        final open = sent.whereType<ToolOpen>().single;
+        tools.handle(ToolOpened(rid: open.rid, ok: false, code: 'gone'));
+        async.flushMicrotasks();
+        expect(opened?.code, 'gone');
+        tools.dispose();
+      });
+    });
+  });
+
   // A tool page's stream (over dart:io sinks) may throw; that must never cost
   // the channel's other traffic (terminals, AI) or its teardown.
   group('a stream that throws is isolated (E18)', () {

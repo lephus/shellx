@@ -748,6 +748,95 @@ void main() {
     expect(events.whereType<ToolSiblingOff>().single.port, api.port);
   });
 
+  // Review I3: the computer answers `busy` (a 503) past E10's 120 stream
+  // opens at once and 60 a second; the phone paces its own (100 at once, then
+  // 50 a second), so a page's burst of modules waits instead of failing.
+  test('a burst of 160 requests from one page: every answer arrives, none '
+      'refused as busy (I3)', () async {
+    const requests = 160;
+    const parallel = 24; // under the phone's 32 HTTP streams (E10)
+    // A reload of a page of modules: each answered 304 Not Modified. Without
+    // a body no answer waits for the computer's frame budget (R9), so the
+    // page asks as fast as the tunnel answers.
+    await openSamePort(
+      routes: {
+        for (var i = 0; i < requests; i++)
+          '/m/$i.js': (request) async {
+            request.response.statusCode = HttpStatus.notModified;
+            await request.response.close();
+          },
+      },
+    );
+    await webview.enter(events.whereType<ToolLoad>().single.url);
+    final answers = <int, Page>{};
+    var next = 0;
+    Future<void> lane() async {
+      while (next < requests) {
+        final i = next++;
+        answers[i] = await webview.request(at('/m/$i.js'));
+      }
+    }
+
+    await Future.wait([for (var c = 0; c < parallel; c++) lane()]);
+    final wrong = [
+      for (var i = 0; i < requests; i++)
+        if (answers[i]?.status != HttpStatus.notModified)
+          '#$i: ${answers[i]?.status}',
+    ];
+    expect(wrong, isEmpty);
+    expect(
+      tool.hits.where((hit) => hit.uri.path.startsWith('/m/')),
+      hasLength(requests),
+    );
+  });
+
+  group('a request waiting its turn on the phone (I3)', () {
+    /// [page]'s next request waits its turn: every token is taken and a
+    /// second's worth of opens is queued ahead of it.
+    void queueAhead(_Desktop desktop) {
+      for (var i = 0; i < kToolPhoneOpenBurst + kToolPhoneOpensPerSecond; i++) {
+        desktop.tools.acquireOpen(() {});
+      }
+    }
+
+    test('the page paused: its tool.req never goes, the computer hears '
+        'nothing of it, the webview is not left waiting', () async {
+      final (:page, :view, :desktop) = await openScripted();
+      queueAhead(desktop);
+      final port = page.servedPort!;
+      final waiting = view
+          .request(Uri.parse('http://localhost:$port/hold'))
+          .then<Object>((answer) => answer, onError: (Object e) => e);
+      await until(() => page.requests == 1);
+      await page.pause();
+      await waiting.timeout(const Duration(seconds: 2));
+      // The opens queued ahead are all granted by now.
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+      expect(desktop.requests.where((r) => r.target == '/hold'), isEmpty);
+      expect(
+        desktop.ends,
+        isEmpty,
+        reason:
+            'no tool.end for a stream it '
+            'never heard of',
+      );
+    });
+
+    test('the channel goes: its tool.req never goes, the webview gets '
+        '502', () async {
+      final (:page, :view, :desktop) = await openScripted();
+      queueAhead(desktop);
+      final port = page.servedPort!;
+      final waiting = view.request(Uri.parse('http://localhost:$port/hold'));
+      await until(() => page.requests == 1);
+      desktop.tools.channelLost();
+      expect((await waiting.timeout(const Duration(seconds: 2))).status, 502);
+      desktop.tools.channelReady();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(desktop.requests.where((r) => r.target == '/hold'), isEmpty);
+    });
+  });
+
   test('a download is told; requests are counted (E12, E20)', () async {
     await openSamePort(
       routes: {
