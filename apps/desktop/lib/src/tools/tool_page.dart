@@ -19,6 +19,18 @@ const Duration kToolKnockEvery = Duration(seconds: 1);
 /// nothing; never logs the host.
 typedef ToolKnock = Future<bool> Function(String host, int port);
 
+/// Ruling R9 with D11's local hosts: where the knock dials for a tool at
+/// [host] (as `Uri.host` gives it). D11 counts a `*.localhost` name as this
+/// computer, but its lookup may fail or leave the machine as a DNS query:
+/// `localhost` instead. `0.0.0.0` is no address to connect to (Windows
+/// refuses it): `127.0.0.1`. Any other host as it is.
+String toolKnockHost(String host) {
+  final h = host.toLowerCase();
+  if (h.endsWith('.localhost')) return 'localhost';
+  if (h == '0.0.0.0') return '127.0.0.1';
+  return host;
+}
+
 Future<bool> knockToolPort(String host, int port) async {
   try {
     final socket = await Socket.connect(
@@ -317,7 +329,7 @@ final class ToolPage extends ChangeNotifier {
     if (_knocking) return;
     _knocking = true;
     try {
-      final up = await _knock(target.host, target.port);
+      final up = await _knock(toolKnockHost(target.host), target.port);
       // Still what a recovery loads: never a URL edited away meanwhile.
       if (up &&
           !_disposed &&

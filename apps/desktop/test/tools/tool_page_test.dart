@@ -162,6 +162,48 @@ void main() {
     });
   });
 
+  test('toolKnockHost: localhost for *.localhost, 127.0.0.1 for 0.0.0.0, '
+      'any other host unchanged (ruling R9, D11)', () {
+    expect(toolKnockHost('app.localhost'), 'localhost');
+    expect(toolKnockHost('a.b.localhost'), 'localhost');
+    expect(toolKnockHost('App.LocalHost'), 'localhost');
+    expect(toolKnockHost('0.0.0.0'), '127.0.0.1');
+    for (final same in [
+      'localhost',
+      '127.0.0.1',
+      '127.8.9.10',
+      '::1',
+      'nas.lan',
+      'localhost.example.com',
+      'notlocalhost',
+    ]) {
+      expect(toolKnockHost(same), same);
+    }
+  });
+
+  test('the knock dials loopback for a tool at a *.localhost name or at '
+      '0.0.0.0; any other host as it is (ruling R9, D11)', () {
+    fakeAsync((async) {
+      for (final (url, dialed) in [
+        ('app.localhost:5173', 'localhost:5173'),
+        ('api.dev.localhost:8000', 'localhost:8000'),
+        ('0.0.0.0:8080', '127.0.0.1:8080'),
+        ('127.0.0.2:3000', '127.0.0.2:3000'),
+        ('[::1]:3000', '::1:3000'),
+      ]) {
+        final p = page(tool(url));
+        p.setShown(true);
+        engine.emit(const LoadFailed(BrowserLoadErrorKind.refused));
+        async.elapse(const Duration(seconds: 1)); // the 1 s reload
+        engine.emit(const LoadFailed(BrowserLoadErrorKind.refused));
+        knocks.clear();
+        async.elapse(const Duration(seconds: 1));
+        expect(knocks, [dialed], reason: url);
+        p.dispose();
+      }
+    });
+  });
+
   test('no knock for a tool that is not on this computer', () {
     fakeAsync((async) {
       page(tool('nas.lan:8080')).setShown(true);
