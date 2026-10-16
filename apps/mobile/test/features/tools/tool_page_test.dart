@@ -73,6 +73,22 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// The app goes to the background (E13): the session is told to stop serving.
+  Future<void> background(WidgetTester tester) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+  }
+
+  /// The app is back on screen: the session is told to serve again.
+  Future<void> foreground(WidgetTester tester) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+  }
+
   testWidgets('the bar names the tool; first load through the tunnel, then the page', (tester) async {
     await open(tester);
     expect(page().starts, 1);
@@ -363,15 +379,9 @@ void main() {
       'process reloads', (tester) async {
     await open(tester);
     await shown(tester);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-    await tester.pump();
+    await background(tester);
     expect(page().pauses, 1);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pump();
+    await foreground(tester);
     expect(page().resumes, 1);
     engine.callbacks.onCrashed();
     expect(engine.reloads, 1);
@@ -510,22 +520,91 @@ void main() {
   testWidgets('pausing blanks the web view; the next serve gets a fresh one (E13, NB1)', (tester) async {
     await open(tester);
     await shown(tester);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-    await tester.pump();
+    await background(tester);
     expect(page().pauses, 1);
     expect(engines.log.last, 'web1 load about:blank');
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pump();
+    await foreground(tester);
     expect(page().resumes, 1);
     page().ready(port: 49152); // served again, on another port: a new secret and its entry URL
     await tester.pump();
     expect(engines.made, hasLength(2));
     expect(engines.made.first.disposed, isTrue);
     expect(engine.loads.single.port, 49152);
+  });
+
+  // A: a serve that comes back on the same ports loads its entry in the web view that is there, so that its
+  // sessionStorage and its in-page history stay (a tool that keeps its token there is not signed out at every app
+  // switch): every page of that history is on a port served again by this session. Other ports, or a sibling
+  // missing or new, are another set: a fresh web view.
+  testWidgets('served again on the same ports after a pause, the entry loads in the same web view (A)', (
+    tester,
+  ) async {
+    await open(tester);
+    page().siblingPorts.add(8000);
+    await shown(tester);
+    await background(tester);
+    await foreground(tester);
+    page().ready(); // the same ports again: a new secret, a new entry URL
+    await tester.pump();
+    expect(engines.made, hasLength(1));
+    expect(engines.log, [
+      'web1 load localhost:5173/__shellx/enter',
+      'web1 load about:blank',
+      'web1 load localhost:5173/__shellx/enter',
+    ]);
+    expect(find.text('Đang tải qua đường hầm…'), findsOneWidget, reason: 'covered again until the entry page is in');
+    engine.callbacks.onPageStarted();
+    engine.callbacks.onPageFinished();
+    await tester.pump();
+    expect(find.text('Đang tải qua đường hầm…'), findsNothing);
+  });
+
+  testWidgets('a sibling no longer served is another set: a fresh web view, the old one blanked first (A)', (
+    tester,
+  ) async {
+    await open(tester);
+    page().siblingPorts.add(8000);
+    await shown(tester);
+    await background(tester);
+    await foreground(tester);
+    page().siblingPorts.clear(); // another app holds the sibling's port now
+    page().ready();
+    await tester.pump();
+    expect(engines.made, hasLength(2));
+    expect(engines.log, [
+      'web1 load localhost:5173/__shellx/enter',
+      'web1 load about:blank',
+      'web1 load about:blank',
+      'web1 dispose',
+      'web2 load localhost:5173/__shellx/enter',
+    ]);
+  });
+
+  testWidgets('a sibling that is served now is another set too (A)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    await background(tester);
+    await foreground(tester);
+    page().siblingPorts.add(8000);
+    page().ready();
+    await tester.pump();
+    expect(engines.made, hasLength(2));
+    expect(engines.made.first.disposed, isTrue);
+  });
+
+  testWidgets('the set that counts is the one the current web view was opened for (A)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    page().ready(port: 49152); // another port: web2, opened for 49152
+    await tester.pump();
+    await background(tester);
+    await foreground(tester);
+    page().ready(port: 49152); // the ports web2 was opened for, again: web2 again
+    await tester.pump();
+    expect(engines.made, hasLength(2));
+    expect(engines.made.last.loads.where((url) => url.scheme == 'http').map((url) => url.port), [49152, 49152]);
+    expect(engines.made.first.disposed, isTrue);
+    expect(engines.made.last.disposed, isFalse);
   });
 
   testWidgets('a pause before anything is loaded leaves the blank web view alone (NB1)', (tester) async {

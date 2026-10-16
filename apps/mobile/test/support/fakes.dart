@@ -648,8 +648,16 @@ class FakeToolPage implements ToolPageSession {
     return served != null && served != tool.port ? served : null;
   }
 
+  /// Ports of the workspace's other tools this page serves too (E4); [origins] holds them while something is
+  /// served.
+  final Set<int> siblingPorts = {};
+
   @override
-  Set<String> get origins => {if (servedPortValue != null) 'http://localhost:$servedPortValue'};
+  Set<String> get origins {
+    final served = servedPortValue;
+    if (served == null) return {};
+    return {'http://localhost:$served', for (final sibling in siblingPorts) 'http://localhost:$sibling'};
+  }
 
   @override
   int get requests => requestsValue;
