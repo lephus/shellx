@@ -11,7 +11,15 @@ import 'package:shellx_mobile/features/terminal/presentation/terminal_metrics.da
 /// What the session picker offers (terminal sharing §9.1): the sessions not open as tabs yet, and
 /// the agent's `desktop_sharing` for the hint shown when there is no desktop terminal.
 final class SessionListing {
-  const SessionListing(this.sessions, {required this.desktopSharing, this.aiSupported, this.ai});
+  const SessionListing(
+    this.sessions, {
+    required this.desktopSharing,
+    this.aiSupported,
+    this.ai,
+    this.toolsSupported,
+    this.tools,
+    this.toolUpdates,
+  });
 
   final List<SessionInfo> sessions;
 
@@ -26,6 +34,16 @@ final class SessionListing {
   /// received yet.
   final AiListing? ai;
 
+  /// V2-4: whether the computer has tools for phones; null when unknown (an older computer says
+  /// nothing: no Tool group then).
+  final bool? toolsSupported;
+
+  /// V2-4: the tools this phone may open; null when not supported or not received yet.
+  final ToolListing? tools;
+
+  /// V2-4: the list as it changes while the picker is open (criterion 1: a tool turned on shows).
+  final Stream<ToolListing>? toolUpdates;
+
   /// "Terminal trên máy tính".
   List<SessionInfo> get desktop => [
     for (final session in sessions)
@@ -38,9 +56,9 @@ final class SessionListing {
       if (session.kind != SessionKind.desktop) session,
   ];
 
-  /// Nothing to pick: `+` opens a new session at once. A computer with AI for phones always
-  /// offers the picker ("Phiên AI mới").
-  bool get isEmpty => sessions.isEmpty && aiSupported != true;
+  /// Nothing to pick: `+` opens a new session at once. A computer with AI or tools for phones
+  /// always offers the picker ("Phiên AI mới", the Tool group).
+  bool get isEmpty => sessions.isEmpty && aiSupported != true && toolsSupported != true;
 }
 
 /// The tabs of one machine. Outlives its page so terminals keep receiving
@@ -200,7 +218,7 @@ class TerminalWorkspace extends Controller {
     await ensureConnected();
     final sessions = await machine.listSessions();
     _listedSessions = true;
-    final ai = await _pickableAiListing();
+    final (ai, tools) = await (_pickableAiListing(), _pickableToolListing()).wait;
     // After the wait for the AI listing: a session attached meanwhile is a tab by now.
     final open = {for (final tab in _tabs.peek()) tab.id};
     return SessionListing(
@@ -211,7 +229,72 @@ class TerminalWorkspace extends Controller {
       desktopSharing: machine.desktopSharing,
       aiSupported: machine.ai.supported,
       ai: ai,
+      toolsSupported: machine.tools.supported,
+      tools: tools,
+      toolUpdates: machine.tools.supported == true ? machine.tools.listings : null,
     );
+  }
+
+  // V2-4: the computer's tools, watched like the AI list (while a page or the picker shows them).
+  int _toolHolders = 0;
+  bool _toolWatching = false;
+  bool _toolStale = false;
+  StreamSubscription<ToolListing>? _toolFeed;
+
+  /// The computer's tool list as far as it can be trusted (see [aiListing]).
+  ToolListing? get toolListing => _toolStale ? null : machine.tools.listing;
+
+  /// Like [holdAiListing], for the tool list.
+  void Function() holdToolListing() {
+    _toolHolders++;
+    _syncToolWatch();
+    var held = true;
+    return () {
+      if (!held) return;
+      held = false;
+      _toolHolders--;
+      _syncToolWatch();
+    };
+  }
+
+  void _syncToolWatch() {
+    final tools = machine.tools;
+    final want = !_disposed && _toolHolders > 0 && tools.supported == true;
+    if (want == _toolWatching) return;
+    _toolWatching = want;
+    if (want) {
+      _toolFeed = tools.listings.listen((_) => _toolStale = false);
+      unawaited(tools.watch().catchError((Object _) {}));
+    } else {
+      unawaited(_toolFeed?.cancel());
+      _toolFeed = null;
+      _toolStale = true;
+      tools.unwatch();
+    }
+  }
+
+  /// The tool list for the picker: null when the computer has no tools for phones, or did not answer
+  /// within [aiListingWait].
+  Future<ToolListing?> _pickableToolListing() async {
+    if (_disposed || machine.tools.supported != true) return null;
+    final release = holdToolListing();
+    try {
+      final held = toolListing;
+      if (held != null) return held;
+      final next = Completer<ToolListing?>();
+      void finish(ToolListing? listing) {
+        if (!next.isCompleted) next.complete(listing);
+      }
+
+      final timer = Timer(aiListingWait, () => finish(null));
+      final heard = machine.tools.listings.listen(finish, onDone: () => finish(null));
+      return await next.future.whenComplete(() {
+        timer.cancel();
+        unawaited(heard.cancel());
+      });
+    } finally {
+      release();
+    }
   }
 
   // V2-2: the computer's AI sessions. The list is watched while a page shows it (or the picker is being
@@ -402,6 +485,7 @@ class TerminalWorkspace extends Controller {
   void dispose() {
     _disposed = true;
     _syncAiWatch();
+    _syncToolWatch();
     clearPendingSelect();
     for (final tab in _tabs.peek()) {
       tab.dispose();

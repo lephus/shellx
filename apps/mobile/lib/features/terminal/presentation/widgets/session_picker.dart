@@ -1,4 +1,5 @@
 import 'package:shellx_ai/remote.dart';
+import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
@@ -28,6 +29,12 @@ final class OpenAiSession extends SessionChoice {
 /// V2-2: "Phiên AI mới".
 final class NewAiSession extends SessionChoice {
   const NewAiSession();
+}
+
+/// V2-4: open a tool of the computer.
+final class OpenTool extends SessionChoice {
+  const OpenTool(this.tool);
+  final ToolInfo tool;
 }
 
 /// Terminal sharing §9.1: the main line of a desktop terminal, "app — title"; a missing part
@@ -103,6 +110,17 @@ Future<SessionChoice?> showSessionPicker(BuildContext context, SessionListing li
                 _GroupHeader(strings.aiGroup),
                 8.sizedHeight,
                 _Group(children: _aiRows(context, listing)),
+              ],
+              // V2-4 E15: the Tool group after the AI sessions (none from a computer without tools).
+              if (listing.toolsSupported == true) ...[
+                14.sizedHeight,
+                _GroupHeader(strings.pickerTools),
+                8.sizedHeight,
+                StreamBuilder<ToolListing>(
+                  stream: listing.toolUpdates,
+                  initialData: listing.tools,
+                  builder: (context, snapshot) => _Group(children: _toolRows(context, snapshot.data)),
+                ),
               ],
               14.sizedHeight,
               _GroupHeader(strings.pickerDesktopGroup),
@@ -184,6 +202,67 @@ List<Widget> _aiRows(BuildContext context, SessionListing listing) {
         text: ai.agents.any((a) => a.ready) ? s.aiNewNoFolders : s.aiNewNoAgents,
       ),
   ];
+}
+
+/// V2-4 E15: a row per tool on for the phone; a hint when there is none, or no list yet.
+List<Widget> _toolRows(BuildContext context, ToolListing? tools) {
+  final s = S.of(context);
+  if (tools == null || !tools.available) {
+    return [_Hint(key: const ValueKey('picker-tools-hint'), text: s.toolNeedsDesktop)];
+  }
+  if (tools.tools.isEmpty) return [_Hint(key: const ValueKey('picker-tools-hint'), text: s.toolsEmpty)];
+  return [for (final tool in tools.tools) _ToolRow(tool: tool)];
+}
+
+/// One tool: 🧩, "Bảng việc" / "shop-web · localhost:4000".
+class _ToolRow extends StatelessWidget {
+  const _ToolRow({required this.tool});
+
+  final ToolInfo tool;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.of(context);
+    final colors = context.colors;
+    return InkWell(
+      key: ValueKey('picker-tool-${tool.id}'),
+      onTap: () => Navigator.pop(context, OpenTool(tool)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+          child: Row(
+            children: [
+              ExcludeSemantics(child: Icon(Icons.extension_outlined, size: 20, color: colors.secondaryText)),
+              10.sizedWidth,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tool.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.typo.subHeader15.bold.copyWith(color: colors.primaryText),
+                    ),
+                    2.sizedHeight,
+                    Text(
+                      s.toolRowSub(tool.ws, tool.port),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.typo.paragraph13.copyWith(color: colors.secondaryText),
+                    ),
+                  ],
+                ),
+              ),
+              10.sizedWidth,
+              Text(s.pickerOpen, style: context.typo.subHeader15.bold.copyWith(color: colors.link)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// One AI session: "Nút đăng xuất" / "Claude · Cần bạn trả lời" / what it waits for.
