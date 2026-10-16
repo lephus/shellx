@@ -63,7 +63,12 @@ Future<void> daemonMain() async {
         await cleanupOldRuntimes(localAppData: local, keep: info.version);
       }
     }
-    await _serve(paths: paths, environment: environment, version: info.version);
+    await _serve(
+      paths: paths,
+      environment: environment,
+      version: info.version,
+      bundleId: info.packageName,
+    );
   } catch (error) {
     debugPrint('ShellX daemon: stopped: ${error.runtimeType}');
     try {
@@ -79,6 +84,7 @@ Future<void> _serve({
   required MuxPaths paths,
   required Map<String, String> environment,
   required String version,
+  required String bundleId,
 }) async {
   final locale = resolveAppLocale(PlatformDispatcher.instance.locales);
   final l10n = lookupAppLocalizations(locale);
@@ -124,6 +130,7 @@ Future<void> _serve({
       ),
     ),
     deviceName: deviceNameFromHostname(Platform.localHostname),
+    bundleId: bundleId,
     remoteTools: remoteTools,
     cliPaths: cliPaths,
     // The listener below is this daemon's: shells are told its address and

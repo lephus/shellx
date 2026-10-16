@@ -10,7 +10,7 @@ void main() {
 
   test('SecureKeyValueStore reads, writes and deletes', () async {
     FlutterSecureStorage.setMockInitialValues({});
-    final store = SecureKeyValueStore();
+    final store = SecureKeyValueStore(bundleId: kProductionBundleId);
     expect(await store.read('auth_token'), isNull);
     await store.write('auth_token', 'secret');
     expect(await store.read('auth_token'), 'secret');

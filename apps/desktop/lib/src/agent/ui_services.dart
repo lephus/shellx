@@ -23,6 +23,7 @@ DesktopServices buildUiServices({
   required String appVersion,
   required Uri relayBase,
   required String deviceName,
+  required String bundleId,
   required TerminalSharingSetup? sharingSetup,
   required Future<void> Function() quitApp,
   Future<void> Function()? deletePastedImages,
@@ -31,7 +32,7 @@ DesktopServices buildUiServices({
   DevicePlatform? platform,
   required bool windows,
 }) => DesktopServices(
-  secureStore: SecureKeyValueStore(),
+  secureStore: SecureKeyValueStore(bundleId: bundleId),
   settings: settings,
   api: ShellxApi(baseUri: relayBase),
   createApi: () => ShellxApi(baseUri: relayBase),

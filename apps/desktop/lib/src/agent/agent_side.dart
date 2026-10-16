@@ -46,6 +46,7 @@ AgentSide buildAgentSide({
   required Uri relayBase,
   required TerminalSharingSetup? sharingSetup,
   required String deviceName,
+  required String bundleId,
   required RemoteTools remoteTools,
   required Future<void> Function() quitApp,
   Future<void> Function()? deletePastedImages,
@@ -97,7 +98,7 @@ AgentSide buildAgentSide({
   // The process's one SecureKeyValueStore; DesktopServices builds the one
   // TrustedStore over it.
   final services = DesktopServices(
-    secureStore: SecureKeyValueStore(),
+    secureStore: SecureKeyValueStore(bundleId: bundleId),
     settings: settings,
     api: api,
     createApi: () => ShellxApi(baseUri: relayBase),
