@@ -1,6 +1,6 @@
 # ShellX V2-5a — The app's full display name and the new design system Implementation Plan
 
-Status: partial — tasks 1–4 written in full; tasks 5–16 outlined only (plan writer stopped 2026-10-16 15:00 on the controller's order).
+Status: complete — tasks 1–4 written in full (code verified by runs); tasks 5–16 written on 2026-10-16 ~16:45 at a compact level (files, interfaces, exact values, tests, commands; full code only for native, security and tricky logic), at the user's request to finish all V2-5 plans within about an hour. Implementers write the remaining code from the spec; reviewers check against the spec.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -59,6 +59,31 @@ Task 1 copies these into the ledger `docs/superpowers/ledgers/v2-5a.md`.
 - **R14 — package tests run with `flutter test` in `packages/shellx_design`** (Global Constraints, every task's checks and Task 16). The only CI that runs package tests (`.github/workflows/windows-check.yml`) is outside A's files (spec header): adding the package there is a follow-up. *Cost if wrong:* CI does not run the package's tests until then.
 - **R15 — the spike's macOS run uses a throw-away worktree of `HEAD`** (V2-3's Task 6 recipe), so Task 1 commits its code first and records the results in a second commit. *Cost if wrong:* none.
 - **R16 — the mobile app gets `integration_test` as a dev dependency** (the spike's simulator run); `pod install` adds its lines to `ios/Podfile.lock`, which are committed with `COCOAPODS: 1.16.2` kept. *Cost if wrong:* none (dev dependency plugins stay out of release builds).
+
+
+**Rulings added 2026-10-16 ~16:45 (compact completion of Tasks 5–16):**
+
+- **R17 — a user `font-family` for the terminal gets no weights and no SF Mono in its fallback.** When the config names a family (`families` not empty), `desktopTerminalStyle` leaves `normalWeight`/`boldWeight` null (no `wght` axis) and builds the fallback as today: `[...families.skip(1), bundled JetBrains Mono (Light or Regular), ...xterm's]` — **never** `'SF Mono'`. The SF Mono default with `wght` 300/400/700 applies only when no family is named (macOS). *Why:* today's contract (`terminal_style.dart` doc: "a named family is drawn as the system has it"); a `wght` on a user's variable font would override the instance they chose, and an unweighted SF Mono in the fallback would draw missing glyphs at its default 295 (Light). JetBrains Mono is static, so it needs no axis. Same rule on iOS has no case (the phone has no user family). *Cost if wrong:* a user who names a variable font sees its default instance, as today; to weight it, set the two fields in the user branch too (one line).
+- **R18 — the fourth `SegmentedButton` also becomes `ShellxSegmented`.** A40 counts three (`settings_page.dart`, `voice_composer.dart`, desktop `ai_changes_panel.dart`); the union has a fourth, `SegmentedButton<bool>` in `apps/mobile/lib/features/ai/presentation/widgets/ai_changes_sheet.dart` (V2-2b's phone mirror of the desktop panel). Task 12 replaces it with `ShellxSegmented<bool>` (A49 allows component swaps in AI files); until then Task 6 keeps `ThemeDataFactory.segmentedButtonTheme`, token-coloured, and Task 12 deletes it once no `SegmentedButton` is left. *Cost if wrong:* one sheet keeps a Material segmented control in token colours.
+- **R19 — the theme default (A26) is a pure function, written only when it decides.** `resolveInitialThemeMode({required SharedPreferences prefs, required AdaptiveThemeMode? saved})` in `apps/mobile/lib/core/platform/theme_default.dart`; key `shellx_theme_default` stores `AdaptiveThemeMode.name` (`'dark'`/`'system'`); an unknown stored string counts as absent. A saved `adaptive_theme` mode wins and nothing is written; a stored default is returned as is; otherwise fresh install (no `shellx_installed`) → `dark`, else `system`, and that result is written. `main.dart` reads it **before** DI (which sets `shellx_installed`). *Cost if wrong:* none.
+- **R20 — `ShellxIconButton`'s gradient variant is its existing toggle flag.** `selected == true` draws the gradient (`ShellxGradients.accent`, white glyph, outside ring); `selected` false/null draws the flat or raised variant chosen by the new `variant` field. *Why:* §7.1 "gradient khi đang bật"; the flag already marks the "on" state for semantics. *Cost if wrong:* a toggled icon button looks louder than wanted; draw `accent` glyph instead (one branch).
+- **R21 — both apps' new components share one API shape** (`ShellxSegmented<T>({segments, selected, onChanged})` with `ShellxSegment<T>(value, label, {icon})`, `ShellxChip`, `ShellxCard` with `ShellxCardVariant`), as two classes (one per app, spec §7: desktop `ui/components/`, phone `shared/src/`), so V2-5b/C code reads the same on both. *Cost if wrong:* none.
+- **R22 — the raw-style guard counts raw text, comments included.** The counter is a regex over the file text (no parser); a comment that names `Icons.x` counts and is reworded. *Why:* deterministic, no analyzer dependency in a test. *Cost if wrong:* a doc comment needs rewording.
+
+- **R30 — Android 12+ dark devices also get `values-night-v31/styles.xml`.** A48 names only `values-v31`. Android picks resources by qualifier precedence, and night mode outranks the API level. On a dark Android 12+ phone, `values-night/styles.xml` would therefore win over `values-v31`, and the system splash would lose `windowSplashScreenBackground`. So Task 14 writes both `values-v31` (Light parent) and `values-night-v31` (dark parent), each with `android:windowSplashScreenBackground` = `@color/shellx_page`. flutter_native_splash ships the same pair. *Cost if wrong:* one extra XML file.
+- **R31 — The desktop "Licenses and credits…" button always shows.** It is not gated on the version: a test with no desktop services has no version line but still has the button. It is a `TextButton` keyed `settings.licenses`, placed right after the version line (or where that line would be), and it takes the theme's `link` style. `applicationVersion` is passed only when the version is known. *Cost if wrong:* none.
+- **R32 — No identity test reads `release/`.** A10 adds no test to `release/tests`. Task 13's `identity_pins_test.dart` reads only `apps/desktop` files. Task 15 instead checks that the diff of `shellx.iss` is exactly its three lines, and that the kept identity lines are byte-equal to before (a `grep` step). *Cost if wrong:* a later rename of an Inno shortcut or folder is not caught by a test. A follow-up could add one to `release/tests` with the teammate's consent.
+- **R33 — One home for the desktop §10.5 checks: `apps/desktop/test/ui/design_budget_test.dart`.** Task 9's outline also mentions the 30-tab sidebar count. If Task 9 already created that test, Task 11 keeps it where it is and adds its own checks to the same file, never a second copy. The ≤ 2 bound must hold once Task 11 makes the selected row a raised tile. *Cost if wrong:* none.
+- **R34 — There are 9 `showModalBottomSheet` calls, not 8.** The integrated tree has 9 (spec A39 says 8). The extra one is V2-2b's `ai_new_session_sheet.dart`. All 9 lose their own `backgroundColor`/`shape`, and a source-scan test pins this for every present and future call. Likewise the desktop has 7 `AlertDialog(` users, not 6. All 7 follow `dialogTheme`. `browser/engines/wk_webview_engine.dart`'s `setOnJavaScriptAlertDialog` is not a Material dialog and is left alone. *Cost if wrong:* none.
+- **R35 — The full-app smoke launch (Task 16) ends with a leftover check.** After stopping the app by its PID:
+  - `pgrep -f "$SCRATCH"` must be empty. Any process still running from the scratch path is one this recipe started, and is stopped by its own PID.
+  - `launchctl print gui/$(id -u) | grep -c 'pro.shellx.desktop.smoketest'` must be 0. Otherwise `launchctl bootout gui/$(id -u)/<that label>` removes only that label.
+
+  Why: the app may start a background service or a login item, and those live in the user's real launchd domain even with a temporary HOME. *Cost if wrong:* a stray `.smoketest` job until the next logout.
+
+- **R18 (from the Tasks 5–10 writer) — applied in Task 12.** The phone's `features/ai/presentation/widgets/ai_changes_sheet.dart` has a fourth `SegmentedButton<bool>` that A40 did not count: "Lượt này" (`true`) vs "Cả phiên" (`false`), in the column keyed `ai.changes.sheet`. Task 12 replaces it with `ShellxSegmented<bool>`, which Task 10 introduces with the desktop's API. The keys `ai.changes.turn`/`ai.changes.session` stay on the segment labels, and the "Lượt này" segment stays disabled while there is no turn. A test pins it (Task 12). *Cost if wrong:* none; it is one Material segmented control fewer.
+
+---
 
 ## Global Constraints
 
@@ -4637,119 +4662,1206 @@ git commit -m "feat(v2-design): the monospaced type scale with weight axes, the 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ````
 
-### Task 5: The desktop adapter — tokens, theme, fonts, terminal — UNFINISHED (plan writer stopped 2026-10-16 15:00)
+### Task 5: The desktop adapter — tokens, theme, fonts, terminal
 
-Started in the scratch union and analyze-clean, not yet run against the suite. What is decided:
-- `ShellxDesktopColors`: every value a `ShellxPalette` constant per spec §5.9's table (e.g. `bgTerminal = navy900`, `rowSelected = navy700`, `rowPressed = navy650`, `line = hairline`, `border = hairlineStrong`, `textPrimary = white87`, `textTitle = white100`, `accent = primary = cyan`, `onPrimary = onCyan`, `err = errDialog = error`, `warnBg = warnSoft`, `warnBorder = warnLine`, `noticeBorder = noticeLine`, `destructiveHover = errorHover`); new `onAccent`, `link`, `overlayHover` (navy650), `overlayPressed` (navy600), `pushed` (navy800); `primaryHover`/`primaryPressed` removed (A50) — their only user, `ShellxPrimaryButton` (`ui/terminal/terminal_overlays.dart`), takes `shellxPrimaryButtonStyle()` in this task.
-- `ShellxSpace` = `ShellxSpacing`; `ShellxRadius.r4/r6/r8/r12/pill` = `ShellxRadii.tiny/control/card/sheet/pill`; `ShellxShadows.e1/e2` = `ShellxElevation.darkFloat1/darkFloat2`, `e1Elevation`/`e1ShadowColor` from the package, new `raised` (= `darkRaisedSmall`) and `inset`; `ShellxMotion` = `ShellxDurations`/`ShellxCurves` (+ `slide`, `slideCurve`); `ShellxText` getters over `ShellxTypeScale.desktopFor(…, defaultTargetPlatform)` (R3) with new `display`.
-- `buildDesktopTheme()`: `fontFamily: ShellxFonts.uiFamily(defaultTargetPlatform)`, `fontFamilyFallback: ShellxFonts.uiFallback(…)`, `textTheme`/`primaryTextTheme` through `shellxWeightedTextTheme` (R5); `ColorScheme.dark` with `surfaceContainerLowest…Highest` = navy900, navy850, navy750, navy750, navy700 and `surfaceTint` transparent; inputs (A43): fill navy900, outline `borderInput` (hover `textSecondary` via `WidgetStateInputBorder`), radius 16, focus cyan 1.5 px, disabled outline at 50 %; switch thumb `onPrimary` on a `primary` track when on (fixes `app_dialogs_test.dart:466`); slider, progress, text selection (`ShellxTerminalPalette.selection`), icon, dialog (r28, navy750, `hairlineStrong`, scrim), bottom sheet, popup menu, menu and dropdown menu (navy750, r16, `hairlineStrong`, `float1`), tooltip (navy700, r10, `hairlineStrong`, `small`, `float1`); window-level `filledButtonTheme` = `shellxPrimaryButtonStyle()` (gradient `accentStrong` through `shellxGradientLayer`, white label, outside ring), `outlinedButtonTheme` = `shellxSecondaryButtonStyle()` (raised navy700 + `raisedSmall`, hover `overlayHover`, pressed `pushed` without shadow, inside ring), `textButtonTheme` = `shellxTextButtonStyle()` (`link`; hover `rowHover`, pressed `rowPressed`). `buildDialogTheme` adds the dialog type and the 32/80/14 sizing on top. `destructiveButtonStyle()` brings its own `backgroundBuilder` (solid `error`, hover `errorHover`, pressed `error` + black 16 %) so the theme's gradient never shows through it.
-- Code family: `kAiMono` (`ui/ai/ai_theme.dart`) stays `const`, family removed, weight 400 + `wght`; `ai_file_viewer.dart` passes `ShellxFonts.uiFamily/uiFallback` to re_editor's `CodeEditorStyle` (R13); `pages/confirm_page.dart` drops `fontFamily: 'JetBrainsMono'`.
-- Terminal (§6.8, A37): `third_party/xterm/lib/src/ui/terminal_text_style.dart` — `TerminalStyle` gains `double? normalWeight`, `double? boldWeight` (constructor, `copyWith`, `fromTextStyle` keeps null), `toTextStyle` adds `fontVariations: [FontVariation('wght', bold ? boldWeight : normalWeight)]` when set; record it in `third_party/xterm/SHELLX_PATCHES.md`. `apps/desktop/lib/src/terminal/terminal_style.dart` `desktopTerminalStyle`: on macOS (`defaultTargetPlatform`) with no user family: family `ShellxFonts.systemMono`, fallback `[regular ? JetBrainsMono : JetBrainsMonoLight, ...xterm's]`, `normalWeight` 300 (`regular` → 400), `boldWeight` 700; Windows unchanged; a user `font-family` stays first and then **no** weights are set (ruling to add: a user's own variable font is drawn as the system has it). `TerminalColors` (`ui/theme/terminal_colors.dart`) reads `ShellxTerminalPalette` (§5.7) and builds the `TerminalTheme`.
-- `apps/desktop/lib/main.dart`: `await ShellxSystemFont.load();` right after `WidgetsFlutterBinding.ensureInitialized()` (before the version check), never in `daemon_main.dart`; `ShellxDesktopApp` (`ui/app.dart`) `builder:` wraps the app in `DefaultTextHeightBehavior(textHeightBehavior: TextHeightBehavior(leadingDistribution: TextLeadingDistribution.even))` (A35).
+Spec A16–A19, A21, A24, A27, A31, A34, A35, A37, A38 (theme), A39, A43, A50; §5.9 (DT), §6.1, §6.5 (DT), §6.8; §10.2; R3, R5, R17.
 
-**Files:** Modify `apps/desktop/lib/src/ui/theme/shellx_desktop_theme.dart`, `ui/theme/terminal_colors.dart`, `ui/terminal/terminal_overlays.dart` (`ShellxPrimaryButton`), `ui/ai/ai_theme.dart`, `ui/ai/ai_file_viewer.dart`, `ui/pages/confirm_page.dart`, `ui/app.dart`, `lib/main.dart`, `lib/src/terminal/terminal_style.dart`, `third_party/xterm/lib/src/ui/terminal_text_style.dart`, `third_party/xterm/SHELLX_PATCHES.md`. Tests: rewrite `apps/desktop/test/ui/theme_test.dart` (§10.2: tokens point at the package and the new hex; families by platform with `debugDefaultTargetPlatformOverride` macOS → `'SF Mono'` + `['JetBrainsMono']`, Windows → `'JetBrainsMono'`; `uiFont()` copies the fallback list; `ShellxText` = §6.5; hover < selected < pressed, selected/sidebar 1.32; every A39 component theme; the gradient `backgroundBuilder` of `ShellxPrimaryButton` and of the dialog `FilledButton`, white label, hover/pressed/disabled, outside ring; the destructive style's own layer); update pinned hex at `notifications_panel_test.dart` (`0xFF1F2F34`), `attention_ring_test.dart`, `find_bar_test.dart`, `find_session_test.dart` (old `#5FD4E2` → the new `accent`), `app_dialogs_test.dart` (switch thumb → `onPrimary`); `terminal_style_test.dart` (macOS: `'SF Mono'`, 300/400/700, JetBrains Mono fallbacks; Windows as before); keep `terminal_font_weight_test.dart`; new `test/ui/font_coverage_test.dart` (parse `cmap` of `assets/fonts/JetBrainsMono-*.ttf`: the 134 letters and 5 marks — the same list as `SystemMonoFontTables.vietnamese`); geometry tests whose widths depend on font size get the new numbers (never a looser matcher).
+**Files:**
+- Modify: `apps/desktop/lib/src/ui/theme/shellx_desktop_theme.dart` (`ShellxDesktopColors`, `ShellxSpace`, `ShellxRadius`, `ShellxShadows`, `ShellxText`, `ShellxMotion`, `uiFont`, `buildDesktopTheme`, `buildDialogTheme`, `destructiveButtonStyle`; new `shellxPrimaryButtonStyle`, `shellxSecondaryButtonStyle`, `shellxTextButtonStyle`)
+- Modify: `apps/desktop/lib/src/ui/theme/terminal_colors.dart` (`TerminalColors` reads `ShellxTerminalPalette`)
+- Modify: `apps/desktop/lib/src/ui/terminal/terminal_overlays.dart` (`ShellxPrimaryButton` → `shellxPrimaryButtonStyle()`)
+- Modify: `apps/desktop/lib/src/ui/ai/ai_theme.dart` (`kAiMono`), `ui/ai/ai_file_viewer.dart` (re_editor `CodeEditorStyle`), `ui/pages/confirm_page.dart` (drop `fontFamily: 'JetBrainsMono'`)
+- Modify: `apps/desktop/lib/src/ui/app.dart` (`ShellxDesktopApp` `builder:`), `apps/desktop/lib/main.dart` (`main`)
+- Modify: `apps/desktop/lib/src/terminal/terminal_style.dart` (`desktopTerminalStyle`)
+- Modify: `third_party/xterm/lib/src/ui/terminal_text_style.dart` (`TerminalStyle`), `third_party/xterm/SHELLX_PATCHES.md`
+- Modify `apps/desktop/pubspec.yaml`: add `shellx_design: any` under `dependencies` if Task 1 did not (workspace resolution).
+- Tests: rewrite `apps/desktop/test/ui/theme_test.dart`; modify `test/ui/notifications_panel_test.dart`, `test/ui/attention_ring_test.dart`, `test/ui/find_bar_test.dart`, `test/terminal/find_session_test.dart`, `test/ui/app_dialogs_test.dart`, `test/terminal/terminal_style_test.dart`; create `test/ui/font_coverage_test.dart`.
 
-**Interfaces:** Consumes Tasks 1, 3, 4. Produces `shellxPrimaryButtonStyle()`, `shellxSecondaryButtonStyle()`, `shellxTextButtonStyle()`, `destructiveButtonStyle()`, the new `ShellxDesktopColors` tokens, `ShellxShadows.raised/inset`, `ShellxText.display`, `ShellxMotion.slide/slideCurve`, `TerminalStyle.normalWeight/boldWeight` — used by Tasks 9 and 11 and by V2-5b.
+**Interfaces:**
+- Consumes: Task 1 `ShellxFonts.{systemMono, bundledMono, bundledMonoLight, uiFamily, uiFallback}`, `ShellxSystemFont.load()`; Task 3 `ShellxPalette.*`, `ShellxGradients.{accent, accentStrong, hoverShade, pressedShade}`, `ShellxRadii.{tiny, control, card, sheet, pill}`, `ShellxSpacing.*`, `ShellxElevation.{darkFloat1, darkFloat2, darkRaisedSmall, darkInset, float1Elevation, float1ShadowColor}`, `ShellxDurations.*`, `ShellxCurves.*`, `ShellxTerminalPalette.*`, `contrastRatio`; Task 4 `ShellxTypeScale.desktop*`, `ShellxTypeScale.desktopFor`, `shellxWeight`, `shellxWeightedTextTheme`, `shellxGradientLayer`.
+- Produces (Tasks 9, 11, V2-5b):
+  - `ShellxDesktopColors` new: `onAccent`, `link`, `overlayHover`, `overlayPressed`, `pushed` (`static const Color`); removed: `primaryHover`, `primaryPressed`.
+  - `ShellxShadows.raised` (`static const List<BoxShadow>` = `ShellxElevation.darkRaisedSmall`), `ShellxShadows.inset` (`static const ShellxInsetShadow inset = ShellxInsetShadow(ShellxElevation.darkInset)`).
+  - `ShellxText.display` (getter, 22/28 600); every `ShellxText.*` a `static TextStyle get` (R3).
+  - `ShellxMotion.slide` (`Duration`), `ShellxMotion.slideCurve` (`Curve`).
+  - `ButtonStyle shellxPrimaryButtonStyle()`, `ButtonStyle shellxSecondaryButtonStyle()`, `ButtonStyle shellxTextButtonStyle()`, `ButtonStyle destructiveButtonStyle()` (kept name, new layer).
+  - xterm: `TerminalStyle({…, double? normalWeight, double? boldWeight})`, fields `normalWeight`, `boldWeight`, `copyWith(normalWeight:, boldWeight:)`.
 
-**Spec decisions:** A16, A17, A18, A19, A21, A24, A27, A31, A34, A35, A37, A38 (theme part), A39, A43, A50; §5.9, §6.1, §6.5 (DT), §6.8, §10.2.
+**Tests first** (all red before the change):
+- `test/ui/theme_test.dart` (rewrite):
+  - `'colours point at the package (§5.9)'`: each `ShellxDesktopColors` token `==` its `ShellxPalette` constant and the hex: `bgTerminal` `0xFF1C222E` (navy900), `bgSidebar` `0xFF222834` (navy850), `rowHover` `0xFF28303F` (navy800), `rowSelected` `0xFF323B4F` (navy700), `rowPressed` `0xFF38445A` (navy650), `line` `0x14FFFFFF` (hairline), `surface` `0xFF2C3547` (navy750), `surfaceInset` `0xFF1C222E`, `border` `0x1AFFFFFF` (hairlineStrong), `borderInput` `0xFF76829C` (fieldOutline), `textPrimary` `0xFFE2E3E5`, `textTitle` `0xFFFFFFFF`, `textSecondary` `0xFFA7A9AE`, `textDialog2` `0xFFCACCD1`, `textPlaceholder` `0xFF8E9096`, `dim` `0xFF767A81`, `accent` = `primary` `0xFF34C8E8` (cyan), `onPrimary` `0xFF0E1A26` (onCyan), `primarySoft` `0xFF253E4D` (cyanSoft), `ok` `0xFF5ED39C`, `warn` `0xFFF5B94E`, `warnBg` `0xFF3B3937`, `warnBorder` `0xFF554B3A`, `err` = `errDialog` `0xFFFF8A94`, `onErr` `0xFF2A0A0C`, `statusInProgress` `0xFF6EA8FE`, `noticeBg` `0xFF453F50`, `noticeText` `0xFFFFD9DB`, `noticeBorder` `0xFF5F4959`, `scrim` `0x99000000`, `scrollThumb` `0xFF3D424C`, `scrollThumbHover` `0xFF4E535D`, `destructiveHover` `0xFFFF98A1`; new `onAccent` `0xFFFFFFFF`, `link` `0xFF5EADEE`, `overlayHover` `0xFF38445A`, `overlayPressed` `0xFF3F4B62`, `pushed` `0xFF28303F`.
+  - `'radii, space, shadows, motion'`: `ShellxRadius.r4/r6/r8/r12` = 6/10/16/28, `pill` = `ShellxRadii.pill`; `ShellxShadows.e1 == ShellxElevation.darkFloat1`, `e2 == darkFloat2`, `raised == darkRaisedSmall`, `e1Elevation == 8`, `e1ShadowColor == Color(0x73000000)`; `ShellxMotion.slide == ShellxDurations.slide`, `slideCurve == ShellxCurves.slide`.
+  - `'ShellxText follows §6.5'` (each `fontSize`, `fontSize * height` closeTo px, weight via `fontWeight` **and** `fontVariations` `[FontVariation('wght', w)]`): `caption` 11/14/500, `small` 11.5/16/400, `body` 12/18/400, `bodyStrong` 12/18/600, `label` 11.5/16/600, `dialogBody` 13/20/400, `emptyTitle` 14/20/600, `dialogTitle` 16/22/600, `display` 22/28/600; no `fontFamily`; `kAiMono` 12/17, `fontFamily == null`, weight 400 + `wght` 400.
+  - `'row backgrounds rise'`: `computeLuminance` hover < selected < pressed; `contrastRatio(rowSelected, bgSidebar)` closeTo(1.32, 0.01) and > 1.25.
+  - `'families by platform'`: with `debugDefaultTargetPlatformOverride = TargetPlatform.macOS`, `buildDesktopTheme().textTheme.bodyMedium!.fontFamily == 'SF Mono'`, `fontFamilyFallback == ['JetBrainsMono']`; Windows → `'JetBrainsMono'`, fallback empty; `uiFont(const TextStyle(), theme.textTheme)` copies both; `textTheme.bodyMedium!.fontVariations` contains `FontVariation('wght', 400)` (R5). Reset the override in `tearDown`.
+  - `'colour scheme'`: `surfaceContainerLowest/Low/Container/High/Highest` = navy900, navy850, navy750, navy750, navy700; `surfaceTint == Colors.transparent`.
+  - `'every A39 component theme'`: `inputDecorationTheme` filled, `fillColor` navy900, enabled outline `0xFF76829C` radius 16, focused `0xFF34C8E8` width 1.5, disabled side colour at alpha 0.5, hovered (via `WidgetStateInputBorder.resolve({WidgetState.hovered})`) `textSecondary`; `switchTheme.thumbColor.resolve({selected})` `0xFF0E1A26`, `trackColor.resolve({selected})` `0xFF34C8E8`; `sliderTheme.activeTrackColor` cyan; `progressIndicatorTheme.color` cyan; `textSelectionTheme.selectionColor == ShellxTerminalPalette.selection`; `iconTheme` non-null; `dialogTheme` (bg navy750, `RoundedRectangleBorder` r28, side `hairlineStrong`, `barrierColor` scrim); `bottomSheetTheme` (navy750, top r28); `popupMenuTheme`, `menuTheme`, `dropdownMenuTheme.menuStyle` (navy750, r16, side `hairlineStrong`); `tooltipTheme` (decoration colour navy700, r10, border `hairlineStrong`, `textStyle` = `ShellxText.small` in `textPrimary`, padding 4/8, shadow `float1`); `filledButtonTheme`, `outlinedButtonTheme`, `textButtonTheme` non-null.
+  - `'primary button paints accentStrong'` (widget test, pump `ShellxPrimaryButton` and a dialog `FilledButton` under `buildDialogTheme`): `style.backgroundBuilder != null`; a `DecoratedBox` whose `BoxDecoration.gradient == ShellxGradients.accentStrong`; label colour `0xFFFFFFFF`; hovered → the overlay `ShellxGradients.hoverShade` (`0x14000000`) painted, pressed → `pressedShade` (`0x29000000`), disabled → `Opacity` 0.38; focused → shape is `OutsideFocusRingBorder`; still `find.byType(FilledButton)`.
+  - `'secondary and text styles'`: secondary bg navy700, hovered navy650 (`overlayHover`), pressed `pushed` with `elevation`/shadow none, shadow `raisedSmall` at rest, inside ring; text button fg `link` `0xFF5EADEE`, hovered bg `rowHover`, pressed `rowPressed`.
+  - `'destructive style has its own layer'`: pumped `FilledButton(style: destructiveButtonStyle())` paints solid `0xFFFF8A94`, hovered `0xFFFF98A1`, pressed `0xFFFF8A94` + `0x29000000`; no `LinearGradient` in its subtree.
+- Hex pins rewritten through tokens: `notifications_panel_test.dart` `0xFF1F2F34` → `ShellxDesktopColors.rowSelected`; `attention_ring_test.dart` (the two pins), `find_bar_test.dart`, `find_session_test.dart` (`#5FD4E2` → `ShellxDesktopColors.accent`); `app_dialogs_test.dart` (switch thumb when on → `ShellxDesktopColors.onPrimary`).
+- `test/terminal/terminal_style_test.dart` (macOS override): `desktopTerminalStyle(13)` → `fontFamily 'SF Mono'`, `fontFamilyFallback.first == 'JetBrainsMonoLight'` then xterm's list, `normalWeight 300`, `boldWeight 700`, `toTextStyle().fontVariations == [FontVariation('wght', 300)]`, `toTextStyle(bold: true)` → `FontWeight.bold` + `wght` 700; `regular: true` → `normalWeight 400`, fallback first `'JetBrainsMono'`; `families: ['Fira Code']` on macOS → `fontFamily 'Fira Code'`, fallback `['JetBrainsMonoLight', ...xterm's]`, no `'SF Mono'`, both weights null, `fontVariations` null (R17); Windows → `'JetBrainsMonoLight'` (regular: `'JetBrainsMono'`), weights null. `test/terminal/terminal_font_weight_test.dart` unchanged and green.
+- `test/ui/font_coverage_test.dart`: read each `assets/fonts/JetBrainsMono-*.ttf` (6 files), parse the `cmap` table (format 4 and 12 subtables, read-only, in the test file), assert every code point of U+1EA0–U+1EF9 plus the 44 of Task 1's `SystemMonoFontTables.vietnamese` list and the marks U+0300, U+0301, U+0303, U+0309, U+0323 maps to a non-zero glyph (134 + 5).
+- Geometry tests whose widths depend on font size get the new numbers from a run (never a looser matcher); heights do not change.
 
-### Task 6: The phone adapter — colours, typography, theme, fonts, terminal, the dark default — UNFINISHED (plan writer stopped 2026-10-16 15:00)
+**Implementation notes:**
+- Colours (A16, §5.9): every `ShellxDesktopColors` value is `ShellxPalette.<name>` (no `Color(0x` left in `ui/theme/*.dart`, Task 7). Mapping: `bgTerminal`/`surfaceInset` navy900, `bgSidebar` navy850, `rowHover` navy800, `rowSelected` navy700, `rowPressed` navy650, `surface` navy750, `line` hairline, `border` hairlineStrong, `borderInput` fieldOutline, `textTitle` white100, `textPrimary` white87, `textDialog2` white75, `textSecondary` white60, `textPlaceholder` white50, `dim` white38, `accent`/`primary` cyan, `onPrimary` onCyan, `primarySoft` cyanSoft, `ok`, `warn`, `warnBg` warnSoft, `warnBorder` warnLine, `err`/`errDialog` error, `onErr` onError, `statusInProgress` inProgress, `noticeBg`, `noticeText`, `noticeBorder` noticeLine, `scrim`, `scrollThumb`, `scrollThumbHover`, `destructiveHover` errorHover, `onAccent`, `link`, `overlayHover` navy650, `overlayPressed` navy600, `pushed` navy800. Delete `primaryHover`/`primaryPressed` (A50) and the `buildDialogTheme` lines that use them.
+- `ShellxText` (R3): `static TextStyle get body => ShellxTypeScale.desktopFor(ShellxTypeScale.desktopBody, defaultTargetPlatform);` for each of the nine; `kAiMono` stays `const` = `ShellxTypeScale.desktopCode` (12/17, 400 + `wght` 400, no family).
+- `buildDesktopTheme()`: `fontFamily: ShellxFonts.uiFamily(defaultTargetPlatform)`, `fontFamilyFallback: ShellxFonts.uiFallback(defaultTargetPlatform)`; `textTheme`/`primaryTextTheme` through `shellxWeightedTextTheme` (R5); `ColorScheme.dark(...)` with the five `surfaceContainer*` and `surfaceTint: Colors.transparent`; the A39 component themes with the values in the tests above; `inputDecorationTheme` (A43) border `WidgetStateInputBorder.resolveWith` (focused cyan 1.5, hovered `textSecondary`, disabled `fieldOutline` at alpha 0.5, error `error`), `contentPadding` 0/10, height 36 kept; `filledButtonTheme: FilledButtonThemeData(style: shellxPrimaryButtonStyle())`, `outlinedButtonTheme: …shellxSecondaryButtonStyle()`, `textButtonTheme: …shellxTextButtonStyle()`.
+- `shellxPrimaryButtonStyle()` (A38, §7.1): `minimumSize` (80, 32), padding 0/14, `textStyle` `ShellxText.bodyStrong` (12/600), `foregroundColor` `onAccent`, `backgroundColor` transparent, `overlayColor` transparent, `elevation` 0, `shape: buttonShape(outsideRing: true)`, `backgroundBuilder: shellxGradientLayer(gradient: ShellxGradients.accentStrong, borderRadius: BorderRadius.circular(ShellxRadius.r6), disabledOpacity: 0.38)`. `ShellxPrimaryButton` builds its `FilledButton` with it (busy spinner 14 px white before the label, width kept — existing behaviour). `buildDialogTheme` keeps its dialog type and the 32/80/14 sizing on top of it.
+- `shellxSecondaryButtonStyle()`: bg navy700 → hovered `overlayHover` → pressed `pushed`; `textPrimary` label; shadow `ShellxShadows.raised` at rest via a `backgroundBuilder` that draws a `DecoratedBox(boxShadow:)` only when not pressed/disabled; `buttonShape(outsideRing: false)`.
+- `shellxTextButtonStyle()`: fg `link`; overlay hovered `rowHover`, pressed `rowPressed`; inside ring; disabled 0.38.
+- `destructiveButtonStyle()`: own `backgroundBuilder` — solid `error`, hovered `errorHover`, pressed `error` with `ShellxGradients.pressedShade` on top; fg `onErr`; outside ring; so the theme's gradient never shows through.
+- `TerminalColors`: every colour from `ShellxTerminalPalette` (§5.7: bg `#1C222E`, fg `#DDE3EC`, ANSI black `#2C3547`, bright black `#8590A6`, selection cyan 30 %); builds the `TerminalTheme` as today. Config themes and user keys are unchanged (A24).
+- xterm patch (§6.8): `TerminalStyle` gains `final double? normalWeight; final double? boldWeight;` (constructor named params, `copyWith`, `fromTextStyle` leaves both null); `toTextStyle` adds `fontVariations: w == null ? null : [FontVariation('wght', w)]` with `w = bold ? boldWeight : normalWeight`. Cell measuring (10 × "m") unchanged. Add a `SHELLX_PATCHES.md` entry: "V2-5a: `TerminalStyle.normalWeight/boldWeight` → `wght` axis (variable system fonts)".
+- `desktopTerminalStyle` (A37, R17): `final mac = defaultTargetPlatform == TargetPlatform.macOS;` no families + mac → `fontFamily: ShellxFonts.systemMono`, fallback `[bundled, ...const TerminalStyle().fontFamilyFallback]`, `normalWeight: regular ? 400 : 300`, `boldWeight: 700`; otherwise exactly today's code (no weights). `bundled` = `regular ? kTerminalFontFamily : kTerminalFontFamilyLight` as today. Doc comment states R17.
+- `ai_file_viewer.dart`: `CodeEditorStyle(fontFamily: ShellxFonts.uiFamily(defaultTargetPlatform), fontFamilyFallback: ShellxFonts.uiFallback(defaultTargetPlatform), …)` (R13 baseline entry). `confirm_page.dart`: remove `fontFamily: 'JetBrainsMono'`.
+- `main.dart` (A33): `await ShellxSystemFont.load();` right after `WidgetsFlutterBinding.ensureInitialized()`, before the version check; never in `daemon_main.dart`. `app.dart` `builder:` wraps `child` in `DefaultTextHeightBehavior(textHeightBehavior: const TextHeightBehavior(leadingDistribution: TextLeadingDistribution.even), child: …)` (A35), inside any existing builder wrapping.
 
-**Files:** Modify `apps/mobile/lib/core/design/{app_colors,light_colors,dark_colors,typography,theme_data_factory,terminal_colors}.dart`; `lib/main.dart` (`ShellxSystemFont.load()` after `ensureInitialized`, then the A26 theme default); Create `lib/core/platform/theme_default.dart` (export from `core/core.dart`): saved `adaptive_theme` mode wins; else `SharedPreferences` key `shellx_theme_default`; else no `shellx_installed` (fresh install, `core/platform/fresh_install.dart`, read **before** DI sets it) → `dark`, else → `system`; write the result to `shellx_theme_default`. `lib/features/app/{app,splash_page}.dart` (`DefaultTextHeightBehavior` even, A35). Remove Raleway: the 18 `assets/fonts/Raleway-*.ttf`, `assets/licenses/Raleway-OFL.txt`, the `Raleway` family in `pubspec.yaml`, its licence in `features/app/font_licenses.dart`; regenerate `lib/shared/src/{fonts,assets}.gen.dart` (build_runner). Remove the 17 `FontFamily.jetBrainsMono` (13 files: AI, markdown, extra keys, link sheet, voice composer (`voice_composer.dart`, also `FontFamily.raleway` at its hint), QR card, Settings, `view_as_text_sheet.dart`, `session_picker.dart`, `ai_file_diff_page.dart`, `ai_item_page.dart`, `ai_changes_sheet.dart`, `ai_dock.dart`, `ai_items.dart`, `ai_markdown.dart`, `arrow_pad.dart`, `extra_keys_bar.dart`, `terminal_page.dart`) so code follows the theme; `features/terminal/presentation/terminal_metrics.dart` `shellxTerminalStyle`: iOS `ShellxFonts.systemMono` (fallback `JetBrainsMono`) with `normalWeight` 400 / `boldWeight` 700, Android `JetBrainsMono`.
+**Commands** (from each dir):
+- `apps/desktop`: `PATH=~/fvm/versions/3.41.4/bin:$PATH flutter analyze` and `PATH=~/fvm/versions/3.41.4/bin:$PATH flutter test` (expect 3924 + new tests, 10 skipped).
+- `packages/shellx_design`: `PATH=~/fvm/versions/3.41.4/bin:$PATH flutter test` (unchanged, still green).
+- `apps/mobile`: `PATH=~/fvm/versions/3.41.4/bin:$PATH flutter test test/features/terminal` (the xterm change reaches the phone).
+- `dart format` on touched files (80 columns).
 
-Decided values (§5.9 `AppColors` table, dark / light): `background` navy850/#EAEFF5, `surface` navy750/#F5F7FA, new `raised` navy700/#FFFFFF, new `inset` navy900/#E0E6EE, `primaryText` white100/#141A26, `secondaryText` white60/#4E586B, `disable` white50/#596376, `border` fieldOutline (#76829C/#717C92), `divider` hairline (#14FFFFFF/#1A141A26), `primary` = `primaryFill` = `accent` cyan/#1767AD, `onPrimary` onCyan/white, new `onAccent` white, `primarySoft` cyanSoft/#DCE8F3, `link` #5EADEE/#1767AD, `ok`,`okDot` #5ED39C / #256B45,#2E8A57, `warn` #F5B94E/#7F4C00, `warnSoft`,`lightGold` #3B3937/#F2EDE6, `error`,`mainRed` #FF8A94/#B0202B, `errorSoft`,`lightRed` #3D3440/#F7E9EA, new `okSoft`,`lightGreen` #293D40/#E9F0EC, `scrim` #99000000/#73141A26, `keyAccent` #34C8E8/#1767AD, `keyboardLink` #5EADEE/#14598F, `keyboardError` #FF8A94/#A3161D, `keyboard*` kept, `gradient` = `ShellxGradients.accent`, new `gradientStrong`, `wedge`, `elevation` (`ShellxElevation.dark/light`); leftovers `mainGreen`, `mainGold`, `mediumRed`, `mediumOrange`, `blueGrey` = `ok`, `warn`, `error`, `warn`, navy900 (light: `text`). No `Color(0x` left in `core/design` (§10.4). `AppTypography` getters = `ShellxTypeScale.mobile*` + colour + `liningFigures`; `.medium/.semiBold/.bold` through `shellxWeight`; `.heavy` → 700. `ThemeDataFactory.create`: `ColorScheme.fromSeed(…).copyWith(…)` plus `surfaceContainerLowest…Highest` (dark navy900, navy850, navy750, navy750, navy700; light #FFFFFF, page, surface, surface, raised) and transparent `surfaceTint`; `fontFamily`/`fontFamilyFallback` from `ShellxFonts` (no Raleway), weighted text themes (R5), AppBar title `ShellxTypeScale.mobileAppBarTitle`; A39 themes: dialog (r28, `surface`, title `heading20` bold, body `paragraph`, text buttons `link`), bottom sheet (top r28, `surface`, drag handle `handle` 36×4, `float2`, max 90 %), popup menu (items 44), switch, slider, progress, text selection, icon, text button (`link`).
+**Commit:** `feat(v2-design): the desktop adapter takes the package — navy tokens, SF Mono theme, gradient buttons, weighted terminal`
 
-Tests: rewrite `test/core/design/design_tokens_test.dart` (§10.3: new hex both brightnesses; the 11 old contrast pairs with the new values — all pass, computed while writing this plan: e.g. `keyAccent` dark on `keyboardKey` 4.60, light 5.87 — plus `onAccent` on `accent` ≥ 3 / `accentStrong` ≥ 4.5, text on `raised` and `inset`, placeholder on `inset` 4.99/4.82; the AppButton expectations move to Task 10); `test/platform_config_test.dart` (no `Raleway-*` file, no Raleway declaration; `:243` Raleway licence assertion removed); `terminal_page_test.dart:1555-1561` (`fontFamily == null` on the voice field and hint; effective family is the theme's: iOS `'SF Mono'`, Android `'JetBrainsMono'`); `test/app_test.dart` "both font licences are registered" becomes JetBrains Mono only; three-case A26 test with `SharedPreferences.setMockInitialValues`; `test/core/design/font_coverage_test.dart` for `assets/fonts/JetBrainsMono-*.ttf`.
+### Task 6: The phone adapter — colours, typography, theme, fonts, terminal, the dark default
 
-**Interfaces:** Consumes Tasks 1, 3, 4. Produces the new `AppColors` roles (`raised`, `inset`, `onAccent`, `okSoft`, `gradientStrong`, `wedge`, `elevation`), `resolveInitialThemeMode(...)` (name to fix when written) — used by Tasks 10, 12, V2-5b/C.
+Spec A16, A18, A22, A25, A26, A31–A35, A37, A39, A41 (theme), §5.4, §5.9 (ĐT), §6.1, §6.5 (ĐT), §6.8, §10.3; R5, R12, R18, R19.
 
-**Spec decisions:** A16, A18, A22, A25, A26, A31–A35, A37, A39, A41 (theme part), §5.4, §5.9 (ĐT), §6.1, §6.5 (ĐT), §6.8, §10.3.
+**Files:**
+- Modify: `apps/mobile/lib/core/design/{app_colors,light_colors,dark_colors,typography,theme_data_factory,terminal_colors}.dart`
+- Create: `apps/mobile/lib/core/platform/theme_default.dart` (export from `lib/core/core.dart`)
+- Modify: `apps/mobile/lib/main.dart` (`main`), `lib/features/app/{app,splash_page}.dart` (`DefaultTextHeightBehavior`), `lib/features/app/font_licenses.dart` (`registerFontLicenses`)
+- Modify: `lib/features/terminal/presentation/terminal_metrics.dart` (`shellxTerminalStyle`)
+- Modify: every `lib/**` file with `FontFamily.jetBrainsMono` or `FontFamily.raleway` except `terminal_metrics.dart` (17 + 1 uses in 13 files: find with `grep -rn "FontFamily\." lib --include=*.dart | grep -v '\.gen\.dart'`)
+- Delete: `apps/mobile/assets/fonts/Raleway-*.ttf` (18 files), `apps/mobile/assets/licenses/Raleway-OFL.txt`; Modify `apps/mobile/pubspec.yaml` (remove the `Raleway` family and its licence asset; add `shellx_design: any` if Task 1 did not); regenerate `lib/shared/src/{fonts,assets}.gen.dart`
+- Tests: rewrite `test/core/design/design_tokens_test.dart`; create `test/core/platform/theme_default_test.dart`, `test/core/design/font_coverage_test.dart`; modify `test/platform_config_test.dart`, `test/app_test.dart`, `test/features/terminal/{terminal_page,terminal_metrics}_test.dart`
 
-### Task 7: Raw-style guards in both apps, with their baselines — UNFINISHED (plan writer stopped 2026-10-16 15:00)
+**Interfaces:**
+- Consumes: Task 1 `ShellxFonts.*`, `ShellxSystemFont.load()`; Task 3 `ShellxPalette.*`, `ShellxLightPalette.*`, `ShellxGradients.{accent, accentStrong, wedge}`, `ShellxElevation` (`.dark`, `.light`), `ShellxTerminalPalette`, `contrastRatio`, `minContrastOnGradient`; Task 4 `ShellxTypeScale.mobile*`, `shellxWeight`, `shellxWeightedTextTheme`.
+- Produces (Tasks 10, 12, V2-5b/C):
+  - `AppColors` new getters: `Color get raised`, `Color get inset`, `Color get onAccent`, `Color get okSoft`, `LinearGradient get gradientStrong`, `LinearGradient get wedge`, `ShellxElevation get elevation`; `Gradient get gradient` now `ShellxGradients.accent`.
+  - `const String themeDefaultKey = 'shellx_theme_default'`; `AdaptiveThemeMode resolveInitialThemeMode({required SharedPreferences prefs, required AdaptiveThemeMode? saved})` (R19; sync, writes via `prefs.setString` unawaited-safe — see code).
+  - `shellxTerminalStyle(double fontSize)` unchanged signature, platform-dependent family and weights.
 
-**Files:** Create `apps/desktop/test/design/raw_style_guard_test.dart`, `apps/desktop/test/design/raw_style_baseline.dart`, `apps/mobile/test/design/raw_style_guard_test.dart`, `apps/mobile/test/design/raw_style_baseline.dart`.
+**Tests first:**
+- `design_tokens_test.dart` (rewrite), per brightness (`DarkColors()` / `LightColors()`), exact hex: `background` `0xFF222834`/`0xFFEAEFF5`, `surface` `0xFF2C3547`/`0xFFF5F7FA`, `raised` `0xFF323B4F`/`0xFFFFFFFF`, `inset` `0xFF1C222E`/`0xFFE0E6EE`, `primaryText` `0xFFFFFFFF`/`0xFF141A26`, `secondaryText` `0xFFA7A9AE`/`0xFF4E586B`, `disable` `0xFF8E9096`/`0xFF596376`, `border` `0xFF76829C`/`0xFF717C92`, `divider` `0x14FFFFFF`/`0x1A141A26`, `primary` = `primaryFill` = `accent` `0xFF34C8E8`/`0xFF1767AD`, `onPrimary` `0xFF0E1A26`/`0xFFFFFFFF`, `onAccent` `0xFFFFFFFF` both, `primarySoft` `0xFF253E4D`/`0xFFDCE8F3`, `link` `0xFF5EADEE`/`0xFF1767AD`, `ok` `0xFF5ED39C`/`0xFF256B45`, `okDot` `0xFF5ED39C`/`0xFF2E8A57`, `warn` `0xFFF5B94E`/`0xFF7F4C00`, `warnSoft` = `lightGold` `0xFF3B3937`/`0xFFF2EDE6`, `error` = `mainRed` `0xFFFF8A94`/`0xFFB0202B`, `errorSoft` = `lightRed` `0xFF3D3440`/`0xFFF7E9EA`, `okSoft` = `lightGreen` `0xFF293D40`/`0xFFE9F0EC`, `scrim` `0x99000000`/`0x73141A26`, `keyAccent` `0xFF34C8E8`/`0xFF1767AD`, `keyboardLink` `0xFF5EADEE`/`0xFF14598F`, `keyboardError` `0xFFFF8A94`/`0xFFA3161D`, `keyboardBackground/Key/Ink` unchanged values; `gradient == ShellxGradients.accent`, `gradientStrong == ShellxGradients.accentStrong`, `wedge == ShellxGradients.wedge`, `elevation == ShellxElevation.dark` / `.light`; leftovers `mainGreen`, `mainGold`, `mediumRed`, `mediumOrange`, `blueGrey` = `ok`, `warn`, `error`, `warn`, `0xFF1C222E` (light: `0xFF141A26`).
+  - The 11 existing contrast pairs, both brightnesses, with the new values (all pass; e.g. `keyAccent` on `keyboardKey` dark 4.60, light 5.87); new: `minContrastOnGradient(gradient, onAccent) ≥ 3.0`, `minContrastOnGradient(gradientStrong, onAccent) ≥ 4.5`; `primaryText` and `secondaryText` on `raised` and on `inset` ≥ 4.5; `disable` (placeholder) on `inset` closeTo(4.99, 0.01) dark / closeTo(4.82, 0.01) light and ≥ 4.5. (The `AppButton` expectations move to Task 10.)
+  - `'no hex in the adapter'`: no `Color(0x` in `lib/core/design/*.dart` (read the files).
+  - Theme (`ThemeDataFactory.create(b)`), both brightnesses: `fontFamily` per `debugDefaultTargetPlatformOverride` (iOS `'SF Mono'` + `['JetBrainsMono']`, Android `'JetBrainsMono'` + `[]`), never `'Raleway'`; `textTheme.bodyMedium!.fontVariations` has `wght` 400; `appBarTheme.titleTextStyle!.fontSize == 16`; `colorScheme.surfaceContainerLowest…Highest` dark navy900, navy850, navy750, navy750, navy700, light `0xFFFFFFFF`, `0xFFEAEFF5`, `0xFFF5F7FA`, `0xFFF5F7FA`, `0xFFFFFFFF`; `surfaceTint` transparent; `dialogTheme` r28, bg `surface`, `titleTextStyle` size 19 weight 700, `contentTextStyle` size 13; `bottomSheetTheme` top r28, bg `surface`, `showDragHandle` true, `dragHandleSize` (36, 4), `dragHandleColor` = `ShellxPalette.handle` / `ShellxLightPalette.handle`, `modalBarrierColor` = `scrim`, `elevation` 0 (the 90 % cap and `float2` are the sheet call sites', Task 12); `popupMenuTheme` bg `surface`, `RoundedRectangleBorder` r16 with side `divider` (item height 44 is set on the items, Task 12); `switchTheme` selected thumb `onPrimary`, track `primary`; `sliderTheme.activeTrackColor == primary`; `progressIndicatorTheme.color == primary`; `textSelectionTheme.cursorColor == primary`; `textButtonTheme` fg `link`.
+- `test/core/platform/theme_default_test.dart` (`SharedPreferences.setMockInitialValues`): `'saved mode wins'` (saved `light`, prefs empty → `light`, `themeDefaultKey` not written); `'stored default is kept'` (`{'shellx_theme_default': 'system'}`, `shellx_installed` absent → `system`); `'fresh install defaults to dark'` (empty → `dark`, key now `'dark'`); `'existing user follows the system'` (`{'shellx_installed': true}` → `system`, key now `'system'`); `'unknown stored value is ignored'` (`'blue'`, fresh → `dark`).
+- `platform_config_test.dart`: no `assets/fonts/Raleway-*` file; `pubspec.yaml` has no `Raleway` (family nor licence); the Raleway licence assertion (`:243`) removed.
+- `app_test.dart` `'both font licences are registered'` → `'the JetBrains Mono licence is registered'`: the `LicenseRegistry` has a `JetBrains Mono` entry and none named `Raleway`.
+- `terminal_page_test.dart:1555-1561`: the voice field's and hint's `TextStyle.fontFamily == null`; the effective family from `DefaultTextStyle`/theme is `'SF Mono'` on iOS, `'JetBrainsMono'` on Android (two platform overrides).
+- `test/features/terminal/terminal_metrics_test.dart` (extend): iOS → `shellxTerminalStyle(14)` `fontFamily 'SF Mono'`, fallback first `'JetBrainsMono'`, `normalWeight 400`, `boldWeight 700`; Android → `'JetBrainsMono'`, weights null.
+- `test/core/design/font_coverage_test.dart`: as Task 5's, over `apps/mobile/assets/fonts/JetBrainsMono-*.ttf` (4 files): 134 letters + 5 marks.
 
-What to build (§10.4): scan `lib/**/*.dart` minus generated files (`*.g.dart`, `*.gr.dart`, `*.config.dart`, `*.gen.dart`, `lib/l10n/**`, `shared/src/l10n.dart`, `shared/src/intl/**`) and the adapters (`lib/src/ui/theme/**` DT, `lib/core/design/**` ĐT); count per file `Color(0x`, `Color.fromARGB(`, `Color.fromRGBO(`, `Colors.` (minus `Colors.transparent`), `TextStyle(`, `fontSize:`, `fontWeight:`, `fontFamily:`, `BoxShadow(`, `BackdropFilter(`, `ImageFilter.blur(`, `Icons.`, `CupertinoIcons.`, each only when no letter, digit or `_` precedes it (regex `(?<![A-Za-z0-9_])`); compare with the baseline map and require an **exact** match (a higher count: "new hard-coded style"; a lower one: fail and print the line to lower the baseline). On failure, print the whole current map as Dart source so it can be pasted. Adapters: no `Color(0x` in `lib/src/ui/theme/*.dart` / `lib/core/design/*.dart`.
+**Implementation notes:**
+- `DarkColors`/`LightColors` return the §5.9 table through `ShellxPalette`/`ShellxLightPalette` constants only (dark: navy850, navy750, navy700, navy900, white100, white60, white50, fieldOutline, hairline, cyan, onCyan, onAccent, cyanSoft, link, ok, warn, warnSoft, error, errorSoft, okSoft, scrim; light: page, surface, raised, inset, text, textSecondary, placeholder, fieldOutline, hairline, primary, primarySoft, ok, okDot, warn, warnSoft, error, errorSoft, okSoft, scrim, keyboardLink, keyboardError). `keyAccent` dark cyan / light primary; `keyboardError` dark `error`. No `Color(0x` left in `lib/core/design` (§10.4).
+- `AppTypography` (§6.5 ĐT, R12; instance getters reached by `context.typo`): each getter = `ShellxTypeScale.mobile*.copyWith(color: …, fontFeatures: liningFigures)`, weight 400 through `shellxWeight`; the `ColorTextStyle` extension (same file) `.medium/.semiBold/.bold` = `shellxWeight(this, FontWeight.w500/w600/w700)`, `.heavy` = `shellxWeight(this, FontWeight.w700)` (was `w800`). Sizes: display56 54, display42 40, display36 34, display32 30, heading28 26, heading26 24, heading24 22, heading20 19, title 17, subHeader 15, subHeader15 14, paragraph 13, paragraph13 13, metadata12/11/10/8 unchanged; px line heights unchanged.
+- `ThemeDataFactory.create(b)`: `ColorScheme.fromSeed(…).copyWith(primary, onPrimary, primaryContainer: primarySoft, surface, onSurface: primaryText, onSurfaceVariant: secondaryText, error, outline: border, outlineVariant: divider, surfaceContainer*…, surfaceTint: Colors.transparent)`; `fontFamily: ShellxFonts.uiFamily(defaultTargetPlatform)`, `fontFamilyFallback: ShellxFonts.uiFallback(defaultTargetPlatform)` (replaces both `FontFamily.raleway` at `:60`, `:82`); `textTheme`/`primaryTextTheme` through `shellxWeightedTextTheme`; AppBar title `ShellxTypeScale.mobileAppBarTitle`; A39 themes (dialog r28 `surface`, title `heading20` 700, body `paragraph`, actions via `textButtonTheme` `link`; bottom sheet top r28, `surface`, drag handle `handle` 36×4, `modalBarrierColor` scrim, `elevation` 0; popup menu r16 `surface`; switch thumb `onPrimary` on `primary` when on, off thumb `secondaryText` on `inset` with `border` outline; slider/progress `primary` on `inset`; text selection `primary` at alpha 0.30, cursor/handle `primary`; icon `primaryText`; text button `link`). `segmentedButtonTheme` kept with token colours (R18).
+- `resolveInitialThemeMode` (R19) — complete code (`lib/core/platform/theme_default.dart`):
 
-Union counts measured while writing (before A; generated and adapters excluded) — desktop: `Icons.` 171, `fontWeight:` 19, `fontSize:` 12, `TextStyle(` 5, `fontFamily:` 5, `Color(0x` 1, `Colors.` 1; mobile: `Icons.` 104, `TextStyle(` 22, `fontSize:` 21, `fontFamily:` 20, `Colors.` 20, `Color(0x` 15, `fontWeight:` 9, `BoxShadow(` 5, `BackdropFilter(` 1, `ImageFilter.blur(` 1. The baseline is taken **after Tasks 5–6** (so `fontFamily:` already dropped on mobile) and lowered by Tasks 8–12; end state: `Icons.`, `CupertinoIcons.` 0; `fontWeight:` 0 except R13's config entry; `BackdropFilter(`/`ImageFilter.blur(` 1 each in `qr_scanner_page.dart`; `popup_handler.dart` absent.
+```dart
+import 'dart:async';
 
-**Interfaces:** none produced.
+import 'package:adaptive_theme/adaptive_theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-**Spec decisions:** A46, §10.4, R13.
+import 'fresh_install.dart' show installMarkerKey;
 
-### Task 8: `ShellxIcons` and every Material icon replaced — UNFINISHED (plan writer stopped 2026-10-16 15:00)
+/// A26: the theme a launch starts with. Read before DI sets [installMarkerKey].
+const String themeDefaultKey = 'shellx_theme_default';
 
-**Files:** Create `packages/shellx_design/lib/src/icons.dart`, `packages/shellx_design/test/icons_test.dart`; Modify `packages/shellx_design/lib/shellx_design.dart`; every `apps/{desktop,mobile}/lib/**` and `test/**` file with `Icons.` (one commit, A45); both guard baselines (`Icons.` → 0).
+AdaptiveThemeMode resolveInitialThemeMode({
+  required SharedPreferences prefs,
+  required AdaptiveThemeMode? saved,
+}) {
+  if (saved != null) return saved;
+  final stored = prefs.getString(themeDefaultKey);
+  for (final mode in AdaptiveThemeMode.values) {
+    if (mode.name == stored) return mode;
+  }
+  final fresh = !(prefs.getBool(installMarkerKey) ?? false);
+  final mode = fresh ? AdaptiveThemeMode.dark : AdaptiveThemeMode.system;
+  unawaited(prefs.setString(themeDefaultKey, mode.name)); // the cache updates synchronously
+  return mode;
+}
+```
 
-What to build: `abstract final class ShellxIcons` with the **95** `static const IconData` roles of spec §7.4 exactly (87 roles + 8 `voice*`; 91 `CupertinoIcons.*`, 4 Material fallbacks: `terminal` = `Icons.terminal_rounded`, `faceId` = `Icons.face_rounded`, `fingerprint` = `Icons.fingerprint_rounded`, `sshHost` = `Icons.dns_rounded`), plus `static const Map<String, IconData> roles` (for the test; V2-5b adds its roles to both). `icons_test.dart`: every role `fontFamily == 'CupertinoIcons'` and `fontPackage == 'cupertino_icons'` except exactly those 4 (`MaterialIcons`); the 8 `voice*` glyphs of §7.4; `roles` has 95 entries and matches every `static const IconData` declared in `icons.dart` (parse the source); the package `pubspec.yaml` pins `cupertino_icons: 1.0.9`. Replacement: a deterministic script mapping each `Icons.<glyph>` by §7.4's "Thay `Icons.*`" column; checked on the union: **every glyph used in both apps maps** (desktop 74 kinds, mobile 60). Context-dependent: `Icons.extension_outlined` → `ShellxIcons.toolOther` in `ui/ai/ai_tool_card.dart` (`ToolKind.other`) and mobile `ai_items.dart`, `ShellxIcons.tool` elsewhere (`ui/tools/tool_bar.dart`, `tool_project_list.dart`, `tool_sidebar_group.dart`, `session_sidebar.dart`, `ai/ai_header.dart`, mobile `session_picker.dart`); `kPhoneIcon` (`terminal_overlays.dart`) = `ShellxIcons.phone`; the AI tool-card kind table of §7.4 (`fetch` → `fetch` globe in both apps). Add `import 'package:shellx_design/shellx_design.dart';` where needed; tests' `find.byIcon(Icons.x)` change in the same commit. Tray and app icons unchanged.
+- `main.dart`: `WidgetsFlutterBinding.ensureInitialized(); await ShellxSystemFont.load(); registerFontLicenses(); final prefs = await SharedPreferences.getInstance(); final themeMode = resolveInitialThemeMode(prefs: prefs, saved: await AdaptiveTheme.getThemeMode());` then `runApp` as today with `initial: themeMode`. `app.dart` and `splash_page.dart` `MaterialApp.builder` wrap in `DefaultTextHeightBehavior(… leadingDistribution: even)` (A35).
+- Remove the `fontFamily: FontFamily.jetBrainsMono` / `FontFamily.raleway` arguments so code follows the theme (A31); drop now-unused `fonts.gen.dart` imports. `font_licenses.dart` registers JetBrains Mono only.
+- `shellxTerminalStyle` (A37, §6.8): iOS → `TerminalStyle(fontSize:, fontFamily: ShellxFonts.systemMono, fontFamilyFallback: [ShellxFonts.bundledMono, ...const TerminalStyle().fontFamilyFallback], normalWeight: 400, boldWeight: 700)`; else `fontFamily: ShellxFonts.bundledMono` (the `FontFamily.jetBrainsMono` value), no weights. `TerminalColors` (ĐT) reads `ShellxTerminalPalette` (§5.7), builds its `TerminalTheme`.
+- Regenerate: `PATH=~/fvm/versions/3.41.4/bin:$PATH dart run build_runner build --delete-conflicting-outputs` (updates `fonts.gen.dart` — no `raleway` — and `assets.gen.dart` — no `ralewayOFL`); commit both.
 
-**Interfaces:** Produces `ShellxIcons.*` (all 95 names of §7.4) — consumed by Tasks 9–12, V2-5b T48, V2-5c §4.8.
+**Commands** (`apps/mobile`): `PATH=~/fvm/versions/3.41.4/bin:$PATH flutter pub get` (root), build_runner as above, `PATH=~/fvm/versions/3.41.4/bin:$PATH flutter analyze` (only the pre-existing `unnecessary_import` info), `PATH=~/fvm/versions/3.41.4/bin:$PATH flutter test`; `dart format` touched files (120 columns).
 
-**Spec decisions:** A45, §7.4, §10.1 `icons_test.dart`, success criterion 5.
+**Commit:** `feat(v2-design): the phone adapter takes the package — navy and light tokens, SF Mono theme, dark default, Raleway removed`
 
-### Task 9: Desktop components — UNFINISHED (plan writer stopped 2026-10-16 15:00)
+### Task 7: Raw-style guards in both apps, with their baselines
 
-**Files:** Create `apps/desktop/lib/src/ui/components/{shellx_chip,shellx_segmented,shellx_card,shellx_brand_line}.dart` and their tests under `apps/desktop/test/ui/components/`; Modify `ui/terminal/terminal_overlays.dart` (`ShellxIconButton`: flat / raised / gradient-when-on variants, bo 10; `NoticeToast`: bo 16, max 420, `float1`, normal navy750 + `hairlineStrong` + `textPrimary`, error `noticeBg`/`noticeLine`/`noticeText`), `ui/terminal/shellx_menu.dart` (`showShellxMenu`: navy750, bo 16, `hairlineStrong`, `float1`, padding 4; items 28 high, bo 10, padding 0/10, hover `overlayHover` + `textTitle`, hints `textDialog2`, pressed `overlayPressed`), `ui/dialogs/{route_dialog,dialog_layout}.dart` (box bo 28, navy750, `hairlineStrong`, `float2`, scrim 60 %; `DialogBody` gains a `brand` flag drawing `ShellxBrandLine` 8 px above the title), `ui/ai/ai_changes_panel.dart` (its `SegmentedButton` → `ShellxSegmented`, A40).
+Spec A46, §10.4; R13, R22. Runs after Tasks 5–6 (the baseline is taken then; Tasks 8–12 lower it).
 
-Component values (§7.1): `ShellxChip` 24 high, padding 0/10, 11.5/500, bo 10, icon 14, `hairlineStrong` border on transparent, hover navy800, pressed `pushed`, selected `accentStrong` + white 600 (hover/pressed shades), rings (inside; selected outside); `ShellxSegmented<T>` track 28 high, padding 2, bo 10, inset (`ShellxInsetBox`), segments 24 high, bo 8, min 56, padding 0/10, 11.5 text, unselected `textSecondary` (hover `textPrimary` on navy800), selected `accentStrong` + white 600 + `raisedSmall`, tile slides in `slide`, one tab stop, ←/→ change, `Semantics(button, selected, inMutuallyExclusiveGroup, label)`; `ShellxCard` (`flat` navy750 + `hairlineStrong`, `raised`, `inset`; bo 16, padding 12; pressable: hover `overlayHover`, pressed `pushed`, inside ring); `ShellxBrandLine` (`appTitle`, `label`, `accent`). Perf (§10.5): sidebar 30 tabs with one selected → ≤ 2 `BoxShadow` under the sidebar. Tests per §10.2 "Component mới".
+**Files:**
+- Create: `apps/desktop/test/design/raw_style_guard_test.dart`, `apps/desktop/test/design/raw_style_baseline.dart`
+- Create: `apps/mobile/test/design/raw_style_guard_test.dart`, `apps/mobile/test/design/raw_style_baseline.dart`
 
-**Interfaces:** Consumes Tasks 4, 5, 8. Produces `ShellxChip`, `ShellxSegmented<T>`, `ShellxCard`, `ShellxBrandLine`, `DialogBody(brand: true)` — consumed by Task 11 and V2-5b ("chip / segmented / thẻ / menu của A").
+**Interfaces:**
+- Consumes: nothing from the package.
+- Produces: `const Map<String, Map<String, int>> rawStyleBaseline` in each `raw_style_baseline.dart` (path relative to the app root, e.g. `'lib/src/ui/ai/ai_theme.dart'` → pattern → count; only non-zero entries; keys sorted). Later tasks edit it downward. `Map<String, int> countRawStyles(String source)` (top-level in the guard test file).
 
-**Spec decisions:** A38 (widgets), A40, A41 (DT), A44, §7.1, §7.3, §10.2, §10.5 (DT).
+**Tests first** (each guard test file):
+- `'the counter matches only whole tokens'`: `countRawStyles('AppColors.red Colors.red Colors.transparent CupertinoIcons.add Icons.add ShellxIcons.add _Icons.x TextStyle( fontWeight: BoxShadow( ImageFilter.blur(')` == `{'Colors.': 1, 'CupertinoIcons.': 1, 'Icons.': 1, 'TextStyle(': 1, 'fontWeight:': 1, 'BoxShadow(': 1, 'ImageFilter.blur(': 1}`.
+- `'no new hard-coded style (§10.4)'`: scan, compare exactly with `rawStyleBaseline`; fail with one line per difference — higher: `new hard-coded style: <file> <pattern> <baseline> → <now>`; lower: `lower the baseline: <file> <pattern> <baseline> → <now>` — then print the whole current map as Dart source (`const Map<String, Map<String, int>> rawStyleBaseline = {…};`) ready to paste.
+- `'adapters hold no hex'`: desktop `lib/src/ui/theme/*.dart`, mobile `lib/core/design/*.dart` contain no `Color(0x`.
 
-### Task 10: Phone components — UNFINISHED (plan writer stopped 2026-10-16 15:00)
+**Implementation notes:**
+- Patterns (exact list, each compiled as `RegExp('(?<![A-Za-z0-9_])' + RegExp.escape(p))`, except `Colors.` which is `(?<![A-Za-z0-9_])Colors\.(?!transparent\b)`): `Color(0x`, `Color.fromARGB(`, `Color.fromRGBO(`, `Colors.`, `TextStyle(`, `fontSize:`, `fontWeight:`, `fontFamily:`, `BoxShadow(`, `BackdropFilter(`, `ImageFilter.blur(`, `Icons.`, `CupertinoIcons.`. Raw text, comments included (R22).
+- Scan `lib/**/*.dart` from the app root (`Directory('lib')`, tests run with cwd = app root), excluding by path: suffixes `.g.dart`, `.gr.dart`, `.config.dart`, `.gen.dart`; prefixes `lib/l10n/`, `lib/shared/src/intl/`; file `lib/shared/src/l10n.dart`; adapters `lib/src/ui/theme/` (desktop), `lib/core/design/` (mobile). Paths with `/` separators, sorted.
+- Baseline: run the test once, paste the printed map into `raw_style_baseline.dart` with a header comment ("§10.4: exact counts; lower when a task removes a style; never raise"). Union counts before A for orientation (generated/adapters excluded) — desktop: `Icons.` 171, `fontWeight:` 19, `fontSize:` 12, `TextStyle(` 5, `fontFamily:` 5, `Color(0x` 1, `Colors.` 1; mobile: `Icons.` 104, `TextStyle(` 22, `fontSize:` 21, `fontFamily:` 20, `Colors.` 20, `Color(0x` 15, `fontWeight:` 9, `BoxShadow(` 5, `BackdropFilter(` 1, `ImageFilter.blur(` 1; after Tasks 5–6 `fontFamily:` is lower in both (mobile: the 17 + 1 `FontFamily.*` uses removed, A31; desktop: `confirm_page.dart`, `kAiMono`).
+- End state (Task 16 checks): `Icons.`, `CupertinoIcons.` 0; `fontWeight:` 0 except R13's `shellx_config.dart`; `BackdropFilter(`/`ImageFilter.blur(` 1 each in `lib/features/pairing/presentation/pages/qr_scanner_page.dart`; `lib/core/handler/popup_handler.dart` absent; R13's other entries (`config/config_color.dart` `Color(0x`, `config/font_probe.dart` `TextStyle(`, `ai_file_viewer.dart` `fontFamily:`) stay.
 
-**Files:** Modify `apps/mobile/lib/shared/src/{app_button,app_text_field,notice_banner,confirm_dialog,app_error_view}.dart`, `lib/features/auth/presentation/widgets/password_text_field.dart`, `lib/core/handler/popup_handler.dart` (toast); Create `lib/shared/src/{shellx_bottom_bar,shellx_segmented,shellx_chip,shellx_card,shellx_brand_header}.dart` (export from `shared.dart`) and tests under `apps/mobile/test/shared/`.
+**Commands:** in `apps/desktop` and `apps/mobile`: `PATH=~/fvm/versions/3.41.4/bin:$PATH flutter test test/design` then the full `flutter analyze` + `flutter test`.
 
-Values (§7.1): `AppButton` 54 high, bo 10, `Ink(decoration: gradient)` `accent` (→ `accentStrong` when `MediaQuery.textScalerOf(context).scale(15) < 15`), label 15/700 `onAccent`, `IconTheme(onAccent)` for `prefix`/`suffix` (A22: drop the self-coloured icons at `session_picker.dart` (the "Phiên mới" prefix), `machine_list_page.dart` (two prefixes) and `app_error_view.dart`), `cta` shadow, press scale 0.98 in `press`, disabled 0.45; a `backgroundColor` override (destructive, transparent text-like uses) keeps a solid fill. `AppTextField`/`PasswordTextField`: 52 high, bo 16, `inset` fill, 1.5 px `border`, inner shadow via `ShellxInsetBox`, focus `primary` 2 px, error `error` + text 4 px below. Toast: top centre, bo 16, `surface` (dark navy750, never white), icon 20 by kind (`ok`, `warn`, `error`, `primary`), title 14/600, description 13 `secondaryText`, error `errorSoft`, 3 s, swipe up to close. `ShellxBottomBar` (B places it): 64 + safe area, `navy825` (light `raised`), top bo 28, `float1` flipped up, equal items ≥ 48×48, icon 24, label 12/600 one line, text scale capped 1.3×; active: 56×36 `ShellxSlantBorder` tile, `accent`, `cta`, white icon, label `primaryText` 700, slides in `slide` (instant with reduced motion), `HapticFeedback.selectionClick()`; badge dot 8 `accent` or count pill 16 `error`/`onError`; `Semantics(container, explicitChildNodes)` and per item `Semantics(button, selected, inMutuallyExclusiveGroup, label)`. `ShellxSegmented<T>` (track ≥ 48, padding 4, bo 14, segments ≥ 40, bo 10, 13/600, up to 2 lines), `ShellxChip` (36 high, padding 0/14, 13/600, `raised`), `ShellxCard` (bo 16, padding 16), `ShellxBrandHeader` (logo 48 + `title` 700 name, `maxLines: 2`; splash: logo 72 over `heading20` 700). Tests per §10.3 "Component mới" (2 lines at 320 pt, 1.3× labels, toast dark not white).
+**Commit:** `test(v2-design): raw-style guards in both apps with exact baselines (§10.4)`
 
-**Interfaces:** Consumes Tasks 4, 6, 8. Produces `ShellxBottomBar`, `ShellxSegmented<T>`, `ShellxChip`, `ShellxCard`, `ShellxBrandHeader` — consumed by Task 12, V2-5b (bottom bar, chips) and V2-5c (VI│EN segmented).
+### Task 8: `ShellxIcons` and every Material icon replaced
 
-**Spec decisions:** A22, A27, A28, A38 (ĐT), A40, A41, A42, §7.1, §10.3.
+Spec A45, §7.4, §10.1 `icons_test.dart`, success criterion 5. One commit for `lib/` and `test/` (A45).
 
-### Task 11: Desktop screens (§8.1) — UNFINISHED (plan writer stopped 2026-10-16 15:00)
+**Files:**
+- Create: `packages/shellx_design/lib/src/icons.dart`, `packages/shellx_design/test/icons_test.dart`; Modify `packages/shellx_design/lib/shellx_design.dart` (export)
+- Modify: every `apps/desktop/{lib,test}/**/*.dart` and `apps/mobile/{lib,test}/**/*.dart` with `Icons.` (desktop 74 glyph kinds, mobile 60), incl. `apps/desktop/lib/src/ui/terminal/terminal_overlays.dart` (`kPhoneIcon`), `ui/ai/ai_tool_card.dart` (`_icon`), mobile `features/ai/presentation/widgets/ai_items.dart`
+- Modify: `apps/mobile/pubspec.yaml` (drop `cupertino_icons: ^1.0.8`; the package pins 1.0.9); both `test/design/raw_style_baseline.dart` (`Icons.` → 0)
+- Scratch (not committed): `SCRATCH/v25a-tools/replace_icons.py`
 
-**Files:** `ui/terminal/{session_sidebar,session_tab_row,workspace_header,sidebar_new_button,sidebar_remote,attention_marks,agent_badge,agent_chip,terminal_pane,pane_tree_view,info_strip,remote_strip,resume_banner,terminal_overlays,notifications_panel,find_bar,key_sequence}.dart`, `ui/terminal/terminal_workspace_page.dart`, `ui/tools/*`, `ui/config/{command_palette,search_all_overlay,shortcuts_sheet,config_problems_panel}.dart`, `ui/onboarding/{tour_overlay,whats_new_card}.dart`, `ui/settings/{settings_overlay,settings_row}.dart`, `ui/settings/pages/*`, `ui/pages/*`, `ui/ssh/ssh_connect_dialog.dart`, `ui/tools/tool_dialogs.dart`, `ui/ai/*` (tokens/components only, layout kept — V2-5b), the 6 `AlertDialog` users. Every remaining `fontWeight:` → `shellxWeight` (guard: 0 except R13); markdown `strong`/headings through `shellxWeight` (R5); links `link`; the terminal empty state gets `ShellxWedge` top-right and a gradient primary button; the selected sidebar row is a raised tile (`raisedSmall`) + cyan bar 3×18; Settings nav item likewise; "Giấy phép và ghi công…" button lives in Task 14. Lower the guard baseline.
+**Interfaces:**
+- Consumes: Task 1's package pubspec (`cupertino_icons: 1.0.9`).
+- Produces (Tasks 9–12, V2-5b T48, V2-5c §4.8): `abstract final class ShellxIcons` with the 95 `static const IconData` roles of §7.4 (names exactly: `add, back, close, more, chevronRight, expand, collapse, openExternal, refresh, search, settings, tune, edit, moveFile, delete, copy, undo, send, queue, stop, stopCircle, scrollToEnd, maximize, restore, sidePanel, splitRight, splitDown, download, update, signOut, mention, scanQr, keyboard, mic, micOn, attachPhoto, camera, pin, resume, history, check, success, successOutline, failure, warning, error, danger, info, infoFill, pending, waiting, dotFill, dot, radioOn, checkboxOn, checkboxOff, checkboxMixed, prOpen, prMerged, offline, visible, hidden, notifications, notificationsUnread, notificationsOff, ai, agentProgram, thinking, fetch, switchMode, plan, file, readText, image, folderMissing, tool, toolOther, tab, tmux, lock, phone, laptop, desktop, terminal, faceId, fingerprint, sshHost, voiceMode, voiceMicOn, voiceMicOff, voiceEnd, voiceStopTurn, voiceExpand, voiceCollapse, voiceNeedsYou`) and `static const Map<String, IconData> roles` (95 entries, name → constant; V2-5b adds its roles to both).
 
-**Interfaces:** Consumes Tasks 5, 8, 9.
+**Tests first** (`packages/shellx_design/test/icons_test.dart`):
+- `'Cupertino font except the four Material fallbacks'`: for every `roles` entry, `fontFamily == 'CupertinoIcons'` and `fontPackage == 'cupertino_icons'`, except exactly `terminal`, `faceId`, `fingerprint`, `sshHost` which have `fontFamily == 'MaterialIcons'` and equal `Icons.terminal_rounded`, `Icons.face_rounded`, `Icons.fingerprint_rounded`, `Icons.dns_rounded`; 91 Cupertino, 4 Material.
+- `'voice roles (V2-5c §4.8)'`: `voiceMode == CupertinoIcons.waveform`, `voiceMicOn == CupertinoIcons.mic`, `voiceMicOff == CupertinoIcons.mic_slash`, `voiceEnd == CupertinoIcons.xmark`, `voiceStopTurn == CupertinoIcons.stop_fill`, `voiceExpand == CupertinoIcons.arrow_up_left_arrow_down_right`, `voiceCollapse == CupertinoIcons.chevron_down`, `voiceNeedsYou == CupertinoIcons.exclamationmark_triangle`.
+- `'roles lists every declared constant'`: parse `lib/src/icons.dart` with `RegExp(r'static const IconData (\w+)')`; the set equals `roles.keys.toSet()`, length 95, and `roles[name]` is the same glyph (`codePoint`) as declared (spot-check `add`, `fetch` = `CupertinoIcons.globe`, `tool` = `square_grid_2x2`, `toolOther` = `wrench`, `phone` = `device_phone_portrait`).
+- `'cupertino_icons pinned'`: `File('pubspec.yaml')` contains a line `  cupertino_icons: 1.0.9`.
+- App side (same commit): desktop `test/ui/ai/ai_tool_card_test.dart` gains `'tool kinds share the §7.4 table'` — `read→file, edit→edit, delete→delete, move→moveFile, search→search, execute→terminal, fetch→fetch, think→thinking, switchMode→switchMode, other→toolOther` via `find.byIcon(ShellxIcons.x)`; mobile `test/features/ai/ai_items_test.dart` likewise for `fetch` (globe) and `other` (`toolOther`). Every existing `find.byIcon(Icons.x)` in `test/**` becomes `find.byIcon(ShellxIcons.<role>)`.
 
-**Spec decisions:** §8.1, A21 (link on strips/markdown), A29/A30 places (DT), A44, A49, §10.5 (DT).
+**Implementation notes:**
+- `icons.dart`: the 95 roles with the glyphs of §7.4 verbatim (e.g. `back` `chevron_back`, `settings` `gear_alt`, `tune` `slider_horizontal_3`, `moveFile` `square_pencil`, `queue` `text_badge_plus`, `maximize` `arrow_up_left_arrow_down_right`, `restore` `arrow_down_right_arrow_up_left`, `sidePanel` `sidebar_right`, `splitRight` `square_split_2x1`, `splitDown` `square_split_1x2`, `download` `arrow_down_to_line`, `signOut` `square_arrow_right`, `pin` `pin_fill`, `resume` `arrow_counterclockwise`, `history`/`pending` `clock`, `radioOn` `largecircle_fill_circle`, `checkboxMixed` `minus_square`, `prOpen` `arrow_branch`, `prMerged` `arrow_merge`, `offline` `wifi_slash`, `agentProgram` `chevron_left_slash_chevron_right`, `thinking` `lightbulb`, `switchMode` `arrow_right_arrow_left`, `folderMissing` `folder_badge_minus`, `tab` `square_on_square`, `tmux` `square_split_2x2`, …); imports `package:flutter/cupertino.dart` and `package:flutter/material.dart` (for the four `Icons.*`). One-line doc per role naming its use.
+- Replacement (deterministic): `replace_icons.py` holds the "Thay `Icons.*`" column as a dict (`arrow_back`/`arrow_back_ios_new`→`back`, `expand_more`/`keyboard_arrow_down`→`expand`, `expand_less`/`keyboard_arrow_up`→`collapse`, `search_off`→`search`, `send`/`arrow_upward`→`send`, `stop`/`stop_rounded`→`stop`, `fullscreen`/`open_in_full`→`maximize`, `check`/`check_rounded`→`check`, `warning_amber`/`warning_amber_rounded`→`warning`, `circle_outlined`/`radio_button_unchecked`→`dot`, `cloud_off_outlined`/`link_off`→`offline`, `notifications_none`/`notifications_active_outlined`→`notifications`, `public`/`cloud_download_outlined`→`fetch`, `image_outlined`/`broken_image_outlined`→`image`, `lock_outline`/`key_outlined`→`lock`, `phone_iphone_outlined`/`smartphone`→`phone`, `add_photo_alternate_outlined`/`photo_library_outlined`→`attachPhoto`, `mic_none`→`mic`, `mic`→`micOn`, `terminal`→`terminal`, …); it rewrites `(?<![A-Za-z0-9_])Icons\.(\w+)` → `ShellxIcons.<role>` and **exits non-zero on any glyph not in the dict** (checked on the union: every glyph maps). Context-dependent first, by hand: `Icons.extension_outlined` → `ShellxIcons.toolOther` in `ui/ai/ai_tool_card.dart` (`ToolKind.other`) and mobile `ai_items.dart`; → `ShellxIcons.tool` in `ui/tools/tool_bar.dart`, `ui/tools/tool_project_list.dart`, `ui/tools/tool_sidebar_group.dart`, `ui/terminal/session_sidebar.dart`, `ui/ai/ai_header.dart`, mobile `session_picker.dart`. `kPhoneIcon = ShellxIcons.phone`. Desktop `ToolKind.fetch` changes from cloud to `ShellxIcons.fetch` (globe, §7.4).
+- Add `import 'package:shellx_design/shellx_design.dart';` where needed; remove `package:flutter/material.dart` only if it becomes unused. Tray and app icons unchanged. `uses-material-design: true` stays (four fallbacks).
+- Lower both baselines: every `Icons.` entry removed; `CupertinoIcons.` none.
 
-### Task 12: Phone screens (§8.2) — UNFINISHED (plan writer stopped 2026-10-16 15:00)
+**Commands:** `packages/shellx_design`, `apps/desktop`, `apps/mobile`: `PATH=~/fvm/versions/3.41.4/bin:$PATH flutter pub get` (root), `flutter analyze`, `flutter test` (all three); `dart format` touched files.
 
-**Files:** `features/app/{splash_page,update_required_page,connection_banner}.dart`, `features/auth/presentation/pages/{login_page,register_page}.dart`, `features/lock/presentation/{lock_gate,biometric_method}.dart`, `features/machines/presentation/pages/machine_list_page.dart` (cards flat bo 16; online dot `ok`; first-run empty state: brand line + `ShellxWedge` + steps card in `ShellxGlass` σ 16), `features/pairing/presentation/pages/qr_scanner_page.dart` (camera overlay kept; failure sheet and success screen by token; its `BackdropFilter` σ 3 stays, A44), `features/terminal/presentation/{pages/terminal_page,widgets/session_picker,widgets/extra_keys_bar,widgets/arrow_pad,widgets/keyboard_cover,widgets/link_sheet,widgets/view_as_text_sheet,widgets/agent_reply_bar}.dart`, `features/ai/presentation/**` (tokens/components only), `features/tools/presentation/pages/tool_page.dart`, `features/settings/presentation/pages/{settings_page,delete_account_page}.dart` (groups as flat cards; theme picker `ShellxSegmented<AdaptiveThemeMode>`; delete-account button destructive), `features/voice/presentation/widgets/{voice_composer,mic_button}.dart` (`SegmentedButton<VoiceLocale>` → `ShellxSegmented`, A40), `shared/src/confirm_dialog.dart`, `core/router/app_transparent_route.dart`; the 8 `showModalBottomSheet` calls lose their own `backgroundColor`/`shape` (A39). Remaining `fontWeight:` → `shellxWeight`; guard lowered (`popup_handler.dart` gone from it). Tests: `settings_page_test.dart` (`ShellxSegmented<AdaptiveThemeMode>`, the 2× text on 320 pt test stays green), `terminal_page_test.dart:1528` (`ShellxSegmented<VoiceLocale>`), §10.5 (8 machines: 0 `BoxShadow` in rows; AI session 50 items: 0 in the timeline; no `ShellxGlass` on the terminal and tool pages).
+**Commit:** `feat(v2-design): ShellxIcons — 95 Cupertino roles replace every Material icon in both apps`
 
-**Interfaces:** Consumes Tasks 6, 8, 10.
+### Task 9: Desktop components
 
-**Spec decisions:** §8.2, A12 (ĐT brand header on splash/login/register/first-run), A29/A30 places (ĐT), A39, A40, A41, A44, A49, §10.3, §10.5 (ĐT).
+Spec A12 (DT), A38 (widgets), A40, A41 (DT), A44, §7.1, §7.3, §10.2 "Component mới", §10.5 (DT); R20, R21.
 
-### Task 13: ⚠ The full name and the identity pins — UNFINISHED (plan writer stopped 2026-10-16 15:00)
+**Files:**
+- Create: `apps/desktop/lib/src/ui/components/{shellx_chip,shellx_segmented,shellx_card,shellx_brand_line}.dart`
+- Create: `apps/desktop/test/ui/components/{shellx_chip,shellx_segmented,shellx_card,shellx_brand_line,shellx_icon_button,notice_toast,shellx_menu,dialog_box}_test.dart`, `apps/desktop/test/ui/components/sidebar_shadow_test.dart`
+- Modify: `apps/desktop/lib/src/ui/terminal/terminal_overlays.dart` (`ShellxIconButton`, `NoticeToast`), `ui/terminal/shellx_menu.dart` (`showShellxMenu`), `ui/dialogs/route_dialog.dart` (`RouteDialogHost` box), `ui/dialogs/dialog_layout.dart` (`DialogBody`), `ui/pages/login_page.dart`, `ui/pages/onboarding_page.dart` (`DialogBody(brand: true)`), `ui/ai/ai_changes_panel.dart` (`SegmentedButton<AiChangesScope>` → `ShellxSegmented<AiChangesScope>`)
+- Modify: `apps/desktop/test/design/raw_style_baseline.dart` (lower if counts drop)
 
-**Files (spec §4.1, verbatim values in §9):** `apps/mobile/ios/Runner/Info.plist` (`CFBundleDisplayName` = `ShellX: Remote AI agents`; `CFBundleName` stays `shellx_mobile`; no key added to `en.lproj`/`vi.lproj/InfoPlist.strings`), `apps/mobile/android/app/src/main/AndroidManifest.xml` (`android:label="ShellX: Remote AI agents"`), `apps/mobile/lib/l10n/intl_{en,vi}.arb` (`appTitle` = `ShellX: Remote AI agents`; `settingsVersion` = `ShellX: Remote AI agents {version} ({build})`; regenerate), `features/app/splash_page.dart` (`MaterialApp.onGenerateTitle: (context) => S.of(context).appTitle`, A13), `apps/desktop/lib/l10n/app_{en,vi}.arb` (`appTitle`, `trayTooltip` = the long name; `windowTitle` stays `{title} — ShellX`; `flutter gen-l10n`), `apps/desktop/lib/src/ui/window_host.dart` (`windowTitleFor(null, l10n)` → `l10n.appTitle`; `WindowManagerHost.init({required String title})`), `lib/main.dart` (`windowHost.init(title: l10n.appTitle)`; `_windowsErrorBox(title, message)` with `l10n.appTitle` at both calls; notification titles stay "ShellX", A9), `ui/terminal/terminal_pane.dart` (the macOS pane header with no tab → `l10n.appTitle`), `apps/desktop/windows/runner/main.cpp` (`window.Create(L"ShellX: Remote AI agents", …)`), `apps/desktop/windows/runner/Runner.rc` (`FileDescription` only), `apps/desktop/macos/Runner/Info.plist` (add `CFBundleDisplayName` = `ShellX`, `LSHasLocalizedDisplayName` = true), new `apps/desktop/macos/Runner/en.lproj/InfoPlist.strings` (`"CFBundleDisplayName" = "ShellX: Remote AI agents";`) added to the Runner target's Resources as a variant group like `MainMenu.xib` (pbxproj ids `5A5F0001…A002`, `5A5F0002…A002`, `5A5F0003…A002`). Identities stay (spec §4.2 table).
+**Interfaces:**
+- Consumes: Task 4 `ShellxInsetBox`, `ShellxInsetShadow`, `shellxGradientLayer`; Task 5 `ShellxDesktopColors.{onAccent, overlayHover, overlayPressed, pushed, …}`, `ShellxShadows.{e1, e2, raised, inset}`, `ShellxText.*`, `ShellxMotion.{slide, slideCurve}`, `ShellxRadius.*`, `OutsideFocusRingBorder`, `buttonShape`; Task 3 `ShellxGradients.{accent, accentStrong, hoverShade, pressedShade}`; Task 8 `ShellxIcons`; `AppLocalizations.appTitle`.
+- Produces (Task 11, V2-5b):
+  - `ShellxChip({Key? key, required String label, IconData? icon, bool selected = false, VoidCallback? onPressed, String? tooltip})`.
+  - `class ShellxSegment<T> { const ShellxSegment({required T value, required String label, IconData? icon}); }`; `ShellxSegmented<T>({Key? key, required List<ShellxSegment<T>> segments, required T selected, required ValueChanged<T>? onChanged})` (`onChanged == null` → disabled).
+  - `enum ShellxCardVariant { flat, raised, inset }`; `ShellxCard({Key? key, required Widget child, ShellxCardVariant variant = ShellxCardVariant.flat, VoidCallback? onTap, EdgeInsetsGeometry padding = const EdgeInsets.all(12)})`.
+  - `ShellxBrandLine({Key? key})` (reads `AppLocalizations.of(context).appTitle`).
+  - `enum ShellxIconButtonVariant { flat, raised }`; `ShellxIconButton(…, ShellxIconButtonVariant variant = ShellxIconButtonVariant.flat)` (existing params kept; `selected == true` → gradient, R20).
+  - `DialogBody({…, bool brand = false})`.
 
-Tests: change `apps/mobile/test/platform_config_test.dart` (`:28` long `CFBundleDisplayName`, `:123` long `android:label`; add: the two `InfoPlist.strings` have no `CFBundleDisplayName`, `CFBundleName` = `shellx_mobile`), `settings_page_test.dart:172, 277, 557` ("ShellX: Remote AI agents 1.0.0 (1)"), `shared/shellx_logo_test.dart:13` (semantics label long), `apps/desktop/test/ui/window_flow_test.dart:748` (`windowTitleFor(null, l10n)` long; `:752` kept); add `apps/desktop/test/platform/identity_pins_test.dart` (`Runner.rc` `FileDescription` long, `ProductName`, `CompanyName`, `InternalName`, `OriginalFilename` kept; `CMakeLists.txt` `BINARY_NAME` = `ShellX`; `main.cpp` long title; `AppInfo.xcconfig` `PRODUCT_NAME` and bundle id kept; `Info.plist` the two A5 keys; `en.lproj/InfoPlist.strings` long; `notifier.dart` and `launch_at_login.dart` `appName: 'ShellX'`), ARB tests for `appTitle`, `trayTooltip` (DT) and `appTitle`, `settingsVersion` (ĐT) in EN and VI, `splash_page_test.dart` (the splash's `MaterialApp` title is the long name). Kept as is: the tests listed in spec §4.3 "Giữ". Check: `flutter build macos --debug` in a throw-away worktree (no launch) shows `Contents/Resources/en.lproj/InfoPlist.strings`; revert the `COCOAPODS:` line if the build ran in the worktree.
+**Tests first:**
+- `shellx_chip_test.dart`: size 24 high, padding 0/10, label `ShellxText.small`-sized 11.5 weight 500 (`wght` 500), radius 10, icon 14; rest: border `hairlineStrong` (`0x1AFFFFFF`), transparent fill, no `BoxShadow`; hovered fill navy800 `0xFF28303F`; pressed `pushed`; `selected: true` → `ShellxGradients.accentStrong` gradient, label `0xFFFFFFFF` weight 600, hovered/pressed overlay `0x14000000`/`0x29000000`; focus ring inside (rest) / outside (selected); `onPressed: null` → `Opacity` 0.38.
+- `shellx_segmented_test.dart`: track 28 high, padding 2, radius 10, `ShellxInsetBox` with `ShellxShadows.inset`; segments 24 high, radius 8, min width 56, padding 0/10, text 11.5; unselected text `textSecondary`, hovered `textPrimary` on navy800; selected `accentStrong`, white 600, shadow `raisedSmall`; the tile animates with `ShellxMotion.slide` (pump half → between positions; with `MediaQuery(disableAnimations: true)` → final at once); **one tab stop** (Tab from before moves focus onto the control, a second Tab leaves it); `→`/`←` change the selection and call `onChanged` with the next/previous value (no wrap at the ends); `Semantics` per segment: `isButton`, `isSelected` (true on the selected only), `isInMutuallyExclusiveGroup`, `label` = segment label; `onChanged: null` → 0.38 and no callback.
+- `shellx_card_test.dart`: radius 16, padding 12; `flat` navy750 + `hairlineStrong` side, no shadow; `raised` shadow `ShellxShadows.raised`; `inset` uses `ShellxInsetBox`; with `onTap`: hovered `overlayHover`, pressed `pushed`, focus ring inside; without `onTap` no `InkWell`/`FocusableActionDetector`.
+- `shellx_brand_line_test.dart`: text `'ShellX: Remote AI agents'` once Task 13 lands — until then assert it equals `AppLocalizations.of(ctx).appTitle` (EN and VI); style `ShellxText.label` (11.5/16/600) in `accent` `0xFF34C8E8`; `DialogBody(brand: true)` draws it 8 px above the title (`tester.getBottomLeft(brand).dy + 8 == getTopLeft(title).dy`); `brand: false` has none.
+- `app_dialogs_test.dart` (existing): the sign-in dialog stays `lessThan(520)` high with the brand line (A12).
+- `shellx_icon_button_test.dart`: hit 28, visual 24, glyph 16, radius 10; `flat` transparent, hovered navy800 + glyph `textPrimary`, pressed navy650; `raised` navy700 + `ShellxShadows.raised`; `selected: true` → `ShellxGradients.accent` gradient, glyph `0xFFFFFFFF`, pressed overlay `0x29000000`, outside ring; `busy` → 12 px spinner (as today).
+- `notice_toast_test.dart`: radius 16, max width 420, padding 8/12, shadow `ShellxShadows.e1`; normal: bg navy750, border `hairlineStrong`, text `textPrimary`; error: `noticeBg` `0xFF453F50`, border `noticeLine` `0xFF5F4959`, text `noticeText` `0xFFFFD9DB`; hover pauses the timer (existing behaviour kept).
+- `shellx_menu_test.dart`: menu bg navy750, radius 16, side `hairlineStrong`, shadow `e1`, padding 4; item height 28, radius 10, padding 0/10; hovered item bg `overlayHover`, text `textTitle`, shortcut hint `textDialog2`; pressed `overlayPressed`; disabled item 0.38 and keeps its slot.
+- `dialog_box_test.dart`: `RouteDialogHost` box radius 28, bg navy750, side `hairlineStrong`, shadow `e2`, barrier `0x99000000`; widths 400/480/520 unchanged.
+- `test/ui/ai/ai_changes_safety_test.dart` (the panel's test) stays green and gains `'the scope control is ShellxSegmented'`: `find.byType(ShellxSegmented<AiChangesScope>)` one, `find.byType(SegmentedButton<AiChangesScope>)` none; tapping the other scope changes the list as before.
+- `sidebar_shadow_test.dart` (§10.5 DT, Review Focus 5; reuse the `SessionSidebar` harness of `test/ui/sidebar_polish_test.dart`): pump `SessionSidebar` with 30 tabs, one selected; `find.descendant(of: sidebar, matching: …)` collecting every `BoxDecoration.boxShadow` (and `Material.elevation > 0`) → total `BoxShadow` count ≤ 2. Green now; Task 11 (raised selected row) must keep it green.
 
-**Interfaces:** none new.
+**Implementation notes:**
+- Values per §7.1 table rows "Chip", "Chip đang chọn", "Segmented", "Segment đang chọn", "Thẻ", "Nút icon", "Toast", "Menu", "Hộp thoại", "Dòng thương hiệu"; colours only through `ShellxDesktopColors`/`ShellxGradients`, no `Color(0x`, no `fontWeight:` (use `shellxWeight`) — the guard must not rise.
+- Gradient fills reuse `shellxGradientLayer` (hover/pressed shades, disabled opacity) inside a `FilledButton`-free `DecoratedBox`; painters in a `RepaintBoundary` (A44).
+- `ShellxSegmented`: one `Focus` node for the whole control (`FocusableActionDetector` with `ArrowLeft`/`ArrowRight` intents); the selected tile is an `AnimatedAlign`/`AnimatedPositioned` with `ShellxDurations.of(context, ShellxMotion.slide)`; segments are not separately focusable; the outside ring wraps the selected segment when the control has focus.
+- `ShellxBrandLine` sits in `DialogBody` above the title with `SizedBox(height: 8)`; `login_page.dart` (sign-in and sign-up) and `onboarding_page.dart` pass `brand: true` (A12); nothing else.
+- `NoticeToast` timing from `ShellxMotion` (`toastVisible` 4 s, `toastVisibleError` 6 s, existing names kept).
+- No `BoxShadow` on chips, flat cards, menu items or segments other than the selected one (A44).
 
-**Spec decisions:** A1–A9, A11, A13, §4.1–§4.3, §9.1–§9.2, Review Focus 1.
+**Commands** (`apps/desktop`): `PATH=~/fvm/versions/3.41.4/bin:$PATH flutter analyze`; `PATH=~/fvm/versions/3.41.4/bin:$PATH flutter test test/ui/components test/ui/app_dialogs_test.dart test/design` then the full `flutter test`; `dart format` touched files.
 
-### Task 14: ⚠ Native launch screens and the licence page — UNFINISHED (plan writer stopped 2026-10-16 15:00)
+**Commit:** `feat(v2-design): desktop components — chip, segmented, card, brand line; icon button, toast, menu and dialog box on tokens`
 
-**Files:** `apps/mobile/ios/Runner/Base.lproj/LaunchScreen.storyboard` (background #222834, logo kept), `apps/mobile/android/app/src/main/res/drawable/launch_background.xml`, `drawable-v21/launch_background.xml`, `values/styles.xml`, `values-night/styles.xml` (`NormalTheme`), new `values-v31/styles.xml` (`android:windowSplashScreenBackground`), `values/colors.xml` (`shellx_page` #222834) (A48); `packages/shellx_design/lib/src/licenses.dart` + test (`registerShellxDesignLicenses()`: one `LicenseEntryWithLineBreaks(['Online Bike Shopping App (design reference)'], <the §9.3 text verbatim>)`), both apps' `main.dart` call it once; new ARB `licensesLegalese` (EN/VI §9.1) in both apps, `settingsLicenses` (DT only: "Licenses and credits…" / "Giấy phép và ghi công…"); DT Settings › General button under the version line opening `showLicensePage(applicationName: appTitle, applicationLegalese: licensesLegalese)`; ĐT `showLicensePage` gets `applicationLegalese`. Tests: licence entry present, no SF Mono entry; platform_config_test pins the launch colours.
+### Task 10: Phone components
 
-**Spec decisions:** A47, A48, §9.3, manual §12 items 4, 5, 13.
+Spec A12 (ĐT), A22, A27, A28, A38 (ĐT), A40, A41, A42, §7.1, §10.3 "Component mới"; R21.
 
-### Task 15: ⚠ The Windows installer's three display lines — UNFINISHED (plan writer stopped 2026-10-16 15:00)
+**Files:**
+- Modify: `apps/mobile/lib/shared/src/{app_button,app_text_field,notice_banner,confirm_dialog,app_error_view}.dart`, `lib/features/auth/presentation/widgets/password_text_field.dart`, `lib/core/handler/popup_handler.dart` (`PopupHandler.showMessage`, `showLoading`)
+- Modify (A22, `AppButton` icon colour only): `lib/features/terminal/presentation/widgets/session_picker.dart` (the "Phiên mới" prefix), `lib/features/machines/presentation/pages/machine_list_page.dart` (two prefixes)
+- Create: `apps/mobile/lib/shared/src/{shellx_bottom_bar,shellx_segmented,shellx_chip,shellx_card,shellx_brand_header}.dart`; export from `lib/shared/shared.dart`
+- Create: `apps/mobile/test/shared/{app_button,app_text_field,toast,shellx_bottom_bar,shellx_segmented,shellx_chip,shellx_card,shellx_brand_header}_test.dart`; modify `test/shared/app_error_view_test.dart`
+- Modify: `apps/mobile/test/design/raw_style_baseline.dart` (`popup_handler.dart` entry gone; others lowered)
 
-**Flagged: `release/windows/shellx.iss` is a teammate's file on `main`; tell the user before it is merged to `main` (A10).** Change only `AppName=ShellX: Remote AI agents` (`:22`), `AppVerName=ShellX: Remote AI agents {#AppVersion}` (`:24`), `UninstallDisplayName=ShellX: Remote AI agents` (`:44`). Keep `AppId`, folders, group, shortcut names, `LaunchProgram,ShellX`, `AppPublisher`. No new test in `release/tests`; run the existing `release/tests/inno.test.mjs` (`node --test`) to show it still passes. Separate commit.
+**Interfaces:**
+- Consumes: Task 4 `ShellxInsetBox`, `ShellxSlantBorder`, `ShellxWedge`, `shellxWeight`; Task 6 `AppColors.{raised, inset, onAccent, okSoft, gradient, gradientStrong, elevation, …}`, `AppTypography.*`; Task 3 `ShellxDurations.{press, slide, toastVisiblePhone}`, `ShellxCurves.*`, `ShellxPalette.navy825`, `ShellxElevation` lists; Task 8 `ShellxIcons`; `S.of(context).appTitle`; `ShellxLogo` (existing).
+- Produces (Task 12, V2-5b, V2-5c):
+  - `class ShellxBottomBarItem { const ShellxBottomBarItem({required IconData icon, required String label, int? badgeCount, bool badgeDot = false}); }`; `ShellxBottomBar({Key? key, required List<ShellxBottomBarItem> items, required int currentIndex, required ValueChanged<int>? onTap})`.
+  - `ShellxSegment<T>`, `ShellxSegmented<T>({Key? key, required List<ShellxSegment<T>> segments, required T selected, required ValueChanged<T>? onChanged})` (same shape as desktop, R21).
+  - `ShellxChip({Key? key, required String label, IconData? icon, bool selected = false, VoidCallback? onPressed})`.
+  - `enum ShellxCardVariant { flat, raised, inset }`; `ShellxCard({Key? key, required Widget child, ShellxCardVariant variant = ShellxCardVariant.flat, VoidCallback? onTap, EdgeInsetsGeometry padding = const EdgeInsets.all(16)})`.
+  - `ShellxBrandHeader({Key? key, bool splash = false})`.
 
-**Spec decisions:** A10, §4.1 rows 16–18, §13.2.
+**Tests first:**
+- `app_button_test.dart` (moved from design tokens, §10.3): height 54, radius 10; an `Ink` whose `BoxDecoration.gradient == ShellxGradients.accent`; label 15 / weight 700 (`wght` 700) in `onAccent` `0xFFFFFFFF` (default `textColor` becomes `onAccent`); `prefix`/`suffix` icon colour from `IconTheme` = `onAccent`; shadow `elevation.cta`; pressed → `Transform.scale` 0.98 within `ShellxDurations.press`; disabled → opacity 0.45, no shadow; with `MediaQuery(textScaler: TextScaler.linear(0.9))` (`scale(15) < 15`) the gradient is `ShellxGradients.accentStrong`; a `backgroundColor` override (destructive) → solid colour, no gradient.
+- `app_text_field_test.dart` (and `PasswordTextField`): height 52, radius 16, fill `inset`, border 1.5 `border`, `ShellxInsetBox` present; focused → border `primary` width 2; error → border `error` and the error text 4 px below in `paragraph13` bold `error`.
+- `toast_test.dart` (A41): `PopupHandler().showMessage(…)` in dark theme → toast at top centre, radius 16, bg `0xFF2C3547` (navy750, **not** `Colors.white`), icon 20 coloured `ok`/`warn`/`error`/`primary` by `ToastificationType`, title 14 / 600, description 13 `secondaryText`; error kind bg `errorSoft`; auto-close `ShellxDurations.toastVisiblePhone` (3 s); swipe up dismisses (as today); light theme bg `0xFFF5F7FA`.
+- `shellx_bottom_bar_test.dart`: bar height 64 + bottom safe area, bg navy825 `0xFF242C3B` (light `raised`), top radius 28, shadow `float1` mirrored up (negative `dy`); items equal width, each ≥ 48×48, icon 24, label 12 / 600 `maxLines: 1`; label text scale capped: at `TextScaler.linear(2.0)` the label's effective scale is 1.3; inactive icon/label `secondaryText`; active: a 56×36 tile with `ShellxSlantBorder(radius: 10, slant: 4)`, `gradient` `accent`, shadow `cta`, icon white, label `primaryText` weight 700; tapping item 2 calls `onTap(2)`, the tile slides over `ShellxDurations.slide` (mid-pump between) and lands at once with `disableAnimations: true`; `HapticFeedback.selectionClick` called (mock `SystemChannels.platform`, `HapticFeedback.vibrate` with `HapticFeedbackType.selectionClick`); badge dot 8 `accent`, count pill 16 high `error` with `onError` text; semantics: bar `container` + `explicitChildNodes`, each item `isButton`, `isSelected` on the current only, `isInMutuallyExclusiveGroup`, `label`; `onTap: null` → 0.45 and not tappable.
+- `shellx_segmented_test.dart`: track ≥ 48 high, padding 4, radius 14, `ShellxInsetBox`; segments ≥ 40 high, radius 10, text 13 / 600, up to 2 lines at 320 pt and 2× text (grows, never clips: no `RenderParagraph.didExceedMaxLines`); selected `gradientStrong`, white 600, `raisedSmall`; semantics as desktop; tap changes selection; `onChanged: null` → 0.45.
+- `shellx_chip_test.dart`: height 36, padding 0/14, 13 / 600, radius 10, icon 18; bg `raised`, border `ShellxPalette.hairlineStrong` (dark) / `ShellxLightPalette.hairline` (light) (§7.1), no shadow; selected `gradientStrong`, white 600; disabled 0.45.
+- `shellx_card_test.dart`: radius 16, padding 16; `flat` `surface` + border; `raised` `elevation.raised`; `inset` `ShellxInsetBox`; pressable: pressed fill `inset` (the phone has no `pushed` role: sunken = `inset`), no shadow, focus ring inside.
+- `shellx_brand_header_test.dart`: header: `ShellxLogo(size: 48)` + `S.of(context).appTitle` in `context.typo.title` weight 700, `maxLines: 2`; splash: logo 72 above, `heading20` 700 below, centred; at 320 pt width with `TextScaler.linear(2.0)` the name wraps to 2 lines without overflow (no exception, `didExceedMaxLines` false); logo semantics label = `appTitle`.
+- `app_error_view_test.dart`: the retry `AppButton` icon takes `onAccent` from `IconTheme` (no own colour).
 
-### Task 16: Final verification and the ledger — UNFINISHED (plan writer stopped 2026-10-16 15:00)
+**Implementation notes:**
+- `AppButton` (A22, A27, A38; `context.colors`, `context.typo`): `radius` default 15 → 10; the existing `Ink` gets `BoxDecoration(gradient: small ? colors.gradientStrong : colors.gradient, borderRadius: radius, boxShadow: state.isDisable ? null : colors.elevation.cta)` with `small = MediaQuery.textScalerOf(context).scale(15) < 15`; `IconTheme.merge(data: IconThemeData(color: colors.onAccent))` around `prefix`/`suffix`; press scale 0.98 via `AnimatedScale(duration: ShellxDurations.press)`; disabled `Opacity(0.45)`; existing loading spinner kept; `backgroundColor` param non-null → solid fill (no gradient). Remove the self-set `onPrimary` icon colours at `session_picker.dart` ("Phiên mới"), `machine_list_page.dart` (both prefixes) and `app_error_view.dart` (A22).
+- `AppTextField`/`PasswordTextField` (A28, A43 ĐT): `ShellxInsetBox(color: colors.inset, shadow: colors.elevation.inset, borderRadius: 16, border: BorderSide(color: colors.border, width: 1.5))` around a borderless `TextField`; focus/error borders as in the tests; text 15.
+- `notice_banner.dart` radius 13 → 16; `confirm_dialog.dart` follows `dialogTheme` (drop own shape/colour), its destructive action uses `AppButton(backgroundColor: colors.error)`.
+- Toast (`popup_handler.dart`, A41): `toastification.show(alignment: Alignment.topCenter, autoCloseDuration: ShellxDurations.toastVisiblePhone, backgroundColor: kind == error ? colors.errorSoft : colors.surface, foregroundColor: colors.primaryText, primaryColor: <ok|warn|error|primary>, borderRadius: BorderRadius.circular(16), boxShadow: colors.elevation.float1, …)`; icon `ShellxIcons.success/warning/error/info` size 20; title `context.typo.subHeader15.semiBold` (14/600), description `context.typo.paragraph13` (13) `secondaryText`; no `Colors.*`, no `Color(0x` left (`showLoading`'s `Colors.transparent` is allowed by the guard).
+- `ShellxBottomBar` (A42; B places it): `Semantics(container: true, explicitChildNodes: true)`; `MediaQuery.withClampedTextScaling(maxScaleFactor: 1.3)` around labels; active tile `AnimatedPositioned` over `ShellxDurations.of(context, ShellxDurations.slide)` (0 with reduced motion); `HapticFeedback.selectionClick()` on change; press `AnimatedScale` 0.96; focus ring cyan 2 px around the item.
+- `ShellxBrandHeader` (A12): `Column(ShellxLogo(size: splash ? 72 : 48), SizedBox(8), Text(S.of(context).appTitle, maxLines: 2, textAlign: center, style: splash ? context.typo.heading20.bold : context.typo.title.bold))`. Task 12 places it (splash, login, register, first-run empty state).
+- All values through `AppColors`/`AppTypography`/package constants; weights through `shellxWeight` or the `.bold/.semiBold` getters (guard must not rise).
 
-Run analyze + tests for `packages/shellx_design`, `apps/desktop`, `apps/mobile` and every other package (`shellx_core`, `shellx_agent`, `shellx_client`, `shellx_e2e`, `shellx_acp`, `shellx_ai` with `dart analyze`/`dart test`); builds without launching: `flutter build apk --debug`, `flutter build ios --debug --no-codesign`, `flutter build macos --debug` in a throw-away worktree; search the built `.app`, `.apk` and iOS `Runner.app` for any `SF*Mono*` file (none); the isolated smoke launch of the full desktop app (allowed only because Task 2 is done; bundle id `pro.shellx.desktop.smoketest`, temporary HOME, own Keychain service, stop by PID; it calls the relay's public `/v1/version`): no exception, SF Mono loaded on macOS; record test counts, guard end state (Task 7), spike rows, and the 14 manual checks of §12 (unchecked) in the ledger; follow-ups of §13.2 plus R14's CI line.
+**Commands** (`apps/mobile`): `PATH=~/fvm/versions/3.41.4/bin:$PATH flutter analyze`; `PATH=~/fvm/versions/3.41.4/bin:$PATH flutter test test/shared test/design` then the full `flutter test`; `dart format` touched files (120 columns).
+
+**Commit:** `feat(v2-design): phone components — gradient AppButton, inset fields, dark toast, bottom bar, segmented, chip, card, brand header`
+
+### Task 11: Desktop screens (§8.1)
+
+**Files:**
+- Modify `apps/desktop/lib/src/ui/terminal/`:
+  - The sidebar and its rows: `session_sidebar.dart` (the selected row in `_TabRow`/`_Item`), `session_tab_row.dart`, `sidebar_new_button.dart`, `sidebar_remote.dart`.
+  - The header and the marks on a row: `workspace_header.dart`, `attention_marks.dart`, `agent_badge.dart`, `agent_chip.dart`.
+  - The panes: `terminal_pane.dart`, `pane_tree_view.dart`, `terminal_workspace_page.dart`.
+  - The strips: `info_strip.dart`, `remote_strip.dart`, `resume_banner.dart`.
+  - The overlays: `terminal_overlays.dart` (`EmptyTerminalState`), `notifications_panel.dart`, `find_bar.dart`, `key_sequence.dart`.
+- Modify `apps/desktop/lib/src/ui/tools/*` (all files, V2-3).
+- Modify `ui/config/{command_palette,search_all_overlay,shortcuts_sheet,config_problems_panel}.dart`.
+- Modify `ui/onboarding/{tour_overlay,whats_new_card}.dart`.
+- Modify `ui/settings/settings_overlay.dart` (`_NavItem`), `ui/settings/settings_row.dart` and `ui/settings/pages/*`.
+- Modify `ui/pages/{login_page,onboarding_page,pairing_page,change_password_page,confirm_page}.dart`.
+- Modify `ui/ssh/ssh_connect_dialog.dart` and `ui/tools/tool_dialogs.dart`.
+- Modify `ui/ai/*`: tokens, components, fonts and icons only; the layout is V2-5b's (A49). Includes `ai_markdown.dart` and the 7 `AlertDialog(` users of R34:
+  - `settings/pages/advanced_page.dart`
+  - `tools/tool_dialogs.dart`
+  - `ai/ai_log_dialog.dart`
+  - `ai/ai_config_chips.dart`
+  - `ai/ai_history.dart`
+  - `ai/ai_agents_section.dart`
+  - `ai/ai_changes_panel.dart`
+- Modify `apps/desktop/test/design/raw_style_baseline.dart` (lower it).
+- Create `apps/desktop/test/ui/design_budget_test.dart` (R33) and `apps/desktop/test/ui/ai/ai_markdown_style_test.dart`.
+- Modify `test/ui/empty_states_test.dart`, `pages_test.dart`, `settings_overlay_test.dart`, `info_strip_test.dart`, `remote_strip_test.dart` and `app_dialogs_test.dart` (keep it green).
+
+**Interfaces:**
+- Consumes:
+  - **Task 4:** `shellxWeight(TextStyle, FontWeight)`, `ShellxWedge({corner, widthFactor, heightFactor})`, `ShellxWedgeCorner.topRight`, `ShellxWedgePainter.points(Size)`.
+  - **Task 5 tokens:** `ShellxDesktopColors.{accent, link, overlayHover, overlayPressed, pushed, rowSelected, textTitle, textPrimary, textSecondary, line, border}`, `ShellxShadows.{raised, inset, e1, e2}`, `ShellxRadius.{r4, r6, r8, r12, pill}`, `ShellxText.*` (getters, R3) and `ShellxMotion.{slide, slideCurve}`.
+  - **Task 5 button styles:** `shellxPrimaryButtonStyle()`, `shellxSecondaryButtonStyle()`, `shellxTextButtonStyle()`, `destructiveButtonStyle()`.
+  - **Task 8:** `ShellxIcons.*`.
+  - **Task 9:** `ShellxChip`, `ShellxSegmented<T>`, `ShellxCard` (its `flat` variant, as Task 9 declares it), `ShellxBrandLine`, `DialogBody(brand: true)`.
+- Produces:
+  - `const Key('sidebar.selectedBar')`: the 3×18 cyan bar of the selected sidebar row.
+  - `const Key('settings.nav.selectedBar')`: the same bar on the selected Settings nav item.
+  - `EmptyTerminalState` becomes a `Stack` whose first child is `const Positioned.fill(child: ShellxWedge())`.
+
+**Tests first** (red before the change, green after):
+- `test/ui/design_budget_test.dart`:
+  - **'sidebar, 30 tabs, one selected: at most 2 BoxShadow under the sidebar (§10.5)'.**
+    - Pump through `sidebar_test_harness.dart`.
+    - The helper `int boxShadowsUnder(WidgetTester, Finder)` adds up `boxShadow.length` of every `BoxDecoration` on a `DecoratedBox` or an `Ink` below the finder (`Container`/`AnimatedContainer` build a `DecoratedBox`).
+    - Expect `<= 2`.
+  - **'the selected row is a raised tile with a cyan bar 3×18; other rows have no shadow'.**
+    - The selected row's decoration: `boxShadow == ShellxShadows.raised`, colour `ShellxDesktopColors.rowSelected`, radius `ShellxRadius.r6` (10).
+    - `tester.getSize(find.byKey(const Key('sidebar.selectedBar')))` is `Size(3, 18)`, and its colour is `ShellxDesktopColors.accent`.
+    - Any unselected row: `boxShadowsUnder == 0`.
+    - The sidebar width stays 220. Row heights stay 30/46/62/78 (A34).
+  - **'no BackdropFilter in the workspace window (A44: no glass on the desktop in A)'.** Pump the workspace page with 2 tabs and expect `find.byType(BackdropFilter)` to find nothing.
+- `test/ui/empty_states_test.dart`, in its existing groups:
+  - **'empty pane: a ShellxWedge at the top right, and a gradient primary button (§8.1)'.**
+    - With no tab, `find.byType(ShellxWedge)` finds one widget, and its `corner == ShellxWedgeCorner.topRight`. With a tab it finds nothing.
+    - `pane.empty.open` is a `FilledButton` whose `style.backgroundBuilder` is not null.
+  - **'no text or control of the empty state lies on the wedge (A30)'.**
+    - At pane sizes 800×600 and 520×400, take the global rect of every `Text` and every `ButtonStyleButton` under `pane.empty`.
+    - None of the 4 corners of any rect may lie inside the polygon `ShellxWedgePainter.points(paneSize)`. Use a point-in-polygon helper written in the test.
+- `test/ui/ai/ai_markdown_style_test.dart`:
+  - **'markdown strong and headings carry wght (R5)'.** Render `**b**` and `# h`. The span's `fontVariations` contains `FontVariation('wght', 700)` and its `fontWeight` is `w700`. Body text uses `ShellxText.dialogBody`'s size.
+  - **'markdown links use link (A21)'.** The link span's colour is `ShellxDesktopColors.link`.
+- `test/ui/pages_test.dart`:
+  - **'login (sign-in and register) and onboarding show ShellxBrandLine above the title (A12)'.** `find.byType(ShellxBrandLine)` finds one widget in each mode, and `tester.getRect(brandLine).bottom + 8 == tester.getRect(title).top` (§7.1: 8 px above the title).
+  - `app_dialogs_test.dart`'s "under 520 high" test stays green, unchanged.
+- `test/ui/settings_overlay_test.dart`:
+  - **'the selected nav item is a raised tile with the cyan bar'.** `boxShadow == ShellxShadows.raised`; `Key('settings.nav.selectedBar')` is 3×18 `accent`. Unselected items have no shadow.
+- `test/ui/info_strip_test.dart` and `remote_strip_test.dart`:
+  - **'strip buttons use link (A21)'.** `TextButton.style!.foregroundColor!.resolve({})` equals `ShellxDesktopColors.link`, or the style comes from the theme's `textButtonTheme`. Assert the effective colour of the label `Text` via `DefaultTextStyle`/`RichText` colour.
+- Guard (Task 7): the baseline's `fontWeight:` counts go to 0 in every file except `lib/src/config/shellx_config.dart` (1, R13). The guard test must fail before the baseline is lowered, then pass.
+
+**Implementation notes:**
+- **Sidebar and tab rows (§8.1 row 1):**
+  - Colours come from Task 5's map: sidebar `navy850`; hover `rowHover` < selected `rowSelected` (navy700) < pressed `rowPressed` (navy650).
+  - The selected row is a tile: radius 10 (`ShellxRadius.r6`), `ShellxShadows.raised`, and a cyan bar 3×18 (`accent`) at the leading edge, vertically centred. Only the selected row has a shadow (A44).
+  - Tags are pills (`ShellxRadius.pill`). Text is 12 (`ShellxText.body`/`small` per §6.5). Icons come from `ShellxIcons`.
+  - Sizes stay: width 220, rows 30/46/62/78.
+- **Panes (row 2):**
+  - Pane background `bgTerminal` (navy900). Splits use `line` (hairline). The focus ring is `accent` (cyan).
+  - The terminal palette and default font are already done (Task 5). Nothing here sets a font family.
+- **Strips, pills, toast, empty state (row 3):**
+  - `info_strip`, `remote_strip` and `resume_banner` use tokens. Their buttons use `shellxTextButtonStyle()` (link, A21).
+  - `NoticeToast` is already radius 16 (Task 9).
+  - `EmptyTerminalState`:
+    - It becomes `Stack(children: [const Positioned.fill(child: ShellxWedge()), <the existing Center keyed pane.empty>])`. The wedge is drawn behind the content, top right, at 45 %/70 %.
+    - The open button stays `ShellxPrimaryButton` (gradient `accentStrong`, Task 5).
+    - The wedge carries no semantics and does not hit-test (Task 4).
+- **Overlays (row 4):**
+  - Applies to the command palette, search-all, the shortcuts sheet, the config problems panel, notifications, the tour, what's-new, the find bar and the key sequence.
+  - Each is navy750, radius 16 (`r8`), border `hairlineStrong` (`border`), `ShellxShadows.e1` (float1).
+  - Hovered rows are `overlayHover`, pressed rows `overlayPressed`. Inputs follow the theme (A43). Never give a row its own shadow.
+- **Dialogs (row 6):**
+  - Everything goes through `RouteDialogHost`/`dialogTheme` (Task 9): radius 28, navy750, float2.
+  - `FilledButton` takes the theme's gradient. Secondary buttons take `OutlinedButton` (raised). Text buttons are `link`.
+  - Login (both modes) and onboarding pass `DialogBody(brand: true)`.
+  - The QR box keeps its white background (`pairing_page.dart`).
+  - The 7 `AlertDialog(` users (R34) drop any own `shape:`/`backgroundColor:`.
+  - Destructive confirmations keep `destructiveButtonStyle()`.
+- **Settings (row 7):**
+  - The frame is radius 28.
+  - `_NavItem` when selected: a raised tile plus `Key('settings.nav.selectedBar')` 3×18 `accent`, the same build as the sidebar.
+  - Switches, sliders and dropdowns follow the theme. Remove their per-widget colours.
+  - The licence button is Task 14's.
+- **AI pane (row 8; tokens and components only, A49):**
+  - Config chips become `ShellxChip`. Cards become `ShellxCard` (flat). Buttons take the new styles.
+  - The changes panel's `ShellxSegmented` is already Task 9's.
+  - Markdown (`ai_markdown.dart`): the body is `ShellxText.dialogBody`; `a` is `link`; `strong` is `shellxWeight(base, FontWeight.w700)`; `h1`–`h3` go through `shellxWeight(…, FontWeight.w600)` (R5); code is `kAiMono` (Task 5).
+- **Every `fontWeight:` left outside `ui/theme/**`** becomes `shellxWeight(style, w)` (A35). R13 keeps `shellx_config.dart`. Lower the baseline in the same commit.
+- **No new `BoxShadow(`, `BackdropFilter(` or raw colour.** Values come from `ShellxDesktopColors`/`ShellxShadows`.
+
+**Commands** (from `apps/desktop`):
+```bash
+PATH=~/fvm/versions/3.41.4/bin:$PATH dart format <touched files>
+PATH=~/fvm/versions/3.41.4/bin:$PATH flutter analyze
+PATH=~/fvm/versions/3.41.4/bin:$PATH flutter test
+```
+
+**Commits** (one per area, each green):
+- `feat(v2-design): desktop sidebar, panes and empty state on the new tokens — raised selected row, wedge (§8.1)`
+- `feat(v2-design): desktop overlays, dialogs and Settings on the new components (§8.1)`
+- `feat(v2-design): desktop AI pane tokens and components, weighted markdown (§8.1, R5)`
+- `test(v2-design): desktop design budget — shadows and blur (§10.5)`
+
+Each ends with the model's own trailer.
 
 ---
+
+### Task 12: Phone screens (§8.2)
+
+**Files:**
+- Modify `apps/mobile/lib/`:
+  - **App and auth:**
+    - `features/app/{splash_page,update_required_page,connection_banner}.dart`
+    - `features/auth/presentation/pages/{login_page,register_page}.dart`
+    - `features/lock/presentation/{lock_gate,biometric_method}.dart`
+  - **Machines and pairing:**
+    - `features/machines/presentation/pages/machine_list_page.dart` (`_EmptyState`, the machine card)
+    - `features/pairing/presentation/pages/qr_scanner_page.dart`
+  - **Terminal:**
+    - `features/terminal/presentation/pages/terminal_page.dart`
+    - `features/terminal/presentation/widgets/{session_picker,extra_keys_bar,arrow_pad,keyboard_cover,link_sheet,view_as_text_sheet,agent_reply_bar}.dart`
+  - **AI, tools and Settings:**
+    - `features/ai/presentation/**` (tokens and components only, A49; includes `widgets/ai_markdown.dart`, and `widgets/ai_changes_sheet.dart`'s `SegmentedButton<bool>` → `ShellxSegmented<bool>`, R18)
+    - `features/tools/presentation/pages/tool_page.dart`
+    - `features/settings/presentation/pages/{settings_page,delete_account_page}.dart`
+  - **Voice:**
+    - `features/voice/presentation/widgets/{voice_composer,mic_button}.dart`
+  - **Shared:**
+    - `shared/src/confirm_dialog.dart`
+    - `core/router/app_transparent_route.dart`
+- Modify the 9 `showModalBottomSheet` call sites (R34):
+  - `terminal_page.dart` (`_showFontSize`)
+  - `link_sheet.dart`, `session_picker.dart`, `view_as_text_sheet.dart`
+  - `ai_changes_sheet.dart`, `ai_new_session_sheet.dart`, `ai_history_sheet.dart`, `ai_config_sheet.dart`, `ai_attach_sheet.dart`
+- Modify `apps/mobile/test/design/raw_style_baseline.dart`.
+- Create `apps/mobile/test/design/design_budget_test.dart`, `apps/mobile/test/features/auth/register_page_test.dart` and `apps/mobile/test/features/ai/ai_markdown_style_test.dart`.
+- Modify these tests:
+  - `test/features/settings/settings_page_test.dart`
+  - `test/features/terminal/terminal_page_test.dart`
+  - `test/features/app/splash_page_test.dart`
+  - `test/features/auth/login_page_test.dart`
+  - `test/features/machines/machine_list_page_test.dart`
+  - `test/features/ai/ai_changes_test.dart` (R18)
+
+**Interfaces:**
+- Consumes:
+  - **Task 4:** `ShellxWedge`, `ShellxWedgeCorner`, `ShellxGlass({child, blur, borderRadius, padding})` and `shellxWeight`.
+  - **Task 6:** the `AppColors` roles `raised`, `inset`, `onAccent`, `okSoft`, `gradientStrong`, `wedge` and `elevation`, plus `context.colors` and `context.typo`.
+  - **Task 8:** `ShellxIcons.{faceId, fingerprint, lock, update, …}`.
+  - **Task 10:**
+    - `ShellxSegmented<T>`, `ShellxChip`, `ShellxCard` and `ShellxBrandHeader`, constructors as Task 10 defines them. The splash variant is logo 72 over `heading20` 700.
+    - `AppButton` (gradient; its `backgroundColor` override gives a solid destructive fill) and the token toast.
+- Produces: none new.
+
+**Tests first:**
+- `test/design/design_budget_test.dart`:
+  - **'machine list with 8 machines: no BoxShadow inside any machine row (§10.5)'.** Use the same `boxShadowsUnder` helper as the desktop (`DecoratedBox` + `Ink` decorations). Each row gives 0.
+  - **'AI session with 50 items: no BoxShadow inside the timeline'.** Use the `ai_session_page_test.dart` harness with 50 items. The timeline list's subtree gives 0.
+  - **'terminal page and tool page: no ShellxGlass and no BackdropFilter (§10.5)'.** Both counts are 0.
+  - **'BackdropFilter only under ShellxGlass'.**
+    - On the first-run machine list: `find.byType(BackdropFilter)` finds exactly 1, and it is a descendant of `ShellxGlass`.
+    - In the QR scanner's failure sheet: exactly 1, the kept σ 3 (A44).
+  - **'every showModalBottomSheet call leaves backgroundColor and shape to the theme (A39, R34)'.**
+    - Scan `lib/**/*.dart` (skipping generated files). For each `showModalBottomSheet` match, take the text up to its balanced closing parenthesis.
+    - That text contains neither `backgroundColor:` nor `shape:`.
+    - The scan finds at least 9 calls.
+- `settings_page_test.dart`:
+  - At the existing anchors (`find.byType(SegmentedButton<AdaptiveThemeMode>)`), replace the finder with `ShellxSegmented<AdaptiveThemeMode>`.
+  - **'2× text on 320 pt: no label clipped'** stays and is green.
+  - **New 'groups are flat ShellxCard (radius 16)'.**
+  - **New 'delete account is destructive'**, on the button of `delete_account_page.dart`. Its fill is `colors.error` and its label is `onError` (dark) or white (light). It has no `Ink` gradient.
+- `terminal_page_test.dart`, anchor `find.byType(SegmentedButton<VoiceLocale>)`: replace with `ShellxSegmented<VoiceLocale>` (A40).
+- `ai_changes_test.dart`, new **'the changes sheet picks the scope with ShellxSegmented<bool>, not a Material SegmentedButton (R18)'**:
+  - Open the sheet the way 'the menu opens the whole session; "Lượt này" is the last turn' does.
+  - Under `find.byKey(const Key('ai.changes.sheet'))`, `find.byType(ShellxSegmented<bool>)` finds one widget and `find.byType(SegmentedButton<bool>)` finds nothing.
+  - Tapping `ai.changes.turn` and then `ai.changes.session` switches the listed scope, as the existing tests expect.
+  - With no turn, the "Lượt này" segment is disabled: a tap changes nothing.
+  - The existing tests that tap `ai.changes.turn`/`ai.changes.session` stay green unchanged.
+- `splash_page_test.dart`:
+  - **'loading splash: ShellxBrandHeader centred and ShellxWedge at the top right (A12, §8.2)'.** Both find one widget, and the wedge's `corner == ShellxWedgeCorner.topRight`.
+  - The failed state shows the error view without a wedge.
+- `login_page_test.dart` and new `register_page_test.dart`, which reuses login's harness:
+  - **'the brand header replaces the plain logo; wedge at the top right'.**
+  - `find.byType(ShellxBrandHeader)` finds one widget. `find.byType(ShellxWedge)` finds one widget.
+  - The `ShellxLogo` only appears inside the header.
+- `machine_list_page_test.dart`:
+  - **'first run: brand header, wedge, steps card in ShellxGlass with blur'.** `ShellxGlass.blur == true`, and the three steps are under it.
+  - **'machine card: flat, radius 16, hairline border; online dot ok'.** The dot's colour is `colors.ok`.
+- `ai_markdown_style_test.dart`: **'strong and headings carry wght (R5); links use link'.**
+- Guard: lower the baseline.
+  - `fontWeight:` 0 everywhere.
+  - `popup_handler.dart` absent (Task 10 already).
+  - `BoxShadow(` lowered where the screens drop their own.
+  - `BackdropFilter(`/`ImageFilter.blur(` = 1 each, in `qr_scanner_page.dart` only (`ShellxGlass` lives in the package, which is not scanned).
+
+**Implementation notes (§8.2):**
+- **Splash:**
+  - Page background `colors.background`.
+  - `Stack(children: [const Positioned.fill(child: ShellxWedge()), Center(child: <ShellxBrandHeader, splash variant>)])` while loading.
+  - `onGenerateTitle` is Task 13's.
+- **Login and register:**
+  - `ShellxBrandHeader` replaces the `Align(… ShellxLogo())` row.
+  - `ShellxWedge` top right, behind the header. No field or plain text lies on it (A30); keep the form below the wedge's 70 % height or out of the triangle.
+  - Inputs are Task 10's lowered fields (radius 16). `AppButton` is a gradient with `cta`.
+- **Lock and update:**
+  - Use tokens and `AppButton`.
+  - Icons: `ShellxIcons.faceId`/`fingerprint`/`lock` and `update` (Task 8 already maps them; check nothing is hard-coded).
+- **Machine list:**
+  - The card is `ShellxCard` (flat): `surface`, radius 16, a `divider`/hairline border, no shadow (A44). The online dot is `ok`.
+  - `_EmptyState` (first run):
+    - `ShellxBrandHeader` on top, and `ShellxWedge` top right of the empty area.
+    - The three steps go in `ShellxGlass(blur: true)` (σ 16, the only blur on the screen). Text on the glass is `primaryText` only (A29), never `secondaryText`.
+    - The step number circle keeps `primarySoft`/`link`.
+  - The error state and the buttons use the gradient `AppButton`.
+- **QR scanner:**
+  - The camera overlay stays (functional black and white).
+  - The failure sheet and the success screen use tokens and `AppButton`.
+  - Its `BackdropFilter` σ 3 stays (A44, guard baseline).
+- **Terminal:**
+  - Chrome comes from the new `TerminalColors`.
+  - Sheets follow the theme (top radius 28, handle).
+  - The extra-keys bar keeps the system keyboard look. Only the accent changes (`keyAccent`, `keyboardLink`, `keyboardError`).
+  - `session_picker.dart`'s sheet loses `backgroundColor`/`shape`. In the "Phiên mới" `AppButton` prefix the icon is no longer self-coloured (A22, done in Task 10; check it).
+- **AI (A49):** chips are `ShellxChip`, cards are `ShellxCard`, buttons are `AppButton`, sheets follow the theme. In `ai_changes_sheet.dart`, `SegmentedButton<bool>` becomes `ShellxSegmented<bool>` (R18) with the same two values, labels and keys, and the per-segment `enabled: _turn != null`. If Task 10's API has no per-segment disable, stop and report it rather than dropping the rule. In `ai_markdown.dart`, `strong` and headings go through `shellxWeight` and `a` uses `colors.link`. The layout is untouched.
+- **Tool page:** the top bar uses tokens and the icons come from `ShellxIcons`. No glass.
+- **Settings:**
+  - Each group is a `ShellxCard` (flat, radius 16).
+  - Switches and sliders follow the theme (remove per-widget colours).
+  - The theme picker is `ShellxSegmented<AdaptiveThemeMode>`, with the same three labels and values as before.
+  - The version line is Task 13's; the licence page's legalese is Task 14's.
+  - `delete_account_page.dart`'s confirm button is destructive: `AppButton(backgroundColor: colors.error, …)` with a solid fill and the label `onError` (dark) or white (light).
+- **Voice:**
+  - In `voice_composer.dart`, `SegmentedButton<VoiceLocale>` becomes `ShellxSegmented<VoiceLocale>` with the same values and labels (A40).
+  - Raleway was already removed (Task 6).
+  - `mic_button.dart` gets token colours only. The new voice UI is C's.
+- **Dialogs and routes:** `confirm_dialog.dart` follows `dialogTheme` (drop any own shape or colour). `app_transparent_route.dart`'s barrier is `colors.scrim`.
+- **Everywhere:**
+  - Every `fontWeight:` becomes `shellxWeight` (A35).
+  - Remaining `Colors.`/`Color(0x` become `AppColors` roles, except the camera overlay, which keeps whatever the baseline already lists.
+  - Lower the baseline in the same commit.
+
+**Commands** (from `apps/mobile`):
+```bash
+PATH=~/fvm/versions/3.41.4/bin:$PATH dart format <touched files>
+PATH=~/fvm/versions/3.41.4/bin:$PATH flutter analyze
+PATH=~/fvm/versions/3.41.4/bin:$PATH flutter test
+```
+The mobile analyze may show only the pre-existing info.
+
+**Commits:**
+- `feat(v2-design): phone splash, sign-in and first run — brand header, wedge, glass steps (§8.2, A12)`
+- `feat(v2-design): phone terminal, AI, tools, Settings and voice on the new components; sheets follow the theme (§8.2, A39, A40)`
+- `test(v2-design): phone design budget — shadows, blur, sheets (§10.5)`
+
+---
+
+
+### Task 13: ⚠ The full name and the identity pins
+
+Only display keys change, and every identity stays "ShellX" (A1, A2, §4.2). Done with opus.
+
+**Every display key** (file, key, new value). `L` = `ShellX: Remote AI agents`.
+
+| # | File | Key / site | New value |
+|---|---|---|---|
+| 1 | `apps/mobile/ios/Runner/Info.plist` | `CFBundleDisplayName` | `L` (`CFBundleName` stays `shellx_mobile`; nothing is added to `en.lproj`/`vi.lproj/InfoPlist.strings`, A3) |
+| 2 | `apps/mobile/android/app/src/main/AndroidManifest.xml` | `<application android:label>` | `L` (written inline, A4) |
+| 3 | `apps/mobile/lib/l10n/intl_en.arb`, `intl_vi.arb` | `appTitle` | `L` (both languages) |
+| 4 | same | `settingsVersion` | `ShellX: Remote AI agents {version} ({build})` (both) |
+| 5 | `apps/mobile/lib/features/app/splash_page.dart` (`build`, the splash `MaterialApp`) | `onGenerateTitle` | `(context) => S.of(context).appTitle` (A13) |
+| 6 | `apps/desktop/lib/l10n/app_en.arb`, `app_vi.arb` | `appTitle` | `L` |
+| 7 | same | `trayTooltip` | `L` (A7); `windowTitle` stays `{title} — ShellX` |
+| 8 | `apps/desktop/lib/src/ui/window_host.dart` `windowTitleFor` | the no-tab branch | `l10n.appTitle` |
+| 9 | `window_host.dart` `WindowManagerHost.init` | `setTitle('ShellX')` | `init({required String title})` → `setTitle(title)`; `lib/main.dart` calls `windowHost.init(title: l10n.appTitle)` |
+| 10 | `apps/desktop/lib/src/ui/terminal/terminal_pane.dart` (`build`, the macOS pane header `selected?.label ?? 'ShellX'`) | the no-tab text | `selected?.label ?? l10n.appTitle` (add `final l10n = AppLocalizations.of(context);` in that `build`) |
+| 11 | `apps/desktop/windows/runner/main.cpp` | `window.Create(L"ShellX", …)` | `L"ShellX: Remote AI agents"` |
+| 12 | `apps/desktop/windows/runner/Runner.rc` | `VALUE "FileDescription"` only | `L` (A8) |
+| 13 | `apps/desktop/lib/main.dart` `_windowsErrorBox` | the `MessageBox` title | `_windowsErrorBox(String title, String message)`; both callers (the version check and `_showStartupError`) pass `l10n.appTitle` (A9) |
+| 14 | `apps/desktop/macos/Runner/Info.plist` | add `CFBundleDisplayName` = `ShellX` and `LSHasLocalizedDisplayName` = `true` | A5 |
+| 15 | new `apps/desktop/macos/Runner/en.lproj/InfoPlist.strings` | `"CFBundleDisplayName"` | `L`, a Runner resource |
+
+Rows 16–18 are Task 15.
+
+**Kept (must not change):**
+- **Windows:** `ProductName "ShellX"`, `CompanyName "pro.shellx"`, `InternalName "ShellX"`, `OriginalFilename "ShellX.exe"`, `BINARY_NAME "ShellX"`.
+- **macOS:** `PRODUCT_NAME = ShellX`, the bundle ids `pro.shellx.desktop`/`com.shellx.prod`, `CFBundleName` (macOS `$(PRODUCT_NAME)`, iOS `shellx_mobile`).
+- **Platform `appName` values:** `appName: 'ShellX'` in `lib/src/platform/notifier.dart` and `lib/src/platform/launch_at_login.dart`.
+- **Notification titles** `'ShellX'`: `main.dart` `_showStartupError`, `tray_actions.dart` (A9).
+- **Other identities:** the data folders and the terminal theme "ShellX".
+- **Every sentence that contains "ShellX"** (ARB and `NS*UsageDescription`).
+- **Test fakes:** `PackageInfo(appName: 'ShellX')` values in tests.
+
+**Files:**
+- Modify every file in rows 1–15.
+- Modify `apps/desktop/macos/Runner.xcodeproj/project.pbxproj`.
+- Regenerate the strings:
+  - Desktop: `apps/desktop/lib/l10n/app_localizations*.dart`.
+  - Mobile: `apps/mobile/lib/shared/src/{l10n,intl/messages_en,intl/messages_vi}.dart`.
+- Tests:
+  - Create `apps/desktop/test/platform/identity_pins_test.dart`.
+  - Modify `apps/desktop/test/ui/window_flow_test.dart` and `apps/desktop/test/l10n/l10n_test.dart`.
+  - Modify `apps/mobile/test/platform_config_test.dart`, `test/l10n_test.dart`, `test/features/settings/settings_page_test.dart`, `test/shared/shellx_logo_test.dart` and `test/features/app/splash_page_test.dart`.
+
+**Interfaces:**
+- Consumes: none from Tasks 5–12. This task is independent of the design work and can run any time after Task 2.
+- Produces:
+  - `WindowManagerHost.init({required String title})`
+  - `void _windowsErrorBox(String title, String message)` (private)
+
+**Tests first:**
+
+`apps/desktop/test/platform/identity_pins_test.dart` (whole file; run from `apps/desktop`):
+```dart
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+
+/// V2-5a §4.2, §4.3, Review Focus 1: the long name is display only. Each
+/// identity below stays "ShellX": changing one moves the user's data
+/// folder, loses the sign-in, or makes a second shortcut / AUMID.
+void main() {
+  String read(String path) => File(path).readAsStringSync();
+
+  group('Windows', () {
+    test('Runner.rc: FileDescription is the long name; the identities stay',
+        () {
+      final rc = read('windows/runner/Runner.rc');
+      expect(rc,
+          contains(r'VALUE "FileDescription", "ShellX: Remote AI agents" "\0"'));
+      expect(rc, contains(r'VALUE "ProductName", "ShellX" "\0"'));
+      expect(rc, contains(r'VALUE "CompanyName", "pro.shellx" "\0"'));
+      expect(rc, contains(r'VALUE "InternalName", "ShellX" "\0"'));
+      expect(rc, contains(r'VALUE "OriginalFilename", "ShellX.exe" "\0"'));
+    });
+
+    test('CMakeLists.txt: BINARY_NAME stays ShellX (ShellX.exe)', () {
+      expect(read('windows/CMakeLists.txt'),
+          contains('set(BINARY_NAME "ShellX")'));
+    });
+
+    test('main.cpp: the first native title is the long name', () {
+      expect(read('windows/runner/main.cpp'),
+          contains('window.Create(L"ShellX: Remote AI agents", origin, size)'));
+    });
+  });
+
+  group('macOS', () {
+    test('AppInfo.xcconfig: PRODUCT_NAME and the bundle id stay', () {
+      final x = read('macos/Runner/Configs/AppInfo.xcconfig');
+      expect(x, matches(RegExp(r'^PRODUCT_NAME = ShellX$', multiLine: true)));
+      expect(
+          x,
+          matches(RegExp(r'^PRODUCT_BUNDLE_IDENTIFIER = pro\.shellx\.desktop$',
+              multiLine: true)));
+    });
+
+    test('Info.plist: CFBundleDisplayName = ShellX (the file name), '
+        'LSHasLocalizedDisplayName, CFBundleName from PRODUCT_NAME', () {
+      final plist = read('macos/Runner/Info.plist');
+      expect(plist,
+          contains('<key>CFBundleDisplayName</key>\n\t<string>ShellX</string>'));
+      expect(plist,
+          contains('<key>LSHasLocalizedDisplayName</key>\n\t<true/>'));
+      expect(plist,
+          contains(r'<key>CFBundleName</key>' '\n\t' r'<string>$(PRODUCT_NAME)</string>'));
+    });
+
+    test('en.lproj/InfoPlist.strings has the long name; en is the only '
+        'localization (AppKit menus stay)', () {
+      expect(read('macos/Runner/en.lproj/InfoPlist.strings'),
+          contains('"CFBundleDisplayName" = "ShellX: Remote AI agents";'));
+      final lproj = Directory('macos/Runner')
+          .listSync()
+          .whereType<Directory>()
+          .map((d) => d.uri.pathSegments[d.uri.pathSegments.length - 2])
+          .where((n) => n.endsWith('.lproj'))
+          .toSet();
+      expect(lproj, {'Base.lproj', 'en.lproj'});
+    });
+
+    test('the strings file is a Resources member of the Runner target', () {
+      final pbx = read('macos/Runner.xcodeproj/project.pbxproj');
+      expect(pbx, contains('/* InfoPlist.strings in Resources */ = {isa = PBXBuildFile;'));
+      expect(pbx, contains('path = en.lproj/InfoPlist.strings;'));
+      expect(pbx, contains('name = InfoPlist.strings;'));
+    });
+  });
+
+  test("notifications and launch at login keep appName 'ShellX' "
+      '(AUMID, ShellX.lnk, the HKCU Run value)', () {
+    expect(read('lib/src/platform/notifier.dart'),
+        contains("appName: 'ShellX',"));
+    expect(read('lib/src/platform/launch_at_login.dart'),
+        contains("appName: 'ShellX',"));
+  });
+}
+```
+
+**Changes to existing tests:**
+- **Desktop `test/ui/window_flow_test.dart`:**
+  - At `expect(windowTitleFor(null, l10n), 'ShellX')`, the value becomes `'ShellX: Remote AI agents'`.
+  - `expect(windowTitleFor(tab, l10n), '${tab.label} — ShellX')` stays.
+  - Rename the test: `'window title: "<tab> — ShellX", or the long name without tabs'`.
+- **Desktop `test/l10n/l10n_test.dart`:** add **'V2-5a names: appTitle and trayTooltip long, windowTitle short (§9.1)'**. For both `lookupAppLocalizations(const Locale('en'))` and `(const Locale('vi'))`:
+  - `appTitle == 'ShellX: Remote AI agents'`
+  - `trayTooltip == 'ShellX: Remote AI agents'`
+  - `windowTitle('a') == 'a — ShellX'`
+- **Mobile `test/platform_config_test.dart`:**
+  - Its `CFBundleDisplayName` assertion becomes `'<key>CFBundleDisplayName</key>\n\t<string>ShellX: Remote AI agents</string>'`, and the test name says "long display name".
+  - Its `android:label` assertion becomes `'android:label="ShellX: Remote AI agents"'`.
+  - **New 'iOS: CFBundleName stays shellx_mobile; neither InfoPlist.strings sets CFBundleDisplayName (A3)'**: `'<key>CFBundleName</key>\n\t<string>shellx_mobile</string>'`, and `en.lproj`/`vi.lproj/InfoPlist.strings` do not contain `CFBundleDisplayName`.
+  - The bundle-id test is kept as it is.
+- **Mobile `test/l10n_test.dart`:** add **'V2-5a names: appTitle and settingsVersion (§9.1)'**. In EN and VI, obtained the file's existing way:
+  - `appTitle == 'ShellX: Remote AI agents'`
+  - `settingsVersion('1.0.0', '1') == 'ShellX: Remote AI agents 1.0.0 (1)'`
+- **Mobile `settings_page_test.dart`:** the three `find.text('ShellX 1.0.0 (1)')` sites become `'ShellX: Remote AI agents 1.0.0 (1)'`. One of them checks `.style!.color == colors.secondaryText`; keep that check.
+- **Mobile `shared/shellx_logo_test.dart`:** `find.bySemanticsLabel('ShellX: Remote AI agents')`, and the test name says "the long name".
+- **Mobile `features/app/splash_page_test.dart`:** add **'the splash MaterialApp titles the app with the long name (A13)'**. While loading, `tester.widget<Title>(find.byType(Title).first).title == 'ShellX: Remote AI agents'`.
+- **Kept as is** (§4.3 "Giữ"):
+  - `lock_gate_test.dart`, `app_lock_controller_test.dart`, `login_page_test.dart`
+  - the sentences in both `l10n_test.dart` files
+  - `tray_menu_test.dart`, `agent_controller_test.dart`, `theme_listing_test.dart`, `end_to_end_macos_test.dart`, `mux_paths_test.dart`
+  - `release/tests/*`, `term/tests/*`
+
+**Implementation:**
+
+ARB:
+- Desktop `app_en.arb`/`app_vi.arb`:
+  - `"appTitle": "ShellX: Remote AI agents"`
+  - `"trayTooltip": "ShellX: Remote AI agents"`
+- Mobile `intl_en.arb`/`intl_vi.arb`:
+  - `"appTitle": "ShellX: Remote AI agents"`
+  - `"settingsVersion": "ShellX: Remote AI agents {version} ({build})"`, keeping the existing placeholders metadata.
+- Anchor on the key names. V2-2b/V2-4 added keys at the end; leave them.
+
+Dart (desktop):
+```dart
+// window_host.dart
+String windowTitleFor(TerminalTab? selected, AppLocalizations l10n) =>
+    selected == null ? l10n.appTitle : l10n.windowTitle(selected.label);
+// update its doc comment: '"{tab} — ShellX", or the app title with no tabs.'
+
+  Future<void> init({required String title}) async {
+    await windowManager.ensureInitialized();
+    await windowManager.setPreventClose(true);
+    await windowManager.setTitle(title);
+    // …rest unchanged
+
+// main.dart
+  await windowHost.init(title: l10n.appTitle);
+  …
+    _windowsErrorBox(l10n.appTitle, l10n.windowsVersionUnsupported);
+  …
+    _windowsErrorBox(l10n.appTitle, l10n.startupFailed);
+  …
+void _windowsErrorBox(String title, String message) {
+  final text = message.toNativeUtf16();
+  final caption = title.toNativeUtf16();
+  win32.MessageBox(0, text, caption, win32.MB_OK | win32.MB_ICONERROR);
+  malloc.free(text);
+  malloc.free(caption);
+}
+```
+`notifier.show(title: 'ShellX', …)` stays (A9).
+
+Dart (mobile): in `splash_page.dart`'s `MaterialApp(`, add `onGenerateTitle: (context) => S.of(context).appTitle,`.
+
+Native, complete:
+- `apps/desktop/windows/runner/main.cpp`: `if (!window.Create(L"ShellX: Remote AI agents", origin, size)) {`
+- `apps/desktop/windows/runner/Runner.rc`: `            VALUE "FileDescription", "ShellX: Remote AI agents" "\0"`. Only this line changes. The file stays ASCII, as the name is ASCII.
+- `apps/mobile/ios/Runner/Info.plist`: `<key>CFBundleDisplayName</key>\n\t<string>ShellX: Remote AI agents</string>`
+- `apps/mobile/android/app/src/main/AndroidManifest.xml`: `android:label="ShellX: Remote AI agents"`
+- `apps/desktop/macos/Runner/Info.plist`: insert after the `CFBundleDevelopmentRegion` pair:
+  ```xml
+  	<key>CFBundleDisplayName</key>
+  	<string>ShellX</string>
+  ```
+  and after the `LSMinimumSystemVersion` pair:
+  ```xml
+  	<key>LSHasLocalizedDisplayName</key>
+  	<true/>
+  ```
+- New `apps/desktop/macos/Runner/en.lproj/InfoPlist.strings` (UTF-8):
+  ```
+  /* Finder, Launchpad, Spotlight, Dock, ⌘-Tab and Login Items show this name; the menu bar and About keep CFBundleName (ShellX). V2-5a A5. */
+  "CFBundleDisplayName" = "ShellX: Remote AI agents";
+  ```
+- `project.pbxproj`: four inserts, modelled on `MainMenu.xib`'s variant group.
+  - PBXBuildFile section, after the `MainMenu.xib in Resources` line:
+    ```
+    		5A5F0001000000000000A002 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 5A5F0002000000000000A002 /* InfoPlist.strings */; };
+    ```
+  - PBXFileReference section, after the `33CC10F52044A3C60003C045 /* Base */` line:
+    ```
+    		5A5F0003000000000000A002 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+    ```
+  - Group `33CC11242044D66E0003C045 /* Resources */` children, after `MainMenu.xib`: `				5A5F0002000000000000A002 /* InfoPlist.strings */,`
+  - Resources build phase `33CC10EB2044A3C60003C045` files, after `MainMenu.xib in Resources`: `				5A5F0001000000000000A002 /* InfoPlist.strings in Resources */,`
+  - PBXVariantGroup section, after the `MainMenu.xib` group:
+    ```
+    		5A5F0002000000000000A002 /* InfoPlist.strings */ = {
+    			isa = PBXVariantGroup;
+    			children = (
+    				5A5F0003000000000000A002 /* en */,
+    			);
+    			name = InfoPlist.strings;
+    			path = Runner;
+    			sourceTree = "<group>";
+    		};
+    ```
+  - `knownRegions` already has `en` and `Base`; leave it.
+  - Check that the ids are unused: `grep -c 5A5F000.000000000000A002 project.pbxproj` must give 0 before the edit (Task 1 used `…A001`).
+
+**Commands:**
+```bash
+# desktop strings and checks (apps/desktop)
+PATH=~/fvm/versions/3.41.4/bin:$PATH flutter gen-l10n
+PATH=~/fvm/versions/3.41.4/bin:$PATH flutter analyze && PATH=~/fvm/versions/3.41.4/bin:$PATH flutter test
+# mobile strings and checks (apps/mobile)
+PATH=~/fvm/versions/3.41.4/bin:$PATH dart run intl_utils:generate
+PATH=~/fvm/versions/3.41.4/bin:$PATH dart format lib/shared/src/l10n.dart lib/shared/src/intl/messages_en.dart lib/shared/src/intl/messages_vi.dart
+PATH=~/fvm/versions/3.41.4/bin:$PATH flutter analyze && PATH=~/fvm/versions/3.41.4/bin:$PATH flutter test
+# no leak into identities: every hit must be a display key above
+git grep -n 'Remote AI agents' -- apps ':!**/test/**'
+```
+
+Build check without launching, in a throw-away worktree of `HEAD`, after committing:
+```bash
+SCRATCH=$(mktemp -d "${TMPDIR:-/tmp}/shellx-name.XXXXXX")
+git worktree add --detach "$SCRATCH/wt" HEAD
+(cd "$SCRATCH/wt" && PATH=~/fvm/versions/3.41.4/bin:$PATH flutter pub get >/dev/null \
+  && cd apps/desktop && PATH=~/fvm/versions/3.41.4/bin:$PATH flutter build macos --debug \
+  && APP=build/macos/Build/Products/Debug/ShellX.app/Contents \
+  && plutil -p "$APP/Resources/en.lproj/InfoPlist.strings" \
+  && plutil -p "$APP/Info.plist" | grep -E 'CFBundleDisplayName|LSHasLocalizedDisplayName|CFBundleName|CFBundleIdentifier')
+git worktree remove --force "$SCRATCH/wt" && rm -rf "$SCRATCH"
+```
+
+Expected output:
+- `"CFBundleDisplayName" => "ShellX: Remote AI agents"` from the strings file.
+- `"CFBundleDisplayName" => "ShellX"`, `"LSHasLocalizedDisplayName" => 1` (or `true`), `"CFBundleName" => "ShellX"` and `"CFBundleIdentifier" => "pro.shellx.desktop"` from the Info.plist.
+- Never open the built app.
+
+**Commits:**
+- `feat(v2-name): the full display name "ShellX: Remote AI agents" on every OS surface; identities stay ShellX (§4.1, A1–A13)`
+- `test(v2-name): pin the identities and the display names (§4.3, Review Focus 1)`
+
+The tests may go in the same commit when they are written first. Use the Opus trailer.
+
+---
+
+### Task 14: ⚠ Native launch screens and the licence page
+
+**Files:**
+- **iOS launch screen:** Modify `apps/mobile/ios/Runner/Base.lproj/LaunchScreen.storyboard`: the view's `backgroundColor` only; the `LaunchImage` stays.
+- **Android launch screen:**
+  - Modify `apps/mobile/android/app/src/main/res/drawable/launch_background.xml` and `drawable-v21/launch_background.xml`.
+  - Modify `values/styles.xml` and `values-night/styles.xml` (`NormalTheme`).
+  - Modify `values/colors.xml` (add `shellx_page`).
+  - Create `values-v31/styles.xml` and `values-night-v31/styles.xml` (R30).
+- **The package's licence entry:**
+  - Create `packages/shellx_design/lib/src/licenses.dart` and `packages/shellx_design/test/licenses_test.dart`.
+  - Modify `packages/shellx_design/lib/shellx_design.dart` (export).
+- **The calls:** Modify `apps/desktop/lib/main.dart` (next to `registerFontLicenses()`, before `runApp`) and `apps/mobile/lib/main.dart` (after `registerFontLicenses()`).
+- **Strings:** Modify the ARBs:
+  - `apps/desktop/lib/l10n/app_{en,vi}.arb` get `settingsLicenses` and `licensesLegalese`.
+  - `apps/mobile/lib/l10n/intl_{en,vi}.arb` get `licensesLegalese`; mobile `settingsLicenses` keeps its text.
+  - Regenerate both apps' strings.
+- **The pages:** Modify `apps/desktop/lib/src/ui/settings/pages/general_page.dart` (button, R31) and `apps/mobile/lib/features/settings/presentation/pages/settings_page.dart` (`_showLicenses`).
+- **Tests:**
+  - Modify `apps/mobile/test/platform_config_test.dart`, `apps/mobile/test/app_test.dart`, `apps/mobile/test/features/settings/settings_page_test.dart`, `apps/desktop/test/l10n/l10n_test.dart`.
+  - Create `apps/desktop/test/ui/settings_licenses_test.dart`.
+
+**Interfaces:**
+- Consumes: Task 13's long `appTitle` (the `applicationName`).
+- Produces:
+  - `void registerShellxDesignLicenses()`
+  - `const String shellxDesignReferencePackage = 'Online Bike Shopping App (design reference)'`
+  - `const String shellxDesignReferenceText` (the §9.3 text)
+  - ARB `licensesLegalese` (both apps) and `settingsLicenses` (desktop)
+  - `Key('settings.licenses')`
+
+**Tests first:**
+- **`packages/shellx_design/test/licenses_test.dart`.** Use `tearDown(LicenseRegistry.reset)`.
+  - **'registers one CC BY 4.0 entry under the design reference name (§9.3)'.** After `registerShellxDesignLicenses()`, `await LicenseRegistry.licenses.toList()` has exactly one entry whose `packages` is `['Online Bike Shopping App (design reference)']`. Its paragraphs joined with `\n` equal `shellxDesignReferenceText`, which equals the §9.3 text verbatim (below).
+  - **'no SF Mono entry (A32, A47)'.** No entry's packages or text match `RegExp(r'SF ?Mono', caseSensitive: false)`.
+- **Mobile `test/app_test.dart`:**
+  - Extend the font licences test, which Task 6 makes JetBrains Mono only: after `registerFontLicenses(); registerShellxDesignLicenses();`, the packages are `{'JetBrains Mono', 'Online Bike Shopping App (design reference)'}`, with no `SF Mono` and no `Raleway`.
+  - Add a source check: `lib/main.dart` contains `registerShellxDesignLicenses();` exactly once.
+- **Desktop `test/ui/settings_licenses_test.dart`:**
+  - **'General: "Licenses and credits…" under the version opens the licence page with the legalese (A47, R31)'.**
+    - Pump `GeneralPage` the way `settings_general_a12_test.dart` does.
+    - `find.byKey(const Key('settings.licenses'))` shows the text `Licenses and credits…`.
+    - Tap, then `pumpAndSettle`: `find.byType(LicensePage)` finds one widget, and `find.text(l10n.licensesLegalese)` finds one widget.
+  - **'main.dart registers the design licence once, daemon_main.dart never'.** A source check.
+- **Desktop `test/l10n/l10n_test.dart`:** add EN/VI checks:
+  - `settingsLicenses`: `Licenses and credits…` / `Giấy phép và ghi công…`
+  - `licensesLegalese`: the two §9.1 strings verbatim (below)
+- **Mobile `settings_page_test.dart`:** extend the existing licences test. After opening, `find.text(<VI legalese>)` finds one widget. The harness locale is VI; use EN if the harness is EN.
+- **Mobile `platform_config_test.dart`, new group 'V2-5a A48: native launch screens are navy #222834':**
+  - **iOS:** `LaunchScreen.storyboard` contains `<color key="backgroundColor" red="0.13333333333333333" green="0.15686274509803921" blue="0.20392156862745098" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>` and still contains `image="LaunchImage"`.
+  - **Android `values/colors.xml`:** contains `<color name="shellx_page">#222834</color>`; `notification_color` is unchanged.
+  - **Android `drawable/` and `drawable-v21/launch_background.xml`:** both contain `<item android:drawable="@color/shellx_page" />`.
+  - **Android `values/` and `values-night/styles.xml`:** both have `NormalTheme` with `<item name="android:windowBackground">@color/shellx_page</item>`.
+  - **Android `values-v31/` and `values-night-v31/styles.xml`:** both contain `<item name="android:windowSplashScreenBackground">@color/shellx_page</item>` and keep the `Theme.AppCompat` parents.
+
+**Implementation:**
+
+`packages/shellx_design/lib/src/licenses.dart` (whole file):
+```dart
+import 'package:flutter/foundation.dart';
+
+/// The design reference's CC BY 4.0 attribution (V2-5a §9.3, A47). English,
+/// not translated. SF Mono is never bundled, so it has no entry (A32).
+const String shellxDesignReferencePackage =
+    'Online Bike Shopping App (design reference)';
+
+const String shellxDesignReferenceText =
+    "ShellX's visual style (colours, shapes and gradients) is adapted from "
+    '"Online Bike Shopping App" by Sourasith '
+    '(https://www.figma.com/@sourasithp), Figma Community file '
+    'https://www.figma.com/community/file/1149336740234053658, licensed under '
+    'CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: '
+    'colours re-tuned for contrast; components rebuilt for ShellX. No images '
+    'or artwork from the file are used.';
+
+/// Call once in each app's `main()`, before `runApp`.
+void registerShellxDesignLicenses() {
+  LicenseRegistry.addLicense(() async* {
+    yield const LicenseEntryWithLineBreaks(
+      [shellxDesignReferencePackage],
+      shellxDesignReferenceText,
+    );
+  });
+}
+```
+Export it from `lib/shellx_design.dart`. Call it right after `registerFontLicenses();` in both apps' `main.dart`, never in `daemon_main.dart`.
+
+ARB values, verbatim from §9.1:
+- `settingsLicenses` (desktop only):
+  - EN: `Licenses and credits…`
+  - VI: `Giấy phép và ghi công…`
+- `licensesLegalese` (both apps):
+  - EN: `Visual style adapted from “Online Bike Shopping App” by Sourasith (Figma Community, CC BY 4.0).`
+  - VI: `Phong cách giao diện phỏng theo “Online Bike Shopping App” của Sourasith (Figma Community, CC BY 4.0).`
+  - Curly quotes U+201C/U+201D, as written.
+
+Desktop `GeneralPage` (R31), after the `if (version != null)` version `Padding`:
+```dart
+Align(
+  alignment: Alignment.centerLeft,
+  child: Padding(
+    padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+    child: TextButton(
+      key: const Key('settings.licenses'),
+      onPressed: () => showLicensePage(
+        context: context,
+        applicationName: l10n.appTitle,
+        applicationVersion: version,
+        applicationLegalese: l10n.licensesLegalese,
+      ),
+      child: Text(l10n.settingsLicenses),
+    ),
+  ),
+),
+```
+The page is a full-window Material route with a back button; Esc does not close it (A47's accepted cost).
+
+Mobile `_showLicenses`: add `applicationLegalese: strings.licensesLegalese,`.
+
+Native launch screens (A48), complete:
+- **iOS `LaunchScreen.storyboard`:** replace the view's `<color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>` with `<color key="backgroundColor" red="0.13333333333333333" green="0.15686274509803921" blue="0.20392156862745098" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>`. That is #222834: 34/255, 40/255, 52/255.
+- **`values/colors.xml`:** add `    <!-- The launch background (V2-5a A48): the page colour navy850. -->` and `    <color name="shellx_page">#222834</color>`.
+- **`drawable/launch_background.xml`:** `@android:color/white` becomes `@color/shellx_page`.
+- **`drawable-v21/launch_background.xml`:** `?android:colorBackground` becomes `@color/shellx_page`.
+- **`values/styles.xml` and `values-night/styles.xml`:** in `NormalTheme`, `?android:colorBackground` becomes `@color/shellx_page`.
+- **`values-v31/styles.xml`:**
+  ```xml
+  <?xml version="1.0" encoding="utf-8"?>
+  <resources>
+      <!-- Android 12+ draws its own splash first (V2-5a A48): navy, like the Flutter splash. -->
+      <style name="LaunchTheme" parent="Theme.AppCompat.Light.NoActionBar">
+          <item name="android:windowBackground">@drawable/launch_background</item>
+          <item name="android:windowSplashScreenBackground">@color/shellx_page</item>
+      </style>
+      <style name="NormalTheme" parent="Theme.AppCompat.Light.NoActionBar">
+          <item name="android:windowBackground">@color/shellx_page</item>
+      </style>
+  </resources>
+  ```
+- **`values-night-v31/styles.xml`:** the same, with `parent="Theme.AppCompat.NoActionBar"` in both styles (R30).
+
+**Commands:**
+```bash
+# packages/shellx_design, then apps/desktop, then apps/mobile
+PATH=~/fvm/versions/3.41.4/bin:$PATH flutter analyze && PATH=~/fvm/versions/3.41.4/bin:$PATH flutter test
+# strings: desktop `flutter gen-l10n`; mobile `dart run intl_utils:generate` + `dart format` of the 3 generated files
+```
+The Android resources are compiled by Task 16's `flutter build apk --debug`; run it now as well if time allows, since it catches a resource typo.
+
+**Commits:**
+- `feat(v2-design): navy native launch screens on iOS and Android, Android 12+ splash included (A48, R30)`
+- `feat(v2-design): design reference attribution on both licence pages; desktop Settings › General button (A47, §9.3)`
+
+Use the Opus trailer.
+
+---
+
+### Task 15: ⚠ The Windows installer's three display lines
+
+> **⚠ Flagged: `release/windows/shellx.iss` is a teammate's file on `main` (A10).** Tell the user before this commit is merged to `main`. The controller lists it in the hand-off; §13.2 "Gộp ba dòng Inno vào `main`" needs the user's approval. Nothing else in `release/**` may change.
+
+**Files:** Modify `release/windows/shellx.iss`, these three lines only (anchor on the keys):
+- `AppName=ShellX` becomes `AppName=ShellX: Remote AI agents`
+- `AppVerName=ShellX {#AppVersion}` becomes `AppVerName=ShellX: Remote AI agents {#AppVersion}`
+- `UninstallDisplayName=ShellX` becomes `UninstallDisplayName=ShellX: Remote AI agents`
+
+**Kept, byte-equal (R32):**
+- `AppId={{6A3A45BD-0A27-407A-A1FF-3C8D1BE226EE}`
+- `DefaultDirName={autopf}\ShellX`
+- `DefaultGroupName=ShellX`
+- the `{autodesktop}\ShellX` and Start-menu `[Icons]` names
+- `{cm:LaunchProgram,ShellX}`
+- `AppPublisher=ShellX`
+- `#define AppExeName "ShellX.exe"`
+- `OutputBaseFilename=ShellX-Setup-{#AppVersion}`
+- every `[UninstallDelete]`/`[Code]` path
+
+**Interfaces:** none.
+
+**Tests:** no new test (A10, R32). The existing `release/tests/inno.test.mjs` must still pass.
+
+**Steps:**
+1. Edit the three lines.
+2. Check that the diff is exactly three lines:
+   ```bash
+   git diff --numstat -- release/windows/shellx.iss   # expect: 3	3	release/windows/shellx.iss
+   git diff -U0 -- release/windows/shellx.iss | grep '^[-+][A-Za-z]' 
+   # expect exactly:
+   # -AppName=ShellX
+   # +AppName=ShellX: Remote AI agents
+   # -AppVerName=ShellX {#AppVersion}
+   # +AppVerName=ShellX: Remote AI agents {#AppVersion}
+   # -UninstallDisplayName=ShellX
+   # +UninstallDisplayName=ShellX: Remote AI agents
+   grep -c -E '^(AppId=\{\{6A3A45BD-0A27-407A-A1FF-3C8D1BE226EE\}|DefaultDirName=\{autopf\}\\ShellX|DefaultGroupName=ShellX|AppPublisher=ShellX)$' release/windows/shellx.iss   # expect 4
+   grep -c 'LaunchProgram,ShellX}' release/windows/shellx.iss   # expect 1
+   ```
+3. Run the existing installer test (from the worktree root): `node --test release/tests/inno.test.mjs`. Every test passes, as before.
+4. Commit alone, with nothing else in it:
+   ```
+   feat(v2-name): installer shows "ShellX: Remote AI agents" in Apps & features and the wizard (A10)
+
+   Only AppName, AppVerName and UninstallDisplayName change; AppId, folders,
+   group, shortcuts and the publisher stay ShellX. release/windows/shellx.iss
+   is a teammate's file: needs the user's approval before main.
+
+   Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+   ```
+
+**Notes:** the wizard text becomes "Cài đặt ShellX: Remote AI agents…". That is A10's accepted cost. If the user wants it short, revert `AppName`/`AppVerName` and keep `UninstallDisplayName`. Inno's own `[name]` messages use `AppName`; nothing in the script builds a path from it (checked: every path is literal `ShellX`).
+
+---
+
+### Task 16: Final verification and the ledger
+
+**Files:** Modify `docs/superpowers/ledgers/v2-5a.md`, which Task 1 created. No code changes. Any failure found here goes back to its task as a fix commit (`fix(v2-design): …`), and then this task runs again.
+
+**Interfaces:** none.
+
+**Steps:**
+
+1. **All suites, from each directory.** Record the counts.
+   ```bash
+   # Flutter packages
+   for d in packages/shellx_design apps/desktop apps/mobile; do
+     (cd "$d" && PATH=~/fvm/versions/3.41.4/bin:$PATH flutter analyze && PATH=~/fvm/versions/3.41.4/bin:$PATH flutter test) || echo "FAIL $d"
+   done
+   # Dart packages
+   for d in packages/shellx_core packages/shellx_agent packages/shellx_client packages/shellx_e2e packages/shellx_acp packages/shellx_ai; do
+     (cd "$d" && ~/fvm/versions/3.41.4/bin/dart analyze && ~/fvm/versions/3.41.4/bin/dart test) || echo "FAIL $d"
+   done
+   node --test release/tests/inno.test.mjs
+   ```
+   - **Expected:** every package analyze-clean; mobile shows only the pre-existing `unnecessary_import` info.
+   - **Desktop count:** ≥ the 3924 of Tasks 1–4, plus the new tests; 10 skipped.
+   - **Mobile count:** ≥ 1614, plus the new tests.
+   - **Package:** ≥ 62, plus Tasks 8 and 14.
+   - **Timing:** if `terminal_links_test.dart` "path performance" fails, rerun it alone first (plan header).
+
+2. **Guard end state (Task 7, §10.4).** Print the two baselines and check:
+   - Desktop:
+     - `Icons.` and `CupertinoIcons.` are absent.
+     - `fontWeight:` appears only in `lib/src/config/shellx_config.dart` (1).
+     - R13's other entries are `config/config_color.dart` `Color(0x`, `config/font_probe.dart` `TextStyle(` and the file viewer's `fontFamily:`.
+   - Mobile:
+     - `Icons.`, `CupertinoIcons.` and `fontWeight:` are absent.
+     - `BackdropFilter(` and `ImageFilter.blur(` are 1 each, in `qr_scanner_page.dart` only.
+     - `popup_handler.dart` is absent.
+   - Adapters: `grep -c 'Color(0x' apps/desktop/lib/src/ui/theme/*.dart apps/mobile/lib/core/design/*.dart` gives 0 for each file.
+
+3. **Builds, without launching, in a throw-away worktree of `HEAD`.** This leaves the worktree's `Podfile.lock` untouched.
+   ```bash
+   SCRATCH=$(mktemp -d "${TMPDIR:-/tmp}/shellx-final.XXXXXX")
+   git worktree add --detach "$SCRATCH/wt" HEAD
+   cd "$SCRATCH/wt" && PATH=~/fvm/versions/3.41.4/bin:$PATH flutter pub get >/dev/null
+   (cd apps/mobile && PATH=~/fvm/versions/3.41.4/bin:$PATH flutter build apk --debug)
+   (cd apps/mobile && PATH=~/fvm/versions/3.41.4/bin:$PATH flutter build ios --debug --no-codesign)
+   (cd apps/desktop && PATH=~/fvm/versions/3.41.4/bin:$PATH flutter build macos --debug)
+   # no SF Mono file or declaration in any artifact (A32, §6.2)
+   find apps/desktop/build/macos/Build/Products/Debug/ShellX.app apps/mobile/build/ios/iphoneos/Runner.app \
+     \( -iname '*sf*mono*' -o -iname '*sfnsmono*' -o -iname '*sf-mono*' \) | wc -l          # expect 0
+   unzip -l apps/mobile/build/app/outputs/flutter-apk/app-debug.apk | grep -ciE 'sf-?mono|sfnsmono'   # expect 0
+   for m in $(find apps/desktop/build/macos/Build/Products/Debug/ShellX.app apps/mobile/build/ios/iphoneos/Runner.app -name FontManifest.json); do
+     grep -c 'SF Mono' "$m"; done                                                              # expect 0 each
+   unzip -p apps/mobile/build/app/outputs/flutter-apk/app-debug.apk assets/flutter_assets/FontManifest.json | grep -c 'SF Mono'   # expect 0
+   # names in the built products (A3, A4, A5)
+   plutil -p apps/mobile/build/ios/iphoneos/Runner.app/Info.plist | grep -E 'CFBundleDisplayName|CFBundleName'
+   plutil -p apps/desktop/build/macos/Build/Products/Debug/ShellX.app/Contents/Resources/en.lproj/InfoPlist.strings
+   ```
+   **Expected:**
+   - The three builds succeed.
+   - Every count above is 0. FontManifest still lists `JetBrainsMono` and `CupertinoIcons`, with no `Raleway` in the mobile manifest.
+   - iOS: `"CFBundleDisplayName" => "ShellX: Remote AI agents"` and `"CFBundleName" => "shellx_mobile"`.
+   - macOS: the strings file shows the long name.
+   - Keep the scratch worktree for step 4.
+
+4. **The isolated smoke launch of the full desktop app.** This is allowed only because Task 2 is done (R1). It uses the same recipe as Task 1 Step 10, with these differences:
+   - The bundle id is `pro.shellx.desktop.smoketest`.
+   - It builds `main()`, not the spike.
+   - It also calls the relay's public `GET /v1/version` (read-only).
+
+   ```bash
+   cd "$SCRATCH/wt"
+   sed -i '' 's/^PRODUCT_BUNDLE_IDENTIFIER = .*/PRODUCT_BUNDLE_IDENTIFIER = pro.shellx.desktop.smoketest/' apps/desktop/macos/Runner/Configs/AppInfo.xcconfig
+   grep -q '^PRODUCT_BUNDLE_IDENTIFIER = pro.shellx.desktop.smoketest$' apps/desktop/macos/Runner/Configs/AppInfo.xcconfig || { echo 'bundle id not changed: stop'; exit 1; }
+   (cd apps/desktop && PATH=~/fvm/versions/3.41.4/bin:$PATH flutter build macos --debug) || exit 1
+   mkdir -p "$SCRATCH/home"
+   HOME="$SCRATCH/home" CFFIXED_USER_HOME="$SCRATCH/home" \
+     apps/desktop/build/macos/Build/Products/Debug/ShellX.app/Contents/MacOS/ShellX > "$SCRATCH/smoke.log" 2>&1 &
+   PID=$!
+   python3 - "$SCRATCH/smoke.log" "$PID" <<'EOF'
+   import os, signal, sys, time
+   log, pid = sys.argv[1], int(sys.argv[2])
+   time.sleep(25)                      # first frame, sign-in window, version check
+   os.kill(pid, signal.SIGTERM)        # only the app this recipe started
+   EOF
+   grep -E 'SF Mono not loaded|Unhandled|Exception|Error:' "$SCRATCH/smoke.log"   # expect no line
+   pgrep -f "$SCRATCH" || echo 'no leftover'                                         # R35
+   launchctl print "gui/$(id -u)" | grep -c 'pro.shellx.desktop.smoketest'          # expect 0 (R35)
+   cd - && git worktree remove --force "$SCRATCH/wt" && rm -rf "$SCRATCH"
+   ```
+   **Expected:**
+   - No error line. If any line matches, read it and explain it in the ledger; a relay `SocketException` while offline is benign.
+   - No `ShellX: SF Mono not loaded (…)` line: the loader is silent on success (R7), so SF Mono was loaded on macOS.
+   - No leftover process or launchd job.
+   - If any leftover is found, stop it by its own PID, or `launchctl bootout` that single label (R35), and write it in the ledger.
+   - Never touch the `pro.shellx.desktop` domain or its Keychain items.
+
+5. **The ledger** (`docs/superpowers/ledgers/v2-5a.md`). Append:
+   - **Results:** the test counts per package (step 1); the guard end state (step 2); the build and artifact checks (step 3); the smoke launch (step 4); the date and `HEAD`.
+   - **Spike:** the SF Mono spike rows for macOS and iOS (already recorded by Task 1; confirm they are present).
+   - **Rulings:** R1–R16 and the new R17+ of Tasks 5–10 and R30–R35, each with its cost if wrong.
+   - **Manual checks pending (§12),** as 14 unchecked boxes:
+     1. the spike on a real iPhone, and the fallback through `FORCE_BUNDLED_MONO`;
+     2. the macOS names and the 1.0.0 → new dmg update;
+     3. the Windows install over 1.0.0;
+     4. iPhone;
+     5. Android 10/14/16;
+     6. readability (A36; record the result in the PR);
+     7. widths;
+     8. icons;
+     9. Vietnamese input;
+     10. contrast;
+     11. performance;
+     12. terminal;
+     13. licences;
+     14. VoiceOver/TalkBack.
+   - **Follow-ups (§13.2):**
+     - store names (the user, in the consoles);
+     - `web/**` (needs consent);
+     - **the three Inno lines need the user's approval before `main` (Task 15, A10, flagged);**
+     - a new app and tray icon;
+     - the Windows 11 caption colour;
+     - renaming the old tokens after B and C;
+     - JetBrains Mono into the package;
+     - an OFL font closer to SF Mono;
+     - **R14:** add `packages/shellx_design`'s `flutter test` to `.github/workflows/windows-check.yml` (outside A's files).
+
+6. **Commit:**
+   ```
+   docs(v2-design): V2-5a ledger — final counts, guard end state, builds, smoke launch, manual checks and follow-ups
+
+   Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+   ```
+   Use the trailer of the model that commits. Never push, merge or force: the controller merges, and a push to `main` releases the desktop app.
 
 ## Self-review (partial — the writer stopped at 15:00)
 
