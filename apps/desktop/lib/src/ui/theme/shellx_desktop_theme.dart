@@ -1,68 +1,93 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:shellx_design/shellx_design.dart';
 
-/// UI §1.1. One dark theme for the whole window (A1 has no light theme).
+/// UI §1.1, V2-5a §5.9. One dark theme for the whole window (A1 has no light
+/// theme). The names are the call sites'; every value is the shared
+/// package's (no hex here, V2-5a §10.4).
 abstract final class ShellxDesktopColors {
-  static const Color bgTerminal = Color(0xFF0B1215);
-  static const Color bgSidebar = Color(0xFF111B1E);
-  static const Color rowHover = Color(0xFF172427);
+  static const Color bgTerminal = ShellxPalette.navy900;
+  static const Color bgSidebar = ShellxPalette.navy850;
+  static const Color rowHover = ShellxPalette.navy800;
 
-  /// 1.26:1 on `bgSidebar` (S-7: the selected row reads at a glance);
+  /// 1.32:1 on `bgSidebar` (S-7: the selected row reads at a glance);
   /// hover stays darker, pressed lighter.
-  static const Color rowSelected = Color(0xFF1F2F34);
-  static const Color rowPressed = Color(0xFF26393E);
-  static const Color line = Color(0xFF243337);
-  static const Color surface = Color(0xFF172023);
-  static const Color surfaceInset = Color(0xFF0D1315);
-  static const Color border = Color(0xFF2B373A);
-  static const Color borderInput = Color(0xFF5E7176);
-  static const Color textPrimary = Color(0xFFD4E1E4);
-  static const Color textTitle = Color(0xFFE8F0F2);
-  static const Color textSecondary = Color(0xFF93A5A9);
-  static const Color textDialog2 = Color(0xFFA7B6BA);
-  static const Color textPlaceholder = Color(0xFF6F8186);
+  static const Color rowSelected = ShellxPalette.navy700;
+  static const Color rowPressed = ShellxPalette.navy650;
+
+  /// White 8 % (V2-5a A19): never the base of another colour.
+  static const Color line = ShellxPalette.hairline;
+  static const Color surface = ShellxPalette.navy750;
+  static const Color surfaceInset = ShellxPalette.navy900;
+
+  /// White 10 % (V2-5a A19).
+  static const Color border = ShellxPalette.hairlineStrong;
+  static const Color borderInput = ShellxPalette.fieldOutline;
+  static const Color textPrimary = ShellxPalette.white87;
+  static const Color textTitle = ShellxPalette.white100;
+  static const Color textSecondary = ShellxPalette.white60;
+  static const Color textDialog2 = ShellxPalette.white75;
+  static const Color textPlaceholder = ShellxPalette.white50;
 
   /// Decorative only (UI §1.1): never body text on the sidebar.
-  static const Color dim = Color(0xFF6C8288);
-  static const Color accent = Color(0xFF5FD4E2);
-  static const Color primary = Color(0xFF2DBFCF);
-  static const Color onPrimary = Color(0xFF04282D);
-  static const Color primarySoft = Color(0xFF0E363C);
-  static const Color ok = Color(0xFF7ED492);
-  static const Color warn = Color(0xFFE9C46A);
-  static const Color warnBg = Color(0xFF2A2412);
-  static const Color warnBorder = Color(0xFF4A3F1C);
-  static const Color err = Color(0xFFF07178);
+  static const Color dim = ShellxPalette.white38;
+  static const Color accent = ShellxPalette.cyan;
+  static const Color primary = ShellxPalette.cyan;
+  static const Color onPrimary = ShellxPalette.onCyan;
+  static const Color primarySoft = ShellxPalette.cyanSoft;
+  static const Color ok = ShellxPalette.ok;
+  static const Color warn = ShellxPalette.warn;
+  static const Color warnBg = ShellxPalette.warnSoft;
+  static const Color warnBorder = ShellxPalette.warnLine;
+  static const Color err = ShellxPalette.error;
   // A11 D18: the tab status "in progress".
-  static const Color statusInProgress = Color(0xFF6EA8FE);
-  static const Color errDialog = Color(0xFFF26A70);
-  static const Color onErr = Color(0xFF2A0A0C);
-  static const Color noticeBg = Color(0xFF2A1416);
-  static const Color noticeText = Color(0xFFFFD9DB);
-  static const Color noticeBorder = Color(0xFF5A2A2E);
-  static const Color scrim = Color(0x99000000);
-  static const Color scrollThumb = Color(0xFF2B373A);
-  static const Color scrollThumbHover = Color(0xFF3A4A4E);
+  static const Color statusInProgress = ShellxPalette.inProgress;
+  static const Color errDialog = ShellxPalette.error;
+  static const Color onErr = ShellxPalette.onError;
+  static const Color noticeBg = ShellxPalette.noticeBg;
+  static const Color noticeText = ShellxPalette.noticeText;
+  static const Color noticeBorder = ShellxPalette.noticeLine;
+  static const Color scrim = ShellxPalette.scrim;
+  static const Color scrollThumb = ShellxPalette.scrollThumb;
+  static const Color scrollThumbHover = ShellxPalette.scrollThumbHover;
 
-  /// UI §3.3 button states.
-  static const Color primaryHover = Color(0xFF4CCAD8);
-  static const Color primaryPressed = Color(0xFF26A9B8);
-  static const Color destructiveHover = Color(0xFFF4848A);
+  /// UI §3.3 button states (the primary button is a gradient, V2-5a A50).
+  static const Color destructiveHover = ShellxPalette.errorHover;
+
+  /// V2-5a A50: text and icons on a gradient.
+  static const Color onAccent = ShellxPalette.onAccent;
+
+  /// V2-5a A21: text buttons, markdown links, buttons on strips.
+  static const Color link = ShellxPalette.link;
+
+  /// V2-5a A50: a menu item or a pressable card hovered, pressed.
+  static const Color overlayHover = ShellxPalette.navy650;
+  static const Color overlayPressed = ShellxPalette.navy600;
+
+  /// V2-5a A28: a raised element while pressed (it loses its shadow).
+  static const Color pushed = ShellxPalette.navy800;
 
   /// UI §3: disabled = 38 % opacity.
   static const double disabledOpacity = 0.38;
 }
 
-/// UI §1.2 spacing scale (px).
+/// UI §1.2 spacing scale (px), V2-5a §5.8.
 abstract final class ShellxSpace {
-  static const double s2 = 2, s4 = 4, s6 = 6, s8 = 8, s12 = 12;
-  static const double s16 = 16, s20 = 20, s24 = 24, s32 = 32;
+  static const double s2 = ShellxSpacing.s2, s4 = ShellxSpacing.s4;
+  static const double s6 = ShellxSpacing.s6, s8 = ShellxSpacing.s8;
+  static const double s12 = ShellxSpacing.s12, s16 = ShellxSpacing.s16;
+  static const double s20 = ShellxSpacing.s20, s24 = ShellxSpacing.s24;
+  static const double s32 = ShellxSpacing.s32;
 }
 
-/// UI §1.2 radii.
+/// UI §1.2 radii, V2-5a A27: the old names, the new values (`r4` 6, `r6` 10,
+/// `r8` 16, `r12` 28).
 abstract final class ShellxRadius {
-  static const double r4 = 4, r6 = 6, r8 = 8, r12 = 12, pill = 999;
+  static const double r4 = ShellxRadii.tiny, r6 = ShellxRadii.control;
+  static const double r8 = ShellxRadii.card, r12 = ShellxRadii.sheet;
+  static const double pill = ShellxRadii.pill;
 }
 
 /// UI §1.2 fixed sizes, §2 window, §2.2 sidebar, §2.5 pill, §2.8 toast,
@@ -333,78 +358,95 @@ abstract final class ShellxSizes {
   static const double keycapGap = 4;
 }
 
-/// UI §1.3. No fontFamily: the platform UI font (SF Pro / Segoe UI).
+/// UI §1.3, V2-5a §6.5: the monospaced scale (SF Mono on macOS, JetBrains
+/// Mono on Windows), one size smaller, line heights in px unchanged. No
+/// family (the theme gives it) and each weight with its `wght` axis. On
+/// Windows, [ShellxTypeScale.desktopWindowsBoost] px larger (A36).
 abstract final class ShellxText {
-  static const TextStyle caption = TextStyle(
-    fontSize: 11,
-    height: 14 / 11,
-    fontWeight: FontWeight.w500,
-  );
-  static const TextStyle small = TextStyle(fontSize: 12, height: 16 / 12);
-  static const TextStyle body = TextStyle(fontSize: 13, height: 18 / 13);
-  static const TextStyle bodyStrong = TextStyle(
-    fontSize: 13,
-    height: 18 / 13,
-    fontWeight: FontWeight.w600,
-  );
-  static const TextStyle dialogBody = TextStyle(fontSize: 14, height: 20 / 14);
-  static const TextStyle label = TextStyle(
-    fontSize: 12.5,
-    height: 16 / 12.5,
-    fontWeight: FontWeight.w600,
-  );
-  static const TextStyle dialogTitle = TextStyle(
-    fontSize: 17,
-    height: 22 / 17,
-    fontWeight: FontWeight.w600,
-  );
-  static const TextStyle emptyTitle = TextStyle(
-    fontSize: 15,
-    height: 20 / 15,
-    fontWeight: FontWeight.w600,
-  );
+  static TextStyle _on(TextStyle style) =>
+      ShellxTypeScale.desktopFor(style, defaultTargetPlatform);
+
+  /// 11/14, 500.
+  static TextStyle get caption => _on(ShellxTypeScale.desktopCaption);
+
+  /// 11.5/16.
+  static TextStyle get small => _on(ShellxTypeScale.desktopSmall);
+
+  /// 12/18.
+  static TextStyle get body => _on(ShellxTypeScale.desktopBody);
+
+  /// 12/18, 600.
+  static TextStyle get bodyStrong => _on(ShellxTypeScale.desktopBodyStrong);
+
+  /// 13/20.
+  static TextStyle get dialogBody => _on(ShellxTypeScale.desktopDialogBody);
+
+  /// 11.5/16, 600.
+  static TextStyle get label => _on(ShellxTypeScale.desktopLabel);
+
+  /// 16/22, 600.
+  static TextStyle get dialogTitle => _on(ShellxTypeScale.desktopDialogTitle);
+
+  /// 14/20, 600.
+  static TextStyle get emptyTitle => _on(ShellxTypeScale.desktopEmptyTitle);
+
+  /// 22/28, 600: for V2-5b (the AI home greeting).
+  static TextStyle get display => _on(ShellxTypeScale.desktopDisplay);
 }
 
-/// UI §1.4.
+/// UI §1.4, V2-5a §5.8.
 abstract final class ShellxShadows {
-  static const List<BoxShadow> e1 = [
-    BoxShadow(offset: Offset(0, 4), blurRadius: 16, color: Color(0x73000000)),
-  ];
+  /// `float1`: menus, toasts, tooltips.
+  static const List<BoxShadow> e1 = ShellxElevation.darkFloat1;
 
   /// [e1] for Material surfaces that only take an elevation (the context
   /// menu of `showMenu`): a shadow of about the same offset and blur.
-  static const double e1Elevation = 8;
-  static const Color e1ShadowColor = Color(0x73000000);
-  static const List<BoxShadow> e2 = [
-    BoxShadow(offset: Offset(0, 16), blurRadius: 48, color: Color(0x8C000000)),
-  ];
+  static const double e1Elevation = ShellxElevation.float1Elevation;
+  static const Color e1ShadowColor = ShellxElevation.float1ShadowColor;
+
+  /// `float2`: dialogs.
+  static const List<BoxShadow> e2 = ShellxElevation.darkFloat2;
+
+  /// V2-5a A28: a raised element (`raisedSmall`): a secondary button, the
+  /// selected row, the selected segment.
+  static const List<BoxShadow> raised = ShellxElevation.darkRaisedSmall;
+
+  /// V2-5a A28: the inner shadow of a track ([ShellxInsetBox]).
+  static const ShellxInsetShadow inset = ShellxInsetShadow(
+    ShellxElevation.darkInset,
+  );
 }
 
-/// UI §1.5. Use [of] so reduced motion turns every duration to zero.
+/// UI §1.5, V2-5a §5.8. Use [of] so reduced motion turns every duration to
+/// zero.
 abstract final class ShellxMotion {
-  static const Duration fast = Duration(milliseconds: 80);
-  static const Duration base = Duration(milliseconds: 150);
-  static const Duration exit = Duration(milliseconds: 120);
-  static const Duration toastIn = Duration(milliseconds: 160);
-  static const Duration toastVisible = Duration(seconds: 4);
-  static const Duration toastVisibleError = Duration(seconds: 6);
-  static const Duration tooltipWait = Duration(milliseconds: 500);
-  static const Duration scrollbarFade = Duration(milliseconds: 800);
+  static const Duration fast = ShellxDurations.fast;
+  static const Duration base = ShellxDurations.base;
+  static const Duration exit = ShellxDurations.exit;
+  static const Duration toastIn = ShellxDurations.toastIn;
+  static const Duration toastVisible = ShellxDurations.toastVisible;
+  static const Duration toastVisibleError = ShellxDurations.toastVisibleError;
+  static const Duration tooltipWait = ShellxDurations.tooltipWait;
+  static const Duration scrollbarFade = ShellxDurations.scrollbarFade;
+
+  /// V2-5a: a segment's tile sliding to its new place.
+  static const Duration slide = ShellxDurations.slide;
 
   /// UI-A2 §6: hovering a dragged tab over a collapsed header expands it.
-  static const Duration dragExpandDelay = Duration(milliseconds: 600);
-  static const Curve fastCurve = Curves.easeOut;
-  static const Curve baseCurve = Curves.easeOutCubic;
-  static const Curve exitCurve = Curves.easeIn;
+  static const Duration dragExpandDelay = ShellxDurations.dragExpandDelay;
+  static const Curve fastCurve = ShellxCurves.fast;
+  static const Curve baseCurve = ShellxCurves.base;
+  static const Curve exitCurve = ShellxCurves.exit;
+  static const Curve slideCurve = ShellxCurves.slide;
 
   static Duration of(BuildContext context, Duration duration) =>
-      MediaQuery.disableAnimationsOf(context) ? Duration.zero : duration;
+      ShellxDurations.of(context, duration);
 }
 
 /// UI §3 focus ring for filled buttons: a ring inside the fill is lost
-/// (`accent` on `primary` is 1.27:1), so a 2 px `accent` ring is drawn
-/// [gap] px outside the button, over whatever is behind it (≥ 3:1 on
-/// `surface` and `bgTerminal`, WCAG 2.4.11).
+/// (cyan on the gradient), so a 2 px `accent` ring is drawn [gap] px outside
+/// the button, over whatever is behind it (≥ 3:1 on `surface` and
+/// `bgTerminal`, WCAG 2.4.11).
 class OutsideFocusRingBorder extends RoundedRectangleBorder {
   const OutsideFocusRingBorder({super.borderRadius, this.gap = ShellxSpace.s2});
 
@@ -467,10 +509,10 @@ WidgetStateProperty<OutlinedBorder> buttonShape({required bool outsideRing}) {
   );
 }
 
-/// [style] in the platform UI font of [theme] (SF Pro / Segoe UI): the
-/// [ShellxText] styles carry no family, and a style that replaces the
-/// ambient one (button labels, tooltips, text fields) would otherwise fall
-/// back to the engine default font.
+/// [style] in the UI font of [theme] (SF Mono on macOS, JetBrains Mono on
+/// Windows, V2-5a §6.1): the [ShellxText] styles carry no family, and a
+/// style that replaces the ambient one (button labels, tooltips, text
+/// fields) would otherwise fall back to the engine default font.
 TextStyle uiFont(TextStyle style, TextTheme theme) {
   final base = theme.bodyMedium;
   return style.copyWith(
@@ -479,87 +521,277 @@ TextStyle uiFont(TextStyle style, TextTheme theme) {
   );
 }
 
-/// The window's only theme (replaces `colorSchemeSeed` in app.dart).
+/// UI §3: a 2 px `accent` ring inside the radius, keyboard focus only.
+const BorderSide _focusRing = BorderSide(
+  color: ShellxDesktopColors.accent,
+  width: ShellxSizes.focusRing,
+);
+
+const BorderRadius _control = BorderRadius.all(
+  Radius.circular(ShellxRadius.r6),
+);
+
+Color _disabled(Color c) =>
+    c.withValues(alpha: c.a * ShellxDesktopColors.disabledOpacity);
+
+WidgetStateProperty<Color> _ink(Color color) => WidgetStateProperty.resolveWith(
+  (states) => states.contains(WidgetState.disabled) ? _disabled(color) : color,
+);
+
+/// V2-5a A38, §7.1: the gradient primary button. `accentStrong` (desktop
+/// labels are 12 px), a white label, black 8 % hovered and 16 % pressed
+/// (drawn by the layer: Material's ink would sit under the gradient), 38 %
+/// disabled, the keyboard ring outside (S-9). Still a [FilledButton].
+ButtonStyle shellxPrimaryButtonStyle() => ButtonStyle(
+  shape: buttonShape(outsideRing: true),
+  elevation: const WidgetStatePropertyAll(0),
+  overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+  foregroundColor: _ink(ShellxDesktopColors.onAccent),
+  iconColor: _ink(ShellxDesktopColors.onAccent),
+  backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+  backgroundBuilder: shellxGradientLayer(
+    gradient: ShellxGradients.accentStrong,
+    borderRadius: _control,
+    disabledOpacity: ShellxDesktopColors.disabledOpacity,
+  ),
+  side: const WidgetStatePropertyAll(BorderSide.none),
+);
+
+/// V2-5a §7.1: the raised secondary button. `rowSelected` (navy700) with
+/// the `raisedSmall` shadow, `overlayHover` hovered; pressed sinks: `pushed`,
+/// no shadow. The keyboard ring is inside.
+ButtonStyle shellxSecondaryButtonStyle() => ButtonStyle(
+  shape: buttonShape(outsideRing: false),
+  elevation: const WidgetStatePropertyAll(0),
+  overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+  foregroundColor: _ink(ShellxDesktopColors.textPrimary),
+  iconColor: _ink(ShellxDesktopColors.textPrimary),
+  backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+  backgroundBuilder: (context, states, child) {
+    final disabled = states.contains(WidgetState.disabled);
+    final pressed = !disabled && states.contains(WidgetState.pressed);
+    final fill = disabled
+        ? _disabled(ShellxDesktopColors.rowSelected)
+        : pressed
+        ? ShellxDesktopColors.pushed
+        : states.contains(WidgetState.hovered)
+        ? ShellxDesktopColors.overlayHover
+        : ShellxDesktopColors.rowSelected;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: _control,
+        boxShadow: disabled || pressed ? null : ShellxShadows.raised,
+      ),
+      child: child,
+    );
+  },
+  side: WidgetStateProperty.resolveWith(
+    (states) =>
+        states.contains(WidgetState.focused) ? _focusRing : BorderSide.none,
+  ),
+);
+
+/// V2-5a §7.1: the text button. `link`, no fill; `rowHover` hovered,
+/// `rowPressed` pressed; the keyboard ring inside.
+ButtonStyle shellxTextButtonStyle() => ButtonStyle(
+  shape: buttonShape(outsideRing: false),
+  elevation: const WidgetStatePropertyAll(0),
+  overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+  foregroundColor: _ink(ShellxDesktopColors.link),
+  iconColor: _ink(ShellxDesktopColors.link),
+  backgroundColor: WidgetStateProperty.resolveWith(
+    (states) => states.contains(WidgetState.disabled)
+        ? Colors.transparent
+        : states.contains(WidgetState.pressed)
+        ? ShellxDesktopColors.rowPressed
+        : states.contains(WidgetState.hovered)
+        ? ShellxDesktopColors.rowHover
+        : Colors.transparent,
+  ),
+  side: WidgetStateProperty.resolveWith(
+    (states) =>
+        states.contains(WidgetState.focused) ? _focusRing : BorderSide.none,
+  ),
+);
+
+/// The window's only theme (replaces `colorSchemeSeed` in app.dart): the
+/// colours of V2-5a §5.9, the family of the platform (§6.1), each text
+/// style's `wght` axis set (A35), every Material component themed (A39).
 ThemeData buildDesktopTheme() {
+  final platform = defaultTargetPlatform;
   const colors = ColorScheme.dark(
     primary: ShellxDesktopColors.primary,
     onPrimary: ShellxDesktopColors.onPrimary,
+    primaryContainer: ShellxDesktopColors.primarySoft,
+    onPrimaryContainer: ShellxDesktopColors.textTitle,
     secondary: ShellxDesktopColors.accent,
+    onSecondary: ShellxDesktopColors.onPrimary,
     surface: ShellxDesktopColors.surface,
     onSurface: ShellxDesktopColors.textPrimary,
+    onSurfaceVariant: ShellxDesktopColors.textSecondary,
+    surfaceContainerLowest: ShellxPalette.navy900,
+    surfaceContainerLow: ShellxPalette.navy850,
+    surfaceContainer: ShellxPalette.navy750,
+    surfaceContainerHigh: ShellxPalette.navy750,
+    surfaceContainerHighest: ShellxPalette.navy700,
+    surfaceTint: Colors.transparent,
     error: ShellxDesktopColors.errDialog,
     onError: ShellxDesktopColors.onErr,
     outline: ShellxDesktopColors.borderInput,
     outlineVariant: ShellxDesktopColors.border,
+    scrim: ShellxDesktopColors.scrim,
   );
+  OutlineInputBorder field(Color color, {double width = 1}) =>
+      OutlineInputBorder(
+        borderRadius: const BorderRadius.all(Radius.circular(ShellxRadii.card)),
+        borderSide: BorderSide(color: color, width: width),
+      );
   final base = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
     colorScheme: colors,
+    fontFamily: ShellxFonts.uiFamily(platform),
+    fontFamilyFallback: ShellxFonts.uiFallback(platform),
     scaffoldBackgroundColor: ShellxDesktopColors.bgTerminal,
+    canvasColor: ShellxDesktopColors.bgTerminal,
     dividerColor: ShellxDesktopColors.line,
     dividerTheme: const DividerThemeData(
       color: ShellxDesktopColors.line,
       thickness: 1,
       space: 1,
     ),
-    inputDecorationTheme: const InputDecorationTheme(
+    inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: ShellxDesktopColors.surfaceInset,
-      hintStyle: TextStyle(color: ShellxDesktopColors.textPlaceholder),
+      hoverColor: Colors.transparent,
+      hintStyle: const TextStyle(color: ShellxDesktopColors.textPlaceholder),
       // UI §3.4: 36 high (20 px `dialogBody` line + 8 + 8), padding 0/10;
       // the label sits above the field (LabeledField), never inside it.
+      // V2-5a A43: inset navy900, outline ≥ 3:1, radius 16, no inner shadow.
       isDense: true,
-      contentPadding: EdgeInsets.symmetric(
+      contentPadding: const EdgeInsets.symmetric(
         horizontal: ShellxSizes.inputPaddingH,
         vertical: ShellxSizes.inputPaddingV,
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r6)),
-        borderSide: BorderSide(color: ShellxDesktopColors.borderInput),
+      enabledBorder: WidgetStateInputBorder.resolveWith(
+        (states) => field(
+          states.contains(WidgetState.hovered)
+              ? ShellxDesktopColors.textSecondary
+              : ShellxDesktopColors.borderInput,
+        ),
       ),
-      disabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r6)),
-        borderSide: BorderSide(color: ShellxDesktopColors.border),
+      disabledBorder: field(
+        ShellxDesktopColors.borderInput.withValues(alpha: 0.5),
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r6)),
-        borderSide: BorderSide(color: ShellxDesktopColors.accent),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r6)),
-        borderSide: BorderSide(color: ShellxDesktopColors.errDialog),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r6)),
-        borderSide: BorderSide(color: ShellxDesktopColors.errDialog),
-      ),
+      focusedBorder: field(ShellxDesktopColors.accent, width: 1.5),
+      errorBorder: field(ShellxDesktopColors.errDialog),
+      focusedErrorBorder: field(ShellxDesktopColors.errDialog, width: 1.5),
     ),
-    // UI §1.1 dark tokens instead of the stock grey Material switch.
+    // UI §1.1 tokens instead of the stock Material switch; V2-5a: the thumb
+    // is ink on the cyan track when on.
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
-            ? ShellxDesktopColors.accent
+            ? ShellxDesktopColors.onPrimary
             : ShellxDesktopColors.textSecondary,
       ),
       trackColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
-            ? ShellxDesktopColors.primarySoft
+            ? ShellxDesktopColors.primary
             : ShellxDesktopColors.surfaceInset,
       ),
       trackOutlineColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
-            ? ShellxDesktopColors.accent
+            ? ShellxDesktopColors.primary
             : ShellxDesktopColors.borderInput,
+      ),
+    ),
+    sliderTheme: const SliderThemeData(
+      activeTrackColor: ShellxDesktopColors.accent,
+      inactiveTrackColor: ShellxDesktopColors.surfaceInset,
+      thumbColor: ShellxDesktopColors.accent,
+      overlayColor: ShellxPalette.hairlineStrong,
+      valueIndicatorColor: ShellxDesktopColors.rowSelected,
+    ),
+    progressIndicatorTheme: const ProgressIndicatorThemeData(
+      color: ShellxDesktopColors.accent,
+      linearTrackColor: ShellxDesktopColors.rowSelected,
+      circularTrackColor: Colors.transparent,
+    ),
+    textSelectionTheme: const TextSelectionThemeData(
+      cursorColor: ShellxDesktopColors.accent,
+      selectionColor: ShellxTerminalPalette.selection,
+      selectionHandleColor: ShellxDesktopColors.accent,
+    ),
+    iconTheme: const IconThemeData(color: ShellxDesktopColors.textPrimary),
+    dialogTheme: const DialogThemeData(
+      backgroundColor: ShellxDesktopColors.surface,
+      surfaceTintColor: Colors.transparent,
+      barrierColor: ShellxDesktopColors.scrim,
+      elevation: 24,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r12)),
+        side: BorderSide(color: ShellxDesktopColors.border),
+      ),
+    ),
+    bottomSheetTheme: const BottomSheetThemeData(
+      backgroundColor: ShellxDesktopColors.surface,
+      surfaceTintColor: Colors.transparent,
+      modalBarrierColor: ShellxDesktopColors.scrim,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(ShellxRadius.r12),
+        ),
+      ),
+    ),
+    popupMenuTheme: const PopupMenuThemeData(
+      color: ShellxDesktopColors.surface,
+      surfaceTintColor: Colors.transparent,
+      elevation: ShellxShadows.e1Elevation,
+      shadowColor: ShellxShadows.e1ShadowColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r8)),
+        side: BorderSide(color: ShellxDesktopColors.border),
+      ),
+    ),
+  );
+  final text = shellxWeightedTextTheme(base.textTheme);
+  const menu = MenuStyle(
+    backgroundColor: WidgetStatePropertyAll(ShellxDesktopColors.surface),
+    surfaceTintColor: WidgetStatePropertyAll(Colors.transparent),
+    elevation: WidgetStatePropertyAll(ShellxShadows.e1Elevation),
+    shadowColor: WidgetStatePropertyAll(ShellxShadows.e1ShadowColor),
+    padding: WidgetStatePropertyAll(EdgeInsets.all(ShellxSpace.s4)),
+    shape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(ShellxRadius.r8)),
+        side: BorderSide(color: ShellxDesktopColors.border),
       ),
     ),
   );
   return base.copyWith(
+    textTheme: text,
+    primaryTextTheme: shellxWeightedTextTheme(base.primaryTextTheme),
+    menuTheme: const MenuThemeData(style: menu),
+    dropdownMenuTheme: DropdownMenuThemeData(
+      menuStyle: menu,
+      inputDecorationTheme: base.inputDecorationTheme,
+      textStyle: uiFont(
+        ShellxText.dialogBody.copyWith(color: ShellxDesktopColors.textTitle),
+        text,
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(style: shellxPrimaryButtonStyle()),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: shellxSecondaryButtonStyle(),
+    ),
+    textButtonTheme: TextButtonThemeData(style: shellxTextButtonStyle()),
     tooltipTheme: TooltipThemeData(
       waitDuration: ShellxMotion.tooltipWait,
       textStyle: uiFont(
         ShellxText.small.copyWith(color: ShellxDesktopColors.textPrimary),
-        base.textTheme,
+        text,
       ),
       decoration: const BoxDecoration(
         color: ShellxDesktopColors.rowSelected,
@@ -567,6 +799,7 @@ ThemeData buildDesktopTheme() {
         border: Border.fromBorderSide(
           BorderSide(color: ShellxDesktopColors.border),
         ),
+        boxShadow: ShellxShadows.e1,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     ),
@@ -574,37 +807,12 @@ ThemeData buildDesktopTheme() {
 }
 
 /// UI §3.3 / §4: the legacy pages reused as dialog bodies get their look
-/// from this theme (applied by the dialog host only, so the terminal
-/// workspace keeps its own explicit styles).
+/// from this theme (applied by the dialog host only): the dialog type
+/// scale, and buttons 32 high, at least 80 wide, padded 0/14, over the
+/// window's button styles.
 ThemeData buildDialogTheme(ThemeData base, {required bool reduceMotion}) {
-  const focusRing = BorderSide(
-    color: ShellxDesktopColors.accent,
-    width: ShellxSizes.focusRing,
-  );
-  Color disabled(Color c) =>
-      c.withValues(alpha: ShellxDesktopColors.disabledOpacity);
-  WidgetStateProperty<Color> fill(Color idle, Color hover, Color pressed) =>
-      WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.disabled)
-            ? disabled(idle)
-            : states.contains(WidgetState.pressed)
-            ? pressed
-            : states.contains(WidgetState.hovered)
-            ? hover
-            : idle,
-      );
-  WidgetStateProperty<Color> ink(Color color) =>
-      WidgetStateProperty.resolveWith(
-        (states) =>
-            states.contains(WidgetState.disabled) ? disabled(color) : color,
-      );
   final text = base.textTheme;
-  ButtonStyle shape({
-    required WidgetStateProperty<Color> foreground,
-    required WidgetStateProperty<Color> background,
-    BorderSide? side,
-    bool filled = false,
-  }) => ButtonStyle(
+  ButtonStyle sized(ButtonStyle style) => style.copyWith(
     minimumSize: const WidgetStatePropertyAll(
       Size(ShellxSizes.buttonMinWidth, ShellxSizes.button),
     ),
@@ -614,19 +822,8 @@ ThemeData buildDialogTheme(ThemeData base, {required bool reduceMotion}) {
     padding: const WidgetStatePropertyAll(
       EdgeInsets.symmetric(horizontal: ShellxSizes.buttonPaddingH),
     ),
-    shape: buttonShape(outsideRing: filled),
     textStyle: WidgetStatePropertyAll(uiFont(ShellxText.bodyStrong, text)),
-    elevation: const WidgetStatePropertyAll(0),
-    overlayColor: const WidgetStatePropertyAll(Colors.transparent),
     animationDuration: reduceMotion ? Duration.zero : ShellxMotion.fast,
-    foregroundColor: foreground,
-    backgroundColor: background,
-    // Material reports `focused` only for keyboard focus (UI §3). A filled
-    // button draws its ring outside instead ([OutsideFocusRingBorder]).
-    side: WidgetStateProperty.resolveWith(
-      (states) =>
-          !filled && states.contains(WidgetState.focused) ? focusRing : side,
-    ),
   );
   TextStyle ui(TextStyle style, Color color) =>
       uiFont(style.copyWith(color: color), text);
@@ -641,57 +838,38 @@ ThemeData buildDialogTheme(ThemeData base, {required bool reduceMotion}) {
       labelLarge: uiFont(ShellxText.bodyStrong, text),
     ),
     filledButtonTheme: FilledButtonThemeData(
-      style: shape(
-        filled: true,
-        foreground: ink(ShellxDesktopColors.onPrimary),
-        background: fill(
-          ShellxDesktopColors.primary,
-          ShellxDesktopColors.primaryHover,
-          ShellxDesktopColors.primaryPressed,
-        ),
-      ),
+      style: sized(shellxPrimaryButtonStyle()),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
-      style: shape(
-        foreground: ink(ShellxDesktopColors.textPrimary),
-        background: fill(
-          Colors.transparent,
-          ShellxDesktopColors.rowHover,
-          ShellxDesktopColors.rowPressed,
-        ),
-        side: const BorderSide(color: ShellxDesktopColors.borderInput),
-      ),
+      style: sized(shellxSecondaryButtonStyle()),
     ),
-    textButtonTheme: TextButtonThemeData(
-      style: shape(
-        foreground: ink(ShellxDesktopColors.accent),
-        background: fill(
-          Colors.transparent,
-          ShellxDesktopColors.rowHover,
-          ShellxDesktopColors.rowPressed,
-        ),
-      ),
-    ),
+    textButtonTheme: TextButtonThemeData(style: sized(shellxTextButtonStyle())),
   );
 }
 
-/// UI §3.3 destructive button (closing tabs, signing out, quitting).
+/// UI §3.3, V2-5a §7.1: the destructive button (closing tabs, signing out,
+/// quitting). `error` with `onError` ink, never a gradient: it brings its
+/// own layer, so a theme's gradient never shows through. Hovered
+/// `destructiveHover`, pressed shaded black 16 %, the keyboard ring outside.
 ButtonStyle destructiveButtonStyle() => ButtonStyle(
-  foregroundColor: WidgetStateProperty.resolveWith(
-    (states) => states.contains(WidgetState.disabled)
-        ? ShellxDesktopColors.onErr.withValues(
-            alpha: ShellxDesktopColors.disabledOpacity,
-          )
-        : ShellxDesktopColors.onErr,
-  ),
-  backgroundColor: WidgetStateProperty.resolveWith(
-    (states) => states.contains(WidgetState.disabled)
-        ? ShellxDesktopColors.errDialog.withValues(
-            alpha: ShellxDesktopColors.disabledOpacity,
-          )
-        : states.contains(WidgetState.hovered) ||
-              states.contains(WidgetState.pressed)
-        ? ShellxDesktopColors.destructiveHover
-        : ShellxDesktopColors.errDialog,
+  shape: buttonShape(outsideRing: true),
+  foregroundColor: _ink(ShellxDesktopColors.onErr),
+  iconColor: _ink(ShellxDesktopColors.onErr),
+  backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+  backgroundBuilder: (context, states, child) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: states.contains(WidgetState.disabled)
+          ? _disabled(ShellxDesktopColors.errDialog)
+          : states.contains(WidgetState.pressed)
+          ? Color.alphaBlend(
+              ShellxGradients.pressedShade,
+              ShellxDesktopColors.errDialog,
+            )
+          : states.contains(WidgetState.hovered)
+          ? ShellxDesktopColors.destructiveHover
+          : ShellxDesktopColors.errDialog,
+      borderRadius: _control,
+    ),
+    child: child,
   ),
 );

@@ -26,7 +26,8 @@ const RoundedRectangleBorder _r6 = RoundedRectangleBorder(
 );
 
 /// UI §3.3 primary button (32 high, min 80 wide, padding 0/14, label
-/// bodyStrong; hover / pressed fills, focus ring for keyboard focus only).
+/// bodyStrong), V2-5a A38: the gradient of [shellxPrimaryButtonStyle], the
+/// keyboard ring outside (S-9). Still a [FilledButton].
 class ShellxPrimaryButton extends StatelessWidget {
   const ShellxPrimaryButton({
     super.key,
@@ -42,7 +43,7 @@ class ShellxPrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) => FilledButton(
     onPressed: onPressed,
     focusNode: focusNode,
-    style: ButtonStyle(
+    style: shellxPrimaryButtonStyle().copyWith(
       minimumSize: const WidgetStatePropertyAll(
         Size(ShellxSizes.buttonMinWidth, ShellxSizes.button),
       ),
@@ -52,34 +53,10 @@ class ShellxPrimaryButton extends StatelessWidget {
       padding: const WidgetStatePropertyAll(
         EdgeInsets.symmetric(horizontal: ShellxSizes.buttonPaddingH),
       ),
-      // Material reports `focused` only for keyboard focus (highlight mode
-      // traditional), which is what UI §3 asks for; on the fill the ring
-      // is drawn outside the button (S-9).
-      shape: buttonShape(outsideRing: true),
       textStyle: WidgetStatePropertyAll(
         uiFont(ShellxText.bodyStrong, Theme.of(context).textTheme),
       ),
-      elevation: const WidgetStatePropertyAll(0),
-      overlayColor: const WidgetStatePropertyAll(Colors.transparent),
       animationDuration: ShellxMotion.of(context, ShellxMotion.fast),
-      foregroundColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.disabled)
-            ? ShellxDesktopColors.onPrimary.withValues(
-                alpha: ShellxDesktopColors.disabledOpacity,
-              )
-            : ShellxDesktopColors.onPrimary,
-      ),
-      backgroundColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.disabled)
-            ? ShellxDesktopColors.primary.withValues(
-                alpha: ShellxDesktopColors.disabledOpacity,
-              )
-            : states.contains(WidgetState.pressed)
-            ? ShellxDesktopColors.primaryPressed
-            : states.contains(WidgetState.hovered)
-            ? ShellxDesktopColors.primaryHover
-            : ShellxDesktopColors.primary,
-      ),
     ),
     child: Text(label),
   );
