@@ -9,26 +9,32 @@ import '../support/ai_rig.dart';
 
 const _phone = 'b0000000-0000-4000-8000-000000000002';
 
-/// A permission request with [options], as `(optionId, kind)`.
-PermissionRequest _perm(List<(String, String)> options) =>
-    PermissionRequest.fromJson({
-      'sessionId': 's',
-      'toolCall': {'toolCallId': 'c1', 'title': 'Sửa src/main.ts'},
-      'options': [
-        for (final (id, kind) in options)
-          {'optionId': id, 'name': id, 'kind': kind},
-      ],
-    });
+/// A permission request with [options], as `(optionId, kind)`, each named
+/// [names] gives for its id (else its id).
+PermissionRequest _perm(
+  List<(String, String)> options, {
+  Map<String, String> names = const {},
+}) => PermissionRequest.fromJson({
+  'sessionId': 's',
+  'toolCall': {'toolCallId': 'c1', 'title': 'Sửa src/main.ts'},
+  'options': [
+    for (final (id, kind) in options)
+      {'optionId': id, 'name': names[id] ?? id, 'kind': kind},
+  ],
+});
 
 /// The one push of a permission with [options], in a session nobody shows.
-AiPush _pushFor(List<(String, String)> options) {
+AiPush _pushFor(
+  List<(String, String)> options, {
+  Map<String, String> names = const {},
+}) {
   late AiPush push;
   fakeAsync((async) {
     final pushes = <AiPush>[];
     final rig = HubRig(pushes: pushes, clock: () => aiT0.add(async.elapsed));
     rig.source.add(-1)
       ..beginTurn(const [TextBlock('go')], aiT0)
-      ..addPermission(_perm(options), aiT0);
+      ..addPermission(_perm(options, names: names), aiT0);
     push = pushes.single;
   });
   return push;
@@ -112,6 +118,71 @@ void main() {
         ('reject', 'reject_once'),
       ]).answerable,
       isTrue,
+    );
+  });
+
+  test('an option id that is not well-formed UTF-16 (a lone surrogate: both '
+      'relays refuse it, and the whole push with it) gives no buttons: the '
+      'plain push, as for an id too long', () {
+    for (final options in [
+      [('allow\uD800', 'allow_once'), ('reject', 'reject_once')],
+      [('allow', 'allow_once'), ('\uDC00reject', 'reject_once')],
+      [('allow', 'allow_once'), ('reject\uDBFF', 'reject_once')],
+    ]) {
+      final push = _pushFor(options);
+      expect(
+        (push.permission, push.allow, push.reject, push.answerable),
+        (null, null, null, false),
+        reason: '$options',
+      );
+      expect(push.detail, 'Sửa src/main.ts', reason: 'still the plain push');
+    }
+    // A pair is one character like any other.
+    expect(
+      _pushFor([
+        ('allow \u{1F600}', 'allow_once'),
+        ('reject', 'reject_once'),
+      ]).allow,
+      'allow \u{1F600}',
+    );
+    // And the background service checks the same on what the window sends.
+    AiPush withAllow(String allow) => AiPush(
+      kind: AiPushKind.needsInput,
+      agentName: 'Claude',
+      sid: 'ep.-1',
+      permission: 1,
+      allow: allow,
+      reject: 'reject',
+    );
+    expect(withAllow('allow\uD800').answerable, isFalse);
+    expect(withAllow('allow').answerable, isTrue);
+  });
+
+  test('an "allow once" whose name says it turns on a mode acting without '
+      'asking is no Allow button either; the first one that does not is', () {
+    final flagged = _pushFor(
+      [('opt-1', 'allow_once'), ('opt-9', 'reject_once')],
+      names: {'opt-1': 'Yes, and bypass permissions', 'opt-9': 'No'},
+    );
+    expect(
+      (flagged.permission, flagged.allow, flagged.reject, flagged.answerable),
+      (null, null, null, false),
+    );
+    expect(flagged.detail, 'Sửa src/main.ts', reason: 'still the plain push');
+    expect(
+      _pushFor(
+        [
+          ('opt-1', 'allow_once'),
+          ('opt-2', 'allow_once'),
+          ('opt-9', 'reject_once'),
+        ],
+        names: {
+          'opt-1': 'Allow all edits (auto approve)',
+          'opt-2': 'Yes',
+          'opt-9': 'No',
+        },
+      ).allow,
+      'opt-2',
     );
   });
 
