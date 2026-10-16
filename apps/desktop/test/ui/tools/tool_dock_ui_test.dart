@@ -9,6 +9,7 @@ import 'package:shellx_desktop/src/terminal/sidebar_workspaces.dart';
 import 'package:shellx_desktop/src/terminal/tab_attention.dart';
 import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/tools/tool_dock.dart';
+import 'package:shellx_desktop/src/tools/tool_dock_state.dart';
 import 'package:shellx_desktop/src/tools/tool_pages.dart';
 import 'package:shellx_desktop/src/ui/terminal/key_sequence.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_intents.dart';
@@ -30,6 +31,20 @@ void main() {
     Actions.invoke(t.element(find.byType(ToolArea)), OpenToolIntent(id));
     await t.pumpAndSettle();
   }
+
+  /// ⌘⇧B (D10).
+  Future<void> toggleTools(WidgetTester t) async {
+    await t.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+    await t.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await t.sendKeyEvent(LogicalKeyboardKey.keyB);
+    await t.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await t.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+    await t.pumpAndSettle();
+  }
+
+  /// The name on the dock's bar: the tool on show.
+  String? barName(WidgetTester t) =>
+      t.widget<Text>(find.byKey(const Key('tool.bar.name'))).data;
 
   testWidgets('opening a tool shows the dock beside the panes; the page '
       'loads its URL and gets the keyboard (D3, D4)', (t) async {
@@ -159,6 +174,62 @@ void main() {
     expect(find.byKey(const ValueKey('tool.dockSlot')), findsNothing);
     expect(rig.engines[tool.id]!.disposed, isTrue);
     expect(rig.container.read(terminalTabsProvider).tabs, hasLength(1));
+    await disposeWorkspace(t, rig.container);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('⌘⇧B on a closed dock without chips reopens the tool viewed '
+      'last: the chip a closed chip handed over to (D10)', (t) async {
+    await rig.pump(t);
+    final a = rig.add(kDefaultWorkspaceId, 'localhost:1', name: 'A');
+    final b = rig.add(kDefaultWorkspaceId, 'localhost:2', name: 'B');
+    await t.pumpAndSettle();
+    await openTool(t, a.id);
+    await openTool(t, b.id);
+    // B's chip closes: A shows, then A closes too (the last chip: the dock
+    // closes).
+    await t.tap(find.byKey(Key('tool.chip.${b.id}.close')));
+    await t.pumpAndSettle();
+    expect(barName(t), 'A');
+    await t.tap(find.byKey(const Key('tool.bar.close')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('tool.dockSlot')), findsNothing);
+    await toggleTools(t);
+    expect(find.byKey(const ValueKey('tool.dockSlot')), findsOneWidget);
+    expect(
+      rig.container.read(toolDockProvider).of(kDefaultWorkspaceId).active,
+      a.id,
+    );
+    expect(barName(t), 'A');
+    await disposeWorkspace(t, rig.container);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('⌘⇧B on a closed dock without chips reopens the tool viewed '
+      'last: the restored one, not the workspace\'s first tool (D10, D14)', (
+    t,
+  ) async {
+    await rig.pump(t);
+    final first = rig.add(kDefaultWorkspaceId, 'localhost:1', name: 'First');
+    final a = rig.add(kDefaultWorkspaceId, 'localhost:2', name: 'A');
+    await t.pumpAndSettle();
+    rig.container.read(toolDockProvider.notifier).restore({
+      kDefaultWorkspaceId: ToolDockState(
+        open: true,
+        active: a.id,
+        tools: [a.id],
+      ),
+    });
+    await t.pumpAndSettle();
+    expect(barName(t), 'A');
+    await t.tap(find.byKey(const Key('tool.bar.close')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('tool.dockSlot')), findsNothing);
+    await toggleTools(t);
+    expect(
+      rig.container.read(toolDockProvider).of(kDefaultWorkspaceId).active,
+      a.id,
+      reason: 'not ${first.id}, the first tool',
+    );
+    expect(barName(t), 'A');
     await disposeWorkspace(t, rig.container);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
