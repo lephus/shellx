@@ -26,7 +26,7 @@ final class ToolDialogs {
   final Future<String?> Function(String message, String? value) prompt;
 }
 
-final _blank = Uri.parse('about:blank');
+final _blankUrl = Uri.parse('about:blank');
 
 /// V2-4 E13, E15, E16: one tool on the phone. It serves the tool while the page is open and the app
 /// is in the foreground, drives the web view (the entry URL, reloads), and says where the page is.
@@ -40,6 +40,10 @@ final _blank = Uri.parse('about:blank');
 /// origins (A) loads its entry in the web view that is there: every page of its history is on a port
 /// served again, and its `sessionStorage` and in-page history stay. Neither the user's back nor the
 /// page's own `history.back()` can reach a port this session no longer serves.
+///
+/// B: a page stops with its servers. The web view goes to `about:blank` when the app goes to the
+/// background, when the servers close while the page stays (disabled, gone, unavailable), and when the page
+/// is left: a page that went on would ask ports nothing of ours serves, with the gate cookies of every port.
 @injectable
 class ToolPageController extends Controller {
   ToolPageController(@factoryParam this.agentId, @factoryParam this.tool, SessionHolder session)
@@ -166,8 +170,21 @@ class ToolPageController extends Controller {
   void _sync() {
     final page = _page;
     if (page == null) return;
-    _set(_phase, page.phase);
+    final phase = page.phase;
+    // B: the servers closed while the page stays (a cover over it): the page stops with them.
+    if (_serversClosed(phase) && !_serversClosed(_phase.peek())) _goBlank();
+    _set(_phase, phase);
     _set(_alias, page.alias);
+  }
+
+  static bool _serversClosed(ToolPhase phase) =>
+      phase == ToolPhase.disabled || phase == ToolPhase.gone || phase == ToolPhase.unavailable;
+
+  /// B: the current web view goes to `about:blank` (if anything was loaded in it): its page stops, with its
+  /// scripts and their requests. Pages that go on after their servers closed (a WebSocket client that
+  /// reconnects, a poll) would ask ports nothing of ours serves, with the gate cookies of every port.
+  void _goBlank() {
+    if (_used) unawaited(_current?.load(_blankUrl));
   }
 
   void _onEvent(ToolPageEvent event) {
@@ -202,7 +219,7 @@ class ToolPageController extends Controller {
     if (old == null) return;
     final origins = <String>{...?_page?.origins};
     if (_used && !setEquals(origins, _openedFor)) {
-      unawaited(old.load(_blank));
+      unawaited(old.load(_blankUrl));
       _generation++;
       old.dispose();
       _set(_engine, _makeEngine());
@@ -340,14 +357,15 @@ class ToolPageController extends Controller {
       page.resume();
     } else {
       unawaited(page.pause());
-      if (_used) unawaited(_current?.load(_blank));
+      _goBlank();
     }
   }
 
   void dispose() {
     if (_disposed) return;
     _disposed = true;
-    _generation++;
+    _generation++; // what the left web view reports is not heard any more
+    _goBlank(); // B: its page stops before the web view is dropped
     _slow?.cancel();
     unawaited(_changes?.cancel());
     unawaited(_events?.cancel());

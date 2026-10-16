@@ -607,6 +607,92 @@ void main() {
     expect(engines.made.last.disposed, isFalse);
   });
 
+  // B: the page stops with the servers. Leaving the page, and the servers closing while the page stays, send the
+  // web view to about:blank, so that its scripts do not go on asking ports nothing of ours serves, with the cookies
+  // of every port (once the user opens a tool again, those include a live secret).
+  testWidgets('leaving the page sends the web view to about:blank before it is dropped (B)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Bảng việc'), findsNothing);
+    expect(engines.log, ['web1 load localhost:5173/__shellx/enter', 'web1 load about:blank', 'web1 dispose']);
+  });
+
+  testWidgets('leaving a page nothing was loaded in leaves the blank web view alone (B)', (tester) async {
+    await open(tester);
+    await tester.tap(find.byKey(const Key('tool.back')));
+    await tester.pumpAndSettle();
+    expect(find.text('Bảng việc'), findsNothing);
+    expect(engines.log, ['web1 dispose']);
+  });
+
+  for (final phase in [ToolPhase.disabled, ToolPhase.gone, ToolPhase.unavailable]) {
+    testWidgets(
+      'the servers closing (${phase.name}) send the web view to about:blank, once; served again, it takes the entry (B)',
+      (tester) async {
+        await open(tester);
+        await shown(tester);
+        page().servedPortValue = null; // the servers are closed
+        page().setPhase(phase);
+        await tester.pump();
+        expect(engines.log, ['web1 load localhost:5173/__shellx/enter', 'web1 load about:blank']);
+        page().setPhase(phase); // told again: not blanked again
+        await tester.pump();
+        expect(engines.log, hasLength(2));
+        page().ready(); // served again on the same port: the same web view, per rule A
+        await tester.pump();
+        expect(engines.made, hasLength(1));
+        expect(engines.log.last, 'web1 load localhost:5173/__shellx/enter');
+      },
+    );
+  }
+
+  testWidgets('the servers closing in one phase after another blank the web view once (B)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    page().servedPortValue = null;
+    page().setPhase(ToolPhase.disabled);
+    page().setPhase(ToolPhase.gone);
+    page().setPhase(ToolPhase.unavailable);
+    await tester.pump();
+    expect(engines.log.where((entry) => entry == 'web1 load about:blank'), hasLength(1));
+  });
+
+  for (final phase in [ToolPhase.opening, ToolPhase.busy, ToolPhase.refused, ToolPhase.reconnecting]) {
+    testWidgets('the servers staying open (${phase.name}) leave the web view alone (B)', (tester) async {
+      await open(tester);
+      await shown(tester);
+      page().setPhase(phase);
+      await tester.pump();
+      expect(engines.log, ['web1 load localhost:5173/__shellx/enter']);
+    });
+  }
+
+  // Leaving raises the generation: what the left web view reports after that is not heard.
+  testWidgets('after leaving, a late question of the left web view touches no closed stream (B)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    final left = engine;
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    // Heard, an unserved local port would be named in a toast: an add on the closed notices (a StateError inside
+    // the plugin's callback).
+    expect(left.callbacks.decide('http://localhost:8000/', true), isA<ToolBlock>());
+    left.callbacks.onFileChooser();
+    expect(popups.infos, isEmpty);
+  });
+
+  testWidgets('after leaving, a late page start of the left web view starts no timer (B)', (tester) async {
+    await open(tester);
+    await shown(tester);
+    final left = engine;
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    left.callbacks.onPageStarted(); // heard, it would start a periodic timer that nothing cancels
+    await tester.pump(const Duration(seconds: 5));
+  });
+
   testWidgets('a pause before anything is loaded leaves the blank web view alone (NB1)', (tester) async {
     await open(tester);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
