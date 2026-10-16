@@ -136,7 +136,8 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m55(method) => "Unlock with ${method}";
 
-  static String m56(n, w) => "✦ ${Intl.plural(n, one: '1 AI session', other: '${n} AI sessions')} · ${w} need you";
+  static String m56(n, w) =>
+      "✦ ${Intl.plural(n, one: '1 AI session', other: '${n} AI sessions')} · ${Intl.plural(w, one: '1 needs you', other: '${w} need you')}";
 
   static String m57(n) => "✦ ${Intl.plural(n, one: '1 AI session', other: '${n} AI sessions')}";
 

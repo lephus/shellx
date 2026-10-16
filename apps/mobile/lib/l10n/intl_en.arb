@@ -699,7 +699,7 @@
   "@aiPushDenied": {"placeholders": {"title": {"type": "String"}}},
   "aiPushMaybeNotSent": "It may not have been sent. Check the session.",
   "aiPushAnsweredElsewhere": "This request was already answered elsewhere.",
-  "machineAiLine": "✦ {n, plural, =1{1 AI session} other{{n} AI sessions}} · {w} need you",
+  "machineAiLine": "✦ {n, plural, =1{1 AI session} other{{n} AI sessions}} · {w, plural, =1{1 needs you} other{{w} need you}}",
   "@machineAiLine": {"placeholders": {"n": {"type": "int"}, "w": {"type": "int"}}},
   "machineAiSessions": "✦ {n, plural, =1{1 AI session} other{{n} AI sessions}}",
   "@machineAiSessions": {"placeholders": {"n": {"type": "int"}}},

@@ -173,13 +173,14 @@ void main() {
     expect(line(), findsNothing);
   });
 
-  testWidgets('English: the sessions in the singular or the plural, and no "need you" when nobody waits (R11)', (
-    tester,
-  ) async {
+  testWidgets('English: the sessions and those that wait in the singular or the plural, and no "need you" when nobody '
+      'waits (R11)', (tester) async {
     await tester.pumpWidget(cardOf(locale: en));
-    expect(find.text('✦ 2 AI sessions · 1 need you'), findsOneWidget);
+    expect(find.text('✦ 2 AI sessions · 1 needs you'), findsOneWidget);
     await tester.pumpWidget(cardOf(locale: en, ai: (sessions: 1, waiting: 1)));
-    expect(find.text('✦ 1 AI session · 1 need you'), findsOneWidget);
+    expect(find.text('✦ 1 AI session · 1 needs you'), findsOneWidget);
+    await tester.pumpWidget(cardOf(locale: en, ai: (sessions: 3, waiting: 2)));
+    expect(find.text('✦ 3 AI sessions · 2 need you'), findsOneWidget);
     await tester.pumpWidget(cardOf(locale: en, ai: (sessions: 1, waiting: 0)));
     expect(find.text('✦ 1 AI session'), findsOneWidget);
     await tester.pumpWidget(cardOf(locale: en, ai: (sessions: 3, waiting: 0)));

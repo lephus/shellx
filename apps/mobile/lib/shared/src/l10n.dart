@@ -4028,10 +4028,10 @@ class S {
     );
   }
 
-  /// `✦ {n, plural, =1{1 AI session} other{{n} AI sessions}} · {w} need you`
+  /// `✦ {n, plural, =1{1 AI session} other{{n} AI sessions}} · {w, plural, =1{1 needs you} other{{w} need you}}`
   String machineAiLine(int n, int w) {
     return Intl.message(
-      '✦ ${Intl.plural(n, one: '1 AI session', other: '$n AI sessions')} · $w need you',
+      '✦ ${Intl.plural(n, one: '1 AI session', other: '$n AI sessions')} · ${Intl.plural(w, one: '1 needs you', other: '$w need you')}',
       name: 'machineAiLine',
       desc: '',
       args: [n, w],
