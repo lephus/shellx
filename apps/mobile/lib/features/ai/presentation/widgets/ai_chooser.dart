@@ -55,7 +55,8 @@ Future<void> openAiChooser(
         return;
       }
       sid = made;
-    case AttachSession() || OpenNewSession() || null:
+    // The AI group alone shows (no Tool group): a tool is never picked here.
+    case AttachSession() || OpenNewSession() || OpenTool() || null:
       return;
   }
   // Keyed by its session: a page that takes the place of another session's page is a new page (the
