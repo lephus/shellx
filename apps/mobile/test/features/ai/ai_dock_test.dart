@@ -1,0 +1,624 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_acp/shellx_acp.dart';
+import 'package:shellx_ai/remote.dart';
+import 'package:shellx_mobile/core/core.dart' hide test;
+import 'package:shellx_mobile/features/ai/presentation/widgets/ai_dock.dart';
+
+import '../../support/app_harness.dart';
+
+/// V2-2 §5.2–5.4: the dock under the conversation, widget by widget.
+void main() {
+  /// [settle]: false for a dock that shows a spinner, which never settles.
+  Future<void> pumpDock(WidgetTester tester, Widget child, {double height = 900, bool settle = true}) async {
+    tester.view.physicalSize = Size(400, height);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(localized(Scaffold(body: SingleChildScrollView(child: child))));
+    if (settle) {
+      await tester.pumpAndSettle();
+    } else {
+      await tester.pump();
+    }
+  }
+
+  group('the question form (V2-1 D22, V2-2 §5.4)', () {
+    MirrorAsk ask(Map<String, Object?> properties, {List<String> required = const [], String message = 'Hỏi'}) =>
+        MirrorAsk(
+          0,
+          1,
+          1,
+          id: 4,
+          status: 'open',
+          request: ElicitationRequest.fromJson({
+            'mode': 'form',
+            'message': message,
+            'requestedSchema': {'type': 'object', 'properties': properties, 'required': required},
+          }),
+        );
+
+    late List<ElicitationResponse> answers;
+
+    /// [fresh]: just appeared, not given the 400 ms its buttons wait before they answer.
+    Future<void> pumpAsk(
+      WidgetTester tester,
+      MirrorAsk item, {
+      bool busy = false,
+      double height = 900,
+      bool fresh = false,
+    }) async {
+      answers = [];
+      await pumpDock(
+        tester,
+        AiAskPanel(ask: item, agentName: 'Claude', busy: busy, onAnswer: answers.add),
+        height: height,
+        settle: !fresh,
+      );
+      if (!fresh) await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    Map<String, Object?>? accepted() => answers.isEmpty ? null : (answers.single as ElicitAccept).content;
+
+    testWidgets('every kind of field, and the answer is what was filled in', (tester) async {
+      await pumpAsk(
+        tester,
+        ask(
+          {
+            'name': {'type': 'string', 'title': 'Tên'},
+            'count': {'type': 'integer', 'title': 'Số lượng'},
+            'ratio': {'type': 'number', 'title': 'Tỉ lệ'},
+            'yes': {'type': 'boolean', 'title': 'Đồng ý'},
+            'color': {
+              'type': 'string',
+              'title': 'Màu',
+              'oneOf': [
+                {'const': 'r', 'title': 'Đỏ'},
+                {'const': 'g', 'title': 'Xanh'},
+              ],
+            },
+            'tags': {
+              'type': 'array',
+              'title': 'Nhãn',
+              'items': {
+                'anyOf': [
+                  {'const': 'a', 'title': 'Một'},
+                  {'const': 'b', 'title': 'Hai'},
+                  {'const': 'c', 'title': 'Ba'},
+                ],
+              },
+            },
+          },
+          required: ['name', 'color'],
+        ),
+        height: 2400, // the panel keeps to half of the screen: every field is in view
+      );
+      expect(find.text('Claude hỏi bạn'), findsOneWidget);
+      final submit = find.byKey(const Key('ai.ask.submit'));
+      await tester.tap(submit);
+      await tester.pump();
+      expect(answers, isEmpty); // the required fields are empty
+
+      await tester.enterText(find.widgetWithText(TextFormField, 'Tên'), 'Linh');
+      await tester.enterText(find.widgetWithText(TextFormField, 'Số lượng'), '3');
+      await tester.enterText(find.widgetWithText(TextFormField, 'Tỉ lệ'), '0.5');
+      await tester.tap(find.byType(Switch));
+      await tester.tap(find.text('Xanh'));
+      await tester.tap(find.text('Một'));
+      await tester.tap(find.text('Ba'));
+      await tester.pump();
+      await tester.tap(submit);
+      await tester.pump();
+      expect(accepted(), {
+        'name': 'Linh',
+        'count': 3,
+        'ratio': 0.5,
+        'yes': true,
+        'color': 'g',
+        'tags': ['a', 'c'],
+      });
+    });
+
+    testWidgets('a value the form does not accept keeps "Gửi câu trả lời" shut', (tester) async {
+      await pumpAsk(
+        tester,
+        ask(
+          {
+            'age': {'type': 'integer', 'title': 'Tuổi', 'minimum': 18},
+          },
+          required: ['age'],
+        ),
+      );
+      final submit = find.byKey(const Key('ai.ask.submit'));
+      await tester.enterText(find.widgetWithText(TextFormField, 'Tuổi'), '12');
+      await tester.pump();
+      await tester.tap(submit);
+      expect(answers, isEmpty);
+      await tester.enterText(find.widgetWithText(TextFormField, 'Tuổi'), '1.5'); // not a whole number
+      await tester.pump();
+      await tester.tap(submit);
+      expect(answers, isEmpty);
+      await tester.enterText(find.widgetWithText(TextFormField, 'Tuổi'), '21');
+      await tester.pump();
+      await tester.tap(submit);
+      expect(accepted(), {'age': 21});
+    });
+
+    testWidgets('defaults are filled in', (tester) async {
+      await pumpAsk(
+        tester,
+        ask(
+          {
+            'name': {'type': 'string', 'title': 'Tên', 'default': 'Linh'},
+            'yes': {'type': 'boolean', 'title': 'Đồng ý', 'default': true},
+          },
+          required: ['name'],
+        ),
+      );
+      await tester.tap(find.byKey(const Key('ai.ask.submit')));
+      expect(accepted(), {'name': 'Linh', 'yes': true});
+    });
+
+    testWidgets('"Từ chối" is always there, and answers decline', (tester) async {
+      await pumpAsk(
+        tester,
+        ask(
+          {
+            'name': {'type': 'string', 'title': 'Tên'},
+          },
+          required: ['name'],
+        ),
+      );
+      await tester.tap(find.byKey(const Key('ai.ask.decline')));
+      expect(answers.single, isA<ElicitDecline>());
+    });
+
+    testWidgets('while an answer is on its way nothing can be sent', (tester) async {
+      await pumpAsk(
+        tester,
+        ask({
+          'yes': {'type': 'boolean', 'title': 'Đồng ý'},
+        }),
+        busy: true,
+      );
+      await tester.tap(find.byKey(const Key('ai.ask.submit')));
+      await tester.tap(find.byKey(const Key('ai.ask.decline')));
+      expect(answers, isEmpty);
+    });
+
+    testWidgets('a field type ShellX does not know: answered on the computer, declined here', (tester) async {
+      await pumpAsk(
+        tester,
+        ask({
+          'when': {'type': 'object', 'title': 'Lúc'},
+        }),
+      );
+      expect(find.text('Câu hỏi này dùng kiểu trả lời ShellX chưa hỗ trợ.'), findsOneWidget);
+      expect(find.byKey(const Key('ai.ask.submit')), findsNothing);
+      await tester.tap(find.byKey(const Key('ai.ask.decline')));
+      expect(answers.single, isA<ElicitDecline>());
+    });
+
+    testWidgets('a question that came without its form (too big), or by link: answered on the computer', (
+      tester,
+    ) async {
+      await pumpAsk(tester, const MirrorAsk(0, 1, 1, id: 4, status: 'open'));
+      expect(find.text('Trả lời câu hỏi này trên máy tính.'), findsOneWidget);
+      expect(find.byKey(const Key('ai.ask.submit')), findsNothing);
+      await tester.tap(find.byKey(const Key('ai.ask.decline')));
+      expect(answers.single, isA<ElicitDecline>());
+    });
+
+    group('a form that has just appeared waits a moment (V2-1 D10: one tap, meant)', () {
+      MirrorAsk simple(int id) => MirrorAsk(
+        0,
+        1,
+        1,
+        id: id,
+        status: 'open',
+        request: ElicitationRequest.fromJson({
+          'mode': 'form',
+          'message': 'Hỏi',
+          'requestedSchema': {
+            'type': 'object',
+            'properties': {
+              'yes': {'type': 'boolean', 'title': 'Đồng ý', 'default': true},
+            },
+          },
+        }),
+      );
+
+      Future<void> tapBoth(WidgetTester tester) async {
+        await tester.tap(find.byKey(const Key('ai.ask.submit')), warnIfMissed: false);
+        await tester.tap(find.byKey(const Key('ai.ask.decline')), warnIfMissed: false);
+        await tester.pump();
+      }
+
+      testWidgets('submit and decline answer nothing for 400 ms, then they do', (tester) async {
+        await pumpAsk(tester, simple(4), fresh: true);
+        await tapBoth(tester);
+        expect(answers, isEmpty);
+        await tester.pump(const Duration(milliseconds: 399));
+        await tapBoth(tester);
+        expect(answers, isEmpty);
+        await tester.pump(const Duration(milliseconds: 1));
+        await tester.tap(find.byKey(const Key('ai.ask.submit')));
+        expect(answers.single, isA<ElicitAccept>());
+      });
+
+      testWidgets('another question in the same place waits again', (tester) async {
+        answers = [];
+        Future<void> show(int id) async {
+          await tester.pumpWidget(
+            localized(
+              Scaffold(
+                body: SingleChildScrollView(
+                  child: AiAskPanel(
+                    key: const ValueKey('ask'), // the panel is kept: the state is reused for the next question
+                    ask: simple(id),
+                    agentName: 'Claude',
+                    busy: false,
+                    onAnswer: answers.add,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        await show(4);
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.tap(find.byKey(const Key('ai.ask.decline')));
+        expect(answers, hasLength(1));
+        await show(5); // question 5 takes the place of question 4
+        await tester.pump(const Duration(milliseconds: 50));
+        await tapBoth(tester);
+        expect(answers, hasLength(1));
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.tap(find.byKey(const Key('ai.ask.decline')));
+        expect(answers, hasLength(2));
+      });
+
+      testWidgets('another question in the same place starts from its own form, not from what was typed', (
+        tester,
+      ) async {
+        answers = [];
+        MirrorAsk named(int id) => MirrorAsk(
+          0,
+          1,
+          1,
+          id: id,
+          status: 'open',
+          request: ElicitationRequest.fromJson({
+            'mode': 'form',
+            'message': 'Tên?',
+            'requestedSchema': {
+              'type': 'object',
+              'properties': {
+                'name': {'type': 'string', 'title': 'Tên'},
+              },
+              'required': ['name'],
+            },
+          }),
+        );
+        Future<void> show(int id) => tester.pumpWidget(
+          localized(
+            Scaffold(
+              body: SingleChildScrollView(
+                child: AiAskPanel(
+                  key: const ValueKey('ask'),
+                  ask: named(id),
+                  agentName: 'Claude',
+                  busy: false,
+                  onAnswer: answers.add,
+                ),
+              ),
+            ),
+          ),
+        );
+        await show(4);
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.enterText(find.byType(TextFormField), 'abc');
+        await tester.pump();
+        await show(5);
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('abc'), findsNothing, reason: 'the field of question 5 is empty');
+        await tester.tap(find.byKey(const Key('ai.ask.submit')));
+        expect(answers, isEmpty, reason: 'and the name it asks for is not there yet');
+        await tester.enterText(find.byType(TextFormField), 'xyz');
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('ai.ask.submit')));
+        expect((answers.single as ElicitAccept).content, {'name': 'xyz'});
+      });
+
+      testWidgets('the same question shown again and again does not make the form wait again', (tester) async {
+        answers = [];
+        Future<void> show() => tester.pumpWidget(
+          localized(
+            Scaffold(
+              body: SingleChildScrollView(
+                child: AiAskPanel(ask: simple(4), agentName: 'Claude', busy: false, onAnswer: answers.add),
+              ),
+            ),
+          ),
+        );
+        await show();
+        for (var i = 0; i < 6; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+          await show(); // the page rebuilt its dock for news that is not about the question
+        }
+        await tester.tap(find.byKey(const Key('ai.ask.decline')));
+        expect(answers, hasLength(1));
+      });
+
+      testWidgets('buttons that come back after an answer on its way wait again', (tester) async {
+        answers = [];
+        Future<void> show({required bool busy}) async {
+          await tester.pumpWidget(
+            localized(
+              Scaffold(
+                body: SingleChildScrollView(
+                  child: AiAskPanel(ask: simple(4), agentName: 'Claude', busy: busy, onAnswer: answers.add),
+                ),
+              ),
+            ),
+          );
+        }
+
+        await show(busy: false);
+        await tester.pump(const Duration(milliseconds: 400));
+        await show(busy: true); // the answer is on its way
+        await tester.pump(const Duration(seconds: 2));
+        await show(busy: false); // it failed: the form is free, but not at once
+        await tester.pump(const Duration(milliseconds: 50));
+        await tapBoth(tester);
+        expect(answers, isEmpty);
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.tap(find.byKey(const Key('ai.ask.decline')));
+        expect(answers, hasLength(1));
+      });
+
+      testWidgets('the question is a live region, like the permission panel', (tester) async {
+        final handle = tester.ensureSemantics();
+        await pumpAsk(tester, simple(4));
+        final node = tester.getSemantics(find.byKey(const Key('ai.ask')));
+        expect(node.getSemanticsData().flagsCollection.isLiveRegion, isTrue);
+        handle.dispose();
+      });
+    });
+
+    testWidgets('a long form scrolls within half of the screen', (tester) async {
+      await pumpAsk(
+        tester,
+        ask({
+          for (var i = 0; i < 30; i++) 'f$i': {'type': 'string', 'title': 'Trường $i'},
+        }),
+      );
+      expect(tester.getSize(find.byKey(const Key('ai.ask'))).height, lessThanOrEqualTo(450 + 8)); // + its margin
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('the queue', () {
+    testWidgets('each waiting message has its ×, which removes that one', (tester) async {
+      final removed = <int>[];
+      await pumpDock(
+        tester,
+        AiQueueRow(queue: const [MirrorQueued(7, 'tin một'), MirrorQueued(9, 'tin hai')], onRemove: removed.add),
+      );
+      expect(find.text('Đang xếp hàng'), findsNWidgets(2));
+      expect(find.text('tin một'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('ai.unqueue.9')));
+      expect(removed, [9]);
+      expect(find.byTooltip('Bỏ khỏi hàng đợi'), findsNWidgets(2));
+    });
+  });
+
+  group('the plan', () {
+    testWidgets('one line "Kế hoạch · 2/3", opened by a tap', (tester) async {
+      await pumpDock(
+        tester,
+        const AiPlanStrip(
+          plan: [
+            PlanEntry(content: 'Đọc mã', status: PlanStatus.completed),
+            PlanEntry(content: 'Sửa mã', status: PlanStatus.completed),
+            PlanEntry(content: 'Chạy thử', status: PlanStatus.pending),
+          ],
+        ),
+      );
+      expect(find.text('Kế hoạch · 2/3'), findsOneWidget);
+      expect(find.text('Sửa mã'), findsNothing);
+      await tester.tap(find.byKey(const Key('ai.plan')));
+      await tester.pumpAndSettle();
+      expect(find.text('Sửa mã'), findsOneWidget);
+      expect(find.byIcon(Icons.check_box), findsNWidgets(2));
+      expect(find.byIcon(Icons.check_box_outline_blank), findsOneWidget);
+      await tester.tap(find.byKey(const Key('ai.plan')));
+      await tester.pumpAndSettle();
+      expect(find.text('Sửa mã'), findsNothing);
+    });
+
+    testWidgets('the whole line is the tap target, 44 points high at least', (tester) async {
+      await pumpDock(
+        tester,
+        const AiPlanStrip(
+          plan: [PlanEntry(content: 'Đọc mã', status: PlanStatus.pending)],
+        ),
+      );
+      final size = tester.getSize(find.byKey(const Key('ai.plan')));
+      expect(size.height, greaterThanOrEqualTo(44));
+      expect(size.width, greaterThan(300)); // across the dock, not just its text
+    });
+  });
+
+  group('the text field and its buttons (V2-1 D16)', () {
+    late TextEditingController text;
+    late List<String> taps;
+
+    setUp(() {
+      text = TextEditingController();
+      taps = [];
+    });
+
+    tearDown(() => text.dispose());
+
+    Future<void> pumpComposer(
+      WidgetTester tester, {
+      bool canSend = true,
+      bool running = false,
+      bool stopping = false,
+      bool canForceStop = false,
+      bool sending = false,
+      bool settle = true,
+    }) => pumpDock(
+      settle: settle,
+      tester,
+      AiComposer(
+        controller: text,
+        agentName: 'Claude',
+        canSend: canSend,
+        running: running,
+        stopping: stopping,
+        canForceStop: canForceStop,
+        sending: sending,
+        onSend: () => taps.add('send'),
+        onStop: () => taps.add('stop'),
+        onForceStop: () => taps.add('force'),
+      ),
+    );
+
+    IconButton button(WidgetTester tester, String key) => tester.widget<IconButton>(find.byKey(Key(key)));
+
+    testWidgets('Send waits for text, and says what the field asks', (tester) async {
+      await pumpComposer(tester);
+      expect(find.text('Nhắn cho Claude…'), findsOneWidget);
+      expect(button(tester, 'ai.send').onPressed, isNull);
+      await tester.enterText(find.byKey(const Key('ai.composer')), '   ');
+      await tester.pump();
+      expect(button(tester, 'ai.send').onPressed, isNull); // spaces are not a message
+      await tester.enterText(find.byKey(const Key('ai.composer')), 'Thêm nút');
+      await tester.pump();
+      expect(button(tester, 'ai.send').tooltip, 'Gửi');
+      await tester.tap(find.byKey(const Key('ai.send')));
+      expect(taps, ['send']);
+    });
+
+    testWidgets('while a turn runs a message is queued, and an empty field offers Stop', (tester) async {
+      await pumpComposer(tester, running: true);
+      await tester.pump(const Duration(milliseconds: 400)); // Stop has appeared a moment ago
+      expect(find.byKey(const Key('ai.send')), findsNothing);
+      await tester.tap(find.byKey(const Key('ai.stop')));
+      expect(taps, ['stop']);
+      await tester.enterText(find.byKey(const Key('ai.composer')), 'thêm nữa');
+      await tester.pump();
+      expect(find.byKey(const Key('ai.stop')), findsNothing);
+      expect(button(tester, 'ai.send').tooltip, 'Xếp hàng');
+    });
+
+    testWidgets('Stop waits while it is being asked, and shows a spinner (the only one here)', (tester) async {
+      await pumpComposer(tester, running: true, stopping: true, settle: false);
+      expect(button(tester, 'ai.stop').onPressed, isNull);
+      expect(button(tester, 'ai.stop').tooltip, 'Đang dừng…');
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 100)); // a spinner is the only thing moving
+    });
+
+    group('Stop that takes the place of Send waits a moment (V2-1 D16)', () {
+      testWidgets('a message queued clears the field and Stop appears under the finger: 400 ms before it answers', (
+        tester,
+      ) async {
+        text.text = 'thêm nữa';
+        await pumpComposer(tester, running: true);
+        expect(find.byKey(const Key('ai.stop')), findsNothing); // "Queue" is there
+        await tester.tap(find.byKey(const Key('ai.send')));
+        expect(taps, ['send']);
+        text.clear(); // what the page does when the message went
+        await tester.pump();
+        expect(find.byKey(const Key('ai.stop')), findsOneWidget);
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.tap(find.byKey(const Key('ai.stop'))); // a second tap meant for Send
+        expect(taps, ['send']);
+        expect(button(tester, 'ai.stop').onPressed, isNull);
+        await tester.pump(const Duration(milliseconds: 350));
+        expect(button(tester, 'ai.stop').onPressed, isNotNull);
+        await tester.tap(find.byKey(const Key('ai.stop')));
+        expect(taps, ['send', 'stop']);
+      });
+
+      testWidgets('Stop that comes with the turn waits too, and a field that fills again drops it', (tester) async {
+        await pumpComposer(tester, running: false, settle: false);
+        await pumpComposer(tester, running: true, settle: false); // the turn started
+        await tester.pump(const Duration(milliseconds: 100));
+        await tester.tap(find.byKey(const Key('ai.stop')));
+        expect(taps, isEmpty);
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.tap(find.byKey(const Key('ai.stop')));
+        expect(taps, ['stop']);
+        // typing replaces Stop with Queue, and emptying the field brings Stop back: it waits again
+        text.text = 'x';
+        await tester.pump();
+        text.clear();
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('ai.stop')));
+        expect(taps, ['stop']);
+      });
+    });
+
+    testWidgets('a rebuild while Stop is shown does not make it wait again (a turn that streams rebuilds the dock)', (
+      tester,
+    ) async {
+      await pumpComposer(tester, running: true, settle: false);
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+        await pumpComposer(tester, running: true, settle: false); // the same dock again, 600 ms in all
+      }
+      await tester.tap(find.byKey(const Key('ai.stop')));
+      expect(taps, ['stop']);
+    });
+
+    testWidgets('"Dừng hẳn" once the computer offers it', (tester) async {
+      await pumpComposer(tester, running: true, canForceStop: true);
+      await tester.tap(find.byKey(const Key('ai.forceStop')));
+      expect(taps, ['force']);
+      await pumpComposer(tester, running: true);
+      expect(find.byKey(const Key('ai.forceStop')), findsNothing);
+    });
+
+    testWidgets('a message on its way cannot be sent again', (tester) async {
+      text.text = 'Thêm nút';
+      await pumpComposer(tester, sending: true, settle: false);
+      expect(button(tester, 'ai.send').onPressed, isNull);
+    });
+
+    testWidgets('when sending is not possible only Send is shut: the field stays editable, the draft kept', (
+      tester,
+    ) async {
+      text.text = 'bản nháp';
+      await pumpComposer(tester, canSend: false);
+      final field = tester.widget<TextField>(find.byKey(const Key('ai.composer')));
+      expect((field.enabled ?? true, field.controller!.text), (true, 'bản nháp')); // a blip never closes the keyboard
+      expect(button(tester, 'ai.send').onPressed, isNull);
+      await tester.enterText(find.byKey(const Key('ai.composer')), 'bản nháp, viết tiếp');
+      await tester.pump();
+      expect(text.text, 'bản nháp, viết tiếp');
+      expect(button(tester, 'ai.send').onPressed, isNull);
+      await pumpComposer(tester); // the link is back
+      expect(button(tester, 'ai.send').onPressed, isNotNull);
+    });
+
+    testWidgets('the keyboard stays open when sending stops being possible', (tester) async {
+      await pumpComposer(tester);
+      await tester.showKeyboard(find.byKey(const Key('ai.composer')));
+      expect(tester.testTextInput.isVisible, isTrue);
+      await pumpComposer(tester, canSend: false);
+      expect(tester.testTextInput.isVisible, isTrue);
+    });
+
+    testWidgets('a long message grows the field up to six lines', (tester) async {
+      await pumpComposer(tester);
+      await tester.enterText(find.byKey(const Key('ai.composer')), List.generate(20, (i) => 'dòng $i').join('\n'));
+      await tester.pump();
+      final field = tester.widget<TextField>(find.byKey(const Key('ai.composer')));
+      expect((field.minLines, field.maxLines), (1, 6));
+      expect(tester.getSize(find.byKey(const Key('ai.composer'))).height, lessThan(200));
+    });
+  });
+}

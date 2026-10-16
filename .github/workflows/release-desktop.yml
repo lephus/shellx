@@ -1,0 +1,483 @@
+name: Release desktop
+
+# Every push to main releases the `version:` of apps/desktop/pubspec.yaml unless download.shellx.pro
+# already serves it (release/README.md). Pick the next version with
+# `node release/scripts/bump.mjs X.Y.Z`, commit, push: build, sign, publish, then the relay and the
+# website are pointed at it. A failed release is retried by the next push to main.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run: build and package the pubspec version only, skip signing, notarization and upload to download.shellx.pro'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# One real release at a time across all refs: a push that lands while a release is building waits,
+# then sees the version published and skips. Dry runs get their own group each, so one can never
+# replace a real release that is waiting in the queue.
+concurrency:
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && format('release-desktop-dry-{0}', github.run_id) || 'release-desktop' }}
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: 3.41.7
+  NODE_VERSION: 22
+  DOWNLOAD_BASE_URL: https://download.shellx.pro
+  # The only Apple account and team ShellX is signed and notarized with: import-certificate.sh
+  # takes only this team's Developer ID identity, check-team.sh refuses anything else.
+  APPLE_ID: phulealali@gmail.com
+  APPLE_TEAM_ID: W4RF3W4VTZ
+
+jobs:
+  prepare:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      dry_run: ${{ steps.resolve.outputs.dry_run }}
+      build: ${{ steps.resolve.outputs.build }}
+      announce: ${{ steps.resolve.outputs.announce }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      # Reads apps/desktop/pubspec.yaml, deploy/relay.env and web/src/site.config.json; a real
+      # release asks download.shellx.pro whether the version is already out (build=false then, and
+      # nothing is built; announce=true if the relay or the website still names an older version).
+      - id: resolve
+        env:
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: node release/scripts/resolve-version.mjs
+
+  # Seconds on ubuntu instead of a 10x-billed macOS build that fails at the signing step: a real
+  # release stops here while the release Environment lacks the macOS signing secrets.
+  preflight:
+    name: Signing secrets present
+    needs: prepare
+    if: needs.prepare.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: release
+    env:
+      DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
+      HAS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 != '' && secrets.MACOS_CERTIFICATE_PASSWORD != '' }}
+      HAS_NOTARY_LOGIN: ${{ secrets.APPLE_API_KEY_P8_BASE64 != '' || secrets.APPLE_APP_SPECIFIC_PASSWORD != '' }}
+    steps:
+      - name: Check the macOS signing secrets of the release Environment
+        run: |
+          if [[ "$DRY_RUN" == 'true' ]]; then
+            echo "Dry run: no secrets needed"
+            exit 0
+          fi
+          if [[ "$HAS_CERTIFICATE" != 'true' || "$HAS_NOTARY_LOGIN" != 'true' ]]; then
+            echo "::error::the GitHub Environment 'release' lacks MACOS_CERTIFICATE_P12_BASE64 / MACOS_CERTIFICATE_PASSWORD (Developer ID of team $APPLE_TEAM_ID) or APPLE_APP_SPECIFIC_PASSWORD; see release/README.md, 'GitHub secrets'. Nothing was built."
+            exit 1
+          fi
+
+  macos:
+    name: macOS dmg
+    needs: [prepare, preflight]
+    if: needs.prepare.outputs.build == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 60
+    # The signing secrets live only in this GitHub Environment, admitted for branch main. A real
+    # release requires the Developer ID certificate (it is never published unsigned for macOS);
+    # dry runs use no secrets and fall back to ad-hoc signing.
+    environment: release
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
+      # Notarize with the App Store Connect API key when it is set, else with APPLE_ID + an
+      # app-specific password (notarize.sh).
+      HAS_APPLE_API_KEY: ${{ secrets.APPLE_API_KEY_P8_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      # flutter build macos builds shellx-term (term/) as a universal binary through an Xcode
+      # Run Script phase (apps/desktop/macos/scripts/build_shellx_term.sh), spec §4.
+      # Pinned like windows-check.yml, so a release builds with the toolchain the tests ran on.
+      - name: Rust 1.95.0 with the shellx-term targets (arm64 + x86_64)
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal --target aarch64-apple-darwin,x86_64-apple-darwin
+          rustup default 1.95.0
+      - name: flutter build macos --release
+        working-directory: apps/desktop
+        run: flutter build macos --release
+      - name: Check the built app (ShellX.app, bundle id pro.shellx.desktop)
+        run: |
+          app=apps/desktop/build/macos/Build/Products/Release/ShellX.app
+          if [[ ! -d "$app" ]]; then
+            echo "::error::$app not found (apps/desktop must build ShellX.app)"
+            exit 1
+          fi
+          bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")"
+          if [[ "$bundle_id" != "pro.shellx.desktop" ]]; then
+            echo "::error::$app has bundle id '$bundle_id', expected pro.shellx.desktop"
+            exit 1
+          fi
+          helper="$app/Contents/Helpers/shellx-term"
+          if [[ ! -x "$helper" ]]; then
+            echo "::error::$helper not found (the Xcode phase must build shellx-term)"
+            exit 1
+          fi
+          archs="$(lipo -archs "$helper")"
+          if [[ " $archs " != *" arm64 "* || " $archs " != *" x86_64 "* ]]; then
+            echo "::error::$helper has architectures '$archs', expected arm64 and x86_64"
+            exit 1
+          fi
+          short_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
+          if [[ "$short_version" != "$VERSION" ]]; then
+            echo "::error::$app has version '$short_version', expected $VERSION (apps/desktop/pubspec.yaml)"
+            exit 1
+          fi
+          echo "APP=$app" >> "$GITHUB_ENV"
+      - name: Import Developer ID certificate
+        if: env.DRY_RUN == 'false'
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: release/macos/import-certificate.sh
+      - name: Use an ad-hoc signature for the dry run
+        if: env.DRY_RUN != 'false'
+        run: echo "MACOS_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+      - name: Sign ShellX.app (hardened runtime)
+        run: release/macos/sign-app.sh "$APP" apps/desktop/macos/Runner/Release.entitlements
+      - name: Check ShellX.app is signed by team ${{ env.APPLE_TEAM_ID }}
+        if: env.DRY_RUN == 'false'
+        run: release/macos/check-team.sh "$APP" "$APPLE_TEAM_ID"
+      - name: Decode App Store Connect API key
+        if: env.DRY_RUN == 'false' && env.HAS_APPLE_API_KEY == 'true'
+        env:
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+        run: |
+          printf '%s' "$APPLE_API_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+      - name: Notarize and staple ShellX.app
+        if: env.DRY_RUN == 'false'
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: release/macos/notarize.sh "$APP"
+      - name: Build dmg
+        run: release/macos/make-dmg.sh "$APP" "dist/ShellX-$VERSION.dmg"
+      - name: Sign, notarize and staple the dmg
+        if: env.DRY_RUN == 'false'
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          codesign --force --timestamp --sign "$MACOS_SIGNING_IDENTITY" "dist/ShellX-$VERSION.dmg"
+          release/macos/check-team.sh "dist/ShellX-$VERSION.dmg" "$APPLE_TEAM_ID"
+          release/macos/notarize.sh "dist/ShellX-$VERSION.dmg"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-dmg
+          path: dist/ShellX-${{ env.VERSION }}.dmg
+          if-no-files-found: error
+      - name: Remove signing keychain and API key
+        if: always()
+        run: |
+          if [[ -n "${MACOS_KEYCHAIN:-}" ]]; then security delete-keychain "$MACOS_KEYCHAIN" || true; fi
+          rm -f "$RUNNER_TEMP/AuthKey.p8"
+
+  windows:
+    name: Windows installer
+    needs: [prepare, preflight]
+    if: needs.prepare.outputs.build == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    # See the comment on the macos job: the signing secrets live only in this Environment.
+    environment: release
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
+      # Windows signing is optional until a code-signing certificate exists: without the Azure
+      # secrets a real release publishes an unsigned installer (SmartScreen warns) and says so.
+      SIGN_WINDOWS: ${{ needs.prepare.outputs.dry_run == 'false' && secrets.AZURE_CLIENT_ID != '' }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      # Pinned like windows-check.yml; CMake builds shellx-term.exe with it.
+      - name: Rust 1.95.0 for shellx-term
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
+      - name: flutter build windows --release
+        working-directory: apps/desktop
+        run: flutter build windows --release
+      - name: Check the built app (ShellX.exe)
+        run: |
+          $release = Join-Path $env:GITHUB_WORKSPACE 'apps\desktop\build\windows\x64\runner\Release'
+          if (-not (Test-Path (Join-Path $release 'ShellX.exe'))) { throw "ShellX.exe not found in $release (apps/desktop must build ShellX.exe)" }
+          # Spec §4: CMake builds shellx-term.exe with cargo and installs it next to ShellX.exe.
+          if (-not (Test-Path (Join-Path $release 'shellx-term.exe'))) { throw "shellx-term.exe not found in $release (apps/desktop/windows/CMakeLists.txt must build it)" }
+          "RELEASE_DIR=$release" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Sign app binaries (Azure Artifact Signing)
+        if: env.SIGN_WINDOWS == 'true'
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ secrets.AZURE_CERTIFICATE_PROFILE_NAME }}
+          files-folder: ${{ env.RELEASE_DIR }}
+          files-folder-filter: exe,dll
+          files-folder-recurse: true
+      - name: Copy the Visual C++ runtime DLLs into the release folder
+        # Runs after signing (not before) so Microsoft's own Authenticode signatures on these
+        # DLLs are not re-signed by the files-folder-filter: exe,dll step above. A Flutter Windows
+        # app needs msvcp140.dll, vcruntime140.dll and vcruntime140_1.dll next to the exe on a
+        # clean PC: https://docs.flutter.dev/platform-integration/windows/building.
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (-not (Test-Path $vswhere)) { throw "vswhere.exe not found at $vswhere" }
+          $vsInstallPath = & $vswhere -latest -products * -property installationPath
+          if (-not $vsInstallPath) { throw 'vswhere found no Visual Studio installation' }
+          $redistRoot = Join-Path $vsInstallPath 'VC\Redist\MSVC'
+          if (-not (Test-Path $redistRoot)) { throw "$redistRoot not found" }
+          $crtDir = Get-ChildItem -Path $redistRoot -Directory | Sort-Object Name -Descending |
+            ForEach-Object { Get-ChildItem -Path (Join-Path $_.FullName 'x64') -Directory -Filter 'Microsoft.VC*.CRT' -ErrorAction SilentlyContinue } |
+            Select-Object -First 1
+          if (-not $crtDir) { throw "no x64\Microsoft.VC*.CRT folder found under $redistRoot" }
+          foreach ($dll in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') {
+            $src = Join-Path $crtDir.FullName $dll
+            if (-not (Test-Path $src)) { throw "$dll not found in $($crtDir.FullName)" }
+            Copy-Item $src -Destination $env:RELEASE_DIR
+          }
+          Write-Host "Copied VC++ runtime DLLs from $($crtDir.FullName)"
+      - name: Build installer with Inno Setup
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE 'dist'
+          $icon = Join-Path $env:GITHUB_WORKSPACE 'apps\desktop\windows\runner\resources\app_icon.ico'
+          ./release/windows/build-installer.ps1 -Version $env:VERSION -SourceDir $env:RELEASE_DIR -OutputDir $out -AppIcon $icon
+          "SETUP_EXE=$(Join-Path $out "ShellX-Setup-$env:VERSION.exe")" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Sign installer (Azure Artifact Signing)
+        if: env.SIGN_WINDOWS == 'true'
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ secrets.AZURE_CERTIFICATE_PROFILE_NAME }}
+          files: ${{ env.SETUP_EXE }}
+      - name: Verify Authenticode signatures
+        if: env.SIGN_WINDOWS == 'true'
+        run: |
+          foreach ($file in @($env:SETUP_EXE, (Join-Path $env:RELEASE_DIR 'ShellX.exe'), (Join-Path $env:RELEASE_DIR 'shellx-term.exe'))) {
+            $signature = Get-AuthenticodeSignature -FilePath $file
+            if ($signature.Status -ne 'Valid') { throw "$file signature status: $($signature.Status)" }
+            Write-Host "$file signed by $($signature.SignerCertificate.Subject)"
+          }
+      - name: Note an unsigned Windows release
+        if: env.DRY_RUN == 'false' && env.SIGN_WINDOWS != 'true'
+        run: |
+          Write-Host "::warning::ShellX-Setup-$env:VERSION.exe is published unsigned (no Azure signing secrets in the release Environment); Windows SmartScreen asks users to confirm"
+          "> **Windows:** ShellX-Setup-$env:VERSION.exe is unsigned; SmartScreen shows *More info → Run anyway*." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer
+          path: dist/ShellX-Setup-${{ env.VERSION }}.exe
+          if-no-files-found: error
+
+  publish:
+    name: Upload to download.shellx.pro
+    needs: [prepare, macos, windows]
+    # Defense in depth: dry_run == 'false' already requires main (resolve-version.mjs refuses a real
+    # release anywhere else), but require main here too so publish never runs from anywhere else
+    # even if that check regresses.
+    if: needs.prepare.outputs.dry_run == 'false' && needs.prepare.outputs.build == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The VPS_* secrets and the VPS_APP_DIR variable deploy.yml already uses, from the production
+    # Environment (main only, see deploy/README.md); this job only ever writes into
+    # $APP_DIR/downloads on the VPS.
+    environment: production
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      # ShellX's one folder on the VPS, relative to the deploy user's home (VPS spec V8). Declared at
+      # job level (not workflow level): `vars` only resolves an Environment-scoped variable inside a
+      # job that declares that `environment`, so this has to live here to ever see an override.
+      APP_DIR: ${{ vars.VPS_APP_DIR || 'phu/shellx' }}
+      # Optional; only needed if sshd on the VPS does not listen on the default port 22.
+      VPS_SSH_PORT: ${{ vars.VPS_SSH_PORT || '22' }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Refuse to overwrite a published version
+        run: |
+          for name in "ShellX-$VERSION.dmg" "ShellX-Setup-$VERSION.exe"; do
+            test -f "dist/$name" || { echo "::error::missing artifact $name"; exit 1; }
+            url="$DOWNLOAD_BASE_URL/desktop/$VERSION/$name"
+            # Unique query string: never read (or seed) a cached 404 for the real URL.
+            code="$(curl -s -o /dev/null -w '%{http_code}' "$url?precheck=$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" || true)"
+            case "$code" in
+              404) echo "$url is free" ;;
+              000) echo "::error::cannot reach $DOWNLOAD_BASE_URL (is the web container on the VPS running?)"; exit 1 ;;
+              *) echo "::error::$url already answers HTTP $code; bump the version instead of overwriting"; exit 1 ;;
+            esac
+          done
+      - name: Install the deploy SSH key (host key pinned by VPS_KNOWN_HOSTS)
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          # Relative, no leading '-' (could be read as a flag) and no '.'/'..' path segment. The
+          # dotdot check is kept in a variable: some bash versions strip backslash escapes from an
+          # inline =~ pattern, which would silently turn \.\.? into an unescaped, near-universal ..?.
+          dotdot_re='(^|/)\.\.?(/|$)'
+          if [[ ! "$APP_DIR" =~ ^[A-Za-z0-9._/-]+$ ]] || [[ "$APP_DIR" == /* ]] || [[ "$APP_DIR" == -* ]] || [[ "$APP_DIR" =~ $dotdot_re ]]; then
+            echo "::error::VPS_APP_DIR may contain only letters, digits and . _ - /, must be relative, must not start with '-', and must not contain a '.' or '..' path segment"
+            exit 1
+          fi
+          if [[ ! "$VPS_SSH_PORT" =~ ^[0-9]+$ ]]; then
+            echo "::error::VPS_SSH_PORT must contain only digits"
+            exit 1
+          fi
+          umask 077
+          printf '%s\n' "$VPS_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$RUNNER_TEMP/known_hosts"
+          {
+            echo "Host vps"
+            echo "  HostName $VPS_HOST"
+            echo "  User $VPS_USER"
+            echo "  IdentityFile $RUNNER_TEMP/deploy_key"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking yes"
+            echo "  UserKnownHostsFile $RUNNER_TEMP/known_hosts"
+            echo "  BatchMode yes"
+            echo "  Port $VPS_SSH_PORT"
+          } > "$RUNNER_TEMP/ssh_config"
+          echo "SSH_CONFIG=$RUNNER_TEMP/ssh_config" >> "$GITHUB_ENV"
+      - name: Upload installers (rsync into VPS_APP_DIR/downloads/desktop/<version>/)
+        run: |
+          # mode 755 on every level (not the VPS user's umask; `mkdir -m` would only set the last one):
+          # nginx (uid 101, in the web image) must be able to traverse downloads/, desktop/ and this
+          # version folder to serve the files inside it (M6).
+          ssh -F "$SSH_CONFIG" vps "mkdir -p '$APP_DIR/downloads/desktop/$VERSION' && chmod 755 '$APP_DIR/downloads' '$APP_DIR/downloads/desktop' '$APP_DIR/downloads/desktop/$VERSION'"
+          rsync -t -e "ssh -F $SSH_CONFIG" --chmod=F644 "dist/ShellX-$VERSION.dmg" "dist/ShellX-Setup-$VERSION.exe" \
+            "vps:$APP_DIR/downloads/desktop/$VERSION/"
+      - name: Verify public download URLs
+        run: |
+          {
+            echo "## ShellX desktop $VERSION"
+            echo
+            echo "| File | URL | SHA-256 |"
+            echo "|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for name in "ShellX-$VERSION.dmg" "ShellX-Setup-$VERSION.exe"; do
+            url="$DOWNLOAD_BASE_URL/desktop/$VERSION/$name"
+            remote_size="$(curl -sfIL "$url?verify=$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" | tr -d '\r' | awk 'tolower($1) == "content-length:" { size = $2 } END { print size }')"
+            local_size="$(stat -c %s "dist/$name")"
+            if [[ "$remote_size" != "$local_size" ]]; then
+              echo "::error::$url has size '$remote_size', expected $local_size"
+              exit 1
+            fi
+            echo "| $name | $url | $(sha256sum "dist/$name" | cut -d' ' -f1) |" >> "$GITHUB_STEP_SUMMARY"
+          done
+      - name: Remove the SSH key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/deploy_key" "$RUNNER_TEMP/known_hosts" "$RUNNER_TEMP/ssh_config"
+
+  announce:
+    name: Point the relay and the website at the new version
+    needs: [prepare, publish]
+    # After a successful publish, or on a later push when the version is published but a previous
+    # announce failed (prepare's announce=true; publish is skipped then, hence always()).
+    if: >-
+      always() && needs.prepare.result == 'success' && needs.prepare.outputs.dry_run == 'false' &&
+      (needs.publish.result == 'success' || needs.prepare.outputs.announce == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    outputs:
+      changed: ${{ steps.announce.outputs.changed }}
+    steps:
+      # The newest main, not the built commit: this job only edits deploy/relay.env and
+      # web/src/site.config.json on top of whatever landed meanwhile.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - id: announce
+        run: node release/scripts/announce.mjs "$VERSION"
+      # Pushes made with GITHUB_TOKEN start no workflow, so this commit re-runs no release; the
+      # deploy job below rolls it out.
+      - name: Commit the relay and website update to main
+        if: steps.announce.outputs.changed == 'true'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -am "chore(release): desktop $VERSION is live; the relay and the website point at it"
+          # A push to main may land between checkout and here: rebase and try again.
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then exit 0; fi
+            if [[ "$attempt" == 3 ]]; then break; fi
+            git pull --rebase origin main
+          done
+          echo "::error::could not push to main (a branch rule blocking GitHub Actions?). The installers are live; set LATEST_AGENT_VERSION, MAC_URL, WIN_URL in deploy/relay.env and desktopVersion in web/src/site.config.json to $VERSION by hand, or let Actions bypass the rule and push to main again"
+          exit 1
+      # Only the run that built the release tags it, on the commit it built. A tag rule that blocks
+      # GitHub Actions costs the tag only, never the deploy.
+      - name: Tag the released commit desktop-v${{ env.VERSION }}
+        if: needs.publish.result == 'success'
+        continue-on-error: true
+        run: |
+          tag="desktop-v$VERSION"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "$tag already exists"
+          else
+            git tag "$tag" "$GITHUB_SHA"
+            git push origin "refs/tags/$tag"
+            echo "Released commit $GITHUB_SHA is tagged $tag" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  deploy:
+    name: Deploy the relay and the website
+    needs: announce
+    if: always() && needs.announce.result == 'success' && needs.announce.outputs.changed == 'true'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/deploy.yml
+    with:
+      # The newest main (which contains the announce commit), so a relay/web change pushed meanwhile
+      # is never rolled back by this deploy.
+      ref: main
+    secrets: inherit

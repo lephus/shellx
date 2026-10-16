@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1C1438"/>
+      <stop offset="1" stop-color="#0B0716"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.42" cy="0.46" r="0.42">
+      <stop offset="0" stop-color="#4AF2A1" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#4AF2A1" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="mint" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7DF7BE"/>
+      <stop offset="1" stop-color="#2FD98A"/>
+    </linearGradient>
+    <linearGradient id="lilac" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#CFC8EE"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <rect width="512" height="512" fill="url(#glow)"/>
+  <!-- "<" : the phone side -->
+  <polyline points="384,122 290,234 384,346" fill="none" stroke="url(#lilac)" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- ">" : the computer side / prompt -->
+  <polyline points="128,122 222,234 128,346" fill="none" stroke="url(#mint)" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- cursor -->
+  <rect x="300" y="398" width="84" height="26" rx="8" fill="url(#mint)"/>
+</svg>

@@ -1,0 +1,52 @@
+---
+import Base from './Base.astro';
+import { pathFor, ui, type Lang, type Page } from '../i18n/ui';
+import { breadcrumbs } from '../lib/seo';
+
+interface Props {
+  frontmatter: {
+    lang: Lang;
+    page: Page;
+    title: string;
+    description: string;
+    updated: string;
+  };
+}
+
+const { lang, page, title, description, updated } = Astro.props.frontmatter;
+const updatedLabel = new Date(`${updated}T00:00:00Z`).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  timeZone: 'UTC',
+});
+const crumbs = breadcrumbs([
+  { name: ui[lang].breadcrumbHome, path: pathFor(lang, 'home') },
+  { name: title, path: pathFor(lang, page) },
+]);
+---
+
+<Base lang={lang} page={page} title={`${title} — ShellX`} description={description}>
+  <script slot="head" type="application/ld+json" set:html={JSON.stringify(crumbs)} />
+  <article class="wrap legal">
+    <h1>{title}</h1>
+    <p class="updated">{ui[lang].lastUpdated}: <time datetime={updated}>{updatedLabel}</time></p>
+    <slot />
+  </article>
+</Base>
+
+<style>
+  .legal { max-width: 52rem; padding-top: 3rem; font-size: 1rem; }
+  .legal h1 { font-size: clamp(2rem, 5vw, 2.75rem); }
+  .legal :global(code) { font-family: var(--mono); }
+  .legal h1 {
+    margin-bottom: 0.25rem;
+  }
+  .updated {
+    color: var(--muted);
+    margin-top: 0;
+  }
+  .legal :global(h2) {
+    margin-top: 2rem;
+  }
+</style>

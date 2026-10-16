@@ -1,0 +1,6 @@
+/* The iOS permission prompts in English; keep them equal to Info.plist. */
+"NSCameraUsageDescription" = "ShellX uses the camera to scan the pairing QR code shown on your computer, and to take photos you send to an AI session.";
+"NSFaceIDUsageDescription" = "ShellX uses Face ID to unlock the app.";
+"NSMicrophoneUsageDescription" = "ShellX uses the microphone when you tap the mic to speak into your terminal or an AI session.";
+"NSPhotoLibraryUsageDescription" = "ShellX lets you pick photos to send to an AI session on your computer. It reads only the photos you pick.";
+"NSSpeechRecognitionUsageDescription" = "ShellX turns what you say into text for your terminal or an AI session using Apple's speech recognition, which may process it on your phone or on Apple's servers.";

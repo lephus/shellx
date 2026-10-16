@@ -1,0 +1,9 @@
+.dart_tool/
+build/
+pubspec.lock
+
+# Session worktrees
+.claude/worktrees/
+
+# Release builds (published to downloads, never committed)
+release/out/

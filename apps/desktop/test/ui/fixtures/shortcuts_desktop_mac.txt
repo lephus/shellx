@@ -1,0 +1,44 @@
+100000806 -> NextRegionIntent
+alt+meta+100000301 -> FocusPaneIntent(down)
+alt+meta+100000302 -> FocusPaneIntent(left)
+alt+meta+100000303 -> FocusPaneIntent(right)
+alt+meta+100000304 -> FocusPaneIntent(up)
+ctrl+100000009 -> NextTabIntent
+ctrl+100000806 -> NextRegionIntent
+ctrl+meta+100000301 -> ResizePaneIntent(down)
+ctrl+meta+100000302 -> ResizePaneIntent(left)
+ctrl+meta+100000303 -> ResizePaneIntent(right)
+ctrl+meta+100000304 -> ResizePaneIntent(up)
+ctrl+meta+3d norepeat -> EqualizePanesIntent
+ctrl+shift+100000009 -> PreviousTabIntent
+ctrl+shift+100000806 -> PreviousRegionIntent
+meta+20000022b -> FontBiggerIntent
+meta+20000022d -> FontSmallerIntent
+meta+200000230 -> FontResetIntent
+meta+2b -> FontBiggerIntent
+meta+2d -> FontSmallerIntent
+meta+30 -> FontResetIntent
+meta+31 -> SelectTabIntent(1)
+meta+32 -> SelectTabIntent(2)
+meta+33 -> SelectTabIntent(3)
+meta+34 -> SelectTabIntent(4)
+meta+35 -> SelectTabIntent(5)
+meta+36 -> SelectTabIntent(6)
+meta+37 -> SelectTabIntent(7)
+meta+38 -> SelectTabIntent(8)
+meta+39 -> SelectTabIntent(9)
+meta+3d -> FontBiggerIntent
+meta+61 -> SelectAllIntent
+meta+63 -> CopySelectionIntent
+meta+64 norepeat -> SplitPaneIntent(row)
+meta+74 norepeat -> NewTabIntent
+meta+76 -> PasteClipboardIntent
+meta+77 norepeat -> CloseTabIntent
+shift+100000806 -> PreviousRegionIntent
+shift+meta+10000000d norepeat -> TogglePaneZoomIntent
+shift+meta+20000020d norepeat -> TogglePaneZoomIntent
+shift+meta+3d -> FontBiggerIntent
+shift+meta+64 norepeat -> SplitPaneIntent(column)
+shift+meta+69 norepeat -> ToggleNotificationsPanelIntent
+shift+meta+6e norepeat -> NewWorkspaceIntent
+shift+meta+75 norepeat -> JumpToNextUnreadIntent

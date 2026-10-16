@@ -1,0 +1,23 @@
+---
+interface Props { title?: string }
+const { title = 'shellx@pro — zsh' } = Astro.props;
+---
+<div class="term">
+  <div class="term-bar">
+    <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span class="term-title">{title}</span>
+  </div>
+  <div class="term-body"><slot /></div>
+</div>
+<style>
+  .term { border: 1px solid var(--border); border-radius: 0.6rem; background: var(--card);
+          margin-top: 1.5rem; overflow: hidden; }
+  .term-bar { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.9rem;
+              border-bottom: 1px solid var(--border); color: var(--muted); font-size: 0.8rem; }
+  .dots { display: inline-flex; gap: 0.4rem; }
+  .dots i { width: 0.7rem; height: 0.7rem; border-radius: 50%; background: var(--border); }
+  .dots i:first-child { background: #f87171; }
+  .dots i:nth-child(2) { background: #fbbf24; }
+  .dots i:last-child { background: var(--ok); }
+  .term-body { padding: 0.5rem 1rem 1.5rem; overflow-wrap: break-word; }
+</style>

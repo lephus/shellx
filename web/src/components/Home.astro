@@ -1,0 +1,418 @@
+---
+import Base from '../layouts/Base.astro';
+import HeroDemo from './HeroDemo.astro';
+import Pillars from './Pillars.astro';
+import SecurityFlow from './SecurityFlow.astro';
+import Downloads from './Downloads.astro';
+import { ui, type Lang, pathFor } from '../i18n/ui';
+import { appStoreUrl, desktopVersion, googlePlayUrl, macDownloadUrl, supportEmail, windowsDownloadUrl } from '../lib/site';
+import { appId, author, featureList, guidePath, keywords, organization, siteUrl } from '../lib/seo';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = ui[lang];
+const site = siteUrl;
+const url = `${site}${pathFor(lang, 'home')}`;
+const faq = [
+  [t.faqQ1, t.faqA1], [t.faqQ2, t.faqA2], [t.faqQ3, t.faqA3], [t.faqQ7, t.faqA7], [t.faqQ8, t.faqA8],
+  [t.faqQ9, t.faqA9], [t.faqQ10, t.faqA10], [t.faqQ11, t.faqA11],
+  [t.faqQ4, t.faqA4], [t.faqQ5, t.faqA5], [t.faqQ6, t.faqA6],
+];
+const useCases = [
+  { title: t.useCase1Title, body: t.useCase1Body, href: guidePath(lang, 'claude-code-on-phone') },
+  { title: t.useCase2Title, body: t.useCase2Body, href: guidePath(lang, 'ssh-from-phone') },
+  { title: t.useCase3Title, body: t.useCase3Body, href: guidePath(lang, 'remote-terminal-without-vpn') },
+  { title: t.useCase4Title, body: t.useCase4Body, href: pathFor(lang, 'guides') },
+];
+// Store listings only once they exist (site.config.json), so no structured data points at nothing.
+const mobileApps = [
+  { url: appStoreUrl, os: 'iOS 15+' },
+  { url: googlePlayUrl, os: 'Android 8.0+' },
+].filter((s) => s.url).map((s) => ({
+  '@context': 'https://schema.org', '@type': 'MobileApplication',
+  name: 'ShellX', operatingSystem: s.os, applicationCategory: 'DeveloperApplication',
+  url: s.url, installUrl: s.url, isAccessibleForFree: true,
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  isPartOf: { '@id': appId },
+}));
+const ld = [
+  {
+    '@context': 'https://schema.org', '@type': 'SoftwareApplication', '@id': appId,
+    name: 'ShellX', alternateName: ['ShellX Terminal', 'shellx.pro'],
+    applicationCategory: 'DeveloperApplication', applicationSubCategory: 'Remote terminal',
+    operatingSystem: 'macOS 12+, Windows 10+, iOS 15+, Android 8+',
+    softwareVersion: desktopVersion,
+    softwareRequirements: lang === 'vi'
+      ? 'App cho máy tính: macOS 12+ hoặc Windows 10 (1809)+. App điện thoại: iOS 15+ hoặc Android 8.0+.'
+      : 'Desktop app: macOS 12+ or Windows 10 (1809)+. Phone app: iOS 15+ or Android 8.0+.',
+    downloadUrl: [macDownloadUrl(), windowsDownloadUrl()],
+    description: t.homeDescription, url, inLanguage: lang,
+    image: `${site}/og/og-${lang}.png`, screenshot: `${site}/og/og-${lang}.png`,
+    featureList: featureList[lang], keywords: keywords[lang].join(', '),
+    isAccessibleForFree: true,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    author: { '@id': author['@id'] }, publisher: { '@id': organization['@id'] },
+  },
+  ...mobileApps,
+  {
+    '@context': 'https://schema.org', '@type': 'FAQPage', inLanguage: lang,
+    mainEntity: faq.map(([q, a]) => ({
+      '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a },
+    })),
+  },
+  {
+    '@context': 'https://schema.org', '@type': 'HowTo', inLanguage: lang, name: t.stepsHeading,
+    totalTime: 'PT5M', tool: [{ '@type': 'HowToTool', name: 'ShellX' }],
+    step: [t.step1, t.step2, t.step3].map((text, i) => ({
+      '@type': 'HowToStep', position: i + 1, text, url: `${url}#start`,
+    })),
+  },
+  { '@context': 'https://schema.org', ...organization, email: supportEmail },
+  { '@context': 'https://schema.org', ...author },
+  {
+    '@context': 'https://schema.org', '@type': 'WebSite', '@id': `${site}/#website`,
+    name: 'ShellX', url: site, inLanguage: lang, publisher: { '@id': organization['@id'] },
+  },
+];
+
+// Feature icons: 24×24 stroke paths.
+const features = [
+  { title: t.feature1Title, body: t.feature1, icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-9 9h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z' },
+  { title: t.feature2Title, body: t.feature2, icon: 'M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3M12 15v2' },
+  { title: t.feature3Title, body: t.feature3, icon: 'M12 3 4 6v6c0 4.4 3.4 8 8 9 4.6-1 8-4.6 8-9V6l-8-3Zm-3 9 2 2 4-4' },
+  { title: t.feature4Title, body: t.feature4, icon: 'M3 5h8v6H3zM13 5h8v6h-8zM3 13h8v6H3zM13 13h8v6h-8z' },
+  { title: t.feature5Title, body: t.feature5, icon: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2' },
+  { title: t.feature6Title, body: t.feature6, icon: 'M3 5h13v9H3zM7 18h5M9.5 14v4M17 9h4v11h-4z' },
+];
+const steps = [t.step1, t.step2, t.step3];
+---
+<Base lang={lang} page="home" title={t.homeTitle} description={t.homeDescription}>
+  <Fragment slot="head">
+    <meta name="keywords" content={keywords[lang].join(', ')} />
+    {ld.map((d) => <script type="application/ld+json" set:html={JSON.stringify(d)} />)}
+  </Fragment>
+
+  <section class="hero">
+    <div class="blob b1" aria-hidden="true"></div>
+    <div class="blob b2" aria-hidden="true"></div>
+    <div class="blob b3" aria-hidden="true"></div>
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="pulse" aria-hidden="true"></span>{t.heroEyebrow}</p>
+        <h1>{t.heroTitle} <span class="grad-text">{t.heroTitleAccent}</span></h1>
+        <p class="lead">{t.heroLead}</p>
+        <div class="ctas">
+          <a class="btn btn-primary" href="#download" data-os-cta
+             data-mac-href={macDownloadUrl()} data-mac-label={t.macos}
+             data-win-href={windowsDownloadUrl()} data-win-label={t.windows}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
+            <span data-os-label>{t.ctaFree}</span>
+          </a>
+          <a class="btn btn-ghost" href="#how">{t.ctaHow}</a>
+        </div>
+        <p class="e2e">{t.e2e}</p>
+      </div>
+      <HeroDemo text={t.heroDemoText} phoneStatus={t.heroPhoneStatus} />
+    </div>
+  </section>
+
+  <section class="wrap section" id="how" aria-labelledby="how-h">
+    <header class="sec-head" data-reveal>
+      <p class="eyebrow">{t.howEyebrow}</p>
+      <h2 id="how-h">{t.howHeading}</h2>
+      <p class="muted">{t.howLead}</p>
+    </header>
+    <Pillars lang={lang} />
+  </section>
+
+  <section class="wrap section" id="use-cases" aria-labelledby="use-cases-h">
+    <header class="sec-head" data-reveal>
+      <p class="eyebrow">{t.useCasesEyebrow}</p>
+      <h2 id="use-cases-h">{t.useCasesHeading}</h2>
+      <p class="muted">{t.useCasesLead}</p>
+    </header>
+    <ul class="uses">
+      {useCases.map((u, i) => (
+        <li data-reveal style={`--i:${i % 2}`}>
+          <a href={u.href}>
+            <h3>{u.title}</h3>
+            <p>{u.body}</p>
+            <span class="more">{t.readGuide} →</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <section class="wrap section" id="features" aria-labelledby="features-h">
+    <header class="sec-head" data-reveal>
+      <h2 id="features-h">{t.featuresHeading}</h2>
+      <p class="muted">{t.featuresLead}</p>
+    </header>
+    <ul class="features">
+      {features.map((f, i) => (
+        <li class="feature" data-reveal style={`--i:${i % 3}`}>
+          <span class="f-ico" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d={f.icon} /></svg>
+          </span>
+          <h3>{f.title}</h3>
+          <p>{f.body}</p>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <section class="wrap section" id="security" aria-labelledby="security-h">
+    <div class="security">
+      <header class="sec-head left" data-reveal>
+        <h2 id="security-h">{t.securityHeading}</h2>
+        <p class="muted">{t.securityLead}</p>
+        <ul class="checks">
+          <li>{t.security1}</li><li>{t.security2}</li><li>{t.security3}</li><li>{t.security4}</li>
+        </ul>
+        <p><a href={pathFor(lang, 'privacy')}>{t.securityMore} →</a></p>
+      </header>
+      <div class="flow-card" data-reveal style="--i:1">
+        <SecurityFlow phone={t.diagramPhone} relay={t.diagramRelay} desktop={t.diagramDesktop} text={t.diagramText} />
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap section" id="start" aria-labelledby="start-h">
+    <header class="sec-head" data-reveal>
+      <h2 id="start-h">{t.stepsHeading}</h2>
+    </header>
+    <ol class="steps" data-reveal>
+      {steps.map((s, i) => (
+        <li style={`--i:${i}`}><span class="num" aria-hidden="true">{i + 1}</span><p>{s}</p></li>
+      ))}
+    </ol>
+  </section>
+
+  <section class="wrap section narrow" id="faq" aria-labelledby="faq-h">
+    <header class="sec-head" data-reveal>
+      <h2 id="faq-h">{t.faqHeading}</h2>
+    </header>
+    <div class="faq">
+      {faq.map(([q, a]) => (
+        <details data-reveal><summary>{q}</summary><div class="ans"><p>{a}</p></div></details>
+      ))}
+    </div>
+  </section>
+
+  <section class="wrap section" id="download" aria-labelledby="download-h">
+    <div class="final">
+      <div class="blob b4" aria-hidden="true"></div>
+      <div class="blob b5" aria-hidden="true"></div>
+      <header class="sec-head" data-reveal>
+        <h2 id="download-h">{t.ctaHeading}</h2>
+        <p class="muted">{t.ctaLead}</p>
+      </header>
+      <div data-reveal style="--i:1"><Downloads lang={lang} /></div>
+    </div>
+  </section>
+
+  <script is:inline>
+    (() => {
+      // Primary CTA: link straight to the installer for this OS (stays #download otherwise).
+      const cta = document.querySelector('[data-os-cta]');
+      const ua = navigator.userAgent;
+      const os = /iPhone|iPad|iPod|Android/.test(ua) ? '' : /Mac/.test(ua) ? 'mac' : /Win/.test(ua) ? 'win' : '';
+      if (cta && os) {
+        cta.href = cta.dataset[os + 'Href'];
+        cta.querySelector('[data-os-label]').textContent = cta.dataset[os + 'Label'];
+      }
+
+      const motion = document.documentElement.classList.contains('motion');
+      const targets = document.querySelectorAll('[data-reveal], .flow');
+      if (!motion || !('IntersectionObserver' in window)) {
+        targets.forEach((el) => el.classList.add('is-in'));
+      } else {
+        const io = new IntersectionObserver((entries) => {
+          for (const e of entries) {
+            if (!e.isIntersecting) continue;
+            e.target.classList.add('is-in');
+            io.unobserve(e.target);
+          }
+        }, { rootMargin: '0px 0px -8% 0px' });
+        targets.forEach((el) => io.observe(el));
+      }
+
+      // Hero demo: type each command, print output, mirror each line on the phone, then notify.
+      const demo = document.querySelector('[data-demo]');
+      if (!demo || !motion) return;
+      const lines = [...demo.querySelectorAll('.ln')];
+      const mirror = [...demo.querySelectorAll('.pl')];
+      const note = demo.querySelector('[data-note]');
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const show = (i) => {
+        lines[i].classList.add('on');
+        if (mirror[i]) setTimeout(() => mirror[i].classList.add('on'), 350);
+      };
+      async function play() {
+        demo.classList.add('playing');
+        for (;;) {
+          [...lines, ...mirror, note].forEach((el) => el.classList.remove('on'));
+          for (let i = 0; i < lines.length; i++) {
+            const tx = lines[i].querySelector('.tx');
+            if (lines[i].dataset.kind === 'cmd') {
+              const full = tx.dataset.text;
+              tx.textContent = '';
+              tx.classList.add('typing');
+              lines[i].classList.add('on');
+              await wait(500);
+              for (let c = 1; c <= full.length; c++) { tx.textContent = full.slice(0, c); await wait(45); }
+              tx.classList.remove('typing');
+              await wait(250);
+              mirror[i].classList.add('on');
+            } else {
+              await wait(i === lines.length - 2 ? 900 : 420);
+              show(i);
+            }
+          }
+          await wait(700);
+          note.classList.add('on');
+          await wait(5200);
+        }
+      }
+      play();
+    })();
+  </script>
+</Base>
+
+<style>
+  .hero { position: relative; overflow-x: clip; padding: 4.5rem 0 3rem; }
+  .hero-grid { position: relative; display: grid; grid-template-columns: 1.05fr 1fr; gap: 3rem; align-items: center; }
+  .hero h1 { font-size: clamp(2.6rem, 6.5vw, 4.6rem); font-weight: 700; margin-bottom: 1.1rem; }
+  .lead { font-size: 1.15rem; color: var(--muted); max-width: 34rem; margin: 0 0 2rem; }
+  .ctas { display: flex; flex-wrap: wrap; gap: 0.8rem; }
+  .e2e { margin: 1.75rem 0 0; color: var(--muted); font-size: 0.9rem; max-width: 34rem;
+         padding-left: 0.9rem; border-left: 2px solid var(--purple); }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 0.55rem; margin: 0 0 1.1rem;
+    padding: 0.3rem 0.85rem; border-radius: 999px; border: 1px solid var(--border);
+    background: rgba(167, 139, 250, 0.08); color: var(--purple-l); font-size: 0.85rem; font-weight: 600;
+  }
+  .pulse { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.6); }
+  :global(.motion) .pulse { animation: pulse 2s infinite; }
+  @keyframes pulse { 70% { box-shadow: 0 0 0 0.5rem rgba(74, 222, 128, 0); } 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); } }
+
+  .blob { position: absolute; border-radius: 50%; pointer-events: none; }
+  .b1 { width: 46rem; height: 46rem; left: -16rem; top: -20rem;
+        background: radial-gradient(closest-side, rgba(124, 58, 237, 0.32), transparent); }
+  .b2 { width: 38rem; height: 38rem; right: -12rem; top: -6rem;
+        background: radial-gradient(closest-side, rgba(59, 130, 246, 0.22), transparent); }
+  .b3 { width: 30rem; height: 30rem; left: 35%; bottom: -18rem;
+        background: radial-gradient(closest-side, rgba(236, 72, 153, 0.2), transparent); }
+  :global(.motion) .b1 { animation: drift 20s ease-in-out infinite alternate; }
+  :global(.motion) .b2 { animation: drift 24s ease-in-out infinite alternate-reverse; }
+  :global(.motion) .b3 { animation: drift 18s ease-in-out infinite alternate; }
+  @keyframes drift { to { transform: translate(6rem, 3rem) scale(1.12); } }
+
+  .section { padding-top: 6rem; }
+  .narrow { max-width: 50rem; }
+  .sec-head { text-align: center; max-width: 40rem; margin: 0 auto 2.75rem; }
+  .sec-head.left { text-align: left; margin: 0; }
+  .sec-head h2 { font-size: clamp(1.9rem, 4vw, 2.75rem); }
+  .sec-head .eyebrow { margin-bottom: 0.9rem; }
+  .sec-head .muted { font-size: 1.08rem; margin: 0; }
+
+  .uses { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.1rem; grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 44rem) { .uses { grid-template-columns: 1fr; } }
+  .uses a {
+    display: flex; flex-direction: column; height: 100%; padding: 1.6rem; border-radius: 18px; text-decoration: none;
+    color: var(--fg); border: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.14), rgba(21, 16, 38, 0.9) 60%);
+  }
+  .uses a:hover { border-color: rgba(167, 139, 250, 0.6); }
+  .uses h3 { font-size: 1.25rem; margin-bottom: 0.4rem; }
+  .uses p { color: var(--muted); margin: 0 0 1rem; flex: 1; }
+  .uses .more { color: var(--purple-l); font-weight: 600; font-size: 0.95rem; }
+
+  .features { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.1rem; grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 56rem) { .features { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 36rem) { .features { grid-template-columns: 1fr; } }
+  .feature {
+    padding: 1.5rem; border-radius: 18px; background: var(--card); border: 1px solid var(--border);
+  }
+  .feature:hover { border-color: rgba(167, 139, 250, 0.6); box-shadow: 0 16px 40px -22px rgba(167, 139, 250, 0.9); }
+  .feature h3 { font-size: 1.15rem; margin: 1rem 0 0.4rem; }
+  .feature p { margin: 0; color: var(--muted); }
+  .f-ico { display: inline-grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 12px;
+           color: #fff; background: linear-gradient(135deg, var(--purple), var(--pink)); }
+  .feature:nth-child(3n + 2) .f-ico { background: linear-gradient(135deg, var(--blue), var(--purple)); }
+  .feature:nth-child(3n) .f-ico { background: linear-gradient(135deg, var(--pink), var(--purple)); }
+
+  .security { display: grid; grid-template-columns: 1fr 1.1fr; gap: 3rem; align-items: center; }
+  .checks { list-style: none; padding: 0; margin: 1.5rem 0; }
+  .checks li { position: relative; padding-left: 1.9rem; margin: 0.7rem 0; }
+  .checks li::before {
+    content: '✓'; position: absolute; left: 0; top: 0.1rem; width: 1.3rem; height: 1.3rem; border-radius: 50%;
+    display: grid; place-items: center; font-size: 0.75rem; color: var(--ok); background: rgba(74, 222, 128, 0.12);
+  }
+  .flow-card { padding: 1.5rem 1rem 2rem; border-radius: 22px; background: var(--card); border: 1px solid var(--border);
+               box-shadow: 0 40px 80px -50px rgba(124, 58, 237, 0.9); }
+
+  .steps { list-style: none; margin: 0; padding: 0; position: relative; display: grid;
+           grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+  .steps::before {
+    content: ''; position: absolute; top: 1.5rem; left: 16.66%; right: 16.66%; height: 2px;
+    background: var(--grad); transform-origin: left; opacity: 0.7;
+  }
+  .steps li { position: relative; text-align: center; }
+  .num {
+    display: inline-grid; place-items: center; width: 3rem; height: 3rem; border-radius: 50%;
+    font-family: var(--display); font-weight: 700; font-size: 1.2rem; color: #fff;
+    background: linear-gradient(135deg, var(--purple), var(--pink)); box-shadow: 0 0 0 6px var(--bg);
+  }
+  .steps p { color: var(--muted); margin: 1rem auto 0; max-width: 18rem; }
+  :global(.motion) .steps[data-reveal] { opacity: 1; transform: none; }
+  :global(.motion) .steps::before { transform: scaleX(0); transition: transform 1.2s var(--ease) 0.2s; }
+  :global(.motion) .steps.is-in::before { transform: none; }
+  :global(.motion) .steps li { opacity: 0; transform: translateY(18px) scale(0.96);
+                              transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
+                              transition-delay: calc(0.25s + var(--i) * 0.35s); }
+  :global(.motion) .steps.is-in li { opacity: 1; transform: none; }
+
+  .faq details {
+    border: 1px solid var(--border); border-radius: 14px; background: var(--card);
+    margin: 0 0 0.75rem;
+  }
+  .faq details[open] { border-color: rgba(167, 139, 250, 0.55); }
+  .faq summary {
+    cursor: pointer; list-style: none; padding: 1rem 3rem 1rem 1.25rem; font-weight: 600; position: relative;
+  }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after {
+    content: '+'; position: absolute; right: 1.25rem; top: 50%; transform: translateY(-50%);
+    font-size: 1.4rem; color: var(--purple-l); transition: transform 0.3s var(--ease);
+  }
+  .faq details[open] summary::after { transform: translateY(-50%) rotate(45deg); }
+  .ans { padding: 0 1.25rem 1.1rem; color: var(--muted); }
+  .ans p { margin: 0; overflow-wrap: anywhere; }
+  :global(.motion) .faq details[open] .ans { animation: open 0.35s var(--ease); }
+  @keyframes open { from { opacity: 0; transform: translateY(-6px); } }
+
+  .final {
+    position: relative; overflow: hidden; text-align: center; padding: 4rem 1.5rem 2rem; border-radius: 28px;
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(124, 58, 237, 0.16), rgba(21, 16, 38, 0.5));
+  }
+  .final > :not(.blob) { position: relative; }
+  .b4 { width: 34rem; height: 34rem; left: -12rem; top: -14rem;
+        background: radial-gradient(closest-side, rgba(236, 72, 153, 0.28), transparent); }
+  .b5 { width: 30rem; height: 30rem; right: -10rem; bottom: -14rem;
+        background: radial-gradient(closest-side, rgba(59, 130, 246, 0.25), transparent); }
+  :global(.motion) .b4 { animation: drift 22s ease-in-out infinite alternate; }
+  :global(.motion) .b5 { animation: drift 17s ease-in-out infinite alternate-reverse; }
+
+  @media (max-width: 56rem) {
+    .hero { padding-top: 3rem; }
+    .hero-grid, .security { grid-template-columns: 1fr; gap: 2.5rem; }
+    .section { padding-top: 4.5rem; }
+  }
+  @media (max-width: 40rem) {
+    .steps { grid-template-columns: 1fr; }
+    .steps::before { display: none; }
+  }
+</style>

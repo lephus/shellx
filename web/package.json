@@ -1,0 +1,25 @@
+{
+  "name": "shellx-web",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "node scripts/check-placeholders.mjs && astro build && node --test tests/site.test.mjs tests/placeholders.test.mjs",
+    "preview": "astro preview",
+    "test": "node --test tests/site.test.mjs tests/placeholders.test.mjs",
+    "astro": "astro",
+    "lighthouse": "node scripts/lighthouse.mjs",
+    "images": "node scripts/render-images.mjs",
+    "indexnow": "node scripts/indexnow.mjs"
+  },
+  "dependencies": {
+    "astro": "^7.3.5"
+  },
+  "allowScripts": {
+    "esbuild": true
+  }
+}

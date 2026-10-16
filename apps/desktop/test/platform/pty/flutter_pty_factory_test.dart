@@ -1,0 +1,591 @@
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_agent/shellx_agent.dart';
+import 'package:shellx_desktop/src/platform/pty/flutter_pty_factory.dart';
+import 'package:shellx_desktop/src/platform/pty/process_table.dart';
+import 'package:shellx_desktop/src/platform/pty/process_tree_killer.dart';
+import 'package:shellx_desktop/src/platform/pty/windows_text.dart';
+
+final class _FakeNativePty implements NativePty {
+  _FakeNativePty(this.launch);
+  final PtyLaunch launch;
+  final exit = Completer<int>();
+  final StreamController<Uint8List> out = StreamController<Uint8List>();
+  final resizes = <(int, int)>[];
+  final writes = <Uint8List>[];
+  var acceptWrites = true;
+  var kills = 0;
+  var killSucceeds = true;
+  @override
+  var jobError = 0;
+
+  @override
+  int get pid => 4321;
+  @override
+  Stream<Uint8List> get output => out.stream;
+  @override
+  Future<int> get exitCode => exit.future;
+  @override
+  bool write(Uint8List data) {
+    writes.add(data);
+    return acceptWrites;
+  }
+
+  @override
+  void resize(int rows, int columns) => resizes.add((rows, columns));
+  @override
+  bool kill() {
+    kills++;
+    return killSucceeds;
+  }
+}
+
+final class _RecordingKiller implements ProcessTreeKiller {
+  final killed = <int>[];
+  @override
+  Future<void> killTree(int rootPid) async => killed.add(rootPid);
+}
+
+/// A tree kill that finishes only when the test says so.
+final class _GatedKiller implements ProcessTreeKiller {
+  final gates = <int, Completer<void>>{};
+  @override
+  Future<void> killTree(int rootPid) =>
+      (gates[rootPid] = Completer<void>()).future;
+}
+
+final class _PidNativePty extends _FakeNativePty {
+  _PidNativePty(this._pid) : super(_launch);
+  final int _pid;
+  @override
+  int get pid => _pid;
+}
+
+final class _FailingKiller implements ProcessTreeKiller {
+  _FailingKiller(this.error);
+  final Object error;
+  @override
+  Future<void> killTree(int rootPid) async {
+    await Future<void>.delayed(Duration.zero);
+    throw error;
+  }
+}
+
+const _zsh = ShellCommand(
+  executable: '/bin/zsh',
+  arguments: ['-l'],
+  name: 'zsh',
+);
+const _pwsh = ShellCommand(
+  executable: r'C:\Program Files\PowerShell\7\pwsh.exe',
+  arguments: ['-NoLogo', '-Command', 'echo a b'],
+  name: 'pwsh',
+);
+
+const _launch = PtyLaunch(
+  executable: 'x',
+  arguments: [],
+  workingDirectory: '/',
+  environment: {},
+  columns: 80,
+  rows: 24,
+);
+
+void main() {
+  group('windowsQuoteArg', () {
+    test('leaves simple arguments alone', () {
+      expect(windowsQuoteArg('pwsh.exe'), 'pwsh.exe');
+      expect(windowsQuoteArg('-NoLogo'), '-NoLogo');
+      expect(windowsQuoteArg(r'C:\Users\Nguyễn'), r'C:\Users\Nguyễn');
+    });
+    test('quotes spaces, escapes quotes and trailing backslashes', () {
+      expect(
+        windowsQuoteArg(r'C:\Program Files\x.exe'),
+        r'"C:\Program Files\x.exe"',
+      );
+      expect(windowsQuoteArg('a"b'), r'"a\"b"');
+      expect(windowsQuoteArg(r'C:\dir with space\'), r'"C:\dir with space\\"');
+      expect(windowsQuoteArg(''), '""');
+    });
+  });
+
+  group('FlutterPtyFactory', () {
+    test('macOS passes the command through unchanged', () {
+      late _FakeNativePty native;
+      final factory = FlutterPtyFactory(
+        isWindows: false,
+        killer: _RecordingKiller(),
+        start: (launch) => native = _FakeNativePty(launch),
+      );
+      factory.spawn(
+        _zsh,
+        workingDirectory: '/Users/phú',
+        environment: {'SHELLX': '1'},
+        cols: 120,
+        rows: 40,
+      );
+      expect(native.launch.executable, '/bin/zsh');
+      expect(native.launch.arguments, ['-l']);
+      expect(native.launch.workingDirectory, '/Users/phú');
+      expect(native.launch.environment, {'SHELLX': '1'});
+      expect(native.launch.columns, 120);
+      expect(native.launch.rows, 40);
+    });
+
+    test('Windows quotes the executable and arguments, and passes paths and '
+        'environment through unchanged', () {
+      late _FakeNativePty native;
+      final factory = FlutterPtyFactory(
+        isWindows: true,
+        start: (launch) => native = _FakeNativePty(launch),
+      );
+      factory.spawn(
+        _pwsh,
+        workingDirectory: r'C:\Users\Nguyễn Văn',
+        environment: {'USERPROFILE': r'C:\Users\Nguyễn Văn'},
+        cols: 80,
+        rows: 24,
+      );
+      expect(
+        native.launch.executable,
+        r'"C:\Program Files\PowerShell\7\pwsh.exe"',
+      );
+      expect(native.launch.arguments, ['-NoLogo', '-Command', '"echo a b"']);
+      expect(native.launch.workingDirectory, r'C:\Users\Nguyễn Văn');
+      expect(native.launch.environment, {
+        'USERPROFILE': r'C:\Users\Nguyễn Văn',
+      });
+    });
+
+    test('spawn rethrows when the shell cannot start', () {
+      final factory = FlutterPtyFactory(
+        isWindows: false,
+        killer: _RecordingKiller(),
+        start: (launch) => throw StateError('Failed to create PTY'),
+      );
+      expect(
+        () => factory.spawn(
+          _zsh,
+          workingDirectory: '/',
+          environment: {},
+          cols: 80,
+          rows: 24,
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('resize swaps to flutter_pty (rows, cols) order; macOS kill runs the '
+        'tree killer once', () async {
+      late _FakeNativePty native;
+      final killer = _RecordingKiller();
+      final pty = FlutterPtyFactory(
+        isWindows: false,
+        killer: killer,
+        start: (launch) => native = _FakeNativePty(launch),
+      ).spawn(_zsh, workingDirectory: '/', environment: {}, cols: 80, rows: 24);
+
+      pty.resize(132, 50);
+      pty.kill();
+      pty.kill();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(native.resizes, [(50, 132)]);
+      expect(killer.killed, [4321]);
+      expect(native.kills, 0);
+    });
+
+    test('Windows: a shell started without a job object is reported once', () {
+      final errors = <String>[];
+      var jobError = 5;
+      final factory = FlutterPtyFactory(
+        isWindows: true,
+        start: (launch) => _FakeNativePty(launch)..jobError = jobError,
+        onError: errors.add,
+      );
+      void spawn() => factory.spawn(
+        _pwsh,
+        workingDirectory: r'C:\',
+        environment: {},
+        cols: 80,
+        rows: 24,
+      );
+
+      spawn();
+      spawn();
+      jobError = 0;
+      spawn();
+
+      expect(errors, [
+        'pid 4321 started without a job object (error 5): '
+            'kill() ends the shell only',
+      ]);
+    });
+
+    test('Windows kill terminates the job through the plugin, once', () async {
+      late _FakeNativePty native;
+      final pty =
+          FlutterPtyFactory(
+            isWindows: true,
+            start: (launch) => native = _FakeNativePty(launch),
+          ).spawn(
+            _pwsh,
+            workingDirectory: r'C:\',
+            environment: {},
+            cols: 80,
+            rows: 24,
+          );
+
+      pty.kill();
+      pty.kill();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(native.kills, 1);
+    });
+  });
+
+  group('FlutterPtyAdapter output', () {
+    test('forwards data and closes when the native stream closes', () async {
+      final native = _FakeNativePty(_launch);
+      final pty = FlutterPtyAdapter(native, killer: _RecordingKiller());
+      final received = pty.output.toList();
+      native.out.add(Uint8List.fromList([104, 105]));
+      await native.out.close();
+      expect(await received, [
+        [104, 105],
+      ]);
+    });
+
+    test(
+      'closes within the grace period after exit even if native stays open',
+      () async {
+        final native = _FakeNativePty(_launch);
+        final pty = FlutterPtyAdapter(
+          native,
+          killer: _RecordingKiller(),
+          outputGrace: const Duration(milliseconds: 10),
+        );
+        final done = Completer<void>();
+        pty.output.listen((_) {}, onDone: done.complete);
+        native.exit.complete(0);
+        await done.future.timeout(const Duration(seconds: 2));
+      },
+    );
+  });
+
+  group('FlutterPtyAdapter write', () {
+    test('passes input through', () {
+      final native = _FakeNativePty(_launch);
+      final pty = FlutterPtyAdapter(native, killer: _RecordingKiller());
+      pty.write(Uint8List.fromList([108, 115, 13]));
+      expect(native.writes, [
+        [108, 115, 13],
+      ]);
+    });
+
+    test('dropped input is reported once per pty, with the pid only', () {
+      final errors = <String>[];
+      final native = _FakeNativePty(_launch)..acceptWrites = false;
+      final pty = FlutterPtyAdapter(
+        native,
+        killer: _RecordingKiller(),
+        onError: errors.add,
+      );
+      pty.write(Uint8List.fromList('SECRET-INPUT'.codeUnits));
+      pty.write(Uint8List.fromList('more'.codeUnits));
+      native.acceptWrites = true;
+      pty.write(Uint8List.fromList('ok'.codeUnits));
+      expect(errors, ['pid 4321: input dropped: the shell is not reading it']);
+    });
+
+    test('input refused after the shell exited is not reported', () async {
+      final errors = <String>[];
+      final native = _FakeNativePty(_launch)..acceptWrites = false;
+      final pty = FlutterPtyAdapter(
+        native,
+        killer: _RecordingKiller(),
+        onError: errors.add,
+      );
+      native.exit.complete(0);
+      await Future<void>.delayed(Duration.zero);
+      pty.write(Uint8List.fromList([1]));
+      expect(errors, isEmpty);
+    });
+  });
+
+  group('FlutterPtyAdapter kill', () {
+    test(
+      'macOS: kill after the shell exited leaves the stale pid alone',
+      () async {
+        final native = _FakeNativePty(_launch);
+        final killer = _RecordingKiller();
+        final pty = FlutterPtyAdapter(native, killer: killer);
+        native.exit.complete(0);
+        await Future<void>.delayed(Duration.zero);
+
+        pty.kill();
+        await Future<void>.delayed(Duration.zero);
+
+        expect(killer.killed, isEmpty);
+        expect(native.kills, 0);
+      },
+    );
+
+    test('Windows: kill after the shell exited is a no-op (overview §5.6: '
+        'what it left behind keeps running, as on macOS)', () async {
+      final errors = <String>[];
+      final native = _FakeNativePty(_launch);
+      final pty = FlutterPtyAdapter(native, onError: errors.add);
+      native.exit.complete(0);
+      await Future<void>.delayed(Duration.zero);
+
+      pty.kill();
+
+      expect(native.kills, 0);
+      expect(errors, isEmpty);
+    });
+
+    test('a failing tree kill is reported with the pid, not thrown', () async {
+      final errors = <String>[];
+      final pty = FlutterPtyAdapter(
+        _FakeNativePty(_launch),
+        killer: _FailingKiller(
+          const ProcessTableException('ps exited with code 1'),
+        ),
+        onError: errors.add,
+      );
+
+      pty.kill();
+      await pumpEventQueue();
+
+      expect(errors, ['kill of pid 4321 failed: ps exited with code 1']);
+    });
+
+    test('other kill errors are reported by type only', () async {
+      final errors = <String>[];
+      final pty = FlutterPtyAdapter(
+        _FakeNativePty(_launch),
+        killer: _FailingKiller(StateError('/bin/zsh -l SECRET=1')),
+        onError: errors.add,
+      );
+
+      pty.kill();
+      await pumpEventQueue();
+
+      expect(errors, ['kill of pid 4321 failed: StateError']);
+    });
+
+    test('Windows: a failed job kill is reported', () {
+      final errors = <String>[];
+      final native = _FakeNativePty(_launch)..killSucceeds = false;
+      final pty = FlutterPtyAdapter(native, onError: errors.add);
+
+      pty.kill();
+
+      expect(errors, [
+        'kill of pid 4321 failed: could not terminate the job object',
+      ]);
+    });
+
+    test('the factory hands onError to its ptys', () async {
+      final errors = <String>[];
+      final pty = FlutterPtyFactory(
+        isWindows: false,
+        killer: _FailingKiller(
+          const ProcessTableException('cannot run ps (OS error 2)'),
+        ),
+        start: _FakeNativePty.new,
+        onError: errors.add,
+      ).spawn(_zsh, workingDirectory: '/', environment: {}, cols: 80, rows: 24);
+
+      pty.kill();
+      await pumpEventQueue();
+
+      expect(errors, ['kill of pid 4321 failed: cannot run ps (OS error 2)']);
+    });
+  });
+
+  group('onProblem (user-facing: the pid only)', () {
+    test(
+      'a failed tree kill reports the pid; a good one reports nothing',
+      () async {
+        final problems = <int>[];
+        final failing =
+            FlutterPtyFactory(
+              isWindows: false,
+              killer: _FailingKiller(StateError('/bin/zsh -l SECRET=1')),
+              start: _FakeNativePty.new,
+              onError: (_) {},
+              onProblem: problems.add,
+            ).spawn(
+              _zsh,
+              workingDirectory: '/',
+              environment: {},
+              cols: 80,
+              rows: 24,
+            );
+        final fine =
+            FlutterPtyFactory(
+              isWindows: false,
+              killer: _RecordingKiller(),
+              start: _FakeNativePty.new,
+              onError: (_) {},
+              onProblem: problems.add,
+            ).spawn(
+              _zsh,
+              workingDirectory: '/',
+              environment: {},
+              cols: 80,
+              rows: 24,
+            );
+
+        failing.kill();
+        fine.kill();
+        await pumpEventQueue();
+
+        expect(problems, [4321]);
+      },
+    );
+
+    test('Windows: a failed job kill and a shell without a job object each '
+        'report the pid', () {
+      final problems = <int>[];
+      final factory = FlutterPtyFactory(
+        isWindows: true,
+        start: (launch) => _FakeNativePty(launch)
+          ..jobError = 5
+          ..killSucceeds = false,
+        onError: (_) {},
+        onProblem: problems.add,
+      );
+      final pty = factory.spawn(
+        _pwsh,
+        workingDirectory: r'C:\',
+        environment: {},
+        cols: 80,
+        rows: 24,
+      );
+      expect(problems, [4321]);
+
+      pty.kill();
+      expect(problems, [4321, 4321]);
+    });
+  });
+
+  group('FlutterPtyFactory.killsSettled', () {
+    var nextPid = 100;
+    Pty spawn(FlutterPtyFactory factory) => factory.spawn(
+      _zsh,
+      workingDirectory: '/',
+      environment: {},
+      cols: 80,
+      rows: 24,
+    );
+    FlutterPtyFactory macFactory(
+      ProcessTreeKiller killer, {
+      void Function(String message)? onError,
+    }) => FlutterPtyFactory(
+      isWindows: false,
+      killer: killer,
+      start: (_) => _PidNativePty(nextPid++),
+      onError: onError,
+    );
+
+    test('completes at once when no kill is in flight', () async {
+      final factory = macFactory(_GatedKiller());
+      spawn(factory);
+      await factory.killsSettled().timeout(const Duration(seconds: 1));
+    });
+
+    test('waits for every tree kill in flight, then completes', () async {
+      final killer = _GatedKiller();
+      final factory = macFactory(killer);
+      final first = spawn(factory);
+      final second = spawn(factory);
+      first.kill();
+      second.kill();
+      final firstPid = killer.gates.keys.first;
+      final secondPid = killer.gates.keys.last;
+
+      var settled = false;
+      final done = factory.killsSettled().then((_) => settled = true);
+      await pumpEventQueue();
+      expect(settled, isFalse);
+
+      killer.gates[firstPid]!.complete();
+      await pumpEventQueue();
+      expect(settled, isFalse);
+
+      killer.gates[secondPid]!.complete();
+      await done.timeout(const Duration(seconds: 1));
+      expect(settled, isTrue);
+      // Nothing left in flight: a later call returns at once.
+      await factory.killsSettled().timeout(const Duration(seconds: 1));
+    });
+
+    test('also waits for a kill that starts while it is waiting', () async {
+      final killer = _GatedKiller();
+      final factory = macFactory(killer);
+      final first = spawn(factory);
+      final later = spawn(factory);
+      first.kill();
+
+      var settled = false;
+      final done = factory.killsSettled().then((_) => settled = true);
+      later.kill();
+      killer.gates.values.first.complete();
+      await pumpEventQueue();
+      expect(settled, isFalse);
+
+      killer.gates.values.last.complete();
+      await done.timeout(const Duration(seconds: 1));
+    });
+
+    test('a failed kill counts as settled: reported, never thrown', () async {
+      final errors = <String>[];
+      final factory = macFactory(
+        _FailingKiller(const ProcessTableException('ps exited with code 1')),
+        onError: errors.add,
+      );
+      spawn(factory).kill();
+
+      await factory.killsSettled().timeout(const Duration(seconds: 1));
+
+      expect(errors, [startsWith('kill of pid ')]);
+      expect(errors.single, endsWith('failed: ps exited with code 1'));
+    });
+
+    test(
+      'a kill skipped after the shell exited leaves nothing to wait for',
+      () async {
+        late _FakeNativePty native;
+        final factory = FlutterPtyFactory(
+          isWindows: false,
+          killer: _GatedKiller(),
+          start: (launch) => native = _FakeNativePty(launch),
+        );
+        final pty = spawn(factory);
+        native.exit.complete(0);
+        await pumpEventQueue();
+
+        pty.kill();
+
+        await factory.killsSettled().timeout(const Duration(seconds: 1));
+      },
+    );
+
+    test('Windows: the job kill is synchronous, nothing to wait for', () async {
+      late _FakeNativePty native;
+      final factory = FlutterPtyFactory(
+        isWindows: true,
+        start: (launch) => native = _FakeNativePty(launch),
+      );
+      spawn(factory).kill();
+
+      await factory.killsSettled().timeout(const Duration(seconds: 1));
+      expect(native.kills, 1);
+    });
+  });
+}

@@ -1,0 +1,666 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shellx_core/shellx_core.dart';
+
+import '../agent/agent_controller.dart';
+import '../agent/agent_state.dart';
+import '../agent/desktop_services.dart';
+import '../cli/cli_install.dart';
+import '../cli/cli_service.dart';
+import '../cli/cli_settings.dart';
+import '../restore/restore_persistence.dart';
+import '../mux/daemon_state.dart';
+import '../l10n/locale.dart' show appLanguageChoice, kAppLanguageChoices;
+import '../startup.dart';
+import '../config/config_controller.dart' show shellxConfigProvider;
+import '../platform/settings_store.dart'
+    show SettingKeys, backgroundServiceEnabled;
+import '../config/config_opener.dart' show openShellxConfig;
+import '../remote/ssh_actions.dart';
+import '../remote/ssh_settings.dart';
+import '../terminal/sidebar_workspaces.dart' show settingsStoreProvider;
+import '../terminal/local_sessions_provider.dart' show localSessionsProvider;
+import '../terminal/terminal_tabs.dart';
+import '../terminal_sharing/confirm_text.dart';
+import '../ui/activation.dart';
+import '../ui/config/config_ui_request.dart';
+import '../ui/terminal/close_tab.dart';
+import '../ui/window_router.dart';
+import 'tray_action.dart';
+import 'tray_menu.dart';
+
+final trayActionsProvider = Provider<TrayActions>(TrayActions.new);
+
+/// The tray's "Terminal" submenu (A5a D13). The switch lives in the
+/// settings: invalidated after [ToggleRestoreScrollback]. The "Dòng lệnh"
+/// settings (A7) are watched.
+final trayLocalStateProvider = Provider<TrayLocalState>((ref) {
+  final cli = ref.watch(cliSettingsProvider);
+  return TrayLocalState(
+    restoreScrollback: ref
+        .read(restorePersistenceProvider.notifier)
+        .scrollbackEnabled,
+    hasSavedScrollback: ref.watch(savedScrollbackProvider),
+    cliControlEnabled: cli.controlEnabled,
+    cliAllowExternal: cli.allowExternal,
+    cliPathInstalled: cli.pathInstalled,
+    sshHook: ref.watch(agentControllerProvider.select((s) => s.sshRemoteHook)),
+    hasRecentServers: recentTargets(ref.read(settingsStoreProvider)).isNotEmpty,
+    daemonMode: ref.watch(daemonModeProvider),
+    backgroundService: backgroundServiceEnabled(
+      ref.read(settingsStoreProvider),
+    ),
+    appLanguage: appLanguageChoice(ref.read(settingsStoreProvider)),
+    configProblemCount: ref.watch(
+      shellxConfigProvider.select((s) => s.visibleProblemCount),
+    ),
+  );
+});
+
+/// A7 D26: what "Sao chép lệnh cài skill cho agent" copies.
+const kSkillsInstallCommand = 'shellx skills install';
+
+/// Executes tray menu actions, asking for confirmation where an action is
+/// destructive or disconnects a phone.
+class TrayActions {
+  TrayActions(this._ref);
+
+  final Ref _ref;
+
+  /// Set once a quit is confirmed: a ⌘Q or "Thoát" while shutting down
+  /// must not ask again (A1 D10: exactly one confirmation).
+  bool _quitting = false;
+
+  /// Ruling M3: an install or removal (maybe a password prompt) in flight.
+  bool _cliPathBusy = false;
+
+  AgentControllerBase get _agent => _ref.read(agentControllerProvider.notifier);
+  AgentViewState get _state => _ref.read(agentControllerProvider);
+  WindowRouter get _router => _ref.read(windowRouterProvider.notifier);
+  DesktopServices get _services => _ref.read(desktopServicesProvider);
+
+  /// [TrayPresenter.onMenuItemClick] fire-and-forgets this call (binding
+  /// ruling, Task 9), so it must never throw: any failure is caught here and
+  /// surfaced as a system notification instead of becoming an unhandled
+  /// Future error.
+  Future<void> handle(TrayAction action) async {
+    try {
+      await _dispatch(action);
+    } catch (error) {
+      await _reportFailure(error);
+    }
+  }
+
+  Future<void> _dispatch(TrayAction action) async {
+    final l10n = _services.l10n;
+    final state = _state;
+    switch (action) {
+      case OpenTerminalWindow():
+        await openTerminalWindow(
+          router: _router,
+          tabs: _ref.read(terminalTabsProvider.notifier),
+        );
+      case ToggleRemoteAccess():
+        // A1 D7: turning off only disconnects phones; ask only when a phone
+        // is connected right now.
+        if (state.remoteAccess && state.activeChannels > 0) {
+          final ok = await _router.confirm(
+            ConfirmRequest(
+              title: l10n.confirmRemoteOffTitle,
+              body: l10n.confirmRemoteOffBody,
+              confirmLabel: l10n.confirmRemoteOffAction,
+            ),
+          );
+          if (!ok) return;
+        }
+        await _agent.setRemoteAccess(!state.remoteAccess);
+      case CloseSession(:final id):
+        await _closeSession(id);
+      case CloseAllSessions():
+        // Ruling I2: every shell goes, so always ask, with the count.
+        final count = state.sessions.length;
+        if (count == 0) return;
+        final ok = await _router.confirm(
+          ConfirmRequest(
+            title: l10n.confirmCloseAllTitle(count),
+            body: l10n.confirmCloseAllBody,
+            confirmLabel: l10n.confirmCloseAllAction,
+          ),
+        );
+        if (!ok) return;
+        await _agent.closeAllSessions();
+      case PairPhone():
+        if (await _agent.startPairing() != null) {
+          _router.open(const PairingRoute());
+        }
+      case RevokeDevice(:final mobileId):
+        final matches = state.trusted.where((d) => d.mobileId == mobileId);
+        final name = matches.isEmpty ? mobileId : matches.first.name;
+        final ok = await _router.confirm(
+          ConfirmRequest(
+            title: l10n.confirmRevokeTitle(name),
+            body: l10n.confirmRevokeBody,
+            confirmLabel: l10n.confirmRevokeAction,
+          ),
+        );
+        if (!ok) return;
+        await _agent.revoke(mobileId);
+      case ToggleKeepAwake():
+        await _agent.setKeepAwake(!state.keepAwake);
+      case SetNotifyThreshold(:final seconds):
+        await _agent.setNotifyThreshold(seconds);
+      case ToggleDesktopNotifications():
+        await _agent.setDesktopNotifications(!state.desktopNotifications);
+      case ToggleDesktopNotificationsOnlyUnfocused():
+        await _agent.setDesktopNotificationsOnlyUnfocused(
+          !state.desktopNotificationsOnlyUnfocused,
+        );
+      case ToggleLaunchAtStartup():
+        await _agent.setLaunchAtStartup(!state.launchAtStartup);
+      case OpenChangePassword():
+        _router.open(const ChangePasswordRoute());
+      case SignOut():
+        final ok = await _router.confirm(
+          ConfirmRequest(
+            title: l10n.confirmSignOutTitle,
+            body: l10n.confirmSignOutBody,
+            confirmLabel: l10n.confirmSignOutAction,
+          ),
+        );
+        if (!ok) return;
+        await _agent.signOut();
+      case SignIn():
+        _router.open(const LoginRoute());
+      case DownloadUpdate():
+        final update = state.update;
+        if (update != null) await _services.urlOpener.open(update.url);
+      case Reconnect():
+        // Binding ruling (Task 8): the only way back after a 4001
+        // (`replaced`) close, since spec §12 forbids the relay from
+        // reconnecting on its own then. No confirmation needed.
+        await _agent.reconnect();
+      case ToggleTerminalSharing():
+        if (state.terminalSharing.enabled) {
+          await _agent.disableTerminalSharing();
+        } else {
+          await _setUpTerminalSharing();
+        }
+      case SetUpTerminalSharing():
+        await _setUpTerminalSharing();
+      case DisconnectDesktopPhone(:final id):
+        await _agent.disconnectDesktopPhone(id);
+      // UI-A5 §3: both apply at once, without asking.
+      case ToggleRestoreScrollback():
+        final restore = _ref.read(restorePersistenceProvider.notifier);
+        try {
+          await restore.setScrollbackEnabled(!restore.scrollbackEnabled);
+        } finally {
+          // Failed or not, the menu shows what is stored.
+          _ref.invalidate(trayLocalStateProvider);
+        }
+      // A5b ruling: UI-owned, applies at the next launch (says so).
+      case ToggleBackgroundService():
+        final settings = _ref.read(settingsStoreProvider);
+        try {
+          await settings.setBool(
+            SettingKeys.backgroundService,
+            !backgroundServiceEnabled(settings),
+          );
+        } finally {
+          _ref.invalidate(trayLocalStateProvider);
+        }
+        await _services.notifier.show(
+          title: 'ShellX',
+          body: l10n.backgroundServiceNextLaunch,
+        );
+      // A12 D19: UI-owned; read once at the next start (the row says so).
+      case SetAppLanguage(:final code):
+        final settings = _ref.read(settingsStoreProvider);
+        try {
+          await settings.setStrings(SettingKeys.appLanguage, [
+            kAppLanguageChoices.contains(code) ? code : 'system',
+          ]);
+        } finally {
+          _ref.invalidate(trayLocalStateProvider);
+        }
+      case ClearSavedScrollback():
+        await _ref.read(restorePersistenceProvider.notifier).clearScrollback();
+      // A7 D26, amendment: at once, without asking; the host rechecks.
+      case ToggleCliControl():
+        final cli = _ref.read(cliSettingsProvider.notifier);
+        await cli.setControlEnabled(
+          !_ref.read(cliSettingsProvider).controlEnabled,
+        );
+      case ToggleCliAllowExternal():
+        final cli = _ref.read(cliSettingsProvider.notifier);
+        await cli.setAllowExternal(
+          !_ref.read(cliSettingsProvider).allowExternal,
+        );
+      case ToggleCliPath():
+        await _toggleCliPath();
+      case CopySkillsCommand():
+        await _ref.read(cliClipboardProvider)(kSkillsInstallCommand);
+        _ref
+            .read(terminalTabsProvider.notifier)
+            .showNotice(const CliSkillsCopiedNotice());
+      // A8 UI §5.3: the window first, then the dialog on its tab.
+      case OpenSshConnect():
+        await _showWindow();
+        _router.open(const SshConnectRoute());
+      case OpenTmuxAttach():
+        await _showWindow();
+        _router.open(const SshConnectRoute(SshDialogTab.tmux));
+      // At once, without asking; only for opens from now on. The switch is
+      // the agent's (A5b D13): the menu follows its state.
+      case ToggleSshHook():
+        await _agent.setSshRemoteHook(!state.sshRemoteHook);
+      case ClearRecentServers():
+        try {
+          await _ref.read(sshActionsProvider).clearRecent();
+        } finally {
+          _ref.invalidate(trayLocalStateProvider);
+        }
+        _ref
+            .read(terminalTabsProvider.notifier)
+            .showNotice(const SshRecentClearedNotice());
+      case OpenConfigFile():
+        await _showWindow();
+        await openShellxConfig(_ref.read);
+      case ReloadConfig():
+        await _showWindow();
+        await _ref.read(shellxConfigProvider.notifier).load(manual: true);
+      case OpenSettings():
+        await _showWindow();
+        _ref
+            .read(configUiRequestProvider.notifier)
+            .request(ConfigUiRequest.settings);
+      case ShowShortcutsFromTray():
+        await _showWindow();
+        _ref
+            .read(configUiRequestProvider.notifier)
+            .request(ConfigUiRequest.shortcuts);
+      case ShowConfigProblemsFromTray():
+        await _showWindow();
+        _ref
+            .read(configUiRequestProvider.notifier)
+            .request(ConfigUiRequest.problems);
+      case Quit(:final confirm) when _ref.read(daemonModeProvider):
+        await _quitUi(confirm: confirm);
+      case QuitAll() when _ref.read(daemonModeProvider):
+        await _quitAll();
+      // Without the background service there is one way to quit.
+      case QuitAll():
+        await _dispatch(const Quit());
+      case Quit(:final confirm):
+        if (_quitting) return;
+        final aiBusy = confirm ? _aiBusyCount() : 0;
+        if (confirm && (state.sessions.isNotEmpty || aiBusy > 0)) {
+          final ok = await _router.confirm(
+            ConfirmRequest(
+              title: l10n.confirmQuitTitle,
+              body: _quitBody(state.sessions.length, aiBusy),
+              confirmLabel: l10n.confirmQuitAction,
+            ),
+          );
+          if (!ok || _quitting) return;
+        }
+        _quitting = true;
+        // A8 D20: first of all, no reconnect may open a session while the
+        // app shuts down.
+        try {
+          _services.stopRemoteRetries?.call();
+        } catch (_) {}
+        // Ruling M6: no command-line request may act while the shells
+        // close: the host stops first.
+        await runBounded(
+          _ref.read(cliHostControlProvider).stopNow,
+          timeout: const Duration(seconds: 2),
+          label: 'stopping the command-line host',
+        );
+        // A5a D12: the last save is clean, contents included, and final:
+        // the sessions the shutdown closes, or a late "power-off
+        // cancelled", must not change it.
+        await runBounded(
+          () => _ref.read(restorePersistenceProvider.notifier).flushForQuit(),
+          timeout: const Duration(seconds: 2),
+          label: 'saving the session layout',
+        );
+        // Bounded: Quit must always reach exit (quitApp), even if closing
+        // the sessions or the relay link hangs.
+        await runBounded(
+          _agent.shutdown,
+          timeout: _services.shutdownTimeout,
+          label: 'shutting down',
+        );
+        // A8 D40: ssh forwards and masters end with the shells.
+        final remote = _services.shutdownRemote;
+        if (remote != null) {
+          await runBounded(
+            remote,
+            timeout: const Duration(seconds: 3),
+            label: 'closing ssh helpers',
+          );
+        }
+        await _deleteImages();
+        await _services.quitApp?.call();
+    }
+  }
+
+  /// V2-1: how many AI tabs have an agent at work — a running turn, or
+  /// messages waiting for it (the same question as closing the tab). Their
+  /// agents run in this window's process and stop on any quit.
+  int _aiBusyCount() {
+    final busy = _ref.read(terminalTabsProvider.notifier).aiBusy;
+    if (busy == null) return 0;
+    return _ref
+        .read(terminalTabsProvider)
+        .tabs
+        .where((tab) => tab.isAi && busy(tab.id))
+        .length;
+  }
+
+  /// What a quit question says: the tabs the shells lose (A1), then the AI
+  /// agents at work that stop with it; either may be absent.
+  String _quitBody(int sessions, int aiBusy) {
+    final l10n = _services.l10n;
+    return [
+      if (sessions > 0) l10n.confirmQuitBody(sessions),
+      if (aiBusy > 0) l10n.confirmQuitAiBusy(aiBusy),
+    ].join(' ');
+  }
+
+  /// A10 D15: only where the shells end with the app (never when the
+  /// background service keeps them).
+  Future<void> _deleteImages() async {
+    final delete = _services.deletePastedImages;
+    if (delete == null) return;
+    await runBounded(
+      delete,
+      timeout: const Duration(seconds: 1),
+      label: 'deleting pasted images',
+    );
+  }
+
+  /// A5b D14, UI-A5 §6, §7.1: "Thoát" / ⌘Q ends the window only; the
+  /// shells and the phones' connection stay with the background service.
+  /// The first time, with sessions, it says so (once).
+  Future<void> _quitUi({required bool confirm}) async {
+    if (_quitting) return;
+    final l10n = _services.l10n;
+    final settings = _ref.read(settingsStoreProvider);
+    final count = _ref.read(localSessionsProvider).sessions.length;
+    // The AI agents run in this window's process: they stop on this quit too,
+    // though the shells do not.
+    final aiBusy = confirm ? _aiBusyCount() : 0;
+    if (confirm &&
+        count > 0 &&
+        !settings.getBool(
+          SettingKeys.quitKeepsSessionsExplained,
+          defaultValue: false,
+        )) {
+      final explained = _services.platform == DevicePlatform.windows
+          ? l10n.quitUiExplainedBodyWindows(count)
+          : l10n.quitUiExplainedBody(count);
+      final request = ConfirmRequest(
+        title: l10n.quitUiExplainedTitle,
+        body: aiBusy > 0
+            ? '$explained ${l10n.confirmQuitAiBusy(aiBusy)}'
+            : explained,
+        confirmLabel: l10n.quitUiAction,
+        secondaryLabel: l10n.quitAllAction,
+        destructive: false,
+      );
+      final ok = await _router.confirm(request);
+      // Either button counts as read; Esc does not (UI-A5 §7.1).
+      if (ok || request.secondaryChosen) {
+        await settings.setBool(SettingKeys.quitKeepsSessionsExplained, true);
+      }
+      if (request.secondaryChosen) {
+        await _quitAll();
+        return;
+      }
+      if (!ok || _quitting) return;
+    } else if (aiBusy > 0) {
+      // No shell to explain (or it was explained): the agents at work are
+      // the one thing this quit stops.
+      final ok = await _router.confirm(
+        ConfirmRequest(
+          title: l10n.confirmQuitTitle,
+          body: l10n.confirmQuitAiBusy(aiBusy),
+          confirmLabel: l10n.quitUiAction,
+        ),
+      );
+      if (!ok || _quitting) return;
+    }
+    await _finishQuit(stopService: false);
+  }
+
+  /// A5b D14, UI-A5 §7.2: every shell and the background service end. The
+  /// A1 question, with "Thoát hoàn toàn" on its button, when sessions run.
+  Future<void> _quitAll() async {
+    if (_quitting) return;
+    final l10n = _services.l10n;
+    final count = _ref.read(localSessionsProvider).sessions.length;
+    final aiBusy = _aiBusyCount();
+    if (count > 0 || aiBusy > 0) {
+      final ok = await _router.confirm(
+        ConfirmRequest(
+          title: l10n.confirmQuitTitle,
+          body: _quitBody(count, aiBusy),
+          confirmLabel: l10n.confirmQuitAllAction,
+        ),
+      );
+      if (!ok || _quitting) return;
+    }
+    await _finishQuit(stopService: true);
+  }
+
+  /// The steps of a window quit with the background service, each bounded
+  /// so the window always exits: no reconnect, the last clean save (with
+  /// the service instance), this window's own forwards, then either the
+  /// service's `daemon.quit` or just the end of the connection.
+  Future<void> _finishQuit({required bool stopService}) async {
+    _quitting = true;
+    try {
+      _services.stopRemoteRetries?.call();
+    } catch (_) {}
+    final daemon = _ref.read(daemonStateProvider.notifier);
+    // From here a closing connection is not a lost service.
+    daemon.markQuitting();
+    await runBounded(
+      () => _ref.read(restorePersistenceProvider.notifier).flushForQuit(),
+      timeout: const Duration(seconds: 2),
+      label: 'saving the session layout',
+    );
+    // This window's forwards go before the service (which closes the ssh
+    // masters of "Thoát hoàn toàn") stops.
+    final remote = _services.shutdownRemote;
+    if (remote != null) {
+      await runBounded(
+        remote,
+        timeout: const Duration(seconds: 3),
+        label: 'closing ssh helpers',
+      );
+    }
+    if (stopService) {
+      var stopped = false;
+      try {
+        stopped = await daemon.quitDaemon();
+      } on Object catch (error) {
+        debugPrint('ShellX: stopping the service failed: ${error.runtimeType}');
+      }
+      if (!stopped) {
+        // The service is still there with its shells: stay, say so, and let
+        // the user try again (the connection is intact, nothing was lost).
+        _quitting = false;
+        daemon.markQuitting(false);
+        _ref.read(restorePersistenceProvider.notifier).cancelQuit();
+        _ref
+            .read(terminalTabsProvider.notifier)
+            .showNotice(const DaemonQuitFailedNotice());
+        return;
+      }
+      await _deleteImages();
+    } else {
+      await runBounded(
+        daemon.disconnect,
+        timeout: const Duration(seconds: 5),
+        label: 'disconnecting',
+      );
+    }
+    await _services.quitApp?.call();
+  }
+
+  /// The tray's "Đóng" on one session: the same rules as ⌘W (D15: asks
+  /// while a command runs). The tray lists sessions, and a split tab holds
+  /// several (A3 D1, final ruling I-1): one pane of a split tab closes as
+  /// that pane (the pane dialog); a one-pane tab as the tab (A1's dialog).
+  /// A session the window has no tab for yet closes at once.
+  Future<void> _closeSession(int id) async {
+    final tabs = _ref.read(terminalTabsProvider.notifier);
+    final tab = _ref.read(terminalTabsProvider).tabOfSession(id);
+    if (tab == null) {
+      await _agent.closeSession(id);
+      return;
+    }
+    await closePaneWithConfirm(
+      tabs: tabs,
+      router: _router,
+      l10n: _services.l10n,
+      tab: tab,
+      paneId: id,
+      confirm: _ref.read(shellxConfigProvider).config.confirmClose,
+    );
+  }
+
+  /// A1 D11: a window item brings the window forward first.
+  Future<void> _showWindow() => openTerminalWindow(
+    router: _router,
+    tabs: _ref.read(terminalTabsProvider.notifier),
+  );
+
+  /// A7 D8: installs or removes `shellx` for other terminals. Never at
+  /// startup. Stored only when it worked; a cancelled password prompt
+  /// changes nothing and says nothing; the result shows in the window.
+  Future<void> _toggleCliPath() async {
+    final installer = _ref.read(cliPathInstallerProvider);
+    final paths = _ref.read(cliPathsProvider);
+    if (installer == null || paths == null || _cliPathBusy) return;
+    _cliPathBusy = true;
+    try {
+      await _runCliPath(installer, paths);
+    } finally {
+      _cliPathBusy = false;
+    }
+  }
+
+  Future<void> _runCliPath(PathInstaller installer, CliPaths paths) async {
+    final cli = _ref.read(cliSettingsProvider.notifier);
+    final removing = _ref.read(cliSettingsProvider).pathInstalled;
+    PathInstallResult result;
+    try {
+      result = removing
+          ? await installer.uninstall()
+          : await installer.install();
+    } on Object catch (e) {
+      debugPrint('ShellX: shellx PATH install failed: ${e.runtimeType}');
+      result = PathInstallResult.failed;
+    }
+    if (result == PathInstallResult.cancelled) return;
+    if (result == PathInstallResult.installed) {
+      await cli.setPathInstalled(!removing);
+    }
+    // Ruling M10: installed where the login shell does not look.
+    final hint = result == PathInstallResult.installed && !removing
+        ? await _loginPathHint()
+        : null;
+    final notice = switch ((result, removing)) {
+      (PathInstallResult.installed, false) when hint != null =>
+        CliPathNotOnPathNotice(hint),
+      (PathInstallResult.installed, false) => const CliPathInstalledNotice(),
+      (PathInstallResult.installed, true) => null,
+      (_, false) => CliPathFailedNotice(paths.dir),
+      (_, true) => CliPathRemoveFailedNotice(
+        paths.windows ? paths.dir : paths.systemLink,
+      ),
+    };
+    if (notice == null) return;
+    _router.showTerminal();
+    _ref.read(terminalTabsProvider.notifier).showNotice(notice);
+  }
+
+  Future<LoginPathHint?> _loginPathHint() async {
+    final check = _ref.read(cliLoginPathCheckProvider);
+    if (check == null) return null;
+    try {
+      return await check();
+    } on Object catch (e) {
+      debugPrint('ShellX: login PATH check failed: ${e.runtimeType}');
+      return null;
+    }
+  }
+
+  /// Spec §10.1: confirm with the exact files, then (Windows, a PowerShell
+  /// whose scripts are blocked) offer to allow local scripts — only on that
+  /// button — then install.
+  Future<void> _setUpTerminalSharing() async {
+    final setup = _services.terminalSharing;
+    if (setup == null || _state.terminalSharing.busy) return;
+    final plan = await _agent.prepareTerminalSharing();
+    if (plan == null) return;
+    final l10n = _services.l10n;
+    final ok = await _router.confirm(
+      ConfirmRequest(
+        title: l10n.confirmSharingTitle,
+        body: sharingConfirmBody(
+          plan,
+          l10n,
+          windows: setup.windows,
+          binaryPath: setup.paths.binary,
+        ),
+        confirmLabel: l10n.confirmSharingAction,
+        long: true,
+        destructive: false,
+      ),
+    );
+    if (!ok) return;
+    final fixable = setup.windows ? fixablePowerShells(plan) : const [];
+    if (fixable.isNotEmpty) {
+      final allow = await _router.confirm(
+        ConfirmRequest(
+          title: l10n.confirmAllowScriptsTitle,
+          body: l10n.confirmAllowScriptsBody(
+            fixable.map((s) => s.name).join(', '),
+          ),
+          confirmLabel: l10n.confirmAllowScriptsAction,
+          long: true,
+          destructive: false,
+        ),
+      );
+      if (allow) {
+        for (final shell in fixable) {
+          if (!await setup.allowLocalScripts(shell)) {
+            await _services.notifier.show(
+              title: l10n.notifyAllowScriptsFailedTitle(shell.name),
+            );
+          }
+        }
+      }
+    }
+    await _agent.enableTerminalSharing(plan);
+  }
+
+  /// Never throws itself: a broken notifier must not turn a caught failure
+  /// into a new unhandled one. Never shows tokens, passwords or pairing
+  /// codes — only [ApiException.code] (e.g. `network`) or a generic code.
+  Future<void> _reportFailure(Object error) async {
+    final code = error is ApiException ? error.code : 'internal';
+    try {
+      await _services.notifier.show(
+        title: _services.l10n.errorUnexpected(code),
+      );
+    } catch (_) {
+      // Nothing else to do here.
+    }
+  }
+}

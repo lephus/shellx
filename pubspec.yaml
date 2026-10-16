@@ -1,0 +1,15 @@
+name: shellx_workspace
+publish_to: none
+environment:
+  sdk: ^3.11.0
+workspace:
+  - packages/shellx_core
+  - packages/shellx_agent
+  - packages/shellx_client
+  - packages/shellx_e2e
+  - packages/shellx_acp
+  - packages/shellx_ai
+  - apps/desktop
+  - apps/mobile
+dev_dependencies:
+  lints: ^6.0.0
