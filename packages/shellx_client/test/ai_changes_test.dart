@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:fake_async/fake_async.dart';
-import 'package:shellx_agent/shellx_agent.dart';
 import 'package:shellx_ai/remote.dart';
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart';
@@ -9,59 +8,9 @@ import 'package:test/test.dart';
 
 import 'support/drive.dart';
 import 'support/harness.dart';
+import 'support/scripted_desktop.dart';
 
 const _sid = 'x.1';
-
-/// A scripted desktop: its window offers [features]; [answer] says what it
-/// answers to a V2-2b request (nothing when it returns null).
-final class _Desktop implements AiEndpoint {
-  _Desktop(this.features);
-
-  final Set<String> features;
-  final _out = StreamController<OutboundMessage>.broadcast(sync: true);
-  final received = <AiMessage>[];
-  AiResult? Function(AiMessage message)? answer;
-
-  @override
-  Stream<OutboundMessage> get outbound => _out.stream;
-
-  @override
-  void handle(String mobileId, AiMessage message) {
-    received.add(message);
-    if (message is AiList) {
-      _out.add(
-        OutboundMessage(
-          mobileId,
-          AiListResult(
-            available: true,
-            body: encodeBody(AiListing(features: features).toJson()),
-          ),
-        ),
-      );
-      return;
-    }
-    final result = answer?.call(message);
-    if (result != null) _out.add(OutboundMessage(mobileId, result));
-  }
-
-  @override
-  void phoneGone(String mobileId) {}
-
-  @override
-  void allPhonesGone() {}
-
-  List<T> got<T extends AiMessage>() => received.whereType<T>().toList();
-}
-
-/// The phone's AI client, connected, its listing watched (so it knows what
-/// the computer can do).
-MachineAi _connect(Harness h) {
-  h.run(h.phoneMachine.connect());
-  h.run(h.phoneMachine.listSessions(includeDesktop: true));
-  h.run(h.phoneMachine.ai.watch());
-  settle(h.async);
-  return h.phoneMachine.ai;
-}
 
 /// V2-2b B19: changes, one file's diff and a revert, from the phone.
 void main() {
@@ -72,9 +21,9 @@ void main() {
 
   test('changes, a diff and a revert travel, and their bodies come back', () {
     fakeAsync((async) {
-      final d = _Desktop(both);
+      final d = ScriptedDesktop(features: both);
       final h = Harness(async, keys, ai: d);
-      final ai = _connect(h);
+      final ai = readyAi(h);
       d.answer = (m) => switch (m) {
         AiChanges(:final rid) => AiResult(
           rid: rid,
@@ -114,9 +63,9 @@ void main() {
 
   test('confirm comes back with its question; keep goes with the next one', () {
     fakeAsync((async) {
-      final d = _Desktop(both);
+      final d = ScriptedDesktop(features: both);
       final h = Harness(async, keys, ai: d);
-      final ai = _connect(h);
+      final ai = readyAi(h);
       d.answer = (m) => switch (m) {
         AiRevert(:final rid, keep: null) => AiResult(
           rid: rid,
@@ -154,9 +103,9 @@ void main() {
 
   test('a computer that cannot: unsupported at once, nothing sent (R15)', () {
     fakeAsync((async) {
-      final d = _Desktop(const {});
+      final d = ScriptedDesktop();
       final h = Harness(async, keys, ai: d);
-      final ai = _connect(h);
+      final ai = readyAi(h);
       for (final call in <Future<Object?> Function()>[
         () => ai.changes(_sid),
         () => ai.diff(_sid, 'a.ts'),
@@ -177,9 +126,9 @@ void main() {
 
   test('a revert lost with its channel fails and is never sent again', () {
     fakeAsync((async) {
-      final d = _Desktop(both);
+      final d = ScriptedDesktop(features: both);
       final h = Harness(async, keys, ai: d);
-      final ai = _connect(h);
+      final ai = readyAi(h);
       Object? failure;
       unawaited(
         ai
