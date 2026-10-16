@@ -182,8 +182,7 @@ final class ToolPage extends ChangeNotifier {
   /// about:blank after a stopped first load (R25). Only a page that
   /// finished loading, with no error, is reloaded natively.
   Future<void> reload() async {
-    _crashes = 0;
-    _attempt = 0;
+    _startOver();
     _stopRetrying();
     if (_state.error != null || !_state.started || _loadPending) {
       await _load(_recoveryUrl);
@@ -203,19 +202,35 @@ final class ToolPage extends ChangeNotifier {
 
   Future<void> back() => engine.goBack();
 
-  /// D9 "Back to tool".
-  Future<void> backToTool() => _load(_tool.uri);
+  /// D9 "Back to tool": a URL the app newly asks for ([_startOver]).
+  Future<void> backToTool() {
+    _startOver();
+    return _load(_tool.uri);
+  }
 
   /// D23: the tool was edited. A new URL loads at once (if the page had
-  /// started); a new name or flag only changes what the bar says.
+  /// started), as a URL the app newly asks for ([_startOver]); a new name
+  /// or flag only changes what the bar says.
   void retarget(ToolEntry next) {
     final moved = next.url != _tool.url;
     _tool = next;
     if (moved && _state.started) {
+      _startOver();
       unawaited(_load(next.uri));
     } else {
       notifyListeners();
     }
+  }
+
+  /// D13 from the start for what the app asks for anew (↻, an edited URL,
+  /// "Back to tool"): refused, it is tried again after 1, 2, 4, 8 s, then
+  /// every 10 s (still only while shown, so a page hidden meanwhile gets its
+  /// 1 s once shown), and a crash reloads it once by itself. Never on a
+  /// recovery's own load: after a committed page a recovery loads the
+  /// page's address, not the target, and must keep its back-off.
+  void _startOver() {
+    _attempt = 0;
+    _crashes = 0;
   }
 
   void dismissDownload() => _set(_state.copyWith(download: null));
