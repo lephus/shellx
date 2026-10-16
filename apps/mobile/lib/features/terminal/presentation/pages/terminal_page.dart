@@ -185,7 +185,14 @@ class _TerminalPageState extends State<TerminalPage> {
   }
 
   Future<void> _pick(SessionListing listing) async {
-    final choice = await showSessionPicker(context, listing);
+    // V2-4 criterion 1: the Tool group follows the computer's list while the picker is open.
+    final release = _controller.hasWorkspace ? _controller.workspace.holdToolListing() : () {};
+    final SessionChoice? choice;
+    try {
+      choice = await showSessionPicker(context, listing);
+    } finally {
+      release();
+    }
     if (!mounted || _controller.closing.peek()) return;
     switch (choice) {
       case AttachSession(:final session):
@@ -194,6 +201,8 @@ class _TerminalPageState extends State<TerminalPage> {
         await _controller.openNew(_grid);
       case OpenAiSession(:final session):
         await _openAi(session.sid);
+      case OpenTool(:final tool):
+        await _openTool(tool);
       case NewAiSession():
         final ai = listing.ai;
         if (ai == null) return;
@@ -217,6 +226,13 @@ class _TerminalPageState extends State<TerminalPage> {
   Future<void> _openAi(String sid) async {
     _controller.setViewing(false);
     await context.router.push(AiSessionRoute(agentId: widget.agentId, machineName: widget.machineName, sid: sid));
+    if (mounted && (ModalRoute.of(context)?.isCurrent ?? false)) _controller.setViewing(true);
+  }
+
+  /// V2-4 E15: the tool over this page; the terminal tabs are not looked at meanwhile.
+  Future<void> _openTool(ToolInfo tool) async {
+    _controller.setViewing(false);
+    await context.router.push(ToolRoute(agentId: widget.agentId, tool: tool));
     if (mounted && (ModalRoute.of(context)?.isCurrent ?? false)) _controller.setViewing(true);
   }
 

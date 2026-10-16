@@ -555,6 +555,16 @@ class FakeToolMachine implements ToolMachine {
   int unwatchCalls = 0;
   bool watching = false;
 
+  /// Makes [watch] fail like the real one does for a machine that cannot be reached (the list is
+  /// wanted all the same: the real client asks for it on every new channel from its first call on).
+  MachineConnectionFailure? connectFailure;
+
+  /// Somebody still listens to [listings]: what a screen that is gone must not leave behind.
+  bool get hasListingListener => _listings.hasListener;
+
+  /// The machine is dropped (unpaired, signed out): its lists end.
+  Future<void> endListings() => _listings.close();
+
   /// Every page made, in order, and the texts each was given.
   final List<FakeToolPage> pages = [];
   final List<ToolHostTexts> texts = [];
@@ -579,6 +589,8 @@ class FakeToolMachine implements ToolMachine {
   Future<void> watch() async {
     watchCalls++;
     watching = true;
+    final failure = connectFailure;
+    if (failure != null) throw MachineConnectionException(failure);
   }
 
   @override
