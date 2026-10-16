@@ -432,5 +432,7 @@
   "aiPushAllowed": "Đã cho phép: {title}",
   "aiPushDenied": "Đã từ chối: {title}",
   "aiPushMaybeNotSent": "Có thể chưa gửi được. Xem trong phiên.",
-  "aiPushAnsweredElsewhere": "Yêu cầu này đã được trả lời ở nơi khác."
+  "aiPushAnsweredElsewhere": "Yêu cầu này đã được trả lời ở nơi khác.",
+  "machineAiLine": "✦ {n} phiên AI · {w} cần bạn",
+  "machineAiSessions": "✦ {n} phiên AI"
 }

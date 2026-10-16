@@ -29,6 +29,8 @@ import '../../features/auth/presentation/controllers/register_controller.dart'
     as _i145;
 import '../../features/lock/domain/biometric_authenticator.dart' as _i870;
 import '../../features/lock/presentation/app_lock_controller.dart' as _i306;
+import '../../features/machines/presentation/controllers/machine_ai_lines.dart'
+    as _i474;
 import '../../features/machines/presentation/controllers/machine_list_controller.dart'
     as _i70;
 import '../../features/notifications/domain/push_messaging.dart' as _i623;
@@ -181,6 +183,12 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i667.WorkspaceRegistry>(
       () => _i667.WorkspaceRegistry.create(gh<_i351.SessionHolder>()),
       dispose: (i) => i.dispose(),
+    );
+    gh.factory<_i474.MachineAiLines>(
+      () => _i474.MachineAiLines(
+        gh<_i351.SessionHolder>(),
+        gh<_i667.WorkspaceRegistry>(),
+      ),
     );
     gh.factory<_i409.BuildContext>(() => module.context(gh<_i81.AppRouter>()));
     gh.factoryParam<_i229.TerminalPageController, String, dynamic>(
