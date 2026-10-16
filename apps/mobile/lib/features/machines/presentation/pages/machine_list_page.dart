@@ -1,7 +1,12 @@
+import 'dart:async';
+
+import 'package:shellx_ai/remote.dart';
 import 'package:shellx_core/shellx_core.dart';
 import 'package:shellx_mobile/core/core.dart';
+import 'package:shellx_mobile/features/ai/presentation/widgets/ai_chooser.dart';
 import 'package:shellx_mobile/features/app/connection_banner.dart';
 import 'package:shellx_mobile/features/machines/domain/machine_entry.dart';
+import 'package:shellx_mobile/features/machines/presentation/controllers/machine_ai_lines.dart';
 import 'package:shellx_mobile/features/machines/presentation/controllers/machine_list_controller.dart';
 import 'package:shellx_mobile/features/machines/presentation/last_seen.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_page_controller.dart';
@@ -21,28 +26,64 @@ class MachineListPage extends StatefulWidget {
 class _MachineListPageState extends State<MachineListPage> {
   final MachineListController _controller = getIt<MachineListController>();
 
+  /// V2-2b B21: the AI line of each machine; optional, like the push controller of the app (a test that does not
+  /// register it gets the list without lines).
+  final MachineAiLines? _ai = getIt.isRegistered<MachineAiLines>() ? getIt<MachineAiLines>() : null;
+  void Function()? _stopMachines;
+  AppLifecycleListener? _lifecycle;
+
   @override
   void initState() {
     super.initState();
     _controller.refresh();
+    final ai = _ai;
+    if (ai != null) {
+      // Not from inside the signal's own notification: the lines write signals of their own.
+      _stopMachines = _controller.state.subscribe((list) => scheduleMicrotask(() => ai.setMachines(list.machines)));
+      ai.setVisible(true);
+      // `inactive` (the notification shade, a system dialog) still shows the list; `hidden` and `paused` do not.
+      _lifecycle = AppLifecycleListener(
+        onStateChange: (state) =>
+            ai.setForeground(state == AppLifecycleState.resumed || state == AppLifecycleState.inactive),
+      );
+    }
   }
 
   @override
   void dispose() {
+    _lifecycle?.dispose();
+    _stopMachines?.call();
+    _ai?.dispose();
     _controller.dispose();
     super.dispose();
   }
 
+  /// The lines let their machines go while a page of this one is over the list (B21).
+  Future<T?> _over<T>(Future<T?> Function() navigation) async {
+    _ai?.setVisible(false);
+    try {
+      return await navigation();
+    } finally {
+      if (mounted) _ai?.setVisible(true);
+    }
+  }
+
   /// Pairing, unpairing and new tabs happen on the pushed pages: refresh when they close.
-  Future<void> _then(Future<Object?> navigation) async {
-    await navigation;
+  Future<void> _then(Future<Object?> Function() navigation) async {
+    await _over(navigation);
     if (mounted) await _controller.refresh();
   }
 
-  Future<void> _scan() => _then(context.router.push(QrScannerRoute()));
+  Future<void> _scan() => _then(() => context.router.push(QrScannerRoute()));
+
+  Future<void> _refresh() async {
+    await Future.wait([_controller.refresh(), ?_ai?.refresh()]);
+  }
 
   Future<void> _open(MachineEntry machine) async {
-    final exit = await context.router.push<TerminalExit>(TerminalRoute(agentId: machine.id, machineName: machine.name));
+    final exit = await _over(
+      () => context.router.push<TerminalExit>(TerminalRoute(agentId: machine.id, machineName: machine.name)),
+    );
     if (!mounted) return;
     await _controller.refresh();
     if (!mounted) return;
@@ -50,7 +91,7 @@ class _MachineListPageState extends State<MachineListPage> {
       case TerminalExit.untrusted:
         await _askToPairAgain();
       case TerminalExit.updateRequired:
-        await context.router.push(const UpdateRequiredRoute());
+        await _over(() => context.router.push(const UpdateRequiredRoute()));
       case null:
         break;
     }
@@ -81,6 +122,41 @@ class _MachineListPageState extends State<MachineListPage> {
     if (scan == true && mounted) await _scan();
   }
 
+  /// B21, R10: the AI line opens the one session that waits for the user, else the computer's AI sessions to pick
+  /// from (over the list).
+  Future<void> _openAi(MachineEntry machine) async {
+    final listing = _ai?.listing(machine.id);
+    if (listing == null) return;
+    final waiting = [
+      for (final session in listing.sessions)
+        if (session.state == AiRemoteState.needsInput) session,
+    ];
+    if (waiting.length == 1) {
+      await _over(
+        () => context.router.push(
+          // Keyed by its session, like every way into an AI session page (F44): the router would otherwise
+          // update a page of the same name instead of pushing a new one.
+          AiSessionRoute(
+            key: ValueKey('ai:${machine.id}/${waiting.single.sid}'),
+            agentId: machine.id,
+            machineName: machine.name,
+            sid: waiting.single.sid,
+          ),
+        ),
+      );
+      return;
+    }
+    final AiMachine ai;
+    try {
+      ai = _controller.backend.machine(machine.id).ai;
+    } on StateError {
+      return; // not paired any more
+    }
+    await _over(
+      () => openAiChooser(context, agentId: machine.id, machineName: machine.name, ai: ai, listing: listing),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = S.of(context);
@@ -97,7 +173,7 @@ class _MachineListPageState extends State<MachineListPage> {
                 child: IconButton(
                   tooltip: strings.settingsTooltip,
                   icon: Icon(Icons.settings_outlined, color: context.colors.primary),
-                  onPressed: () => _then(context.router.push(const SettingsRoute())),
+                  onPressed: () => _then(() => context.router.push(const SettingsRoute())),
                 ),
               ),
             ),
@@ -115,7 +191,7 @@ class _MachineListPageState extends State<MachineListPage> {
                 final state = _controller.state;
                 final machines = state.value.machines;
                 if (!state.isLoading && !state.hasError && machines.isEmpty) {
-                  return _EmptyState(onScan: _scan, onReload: _controller.refresh);
+                  return _EmptyState(onScan: _scan, onReload: _refresh);
                 }
                 if (!state.isLoading && state.hasError && machines.isEmpty) {
                   return _ErrorState(error: state.error, onRetry: _controller.refresh);
@@ -133,6 +209,8 @@ class _MachineListPageState extends State<MachineListPage> {
                   agentState: machine.paired ? _controller.agentState(machine.id) : null,
                   lastUsed: machine.online && machine.id == state.value.lastUsedId,
                   now: _controller.now(),
+                  ai: machine.paired ? _ai?.line(machine.id) : null,
+                  onAi: () => unawaited(_openAi(machine)),
                   onTap: waiting || !machine.online
                       ? null
                       : machine.paired
@@ -144,7 +222,7 @@ class _MachineListPageState extends State<MachineListPage> {
                   children: [
                     Expanded(
                       child: AppScrollView(
-                        onRefresh: _controller.refresh,
+                        onRefresh: _refresh,
                         slivers: [
                           SliverPadding(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -227,6 +305,8 @@ class MachineCard extends StatelessWidget {
     this.unseen = 0,
     this.agentState,
     this.lastUsed = false,
+    this.ai,
+    this.onAi,
   });
 
   final MachineEntry machine;
@@ -246,6 +326,12 @@ class MachineCard extends StatelessWidget {
 
   /// Null when the card cannot be opened (offline, or the relay is reconnecting).
   final VoidCallback? onTap;
+
+  /// V2-2b B21: the computer's AI sessions ("✦ 2 phiên AI · 1 cần bạn"); null shows no line.
+  final MachineAiLine? ai;
+
+  /// A tap on that line (R10).
+  final VoidCallback? onAi;
 
   @override
   Widget build(BuildContext context) {
@@ -402,12 +488,44 @@ class MachineCard extends StatelessWidget {
                             ),
                         ],
                       ),
+                      if (ai case final line? when online)
+                        _AiLine(key: ValueKey('machine-ai-${machine.id}'), line: line, onTap: onAi),
                     ],
                   ),
                 ),
                 if (onTap != null) ...[6.sizedWidth, Icon(Icons.chevron_right, color: colors.secondaryText)],
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// V2-2b B21: "✦ 2 phiên AI · 1 cần bạn" (warning colour while a session waits for the user), or "✦ 2 phiên AI"
+/// (R11). The whole line is the button: at least 44 points high.
+class _AiLine extends StatelessWidget {
+  const _AiLine({super.key, required this.line, required this.onTap});
+
+  final MachineAiLine line;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = S.of(context);
+    final colors = context.colors;
+    final waiting = line.waiting > 0;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            waiting ? strings.machineAiLine(line.sessions, line.waiting) : strings.machineAiSessions(line.sessions),
+            style: context.typo.paragraph13.bold.copyWith(color: waiting ? colors.warn : colors.secondaryText),
           ),
         ),
       ),

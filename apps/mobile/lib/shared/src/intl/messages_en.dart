@@ -120,59 +120,63 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m49(method) => "Unlock with ${method}";
 
-  static String m50(when) => "Last online: ${when}";
+  static String m50(n, w) => "✦ ${Intl.plural(n, one: '1 AI session', other: '${n} AI sessions')} · ${w} need you";
 
-  static String m51(count) => "${Intl.plural(count, one: '1 tab', other: '${count} tabs')}";
+  static String m51(n) => "✦ ${Intl.plural(n, one: '1 AI session', other: '${n} AI sessions')}";
 
-  static String m52(tabs, unseen) =>
+  static String m52(when) => "Last online: ${when}";
+
+  static String m53(count) => "${Intl.plural(count, one: '1 tab', other: '${count} tabs')}";
+
+  static String m54(tabs, unseen) =>
       "${Intl.plural(tabs, one: '1 tab', other: '${tabs} tabs')} · ${unseen} with new output";
 
-  static String m53(name) => "${name} now trusts this phone. From now on, just tap the computer to open a terminal.";
+  static String m55(name) => "${name} now trusts this phone. From now on, just tap the computer to open a terminal.";
 
-  static String m54(count) =>
+  static String m56(count) =>
       "${Intl.plural(count, one: '1 more character needed.', other: '${count} more characters needed.')}";
 
-  static String m55(count) =>
+  static String m57(count) =>
       "${Intl.plural(count, one: '1 character too many.', other: '${count} characters too many.')}";
 
-  static String m56(name) => "${name} · done";
+  static String m58(name) => "${name} · done";
 
-  static String m57(name) => "${name} · waiting";
+  static String m59(name) => "${name} · waiting";
 
-  static String m58(name) => "${name} · needs your answer";
+  static String m60(name) => "${name} · needs your answer";
 
-  static String m59(name) => "${name} · running";
+  static String m61(name) => "${name} · running";
 
-  static String m60(when) => "opened ${when}";
+  static String m62(when) => "opened ${when}";
 
-  static String m61(count) =>
+  static String m63(count) =>
       "${Intl.plural(count, one: 'This computer has 1 session', other: 'This computer has ${count} sessions')}";
 
-  static String m62(number) => "Option ${number}";
+  static String m64(number) => "Option ${number}";
 
-  static String m63(menu) =>
+  static String m65(menu) =>
       "macOS: click the ShellX icon in the menu bar. Windows: click the icon in the system tray. Choose ${menu}";
 
-  static String m64(code) =>
+  static String m66(code) =>
       "The last command exited with code ${code}. The output above can still be read and copied.";
 
-  static String m65(method) => "Lock with ${method}";
+  static String m67(method) => "Lock with ${method}";
 
-  static String m66(name) => "Unpair ${name}? You\'ll need to scan a QR code again to use this computer.";
+  static String m68(name) => "Unpair ${name}? You\'ll need to scan a QR code again to use this computer.";
 
-  static String m67(version, build) => "ShellX ${version} (${build})";
+  static String m69(version, build) => "ShellX ${version} (${build})";
 
-  static String m68(terms, privacy) => "By creating an account you agree to the ${terms} and the ${privacy}.";
+  static String m70(terms, privacy) => "By creating an account you agree to the ${terms} and the ${privacy}.";
 
-  static String m69(length) => "Password must be at least ${length} characters.";
+  static String m71(length) => "Password must be at least ${length} characters.";
 
-  static String m70(length) => "Must be at most ${length} characters.";
+  static String m72(length) => "Must be at most ${length} characters.";
 
-  static String m71(length) => "Must be at least ${length} characters.";
+  static String m73(length) => "Must be at least ${length} characters.";
 
-  static String m72(lines) => "Showing the last ${lines} lines";
+  static String m74(lines) => "Showing the last ${lines} lines";
 
-  static String m73(target) => "To: ${target}";
+  static String m75(target) => "To: ${target}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -601,7 +605,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Use the same account as ShellX on your computer.",
     ),
     "loginTitle": MessageLookupByLibrary.simpleMessage("Sign in"),
-    "machineLastOnline": m50,
+    "machineAiLine": m50,
+    "machineAiSessions": m51,
+    "machineLastOnline": m52,
     "machineLastUsed": MessageLookupByLibrary.simpleMessage("Last used"),
     "machineNewOutput": MessageLookupByLibrary.simpleMessage("New output"),
     "machineNotPaired": MessageLookupByLibrary.simpleMessage("Not paired"),
@@ -609,8 +615,8 @@ class MessageLookup extends MessageLookupByLibrary {
       "This computer is offline.",
     ),
     "machineOnline": MessageLookupByLibrary.simpleMessage("Online"),
-    "machineTabs": m51,
-    "machineTabsActivity": m52,
+    "machineTabs": m53,
+    "machineTabsActivity": m54,
     "machineWaiting": MessageLookupByLibrary.simpleMessage(
       "Waiting for connection",
     ),
@@ -639,20 +645,20 @@ class MessageLookup extends MessageLookupByLibrary {
       "Couldn\'t pair",
     ),
     "pairingSucceeded": MessageLookupByLibrary.simpleMessage("Paired"),
-    "pairingSucceededBody": m53,
+    "pairingSucceededBody": m55,
     "passwordHide": MessageLookupByLibrary.simpleMessage("Hide password"),
     "passwordHint": MessageLookupByLibrary.simpleMessage("Password"),
     "passwordLabel": MessageLookupByLibrary.simpleMessage("Password"),
-    "passwordMissing": m54,
+    "passwordMissing": m56,
     "passwordRule": MessageLookupByLibrary.simpleMessage(
       "8 to 128 characters.",
     ),
     "passwordShow": MessageLookupByLibrary.simpleMessage("Show password"),
-    "passwordTooLong": m55,
-    "pickerAgentDone": m56,
-    "pickerAgentIdle": m57,
-    "pickerAgentNeedsInput": m58,
-    "pickerAgentRunning": m59,
+    "passwordTooLong": m57,
+    "pickerAgentDone": m58,
+    "pickerAgentIdle": m59,
+    "pickerAgentNeedsInput": m60,
+    "pickerAgentRunning": m61,
     "pickerAttachedElsewhere": MessageLookupByLibrary.simpleMessage(
       "open on another device",
     ),
@@ -673,11 +679,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "pickerShellxGroup": MessageLookupByLibrary.simpleMessage(
       "ShellX sessions",
     ),
-    "pickerStarted": m60,
+    "pickerStarted": m62,
     "pickerSubtitle": MessageLookupByLibrary.simpleMessage(
       "Reopen a session to continue where you left off, or start a new one.",
     ),
-    "pickerTitle": m61,
+    "pickerTitle": m63,
     "privacyLink": MessageLookupByLibrary.simpleMessage("Privacy Policy"),
     "pushActionAllow": MessageLookupByLibrary.simpleMessage("Allow"),
     "pushActionReject": MessageLookupByLibrary.simpleMessage("Deny"),
@@ -692,7 +698,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "replyKeyEnter": MessageLookupByLibrary.simpleMessage("Enter"),
     "replyKeyEscape": MessageLookupByLibrary.simpleMessage("Escape"),
     "replyKeyNo": MessageLookupByLibrary.simpleMessage("No"),
-    "replyKeyOption": m62,
+    "replyKeyOption": m64,
     "replyKeyYes": MessageLookupByLibrary.simpleMessage("Yes"),
     "replyShowExtraKeys": MessageLookupByLibrary.simpleMessage(
       "Show the extra keys",
@@ -706,14 +712,14 @@ class MessageLookup extends MessageLookupByLibrary {
     "scannerCameraError": MessageLookupByLibrary.simpleMessage(
       "Couldn\'t start the camera.",
     ),
-    "scannerCardBody": m63,
+    "scannerCardBody": m65,
     "scannerCardTitle": MessageLookupByLibrary.simpleMessage(
       "The code is on your computer",
     ),
     "scannerPairing": MessageLookupByLibrary.simpleMessage("Pairing…"),
     "scannerTitle": MessageLookupByLibrary.simpleMessage("Scan pairing code"),
     "sessionEnded": MessageLookupByLibrary.simpleMessage("Session ended"),
-    "sessionExitedBody": m64,
+    "sessionExitedBody": m66,
     "sessionGoneBody": MessageLookupByLibrary.simpleMessage(
       "The computer no longer has this session. The output above can still be read and copied.",
     ),
@@ -744,7 +750,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "settingsLockFootnote": MessageLookupByLibrary.simpleMessage(
       "Asked when the app opens and when you come back after more than 5 minutes.",
     ),
-    "settingsLockWith": m65,
+    "settingsLockWith": m67,
     "settingsLogout": MessageLookupByLibrary.simpleMessage("Sign out"),
     "settingsLogoutConfirm": MessageLookupByLibrary.simpleMessage(
       "Sign out of ShellX? Paired computers are kept for your next sign-in.",
@@ -786,11 +792,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "settingsTitle": MessageLookupByLibrary.simpleMessage("Settings"),
     "settingsTooltip": MessageLookupByLibrary.simpleMessage("Settings"),
     "settingsUnpair": MessageLookupByLibrary.simpleMessage("Unpair"),
-    "settingsUnpairConfirm": m66,
+    "settingsUnpairConfirm": m68,
     "settingsUnpairFailed": MessageLookupByLibrary.simpleMessage(
       "Couldn\'t unpair yet.",
     ),
-    "settingsVersion": m67,
+    "settingsVersion": m69,
     "signedOutAccountDeleted": MessageLookupByLibrary.simpleMessage(
       "Your account has been deleted.",
     ),
@@ -824,7 +830,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Open a new session",
     ),
     "termsLink": MessageLookupByLibrary.simpleMessage("Terms"),
-    "termsNotice": m68,
+    "termsNotice": m70,
     "unauthorized": MessageLookupByLibrary.simpleMessage("Unauthorized"),
     "unknownError": MessageLookupByLibrary.simpleMessage("Unknown Error"),
     "unknownMachine": MessageLookupByLibrary.simpleMessage("Unknown computer"),
@@ -850,7 +856,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationPasswordLowercase": MessageLookupByLibrary.simpleMessage(
       "Password must contain at least one lowercase letter.",
     ),
-    "validationPasswordMinLength": m69,
+    "validationPasswordMinLength": m71,
     "validationPasswordNotMatch": MessageLookupByLibrary.simpleMessage(
       "Passwords do not match.",
     ),
@@ -869,8 +875,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationPhoneRequired": MessageLookupByLibrary.simpleMessage(
       "Phone number is required.",
     ),
-    "validationTextMaxLength": m70,
-    "validationTextMinLength": m71,
+    "validationTextMaxLength": m72,
+    "validationTextMinLength": m73,
     "validationTextRequired": MessageLookupByLibrary.simpleMessage(
       "This field is required.",
     ),
@@ -881,7 +887,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "viewAsTextRefresh": MessageLookupByLibrary.simpleMessage("Refresh"),
     "viewAsTextTitle": MessageLookupByLibrary.simpleMessage("Terminal text"),
     "viewAsTextTooltip": MessageLookupByLibrary.simpleMessage("View as text"),
-    "viewAsTextTruncated": m72,
+    "viewAsTextTruncated": m74,
     "voiceClose": MessageLookupByLibrary.simpleMessage("Close"),
     "voiceDetached": MessageLookupByLibrary.simpleMessage(
       "This session was disconnected from the phone — reattach to send",
@@ -927,7 +933,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "voiceSend": MessageLookupByLibrary.simpleMessage("Send"),
     "voiceSendEnter": MessageLookupByLibrary.simpleMessage("Send Enter"),
     "voiceStopTooltip": MessageLookupByLibrary.simpleMessage("Stop listening"),
-    "voiceTarget": m73,
+    "voiceTarget": m75,
     "voiceUnsupported": MessageLookupByLibrary.simpleMessage(
       "Speech recognition isn\'t available on this phone",
     ),

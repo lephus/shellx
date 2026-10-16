@@ -3837,6 +3837,26 @@ class S {
       args: [],
     );
   }
+
+  /// `✦ {n, plural, =1{1 AI session} other{{n} AI sessions}} · {w} need you`
+  String machineAiLine(int n, int w) {
+    return Intl.message(
+      '✦ ${Intl.plural(n, one: '1 AI session', other: '$n AI sessions')} · $w need you',
+      name: 'machineAiLine',
+      desc: '',
+      args: [n, w],
+    );
+  }
+
+  /// `✦ {n, plural, =1{1 AI session} other{{n} AI sessions}}`
+  String machineAiSessions(int n) {
+    return Intl.message(
+      '✦ ${Intl.plural(n, one: '1 AI session', other: '$n AI sessions')}',
+      name: 'machineAiSessions',
+      desc: '',
+      args: [n],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

@@ -433,6 +433,8 @@
   "aiPushDenied": "Đã từ chối: {title}",
   "aiPushMaybeNotSent": "Có thể chưa gửi được. Xem trong phiên.",
   "aiPushAnsweredElsewhere": "Yêu cầu này đã được trả lời ở nơi khác.",
+  "machineAiLine": "✦ {n} phiên AI · {w} cần bạn",
+  "machineAiSessions": "✦ {n} phiên AI",
   "pickerTools": "Tool",
   "toolRowSub": "{workspace} · localhost:{port}",
   "toolsEmpty": "Chưa có tool nào bật cho điện thoại. Trên máy tính: thanh của tool › 📱 Điện thoại.",
