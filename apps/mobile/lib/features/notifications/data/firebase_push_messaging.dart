@@ -24,13 +24,15 @@ Future<PushMessaging> startPushMessaging({Duration timeout = const Duration(seco
   }
 }
 
-/// V2-2b B9, Android only: the background handler that draws an AI permission push again with its buttons, and the
-/// app's side of their taps. Null elsewhere, or when it cannot start (push still works, without buttons).
+/// V2-2b B9, Android only: the app's side of the taps on the notifications the background handler draws again with
+/// buttons, then that handler. Null elsewhere, or when it cannot start (push still works, without buttons).
 Future<AndroidPushActions?> _startAndroidActions(Duration timeout) async {
   if (!Platform.isAndroid) return null;
   try {
-    FirebaseMessaging.onBackgroundMessage(shellxBackgroundMessage);
-    return await AndroidPushActions.start().timeout(timeout);
+    final actions = await AndroidPushActions.start().timeout(timeout);
+    // A redraw takes FCM's notification away (F47): only drawn once the app can take its taps.
+    if (actions != null) FirebaseMessaging.onBackgroundMessage(shellxBackgroundMessage);
+    return actions;
   } catch (error) {
     if (kDebugMode) debugPrint('Push buttons unavailable: ${error.runtimeType}');
     return null;
