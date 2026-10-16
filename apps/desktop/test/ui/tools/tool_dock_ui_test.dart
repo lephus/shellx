@@ -14,6 +14,7 @@ import 'package:shellx_desktop/src/terminal/terminal_tabs.dart';
 import 'package:shellx_desktop/src/tools/tool_dock.dart';
 import 'package:shellx_desktop/src/tools/tool_dock_state.dart';
 import 'package:shellx_desktop/src/tools/tool_pages.dart';
+import 'package:shellx_desktop/src/tools/tool_registry.dart';
 import 'package:shellx_desktop/src/ui/terminal/key_sequence.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_intents.dart';
 import 'package:shellx_desktop/src/ui/ai/ai_scope.dart';
@@ -385,6 +386,51 @@ void main() {
     await t.tap(find.byKey(const Key('tool.bar.backToTool')));
     await t.pump();
     expect(engine.loads.last, Uri.parse('http://localhost:5173/'));
+    await disposeWorkspace(t, rig.container);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('after a failed edit the bar says no "On {host}" and the '
+      'panel\'s browser button opens the URL that failed; a page loaded '
+      'elsewhere (SSO) still says "On {host}" (R18, D9, D13, D23)', (t) async {
+    await rig.pump(t);
+    final tool = rig.add(kDefaultWorkspaceId, 'localhost:5173', name: 'Board');
+    await t.pumpAndSettle();
+    await openTool(t, tool.id);
+    final engine = rig.engines[tool.id]!;
+    engine.emit(UrlChanged(Uri.parse('http://localhost:5173/')));
+    engine.emit(const LoadFinished());
+    await t.pump();
+    final registry = rig.container.read(toolRegistryProvider.notifier);
+    void edit(String url) =>
+        registry.update(registry.byId(tool.id)!.copyWith(url: url));
+    // Another port of the same host, refused: no "On localhost" beside the
+    // panel.
+    edit('localhost:5174');
+    await t.pump();
+    engine.emit(const LoadFailed(BrowserLoadErrorKind.refused));
+    await t.pump();
+    expect(find.byKey(const Key('tool.error.refused')), findsOneWidget);
+    expect(find.byKey(const Key('tool.bar.away')), findsNothing);
+    expect(find.byKey(const Key('tool.bar.backToTool')), findsNothing);
+    // A host that is not found: the panel's browser button opens it, not
+    // the page left behind.
+    edit('http://board.example.com/');
+    await t.pump();
+    engine.emit(const LoadFailed(BrowserLoadErrorKind.dns));
+    await t.pump();
+    expect(find.byKey(const Key('tool.bar.away')), findsNothing);
+    await t.tap(find.byKey(const Key('tool.error.browser')));
+    await t.pump();
+    expect(rig.harness.urlOpener.webLinks, [
+      Uri.parse('http://board.example.com/'),
+    ]);
+    // A page that loaded elsewhere (an SSO round trip) still says so.
+    engine.emit(const LoadStarted());
+    engine.emit(UrlChanged(Uri.parse('https://sso.example.com/login')));
+    engine.emit(const LoadFinished());
+    await t.pump();
+    expect(find.text('On sso.example.com'), findsOneWidget);
+    expect(find.byKey(const Key('tool.bar.backToTool')), findsOneWidget);
     await disposeWorkspace(t, rig.container);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 

@@ -385,6 +385,57 @@ void main() {
     expect(p.state.awayFrom(p.tool), isFalse);
   });
 
+  test('after an edit or "Back to tool", the page is not "away" until the '
+      'asked-for URL loads — pending or failed, the address left behind '
+      'says nothing (D9, D23, R18)', () {
+    fakeAsync((async) {
+      final p = page(tool('localhost:5173'));
+      p.setShown(true);
+      engine.emit(UrlChanged(Uri.parse('http://localhost:5173/')));
+      engine.emit(const LoadFinished());
+      // Another port of the same host, refused.
+      p.retarget(p.tool.copyWith(url: 'http://localhost:5174/'));
+      expect(p.state.awayFrom(p.tool), isFalse, reason: 'pending');
+      engine.emit(const LoadFailed(BrowserLoadErrorKind.refused));
+      expect(p.state.awayFrom(p.tool), isFalse, reason: 'refused');
+      async.elapse(const Duration(seconds: 1)); // the retry
+      engine.emit(const LoadFailed(BrowserLoadErrorKind.refused));
+      expect(p.state.awayFrom(p.tool), isFalse, reason: 'still refused');
+      engine.emit(UrlChanged(Uri.parse('http://localhost:5174/')));
+      engine.emit(const LoadFinished());
+      expect(p.state.awayFrom(p.tool), isFalse, reason: 'loaded');
+      // An SSO round trip is away; "Back to tool" is not, loading or
+      // refused.
+      engine.emit(UrlChanged(Uri.parse('https://sso.example.com/login')));
+      engine.emit(const LoadFinished());
+      expect(p.state.awayFrom(p.tool), isTrue);
+      unawaited(p.backToTool());
+      expect(p.state.awayFrom(p.tool), isFalse, reason: 'going back');
+      engine.emit(const LoadFailed(BrowserLoadErrorKind.refused));
+      expect(p.state.awayFrom(p.tool), isFalse, reason: 'back, refused');
+      p.dispose();
+    });
+  });
+
+  test('recoveryUrl is the URL a failure is about: the tool before the '
+      'first load, an edit\'s URL until it loads, then the page\'s own '
+      'address (R18, D13)', () {
+    final p = page(tool('localhost:5173'));
+    expect(p.recoveryUrl, Uri.parse('http://localhost:5173/'));
+    p.setShown(true);
+    engine.emit(UrlChanged(Uri.parse('http://localhost:5173/')));
+    engine.emit(const LoadFinished());
+    p.retarget(p.tool.copyWith(url: 'http://board.example.com/'));
+    engine.emit(const LoadFailed(BrowserLoadErrorKind.dns));
+    expect(p.recoveryUrl, Uri.parse('http://board.example.com/'));
+    expect(p.state.url, Uri.parse('http://localhost:5173/'), reason: 'left');
+    engine.emit(UrlChanged(Uri.parse('http://board.example.com/deep')));
+    engine.emit(const LoadFinished());
+    engine.emit(const LoadFailed(BrowserLoadErrorKind.unreachable));
+    expect(p.recoveryUrl, Uri.parse('http://board.example.com/deep'));
+    p.dispose();
+  });
+
   test('outside links, downloads, keys and clicks reach the window (D9, '
       'D10)', () {
     final p = page(tool('localhost:4000'));
