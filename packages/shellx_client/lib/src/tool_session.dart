@@ -318,10 +318,19 @@ final class ToolSession {
     }
   }
 
+  /// R4: the tool left the list (or its port changed): the computer is asked
+  /// again. I2: so is a page whose computer had no list or whose tool was
+  /// off, at every change whatever the list says (a window that connects
+  /// pushes its list; turning 📱 on changes it): it comes back by itself.
+  /// `gone` stays: the user opens the tool again (§7).
   void _onListing(ToolListing listing) {
     if (_phase == ToolPhase.closed || _phase == ToolPhase.paused) return;
     final me = listing.tools.where((t) => t.id == tool).firstOrNull;
-    if (!listing.available || me == null || me.port != _port) {
+    if (_phase == ToolPhase.unavailable ||
+        _phase == ToolPhase.disabled ||
+        !listing.available ||
+        me == null ||
+        me.port != _port) {
       unawaited(_check());
     }
   }

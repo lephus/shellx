@@ -648,6 +648,44 @@ void main() {
       await until(() => session.phase == ToolPhase.gone);
     });
 
+    // Review I2: a page whose computer had no list (E5: the background
+    // service runs alone) or whose tool was off comes back by itself when
+    // the list changes (a window that connects pushes its list; turning 📱 on
+    // changes it): served again, with a fresh entry.
+    test('no list on the computer, then the list again: unavailable, then '
+        'ready with a fresh entry (I2)', () async {
+      await openSamePort();
+      proxy.serve(null);
+      await until(() => session.phase == ToolPhase.unavailable);
+      proxy.serve(catalogOf([tool.entry()]));
+      await until(
+        () => session.phase == ToolPhase.ready,
+        timeout: const Duration(seconds: 3),
+      );
+      final loads = events.whereType<ToolLoad>().toList();
+      expect(loads, hasLength(2));
+      expect(loads.last.url, isNot(loads.first.url), reason: 'a new nonce');
+      final page = await webview.enter(loads.last.url);
+      expect(page.status, 200);
+    });
+
+    test('the flag turned off, then on again: disabled, then ready with a '
+        'fresh entry (I2)', () async {
+      await openSamePort();
+      proxy.serve(catalogOf([], off: [_id]));
+      await until(() => session.phase == ToolPhase.disabled);
+      proxy.serve(catalogOf([tool.entry()]));
+      await until(
+        () => session.phase == ToolPhase.ready,
+        timeout: const Duration(seconds: 3),
+      );
+      final loads = events.whereType<ToolLoad>().toList();
+      expect(loads, hasLength(2));
+      expect(loads.last.url, isNot(loads.first.url), reason: 'a new nonce');
+      final page = await webview.enter(loads.last.url);
+      expect(page.status, 200);
+    });
+
     test('nothing runs on the port: refused, tried again, ready when it is '
         'back', () async {
       await openSamePort(retry: const [Duration(milliseconds: 100)]);
