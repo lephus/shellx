@@ -26,6 +26,131 @@
 - macOS engine review: #21 a disposed engine loads nothing (task review) — fixed by `_live()`: every public method that waits for setup makes no native call once the engine is disposed (no unit seam: the engine makes a native WKWebView).
 - macOS engine review: #22 dispose stops the page (task review) — fixed by `forget` (dispose only) stopping the load and loading `about:blank`; the disposed engine reads nothing back from it and emits nothing (no automated test: native).
 - Task 6 (2026-10-15): `flutter: 00:15 +12: All tests passed!` — integration test: isolated build, bundle id pro.shellx.desktop.itest, temporary HOME (plan Task 6 recipe) (`apps/desktop/integration_test/tool_engine_test.dart`; +3 cases from the Task 5 review: target=_blank mailto, blob download, same-origin download attribute).
+- Task 16 (2026-10-16): `flutter: 00:22 +13: All tests passed!` — the same integration test at bfff4c0, isolated build, bundle id pro.shellx.desktop.itest, temporary HOME (plan Task 6 recipe with F4–F6) (+1 case: a refused load after a loaded page sends `LoadFailed(refused)` and no `LoadFinished` within 2 s, the premise of Task 10's recovery URL).
+
+### Commits and test counts per task
+
+- Task 1: eb0b6dc..54489b9 (f7bacfe, 54489b9) — tool_entry 48, tool_registry 10, settings_ownership 6; suite 3631/10 at f7bacfe, +1 test in 54489b9.
+- Task 2: 54489b9..b509e58 (bdf117a, b509e58) — tool_strings 5, test/l10n 23; suite 3637/10 (before the first macOS build).
+- Task 3: b509e58..b22a15d (b22a15d) — browser_url 53, wk_webview_engine 2; suite 3692/10, 3693/9 after the first macOS build.
+- Task 4: b22a15d..d183362 (d183362) — keybindings +21, shortcut_golden +4; suite 3694/9.
+- Task 5: d183362..84147e8 (9fef65d, 328dd40, e2e0be3, 84147e8) — test/browser + test/tools 127; macOS debug build, not launched; suite 3708/9.
+- Task 6: 84147e8..bc1ec86 (42c767e, bc1ec86) — isolated run `+12: All tests passed!` at 42c767e and at bc1ec86.
+- Task 7: bc1ec86..cd8f192 (cd8f192) — win_floating_engine 10, tool_embed +3, settings_schema +13; suite 3724/9.
+- Task 8: cd8f192..7eed4f2 (4abdc1c, 7eed4f2) — tool_dock_state +10, tool_dock +9; suite 3742/9 at 4abdc1c, 3743 with 7eed4f2's test.
+- Task 9: 7eed4f2..27818da (c37686a, 27818da) — tool_dock_restore +8; suite 3750/9 at c37686a, 3751 with 27818da's test.
+- Task 10: 27818da..941c8f7 (a657251, 2fb86bd, 941c8f7) — tool_page 20, tool_pages 8; suite 3777/9 at 2fb86bd, 3779 with 941c8f7's tests.
+- Task 11: 941c8f7..982c883 (f592f6d, 7ff50a9, 982c883) — shellx_agent listening_under +5 (package 921); tool_ports 15; suite 3785/9 at f592f6d, 3794 with the follow-up tests.
+- Task 12: 982c883..004cb6d (efee9b5, 36ca72c, 004cb6d) — tool_dialog 17, url_opener_mail 3; suite 3802/9 at efee9b5, 3814 with the follow-up tests.
+- Task 13: 004cb6d..b7cab3f (8116f9f, cd31077, 22865d2, 6ab6247, b7cab3f) — tool_dock_ui 21, tool_ai_header 1, win_floating_engine 11, test/ui 1238; macOS debug build, not launched; suite 3837/9.
+- Task 14: b7cab3f..a7df506 (8fc7e86, f128aea, a7df506) — tool_sidebar 8, test/ui 1246; suite 3845/9.
+- Task 15: a7df506..bc70258 (0d77cad, bc70258) — tool_settings 5, test/ui 1251; suite 3850/9.
+- Task 16: bc70258..this ledger commit (bfff4c0, then the ledger) — tool_engine_test 11 cases (+1), isolated `+13`; no product code changed.
+- Final counts (Task 16 Step 1, HEAD bfff4c0): desktop `flutter analyze` No issues found!; `flutter test` `01:52 +3850 ~9: All tests passed!` (the plan's 3789 + 61 tests added by reviewed rulings), after a first whole run of `+3849 ~9 -1` whose one failure was a timing flake (below); shellx_agent `dart analyze` No issues found!, `dart test` `+921: All tests passed!`; `git diff --stat eb0b6dc -- packages/shellx_core packages/shellx_ai packages/shellx_acp packages/shellx_client apps/mobile relay agent-skills` prints nothing (outside apps/desktop the branch changes only this ledger and shellx_agent's `listening_ports.dart` and its test).
+
+### Results (Task 16, 2026-10-16)
+
+- Compatibility and Review Focus (Step 2): `test/restore/tool_dock_restore_test.dart` + `test/restore/ai_tabs_restore_test.dart` `+16`; `test/tools/tool_registry_test.dart` "Review Focus 4" `+1`; `test/ui/tools/tool_dock_ui_test.dart` "Review Focus 1" `+2`; `tool_keys_test`, `tool_page_test`, `tool_entry_test`, `tool_navigation_test` `+76`. All passed: old builds keep every tab (V1, V2.0); tools never touch the workspace list; one engine through tab, palette and size changes; the forwarded chords; the server coming up; odd URLs and schemes.
+- Privacy and safety sweep (Step 3): `no content logged`, `no bridge`, `no arbitrary loads`, `no Claude Code in tool strings`, `no permission granted`, `version unchanged` (against eb0b6dc). Beyond the six greps: the seven log lines the branch adds anywhere print only an error's `runtimeType`, and every `toString()` it adds prints a type and at most a kind, a count or flags. No finding, no fix.
+- macOS build (Step 4): `flutter build macos --debug` → `✓ Built build/macos/Build/Products/Debug/ShellX.app`, not launched; the `COCOAPODS:` line put back; nothing under `macos/` in `git status`.
+- Isolated real-engine run (Step 5): the Task 16 line above. Bundle id `pro.shellx.desktop.itest` in the throw-away worktree's xcconfig and in the built app (PlistBuddy) before the launch; the app's PID had exited after the SIGTERM, no kill needed; WebKit's data went to the temporary HOME (`Library/WebKit/pro.shellx.desktop.itest`); the throw-away worktree and its folder removed.
+- Isolated smoke launch of the whole app (Step 6): the real app (no `-t`) built in a throw-away worktree of bfff4c0, bundle id `pro.shellx.desktop.itest` checked in the xcconfig and in the built app, temporary HOME, up for 20 s, then SIGTERM to its one direct child (`/bin/zsh`) and to the app: both had exited, no kill needed, and no process ran from the throw-away worktree afterwards. The log's `grep -iE "exception|error|failed"` shows only `restore: backup exclusion failed (TimeoutException)` and `ShellX: AI backup exclusion failed (TimeoutException)` (twice): Time Machine exclusion under a temporary HOME, as expected.
+- Real-home metadata (`ls -lT ~/Library/Preferences/pro.shellx.desktop.*.plist` before Step 5 and after Step 6; names, sizes and mtimes only): `pro.shellx.desktop.itest.plist` 244 B, Oct 15 12:09:41 2026, and `pro.shellx.desktop.smoketest.plist` 178 B, Oct 14 21:56:51 2026, both unchanged; no new file. `~/Library/{WebKit,Caches,HTTPStorages}/pro.shellx.desktop.itest` exist neither before nor after.
+- Timing flake (not on the known list): `test/ui/find_bar_test.dart` "opens focused; typing counts matches "3 of 3"" failed once in the first whole run (count empty) and passed alone (`+7`) and in the second whole run. `FindSession` reads the buffer in 4 ms wall-clock slices; when the first slice does not finish under load, the rest waits for the 150 ms query debounce, which the test's single `pump()` never reaches. The branch touches neither the find bar, its session nor its test.
+
+### Controller rulings beyond R1–R28
+
+Product-behaviour rulings of the SDD ledger, grouped by task, in ledger order within a task (process rulings left out).
+
+- Before Task 1 (F9): the plan's R7, R22, R23 and R24 stand where they differ from the spec's text (the page keeps its editing keys; a redacted `ToolEntry(…)`; V2-4 watches the provider; an isolated build with its own bundle id and HOME) — cost if wrong: as the plan states for each.
+- Task 1: `parseToolUrl` refuses a port too large for an int (`ToolUrlBad(badPort)`), so `ToolEntry.fromJson` never throws and one damaged `workspace_tools` entry never empties the registry (spec §5, §8) — cost if wrong: none.
+- Task 3: with the pinned webview_flutter_wkwebview 3.25.1, a cancelled or flood-answered `prompt()` reaches the page as `""`, not `null` (macOS; Windows keeps WebView2's own dialogs) — accepted as the plugin's limit — cost if wrong: a page that tells cancel from empty input reads a cancel as empty; the later fix is a native prompt panel (~50 lines and an isolated-run test).
+- Task 3 (applied in Task 5): `setInspectable` is best effort — below macOS 13.3 its error is logged by `runtimeType` and setup goes on, so pages load on macOS 12.0–13.2 (spec §8) — cost if wrong: none.
+- Task 3 (applied in Tasks 5 and 7): `UrlChanged` only for a URL with a scheme; a nil or empty URL from WebKit or WebView2 is never the page's address (D9, D17) — cost if wrong: none.
+- Task 5: setup sends nothing native once the engine is disposed (no leaked, re-registered web view) — cost if wrong: none.
+- Task 5: a navigation with no target frame (`target=_blank`, mail and phone links included) is a new window — cancelled, sent as `OpenOutside(newWindow: true)`; frames still block mail and phone (D9) — cost if wrong: none beyond a few native lines.
+- Task 5: `download`-attribute downloads (`blob:`, `data:`, same-origin links) are cancelled and show D9's download line (`shouldPerformDownload`) — cost if wrong: none.
+- Task 5: forwarded chords are named as Flutter names the logical key, so non-Latin and AZERTY-style layouts forward ShellX's chords; US output unchanged (D10, criterion 4) — cost if wrong: on an unusual layout a chord forwards differently from the terminal.
+- Task 5: every public engine method makes no native call once disposed, so no hidden page runs without the D9 policy — cost if wrong: none.
+- Task 5: dispose stops the page and loads `about:blank`, so an unloaded tool frees its scripts, sockets and audio (D5) — cost if wrong: none.
+- Task 7 (F1): an empty data folder means no folder — no WebView2 starts and every call answers `unavailable` (D8) — cost if wrong: a few lines and one test for an environment (no LOCALAPPDATA) a real Windows session never has.
+- Task 7: once disposed, `WinFloatingEngine` makes no plugin call, as on macOS — cost if wrong: a few lines and one test.
+- Task 7: the plugin's `onPageFinished` after a failure is dropped (only `LoadFailed`); a 4xx/5xx page still ends with `LoadFinished`, as on macOS (D13) — cost if wrong: one flag; a failure never followed by a finish is cleared by the next start.
+- Task 7: `_ready` never fails — a failed creation is logged once by `runtimeType`, every call then answers `LoadFailed(unavailable)`, and clearing data never throws because of a failed engine (§8) — cost if wrong: none.
+- Task 7: the plugin's widget mounts only after a successful creation, and dispose frees the plugin's controller only after the view left the tree (no uncaught plugin errors) — cost if wrong: ~30 lines of Windows-only lifecycle code checked only by unit tests with the mock channel.
+- Task 7: accepted known limitation — Windows D9 coverage is narrower than macOS: the plugin asks Dart only about user-initiated GET top-frame navigations and new windows, so redirects, POSTs and back/forward skip the policy (Chromium still blocks top-frame `file:`/`data:`; an external scheme reached by a redirect gets WebView2's own prompt) — cost if wrong: with `tool-embed = on`, a redirect to an external scheme shows WebView2's prompt instead of a silent block (manual check below).
+- Task 8 (raised at Task 1): tools whose workspace no longer exists (deleted by an older build, or a damaged workspace list) are removed once at start: the dock controller drops every registry tool whose `ws` is not a loaded sidebar workspace (D2, §8) — cost if wrong: such a tool is deleted at the next start instead of staying invisible.
+- Task 10 (raised at Task 5): R10's burst numbers also limit page-initiated outside opens — at most 5 per 10 s per page, extras dropped silently — cost if wrong: a 6th outside open within 10 s is dropped and the user clicks again.
+- Task 10: dropped outside opens count toward that window, as dropped dialogs do (one shared helper) — cost if wrong: a looping page's next legitimate outside open waits for 10 s of calm.
+- Task 10: the recovery URL is the one that failed — until a `LoadFinished`, every retry, R9 knock, crash reload and panel Reload loads the URL the app asked for (the new one after a D23 edit, the tool after "Về tool"); after it, the page's own address; a knock loads only if its target is still the recovery URL (D23, D9) — cost if wrong: a few lines; ↻ unchanged.
+- Task 10: a crash before the asked-for load finished reloads what was asked; a crash after a committed page reloads the page's address — cost if wrong: a crash in the middle of a redirected first load restarts from the tool's URL.
+- Task 10: ✕ ends the loading state, and ↻ after ✕ runs the pending load again with `load`, never `engine.reload()` (D17, R25) — cost if wrong: after ✕ of an edit, a later link failure retries the stopped URL (rare).
+- Task 11: R12's runtime copy (F8) builds every desktop AI pane's runtime (the `AiHost.runtime` branch is unused in production); a tripwire test pins `AiHost.runtime`'s text and fails, naming the copy, when it changes — cost if wrong: one test that fails whenever `AiHost.runtime` changes (intended).
+- Task 12: with embedding off, ⌘⇧B on a workspace with no tool adds one and then opens it in the browser (R20, D20) — cost if wrong: one browser open after adding through ⌘⇧B with embedding off.
+- Task 13: R14 split by file — the window's tab selections end loose (⌘1…9 and the palette's tab entries, Next/Previous tab, the sidebar row's click, Enter and Space); the notification jump and the CLI `ui focus` were parked — cost if wrong: after a notification click on the tab selected underneath, loose stays until the user clicks the row (the jump was then fixed by the R14-gap ruling below).
+- Task 13: `WinFloatingEngine` re-applies the last asked visibility after the plugin's widget mounts or re-activates, so a covered page stays hidden (D7) — cost if wrong: ~10 lines and one test in Task 7's file.
+- Task 13: the loose panel has its own focus node, so closing a loose dock with no tab keeps the keyboard in ShellX (D10, D18) — cost if wrong: one more focus node and test.
+- Task 13: a key that selects no tab (⌘9 with fewer tabs; Next/Previous with none visible) keeps loose (R14) — cost if wrong: ⌘9 with no ninth tab leaves loose on screen.
+- Task 13: R14 gap — the notification jump (`TabAttention.jumpTo`), a search hit and a focus-history move also end loose; the CLI `ui focus` stays a deferred minor for the final review — cost if wrong: an agent's `ui focus` of the covered tab leaves loose on screen until the user clicks the row.
+- Task 13: while loose, Swap/Join pane and the commands that act on the covered tab (Move to workspace, Pin, Close whole tab) are disabled and the move list is empty (R14) — cost if wrong: a palette command acts on a tab the user cannot see.
+- Task 13: narrow windows — when an unzoomed dock would not show at the current width (content below 686 px, a window below ~907 px), a window entry point that opens a dock opens it expanded; Restore and Esc keep their meaning (spec §8) — cost if wrong: in a narrow window a tool opens full-width instead of not at all.
+- Task 13: parked for the final review — `TabAttention` treats the selected tab's focused pane as in view while a zoomed dock or a loose panel covers it, so its bells are dropped and its notices marked read — cost if wrong: while a tool is expanded or a loose dock shows, a bell from the covered focused pane is not announced.
+- Task 13: while loose, a file dropped on the area types nothing (`PaneDropTarget` off) (R14) — cost if wrong: one line and one test.
+- Task 13: ⌘⇧B or 🧩 on an open dock that the width hides shows it expanded instead of closing it (D10) — cost if wrong: a few lines in the window's toggle handler.
+- Task 13: while loose, a keyed user command runs nothing and shows D35's "no terminal" toast; Copy, Find next/end and workspace font zoom stay — cost if wrong: a keyed user command while loose gives the "no terminal" toast.
+- Task 14: the sidebar's own keyboard selection (arrows, Home, End) ends loose where it selects a tab, not on a header move (R14) — cost if wrong: one line and one test.
+- Task 14: a tool row's height holds both lines at any text size and stays 36 at 1× (D18) — cost if wrong: one test.
+- Task 14: the list's own focus is a Tab stop only when it has tab rows or headers to walk, not for a Tools group alone (UI §3.6) — cost if wrong: one test.
+- Task 14: amendment — no loose-ending in the one-workspace branch (a single workspace cannot be loose while it has a tab, so there it could only end loose with no tab chosen) — cost if wrong: none.
+- Task 14: the footer stays one row — "New AI session" keeps its whole label; "Add tool" is a compact 🧩 icon button whose tooltip and Semantics label read "Add tool" (D21, D18) — cost if wrong: "Add tool" shows its name only on hover or VoiceOver; a stacked two-row footer is the alternative.
+- Task 15: a confirmed "Clear tool data…" clears even when Settings closes under its question (D8) — cost if wrong: one test.
+- Task 15: Add, Edit and Delete (Settings and the sidebar menu) take every provider before their first await, so they finish when Settings closes under their question (D22, D23) — cost if wrong: one test.
+- Task 16 (prepared): the R9 knock for `*.localhost` and `0.0.0.0` tools is not probed here (a `.localhost` lookup may leave the machine); it goes to the final review as a fix-wave candidate (the knock dials loopback for D11-local names other than `localhost`) — cost if wrong: such tools wait for the 10 s schedule instead of the 1 s knock.
+
+### Windows
+
+- Windows: the controller pushes `windows-check/v2-3`; result pending (the user reads it).
+
+### Manual checks (spec §11)
+
+§11.1 macOS (a real Mac, macOS 14 or later and, if possible, macOS 12):
+1. Add a Vite app's `http://localhost:<port>` as a tool: the page shows in the tool area; a window resize leaves no stale frame — pending manual.
+2. The palette (⌘⇧P), context menus, toasts and the notifications panel draw over the page — pending manual.
+3. Telex `tieesng vieejt` typed into a field in the page gives "tiếng việt", underlined while composing; ⌘C/⌘V inside the page — pending manual.
+4. A click into the AI pane's input types there; a click back into the page gives the page the keys — pending manual.
+5. While the page has the keyboard: ⌘T opens a tab, ⌘⇧B closes the tool area, ⌘1 goes to tab 1 — pending manual.
+6. Trackpad scrolling; the pointer changes over links — pending manual.
+7. `http://127.0.0.1:<port>` loads (ATS, D19) — pending manual.
+8. Sign in to a tool, quit, reopen: still signed in; Safari does not see that cookie — pending manual.
+9. VoiceOver reads the tool's bar; note how far it reads the page — pending manual.
+
+§11.2 Windows (Windows 10 1809+ or 11, at 100 % and 150 %), with `tool-embed = on` in the config file:
+1. Items 1, 3 (UniKey/EVKey Telex and the built-in Telex), 4, 6 and 8 as on macOS — pending manual.
+2. Opening the palette, a menu or a dialog hides the page and shows the stand-in; closing the overlay puts the page back in place — pending manual.
+3. At 150 %: sharp text, clicks land where aimed — pending manual.
+4. Dragging the tool area's width, minimizing and maximizing the window: the page follows its frame and never sticks out — pending manual.
+5. A machine without the WebView2 Runtime shows the D8 notice (§8) — pending manual.
+
+Passing all five §11.2 items is what flips `auto` to embed on Windows: one line in `toolsEmbedded`, with its test.
+
+Manual checks added during execution:
+- macOS: ShellX shortcuts from a tool page on non-US layouts (Russian, Hebrew, Arabic, AZERTY, Turkish F) — pending manual.
+- macOS: a click outside the page returns the keyboard to Flutter — pending manual.
+- macOS: an export through a `download`-attribute link shows the download line — pending manual.
+- The sidebar footer at its fixed 220 px: "New AI session" shows its whole label (EN and VI) and "Add tool" is a 🧩 icon button whose tooltip reads "Add tool" (macOS and Windows fonts) — pending manual.
+- A window narrower than about 907 px: opening a tool shows its dock expanded; Restore hides it; ⌘⇧B shows it again — pending manual.
+- A tool of a workspace without a tab ("loose"): a notification click, a search hit or focus history onto the tab selected underneath ends it; a file dropped on the empty area types nothing anywhere — pending manual.
+- Windows with `tool-embed = on`: a page redirect to `mailto:` or a custom scheme (WebView2's own prompt shows instead of a silent block), a form POST to another origin, back/forward (D9 coverage is narrower than on macOS) — pending manual.
+- Windows: the Add dialog's port suggestions appear within 2 s from a cold PowerShell/CIM start (criterion 2) — pending manual.
+- Windows with `tool-embed = on`: opening the palette while a tool's WebView2 is still starting keeps the page hidden behind the stand-in — pending manual.
+- The 1 s knock for tools at `*.localhost` and `0.0.0.0` (criterion 5) — pending manual.
+- ⌘⇧B with `tool-embed = off` on a workspace without tools: adding opens the browser — pending manual.
+
+### Follow-ups
+
+- `agent-skills/`: tell agents that tools exist (R19).
+- V2-4 (tools on the phone) consumes Task 1's interface (`ToolEntry`, `parseToolUrl`, `ToolUrlResult`, `ToolRegistry`, `toolRegistryProvider`; commits eb0b6dc..54489b9).
+- A6's full browser can resume on this engine (D6): `BrowserEngine` without the bridge (R3), the macOS and Windows engines, and `browser_url.dart` kept for it (R27).
 
 ## V2-3 (tools, desktop) — planning rulings
 
