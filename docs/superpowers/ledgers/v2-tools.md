@@ -56,11 +56,11 @@
 - Isolated real-engine run (Step 5): the Task 16 line above. Bundle id `pro.shellx.desktop.itest` in the throw-away worktree's xcconfig and in the built app (PlistBuddy) before the launch; the app's PID had exited after the SIGTERM, no kill needed; WebKit's data went to the temporary HOME (`Library/WebKit/pro.shellx.desktop.itest`); the throw-away worktree and its folder removed.
 - Isolated smoke launch of the whole app (Step 6): the real app (no `-t`) built in a throw-away worktree of bfff4c0, bundle id `pro.shellx.desktop.itest` checked in the xcconfig and in the built app, temporary HOME, up for 20 s, then SIGTERM to its one direct child (`/bin/zsh`) and to the app: both had exited, no kill needed, and no process ran from the throw-away worktree afterwards. The log's `grep -iE "exception|error|failed"` shows only `restore: backup exclusion failed (TimeoutException)` and `ShellX: AI backup exclusion failed (TimeoutException)` (twice): Time Machine exclusion under a temporary HOME, as expected.
 - Real-home metadata (`ls -lT ~/Library/Preferences/pro.shellx.desktop.*.plist` before Step 5 and after Step 6; names, sizes and mtimes only): `pro.shellx.desktop.itest.plist` 244 B, Oct 15 12:09:41 2026, and `pro.shellx.desktop.smoketest.plist` 178 B, Oct 14 21:56:51 2026, both unchanged; no new file. `~/Library/{WebKit,Caches,HTTPStorages}/pro.shellx.desktop.itest` exist neither before nor after.
-- Timing flake (not on the known list): `test/ui/find_bar_test.dart` "opens focused; typing counts matches "3 of 3"" failed once in the first whole run (count empty) and passed alone (`+7`) and in the second whole run. `FindSession` reads the buffer in 4 ms wall-clock slices; when the first slice does not finish under load, the rest waits for the 150 ms query debounce, which the test's single `pump()` never reaches. The branch touches neither the find bar, its session nor its test.
+- Timing flake (not among the plan's known timing-flaky files): `test/ui/find_bar_test.dart` "opens focused; typing counts matches "3 of 3"" failed once in the first whole run (count empty) and passed alone (`+7`) and in the second whole run. `FindSession` reads the buffer in 4 ms wall-clock slices; when the first slice does not finish under load, the rest waits for the 150 ms query debounce, which the test's single `pump()` never reaches. The branch touches neither the find bar, its session nor its test.
 
 ### Controller rulings beyond R1–R28
 
-Product-behaviour rulings of the SDD ledger, grouped by task, in ledger order within a task (process rulings left out).
+The controller's product-behaviour rulings made during execution, grouped by task, in the order they were made within a task (process and test-only rulings left out).
 
 - Before Task 1 (F9): the plan's R7, R22, R23 and R24 stand where they differ from the spec's text (the page keeps its editing keys; a redacted `ToolEntry(…)`; V2-4 watches the provider; an isolated build with its own bundle id and HOME) — cost if wrong: as the plan states for each.
 - Task 1: `parseToolUrl` refuses a port too large for an int (`ToolUrlBad(badPort)`), so `ToolEntry.fromJson` never throws and one damaged `workspace_tools` entry never empties the registry (spec §5, §8) — cost if wrong: none.
@@ -151,6 +151,30 @@ Manual checks added during execution:
 - `agent-skills/`: tell agents that tools exist (R19).
 - V2-4 (tools on the phone) consumes Task 1's interface (`ToolEntry`, `parseToolUrl`, `ToolUrlResult`, `ToolRegistry`, `toolRegistryProvider`; commits eb0b6dc..54489b9).
 - A6's full browser can resume on this engine (D6): `BrowserEngine` without the bridge (R3), the macOS and Windows engines, and `browser_url.dart` kept for it (R27).
+
+### Final review (2026-10-16)
+
+Verdict: With fixes; no Critical. One fix wave on a2fe9c1, one commit per item, each with its tests:
+
+1. D10 — ⌘⇧B on a closed dock without chips reopens the tool viewed last: the chip last on show however it got there (opened or chosen, the one a closed chip handed over to, the restored one); the first tool only when that one no longer exists — 9667cf3 (`tool_dock_ui_test` "⌘⇧B on a closed dock without chips reopens the tool viewed last: …", both probes).
+2. D13 — a D23 edit that moves the URL and D9 "Back to tool" restart the retry back-off (1, 2, 4, 8, then every 10 s, only while shown; an edit made while hidden gets its 1 s once shown) and get their own crash reload — 4f3235e (`tool_page_test` "a URL the app newly asks for …", "an edited URL and "Back to tool" get their own crash reload").
+3. A pane under a zoomed dock or a loose panel is not in view: one predicate, `toolPanesCovered` (`toolPanesCoveredProvider`), the rule ToolArea draws by; A4's "seen" and A12's "watched" exclude a covered pane, so its bells, notices and Claude's permission requests badge the tab and arrive; the 1 s dwell re-arms when the panes show again — b40fca6 (`attention_covered_test` 5 tests; `tool_dock_test` "the panes are covered by …"; `tool_dock_state_test` "toolDockCoversPanes …"; `tool_dock_ui_test` "the panes count as covered exactly …").
+4. §8 — closing the last tab of the shown workspace with its dock open and embedded keeps that workspace on screen loose, after A2's successor selection: the same page, no reload; a closed dock or tools in the browser keep A2's behaviour — f8d3438 (`tool_dock_ui_test` "closing the last tab of the shown workspace …"; `tool_dock_test` group "§8: the last tab of the shown workspace closes", 3 tests).
+5. R18 — after a failed edit or "Back to tool" the error panels' browser button opens the URL that failed (`ToolPage.recoveryUrl`), and the bar shows no "On {host}" until the asked-for URL loads — 0c33ad1 (`tool_page_test` "after an edit or "Back to tool", the page is not "away" …", "recoveryUrl is the URL a failure is about …"; `tool_dock_ui_test` "after a failed edit the bar says no "On {host}" …").
+6. Drops — the terminal's drop target and the AI composer's refuse drops while item 3's predicate holds (desktop_drop routes a drop by bounds, not by what is on top) — 327b635 (`tool_dock_ui_test` "a file dropped on a zoomed dock …", "an image dropped over a zoomed dock or over the panel of a workspace shown without a tab …").
+7. `tool-embed = off` closes every live page (engines disposed); switched back on, a tool shown loads again — 6ce3170 (`tool_dock_ui_test` "switching tool-embed to off closes every live page …").
+8. R9 — the knock dials `localhost` for a `*.localhost` tool and `127.0.0.1` for `0.0.0.0`; any other host as it is — e02a59e (`tool_page_test` "toolKnockHost: …", "the knock dials loopback …").
+
+Parked findings (ruling, cost if wrong):
+- Toasts and the key-sequence pill under a zoomed dock or a loose panel: the notice layer lives in TerminalPane, which those cover — parked, next fix candidate — cost if wrong: a toast or the pill is not seen while a tool is expanded or a workspace shows loose.
+- The refused panel blinks on each retry (it goes while the retry loads and comes back when refused): keeping it until a page commits needs a "committed" signal from the engines — parked — cost if wrong: a short blink at each retry while the server is down.
+- Retries and the R9 knock go on while the window is minimized (the page still counts as shown, D13) — parked — cost if wrong: one local connect per second, and a reload every 10 s, while minimized.
+- Deleting a workspace silently deletes its tools (D2, §8): telling the user needs new strings — the user's decision — cost if wrong: the tools go without a word.
+- Polish: `toggleToolsShortcutLabel()` is unused — parked — cost if wrong: none. (ToolArea's inline copy of `dockWorkspaceOf`, parked with it, went with item 3: `dockWorkspaceOf` moved next to the shared predicate in `tool_dock.dart`, and ToolArea calls it.)
+
+Manual checks this review added:
+- Open a tool with ⌘⇧B and type at once: the keys reach the page (the first `focusContent` may run before the platform view is in a window) — pending manual.
+- With a tool expanded, or a workspace shown loose, a Claude permission request in the covered pane badges its tab — pending manual.
 
 ## V2-3 (tools, desktop) — planning rulings
 
