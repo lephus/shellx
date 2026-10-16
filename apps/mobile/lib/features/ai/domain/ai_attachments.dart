@@ -89,8 +89,9 @@ enum AiImageProblem {
 ///   and the scan on are copied as they are. Both pickers keep the sensor's pixels of a camera photo and its Exif
 ///   Orientation, so when the first Exif held one of 2-8 an Exif that holds only it is put back, after the JFIF
 ///   segment (right after the start of the image when there is none): the photo would otherwise turn sideways.
-///   Metadata after the first scan header (more scans, bytes after the end of the picture) is not looked for:
-///   the pickers write none there.
+///   Everything after the end of the picture (its first EOI) goes: some cameras append further images there (MPF
+///   depth or gain maps), each with an Exif and an XMP of its own. Between the scans of a progressive picture
+///   metadata is not looked for: the pickers write none there. A picture cut before its EOI is kept to its end.
 /// - PNG: the `eXIf`, `tEXt`, `iTXt`, `zTXt` and `tIME` chunks are dropped, the rest copied as it is. Bytes after
 ///   `IEND` are no part of the picture and go.
 /// - WebP: the `EXIF` and `XMP ` chunks are dropped, their flags cleared in `VP8X`, the RIFF size written again.
@@ -128,8 +129,10 @@ Uint8List? _jpegWithoutMetadata(Uint8List b) {
     if (j == i || j >= n) return null; // a stray byte where a marker belongs, or the end before any scan
     final code = b[j];
     if (code == 0xDA) {
-      // The scan header: it and all that follows stay as they are.
-      if (!dropped) return b;
+      // The scan header: it and all that follows stay as they are, up to the end of the picture.
+      final stop = _jpegEnd(b, i);
+      if (stop == null) return null;
+      if (!dropped) return stop == n ? b : Uint8List.fromList(_view(b, 0, stop));
       final out = BytesBuilder(copy: false)..add(_view(b, 0, 2));
       var k = 0;
       while (k < kept.length && kept[k].app0) {
@@ -140,7 +143,7 @@ Uint8List? _jpegWithoutMetadata(Uint8List b) {
       for (; k < kept.length; k++) {
         out.add(_view(b, kept[k].start, kept[k].end));
       }
-      out.add(_view(b, i, n));
+      out.add(_view(b, i, stop));
       return out.takeBytes();
     }
     // SOI, EOI, RSTn, TEM and the reserved markers have no length and have no place before the scan.
@@ -160,6 +163,55 @@ Uint8List? _jpegWithoutMetadata(Uint8List b) {
     }
     i = end;
   }
+}
+
+/// Where the picture of [b] ends: just after its first EOI, walked from the first scan header at [from] — segments by
+/// their lengths, the entropy-coded data of each scan byte by byte (a 0xFF in it is followed by 0x00, a restart marker
+/// or more 0xFF before a marker). The end of [b] when there is no EOI (a picture cut short); null when a segment does
+/// not walk (a length past the end or under 2, a marker that has no place there).
+int? _jpegEnd(Uint8List b, int from) {
+  final n = b.length;
+  var i = from;
+  while (i < n) {
+    var j = i; // the marker code, after at least one 0xFF (more are fill bytes)
+    while (j < n && b[j] == 0xFF) {
+      j++;
+    }
+    if (j == i) return null; // a stray byte where a marker belongs
+    if (j >= n) return n;
+    final code = b[j];
+    if (code == 0xD9) return j + 1;
+    if (code < 0xC0 || code == 0xD8) return null; // SOI, TEM, a reserved marker: no place after a scan
+    if (code >= 0xD0 && code <= 0xD7) {
+      i = j + 1; // a restart marker outside a scan's data: no length
+      continue;
+    }
+    if (j + 2 >= n) return null;
+    final length = (b[j + 1] << 8) | b[j + 2];
+    final end = j + 1 + length;
+    if (length < 2 || end > n) return null;
+    i = end;
+    if (code != 0xDA) continue;
+    // The scan's data, up to the next marker.
+    while (i < n) {
+      if (b[i] != 0xFF) {
+        i++;
+        continue;
+      }
+      var k = i + 1;
+      while (k < n && b[k] == 0xFF) {
+        k++;
+      }
+      if (k >= n) return n;
+      final next = b[k];
+      if (next == 0x00 || (next >= 0xD0 && next <= 0xD7)) {
+        i = k + 1; // a stuffed 0xFF or a restart: still the scan's data
+        continue;
+      }
+      break; // a marker: i is at its first 0xFF
+    }
+  }
+  return n;
 }
 
 bool _isExif(Uint8List b, int start, int end) =>

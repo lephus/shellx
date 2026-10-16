@@ -392,6 +392,54 @@ void main() {
       },
     );
 
+    test('JPEG: what follows the end of the picture goes — the images a camera appends after it (MPF depth or gain '
+        'maps), each with an Exif and an XMP of its own', () {
+      final appended = [..._soi, ..._exif(Endian.big, orientation: 6), ..._xmp, ..._dqt, ..._sos, ..._scan];
+      final picture = [..._soi, ..._jfif, ..._dqt, ..._sos, ..._scan];
+      final clean = aiWithoutMetadata(Uint8List.fromList([...picture, ...appended]), 'image/jpeg');
+      expectClean(clean, 'image/jpeg', picture);
+      expect(String.fromCharCodes(clean!), isNot(contains('Exif')));
+      expect(String.fromCharCodes(clean), isNot(contains('xmpmeta')));
+      // With metadata before the scan too: both go.
+      expectClean(
+        aiWithoutMetadata(
+          Uint8List.fromList([..._soi, ..._jfif, ..._xmp, ..._dqt, ..._sos, ..._scan, ...appended]),
+          'image/jpeg',
+        ),
+        'image/jpeg',
+        picture,
+      );
+    });
+
+    test('JPEG: the end of the picture is found past restart markers, stuffed bytes, fill bytes and further scans '
+        '(progressive); a picture without one stays as it is', () {
+      final dht = _segment(0xC4, [0x00, ...List.filled(16, 0), 1, 2]);
+      final progressive = [
+        ..._soi, ..._jfif, ..._dqt, //
+        ..._sos, 0x12, 0xFF, 0x00, 0xFF, 0xD0, 0x34, 0xFF, 0xD7, 0x56, // a scan: a stuffed 0xFF, restarts
+        0xFF, ...dht, // a fill byte, then a table for the next scan
+        ..._sos, 0x78, 0xFF, 0x00, 0x9A, 0xFF, 0xFF, 0xD9, // the next scan, a fill byte, the end
+      ];
+      expectClean(
+        aiWithoutMetadata(
+          Uint8List.fromList([...progressive, ..._soi, ..._exif(Endian.little), 0x01, 0x02]),
+          'image/jpeg',
+        ),
+        'image/jpeg',
+        progressive,
+      );
+      final cut = Uint8List.fromList([..._soi, ..._jfif, ..._dqt, ..._sos, 0x12, 0x34, 0xFF, 0x00]);
+      expect(aiWithoutMetadata(cut, 'image/jpeg'), cut);
+      // A segment between scans that runs past the end: what cannot be walked is none.
+      expect(
+        aiWithoutMetadata(
+          Uint8List.fromList([..._soi, ..._jfif, ..._sos, 0x12, 0xFF, 0xC4, 0x7F, 0xFF, 0x00]),
+          'image/jpeg',
+        ),
+        isNull,
+      );
+    });
+
     test('JPEG: nothing to remove: the same bytes', () {
       final plain = jpeg([_jfif, _dqt]);
       expect(aiWithoutMetadata(plain, 'image/jpeg'), plain);
