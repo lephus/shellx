@@ -70,6 +70,7 @@ import 'src/terminal/paste_image_store.dart'
 import 'src/terminal/port_watch.dart';
 import 'src/terminal/tab_attention.dart';
 import 'src/terminal/terminal_tabs.dart';
+import 'src/tools/tool_phone.dart';
 import 'src/ui/theme/font_licenses.dart';
 import 'src/tray/tray_action.dart';
 import 'src/tray/tray_actions.dart';
@@ -284,6 +285,9 @@ Future<void> _start(_Startup startup) async {
   // Runs after the shutdown. Each step is bounded, so quitting always ends
   // in exit(0).
   Future<void> quitApp() async {
+    // V2-4 E5: a phone on a tool page hears the window quit (in-process); the
+    // background service keeps serving its last list. Never throws.
+    stopToolPhone(container);
     // V2-2 D1: a phone that still mirrors an AI session hears the window
     // quit, not its agent stop; the agent side's slot answers "unavailable"
     // from then on. V2-1 §6: then no agent outlives the app (stdin closed,
@@ -703,6 +707,10 @@ Future<void> _start(_Startup startup) async {
   // below, so the hub is there before any phone can attach. Never throws:
   // the window is shown whatever happens here.
   startAiPhone(container, slot: side?.core.ai);
+  // V2-4 E5: phones reach the tools on for them — through this process's
+  // proxy (the agent side's slot), or the background service's (the list goes
+  // there). Never throws.
+  startToolPhone(container, slot: side?.core.tools);
   container.read(windowRouterProvider.notifier).showTerminal();
   if (daemonMode) {
     // UI-A5 §7.3, §7.4: the dialogs come over the window; leaving them is
