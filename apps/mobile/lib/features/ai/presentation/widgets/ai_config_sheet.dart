@@ -34,10 +34,6 @@ class _AiConfigSheetState extends State<AiConfigSheet> {
   AiConfigView? _view;
   String? _error;
 
-  /// The option (its id, or `mode` for the legacy modes) whose choice is on its way: nothing else is
-  /// sent meanwhile.
-  String? _busy;
-
   @override
   void initState() {
     super.initState();
@@ -53,14 +49,15 @@ class _AiConfigSheetState extends State<AiConfigSheet> {
     });
   }
 
-  Future<void> _set(String key, Future<String?> Function() send) async {
-    if (_busy != null) return;
-    setState(() => _busy = key);
+  /// One choice, sent by the controller — one of the session's at a time, whichever sheet sent it
+  /// ([AiSessionController.configuring]; another meanwhile sends nothing and says nothing).
+  Future<void> _set(Future<String?> Function() send) async {
     final code = await send();
     if (!mounted) return;
-    setState(() => _busy = null);
     if (code == null) {
-      Navigator.of(context).pop();
+      // Only the sheet itself, and only while it is the route on top: an answer that comes while it is being swiped
+      // away would otherwise close the session page under it (and the photos of its composer with it).
+      if (ModalRoute.of(context)?.isCurrent ?? false) Navigator.of(context).pop();
       return;
     }
     final s = S.of(context);
@@ -69,7 +66,11 @@ class _AiConfigSheetState extends State<AiConfigSheet> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Watch(_content);
+
+  Widget _content(BuildContext context) {
+    // Read first, always: a `Watch` follows what its last tracked run read.
+    final busy = widget.controller.configuring.value;
     final s = S.of(context);
     final colors = context.colors;
     final view = _view;
@@ -94,8 +95,8 @@ class _AiConfigSheetState extends State<AiConfigSheet> {
                 style: context.typo.paragraph.copyWith(color: colors.secondaryText),
               )
             else ...[
-              for (final o in view.options) ..._option(context, o),
-              if (view.modes case final modes?) ..._modes(context, modes),
+              for (final o in view.options) ..._option(context, o, busy: busy),
+              if (view.modes case final modes?) ..._modes(context, modes, busy: busy),
             ],
           ],
         ),
@@ -103,7 +104,7 @@ class _AiConfigSheetState extends State<AiConfigSheet> {
     );
   }
 
-  List<Widget> _option(BuildContext context, AiConfigOptionView o) {
+  List<Widget> _option(BuildContext context, AiConfigOptionView o, {required bool busy}) {
     final s = S.of(context);
     if (o.isSwitch) {
       return [
@@ -112,7 +113,7 @@ class _AiConfigSheetState extends State<AiConfigSheet> {
           contentPadding: EdgeInsets.zero,
           title: Text(o.name),
           value: o.current == true,
-          onChanged: _busy != null ? null : (on) => _set(o.id, () => widget.controller.setConfig(o.id, on)),
+          onChanged: busy ? null : (on) => _set(() => widget.controller.setConfig(o.id, on)),
         ),
       ];
     }
@@ -131,14 +132,14 @@ class _AiConfigSheetState extends State<AiConfigSheet> {
           for (final c in o.choices)
             (c, o.category == 'mode' ? AiWords.modeName(s, c.value, c.name) ?? c.name : c.name),
         ],
-        busy: _busy != null,
-        onPick: (value) => _set(o.id, () => widget.controller.setConfig(o.id, value)),
+        busy: busy,
+        onPick: (value) => _set(() => widget.controller.setConfig(o.id, value)),
       ),
       if (o.more) _More(s.aiConfigMore),
     ];
   }
 
-  List<Widget> _modes(BuildContext context, AiModesView modes) {
+  List<Widget> _modes(BuildContext context, AiModesView modes, {required bool busy}) {
     final s = S.of(context);
     return [
       _Header(s.aiConfigMode),
@@ -146,8 +147,8 @@ class _AiConfigSheetState extends State<AiConfigSheet> {
         id: 'mode',
         current: modes.current,
         choices: [for (final c in modes.choices) (c, AiWords.modeName(s, c.value, c.name) ?? c.name)],
-        busy: _busy != null,
-        onPick: (value) => _set('mode', () => widget.controller.setMode(value)),
+        busy: busy,
+        onPick: (value) => _set(() => widget.controller.setMode(value)),
       ),
       if (modes.more) _More(s.aiConfigMore),
     ];
