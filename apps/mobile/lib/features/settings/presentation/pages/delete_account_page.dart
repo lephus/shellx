@@ -96,9 +96,13 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                         const Spacer(),
                         24.sizedHeight,
                         Watch((context) {
+                          // Read first, always: a Watch follows only what its last tracked run read, and [busy] is
+                          // the outer Watch's (to this one a plain value). Read only when not busy, a field cleared
+                          // during a deletion would leave the button deaf to the field from then on.
+                          final hasPassword = _hasPassword.value;
                           final state = busy
                               ? ButtonState.loading
-                              : _hasPassword.value
+                              : hasPassword
                               ? ButtonState.available
                               : ButtonState.disable;
                           return AppButton(

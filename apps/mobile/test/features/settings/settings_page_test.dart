@@ -567,6 +567,28 @@ void main() {
       expect(find.text('Thử lại sau ít phút.'), findsOneWidget);
     });
 
+    testWidgets('the password cleared while a deletion is pending, typed again once it failed: the button follows '
+        'the field again (its Watch reads the field first, whatever the page\'s busy says)', (tester) async {
+      final gate = Completer<void>();
+      session
+        ..deleteGate = gate
+        ..deleteError = const ApiException(status: 401, code: 'invalid_credentials', message: 'no');
+      await openDeletePage(tester);
+      await tester.enterText(find.byType(TextField), 'wrong');
+      await tester.pump();
+      await tester.tap(find.text('Xóa vĩnh viễn'));
+      await tester.pump();
+      expect(deleteButton(tester).state, ButtonState.loading);
+      await tester.enterText(find.byType(TextField), '');
+      await tester.pump();
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(deleteButton(tester).state, ButtonState.disable);
+      await tester.enterText(find.byType(TextField), 'right');
+      await tester.pump();
+      expect(deleteButton(tester).state, ButtonState.available);
+    });
+
     testWidgets('while a deletion is pending, back navigation and "Hủy" do nothing', (tester) async {
       final gate = Completer<void>();
       session.deleteGate = gate;
