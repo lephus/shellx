@@ -257,38 +257,48 @@ class _TurnEnd extends StatelessWidget {
       _ => s.aiTurnSummary(item.turn, time),
     };
     final files = item.files;
+    final changed = files != null && files > 0;
     final parts = [
       head,
-      if (files != null && files > 0) '${s.aiTurnFiles(files)} +${item.plus} −${item.minus}',
+      if (changed) '${s.aiTurnFiles(files)} +${item.plus} −${item.minus}',
     ];
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
+    // V2-2b B20: a turn that changed files opens them ("Thay đổi"), when the computer offers it.
+    final onChanges = changed ? AiItemActions.maybeOf(context)?.onChanges : null;
+    // The summary can be long on a narrow phone ("Đã dừng lượt 12 · 1:02:03 · 120 tệp đổi +1234 −567"): it wraps
+    // within most of the width and the lines at its sides take what is left.
+    Widget summary = LayoutBuilder(
+      builder: (context, box) => Row(
         children: [
-          // The summary can be long on a narrow phone ("Đã dừng lượt 12 · 1:02:03 · 120 tệp đổi +1234
-          // −567"): it wraps within most of the width and the lines at its sides take what is left.
-          LayoutBuilder(
-            builder: (context, box) => Row(
-              children: [
-                Expanded(child: Divider(color: colors.divider)),
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: box.maxWidth * 0.8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text(
-                      parts.join(' · '),
-                      textAlign: TextAlign.center,
-                      style: context.typo.metadata12.copyWith(color: colors.secondaryText),
-                    ),
-                  ),
-                ),
-                Expanded(child: Divider(color: colors.divider)),
-              ],
+          Expanded(child: Divider(color: colors.divider)),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: box.maxWidth * 0.8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                parts.join(' · '),
+                textAlign: TextAlign.center,
+                style: context.typo.metadata12.copyWith(color: onChanges == null ? colors.secondaryText : colors.link),
+              ),
             ),
           ),
-          if (item.error != null) _Hint(item.error!),
+          Expanded(child: Divider(color: colors.divider)),
         ],
       ),
+    );
+    if (onChanges != null) {
+      summary = InkWell(
+        key: ValueKey('ai.turnEnd.${item.turn}'),
+        onTap: () => onChanges(item.turn),
+        // At least 44 points under the finger.
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child: Center(child: summary),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(children: [summary, if (item.error != null) _Hint(item.error!)]),
     );
   }
 }

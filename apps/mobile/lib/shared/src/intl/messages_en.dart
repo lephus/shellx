@@ -22,161 +22,177 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m0(agent) => "${agent} asks you";
 
-  static String m1(agent) => "Message ${agent}…";
+  static String m1(n) =>
+      "${Intl.plural(n, one: '1 more file — see it on the computer.', other: '${n} more files — see them on the computer.')}";
 
-  static String m2(percent) => "Context ${percent}%";
+  static String m2(agent) => "Message ${agent}…";
 
-  static String m3(count) => "${count} lines in all; the middle is on the computer";
+  static String m3(percent) => "Context ${percent}%";
 
-  static String m4(n) => "${Intl.plural(n, one: '1 image', other: '${n} images')}";
+  static String m4(count) => "${count} lines in all; the middle is on the computer";
 
-  static String m5(part, parts) => "Loading ${part}/${parts}";
+  static String m5(turn) => "Compared with the start of turn ${turn}";
 
-  static String m6(count) => "${Intl.plural(count, one: '+1 more file', other: '+${count} more files')}";
+  static String m6(n) => "${Intl.plural(n, one: '1 image', other: '${n} images')}";
 
-  static String m7(agent) => "${agent} doesn\'t take images.";
+  static String m7(part, parts) => "Loading ${part}/${parts}";
 
-  static String m8(agent, code) => "${agent} stopped unexpectedly (exit ${code}).";
+  static String m8(count) => "${Intl.plural(count, one: '+1 more file', other: '+${count} more files')}";
 
-  static String m9(agent) => "${agent} sent output ShellX cannot read and was stopped.";
+  static String m9(agent) => "${agent} doesn\'t take images.";
 
-  static String m10(agent) => "${agent} needs you to sign in, on the computer.";
+  static String m10(agent, code) => "${agent} stopped unexpectedly (exit ${code}).";
 
-  static String m11(agent) => "${agent} was not found on the computer.";
+  static String m11(agent) => "${agent} sent output ShellX cannot read and was stopped.";
 
-  static String m12(agent, version) => "${agent} needs Node.js ${version} or newer on the computer.";
+  static String m12(agent) => "${agent} needs you to sign in, on the computer.";
 
-  static String m13(agent) => "${agent} is not installed on the computer.";
+  static String m13(agent) => "${agent} was not found on the computer.";
 
-  static String m14(agent) => "${agent} could not start.";
+  static String m14(agent, version) => "${agent} needs Node.js ${version} or newer on the computer.";
 
-  static String m15(reason) => "Undo is off for this project (${reason}).";
+  static String m15(agent) => "${agent} is not installed on the computer.";
 
-  static String m16(reason) => "Undo is off for this turn (${reason}).";
+  static String m16(agent) => "${agent} could not start.";
 
-  static String m17(count) => "${count} more waiting";
+  static String m17(reason) => "Undo is off for this project (${reason}).";
 
-  static String m18(agent) => "${agent} asks:";
+  static String m18(reason) => "Undo is off for this turn (${reason}).";
 
-  static String m19(done, total) => "Plan · ${done}/${total}";
+  static String m19(count) => "${count} more waiting";
 
-  static String m20(title) => "Allowed: ${title}";
+  static String m20(agent) => "${agent} asks:";
 
-  static String m21(title) => "Denied: ${title}";
+  static String m21(done, total) => "Plan · ${done}/${total}";
 
-  static String m22(reason) => "The computer did not take it (${reason}).";
+  static String m22(title) => "Allowed: ${title}";
 
-  static String m23(agent, state) => "${agent} · ${state}";
+  static String m23(title) => "Denied: ${title}";
 
-  static String m24(max) => "Too long to send from the phone (${max} KB at most).";
+  static String m24(reason) => "The computer did not take it (${reason}).";
 
-  static String m25(target) => "Create ${target}";
+  static String m25(n, turn) =>
+      "${Intl.plural(n, one: 'Revert 1 file to before turn ${turn}?', other: 'Revert ${n} files to before turn ${turn}?')}";
 
-  static String m26(target) => "Delete ${target}";
+  static String m26(n) =>
+      "${Intl.plural(n, one: 'Revert 1 file to before the session?', other: 'Revert ${n} files to before the session?')}";
 
-  static String m27(target) => "Edit ${target}";
+  static String m27(n) =>
+      "${Intl.plural(n, one: '1 file changed after this turn.', other: '${n} files changed after this turn.')}";
 
-  static String m28(target) => "Run ${target}";
+  static String m28(n) => "${Intl.plural(n, one: 'Reverted 1 file.', other: 'Reverted ${n} files.')}";
 
-  static String m29(target) => "Fetch ${target}";
+  static String m29(agent, state) => "${agent} · ${state}";
 
-  static String m30(target) => "Rename ${target}";
+  static String m30(max) => "Too long to send from the phone (${max} KB at most).";
 
-  static String m31(target) => "Read ${target}";
+  static String m31(target) => "Create ${target}";
 
-  static String m32(time) => "running · ${time}";
+  static String m32(target) => "Delete ${target}";
 
-  static String m33(target) => "Search ${target}";
+  static String m33(target) => "Edit ${target}";
 
-  static String m34(n) => "Turn ${n} failed";
+  static String m34(target) => "Run ${target}";
 
-  static String m35(count) => "${Intl.plural(count, one: '1 file changed', other: '${count} files changed')}";
+  static String m35(target) => "Fetch ${target}";
 
-  static String m36(n) => "Turn ${n} interrupted";
+  static String m36(target) => "Rename ${target}";
 
-  static String m37(n, time) => "Stopped turn ${n} · ${time}";
+  static String m37(target) => "Read ${target}";
 
-  static String m38(n, time) => "Turn ${n} · ${time}";
+  static String m38(time) => "running · ${time}";
 
-  static String m39(option) => "You chose: ${option}";
+  static String m39(target) => "Search ${target}";
 
-  static String m40(email) => "Deletes the account ${email} with all its devices and pairings.";
+  static String m40(n) => "Turn ${n} failed";
 
-  static String m41(site) => "Install ShellX on your computer (macOS or Windows) from ${site}.";
+  static String m41(count) => "${Intl.plural(count, one: '1 file changed', other: '${count} files changed')}";
 
-  static String m42(menu) => "Click the ShellX icon, choose ${menu}, then scan the code.";
+  static String m42(n) => "Turn ${n} interrupted";
 
-  static String m43(reason) => "Couldn\'t start the shell: ${reason}";
+  static String m43(n, time) => "Stopped turn ${n} · ${time}";
 
-  static String m44(code) => "Something went wrong (${code}).";
+  static String m44(n, time) => "Turn ${n} · ${time}";
 
-  static String m45(day, month, time) => "${month}/${day}, ${time}";
+  static String m45(option) => "You chose: ${option}";
 
-  static String m46(count) => "${Intl.plural(count, one: '1 minute ago', other: '${count} minutes ago')}";
+  static String m46(email) => "Deletes the account ${email} with all its devices and pairings.";
 
-  static String m47(time) => "today, ${time}";
+  static String m47(site) => "Install ShellX on your computer (macOS or Windows) from ${site}.";
 
-  static String m48(time) => "yesterday, ${time}";
+  static String m48(menu) => "Click the ShellX icon, choose ${menu}, then scan the code.";
 
-  static String m49(method) => "Unlock with ${method}";
+  static String m49(reason) => "Couldn\'t start the shell: ${reason}";
 
-  static String m50(n, w) => "✦ ${Intl.plural(n, one: '1 AI session', other: '${n} AI sessions')} · ${w} need you";
+  static String m50(code) => "Something went wrong (${code}).";
 
-  static String m51(n) => "✦ ${Intl.plural(n, one: '1 AI session', other: '${n} AI sessions')}";
+  static String m51(day, month, time) => "${month}/${day}, ${time}";
 
-  static String m52(when) => "Last online: ${when}";
+  static String m52(count) => "${Intl.plural(count, one: '1 minute ago', other: '${count} minutes ago')}";
 
-  static String m53(count) => "${Intl.plural(count, one: '1 tab', other: '${count} tabs')}";
+  static String m53(time) => "today, ${time}";
 
-  static String m54(tabs, unseen) =>
+  static String m54(time) => "yesterday, ${time}";
+
+  static String m55(method) => "Unlock with ${method}";
+
+  static String m56(n, w) => "✦ ${Intl.plural(n, one: '1 AI session', other: '${n} AI sessions')} · ${w} need you";
+
+  static String m57(n) => "✦ ${Intl.plural(n, one: '1 AI session', other: '${n} AI sessions')}";
+
+  static String m58(when) => "Last online: ${when}";
+
+  static String m59(count) => "${Intl.plural(count, one: '1 tab', other: '${count} tabs')}";
+
+  static String m60(tabs, unseen) =>
       "${Intl.plural(tabs, one: '1 tab', other: '${tabs} tabs')} · ${unseen} with new output";
 
-  static String m55(name) => "${name} now trusts this phone. From now on, just tap the computer to open a terminal.";
+  static String m61(name) => "${name} now trusts this phone. From now on, just tap the computer to open a terminal.";
 
-  static String m56(count) =>
+  static String m62(count) =>
       "${Intl.plural(count, one: '1 more character needed.', other: '${count} more characters needed.')}";
 
-  static String m57(count) =>
+  static String m63(count) =>
       "${Intl.plural(count, one: '1 character too many.', other: '${count} characters too many.')}";
 
-  static String m58(name) => "${name} · done";
+  static String m64(name) => "${name} · done";
 
-  static String m59(name) => "${name} · waiting";
+  static String m65(name) => "${name} · waiting";
 
-  static String m60(name) => "${name} · needs your answer";
+  static String m66(name) => "${name} · needs your answer";
 
-  static String m61(name) => "${name} · running";
+  static String m67(name) => "${name} · running";
 
-  static String m62(when) => "opened ${when}";
+  static String m68(when) => "opened ${when}";
 
-  static String m63(count) =>
+  static String m69(count) =>
       "${Intl.plural(count, one: 'This computer has 1 session', other: 'This computer has ${count} sessions')}";
 
-  static String m64(number) => "Option ${number}";
+  static String m70(number) => "Option ${number}";
 
-  static String m65(menu) =>
+  static String m71(menu) =>
       "macOS: click the ShellX icon in the menu bar. Windows: click the icon in the system tray. Choose ${menu}";
 
-  static String m66(code) =>
+  static String m72(code) =>
       "The last command exited with code ${code}. The output above can still be read and copied.";
 
-  static String m67(method) => "Lock with ${method}";
+  static String m73(method) => "Lock with ${method}";
 
-  static String m68(name) => "Unpair ${name}? You\'ll need to scan a QR code again to use this computer.";
+  static String m74(name) => "Unpair ${name}? You\'ll need to scan a QR code again to use this computer.";
 
-  static String m69(version, build) => "ShellX ${version} (${build})";
+  static String m75(version, build) => "ShellX ${version} (${build})";
 
-  static String m70(terms, privacy) => "By creating an account you agree to the ${terms} and the ${privacy}.";
+  static String m76(terms, privacy) => "By creating an account you agree to the ${terms} and the ${privacy}.";
 
-  static String m71(length) => "Password must be at least ${length} characters.";
+  static String m77(length) => "Password must be at least ${length} characters.";
 
-  static String m72(length) => "Must be at most ${length} characters.";
+  static String m78(length) => "Must be at most ${length} characters.";
 
-  static String m73(length) => "Must be at least ${length} characters.";
+  static String m79(length) => "Must be at least ${length} characters.";
 
-  static String m74(lines) => "Showing the last ${lines} lines";
+  static String m80(lines) => "Showing the last ${lines} lines";
 
-  static String m75(target) => "To: ${target}";
+  static String m81(target) => "To: ${target}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -213,9 +229,16 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "aiAttach": MessageLookupByLibrary.simpleMessage("Add photos"),
     "aiAttachPhoto": MessageLookupByLibrary.simpleMessage("Photo library"),
+    "aiBinaryFile": MessageLookupByLibrary.simpleMessage("binary"),
     "aiBusy": MessageLookupByLibrary.simpleMessage(
       "Too many requests at once. Wait a moment, then try again.",
     ),
+    "aiChangedAfter": MessageLookupByLibrary.simpleMessage(
+      "changed after this turn",
+    ),
+    "aiChanges": MessageLookupByLibrary.simpleMessage("Changes"),
+    "aiChangesEmpty": MessageLookupByLibrary.simpleMessage("Nothing changed."),
+    "aiChangesMore": m1,
     "aiChooseFolder": MessageLookupByLibrary.simpleMessage(
       "Choose a folder for this session",
     ),
@@ -229,7 +252,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiClosedUnreadable": MessageLookupByLibrary.simpleMessage(
       "The phone cannot read this AI session. See it on the computer.",
     ),
-    "aiComposerHint": m1,
+    "aiComposerHint": m2,
     "aiConfigEffort": MessageLookupByLibrary.simpleMessage("Thinking"),
     "aiConfigMode": MessageLookupByLibrary.simpleMessage("Mode"),
     "aiConfigModel": MessageLookupByLibrary.simpleMessage("Model"),
@@ -240,12 +263,22 @@ class MessageLookup extends MessageLookupByLibrary {
       "Choose this on the computer.",
     ),
     "aiConfigTitle": MessageLookupByLibrary.simpleMessage("Mode and model"),
-    "aiContext": m2,
+    "aiContext": m3,
     "aiCreated": MessageLookupByLibrary.simpleMessage("new file"),
-    "aiCutLines": m3,
+    "aiCutLines": m4,
     "aiCutText": MessageLookupByLibrary.simpleMessage(
       "The rest of this message is on the computer.",
     ),
+    "aiDiffBinary": MessageLookupByLibrary.simpleMessage(
+      "Binary file — see it on the computer.",
+    ),
+    "aiDiffMissing": MessageLookupByLibrary.simpleMessage(
+      "This file is not there, before or now.",
+    ),
+    "aiDiffVsSession": MessageLookupByLibrary.simpleMessage(
+      "Compared with the start of the session",
+    ),
+    "aiDiffVsTurn": m5,
     "aiEmpty": MessageLookupByLibrary.simpleMessage(
       "No messages yet. Write the first one below.",
     ),
@@ -272,7 +305,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiImageType": MessageLookupByLibrary.simpleMessage(
       "Only JPEG, PNG, GIF or WebP images can be sent.",
     ),
-    "aiImagesCount": m4,
+    "aiImagesCount": m6,
     "aiImagesTooMuch": MessageLookupByLibrary.simpleMessage(
       "One message can carry at most 20 MB of images.",
     ),
@@ -284,14 +317,14 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "aiJumpLatest": MessageLookupByLibrary.simpleMessage("Latest"),
     "aiLoadEarlier": MessageLookupByLibrary.simpleMessage("Load earlier"),
-    "aiLoadingParts": m5,
+    "aiLoadingParts": m7,
     "aiMicTooltip": MessageLookupByLibrary.simpleMessage("Speak a message"),
     "aiModeAcceptEdits": MessageLookupByLibrary.simpleMessage("Edit files"),
     "aiModeAuto": MessageLookupByLibrary.simpleMessage("Auto"),
     "aiModeBypass": MessageLookupByLibrary.simpleMessage("Bypass permissions"),
     "aiModeDefault": MessageLookupByLibrary.simpleMessage("Ask first"),
     "aiModePlan": MessageLookupByLibrary.simpleMessage("Plan"),
-    "aiMoreDiffs": m6,
+    "aiMoreDiffs": m8,
     "aiNewAgent": MessageLookupByLibrary.simpleMessage("Agent"),
     "aiNewFolder": MessageLookupByLibrary.simpleMessage("Folder"),
     "aiNewNoAgents": MessageLookupByLibrary.simpleMessage(
@@ -302,29 +335,29 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "aiNewSession": MessageLookupByLibrary.simpleMessage("New AI session"),
     "aiNewStart": MessageLookupByLibrary.simpleMessage("Start"),
-    "aiNoImages": m7,
+    "aiNoImages": m9,
     "aiNoOutput": MessageLookupByLibrary.simpleMessage("No output"),
     "aiNoticeCannotResume": MessageLookupByLibrary.simpleMessage(
       "This agent cannot reopen the old session; a new one was started.",
     ),
-    "aiNoticeExited": m8,
+    "aiNoticeExited": m10,
     "aiNoticeFolderMissing": MessageLookupByLibrary.simpleMessage(
       "The session\'s folder is gone. Choose one on the computer.",
     ),
-    "aiNoticeInvalid": m9,
-    "aiNoticeLogin": m10,
-    "aiNoticeMissing": m11,
-    "aiNoticeNode": m12,
-    "aiNoticeNotInstalled": m13,
+    "aiNoticeInvalid": m11,
+    "aiNoticeLogin": m12,
+    "aiNoticeMissing": m13,
+    "aiNoticeNode": m14,
+    "aiNoticeNotInstalled": m15,
     "aiNoticeOther": MessageLookupByLibrary.simpleMessage(
       "A notice from the computer.",
     ),
-    "aiNoticeStartFailed": m14,
+    "aiNoticeStartFailed": m16,
     "aiNoticeUndoOff": MessageLookupByLibrary.simpleMessage(
       "Undo is off for this project.",
     ),
-    "aiNoticeUndoOffReason": m15,
-    "aiNoticeUndoOffTurn": m16,
+    "aiNoticeUndoOffReason": m17,
+    "aiNoticeUndoOffTurn": m18,
     "aiOpenList": MessageLookupByLibrary.simpleMessage("Open the session list"),
     "aiOpenOutcomeUnknown": MessageLookupByLibrary.simpleMessage(
       "The new session may not have been created. Check the list before trying again.",
@@ -335,23 +368,23 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiPermAllowAlways": MessageLookupByLibrary.simpleMessage("Always allow"),
     "aiPermAllowOnce": MessageLookupByLibrary.simpleMessage("Allow"),
     "aiPermDetails": MessageLookupByLibrary.simpleMessage("Details"),
-    "aiPermMore": m17,
+    "aiPermMore": m19,
     "aiPermOnComputer": MessageLookupByLibrary.simpleMessage(
       "Answer this request on the computer.",
     ),
     "aiPermOption": MessageLookupByLibrary.simpleMessage("Option"),
     "aiPermRejectAlways": MessageLookupByLibrary.simpleMessage("Always reject"),
     "aiPermRejectOnce": MessageLookupByLibrary.simpleMessage("Reject"),
-    "aiPermTitle": m18,
+    "aiPermTitle": m20,
     "aiPickFailed": MessageLookupByLibrary.simpleMessage(
       "Couldn\'t open the photos. Check ShellX\'s access in Settings.",
     ),
-    "aiPlan": m19,
-    "aiPushAllowed": m20,
+    "aiPlan": m21,
+    "aiPushAllowed": m22,
     "aiPushAnsweredElsewhere": MessageLookupByLibrary.simpleMessage(
       "This request was already answered elsewhere.",
     ),
-    "aiPushDenied": m21,
+    "aiPushDenied": m23,
     "aiPushMaybeNotSent": MessageLookupByLibrary.simpleMessage(
       "It may not have been sent. Check the session.",
     ),
@@ -371,8 +404,23 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "aiRemoveImage": MessageLookupByLibrary.simpleMessage("Remove image"),
     "aiRemoveQueued": MessageLookupByLibrary.simpleMessage("Remove from queue"),
-    "aiRequestFailed": m22,
-    "aiRowSubtitle": m23,
+    "aiRequestFailed": m24,
+    "aiRevertAll": MessageLookupByLibrary.simpleMessage("Revert all"),
+    "aiRevertBusy": MessageLookupByLibrary.simpleMessage(
+      "Wait for the turn to finish.",
+    ),
+    "aiRevertConfirm": m25,
+    "aiRevertConfirmSession": m26,
+    "aiRevertOnlyClean": MessageLookupByLibrary.simpleMessage(
+      "Only unchanged files",
+    ),
+    "aiRevertSession": MessageLookupByLibrary.simpleMessage(
+      "Revert the whole session",
+    ),
+    "aiRevertTouched": m27,
+    "aiRevertTurn": MessageLookupByLibrary.simpleMessage("Revert this turn"),
+    "aiReverted": m28,
+    "aiRowSubtitle": m29,
     "aiSend": MessageLookupByLibrary.simpleMessage("Send"),
     "aiStateAgentOff": MessageLookupByLibrary.simpleMessage(
       "Agent off on the computer",
@@ -395,29 +443,30 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiStop": MessageLookupByLibrary.simpleMessage("Stop"),
     "aiStopping": MessageLookupByLibrary.simpleMessage("Stopping…"),
     "aiTakePhoto": MessageLookupByLibrary.simpleMessage("Camera"),
+    "aiThisTurn": MessageLookupByLibrary.simpleMessage("This turn"),
     "aiThought": MessageLookupByLibrary.simpleMessage("Thinking"),
-    "aiTooLong": m24,
+    "aiTooLong": m30,
     "aiToolAwaiting": MessageLookupByLibrary.simpleMessage("waiting for you"),
-    "aiToolCreate": m25,
-    "aiToolDelete": m26,
+    "aiToolCreate": m31,
+    "aiToolDelete": m32,
     "aiToolDone": MessageLookupByLibrary.simpleMessage("done"),
-    "aiToolEdit": m27,
-    "aiToolExecute": m28,
+    "aiToolEdit": m33,
+    "aiToolExecute": m34,
     "aiToolFailed": MessageLookupByLibrary.simpleMessage("error"),
-    "aiToolFetch": m29,
-    "aiToolMove": m30,
+    "aiToolFetch": m35,
+    "aiToolMove": m36,
     "aiToolPending": MessageLookupByLibrary.simpleMessage("waiting"),
-    "aiToolRead": m31,
+    "aiToolRead": m37,
     "aiToolRejected": MessageLookupByLibrary.simpleMessage("rejected"),
-    "aiToolRunningFor": m32,
-    "aiToolSearch": m33,
+    "aiToolRunningFor": m38,
+    "aiToolSearch": m39,
     "aiToolStopped": MessageLookupByLibrary.simpleMessage("stopped"),
     "aiToolSwitchMode": MessageLookupByLibrary.simpleMessage("Switch mode"),
-    "aiTurnFailed": m34,
-    "aiTurnFiles": m35,
-    "aiTurnInterrupted": m36,
-    "aiTurnStopped": m37,
-    "aiTurnSummary": m38,
+    "aiTurnFailed": m40,
+    "aiTurnFiles": m41,
+    "aiTurnInterrupted": m42,
+    "aiTurnStopped": m43,
+    "aiTurnSummary": m44,
     "aiUnavailable": MessageLookupByLibrary.simpleMessage(
       "Open ShellX on the computer to use AI sessions.",
     ),
@@ -445,7 +494,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "aiUploading": MessageLookupByLibrary.simpleMessage("Sending images…"),
     "aiUseFolder": MessageLookupByLibrary.simpleMessage("Use this folder"),
     "aiViewAll": MessageLookupByLibrary.simpleMessage("View all"),
-    "aiYouChose": m39,
+    "aiWholeSession": MessageLookupByLibrary.simpleMessage("Whole session"),
+    "aiYouChose": m45,
     "appTitle": MessageLookupByLibrary.simpleMessage("ShellX"),
     "arrowPadDown": MessageLookupByLibrary.simpleMessage("Down"),
     "arrowPadLabel": MessageLookupByLibrary.simpleMessage(
@@ -476,7 +526,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "deleteAccountButton": MessageLookupByLibrary.simpleMessage(
       "Delete permanently",
     ),
-    "deleteAccountLoseAccount": m40,
+    "deleteAccountLoseAccount": m46,
     "deleteAccountLoseComputers": MessageLookupByLibrary.simpleMessage(
       "Every computer signed in to it is signed out.",
     ),
@@ -515,11 +565,11 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "emailHint": MessageLookupByLibrary.simpleMessage("email@example.com"),
     "emailLabel": MessageLookupByLibrary.simpleMessage("Email"),
-    "emptyStep1": m41,
+    "emptyStep1": m47,
     "emptyStep2": MessageLookupByLibrary.simpleMessage(
       "Sign in with this same account.",
     ),
-    "emptyStep3": m42,
+    "emptyStep3": m48,
     "emptyTitle": MessageLookupByLibrary.simpleMessage("No computers yet"),
     "errorAgentOffline": MessageLookupByLibrary.simpleMessage(
       "The computer is offline. Open ShellX on the computer and try again.",
@@ -551,11 +601,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "errorSessionLimit": MessageLookupByLibrary.simpleMessage(
       "This computer already has the maximum of 10 sessions open. Close some sessions first.",
     ),
-    "errorSpawnFailed": m43,
+    "errorSpawnFailed": m49,
     "errorTimeout": MessageLookupByLibrary.simpleMessage(
       "The computer didn\'t respond. Please try again.",
     ),
-    "errorUnknown": m44,
+    "errorUnknown": m50,
     "errorUntrusted": MessageLookupByLibrary.simpleMessage(
       "This computer no longer trusts this phone. Please pair again.",
     ),
@@ -582,12 +632,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "keySlash": MessageLookupByLibrary.simpleMessage("Slash"),
     "keyTilde": MessageLookupByLibrary.simpleMessage("Tilde"),
     "keyboardTooltip": MessageLookupByLibrary.simpleMessage("Keyboard"),
-    "lastSeenDate": m45,
+    "lastSeenDate": m51,
     "lastSeenJustNow": MessageLookupByLibrary.simpleMessage("just now"),
-    "lastSeenMinutes": m46,
-    "lastSeenToday": m47,
+    "lastSeenMinutes": m52,
+    "lastSeenToday": m53,
     "lastSeenUnknown": MessageLookupByLibrary.simpleMessage("unknown"),
-    "lastSeenYesterday": m48,
+    "lastSeenYesterday": m54,
     "linkSheetCopy": MessageLookupByLibrary.simpleMessage("Copy link"),
     "linkSheetOpen": MessageLookupByLibrary.simpleMessage("Open"),
     "linkSheetTitle": MessageLookupByLibrary.simpleMessage("Open link?"),
@@ -599,15 +649,15 @@ class MessageLookup extends MessageLookupByLibrary {
       "Unlock to see your computers and terminal sessions.",
     ),
     "lockTitle": MessageLookupByLibrary.simpleMessage("ShellX is locked"),
-    "lockUnlockWith": m49,
+    "lockUnlockWith": m55,
     "loginButton": MessageLookupByLibrary.simpleMessage("Sign in"),
     "loginSubtitle": MessageLookupByLibrary.simpleMessage(
       "Use the same account as ShellX on your computer.",
     ),
     "loginTitle": MessageLookupByLibrary.simpleMessage("Sign in"),
-    "machineAiLine": m50,
-    "machineAiSessions": m51,
-    "machineLastOnline": m52,
+    "machineAiLine": m56,
+    "machineAiSessions": m57,
+    "machineLastOnline": m58,
     "machineLastUsed": MessageLookupByLibrary.simpleMessage("Last used"),
     "machineNewOutput": MessageLookupByLibrary.simpleMessage("New output"),
     "machineNotPaired": MessageLookupByLibrary.simpleMessage("Not paired"),
@@ -615,8 +665,8 @@ class MessageLookup extends MessageLookupByLibrary {
       "This computer is offline.",
     ),
     "machineOnline": MessageLookupByLibrary.simpleMessage("Online"),
-    "machineTabs": m53,
-    "machineTabsActivity": m54,
+    "machineTabs": m59,
+    "machineTabsActivity": m60,
     "machineWaiting": MessageLookupByLibrary.simpleMessage(
       "Waiting for connection",
     ),
@@ -645,20 +695,20 @@ class MessageLookup extends MessageLookupByLibrary {
       "Couldn\'t pair",
     ),
     "pairingSucceeded": MessageLookupByLibrary.simpleMessage("Paired"),
-    "pairingSucceededBody": m55,
+    "pairingSucceededBody": m61,
     "passwordHide": MessageLookupByLibrary.simpleMessage("Hide password"),
     "passwordHint": MessageLookupByLibrary.simpleMessage("Password"),
     "passwordLabel": MessageLookupByLibrary.simpleMessage("Password"),
-    "passwordMissing": m56,
+    "passwordMissing": m62,
     "passwordRule": MessageLookupByLibrary.simpleMessage(
       "8 to 128 characters.",
     ),
     "passwordShow": MessageLookupByLibrary.simpleMessage("Show password"),
-    "passwordTooLong": m57,
-    "pickerAgentDone": m58,
-    "pickerAgentIdle": m59,
-    "pickerAgentNeedsInput": m60,
-    "pickerAgentRunning": m61,
+    "passwordTooLong": m63,
+    "pickerAgentDone": m64,
+    "pickerAgentIdle": m65,
+    "pickerAgentNeedsInput": m66,
+    "pickerAgentRunning": m67,
     "pickerAttachedElsewhere": MessageLookupByLibrary.simpleMessage(
       "open on another device",
     ),
@@ -679,11 +729,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "pickerShellxGroup": MessageLookupByLibrary.simpleMessage(
       "ShellX sessions",
     ),
-    "pickerStarted": m62,
+    "pickerStarted": m68,
     "pickerSubtitle": MessageLookupByLibrary.simpleMessage(
       "Reopen a session to continue where you left off, or start a new one.",
     ),
-    "pickerTitle": m63,
+    "pickerTitle": m69,
     "privacyLink": MessageLookupByLibrary.simpleMessage("Privacy Policy"),
     "pushActionAllow": MessageLookupByLibrary.simpleMessage("Allow"),
     "pushActionReject": MessageLookupByLibrary.simpleMessage("Deny"),
@@ -698,7 +748,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "replyKeyEnter": MessageLookupByLibrary.simpleMessage("Enter"),
     "replyKeyEscape": MessageLookupByLibrary.simpleMessage("Escape"),
     "replyKeyNo": MessageLookupByLibrary.simpleMessage("No"),
-    "replyKeyOption": m64,
+    "replyKeyOption": m70,
     "replyKeyYes": MessageLookupByLibrary.simpleMessage("Yes"),
     "replyShowExtraKeys": MessageLookupByLibrary.simpleMessage(
       "Show the extra keys",
@@ -712,14 +762,14 @@ class MessageLookup extends MessageLookupByLibrary {
     "scannerCameraError": MessageLookupByLibrary.simpleMessage(
       "Couldn\'t start the camera.",
     ),
-    "scannerCardBody": m65,
+    "scannerCardBody": m71,
     "scannerCardTitle": MessageLookupByLibrary.simpleMessage(
       "The code is on your computer",
     ),
     "scannerPairing": MessageLookupByLibrary.simpleMessage("Pairing…"),
     "scannerTitle": MessageLookupByLibrary.simpleMessage("Scan pairing code"),
     "sessionEnded": MessageLookupByLibrary.simpleMessage("Session ended"),
-    "sessionExitedBody": m66,
+    "sessionExitedBody": m72,
     "sessionGoneBody": MessageLookupByLibrary.simpleMessage(
       "The computer no longer has this session. The output above can still be read and copied.",
     ),
@@ -750,7 +800,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "settingsLockFootnote": MessageLookupByLibrary.simpleMessage(
       "Asked when the app opens and when you come back after more than 5 minutes.",
     ),
-    "settingsLockWith": m67,
+    "settingsLockWith": m73,
     "settingsLogout": MessageLookupByLibrary.simpleMessage("Sign out"),
     "settingsLogoutConfirm": MessageLookupByLibrary.simpleMessage(
       "Sign out of ShellX? Paired computers are kept for your next sign-in.",
@@ -792,11 +842,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "settingsTitle": MessageLookupByLibrary.simpleMessage("Settings"),
     "settingsTooltip": MessageLookupByLibrary.simpleMessage("Settings"),
     "settingsUnpair": MessageLookupByLibrary.simpleMessage("Unpair"),
-    "settingsUnpairConfirm": m68,
+    "settingsUnpairConfirm": m74,
     "settingsUnpairFailed": MessageLookupByLibrary.simpleMessage(
       "Couldn\'t unpair yet.",
     ),
-    "settingsVersion": m69,
+    "settingsVersion": m75,
     "signedOutAccountDeleted": MessageLookupByLibrary.simpleMessage(
       "Your account has been deleted.",
     ),
@@ -830,7 +880,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Open a new session",
     ),
     "termsLink": MessageLookupByLibrary.simpleMessage("Terms"),
-    "termsNotice": m70,
+    "termsNotice": m76,
     "unauthorized": MessageLookupByLibrary.simpleMessage("Unauthorized"),
     "unknownError": MessageLookupByLibrary.simpleMessage("Unknown Error"),
     "unknownMachine": MessageLookupByLibrary.simpleMessage("Unknown computer"),
@@ -856,7 +906,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationPasswordLowercase": MessageLookupByLibrary.simpleMessage(
       "Password must contain at least one lowercase letter.",
     ),
-    "validationPasswordMinLength": m71,
+    "validationPasswordMinLength": m77,
     "validationPasswordNotMatch": MessageLookupByLibrary.simpleMessage(
       "Passwords do not match.",
     ),
@@ -875,8 +925,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationPhoneRequired": MessageLookupByLibrary.simpleMessage(
       "Phone number is required.",
     ),
-    "validationTextMaxLength": m72,
-    "validationTextMinLength": m73,
+    "validationTextMaxLength": m78,
+    "validationTextMinLength": m79,
     "validationTextRequired": MessageLookupByLibrary.simpleMessage(
       "This field is required.",
     ),
@@ -887,7 +937,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "viewAsTextRefresh": MessageLookupByLibrary.simpleMessage("Refresh"),
     "viewAsTextTitle": MessageLookupByLibrary.simpleMessage("Terminal text"),
     "viewAsTextTooltip": MessageLookupByLibrary.simpleMessage("View as text"),
-    "viewAsTextTruncated": m74,
+    "viewAsTextTruncated": m80,
     "voiceClose": MessageLookupByLibrary.simpleMessage("Close"),
     "voiceDetached": MessageLookupByLibrary.simpleMessage(
       "This session was disconnected from the phone — reattach to send",
@@ -933,7 +983,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "voiceSend": MessageLookupByLibrary.simpleMessage("Send"),
     "voiceSendEnter": MessageLookupByLibrary.simpleMessage("Send Enter"),
     "voiceStopTooltip": MessageLookupByLibrary.simpleMessage("Stop listening"),
-    "voiceTarget": m75,
+    "voiceTarget": m81,
     "voiceUnsupported": MessageLookupByLibrary.simpleMessage(
       "Speech recognition isn\'t available on this phone",
     ),

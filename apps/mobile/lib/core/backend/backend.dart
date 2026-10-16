@@ -236,6 +236,19 @@ abstract interface class AiMachine {
   /// V2-2b B16: item [index] of [sid] in full, a slice at a time ([onPart] after each, 1-based; an error it
   /// throws ends the load). `too_big`: read it on the computer; `changing`: it kept changing while it loaded.
   Future<AiFullView> fullItem(String sid, int index, {void Function(int part, int parts)? onPart});
+
+  /// V2-2b B19: the files changed since [turn] began (null: since the session's first turn), as the computer's
+  /// Changes panel shows them.
+  Future<AiChangesView> changes(String sid, {int? turn});
+
+  /// V2-2b B19: the diff of [path] (one of [changes]' files): an `ai.diff` body — its region (`aiFileDiffOf`), or
+  /// `{"binary": true}` / `{"missing": true}`.
+  Future<Map<String, Object?>> diff(String sid, String path, {int? turn});
+
+  /// V2-2b B19: puts the files changed since [turn] began back; how many went. When some changed after the turn the
+  /// computer asks first: [AiRequestException] `confirm` whose body is an `AiRevertConfirm`; then [keep] `clean` or
+  /// `all`. Sent once per call: a lost channel fails it and nothing sends it again.
+  Future<int> revert(String sid, {int? turn, String? keep});
 }
 
 /// Everything the signed-in UI needs from `shellx_core` + `shellx_client`.
