@@ -20,7 +20,8 @@ typedef MachineAiLine = ({int sessions, int waiting});
 /// its workspace, so the terminal page still shows its picker on the first visit — then the workspace's listing
 /// hold (shared with the pages that show the same list). It lets every one go when the list stops showing, the
 /// app leaves the foreground, the relay drops or the machine goes offline or is no longer paired. A machine that
-/// cannot be reached shows no line and says nothing; pulling the list down tries it again ([refresh]).
+/// cannot be reached shows no line and says nothing; it is tried again when it goes offline and comes back, and
+/// when the list is pulled down ([refresh]).
 @injectable
 class MachineAiLines extends Controller {
   MachineAiLines(this._session, this._registry) {
@@ -35,6 +36,9 @@ class MachineAiLines extends Controller {
   StreamSubscription<RelayConnectionState>? _relay;
   final _held = <String, _Held>{};
   final _probing = <String>{};
+
+  /// Machines whose handshake failed while they were wanted: not tried again by every change of the list, but
+  /// once more after they went offline (or were unpaired) and came back, and by [refresh].
   final _failed = <String>{};
   List<MachineEntry> _machines = const [];
   var _visible = false;
@@ -56,6 +60,12 @@ class MachineAiLines extends Controller {
   /// The machines the list shows now, in its order (online first, the one used last at the top).
   void setMachines(List<MachineEntry> machines) {
     _machines = machines;
+    // A machine that is gone (offline, no longer paired) is forgiven: when it is back it gets one fresh try.
+    final present = {
+      for (final machine in machines)
+        if (machine.online && machine.paired) machine.id,
+    };
+    _failed.removeWhere((agentId) => !present.contains(agentId));
     unawaited(_sync());
   }
 
@@ -130,8 +140,10 @@ class MachineAiLines extends Controller {
       final current = workspace.aiListing;
       if (current != null) _put(agentId, current);
     } catch (error) {
-      // B21: a machine that cannot be reached shows nothing on the list, and says nothing.
-      _failed.add(agentId);
+      // B21: a machine that cannot be reached shows nothing on the list, and says nothing. Only one that was still
+      // wanted is remembered as failed: a handshake that ended because the list stopped showing, the relay dropped
+      // or the machine went is not the machine's fault, and the next time it is wanted it is tried again.
+      if (_wanted().contains(agentId)) _failed.add(agentId);
       if (kDebugMode) debugPrint('MachineAiLines error: ${error.runtimeType}');
     } finally {
       _probing.remove(agentId);
