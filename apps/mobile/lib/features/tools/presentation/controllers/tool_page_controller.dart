@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, setEquals;
 import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_core/shellx_core.dart' show kToolReservedPrefix;
 import 'package:shellx_mobile/core/core.dart';
@@ -33,11 +33,13 @@ final _blank = Uri.parse('about:blank');
 /// Nothing it carries is ever logged.
 ///
 /// NB1: every serve (the first, or a new one after a pause or a change) has a new secret, and cookies
-/// ignore ports, so a serve's entry page is shown in a web view of its own: the old one is sent to
-/// `about:blank` (its scripts and requests stop before the new entry sets the new cookie) and dropped.
-/// The history of a web view therefore only holds pages of the serve that owns the current secret,
-/// and neither the user's back nor the page's own `history.back()` can reach a port this session no
-/// longer serves.
+/// ignore ports, so a web view only ever shows pages of ports this session serves: when a serve comes back
+/// on other served origins than the web view was opened for (another port, a sibling missing or new), its
+/// entry page is shown in a fresh web view, after the old one was sent to `about:blank` (its scripts and
+/// requests stop before the new entry sets the new cookie) and dropped. A serve that comes back on the same
+/// origins (A) loads its entry in the web view that is there: every page of its history is on a port
+/// served again, and its `sessionStorage` and in-page history stay. Neither the user's back nor the
+/// page's own `history.back()` can reach a port this session no longer serves.
 @injectable
 class ToolPageController extends Controller {
   ToolPageController(@factoryParam this.agentId, @factoryParam this.tool, SessionHolder session)
@@ -61,6 +63,9 @@ class ToolPageController extends Controller {
 
   /// Whether anything was loaded in the current web view (the first entry load may use a blank one).
   bool _used = false;
+
+  /// A: the served origins (`http://localhost:<port>`) the current web view was opened for.
+  Set<String> _openedFor = const {};
 
   /// C1: the main-frame address this page last let through, until its page has finished, failed or the
   /// app loaded something itself; how many times it was let through, and whether a page has started
@@ -189,23 +194,25 @@ class ToolPageController extends Controller {
     unawaited(_current?.load(url));
   }
 
-  /// NB1: the entry URL of a serve (a first serve, or a new one, each with a new secret) is loaded in a
-  /// web view that has shown nothing before: the first one, if nothing was loaded in it yet, else a fresh
-  /// one, after the current one went blank and was dropped.
+  /// NB1, A: the entry URL of a serve (a first serve, or a new one, each with a new secret). It loads in the
+  /// current web view when nothing was loaded in it yet or when the origins served now are the ones it was
+  /// opened for; otherwise in a fresh one, after the current one went blank and was dropped.
   void _showEntry(Uri url) {
     final old = _current;
     if (old == null) return;
-    if (_used) {
+    final origins = <String>{...?_page?.origins};
+    if (_used && !setEquals(origins, _openedFor)) {
       unawaited(old.load(_blank));
       _generation++;
       old.dispose();
       _set(_engine, _makeEngine());
-      _resetLoad();
     }
+    _openedFor = origins;
+    _resetLoad();
     _load(url);
   }
 
-  /// A web view with no page yet: nothing is loading, and the first-load cover is up again.
+  /// A serve's entry page is yet to come: nothing is loading, and the first-load cover is up again.
   void _resetLoad() {
     _slow?.cancel();
     _slow = null;
