@@ -472,9 +472,15 @@ final class _HttpStream extends _Stream {
     final HttpClientResponse response;
     try {
       _upstream = upstream;
-      // E9: a 3xx goes to the phone as is; an upload goes as it comes.
+      // E9: a 3xx goes to the phone as is; an upload goes as it comes. M3: a
+      // connection is used for one request: dart:io takes a 1xx other than
+      // 100 and 101 (103 Early Hints) for the final answer, and the real one
+      // behind it on a kept-alive connection would raise an error nobody
+      // hears. (Never on the WebSocket upgrade: `Connection: close` would
+      // replace `Connection: Upgrade`.)
       upstream
         ..followRedirects = false
+        ..persistentConnection = false
         ..bufferOutput = false;
       final head = forwardRequestHead(request.head, tool, alias: request.alias);
       head.applyTo(upstream);

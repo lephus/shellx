@@ -1126,7 +1126,9 @@ final class _HttpStream extends _Stream {
     responded = true;
     final response = request.response;
     final status = message.status;
-    if (status < 100 || status > 599 || status == 101) {
+    // M3: a 1xx (101, or 103 Early Hints taken for the final answer) is never
+    // the webview's final answer: 502, the computer told.
+    if (status < 200 || status > 599) {
       reject();
       return;
     }
@@ -1154,7 +1156,7 @@ final class _HttpStream extends _Stream {
       }
     }
     final head = request.method == 'HEAD';
-    final noBody = status == 204 || status == 304 || status < 200;
+    final noBody = status == 204 || status == 304;
     if (length != null && length >= 0 && !noBody) {
       response.contentLength = length;
     }
@@ -1252,7 +1254,10 @@ final class _WsStream extends _Stream {
     if (done || responded) return;
     responded = true;
     final status = message.status;
-    if (status < 100 || status > 599) {
+    // M3: a 1xx other than 101 is no answer to pass on either: 502.
+    if (status < 100 ||
+        status > 599 ||
+        (status < 200 && status != HttpStatus.switchingProtocols)) {
       reject();
       return;
     }
