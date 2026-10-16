@@ -133,6 +133,7 @@ class _AiSessionPageState extends State<AiSessionPage> {
     final listing = _controller.listing;
     final ai = _controller.ai;
     if (listing == null || ai == null) return;
+    _stopListening();
     await openAiChooser(
       context,
       agentId: widget.agentId,
@@ -189,13 +190,22 @@ class _AiSessionPageState extends State<AiSessionPage> {
   }
 
   /// V2-2b B20: the Changes sheet of [turn] (null: the whole session); a file opens its diff page over it.
-  Future<void> _openChanges(int? turn) => showAiChangesSheet(
-    context,
-    _controller,
-    turn: turn,
-    onOpenFile: (path, turn) =>
-        unawaited(context.router.push(AiFileDiffRoute(controller: _controller, path: path, turn: turn))),
-  );
+  Future<void> _openChanges(int? turn) {
+    _stopListening();
+    return showAiChangesSheet(
+      context,
+      _controller,
+      turn: turn,
+      onOpenFile: (path, turn) {
+        _stopListening();
+        unawaited(context.router.push(AiFileDiffRoute(controller: _controller, path: path, turn: turn)));
+      },
+    );
+  }
+
+  /// B14: a page or a sheet over the session hides the composer and its mic, so the dictation stops first: nothing
+  /// heard meanwhile goes into the field, and no "gửi" sends a message the user is not looking at.
+  void _stopListening() => _dictation?.stop();
 
   /// V2-2b B20: a turn's summary opens the sheet of that turn. A method, so the timeline's items get the same
   /// callback on every build of the page.
@@ -211,6 +221,7 @@ class _AiSessionPageState extends State<AiSessionPage> {
     final s = S.of(context);
     final room = kAiImagesMax - _images.length;
     if (room <= 0) return;
+    _stopListening();
     final origin = await showAiAttachSheet(context);
     if (origin == null || !mounted) return;
     final List<Uint8List> picked;
@@ -291,6 +302,7 @@ class _AiSessionPageState extends State<AiSessionPage> {
   /// V2-2b B17: "Lịch sử phiên" — an earlier session picked there opens on the computer in a new AI tab (not shown
   /// there), and here in place of this page.
   Future<void> _openHistory() async {
+    _stopListening();
     final acp = await showAiHistorySheet(context, _controller);
     if (acp == null || !mounted) return;
     final opened = await _controller.resume(acp);
@@ -364,7 +376,10 @@ class _AiSessionPageState extends State<AiSessionPage> {
   }
 
   /// V2-2b B11.
-  void _openConfig() => unawaited(showAiConfigSheet(context, controller: _controller));
+  void _openConfig() {
+    _stopListening();
+    unawaited(showAiConfigSheet(context, controller: _controller));
+  }
 
   String _subtitle(S s, MirrorHead head) {
     // A closed session is not "running", whatever it was doing when it closed: it says "closed" (the strip
@@ -627,6 +642,7 @@ class _AiSessionPageState extends State<AiSessionPage> {
   /// V2-2b B16: item [index] in full, on its own page.
   void _viewAll(int index) {
     final title = _itemTitle(S.of(context), _controller.mirror?.at(index), _controller.head?.agentName ?? '');
+    _stopListening();
     unawaited(context.router.push(AiItemRoute(title: title, load: (onPart) => _controller.loadFull(index, onPart))));
   }
 

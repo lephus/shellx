@@ -2,13 +2,16 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/remote.dart';
+import 'package:shellx_ai/shellx_ai.dart';
 import 'package:shellx_core/shellx_core.dart' show InMemoryKeyValueStore;
 import 'package:shellx_mobile/core/core.dart' hide test;
 import 'package:shellx_mobile/features/ai/domain/ai_drafts.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_image_source.dart';
 import 'package:shellx_mobile/features/ai/presentation/controllers/ai_dictation.dart';
 import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_controller.dart';
+import 'package:shellx_mobile/features/ai/presentation/widgets/ai_items.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
 import 'package:shellx_mobile/features/voice/domain/speech_input.dart';
 import 'package:shellx_mobile/features/voice/domain/voice_locale.dart';
@@ -58,7 +61,10 @@ void main() {
     await tester.pumpWidget(
       routedApp(
         open: () => AiSessionRoute(agentId: agentA, machineName: 'MacBook', sid: sid),
-        routes: [AutoRoute(page: AiSessionRoute.page)],
+        routes: [
+          AutoRoute(page: AiSessionRoute.page),
+          AutoRoute(page: AiItemRoute.page),
+        ],
       ),
     );
     await tester.pumpAndSettle();
@@ -139,6 +145,71 @@ void main() {
     await tester.tap(find.byKey(const Key('ai.back')));
     await tester.pumpAndSettle();
     expect(speech.cancels, 1);
+  });
+
+  testWidgets('a page pushed over the session (Xem đủ) stops the mic: a "gửi" heard later sends nothing', (
+    tester,
+  ) async {
+    machine.ai
+      ..protocolValue = 2
+      ..emitListing(const AiListing(features: {AiFeature.item}))
+      ..fullItems[0] = const AiFullView(kind: 'tool', title: 'npm test', output: 'dòng 0');
+    machine.ai
+        .session(sid)
+        .desktop
+        .applyUpdate(
+          SessionUpdate.fromJson({
+            'sessionUpdate': 'tool_call',
+            'toolCallId': 'c1',
+            'title': 'npm test',
+            'kind': 'execute',
+            'status': 'completed',
+            'content': [
+              {
+                'type': 'content',
+                'content': {
+                  'type': 'text',
+                  'text': [for (var i = 0; i < 3000; i++) 'dòng $i'].join('\n'),
+                },
+              },
+            ],
+          }),
+          DateTime.now(),
+        );
+    await open(tester);
+    await tester.tap(find.byType(AiToolCard));
+    await tester.pumpAndSettle();
+    await listen(tester);
+    speech.emit(const SpeechPartial('sửa lỗi'));
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const Key('ai.viewAll.0')));
+    await tester.tap(find.byKey(const Key('ai.viewAll.0')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('ai.item.title')), findsOneWidget);
+    expect(speech.cancels, 1, reason: 'the mic stopped when the page went over the session');
+    speech.emit(const SpeechFinal('sửa lỗi gửi'));
+    await tester.pumpAndSettle();
+    expect(machine.ai.prompts, isEmpty);
+  });
+
+  testWidgets('a sheet over the session (the photos) stops the mic: a "gửi" heard later sends nothing', (
+    tester,
+  ) async {
+    getIt.registerSingleton<AiImageSource>(FakeAiImageSource());
+    machine.ai
+      ..protocolValue = 2
+      ..emitListing(const AiListing(features: {AiFeature.blob}));
+    await open(tester);
+    await listen(tester);
+    speech.emit(const SpeechPartial('xem ảnh'));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('ai.attach')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('ai.attach.library')), findsOneWidget);
+    expect(speech.cancels, 1);
+    speech.emit(const SpeechFinal('xem ảnh gửi'));
+    await tester.pumpAndSettle();
+    expect(machine.ai.prompts, isEmpty);
   });
 
   testWidgets('Send while the mic hears: the mic stops, the message goes as it is', (tester) async {
