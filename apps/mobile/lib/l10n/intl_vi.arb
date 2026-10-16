@@ -416,7 +416,6 @@
   "aiModeBypass": "Bỏ qua mọi quyền",
   "aiContext": "Ngữ cảnh {percent}%",
   "aiPlan": "Kế hoạch · {done}/{total}",
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
   "aiFromPhone": "từ điện thoại",
   "aiReattached": "Đã nối lại sau khi ShellX khởi động lại.",
   "aiOpenList": "Mở danh sách phiên",
@@ -455,8 +454,7 @@
   "aiPushMaybeNotSent": "Có thể chưa gửi được. Xem trong phiên.",
   "aiPushAnsweredElsewhere": "Yêu cầu này đã được trả lời ở nơi khác.",
   "machineAiLine": "✦ {n} phiên AI · {w} cần bạn",
-  "machineAiSessions": "✦ {n} phiên AI"
-=======
+  "machineAiSessions": "✦ {n} phiên AI",
   "pickerTools": "Tool",
   "toolRowSub": "{workspace} · localhost:{port}",
   "toolsEmpty": "Chưa có tool nào bật cho điện thoại. Trên máy tính: thanh của tool › 📱 Điện thoại.",
@@ -479,5 +477,4 @@
   "toolDialogTitle": "{name} nhắn",
   "toolClearDataPhoneConfirm": "Đăng xuất mọi tool và xóa cookie, bộ nhớ của chúng?",
   "toolNoPortPhone": "Điện thoại không mở được cổng cục bộ cho tool."
->>>>>>> v2-4
 }

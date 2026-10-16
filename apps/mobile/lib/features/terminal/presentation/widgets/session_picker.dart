@@ -116,11 +116,8 @@ Future<SessionChoice?> showSessionPicker(
                 8.sizedHeight,
                 _Group(children: _aiRows(context, listing)),
               ],
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-              if (!aiOnly) ...[
-=======
               // V2-4 E15: the Tool group after the AI sessions (none from a computer without tools).
-              if (listing.toolsSupported == true) ...[
+              if (!aiOnly && listing.toolsSupported == true) ...[
                 14.sizedHeight,
                 _GroupHeader(strings.pickerTools),
                 8.sizedHeight,
@@ -130,24 +127,7 @@ Future<SessionChoice?> showSessionPicker(
                   builder: (context, snapshot) => _Group(children: _toolRows(context, snapshot.data)),
                 ),
               ],
-              14.sizedHeight,
-              _GroupHeader(strings.pickerDesktopGroup),
-              8.sizedHeight,
-              _Group(
-                children: desktop.isEmpty
-                    ? [_Hint(key: const ValueKey('picker-desktop-hint'), text: hint)]
-                    : [
-                        for (final session in desktop)
-                          _SessionRow(
-                            session: session,
-                            label: desktopSessionLabel(session),
-                            desktop: true,
-                            now: at,
-                          ),
-                      ],
-              ),
-              if (shellx.isNotEmpty) ...[
->>>>>>> v2-4
+              if (!aiOnly) ...[
                 14.sizedHeight,
                 _GroupHeader(strings.pickerDesktopGroup),
                 8.sizedHeight,

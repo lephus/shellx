@@ -10,11 +10,7 @@ import 'package:shellx_ai/remote.dart'
     show aiImageMime, aiTakesNoImages, kAiImageMaxBytes, kAiImagesMax;
 
 import '../../../l10n/app_localizations.dart';
-<<<<<<< a8d865bdbe992ef9a2419d644605a698b35b2717
-=======
-import '../../ai/ai_off_thread.dart';
 import '../../tools/tool_dock.dart' show toolPanesCoveredProvider;
->>>>>>> v2-3
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_scope.dart';
 

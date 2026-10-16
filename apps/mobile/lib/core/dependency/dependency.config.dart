@@ -106,11 +106,8 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i505.VersionGate>(
       () => _i505.VersionGate(gh<_i145.ShellxApi>(), gh<_i655.PackageInfo>()),
     );
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-    gh.lazySingleton<_i264.AiImageSource>(() => _i152.ImagePickerSource());
-=======
     gh.lazySingleton<_i495.ToolWebData>(() => _i495.WebViewToolData());
->>>>>>> v2-4
+    gh.lazySingleton<_i264.AiImageSource>(() => _i152.ImagePickerSource());
     gh.lazySingleton<_i870.BiometricAuthenticator>(
       () => _i870.LocalAuthBiometricAuthenticator(),
     );

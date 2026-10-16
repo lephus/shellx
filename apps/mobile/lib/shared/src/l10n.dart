@@ -3706,7 +3706,6 @@ class S {
     );
   }
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
   /// `from phone`
   String get aiFromPhone {
     return Intl.message('from phone', name: 'aiFromPhone', desc: '', args: []);
@@ -3717,100 +3716,31 @@ class S {
     return Intl.message(
       'Reconnected after ShellX restarted.',
       name: 'aiReattached',
-=======
-  /// `Tools`
-  String get pickerTools {
-    return Intl.message('Tools', name: 'pickerTools', desc: '', args: []);
-  }
-
-  /// `{workspace} · localhost:{port}`
-  String toolRowSub(String workspace, int port) {
-    return Intl.message(
-      '$workspace · localhost:$port',
-      name: 'toolRowSub',
-      desc: '',
-      args: [workspace, port],
-    );
-  }
-
-  /// `No tools are on for phone yet. On the computer: the tool's bar › 📱 Phone.`
-  String get toolsEmpty {
-    return Intl.message(
-      'No tools are on for phone yet. On the computer: the tool\'s bar › 📱 Phone.',
-      name: 'toolsEmpty',
->>>>>>> v2-4
       desc: '',
       args: [],
     );
   }
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
   /// `Open the session list`
   String get aiOpenList {
     return Intl.message(
       'Open the session list',
       name: 'aiOpenList',
-=======
-  /// `localhost:{port} · via computer`
-  String toolViaComputer(int port) {
-    return Intl.message(
-      'localhost:$port · via computer',
-      name: 'toolViaComputer',
-      desc: '',
-      args: [port],
-    );
-  }
-
-  /// `Loading through the tunnel…`
-  String get toolLoadingTunnel {
-    return Intl.message(
-      'Loading through the tunnel…',
-      name: 'toolLoadingTunnel',
->>>>>>> v2-4
       desc: '',
       args: [],
     );
   }
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
   /// `Mode and model`
   String get aiConfigTitle {
     return Intl.message(
       'Mode and model',
       name: 'aiConfigTitle',
-=======
-  /// `Loading through your computer… ({count} requests)`
-  String toolSlow(int count) {
-    return Intl.message(
-      'Loading through your computer… ($count requests)',
-      name: 'toolSlow',
-      desc: '',
-      args: [count],
-    );
-  }
-
-  /// `Nothing is running at localhost:{port} on the computer.`
-  String toolRefusedPhone(int port) {
-    return Intl.message(
-      'Nothing is running at localhost:$port on the computer.',
-      name: 'toolRefusedPhone',
-      desc: '',
-      args: [port],
-    );
-  }
-
-  /// `This tool can no longer be opened on the phone.`
-  String get toolDisabled {
-    return Intl.message(
-      'This tool can no longer be opened on the phone.',
-      name: 'toolDisabled',
->>>>>>> v2-4
       desc: '',
       args: [],
     );
   }
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
   /// `Mode`
   String get aiConfigMode {
     return Intl.message('Mode', name: 'aiConfigMode', desc: '', args: []);
@@ -3831,37 +3761,21 @@ class S {
     return Intl.message(
       'More choices on the computer.',
       name: 'aiConfigMore',
-=======
-  /// `This tool was deleted on the computer.`
-  String get toolGone {
-    return Intl.message(
-      'This tool was deleted on the computer.',
-      name: 'toolGone',
->>>>>>> v2-4
       desc: '',
       args: [],
     );
   }
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
   /// `Choose this on the computer.`
   String get aiConfigOnComputer {
     return Intl.message(
       'Choose this on the computer.',
       name: 'aiConfigOnComputer',
-=======
-  /// `Open ShellX on the computer to use tools.`
-  String get toolNeedsDesktop {
-    return Intl.message(
-      'Open ShellX on the computer to use tools.',
-      name: 'toolNeedsDesktop',
->>>>>>> v2-4
       desc: '',
       args: [],
     );
   }
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
   /// `View all`
   String get aiViewAll {
     return Intl.message('View all', name: 'aiViewAll', desc: '', args: []);
@@ -3882,72 +3796,21 @@ class S {
     return Intl.message(
       'It is still changing on the computer. Try again in a moment.',
       name: 'aiItemChanging',
-=======
-  /// `Opened on port {alias} because port {port} is busy on this phone. Links that name port {port} may not work.`
-  String toolOtherPort(int alias, int port) {
-    return Intl.message(
-      'Opened on port $alias because port $port is busy on this phone. Links that name port $port may not work.',
-      name: 'toolOtherPort',
-      desc: '',
-      args: [alias, port],
-    );
-  }
-
-  /// `The tool on port {port} isn't on for phone.`
-  String toolSiblingOff(int port) {
-    return Intl.message(
-      'The tool on port $port isn\'t on for phone.',
-      name: 'toolSiblingOff',
-      desc: '',
-      args: [port],
-    );
-  }
-
-  /// `Open {host} in your browser?`
-  String toolOpenExternal(String host) {
-    return Intl.message(
-      'Open $host in your browser?',
-      name: 'toolOpenExternal',
-      desc: '',
-      args: [host],
-    );
-  }
-
-  /// `Downloads don't work on the phone yet.`
-  String get toolNoDownloads {
-    return Intl.message(
-      'Downloads don\'t work on the phone yet.',
-      name: 'toolNoDownloads',
->>>>>>> v2-4
       desc: '',
       args: [],
     );
   }
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
   /// `Session history`
   String get aiHistory {
     return Intl.message(
       'Session history',
       name: 'aiHistory',
-=======
-  /// `Start page`
-  String get toolHome {
-    return Intl.message('Start page', name: 'toolHome', desc: '', args: []);
-  }
-
-  /// `Clear tool data`
-  String get toolClearDataPhone {
-    return Intl.message(
-      'Clear tool data',
-      name: 'toolClearDataPhone',
->>>>>>> v2-4
       desc: '',
       args: [],
     );
   }
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
   /// `Load more`
   String get aiHistoryMore {
     return Intl.message('Load more', name: 'aiHistoryMore', desc: '', args: []);
@@ -3958,70 +3821,31 @@ class S {
     return Intl.message(
       'No earlier sessions in this folder.',
       name: 'aiHistoryEmpty',
-=======
-  /// `Reload`
-  String get toolReload {
-    return Intl.message('Reload', name: 'toolReload', desc: '', args: []);
-  }
-
-  /// `Reconnecting…`
-  String get toolReconnecting {
-    return Intl.message(
-      'Reconnecting…',
-      name: 'toolReconnecting',
->>>>>>> v2-4
       desc: '',
       args: [],
     );
   }
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
   /// `The history shows once the agent runs.`
   String get aiHistoryNotReady {
     return Intl.message(
       'The history shows once the agent runs.',
       name: 'aiHistoryNotReady',
-=======
-  /// `The tool's response is too large.`
-  String get toolResponseTooLarge {
-    return Intl.message(
-      'The tool\'s response is too large.',
-      name: 'toolResponseTooLarge',
->>>>>>> v2-4
       desc: '',
       args: [],
     );
   }
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
   /// `Use this folder`
   String get aiUseFolder {
     return Intl.message(
       'Use this folder',
       name: 'aiUseFolder',
-=======
-  /// `{name} says`
-  String toolDialogTitle(String name) {
-    return Intl.message(
-      '$name says',
-      name: 'toolDialogTitle',
-      desc: '',
-      args: [name],
-    );
-  }
-
-  /// `Sign every tool out and clear its cookies and storage?`
-  String get toolClearDataPhoneConfirm {
-    return Intl.message(
-      'Sign every tool out and clear its cookies and storage?',
-      name: 'toolClearDataPhoneConfirm',
->>>>>>> v2-4
       desc: '',
       args: [],
     );
   }
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
   /// `Choose a folder for this session`
   String get aiChooseFolder {
     return Intl.message(
@@ -4223,7 +4047,202 @@ class S {
       args: [n],
     );
   }
-=======
+
+  /// `Tools`
+  String get pickerTools {
+    return Intl.message('Tools', name: 'pickerTools', desc: '', args: []);
+  }
+
+  /// `{workspace} · localhost:{port}`
+  String toolRowSub(String workspace, int port) {
+    return Intl.message(
+      '$workspace · localhost:$port',
+      name: 'toolRowSub',
+      desc: '',
+      args: [workspace, port],
+    );
+  }
+
+  /// `No tools are on for phone yet. On the computer: the tool's bar › 📱 Phone.`
+  String get toolsEmpty {
+    return Intl.message(
+      'No tools are on for phone yet. On the computer: the tool\'s bar › 📱 Phone.',
+      name: 'toolsEmpty',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `localhost:{port} · via computer`
+  String toolViaComputer(int port) {
+    return Intl.message(
+      'localhost:$port · via computer',
+      name: 'toolViaComputer',
+      desc: '',
+      args: [port],
+    );
+  }
+
+  /// `Loading through the tunnel…`
+  String get toolLoadingTunnel {
+    return Intl.message(
+      'Loading through the tunnel…',
+      name: 'toolLoadingTunnel',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Loading through your computer… ({count} requests)`
+  String toolSlow(int count) {
+    return Intl.message(
+      'Loading through your computer… ($count requests)',
+      name: 'toolSlow',
+      desc: '',
+      args: [count],
+    );
+  }
+
+  /// `Nothing is running at localhost:{port} on the computer.`
+  String toolRefusedPhone(int port) {
+    return Intl.message(
+      'Nothing is running at localhost:$port on the computer.',
+      name: 'toolRefusedPhone',
+      desc: '',
+      args: [port],
+    );
+  }
+
+  /// `This tool can no longer be opened on the phone.`
+  String get toolDisabled {
+    return Intl.message(
+      'This tool can no longer be opened on the phone.',
+      name: 'toolDisabled',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This tool was deleted on the computer.`
+  String get toolGone {
+    return Intl.message(
+      'This tool was deleted on the computer.',
+      name: 'toolGone',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Open ShellX on the computer to use tools.`
+  String get toolNeedsDesktop {
+    return Intl.message(
+      'Open ShellX on the computer to use tools.',
+      name: 'toolNeedsDesktop',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Opened on port {alias} because port {port} is busy on this phone. Links that name port {port} may not work.`
+  String toolOtherPort(int alias, int port) {
+    return Intl.message(
+      'Opened on port $alias because port $port is busy on this phone. Links that name port $port may not work.',
+      name: 'toolOtherPort',
+      desc: '',
+      args: [alias, port],
+    );
+  }
+
+  /// `The tool on port {port} isn't on for phone.`
+  String toolSiblingOff(int port) {
+    return Intl.message(
+      'The tool on port $port isn\'t on for phone.',
+      name: 'toolSiblingOff',
+      desc: '',
+      args: [port],
+    );
+  }
+
+  /// `Open {host} in your browser?`
+  String toolOpenExternal(String host) {
+    return Intl.message(
+      'Open $host in your browser?',
+      name: 'toolOpenExternal',
+      desc: '',
+      args: [host],
+    );
+  }
+
+  /// `Downloads don't work on the phone yet.`
+  String get toolNoDownloads {
+    return Intl.message(
+      'Downloads don\'t work on the phone yet.',
+      name: 'toolNoDownloads',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Start page`
+  String get toolHome {
+    return Intl.message('Start page', name: 'toolHome', desc: '', args: []);
+  }
+
+  /// `Clear tool data`
+  String get toolClearDataPhone {
+    return Intl.message(
+      'Clear tool data',
+      name: 'toolClearDataPhone',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Reload`
+  String get toolReload {
+    return Intl.message('Reload', name: 'toolReload', desc: '', args: []);
+  }
+
+  /// `Reconnecting…`
+  String get toolReconnecting {
+    return Intl.message(
+      'Reconnecting…',
+      name: 'toolReconnecting',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The tool's response is too large.`
+  String get toolResponseTooLarge {
+    return Intl.message(
+      'The tool\'s response is too large.',
+      name: 'toolResponseTooLarge',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{name} says`
+  String toolDialogTitle(String name) {
+    return Intl.message(
+      '$name says',
+      name: 'toolDialogTitle',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `Sign every tool out and clear its cookies and storage?`
+  String get toolClearDataPhoneConfirm {
+    return Intl.message(
+      'Sign every tool out and clear its cookies and storage?',
+      name: 'toolClearDataPhoneConfirm',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `This phone couldn't open a local port for the tool.`
   String get toolNoPortPhone {
     return Intl.message(
@@ -4234,7 +4253,6 @@ class S {
       args: [],
     );
   }
->>>>>>> v2-4
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

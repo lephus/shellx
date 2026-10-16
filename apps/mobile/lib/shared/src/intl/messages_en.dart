@@ -184,44 +184,32 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m76(terms, privacy) => "By creating an account you agree to the ${terms} and the ${privacy}.";
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-  static String m77(length) => "Password must be at least ${length} characters.";
+  static String m77(name) => "${name} says";
 
-  static String m78(length) => "Must be at most ${length} characters.";
+  static String m78(host) => "Open ${host} in your browser?";
 
-  static String m79(length) => "Must be at least ${length} characters.";
-
-  static String m80(lines) => "Showing the last ${lines} lines";
-
-  static String m81(target) => "To: ${target}";
-=======
-  static String m64(name) => "${name} says";
-
-  static String m65(host) => "Open ${host} in your browser?";
-
-  static String m66(alias, port) =>
+  static String m79(alias, port) =>
       "Opened on port ${alias} because port ${port} is busy on this phone. Links that name port ${port} may not work.";
 
-  static String m67(port) => "Nothing is running at localhost:${port} on the computer.";
+  static String m80(port) => "Nothing is running at localhost:${port} on the computer.";
 
-  static String m68(workspace, port) => "${workspace} · localhost:${port}";
+  static String m81(workspace, port) => "${workspace} · localhost:${port}";
 
-  static String m69(port) => "The tool on port ${port} isn\'t on for phone.";
+  static String m82(port) => "The tool on port ${port} isn\'t on for phone.";
 
-  static String m70(count) => "Loading through your computer… (${count} requests)";
+  static String m83(count) => "Loading through your computer… (${count} requests)";
 
-  static String m71(port) => "localhost:${port} · via computer";
+  static String m84(port) => "localhost:${port} · via computer";
 
-  static String m72(length) => "Password must be at least ${length} characters.";
+  static String m85(length) => "Password must be at least ${length} characters.";
 
-  static String m73(length) => "Must be at most ${length} characters.";
+  static String m86(length) => "Must be at most ${length} characters.";
 
-  static String m74(length) => "Must be at least ${length} characters.";
+  static String m87(length) => "Must be at least ${length} characters.";
 
-  static String m75(lines) => "Showing the last ${lines} lines";
+  static String m88(lines) => "Showing the last ${lines} lines";
 
-  static String m76(target) => "To: ${target}";
->>>>>>> v2-4
+  static String m89(target) => "To: ${target}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -762,12 +750,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "pickerSubtitle": MessageLookupByLibrary.simpleMessage(
       "Reopen a session to continue where you left off, or start a new one.",
     ),
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
     "pickerTitle": m69,
-=======
-    "pickerTitle": m56,
     "pickerTools": MessageLookupByLibrary.simpleMessage("Tools"),
->>>>>>> v2-4
     "privacyLink": MessageLookupByLibrary.simpleMessage("Privacy Policy"),
     "pushActionAllow": MessageLookupByLibrary.simpleMessage("Allow"),
     "pushActionReject": MessageLookupByLibrary.simpleMessage("Deny"),
@@ -914,17 +898,14 @@ class MessageLookup extends MessageLookupByLibrary {
       "Open a new session",
     ),
     "termsLink": MessageLookupByLibrary.simpleMessage("Terms"),
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
     "termsNotice": m76,
-=======
-    "termsNotice": m63,
     "toolClearDataPhone": MessageLookupByLibrary.simpleMessage(
       "Clear tool data",
     ),
     "toolClearDataPhoneConfirm": MessageLookupByLibrary.simpleMessage(
       "Sign every tool out and clear its cookies and storage?",
     ),
-    "toolDialogTitle": m64,
+    "toolDialogTitle": m77,
     "toolDisabled": MessageLookupByLibrary.simpleMessage(
       "This tool can no longer be opened on the phone.",
     ),
@@ -944,22 +925,21 @@ class MessageLookup extends MessageLookupByLibrary {
     "toolNoPortPhone": MessageLookupByLibrary.simpleMessage(
       "This phone couldn\'t open a local port for the tool.",
     ),
-    "toolOpenExternal": m65,
-    "toolOtherPort": m66,
+    "toolOpenExternal": m78,
+    "toolOtherPort": m79,
     "toolReconnecting": MessageLookupByLibrary.simpleMessage("Reconnecting…"),
-    "toolRefusedPhone": m67,
+    "toolRefusedPhone": m80,
     "toolReload": MessageLookupByLibrary.simpleMessage("Reload"),
     "toolResponseTooLarge": MessageLookupByLibrary.simpleMessage(
       "The tool\'s response is too large.",
     ),
-    "toolRowSub": m68,
-    "toolSiblingOff": m69,
-    "toolSlow": m70,
-    "toolViaComputer": m71,
+    "toolRowSub": m81,
+    "toolSiblingOff": m82,
+    "toolSlow": m83,
+    "toolViaComputer": m84,
     "toolsEmpty": MessageLookupByLibrary.simpleMessage(
       "No tools are on for phone yet. On the computer: the tool\'s bar › 📱 Phone.",
     ),
->>>>>>> v2-4
     "unauthorized": MessageLookupByLibrary.simpleMessage("Unauthorized"),
     "unknownError": MessageLookupByLibrary.simpleMessage("Unknown Error"),
     "unknownMachine": MessageLookupByLibrary.simpleMessage("Unknown computer"),
@@ -985,11 +965,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationPasswordLowercase": MessageLookupByLibrary.simpleMessage(
       "Password must contain at least one lowercase letter.",
     ),
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-    "validationPasswordMinLength": m77,
-=======
-    "validationPasswordMinLength": m72,
->>>>>>> v2-4
+    "validationPasswordMinLength": m85,
     "validationPasswordNotMatch": MessageLookupByLibrary.simpleMessage(
       "Passwords do not match.",
     ),
@@ -1008,13 +984,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationPhoneRequired": MessageLookupByLibrary.simpleMessage(
       "Phone number is required.",
     ),
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-    "validationTextMaxLength": m78,
-    "validationTextMinLength": m79,
-=======
-    "validationTextMaxLength": m73,
-    "validationTextMinLength": m74,
->>>>>>> v2-4
+    "validationTextMaxLength": m86,
+    "validationTextMinLength": m87,
     "validationTextRequired": MessageLookupByLibrary.simpleMessage(
       "This field is required.",
     ),
@@ -1025,11 +996,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "viewAsTextRefresh": MessageLookupByLibrary.simpleMessage("Refresh"),
     "viewAsTextTitle": MessageLookupByLibrary.simpleMessage("Terminal text"),
     "viewAsTextTooltip": MessageLookupByLibrary.simpleMessage("View as text"),
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-    "viewAsTextTruncated": m80,
-=======
-    "viewAsTextTruncated": m75,
->>>>>>> v2-4
+    "viewAsTextTruncated": m88,
     "voiceClose": MessageLookupByLibrary.simpleMessage("Close"),
     "voiceDetached": MessageLookupByLibrary.simpleMessage(
       "This session was disconnected from the phone — reattach to send",
@@ -1075,11 +1042,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "voiceSend": MessageLookupByLibrary.simpleMessage("Send"),
     "voiceSendEnter": MessageLookupByLibrary.simpleMessage("Send Enter"),
     "voiceStopTooltip": MessageLookupByLibrary.simpleMessage("Stop listening"),
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-    "voiceTarget": m81,
-=======
-    "voiceTarget": m76,
->>>>>>> v2-4
+    "voiceTarget": m89,
     "voiceUnsupported": MessageLookupByLibrary.simpleMessage(
       "Speech recognition isn\'t available on this phone",
     ),

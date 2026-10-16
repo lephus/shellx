@@ -28,20 +28,14 @@ final class SessionRouter implements AgentSessions {
     required DesktopSessionManager desktop,
     required bool Function() desktopSharing,
     AiEndpoint? ai,
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
     int aiProtocol = kAiProtocol,
-=======
     ToolEndpoint? tools,
->>>>>>> v2-4
   }) : _shells = shells,
        _desktop = desktop,
        _desktopSharing = desktopSharing,
        _ai = ai,
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-       _aiProtocol = aiProtocol {
-=======
+       _aiProtocol = aiProtocol,
        _tools = tools {
->>>>>>> v2-4
     shells.receivesDriver = _receivesDriver;
     _subscriptions.addAll([
       shells.outbound.listen(_outbound.add),
@@ -57,15 +51,12 @@ final class SessionRouter implements AgentSessions {
   /// phones (they are ignored, `session.list.result` carries no `ai`).
   final AiEndpoint? _ai;
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
   /// V2-2b B1: the `ai` this router reports with an endpoint — the
   /// [kAiProtocol] of this process; a test plays an older desktop with 1.
   final int _aiProtocol;
-=======
   /// V2-4 E5: where `tool.*` messages go; null: this agent has no tools for
   /// phones (they are ignored, `session.list.result` carries no `tools`).
   final ToolEndpoint? _tools;
->>>>>>> v2-4
 
   final _subscriptions = <StreamSubscription<Object?>>[];
 
@@ -111,13 +102,9 @@ final class SessionRouter implements AgentSessions {
             desktopSharing: desktop ? _desktopSharing() : null,
             // V2-2 D3: only to a phone that knows `desktop` (a new decoder);
             // an older one skips the key anyway.
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
             ai: desktop && _ai != null ? _aiProtocol : null,
-=======
-            ai: desktop && _ai != null ? kAiProtocol : null,
             // V2-4 E6: and only while this process serves tools.
             tools: desktop && (_tools?.serving ?? false) ? kToolProtocol : null,
->>>>>>> v2-4
           ),
         );
       case AiMessage():

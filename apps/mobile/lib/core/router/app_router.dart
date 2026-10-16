@@ -25,12 +25,9 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: MachineListRoute.page, initial: true, guards: [updateGuard, authGuard]),
     AutoRoute(page: TerminalRoute.page, guards: [authGuard]),
     AutoRoute(page: AiSessionRoute.page, guards: [authGuard]),
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
     AutoRoute(page: AiItemRoute.page, guards: [authGuard]),
     AutoRoute(page: AiFileDiffRoute.page, guards: [authGuard]),
-=======
     AutoRoute(page: ToolRoute.page, guards: [authGuard]),
->>>>>>> v2-4
     AutoRoute(page: QrScannerRoute.page, guards: [authGuard]),
     AutoRoute(page: SettingsRoute.page, guards: [authGuard]),
     AutoRoute(page: DeleteAccountRoute.page, guards: [authGuard]),

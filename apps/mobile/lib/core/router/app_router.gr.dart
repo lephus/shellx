@@ -10,39 +10,20 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-import 'package:auto_route/auto_route.dart' as _i13;
-import 'package:flutter/foundation.dart' as _i16;
-import 'package:shellx_mobile/core/core.dart' as _i14;
+import 'package:auto_route/auto_route.dart' as _i14;
+import 'package:flutter/foundation.dart' as _i17;
+import 'package:shellx_client/shellx_client.dart' as _i18;
+import 'package:shellx_mobile/core/core.dart' as _i15;
 import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_controller.dart'
-    as _i15;
+    as _i16;
 import 'package:shellx_mobile/features/ai/presentation/pages/ai_file_diff_page.dart'
     as _i1;
 import 'package:shellx_mobile/features/ai/presentation/pages/ai_item_page.dart'
-=======
-import 'package:auto_route/auto_route.dart' as _i12;
-import 'package:flutter/foundation.dart' as _i14;
-import 'package:shellx_client/shellx_client.dart' as _i15;
-import 'package:shellx_mobile/core/core.dart' as _i13;
-import 'package:shellx_mobile/features/ai/presentation/pages/ai_session_page.dart'
-    as _i1;
-import 'package:shellx_mobile/features/app/splash_page.dart' as _i8;
-import 'package:shellx_mobile/features/app/update_required_page.dart' as _i11;
-import 'package:shellx_mobile/features/auth/presentation/pages/login_page.dart'
-    as _i3;
-import 'package:shellx_mobile/features/auth/presentation/pages/register_page.dart'
-    as _i6;
-import 'package:shellx_mobile/features/machines/presentation/pages/machine_list_page.dart'
-    as _i4;
-import 'package:shellx_mobile/features/pairing/presentation/pages/qr_scanner_page.dart'
-    as _i5;
-import 'package:shellx_mobile/features/settings/presentation/pages/delete_account_page.dart'
->>>>>>> v2-4
     as _i2;
 import 'package:shellx_mobile/features/ai/presentation/pages/ai_session_page.dart'
     as _i3;
 import 'package:shellx_mobile/features/app/splash_page.dart' as _i10;
-import 'package:shellx_mobile/features/app/update_required_page.dart' as _i12;
+import 'package:shellx_mobile/features/app/update_required_page.dart' as _i13;
 import 'package:shellx_mobile/features/auth/presentation/pages/login_page.dart'
     as _i5;
 import 'package:shellx_mobile/features/auth/presentation/pages/register_page.dart'
@@ -55,19 +36,20 @@ import 'package:shellx_mobile/features/settings/presentation/pages/delete_accoun
     as _i4;
 import 'package:shellx_mobile/features/settings/presentation/pages/settings_page.dart'
     as _i9;
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
 import 'package:shellx_mobile/features/terminal/presentation/pages/terminal_page.dart'
     as _i11;
+import 'package:shellx_mobile/features/tools/presentation/pages/tool_page.dart'
+    as _i12;
 
 /// generated route for
 /// [_i1.AiFileDiffPage]
-class AiFileDiffRoute extends _i13.PageRouteInfo<AiFileDiffRouteArgs> {
+class AiFileDiffRoute extends _i14.PageRouteInfo<AiFileDiffRouteArgs> {
   AiFileDiffRoute({
-    _i14.Key? key,
-    required _i15.AiSessionController controller,
+    _i15.Key? key,
+    required _i16.AiSessionController controller,
     required String path,
     int? turn,
-    List<_i13.PageRouteInfo>? children,
+    List<_i14.PageRouteInfo>? children,
   }) : super(
          AiFileDiffRoute.name,
          args: AiFileDiffRouteArgs(
@@ -81,7 +63,7 @@ class AiFileDiffRoute extends _i13.PageRouteInfo<AiFileDiffRouteArgs> {
 
   static const String name = 'AiFileDiffRoute';
 
-  static _i13.PageInfo page = _i13.PageInfo(
+  static _i14.PageInfo page = _i14.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<AiFileDiffRouteArgs>();
@@ -103,9 +85,9 @@ class AiFileDiffRouteArgs {
     this.turn,
   });
 
-  final _i14.Key? key;
+  final _i15.Key? key;
 
-  final _i15.AiSessionController controller;
+  final _i16.AiSessionController controller;
 
   final String path;
 
@@ -133,12 +115,12 @@ class AiFileDiffRouteArgs {
 
 /// generated route for
 /// [_i2.AiItemPage]
-class AiItemRoute extends _i13.PageRouteInfo<AiItemRouteArgs> {
+class AiItemRoute extends _i14.PageRouteInfo<AiItemRouteArgs> {
   AiItemRoute({
-    _i14.Key? key,
+    _i15.Key? key,
     required String title,
     required _i2.AiFullLoader load,
-    List<_i13.PageRouteInfo>? children,
+    List<_i14.PageRouteInfo>? children,
   }) : super(
          AiItemRoute.name,
          args: AiItemRouteArgs(key: key, title: title, load: load),
@@ -147,7 +129,7 @@ class AiItemRoute extends _i13.PageRouteInfo<AiItemRouteArgs> {
 
   static const String name = 'AiItemRoute';
 
-  static _i13.PageInfo page = _i13.PageInfo(
+  static _i14.PageInfo page = _i14.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<AiItemRouteArgs>();
@@ -159,7 +141,7 @@ class AiItemRoute extends _i13.PageRouteInfo<AiItemRouteArgs> {
 class AiItemRouteArgs {
   const AiItemRouteArgs({this.key, required this.title, required this.load});
 
-  final _i14.Key? key;
+  final _i15.Key? key;
 
   final String title;
 
@@ -183,27 +165,13 @@ class AiItemRouteArgs {
 
 /// generated route for
 /// [_i3.AiSessionPage]
-class AiSessionRoute extends _i13.PageRouteInfo<AiSessionRouteArgs> {
+class AiSessionRoute extends _i14.PageRouteInfo<AiSessionRouteArgs> {
   AiSessionRoute({
-    _i16.Key? key,
+    _i17.Key? key,
     required String agentId,
     required String machineName,
     required String sid,
-    List<_i13.PageRouteInfo>? children,
-=======
-import 'package:shellx_mobile/features/tools/presentation/pages/tool_page.dart'
-    as _i10;
-
-/// generated route for
-/// [_i1.AiSessionPage]
-class AiSessionRoute extends _i12.PageRouteInfo<AiSessionRouteArgs> {
-  AiSessionRoute({
-    _i13.Key? key,
-    required String agentId,
-    required String machineName,
-    required String sid,
-    List<_i12.PageRouteInfo>? children,
->>>>>>> v2-4
+    List<_i14.PageRouteInfo>? children,
   }) : super(
          AiSessionRoute.name,
          args: AiSessionRouteArgs(
@@ -217,11 +185,7 @@ class AiSessionRoute extends _i12.PageRouteInfo<AiSessionRouteArgs> {
 
   static const String name = 'AiSessionRoute';
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-  static _i13.PageInfo page = _i13.PageInfo(
-=======
-  static _i12.PageInfo page = _i12.PageInfo(
->>>>>>> v2-4
+  static _i14.PageInfo page = _i14.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<AiSessionRouteArgs>();
@@ -243,11 +207,7 @@ class AiSessionRouteArgs {
     required this.sid,
   });
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-  final _i16.Key? key;
-=======
-  final _i13.Key? key;
->>>>>>> v2-4
+  final _i17.Key? key;
 
   final String agentId;
 
@@ -276,24 +236,14 @@ class AiSessionRouteArgs {
 }
 
 /// generated route for
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
 /// [_i4.DeleteAccountPage]
-class DeleteAccountRoute extends _i13.PageRouteInfo<void> {
-  const DeleteAccountRoute({List<_i13.PageRouteInfo>? children})
-=======
-/// [_i2.DeleteAccountPage]
-class DeleteAccountRoute extends _i12.PageRouteInfo<void> {
-  const DeleteAccountRoute({List<_i12.PageRouteInfo>? children})
->>>>>>> v2-4
+class DeleteAccountRoute extends _i14.PageRouteInfo<void> {
+  const DeleteAccountRoute({List<_i14.PageRouteInfo>? children})
     : super(DeleteAccountRoute.name, initialChildren: children);
 
   static const String name = 'DeleteAccountRoute';
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-  static _i13.PageInfo page = _i13.PageInfo(
-=======
-  static _i12.PageInfo page = _i12.PageInfo(
->>>>>>> v2-4
+  static _i14.PageInfo page = _i14.PageInfo(
     name,
     builder: (data) {
       return const _i4.DeleteAccountPage();
@@ -302,24 +252,14 @@ class DeleteAccountRoute extends _i12.PageRouteInfo<void> {
 }
 
 /// generated route for
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
 /// [_i5.LoginPage]
-class LoginRoute extends _i13.PageRouteInfo<void> {
-  const LoginRoute({List<_i13.PageRouteInfo>? children})
-=======
-/// [_i3.LoginPage]
-class LoginRoute extends _i12.PageRouteInfo<void> {
-  const LoginRoute({List<_i12.PageRouteInfo>? children})
->>>>>>> v2-4
+class LoginRoute extends _i14.PageRouteInfo<void> {
+  const LoginRoute({List<_i14.PageRouteInfo>? children})
     : super(LoginRoute.name, initialChildren: children);
 
   static const String name = 'LoginRoute';
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-  static _i13.PageInfo page = _i13.PageInfo(
-=======
-  static _i12.PageInfo page = _i12.PageInfo(
->>>>>>> v2-4
+  static _i14.PageInfo page = _i14.PageInfo(
     name,
     builder: (data) {
       return const _i5.LoginPage();
@@ -328,24 +268,14 @@ class LoginRoute extends _i12.PageRouteInfo<void> {
 }
 
 /// generated route for
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
 /// [_i6.MachineListPage]
-class MachineListRoute extends _i13.PageRouteInfo<void> {
-  const MachineListRoute({List<_i13.PageRouteInfo>? children})
-=======
-/// [_i4.MachineListPage]
-class MachineListRoute extends _i12.PageRouteInfo<void> {
-  const MachineListRoute({List<_i12.PageRouteInfo>? children})
->>>>>>> v2-4
+class MachineListRoute extends _i14.PageRouteInfo<void> {
+  const MachineListRoute({List<_i14.PageRouteInfo>? children})
     : super(MachineListRoute.name, initialChildren: children);
 
   static const String name = 'MachineListRoute';
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-  static _i13.PageInfo page = _i13.PageInfo(
-=======
-  static _i12.PageInfo page = _i12.PageInfo(
->>>>>>> v2-4
+  static _i14.PageInfo page = _i14.PageInfo(
     name,
     builder: (data) {
       return const _i6.MachineListPage();
@@ -354,21 +284,12 @@ class MachineListRoute extends _i12.PageRouteInfo<void> {
 }
 
 /// generated route for
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
 /// [_i7.QrScannerPage]
-class QrScannerRoute extends _i13.PageRouteInfo<QrScannerRouteArgs> {
+class QrScannerRoute extends _i14.PageRouteInfo<QrScannerRouteArgs> {
   QrScannerRoute({
-    _i14.Key? key,
+    _i15.Key? key,
     _i7.ScannerViewBuilder scannerBuilder = _i7.cameraScannerView,
-    List<_i13.PageRouteInfo>? children,
-=======
-/// [_i5.QrScannerPage]
-class QrScannerRoute extends _i12.PageRouteInfo<QrScannerRouteArgs> {
-  QrScannerRoute({
-    _i13.Key? key,
-    _i5.ScannerViewBuilder scannerBuilder = _i5.cameraScannerView,
-    List<_i12.PageRouteInfo>? children,
->>>>>>> v2-4
+    List<_i14.PageRouteInfo>? children,
   }) : super(
          QrScannerRoute.name,
          args: QrScannerRouteArgs(key: key, scannerBuilder: scannerBuilder),
@@ -377,11 +298,7 @@ class QrScannerRoute extends _i12.PageRouteInfo<QrScannerRouteArgs> {
 
   static const String name = 'QrScannerRoute';
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-  static _i13.PageInfo page = _i13.PageInfo(
-=======
-  static _i12.PageInfo page = _i12.PageInfo(
->>>>>>> v2-4
+  static _i14.PageInfo page = _i14.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<QrScannerRouteArgs>(
@@ -401,11 +318,7 @@ class QrScannerRouteArgs {
     this.scannerBuilder = _i7.cameraScannerView,
   });
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-  final _i14.Key? key;
-=======
-  final _i13.Key? key;
->>>>>>> v2-4
+  final _i15.Key? key;
 
   final _i7.ScannerViewBuilder scannerBuilder;
 
@@ -426,24 +339,14 @@ class QrScannerRouteArgs {
 }
 
 /// generated route for
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
 /// [_i8.RegisterPage]
-class RegisterRoute extends _i13.PageRouteInfo<void> {
-  const RegisterRoute({List<_i13.PageRouteInfo>? children})
-=======
-/// [_i6.RegisterPage]
-class RegisterRoute extends _i12.PageRouteInfo<void> {
-  const RegisterRoute({List<_i12.PageRouteInfo>? children})
->>>>>>> v2-4
+class RegisterRoute extends _i14.PageRouteInfo<void> {
+  const RegisterRoute({List<_i14.PageRouteInfo>? children})
     : super(RegisterRoute.name, initialChildren: children);
 
   static const String name = 'RegisterRoute';
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-  static _i13.PageInfo page = _i13.PageInfo(
-=======
-  static _i12.PageInfo page = _i12.PageInfo(
->>>>>>> v2-4
+  static _i14.PageInfo page = _i14.PageInfo(
     name,
     builder: (data) {
       return const _i8.RegisterPage();
@@ -452,24 +355,14 @@ class RegisterRoute extends _i12.PageRouteInfo<void> {
 }
 
 /// generated route for
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
 /// [_i9.SettingsPage]
-class SettingsRoute extends _i13.PageRouteInfo<void> {
-  const SettingsRoute({List<_i13.PageRouteInfo>? children})
-=======
-/// [_i7.SettingsPage]
-class SettingsRoute extends _i12.PageRouteInfo<void> {
-  const SettingsRoute({List<_i12.PageRouteInfo>? children})
->>>>>>> v2-4
+class SettingsRoute extends _i14.PageRouteInfo<void> {
+  const SettingsRoute({List<_i14.PageRouteInfo>? children})
     : super(SettingsRoute.name, initialChildren: children);
 
   static const String name = 'SettingsRoute';
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-  static _i13.PageInfo page = _i13.PageInfo(
-=======
-  static _i12.PageInfo page = _i12.PageInfo(
->>>>>>> v2-4
+  static _i14.PageInfo page = _i14.PageInfo(
     name,
     builder: (data) {
       return const _i9.SettingsPage();
@@ -478,24 +371,14 @@ class SettingsRoute extends _i12.PageRouteInfo<void> {
 }
 
 /// generated route for
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
 /// [_i10.SplashPage]
-class SplashRoute extends _i13.PageRouteInfo<void> {
-  const SplashRoute({List<_i13.PageRouteInfo>? children})
-=======
-/// [_i8.SplashPage]
-class SplashRoute extends _i12.PageRouteInfo<void> {
-  const SplashRoute({List<_i12.PageRouteInfo>? children})
->>>>>>> v2-4
+class SplashRoute extends _i14.PageRouteInfo<void> {
+  const SplashRoute({List<_i14.PageRouteInfo>? children})
     : super(SplashRoute.name, initialChildren: children);
 
   static const String name = 'SplashRoute';
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-  static _i13.PageInfo page = _i13.PageInfo(
-=======
-  static _i12.PageInfo page = _i12.PageInfo(
->>>>>>> v2-4
+  static _i14.PageInfo page = _i14.PageInfo(
     name,
     builder: (data) {
       return const _i10.SplashPage();
@@ -504,23 +387,13 @@ class SplashRoute extends _i12.PageRouteInfo<void> {
 }
 
 /// generated route for
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
 /// [_i11.TerminalPage]
-class TerminalRoute extends _i13.PageRouteInfo<TerminalRouteArgs> {
+class TerminalRoute extends _i14.PageRouteInfo<TerminalRouteArgs> {
   TerminalRoute({
-    _i16.Key? key,
+    _i17.Key? key,
     required String agentId,
     required String machineName,
-    List<_i13.PageRouteInfo>? children,
-=======
-/// [_i9.TerminalPage]
-class TerminalRoute extends _i12.PageRouteInfo<TerminalRouteArgs> {
-  TerminalRoute({
-    _i14.Key? key,
-    required String agentId,
-    required String machineName,
-    List<_i12.PageRouteInfo>? children,
->>>>>>> v2-4
+    List<_i14.PageRouteInfo>? children,
   }) : super(
          TerminalRoute.name,
          args: TerminalRouteArgs(
@@ -533,11 +406,7 @@ class TerminalRoute extends _i12.PageRouteInfo<TerminalRouteArgs> {
 
   static const String name = 'TerminalRoute';
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-  static _i13.PageInfo page = _i13.PageInfo(
-=======
-  static _i12.PageInfo page = _i12.PageInfo(
->>>>>>> v2-4
+  static _i14.PageInfo page = _i14.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<TerminalRouteArgs>();
@@ -557,11 +426,7 @@ class TerminalRouteArgs {
     required this.machineName,
   });
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-  final _i16.Key? key;
-=======
-  final _i14.Key? key;
->>>>>>> v2-4
+  final _i17.Key? key;
 
   final String agentId;
 
@@ -586,18 +451,13 @@ class TerminalRouteArgs {
 }
 
 /// generated route for
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-/// [_i12.UpdateRequiredPage]
-class UpdateRequiredRoute extends _i13.PageRouteInfo<void> {
-  const UpdateRequiredRoute({List<_i13.PageRouteInfo>? children})
-=======
-/// [_i10.ToolPage]
-class ToolRoute extends _i12.PageRouteInfo<ToolRouteArgs> {
+/// [_i12.ToolPage]
+class ToolRoute extends _i14.PageRouteInfo<ToolRouteArgs> {
   ToolRoute({
-    _i13.Key? key,
+    _i15.Key? key,
     required String agentId,
-    required _i15.ToolInfo tool,
-    List<_i12.PageRouteInfo>? children,
+    required _i18.ToolInfo tool,
+    List<_i14.PageRouteInfo>? children,
   }) : super(
          ToolRoute.name,
          args: ToolRouteArgs(key: key, agentId: agentId, tool: tool),
@@ -606,11 +466,11 @@ class ToolRoute extends _i12.PageRouteInfo<ToolRouteArgs> {
 
   static const String name = 'ToolRoute';
 
-  static _i12.PageInfo page = _i12.PageInfo(
+  static _i14.PageInfo page = _i14.PageInfo(
     name,
     builder: (data) {
       final args = data.argsAs<ToolRouteArgs>();
-      return _i10.ToolPage(
+      return _i12.ToolPage(
         key: args.key,
         agentId: args.agentId,
         tool: args.tool,
@@ -622,11 +482,11 @@ class ToolRoute extends _i12.PageRouteInfo<ToolRouteArgs> {
 class ToolRouteArgs {
   const ToolRouteArgs({this.key, required this.agentId, required this.tool});
 
-  final _i13.Key? key;
+  final _i15.Key? key;
 
   final String agentId;
 
-  final _i15.ToolInfo tool;
+  final _i18.ToolInfo tool;
 
   @override
   String toString() {
@@ -645,25 +505,17 @@ class ToolRouteArgs {
 }
 
 /// generated route for
-/// [_i11.UpdateRequiredPage]
-class UpdateRequiredRoute extends _i12.PageRouteInfo<void> {
-  const UpdateRequiredRoute({List<_i12.PageRouteInfo>? children})
->>>>>>> v2-4
+/// [_i13.UpdateRequiredPage]
+class UpdateRequiredRoute extends _i14.PageRouteInfo<void> {
+  const UpdateRequiredRoute({List<_i14.PageRouteInfo>? children})
     : super(UpdateRequiredRoute.name, initialChildren: children);
 
   static const String name = 'UpdateRequiredRoute';
 
-<<<<<<< 7815f8faae7d46d4fcb006a58604eff0792a157b
-  static _i13.PageInfo page = _i13.PageInfo(
+  static _i14.PageInfo page = _i14.PageInfo(
     name,
     builder: (data) {
-      return const _i12.UpdateRequiredPage();
-=======
-  static _i12.PageInfo page = _i12.PageInfo(
-    name,
-    builder: (data) {
-      return const _i11.UpdateRequiredPage();
->>>>>>> v2-4
+      return const _i13.UpdateRequiredPage();
     },
   );
 }
