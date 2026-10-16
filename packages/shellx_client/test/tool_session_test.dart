@@ -174,6 +174,7 @@ final class _Desktop {
 /// What the stand-in computer sends for a request: `/end/<code>` ends it
 /// with that code before any response; `/early` answers in full (`early`)
 /// whatever the body; `/bad-status` answers a status no HTTP response has;
+/// `/early-hints` answers 103 Early Hints as if it were the final answer;
 /// `/ws-protocol` opens a WebSocket on a protocol nobody offered,
 /// `/ws-two-protocols` on two; `/ws-hello`, `/ws-close` and `/ws-hello-bye`
 /// open one and, in the same batch as the 101, send `hello`, close with
@@ -216,6 +217,14 @@ List<ToolMessage> _script(ToolRequest request) {
     ],
     '/bad-status' => [
       ToolResponse(id: id, status: 42, head: const [], end: true),
+    ],
+    '/early-hints' => [
+      ToolResponse(
+        id: id,
+        status: 103,
+        head: const ['link', '</app.css>; rel=preload'],
+        end: true,
+      ),
     ],
     '/ws-protocol' => [
       ToolResponse(
@@ -1367,6 +1376,35 @@ void main() {
         [for (final request in desktop.requests) (request.id, 'aborted')],
       );
     });
+  });
+
+  /// Review M3 (ledger L358): a 1xx other than 101 is never an answer the
+  /// webview takes as final; the computer is told, as for any answer the
+  /// phone cannot pass on.
+  test('an informational answer (103 Early Hints) as the computer\'s answer: '
+      'the webview gets 502, for a request and a WebSocket alike, and the '
+      'computer is told (M3)', () async {
+    final (:page, :view, :desktop) = await openScripted();
+    final port = page.servedPort!;
+    final policy = toolContentSecurityPolicy([port]);
+    final http = await _rawHead(port, [
+      'GET /early-hints HTTP/1.1',
+      'host: localhost:$port',
+      'cookie: ${view.cookieHeader}',
+    ]);
+    expect(http.first, startsWith('HTTP/1.1 502'));
+    expect(_policies(http), [policy]);
+    final ws = await _rawHead(
+      port,
+      _upgrade(port, '/early-hints', view.cookieHeader),
+    );
+    expect(ws.first, startsWith('HTTP/1.1 502'));
+    expect(_policies(ws), [policy]);
+    await until(() => desktop.ends.length == 2);
+    expect(
+      [for (final end in desktop.ends) (end.id, end.code)],
+      [for (final request in desktop.requests) (request.id, 'aborted')],
+    );
   });
 
   /// Ruling I1: the webview tries `localhost` on ::1 first, so a port is

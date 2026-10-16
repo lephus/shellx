@@ -97,6 +97,57 @@ void main() {
       expect(tool.hits.single.headers['accept-encoding'], ['gzip, br']);
     });
 
+    // Review M3: dart:io's client takes a 1xx other than 100 and 101 (103
+    // Early Hints) for the final answer; on a kept-alive connection the
+    // real answer behind it then raised an HttpException that reached no
+    // one (one per request). A loopback connection to a tool is used once.
+    test('a tool that answers 103 Early Hints, then 200: nothing escapes, '
+        'the streams end (M3)', () async {
+      await setUpWith();
+      final hints = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(hints.close);
+      hints.listen((socket) {
+        var seen = '';
+        socket.listen((bytes) {
+          seen += String.fromCharCodes(bytes);
+          while (seen.contains('\r\n\r\n')) {
+            seen = seen.substring(seen.indexOf('\r\n\r\n') + 4);
+            socket.write(
+              'HTTP/1.1 103 Early Hints\r\n'
+              'link: </app.css>; rel=preload\r\n\r\n'
+              'HTTP/1.1 200 OK\r\n'
+              'content-type: text/plain\r\n'
+              'content-length: 2\r\n\r\nok',
+            );
+          }
+        }, onError: (Object _) {});
+      });
+      proxy.serve(
+        catalogOf([
+          {
+            'id': _id,
+            'name': 'Hints',
+            'ws': 'shop-web',
+            'group': 'ws:a',
+            'url': 'http://localhost:${hints.port}/',
+          },
+        ]),
+      );
+      final escaped = <Type>[];
+      final ended = Completer<void>();
+      runZonedGuarded(() {
+        final first = phone.request(_id, target: '/a');
+        final second = phone.request(_id, target: '/b');
+        Future.wait([
+          phone.ended(first),
+          phone.ended(second),
+        ]).then((_) => ended.complete(), onError: ended.completeError);
+      }, (error, _) => escaped.add(error.runtimeType));
+      await ended.future;
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(escaped, isEmpty);
+    });
+
     test(
       'a POST body streams to the tool; what it took is acknowledged',
       () async {
