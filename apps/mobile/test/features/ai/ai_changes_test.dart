@@ -191,9 +191,10 @@ void main() {
       find.descendant(of: find.byKey(const Key('ai.revert.dialog')), matching: find.text('src/a.ts')),
       findsOneWidget,
     );
+    await tester.pump(const Duration(milliseconds: 350)); // shown, and still within its first 400 ms
     await tester.tap(find.byKey(const Key('ai.revert.confirm')));
     await tester.pump();
-    expect(machine.ai.reverts, isEmpty, reason: 'the tap that opened it must not answer it');
+    expect(machine.ai.reverts, isEmpty, reason: 'a tap meant for what was there before must not answer it');
     await answer(tester, const Key('ai.revert.confirm'));
     expect(machine.ai.reverts, [(sid, 1, null)]);
     expect(popups.successes, ['Đã hoàn tác 2 tệp.']);
