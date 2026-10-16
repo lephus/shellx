@@ -88,7 +88,8 @@ class ToolPageController extends Controller {
 
   ShellxBackend? get backend => _backend;
 
-  /// The web view of the current serve (null before [start]); a new serve has a new one (NB1).
+  /// The web view of the current serve (null before [start]); a serve on other origins than it was opened for
+  /// gets a fresh one (NB1, A).
   ReadonlySignal<ToolWebEngine?> get engine => _engine;
   ReadonlySignal<ToolPhase> get phase => _phase;
 
@@ -328,9 +329,9 @@ class ToolPageController extends Controller {
   /// Android back: a page back in the web view first; false when there is none (the page closes).
   ///
   /// I1: only while the page is shown. Chromium's web view never hands back or forward to the navigation
-  /// policy, so behind a cover each press would walk the hidden history; and NB2: only while the session
-  /// serves. Every serve has a web view of its own (NB1), so what is behind the back is never a page of
-  /// an earlier serve.
+  /// policy, so behind a cover (the first load's included) each press would walk the hidden history; and NB2:
+  /// only while the session serves. A web view is kept only while the origins served stay the same (A), so
+  /// every page behind the back is on a port served again.
   Future<bool> back() async {
     final engine = _current;
     if (engine == null || !_backInPage || !await engine.canGoBack()) return false;
@@ -338,9 +339,9 @@ class ToolPageController extends Controller {
     return true;
   }
 
-  /// Shown (not behind a cover) and served: a lost channel lifts the cover, but with the servers closed
-  /// (after "disabled", "gone", "unavailable", or a lost channel right after a resume) the history points
-  /// at ports nothing of ours serves (NB2).
+  /// Shown (not behind a cover, the first load's included) and served: a lost channel lifts the cover, but with
+  /// the servers closed (after "disabled", "gone", "unavailable", or a lost channel right after a resume) the
+  /// history points at ports nothing of ours serves (NB2).
   bool get _backInPage {
     final phase = _phase.peek();
     return _page?.servedPort != null &&
@@ -350,7 +351,7 @@ class ToolPageController extends Controller {
 
   /// E13: served only while the app is in the foreground (Apple TN2277), and the web view goes blank so
   /// that the page stops with it; back in the foreground, served again (the port may change) and loaded in
-  /// a fresh web view (NB1).
+  /// the same web view when the origins served are the same (A), else in a fresh one (NB1).
   void setForeground(bool foreground) {
     if (_foreground == foreground || _disposed) return;
     _foreground = foreground;

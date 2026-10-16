@@ -2,7 +2,8 @@ import 'package:shellx_mobile/core/core.dart' hide test;
 import 'package:shellx_mobile/features/tools/presentation/tool_web_engine.dart';
 
 /// Stands for the web view of a tool page (V2-4): records what the page asks of it; a test plays
-/// the web view's side through [callbacks]. A tool page makes one per serve ([FakeToolWebEngines]).
+/// the web view's side through [callbacks]. A tool page makes a fresh one for a serve on other origins
+/// ([FakeToolWebEngines]).
 class FakeToolWebEngine implements ToolWebEngine {
   FakeToolWebEngine({this.name = 'web', List<String>? log}) : log = log ?? [];
 
@@ -56,8 +57,8 @@ class FakeToolWebEngine implements ToolWebEngine {
   }
 }
 
-/// Hands out a new [FakeToolWebEngine] each time the tool page asks for a web view (V2-4 NB1: every
-/// serve gets its own), and remembers them in order, with one log of what they were all asked.
+/// Hands out a new [FakeToolWebEngine] each time the tool page asks for a web view (V2-4 NB1: a serve on
+/// other origins gets a fresh one), and remembers them in order, with one log of what they were all asked.
 class FakeToolWebEngines {
   final List<FakeToolWebEngine> made = [];
   final List<String> log = [];

@@ -11,7 +11,8 @@ import 'package:shellx_mobile/shared/shared.dart';
 /// V2-4 E15: one tool of the computer, over the machine's page: a bar (‹, the name, "localhost:5173 ·
 /// qua máy tính", ↻, ⋯), a thin progress line, and the page in a web view. The states of E16 cover
 /// the web view; a lost channel keeps the page under a strip. Android back goes back in the page
-/// first. Every serve has a web view of its own (NB1), which the controller makes through [_newEngine].
+/// first. A serve on other origins than the web view was opened for gets a fresh one (NB1, A), which the
+/// controller makes through [_newEngine].
 @RoutePage()
 class ToolPage extends StatefulWidget {
   const ToolPage({super.key, required this.agentId, required this.tool});
@@ -53,7 +54,7 @@ class _ToolPageState extends State<ToolPage> {
     );
   }
 
-  /// A web view for a serve (NB1): the injected engine, asking before another site opens in the browser,
+  /// A fresh web view (NB1): the injected engine, asking before another site opens in the browser,
   /// reporting to [callbacks].
   ToolWebEngine _newEngine(ToolWebCallbacks callbacks) => getIt<ToolWebEngine>()
     ..askExternal = _askExternal

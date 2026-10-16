@@ -58,7 +58,8 @@ abstract interface class ToolWebEngine {
   set askExternal(Future<void> Function(Uri url) ask);
   Widget view();
 
-  /// The page shows this web view no more: a new serve has a web view of its own (NB1), or the page is left.
+  /// The page shows this web view no more: a serve on other origins gets a fresh one (NB1), or the page is
+  /// left.
   void dispose();
 }
 

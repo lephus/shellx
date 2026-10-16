@@ -209,7 +209,7 @@ class TerminalWorkspace extends Controller {
     return pickable();
   }
 
-  /// How long the picker waits for the first AI listing.
+  /// How long the picker waits for the first AI listing, and for the first tool listing (V2-4).
   static const Duration aiListingWait = Duration(seconds: 3);
 
   /// Terminal sharing §9.1, for `+`: lists the machine's sessions (desktop terminals included)
@@ -219,7 +219,7 @@ class TerminalWorkspace extends Controller {
     final sessions = await machine.listSessions();
     _listedSessions = true;
     final (ai, tools) = await (_pickableAiListing(), _pickableToolListing()).wait;
-    // After the wait for the AI listing: a session attached meanwhile is a tab by now.
+    // After the waits for the AI and tool listings: a session attached meanwhile is a tab by now.
     final open = {for (final tab in _tabs.peek()) tab.id};
     return SessionListing(
       [

@@ -16,7 +16,7 @@ import '../../support/fakes.dart';
 
 const _tool = ToolInfo(id: 'k3f9za7q1m', name: 'Bảng việc', ws: 'shop-web', port: 5173, path: '/', group: 'ws:a');
 
-/// The web views the page asked for, in order (a new serve has a web view of its own).
+/// The web views the page asked for, in order (a serve on other origins gets a fresh one).
 late FakeToolWebEngines engines;
 
 /// The web view the page shows now.
@@ -525,10 +525,13 @@ void main() {
     expect(page().closes, 1);
   });
 
-  // NB1: every serve (a first serve or a re-serve) has a new secret, and cookies ignore ports, so its page gets a
-  // web view of its own: the history of an earlier serve is never there to walk (by the user's back, or by the
-  // page's own history.back()), and the old page's scripts stop before the new entry sets the new cookie.
-  testWidgets('"Về trang đầu" and a reload keep the web view: only a new serve gets a new one (NB1)', (tester) async {
+  // NB1: every serve (a first serve or a re-serve) has a new secret, and cookies ignore ports: a serve on other
+  // origins than the web view was opened for gets a fresh one, so the history of a serve on other ports is never
+  // there to walk (by the user's back, or by the page's own history.back()), and the old page's scripts stop before
+  // the new entry sets the new cookie. A serve on the same origins keeps it (A).
+  testWidgets('"Về trang đầu" and a reload keep the web view: only a serve on other origins gets a new one (NB1)', (
+    tester,
+  ) async {
     await open(tester);
     await shown(tester);
     page().emit(ToolLoad(Uri.parse('http://localhost:5173/'))); // the start page: not an entry URL
