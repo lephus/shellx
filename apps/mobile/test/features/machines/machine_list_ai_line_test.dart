@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_ai/remote.dart';
 import 'package:shellx_client/shellx_client.dart';
@@ -27,6 +29,26 @@ AiListing listing({required int waiting, int sessions = 2}) => AiListing(
   ],
 );
 
+/// The lines of the page, counting what is done to them: the app's lifecycle and the end of the page.
+class _SpyLines extends MachineAiLines {
+  _SpyLines(super.session, super.registry);
+
+  int disposeCalls = 0;
+  final List<bool> foreground = [];
+
+  @override
+  void setForeground(bool foreground) {
+    this.foreground.add(foreground);
+    super.setForeground(foreground);
+  }
+
+  @override
+  void dispose() {
+    disposeCalls++;
+    super.dispose();
+  }
+}
+
 /// V2-2b B21: "✦ 2 phiên AI · 1 cần bạn" on the card of a computer, and where it leads.
 void main() {
   late FakeBackend backend;
@@ -34,6 +56,7 @@ void main() {
   late WorkspaceRegistry registry;
   late List<Object?> aiPages;
   late List<Object?> terminals;
+  late _SpyLines lines;
 
   setUp(() {
     backend = FakeBackend(devices: [agentDevice(agentA, 'MacBook Pro')], pinnedList: [pinned(agentA)])
@@ -47,7 +70,7 @@ void main() {
       ..registerSingleton<PopupHandler>(FakePopupHandler())
       ..registerSingleton<ExternalLinks>(FakeExternalLinks())
       ..registerFactory<MachineListController>(() => MachineListController(backend: backend, registry: registry))
-      ..registerFactory<MachineAiLines>(() => MachineAiLines(session, registry));
+      ..registerFactory<MachineAiLines>(() => lines = _SpyLines(session, registry));
   });
 
   tearDown(() async {
@@ -207,13 +230,56 @@ void main() {
     expect((mac.connectCalls, mac.ai.watching), (2, true));
   });
 
-  testWidgets('leaving the list lets every machine go', (tester) async {
+  testWidgets('leaving the list lets every machine go, and the app lifecycle no longer reaches its lines', (
+    tester,
+  ) async {
     await openList(tester);
     expect(mac.ai.watching, isTrue);
     await tester.element(find.byType(MachineListPage)).router.maybePop();
     await tester.pumpAndSettle();
     expect(find.byType(MachineListPage), findsNothing);
-    expect((mac.ai.watching, mac.ai.hasListingListener), (false, false));
+    expect((mac.ai.watching, mac.ai.hasListingListener, lines.disposeCalls), (false, false, 1));
+    final heard = lines.foreground.length;
+    for (final state in [AppLifecycleState.inactive, AppLifecycleState.hidden, AppLifecycleState.paused]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    for (final state in [AppLifecycleState.hidden, AppLifecycleState.inactive, AppLifecycleState.resumed]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    await tester.pumpAndSettle();
+    expect(lines.foreground.length, heard);
+  });
+
+  testWidgets('the session picked in the chooser opens over the list: the machine stays let go under it', (
+    tester,
+  ) async {
+    await openList(tester);
+    mac.ai.emitListing(listing(waiting: 2));
+    await tester.pump();
+    await tester.tap(line());
+    await tester.pumpAndSettle();
+    expect(mac.ai.watching, isFalse, reason: 'the chooser is over the list');
+    final handshakes = mac.connectCalls;
+    await tester.tap(find.byKey(const ValueKey('picker-ai-e.-2')));
+    await tester.pumpAndSettle();
+    expect((aiPages.single as AiSessionRouteArgs).sid, 'e.-2');
+    expect((mac.ai.watching, mac.connectCalls), (false, handshakes), reason: 'the session page is over the list');
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(mac.ai.watching, isTrue);
+  });
+
+  testWidgets('a page pushed over the list by something else lets the machine go too', (tester) async {
+    await openList(tester);
+    // What a tapped notification does: it pushes over the list without the list's own code being involved.
+    final list = tester.element(find.byType(MachineListPage));
+    unawaited(list.router.push(TerminalRoute(agentId: agentA, machineName: 'MacBook Pro')));
+    await tester.pumpAndSettle();
+    expect(terminals, hasLength(1));
+    expect(mac.ai.watching, isFalse);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(mac.ai.watching, isTrue);
   });
 
   testWidgets('a page over the list lets the machine go; back on the list it is held again', (tester) async {

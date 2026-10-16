@@ -40,13 +40,22 @@ class _MachineListPageState extends State<MachineListPage> {
     if (ai != null) {
       // Not from inside the signal's own notification: the lines write signals of their own.
       _stopMachines = _controller.state.subscribe((list) => scheduleMicrotask(() => ai.setMachines(list.machines)));
-      ai.setVisible(true);
       // `inactive` (the notification shade, a system dialog) still shows the list; `hidden` and `paused` do not.
       _lifecycle = AppLifecycleListener(
         onStateChange: (state) =>
             ai.setForeground(state == AppLifecycleState.resumed || state == AppLifecycleState.inactive),
       );
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // B21: the lines hold their machines only while this page is the one on top. Whatever covers it lets them go —
+    // a page this page pushes, the session page the chooser opens (`openAiChooser` does not wait for it), a page a
+    // tapped notification pushes, a sheet, a dialog — and back on top they are held again. `ModalRoute.of` makes the
+    // route's `isCurrent` a dependency of this page, so this runs whenever that changes.
+    _ai?.setVisible(ModalRoute.of(context)?.isCurrent ?? true);
   }
 
   @override
@@ -58,32 +67,20 @@ class _MachineListPageState extends State<MachineListPage> {
     super.dispose();
   }
 
-  /// The lines let their machines go while a page of this one is over the list (B21).
-  Future<T?> _over<T>(Future<T?> Function() navigation) async {
-    _ai?.setVisible(false);
-    try {
-      return await navigation();
-    } finally {
-      if (mounted) _ai?.setVisible(true);
-    }
-  }
-
   /// Pairing, unpairing and new tabs happen on the pushed pages: refresh when they close.
-  Future<void> _then(Future<Object?> Function() navigation) async {
-    await _over(navigation);
+  Future<void> _then(Future<Object?> navigation) async {
+    await navigation;
     if (mounted) await _controller.refresh();
   }
 
-  Future<void> _scan() => _then(() => context.router.push(QrScannerRoute()));
+  Future<void> _scan() => _then(context.router.push(QrScannerRoute()));
 
   Future<void> _refresh() async {
     await Future.wait([_controller.refresh(), ?_ai?.refresh()]);
   }
 
   Future<void> _open(MachineEntry machine) async {
-    final exit = await _over(
-      () => context.router.push<TerminalExit>(TerminalRoute(agentId: machine.id, machineName: machine.name)),
-    );
+    final exit = await context.router.push<TerminalExit>(TerminalRoute(agentId: machine.id, machineName: machine.name));
     if (!mounted) return;
     await _controller.refresh();
     if (!mounted) return;
@@ -91,7 +88,7 @@ class _MachineListPageState extends State<MachineListPage> {
       case TerminalExit.untrusted:
         await _askToPairAgain();
       case TerminalExit.updateRequired:
-        await _over(() => context.router.push(const UpdateRequiredRoute()));
+        await context.router.push(const UpdateRequiredRoute());
       case null:
         break;
     }
@@ -132,16 +129,14 @@ class _MachineListPageState extends State<MachineListPage> {
         if (session.state == AiRemoteState.needsInput) session,
     ];
     if (waiting.length == 1) {
-      await _over(
-        () => context.router.push(
-          // Keyed by its session, like every way into an AI session page (F44): the router would otherwise
-          // update a page of the same name instead of pushing a new one.
-          AiSessionRoute(
-            key: ValueKey('ai:${machine.id}/${waiting.single.sid}'),
-            agentId: machine.id,
-            machineName: machine.name,
-            sid: waiting.single.sid,
-          ),
+      await context.router.push(
+        // Keyed by its session, like every way into an AI session page (F44): the router would otherwise
+        // update a page of the same name instead of pushing a new one.
+        AiSessionRoute(
+          key: ValueKey('ai:${machine.id}/${waiting.single.sid}'),
+          agentId: machine.id,
+          machineName: machine.name,
+          sid: waiting.single.sid,
         ),
       );
       return;
@@ -152,9 +147,7 @@ class _MachineListPageState extends State<MachineListPage> {
     } on StateError {
       return; // not paired any more
     }
-    await _over(
-      () => openAiChooser(context, agentId: machine.id, machineName: machine.name, ai: ai, listing: listing),
-    );
+    await openAiChooser(context, agentId: machine.id, machineName: machine.name, ai: ai, listing: listing);
   }
 
   @override
@@ -173,7 +166,7 @@ class _MachineListPageState extends State<MachineListPage> {
                 child: IconButton(
                   tooltip: strings.settingsTooltip,
                   icon: Icon(Icons.settings_outlined, color: context.colors.primary),
-                  onPressed: () => _then(() => context.router.push(const SettingsRoute())),
+                  onPressed: () => _then(context.router.push(const SettingsRoute())),
                 ),
               ),
             ),
