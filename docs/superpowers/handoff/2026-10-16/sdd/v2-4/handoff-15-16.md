@@ -2,16 +2,16 @@
 
 Plan: `docs/superpowers/plans/2026-10-15-v2-4-tools-phone.md`; spec: `docs/superpowers/specs/2026-10-15-v2-4-tools-phone-design.md`. Worktree `.claude/worktrees/v2-4`, branch `v2-4`. The SDD ledger `.superpowers/sdd/2026-10-15-v2-4-tools-phone/progress.md` is the authority (every ruling verbatim, every deferred minor with file:line, every agent id); this file summarizes it. The workspace is kept (not deleted); the branch is not finished (no finishing skill, no merge, no rebase, no push). `origin/v2-4` is the top-level's own backup push at 50cfd1b; local `v2-4` is ahead.
 
-**Status: PARTIAL** — stopped by the top-level's stop order (14:33; all coding stops at 15:00). Done: Task 14b, Tasks 15–16, the final whole-branch review and the whole fix wave (G1–G9, all committed, the touched packages' full runs green). Not done: the scoped re-review of the fix wave and the adjudication of its residuals — the exact next steps are under "Residual findings" and in the table below. HEAD **adbdaf7**, worktree clean, nothing pushed, no child running (the fix-wave implementer ac2fe97821207757d reported DONE_WITH_CONCERNS at 14:41; report `final-fix-report.md`).
+**Status: DONE.** Task 14b, Tasks 15–16, the final whole-branch review, its one fix wave (G1–G9) and the fix wave's scoped re-review are done; the re-review found every finding addressed and no new Critical/Important breakage; 4 Minor notes are parked with rulings (below). HEAD **adbdaf7**, worktree clean, nothing pushed, no child running. (A stop order at 14:33 paused the work after the fix wave; the top-level lifted it for V2-4 at ~14:55.)
 
-## Next steps to resume (in order)
+## Integration notes for the top-level controller
 
-1. Check the state: `git -C .claude/worktrees/v2-4 log --oneline -1` → adbdaf7, `git -C .claude/worktrees/v2-4 status --short` → empty. If the fix-wave implementer's report (`final-fix-report.md` in this workspace, or its returned message) exists, read it: it holds the per-group RED/GREEN evidence.
-2. The scoped re-review of the fix wave (one opus reviewer, template `SCRATCH/sdd-skill/re-review-prompt.md`): build the package from MAIN with `bash SCRATCH/sdd-skill/scripts/review-package docs/superpowers/plans/2026-10-15-v2-4-tools-phone.md 1b378da6cc3946249bbc8515fef14dc49e30ebd3 adbdaf7` (use the full SHA of adbdaf7); findings to verify = `final-review.md` I1, I2, I3 (as ruled: phone-side pacing 100/50), M1, M2, M3, M6, plus every item `final-fix-brief.md` G6–G9 selected; brief = `final-fix-brief.md`; report = `final-fix-report.md`. Include the harness and scratch-hygiene sentences of `controller-common.md` verbatim.
-   The implementer's concerns, for the re-reviewer to weigh: (a) I3 uses a small bucket in `MachineTools`, not core's `ToolTokenPacer` (that pacer cannot cancel its timer); the in-process burst test uses 304 answers because GET bodies are throttled by the desktop's 150 frames/s and never reach E10's limit; (b) M1/M2: `pause()` and `close()` now set their phase at once and nothing later overwrites either (beyond the brief, which named only `closed`; pinned); (c) `_bind` still rethrows a non-socket binder error after closing the pair, so the page stays in `opening` (unreachable with the default binder); (d) G8 also fixed the same stale wording outside the listed lines; (e) one shellx_core full run failed a test whose name the log cut, the re-run passed 404/404; (f) because of the stop order there was no final whole-diff self-review.
-3. Adjudicate what it leaves open (no second fix wave): park each residual with a ruling, or rule on the smallest change for a load-bearing one; ledger each ruling in `progress.md`; update "Residual findings" below.
-4. Optional before merging: re-run the touched packages' suites once more on the merged tree; manual device checks (below) before a release.
-5. Merge per the merge notes below (the top-level controller merges; never push `main` without the user — a push to `main` releases the desktop app).
+1. `v2-4` is ready to merge at **adbdaf7** (clean; nothing pushed by any chunk; `origin/v2-4` is your backup at 50cfd1b). Range of the whole branch: 130d8aa..adbdaf7.
+2. It carries V2-3 Task 1 as identical cherry-picks (ab82735, 50cfd1b): merge cleanly; take V2-3's side for `docs/superpowers/ledgers/v2-tools.md` and for any of V2-3's six Task 1 files it changed later.
+3. Files shared with V2-2b need both sides' lines (list under "Merge notes"); after merging, merge both ARB key sets, run `dart run intl_utils:generate` + `dart format` of the three generated files, and `dart run build_runner build --delete-conflicting-outputs` in `apps/mobile`; keep `COCOAPODS: 1.16.2` in `apps/mobile/ios/Podfile.lock`.
+4. After merging, run once: the touched packages' analyze + tests (`shellx_core`, `shellx_agent`, `shellx_client`, `shellx_e2e`, `apps/mobile`, `apps/desktop`); the timing test shellx_core "path performance" may need a re-run alone.
+5. I3 is a controller ruling the user should see: the phone paces its stream opens at 100 at once then 50/s (the desktop keeps E10's 120/60), so many-module dev pages load slowly instead of failing with 503s.
+6. Before a release: the 19 manual device checks below; never push `main` without the user (it releases the desktop app).
 
 ## Tasks done in this chunk
 
@@ -21,7 +21,7 @@ Plan: `docs/superpowers/plans/2026-10-15-v2-4-tools-phone.md`; spec: `docs/super
 | Task 15 — the window serves its phone list | e3ca11f..87fd99c (1 commit) | Approved (opus), no Critical/Important; 4 Minor deferred |
 | Task 16 — final verification, ledger | 87fd99c..1b378da (1 commit, ledger doc only) | Approved (sonnet), wording minors deferred to the fix wave |
 | Final whole-branch review (opus, 130d8aa..1b378da) | — | **With fixes** (0 Critical, 3 Important, 6 Minor) |
-| Final fix wave (opus, one dispatch) | 1b378da..adbdaf7 (9 commits) | scoped re-review (opus): **NOT DONE** (stop order) — next step: `cd MAIN && bash SCRATCH/sdd-skill/scripts/review-package docs/superpowers/plans/2026-10-15-v2-4-tools-phone.md 1b378da6cc3946249bbc8515fef14dc49e30ebd3 $(git -C .claude/worktrees/v2-4 rev-parse HEAD)`, then one opus re-review with `re-review-prompt.md`: findings = `final-review.md` I1–I3, M1–M3, M6 + the items `final-fix-brief.md` selected (G6–G9) |
+| Final fix wave (opus, one dispatch) | 1b378da..adbdaf7 (9 commits) | scoped re-review (opus): every finding ADDRESSED (I1–I3, M1–M3, M6, every G6–G9 item); no new Critical/Important; 4 Minor parked |
 
 Chunk 3 range: **e3ca11f..adbdaf7 (12 commits; base 50cfd1b)**. The whole branch: 130d8aa..adbdaf7.
 
@@ -90,13 +90,13 @@ Fix wave (one opus dispatch, brief `final-fix-brief.md`, groups G1–G9): all ni
 
 ## Residual findings and adjudication
 
-**NOT DONE — next step:** the scoped re-review of the fix wave (above) has not run, so nothing is adjudicated yet. After it: each finding it leaves NOT ADDRESSED, and any new Critical/Important breakage in the fix diff, is adjudicated as the SDD breaker says (park with a ruling, or rule on the smallest change for a load-bearing one — there is no second fix wave); ledger every ruling; then finish this section and the totals.
+The fix wave's scoped re-review (opus) left nothing open: every finding ADDRESSED, no new Critical/Important breakage. Its Minor notes, parked (ledger rulings):
+- The phone's gate-cookie drop compares `name == 'set-cookie'` case-sensitively (`tool_session.dart:1150`, `:1359`) — parked: the real desktop sends lowercase names and already drops `__shellx_*` Set-Cookies itself; defence in depth only — cost: a non-ShellX/broken desktop sending a capitalized `Set-Cookie: __shellx_…` could set the gate cookie; one-line fix `name.toLowerCase()`.
+- `_pause()` has no try/finally around `await unserving` (`:293–303`) — parked: no reachable throw — cost: a stuck pause until the page is left.
+- An overtaken serve keeps trying later siblings (`:508–513`) — parked: each bind is closed at once, no leak.
+- (Out of scope, pre-existing) a non-socket binder error escapes the unawaited `_check()` — parked: unreachable with the default binder.
 
-Known open items already ruled (not residuals of the re-review; each in the ledger with its cost):
-- M4 (head timeout only after an upload the tool never reads) and M5 (alias × sibling CORS) — deferred, rulings 13–14.
-- The fix-wave OUT list — ruling 15.
-- Device-only questions — the manual checks below.
-- 124 deferred Minor findings across Tasks 1–16 (ledger lines `minor (deferred`; `final-review-ledger-extract.md`), triaged by the final reviewer: none must be fixed before merge on its own.
+Other open items, already ruled: M4 and M5 (deferred, rulings 13–14), the fix wave's OUT list (ruling 15), device-only questions (manual checks), and 124 deferred Minor findings from Tasks 1–16 (`final-review-ledger-extract.md`; the final reviewer: none must be fixed before merge on its own).
 
 ## Suite totals per package (final tree adbdaf7)
 

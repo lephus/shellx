@@ -10,21 +10,18 @@ Bảng mã commit chính xác lúc dừng nằm ở cuối file, mục "Trạng 
 
 | Nhánh | Nội dung | Trạng thái |
 |---|---|---|
-| `shellx-v2` | V2-1, V2-2a, **V2-3 (đã gộp)**, 3 spec V2-5, plan V2-5a (chưa xong), thư mục bàn giao này | Ổn định, đã kiểm toàn bộ lúc gộp V2-3 |
+| `shellx-v2` | V2-1, V2-2a, **V2-3 và V2-4 (đã gộp, 16/10 ~15:10)**, 3 spec V2-5, plan V2-5a (chưa xong), thư mục bàn giao này | Ổn định. Kiểm toàn bộ trên bản gộp V2-3 + V2-4: core 404, agent 970, client 247, e2e 16, acp 87, ai 576, desktop 3890, mobile 1361, tất cả qua |
 | `v2-2b` | V2-2b: AI trên điện thoại, phần 2 (26 việc) | Việc 1–25 đã xong và review. Việc 26 đã code và commit, test xanh, nhưng **review việc 26 chưa xong**. **Chưa review toàn nhánh.** Gói diff cho review toàn nhánh đã soạn sẵn trong `.superpowers/sdd/…` (xem `sdd/v2-2b/handoff-20-26.md`) |
 | `v2-5a-wip-union` | **Bản thử nghiệm**: gộp tạm cả 4 nhánh, cộng code V2-5a việc 1–4 và một phần việc 5. Do agent viết plan làm để kiểm chứng plan. Cách giải xung đột khi gộp ở đây **không phải** bản gộp chính thức | Việc 1 (thử SF Mono) đạt cả 5 điều kiện trên macOS và trình giả lập iOS 26. Có thể lấy lại code các việc 1–4 sau khi gộp chính thức |
 | `v2-2b-relay` | Relay B6 (category/tag cho nút trên thông báo) và trang quyền riêng tư (việc 26) | **Chưa deploy.** Cần bạn đồng ý |
 | `v2-3` | V2-3: tool trên desktop | Xong, đã gộp vào `shellx-v2` |
 | `windows-check/v2-3` | Bản V2-3 để CI Windows build | Xem tab Actions trên GitHub |
-| `v2-4` | V2-4: tool trên điện thoại (16 việc) | 16/16 việc xong, review toàn nhánh xong. **Đợt sửa sau review đang làm dở**, xem `sdd/v2-4/handoff-15-16.md` |
+| `v2-4` | V2-4: tool trên điện thoại (16 việc) | **Xong**: review toàn nhánh, đợt sửa và review lại đều đã đóng. Đã gộp vào `shellx-v2` (rebase). Quyết định I3 đổi hành vi: điện thoại giãn nhịp mở luồng 100 rồi 50/giây, trang dev nhiều module tải chậm hơn thay vì lỗi 503 |
 
 ## 2. Việc còn lại, theo thứ tự
 
-### V2-4: hoàn tất rồi gộp
-- Làm nốt đợt sửa sau review toàn nhánh. Danh sách và trạng thái từng mục có trong `sdd/v2-4/handoff-15-16.md` và `progress.md`.
-- Review lại phần sửa.
-- Rebase lên `shellx-v2`. Hai commit V2-3 Task 1 mà V2-4 đã cherry-pick (`ab82735`, `50cfd1b`) sẽ tự bị bỏ, vì `shellx-v2` đã có chúng.
-- Chạy kiểm tra toàn bộ (`coordination/verify-dir.sh <thư mục repo>`), rồi fast-forward `shellx-v2`.
+### V2-4: xong
+Đã review, sửa, review lại và gộp vào `shellx-v2` (16/10 ~15:10). Ghi chú gộp với V2-2b: `sdd/v2-4/handoff-15-16.md`, mục "Integration notes".
 
 ### V2-2b: hoàn tất rồi gộp
 - Xong việc 26. Đây là trang quyền riêng tư (nằm trên `v2-2b-relay`), quét quyền riêng tư và test đầu–cuối với relay chạy cục bộ.
@@ -80,7 +77,7 @@ Danh sách gom từ các file `handoff-*.md` và từ mục "⚠ Kiểm tay" tro
 ## 4. Làm tiếp bằng Claude Code (nếu muốn dùng lại quy trình)
 - Quy trình là subagent-driven development của plugin superpowers. Brief chung cho người điều phối: `coordination/controller-common.md`. Hai mục "Harness note" và "Scratch hygiene" là bài học rút ra trong hai ngày này.
 - Sổ theo dõi của từng plan nằm ở `.superpowers/sdd/<tên-plan>/`, thư mục này git-ignore. Bản sao đã có ở `sdd/`. Chép lại vào đúng chỗ thì người điều phối làm tiếp từ đúng điểm dừng.
-- Worktree: `.claude/worktrees/{v2-2b, v2-2b-relay, v2-4}` còn dùng. `v2-3` và `int` đã gộp, xoá được.
+- Worktree: `.claude/worktrees/{v2-2b, v2-2b-relay, v2-4}` còn dùng. `v2-3`, `v2-4` và `int` đã gộp, xoá được.
 - Flutter: `PATH=~/fvm/versions/3.41.4/bin:$PATH`.
 
 ## 5. Nội dung thư mục
@@ -102,7 +99,7 @@ Danh sách gom từ các file `handoff-*.md` và từ mục "⚠ Kiểm tay" tro
 | `v2-2b` | `2e354765` | `14e9eb1..` 42 commit; việc 26 chưa đóng review; chưa review toàn nhánh |
 | `v2-2b-relay` | `b8d0197b` | `c6cf495` relay B6 + `b8d0197` trang quyền riêng tư; chưa deploy |
 | `v2-3` | `73b9bdfc` | đã gộp vào `shellx-v2` (rebase) |
-| `v2-4` | `adbdaf76` | đợt sửa sau review toàn nhánh xong (`1b378da..adbdaf7`), **chưa review lại** |
+| `v2-4` | `adbdaf76` | xong; đã gộp vào `shellx-v2` dưới dạng rebase (`61d83574`) |
 | `v2-5a-wip-union` | `61dddcb3` | bản thử nghiệm, xem bảng ở mục 1 |
 
 Sổ của từng phần kết thúc bằng điểm tiếp tục chính xác: `sdd/v2-2b/progress.md` (mục STOP ORDER), `sdd/v2-4/progress.md`, `sdd/v2-4/handoff-15-16.md` ("Next steps to resume"), `sdd/v2-2b/handoff-20-26.md`.
