@@ -212,6 +212,9 @@ extension _AiPhoneRequests on AiPhoneHub {
   /// `refused`. An agent page longer than [kAiHistoryPage] is served from
   /// here in pages of that many, under the hub's own cursor, so that the
   /// phone skips none; the agent's next cursor comes after the last of them.
+  /// A cursor of the hub's it does not hold now (an old page asked again, a
+  /// new channel, another session's history asked in between) is `refused`:
+  /// it is never the agent's to read.
   void _history(String mobileId, _Phone phone, AiHistory h) {
     unawaited(
       _ask(mobileId, phone, h.sid, h.rid, (c) async {
@@ -231,7 +234,9 @@ extension _AiPhoneRequests on AiPhoneHub {
           after = held.next;
         } else {
           if (cursor != null &&
-              (cursor.isEmpty || utf8Length(cursor) > kAiHistoryCursorBytes)) {
+              (cursor.isEmpty ||
+                  utf8Length(cursor) > kAiHistoryCursorBytes ||
+                  cursor.startsWith(_historyRestPrefix))) {
             return const _Reply.refuse('refused');
           }
           final page = await c.listSessions(cursor: cursor);
@@ -242,7 +247,7 @@ extension _AiPhoneRequests on AiPhoneHub {
         phone.historyRest = null;
         var next = after;
         if (sessions.length > kAiHistoryPage) {
-          final mine = 'shellx-rest-${_nextHistoryRest++}';
+          final mine = '$_historyRestPrefix${_nextHistoryRest++}';
           phone.historyRest = (
             sid: h.sid,
             cursor: mine,
