@@ -230,6 +230,24 @@ void main() {
     expect((mac.connectCalls, mac.ai.watching), (2, true));
   });
 
+  testWidgets('a computer that could not be reached is tried again once the relay was lost and is back', (
+    tester,
+  ) async {
+    mac.connectFailure = MachineConnectionFailure.timeout;
+    await openList(tester);
+    expect((mac.connectCalls, mac.ai.watching), (1, false));
+    mac.connectFailure = null;
+    // The client raises offline presence for every online computer when the relay is lost (or suspended in the
+    // background); they come back with the relay.
+    backend.emitRelayLoss();
+    await tester.pump(); // not pumpAndSettle: the banner "Mất kết nối, đang thử lại…" animates until the relay is back
+    expect(mac.connectCalls, 1, reason: 'no relay, nothing to try');
+    backend.onlineIds.add(agentA);
+    backend.emitRelay(RelayConnectionState.connected);
+    await tester.pumpAndSettle();
+    expect((mac.connectCalls, mac.ai.watching), (2, true));
+  });
+
   testWidgets('leaving the list lets every machine go, and the app lifecycle no longer reaches its lines', (
     tester,
   ) async {

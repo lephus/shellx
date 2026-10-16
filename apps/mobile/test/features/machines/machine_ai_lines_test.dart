@@ -173,6 +173,87 @@ void main() {
     expect(mac.ai.watching, isTrue);
   });
 
+  for (final (name, gone) in [
+    ('goes offline', entry(agentA, online: false)),
+    ('is unpaired', entry(agentA, paired: false)),
+  ]) {
+    test('a machine that could not be reached and then $name is tried once more when it is back', () async {
+      final mac = add(agentA)..connectFailure = MachineConnectionFailure.timeout;
+      lines
+        ..setMachines([entry(agentA)])
+        ..setVisible(true);
+      await pumpEventQueue();
+      expect((mac.connectCalls, lines.line(agentA)), (1, null));
+      mac.connectFailure = null;
+      lines.setMachines([gone]);
+      await pumpEventQueue();
+      expect(mac.connectCalls, 1, reason: 'a machine that is gone is not tried');
+      lines.setMachines([entry(agentA)]);
+      await pumpEventQueue();
+      expect((mac.connectCalls, mac.ai.watching), (2, true));
+      mac.ai.emitListing(listing());
+      expect(lines.line(agentA), (sessions: 2, waiting: 1));
+    });
+  }
+
+  test('a machine that fails again after coming back is tried once per return, not in a loop', () async {
+    final mac = add(agentA)..connectFailure = MachineConnectionFailure.timeout;
+    lines
+      ..setMachines([entry(agentA)])
+      ..setVisible(true);
+    await pumpEventQueue();
+    lines
+      ..setMachines([entry(agentA, online: false)])
+      ..setMachines([entry(agentA)]);
+    await pumpEventQueue();
+    expect(mac.connectCalls, 2);
+    lines.setMachines([entry(agentA)]);
+    await pumpEventQueue();
+    expect(mac.connectCalls, 2, reason: 'it stays online: not tried again before its next return');
+  });
+
+  test('a handshake that fails because the list stopped showing does not mark the machine failed', () async {
+    final mac = add(agentA)..connectFailure = MachineConnectionFailure.timeout;
+    lines
+      ..setMachines([entry(agentA)])
+      ..setVisible(true)
+      ..setVisible(false);
+    await pumpEventQueue();
+    expect(mac.connectCalls, 1);
+    mac.connectFailure = null;
+    lines.setVisible(true);
+    await pumpEventQueue();
+    expect((mac.connectCalls, mac.ai.watching), (2, true));
+  });
+
+  test('a handshake that fails because the relay dropped does not mark the machine failed', () async {
+    final mac = add(agentA)..connectFailure = MachineConnectionFailure.timeout;
+    lines
+      ..setMachines([entry(agentA)])
+      ..setVisible(true);
+    backend.emitRelay(RelayConnectionState.disconnected);
+    await pumpEventQueue();
+    expect(mac.connectCalls, 1);
+    mac.connectFailure = null;
+    backend.emitRelay(RelayConnectionState.connected);
+    await pumpEventQueue();
+    expect((mac.connectCalls, mac.ai.watching), (2, true));
+  });
+
+  test('a handshake that fails because the machine went offline does not mark it failed', () async {
+    final mac = add(agentA)..connectFailure = MachineConnectionFailure.agentOffline;
+    lines
+      ..setMachines([entry(agentA)])
+      ..setVisible(true)
+      ..setMachines([entry(agentA, online: false)]);
+    await pumpEventQueue();
+    expect(mac.connectCalls, 1);
+    mac.connectFailure = null;
+    lines.setMachines([entry(agentA)]);
+    await pumpEventQueue();
+    expect((mac.connectCalls, mac.ai.watching), (2, true));
+  });
+
   test('a computer whose AI support is not known yet is asked once on the machine; the terminal page still shows '
       'its picker on the first visit', () async {
     final mac = add(agentA, supported: null);
