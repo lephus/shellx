@@ -277,7 +277,7 @@ void main() {
       expect(with1.toMap()['tools'], 1);
       final decoded = decodeBatch(encodeBatch([with1])).single;
       expect((decoded as SessionListResult).tools, 1);
-      expect(decoded.ai, 1);
+      expect(decoded.ai, kAiProtocol);
     });
 
     test('an older desktop sends none: null', () {
@@ -326,7 +326,7 @@ void main() {
       ]);
       final decoded = v2.decodeBatch(batch).single as v2.SessionListResult;
       expect(decoded.sessions.single.id, 1);
-      expect(decoded.ai, 1);
+      expect(decoded.ai, kAiProtocol);
       expect(decoded.desktopSharing, isTrue);
     });
   });
