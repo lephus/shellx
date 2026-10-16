@@ -10,6 +10,7 @@ import '../config/config_controller.dart';
 import '../config/keybindings.dart';
 import '../terminal/terminal_tabs.dart';
 import 'tool_dock.dart';
+import 'tool_embed.dart';
 import 'tool_entry.dart';
 import 'tool_keys.dart';
 import 'tool_navigation.dart';
@@ -56,7 +57,8 @@ final toolPagesProvider = NotifierProvider<ToolPages, Set<String>>(
 /// dock rebuilds when a page comes or goes). A page is made when its dock
 /// first shows it; past [kMaxLiveToolPages] the page unseen longest is
 /// unloaded (its chip stays, a toast says so). A closed chip, a deleted
-/// tool or a new URL (D23) reaches its page here.
+/// tool or a new URL (D23) reaches its page here; so does `tool-embed`
+/// turning off (D20).
 class ToolPages extends Notifier<Set<String>> {
   final _pages = <String, ToolPage>{};
 
@@ -80,6 +82,16 @@ class ToolPages extends Notifier<Set<String>> {
       final open = {for (final d in docks.byWorkspace.values) ...d.tools};
       for (final id in [..._pages.keys]) {
         if (!open.contains(id)) close(id);
+      }
+    });
+    // D20: tools no longer shown in ShellX (`tool-embed = off`) leave no
+    // page running hidden — no UI would be left to stop its scripts,
+    // sockets or audio. The chips stay; shown again, a page loads again
+    // (R15).
+    ref.listen<bool>(toolsEmbeddedProvider, (_, embedded) {
+      if (embedded) return;
+      for (final id in [..._pages.keys]) {
+        close(id);
       }
     });
     ref.listen<KeyBindings>(shellxConfigProvider.select((s) => s.bindings), (

@@ -23,6 +23,7 @@ import 'package:shellx_desktop/src/ui/tools/tool_area.dart';
 
 import '../../support/ai_fakes.dart';
 import '../../support/ai_tabs.dart';
+import '../../support/config_harness.dart';
 import '../../support/config_workspace.dart';
 import '../../support/fake_local_sessions.dart';
 import '../../support/tool_harness.dart';
@@ -487,6 +488,45 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
+
+  testWidgets('switching tool-embed to off closes every live page; on again, '
+      'a tool shown loads again (D20, D5, R15)', (t) async {
+    await rig.pump(t);
+    final a = rig.add(kDefaultWorkspaceId, 'localhost:1', name: 'A');
+    final b = rig.add(kDefaultWorkspaceId, 'localhost:2', name: 'B');
+    await t.pumpAndSettle();
+    await openTool(t, a.id);
+    await openTool(t, b.id);
+    final before = {...rig.engines};
+    expect(rig.container.read(toolPagesProvider), {a.id, b.id});
+    Future<void> embed(String mode) async {
+      rig.fs.write(testConfigPaths().shellx, 'tool-embed = $mode\n');
+      await loadConfig(rig.container);
+      await t.pumpAndSettle();
+    }
+
+    await embed('off');
+    expect(find.byKey(const ValueKey('tool.dockSlot')), findsNothing);
+    expect(before.values.every((e) => e.disposed), isTrue);
+    expect(rig.container.read(toolPagesProvider), isEmpty);
+    expect(rig.made, 2, reason: 'none made while off');
+    await embed('on');
+    expect(find.byKey(const ValueKey('tool.dockSlot')), findsOneWidget);
+    expect(barName(t), 'B');
+    expect(rig.made, 3);
+    expect(rig.engines[b.id], isNot(same(before[b.id])));
+    expect(rig.engines[b.id]!.loads, [Uri.parse('http://localhost:2/')]);
+    await t.tap(
+      find.descendant(
+        of: find.byKey(Key('tool.chip.${a.id}')),
+        matching: find.text('A'),
+      ),
+    );
+    await t.pumpAndSettle();
+    expect(rig.made, 4);
+    expect(rig.engines[a.id]!.loads, [Uri.parse('http://localhost:1/')]);
+    await disposeWorkspace(t, rig.container);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets('Windows-like engine: a menu over the window hides the page '
       'behind a stand-in (D7)', (t) async {
