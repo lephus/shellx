@@ -3561,10 +3561,12 @@ class S {
     );
   }
 
-  /// `Loading through your computer… ({count} requests)`
+  /// `{count, plural, =1{Loading through your computer… (1 request)} other{Loading through your computer… ({count} requests)}}`
   String toolSlow(int count) {
-    return Intl.message(
-      'Loading through your computer… ($count requests)',
+    return Intl.plural(
+      count,
+      one: 'Loading through your computer… (1 request)',
+      other: 'Loading through your computer… ($count requests)',
       name: 'toolSlow',
       desc: '',
       args: [count],

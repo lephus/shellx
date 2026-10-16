@@ -278,6 +278,7 @@ class ToolPageController extends Controller {
   void pageStarted() {
     _startedSincePass = true;
     _page?.resetRequests();
+    _set(_progress, 0); // each load starts its line at 0
     _set(_loading, true);
     _set(_slowRequests, null);
     _slow?.cancel();
@@ -342,7 +343,9 @@ class ToolPageController extends Controller {
   /// at ports nothing of ours serves (NB2).
   bool get _backInPage {
     final phase = _phase.peek();
-    return _page?.servedPort != null && (phase == ToolPhase.ready || phase == ToolPhase.reconnecting);
+    return _page?.servedPort != null &&
+        !_firstLoad.peek() &&
+        (phase == ToolPhase.ready || phase == ToolPhase.reconnecting);
   }
 
   /// E13: served only while the app is in the foreground (Apple TN2277), and the web view goes blank so

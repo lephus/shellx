@@ -213,6 +213,20 @@ void main() {
     expect(en.aiUndoBroadFolder, 'this folder is your home folder or a disk root');
   });
 
+  // M6: English counts one request in the singular; Vietnamese has one form.
+  test('the tool page counts its requests in both languages', () async {
+    final en = await S.load(const Locale('en'));
+    expect(
+      [en.toolSlow(1), en.toolSlow(2)],
+      ['Loading through your computer… (1 request)', 'Loading through your computer… (2 requests)'],
+    );
+    final vi = await S.load(const Locale('vi'));
+    expect(
+      [vi.toolSlow(1), vi.toolSlow(2)],
+      ['Đang tải qua máy tính… (1 request)', 'Đang tải qua máy tính… (2 request)'],
+    );
+  });
+
   test('the AI texts call the agent Claude, never "Claude Code"', () {
     for (final path in ['lib/l10n/intl_en.arb', 'lib/l10n/intl_vi.arb']) {
       final json = jsonDecode(File(path).readAsStringSync()) as Map<String, Object?>;

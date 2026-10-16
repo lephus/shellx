@@ -167,7 +167,8 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m69(port) => "The tool on port ${port} isn\'t on for phone.";
 
-  static String m70(count) => "Loading through your computer… (${count} requests)";
+  static String m70(count) =>
+      "${Intl.plural(count, one: 'Loading through your computer… (1 request)', other: 'Loading through your computer… (${count} requests)')}";
 
   static String m71(port) => "localhost:${port} · via computer";
 

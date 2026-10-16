@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 
@@ -8,6 +8,22 @@ import '../mux/daemon_state.dart';
 import '../terminal/local_sessions_provider.dart' show appL10nProvider;
 import '../terminal/sidebar_workspaces.dart';
 import 'tool_registry.dart';
+
+/// The most UTF-16 code units of a served tool's workspace name: `ServedTool.fromJson` drops an
+/// entry with a longer `ws`, and a workspace name (64 characters) can be longer.
+const int _kServedWsUnits = 200;
+
+/// [name] in at most [_kServedWsUnits] UTF-16 code units, cut on a code point (never inside a
+/// surrogate pair).
+String _servedWs(String name) {
+  if (name.length <= _kServedWsUnits) return name;
+  var end = _kServedWsUnits;
+  final last = name.codeUnitAt(end - 1);
+  if (last >= 0xD800 && last <= 0xDBFF) {
+    end--; // a lead surrogate: its pair stays out
+  }
+  return name.substring(0, end);
+}
 
 /// V2-4 E5: what phones may open, as the window says it (`tool.serve`'s `b`, or the in-process
 /// proxy's list): every tool with its phone flag on and allowed (V2-3 D15, `phoneOn`) with its
@@ -24,7 +40,9 @@ final phoneToolsBodyProvider = Provider<Uint8List>((ref) {
           {
             'id': tool.id,
             'name': tool.name,
-            'ws': sidebar.workspace(tool.ws)?.displayName(l10n) ?? '',
+            'ws': _servedWs(
+              sidebar.workspace(tool.ws)?.displayName(l10n) ?? '',
+            ),
             'group': tool.ws,
             'url': tool.url,
           },
@@ -57,24 +75,35 @@ final _toolSlotPlugProvider = Provider<_ToolSlotPlug>((ref) => _ToolSlotPlug());
 /// the log.
 void startToolPhone(ProviderContainer container, {ToolEndpointSlot? slot}) {
   try {
+    // The list is rebuilt on every shell event: only one whose bytes changed is served or sent.
     if (slot != null) {
       final proxy = container.read(toolPhoneProxyProvider);
-      container.listen<Uint8List>(
-        phoneToolsBodyProvider,
-        (_, body) => proxy.serve(ToolCatalog.fromServeBody(body)),
-        fireImmediately: true,
-      );
+      Uint8List? served;
+      container.listen<Uint8List>(phoneToolsBodyProvider, (_, body) {
+        if (served != null && listEquals(served, body)) return;
+        served = body;
+        proxy.serve(ToolCatalog.fromServeBody(body));
+      }, fireImmediately: true);
       container.read(_toolSlotPlugProvider).slot = slot;
       slot.target = proxy;
     } else {
       // The background service holds the relay: the list goes there on each link whose service says
       // it has tools (`hello.caps`), at once and whenever it changes; an older one is never sent it.
+      // A new link always gets it.
+      DaemonLink? pushedTo;
+      Uint8List? pushed;
       void push() {
         final link = container.read(daemonLinkProvider);
         if (link == null || !link.info.caps.contains('tools')) return;
-        link.client.send(MuxType.toolServe, {
-          'b': container.read(phoneToolsBodyProvider),
-        });
+        final body = container.read(phoneToolsBodyProvider);
+        if (identical(link, pushedTo) &&
+            pushed != null &&
+            listEquals(pushed, body)) {
+          return;
+        }
+        pushedTo = link;
+        pushed = body;
+        link.client.send(MuxType.toolServe, {'b': body});
       }
 
       container.listen(daemonLinkProvider, (_, _) => push());

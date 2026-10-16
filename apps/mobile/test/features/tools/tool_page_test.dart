@@ -190,6 +190,20 @@ void main() {
     expect(find.byKey(const Key('tool.slow')), findsNothing);
   });
 
+  // Task 13 (L476): each load starts its progress line at 0, not at the last page's 100 %.
+  testWidgets('each page start begins the progress line at 0', (tester) async {
+    await open(tester);
+    await shown(tester);
+    engine.callbacks.onPageStarted();
+    engine.callbacks.onProgress(100);
+    engine.callbacks.onPageFinished();
+    await tester.pump();
+    engine.callbacks.onPageStarted();
+    await tester.pump();
+    final line = tester.widget<LinearProgressIndicator>(find.byKey(const Key('tool.progress')));
+    expect(line.value, 0);
+  });
+
   testWidgets('another site asks first, then opens in the browser (E12)', (tester) async {
     await open(tester);
     await shown(tester);
@@ -459,6 +473,22 @@ void main() {
       expect(page().closes, 1);
     });
   }
+
+  // Task 13 (b): under the first-load cover the page is not shown yet, and its history may hold the blank of an
+  // earlier serve (A): back leaves the page instead of walking it.
+  testWidgets('back during the first load leaves the page: the hidden history is not walked', (tester) async {
+    await open(tester);
+    page().ready(); // the entry loads under the first-load cover
+    await tester.pump();
+    expect(find.text('Đang tải qua đường hầm…'), findsOneWidget);
+    engine.canGoBackValue = true;
+    await tester.binding.handlePopRoute();
+    await tester.pump(); // the decision (the cover's spinner settles only once the page has left)
+    expect(engine.goBacks, 0);
+    await tester.pumpAndSettle();
+    expect(find.text('Bảng việc'), findsNothing);
+    expect(page().closes, 1);
+  });
 
   testWidgets('back leaves after a re-serve on another port: the fresh web view has no history (NB1)', (tester) async {
     await open(tester);

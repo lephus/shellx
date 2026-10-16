@@ -90,6 +90,96 @@ void main() {
     expect(json['off'], ['grafana001', 'remote0001']);
   });
 
+  // Task 15 minor (b): a workspace name is at most 64 characters, which can
+  // be more UTF-16 units than a served tool's `ws` may hold (200): cut, never
+  // inside a character, the tool is still served (not dropped by the
+  // reader, in neither its tools nor its off list).
+  test('a workspace name over 200 UTF-16 units is cut on a code point: the '
+      'tool is still served', () {
+    final c = _window(const []);
+    final long = 'a${'🇻🇳' * 64}'; // kept: 'a' and 63 flags, 253 units
+    final ws = c.read(sidebarWorkspacesProvider.notifier).createFor(name: long);
+    (c.read(toolRegistryProvider.notifier) as _Tools).set([
+      ToolEntry(
+        id: _board.id,
+        ws: ws,
+        name: _board.name,
+        url: _board.url,
+        phone: true,
+      ),
+    ]);
+    final body = c.read(phoneToolsBodyProvider);
+    final json = jsonDecode(utf8.decode(body)) as Map<String, Object?>;
+    final served = (json['tools']! as List).single as Map;
+    final name = served['ws']! as String;
+    expect(name.length, 199, reason: 'the 200th unit would split a flag');
+    expect(long, startsWith(name));
+    expect(utf8.decode(utf8.encode(name)), name, reason: 'no lone surrogate');
+    expect(ToolCatalog.fromServeBody(body)!.tools.map((t) => t.id), [
+      'k3f9za7q1m',
+    ]);
+  });
+
+  // Task 15 minor (a): the list is rebuilt on every shell event; only a list
+  // whose bytes changed is served (in-process) or sent (to the service).
+  test('in-process: a rebuild of the list that changes nothing is not served '
+      'again', () async {
+    final c = _window([_board]);
+    final core = _core();
+    startToolPhone(c, slot: core.tools);
+    final proxy = c.read(toolPhoneProxyProvider);
+    final served = proxy.catalog;
+    expect(served?.tools.map((t) => t.id), ['k3f9za7q1m']);
+    (c.read(toolRegistryProvider.notifier) as _Tools).set([_board]);
+    await pumpEventQueue();
+    expect(identical(proxy.catalog, served), isTrue);
+    (c.read(toolRegistryProvider.notifier) as _Tools).set([
+      _board,
+      _grafana.copyWith(phone: true),
+    ]);
+    await pumpEventQueue();
+    expect(proxy.catalog?.tools.map((t) => t.id), ['k3f9za7q1m', 'grafana001']);
+    stopToolPhone(c);
+  });
+
+  test('with the background service: a rebuild of the list that changes '
+      'nothing is not sent again on the same link; a new link gets the list '
+      'at once', () async {
+    const info = MuxPeerInfo(
+      protocol: kMuxProtocol,
+      app: 't',
+      caps: ['agent', 'cli', 'tools'],
+    );
+    DaemonLink link(List<String> sent) {
+      final (raw, daemonSide) = MemoryMuxTransport.pair();
+      daemonSide.messages.listen((m) => sent.add(m.type));
+      return DaemonLink(
+        sessions: RemoteLocalSessions(MuxClient(raw)),
+        info: info,
+      );
+    }
+
+    final c = _window([_board]);
+    final first = <String>[];
+    c.read(daemonLinkProvider.notifier).set(link(first));
+    startToolPhone(c);
+    await pumpEventQueue();
+    expect(first.where((type) => type == MuxType.toolServe), hasLength(1));
+    (c.read(toolRegistryProvider.notifier) as _Tools).set([_board]);
+    await pumpEventQueue();
+    expect(first.where((type) => type == MuxType.toolServe), hasLength(1));
+    (c.read(toolRegistryProvider.notifier) as _Tools).set([
+      _board,
+      _grafana.copyWith(phone: true),
+    ]);
+    await pumpEventQueue();
+    expect(first.where((type) => type == MuxType.toolServe), hasLength(2));
+    final second = <String>[];
+    c.read(daemonLinkProvider.notifier).set(link(second));
+    await pumpEventQueue();
+    expect(second.where((type) => type == MuxType.toolServe), hasLength(1));
+  });
+
   test('in-process: the slot serves the window\'s list; a change is heard; '
       'quitting tells the phone and stops serving', () async {
     final c = _window([_board]);

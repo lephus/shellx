@@ -277,12 +277,14 @@ typedef _Ask = ({InternetAddress address, int port, bool v6Only});
 /// another app holds that address and port (then a [SocketException], as a
 /// held port gives). It keeps every bind asked, in order, and every port it
 /// gave on 127.0.0.1. A bind [hold] names is made, then answered only once
-/// [release] completes: a bind still under way ([holding] meanwhile).
+/// [release] completes: a bind still under way ([holding] meanwhile). A bind
+/// [broken] names fails with an error that is no [SocketException].
 final class _Binder {
-  _Binder({this.refuse, this.hold});
+  _Binder({this.refuse, this.hold, this.broken});
 
   final bool Function(InternetAddress address, int port)? refuse;
   final bool Function(InternetAddress address, int port)? hold;
+  final bool Function(InternetAddress address, int port)? broken;
   final release = Completer<void>();
   var holding = false;
   final asked = <_Ask>[];
@@ -296,6 +298,9 @@ final class _Binder {
     asked.add((address: address, port: port, v6Only: v6Only));
     if (refuse?.call(address, port) ?? false) {
       throw const SocketException('held by another app');
+    }
+    if (broken?.call(address, port) ?? false) {
+      throw StateError('the binder broke');
     }
     final server = await HttpServer.bind(address, port, v6Only: v6Only);
     if (address == InternetAddress.loopbackIPv4) given.add(server.port);
@@ -1378,6 +1383,64 @@ void main() {
     });
   });
 
+  /// Task 9 M4 (ledger L361): the phone's gate does not rely on the
+  /// computer: a tool's `Set-Cookie` of a gate cookie never reaches the
+  /// webview, in an answer or in a refused upgrade's.
+  test('a tool\'s Set-Cookie of a gate cookie never reaches the webview, '
+      'whatever the computer sent', () async {
+    final port = await freeLoopbackPort();
+    final desktop = _Desktop(
+      port,
+      (request) => [
+        ToolResponse(
+          id: request.id,
+          status: 200,
+          head: [
+            'set-cookie',
+            '${toolGateCookieName(port)}=stolen; Path=/',
+            'set-cookie',
+            'sid=1; Path=/',
+          ],
+          end: true,
+        ),
+      ],
+    );
+    final page = ToolSession(
+      tool: _id,
+      port: port,
+      path: '/',
+      link: desktop.tools,
+    );
+    final view = Webview();
+    addTearDown(() async {
+      await page.close();
+      view.close();
+    });
+    final loads = <ToolLoad>[];
+    page.events.listen((event) {
+      if (event is ToolLoad) loads.add(event);
+    });
+    page.start();
+    await until(() => loads.isNotEmpty);
+    expect((await view.request(loads.single.url)).status, 303);
+    final gate = view.cookies[toolGateCookieName(port)];
+    final answer = await view.request(Uri.parse('http://localhost:$port/x'));
+    expect(answer.headers['set-cookie'], ['sid=1; Path=/']);
+    expect(view.cookies[toolGateCookieName(port)], gate);
+    final refused = await _rawHead(
+      port,
+      _upgrade(port, '/x', view.cookieHeader),
+    );
+    expect(refused.first, startsWith('HTTP/1.1 200'));
+    expect(
+      [
+        for (final line in refused.skip(1))
+          if (line.toLowerCase().startsWith('set-cookie:')) line,
+      ],
+      ['set-cookie: sid=1; Path=/'],
+    );
+  });
+
   /// Review M3 (ledger L358): a 1xx other than 101 is never an answer the
   /// webview takes as final; the computer is told, as for any answer the
   /// phone cannot pass on.
@@ -1712,6 +1775,35 @@ void main() {
       expect(page.phase, ToolPhase.ready);
       expect(page.servedPort, p);
       expect(tries(), 3);
+    });
+
+    // 14b minor: whatever error a bind ends with, what was bound for the
+    // pair is closed (never 127.0.0.1 alone).
+    test('a bind that fails with another error than a held port: what was '
+        'bound for the pair is closed all the same', () async {
+      final p = await freeLoopbackPort();
+      final binder = _Binder(broken: (address, _) => address == v6);
+      final escaped = <Type>[];
+      final desktop = _Desktop(p, _script);
+      final page = ToolSession(
+        tool: _id,
+        port: p,
+        path: '/',
+        link: desktop.tools,
+        interfaces: _listing([v4, v6]),
+        bind: binder.bind,
+      );
+      addTearDown(page.close);
+      // The error goes on, out of the page's check: heard here.
+      runZonedGuarded(page.start, (error, _) => escaped.add(error.runtimeType));
+      await until(() => escaped.isNotEmpty);
+      expect(escaped, [StateError]);
+      expect(binder.given, [p]);
+      await expectLater(
+        Socket.connect(v4, p),
+        throwsA(isA<SocketException>()),
+        reason: 'nothing stays bound on 127.0.0.1:P',
+      );
     });
   });
 
