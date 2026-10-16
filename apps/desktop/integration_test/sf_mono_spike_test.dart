@@ -73,11 +73,11 @@ void main() {
   });
 }
 
-/// The folders this app writes to: macOS, the temporary HOME's `Library`
-/// (the recipe's isolation); iOS, the app's container.
+/// Where this app may write: macOS, the recipe's temporary HOME; iOS, the
+/// app's container.
 Directory _appRoot() => Platform.isIOS
     ? Directory.systemTemp.parent
-    : Directory('${Platform.environment['HOME']}/Library');
+    : Directory(Platform.environment['HOME']!);
 
 Set<String> _files(Directory root) {
   final found = <String>{};

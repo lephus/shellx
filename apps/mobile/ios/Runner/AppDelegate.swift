@@ -20,6 +20,10 @@ import firebase_messaging
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    // V2-5a §6.3: SF Mono for Dart's FontLoader, before the first frame.
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "ShellxSystemMonoFont") {
+      SystemMonoFont.register(messenger: registrar.messenger())
+    }
   }
 
   /// V2-2b B8: the buttons of an AI permission push (`aps.category` = `ai_perm`). "Deny" is the first action
