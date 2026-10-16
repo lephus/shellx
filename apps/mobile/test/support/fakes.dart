@@ -119,6 +119,10 @@ class FakeMachineSession implements MachineSession {
   List<SessionInfo> sessions = [];
   int listCalls = 0;
 
+  /// Thrown by [listSessions] while set (a handshake that fails at once: the relay still connecting); the list
+  /// teaches nothing then.
+  Object? listError;
+
   /// What [desktopSharing] reports (null: an agent older than terminal sharing).
   bool? desktopSharingValue;
   Object? openError;
@@ -206,6 +210,8 @@ class FakeMachineSession implements MachineSession {
   Future<List<SessionInfo>> listSessions() async {
     listCalls++;
     _failIfShutDown();
+    final error = listError;
+    if (error != null) throw error;
     ai.noteList();
     return sessions;
   }

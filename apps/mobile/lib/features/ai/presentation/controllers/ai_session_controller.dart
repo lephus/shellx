@@ -47,7 +47,10 @@ class AiSessionController extends Controller {
     }
     _machine = machine;
     _machineState.value = machine.state;
-    _machineStates = machine.states.listen((s) => _set(_machineState, s));
+    _machineStates = machine.states.listen((s) {
+      _set(_machineState, s);
+      if (s is MachineReady) unawaited(_listAgain(machine));
+    });
     _follow(machine.ai.attach(sid));
     _onChange();
     unawaited(_holdListing(machine));
@@ -459,16 +462,10 @@ class AiSessionController extends Controller {
 
   /// R3: the page holds the computer's AI listing while it is open — it says what the computer can do
   /// (B1) and which sessions it has (B22). A page opened from a notification has not listed the computer's
-  /// sessions yet: it asks once, which also tells the computer's protocol.
+  /// sessions yet: it asks, which also tells the computer's protocol — again on each ready channel while no list
+  /// answered ([_listAgain]).
   Future<void> _holdListing(MachineSession machine) async {
-    if (machine.ai.protocol == null) {
-      try {
-        await machine.listSessions();
-      } catch (error) {
-        // Offline, or a handshake that failed: the strips say so; the features stay off until a list answers.
-        if (kDebugMode) debugPrint('AI page list error: ${error.runtimeType}');
-      }
-    }
+    if (machine.ai.protocol == null) await _list(machine);
     if (_disposed) return;
     final TerminalWorkspace workspace;
     try {
@@ -483,6 +480,39 @@ class AiSessionController extends Controller {
     _listingFeed = machine.ai.listings.listen((_) => _onChange());
     _onChange();
   }
+
+  /// Lists the machine's sessions, which tells what the computer can do (its `ai` protocol). One that failed (a cold
+  /// start from a notification: the relay still connecting, the handshake failing at once) is asked again on the
+  /// next ready channel ([_listAgain]), until one answers: nothing else would tell the page, and the workspace
+  /// watches the listing only once a list says the computer has AI.
+  Future<bool> _list(MachineSession machine) async {
+    _listInFlight = true;
+    try {
+      await machine.listSessions();
+      _listWanted = false;
+      return true;
+    } catch (error) {
+      // Offline, or a handshake that failed: the strips say so; the features stay off until a list answers.
+      if (kDebugMode) debugPrint('AI page list error: ${error.runtimeType}');
+      _listWanted = true;
+      return false;
+    } finally {
+      _listInFlight = false;
+    }
+  }
+
+  /// A ready channel after a list that failed: the list once more; once it answers, the workspace watches the
+  /// listing (when the computer has AI) and the page is told.
+  Future<void> _listAgain(MachineSession machine) async {
+    if (_disposed || !_listWanted || _listInFlight) return;
+    if (!await _list(machine) || _disposed) return;
+    _workspace?.aiSupportLearned();
+    _onChange();
+  }
+
+  /// A list failed and none answered since; one is on its way.
+  bool _listWanted = false;
+  bool _listInFlight = false;
 
   /// An answer is one tap and one request. Once the computer took it, the buttons keep waiting until
   /// its header shows the request gone (or the link is lost, and what it holds then decides), so a
