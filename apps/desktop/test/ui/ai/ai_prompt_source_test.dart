@@ -81,4 +81,33 @@ void main() {
     await row(t, fromPhone: false);
     expect(queued(t), 'Queued: “then this” — sent when this turn ends');
   });
+
+  testWidgets('in the dock, a prompt queued from the phone says so while it '
+      'waits; one queued on the computer does not (spec criterion 12)', (
+    t,
+  ) async {
+    final runtime = partRuntime(FakeAiRuntimes(const FakeScenario()));
+    runtime.state
+      ..beginTurn(const [TextBlock('Sửa lỗi')], at)
+      ..enqueue(const [TextBlock('rồi chạy test')], source: PromptSource.phone)
+      ..enqueue(const [TextBlock('rồi commit')]);
+    await pumpAiPart(t, const AiDock(), runtime: runtime);
+    await t.pump();
+    final rows = t.widgetList<AiQueuedRow>(find.byType(AiQueuedRow));
+    expect(
+      [for (final r in rows) (r.text, r.fromPhone)],
+      [('rồi chạy test', true), ('rồi commit', false)],
+    );
+    expect(
+      [
+        for (final e in find.byKey(const Key('ai.queued.text')).evaluate())
+          (e.widget as Text).textSpan!.toPlainText(),
+      ],
+      [
+        'You · from your phone · Queued: “rồi chạy test” — sent when this '
+            'turn ends',
+        'Queued: “rồi commit” — sent when this turn ends',
+      ],
+    );
+  });
 }
