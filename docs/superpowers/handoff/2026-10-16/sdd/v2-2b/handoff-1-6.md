@@ -1,0 +1,51 @@
+# Hand-off — V2-2b chunk 1 (Tasks 1–6)
+
+Plan `docs/superpowers/plans/2026-10-15-v2-2b-phone-ai-more.md`; spec `docs/superpowers/specs/2026-10-15-v2-2b-phone-ai-more-design.md`. Ledger: `progress.md` in this workspace (the record of every dispatch, verdict, ruling and deferred minor; read it first). Worktree `/Users/richard/Documents/helper/shellx/.claude/worktrees/v2-2b`, branch `v2-2b`, no upstream, nothing pushed, tree clean.
+
+## Tasks done
+
+| Task | Commits | Review |
+|---|---|---|
+| 1. Request ids unique for the whole window run (B3) | 14e9eb1..5500423 (`5500423`) | opus, clean |
+| 2. V2-2b `ai.*` messages, `AiRaw`, wire maps, `kAiProtocol = 2`, frozen V2-2a decoder | 5500423..329dce0 (`329dce0`) | opus, clean |
+| 3. Background service forwards `ai.*` verbatim; every new request answered without a window | 329dce0..9731353 (`9731353`) | opus, clean |
+| 4. Capability on the phone (router `ai ≥ 2` + listing `f`) and request bodies | 9731353..c24fbfa (`c24fbfa`) | opus, clean |
+| 5. "Bạn · từ điện thoại": the source of a prompt (B24) | c24fbfa..67093c4 (`67093c4`) | sonnet, clean |
+| 6. Header keys; re-attach after a restart (B22); pushes of a previous run (B23) | 67093c4..cea0659 (`5802157` header keys, `cea0659` phone) | opus, clean |
+
+Range for chunk 1: `14e9eb1..cea0659` (7 commits). No fix rounds were needed; no finding was parked at a breaker; 28 Minor findings are deferred in the ledger (`- Task N: minor (deferred): …`) for the final whole-branch review.
+
+Final pass at `cea0659` (analyze + full tests, every package/app the range touched): shellx_core 366, shellx_ai 598, shellx_agent 937, shellx_client 165, apps/desktop 3578 passed + 10 skipped, apps/mobile 1300 — all passing; `dart analyze` "No issues found!" for core, ai, agent, client, e2e, acp; desktop `flutter analyze` clean; mobile only its one pre-existing info (`unnecessary_import`, `test/features/terminal/ime_in_place_edit_test.dart:2:8`); tree clean.
+
+Counts the next chunk starts from (for the briefs' expected numbers): shellx_core 366, shellx_ai 598, shellx_agent 937, shellx_client 165, apps/desktop 3578 passed + 10 skipped, apps/mobile 1300.
+
+## Every ruling (in the order made; each with its cost if wrong)
+
+Top-level rulings (verbatim at the top of the ledger): branch `v2-2b` in the worktree; Task 7 + Task 26's `web/**` on `v2-2b-relay` in `MAIN/.claude/worktrees/v2-2b-relay`, created from `shellx-v2` by the chunk that runs Task 7; each commit ends with the committing model's own trailer; nothing pushed by any chunk.
+
+1. Ruling (F1): the baseline counts are recorded in the SDD ledger under `## V2-2b — execution`; the project ledger `docs/superpowers/ledgers/v2-ai.md` gets that heading and these counts from Task 26 Step 8 — cost if wrong: none (same numbers, written once at the end). Baseline at 14e9eb1: core 351, ai 576, agent 916, client 159, desktop 3574 + 10 skipped, mobile 1262.
+2. Ruling (F2): Task 4's `MachineAi._feature` ships with `// ignore: unused_element` until Task 10 removes it — cost if wrong: one lint suppression for six tasks.
+3. Ruling (F3) — superseded by 5.
+4. Ruling (F4): Task 23 matches its `aiRevert` replace block in `apps/desktop/lib/src/ui/ai/ai_changes_panel.dart` by content; its "lines 113-191 at 38a786d" are informational (Task 6 moved `AiTurns`/`aiTurnsOf`/`aiUndoOffOf` out of that file) — cost if wrong: none.
+5. Ruling (F3 revised): at Task 24, the first test of `packages/shellx_agent/test/ai/ai_phone_hub_v2b_test.dart` ("a V2-2b request whose feature the hub does not offer yet is answered refused…") is replaced by an assertion that every kind's feature word of `_requests()` is in `AiPhoneHub.offered`; the AiRaw and budget tests stay — plan line 25141's removal alone leaves it filtering an empty list (`[] == []`) — cost if wrong: none (test only).
+6. Ruling (F6): Task 7's and Task 26's branch commands (`git switch shellx-v2`, `git switch [-c] v2-2b-relay`, `git worktree add ../shellx-relay-check`, `git worktree remove --force ../shellx-relay-check`) are replaced: relay and privacy-page commits in `MAIN/.claude/worktrees/v2-2b-relay` on `v2-2b-relay`, product and ledger commits in the `v2-2b` worktree; no worktree removed, no branch switched by an implementer — cost if wrong: none.
+7. Ruling (F11): where a brief's format command names whole directories, any file outside the task's Files block that it changes is restored to HEAD and reported, never committed (plan Global Constraints: "Format only the files a task touches") — cost if wrong: none.
+8. Ruling (F12): after `dart run intl_utils:generate` in apps/mobile, run `~/fvm/versions/3.41.4/bin/dart format lib/shared/src/l10n.dart lib/shared/src/intl/messages_en.dart lib/shared/src/intl/messages_vi.dart` from apps/mobile (the generator writes 80 columns, the committed files are at 120), so the commit holds only the new entries — applies to Tasks 11, 13, 15, 18, 19, 20, 22, 25 (no brief mentions it: carry it in every mobile-strings dispatch) — cost if wrong: none.
+
+## What the next chunks must know
+
+- **Reusable dispatch files in this workspace:** `global-constraints.md` (binding constraints + the top-level rulings, read first by every implementer and reviewer), `protocol-constraints.md` (verbatim spec/plan excerpts for protocol reviews), `task-5-constraints.md`, `task-6-constraints.md`. Briefs exist for Tasks 1–6 only (`task-brief` makes the rest).
+- **Task 6's contract is matched exactly (H1):** `AiSessionController(@factoryParam String agentId, @factoryParam String sid, SessionHolder session, AiDrafts drafts, WorkspaceRegistry registry)` positional in this order (the reviewer diffed the committed controller byte for byte against the brief); `findAgainFor`, `sid`, `ai`, `can`, `listing`, `reattached`, `version` bumps per listing; `typedef AiHeaderAction`, `_Header({…, VoidCallback? onSubtitle, List<AiHeaderAction> menu = const []})`, `_Strip({…, Widget? action})`, keys `ai.status.tap`, `ai.menu`, `ai.openList`, `ai.reattached`; `openAiChooser`, `showSessionPicker(…, aiOnly)`; `FakeAiMachine.protocolValue`/`listedProtocol`/`noteList()`/`seenSessions`. The plan's later tests (Tasks 11, 13, 15, 18, 19, 25) were written against this contract on paper only: if one fails to compile, compare it with this contract first (plan line 32 lists the other unrun items — Tasks 14, 15, Task 18's `client_backend_test` case, Task 24's hub test "every listing names changes and revert" — run those first in their chunks, H2).
+- **`_feature` (Task 4):** every V2-2b `MachineAi` request method of Tasks 10, 12, 14, 16, 17, 24 must go through it (the old-peer rule depends on it) — ask those reviewers to check. Task 10 removes its `// ignore: unused_element` and its client test pins R15 ("nothing is sent, unsupported at once", plan ≈ 10661).
+- **`MachineAi.can` reads `MachineAi._listing`** (kept across a lost channel, like `_protocol`/`_supported`), not the workspace's stale-guarded `aiListing`: a button gated by `can()` (Tasks 11+) may show while the channel is down; its request then fails as a lost channel.
+- **Pre-existing noise (not to be charged to a task):** core `terminal_links_test.dart` "200k-char path finishes in reasonable time" is a flaky 50 ms wall-clock assertion (failed once at 52 ms, passed on re-run); desktop `ai_phone_test.dart` prints `ShellX: AI session for a phone failed: StateError` (debugPrint at `apps/desktop/lib/src/ai/ai_phone.dart:204`); mobile `flutter analyze` keeps one info (`unnecessary_import`, `test/features/terminal/ime_in_place_edit_test.dart:2:8`).
+- **Task 8's push e2e** is skipped without a relay (plan ≈ 9009); the run with `SHELLX_E2E_EXPECT_ACTIONS=1` belongs to Task 26 on the relay branch.
+- **Deferred minors worth the final review's attention** (all in the ledger): Task 5's queued-row source has no dock test (spec criterion 12 "even while queued"; `apps/desktop/lib/src/ui/ai/ai_dock.dart:61`); spec §8 "each new message" pins are partial (Task 2: largest-fits for 5 of 13 kinds, wrong-field→null and budget→busy for a few kinds); `aiUnavailableReply` keeps a `_ => null` default (Task 3) so a future kind left out still compiles; `MuxAiBinding`'s `wire` write is unpinned (Task 3); verbatim forwarding has two unbudgeted latent edges — a window map nested 7 levels drops the phone's channel, a phone message within ~54 bytes of one sealed batch is never answered (Tasks 2–3); `openAiChooser` has no catch-all (Task 6); B23 can open the machine page for a live session the listing cut dropped (Task 6).
+
+## For the top-level controller
+
+- **Merge:** `v2-2b` = `shellx-v2`@14e9eb1 + 7 commits (14e9eb1..cea0659). Tasks 2–4 must land together (the router says `ai: 2` from Task 2; verbatim forwarding is Task 3, the phone's gate Task 4) — merging the chunk as a whole does that.
+- **Shared files with V2-3/V2-4:** Task 2 replaced `packages/shellx_core/lib/src/protocol/ai_messages.dart` whole and edited `messages.dart` (`fromMap` comment, `encodeBatch`, three `_Fields` helpers); `packages/shellx_agent/lib/src/mux/mux_ai.dart` (Tasks 2–3); mobile ARB + generated l10n (Task 5 `aiFromPhone`; Task 6 `aiReattached`, `aiOpenList`); desktop ARB + generated `app_localizations*.dart` (Task 5 `aiYouFromPhone`); `apps/mobile/lib/core/dependency/dependency.config.dart` (Task 6). No mobile pubspec or Info.plist change in this chunk.
+- **Relay branch:** not created yet (Task 7 is chunk 2's; its worktree is created from `shellx-v2` by that chunk).
+- **Manual checks to add to Task 26's list:** spec §10 item 8 (restart ShellX while the phone shows a session: it re-attaches) in both modes — with the background service (the service re-lists phones for the new window: `mux_ai.dart:104-110`) and without; a restart slower than B22's 30 s leaves the page closed with "Mở danh sách phiên" by design.
+- **Spec wording for the user (no code defect):** (a) B22 has no restart condition — after any `gone`, if exactly one other tab shares the same agent session (acp, agent, folder; B17 allows two), the page follows it and says "Đã nối lại sau khi ShellX khởi động lại." though ShellX did not restart (nothing is sent); (b) "từ điện thoại" under a phone's bubble also marks another paired phone's prompts (`src: phone` cannot say which phone; the brief's wording says "this one or another").

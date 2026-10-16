@@ -1,0 +1,4 @@
+- [Fast-track to main](fast-track-push-main.md) — after chat design approval, implement, merge, push main; fvm flutter path
+- [Full researched proposal](prefers-full-researched-proposal.md) — brainstorming: few questions, then one verified, reasoned design with risks + open decisions
+- [V2 on shellx-v2](v2-work-on-shellx-v2.md) — V2 stays on shellx-v2; no push to main until the user says so (2026-10-15: main pushes release the desktop app)
+- [V2 hand-off 2026-10-16](v2-handoff-2026-10-16.md) — user stopped agent coding at 15:00 and continues V2 themselves; read docs/superpowers/handoff/2026-10-16/README.md first
