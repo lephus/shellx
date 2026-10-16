@@ -253,4 +253,20 @@ Branch `v2-2b-relay` (no upstream; nothing merged or pushed):
 13. Small-phone layout (375×667, keyboard up): four `@` suggestions, a thumbnail row and a note together; the composer at 320–360 dp with attach, mic, Force stop and Send (possible RenderFlex overflow) — pending manual.
 14. The two live rows of the compatibility matrix (list, open, send, answer): a V2-2b phone build against the V2-2a desktop (`38a786d` build), no V2-2b button; a V2-2a phone build against the V2-2b desktop — pending manual.
 
+Final review and fix wave (2026-10-16): verdict — ready with fixes; every item below fixed on `v2-2b` (TDD, RED then GREEN; items 1, 3, 4, 5, 7 mutation-checked):
+- Important 1 — a cold-start session page whose first `session.list` failed (relay still connecting) lists again on the next `MachineReady` until one answers; the workspace then watches the listing (`aiSupportLearned`) — `fa2e0560`.
+- Important 2 — the "Chế độ và model" sheet pops only itself (`ModalRoute.isCurrent`), and one choice per session is in flight (`AiSessionController.configuring`), not per sheet — `161a60fe`.
+- Important 3 — the dictation stops before "Xem đủ", the diff page, the chooser and the config, history, Changes and attach sheets; a later "gửi" sends nothing — `7949cde6`.
+- T8 — a push option id with a lone surrogate (not well-formed UTF-16) gives the plain push; an `allow_once` whose name the no-approval predicate flags is no Allow button — `6da2fcd7`.
+- T14 — a `shellx-rest-` cursor the hub does not hold is refused without calling the agent; the history tests' `_ask` asserts exactly one `ai.result` with its rid — `c1f638dc`.
+- F55 / T18 — the picker's file is deleted as soon as its bytes are read, also on a refused photo or a failed read — `94ab0ba0`.
+- Minor 1 — the JPEG strip stops at the first EOI (appended MPF images and their Exif/XMP go); a segment past the scan that does not walk fails closed — `d9d37145`.
+- T21 — `DartPluginRegistrant.ensureInitialized()` at the top of `shellxBackgroundMessage` (manual check 3's last bullet stays) — `f43ef8e5`.
+- T22 — English "✦ 2 AI sessions · 1 needs you" (ICU plural; Vietnamese unchanged) — `66cacca9`.
+- T25 — the revert question's early tap comes 350 ms in, so the test pins the 400 ms window (it passed with the settle time at zero) — `d3b6e74f`.
+- T5 — the desktop dock's queued row "from your phone" has a test — `a066a5b4`.
+- T19 — `Watch(` audit of `apps/mobile/lib` (46 builders in 18 files): one real stale case, the delete-account button reading the password signal only when the outer Watch's `busy` was false — `ee0678f9`; every other builder reads its signals first, or gates them only on other signals or on state that changes only with a signal it reads first (the AI page's `version`).
+- `961485b2` — an unused test import.
+Counts after the wave: shellx_ai 642, shellx_agent 1005, apps/desktop 3621 + 5 skipped (`shellx-term` built; one failure in a first run under load did not come back in a full re-run), apps/mobile 1535; shellx_core 368 and shellx_client 197 untouched; analyze clean (mobile keeps the pre-existing info in `ime_in_place_edit_test.dart`).
+
 Next: V2-3 (tools by URL on the desktop).
