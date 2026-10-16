@@ -31,11 +31,21 @@ SessionSummary _past(int i, {String? title}) => SessionSummary(
 
 AiHistoryPage _page(AiResult r) => AiHistoryPage.fromJson(decodeBody(r.body)!);
 
-/// [m] from the phone, and the answer once the hub has worked it out.
+/// [m] from the phone, and the answer once the hub has worked it out: exactly
+/// one `ai.result`, with [m]'s rid.
 Future<AiResult> _ask(HubRig rig, AiMessage m) async {
+  final rid = switch (m) {
+    AiHistory(:final rid) || AiOpen(:final rid) || AiFolder(:final rid) => rid,
+    _ => throw ArgumentError('no rid: ${m.runtimeType}'),
+  };
   rig.hub.handle(_phone, m);
   await pumpEventQueue();
-  return rig.last<AiResult>(_phone);
+  final answers = [
+    for (final r in rig.to(_phone).whereType<AiResult>())
+      if (r.rid == rid) r,
+  ];
+  expect(answers, hasLength(1), reason: 'one ai.result for rid $rid');
+  return answers.single;
 }
 
 /// V2-2b B17, B18: session history, resume, and a folder from the phone.
@@ -110,6 +120,49 @@ void main() {
     for (final s in pages.first.sessions) {
       expect(s.title!.runes.length, lessThanOrEqualTo(kAiHistoryTitleChars));
     }
+  });
+
+  test("a hub cursor the hub does not hold — an old page asked again, after "
+      "another one or another session's — is refused and never reaches the "
+      'agent as its own', () async {
+    final rig = HubRig();
+    _listing(rig.source, -1);
+    _listing(rig.source, -2);
+    final control = rig.source.controls[-1]!;
+    control.history = ListSessionsResult(
+      sessions: [for (var i = 0; i < 160; i++) _past(i)],
+      nextCursor: 'agent-2',
+    );
+    rig.source.controls[-2]!.history = ListSessionsResult(
+      sessions: [for (var i = 0; i < 120; i++) _past(i)],
+    );
+    final first = _page(
+      await _ask(rig, const AiHistory(sid: 'ep.-1', rid: 1)),
+    ).next!;
+    expect(first, startsWith('shellx-rest-'));
+    final second = _page(
+      await _ask(rig, AiHistory(sid: 'ep.-1', rid: 2, cursor: first)),
+    ).next!;
+    expect(second, startsWith('shellx-rest-'));
+    // The first page's cursor again (an answer lost, asked once more).
+    final again = await _ask(
+      rig,
+      AiHistory(sid: 'ep.-1', rid: 3, cursor: first),
+    );
+    expect(again.code, 'refused');
+    // Another session's history asked in between: its own rest is held now.
+    await _ask(rig, const AiHistory(sid: 'ep.-2', rid: 4));
+    final other = await _ask(
+      rig,
+      AiHistory(sid: 'ep.-1', rid: 5, cursor: second),
+    );
+    expect(other.code, 'refused');
+    final unknown = await _ask(
+      rig,
+      const AiHistory(sid: 'ep.-1', rid: 6, cursor: 'shellx-rest-999'),
+    );
+    expect(unknown.code, 'refused');
+    expect(control.cursors, [null], reason: 'the agent saw no cursor of ours');
   });
 
   test('not running: not_ready; no session/list, nothing from the agent or '

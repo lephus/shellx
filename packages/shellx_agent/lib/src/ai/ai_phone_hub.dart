@@ -203,6 +203,10 @@ const String kAiPermissionCategory = 'ai_perm';
 /// on a data value, in characters).
 const int kAiPushValueChars = 256;
 
+/// V2-2b B17: what the hub's own history cursors begin with
+/// (`shellx-rest-<n>`).
+const String _historyRestPrefix = 'shellx-rest-';
+
 /// A push the hub asks for (V2-2 D11); worded by the agent side's
 /// `AgentNotifications.aiNotice`.
 final class AiPush with Redacted {
