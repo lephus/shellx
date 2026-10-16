@@ -190,6 +190,47 @@ void main() {
     );
   });
 
+  // Ledger L229: an answer that has no body (to HEAD, 204, 304, an everyday
+  // dev-server answer) ends the stream with its head.
+  test(
+    'HEAD, 204 and 304: the head ends the stream, no body follows',
+    () async {
+      await setUpWith(
+        routes: {
+          '/no-content': (request) async {
+            request.response.statusCode = HttpStatus.noContent;
+            await request.response.close();
+          },
+          '/not-modified': (request) async {
+            request.response.statusCode = HttpStatus.notModified;
+            await request.response.close();
+          },
+        },
+      );
+      final statuses = {
+        phone.request(_id, method: 'HEAD', target: '/'): 200,
+        phone.request(_id, target: '/no-content'): 204,
+        phone.request(
+          _id,
+          target: '/not-modified',
+          head: ['if-none-match', '"v1"'],
+        ): 304,
+      };
+      for (final MapEntry(key: id, value: status) in statuses.entries) {
+        final response = await phone.response(id);
+        await phone.ended(id);
+        expect(response.status, status);
+        expect(response.end, isTrue, reason: 'the head ends it ($status)');
+        expect(
+          phone.messages.whereType<ToolData>().where((m) => m.id == id),
+          isEmpty,
+          reason: 'no body ($status)',
+        );
+        expect(phone.endOf(id), isNull, reason: 'ended well ($status)');
+      }
+    },
+  );
+
   group('only the tool, nothing else (E9, RF 4)', () {
     test('a target that is not origin form, a forbidden method, CRLF in a '
         'header: bad_request, nothing reaches the tool', () async {

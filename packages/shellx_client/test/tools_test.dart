@@ -176,6 +176,42 @@ void main() {
     });
   });
 
+  // Ledger L329 (RF 2): the outbox's frame tokens come back up to its burst
+  // and no further, so an idle phone never sends more than 10 frames at once.
+  test('after a drain and a second idle, the first flush sends at most 10 '
+      'frames (E8, RF 2)', () {
+    fakeAsync((async) {
+      var frames = 0;
+      final tools = MachineTools(
+        send: (batch) {
+          frames++;
+          return true;
+        },
+        connect: () async {},
+        timeout: const Duration(seconds: 5),
+      )..channelReady();
+      void chunks(int n) {
+        for (var i = 0; i < n; i++) {
+          tools.enqueue(
+            ToolData(id: i, data: Uint8List(kToolMaxChunkBytes), end: false),
+          );
+        }
+      }
+
+      chunks(250);
+      async.elapse(const Duration(seconds: 3));
+      expect(frames, 250, reason: 'drained');
+      async.elapse(const Duration(seconds: 1)); // idle
+      final before = frames;
+      chunks(50);
+      async.elapse(tools.flushInterval); // the first flush
+      expect(frames - before, lessThanOrEqualTo(kToolPhoneFrameBurst));
+      async.elapse(const Duration(seconds: 1));
+      expect(frames - before, 50, reason: 'none lost');
+      tools.dispose();
+    });
+  });
+
   test(
     'a message over one sealed batch is refused; the channel stays (RF 1)',
     () {

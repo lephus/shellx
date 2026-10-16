@@ -705,7 +705,14 @@ void main() {
     expect(engines.log.where((entry) => entry == 'web1 load about:blank'), hasLength(1));
   });
 
-  for (final phase in [ToolPhase.opening, ToolPhase.busy, ToolPhase.refused, ToolPhase.reconnecting]) {
+  // noPort (S2): nothing was served, or the web view is blank already: entering it blanks nothing.
+  for (final phase in [
+    ToolPhase.opening,
+    ToolPhase.busy,
+    ToolPhase.refused,
+    ToolPhase.noPort,
+    ToolPhase.reconnecting,
+  ]) {
     testWidgets('the servers staying open (${phase.name}) leave the web view alone (B)', (tester) async {
       await open(tester);
       await shown(tester);
