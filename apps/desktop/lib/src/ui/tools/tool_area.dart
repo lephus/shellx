@@ -38,12 +38,12 @@ class ToolArea extends ConsumerWidget {
     );
     final sidebar = ref.watch(sidebarWorkspacesProvider);
     final embedded = ref.watch(toolsEmbeddedProvider);
-    final ws =
-        docks.loose ??
-        (tabs.$1 == null ? null : sidebar.workspaceOf(tabs.$1!)) ??
-        sidebar.currentId;
+    final ws = dockWorkspaceOf(docks, tabs.$1, sidebar);
     final dock = docks.of(ws);
     final loose = docks.loose;
+    // The rule of toolPanesCoveredProvider (A4 "seen", A12 "watched", the
+    // drop targets): the two never disagree.
+    final hidden = toolPanesCovered(docks, shown: dock, embedded: embedded);
     return LayoutBuilder(
       builder: (context, c) {
         final layout = toolDockLayout(
@@ -51,7 +51,6 @@ class ToolArea extends ConsumerWidget {
           dock: dock,
           embedded: embedded,
         );
-        final hidden = layout.dockLeft == 0 || loose != null;
         return Stack(
           children: [
             Positioned(

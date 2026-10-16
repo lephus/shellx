@@ -126,6 +126,72 @@ void main() {
     await disposeWorkspace(t, rig.container);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
+  testWidgets('the panes count as covered exactly while the window draws a '
+      'zoomed dock or a loose panel over them; a dock beside them, or one a '
+      'narrow window hides, covers nothing (V2-3 D3, D4, §8)', (t) async {
+    await rig.pump(t);
+    bool covered() => rig.container.read(toolPanesCoveredProvider);
+    bool drawnOver() {
+      if (find.byKey(const Key('tool.loose')).evaluate().isNotEmpty) {
+        return true;
+      }
+      final dock = find.byKey(const ValueKey('tool.dockSlot'));
+      return dock.evaluate().isNotEmpty &&
+          t.getRect(dock) == t.getRect(find.byType(ToolArea));
+    }
+
+    bool panesOutOfReach() => t
+        .widget<ExcludeFocus>(
+          find
+              .descendant(
+                of: find.byKey(const ValueKey('tool.panesSlot')),
+                matching: find.byType(ExcludeFocus),
+              )
+              .first,
+        )
+        .excluding;
+    void agree(String why, {required bool expected}) {
+      expect(drawnOver(), expected, reason: why);
+      expect(covered(), expected, reason: why);
+      expect(panesOutOfReach(), expected, reason: why);
+    }
+
+    agree('no dock', expected: false);
+    final tool = rig.add(kDefaultWorkspaceId, 'localhost:1');
+    await t.pumpAndSettle();
+    await openTool(t, tool.id);
+    agree('beside the panes', expected: false);
+    await t.tap(find.byKey(const Key('tool.bar.expand')));
+    await t.pumpAndSettle();
+    agree('zoomed', expected: true);
+    await t.tap(find.byKey(const Key('tool.bar.expand')));
+    await t.pumpAndSettle();
+    agree('restored', expected: false);
+    t.view.physicalSize = const Size(800, 800);
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('tool.dockSlot')), findsNothing);
+    agree('hidden by a narrow window', expected: false);
+    rig.container
+        .read(toolDockProvider.notifier)
+        .setZoom(kDefaultWorkspaceId, true);
+    await t.pumpAndSettle();
+    agree('zoomed in a narrow window', expected: true);
+    rig.container
+        .read(toolDockProvider.notifier)
+        .setZoom(kDefaultWorkspaceId, false);
+    t.view.physicalSize = const Size(1100, 720);
+    await t.pumpAndSettle();
+    final ws = rig.container
+        .read(sidebarWorkspacesProvider.notifier)
+        .createFor(name: 'B');
+    final other = rig.add(ws, 'localhost:2');
+    await t.pumpAndSettle();
+    await openTool(t, other.id);
+    expect(rig.container.read(toolDockProvider).loose, ws);
+    agree('a workspace shown without a tab', expected: true);
+    await disposeWorkspace(t, rig.container);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
   testWidgets('Expand covers the content area; Restore and Esc bring it '
       'back (D3)', (t) async {
     await rig.pump(t);

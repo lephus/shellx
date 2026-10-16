@@ -183,6 +183,16 @@ final class ToolDockLayout {
   bool get showsHandle => dockLeft != null && dockLeft! > 0;
 }
 
+/// D3: [dock] is drawn at all — embedded, open and with chips (beside the
+/// panes when it fits, over them when zoomed).
+bool _dockDrawn(ToolDockState? dock, bool embedded) =>
+    embedded && dock != null && dock.open && dock.tools.isNotEmpty;
+
+/// D3 "Expand": [dock] is drawn over the whole content area, the panes under
+/// it — at any width ([toolDockLayout] puts it at the left edge).
+bool toolDockCoversPanes(ToolDockState? dock, {required bool embedded}) =>
+    _dockDrawn(dock, embedded) && dock!.zoom;
+
 /// D3, §8: the dock of [dock] in a content area [width] wide. A dock that
 /// does not fit beside 360 px of panes is shown only zoomed.
 ToolDockLayout toolDockLayout({
@@ -190,19 +200,18 @@ ToolDockLayout toolDockLayout({
   required ToolDockState? dock,
   required bool embedded,
 }) {
-  final show = embedded && dock != null && dock.open && dock.tools.isNotEmpty;
-  if (!show) {
+  if (!_dockDrawn(dock, embedded)) {
     return ToolDockLayout(paneWidth: width, dockLeft: null, dockWidth: 0);
   }
   final room = width - kToolDockHandle;
   final fits = room >= kToolPaneMinWidth + kToolDockMinWidth;
   final dockWidth = fits
-      ? (width * dock.width)
+      ? (width * dock!.width)
             .clamp(kToolDockMinWidth, room - kToolPaneMinWidth)
             .roundToDouble()
       : 0.0;
   final paneWidth = fits ? room - dockWidth : width;
-  if (dock.zoom) {
+  if (toolDockCoversPanes(dock, embedded: embedded)) {
     return ToolDockLayout(paneWidth: paneWidth, dockLeft: 0, dockWidth: width);
   }
   if (!fits) {

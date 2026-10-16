@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shellx_agent/shellx_agent.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../tools/tool_dock.dart'
+    show readToolPanesCovered, toolPanesCoveredProvider;
 import '../ui/window_focus.dart';
 import '../ui/window_router.dart';
 import 'agent_status_notifier.dart';
@@ -282,6 +284,9 @@ class TabAttention extends Notifier<AttentionState> {
       windowRouterProvider.select((w) => w.visible),
       (_, _) => _armDwell(),
     );
+    // V2-3: the panes covered (a zoomed tool dock, a workspace shown without
+    // a tab) or shown again.
+    ref.listen<bool>(toolPanesCoveredProvider, (_, _) => _armDwell());
     // The streams stay open: Riverpod keeps this notifier across a
     // rebuild (onDispose runs then too), and its listeners stay with it.
     ref.onDispose(() {
@@ -432,7 +437,11 @@ class TabAttention extends Notifier<AttentionState> {
 
   // ---- internals --------------------------------------------------------
 
-  bool get _active => readWindowActive(ref.read);
+  /// The selected tab's focused pane can be seen: the window is active and
+  /// nothing of the tool area covers the panes (V2-3: a zoomed dock, the
+  /// panel of a workspace shown without a tab).
+  bool get _inView =>
+      readWindowActive(ref.read) && !readToolPanesCovered(ref.read);
 
   void _onNotice(SessionNotice notice) {
     if (!ref.mounted) return;
@@ -474,9 +483,10 @@ class TabAttention extends Notifier<AttentionState> {
 
   void _record(TerminalTabsState tabs, TerminalTab tab, SessionNotice notice) {
     final pane = notice.sessionId;
-    // A3 D18: only the focused pane of the selected tab is in view.
+    // A3 D18: only the focused pane of the selected tab is in view (V2-3:
+    // and only while no tool dock or loose panel covers it).
     final seen =
-        tabs.selectedId == tab.id && tab.focusedPaneId == pane && _active;
+        tabs.selectedId == tab.id && tab.focusedPaneId == pane && _inView;
     if (seen && notice.kind == SessionNoticeKind.bell) return; // D7
     final kind = _kindOf(notice.kind);
     final history = _withEntry(tab, pane, kind, notice, read: seen);
@@ -621,13 +631,13 @@ class TabAttention extends Notifier<AttentionState> {
   }
 
   /// D10: one timer for the selected tab's focused pane (A3 D18) while it
-  /// has unread and the window is active; unchanged conditions keep the
-  /// running timer.
+  /// has unread and is in view (the window active, the panes not covered);
+  /// unchanged conditions keep the running timer.
   void _armDwell() {
     if (!ref.mounted) return;
     final tab = ref.read(terminalTabsProvider).selected;
     final key = tab == null ? null : (tab.id, tab.focusedPaneId);
-    if (key == null || !state.paneHasUnread(key.$1, key.$2) || !_active) {
+    if (key == null || !state.paneHasUnread(key.$1, key.$2) || !_inView) {
       _cancelDwell();
       return;
     }
@@ -638,7 +648,7 @@ class TabAttention extends Notifier<AttentionState> {
       _dwellFor = null;
       if (!ref.mounted) return;
       final now = ref.read(terminalTabsProvider).selected;
-      if (now?.id == key.$1 && now?.focusedPaneId == key.$2 && _active) {
+      if (now?.id == key.$1 && now?.focusedPaneId == key.$2 && _inView) {
         markPaneRead(key.$1, key.$2);
       }
     });

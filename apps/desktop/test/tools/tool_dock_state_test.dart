@@ -131,6 +131,35 @@ void main() {
       );
     });
 
+    test('toolDockCoversPanes: exactly when the layout puts the dock over '
+        'the whole area — embedded, open, with chips, zoomed — at any width '
+        '(D3, §8)', () {
+      final open = const ToolDockState().opened(a);
+      for (final (dock, embedded, covers) in [
+        (null, true, false),
+        (const ToolDockState(), true, false),
+        (open, true, false),
+        (open.copyWith(zoom: true), true, true),
+        (open.copyWith(zoom: true), false, false),
+        (open.copyWith(zoom: true, open: false), true, false),
+        (const ToolDockState(open: true, zoom: true), true, false),
+      ]) {
+        expect(
+          toolDockCoversPanes(dock, embedded: embedded),
+          covers,
+          reason: '$dock, embedded: $embedded',
+        );
+        for (final width in [400.0, 600.0, 879.0, 1400.0]) {
+          final layout = toolDockLayout(
+            width: width,
+            dock: dock,
+            embedded: embedded,
+          );
+          expect(layout.dockLeft == 0, covers, reason: '$dock at $width px');
+        }
+      }
+    });
+
     test('a drag keeps a fraction within the pixel minimums', () {
       expect(toolDockFraction(width: 1000, dockWidth: 500), 0.5);
       expect(toolDockFraction(width: 1000, dockWidth: 100), 0.32);

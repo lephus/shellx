@@ -9,6 +9,8 @@ import 'package:shellx_agent/shellx_agent.dart'
 import '../agent/notify_threshold.dart';
 import '../config/config_controller.dart' show shellxConfigProvider;
 import '../integrations/agent_command_runner.dart';
+import '../tools/tool_dock.dart'
+    show readToolPanesCovered, toolPanesCoveredProvider;
 import '../ui/window_focus.dart';
 import 'agent_names.dart';
 import 'agent_notify_policy.dart';
@@ -176,6 +178,8 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
     ];
     ref.listen<TerminalTabsState>(terminalTabsProvider, (_, _) => _review());
     ref.listen<bool>(windowFocusProvider, (_, _) => _review());
+    // V2-3: the panes shown again after a zoomed tool dock or a loose panel.
+    ref.listen<bool>(toolPanesCoveredProvider, (_, _) => _review());
     ref.onDispose(() {
       for (final s in subs) {
         unawaited(s.cancel());
@@ -189,8 +193,9 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
     return const {};
   }
 
-  /// D9 "watched": the window is in front, the pane's tab is selected and
-  /// the pane is that tab's focused one.
+  /// D9 "watched": the window is in front, the pane's tab is selected, the
+  /// pane is that tab's focused one, and nothing of the tool area covers it
+  /// (V2-3: a zoomed dock, the panel of a workspace shown without a tab).
   bool paneVisible(int pane) {
     final tabs = ref.read(terminalTabsProvider);
     // V2-1 D13: an AI pane is watched like a terminal pane.
@@ -198,7 +203,8 @@ class AgentStatusNotifier extends Notifier<Map<int, AgentPane>> {
     return tab != null &&
         tabs.selectedId == tab.id &&
         tab.focusedPaneId == pane &&
-        readWindowActive(ref.read);
+        readWindowActive(ref.read) &&
+        !readToolPanesCovered(ref.read);
   }
 
   /// Applies [e]. False when it was dropped: the pane is not a pane of this

@@ -15,20 +15,6 @@ import '../../tools/tool_registry.dart';
 import '../window_router.dart';
 import 'tool_dialogs.dart';
 
-/// D3, D4: the workspace whose dock the window shows — the one shown
-/// without a tab ([ToolDocks.loose]), else the selected tab's, else the
-/// current one.
-String dockWorkspaceOf(
-  ToolDocks docks,
-  TerminalTabsState tabs,
-  SidebarState sidebar,
-) {
-  final selected = tabs.selectedId;
-  return docks.loose ??
-      (selected == null ? null : sidebar.workspaceOf(selected)) ??
-      sidebar.currentId;
-}
-
 /// What ⌘⇧B did (D10, D20).
 enum ToolToggle { opened, closed, asked, nothing }
 
@@ -50,7 +36,7 @@ final class ToolActions {
 
   String currentWorkspace() => dockWorkspaceOf(
     ref.read(toolDockProvider),
-    ref.read(terminalTabsProvider),
+    ref.read(terminalTabsProvider).selectedId,
     ref.read(sidebarWorkspacesProvider),
   );
 
