@@ -83,6 +83,63 @@ void main() {
     });
   });
 
+  test('a URL the app newly asks for — an edit, "Back to tool" — restarts '
+      'the retries at 1 s, then 2 s; an edit made while hidden retries 1 s '
+      'after it shows (D13, D23, D9)', () {
+    fakeAsync((async) {
+      // Not on this computer: no knock between the reloads.
+      final p = page(tool('https://example.com/'));
+      void refuse() =>
+          engine.emit(const LoadFailed(BrowserLoadErrorKind.refused));
+      // Refused for 15 s: the schedule is at 10 s.
+      void climb() {
+        for (final wait in [1, 2, 4, 8]) {
+          async.elapse(Duration(seconds: wait));
+          refuse();
+        }
+      }
+
+      void expectRetriesAt(List<int> waits, String why) {
+        for (final wait in waits) {
+          final loads = engine.loads.length;
+          async.elapse(
+            Duration(seconds: wait) - const Duration(milliseconds: 1),
+          );
+          expect(engine.loads, hasLength(loads), reason: '$why: not yet');
+          async.elapse(const Duration(milliseconds: 1));
+          expect(engine.loads, hasLength(loads + 1), reason: '$why: $wait s');
+          refuse();
+        }
+      }
+
+      p.setShown(true);
+      refuse();
+      climb();
+      p.retarget(p.tool.copyWith(url: 'https://example.org/'));
+      expect(engine.loads.last, Uri.parse('https://example.org/'));
+      refuse();
+      expectRetriesAt([1, 2], 'the edit');
+      climb();
+      unawaited(p.backToTool());
+      expect(engine.loads.last, Uri.parse('https://example.org/'));
+      refuse();
+      expectRetriesAt([1, 2], 'Back to tool');
+      climb();
+      p.setShown(false);
+      p.retarget(p.tool.copyWith(url: 'https://example.net/'));
+      refuse();
+      async.elapse(const Duration(seconds: 30));
+      final loads = engine.loads.length;
+      p.setShown(true);
+      expectRetriesAt([1, 2], 'the edit made while hidden');
+      expect(engine.loads.sublist(loads), [
+        Uri.parse('https://example.net/'),
+        Uri.parse('https://example.net/'),
+      ]);
+      p.dispose();
+    });
+  });
+
   test('between slow reloads a local tool is knocked on every second; once '
       'its port answers the page loads at once (ruling R9, criterion 5)', () {
     fakeAsync((async) {
@@ -207,6 +264,27 @@ void main() {
     expect(engine.loads, hasLength(loads + 1), reason: 'user reload');
     engine.emit(const LoadFailed(BrowserLoadErrorKind.crashed));
     expect(p.state.error, isNull, reason: 'a user reload starts over');
+  });
+
+  test('an edited URL and "Back to tool" get their own crash reload (D13, '
+      'D23, D9)', () {
+    final p = page(tool('localhost:5173'));
+    p.setShown(true);
+    engine.emit(const LoadFailed(BrowserLoadErrorKind.crashed));
+    engine.emit(const LoadFailed(BrowserLoadErrorKind.crashed));
+    expect(p.state.error, BrowserLoadErrorKind.crashed, reason: 'used up');
+    p.retarget(p.tool.copyWith(url: 'http://localhost:5174/'));
+    var loads = engine.loads.length;
+    engine.emit(const LoadFailed(BrowserLoadErrorKind.crashed));
+    expect(p.state.error, isNull, reason: 'the edit: reloaded by itself');
+    expect(engine.loads.sublist(loads), [Uri.parse('http://localhost:5174/')]);
+    engine.emit(const LoadFailed(BrowserLoadErrorKind.crashed));
+    expect(p.state.error, BrowserLoadErrorKind.crashed);
+    unawaited(p.backToTool());
+    loads = engine.loads.length;
+    engine.emit(const LoadFailed(BrowserLoadErrorKind.crashed));
+    expect(p.state.error, isNull, reason: 'Back to tool: reloaded by itself');
+    expect(engine.loads.sublist(loads), [Uri.parse('http://localhost:5174/')]);
   });
 
   test('✕ ends the loading state; ↻ after ✕ of the first load loads the '
