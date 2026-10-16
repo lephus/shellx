@@ -3231,6 +3231,196 @@ class S {
     );
   }
 
+  /// `Changes`
+  String get aiChanges {
+    return Intl.message('Changes', name: 'aiChanges', desc: '', args: []);
+  }
+
+  /// `This turn`
+  String get aiThisTurn {
+    return Intl.message('This turn', name: 'aiThisTurn', desc: '', args: []);
+  }
+
+  /// `Whole session`
+  String get aiWholeSession {
+    return Intl.message(
+      'Whole session',
+      name: 'aiWholeSession',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Revert this turn`
+  String get aiRevertTurn {
+    return Intl.message(
+      'Revert this turn',
+      name: 'aiRevertTurn',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Revert the whole session`
+  String get aiRevertSession {
+    return Intl.message(
+      'Revert the whole session',
+      name: 'aiRevertSession',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{n, plural, =1{Revert 1 file to before turn {turn}?} other{Revert {n} files to before turn {turn}?}}`
+  String aiRevertConfirm(int n, int turn) {
+    return Intl.plural(
+      n,
+      one: 'Revert 1 file to before turn $turn?',
+      other: 'Revert $n files to before turn $turn?',
+      name: 'aiRevertConfirm',
+      desc: '',
+      args: [n, turn],
+    );
+  }
+
+  /// `{n, plural, =1{Revert 1 file to before the session?} other{Revert {n} files to before the session?}}`
+  String aiRevertConfirmSession(int n) {
+    return Intl.plural(
+      n,
+      one: 'Revert 1 file to before the session?',
+      other: 'Revert $n files to before the session?',
+      name: 'aiRevertConfirmSession',
+      desc: '',
+      args: [n],
+    );
+  }
+
+  /// `{n, plural, =1{1 file changed after this turn.} other{{n} files changed after this turn.}}`
+  String aiRevertTouched(int n) {
+    return Intl.plural(
+      n,
+      one: '1 file changed after this turn.',
+      other: '$n files changed after this turn.',
+      name: 'aiRevertTouched',
+      desc: '',
+      args: [n],
+    );
+  }
+
+  /// `Only unchanged files`
+  String get aiRevertOnlyClean {
+    return Intl.message(
+      'Only unchanged files',
+      name: 'aiRevertOnlyClean',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Revert all`
+  String get aiRevertAll {
+    return Intl.message('Revert all', name: 'aiRevertAll', desc: '', args: []);
+  }
+
+  /// `Wait for the turn to finish.`
+  String get aiRevertBusy {
+    return Intl.message(
+      'Wait for the turn to finish.',
+      name: 'aiRevertBusy',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{n, plural, =1{Reverted 1 file.} other{Reverted {n} files.}}`
+  String aiReverted(int n) {
+    return Intl.plural(
+      n,
+      one: 'Reverted 1 file.',
+      other: 'Reverted $n files.',
+      name: 'aiReverted',
+      desc: '',
+      args: [n],
+    );
+  }
+
+  /// `Nothing changed.`
+  String get aiChangesEmpty {
+    return Intl.message(
+      'Nothing changed.',
+      name: 'aiChangesEmpty',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{n, plural, =1{1 more file — see it on the computer.} other{{n} more files — see them on the computer.}}`
+  String aiChangesMore(int n) {
+    return Intl.plural(
+      n,
+      one: '1 more file — see it on the computer.',
+      other: '$n more files — see them on the computer.',
+      name: 'aiChangesMore',
+      desc: '',
+      args: [n],
+    );
+  }
+
+  /// `changed after this turn`
+  String get aiChangedAfter {
+    return Intl.message(
+      'changed after this turn',
+      name: 'aiChangedAfter',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `binary`
+  String get aiBinaryFile {
+    return Intl.message('binary', name: 'aiBinaryFile', desc: '', args: []);
+  }
+
+  /// `Binary file — see it on the computer.`
+  String get aiDiffBinary {
+    return Intl.message(
+      'Binary file — see it on the computer.',
+      name: 'aiDiffBinary',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This file is not there, before or now.`
+  String get aiDiffMissing {
+    return Intl.message(
+      'This file is not there, before or now.',
+      name: 'aiDiffMissing',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Compared with the start of turn {turn}`
+  String aiDiffVsTurn(int turn) {
+    return Intl.message(
+      'Compared with the start of turn $turn',
+      name: 'aiDiffVsTurn',
+      desc: '',
+      args: [turn],
+    );
+  }
+
+  /// `Compared with the start of the session`
+  String get aiDiffVsSession {
+    return Intl.message(
+      'Compared with the start of the session',
+      name: 'aiDiffVsSession',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Stopped turn {n} · {time}`
   String aiTurnStopped(int n, String time) {
     return Intl.message(

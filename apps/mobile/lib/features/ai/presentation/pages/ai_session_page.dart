@@ -10,6 +10,7 @@ import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
 import 'package:shellx_mobile/features/ai/presentation/controllers/ai_dictation.dart';
 import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_controller.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_attach_sheet.dart';
+import 'package:shellx_mobile/features/ai/presentation/widgets/ai_changes_sheet.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_chooser.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_config_sheet.dart';
 import 'package:shellx_mobile/features/ai/presentation/widgets/ai_dock.dart';
@@ -187,6 +188,19 @@ class _AiSessionPageState extends State<AiSessionPage> {
     }
   }
 
+  /// V2-2b B20: the Changes sheet of [turn] (null: the whole session); a file opens its diff page over it.
+  Future<void> _openChanges(int? turn) => showAiChangesSheet(
+    context,
+    _controller,
+    turn: turn,
+    onOpenFile: (path, turn) =>
+        unawaited(context.router.push(AiFileDiffRoute(controller: _controller, path: path, turn: turn))),
+  );
+
+  /// V2-2b B20: a turn's summary opens the sheet of that turn. A method, so the timeline's items get the same
+  /// callback on every build of the page.
+  void _openTurnChanges(int turn) => unawaited(_openChanges(turn));
+
   /// The bytes of the images already in the next message.
   int get _imageBytes => _images.fold(0, (n, image) => n + image.bytes.length);
 
@@ -342,6 +356,9 @@ class _AiSessionPageState extends State<AiSessionPage> {
       menu: [
         if (!closed && head != null && head.history && _controller.can(AiFeature.history))
           (key: const Key('ai.menu.history'), label: s.aiHistory, onTap: () => unawaited(_openHistory())),
+        // V2-2b B20: the session's changes, when the computer offers them.
+        if (_controller.can(AiFeature.changes) && _controller.linkState == AiLinkState.live)
+          (key: const Key('ai.menu.changes'), label: s.aiChanges, onTap: () => unawaited(_openChanges(null))),
       ],
     );
   }
@@ -473,6 +490,8 @@ class _AiSessionPageState extends State<AiSessionPage> {
           // V2-2b B16: "Xem đủ" on what the phone shows cut, when the computer offers it.
           child: AiItemActions(
             onViewAll: _controller.can(AiFeature.item) ? _viewAll : null,
+            // V2-2b B20: a turn's summary opens its changes.
+            onChanges: _controller.can(AiFeature.changes) ? _openTurnChanges : null,
             child: AiTimeline(
               mirror: mirror,
               version: version,

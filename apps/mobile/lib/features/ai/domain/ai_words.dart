@@ -210,6 +210,9 @@ abstract final class AiWords {
     // The computer keeps an answer that would turn on a mode without approval for itself: it stays
     // open there (V2-2 D13).
     'on_computer' => s.aiPermOnComputer,
+    // V2-2b B19: a revert while a turn runs, or with undo off on the computer.
+    'busy_turn' => s.aiRevertBusy,
+    'undo_off' => s.aiNoticeUndoOff,
     outcomeUnknown => s.aiOutcomeUnknown,
     openUnknown => s.aiOpenOutcomeUnknown,
     untrusted => ErrorText(s).machine(MachineConnectionFailure.untrusted),

@@ -710,6 +710,39 @@ class FakeAiMachine implements AiMachine {
     if (view == null) throw const AiRequestException('refused');
     return view;
   }
+
+  /// V2-2b B19 (Task 25): what [changes] answers, and the (sid, turn) asked; what [diff] answers, and the (sid, path,
+  /// turn) asked; the answers of [revert] in turn — a number of files, or an exception to throw — and the (sid, turn,
+  /// keep) asked.
+  AiChangesView changesValue = const AiChangesView(scope: 'session');
+  final List<(String, int?)> changesAsked = [];
+  Map<String, Object?> diffValue = const {'missing': true};
+  final List<(String, String, int?)> diffsAsked = [];
+  final List<Object> revertAnswers = [];
+  final List<(String, int?, String?)> reverts = [];
+
+  @override
+  Future<AiChangesView> changes(String sid, {int? turn}) async {
+    changesAsked.add((sid, turn));
+    await _request();
+    return changesValue;
+  }
+
+  @override
+  Future<Map<String, Object?>> diff(String sid, String path, {int? turn}) async {
+    diffsAsked.add((sid, path, turn));
+    await _request();
+    return diffValue;
+  }
+
+  @override
+  Future<int> revert(String sid, {int? turn, String? keep}) async {
+    reverts.add((sid, turn, keep));
+    await _request();
+    final answer = revertAnswers.isEmpty ? 0 : revertAnswers.removeAt(0);
+    if (answer is Exception) throw answer;
+    return answer as int;
+  }
 }
 
 /// Scriptable [ToolMachine] (V2-4): the list as a test sets it, and the pages it made.

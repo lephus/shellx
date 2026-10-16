@@ -358,6 +358,15 @@ final class _AiMachineAdapter implements AiMachine {
   @override
   Future<AiFullView> fullItem(String sid, int index, {void Function(int part, int parts)? onPart}) =>
       _ai.fullItem(sid, index, onPart: onPart);
+
+  @override
+  Future<AiChangesView> changes(String sid, {int? turn}) => _ai.changes(sid, turn: turn);
+
+  @override
+  Future<Map<String, Object?>> diff(String sid, String path, {int? turn}) => _ai.diff(sid, path, turn: turn);
+
+  @override
+  Future<int> revert(String sid, {int? turn, String? keep}) => _ai.revert(sid, turn: turn, keep: keep);
 }
 
 final class _AiSessionAdapter implements AiSessionHandle {

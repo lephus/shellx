@@ -7,6 +7,7 @@ import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_attachments.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_drafts.dart';
+import 'package:shellx_mobile/features/ai/domain/ai_revert_outcome.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
 
@@ -98,6 +99,7 @@ class AiSessionController extends Controller {
   final Signal<int?> _answering = signal(null);
   final Signal<bool> _stopping = signal(false);
   final Signal<DateTime> _now = signal(DateTime.now());
+  final Signal<bool> _reverting = signal(false);
   final Signal<({int sent, int parts})?> _upload = signal(null);
   final Signal<bool> _reattached = signal(false);
 
@@ -324,6 +326,53 @@ class AiSessionController extends Controller {
 
   /// "Tải thêm".
   void loadEarlier() => _link?.loadEarlier();
+
+  /// V2-2b B20: a revert is on its way; its button waits.
+  ReadonlySignal<bool> get reverting => _reverting;
+
+  /// V2-2b B19: the files changed since [turn] began (null: since the session's first turn), or the code of what went
+  /// wrong ([AiWords.failure]).
+  Future<({AiChangesView? view, String? code})> loadChanges({int? turn}) async {
+    final machine = _machine;
+    if (machine == null) return (view: null, code: 'refused');
+    try {
+      return (view: await machine.ai.changes(sid, turn: turn), code: null);
+    } catch (error) {
+      return (view: null, code: _failure(error));
+    }
+  }
+
+  /// V2-2b B19: the diff of [path] since [turn] began (null: since the session's first turn), as an `ai.diff` body,
+  /// or the code of what went wrong.
+  Future<({Map<String, Object?>? diff, String? code})> loadDiff(String path, {int? turn}) async {
+    final machine = _machine;
+    if (machine == null) return (diff: null, code: 'refused');
+    try {
+      return (diff: await machine.ai.diff(sid, path, turn: turn), code: null);
+    } catch (error) {
+      return (diff: null, code: _failure(error));
+    }
+  }
+
+  /// V2-2b B19, B20: one revert the user asked for — after the phone's own question — of [turn] (null: the whole
+  /// session); [keep] (`clean` or `all`) answers the computer's question about files changed after the turn. One
+  /// request: a lost channel is [AiWords.outcomeUnknown], and nothing sends it again (V2-2 D13).
+  Future<AiRevertOutcome> revert({int? turn, String? keep}) async {
+    final machine = _machine;
+    if (machine == null) return const AiRevertFailed('refused');
+    if (_reverting.peek()) return const AiRevertFailed(AiWords.inFlight);
+    _set(_reverting, true);
+    try {
+      return AiRevertDone(await machine.ai.revert(sid, turn: turn, keep: keep));
+    } on AiRequestException catch (error) {
+      if (error.code == 'confirm') return AiRevertAsk(AiRevertConfirm.fromJson(error.body ?? const {}));
+      return AiRevertFailed(error.code);
+    } catch (error) {
+      return AiRevertFailed(_failure(error));
+    } finally {
+      _set(_reverting, false);
+    }
+  }
 
   /// V2-2b B11: the choices of "Chế độ và model", or why they cannot be had (a code for [AiWords.failure]).
   Future<({AiConfigView? view, String? code})> loadConfig() async {
