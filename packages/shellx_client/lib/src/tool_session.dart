@@ -572,7 +572,6 @@ final class ToolSession {
   }
 
   Future<void> _handle(_Served served, int port, HttpRequest request) async {
-    final response = request.response;
     // E11: a page of another host (DNS rebinding) is refused.
     final host = request.headers.value(HttpHeaders.hostHeader) ?? '';
     if (!isToolLoopbackAuthority(host, port)) {
@@ -667,24 +666,19 @@ final class ToolSession {
           );
     _streams.add(stream);
     link.listen(id, stream);
-    final sent = link.enqueue(
-      ToolRequest(
-        id: id,
-        tool: served.tool,
-        method: request.method,
-        target: target,
-        head: head,
-        alias: served.main ? alias : null,
-        ws: upgrade,
-        end: stream is! _HttpStream || !stream.hasBody,
-      ),
+    final message = ToolRequest(
+      id: id,
+      tool: served.tool,
+      method: request.method,
+      target: target,
+      head: head,
+      alias: served.main ? alias : null,
+      ws: upgrade,
+      end: stream is! _HttpStream || !stream.hasBody,
     );
-    if (!sent) {
-      stream.forget();
-      return _answer(request, HttpStatus.serviceUnavailable);
-    }
-    response.bufferOutput = false; // a piece goes as it comes (SSE)
-    stream.start();
+    // I3: the open waits its turn on the phone (at once in the common case),
+    // never a `busy` from the computer; the webview's request stays pending.
+    stream._withdrawOpen = link.acquireOpen(() => stream._open(message));
   }
 
   /// The request's head as the computer gets it: no hop-by-hop header, no
@@ -902,7 +896,28 @@ sealed class _Stream implements ToolStreamListener {
   bool done = false;
   bool responded = false;
 
+  /// Its `tool.req` went to the computer (I3: not while it waits its turn).
+  bool opened = false;
+
+  /// Withdraws its open while it waits its turn ([MachineTools.acquireOpen]).
+  void Function()? _withdrawOpen;
+
   MachineTools get link => session.link;
+
+  /// I3: its turn came: [message] (its `tool.req`) goes to the computer,
+  /// then its body ([start]); without a channel the webview gets 503.
+  void _open(ToolRequest message) {
+    _withdrawOpen = null;
+    if (done) return;
+    if (!link.enqueue(message)) {
+      forget();
+      unawaited(reply(HttpStatus.serviceUnavailable));
+      return;
+    }
+    opened = true;
+    request.response.bufferOutput = false; // a piece goes as it comes (SSE)
+    start();
+  }
 
   void start();
 
@@ -923,10 +938,11 @@ sealed class _Stream implements ToolStreamListener {
     unawaited(reply(HttpStatus.badGateway));
   }
 
-  /// Ended here (page left, app paused): the computer is told.
+  /// Ended here (page left, app paused): the computer is told, when it heard
+  /// of the stream.
   void abort() {
     if (done) return;
-    link.enqueue(ToolEnd(id: id, code: ToolCode.aborted));
+    if (opened) link.enqueue(ToolEnd(id: id, code: ToolCode.aborted));
     forget();
     cut();
   }
@@ -934,9 +950,12 @@ sealed class _Stream implements ToolStreamListener {
   /// Drops what is held toward the webview.
   void cut();
 
-  /// The stream is over: forget it.
+  /// The stream is over: forget it (an open still waiting its turn is
+  /// withdrawn: its `tool.req` never goes, I3).
   void forget() {
     done = true;
+    _withdrawOpen?.call();
+    _withdrawOpen = null;
     window.close();
     link.release(id);
     session._streams.remove(this);
@@ -972,8 +991,10 @@ final class _HttpStream extends _Stream {
   StreamSubscription<List<int>>? _upload;
   final _read = Completer<void>();
 
+  /// Null until [start] (an answer given while the open waits its turn, I3,
+  /// drains the request itself).
   @override
-  Future<void> get read => _read.future;
+  Future<void>? get read => _upload == null ? null : _read.future;
 
   void _readAll() {
     if (!_read.isCompleted) _read.complete();
