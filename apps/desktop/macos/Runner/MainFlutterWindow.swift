@@ -22,6 +22,8 @@ class MainFlutterWindow: NSWindow {
     LaunchAtLoginChannel.register(
       messenger: flutterViewController.engine.binaryMessenger)
     AppChannel.register(messenger: flutterViewController.engine.binaryMessenger)
+    // V2-5a §6.3: SF Mono for the window's engine only (the service never draws text).
+    SystemMonoFont.register(messenger: flutterViewController.engine.binaryMessenger)
     browserNative = BrowserNative(controller: flutterViewController)
 
     super.awakeFromNib()

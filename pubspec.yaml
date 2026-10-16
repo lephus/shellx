@@ -9,6 +9,7 @@ workspace:
   - packages/shellx_e2e
   - packages/shellx_acp
   - packages/shellx_ai
+  - packages/shellx_design
   - apps/desktop
   - apps/mobile
 dev_dependencies:

@@ -24,6 +24,7 @@
 		331C80D8294CF71000263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C80D7294CF71000263BE5 /* RunnerTests.swift */; };
 		335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */; };
 		A6B0000100000000000000A1 /* BrowserNative.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B0000200000000000000A2 /* BrowserNative.swift */; };
+		5A5F0001000000000000A001 /* SystemMonoFont.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A5F0002000000000000A001 /* SystemMonoFont.swift */; };
 		33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC10F02044A3C60003C045 /* AppDelegate.swift */; };
 		33CC10F32044A3C60003C045 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F22044A3C60003C045 /* Assets.xcassets */; };
 		33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F42044A3C60003C045 /* MainMenu.xib */; };
@@ -69,6 +70,7 @@
 		335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GeneratedPluginRegistrant.swift; sourceTree = "<group>"; };
 		33CC10ED2044A3C60003C045 /* shellx_desktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = shellx_desktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A6B0000200000000000000A2 /* BrowserNative.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserNative.swift; sourceTree = "<group>"; };
+		5A5F0002000000000000A001 /* SystemMonoFont.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMonoFont.swift; sourceTree = "<group>"; };
 		33CC10F02044A3C60003C045 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		33CC10F22044A3C60003C045 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Runner/Assets.xcassets; sourceTree = "<group>"; };
 		33CC10F52044A3C60003C045 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
@@ -180,6 +182,7 @@
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
 				A6B0000200000000000000A2 /* BrowserNative.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
+				5A5F0002000000000000A001 /* SystemMonoFont.swift */,
 				33E51913231747F40026EE4D /* DebugProfile.entitlements */,
 				33E51914231749380026EE4D /* Release.entitlements */,
 				33CC11242044D66E0003C045 /* Resources */,
@@ -463,6 +466,7 @@
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
 				A6B0000100000000000000A1 /* BrowserNative.swift in Sources */,
+				5A5F0001000000000000A001 /* SystemMonoFont.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
