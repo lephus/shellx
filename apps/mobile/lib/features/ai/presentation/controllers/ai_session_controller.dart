@@ -105,6 +105,7 @@ class AiSessionController extends Controller {
   final Signal<bool> _reverting = signal(false);
   final Signal<({int sent, int parts})?> _upload = signal(null);
   final Signal<bool> _reattached = signal(false);
+  final Signal<bool> _configuring = signal(false);
 
   /// The session shown: the one the page was opened for, or the one it was found again as after the
   /// computer restarted ShellX (B22).
@@ -389,11 +390,26 @@ class AiSessionController extends Controller {
   }
 
   /// V2-2b B11: one choice of an option (one explicit tap, one request, never sent again): null when the
-  /// computer took it, else the failure code (`on_computer`: chosen on the computer only).
-  Future<String?> setConfig(String id, Object value) => _simple(() => _machine!.ai.setConfig(sid, id, value));
+  /// computer took it, else the failure code (`on_computer`: chosen on the computer only). One choice of the
+  /// session at a time, whichever sheet sent it ([configuring]): another meanwhile is [AiWords.inFlight].
+  Future<String?> setConfig(String id, Object value) => _config(() => _machine!.ai.setConfig(sid, id, value));
 
   /// V2-2b B11: the mode of an agent with only modes; as [setConfig].
-  Future<String?> setMode(String modeId) => _simple(() => _machine!.ai.setMode(sid, modeId));
+  Future<String?> setMode(String modeId) => _config(() => _machine!.ai.setMode(sid, modeId));
+
+  /// V2-2b B11: a choice of "Chế độ và model" is on its way. The session's, not a sheet's: a sheet swiped away and
+  /// opened again while it travels sends nothing more.
+  ReadonlySignal<bool> get configuring => _configuring;
+
+  Future<String?> _config(Future<void> Function() run) async {
+    if (_configuring.peek()) return AiWords.inFlight;
+    _set(_configuring, true);
+    try {
+      return await _simple(run);
+    } finally {
+      _set(_configuring, false);
+    }
+  }
 
   /// V2-2b B16: item [index] in full for "Xem đủ", a slice at a time ([onPart]; an error it throws ends the
   /// load: the page left), or the failure code.

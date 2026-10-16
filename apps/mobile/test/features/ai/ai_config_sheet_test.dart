@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/remote.dart';
@@ -160,6 +162,49 @@ void main() {
     await tester.pumpAndSettle();
     expect(popups.errors, ['Chọn mục này trên máy tính.']);
     expect(find.text('Chế độ và model'), findsOneWidget);
+  });
+
+  testWidgets('a choice the computer takes while its sheet is being swiped away closes nothing more: the session '
+      'page stays', (tester) async {
+    await open(tester);
+    await openSheet(tester);
+    final answer = machine.ai.gate = Completer<void>();
+    await tester.tap(find.byKey(const Key('ai.config.model.sonnet')));
+    await tester.pump();
+    expect(machine.ai.configSets, [(sid, 'model', 'sonnet')]);
+    await tester.tapAt(const Offset(195, 40)); // the barrier: the sheet goes
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60)); // still on its way down
+    answer.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Chế độ và model'), findsNothing);
+    expect(find.byKey(const Key('ai.title')), findsOneWidget, reason: 'the session page is still there');
+    expect(find.text('open'), findsNothing, reason: 'nothing under it shows');
+  });
+
+  testWidgets('one choice at a time for the session, whichever sheet sent it: a sheet opened again while one is on '
+      'its way sends nothing', (tester) async {
+    await open(tester);
+    await openSheet(tester);
+    final answer = machine.ai.gate = Completer<void>();
+    await tester.tap(find.byKey(const Key('ai.config.model.sonnet')));
+    await tester.pump();
+    await tester.tapAt(const Offset(195, 40));
+    await tester.pumpAndSettle();
+    machine.ai.gate = null; // the sheet's own load goes through
+    await openSheet(tester);
+    expect(find.text('Chế độ và model'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('ai.config.mode.plan')));
+    await tester.pumpAndSettle();
+    expect(machine.ai.configSets, [(sid, 'model', 'sonnet')], reason: 'nothing more while the first is on its way');
+    answer.complete();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('ai.title')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('ai.config.mode.plan')));
+    await tester.pumpAndSettle();
+    expect(machine.ai.configSets.last, (sid, 'mode', 'plan'), reason: 'the first answered: a new choice goes');
+    expect(find.text('Chế độ và model'), findsNothing);
+    expect(find.byKey(const Key('ai.title')), findsOneWidget);
   });
 
   testWidgets('an agent with only modes: its modes, set as a mode', (tester) async {
