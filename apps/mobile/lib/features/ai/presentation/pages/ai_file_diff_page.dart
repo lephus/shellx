@@ -5,6 +5,7 @@ import 'package:shellx_mobile/core/core.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_text.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_words.dart';
 import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_controller.dart';
+import 'package:shellx_mobile/features/ai/presentation/widgets/ai_items.dart' show AiDiffLineRow;
 import 'package:shellx_mobile/shared/shared.dart';
 
 /// V2-2b B20: one changed file's diff, full screen — its changed region as the computer read it now (before [turn],
@@ -128,7 +129,8 @@ class _AiFileDiffPageState extends State<AiFileDiffPage> {
   }
 }
 
-/// The lines of a diff region, built only as they scroll into view; a line too long for the screen wraps.
+/// The lines of a diff region, built only as they scroll into view, in the conversation's diff rows ([AiDiffLineRow],
+/// as "Xem đủ" shows them): a line too long for the screen wraps, and one longer than [kShownLineChars] is cut.
 class _Lines extends StatelessWidget {
   const _Lines({required this.lines, required this.cut});
 
@@ -138,34 +140,21 @@ class _Lines extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    const mono = TextStyle(fontFamily: FontFamily.jetBrainsMono, fontSize: 12, height: 1.35);
     return ListView.builder(
       key: const Key('ai.fileDiff.lines'),
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       itemCount: lines.length + (cut ? 1 : 0),
       itemBuilder: (context, i) {
         if (i == lines.length) {
           return Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Text(
               S.of(context).aiFromComputerOnly,
               style: context.typo.paragraph13.copyWith(color: colors.secondaryText),
             ),
           );
         }
-        final line = lines[i];
-        return Container(
-          color: switch (line.mark) {
-            '+' => colors.okDot.withValues(alpha: 0.16),
-            '-' => colors.error.withValues(alpha: 0.12),
-            _ => null,
-          },
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
-          child: Text(
-            '${line.mark} ${line.text}',
-            style: mono.copyWith(color: line.mark == ' ' ? colors.secondaryText : colors.primaryText),
-          ),
-        );
+        return AiDiffLineRow(line: lines[i]);
       },
     );
   }
