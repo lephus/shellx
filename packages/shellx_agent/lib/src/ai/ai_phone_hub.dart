@@ -255,13 +255,12 @@ final class AiPush with Redacted {
     return _tagPattern.hasMatch(tag) ? tag : null;
   }
 
-  /// The push may carry answer buttons: a [permission], two option ids of
-  /// 1..[kAiPushValueChars] characters, and a [tag].
+  /// The push may carry answer buttons: a [permission], two option ids that
+  /// fit its data ([_pushValueFits]), and a [tag].
   bool get answerable =>
       permission != null && _fits(allow) && _fits(reject) && tag != null;
 
-  static bool _fits(String? id) =>
-      id != null && id.isNotEmpty && id.runes.length <= kAiPushValueChars;
+  static bool _fits(String? id) => id != null && _pushValueFits(id);
 
   /// For `ai.push` (window → background service). `question`, `perm`,
   /// `allow` and `reject` are later keys: an older service skips them —
@@ -312,19 +311,30 @@ final class AiPush with Redacted {
   }
 }
 
+/// V2-2b B7: whether [value] fits a push's data: 1..[kAiPushValueChars]
+/// characters of well-formed UTF-16. A lone surrogate is refused by both
+/// relays (400), and the whole push with it. (The [AiPush.tag] is ASCII by
+/// its pattern.)
+bool _pushValueFits(String value) =>
+    value.isNotEmpty &&
+    value.runes.length <= kAiPushValueChars &&
+    !value.runes.any((r) => r >= 0xD800 && r <= 0xDFFF);
+
 /// V2-2b B7: the two answers the push of permission [p] may offer as
 /// buttons — the first "allow once" that turns on no mode acting without
-/// asking ([aiOptionEnablesNoApproval]) and the first "reject once" — or
-/// null, for a push without buttons, when either is missing or an id would
-/// not fit the push's data (1..[kAiPushValueChars] characters). Never an
-/// "always" answer: it changes what happens next, which is no button's to do
-/// (V2-2 D13).
+/// asking, by its id ([aiOptionEnablesNoApproval]) or by its name
+/// ([aiIsNoApprovalMode]: "Yes, and bypass permissions"), and the first
+/// "reject once" — or null, for a push without buttons, when either is
+/// missing or an id would not fit the push's data ([_pushValueFits]). Never
+/// an "always" answer: it changes what happens next, which is no button's to
+/// do (V2-2 D13).
 ({String allow, String reject})? aiPushChoices(PendingPermission p) {
-  bool fits(String id) => id.isNotEmpty && id.runes.length <= kAiPushValueChars;
   final allow = p.request.options
       .where(
         (o) =>
-            o.kind == PermissionKind.allowOnce && !aiOptionEnablesNoApproval(o),
+            o.kind == PermissionKind.allowOnce &&
+            !aiOptionEnablesNoApproval(o) &&
+            !aiIsNoApprovalMode(o.name),
       )
       .firstOrNull;
   final reject = p.request.options
@@ -332,8 +342,8 @@ final class AiPush with Redacted {
       .firstOrNull;
   if (allow == null ||
       reject == null ||
-      !fits(allow.optionId) ||
-      !fits(reject.optionId)) {
+      !_pushValueFits(allow.optionId) ||
+      !_pushValueFits(reject.optionId)) {
     return null;
   }
   return (allow: allow.optionId, reject: reject.optionId);
