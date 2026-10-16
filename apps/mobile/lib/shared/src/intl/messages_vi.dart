@@ -175,15 +175,32 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m76(terms, privacy) => "Khi tạo tài khoản, bạn đồng ý với ${terms} và ${privacy}.";
 
-  static String m77(length) => "Mật khẩu phải có ít nhất ${length} ký tự.";
+  static String m77(name) => "${name} nhắn";
 
-  static String m78(length) => "Tối đa ${length} ký tự.";
+  static String m78(host) => "Mở ${host} bằng trình duyệt?";
 
-  static String m79(length) => "Phải có ít nhất ${length} ký tự.";
+  static String m79(alias, port) =>
+      "Đang mở ở cổng ${alias} vì cổng ${port} bận trên điện thoại. Link ghi rõ cổng ${port} có thể không chạy.";
 
-  static String m80(lines) => "Hiển thị ${lines} dòng cuối";
+  static String m80(port) => "Không có gì chạy ở localhost:${port} trên máy tính.";
 
-  static String m81(target) => "Gửi tới: ${target}";
+  static String m81(workspace, port) => "${workspace} · localhost:${port}";
+
+  static String m82(port) => "Tool ở cổng ${port} chưa bật cho điện thoại.";
+
+  static String m83(count) => "Đang tải qua máy tính… (${count} request)";
+
+  static String m84(port) => "localhost:${port} · qua máy tính";
+
+  static String m85(length) => "Mật khẩu phải có ít nhất ${length} ký tự.";
+
+  static String m86(length) => "Tối đa ${length} ký tự.";
+
+  static String m87(length) => "Phải có ít nhất ${length} ký tự.";
+
+  static String m88(lines) => "Hiển thị ${lines} dòng cuối";
+
+  static String m89(target) => "Gửi tới: ${target}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -713,6 +730,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Mở lại phiên cũ để xem tiếp đúng chỗ đã dừng, hoặc tạo phiên mới.",
     ),
     "pickerTitle": m69,
+    "pickerTools": MessageLookupByLibrary.simpleMessage("Tool"),
     "privacyLink": MessageLookupByLibrary.simpleMessage(
       "Chính sách quyền riêng tư",
     ),
@@ -862,6 +880,49 @@ class MessageLookup extends MessageLookupByLibrary {
     "terminalOpenNew": MessageLookupByLibrary.simpleMessage("Mở phiên mới"),
     "termsLink": MessageLookupByLibrary.simpleMessage("Điều khoản"),
     "termsNotice": m76,
+    "toolClearDataPhone": MessageLookupByLibrary.simpleMessage(
+      "Xóa dữ liệu của tool",
+    ),
+    "toolClearDataPhoneConfirm": MessageLookupByLibrary.simpleMessage(
+      "Đăng xuất mọi tool và xóa cookie, bộ nhớ của chúng?",
+    ),
+    "toolDialogTitle": m77,
+    "toolDisabled": MessageLookupByLibrary.simpleMessage(
+      "Tool này không còn mở được trên điện thoại.",
+    ),
+    "toolGone": MessageLookupByLibrary.simpleMessage(
+      "Tool này đã bị xóa trên máy tính.",
+    ),
+    "toolHome": MessageLookupByLibrary.simpleMessage("Về trang đầu"),
+    "toolLoadingTunnel": MessageLookupByLibrary.simpleMessage(
+      "Đang tải qua đường hầm…",
+    ),
+    "toolNeedsDesktop": MessageLookupByLibrary.simpleMessage(
+      "Mở ShellX trên máy tính để dùng tool.",
+    ),
+    "toolNoDownloads": MessageLookupByLibrary.simpleMessage(
+      "Tải tệp chưa làm được trên điện thoại.",
+    ),
+    "toolNoPortPhone": MessageLookupByLibrary.simpleMessage(
+      "Điện thoại không mở được cổng cục bộ cho tool.",
+    ),
+    "toolOpenExternal": m78,
+    "toolOtherPort": m79,
+    "toolReconnecting": MessageLookupByLibrary.simpleMessage(
+      "Đang kết nối lại…",
+    ),
+    "toolRefusedPhone": m80,
+    "toolReload": MessageLookupByLibrary.simpleMessage("Tải lại"),
+    "toolResponseTooLarge": MessageLookupByLibrary.simpleMessage(
+      "Phản hồi của tool quá lớn.",
+    ),
+    "toolRowSub": m81,
+    "toolSiblingOff": m82,
+    "toolSlow": m83,
+    "toolViaComputer": m84,
+    "toolsEmpty": MessageLookupByLibrary.simpleMessage(
+      "Chưa có tool nào bật cho điện thoại. Trên máy tính: thanh của tool › 📱 Điện thoại.",
+    ),
     "unauthorized": MessageLookupByLibrary.simpleMessage("Chưa được xác thực"),
     "unknownError": MessageLookupByLibrary.simpleMessage("Lỗi không xác định"),
     "unknownMachine": MessageLookupByLibrary.simpleMessage(
@@ -889,7 +950,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationPasswordLowercase": MessageLookupByLibrary.simpleMessage(
       "Mật khẩu phải có ít nhất một chữ thường.",
     ),
-    "validationPasswordMinLength": m77,
+    "validationPasswordMinLength": m85,
     "validationPasswordNotMatch": MessageLookupByLibrary.simpleMessage(
       "Mật khẩu không khớp.",
     ),
@@ -908,8 +969,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "validationPhoneRequired": MessageLookupByLibrary.simpleMessage(
       "Cần nhập số điện thoại.",
     ),
-    "validationTextMaxLength": m78,
-    "validationTextMinLength": m79,
+    "validationTextMaxLength": m86,
+    "validationTextMinLength": m87,
     "validationTextRequired": MessageLookupByLibrary.simpleMessage(
       "Trường này là bắt buộc.",
     ),
@@ -922,7 +983,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "viewAsTextTooltip": MessageLookupByLibrary.simpleMessage(
       "Xem dạng văn bản",
     ),
-    "viewAsTextTruncated": m80,
+    "viewAsTextTruncated": m88,
     "voiceClose": MessageLookupByLibrary.simpleMessage("Đóng"),
     "voiceDetached": MessageLookupByLibrary.simpleMessage(
       "Phiên đã ngắt khỏi điện thoại — gắn lại để gửi",
@@ -968,7 +1029,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "voiceSend": MessageLookupByLibrary.simpleMessage("Gửi"),
     "voiceSendEnter": MessageLookupByLibrary.simpleMessage("Gửi phím Enter"),
     "voiceStopTooltip": MessageLookupByLibrary.simpleMessage("Dừng nghe"),
-    "voiceTarget": m81,
+    "voiceTarget": m89,
     "voiceUnsupported": MessageLookupByLibrary.simpleMessage(
       "Máy này không hỗ trợ nhận dạng giọng nói",
     ),
