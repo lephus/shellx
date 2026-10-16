@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../terminal/sidebar_workspaces.dart';
 import '../../theme/shellx_desktop_theme.dart';
+import '../../tools/tool_project_list.dart';
 import 'page_parts.dart';
 
 /// Projects (cmux gap 36): a prominent place to create, name and fold the
@@ -42,6 +43,14 @@ class ProjectsPage extends ConsumerWidget {
             name: w.displayName(l10n),
             tabCount: state.tabsOf(w.id).length,
           ),
+        // V2-3 D22: the tools' data, and where tools open.
+        ActionRow(
+          key: const Key('settings.tools.clear'),
+          label: l10n.toolDataLabel,
+          button: l10n.toolClearData,
+          onPressed: () => confirmClearToolData(ref, l10n),
+        ),
+        settingWidget(settingById('tool-embed')),
       ],
     );
   }
@@ -167,9 +176,7 @@ class _ProjectCardState extends ConsumerState<_ProjectCard> {
                 Tooltip(
                   message: l10n.settingsProjectDelete,
                   child: IconButton(
-                    key: Key(
-                      'settings.project.${widget.workspace.id}.delete',
-                    ),
+                    key: Key('settings.project.${widget.workspace.id}.delete'),
                     icon: const Icon(Icons.delete_outline, size: 20),
                     onPressed: () => _notifier.delete(widget.workspace.id),
                   ),
@@ -202,6 +209,9 @@ class _ProjectCardState extends ConsumerState<_ProjectCard> {
               color: ShellxDesktopColors.textSecondary,
             ),
           ),
+          // V2-3 D22: the project's tools.
+          const SizedBox(height: 8),
+          ToolProjectList(workspaceId: widget.workspace.id),
         ],
       ),
     );
