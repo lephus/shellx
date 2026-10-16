@@ -4,7 +4,6 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shellx_acp/shellx_acp.dart';
 import 'package:shellx_ai/remote.dart';
-import 'package:shellx_ai/shellx_ai.dart';
 import 'package:shellx_core/shellx_core.dart' show InMemoryKeyValueStore;
 import 'package:shellx_mobile/core/core.dart' hide test;
 import 'package:shellx_mobile/features/ai/domain/ai_drafts.dart';
