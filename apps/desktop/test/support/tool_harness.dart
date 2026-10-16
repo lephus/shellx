@@ -13,6 +13,7 @@ import 'package:shellx_desktop/src/tools/tool_registry.dart';
 import 'config_workspace.dart';
 import 'fake_browser_engine.dart';
 import 'fakes.dart';
+import 'memory_config_fs.dart';
 
 /// V2-3: scans that find [ports] (pid → ports) and [table].
 final class FakeToolProbe implements PortProbe, ProcessTableProbe {
@@ -57,6 +58,9 @@ final class ToolRig {
 
   late ProviderContainer container;
 
+  /// The configuration files (A9): a test writes one and reloads.
+  late MemoryConfigFs fs;
+
   List<Override> get overrides => [
     toolEngineFactoryProvider.overrideWithValue((tool, presenter) {
       made++;
@@ -75,14 +79,21 @@ final class ToolRig {
     ),
   ];
 
-  Future<void> pump(WidgetTester tester, {String config = ''}) async {
+  /// The workspace with one tab; [extra] goes with the rig's overrides (an
+  /// AI tab's runtimes, say).
+  Future<void> pump(
+    WidgetTester tester, {
+    String config = '',
+    List<Override> extra = const [],
+  }) async {
     final r = await pumpConfiguredWorkspace(
       tester,
       config: config,
       harness: harness,
-      extra: overrides,
+      extra: [...overrides, ...extra],
     );
     container = r.container;
+    fs = r.fs;
   }
 
   ToolEntry add(String ws, String url, {String name = ''}) => container
