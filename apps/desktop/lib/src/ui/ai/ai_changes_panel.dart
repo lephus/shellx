@@ -6,6 +6,7 @@ import 'package:shellx_ai/remote.dart' show AiTurns, aiTurnsOf, aiUndoOffOf;
 import 'package:shellx_ai/shellx_ai.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../ai/ai_undo.dart';
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_diff_overlay.dart';
 import 'ai_notice_card.dart' show aiUndoReason;
@@ -80,7 +81,9 @@ Future<AiRevertChoice?> showAiRevertDialog(
 /// "Revert turn" [turn], "Revert session" ([turn] null), or one file
 /// ([only]), §4.4: the files changed since the restore point go back. Files
 /// changed after the turn ended ask first (B14). Refused while a turn runs.
-/// The result shows at the foot of the Changes panel, which opens.
+/// The result shows at the foot of the Changes panel, which opens. What goes
+/// back is worked out by [AiUndo] (V2-2b B19), which a phone's revert uses
+/// too.
 Future<void> aiRevert(
   BuildContext context,
   AiRuntime runtime,
@@ -90,70 +93,45 @@ Future<void> aiRevert(
 }) async {
   final l10n = AppLocalizations.of(context);
   ui.openPanel();
-  if (runtime.state.turn != null) {
-    ui.note.value = l10n.aiRevertBusy;
-    return;
-  }
-  final last = turn ?? aiTurnsOf(runtime.state).lastFinished;
-  final changes = turn == null
-      ? await runtime.sessionChanges()
-      : await runtime.changesSince(turn);
+  final undo = AiUndo(runtime);
+  final planned = await undo.plan(turn: turn, only: only);
   // Every wait below can outlive the panel or the tab (closed while git
   // works): its notifiers are disposed then, and nobody reads a note.
   if (!context.mounted) return;
-  if (changes == null) {
-    // git did not answer: said, never a silent nothing.
-    ui.note.value = l10n.aiRevertFailed;
-    return;
+  final AiUndoPlan plan;
+  switch (planned) {
+    case AiUndoBusy():
+      ui.note.value = l10n.aiRevertBusy;
+      return;
+    case AiUndoFailed():
+      // git did not answer: said, never a silent nothing.
+      ui.note.value = l10n.aiRevertFailed;
+      return;
+    case AiUndoNothing():
+      // Nothing of it is changed any more (put back by hand): the panel
+      // looks again, so the row it still shows goes.
+      ui.changesChanged();
+      return;
+    case final AiUndoPlan p:
+      plan = p;
   }
-  var paths = [
-    for (final c in changes)
-      if (only == null || c.path == only) c.path,
-  ];
-  if (paths.isEmpty) {
-    // Nothing of it is changed any more (put back by hand): the panel
-    // looks again, so the row it still shows goes.
-    ui.changesChanged();
-    return;
-  }
-  // A turn that ended without its end tree (the agent died, "Dừng hẳn")
-  // cannot say what changed after it: any file may have, so every file asks.
-  final known = last == null
-      ? const <String>{}
-      : await runtime.changedAfterTurn(last);
-  if (!context.mounted) return;
-  final after = known ?? paths.toSet();
-  final touched = [
-    for (final path in paths)
-      if (after.contains(path)) path,
-  ];
+  var keepTouched = false;
+  final touched = plan.touched;
   if (touched.isNotEmpty) {
     final choice = await showAiRevertDialog(
       context,
       touched: touched,
-      someUnchanged: touched.length < paths.length,
+      someUnchanged: plan.someClean,
     );
     if (choice == null || !context.mounted) return;
-    if (choice == AiRevertChoice.onlyUnchanged) {
-      paths = [
-        for (final path in paths)
-          if (!after.contains(path)) path,
-      ];
-    }
+    keepTouched = choice == AiRevertChoice.onlyUnchanged;
   }
-  var ok = false;
-  try {
-    ok = turn == null
-        ? await runtime.revertSession(paths)
-        : await runtime.revert(turn, paths);
-  } on Object catch (error) {
-    debugPrint('ShellX: revert failed: ${error.runtimeType}');
-  }
+  final done = await undo.apply(plan, keepTouched: keepTouched);
   if (!context.mounted) return;
-  ui.note.value = ok
-      ? l10n.aiReverted(paths.length)
+  ui.note.value = done.ok
+      ? l10n.aiReverted(done.count)
       // A turn started while the dialog was open: that is the reason.
-      : runtime.state.turn != null
+      : done.busy
       ? l10n.aiRevertBusy
       : l10n.aiRevertFailed;
   ui.changesChanged();
