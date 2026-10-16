@@ -401,8 +401,11 @@ class _ToolPageHostState extends ConsumerState<_ToolPageHost> {
                 kind: kind,
                 tool: page.tool,
                 onReload: () => unawaited(page.reload()),
+                // R18: the URL that failed, not the page left behind.
                 onBrowser: () => unawaited(
-                  ToolActions(ref).openInBrowser(page.tool, url: s.url),
+                  ToolActions(
+                    ref,
+                  ).openInBrowser(page.tool, url: page.recoveryUrl),
                 ),
               ),
             if (s.download case final url?)

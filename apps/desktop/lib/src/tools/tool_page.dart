@@ -61,6 +61,7 @@ final class ToolPageState {
     this.error,
     this.download,
     this.started = false,
+    this.asked = false,
   });
 
   /// The page's address now (null before the first load).
@@ -77,8 +78,16 @@ final class ToolPageState {
   /// The page was asked to load at least once (lazy, D14).
   final bool started;
 
+  /// A D23 edit or D9 "Back to tool" asked for the tool's URL in place of
+  /// the page shown, and it has not loaded yet (pending, or failed): the
+  /// address the engine still reports is the page left behind (R18).
+  final bool asked;
+
   /// D9 "On {host}": the page left the tool's origin (an SSO round trip).
+  /// Never while the tool's URL is [asked] for: the page is about that URL
+  /// then, not about the address left behind.
   bool awayFrom(ToolEntry tool) {
+    if (asked) return false;
     final u = url;
     if (u == null || (u.scheme != 'http' && u.scheme != 'https')) return false;
     final t = tool.uri;
@@ -92,6 +101,7 @@ final class ToolPageState {
     Object? error = _keep,
     Object? download = _keep,
     bool? started,
+    bool? asked,
   }) => ToolPageState(
     url: identical(url, _keep) ? this.url : url as Uri?,
     loading: loading ?? this.loading,
@@ -101,6 +111,7 @@ final class ToolPageState {
         : error as BrowserLoadErrorKind?,
     download: identical(download, _keep) ? this.download : download as Uri?,
     started: started ?? this.started,
+    asked: asked ?? this.asked,
   );
 
   @override
@@ -214,10 +225,11 @@ final class ToolPage extends ChangeNotifier {
 
   Future<void> back() => engine.goBack();
 
-  /// D9 "Back to tool": a URL the app newly asks for ([_startOver]).
+  /// D9 "Back to tool": a URL the app newly asks for ([_startOver]), in
+  /// place of the page shown ([ToolPageState.asked]).
   Future<void> backToTool() {
     _startOver();
-    return _load(_tool.uri);
+    return _load(_tool.uri, asked: true);
   }
 
   /// D23: the tool was edited. A new URL loads at once (if the page had
@@ -228,7 +240,7 @@ final class ToolPage extends ChangeNotifier {
     _tool = next;
     if (moved && _state.started) {
       _startOver();
-      unawaited(_load(next.uri));
+      unawaited(_load(next.uri, asked: true));
     } else {
       notifyListeners();
     }
@@ -247,6 +259,10 @@ final class ToolPage extends ChangeNotifier {
 
   void dismissDownload() => _set(_state.copyWith(download: null));
 
+  /// R18: the URL a failure is about — what the error panels open in the
+  /// browser and what every recovery loads ([_recoveryUrl]).
+  Uri get recoveryUrl => _recoveryUrl;
+
   /// What a recovery loads (a D13 retry, the R9 knock, the crash reload,
   /// the panels' "Reload"): the URL that failed. Until a load the app asked
   /// for finishes, that is its URL — the new one after an edit (D23), the
@@ -258,7 +274,10 @@ final class ToolPage extends ChangeNotifier {
     return _state.url ?? target ?? _tool.uri;
   }
 
-  Future<void> _load(Uri url) async {
+  /// [asked]: the tool's URL in place of the page shown (an edit, "Back to
+  /// tool"); a recovery or the first load keeps what [ToolPageState.asked]
+  /// says until a load finishes.
+  Future<void> _load(Uri url, {bool asked = false}) async {
     _target = url;
     _loadPending = true;
     _stopRetrying();
@@ -268,6 +287,7 @@ final class ToolPage extends ChangeNotifier {
         loading: true,
         error: null,
         download: null,
+        asked: asked ? true : null,
       ),
     );
     await engine.load(url);
@@ -281,7 +301,7 @@ final class ToolPage extends ChangeNotifier {
         _attempt = 0;
         _loadPending = false;
         _stopRetrying();
-        _set(_state.copyWith(loading: false, error: null));
+        _set(_state.copyWith(loading: false, error: null, asked: false));
       case UrlChanged(:final url):
         _set(_state.copyWith(url: url));
       case HistoryChanged(:final canGoBack):
