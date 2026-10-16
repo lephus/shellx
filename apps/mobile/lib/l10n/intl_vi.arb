@@ -416,5 +416,6 @@
   "toolReconnecting": "Đang kết nối lại…",
   "toolResponseTooLarge": "Phản hồi của tool quá lớn.",
   "toolDialogTitle": "{name} nhắn",
-  "toolClearDataPhoneConfirm": "Đăng xuất mọi tool và xóa cookie, bộ nhớ của chúng?"
+  "toolClearDataPhoneConfirm": "Đăng xuất mọi tool và xóa cookie, bộ nhớ của chúng?",
+  "toolNoPortPhone": "Điện thoại không mở được cổng cục bộ cho tool."
 }

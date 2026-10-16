@@ -6,6 +6,7 @@ import 'package:shellx_mobile/core/core.dart' hide test;
 import 'package:shellx_mobile/features/tools/domain/tool_navigation.dart';
 import 'package:shellx_mobile/features/tools/presentation/controllers/tool_page_controller.dart';
 import 'package:shellx_mobile/features/tools/presentation/tool_web_engine.dart';
+import 'package:shellx_mobile/shared/shared.dart';
 
 import '../../support/app_harness.dart';
 import '../../support/fake_links.dart';
@@ -126,6 +127,20 @@ void main() {
       await tester.pump();
       expect(find.text(text), findsOneWidget, reason: phase.name);
     }
+  });
+
+  // S2: this phone could hold no port on every loopback address it has; tried again by itself, like refused.
+  testWidgets('no port on the phone (S2): its own text over the page, with the spinner', (tester) async {
+    await open(tester);
+    page().setPhase(ToolPhase.noPort);
+    await tester.pump();
+    final cover = find.byKey(const Key('tool.noPort'));
+    expect(cover, findsOneWidget);
+    expect(
+      find.descendant(of: cover, matching: find.text('Điện thoại không mở được cổng cục bộ cho tool.')),
+      findsOneWidget,
+    );
+    expect(find.descendant(of: cover, matching: find.byType(AppCircularProgress)), findsOneWidget);
   });
 
   testWidgets('a lost channel keeps the page under "Đang kết nối lại…"; another port says so (E3)', (tester) async {
@@ -424,6 +439,7 @@ void main() {
     ToolPhase.opening,
     ToolPhase.busy,
     ToolPhase.refused,
+    ToolPhase.noPort,
     ToolPhase.disabled,
     ToolPhase.gone,
     ToolPhase.unavailable,

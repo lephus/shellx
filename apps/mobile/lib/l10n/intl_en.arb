@@ -659,5 +659,7 @@
   "toolResponseTooLarge": "The tool's response is too large.",
   "toolDialogTitle": "{name} says",
   "@toolDialogTitle": {"placeholders": {"name": {"type": "String"}}},
-  "toolClearDataPhoneConfirm": "Sign every tool out and clear its cookies and storage?"
+  "toolClearDataPhoneConfirm": "Sign every tool out and clear its cookies and storage?",
+  "toolNoPortPhone": "This phone couldn't open a local port for the tool.",
+  "@toolNoPortPhone": {"description": "The tool page's cover when this phone cannot hold a port for the tool on every loopback address it has; tried again by itself."}
 }

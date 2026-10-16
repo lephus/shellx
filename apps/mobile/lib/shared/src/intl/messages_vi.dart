@@ -778,6 +778,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "toolNoDownloads": MessageLookupByLibrary.simpleMessage(
       "Tải tệp chưa làm được trên điện thoại.",
     ),
+    "toolNoPortPhone": MessageLookupByLibrary.simpleMessage(
+      "Điện thoại không mở được cổng cục bộ cho tool.",
+    ),
     "toolOpenExternal": m65,
     "toolOtherPort": m66,
     "toolReconnecting": MessageLookupByLibrary.simpleMessage(

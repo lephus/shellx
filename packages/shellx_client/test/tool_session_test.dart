@@ -68,11 +68,12 @@ List<String> _policies(List<String> head) => [
 ];
 
 /// A stand-in for the computer, for the answers the real proxy gives only
-/// in rare cases: it serves the page's tool on [port] and answers each
-/// request at once with what [script] gives. It takes no body (never
-/// acknowledges), so an upload stays within the windows.
+/// in rare cases: it serves the page's tool on [port] (and the other tools
+/// of its workspace, [siblings]) and answers each request at once with what
+/// [script] gives. It takes no body (never acknowledges), so an upload stays
+/// within the windows.
 final class _Desktop {
-  _Desktop(this.port, this.script) {
+  _Desktop(this.port, this.script, {this.siblings = const {}}) {
     tools = MachineTools(
       send: _fromPhone,
       connect: () async {},
@@ -82,6 +83,10 @@ final class _Desktop {
 
   final int port;
   final List<ToolMessage> Function(ToolRequest request) script;
+
+  /// The ports of the workspace's other tools (E4), by id.
+  final Map<String, int> siblings;
+
   late final MachineTools tools;
   final requests = <ToolRequest>[];
 
@@ -102,6 +107,8 @@ final class _Desktop {
               'v': 1,
               'tools': [
                 {'id': tool, 'port': port, 'path': '/'},
+                for (final MapEntry(key: id, value: at) in siblings.entries)
+                  {'id': id, 'port': at, 'path': '/'},
               ],
             };
             replies = [
@@ -200,6 +207,53 @@ List<ToolMessage> _script(ToolRequest request) {
     '/hold' => const [],
     _ => [ToolResponse(id: id, status: 204, head: const [], end: true)],
   };
+}
+
+/// S2: the phone's loopback interface as an injected list gives it.
+final class _Loopback implements NetworkInterface {
+  _Loopback(this.addresses);
+
+  @override
+  final List<InternetAddress> addresses;
+
+  @override
+  String get name => 'lo';
+
+  @override
+  int get index => 1;
+}
+
+/// S2: an interface list whose loopback holds [addresses].
+ToolInterfaces _listing(List<InternetAddress> addresses) =>
+    () async => [_Loopback(addresses)];
+
+/// One bind the phone asked for.
+typedef _Ask = ({InternetAddress address, int port, bool v6Only});
+
+/// S2's injected binder: a real [HttpServer.bind], unless [refuse] says
+/// another app holds that address and port (then a [SocketException], as a
+/// held port gives). It keeps every bind asked, in order, and every port it
+/// gave on 127.0.0.1.
+final class _Binder {
+  _Binder({this.refuse});
+
+  final bool Function(InternetAddress address, int port)? refuse;
+  final asked = <_Ask>[];
+  final given = <int>[];
+
+  Future<HttpServer> bind(
+    InternetAddress address,
+    int port, {
+    required bool v6Only,
+  }) async {
+    asked.add((address: address, port: port, v6Only: v6Only));
+    if (refuse?.call(address, port) ?? false) {
+      throw const SocketException('held by another app');
+    }
+    final server = await HttpServer.bind(address, port, v6Only: v6Only);
+    if (address == InternetAddress.loopbackIPv4) given.add(server.port);
+    return server;
+  }
 }
 
 /// V2-4 E2, E3, E4, E11, E13, §8: the phone's loopback server for one open
@@ -673,13 +727,20 @@ void main() {
   /// reaches another app listening on a localhost port (RF 5).
   group('the page\'s Content-Security-Policy (CSP ruling)', () {
     test('the policy: every served port ascending, http and ws; deduplicated; '
-        'never upgrade-insecure-requests', () {
+        'forms only to the served ports (S1); never '
+        'upgrade-insecure-requests', () {
+      final policy = toolContentSecurityPolicy([8000, 5173]);
       expect(
-        toolContentSecurityPolicy([8000, 5173]),
+        policy,
         "default-src 'self' http://localhost:5173 ws://localhost:5173 "
         'http://localhost:8000 ws://localhost:8000 https: wss: data: blob: '
         "'unsafe-inline' 'unsafe-eval'; form-action 'self' "
-        'http://localhost:5173 http://localhost:8000 https:',
+        'http://localhost:5173 http://localhost:8000',
+      );
+      expect(
+        policy.split('form-action').last,
+        isNot(contains('https:')),
+        reason: 'S1: a form never posts to a remote site',
       );
       expect(
         toolContentSecurityPolicy([5173, 8000, 5173]),
@@ -688,7 +749,7 @@ void main() {
       expect(
         toolContentSecurityPolicy(const []),
         "default-src 'self' https: wss: data: blob: 'unsafe-inline' "
-        "'unsafe-eval'; form-action 'self' https:",
+        "'unsafe-eval'; form-action 'self'",
       );
       expect(
         toolContentSecurityPolicy([8000, 5173]),
@@ -835,7 +896,7 @@ void main() {
           "default-src 'self' http://localhost:$lo ws://localhost:$lo "
           'http://localhost:$hi ws://localhost:$hi https: wss: data: blob: '
           "'unsafe-inline' 'unsafe-eval'; form-action 'self' "
-          'http://localhost:$lo http://localhost:$hi https:';
+          'http://localhost:$lo http://localhost:$hi';
       final page = await webview.enter(events.whereType<ToolLoad>().single.url);
       expect(page.headers['content-security-policy'], [policy]);
       final fromApi = await webview.request(at('/v1', port: api.port));
@@ -1121,6 +1182,246 @@ void main() {
         throwsA(isA<SocketException>()),
       );
       expect(api.hits, isEmpty);
+    });
+  });
+
+  /// Top-level ruling S2: an app holding [::1]'s ports must never make the
+  /// phone serve 127.0.0.1 alone (it would then get `localhost` requests,
+  /// with the gate cookie, on [::1]). A port is served on 127.0.0.1 alone
+  /// only when the phone's interface list shows no ::1; otherwise only when
+  /// it is held on 127.0.0.1 and [::1]. The list and the binder are
+  /// injected; the binder binds for real unless it refuses.
+  group('127.0.0.1 alone only when the phone lists no ::1 (S2)', () {
+    final v4 = InternetAddress.loopbackIPv4;
+    final v6 = InternetAddress.loopbackIPv6;
+
+    /// A page of the stand-in computer's tool on [port] (with [siblings]),
+    /// its interface list and binds injected; started, closed after the
+    /// test. Nothing is tried again within a test unless [retry] says so.
+    Future<({ToolSession page, List<ToolLoad> loads})> start(
+      _Binder binder, {
+      required int port,
+      required ToolInterfaces interfaces,
+      Map<String, int> siblings = const {},
+      List<Duration> retry = const [Duration(hours: 1)],
+    }) async {
+      final desktop = _Desktop(port, _script, siblings: siblings);
+      final page = ToolSession(
+        tool: _id,
+        port: port,
+        path: '/',
+        link: desktop.tools,
+        retryDelays: retry,
+        interfaces: interfaces,
+        bind: binder.bind,
+      );
+      addTearDown(page.close);
+      final loads = <ToolLoad>[];
+      page.events.listen((event) {
+        if (event is ToolLoad) loads.add(event);
+      });
+      page.start();
+      await until(() => page.phase != ToolPhase.opening);
+      return (page: page, loads: loads);
+    }
+
+    /// Nothing is served, and never was on 127.0.0.1 alone: each pair asked
+    /// 127.0.0.1 first, then [::1] (v6Only) on the port 127.0.0.1 gave, and
+    /// was refused there — the tool's port [p], then an ephemeral one 16
+    /// times (E3) — and nothing bound stays bound.
+    Future<void> expectNoPort(ToolSession page, _Binder binder, int p) async {
+      expect(page.servedPort, isNull, reason: 'never 127.0.0.1 alone');
+      expect(page.origins, isEmpty);
+      expect(page.phase, ToolPhase.noPort);
+      expect(binder.given, hasLength(1 + 16));
+      expect(binder.asked, [
+        for (final (i, given) in binder.given.indexed) ...[
+          (address: v4, port: i == 0 ? p : 0, v6Only: false),
+          (address: v6, port: given, v6Only: true),
+        ],
+      ]);
+      for (final port in binder.given) {
+        await expectLater(
+          Socket.connect(v4, port),
+          throwsA(isA<SocketException>()),
+          reason: 'nothing stays bound on 127.0.0.1:$port',
+        );
+      }
+    }
+
+    test('::1 listed and every bind of it refused: never 127.0.0.1 alone; an '
+        'alias is tried, then nothing is served (no port)', () async {
+      final p = await freeLoopbackPort();
+      final binder = _Binder(refuse: (address, _) => address == v6);
+      final (:page, :loads) = await start(
+        binder,
+        port: p,
+        interfaces: _listing([v4, v6]),
+      );
+      await expectNoPort(page, binder, p);
+      expect(loads, isEmpty);
+    });
+
+    test('an interface list that cannot be read counts as listing ::1 '
+        '(R-C3-2): with its binds refused, nothing is served', () async {
+      final p = await freeLoopbackPort();
+      final binder = _Binder(refuse: (address, _) => address == v6);
+      final (:page, :loads) = await start(
+        binder,
+        port: p,
+        interfaces: () async => throw const SocketException('no list'),
+      );
+      await expectNoPort(page, binder, p);
+      expect(loads, isEmpty);
+    });
+
+    test('no ::1 listed: 127.0.0.1 alone, on the tool\'s own port; [::1] is '
+        'never asked for', () async {
+      final p = await freeLoopbackPort();
+      final binder = _Binder();
+      final (:page, :loads) = await start(
+        binder,
+        port: p,
+        interfaces: _listing([v4]),
+      );
+      expect(binder.asked, [(address: v4, port: p, v6Only: false)]);
+      expect(page.phase, ToolPhase.ready);
+      expect(page.servedPort, p);
+      expect(page.alias, isNull);
+      final view = Webview();
+      addTearDown(view.close);
+      expect((await view.request(loads.single.url)).status, 303);
+    });
+
+    test('::1 listed and both bind: the tool\'s own port on 127.0.0.1 and '
+        '[::1] (same-port mode, E2), with E11\'s settings', () async {
+      final p = await freeLoopbackPort();
+      final binder = _Binder();
+      final (:page, loads: _) = await start(
+        binder,
+        port: p,
+        interfaces: _listing([v4, v6]),
+      );
+      expect(binder.asked, [
+        (address: v4, port: p, v6Only: false),
+        (address: v6, port: p, v6Only: true),
+      ]);
+      expect(page.phase, ToolPhase.ready);
+      expect(page.servedPort, p);
+      expect(page.alias, isNull);
+      for (final address in [v4, v6]) {
+        final head = await _rawHead(p, [
+          'GET / HTTP/1.1',
+          'host: localhost:$p',
+        ], address: address);
+        expect(head.first, startsWith('HTTP/1.1 403'), reason: address.address);
+        final names = [
+          for (final line in head.skip(1))
+            line.substring(0, line.indexOf(':')).toLowerCase(),
+        ];
+        for (final name in ['x-frame-options', 'x-content-type-options']) {
+          expect(names, isNot(contains(name)), reason: address.address);
+        }
+      }
+    });
+
+    test('::1 listed and the tool\'s port held there only: an alias P′ held '
+        'on 127.0.0.1 and [::1], named by the policy (E3); nothing stays on '
+        'P', () async {
+      final p = await freeLoopbackPort();
+      final binder = _Binder(
+        refuse: (address, port) => address == v6 && port == p,
+      );
+      final (:page, :loads) = await start(
+        binder,
+        port: p,
+        interfaces: _listing([v4, v6]),
+      );
+      expect(page.phase, ToolPhase.ready);
+      final alias = page.alias!;
+      expect(alias, isNot(p));
+      expect(page.servedPort, alias);
+      expect(binder.asked, [
+        (address: v4, port: p, v6Only: false),
+        (address: v6, port: p, v6Only: true),
+        (address: v4, port: 0, v6Only: false),
+        (address: v6, port: alias, v6Only: true),
+      ]);
+      for (final address in [v4, v6]) {
+        final head = await _rawHead(alias, [
+          'GET / HTTP/1.1',
+          'host: localhost:$alias',
+        ], address: address);
+        expect(head.first, startsWith('HTTP/1.1 403'), reason: address.address);
+      }
+      final view = Webview();
+      addTearDown(view.close);
+      final entry = await view.request(loads.single.url);
+      expect(entry.status, 303);
+      expect(entry.headers['content-security-policy'], [
+        toolContentSecurityPolicy([alias]),
+      ]);
+      await expectLater(
+        Socket.connect(v4, p),
+        throwsA(isA<SocketException>()),
+        reason: 'nothing stays bound on 127.0.0.1:P',
+      );
+    });
+
+    test('a sibling whose port is held on [::1] is not served, takes no '
+        'alias, and nothing stays bound for it (E4, R5)', () async {
+      final p = await freeLoopbackPort();
+      var s = await freeLoopbackPort();
+      while (s == p) {
+        s = await freeLoopbackPort();
+      }
+      final binder = _Binder(
+        refuse: (address, port) => address == v6 && port == s,
+      );
+      final (:page, loads: _) = await start(
+        binder,
+        port: p,
+        siblings: {'api0000001': s},
+        interfaces: _listing([v4, v6]),
+      );
+      expect(page.phase, ToolPhase.ready);
+      expect(page.origins, {'http://localhost:$p'});
+      expect(binder.asked, [
+        (address: v4, port: p, v6Only: false),
+        (address: v6, port: p, v6Only: true),
+        (address: v4, port: s, v6Only: false),
+        (address: v6, port: s, v6Only: true),
+      ]);
+      await expectLater(
+        Socket.connect(v4, s),
+        throwsA(isA<SocketException>()),
+        reason: 'nothing stays bound on 127.0.0.1 for the sibling',
+      );
+    });
+
+    test('no port is tried again by itself, with refused\'s growing delays, '
+        'and served once both addresses bind (R-C3-1)', () async {
+      final p = await freeLoopbackPort();
+      var held = true;
+      final binder = _Binder(refuse: (address, _) => held && address == v6);
+      final (:page, :loads) = await start(
+        binder,
+        port: p,
+        interfaces: _listing([v4, v6]),
+        retry: const [Duration(milliseconds: 50), Duration(seconds: 1)],
+      );
+      int tries() => binder.asked
+          .where((ask) => ask.address == v4 && ask.port == p)
+          .length;
+      expect(page.phase, ToolPhase.noPort);
+      await until(() => tries() == 2); // after the first delay
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(tries(), 2, reason: 'the next try waits the second delay');
+      held = false;
+      await until(() => loads.isNotEmpty);
+      expect(page.phase, ToolPhase.ready);
+      expect(page.servedPort, p);
+      expect(tries(), 3);
     });
   });
 

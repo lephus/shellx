@@ -3710,6 +3710,17 @@ class S {
       args: [],
     );
   }
+
+  /// `This phone couldn't open a local port for the tool.`
+  String get toolNoPortPhone {
+    return Intl.message(
+      'This phone couldn\'t open a local port for the tool.',
+      name: 'toolNoPortPhone',
+      desc:
+          'The tool page\'s cover when this phone cannot hold a port for the tool on every loopback address it has; tried again by itself.',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {
