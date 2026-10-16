@@ -1389,6 +1389,8 @@
   "aiRevertBusy": "Wait for the running turn to finish.",
   "aiReverted": "{count, plural, =1{Reverted 1 file.} other{Reverted {count} files.}}",
   "@aiReverted": {"placeholders": {"count": {"type": "int"}}},
+  "aiRevertedFromPhone": "{count, plural, =1{Reverted 1 file (from your phone).} other{Reverted {count} files (from your phone).}}",
+  "@aiRevertedFromPhone": {"placeholders": {"count": {"type": "int"}}},
   "aiRevertFailed": "The revert did not work.",
   "aiVsTurnStart": "compared with the start of the turn",
   "aiVsSessionStart": "compared with the start of the session",

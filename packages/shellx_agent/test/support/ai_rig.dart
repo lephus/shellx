@@ -111,6 +111,42 @@ final class FakeAiControl implements AiControl {
     state.resolveAsk(id, response);
   }
 
+  /// V2-2b B19: what [changes] answers (null: it cannot read them) and the
+  /// turns asked; what [diff] answers (null: `refused`) and what was asked;
+  /// what [revert] does — [revertRefusal] thrown, else [reverted] files —
+  /// and how it was asked.
+  AiChangesView? changesView;
+  final changesAsked = <int?>[];
+  Map<String, Object?>? diffBody;
+  final diffs = <(int?, String)>[];
+  AiRefused? revertRefusal;
+  var reverted = 0;
+  final reverts = <(int?, String?)>[];
+
+  @override
+  Future<AiChangesView> changes({int? turn}) async {
+    changesAsked.add(turn);
+    final view = changesView;
+    if (view == null) throw const AiRefused('refused');
+    return view;
+  }
+
+  @override
+  Future<Map<String, Object?>> diff({int? turn, required String path}) async {
+    diffs.add((turn, path));
+    final body = diffBody;
+    if (body == null) throw const AiRefused('refused');
+    return body;
+  }
+
+  @override
+  Future<int> revert({int? turn, String? keep}) async {
+    reverts.add((turn, keep));
+    final refusal = revertRefusal;
+    if (refusal != null) throw refusal;
+    return reverted;
+  }
+
   /// V2-2b B11: the choices set, in order.
   final configs = <(String, Object)>[];
   final modes = <String>[];

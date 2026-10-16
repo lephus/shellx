@@ -89,6 +89,24 @@ abstract interface class AiControl {
   /// Throws [AiRefused] for an answer the window takes only on the computer.
   void answerAsk(int id, ElicitationResponse response);
 
+  /// V2-2b B19: the files changed since [turn] began (null: since the
+  /// session's first turn), as the window's Changes panel shows them, read
+  /// now. [AiRefused] `refused` when they cannot be read.
+  Future<AiChangesView> changes({int? turn});
+
+  /// V2-2b B19: the diff of [path] — one of [changes]' files now, else
+  /// [AiRefused] `refused` — as an `ai.diff` body: its changed region, or
+  /// `{"binary": true}` / `{"missing": true}`; [AiRefused] `too_big` for a
+  /// file over 1 MiB, `undo_off` without a restore point.
+  Future<Map<String, Object?>> diff({int? turn, required String path});
+
+  /// V2-2b B19: puts the files changed since [turn] began back, worked out
+  /// again now; the number of files put back. [AiRefused] `busy_turn` while
+  /// a turn runs, `undo_off` without a restore point, `confirm` (body:
+  /// `encodeRevertConfirm`) when files changed after the turn and [keep] is
+  /// null; [keep] `clean` leaves those files, `all` puts them back too.
+  Future<int> revert({int? turn, String? keep});
+
   /// V2-2b B11: sets option [id] to [value] (a choice's value, or a bool for
   /// a switch) as the computer's chip does: sent to the agent, then
   /// remembered for its next sessions. The hub checked it against what the
@@ -473,6 +491,8 @@ final class AiPhoneHub implements AiEndpoint {
     AiFeature.folder,
     AiFeature.blob,
     AiFeature.files,
+    AiFeature.changes,
+    AiFeature.revert,
   };
 
   /// What this hub's listings name ([offered]; a test may say otherwise).
@@ -587,8 +607,8 @@ final class AiPhoneHub implements AiEndpoint {
         });
       case AiOpen():
         unawaited(_open(mobileId, phone, message));
-      // V2-2b requests answer `refused` until the task of their feature
-      // replaces their two lines here with the request's handler.
+      // V2-2b requests (B1, B4): each has its handler, its feature named in
+      // [offered].
       case AiConfigGet(:final sid, :final rid):
         _configGet(mobileId, phone, sid, rid);
       case AiConfigSet():
@@ -603,12 +623,12 @@ final class AiPhoneHub implements AiEndpoint {
         _history(mobileId, phone, message);
       case AiFolder():
         unawaited(_folder(mobileId, phone, message));
-      case AiChanges(:final rid):
-        _refuse(mobileId, rid);
-      case AiDiff(:final rid):
-        _refuse(mobileId, rid);
-      case AiRevert(:final rid):
-        _refuse(mobileId, rid);
+      case AiChanges():
+        _phoneChanges(mobileId, phone, message);
+      case AiDiff():
+        _phoneDiff(mobileId, phone, message);
+      case AiRevert():
+        _phoneRevert(mobileId, phone, message);
       case AiRaw(:final rid):
         // A newer phone's request (V2-2b B2) gets its one answer too.
         if (rid != null) _refuse(mobileId, rid);

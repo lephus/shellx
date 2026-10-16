@@ -42,6 +42,17 @@ final class _Control implements AiControl {
   @override
   void answerAsk(int id, ElicitationResponse response) {}
 
+  // V2-2b B19: not what these tests are about.
+  @override
+  Future<AiChangesView> changes({int? turn}) async =>
+      throw const AiRefused('refused');
+  @override
+  Future<Map<String, Object?>> diff({int? turn, required String path}) async =>
+      throw const AiRefused('refused');
+  @override
+  Future<int> revert({int? turn, String? keep}) async =>
+      throw const AiRefused('refused');
+
   @override
   Future<List<String>> files(String query) async => const [];
 

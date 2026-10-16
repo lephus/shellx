@@ -5598,6 +5598,12 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{Reverted 1 file.} other{Reverted {count} files.}}'**
   String aiReverted(int count);
 
+  /// No description provided for @aiRevertedFromPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Reverted 1 file (from your phone).} other{Reverted {count} files (from your phone).}}'**
+  String aiRevertedFromPhone(int count);
+
   /// No description provided for @aiRevertFailed.
   ///
   /// In en, this message translates to:

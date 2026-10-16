@@ -917,6 +917,7 @@
   "aiRevertAll": "Hoàn tác tất cả",
   "aiRevertBusy": "Đợi lượt đang chạy xong.",
   "aiReverted": "Đã hoàn tác {count} tệp.",
+  "aiRevertedFromPhone": "Đã hoàn tác {count} tệp (từ điện thoại).",
   "aiRevertFailed": "Hoàn tác không thành công.",
   "aiVsTurnStart": "so với đầu lượt",
   "aiVsSessionStart": "so với đầu phiên",

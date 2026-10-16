@@ -3487,6 +3487,11 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String aiRevertedFromPhone(int count) {
+    return 'Đã hoàn tác $count tệp (từ điện thoại).';
+  }
+
+  @override
   String get aiRevertFailed => 'Hoàn tác không thành công.';
 
   @override

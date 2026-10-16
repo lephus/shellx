@@ -192,7 +192,7 @@ Map<String, Object?> _tool(ToolItem t, {int scale = 1}) {
     if (diffs.isNotEmpty)
       'diffs': [
         for (final d in diffs.take(kAiMaxDiffs))
-          _diff(d, kAiDiffSideBytes ~/ scale),
+          aiDiffRegion(d, kAiDiffSideBytes ~/ scale),
       ],
     if (diffs.length > kAiMaxDiffs) 'more_diffs': diffs.length - kAiMaxDiffs,
     'input': ?inputText,
@@ -214,8 +214,10 @@ Map<String, Object?> _output(String text, int side) {
 
 /// The changed region of [d] with [kAiDiffContext] lines around it: the
 /// lines both sides share at the start and at the end are dropped (V2-2
-/// D6). A new file keeps its first lines.
-Map<String, Object?> _diff(ToolDiff d, int side) {
+/// D6). A new file keeps its first lines. Each side is cut to [side] bytes
+/// of UTF-8 (`cut` says so). Public since V2-2b (B19): the phone's diff page
+/// gets one file's region this way ([aiTextDiffRegion]).
+Map<String, Object?> aiDiffRegion(ToolDiff d, int side) {
   final newLines = const LineSplitter().convert(d.newText);
   final path = clipText(d.path, 600);
   final old = d.oldText;
@@ -264,6 +266,18 @@ Map<String, Object?> _diff(ToolDiff d, int side) {
       'cut': true,
   };
 }
+
+/// V2-2b B19: [aiDiffRegion] of one file's two texts: [oldText] null for a
+/// file that was not there (a new file).
+Map<String, Object?> aiTextDiffRegion({
+  required String path,
+  String? oldText,
+  required String newText,
+  required int side,
+}) => aiDiffRegion(
+  ToolDiff(path: path, oldText: oldText, newText: newText),
+  side,
+);
 
 Map<String, Object?> _ask(AskItem a) {
   final response = a.response;
