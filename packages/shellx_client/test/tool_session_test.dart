@@ -47,6 +47,35 @@ Future<List<String>> _rawHead(
   return (end < 0 ? text : text.substring(0, end)).split('\r\n');
 }
 
+/// Sends [lines] (one HTTP/1.1 request) on a raw socket to 127.0.0.1:[port]
+/// and gives up on the answer once [after] bytes of it arrived: the socket is
+/// dropped mid-body, as a webview drops a download when its page is left or
+/// reloaded. The bytes read.
+Future<int> _abandon(
+  int port,
+  List<String> lines, {
+  int after = 64 * 1024,
+}) async {
+  final socket = await Socket.connect(InternetAddress.loopbackIPv4, port);
+  var got = 0;
+  final enough = Completer<void>();
+  final subscription = socket.listen(
+    (chunk) {
+      got += chunk.length;
+      if (got >= after && !enough.isCompleted) enough.complete();
+    },
+    onError: (Object _) {},
+    onDone: () {
+      if (!enough.isCompleted) enough.complete();
+    },
+  );
+  socket.write('${lines.join('\r\n')}\r\n\r\n');
+  await enough.future.timeout(const Duration(seconds: 5));
+  socket.destroy();
+  await subscription.cancel();
+  return got;
+}
+
 /// A WebSocket upgrade of [path] from the page on [port], with [cookie]
 /// (the webview's `Cookie` value), for [_rawHead].
 List<String> _upgrade(int port, String path, String cookie) => [
@@ -992,6 +1021,89 @@ void main() {
           .timeout(const Duration(seconds: 3));
       expect(answer.status, 504);
       expect(answer.headers['content-security-policy'], [policy]);
+    });
+  });
+
+  /// Review I1: a webview that gives up on a response mid-body (↻ during a
+  /// load, a page left, an aborted fetch) has dart:io end the response
+  /// quietly. The stream must still end toward the computer: its bytes not
+  /// acknowledged would otherwise hold the phone's shared window (512 KiB)
+  /// until the computer's 5-minute idle drop, and every larger response of
+  /// the page would wait that long.
+  group('a response the webview gives up on (I1)', () {
+    const big = 8 * 1024 * 1024;
+    const medium = 100 * 1024;
+
+    /// The `/big` answers the tool is done with: the computer let go of the
+    /// connection (its stream ended), or all of it was sent.
+    var finished = 0;
+    setUp(() => finished = 0);
+
+    /// 8 MiB, as the socket takes it: the tool waits while the windows are
+    /// full.
+    Future<void> serveBig(HttpRequest request) async {
+      final chunk = Uint8List(64 * 1024);
+      try {
+        request.response.contentLength = big;
+        for (var at = 0; at < big; at += chunk.length) {
+          request.response.add(chunk);
+          await request.response.flush();
+        }
+        await request.response.close();
+      } on Object {
+        // The desktop dropped the connection.
+      }
+      finished++;
+    }
+
+    Future<void> serveMedium(HttpRequest request) async {
+      request.response
+        ..contentLength = medium
+        ..add(Uint8List(medium));
+      await request.response.close();
+    }
+
+    test('two downloads given up mid-body: each ends, and a 100 KiB '
+        'resource after them arrives at once', () async {
+      await openSamePort(routes: {'/big': serveBig, '/medium': serveMedium});
+      await webview.enter(events.whereType<ToolLoad>().single.url);
+      final port = session.servedPort!;
+      for (var i = 0; i < 2; i++) {
+        final got = await _abandon(port, [
+          'GET /big HTTP/1.1',
+          'host: localhost:$port',
+          'cookie: ${webview.cookieHeader}',
+        ]);
+        expect(got, lessThan(big), reason: 'given up mid-body');
+      }
+      // Both streams ended toward the computer: it let go of the tool.
+      await until(() => finished == 2, timeout: const Duration(seconds: 5));
+      final page = await webview
+          .request(at('/medium'))
+          .timeout(const Duration(seconds: 5));
+      expect(page.status, 200);
+      expect(page.body.length, medium);
+    });
+
+    test('two upgrades the tool answers with a large body instead, given up '
+        'mid-body: each ends, and a 100 KiB resource after them arrives at '
+        'once', () async {
+      await openSamePort(routes: {'/big': serveBig, '/medium': serveMedium});
+      await webview.enter(events.whereType<ToolLoad>().single.url);
+      final port = session.servedPort!;
+      for (var i = 0; i < 2; i++) {
+        final got = await _abandon(
+          port,
+          _upgrade(port, '/big', webview.cookieHeader),
+        );
+        expect(got, lessThan(big), reason: 'given up mid-body');
+      }
+      await until(() => finished == 2, timeout: const Duration(seconds: 5));
+      final page = await webview
+          .request(at('/medium'))
+          .timeout(const Duration(seconds: 5));
+      expect(page.status, 200);
+      expect(page.body.length, medium);
     });
   });
 

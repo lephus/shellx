@@ -1083,11 +1083,16 @@ final class _HttpStream extends _Stream {
     final inlet = _answer = ToolBytesIn(
       onConsumed: (total) => link.acks.consumed(id, total),
     );
+    // I1: a webview that gives up mid-body (a page left, ↻, an aborted
+    // fetch) has dart:io end `addStream` quietly and cancel [inlet]; the
+    // stream is then not done (the body's end makes it so in [onData]
+    // before `addStream` is over) and ends here, toward the computer too,
+    // so its bytes in flight no longer hold the phone's window.
     unawaited(
       response
           .addStream(inlet.stream)
-          .then((_) => _close(response))
-          .catchError((Object _) {}),
+          .then((_) => done ? _close(response) : abort())
+          .catchError((Object _) => abort()),
     );
   }
 
@@ -1274,11 +1279,13 @@ final class _WsStream extends _Stream {
     final inlet = _refusal = ToolBytesIn(
       onConsumed: (total) => link.acks.consumed(id, total),
     );
+    // I1: as an HTTP answer ([_HttpStream.onResponse]): given up mid-body,
+    // the stream ends here, toward the computer too.
     unawaited(
       response
           .addStream(inlet.stream)
-          .then((_) => response.close())
-          .catchError((Object _) => response),
+          .then((_) => done ? response.close() : abort())
+          .catchError((Object _) => abort()),
     );
   }
 
