@@ -35,6 +35,11 @@ enum ToolToggle { opened, closed, asked, nothing }
 /// The window's tool commands (D4, D10, D15, D20–D23) for the sidebar, the
 /// palette, the AI header and Settings. Opening, toggling and adding run
 /// through the window's intents, which also move the keyboard.
+///
+/// From Settings, [ref] is the page's, and it is dead once Settings closes
+/// (a notification click closes it under an open dialog or question). So
+/// [add], [edit] and [delete], which wait for an answer, read from [ref]
+/// before their first await whatever they use after it.
 final class ToolActions {
   const ToolActions(this.ref);
   final WidgetRef ref;
@@ -112,9 +117,10 @@ final class ToolActions {
 
   /// §4.2: the dialog for a new tool of [ws]; the tool, or null.
   Future<ToolEntry?> add(BuildContext context, String ws) async {
+    final registry = _registry;
     final draft = await showToolDialog(context, ws: ws);
     if (draft == null) return null;
-    return _registry.add(
+    return registry.add(
       ws: ws,
       name: draft.name,
       url: draft.url,
@@ -124,9 +130,10 @@ final class ToolActions {
 
   /// D23: name, URL and phone flag in the same dialog.
   Future<void> edit(BuildContext context, ToolEntry tool) async {
+    final registry = _registry;
     final draft = await showToolDialog(context, ws: tool.ws, existing: tool);
     if (draft == null) return;
-    _registry.update(
+    registry.update(
       tool.copyWith(name: draft.name, url: draft.url, phone: draft.phone),
     );
   }
@@ -134,6 +141,7 @@ final class ToolActions {
   /// D23: asks first; the chip and the page go with the tool.
   Future<void> delete(ToolEntry tool) async {
     final l10n = ref.read(appL10nProvider);
+    final registry = _registry;
     final yes = await ref
         .read(windowRouterProvider.notifier)
         .confirm(
@@ -143,7 +151,7 @@ final class ToolActions {
             confirmLabel: l10n.toolDeleteAction,
           ),
         );
-    if (yes) _registry.remove(tool.id);
+    if (yes) registry.remove(tool.id);
   }
 
   /// D17 ↗, D20, D21: the tool's URL (or [url], a page or a download it
