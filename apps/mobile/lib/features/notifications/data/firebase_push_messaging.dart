@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:async/async.dart' show StreamGroup;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shellx_mobile/features/notifications/data/android_push_actions.dart';
 import 'package:shellx_mobile/features/notifications/domain/push_messaging.dart';
 import 'package:shellx_mobile/firebase_options.dart';
 
@@ -15,19 +17,35 @@ Future<PushMessaging> startPushMessaging({Duration timeout = const Duration(seco
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform).timeout(timeout);
     }
-    return FirebasePushMessaging(FirebaseMessaging.instance);
+    return FirebasePushMessaging(FirebaseMessaging.instance, actions: await _startAndroidActions(timeout));
   } catch (error) {
     if (kDebugMode) debugPrint('Push unavailable: ${error.runtimeType}');
     return const UnavailablePushMessaging();
   }
 }
 
+/// V2-2b B9, Android only: the background handler that draws an AI permission push again with its buttons, and the
+/// app's side of their taps. Null elsewhere, or when it cannot start (push still works, without buttons).
+Future<AndroidPushActions?> _startAndroidActions(Duration timeout) async {
+  if (!Platform.isAndroid) return null;
+  try {
+    FirebaseMessaging.onBackgroundMessage(shellxBackgroundMessage);
+    return await AndroidPushActions.start().timeout(timeout);
+  } catch (error) {
+    if (kDebugMode) debugPrint('Push buttons unavailable: ${error.runtimeType}');
+    return null;
+  }
+}
+
 /// [PushMessaging] over `firebase_messaging`. Foreground messages are left to the app (an in-app
-/// banner): no system presentation options are set on iOS, and Android never shows them itself.
+/// banner): no system presentation options are set on iOS, and Android never shows them itself. On
+/// Android the taps on the notifications the app draws again with buttons ([AndroidPushActions], V2-2b
+/// B9) come in with FCM's own.
 final class FirebasePushMessaging implements PushMessaging {
-  FirebasePushMessaging(this._messaging);
+  FirebasePushMessaging(this._messaging, {AndroidPushActions? actions}) : _actions = actions;
 
   final FirebaseMessaging _messaging;
+  final AndroidPushActions? _actions;
 
   /// iOS hands out an FCM token only once APNs has registered the app.
   static const Duration _apnsWait = Duration(milliseconds: 500);
@@ -64,12 +82,17 @@ final class FirebasePushMessaging implements PushMessaging {
   Stream<PushMessage> get foregroundMessages => FirebaseMessaging.onMessage.map(_message);
 
   @override
-  Stream<PushMessage> get openedMessages => FirebaseMessaging.onMessageOpenedApp.map(_message);
+  Stream<PushMessage> get openedMessages {
+    final opened = FirebaseMessaging.onMessageOpenedApp.map(_message);
+    final actions = _actions;
+    return actions == null ? opened : StreamGroup.merge([opened, actions.responses]);
+  }
 
   @override
   Future<PushMessage?> initialMessage() async {
     final message = await _messaging.getInitialMessage();
-    return message == null ? null : _message(message);
+    if (message != null) return _message(message);
+    return _actions?.launchMessage();
   }
 
   @override
