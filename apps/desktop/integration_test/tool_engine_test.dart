@@ -11,11 +11,13 @@ import 'package:shellx_desktop/src/tools/tool_navigation.dart';
 /// V2-3 §9: the real macOS engine in the real Runner, against a small
 /// server: load and title, http to 127.0.0.1 (D19), the D9 navigation
 /// rules (target=_blank links included), a refused port then the server up
-/// (D13), stopped downloads (a response, a blob: link, a download link to
-/// the page's own server), a refused camera, a JavaScript alert through
-/// ShellX, and a page that stays loaded when its view leaves the tree and
-/// comes back (Review Focus 1). Run only in an isolated build (plan Task 6
-/// recipe): never with the app's real bundle id or HOME.
+/// (D13), a refused load after a loaded page that never says it finished
+/// (the tool page's recovery URL), stopped downloads (a response, a blob:
+/// link, a download link to the page's own server), a refused camera, a
+/// JavaScript alert through ShellX, and a page that stays loaded when its
+/// view leaves the tree and comes back (Review Focus 1). Run only in an
+/// isolated build (plan Task 6 recipe): never with the app's real bundle id
+/// or HOME.
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -209,6 +211,31 @@ void main() {
       () => events.any((e) => e is TitleChanged && e.title == 'Up'),
       'up',
     );
+  });
+
+  testWidgets('a refused load after a loaded page never finishes (D13)', (
+    t,
+  ) async {
+    // The tool page's recovery URL counts on this: until a LoadFinished,
+    // a retry loads the URL that failed, not the page that stays.
+    final probe = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final port = probe.port;
+    await probe.close();
+    await show(t);
+    await engine.load(Uri.parse('$base/'));
+    await until(t, () => events.any((e) => e is LoadFinished), 'page');
+    events.clear();
+    await engine.load(Uri.parse('http://127.0.0.1:$port/'));
+    await until(
+      t,
+      () => events.any(
+        (e) => e is LoadFailed && e.kind == BrowserLoadErrorKind.refused,
+      ),
+      'refused',
+    );
+    await t.pump(const Duration(seconds: 1));
+    await Future<void>.delayed(const Duration(seconds: 1));
+    expect(events.whereType<LoadFinished>(), isEmpty, reason: 'no finish');
   });
 
   testWidgets('a download is stopped, the page stays (D9)', (t) async {
