@@ -247,6 +247,11 @@ class TerminalWorkspace extends Controller {
     };
   }
 
+  /// V2-2b: a list of the machine's sessions answered after the listing was held (a page opened from a
+  /// notification before the relay was connected, whose own list failed): a holder that waited for it is watched
+  /// now if the computer has AI. Nothing when nothing changed.
+  void aiSupportLearned() => _syncAiWatch();
+
   /// Watches while somebody holds the list and the computer has AI; stops when nobody does.
   void _syncAiWatch() {
     final ai = machine.ai;

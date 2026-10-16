@@ -62,6 +62,51 @@ void main() {
       expect(machine.ai.hasListingListener, isFalse);
     });
 
+    test('a cold start whose list fails (the relay still connecting) lists again on the next ready channel, until '
+        'one answers: the listing is watched then, the features turn on, the closed strip can open the list', () async {
+      machine.ai.listedProtocol = 2;
+      machine.listError = const MachineConnectionException(MachineConnectionFailure.timeout);
+      final controller = make();
+      await pumpEventQueue();
+      expect(machine.listCalls, 1);
+      expect(machine.ai.protocol, isNull);
+      expect(machine.ai.watching, isFalse, reason: 'nothing says yet that the computer has AI');
+      machine.emitState(const MachineConnecting());
+      machine.emitState(const MachineReady());
+      await pumpEventQueue();
+      expect(machine.listCalls, 2, reason: 'failed again: still unknown');
+      expect(machine.ai.watching, isFalse);
+      machine.listError = null;
+      final before = controller.version.value;
+      machine.emitState(const MachineIdle());
+      machine.emitState(const MachineReady());
+      await pumpEventQueue();
+      expect(machine.listCalls, 3);
+      expect(machine.ai.protocol, 2);
+      expect(machine.ai.watching, isTrue, reason: 'the workspace watches the listing once it knows');
+      expect(controller.version.value, greaterThan(before), reason: 'the page is told');
+      machine.ai.emitListing(AiListing(features: const {AiFeature.config}, sessions: [_info(_sid)]));
+      expect(controller.can(AiFeature.config), isTrue);
+      expect(controller.listing, isNotNull);
+      machine.emitState(const MachineIdle());
+      machine.emitState(const MachineReady());
+      await pumpEventQueue();
+      expect(machine.listCalls, 3, reason: 'one answered: never again');
+      controller.dispose();
+      expect(machine.ai.watching, isFalse);
+    });
+
+    test('a page left before its list answered lists nothing on a later ready channel', () async {
+      machine.listError = const MachineConnectionException(MachineConnectionFailure.timeout);
+      final controller = make();
+      await pumpEventQueue();
+      controller.dispose();
+      machine.listError = null;
+      machine.emitState(const MachineReady());
+      await pumpEventQueue();
+      expect(machine.listCalls, 1);
+    });
+
     test('a computer whose protocol is known is not listed again', () async {
       known();
       final controller = make();
