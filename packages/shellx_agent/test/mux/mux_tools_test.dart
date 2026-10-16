@@ -143,6 +143,48 @@ void main() {
     },
   );
 
+  // Review Focus 4 (ledger L248): the service checks again what the window
+  // sends: an entry that is not plain http on a loopback name with no user
+  // info and no fragment is never served.
+  test('the service drops the entries it must not serve (https, another '
+      'host, user info, a fragment) and keeps the valid ones', () {
+    Map<String, Object?> entry(String id, String url) => {
+      'id': id,
+      'name': 'Tool $id',
+      'ws': 'shop-web',
+      'group': 'ws:a',
+      'url': url,
+    };
+    final body = Uint8List.fromList(
+      utf8.encode(
+        jsonEncode({
+          'v': 1,
+          'tools': [
+            entry('good000001', 'http://localhost:5173/'),
+            entry('https00001', 'https://localhost:5173/'),
+            entry('remote0001', 'http://example.com:5173/'),
+            entry('lan0000001', 'http://192.168.1.20:5173/'),
+            entry('userinfo01', 'http://user:secret@localhost:5173/'),
+            entry('fragment01', 'http://localhost:5173/#top'),
+            entry('good000002', 'http://127.0.0.1:8000/app?x=1'),
+            entry('good000003', 'http://[::1]:3000/'),
+          ],
+        }),
+      ),
+    );
+    final catalog = ToolCatalog.fromServeBody(body)!;
+    expect(catalog.tools.map((t) => t.id), [
+      'good000001',
+      'good000002',
+      'good000003',
+    ]);
+    expect(catalog.tools.map((t) => (t.host, t.port, t.path)), [
+      ('localhost', 5173, '/'),
+      ('127.0.0.1', 8000, '/app?x=1'),
+      ('::1', 3000, '/'),
+    ]);
+  });
+
   test('a list over one mux frame is cut to fit, in order', () {
     final body = ToolCatalog.serveBody([
       for (var i = 0; i < 100; i++)

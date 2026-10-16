@@ -300,14 +300,19 @@ void main() {
     w.proxy.serve(catalogOf([], off: [_id]));
     await until(() => session.phase == ToolPhase.disabled);
     expect(clock.elapsed, lessThan(const Duration(seconds: 1)));
+    // Nothing is served on the phone any more: the port it served is shut on
+    // both loopback addresses (the webview tries ::1 first).
+    for (final address in [
+      InternetAddress.loopbackIPv4,
+      InternetAddress.loopbackIPv6,
+    ]) {
+      await expectLater(
+        Socket.connect(address, served),
+        throwsA(isA<SocketException>()),
+        reason: address.address,
+      );
+    }
     await ws.done.timeout(const Duration(seconds: 5));
-    final hits = tool.hits.length;
-    // Nothing is served on the phone any more: the port it served is shut.
-    await expectLater(
-      webview.request(Uri.parse('http://localhost:$served/')),
-      throwsA(isA<SocketException>()),
-    );
-    expect(tool.hits.length, hits);
     await session.close();
   });
 

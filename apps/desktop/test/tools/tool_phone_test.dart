@@ -266,6 +266,93 @@ void main() {
     expect(sent, isNot(contains(MuxType.toolServe)));
   });
 
+  // Task 15 minors: what quitting does with the background service, and
+  // stopping out of turn.
+  test('with the background service: stopToolPhone sends nothing, and the '
+      'service keeps serving its list', () async {
+    final core = _core();
+    final listener = TestListener();
+    final server = MuxServer(
+      sessions: core.sessions,
+      secret: testSecret,
+      self: const MuxPeerInfo(
+        protocol: kMuxProtocol,
+        app: 't',
+        instance: 'i',
+        caps: ['agent', 'cli', 'tools'],
+      ),
+      onQuit: () async {},
+    )..serve(listener);
+    addTearDown(server.close);
+    final proxy = installDaemonTools(server, core);
+    addTearDown(proxy.close);
+    final c = _window([_board]);
+    c
+        .read(daemonLinkProvider.notifier)
+        .set(
+          DaemonLink(
+            sessions: RemoteLocalSessions(await attachClient(listener)),
+            info: const MuxPeerInfo(
+              protocol: kMuxProtocol,
+              app: 't',
+              caps: ['agent', 'cli', 'tools'],
+            ),
+          ),
+        );
+    startToolPhone(c);
+    await pumpEventQueue();
+    final served = proxy.catalog;
+    expect(served?.tools.map((t) => t.id), ['k3f9za7q1m']);
+    stopToolPhone(c);
+    await pumpEventQueue();
+    expect(identical(proxy.catalog, served), isTrue, reason: 'nothing sent');
+    expect(proxy.serving, isTrue);
+    expect(core.tools.serving, isTrue);
+  });
+
+  test('stopToolPhone before startToolPhone, and twice, does nothing more '
+      'than once', () {
+    final c = _window([_board]);
+    stopToolPhone(c);
+    expect(
+      c.exists(toolPhoneProxyProvider),
+      isFalse,
+      reason: 'no proxy is made to be closed',
+    );
+    final core = _core();
+    startToolPhone(c, slot: core.tools);
+    expect(core.tools.serving, isTrue);
+    stopToolPhone(c);
+    stopToolPhone(c);
+    expect(core.tools.serving, isFalse);
+    expect(c.read(toolPhoneProxyProvider).serving, isFalse);
+  });
+
+  test('a tool whose workspace is missing is served with an empty workspace '
+      'name', () {
+    final c = _window(const [
+      ToolEntry(
+        id: 'k3f9za7q1m',
+        ws: 'gone000001',
+        name: 'Bảng việc',
+        url: 'http://localhost:4000/',
+        phone: true,
+      ),
+    ]);
+    final body = c.read(phoneToolsBodyProvider);
+    final json = jsonDecode(utf8.decode(body)) as Map<String, Object?>;
+    expect(json['tools'], [
+      {
+        'id': 'k3f9za7q1m',
+        'name': 'Bảng việc',
+        'ws': '',
+        'group': 'gone000001',
+        'url': 'http://localhost:4000/',
+      },
+    ]);
+    expect(ToolCatalog.fromServeBody(body)!.tools.single.ws, '');
+  });
+
   // Not in the plan's list: `main.dart` starts the tools before the first
   // connection to the service exists, so only the link listener ever sends
   // the list (the test above sets its link first).

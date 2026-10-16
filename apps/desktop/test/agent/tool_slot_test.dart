@@ -100,6 +100,15 @@ void main() {
     await client.close();
     await pumpEventQueue();
     expect(proxy.catalog?.tools.single.id, 'k3f9za7q1m');
+    // E5 (ledger L428): the service keeps serving the last list: the tools
+    // flag stays, and a phone that lists now hears it.
+    expect(c.tools.serving, isTrue);
+    final heard = toPhone.length;
+    c.tools.handle(_phone, const ToolList());
+    expect(toPhone, hasLength(heard + 1));
+    final last = toPhone.last as ToolListResult;
+    expect(last.available, isTrue);
+    expect(utf8.decode(last.body), contains('Bảng việc'));
   });
 }
 

@@ -1767,7 +1767,9 @@ void main() {
           .where((ask) => ask.address == v4 && ask.port == p)
           .length;
       expect(page.phase, ToolPhase.noPort);
-      await until(() => tries() == 2); // after the first delay
+      // The second try (after the first delay): its pair on P and its 16
+      // alias pairs, every one asked, before anything is let go.
+      await until(() => binder.asked.length == 2 * 34);
       await Future<void>.delayed(const Duration(milliseconds: 200));
       expect(tries(), 2, reason: 'the next try waits the second delay');
       held = false;
@@ -1775,6 +1777,29 @@ void main() {
       expect(page.phase, ToolPhase.ready);
       expect(page.servedPort, p);
       expect(tries(), 3);
+    });
+
+    // R-C3-3: the interface list is asked at every serve, never kept.
+    test('the interface list is asked again at every serve: ::1 listed only '
+        'later is bound from then on', () async {
+      final p = await freeLoopbackPort();
+      var listed = [v4];
+      final binder = _Binder();
+      final (:page, :loads) = await start(
+        binder,
+        port: p,
+        interfaces: () async => [_Loopback(listed)],
+      );
+      expect(binder.asked, [(address: v4, port: p, v6Only: false)]);
+      await page.pause();
+      listed = [v4, v6];
+      page.resume();
+      await until(() => loads.length == 2);
+      expect(binder.asked.skip(1), [
+        (address: v4, port: p, v6Only: false),
+        (address: v6, port: p, v6Only: true),
+      ]);
+      expect(page.servedPort, p);
     });
 
     // 14b minor: whatever error a bind ends with, what was bound for the
