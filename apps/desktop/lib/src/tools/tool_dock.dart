@@ -60,7 +60,8 @@ final toolDockProvider = NotifierProvider<ToolDockController, ToolDocks>(
 class ToolDockController extends Notifier<ToolDocks> {
   final _lastTab = <String, int>{};
 
-  /// D10: the tool each workspace showed last, kept after its chip closed.
+  /// D10: the tool each workspace showed last — the chip last on show,
+  /// however it got there — kept after its chip closed.
   final _lastViewed = <String, String>{};
 
   @override
@@ -104,18 +105,15 @@ class ToolDockController extends Notifier<ToolDocks> {
   }
 
   /// D4: [ws]'s dock opens with [toolId] on show.
-  void open(String ws, String toolId) {
-    _lastViewed[ws] = toolId;
-    _set(ws, state.of(ws).opened(toolId));
-  }
+  void open(String ws, String toolId) => _set(ws, state.of(ws).opened(toolId));
 
   /// D5: a chip of [ws] on show.
-  void activate(String ws, String toolId) {
-    _lastViewed[ws] = toolId;
-    _set(ws, state.of(ws).activated(toolId));
-  }
+  void activate(String ws, String toolId) =>
+      _set(ws, state.of(ws).activated(toolId));
 
-  /// D10: the tool [ws] showed last (it may have been deleted since).
+  /// D10: the tool [ws] showed last (it may have been deleted since): the
+  /// chip last on show, however it got there — opened or chosen, the one a
+  /// closed chip handed over to, or the restored one.
   String? lastViewedOf(String ws) => _lastViewed[ws];
 
   /// D10, D17 ×: [toolId]'s chip closes (the last one closes the dock).
@@ -182,6 +180,8 @@ class ToolDockController extends Notifier<ToolDocks> {
       }
       if (kept.isDefault) continue;
       next[ws] = kept;
+      // D10: the restored chip on show is the one viewed last.
+      if (kept.active case final active?) _lastViewed[ws] = active;
     }
     state = state.copyWith(byWorkspace: Map.unmodifiable(next));
   }
@@ -227,6 +227,9 @@ class ToolDockController extends Notifier<ToolDocks> {
   }
 
   void _set(String ws, ToolDockState dock) {
+    // D10: whatever put a chip on show made it the one viewed last; the last
+    // chip closing (none on show then) keeps the one before.
+    if (dock.active case final active?) _lastViewed[ws] = active;
     if (state.of(ws) == dock) return;
     state = state.copyWith(
       byWorkspace: Map.unmodifiable({...state.byWorkspace, ws: dock}),
