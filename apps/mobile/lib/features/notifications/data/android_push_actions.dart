@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui' show Locale, PlatformDispatcher;
+import 'dart:ui' show DartPluginRegistrant, Locale, PlatformDispatcher;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -213,6 +213,9 @@ Future<bool> redrawAiAction(
 /// keeps the app from running in the background), FCM's notification stays, without buttons.
 @pragma('vm:entry-point')
 Future<void> shellxBackgroundMessage(RemoteMessage message) async {
+  // FCM's isolate runs no `main`: the Dart side of the plugins (flutter_local_notifications') is registered here.
+  // Once is enough; again is nothing.
+  DartPluginRegistrant.ensureInitialized();
   // Registered on Android only, once the app can take the taps (`startPushMessaging`): never draws anything on
   // iOS (B5, B8).
   if (!Platform.isAndroid) return;
