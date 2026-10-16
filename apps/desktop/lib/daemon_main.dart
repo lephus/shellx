@@ -224,7 +224,7 @@ Future<void> _serve({
 /// M6), then every shell closes and the agent stops (`AgentController.
 /// shutdown` also waits, bounded, for the PTY kills), then the remote side
 /// goes: port probes, forwards, and every ssh master in the control
-/// directory, the UI's included.
+/// directory, the UI's included. Last the tool proxy closes (V2-4 E5).
 Future<void> _shutdown(
   ProviderContainer container,
   CliHost cli,
@@ -249,5 +249,7 @@ Future<void> _shutdown(
       label: 'closing the ssh masters',
     );
   }
-  tools.close(); // its streams and its connections to the tools
+  // The agent step has let the phones go already: the proxy stops serving,
+  // cancels its idle check and force-closes its connections to the tools.
+  tools.close();
 }

@@ -285,8 +285,11 @@ Future<void> _start(_Startup startup) async {
   // Runs after the shutdown. Each step is bounded, so quitting always ends
   // in exit(0).
   Future<void> quitApp() async {
-    // V2-4 E5: a phone on a tool page hears the window quit (in-process); the
-    // background service keeps serving its last list. Never throws.
+    // V2-4 E5, in-process: the tray's Quit has already dropped the phones
+    // with the relay (the agent shutdown runs first; spec §7: they see the
+    // machine offline). This closes the proxy's streams and its connections
+    // to the tools, and unplugs the slot. The background service keeps
+    // serving its last list. Never throws.
     stopToolPhone(container);
     // V2-2 D1: a phone that still mirrors an AI session hears the window
     // quit, not its agent stop; the agent side's slot answers "unavailable"
