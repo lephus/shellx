@@ -6,7 +6,9 @@ import 'package:shellx_client/shellx_client.dart';
 import 'package:shellx_mobile/core/core.dart' hide test;
 import 'package:shellx_mobile/features/ai/domain/ai_drafts.dart';
 import 'package:shellx_mobile/features/ai/domain/ai_revert_outcome.dart';
+import 'package:shellx_mobile/features/ai/domain/ai_text.dart' show kShownLineChars;
 import 'package:shellx_mobile/features/ai/presentation/controllers/ai_session_controller.dart';
+import 'package:shellx_mobile/features/ai/presentation/widgets/ai_items.dart' show AiDiffLineRow;
 import 'package:shellx_mobile/features/terminal/presentation/controllers/terminal_workspace.dart';
 
 import '../../support/app_harness.dart';
@@ -150,6 +152,19 @@ void main() {
     expect(find.text('Tệp này không có, cả trước lẫn bây giờ.'), findsOneWidget);
   });
 
+  testWidgets('a line longer than the phone shows is cut, in the diff rows of the conversation (F52)', (tester) async {
+    await open(tester);
+    await openTurnOne(tester);
+    final long = 'x' * (kShownLineChars + 1000);
+    machine.ai.diffValue = {'path': 'src/a.ts', 'old': 'a', 'new': long, 'plus': 1, 'minus': 1};
+    await tester.tap(find.byKey(const ValueKey('ai.change.src/a.ts')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AiDiffLineRow), findsNWidgets(2));
+    expect(find.text('- a'), findsOneWidget);
+    expect(find.text('+ ${'x' * kShownLineChars}…'), findsOneWidget);
+    expect(find.text('+ $long'), findsNothing);
+  });
+
   testWidgets('the menu opens the whole session; "Lượt này" is the last turn', (tester) async {
     await open(tester);
     await tester.tap(find.byKey(const Key('ai.menu')));
@@ -259,13 +274,69 @@ void main() {
     expect(popups.errors, ['Chờ lượt này xong.']);
   });
 
-  testWidgets('a revert lost with the channel may not have gone, and is never '
-      'sent again', (tester) async {
+  testWidgets('the question names what the revert puts back at the tap: files the running turn changed after '
+      'the sheet opened are in it (F51)', (tester) async {
+    await open(tester, running: true);
+    await tester.tap(find.byKey(const Key('ai.menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ai.menu.changes')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('ai.change.c.ts')), findsNothing);
+
+    // The running turn writes c.ts, then ends: the button wakes, and the sheet still shows what it read at first.
+    machine.ai.changesValue = const AiChangesView(
+      scope: 'session',
+      files: [
+        AiChangedFile(path: 'src/a.ts', kind: 'm', plus: 3, minus: 1),
+        AiChangedFile(path: 'b.txt', kind: 'a', plus: 2, minus: 0),
+        AiChangedFile(path: 'c.ts', kind: 'a', plus: 7, minus: 0),
+      ],
+      first: 1,
+      last: 2,
+      done: 2,
+    );
+    final ai = machine.ai.session(sid);
+    ai.desktop.endTurn(outcome: TurnOutcome.finished, at: DateTime.now());
+    ai.sync();
+    await tester.pumpAndSettle();
+    machine.ai.revertAnswers.add(3);
+    await tester.tap(find.byKey(const Key('ai.changes.revert')));
+    await tester.pump();
+    expect(find.text('Đưa 3 tệp về như trước phiên này?'), findsOneWidget);
+    expect(
+      find.descendant(of: find.byKey(const Key('ai.revert.dialog')), matching: find.text('c.ts')),
+      findsOneWidget,
+    );
+    expect(machine.ai.changesAsked, [(sid, null), (sid, null)], reason: 'read again at the tap');
+    expect(find.byKey(const ValueKey('ai.change.c.ts')), findsOneWidget, reason: 'the sheet shows what it read');
+    await answer(tester, const Key('ai.revert.confirm'));
+    expect(machine.ai.reverts, [(sid, null, null)]);
+    expect(popups.successes, ['Đã hoàn tác 3 tệp.']);
+  });
+
+  testWidgets('a read that fails at the tap asks nothing and sends nothing; the sheet says why (F51)', (tester) async {
     await open(tester);
     await openTurnOne(tester);
     machine.ai.connectFailure = MachineConnectionFailure.agentOffline;
     await tester.tap(find.byKey(const Key('ai.changes.revert')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('ai.revert.dialog')), findsNothing);
+    expect(machine.ai.changesAsked, [(sid, 1), (sid, 1)]);
+    expect(machine.ai.reverts, isEmpty);
+    expect(find.byKey(const Key('ai.changes.error')), findsOneWidget);
+    expect(find.textContaining('Có thể chưa gửi được'), findsOneWidget);
+    expect(popups.errors, isEmpty, reason: 'the sheet says it, as it says any read that failed');
+  });
+
+  testWidgets('a revert lost with the channel may not have gone, and is never '
+      'sent again', (tester) async {
+    await open(tester);
+    await openTurnOne(tester);
+    await tester.tap(find.byKey(const Key('ai.changes.revert')));
     await tester.pump();
+    // The channel drops once the question is up (the changes are read again at the tap, F51): the revert itself is
+    // what it takes with it.
+    machine.ai.connectFailure = MachineConnectionFailure.agentOffline;
     await answer(tester, const Key('ai.revert.confirm'));
     expect(machine.ai.reverts, hasLength(1));
     expect(popups.errors.single, startsWith('Có thể chưa gửi được'));

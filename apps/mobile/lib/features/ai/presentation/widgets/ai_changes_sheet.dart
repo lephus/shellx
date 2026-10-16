@@ -61,18 +61,20 @@ class _AiChangesSheetState extends State<AiChangesSheet> {
     unawaited(_load());
   }
 
-  /// Reads the changes of the scope shown; a newer read wins over an older one still on its way.
-  Future<void> _load() async {
+  /// Reads the changes of the scope shown; a newer read wins over an older one still on its way. The view read, or
+  /// null when the read failed (the sheet says why) or a newer one took its place.
+  Future<AiChangesView?> _load() async {
     final asked = ++_asked;
     if (mounted && !_loading) setState(() => _loading = true);
     final result = await widget.controller.loadChanges(turn: _thisTurn ? _turn : null);
-    if (!mounted || asked != _asked) return;
+    if (!mounted || asked != _asked) return null;
     setState(() {
       _loading = false;
       _view = result.view;
       _error = result.code == null ? null : AiWords.failure(S.of(context), result.code!) ?? S.of(context).aiRefused;
       _turn ??= result.view?.last;
     });
+    return result.view;
   }
 
   void _scope(bool thisTurn) {
@@ -81,12 +83,23 @@ class _AiChangesSheetState extends State<AiChangesSheet> {
     unawaited(_load());
   }
 
-  /// One revert, asked first on the phone with the files; when the computer asks too (files changed after the turn),
-  /// its question with the desktop's choices (B14). Never sent again by itself.
-  Future<void> _revert(int? turn, List<String> paths, int more) async {
+  /// One revert of the scope shown, asked first on the phone with the files it puts back as the tap reads them (F51):
+  /// a turn that ran while the sheet was open may have changed more than the sheet showed, and the computer asks again
+  /// only about files changed after the turn. A read that fails, or finds nothing to put back, asks nothing and sends
+  /// nothing: the sheet says so. When the computer asks too (files changed after the turn), its question with the
+  /// desktop's choices (B14). Never sent again by itself.
+  Future<void> _revert() async {
     final controller = widget.controller;
     final s = S.of(context);
-    final sure = await showAiRevertConfirm(context, paths: paths, more: more, turn: turn);
+    final turn = _thisTurn ? _turn : null;
+    final view = await _load();
+    if (view == null || view.files.isEmpty || !mounted) return;
+    final sure = await showAiRevertConfirm(
+      context,
+      paths: [for (final f in view.files) f.path],
+      more: view.more,
+      turn: turn,
+    );
     if (!sure || !mounted) return;
     var outcome = await controller.revert(turn: turn);
     if (outcome case AiRevertAsk(:final question)) {
@@ -222,7 +235,7 @@ class _AiChangesSheetState extends State<AiChangesSheet> {
         FilledButton(
           key: const Key('ai.changes.revert'),
           style: FilledButton.styleFrom(backgroundColor: colors.error, foregroundColor: colors.white),
-          onPressed: enabled ? () => unawaited(_revert(turn, [for (final f in files) f.path], view?.more ?? 0)) : null,
+          onPressed: enabled ? () => unawaited(_revert()) : null,
           child: Text(turn == null ? s.aiRevertSession : s.aiRevertTurn),
         ),
         if (running) ...[
