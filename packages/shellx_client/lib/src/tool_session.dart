@@ -546,7 +546,8 @@ final class ToolSession {
   /// holding [::1]:[port] would get the entry URL's nonce and every request
   /// carrying the gate cookie, so then the port is not this phone's to
   /// serve. Null when the port cannot be had on every one of them; what was
-  /// bound for it is closed then (never 127.0.0.1 alone, S2).
+  /// bound for it is closed then (never 127.0.0.1 alone, S2), and also
+  /// before any other error of the binder goes on.
   Future<List<HttpServer>?> _bind(
     int port,
     List<InternetAddress> addresses,
@@ -561,11 +562,12 @@ final class ToolSession {
             v6Only: address.type == InternetAddressType.IPv6,
           ),
         );
-      } on SocketException {
+      } on Object catch (error) {
         for (final server in servers) {
           await server.close(force: true);
         }
-        return null; // another app holds it there
+        if (error is SocketException) return null; // another app holds it
+        rethrow;
       }
     }
     for (final server in servers) {
@@ -1142,7 +1144,11 @@ final class _HttpStream extends _Stream {
         length = int.tryParse(value);
         continue;
       }
-      if (kToolHopByHop.contains(name) || !isWritableHeaderValue(value)) {
+      // E11: the gate cookie is the phone's own; it drops a tool's itself,
+      // not only the computer (Task 9 M4).
+      if (kToolHopByHop.contains(name) ||
+          (name == 'set-cookie' && setsToolGateCookie(value)) ||
+          !isWritableHeaderValue(value)) {
         continue;
       }
       if (name == 'content-disposition' &&
@@ -1350,6 +1356,7 @@ final class _WsStream extends _Stream {
       final value = message.head[i + 1];
       if (kToolHopByHop.contains(name) ||
           name == 'content-length' ||
+          (name == 'set-cookie' && setsToolGateCookie(value)) ||
           !isWritableHeaderValue(value)) {
         continue;
       }

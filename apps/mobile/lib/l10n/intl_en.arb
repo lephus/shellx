@@ -638,7 +638,7 @@
   "toolViaComputer": "localhost:{port} · via computer",
   "@toolViaComputer": {"placeholders": {"port": {"type": "int"}}},
   "toolLoadingTunnel": "Loading through the tunnel…",
-  "toolSlow": "Loading through your computer… ({count} requests)",
+  "toolSlow": "{count, plural, =1{Loading through your computer… (1 request)} other{Loading through your computer… ({count} requests)}}",
   "@toolSlow": {"placeholders": {"count": {"type": "int"}}},
   "toolRefusedPhone": "Nothing is running at localhost:{port} on the computer.",
   "@toolRefusedPhone": {"placeholders": {"port": {"type": "int"}}},
