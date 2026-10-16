@@ -44,6 +44,10 @@ dependencies:
   # `flutterfire configure --project=shellxpro`.
   firebase_core: ^4.15.0
   firebase_messaging: ^16.7.0
+  # V2-2b B9, Android only: an AI permission push is drawn again with its two buttons. Pinned exactly; it needs
+  # core-library desugaring (android/app/build.gradle.kts). Never initialised on iOS, where the buttons are the
+  # app's own category (B8).
+  flutter_local_notifications: 22.3.2
   local_auth: ^3.0.2
   mobile_scanner: ^7.4.2
   package_info_plus: ^9.0.1

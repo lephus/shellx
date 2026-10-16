@@ -258,6 +258,13 @@ void main() {
       expect(manifest, contains('android.permission.RECORD_AUDIO'));
       expect(manifest, contains('<action android:name="android.speech.RecognitionService"/>'));
     });
+
+    test('V2-2b B9: flutter_local_notifications pinned, with core-library desugaring', () {
+      final gradle = readFile('android/app/build.gradle.kts');
+      expect(gradle, contains('isCoreLibraryDesugaringEnabled = true'));
+      expect(gradle, contains('coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")'));
+      expect(readFile('pubspec.yaml'), contains('flutter_local_notifications: 22.3.2'));
+    });
   });
 
   test('Firebase options name project shellxpro for both platforms (flutterfire configure)', () {
