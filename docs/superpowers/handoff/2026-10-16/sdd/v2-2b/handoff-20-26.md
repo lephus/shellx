@@ -1,6 +1,65 @@
 # Hand-off — V2-2b chunk 4 (Tasks 20–26), stopped at a checkpoint
 
-**Status: PARTIAL, stopped on the user's order (all coding stops 15:00, 2026-10-16).** Tasks 20–25 are implemented, reviewed and closed. Task 26 is implemented and committed, with every final check green, but its own task review had not closed when the order came. The final whole-branch review and its fix wave have **not** run. Nothing was pushed or merged.
+**Status (final, after the resume at ~15:15): DONE_WITH_CONCERNS.** Tasks 20–26 are complete, the final whole-branch review is complete, and its one fix wave has been re-reviewed. Nothing was pushed or merged.
+
+## Final update — read this first
+
+**Task 26.** Its review was re-run (sonnet). It found one Important item: the privacy sentence "ShellX không lưu ảnh" was not true of the phone, because the picker's copy stays in the cache. That item went into the fix wave (F55). Task 26 is complete.
+
+**Final whole-branch review** (opus): ready to merge **with fixes**. It found three Important items:
+1. A session page opened from a cold notification tap never learned what the computer can do.
+2. The config sheet could pop the session page.
+3. Dictation kept listening under pushed pages.
+
+It also triaged the flagged minors, 10 as fix and 18 as defer. Details: `progress.md`, section "Final whole-branch review".
+
+**Fix wave** (opus, one dispatch): **`v2-2b` `2e35476..b37d1b0`, 14 commits, one fix per commit.** It covers:
+- the three Important items;
+- the four must-include items: the lone surrogate gives a plain push; the config sheet pops only itself; Allow also checks the option's name; the `Watch(` audit (46 builders in 18 files, one stale case fixed, the delete-account button);
+- F55: the picker's file is deleted after its bytes are read;
+- the JPEG strip stops at the first EOI;
+- an unheld `shellx-rest-` cursor is refused;
+- the exact-rid history test, `DartPluginRegistrant` in the Android background handler, the English "1 needs you", the 400 ms guard test, the desktop queued-row test;
+- a "Final review and fix wave" block in `docs/superpowers/ledgers/v2-ai.md`.
+
+**Scoped re-review** (opus): 14 of 15 items addressed, with no new breakage.
+
+**Residual, parked by ruling F57:** on Android, a photo picked from the library still leaves image_picker's full-metadata *original* copy in the app cache (`cacheDir/<uuid>/<name>`, written by image_picker_android and never deleted). iOS and the Android camera are covered. **Before deploying `v2-2b-relay`, do one of:**
+- delete those UUID folders (after the read or at start-up), in a follow-up on the product branch;
+- reword the privacy sentence on `v2-2b-relay`.
+
+Either way, fix the doc comment at `apps/mobile/lib/features/ai/data/image_picker_source.dart:18-20`.
+
+**Also parked** as follow-ups:
+- the push's `detail`/`agentName` are not checked for lone surrogates (`ai_phone_hub.dart:983`);
+- a list that fails on a channel that stays ready waits for the next channel;
+- the DartPluginRegistrant line has no test.
+
+**Final counts** (all green; analyze clean, mobile keeps its one info):
+
+| Package or app | Result |
+|---|---|
+| shellx_core | 368 |
+| shellx_ai | 642 |
+| shellx_agent | 1005 |
+| shellx_client | 197 |
+| shellx_e2e | 16 + 10 skipped |
+| apps/desktop | 3621 + 5 skipped |
+| apps/mobile | 1535 |
+| relay | 377 |
+| web site | 57 |
+
+**Integration** (top-level controller):
+- **Fix wave:** cherry-pick `2e35476..b37d1b0` (14 commits, in order) onto `int/v2-2b`.
+- **Conflict risk:** the only shared-file touches are `apps/mobile/lib/l10n/intl_en.arb` (one plural) and its regenerated `messages_en.dart`/`l10n.dart`, so re-run `intl_utils:generate` + F12 format if they conflict, and `docs/superpowers/ledgers/v2-ai.md` (an append).
+- **Relay branch:** unchanged at `b8d0197`. It stays separate and undeployed, with F57's privacy note to resolve first.
+- **Branch heads:** `v2-2b` `b37d1b0`, `v2-2b-relay` `b8d0197`; both trees clean.
+
+---
+
+*(The checkpoint text below was written at the 14:35 stop order. Its "What remains" steps 1–3 are now done.)*
+
+**Status at the stop order: PARTIAL.** Tasks 20–25 were complete; Task 26 was committed, but its review had not closed. The final review had not run.
 
 - Plan: `docs/superpowers/plans/2026-10-15-v2-2b-phone-ai-more.md`. Spec (binding): `docs/superpowers/specs/2026-10-15-v2-2b-phone-ai-more-design.md`.
 - SDD workspace (git-ignored, keep it): `/Users/richard/Documents/helper/shellx/.superpowers/sdd/2026-10-15-v2-2b-phone-ai-more/`. The ledger `progress.md` there records every dispatch, verdict, ruling and deferred minor. Its last section, "STOP ORDER", gives the exact resume point.

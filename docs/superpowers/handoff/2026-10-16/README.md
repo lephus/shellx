@@ -10,8 +10,8 @@ Bảng mã commit chính xác lúc dừng nằm ở cuối file, mục "Trạng 
 
 | Nhánh | Nội dung | Trạng thái |
 |---|---|---|
-| `shellx-v2` | V2-1, V2-2a, **V2-3 và V2-4 (đã gộp, 16/10 ~15:10)**, 3 spec V2-5, plan V2-5a (chưa xong), thư mục bàn giao này | Ổn định. Kiểm toàn bộ trên bản gộp V2-3 + V2-4: core 404, agent 970, client 247, e2e 16, acp 87, ai 576, desktop 3890, mobile 1361, tất cả qua |
-| `v2-2b` | V2-2b: AI trên điện thoại, phần 2 (26 việc) | Việc 1–25 đã xong và review. Việc 26 đã code và commit, test xanh, nhưng **review việc 26 chưa xong**. **Chưa review toàn nhánh.** Gói diff cho review toàn nhánh đã soạn sẵn trong `.superpowers/sdd/…` (xem `sdd/v2-2b/handoff-20-26.md`) |
+| `shellx-v2` | V2-1, V2-2a, **V2-2b, V2-3, V2-4 (đều đã gộp, 16/10 ~16:20)**, 3 spec V2-5, plan V2-5a (chưa xong), thư mục bàn giao này | Ổn định. Kiểm toàn bộ trên bản gộp cuối: core 421, agent 1059, client 285, e2e 16, acp 87, ai 642, desktop 3932, mobile 1634, tất cả qua. **Toàn bộ V2 thử được trên máy thật từ nhánh này** |
+| `v2-2b` | V2-2b: AI trên điện thoại, phần 2 (26 việc) | **Xong**: 26/26 việc, review toàn nhánh, đợt sửa 14 commit, review lại. Đã gộp vào `shellx-v2` (rebase, giải xung đột giữ cả hai bên, sinh lại l10n/router/DI, 2 sửa lỗi gộp) |
 | `v2-5a-wip-union` | **Bản thử nghiệm**: gộp tạm cả 4 nhánh, cộng code V2-5a việc 1–4 và một phần việc 5. Do agent viết plan làm để kiểm chứng plan. Cách giải xung đột khi gộp ở đây **không phải** bản gộp chính thức | Việc 1 (thử SF Mono) đạt cả 5 điều kiện trên macOS và trình giả lập iOS 26. Có thể lấy lại code các việc 1–4 sau khi gộp chính thức |
 | `v2-2b-relay` | Relay B6 (category/tag cho nút trên thông báo) và trang quyền riêng tư (việc 26) | **Chưa deploy.** Cần bạn đồng ý |
 | `v2-3` | V2-3: tool trên desktop | Xong, đã gộp vào `shellx-v2` |
@@ -23,20 +23,8 @@ Bảng mã commit chính xác lúc dừng nằm ở cuối file, mục "Trạng 
 ### V2-4: xong
 Đã review, sửa, review lại và gộp vào `shellx-v2` (16/10 ~15:10). Ghi chú gộp với V2-2b: `sdd/v2-4/handoff-15-16.md`, mục "Integration notes".
 
-### V2-2b: hoàn tất rồi gộp
-- Xong việc 26. Đây là trang quyền riêng tư (nằm trên `v2-2b-relay`), quét quyền riêng tư và test đầu–cuối với relay chạy cục bộ.
-- Review toàn nhánh (`14e9eb1..HEAD` trên `v2-2b` và `5929cdc..HEAD` trên `v2-2b-relay`). Đợt sửa sau review phải gồm:
-  - option id chứa surrogate đơn lẻ làm mất cả thông báo; cần quay về thông báo thường;
-  - sheet cấu hình giữ trạng thái đang gửi theo từng instance, nên trả lời đến lúc sheet đang đóng có thể đóng luôn trang phiên;
-  - xem lại: nút Allow chỉ kiểm option id, không kiểm tên option;
-  - rà các chỗ `Watch(` trên mobile (khoảng 46–49) xem có lỗi "watch cũ" như F43 không.
-- Gộp vào `shellx-v2`. Xung đột cần giữ cả hai bên:
-  - ARB, rồi chạy `flutter gen-l10n` (desktop) và `intl_utils` (mobile);
-  - `settings_store.dart` và số khoá trong `settings_ownership_test.dart` (của nhánh kia + 1);
-  - `messages.dart`, `session_router.dart`, `lib/shellx_agent.dart`, `machine_client.dart`;
-  - mobile `pubspec.yaml`, `Info.plist`, Android manifest, `Podfile.lock` (giữ `COCOAPODS: 1.16.2`);
-  - `app_router.gr.dart` và `dependency.config.dart`: chạy lại build_runner;
-  - test "tripwire" `AiHost.runtime` trong `apps/desktop/test/tools/tool_ports_test.dart`: cập nhật bản sao trong `ai_runtimes.dart`.
+### V2-2b: xong
+Đã review, sửa, review lại và gộp vào `shellx-v2` (16/10 ~16:20). Còn để lại (follow-up): ký tự surrogate lẻ trong `detail`/`agentName` của push chưa kiểm; trang phiên mà lần liệt kê đầu lỗi trên kênh còn mở chỉ liệt kê lại ở kênh sau. Chi tiết: `sdd/v2-2b/handoff-20-26.md` (mục "Final update").
 
 ### V2-5a: tên app và giao diện mới
 - Viết nốt plan `docs/superpowers/plans/2026-10-16-v2-5a-name-and-design-system.md`. Các task còn "UNFINISHED" đã có dàn ý.
@@ -55,6 +43,7 @@ Danh sách gom từ các file `handoff-*.md` và từ mục "⚠ Kiểm tay" tro
 
 ## 3. Quyết định đang chờ bạn
 - Đồng ý deploy relay và trang quyền riêng tư (nhánh `v2-2b-relay`). Trước khi deploy:
+  - **Android giữ bản sao gốc (còn metadata) của ảnh chọn từ thư viện trong cache của app**, trong khi trang quyền riêng tư ghi "ShellX không lưu ảnh": hoặc sửa code để xoá bản sao, hoặc sửa câu chữ;
   - gửi thử một thông báo FCM thật có category và tag;
   - xem cảnh báo "1 high severity vulnerability" của `npm ci`.
 - Khi nào đưa V2 lên `main`. `shellx-v2` dựa trên `main` cũ (`5929cdc`); `main` đã có thêm commit phát hành của đồng đội.
@@ -77,7 +66,7 @@ Danh sách gom từ các file `handoff-*.md` và từ mục "⚠ Kiểm tay" tro
 ## 4. Làm tiếp bằng Claude Code (nếu muốn dùng lại quy trình)
 - Quy trình là subagent-driven development của plugin superpowers. Brief chung cho người điều phối: `coordination/controller-common.md`. Hai mục "Harness note" và "Scratch hygiene" là bài học rút ra trong hai ngày này.
 - Sổ theo dõi của từng plan nằm ở `.superpowers/sdd/<tên-plan>/`, thư mục này git-ignore. Bản sao đã có ở `sdd/`. Chép lại vào đúng chỗ thì người điều phối làm tiếp từ đúng điểm dừng.
-- Worktree: `.claude/worktrees/{v2-2b, v2-2b-relay, v2-4}` còn dùng. `v2-3`, `v2-4` và `int` đã gộp, xoá được.
+- Worktree: `.claude/worktrees/{v2-2b, v2-2b-relay, v2-4}` còn dùng. `v2-2b`, `v2-3`, `v2-4` và `int` đã gộp, xoá được; `v2-2b-relay` giữ tới khi deploy.
 - Flutter: `PATH=~/fvm/versions/3.41.4/bin:$PATH`.
 
 ## 5. Nội dung thư mục
@@ -95,8 +84,8 @@ Danh sách gom từ các file `handoff-*.md` và từ mục "⚠ Kiểm tay" tro
 | Nhánh | Commit | Ghi chú |
 |---|---|---|
 | `main` (origin) | `e74b02f3` | không đụng tới |
-| `shellx-v2` | (commit chứa thư mục này) | gốc `6a51fd3` = V2-3 đã gộp |
-| `v2-2b` | `2e354765` | `14e9eb1..` 42 commit; việc 26 chưa đóng review; chưa review toàn nhánh |
+| `shellx-v2` | V2-1, V2-2a, **V2-2b, V2-3, V2-4 (đều đã gộp, 16/10 ~16:20)**, 3 spec V2-5, plan V2-5a (chưa xong), thư mục bàn giao này | Ổn định. Kiểm toàn bộ trên bản gộp cuối: core 421, agent 1059, client 285, e2e 16, acp 87, ai 642, desktop 3932, mobile 1634, tất cả qua. **Toàn bộ V2 thử được trên máy thật từ nhánh này** |
+| `v2-2b` | `b37d1b0` | xong; đã gộp vào `shellx-v2` dưới dạng rebase |
 | `v2-2b-relay` | `b8d0197b` | `c6cf495` relay B6 + `b8d0197` trang quyền riêng tư; chưa deploy |
 | `v2-3` | `73b9bdfc` | đã gộp vào `shellx-v2` (rebase) |
 | `v2-4` | `adbdaf76` | xong; đã gộp vào `shellx-v2` dưới dạng rebase (`61d83574`) |

@@ -77,6 +77,7 @@ c24fbfa feat(v2-ai): a phone uses a V2-2b feature only with ai 2 and the listing
 - Task 23: complete (commits 8ad948d..6f11366, review clean)
 - Task 24: complete (commits 6f11366..7f998a1, review clean after fix round 1)
 - Task 25: complete (commits 7f998a1..3072513, review clean after fix round 1)
+- Task 26: commits 3072513..2e35476 on v2-2b (project ledger) and c6cf495..b8d0197 on v2-2b-relay (privacy pages); its task review runs in parallel with this final review
 - F19 (top-level ruling, chunk 2): ef867fe
 
 ## Diff files (read in passes, in this order)
