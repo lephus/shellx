@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shellx_ai/testing.dart' show FakeScenario;
 import 'package:shellx_desktop/src/browser/browser_engine.dart';
 import 'package:shellx_desktop/src/config/keybind_trigger.dart';
 import 'package:shellx_desktop/src/terminal/local_sessions_provider.dart';
@@ -13,12 +16,21 @@ import 'package:shellx_desktop/src/tools/tool_dock_state.dart';
 import 'package:shellx_desktop/src/tools/tool_pages.dart';
 import 'package:shellx_desktop/src/ui/terminal/key_sequence.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_intents.dart';
+import 'package:shellx_desktop/src/ui/ai/ai_scope.dart';
 import 'package:shellx_desktop/src/ui/terminal/terminal_workspace_page.dart';
 import 'package:shellx_desktop/src/ui/tools/tool_area.dart';
 
+import '../../support/ai_fakes.dart';
+import '../../support/ai_tabs.dart';
 import '../../support/config_workspace.dart';
 import '../../support/fake_local_sessions.dart';
 import '../../support/tool_harness.dart';
+
+/// A 1×1 PNG.
+final _png = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGA'
+  'WjR9awAAAABJRU5ErkJggg==',
+);
 
 void main() {
   late ToolRig rig;
@@ -45,6 +57,23 @@ void main() {
   /// The name on the dock's bar: the tool on show.
   String? barName(WidgetTester t) =>
       t.widget<Text>(find.byKey(const Key('tool.bar.name'))).data;
+
+  /// A file dropped at [at], as the platform reports it through
+  /// desktop_drop's channel (the plugin picks targets by their bounds, not by
+  /// what is on top).
+  Future<void> drop(WidgetTester t, Offset at, String path) async {
+    const channel = MethodChannel('desktop_drop');
+    Future<void> send(String method, Object arguments) =>
+        t.binding.defaultBinaryMessenger.handlePlatformMessage(
+          channel.name,
+          channel.codec.encodeMethodCall(MethodCall(method, arguments)),
+          (_) {},
+        );
+    await send('entered', [at.dx, at.dy]);
+    await send('performOperation', [path]);
+    await t.pump();
+    await t.pump();
+  }
 
   testWidgets('opening a tool shows the dock beside the panes; the page '
       'loads its URL and gets the keyboard (D3, D4)', (t) async {
@@ -662,23 +691,12 @@ void main() {
         rig.container.read(localSessionsProvider) as FakeLocalSessions;
     final pane = rig.container.read(terminalTabsProvider).selected!;
     final writes = local.views[pane.focusedPaneId]!.writes;
-    // As the platform reports a drop through desktop_drop's channel.
-    Future<void> drop(Offset at, String path) async {
-      const channel = MethodChannel('desktop_drop');
-      Future<void> send(String method, Object arguments) =>
-          t.binding.defaultBinaryMessenger.handlePlatformMessage(
-            channel.name,
-            channel.codec.encodeMethodCall(MethodCall(method, arguments)),
-            (_) {},
-          );
-      await send('entered', [at.dx, at.dy]);
-      await send('performOperation', [path]);
-      await t.pump();
-      await t.pump();
-    }
-
     // A drop reaches the pane while it shows.
-    await drop(t.getCenter(find.byKey(const ValueKey('tool.panesSlot'))), '/a');
+    await drop(
+      t,
+      t.getCenter(find.byKey(const ValueKey('tool.panesSlot'))),
+      '/a',
+    );
     expect(writes.join(), '/a ');
     final ws = rig.container
         .read(sidebarWorkspacesProvider.notifier)
@@ -687,10 +705,85 @@ void main() {
     await t.pumpAndSettle();
     await openTool(t, tool.id);
     expect(rig.container.read(toolDockProvider).loose, ws);
-    await drop(t.getCenter(find.byKey(const Key('tool.loose'))), '/b');
+    await drop(t, t.getCenter(find.byKey(const Key('tool.loose'))), '/b');
     await t.pumpAndSettle();
     expect(writes.join(), '/a ');
     expect(rig.container.read(toolDockProvider).loose, ws);
+    await disposeWorkspace(t, rig.container);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('a file dropped on a zoomed dock types nothing into the '
+      'terminal under it; restored, the pane takes drops again (V2-3 D3)', (
+    t,
+  ) async {
+    await rig.pump(t);
+    final local =
+        rig.container.read(localSessionsProvider) as FakeLocalSessions;
+    final pane = rig.container.read(terminalTabsProvider).selected!;
+    final writes = local.views[pane.focusedPaneId]!.writes;
+    Offset panes() => t.getCenter(find.byKey(const ValueKey('tool.panesSlot')));
+    final tool = rig.add(kDefaultWorkspaceId, 'localhost:1');
+    await t.pumpAndSettle();
+    await openTool(t, tool.id);
+    // Beside the dock the pane takes a drop (the positive control).
+    await drop(t, panes(), '/a');
+    expect(writes.join(), '/a ');
+    await t.tap(find.byKey(const Key('tool.bar.expand')));
+    await t.pumpAndSettle();
+    final under = panes();
+    expect(
+      t.getRect(find.byKey(const ValueKey('tool.dockSlot'))).contains(under),
+      isTrue,
+      reason: 'on the zoomed dock, over the pane',
+    );
+    await drop(t, under, '/b');
+    await t.pumpAndSettle();
+    expect(writes.join(), '/a ');
+    await t.tap(find.byKey(const Key('tool.bar.expand')));
+    await t.pumpAndSettle();
+    await drop(t, panes(), '/c');
+    expect(writes.join(), '/a /c ');
+    await disposeWorkspace(t, rig.container);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
+  testWidgets('an image dropped over a zoomed dock or over the panel of a '
+      'workspace shown without a tab attaches nothing to the AI composer '
+      'under it (V2-3 D3, D4)', (t) async {
+    await rig.pump(t, extra: FakeAiRuntimes(const FakeScenario()).overrides);
+    openTestAiTab(rig.container, cwd: testAiCwd);
+    await t.pumpAndSettle();
+    final composer = find.byKey(const Key('ai.composer'));
+    expect(composer, findsOneWidget);
+    final ui = AiPaneScope.of(t.element(composer)).ui;
+    ui.readImageFile = (_) async => _png;
+    Future<void> dropImage(String path) async {
+      await drop(t, t.getCenter(composer), path);
+      for (var i = 0; i < 3; i++) {
+        await t.pump();
+      }
+    }
+
+    final tool = rig.add(kDefaultWorkspaceId, 'localhost:1');
+    await t.pumpAndSettle();
+    await openTool(t, tool.id);
+    // Beside the dock the composer takes an image (the positive control).
+    await dropImage('/shots/a.png');
+    expect(ui.images.items, hasLength(1));
+    await t.tap(find.byKey(const Key('tool.bar.expand')));
+    await t.pumpAndSettle();
+    await dropImage('/shots/b.png');
+    expect(ui.images.items, hasLength(1), reason: 'under the zoomed dock');
+    await t.tap(find.byKey(const Key('tool.bar.expand')));
+    await t.pumpAndSettle();
+    final ws = rig.container
+        .read(sidebarWorkspacesProvider.notifier)
+        .createFor(name: 'B');
+    final other = rig.add(ws, 'localhost:2');
+    await t.pumpAndSettle();
+    await openTool(t, other.id);
+    expect(rig.container.read(toolDockProvider).loose, ws);
+    await dropImage('/shots/c.png');
+    expect(ui.images.items, hasLength(1), reason: 'under the loose panel');
     await disposeWorkspace(t, rig.container);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 

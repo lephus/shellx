@@ -5,11 +5,13 @@ import 'dart:ui' as ui;
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:shellx_ai/shellx_ai.dart' show AiSessionState;
 
 import '../../../l10n/app_localizations.dart';
 import '../../ai/ai_off_thread.dart';
+import '../../tools/tool_dock.dart' show toolPanesCoveredProvider;
 import '../theme/shellx_desktop_theme.dart';
 import 'ai_scope.dart';
 
@@ -171,8 +173,10 @@ Future<List<String>> aiEncodeImages(OffThread run, List<Uint8List> images) {
 /// D16 around the composer: a paste attaches the pictures among the files on
 /// the clipboard, else pastes the text on it at the cursor, else attaches the
 /// image on it; and images dropped on the composer go with the next message. A
-/// hidden pane takes no drop (`DropTarget` hears drops while invisible).
-class AiImageInput extends StatelessWidget {
+/// hidden pane takes no drop (`DropTarget` hears drops while invisible), nor
+/// one a zoomed tool dock or a workspace shown without a tab covers (V2-3 D3,
+/// D4: desktop_drop picks targets by their bounds, not by what is on top).
+class AiImageInput extends ConsumerWidget {
   const AiImageInput({super.key, required this.child});
   final Widget child;
 
@@ -282,7 +286,7 @@ class AiImageInput extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => Actions(
+  Widget build(BuildContext context, WidgetRef ref) => Actions(
     actions: {
       AiPasteIntent: CallbackAction<AiPasteIntent>(
         onInvoke: (_) {
@@ -292,7 +296,7 @@ class AiImageInput extends StatelessWidget {
       ),
     },
     child: DropTarget(
-      enable: aiPaneShown(context),
+      enable: aiPaneShown(context) && !ref.watch(toolPanesCoveredProvider),
       onDragDone: (details) => unawaited(_drop(context, details)),
       child: child,
     ),
