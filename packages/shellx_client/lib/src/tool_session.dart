@@ -225,6 +225,16 @@ final class ToolSession {
   bool _checking = false;
   bool _checkAgain = false;
 
+  /// M1: every [_unserve] makes a new one. A [_serve] under way that finds
+  /// another after an await was overtaken by a pause or a close: it closes
+  /// at once what it bound.
+  int _generation = 0;
+
+  /// M2: the pause under way (its servers closing), and whether [resume]
+  /// came meanwhile: the page is served again once that pause is over.
+  Future<void>? _pausing;
+  bool _resumeAfterPause = false;
+
   ToolPhase get phase => _phase;
 
   /// The tool's port on the computer.
@@ -271,22 +281,42 @@ final class ToolSession {
   }
 
   /// The app goes to the background (E13): nothing is served until
-  /// [resume]; every stream ends.
-  Future<void> pause() async {
-    if (_phase == ToolPhase.closed) return;
-    _retry?.cancel();
-    await _unserve();
-    _set(ToolPhase.paused);
+  /// [resume]; every stream ends. The page says so at once (a check under
+  /// way stops at its next step); the future completes once the servers
+  /// are closed.
+  Future<void> pause() {
+    if (_phase == ToolPhase.closed) return Future<void>.value();
+    _resumeAfterPause = false; // the last word holds
+    return _pausing ??= _pause();
   }
 
-  /// The app is back: served again (the port may change), then loaded.
+  Future<void> _pause() async {
+    _retry?.cancel();
+    final unserving = _unserve();
+    _set(ToolPhase.paused);
+    await unserving;
+    _pausing = null;
+    if (_resumeAfterPause) {
+      _resumeAfterPause = false;
+      resume();
+    }
+  }
+
+  /// The app is back: served again (the port may change), then loaded; M2:
+  /// once a pause still under way is over (its ports are free again).
   void resume() {
+    if (_pausing != null) {
+      _resumeAfterPause = true;
+      return;
+    }
     if (_phase != ToolPhase.paused) return;
     _set(ToolPhase.opening);
     unawaited(_check());
   }
 
-  /// The page was left (E13): nothing is served, the computer is told.
+  /// The page was left (E13): nothing is served, the computer is told. M1:
+  /// final from the call on: the page says closed at once, nothing changes
+  /// that, and a second call does nothing.
   Future<void> close() async {
     if (_phase == ToolPhase.closed) return;
     _retry?.cancel();
@@ -294,17 +324,25 @@ final class ToolSession {
       unawaited(subscription.cancel());
     }
     _subscriptions.clear();
-    await _unserve();
+    final unserving = _unserve();
+    _set(ToolPhase.closed);
+    await unserving;
     link.enqueue(ToolClose(tool: tool));
     _release?.call();
     _release = null;
-    _set(ToolPhase.closed);
     unawaited(_events.close());
     unawaited(_changes.close());
   }
 
+  /// M1: a close is final, and a pause holds until [resume] or [close]: a
+  /// check still under way when either came never overwrites it.
   void _set(ToolPhase phase) {
-    if (_phase == phase) return;
+    if (_phase == phase || _phase == ToolPhase.closed) return;
+    if (_phase == ToolPhase.paused &&
+        phase != ToolPhase.opening &&
+        phase != ToolPhase.closed) {
+      return;
+    }
     _phase = phase;
     if (!_changes.isClosed) _changes.add(null);
   }
@@ -391,11 +429,11 @@ final class ToolSession {
     _path = main.path;
     final wasReady = _phase == ToolPhase.ready;
     if (_servers.isEmpty) {
+      final generation = _generation;
       await _serve(serving);
-      if (_phase == ToolPhase.closed || _phase == ToolPhase.paused) {
-        await _unserve();
-        return;
-      }
+      // M1: a pause or a close came meanwhile (each unserves first): this
+      // serve closed what it bound, and the page says what they said.
+      if (generation != _generation) return;
       if (_servers.isEmpty) {
         // S2: no port on every loopback address of this phone. Tried again
         // by itself, the delays growing as refused's do (R-C3-1).
@@ -452,18 +490,32 @@ final class ToolSession {
   /// Binds the tool on its port (or another, E3) and each other tool of the
   /// workspace on its own port when it is free (E4): a port is the phone's
   /// only when it holds it on every loopback address it has (S2). Nothing is
-  /// served when the tool itself gets no such port.
+  /// served when the tool itself gets no such port. M1: overtaken by a
+  /// pause or a close (an [_unserve]) at any await, it stops there and
+  /// closes at once what it bound since.
   Future<void> _serve(List<ToolServing> serving) async {
+    final generation = _generation;
+    bool overtaken() => generation != _generation;
     _secret = _random();
     final addresses = await _loopbacks();
+    if (overtaken()) return;
     final main = serving.first;
-    final own =
-        await _bind(main.port, addresses) ?? await _bindAnyPort(addresses);
+    var own = await _bind(main.port, addresses);
+    if (own == null && !overtaken()) own = await _bindAnyPort(addresses);
     if (own == null) return;
+    if (overtaken()) return _closeAll(own);
     _servers.add(_Served(this, main.id, own, main: true));
     for (final other in serving.skip(1)) {
       final servers = await _bind(other.port, addresses);
-      if (servers != null) _servers.add(_Served(this, other.id, servers));
+      if (servers == null) continue;
+      if (overtaken()) return _closeAll(servers);
+      _servers.add(_Served(this, other.id, servers));
+    }
+  }
+
+  static Future<void> _closeAll(List<HttpServer> servers) async {
+    for (final server in servers) {
+      await server.close(force: true).catchError((Object _) => server);
     }
   }
 
@@ -539,6 +591,7 @@ final class ToolSession {
   }
 
   Future<void> _unserve() async {
+    _generation++; // a serve under way is overtaken (M1)
     for (final stream in [..._streams]) {
       stream.abort();
     }
