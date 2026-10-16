@@ -103,20 +103,22 @@ class ToolProjectList extends ConsumerWidget {
 }
 
 /// D22: "Clear tool data…": asks, then signs every tool out (one store,
-/// D8).
+/// D8). The answer can come after Settings closed (a notification click
+/// closes it under the question), when [ref] is dead: both providers are
+/// read before the question.
 Future<void> confirmClearToolData(WidgetRef ref, AppLocalizations l10n) async {
-  final yes = await ref
-      .read(windowRouterProvider.notifier)
-      .confirm(
-        ConfirmRequest(
-          title: l10n.toolClearDataConfirm,
-          body: l10n.toolClearDataNote,
-          confirmLabel: l10n.toolClearDataAction,
-        ),
-      );
+  final router = ref.read(windowRouterProvider.notifier);
+  final store = ref.read(toolDataStoreProvider);
+  final yes = await router.confirm(
+    ConfirmRequest(
+      title: l10n.toolClearDataConfirm,
+      body: l10n.toolClearDataNote,
+      confirmLabel: l10n.toolClearDataAction,
+    ),
+  );
   if (!yes) return;
   try {
-    await ref.read(toolDataStoreProvider).clearAll();
+    await store.clearAll();
   } on Object catch (error) {
     debugPrint('tool data not cleared (${error.runtimeType})');
   }
