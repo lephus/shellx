@@ -13,3 +13,8 @@ export 'src/spacing.dart';
 export 'src/system_font.dart';
 export 'src/terminal_palette.dart';
 export 'src/type_scale.dart';
+export 'src/widgets/glass.dart';
+export 'src/widgets/gradient_layer.dart';
+export 'src/widgets/inset_box.dart';
+export 'src/widgets/slant_border.dart';
+export 'src/widgets/wedge.dart';
