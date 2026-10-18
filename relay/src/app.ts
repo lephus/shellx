@@ -16,6 +16,7 @@ import { deviceRoutes } from "./routes/devices.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { pairingRoutes } from "./routes/pairings.js";
 import { machineRoutes } from "./v2/machines.js";
+import { relayTicketRoutes } from "./v2/relay-tickets.js";
 import { machinePairingRoutes, randomPairingCode } from "./v2/pairings.js";
 import type { PushGateway } from "./push/fcm.js";
 import { webSocketAuth, webSocketUpgrade } from "./routes/ws.js";
@@ -107,6 +108,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   app.route("/v1/notifications", notificationRoutes);
   app.route("/v2/machines", machineRoutes);
   app.route("/v2/pairings", machinePairingRoutes);
+  app.route("/v2/relay/tickets", relayTicketRoutes);
   app.get("/v1/ws", webSocketAuth, webSocketUpgrade);
 
   app.notFound((c) => {
