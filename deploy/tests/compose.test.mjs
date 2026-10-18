@@ -160,6 +160,19 @@ test('README Relay v2 runbook has the G2 foreign_key_check pre-check on a copy o
   assert.match(section, /PRAGMA foreign_key_check;/);
   assert.match(section, /COPY of\s+the production database, never on the live file/);
   assert.ok(section.indexOf('foreign_key_check') < section.indexOf('1. **VPS prerequisites**'), 'pre-check comes before the steps');
+  assert.match(section, /before you push main with migration 0005/i);
+  assert.match(section, /up to 24 h old/);
+});
+
+test('README Relay v2 runbook: merge with --no-ff, inline PROXY, pre-build, rollback note', () => {
+  const readme = readFileSync(join(deployDir, 'README.md'), 'utf8');
+  const section = readme.match(/^## Relay v2[\s\S]*?(?=\n## )/m)[0];
+  assert.match(section, /git merge --no-ff/);
+  assert.match(section, /never squash/i);
+  assert.match(section, /PROXY=\$\(docker ps[^\n]*nginx-proxy\)/);
+  assert.match(section, /docker compose --profile relay2 build relay2/);
+  assert.ok(section.indexOf('build relay2') < section.indexOf("echo 'COMPOSE_PROFILES=relay2'"), 'pre-build comes before enabling the profile');
+  assert.match(section, /workflow_dispatch[^\n]*\n?[^\n]*pre-v2/);
 });
 
 test('README switch-off removes the relay2 container (a deactivated profile makes no orphan) before dropping the profile', () => {

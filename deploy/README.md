@@ -274,11 +274,17 @@ upstream authors is open), so nothing is pulled or pushed for it: it is built fr
 profile `relay2`; a deploy without `COMPOSE_PROFILES=relay2` in the VPS's `.env` behaves exactly as
 before (relay + web + backup). deploy.yml never syncs `relay2-src/`.
 
-**G2 pre-check, before the first deploy of migration 0005 (once).** Migration 0005 rebuilds the
+**Merge procedure (read first).** The relay2 pin `57dd520ccf20b55c7eac662f1e09eae1c5069917` in
+`docker-compose.yml` must stay reachable from `main`, because the rollout stages and the workflow
+rollback checks require it. Merge `feat/relay-v2` with a real merge commit (`git merge --no-ff`;
+never squash, never rebase), or re-pin compose to a commit that is on `main` before enabling relay2.
+
+**G2 pre-check, before you push main with migration 0005 (once).** deploy.yml deploys `main`, so the
+push that carries migration 0005 IS the production deploy of it. Migration 0005 rebuilds the
 `devices` table (to allow `kind = 'desktop'`) and fails closed: on any dangling reference it rolls back,
-the relay stays unhealthy and the deploy rolls back. So first look for dangling references on a COPY of
-the production database, never on the live file `data/relay.db`. On the VPS, with the newest nightly
-backup as the copy:
+the relay stays unhealthy and the deploy rolls back. So, before that push, look for dangling references
+on a COPY of the production database, never on the live file `data/relay.db`. On the VPS, with the newest
+nightly backup as the copy (it may be up to 24 h old; 0005 still fails closed on anything newer):
 
 ```bash
 cd ~/phu/shellx
@@ -335,16 +341,19 @@ Any output row means a dangling reference: stop, do not deploy, and report it. N
    exact-match location and the rewrite:
 
    ```bash
+   PROXY=$(docker ps --format '{{.Names}}' | grep -m1 nginx-proxy)
    docker exec "$PROXY" nginx -T 2>/dev/null | grep -B2 -A8 'location = /v2/relay'
    ```
 
    It must show a `location = /v2/relay` block that proxies to relay2 with `/v1/relay`, and the
    `/` location still going to the relay. If your nginx-proxy version ignores `VIRTUAL_PATH` with `=`
    or `VIRTUAL_DEST`, use the fallback below.
-5. **Enable.** Add the profile, then deploy (push `main` or run the workflow):
+5. **Enable.** First build relay2 once by hand, so the first deploy does not run a cold Rust build
+   inside the 30-minute deploy job, then add the profile and deploy (push `main` or run the workflow):
 
    ```bash
-   cd ~/phu/shellx && grep -q '^COMPOSE_PROFILES=' .env || echo 'COMPOSE_PROFILES=relay2' >> .env
+   cd ~/phu/shellx && docker compose --profile relay2 build relay2
+   grep -q '^COMPOSE_PROFILES=' .env || echo 'COMPOSE_PROFILES=relay2' >> .env
    ```
 
    If `.env` already has a `COMPOSE_PROFILES` line, add `relay2` to it by hand. rollout.sh then
@@ -354,7 +363,9 @@ Any output row means a dangling reference: stop, do not deploy, and report it. N
    `IMAGE_TAG` stay as they were. Then set the repository variable `RELAY2_ENABLED` to `true`
    (Settings, Environments, production, Variables) so deploy.yml also checks that
    `GET https://relay.shellx.pro/v2/relay` answers 400 or 426; the `/v2/relay/tickets` check (401
-   `unauthorized`, served by the Node relay) always runs.
+   `unauthorized`, served by the Node relay) always runs. Note: a workflow_dispatch rollback to a
+   pre-v2 commit makes that `/v2/relay/tickets` check red although the rollout worked (expected; check
+   the relay logs instead).
 6. **Fallback: own subdomain.** If the path routing does not work on your nginx-proxy, branch
    `feat/relay-v2-subdomain` serves relay2 at `wss://relay2.shellx.pro/v1/relay` (own hostname and
    certificate, `nginx-proxy/relay2.shellx.pro`, DNS A record for `relay2.shellx.pro` first, and add
