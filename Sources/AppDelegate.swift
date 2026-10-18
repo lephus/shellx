@@ -1718,6 +1718,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         CmuxTuiSurfaceProviderRegistry.shared.start(catalog: .shared)
         let env = ProcessInfo.processInfo.environment
+        #if DEBUG
+        ShellXBridgeDebugStart.startIfRequested(environment: env) // ShellX: temporary, removed in Task 13
+        #endif
         let telemetryEnabled = TelemetrySettings.enabledForCurrentLaunch
         let sentryStartupPolicy = MacSentryStartupPolicy(
             environment: env,
@@ -2566,6 +2569,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         WebViewInspectorTeardown.closeAllInspectors(in: NSApp.windows)
     }
     func applicationWillTerminate(_ notification: Notification) {
+        #if DEBUG
+        ShellXBridgeDebugStart.stop() // ShellX: temporary, removed in Task 13
+        #endif
         cloudWorkspaceOperationController?.cancelAll()
         StartupBreadcrumbLog.append("appDelegate.willTerminate.begin")
         agentChatTranscriptService.shutdown()
