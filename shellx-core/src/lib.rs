@@ -21,6 +21,7 @@ pub use config::Config;
 pub use envelope::CoreError;
 
 use serde_json::{Value, json};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 use store::StateStore;
@@ -55,6 +56,9 @@ pub struct Core {
     agent: OnceLock<ureq::Agent>,
     /// Serializes calls that create or replace state files (device key, session).
     auth_lock: Mutex<()>,
+    /// `pairing_id → fingerprint` shown by the most recent `pair.pending`
+    /// (Ruling R14, see `pairing`). Public keys' fingerprints only, no secrets.
+    shown_fingerprints: Mutex<HashMap<String, String>>,
 }
 
 impl Core {
@@ -74,6 +78,7 @@ impl Core {
         if method == "config.set" {
             let cfg = Config::from_params(&params)?;
             *self.config.lock().unwrap_or_else(|p| p.into_inner()) = Some(cfg);
+            self.shown_fingerprints.lock().unwrap_or_else(|p| p.into_inner()).clear();
             return Ok(json!({}));
         }
         let cfg = self
@@ -103,8 +108,18 @@ impl Core {
             "machines.heartbeat" => machines::heartbeat(self.agent(), &cfg, &store),
             "tickets.mint" => tickets::mint(self.agent(), &cfg, &store, &params),
             "pair.request" => pairing::request(self.agent(), &cfg, &store, &params),
-            "pair.pending" => pairing::pending(self.agent(), &cfg, &store),
-            "pair.approve" => pairing::approve(self.agent(), &cfg, &store, &params),
+            "pair.pending" => {
+                let shown = pairing::pending(self.agent(), &cfg, &store)?;
+                *self.shown_fingerprints.lock().unwrap_or_else(|p| p.into_inner()) =
+                    pairing::shown_fingerprints(&shown);
+                Ok(shown)
+            }
+            "pair.approve" => {
+                let remembered = params.get("pairing_id").and_then(Value::as_str).and_then(|id| {
+                    self.shown_fingerprints.lock().unwrap_or_else(|p| p.into_inner()).get(id).cloned()
+                });
+                pairing::approve(self.agent(), &cfg, &store, &params, remembered.as_deref())
+            }
             "pair.deny" => pairing::deny(self.agent(), &cfg, &store, &params),
             "pair.poll" => pairing::poll(self.agent(), &cfg, &store, &params),
             _ => Err(CoreError::new("unknown_method", format!("method not implemented: {method}"))),

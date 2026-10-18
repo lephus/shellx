@@ -81,6 +81,10 @@ impl Pair {
         let r = self.a.call("pair.request", json!({"to_machine_id": self.b_id})).unwrap();
         r["pairing_id"].as_str().unwrap().to_string()
     }
+    /// B lists its pending requests (what the person sees before approving).
+    fn show(&self) -> Value {
+        self.b.call("pair.pending", json!({})).unwrap()
+    }
     fn approve_posts(&self) -> usize {
         self.fake.requests().iter().filter(|r| r.path.ends_with("/approve")).count()
     }
@@ -127,6 +131,7 @@ fn approve_seals_and_requester_opens() {
     let p = pair();
     let pid = p.request();
     assert_eq!(p.a.call("pair.poll", json!({"pairing_id": pid})).unwrap(), json!({"status": "pending"}));
+    p.show();
     let out = p.b.call("pair.approve", json!({"pairing_id": pid, "invite_uri": uri()})).unwrap();
     assert_eq!(out, json!({}));
     let poll = p.a.call("pair.poll", json!({"pairing_id": pid, "write_invite_to": "invite-b.uri"})).unwrap();
@@ -159,6 +164,7 @@ fn approve_seals_and_requester_opens() {
 fn poll_returns_invite_uri_when_not_written() {
     let p = pair();
     let pid = p.request();
+    p.show();
     p.b.call("pair.approve", json!({"pairing_id": pid, "invite_uri": uri()})).unwrap();
     let poll = p.a.call("pair.poll", json!({"pairing_id": pid})).unwrap();
     assert_eq!(poll["invite_uri"], json!(uri()));
@@ -234,6 +240,7 @@ fn approve_refuses_non_pending() {
 fn poll_rejects_invite_moved_to_another_pairing() {
     let p = pair();
     let pid1 = p.request();
+    p.show();
     p.b.call("pair.approve", json!({"pairing_id": pid1, "invite_uri": uri()})).unwrap();
     let pid2 = p.request();
     p.fake.move_sealed_invite(&pid1, &pid2);
@@ -323,4 +330,49 @@ fn unregistered_machine_cannot_pair() {
         assert_eq!(core.call(m, params).unwrap_err().code, "not_registered", "{m}");
     }
     assert!(requests_to(&fake, "/v2/pairings").is_empty());
+}
+
+/// The attacker key a lying server swaps in (a valid X25519 point).
+fn attacker_key() -> [u8; 32] {
+    x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from([9u8; 32])).to_bytes()
+}
+
+#[test]
+fn approve_without_shown_fingerprint_fails_closed() {
+    let p = pair();
+    let pid = p.request();
+    // No pair.pending on this Core and no fingerprint param: nothing was shown.
+    let e = p.b.call("pair.approve", json!({"pairing_id": pid, "invite_uri": uri()})).unwrap_err();
+    assert_eq!(e.code, "fingerprint_mismatch");
+    assert_eq!(p.approve_posts(), 0);
+    // config.set forgets what was shown.
+    p.show();
+    support::configure(&p.b, &p.fake.base_url, &p._b_dir, json!({}));
+    let e = p.b.call("pair.approve", json!({"pairing_id": pid, "invite_uri": uri()})).unwrap_err();
+    assert_eq!(e.code, "fingerprint_mismatch");
+    assert_eq!(p.approve_posts(), 0);
+}
+
+#[test]
+fn approve_refuses_key_swapped_after_pending() {
+    let p = pair();
+    let pid = p.request();
+    let shown = p.show()["pairings"][0]["fingerprint"].clone();
+    assert_eq!(shown, p.a_login["fingerprint"]);
+    // The server swaps the key and keeps its fingerprint consistent with it.
+    p.fake.swap_requester_key(&pid, attacker_key());
+    // Remembered fingerprint (no param) ...
+    let e = p.b.call("pair.approve", json!({"pairing_id": pid, "invite_uri": uri()})).unwrap_err();
+    assert_eq!(e.code, "fingerprint_mismatch");
+    // ... and the shown fingerprint passed explicitly.
+    let e = p.b.call("pair.approve", json!({"pairing_id": pid, "invite_uri": uri(), "fingerprint": shown})).unwrap_err();
+    assert_eq!(e.code, "fingerprint_mismatch");
+    assert_eq!(p.approve_posts(), 0);
+    // The param wins over the remembered value: a wrong param is refused even
+    // though the last pending showed the (now current) attacker fingerprint.
+    let now_shown = p.show()["pairings"][0]["fingerprint"].clone();
+    assert_ne!(now_shown, shown);
+    let e = p.b.call("pair.approve", json!({"pairing_id": pid, "invite_uri": uri(), "fingerprint": shown})).unwrap_err();
+    assert_eq!(e.code, "fingerprint_mismatch");
+    assert_eq!(p.approve_posts(), 0);
 }

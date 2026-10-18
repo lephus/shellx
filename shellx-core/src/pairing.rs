@@ -11,6 +11,14 @@
 //!   `pairing_not_pending`, `contract_missing_requester_key`,
 //!   `fingerprint_mismatch`) **before** any POST; it seals to the exact key bytes
 //!   whose fingerprint it checked.
+//! * Shown-fingerprint rule (fails closed, Ruling R14): the server controls both
+//!   `requester_x25519_b64` and `requester_fingerprint`, so agreeing with the
+//!   server proves nothing about the key the person compared. `pair.approve`
+//!   seals only if the fingerprint of the re-fetched key equals the fingerprint
+//!   the person was shown: the `fingerprint` param when given (it wins), else the
+//!   one this `Core` returned for that `pairing_id` in its most recent
+//!   `pair.pending` (an in-memory map, replaced by every successful
+//!   `pair.pending`, cleared by `config.set`). Neither → `fingerprint_mismatch`.
 //! * The invite URI is a secret (it carries the enrollment PSK and a relay
 //!   ticket): it is never logged, never put in an error, and returned by
 //!   `pair.poll` only when `write_invite_to` is absent. With `write_invite_to` it
@@ -31,6 +39,7 @@ use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_S
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::fmt;
 use zeroize::Zeroizing;
 
@@ -248,16 +257,37 @@ pub fn pending(agent: &ureq::Agent, cfg: &Config, store: &StateStore) -> Result<
     Ok(json!({"pairings": pairings}))
 }
 
-pub fn approve(agent: &ureq::Agent, cfg: &Config, store: &StateStore, params: &Value) -> Result<Value, CoreError> {
+/// `pairing_id → fingerprint` of every item a `pair.pending` result shows (items
+/// without a usable key show `""` and are left out).
+pub fn shown_fingerprints(pending: &Value) -> HashMap<String, String> {
+    pending["pairings"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|it| Some((it["pairing_id"].as_str()?.to_string(), it["fingerprint"].as_str()?.to_string())))
+        .filter(|(id, fp)| !id.is_empty() && !fp.is_empty())
+        .collect()
+}
+
+/// `remembered` = the fingerprint the last `pair.pending` of this `Core` showed
+/// for the pairing, if any (see the shown-fingerprint rule in the module docs).
+pub fn approve(
+    agent: &ureq::Agent,
+    cfg: &Config,
+    store: &StateStore,
+    params: &Value,
+    remembered: Option<&str>,
+) -> Result<Value, CoreError> {
     object(params)?;
     let pairing_id = pairing_id_param(params)?;
     let invite_uri = params
         .get("invite_uri")
         .and_then(Value::as_str)
         .ok_or_else(|| CoreError::invalid_params("invite_uri is required and must be a string"))?;
-    // Optional: the fingerprint the user compared on screen. When given, the key
-    // sealed to must still have it (closes a key swap between pending and approve).
-    let shown = match params.get("fingerprint") {
+    // The fingerprint the person compared on screen; the param wins over the
+    // remembered one. The key sealed to must still have it (closes a server key
+    // swap between pending and approve).
+    let param_fp = match params.get("fingerprint") {
         None | Some(Value::Null) => None,
         Some(Value::String(f)) => Some(f.as_str()),
         Some(_) => return Err(CoreError::invalid_params("fingerprint must be a string")),
@@ -283,8 +313,17 @@ pub fn approve(agent: &ureq::Agent, cfg: &Config, store: &StateStore, params: &V
     if fp != item.requester_fingerprint {
         return Err(CoreError::new("fingerprint_mismatch", "requester key does not match the server fingerprint"));
     }
-    if shown.is_some_and(|s| s != fp) {
-        return Err(CoreError::new("fingerprint_mismatch", "requester key does not match the fingerprint shown"));
+    match param_fp.or(remembered) {
+        Some(shown) if shown == fp => {}
+        Some(_) => {
+            return Err(CoreError::new("fingerprint_mismatch", "requester key does not match the fingerprint shown"));
+        }
+        None => {
+            return Err(CoreError::new(
+                "fingerprint_mismatch",
+                "no fingerprint was shown for this pairing (call pair.pending or pass fingerprint)",
+            ));
+        }
     }
     // Sealed to `key`, the exact bytes `fp` was computed from.
     let sealed = seal::seal_invite(&key, pairing_id, invite_uri)?;

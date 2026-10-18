@@ -272,6 +272,15 @@ impl FakeApi {
         }
     }
 
+    /// Replace a pairing's requester key and keep `requester_fingerprint`
+    /// consistent with it (a server swapping in an attacker key). Test hook.
+    pub fn swap_requester_key(&self, pairing_id: &str, public: [u8; 32]) {
+        if let Some(p) = self.shared.lock().pairings.get_mut(pairing_id) {
+            p.requester_fingerprint = key_fingerprint(&URL_SAFE_NO_PAD.encode(public));
+            p.requester_x25519 = Some(public.to_vec());
+        }
+    }
+
     /// Forget a pairing's requester key, so `role=target` items lack
     /// `requester_x25519_b64` (a server without D2). Test hook.
     pub fn drop_requester_key(&self, pairing_id: &str) {
