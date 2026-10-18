@@ -1,5 +1,6 @@
 //! Pure Rust model for the ShellX Windows app: no GPUI, no libghostty.
 
+pub mod account;
 pub mod core_api;
 pub mod keys;
 pub mod layout;

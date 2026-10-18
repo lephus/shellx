@@ -128,8 +128,45 @@ pub fn ui_assets() -> Result<()> {
     Ok(())
 }
 
+/// Cross-platform, no GPUI: shellx-core links and answers over a temp state
+/// dir. No network is touched (a logged-out core fails before any request).
+pub fn core_bridge() -> Result<()> {
+    use shellx_model::core_api::{CoreCall, CoreConfig, config_set, list_machines};
+    let dir = std::env::temp_dir().join(format!("shellx-smoke-core-{}", std::process::id()));
+    let bridge = crate::core_bridge::CoreBridge::new();
+    config_set(
+        &bridge,
+        &CoreConfig {
+            api_base: "https://relay.shellx.pro".into(),
+            state_dir: dir.to_string_lossy().into_owned(),
+            app_version: shellx_model::VERSION.into(),
+            os_version: crate::os_info::os_version(),
+            device_name: crate::os_info::device_name(),
+        },
+    )
+    .map_err(|e| anyhow::anyhow!("config.set: {e}"))?;
+    let result = list_machines(&bridge);
+    let _ = std::fs::remove_dir_all(&dir);
+    let err = match result {
+        Ok(_) => bail!("machines.list succeeded without a session"),
+        Err(e) => e,
+    };
+    ensure!(
+        err.code == "not_logged_in" || err.code == "unknown_method",
+        "machines.list: unexpected error {err}"
+    );
+    let unknown = bridge.call("no.such.method", serde_json::json!({}));
+    ensure!(
+        matches!(&unknown, Err(e) if e.code == "unknown_method"),
+        "unknown method did not map to unknown_method"
+    );
+    println!("smoke-core: config.set OK, machines.list -> {}", err.code);
+    Ok(())
+}
+
 pub fn run() -> Result<()> {
     ui_assets()?;
+    core_bridge()?;
     let started = Instant::now();
     let (program, args) = default_shell();
     let mut full_args = args.clone();
