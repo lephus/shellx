@@ -143,6 +143,20 @@ Both ends are WebSocket clients, so their frames are masked: a raw grep alone gi
 
 Recorded 2026-10-19. Workflow `.github/workflows/shellx-windows-spike.yml` on fork branch `shellx/w0-spikes`. First run `39142103019`: `-gnu` green, `-msvc` test compile failed (`KeyInput { key: u32::MAX }`, bindgen makes `GhosttyKey` `i32` under MSVC). Fix `03e475b590` (`u32::MAX as _`). Run `39146962148`: **both `x86_64-pc-windows-msvc` and `-gnu` green**: libghostty-vt build (Zig 0.16.0), `cmux-tui-core` platform tests, `cmux-tui.exe`, long-path tests, process-exit / ConPTY resize smokes, remote-probe check. Artifacts `cmux-tui-x86_64-pc-windows-msvc` (9.88 MB), `cmux-tui-x86_64-pc-windows-gnu` (9.91 MB). §13 fallback (`alacritty_terminal`) not needed. Note: this proves the core builds and ConPTY works; `cmux-remote` on Windows is still uncompiled (see D-W0-1).
 
+### GPUI terminal spike CI (W0 Task 7 Step 1–2) — PASS
+
+Recorded 2026-10-19. Spike `spikes/windows-term` (own Cargo workspace, GPUI window + `cmux-tui-core` session) on fork branch `shellx/w0-spikes` `ada66c3042`, job `term-spike` in `shellx-windows-spike.yml`. Run `39149103261`: all three jobs green (`windows` msvc 16 min, gnu 28 min, `term spike` msvc 8.6 min). Artifact `shellx-term-spike` (`shellx-term-spike.exe`). Still open: W0 Task 7 Step 3 hands-on checks on the user's Windows 11 PC (Telex/Unikey/EVKey, 150/200 % scaling, Typometer vs Windows Terminal, Narrator) = sprint gate G1. CI note: `actions/upload-artifact` and `mlugg/setup-zig` pins still target Node 20 (forced to Node 24, warning only).
+
+## Sprint rulings (L0, 2026-10-19, before T+0)
+
+Sub-plans written: `plans/2026-10-19-native-desktop-w2-server.md` (L4, 12 tasks), `-w2-mac-remote.md` (L5 Tasks 1–14 + L3 Tasks U1–U4), `-w3-release-share.md`, `-w4-windows-mvp.md`. K1 amended in the master plan:
+
+- **D1** one X25519 device key per shellx-core `state_dir` (`device.key`, 0600) = v1 login device key (`kind: "desktop"`), `noise_public_key_b64` of `POST /v2/machines`, `requester_x25519_b64` of `POST /v2/pairings`. Fingerprints then agree between server and clients. Binding for L6. Wiping `state_dir` means pairing again (L4 revokes grants on a key change).
+- **D2** `GET /v2/pairings?role=target` items carry `requester_x25519_b64` (public key; the target seals the invite to it).
+- **D3** `POST /v2/relay/tickets {permission: "connect", target_machine_id: <own machine>}` is allowed without a grant: `remote enroll create` needs a connect ticket for its own slot, and it only travels inside the sealed invite; the daemon's PSK + on-site approval still gate access. `register` never for another machine.
+
+Open for the user at G2: `deploy.yml` and the `production` environment only accept `main`, so the master plan's "`workflow_dispatch` on `feat/relay-v2`" cannot run; options = push the server-only diff to shellx `main` (L4 estimates ~1 ubuntu minute because the pubspec version 1.0.0 is already released; unverified) or widen the environment rule. Also: `/v2/relay` (K2) vs `/v2/relay/tickets` (K1) path overlap → L4 uses an exact-match nginx route, subdomain fallback ready; cmux-relay refuses any `Origin` header, so L7's browser viewer needs a bridge.
+
 ## Handoff (2026-10-18 evening)
 
 State for the next session:
