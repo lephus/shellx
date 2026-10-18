@@ -61,6 +61,9 @@
       <FileRef
          location = "group:CmuxWorkspacePresence">
       </FileRef>
+      <FileRef
+         location = "group:ShellXBrand">
+      </FileRef>
    </Group>
    <Group
       location = "container:Packages/iOS"
