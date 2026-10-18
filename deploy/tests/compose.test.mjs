@@ -94,14 +94,13 @@ test('relay2: restart, 256 MB ceiling without swap, read-only, no ports, no volu
   assert.match(relay2, /^ {4}networks: \[proxy\]$/m);
 });
 
-test('relay2: routed by exact path /v2/relay (so /v2/relay/tickets stays on the Node relay), rewritten to /v1/relay, no certificate of its own', () => {
+test('relay2 (subdomain fallback): own host and certificate relay2.shellx.pro, no path routing', () => {
   const relay2 = service('relay2');
-  assert.match(relay2, /^ {6}VIRTUAL_HOST: relay\.shellx\.pro$/m);
-  assert.match(relay2, /^ {6}VIRTUAL_PATH: "= \/v2\/relay"$/m);
-  assert.match(relay2, /^ {6}VIRTUAL_DEST: \/v1\/relay$/m);
+  assert.match(relay2, /^ {6}VIRTUAL_HOST: relay2\.shellx\.pro$/m);
+  assert.match(relay2, /^ {6}LETSENCRYPT_HOST: relay2\.shellx\.pro$/m);
+  assert.doesNotMatch(relay2, /VIRTUAL_PATH|VIRTUAL_DEST/);
   assert.match(relay2, /^ {6}VIRTUAL_PORT: "8787"$/m);
-  assert.doesNotMatch(relay2, /LETSENCRYPT/);
-  assert.match(relay2, /^ {6}CMUX_RELAY_BIND: 0\.0\.0\.0:8787$/m);
+    assert.match(relay2, /^ {6}CMUX_RELAY_BIND: 0\.0\.0\.0:8787$/m);
 });
 
 test('relay2 drops every capability and cannot gain privileges (uid 10001, port 8787)', () => {
@@ -128,20 +127,25 @@ test('relay and relay2 take CMUX_RELAY_HMAC_SECRET from .env only; the issuer is
   // Node trims the issuer, cmux-relay reads it raw: no whitespace anywhere may differ between them.
   assert.match(relayEnv, /^CMUX_RELAY_ISSUER=shellx-relay$/m);
   assert.match(service('relay2'), /^ {6}CMUX_RELAY_ISSUER: shellx-relay$/m);
-  assert.match(relayEnv, /^RELAY_V2_URL=wss:\/\/relay\.shellx\.pro\/v2\/relay$/m);
+  assert.match(relayEnv, /^RELAY_V2_URL=wss:\/\/relay2\.shellx\.pro\/v1\/relay$/m);
 });
 
-test('nginx-proxy relay.shellx.pro: 330 s timeouts (above cmux-relay 300 s idle) and still no access log', () => {
+test('nginx-proxy relay.shellx.pro and relay2.shellx.pro: 330 s timeouts (above cmux-relay 300 s idle) and still no access log', () => {
   const vhost = readFileSync(join(deployDir, 'nginx-proxy', 'relay.shellx.pro'), 'utf8');
   assert.match(vhost, /^proxy_read_timeout 330s;$/m);
   assert.match(vhost, /^proxy_send_timeout 330s;$/m);
   assert.match(vhost, /^access_log off;$/m);
+  const vhost2 = readFileSync(join(deployDir, 'nginx-proxy', 'relay2.shellx.pro'), 'utf8');
+  assert.match(vhost2, /^proxy_read_timeout 330s;$/m);
+  assert.match(vhost2, /^proxy_send_timeout 330s;$/m);
+  assert.match(vhost2, /^access_log off;$/m);
 });
 
 test('deploy.yml: /v2/relay check only when RELAY2_ENABLED, /v2/relay/tickets always, relay2-src never synced', () => {
   const wf = readFileSync(join(deployDir, '..', '.github', 'workflows', 'deploy.yml'), 'utf8');
   assert.match(wf, /vars\.RELAY2_ENABLED/);
   assert.match(wf, /https:\/\/relay\.shellx\.pro\/v2\/relay\/tickets/);
+  assert.match(wf, /check_status https:\/\/relay2\.shellx\.pro\/v1\/relay "400 426"/);
   assert.match(wf, /"code":"unauthorized"/);
   assert.doesNotMatch(wf, /rsync[^\n]*relay2-src/);
 });

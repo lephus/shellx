@@ -86,12 +86,10 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     environment:
-      # Same host as the relay, exact path match: a prefix location would also swallow
-      # POST /v2/relay/tickets, which the Node relay serves. VIRTUAL_DEST rewrites to cmux-relay's only
-      # WebSocket path. No certificate settings of its own: the relay service owns relay.shellx.pro's certificate.
-      VIRTUAL_HOST: relay.shellx.pro
-      VIRTUAL_PATH: "= /v2/relay"
-      VIRTUAL_DEST: /v1/relay
+      # Its own hostname and certificate (fallback when nginx-proxy cannot route by exact path):
+      # cmux-relay serves /v1/relay itself, so no path routing or rewrite is needed.
+      VIRTUAL_HOST: relay2.shellx.pro
+      LETSENCRYPT_HOST: relay2.shellx.pro
       VIRTUAL_PORT: "8787"
       CMUX_RELAY_BIND: 0.0.0.0:8787
       CMUX_RELAY_HMAC_SECRET: ${CMUX_RELAY_HMAC_SECRET:-}

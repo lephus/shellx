@@ -118,7 +118,7 @@ the VPS as the deploy user unless a step says otherwise.
    PROXY=nginx-proxy   # the name of the nginx-proxy container (docker ps)
    VHOST_D="$(docker inspect "$PROXY" --format '{{range .Mounts}}{{if eq .Destination "/etc/nginx/vhost.d"}}{{.Source}}{{end}}{{end}}')"
    echo "$VHOST_D"     # must print a directory; stop here if it is empty
-   for f in relay.shellx.pro admin.shellx.pro shellx.pro www.shellx.pro download.shellx.pro; do
+   for f in relay.shellx.pro relay2.shellx.pro admin.shellx.pro shellx.pro www.shellx.pro download.shellx.pro; do
      target="$VHOST_D/$f"
      if [ -e "$target" ] && grep -q 'access_log off' "$target"; then
        echo "$target already has our lines; leaving it alone (edit it by hand if deploy/nginx-proxy/$f changed)"
@@ -264,7 +264,7 @@ from one IP within 15 minutes lock that IP out for the rest of the window.
 ## Relay v2
 
 `relay2` is `cmux-relay` (Rust), the transport of the native desktop apps' remote feature
-(`wss://relay.shellx.pro/v2/relay`). The Node relay still mints the tickets (`POST /v2/relay/tickets`)
+(`wss://relay2.shellx.pro/v1/relay` on THIS branch, the subdomain fallback). The Node relay still mints the tickets (`POST /v2/relay/tickets`)
 and serves everything else; nginx-proxy sends only the exact path `/v2/relay` to relay2 (rewritten to
 cmux-relay's own `/v1/relay`), so `/v2/relay/tickets` stays on the Node relay.
 
@@ -362,7 +362,7 @@ Any output row means a dangling reference: stop, do not deploy, and report it. N
    healthy on <tag>`). A missing source or a failed build ends like a failed pull: config and
    `IMAGE_TAG` stay as they were. Then set the repository variable `RELAY2_ENABLED` to `true`
    (Settings, Environments, production, Variables) so deploy.yml also checks that
-   `GET https://relay.shellx.pro/v2/relay` answers 400 or 426; the `/v2/relay/tickets` check (401
+   `GET https://relay2.shellx.pro/v1/relay` answers 400 or 426; the `/v2/relay/tickets` check (401
    `unauthorized`, served by the Node relay) always runs. Note: a workflow_dispatch rollback to a
    pre-v2 commit makes that `/v2/relay/tickets` check red although the rollout worked (expected; check
    the relay logs instead).

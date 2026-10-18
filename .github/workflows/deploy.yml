@@ -210,8 +210,8 @@ jobs:
           }
           check_tickets
           if [ "$RELAY2_ENABLED" = true ]; then
-            # cmux-relay refuses a plain GET (400 or 426); the Node relay would answer 404 JSON.
-            check_status https://relay.shellx.pro/v2/relay "400 426"
+            # cmux-relay (own hostname) refuses a plain GET: 400 or 426.
+            check_status https://relay2.shellx.pro/v1/relay "400 426"
           fi
 
       - name: Remove the SSH key
