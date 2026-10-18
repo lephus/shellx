@@ -13,6 +13,9 @@ const (
 	// (~/.shellx/bin/shellx on the remote host).
 	remoteCLIName = "shellx"
 	// remoteStateDirName is $HOME/.shellx: daemon/, relay/, bin/,
-	// socket_addr, wait-for/, claude-settings/, claude-hook.log.
+	// socket_addr, wait-for/, claude-settings/, claude-hook.log, the agent
+	// shim dirs (claude-teams-bin/, omo-bin/, ...), cmux-claude-node-options/,
+	// omo-config/ and tmux-compat-store.json (upstream keeps those last ones
+	// in cmux's own state directory, which cmux's helper shares).
 	remoteStateDirName = ".shellx"
 )

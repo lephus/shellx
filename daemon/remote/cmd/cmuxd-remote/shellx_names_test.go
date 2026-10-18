@@ -136,3 +136,36 @@ func TestShellXRelayAndCLIPathsAreUnderDotShellX(t *testing.T) {
 		t.Fatalf("readSocketAddrFile = %q, want the ShellX relay address", got)
 	}
 }
+
+func TestShellXAgentShimsAndTmuxStoreAreUnderDotShellX(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	dot := filepath.Join(home, ".shellx")
+
+	if got := tmuxCompatStoreURL(); got != filepath.Join(dot, "tmux-compat-store.json") {
+		t.Errorf("tmuxCompatStoreURL = %q, want ~/.shellx/tmux-compat-store.json", got)
+	}
+	if got := omoShadowConfigDir(); got != filepath.Join(dot, "omo-config") {
+		t.Errorf("omoShadowConfigDir = %q, want ~/.shellx/omo-config", got)
+	}
+	shimDir, err := createTmuxShimDir("claude-teams-bin", "#!/bin/sh\n")
+	if err != nil || shimDir != filepath.Join(dot, "claude-teams-bin") {
+		t.Errorf("createTmuxShimDir = %q, %v; want ~/.shellx/claude-teams-bin", shimDir, err)
+	}
+	restore, err := ensureClaudeNodeOptionsRestoreModule()
+	if err != nil || filepath.Dir(restore) != filepath.Join(dot, "cmux-claude-node-options") {
+		t.Errorf("ensureClaudeNodeOptionsRestoreModule = %q, %v", restore, err)
+	}
+	// Nothing lands in cmux's home directories: ~/.shellx is the only entry.
+	entries, err := os.ReadDir(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != ".shellx" {
+		names := []string{}
+		for _, entry := range entries {
+			names = append(names, entry.Name())
+		}
+		t.Errorf("home entries = %v, want only .shellx", names)
+	}
+}

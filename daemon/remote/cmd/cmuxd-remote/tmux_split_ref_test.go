@@ -274,7 +274,7 @@ func TestTmuxSplitWindowIgnoresStaleUUIDColumnSurface(t *testing.T) {
 		}
 	}()
 
-	storePath := filepath.Join(home, ".cmuxterm", "tmux-compat-store.json")
+	storePath := filepath.Join(home, ".shellx", "tmux-compat-store.json")
 	if err := os.MkdirAll(filepath.Dir(storePath), 0o755); err != nil {
 		t.Fatalf("mkdir store dir: %v", err)
 	}

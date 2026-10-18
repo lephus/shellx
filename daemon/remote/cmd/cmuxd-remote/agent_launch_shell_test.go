@@ -78,7 +78,7 @@ command -v tmux > "$CMUX_TEST_RESOLVED_TMUX_LOG"
 		t.Fatal(err)
 	}
 	resolvedTmux := strings.TrimSpace(string(resolvedBytes))
-	wantTmux := filepath.Join(home, ".cmuxterm", "claude-teams-bin", "tmux")
+	wantTmux := filepath.Join(home, ".shellx", "claude-teams-bin", "tmux")
 	if resolvedTmux != wantTmux {
 		snapshotBytes, _ := os.ReadFile(snapshotPathLog)
 		t.Fatalf("snapshot resolved tmux = %q, want %q; PATH=%q", resolvedTmux, wantTmux, strings.TrimSpace(string(snapshotBytes)))
