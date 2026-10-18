@@ -157,10 +157,12 @@ authRoutes.post("/logout", requireAuth, async (c) => {
       logMeta("agent_purge_failed", { device_id: auth.deviceId });
     }
   } else {
-    // A signed-out phone must stop getting notifications (push spec §5).
+    // A signed-out phone must stop getting notifications (push spec §5); a signed-out desktop
+    // leaves the machine list (its grants and pairings go by cascade).
     db.transaction(() => {
       db.run("DELETE FROM tokens WHERE token_hash = ?", tokenHash);
       db.run("DELETE FROM push_tokens WHERE device_id = ?", auth.deviceId);
+      if (auth.kind === "desktop") db.run("DELETE FROM machines WHERE device_id = ?", auth.deviceId);
     });
   }
   logMeta("logout", { device_id: auth.deviceId });

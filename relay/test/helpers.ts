@@ -294,6 +294,23 @@ export async function loginDesktop(app: TestApp, account: Account, overrides: Re
   return { userId: body.user_id, deviceId: body.device_id, token: body.token, publicKey: device.public_key as string };
 }
 
+/** Registers the desktop's machine (valid defaults, a fresh noise key unless `overrides` say otherwise). */
+export async function registerMachine(
+  app: TestApp, token: string, overrides: Record<string, unknown> = {},
+): Promise<{ machine_id: string; slot: string; noiseKey: string }> {
+  const noiseKey = (overrides.noise_public_key_b64 as string | undefined) ?? randomPublicKey();
+  const res = await call(app, "POST", "/v2/machines", {
+    token,
+    body: {
+      name: "Mac-Studio", platform: "macos", os_version: "15.2", app_version: "1.0.0",
+      ...overrides, noise_public_key_b64: noiseKey,
+    },
+  });
+  if (res.status !== 201 && res.status !== 200) throw new Error(`register machine failed: ${res.status} ${await res.text()}`);
+  const body = await res.json<{ machine_id: string; slot: string }>();
+  return { ...body, noiseKey };
+}
+
 /** A UUIDv7 (RFC 9562) for unix-millisecond timestamp `ms`, lower case, random in the other bits. */
 export function uuidv7(ms: number): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
