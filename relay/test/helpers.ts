@@ -232,13 +232,13 @@ export function randomPublicKey(): string {
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 }
 
-export type Kind = "agent" | "mobile";
+export type Kind = "agent" | "mobile" | "desktop";
 
 export function deviceBody(kind: Kind, overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     kind,
-    name: kind === "agent" ? "MacBook-Pro" : "iPhone 16",
-    platform: kind === "agent" ? "macos" : "ios",
+    name: kind === "agent" ? "MacBook-Pro" : kind === "desktop" ? "Mac-Studio" : "iPhone 16",
+    platform: kind === "mobile" ? "ios" : "macos",
     public_key: randomPublicKey(),
     ...overrides,
   };
@@ -278,6 +278,15 @@ export async function loginDevice(app: TestApp, account: Account, kind: Kind, pu
   if (res.status !== 200) throw new Error(`login failed: ${res.status} ${await res.text()}`);
   const body = await res.json<{ user_id: string; device_id: string; token: string }>();
   return { userId: body.user_id, deviceId: body.device_id, token: body.token, publicKey };
+}
+
+/** Logs in a native desktop device (kind `desktop`, Mac-Studio / macos unless `overrides` say otherwise). */
+export async function loginDesktop(app: TestApp, account: Account, overrides: Record<string, unknown> = {}): Promise<Session> {
+  const device = deviceBody("desktop", overrides);
+  const res = await call(app, "POST", "/v1/auth/login", { body: { email: account.email, password: account.password, device } });
+  if (res.status !== 200) throw new Error(`login failed: ${res.status} ${await res.text()}`);
+  const body = await res.json<{ user_id: string; device_id: string; token: string }>();
+  return { userId: body.user_id, deviceId: body.device_id, token: body.token, publicKey: device.public_key as string };
 }
 
 /** A UUIDv7 (RFC 9562) for unix-millisecond timestamp `ms`, lower case, random in the other bits. */

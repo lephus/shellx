@@ -346,7 +346,7 @@ describe("admin stats endpoint", () => {
     const stats = await res.json();
     expect(stats.devices.agent).toEqual({ total: 1, online: 1, by_platform: { macos: 1, windows: 0 } });
     expect(stats.devices.mobile).toEqual({ total: 0, online: 0, by_platform: { ios: 0, android: 0 } });
-    expect(stats.versions).toEqual({ agent: [{ version: "1.2.3", count: 1 }], mobile: [] });
+    expect(stats.versions).toEqual({ agent: [{ version: "1.2.3", count: 1 }], mobile: [], desktop: [] });
     expect(stats.users).toMatchObject({ total: 1, new_24h: 1, active_7d: 1, active_30d: 1 });
     expect(stats.signups_by_day).toHaveLength(30);
     expectSecurityHeaders(res);

@@ -132,7 +132,7 @@ describe("migration 0004_admin", () => {
       expect(migrate(old, dir)).toHaveLength(3);
       old.run("INSERT INTO users VALUES ('u1', 'a@example.com', 'x', 1, 1)");
       old.run("INSERT INTO devices (id, user_id, kind, name, platform, public_key, created_at) VALUES ('d1', 'u1', 'agent', 'n', 'macos', x'00', 1)");
-      expect(migrate(old)).toEqual(["0004_admin.sql"]);
+      expect(migrate(old)).toEqual(["0004_admin.sql", "0005_relay_v2.sql"]);
       expect(old.get("SELECT id, app_version FROM devices")).toEqual({ id: "d1", app_version: null });
     } finally {
       old.close();

@@ -52,6 +52,7 @@ describe("adminStats", () => {
     expect(stats.devices).toEqual({
       agent: { total: 4, online: 1, by_platform: { macos: 3, windows: 1 } },
       mobile: { total: 2, online: 0, by_platform: { ios: 1, android: 1 } },
+      desktop: { total: 0, online: 0, by_platform: { macos: 0, windows: 0 } },
     });
     expect(stats.versions).toEqual({
       agent: [
@@ -64,6 +65,7 @@ describe("adminStats", () => {
         { version: "1.0.2", count: 1 },
         { version: null, count: 1 },
       ],
+      desktop: [],
     });
     expect(stats.signups_by_day).toHaveLength(30);
     expect(stats.signups_by_day[0]).toEqual({ day: "2026-09-16", count: 1 });
@@ -85,8 +87,9 @@ describe("adminStats", () => {
     expect(stats.devices).toEqual({
       agent: { total: 0, online: null, by_platform: { macos: 0, windows: 0 } },
       mobile: { total: 0, online: null, by_platform: { ios: 0, android: 0 } },
+      desktop: { total: 0, online: null, by_platform: { macos: 0, windows: 0 } },
     });
-    expect(stats.versions).toEqual({ agent: [], mobile: [] });
+    expect(stats.versions).toEqual({ agent: [], mobile: [], desktop: [] });
     expect(stats.signups_by_day.every((d) => d.count === 0)).toBe(true);
     expect(stats.signups_by_day).toHaveLength(30);
   });
