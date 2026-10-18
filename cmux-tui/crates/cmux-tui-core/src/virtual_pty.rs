@@ -38,6 +38,8 @@ pub(crate) const BRIDGE_SOCKET_ENV: &str = "CMUX_SHELLX_BRIDGE_SOCKET";
 const PROTOCOL: u32 = 1;
 /// Largest payload either side may send in one frame.
 const MAX_FRAME: usize = 16 * 1024 * 1024;
+/// How long `kill` may spend sending its best-effort `K` frame.
+const KILL_WRITE_TIMEOUT: Duration = Duration::from_millis(500);
 
 const HELLO: u8 = b'H';
 const INPUT: u8 = b'I';
@@ -77,7 +79,11 @@ struct HostSizeSink {
 }
 
 struct Shared {
-    writer: Mutex<UnixStream>,
+    /// The daemon's sending side; `None` once the terminal was killed.
+    writer: Mutex<Option<UnixStream>>,
+    /// A clone used only by `kill`, so hanging up never waits behind a
+    /// write that holds `writer`.
+    hangup: Mutex<Option<UnixStream>>,
     size: Mutex<PtySize>,
     /// Last real grid the app reported. A Mux resize to exactly this size is
     /// the echo of our own host-size apply and is not sent back.
@@ -92,7 +98,12 @@ struct Shared {
 
 impl Shared {
     fn send(&self, kind: u8, payload: &[u8]) -> io::Result<()> {
-        write_frame(&mut self.writer.lock().unwrap(), kind, payload)
+        match self.writer.lock().unwrap().as_mut() {
+            Some(stream) => write_frame(stream, kind, payload),
+            None => {
+                Err(io::Error::new(io::ErrorKind::BrokenPipe, "shellx bridge: terminal was killed"))
+            }
+        }
     }
 
     fn mark_exited(&self) {
@@ -239,7 +250,8 @@ pub(crate) fn open(
     let (reader, mut pipe_writer) = UnixStream::pair()?;
     let initial = host_size.map(|(cols, rows)| PtySize { cols, rows, ..size }).unwrap_or(size);
     let shared = Arc::new(Shared {
-        writer: Mutex::new(stream.try_clone()?),
+        writer: Mutex::new(Some(stream.try_clone()?)),
+        hangup: Mutex::new(Some(stream.try_clone()?)),
         size: Mutex::new(initial),
         host_size: Mutex::new(host_size),
         on_host_size: Mutex::new(HostSizeSink::default()),
@@ -360,11 +372,30 @@ impl std::fmt::Debug for VirtualChild {
 }
 
 impl ChildKiller for VirtualChild {
-    /// Tells the app to unbind the terminal, then hangs up; the demux thread
-    /// sees the end of stream and marks the child exited.
+    /// Tells the app to unbind the terminal (best effort), then hangs up;
+    /// the demux thread sees the end of stream and marks the child exited.
+    ///
+    /// The daemon-side descriptors are closed, not only shut down: on macOS a
+    /// `shutdown` while another descriptor of the socket is blocked in `read`
+    /// does not always reach the peer, while closing the last one does. Later
+    /// writes and resize wishes fail with `BrokenPipe`.
     fn kill(&mut self) -> io::Result<()> {
-        let _ = self.shared.send(KILL, &[]);
-        let _ = self.shared.writer.lock().unwrap().shutdown(std::net::Shutdown::Both);
+        let Some(hangup) = self.shared.hangup.lock().unwrap().take() else {
+            return Ok(());
+        };
+        // The timeout is per socket, so it also bounds a stalled `send`.
+        let _ = hangup.set_write_timeout(Some(KILL_WRITE_TIMEOUT));
+        if let Ok(mut writer) = self.shared.writer.try_lock()
+            && let Some(stream) = writer.as_mut()
+        {
+            let _ = write_frame(stream, KILL, &[]);
+        }
+        let _ = hangup.shutdown(std::net::Shutdown::Both);
+        drop(hangup);
+        // A write stalled behind the lock is woken by the shutdown (the send
+        // side is closed) and fails. Dropping the stream closes this side's
+        // last descriptor apart from the demux thread's, closed as it exits.
+        drop(self.shared.writer.lock().unwrap().take());
         Ok(())
     }
 
@@ -739,6 +770,40 @@ mod tests {
         let error = open(&spec, SIZE_80X24, None).err().expect("symlinked dir accepted");
         let _ = std::fs::remove_file(&link);
         assert!(error.to_string().contains("shellx bridge: insecure socket directory"), "{error}");
+    }
+
+    /// `kill` sends `K` and closes the socket, so the app always sees the end
+    /// of stream promptly (repeated: a lone `shutdown` missed it about once
+    /// in a thousand on macOS). Writes and resize wishes then fail cleanly.
+    #[test]
+    fn kill_closes_socket_so_app_sees_eof() {
+        for round in 0..50 {
+            let dir = SocketDir::new(&format!("kill-{round}"));
+            let app = fake_app(&dir, (80, 24), |conn, _| {
+                let mut saw_kill = false;
+                loop {
+                    match read_frame(conn) {
+                        Ok((KILL, _)) => saw_kill = true,
+                        Ok(_) => {}
+                        Err(_) => return saw_kill,
+                    }
+                }
+            });
+            let (spawned, _handle) = open(&dir.spec(), SIZE_80X24, None).unwrap();
+            let mut writer = spawned.master.take_writer().unwrap();
+            let mut child = spawned.child;
+            child.kill().unwrap();
+            let saw_kill = within("app sees EOF after kill", move || app.join().unwrap());
+            assert!(saw_kill, "round {round}: no K before EOF");
+            let child = within("child.wait after kill", move || {
+                assert!(child.wait().unwrap().success());
+                child
+            });
+            drop(child);
+            let error = writer.write_all(b"late").unwrap_err();
+            assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
+            assert!(spawned.master.resize(PtySize { cols: 60, ..SIZE_80X24 }).is_err());
+        }
     }
 
     #[test]
