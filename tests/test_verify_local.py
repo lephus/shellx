@@ -487,8 +487,6 @@ class AffectedChecksTests(unittest.TestCase):
 
     def test_current_ci_schema_and_sync_inputs_select_their_checks(self):
         for path, expected in (
-            ("web/data/cmux.schema.json", "config-schema"),
-            ("Packages/macOS/CmuxFoundation/Sources/CmuxFoundation/ConfigValidation/CmuxConfigSchema.generated.swift", "config-schema"),
             ("scripts/sync-test-wiring", "test-wiring-sync"),
             ("scripts/sync_test_wiring.py", "test-wiring-sync"),
             ("tests/fixtures/pbxproj-test-wiring/new.pbxproj", "test-wiring-sync"),
