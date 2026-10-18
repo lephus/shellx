@@ -70,6 +70,7 @@ public actor ShellXDaemonSupervisor: LinkSupervising {
     // MARK: - LinkSupervising
 
     func prepareAndMint() async -> String? {
+        let attempt = engine.attempt
         do {
             try OwnerOnlyFile.ensurePrivateDirectory(paths.socketDir)
             try OwnerOnlyFile.ensurePrivateDirectory(paths.daemonStateDir)
@@ -78,6 +79,8 @@ public actor ShellXDaemonSupervisor: LinkSupervising {
         }
         // Review Focus 5: a daemon of this session may survive a crash; stop it first. Status ignored.
         _ = try? await launcher.run(cmuxTui, RemoteCommandLine.serverStop(paths: paths), env: [:])
+        // stop() (or an offline/newer attempt) ran while we waited: never (re)register the ticket.
+        guard attempt == engine.attempt else { return "superseded" }
         do {
             if needsKeepFresh {
                 needsKeepFresh = false
@@ -105,6 +108,15 @@ public actor ShellXDaemonSupervisor: LinkSupervising {
     func didPublish(_ state: LinkState) async {
         switch state {
         case .idle, .failed:
+            await refresher.stop(name: Self.registerTicketName)
+            needsKeepFresh = true
+        default: break
+        }
+    }
+
+    func mintAbandoned() async {
+        switch engine.machine.state {
+        case .idle, .failed, .offline:
             await refresher.stop(name: Self.registerTicketName)
             needsKeepFresh = true
         default: break

@@ -36,6 +36,9 @@ protocol LinkSupervising: Actor {
     func event(forLine line: String) -> LinkEvent?
     func didSpawn(generation: Int)
     func didPublish(_ state: LinkState) async
+    /// A mint finished after the link was stopped, went offline or was superseded. If the link is no
+    /// longer running, the ticket entry the mint may have (re)registered must not keep refreshing.
+    func mintAbandoned() async
 }
 
 extension LinkSupervising {
@@ -58,7 +61,10 @@ extension LinkSupervising {
                 engine.attempt += 1
                 let attempt = engine.attempt
                 let failure = await prepareAndMint()
-                guard attempt == engine.attempt else { return }   // stopped, offline or superseded meanwhile
+                guard attempt == engine.attempt else {             // stopped, offline or superseded meanwhile
+                    await mintAbandoned()
+                    return
+                }
                 if let failure {
                     await feed(.mintFailed(code: failure))
                     return

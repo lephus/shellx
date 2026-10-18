@@ -6,13 +6,28 @@ public protocol RemoteClock: Sendable {
     func sleep(until: Date) async throws
 }
 
+/// Bounds for every computed delay, so an absurd `expires_at_unix` can never trap a conversion.
+public enum RemoteTimers {
+    public static let maxDelay: TimeInterval = 86_400
+
+    /// `seconds` clamped to `0...maxDelay` (NaN and +infinity become `maxDelay`).
+    public static func clamp(_ seconds: TimeInterval) -> TimeInterval {
+        guard !seconds.isNaN else { return maxDelay }
+        return min(max(seconds, 0), maxDelay)
+    }
+}
+
 public struct SystemRemoteClock: RemoteClock {
     public init() {}
     public var now: Date { Date() }
+    /// Sleeps in chunks of at most `RemoteTimers.maxDelay`, so any deadline is safe.
     public func sleep(until deadline: Date) async throws {
-        let seconds = deadline.timeIntervalSinceNow
-        if seconds > 0 { try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000)) }
-        try Task.checkCancellation()
+        while true {
+            try Task.checkCancellation()
+            let seconds = RemoteTimers.clamp(deadline.timeIntervalSinceNow)
+            if seconds <= 0 { return }
+            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+        }
     }
 }
 
@@ -94,7 +109,7 @@ public actor ShellXTicketRefresher {
 
     private func schedule(name: String, generation: Int, expiresAt: Date) {
         let now = clock.now
-        let wakeAt = now.addingTimeInterval(TicketSchedule.nextRefresh(expiresAt: expiresAt, now: now))
+        let wakeAt = now.addingTimeInterval(RemoteTimers.clamp(TicketSchedule.nextRefresh(expiresAt: expiresAt, now: now)))
         entries[name]?.task = Task { [weak self] in
             await self?.refreshLoop(name: name, generation: generation, firstWake: wakeAt)
         }
@@ -117,10 +132,10 @@ public actor ShellXTicketRefresher {
                 failures = 0
                 let expires = Date(timeIntervalSince1970: reply.expires_at_unix)
                 let now = clock.now
-                wakeAt = now.addingTimeInterval(TicketSchedule.nextRefresh(expiresAt: expires, now: now))
+                wakeAt = now.addingTimeInterval(RemoteTimers.clamp(TicketSchedule.nextRefresh(expiresAt: expires, now: now)))
             } catch {
                 guard isCurrent(name, generation), !LinkFailure.isFatal(LinkFailure.code(for: error)) else { return }
-                wakeAt = clock.now.addingTimeInterval(ReconnectBackoff.delay(attempt: failures))
+                wakeAt = clock.now.addingTimeInterval(RemoteTimers.clamp(ReconnectBackoff.delay(attempt: failures)))
                 failures += 1
             }
         }

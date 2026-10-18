@@ -33,10 +33,14 @@ public struct ShellXSidecarProcess: SidecarLaunching {
 
     private let baseEnvironment: [String: String]
     private let runTimeout: TimeInterval
+    /// `terminate()` sends SIGTERM, then SIGKILL this long after if the process still runs.
+    private let killGrace: TimeInterval
 
-    public init(baseEnvironment: [String: String] = ProcessInfo.processInfo.environment, runTimeout: TimeInterval = 30) {
+    public init(baseEnvironment: [String: String] = ProcessInfo.processInfo.environment, runTimeout: TimeInterval = 30,
+                killGrace: TimeInterval = 3) {
         self.baseEnvironment = baseEnvironment
         self.runTimeout = runTimeout
+        self.killGrace = killGrace
     }
 
     public static func scrubbedEnvironment(base: [String: String], extra: [String: String]) -> [String: String] {
@@ -90,14 +94,29 @@ public struct ShellXSidecarProcess: SidecarLaunching {
         }
         try process.run()
         reader.start()
-        return SidecarProcessHandle(process)
+        return SidecarProcessHandle(process, killGrace: killGrace)
     }
 }
 
 final class SidecarProcessHandle: SidecarHandle, @unchecked Sendable {
     private let process: Process
-    init(_ process: Process) { self.process = process }
-    func terminate() { if process.isRunning { process.terminate() } }
+    private let killGrace: TimeInterval
+
+    init(_ process: Process, killGrace: TimeInterval) {
+        self.process = process
+        self.killGrace = RemoteTimers.clamp(killGrace)
+    }
+
+    /// SIGTERM now, SIGKILL after `killGrace` if it is still running; never blocks the caller.
+    func terminate() {
+        guard process.isRunning else { return }
+        process.terminate()
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + killGrace) { [self] in
+            // isRunning turns false when Foundation reaps the child, so a dead process is never
+            // signalled; only the instant between reaping and that flag update is left (negligible).
+            if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+        }
+    }
 }
 
 /// Reads a pipe's read end non-blocking on a private serial queue.

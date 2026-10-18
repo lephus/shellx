@@ -63,15 +63,22 @@ public actor ShellXClientLinkSupervisor: LinkSupervising {
     var ticketName: String { paths.connectTicketName(for: machine) }
     var ticketFile: URL { paths.coreStateDir.appendingPathComponent("tickets/" + ticketName) }
 
+    /// Starts the link. An invite given while the link already runs is never ignored: while connected
+    /// it is not needed and is unlinked; otherwise it replaces any older invite (which is unlinked) and is
+    /// used from the next spawn, with a fresh `inviteLifetime`.
     public func start(inviteFile: URL?) async {
+        if let inviteFile, inviteFile != self.inviteFile {
+            if case .connected = engine.machine.state {
+                _ = unlink(inviteFile.path)
+            } else {
+                dropInvite()
+                self.inviteFile = inviteFile
+                inviteDeadline = clock.now.addingTimeInterval(Self.inviteLifetime)
+            }
+        }
         switch engine.machine.state {
         case .idle, .failed: break
         default: return
-        }
-        if let inviteFile, inviteFile != self.inviteFile {
-            dropInvite()
-            self.inviteFile = inviteFile
-            inviteDeadline = clock.now.addingTimeInterval(Self.inviteLifetime)
         }
         needsKeepFresh = true
         await feed(.start)
@@ -154,6 +161,15 @@ public actor ShellXClientLinkSupervisor: LinkSupervising {
             needsKeepFresh = true
         case .connecting, .reconnecting:
             break
+        }
+    }
+
+    func mintAbandoned() async {
+        switch engine.machine.state {
+        case .idle, .failed, .offline:
+            await refresher.stop(name: ticketName)
+            needsKeepFresh = true
+        default: break
         }
     }
 

@@ -451,3 +451,128 @@ private let statusUp = Data(#"{"daemon_name":"Phu's Mac","daemon_fingerprint":"f
                                                             "TMPDIR": "/t", "SSH_AUTH_SOCK": "/a"], extra: ["K": "v"])
             == ["HOME": "/h", "PATH": "/usr/bin:/bin", "LANG": "vi_VN.UTF-8", "TMPDIR": "/t", "K": "v"])
 }
+
+// MARK: - Fix round 1
+
+@Test func daemonStopDuringStaleStopLeavesNoRefresher() async {
+    // stop() while start() is suspended in its pre-start `server stop`: nothing may be minted afterwards.
+    let rig = SupervisorRig(); let sup = rig.daemon()
+    rig.launcher.holdNextServerStop.with { $0 = true }
+    let starting = Task { await sup.start(route: supRoute, slot: "S1") }
+    #expect(await eventually { rig.launcher.isHoldingRun })
+    await sup.stop()
+    rig.launcher.releaseHeldRun()
+    await starting.value
+    await settle()
+    #expect(await sup.state == .idle)
+    #expect(rig.core.mintCount == 0)
+    #expect(await !rig.refresher.isRegistered(name: "register.ticket"))
+    #expect(rig.clock.deadlines.isEmpty)
+    rig.clock.advance(by: 900)
+    await settle()
+    #expect(rig.core.mintCount == 0)
+    #expect(rig.launcher.launches.isEmpty)
+}
+
+@Test func clientStopDuringMintLeavesNoRefresher() async {
+    let rig = SupervisorRig(); let sup = rig.client(record: rig.record(enrolled: true))
+    rig.core.lifetime.with { $0 = 2 }
+    await sup.start(inviteFile: nil)
+    rig.launcher.exit(0, status: 1)
+    #expect(await eventually { await sup.state.retryAt != nil })
+    await sup.stop()
+    rig.clock.advance(by: 900)
+    await settle()
+    #expect(await !rig.refresher.isRegistered(name: rig.paths.connectTicketName(for: "m_1")))
+    #expect(rig.core.mintCount == 1)
+}
+
+@Test func inviteGivenWhileConnectingIsAdoptedForTheNextSpawn() async throws {
+    let rig = SupervisorRig(); let sup = rig.client()
+    await sup.start(inviteFile: nil)
+    let first = try rig.makeInvite()
+    let second = first.deletingLastPathComponent().appendingPathComponent("invite-2")
+    try Data("cmux://enroll/other".utf8).write(to: second)
+    await sup.start(inviteFile: first)                       // not startable: adopted
+    await sup.start(inviteFile: second)                      // replaces the first, which is unlinked
+    #expect(!FileManager.default.fileExists(atPath: first.path))
+    #expect(FileManager.default.fileExists(atPath: second.path))
+    rig.launcher.exit(0, status: 1)
+    #expect(await eventually { await sup.state.retryAt != nil })
+    rig.clock.advance(to: supT0 + 1)
+    #expect(await eventually { rig.launcher.launches.count == 2 })
+    let args = rig.launcher.launches[1].args
+    #expect(args.firstIndex(of: "--invite-file").map { args[$0 + 1] } == second.path)
+    await sup.stop()
+    #expect(!FileManager.default.fileExists(atPath: second.path))
+}
+
+@Test func inviteGivenWhileConnectedIsDropped() async throws {
+    let rig = SupervisorRig(); let sup = rig.client(record: rig.record(enrolled: true))
+    await sup.start(inviteFile: nil)
+    rig.launcher.line(0, #"{"event":"connection-snapshot"}"#)
+    #expect(await eventually { await sup.state == .connected(localSocket: rig.paths.clientSocket(for: "m_1").path) })
+    let invite = try rig.makeInvite()
+    await sup.start(inviteFile: invite)
+    #expect(!FileManager.default.fileExists(atPath: invite.path))
+}
+
+@Test func adoptedInviteGetsAFreshLifetime() async throws {
+    let rig = SupervisorRig(); let sup = rig.client()
+    await sup.start(inviteFile: nil)
+    rig.launcher.exit(0, status: 1)
+    #expect(await eventually { await sup.state.retryAt != nil })
+    rig.clock.advance(to: supT0 + 0.5)
+    let invite = try rig.makeInvite()
+    await sup.start(inviteFile: invite)                      // deadline t0+300.5
+    rig.clock.advance(to: supT0 + 1)
+    #expect(await eventually { rig.launcher.launches.count == 2 })
+    #expect(rig.launcher.launches[1].args.contains("--invite-file"))
+    rig.launcher.exit(1, status: 1)
+    #expect(await eventually { await sup.state == .reconnecting(attempt: 2, retryAt: supT0 + 3) })
+    rig.clock.advance(to: supT0 + 301)
+    #expect(await eventually { await sup.state == .failed(code: "invite_expired") })
+    #expect(!FileManager.default.fileExists(atPath: invite.path))
+}
+
+@Test func hugeExpiryIsClampedToOneDay() async throws {
+    let rig = SupervisorRig()
+    rig.core.lifetime.with { $0 = 1e300 }
+    _ = try await rig.refresher.keepFresh(name: "register.ticket", permission: "register", target: nil)
+    #expect(await eventually { rig.clock.deadlines == [supT0 + RemoteTimers.maxDelay] })
+    #expect(RemoteTimers.maxDelay == 86_400)
+    #expect(RemoteTimers.clamp(1e300) == 86_400)
+    #expect(RemoteTimers.clamp(-5) == 0)
+    #expect(RemoteTimers.clamp(.infinity) == 86_400)
+    #expect(RemoteTimers.clamp(.nan) == 86_400)
+    #expect(RemoteTimers.clamp(2.5) == 2.5)
+}
+
+@Test func systemClockSurvivesAbsurdDeadlines() async {
+    let clock = SystemRemoteClock()
+    try? await clock.sleep(until: .distantPast)              // returns at once
+    let far = Task { try await clock.sleep(until: Date(timeIntervalSince1970: 1e300)) }
+    far.cancel()
+    await #expect(throws: CancellationError.self) { try await far.value }
+}
+
+@Test func terminateEscalatesToSigkill() async throws {
+    let process = ShellXSidecarProcess(killGrace: 0.2)
+    func exitStatus(_ args: [String], _ executable: String) async throws -> Int32 {
+        let once = Locked(false)
+        return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Int32, any Error>) in
+            let finish: @Sendable (Int32) -> Void = { status in
+                if once.with({ done in let was = done; done = true; return !was }) { cont.resume(returning: status) }
+            }
+            do {
+                let handle = try process.launch(URL(fileURLWithPath: executable), args, env: [:], onLine: { _ in }, onExit: finish)
+                DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) { handle.terminate() }
+                DispatchQueue.global().asyncAfter(deadline: .now() + 10) { finish(-1) }
+            } catch { cont.resume(throwing: error) }
+        }
+    }
+    // A child that ignores SIGTERM (the ignore survives exec) dies by SIGKILL after the grace period.
+    #expect(try await exitStatus(["-c", "trap '' TERM; exec /bin/sleep 30"], "/bin/sh") == SIGKILL)
+    // A normal child dies by SIGTERM.
+    #expect(try await exitStatus(["30"], "/bin/sleep") == SIGTERM)
+}

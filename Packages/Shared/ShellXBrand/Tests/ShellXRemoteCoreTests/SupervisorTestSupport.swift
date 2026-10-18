@@ -96,9 +96,18 @@ final class FakeLauncher: SidecarLaunching, @unchecked Sendable {
     var launches: [Call] { calls.filter { $0.kind == .launch } }
     var procs: [Proc] { processes.get() }
 
+    /// When set, the next `server stop` run suspends until `releaseHeldRun()`.
+    let holdNextServerStop = Locked(false)
+    private let held = Locked<CheckedContinuation<Void, Never>?>(nil)
+    var isHoldingRun: Bool { held.get() != nil }
+    func releaseHeldRun() { held.with { c in let r = c; c = nil; return r }?.resume() }
+
     func run(_ executable: URL, _ args: [String], env: [String: String]) async throws -> (status: Int32, stdout: Data) {
         recorded.with { $0.append(Call(kind: .run, executable: executable, args: args, env: env)) }
         log.add("run:" + args.prefix(2).joined(separator: " "))
+        if args.starts(with: ["server", "stop"]), holdNextServerStop.with({ h in let was = h; h = false; return was }) {
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in held.with { $0 = c } }
+        }
         let reply = runReply.get()(args)
         return (reply.0, reply.1)
     }
@@ -151,8 +160,8 @@ final class ScriptedCore: ShellXCoreCalling, @unchecked Sendable {
             return Data(#"{"error":{"code":"invalid_params","message":"m"}}"#.utf8)
         }
         let path = coreStateDir.appendingPathComponent("tickets/" + name).path
-        let expires = Int(clock.now.timeIntervalSince1970 + lifetime.get())
-        let body: [String: JSONValue] = ["ok": .object(["path": .string(path), "expires_at_unix": .number(Double(expires)),
+        let expires = clock.now.timeIntervalSince1970 + lifetime.get()
+        let body: [String: JSONValue] = ["ok": .object(["path": .string(path), "expires_at_unix": .number(expires),
                                                         "relay_url": .string(relayURL.get())])]
         return try JSONEncoder().encode(body)
     }
