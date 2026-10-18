@@ -376,3 +376,43 @@ fn approve_refuses_key_swapped_after_pending() {
     assert_eq!(e.code, "fingerprint_mismatch");
     assert_eq!(p.approve_posts(), 0);
 }
+
+/// L4 R17 (D1 enforced server-side): a pairing request whose key is not the
+/// requester machine's registered key is refused, and nothing is created.
+#[test]
+fn request_with_key_other_than_registered_is_refused() {
+    let fake = support::fake();
+    let a = Core::new();
+    let a_dir = support::state_dir();
+    support::configure(&a, &fake.base_url, &a_dir, json!({}));
+    a.call("auth.login", json!({"email": "a@b.c", "password": "pw"})).unwrap();
+    // Registered under a key that is not this state_dir's device key.
+    a.call(
+        "machines.register",
+        json!({"name": "Mac A", "platform": "macos", "os_version": "15", "app_version": "2.0.0",
+               "noise_public_key_b64": URL_SAFE_NO_PAD.encode(attacker_key())}),
+    )
+    .unwrap();
+    let (b, _b_dir, _, b_id) = machine(&fake, "a@b.c", "Mac B");
+    let e = a.call("pair.request", json!({"to_machine_id": b_id})).unwrap_err();
+    assert_eq!(e.code, "bad_request");
+    assert!(b.call("pair.pending", json!({})).unwrap()["pairings"].as_array().unwrap().is_empty());
+}
+
+/// L4 R13: the requester's own items carry `requester_x25519_b64` too.
+#[test]
+fn requester_list_items_carry_the_requester_key() {
+    let p = pair();
+    p.request();
+    let session: Value = serde_json::from_slice(&std::fs::read(p.a_dir.join("session.json")).unwrap()).unwrap();
+    let token = session["token"].as_str().unwrap();
+    let mut res = ureq::get(format!("{}/v2/pairings?role=requester", p.fake.base_url))
+        .header("Authorization", format!("Bearer {token}"))
+        .call()
+        .unwrap();
+    let body: Value = serde_json::from_str(&res.body_mut().read_to_string().unwrap()).unwrap();
+    let item = &body["pairings"][0];
+    let shown = base64::engine::general_purpose::STANDARD.decode(item["requester_x25519_b64"].as_str().expect("key present")).unwrap();
+    let own = URL_SAFE_NO_PAD.decode(p.a_login["device_public_key_b64"].as_str().unwrap()).unwrap();
+    assert_eq!(shown, own, "{item}");
+}
