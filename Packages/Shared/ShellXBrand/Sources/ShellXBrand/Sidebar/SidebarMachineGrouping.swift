@@ -4,14 +4,12 @@ import IOKit.ps
 import SystemConfiguration
 
 /// Which machine a sidebar section stands for.
-///
-/// Wave 2 adds `case remote(machineID: String)` for devices paired through the
-/// ShellX server; callers should not switch on this exhaustively from outside
-/// the package without expecting that case.
 public enum SidebarMachineKey: Hashable, Sendable {
     case local
     /// `target` is the workspace's `remoteDisplayTarget`, e.g. "ubuntu@vm01".
     case ssh(target: String)
+    /// A device on the same ShellX account, paired through the ShellX server.
+    case remote(machineID: String)
 
     /// Deterministic identity for list diffing: the same key gives the same
     /// UUID in every launch, different keys give different UUIDs.
@@ -22,6 +20,8 @@ public enum SidebarMachineKey: Hashable, Sendable {
             seed = "shellx.machine.local"
         case .ssh(let target):
             seed = "shellx.machine.ssh:" + target
+        case .remote(let machineID):
+            seed = "shellx.machine.remote:" + machineID
         }
         let bytes = Array(seed.utf8)
         let high = Self.fnv1a64(bytes, basis: 0xcbf2_9ce4_8422_2325)
@@ -120,11 +120,14 @@ public struct SidebarMachineInput<ID: Hashable & Sendable>: Equatable, Sendable 
     /// The workspace's SSH target; nil (or blank) for a local workspace.
     public let sshTarget: String?
     public let sshConnected: Bool
+    /// The remote ShellX machine this workspace is attached to, if any.
+    public let remoteMachineID: String?
 
-    public init(workspaceID: ID, sshTarget: String?, sshConnected: Bool) {
+    public init(workspaceID: ID, sshTarget: String?, sshConnected: Bool, remoteMachineID: String? = nil) {
         self.workspaceID = workspaceID
         self.sshTarget = sshTarget
         self.sshConnected = sshConnected
+        self.remoteMachineID = remoteMachineID
     }
 }
 
@@ -141,21 +144,65 @@ public struct SidebarMachineLabels: Equatable, Sendable {
     public static let english = SidebarMachineLabels(thisMac: "this Mac", ssh: "SSH")
 }
 
+/// The trailing control a remote machine header offers.
+public enum SidebarMachineHeaderAction: Hashable, Sendable {
+    /// No access yet: a "Request access" button.
+    case requestAccess
+    /// A request is pending; `code` is already grouped for display ("123 456").
+    case waiting(code: String)
+    /// Access granted: clicking the header opens a session.
+    case open
+    case reconnecting
+    case connecting
+}
+
 /// What a machine section header shows: "MacBook Pro · this Mac".
 public struct SidebarMachineHeaderModel: Hashable, Sendable {
     public let key: SidebarMachineKey
     public let title: String
+    /// Shown after the title as "title · note"; empty means title only.
     public let note: String
     /// coolicons name: "Laptop", "Desktop" or "Data".
     public let coolicon: String
     public let isOnline: Bool
+    /// Offline remote machines render the whole header at reduced opacity.
+    public let isDimmed: Bool
+    /// Remote machines only; local and SSH headers have none.
+    public let action: SidebarMachineHeaderAction?
 
-    public init(key: SidebarMachineKey, title: String, note: String, coolicon: String, isOnline: Bool) {
+    public init(
+        key: SidebarMachineKey,
+        title: String,
+        note: String,
+        coolicon: String,
+        isOnline: Bool,
+        isDimmed: Bool = false,
+        action: SidebarMachineHeaderAction? = nil
+    ) {
         self.key = key
         self.title = title
         self.note = note
         self.coolicon = coolicon
         self.isOnline = isOnline
+        self.isDimmed = isDimmed
+        self.action = action
+    }
+}
+
+/// A remote machine section the caller already resolved (header text, order,
+/// whether its workspaces show). Kept free of the remote models so this
+/// package needs no ShellXRemoteCore; ShellXRemoteUI builds these.
+public struct SidebarRemoteSectionDescriptor: Hashable, Sendable {
+    /// Matched against `SidebarMachineInput.remoteMachineID`.
+    public let machineID: String
+    public let header: SidebarMachineHeaderModel
+    /// False for an offline machine: its tagged workspaces are hidden.
+    public let showsRows: Bool
+
+    public init(machineID: String, header: SidebarMachineHeaderModel, showsRows: Bool) {
+        self.machineID = machineID
+        self.header = header
+        self.showsRows = showsRows
     }
 }
 
@@ -185,11 +232,40 @@ public enum SidebarMachineGrouping {
         local: LocalMachineInfo,
         labels: SidebarMachineLabels = .english
     ) -> [SidebarMachineSection<ID>] {
+        sections(for: inputs, local: local, remote: [SidebarRemoteSectionDescriptor](), labels: labels)
+    }
+
+    /// As `sections(for:local:labels:)`, with remote machine sections between
+    /// the local section and the SSH sections, in `remote`'s order (the
+    /// first descriptor wins for a repeated machine id). A workspace whose
+    /// `remoteMachineID` names one of them goes under it, or is hidden when
+    /// that section `showsRows == false`. A workspace naming an unknown
+    /// machine is grouped as if it had no remote machine, so it never
+    /// disappears.
+    public static func sections<ID: Hashable & Sendable>(
+        for inputs: [SidebarMachineInput<ID>],
+        local: LocalMachineInfo,
+        remote: [SidebarRemoteSectionDescriptor],
+        labels: SidebarMachineLabels = .english
+    ) -> [SidebarMachineSection<ID>] {
+        var remoteOrder: [SidebarRemoteSectionDescriptor] = []
+        var remoteByID: [String: SidebarRemoteSectionDescriptor] = [:]
+        for descriptor in remote where remoteByID[descriptor.machineID] == nil {
+            remoteByID[descriptor.machineID] = descriptor
+            remoteOrder.append(descriptor)
+        }
+        var remoteIDs: [String: [ID]] = [:]
         var localIDs: [ID] = []
         var sshOrder: [String] = []
         var sshIDs: [String: [ID]] = [:]
         var sshOnline: [String: Bool] = [:]
         for input in inputs {
+            if let machineID = input.remoteMachineID, let descriptor = remoteByID[machineID] {
+                if descriptor.showsRows {
+                    remoteIDs[machineID, default: []].append(input.workspaceID)
+                }
+                continue
+            }
             guard let target = normalizedTarget(input.sshTarget) else {
                 localIDs.append(input.workspaceID)
                 continue
@@ -208,7 +284,13 @@ public enum SidebarMachineGrouping {
             isOnline: true
         )
         var result = [SidebarMachineSection(header: localHeader, workspaceIDs: localIDs)]
-        result.reserveCapacity(1 + sshOrder.count)
+        result.reserveCapacity(1 + remoteOrder.count + sshOrder.count)
+        for descriptor in remoteOrder {
+            result.append(SidebarMachineSection(
+                header: descriptor.header,
+                workspaceIDs: remoteIDs[descriptor.machineID] ?? []
+            ))
+        }
         for target in sshOrder {
             let header = SidebarMachineHeaderModel(
                 key: .ssh(target: target),
