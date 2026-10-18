@@ -49,6 +49,25 @@ Recorded 2026-10-18 (Wave 0, Task 1).
 - `python3 scripts/verify-local.py --all`: **16/16 checks passed** (includes project-tests 16 tests, test-wiring-sync 18, wire-app-sources 13, ui-lab 4, ui-fuzzer 22; all 0 failures, 0 skipped).
 - `./scripts/test-unit.sh test` (xcodebuild scheme `cmux-unit`): compile took about 55 min, then the run was **stopped by me at the 60 min budget**, so there is no final summary line (exit was a kill, not a test result). Before the stop: 215 test cases started, 214 passed, 0 failed; the one in flight was `AppDelegateShortcutRoutingTests testTextBoxPendingAttachmentUploadIsStrippedWhenPreservedForRemount`. Known failures: none observed. The full unit suite is far larger than 215 cases and was not completed. Log: `/tmp/shellx-w0-unit.log`. A rerun will be fast on compile (warm DerivedData) but needs a time budget for the test phase itself. The unit run launches a `cmux DEV` test host, not `com.cmuxterm.app`.
 
+## Signing (W0 Task 2)
+
+Recorded 2026-10-18. Fork commit `3bb417b7eb` on `main`: `shellx.release.entitlements`, `scripts/shellx/sign-and-notarize.sh`, `tests/test_shellx_entitlements.py` (wired into `tests/test-execution.toml` lane `linux-guard` and the `preflight` group of `ci-guards.yml`).
+
+- Build: `CMUX_GHOSTTYKIT_NO_PREBUILT=1 scripts/shellx/sign-and-notarize.sh --build` → `build-shellx/Build/Products/Release/ShellX.app` (bundle id `pro.shellx.desktop`, display name ShellX, executable still `cmux`, arm64 only). GhosttyKit built locally with Zig (cache `~/.cache/cmux/ghosttykit-local/cb1ef709…-noi18n-v2-dirty-4a469b6a…`; "dirty" only because `ghostty/macos/GhosttyKit.xcframework.prebuilt-bak/` is an untracked backup in the submodule). Releases therefore do not depend on Manaflow's prebuilt artifacts.
+- Build workarounds, all in the script with comments: `SWIFT_OPTIMIZATION_LEVEL=-Onone` (Xcode 26.2 `-O` dies in the SIL linker on `ghostty_surface_clear_selection`, declared twice: `@_silgen_name` in CmuxTerminalCore and the GhosttyKit header; **W1 must fix this before an optimized build**); `ENABLE_DEBUG_DYLIB=NO` (otherwise `-Onone` splits out `cmux.debug.dylib` + `__preview.dylib`, which the inside-out signer never signs); `CMUX_WIREGUARD_GO_REQUIRE=0` (no Go; the tunnel extension is not shipped); `PRODUCT_NAME` cannot be overridden project-wide (collides across Swift package products), so the bundle dir is renamed after the build.
+- Entitlements: started from `cmux.release.entitlements`, team/app ids changed, network-extension/system-extension dropped. **Also dropped** `com.apple.application-identifier`, `com.apple.developer.team-identifier`, `keychain-access-groups`, `com.apple.developer.web-browser.public-key-credential`: without a Developer ID provisioning profile amfi refuses to spawn the app (`open` → launchd errno 163). Code that loses them: CmuxPhonePush / CmuxIrxTransport / CmuxIrohTransport keychain access groups and CmuxBrowser WebAuthn passkeys. Follow-up: if W2 device identity needs a shared keychain group, or passkeys in the browser are wanted, create a Developer ID provisioning profile for `pro.shellx.desktop` (and request the web-browser public-key-credential capability from Apple), embed it, and restore the keys.
+- Signing: `scripts/sign-cmux-bundle.sh` inside-out with "Developer ID Application: Phu Le huu (W4RF3W4VTZ)" (first run needs a one-time keychain "Always Allow"). Every Mach-O in the bundle (13 files: main `cmux`, `Resources/bin` helpers `cmux`, `ghostty`, `cmux-diff-sidecar`…, Sparkle, Sentry, Iroh, `libcmux_command_palette_nucleo_ffi.dylib`, DockTile plugin, Computer Use app) has `TeamIdentifier=W4RF3W4VTZ`.
+- Notarization: submission `19690875-473e-4655-94e6-9b2e45ead5db` **Accepted**; stapled; `spctl` → `accepted`, `source=Notarized Developer ID`.
+- Bundle id collision: the Flutter desktop app installed at `/Applications/ShellX.app` also uses `pro.shellx.desktop`, and cmux's single-instance guard makes the native build exit when that app is running ("another instance with bundle id pro.shellx.desktop is running … exiting"). The two cannot run side by side; the native app replaces the Flutter one in place (same id, good for updates).
+- Launch check: pending (needs the Flutter ShellX quit first).
+
+### Helpers
+
+| Helper | Signed + notarized under W4RF3W4VTZ | Works | W1 |
+| --- | --- | --- | --- |
+| `cmux Computer Use.app` (`com.cmuxterm.cua`) | yes | **no**: `ComputerUseHelperTrust.swift:19` pins `teamIdentifier = "7WLXT3NR37"` and the requirement includes that team, so ShellX never installs or launches it | exclude; follow-up = rebrand bundle id + team pin or drop Computer Use |
+| `CmuxDockTilePlugin.plugin` | yes | pending launch check | keep if launch check passes |
+
 ## Decisions
 
 (none yet)
