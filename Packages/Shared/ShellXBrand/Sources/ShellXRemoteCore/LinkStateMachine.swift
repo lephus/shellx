@@ -5,6 +5,29 @@ public enum LinkEvent: Equatable, Sendable {
     case machineOffline(lastSeen: Date?), machineOnline, retryDue, stop
 }
 
+/// Which failure codes end a link (`.failed`) and which are retried on the backoff.
+/// Codes come from shellx-core (`tickets.rs`, `machines.rs`, `store.rs`, `http.rs`: server codes verbatim,
+/// `http_<status>`, `network`, `server`) or from the supervisors (`state_dir_insecure`, `invite_expired`).
+public enum LinkFailure {
+    /// Will not heal by retrying: sign-in, registration, access or local-state problems.
+    public static let fatalCodes: Set<String> = [
+        "unauthorized", "forbidden", "not_logged_in", "invalid_credentials", "not_registered", "not_granted",
+        "machine_not_found", "invalid_machine", "invalid_params", "bad_request", "not_configured",
+        "state_dir_insecure", "state_file_insecure", "invite_expired",
+    ]
+
+    public static func isFatal(_ code: String) -> Bool {
+        if fatalCodes.contains(code) { return true }
+        // Other 4xx answers are fatal too, except timeouts and rate limits.
+        return code.hasPrefix("http_4") && code != "http_408" && code != "http_429"
+    }
+
+    /// The failure code of a core call; anything that is not a core envelope error is retryable.
+    public static func code(for error: any Error) -> String {
+        (error as? ShellXCoreError)?.code ?? "core_call_failed"
+    }
+}
+
 public enum LinkAction: Equatable, Sendable {
     case mintTicket, spawn, kill, scheduleRetry(at: Date), publish(LinkState)
 }
@@ -13,7 +36,6 @@ public enum LinkAction: Equatable, Sendable {
 public struct LinkStateMachine: Sendable {
     public private(set) var state: LinkState = .idle
     private var attempt = 0
-    private static let fatalMintCodes: Set<String> = ["unauthorized", "forbidden", "not_logged_in"]
 
     public init() {}
 
@@ -46,7 +68,7 @@ public struct LinkStateMachine: Sendable {
         case .mintFailed(let code):
             switch state {
             case .connecting, .reconnecting:
-                if Self.fatalMintCodes.contains(code) {
+                if LinkFailure.isFatal(code) {
                     state = .failed(code: code)
                     return [.publish(state)]
                 }
