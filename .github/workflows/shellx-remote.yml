@@ -1,0 +1,214 @@
+name: shellx-remote
+
+# ShellX remote core (lane L5): shellx-core tests on Linux and macOS, the
+# ShellXBrand package tests, and the remote end-to-end harness on Linux:
+# fake ShellX API + stock cmux-relay + the patched cmux-tui daemon whose
+# terminal is a fake Mac app on the virtual PTY socket + shellx-core-cli on two
+# machines (tests/test_shellx_remote_e2e.py, scripts/shellx/remote-e2e/).
+#
+# cmux's own .github/ (cmux-tui.yml and its setup-cmux-tui-rust composite
+# action) is not in this repo, so the pinned Rust toolchain step below inlines
+# that action: it installs what cmux-tui/rust-toolchain.toml pins. Only the
+# ghostty submodule is initialised (cmux-tui's ghostty-vt-sys builds it).
+# Action pins (full sha + version) are the ones cmux-tui.yml and shellx-mac.yml use.
+
+on:
+  push:
+    branches:
+      - "shellx/**"
+    paths:
+      - "shellx-core/**"
+      - "cmux-tui/crates/cmux-tui-core/src/virtual_pty.rs"
+      - "cmux-tui/crates/cmux-tui-core/src/surface.rs"
+      - "scripts/shellx/remote-e2e/**"
+      - "tests/test_shellx_remote*.py"
+      - "Packages/Shared/ShellXBrand/**"
+      - ".github/workflows/shellx-remote.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shellx-remote-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: shellx-core (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-26]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up pinned Rust (cmux-tui/rust-toolchain.toml)
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --profile minimal --default-toolchain none --no-modify-path
+          fi
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          TOOLCHAIN_FILE=cmux-tui/rust-toolchain.toml python3 - <<'PY'
+          import os, pathlib, re, subprocess
+          contents = pathlib.Path(os.environ["TOOLCHAIN_FILE"]).read_text(encoding="utf-8")
+          def value(name):
+              match = re.search(rf'^\s*{name}\s*=\s*"([^"]+)"', contents, re.MULTILINE)
+              if match is None:
+                  raise SystemExit(f"missing {name} in cmux-tui/rust-toolchain.toml")
+              return match.group(1)
+          channel, profile = value("channel"), value("profile")
+          components = re.search(r"^\s*components\s*=\s*\[([^]]*)\]", contents, re.MULTILINE)
+          if components is None:
+              raise SystemExit("missing components in cmux-tui/rust-toolchain.toml")
+          command = ["rustup", "toolchain", "install", channel, "--profile", profile]
+          for component in re.findall(r'"([^"]+)"', components.group(1)):
+              command.extend(["--component", component])
+          subprocess.run(command, check=True)
+          subprocess.run(["rustup", "default", channel], check=True)
+          PY
+          cargo --version
+          rustc --version
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: shellx-core -> target
+
+      - name: cargo test (shellx-core workspace)
+        working-directory: shellx-core
+        env:
+          CARGO_INCREMENTAL: "0"
+        run: cargo test --workspace --locked
+
+      - name: Dependency allowlist (rustls/ring only, licenses)
+        working-directory: shellx-core
+        run: |
+          set -euo pipefail
+          python3 scripts/test_check_deps.py
+          python3 scripts/check_deps.py
+
+      - name: C ABI smoke (staticlib linked from C)
+        if: runner.os == 'macOS'
+        working-directory: shellx-core
+        env:
+          CARGO_INCREMENTAL: "0"
+        run: scripts/c-smoke.sh
+
+  swift-package:
+    # shellx-mac.yml runs the same command inside its long app-build job;
+    # this one keeps the lane's evidence in one short workflow.
+    name: ShellXBrand package tests
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      CMUX_CI_REQUIRED_MACOS_SDK_MAJOR: "26"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          ./scripts/select-ci-xcode.sh
+          xcodebuild -version
+
+      - name: swift test
+        run: swift test --package-path Packages/Shared/ShellXBrand
+
+  bridge-e2e:
+    name: virtual PTY + remote e2e (linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      # Build libghostty-vt for a baseline CPU so a cached build runs on any
+      # runner (cmux-tui.yml does the same).
+      CMUX_GHOSTTY_VT_ZIG_CPU: baseline
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Init ghostty submodule
+        shell: bash
+        run: bash scripts/ci/init-submodule.sh ghostty
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libclang-dev pkg-config
+
+      - name: Install zig
+        run: ./scripts/install-zig-ci.sh
+
+      - name: Set up pinned Rust (cmux-tui/rust-toolchain.toml)
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --profile minimal --default-toolchain none --no-modify-path
+          fi
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          TOOLCHAIN_FILE=cmux-tui/rust-toolchain.toml python3 - <<'PY'
+          import os, pathlib, re, subprocess
+          contents = pathlib.Path(os.environ["TOOLCHAIN_FILE"]).read_text(encoding="utf-8")
+          def value(name):
+              match = re.search(rf'^\s*{name}\s*=\s*"([^"]+)"', contents, re.MULTILINE)
+              if match is None:
+                  raise SystemExit(f"missing {name} in cmux-tui/rust-toolchain.toml")
+              return match.group(1)
+          channel, profile = value("channel"), value("profile")
+          components = re.search(r"^\s*components\s*=\s*\[([^]]*)\]", contents, re.MULTILINE)
+          if components is None:
+              raise SystemExit("missing components in cmux-tui/rust-toolchain.toml")
+          command = ["rustup", "toolchain", "install", channel, "--profile", profile]
+          for component in re.findall(r'"([^"]+)"', components.group(1)):
+              command.extend(["--component", component])
+          subprocess.run(command, check=True)
+          subprocess.run(["rustup", "default", channel], check=True)
+          PY
+          cargo --version
+          rustc --version
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: |
+            cmux-tui -> target
+            shellx-core -> target
+
+      - name: Virtual PTY unit tests (cmux-tui-core)
+        working-directory: cmux-tui
+        run: cargo test -p cmux-tui-core --lib virtual_pty --locked
+
+      - name: Build patched cmux-tui and stock cmux-relay
+        working-directory: cmux-tui
+        run: cargo build -p cmux-tui -p cmux-relay --locked
+
+      - name: Build shellx-core-cli and shellx-fake-api
+        working-directory: shellx-core
+        run: cargo build --workspace --locked
+
+      - name: Remote e2e (fake API, cmux-relay, patched daemon, two machines)
+        env:
+          SHELLX_E2E_REQUIRE: "1"
+        run: |
+          set -euo pipefail
+          export SHELLX_E2E_BIN="$GITHUB_WORKSPACE/cmux-tui/target/debug"
+          export SHELLX_E2E_CORE_BIN="$GITHUB_WORKSPACE/shellx-core/target/debug"
+          python3 tests/test_shellx_remote_e2e.py -v
