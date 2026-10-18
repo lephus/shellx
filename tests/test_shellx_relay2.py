@@ -62,6 +62,14 @@ class ShellxRelay2Tests(unittest.TestCase):
         for path in ["Cargo.toml", "rust-toolchain.toml", "vendor/**", "bindings/**", "build-support/**"]:
             self.assertIn(f"      - cmux-tui/{path}\n", text)
         self.assertIn("shellx-relay2:${{ github.sha }}", text)
+        self.assertIn("    branches: [feat/relay-v2, main]\n", text)
+        self.assertNotIn("l4-relay2", text)
+        self.assertNotIn("shellx-pro", text)
+
+    def test_image_source_label(self):
+        text = DOCKERFILE.read_text()
+        self.assertIn('org.opencontainers.image.source="https://github.com/lephus/shellx"', text)
+        self.assertNotIn("shellx-pro", text)
 
     def test_source_tarball_contents(self):
         self.assertTrue(SCRIPT.exists() and SCRIPT.stat().st_mode & 0o111)
@@ -83,7 +91,7 @@ class ShellxRelay2Tests(unittest.TestCase):
                 names = tar.getnames()
         self.assertIn(f"{sha}/cmux-tui/crates/cmux-relay/Cargo.toml", names)
         self.assertIn(f"{sha}/scripts/shellx/relay2/Dockerfile", names)
-        for forbidden in ["cmux-tui/relays/", "web/", "workers/", "services/"]:
+        for forbidden in ["cmux-tui/relays/", "web/", "relay/", "deploy/", "docs/", "workers/", "services/"]:
             self.assertEqual([n for n in names if n[len(sha) + 1 :].startswith(forbidden)], [], forbidden)
 
 
