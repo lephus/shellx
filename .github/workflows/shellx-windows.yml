@@ -1,0 +1,161 @@
+name: ShellX Windows
+
+# ShellX native Windows app (windows/ workspace): the pure-Rust model tests on
+# Linux, and the GPUI app build + headless smoke on windows-2025. No secrets,
+# nothing is published; the exe is only uploaded as a run artifact.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - shellx/l6-windows
+      - shellx/sprint
+    paths:
+      - windows/**
+      - cmux-tui/crates/**
+      - cmux-tui/Cargo.toml
+      - .github/workflows/shellx-windows.yml
+      - .github/actions/setup-cmux-tui-rust/**
+
+permissions: {}
+
+concurrency:
+  group: shellx-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  model:
+    name: model (shellx-model tests)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up pinned Rust
+        uses: ./.github/actions/setup-cmux-tui-rust
+
+      - name: Cache target dir
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: windows -> target
+          key: shellx-model
+          cache-on-failure: true
+
+      - name: Test shellx-model
+        working-directory: windows
+        run: cargo test --locked -p shellx-model
+
+  app:
+    name: app (x86_64-pc-windows-msvc)
+    runs-on: windows-2025
+    timeout-minutes: 75
+    permissions:
+      contents: read
+    env:
+      TARGET: x86_64-pc-windows-msvc
+      APP_EXE: windows/target/x86_64-pc-windows-msvc/release/shellx-desktop.exe
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Init ghostty submodule
+        shell: bash
+        run: bash scripts/ci/init-submodule.sh ghostty
+
+      - name: Resolve Ghostty Zig version
+        id: ghostty-zig-version
+        shell: bash
+        run: echo "version=$(bash ./scripts/ghostty-zig-version.sh)" >> "$GITHUB_OUTPUT"
+
+      - name: Install zig
+        uses: mlugg/setup-zig@8d6198c65fb0feaa111df26e6b467fea8345e46f # v2.0.5
+        with:
+          version: ${{ steps.ghostty-zig-version.outputs.version }}
+
+      - name: Set up pinned Rust
+        uses: ./.github/actions/setup-cmux-tui-rust
+
+      - name: Install Rust target
+        shell: bash
+        run: rustup target add "$TARGET"
+
+      - name: Cache target dir
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: windows -> target
+          key: shellx-app
+          cache-on-failure: true
+
+      - name: Show toolchain
+        shell: bash
+        run: |
+          zig version
+          rustc --version --verbose
+          cargo --version
+
+      - name: Build shellx-desktop
+        id: build-app
+        working-directory: windows
+        shell: bash
+        run: |
+          unset CMUX_GHOSTTY_SRC
+          cargo build --release --locked -p shellx-app --target "$TARGET"
+          ls -la "target/$TARGET/release/"
+
+      - name: Test shellx-model
+        working-directory: windows
+        shell: bash
+        run: |
+          unset CMUX_GHOSTTY_SRC
+          cargo test --locked -p shellx-model --target "$TARGET"
+
+      - name: Stage artifact
+        id: stage
+        if: always() && steps.build-app.outcome == 'success'
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp "$APP_EXE" dist/
+          # Ship any runtime DLL the build produced next to the exe.
+          find "windows/target/$TARGET/release" -maxdepth 1 -name '*.dll' -exec cp {} dist/ \; || true
+          ls -la dist
+          # Imported DLLs, so a missing runtime dependency shows up here.
+          dumpbin_path="$(ls /c/Program\ Files/Microsoft\ Visual\ Studio/*/*/VC/Tools/MSVC/*/bin/Hostx64/x64/dumpbin.exe 2>/dev/null | head -1)"
+          if [[ -n "$dumpbin_path" ]]; then
+            "$dumpbin_path" //nologo //dependents dist/shellx-desktop.exe || true
+          fi
+
+      - name: Upload shellx-desktop
+        if: always() && steps.stage.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: shellx-desktop
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Headless smoke (ConPTY + libghostty-vt, no window)
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 180 "./$APP_EXE" --smoke 2>&1 | tee smoke.log
+          # The release exe is a GUI-subsystem binary; the exit code is the
+          # verdict, the log line is informational.
+          grep -F "smoke: PASS" smoke.log || echo "::warning::no PASS line captured (exit code was 0)"
+
+      - name: Version flag
+        shell: bash
+        run: |
+          set -o pipefail
+          "./$APP_EXE" --version 2>&1 | tee version.log
+          # The release exe is a GUI-subsystem binary, so its stdout may not
+          # reach a pipe; the exit code (set -e semantics above) is the
+          # verdict and the text check is informational.
+          grep -F "shellx-desktop 2.0.0" version.log || echo "::warning::no version text captured (exit code was 0)"

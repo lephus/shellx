@@ -1,0 +1,27 @@
+[package]
+name = "shellx-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "shellx-desktop"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+async-channel = "2"
+cmux-pty = { path = "../../cmux-tui/crates/cmux-pty" }
+ghostty-vt = { path = "../../cmux-tui/crates/ghostty-vt" }
+shellx-model = { path = "../shellx-model" }
+
+# GPUI from crates.io, pinned exactly. Default features are off so gpui does
+# not embed its own manifest resource (ours carries the icon + manifest);
+# the Windows backend (Direct3D 11 + DirectWrite) is not feature-gated.
+[target.'cfg(windows)'.dependencies]
+gpui = { version = "=0.2.2", default-features = false }
+
+[build-dependencies]
+embed-resource = "3"
