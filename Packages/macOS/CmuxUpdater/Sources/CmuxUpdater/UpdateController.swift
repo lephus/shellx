@@ -29,6 +29,11 @@ public final class UpdateController {
     /// Whether the running build is a cmux DEV/staging build that must never be compared against
     /// the public release appcast. See ``isDevLikeBundleIdentifier(_:)``.
     let isDevLikeBundle: Bool
+    /// Whether the host bundle carries a Sparkle EdDSA key (`SUPublicEDKey`). ShellX ships
+    /// without one until its update feed is signed; Sparkle refuses to start with an empty key,
+    /// so without one the updater is never started and manual checks behave like a DEV build's.
+    /// See ``hasUpdateSigningKey(infoValue:)``.
+    let hasUpdateSigningKey: Bool
 
     /// Host actions the updater delegates upward (retry, relaunch prep). Forwarded to the driver.
     public weak var actionDelegate: (any UpdateActionDelegate)? {
@@ -78,6 +83,8 @@ public final class UpdateController {
     ///   - isDevLikeBundle: Overrides whether this is a DEV/staging build. Defaults to `nil`,
     ///     which derives it from `hostBundle.bundleIdentifier` via ``isDevLikeBundleIdentifier(_:)``.
     ///     Injectable because a `Bundle` with an arbitrary identifier cannot be constructed in tests.
+    ///   - hasUpdateSigningKey: Overrides whether the build has a Sparkle EdDSA key. Defaults to
+    ///     `nil`, which reads `SUPublicEDKey` from `hostBundle` via ``hasUpdateSigningKey(infoValue:)``.
     /// - Parameter isDisabledByPolicy: The host's `DisableAutoUpdate` managed
     ///   policy. While it returns true the updater is never started and manual
     ///   checks are suppressed; the package stays free of the settings
@@ -89,6 +96,7 @@ public final class UpdateController {
                             defaults: UserDefaults = .standard,
                             fileManager: FileManager = .default,
                             isDevLikeBundle: Bool? = nil,
+                            hasUpdateSigningKey: Bool? = nil,
                             isDisabledByPolicy: @escaping () -> Bool = { false }) {
         self.init(log: log,
                   clock: clock,
@@ -97,6 +105,7 @@ public final class UpdateController {
                   defaults: defaults,
                   fileManager: fileManager,
                   isDevLikeBundle: isDevLikeBundle,
+                  hasUpdateSigningKey: hasUpdateSigningKey,
                   isDisabledByPolicy: isDisabledByPolicy,
                   updaterFactory: { driver, hostBundle in
                       SPUUpdater(
@@ -121,6 +130,7 @@ public final class UpdateController {
          defaults: UserDefaults = .standard,
          fileManager: FileManager = .default,
          isDevLikeBundle: Bool? = nil,
+         hasUpdateSigningKey: Bool? = nil,
          isDisabledByPolicy: @escaping () -> Bool = { false },
          updaterFactory: (UpdateDriver, Bundle) -> any UpdaterHandle) {
         self.log = log
@@ -131,15 +141,19 @@ public final class UpdateController {
         self.hostBundle = hostBundle
         let isDevLikeBundle = isDevLikeBundle ?? Self.isDevLikeBundleIdentifier(hostBundle.bundleIdentifier)
         self.isDevLikeBundle = isDevLikeBundle
+        let hasUpdateSigningKey = hasUpdateSigningKey
+            ?? Self.hasUpdateSigningKey(infoValue: hostBundle.object(forInfoDictionaryKey: "SUPublicEDKey"))
+        self.hasUpdateSigningKey = hasUpdateSigningKey
         settings.apply(to: defaults)
-        if isDevLikeBundle {
-            // DEV (`com.cmuxterm.app.debug[.<tag>]`) and staging (`com.cmuxterm.app.staging[.<tag>]`)
+        if isDevLikeBundle || !hasUpdateSigningKey {
+            // DEV (`pro.shellx.desktop.debug[.<tag>]`) and staging (`pro.shellx.desktop.staging[.<tag>]`)
             // builds are produced from local source and are not on the public release train, so
             // they must never query the public appcast. Turning off Sparkle's automatic checks
             // stops the passive vectors: Sparkle never schedules its own background checks, and
             // cmux's immediate launch probe is short-circuited by the
             // `automaticallyChecksForUpdates` guard. Foreground checks are gated separately by
-            // `requestUpdateCheck(_:)`.
+            // `requestUpdateCheck(_:)`. A build without an update signing key never starts
+            // Sparkle at all (see `startUpdaterIfNeeded`), and keeps the setting off as well.
             defaults.set(false, forKey: UpdateSettings.automaticChecksKey)
         }
 
@@ -265,6 +279,12 @@ public final class UpdateController {
             log.append("updater not started (automatic updates disabled by managed policy)")
             return false
         }
+        if !hasUpdateSigningKey {
+            // Sparkle fails to start with an empty `SUPublicEDKey` and would surface that as an
+            // update error on every launch. Without a key there is nothing to verify updates with.
+            log.append("updater not started (no SUPublicEDKey in Info.plist)")
+            return false
+        }
         ensureSparkleInstallationCache()
 #if DEBUG
         // Keep the permission-related defaults resettable for UI tests even though the
@@ -386,8 +406,8 @@ public final class UpdateController {
 }
 
 extension UpdateController {
-    /// Whether `bundleIdentifier` is a cmux DEV (`com.cmuxterm.app.debug[.<tag>]`) or staging
-    /// (`com.cmuxterm.app.staging[.<tag>]`) build.
+    /// Whether `bundleIdentifier` is a ShellX DEV (`pro.shellx.desktop.debug[.<tag>]`) or staging
+    /// (`pro.shellx.desktop.staging[.<tag>]`) build (`ShellXBrand.bundleID` + channel).
     ///
     /// Such builds are produced from local source and are not on the public release train, so
     /// they must never be compared against the public Sparkle appcast (#6292).
@@ -398,9 +418,16 @@ extension UpdateController {
     /// dependency edge for a small string check.
     static func isDevLikeBundleIdentifier(_ bundleIdentifier: String?) -> Bool {
         guard let bundleIdentifier else { return false }
-        return bundleIdentifier == "com.cmuxterm.app.debug"
-            || bundleIdentifier.hasPrefix("com.cmuxterm.app.debug.")
-            || bundleIdentifier == "com.cmuxterm.app.staging"
-            || bundleIdentifier.hasPrefix("com.cmuxterm.app.staging.")
+        return bundleIdentifier == "pro.shellx.desktop.debug"
+            || bundleIdentifier.hasPrefix("pro.shellx.desktop.debug.")
+            || bundleIdentifier == "pro.shellx.desktop.staging"
+            || bundleIdentifier.hasPrefix("pro.shellx.desktop.staging.")
+    }
+
+    /// Whether an `SUPublicEDKey` Info.plist value is a key Sparkle can start with: a non-empty
+    /// string. ShellX builds set it empty until Wave 3 signs the update feed.
+    static func hasUpdateSigningKey(infoValue: Any?) -> Bool {
+        guard let key = infoValue as? String else { return false }
+        return !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
