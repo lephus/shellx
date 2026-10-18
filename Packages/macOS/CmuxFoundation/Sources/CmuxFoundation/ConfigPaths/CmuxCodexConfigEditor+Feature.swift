@@ -1,10 +1,10 @@
 extension CmuxCodexConfigEditor {
     static let cmuxCodexHooksFeatureBegin =
-        "# cmux-codex-hooks-feature-78f1e4ba-66df-4d35-93c1-67fdf1cbb7df begin"
+        "# shellx-codex-hooks-feature-78f1e4ba-66df-4d35-93c1-67fdf1cbb7df begin"
     static let cmuxCodexHooksFeatureEnd =
-        "# cmux-codex-hooks-feature-78f1e4ba-66df-4d35-93c1-67fdf1cbb7df end"
+        "# shellx-codex-hooks-feature-78f1e4ba-66df-4d35-93c1-67fdf1cbb7df end"
     static let cmuxCodexHooksFeaturePreviousLinePrefix =
-        "# cmux-codex-hooks-feature-78f1e4ba-66df-4d35-93c1-67fdf1cbb7df previous line: "
+        "# shellx-codex-hooks-feature-78f1e4ba-66df-4d35-93c1-67fdf1cbb7df previous line: "
     static let legacyCmuxCodexHooksFeatureBegin = "# cmux hooks codex feature begin"
     static let legacyCmuxCodexHooksFeatureEnd = "# cmux hooks codex feature end"
     static let legacyCmuxCodexHooksFeaturePreviousLinePrefix =
