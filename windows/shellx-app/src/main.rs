@@ -11,8 +11,10 @@
 mod core_bridge;
 mod fonts;
 mod icons;
+mod links_store;
 mod local_pty;
 mod os_info;
+mod pairing_service;
 mod paths;
 mod shell_info;
 mod smoke;

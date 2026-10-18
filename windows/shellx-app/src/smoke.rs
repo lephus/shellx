@@ -214,9 +214,43 @@ pub fn core_bridge() -> Result<()> {
     Ok(())
 }
 
+/// Scripted pairing: pending, pending, approved saves the link; denied saves none.
+pub fn pairing_flow() -> Result<()> {
+    use serde_json::json;
+    use shellx_model::core_api::FakeCore;
+    use shellx_model::remote_state::PairState;
+    let dir = std::env::temp_dir().join(format!("shellx-smoke-pair-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let path = dir.join("links.json");
+    let drive = |core: &FakeCore| {
+        let clock = std::cell::Cell::new(0u64);
+        let mut svc = crate::pairing_service::PairingService::new(crate::links_store::LinksStore::new(path.clone()));
+        svc.run_blocking(core, "m1", "Mac", || clock.get(), |ms| clock.set(clock.get() + ms))
+    };
+    let core = FakeCore::new();
+    core.on("pair.request", Ok(json!({"pairing_id": "p1", "code": "123456", "fingerprint": "ab"})));
+    core.on("pair.poll", Ok(json!({"status": "denied"})));
+    ensure!(matches!(drive(&core), PairState::Denied) && !path.exists(), "denied must not save a link");
+    core.on_seq(
+        "pair.poll",
+        vec![
+            Ok(json!({"status": "pending"})),
+            Ok(json!({"status": "pending"})),
+            Ok(json!({"status": "approved", "invite_path": "i.uri", "relay_route": "r", "relay_slot": "s", "daemon_fingerprint": "d"})),
+        ],
+    );
+    ensure!(matches!(drive(&core), PairState::Approved { .. }), "pairing did not approve");
+    let links = crate::links_store::LinksStore::new(path.clone()).load()?;
+    let _ = std::fs::remove_dir_all(&dir);
+    ensure!(links.get("m1").is_some_and(|l| l.relay_slot == "s" && !l.enrolled), "link not saved");
+    println!("smoke-pairing: denied -> no link, approved -> link saved");
+    Ok(())
+}
+
 pub fn run() -> Result<()> {
     ui_assets()?;
     core_bridge()?;
+    pairing_flow()?;
     input_paths()?;
     let started = Instant::now();
     let (program, args) = default_shell();
