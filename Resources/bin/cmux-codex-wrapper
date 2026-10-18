@@ -313,7 +313,7 @@ cmux_codex_cua_attachment_reason() {
 # to the two identity values baked into a reload.sh tagged app; stable builds
 # retain the signed-parent gate.
 cmux_codex_is_tagged_dev_build() {
-    [[ -n "${CMUX_TAG:-}" && "${CMUX_BUNDLE_ID:-}" == com.cmuxterm.app.debug.* ]]
+    [[ -n "${CMUX_TAG:-}" && "${CMUX_BUNDLE_ID:-}" == pro.shellx.desktop.debug.* ]]
 }
 
 cmux_codex_computer_use_enabled_for_invocation() {

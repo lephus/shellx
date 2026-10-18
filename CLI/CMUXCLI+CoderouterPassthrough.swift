@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import ShellXBrand
 
 // `cmux cr ...`, and every `cmux coderouter ...` verb cmux does not own
 // (CMUXCLI+Coderouter.swift), run the separately distributed CodeRouter CLI.
@@ -50,7 +51,7 @@ extension CMUXCLI {
             explicitSocketPath: nil,
             explicitPassword: nil,
             environment: ProcessInfo.processInfo.environment,
-            bundleIdentifier: CLISocketPathResolver.currentAppBundleIdentifier() ?? "com.cmuxterm.app"
+            bundleIdentifier: CLISocketPathResolver.currentAppBundleIdentifier() ?? ShellXBrand.bundleID
         )
     }
 

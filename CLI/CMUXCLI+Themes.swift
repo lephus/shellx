@@ -1,10 +1,11 @@
 import Foundation
 import CmuxFoundation
 import Darwin
+import ShellXBrand
 
 extension CMUXCLI {
     static let cmuxThemeOverrideBundleIdentifier = CmuxGhosttyConfigPathResolver.releaseBundleIdentifier
-    static let cmuxThemesReloadNotificationName = "com.cmuxterm.themes.reload-config"
+    static let cmuxThemesReloadNotificationName = "\(ShellXBrand.bundleID).themes.reload-config"
 
     struct ThemeSelection {
         let rawValue: String?

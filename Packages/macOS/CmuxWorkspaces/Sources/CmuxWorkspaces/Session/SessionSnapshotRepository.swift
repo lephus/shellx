@@ -41,7 +41,7 @@ public struct SessionSnapshotRepository<SnapshotValue: SessionSnapshotRepresenti
     ///     snapshots with any other version are unusable.
     ///   - bundleIdentifier: The bundle identifier used to derive the
     ///     snapshot file name (pass `Bundle.main.bundleIdentifier` at the
-    ///     composition root). Falls back to `com.cmuxterm.app` when nil or
+    ///     composition root). Falls back to `pro.shellx.desktop` when nil or
     ///     blank.
     ///   - appSupportDirectory: Overrides the discovered user Application
     ///     Support directory (tests pass a temporary directory).

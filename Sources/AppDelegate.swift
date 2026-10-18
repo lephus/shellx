@@ -41,6 +41,7 @@ import CmuxSentryReporting
 import CmuxSidebar
 import CmuxGit
 import os
+import ShellXBrand
 
 private nonisolated let sudoApprovalLogger = Logger(
     subsystem: "com.cmuxterm.app",
@@ -48,7 +49,8 @@ private nonisolated let sudoApprovalLogger = Logger(
 )
 
 private enum CmuxThemeNotifications {
-    static let reloadConfig = Notification.Name("com.cmuxterm.themes.reload-config")
+    // Distributed: the ShellX CLI posts it, so the name must not be cmux's.
+    static let reloadConfig = Notification.Name("\(ShellXBrand.bundleID).themes.reload-config")
 }
 
 struct WorkspaceGroupNewWorkspaceTarget {

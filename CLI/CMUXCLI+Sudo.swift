@@ -1,6 +1,7 @@
 import CmuxSudoBroker
 import Darwin
 import Foundation
+import ShellXBrand
 
 extension CMUXCLI {
     func runSudoCommand(commandArgs: [String]) throws -> Int32 {
@@ -98,8 +99,8 @@ extension CMUXCLI {
         )
     }
 
-    /// The Developer ID team that signs every distributed cmux build.
-    private static let sudoReleaseTeamIdentifier = "7WLXT3NR37"
+    /// The Developer ID team that signs every distributed ShellX build.
+    private static let sudoReleaseTeamIdentifier = ShellXBrand.teamID
 
     /// Pins the signing identity of bundled helpers before any of them reaches sudo.
     ///

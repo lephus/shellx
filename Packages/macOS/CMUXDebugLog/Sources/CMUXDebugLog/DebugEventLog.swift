@@ -485,7 +485,7 @@ public final class DebugEventLog: @unchecked Sendable {
         }
 
         if let bundleId = Bundle.main.bundleIdentifier,
-           bundleId != "com.cmuxterm.app.debug" {
+           bundleId != "pro.shellx.desktop.debug" {
             return "/tmp/cmux-debug-\(sanitizePathToken(bundleId)).log"
         }
 

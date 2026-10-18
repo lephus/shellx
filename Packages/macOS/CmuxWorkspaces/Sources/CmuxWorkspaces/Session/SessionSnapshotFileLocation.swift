@@ -10,8 +10,8 @@ public import Foundation
 /// moved between channels (`cmux restore-session --from nightly`).
 public struct SessionSnapshotFileLocation: Sendable, Equatable {
     /// The stable channel's bundle identifier, also the fallback when the
-    /// running bundle has none.
-    public static let stableBundleIdentifier = "com.cmuxterm.app"
+    /// running bundle has none (`ShellXBrand.bundleID`).
+    public static let stableBundleIdentifier = "pro.shellx.desktop"
 
     /// Maps a release channel name to its bundle identifier.
     ///
@@ -20,8 +20,8 @@ public struct SessionSnapshotFileLocation: Sendable, Equatable {
     /// for tagged Debug builds. The tag is normalized the way
     /// `scripts/reload.sh --tag` builds the bundle id (lowercased, every run
     /// of other characters becomes `.`), so `debug:My-Tag` is
-    /// `com.cmuxterm.app.debug.my.tag`. A value that already is a cmux bundle
-    /// identifier (`com.cmuxterm.app…`) is returned unchanged. Names are
+    /// `pro.shellx.desktop.debug.my.tag`. A value that already is a ShellX bundle
+    /// identifier (`pro.shellx.desktop…`) is returned unchanged. Names are
     /// case-insensitive; returns nil for anything else.
     ///
     /// - Parameter name: The channel name or bundle identifier.

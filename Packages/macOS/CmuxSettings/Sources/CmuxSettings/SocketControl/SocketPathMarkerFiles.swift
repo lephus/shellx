@@ -1,14 +1,15 @@
 public import Foundation
 
 public enum SocketPathMarkerFiles {
-    /// The stable release bundle identifier used for machine-wide discovery.
-    public static let stableBundleIdentifier = "com.cmuxterm.app"
+    /// The stable release bundle identifier used for machine-wide discovery
+    /// (`ShellXBrand.bundleID`; this package does not link ShellXBrand).
+    public static let stableBundleIdentifier = "pro.shellx.desktop"
     public static let stableMarkerFileName = "last-socket-path"
     public static let stableTmpPath = "/tmp/cmux-last-socket-path"
-    public static let nightlyBundleIdentifier = "com.cmuxterm.app.nightly"
-    public static let rcBundleIdentifier = "com.cmuxterm.app.rc"
-    public static let stagingBundleIdentifier = "com.cmuxterm.app.staging"
-    public static let defaultBaseDebugBundleIdentifier = "com.cmuxterm.app.debug"
+    public static let nightlyBundleIdentifier = "pro.shellx.desktop.nightly"
+    public static let rcBundleIdentifier = "pro.shellx.desktop.rc"
+    public static let stagingBundleIdentifier = "pro.shellx.desktop.staging"
+    public static let defaultBaseDebugBundleIdentifier = "pro.shellx.desktop.debug"
     public static let defaultDebugSocketPath = "/tmp/cmux-debug.sock"
     public static let defaultNightlySocketPath = "/tmp/cmux-nightly.sock"
     public static let defaultRCSocketPath = "/tmp/cmux-rc.sock"

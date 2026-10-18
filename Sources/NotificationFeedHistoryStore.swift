@@ -1,4 +1,5 @@
 import Foundation
+import ShellXBrand
 
 /// Main-actor owner of the durable, chronological notification feed.
 @MainActor
@@ -148,7 +149,7 @@ final class NotificationFeedHistoryStore {
             return nil
         }
         let bundleID = bundleIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolvedBundleID = bundleID?.isEmpty == false ? bundleID! : "com.cmuxterm.app"
+        let resolvedBundleID = bundleID?.isEmpty == false ? bundleID! : ShellXBrand.bundleID
         let safeBundleID = resolvedBundleID.replacingOccurrences(
             of: "[^A-Za-z0-9._-]",
             with: "_",

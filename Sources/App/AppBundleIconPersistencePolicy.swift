@@ -1,8 +1,9 @@
 import Foundation
+import ShellXBrand
 
 enum AppBundleIconPersistencePolicy {
-    private static let stableReleaseBundleIdentifier = "com.cmuxterm.app"
-    private static let stableReleaseAppBundleName = "cmux.app"
+    private static let stableReleaseBundleIdentifier = ShellXBrand.bundleID
+    private static let stableReleaseAppBundleName = "\(ShellXBrand.appName).app"
     static let disablePersistenceArgument = "--cmux-disable-bundle-icon-persistence"
     static let disablePersistenceDefaultsKey = "cmuxDisableBundleIconPersistence"
 

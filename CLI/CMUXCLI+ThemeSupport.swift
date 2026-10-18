@@ -1,5 +1,6 @@
 import Foundation
 import CmuxFoundation
+import ShellXBrand
 
 extension CMUXCLI {
     func availableThemeNames() -> [String] {
@@ -217,13 +218,13 @@ extension CMUXCLI {
         case "cmux.sock":
             return Self.cmuxThemeOverrideBundleIdentifier
         case "cmux-debug.sock":
-            return "com.cmuxterm.app.debug"
+            return "\(ShellXBrand.bundleID).debug"
         case "cmux-nightly.sock":
-            return "com.cmuxterm.app.nightly"
+            return "\(ShellXBrand.bundleID).nightly"
         case "cmux-rc.sock":
-            return "com.cmuxterm.app.rc"
+            return "\(ShellXBrand.bundleID).rc"
         case "cmux-staging.sock":
-            return "com.cmuxterm.app.staging"
+            return "\(ShellXBrand.bundleID).staging"
         default:
             break
         }
@@ -233,16 +234,16 @@ extension CMUXCLI {
         }
 
         if let slug = themeReloadSocketSlug(name, prefix: "cmux-debug-", suffix: ".sock") {
-            return "com.cmuxterm.app.debug.\(slug)"
+            return "\(ShellXBrand.bundleID).debug.\(slug)"
         }
         if let slug = themeReloadSocketSlug(name, prefix: "cmux-nightly-", suffix: ".sock") {
-            return "com.cmuxterm.app.nightly.\(slug)"
+            return "\(ShellXBrand.bundleID).nightly.\(slug)"
         }
         if let slug = themeReloadSocketSlug(name, prefix: "cmux-rc-", suffix: ".sock") {
-            return "com.cmuxterm.app.rc.\(slug)"
+            return "\(ShellXBrand.bundleID).rc.\(slug)"
         }
         if let slug = themeReloadSocketSlug(name, prefix: "cmux-staging-", suffix: ".sock") {
-            return "com.cmuxterm.app.staging.\(slug)"
+            return "\(ShellXBrand.bundleID).staging.\(slug)"
         }
         return nil
     }

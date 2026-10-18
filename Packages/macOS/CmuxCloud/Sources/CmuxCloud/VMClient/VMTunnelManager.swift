@@ -518,7 +518,7 @@ public struct VMTunnelManager: Sendable {
         if id.contains("nightly") { return "nightly" }
         if id.contains("staging") { return "staging" }
         if id.hasSuffix(".rc") { return "rc" }
-        if id == "com.cmuxterm.app" { return "stable" }
+        if id == "pro.shellx.desktop" { return "stable" }
         return "dev"
     }
 }

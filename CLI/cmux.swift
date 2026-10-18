@@ -7,6 +7,7 @@ import CmuxFoundation
 import CmuxSettings
 import CmuxSimulator
 import CmuxSudoBroker
+import ShellXBrand
 import CoreFoundation
 import CryptoKit
 import Darwin
@@ -3125,13 +3126,13 @@ final class SocketClient {
     }
 
     private static let coderouterArmServerSigningRequirement =
-        #"anchor apple generic and identifier "com.cmuxterm.app" and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "7WLXT3NR37""#
+        #"anchor apple generic and identifier "\#(ShellXBrand.bundleID)" and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "\#(ShellXBrand.teamID)""#
     // Local tagged Release bundles are signed with the shared Apple
     // Development identity when the Developer ID private key is unavailable.
     // This fallback is gated by the enclosing bundle ID below; the stable
     // production bundle remains Developer ID only.
     private static let coderouterTaggedDevelopmentSigningRequirement =
-        #"anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.12] exists and certificate leaf[subject.OU] = "7WLXT3NR37""#
+        #"anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.12] exists and certificate leaf[subject.OU] = "\#(ShellXBrand.teamID)""#
     private static let codeSigningValidFlag: UInt32 = 0x0000_0001
     private static let codeSigningHardFlag: UInt32 = 0x0000_0100
     private static let codeSigningKillFlag: UInt32 = 0x0000_0200
@@ -3671,8 +3672,8 @@ final class SocketClient {
         guard let expectedBundleIdentifier = CLIExecutableLocator
             .enclosingAppBundle()?
             .bundleIdentifier,
-            expectedBundleIdentifier.hasPrefix("com.cmuxterm.app.debug."),
-            expectedBundleIdentifier.count > "com.cmuxterm.app.debug.".count,
+            expectedBundleIdentifier.hasPrefix("\(ShellXBrand.bundleID).debug."),
+            expectedBundleIdentifier.count > "\(ShellXBrand.bundleID).debug.".count,
             SecCodeCheckValidity(
                 dynamicCode,
                 SecCSFlags(rawValue: UInt32(kSecCSStrictValidate)),
@@ -3714,7 +3715,7 @@ final class SocketClient {
         information[kSecCodeInfoIdentifier as String] as? String
             == expectedBundleIdentifier,
         information[kSecCodeInfoTeamIdentifier as String] as? String
-            == "7WLXT3NR37" else {
+            == ShellXBrand.teamID else {
             return false
         }
 
@@ -4818,13 +4819,13 @@ struct CMUXCLI {
         // Tagged Debug builds use the shared Apple Development identity. Keep
         // the identifier and team pinned while accepting only that Debug
         // certificate family; Release retains the Developer ID requirement.
-        return #"anchor apple generic and identifier "com.cmuxterm.coderouter" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists and certificate leaf[subject.OU] = "7WLXT3NR37""#
+        return #"anchor apple generic and identifier "com.cmuxterm.coderouter" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists and certificate leaf[subject.OU] = "\#(ShellXBrand.teamID)""#
 #else
-        return #"anchor apple generic and identifier "com.cmuxterm.coderouter" and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "7WLXT3NR37""#
+        return #"anchor apple generic and identifier "com.cmuxterm.coderouter" and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "\#(ShellXBrand.teamID)""#
 #endif
     }()
     private static let coderouterTaggedDevelopmentSigningRequirement =
-        #"anchor apple generic and identifier "com.cmuxterm.coderouter" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists and certificate leaf[subject.OU] = "7WLXT3NR37""#
+        #"anchor apple generic and identifier "com.cmuxterm.coderouter" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists and certificate leaf[subject.OU] = "\#(ShellXBrand.teamID)""#
     /// `kSecCodeSignatureRuntime` is not imported by Swift from CSCommon.h.
     private static let coderouterHardenedRuntimeFlag: UInt32 = 0x0001_0000
 
@@ -4911,8 +4912,8 @@ struct CMUXCLI {
         guard let bundleIdentifier = CLIExecutableLocator
             .enclosingAppBundle()?
             .bundleIdentifier,
-            bundleIdentifier.hasPrefix("com.cmuxterm.app.debug."),
-            bundleIdentifier.count > "com.cmuxterm.app.debug.".count else {
+            bundleIdentifier.hasPrefix("\(ShellXBrand.bundleID).debug."),
+            bundleIdentifier.count > "\(ShellXBrand.bundleID).debug.".count else {
             return false
         }
         var requirement: SecRequirement?
@@ -5447,7 +5448,7 @@ struct CMUXCLI {
     }
 
     private static let browserDisabledDefaultsKey = "browserDisabledOverride"
-    private static let defaultBrowserSettingsDomain = "com.cmuxterm.app"
+    private static let defaultBrowserSettingsDomain = ShellXBrand.bundleID
     /// The shared MDM resolver, bound to the target `domain`'s suite with the
     /// channel → release-domain fallback keyed off that domain.
     private static func managedDevicePolicy(
@@ -6340,7 +6341,7 @@ struct CMUXCLI {
         // The resolver has stable debug/release fallbacks at runtime, but its
         // API remains optional for callers that do not need a bundle ID.
         let cliBundleIdentifier = CLISocketPathResolver.currentAppBundleIdentifier()
-            ?? "com.cmuxterm.app"
+            ?? ShellXBrand.bundleID
         var explicitSocketPath: String? = nil
         var jsonOutput = false
         var idFormatArg: String? = nil
@@ -10693,7 +10694,7 @@ struct CMUXCLI {
 
     /// Whether `value` names an install channel (`stable`, `release`,
     /// `nightly`, `rc`, `staging`, `debug`, `debug:<tag>`, `dev:<tag>`) or a
-    /// cmux bundle identifier. Mirrors `SessionSnapshotFileLocation`.
+    /// ShellX bundle identifier. Mirrors `SessionSnapshotFileLocation`.
     static func restoreSessionLooksLikeChannel(_ value: String) -> Bool {
         let lowered = value.lowercased()
         if ["stable", "release", "nightly", "rc", "staging", "debug"].contains(lowered) {
@@ -10702,7 +10703,7 @@ struct CMUXCLI {
         if lowered.hasPrefix("debug:") || lowered.hasPrefix("dev:") {
             return true
         }
-        return value == "com.cmuxterm.app" || value.hasPrefix("com.cmuxterm.app.")
+        return value == ShellXBrand.bundleID || value.hasPrefix("\(ShellXBrand.bundleID).")
     }
 
     /// Sends a session transfer request (`session.import` / `session.export`)

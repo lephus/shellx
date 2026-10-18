@@ -1,4 +1,5 @@
 import Foundation
+import ShellXBrand
 
 extension AgentJournalLifecycleCenter {
     /// Resolves the app-specific journal location without opening the store.
@@ -23,7 +24,7 @@ extension AgentJournalLifecycleCenter {
             return nil
         }
         let bundleID = bundleIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolvedBundleID = bundleID?.isEmpty == false ? bundleID! : "com.cmuxterm.app"
+        let resolvedBundleID = bundleID?.isEmpty == false ? bundleID! : ShellXBrand.bundleID
         let safeBundleID = resolvedBundleID.replacingOccurrences(
             of: "[^A-Za-z0-9._-]",
             with: "_",

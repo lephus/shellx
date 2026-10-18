@@ -25,14 +25,11 @@ public struct BrowserHistoryLocation: Sendable {
     /// so every dev build of the same lane reuses one history file, while
     /// production identifiers pass through unchanged.
     public static func normalizedNamespace(bundleIdentifier: String) -> String {
-        if bundleIdentifier.hasPrefix("com.cmuxterm.app.debug.") {
-            return "com.cmuxterm.app.debug"
-        }
-        if bundleIdentifier.hasPrefix("com.cmuxterm.app.rc.") {
-            return "com.cmuxterm.app.rc"
-        }
-        if bundleIdentifier.hasPrefix("com.cmuxterm.app.staging.") {
-            return "com.cmuxterm.app.staging"
+        for channel in ["debug", "rc", "staging"] {
+            let channelBundleIdentifier = "pro.shellx.desktop.\(channel)"
+            if bundleIdentifier.hasPrefix("\(channelBundleIdentifier).") {
+                return channelBundleIdentifier
+            }
         }
         return bundleIdentifier
     }
