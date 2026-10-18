@@ -6,6 +6,7 @@
 pub mod config;
 pub mod envelope;
 pub mod ffi;
+pub mod store;
 
 pub use config::Config;
 pub use envelope::CoreError;
