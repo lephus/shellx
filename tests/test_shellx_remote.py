@@ -101,7 +101,7 @@ class ShellXRemoteGuards(unittest.TestCase):
 
     def test_core_lock_has_no_forbidden_crates(self):
         lock = read("shellx-core/Cargo.lock")
-        for name in ["aws-lc-rs", "aws-lc-sys", "openssl-sys", "native-tls", "iroh"]:
+        for name in ["aws-lc-rs", "aws-lc-sys", "openssl", "openssl-sys", "native-tls", "iroh"]:
             self.assertNotIn(f'name = "{name}"', lock)
 
     def test_core_is_linked_statically(self):

@@ -115,12 +115,20 @@ if [ "${#libs[@]}" -eq 0 ]; then
   exit 1
 fi
 
+# The phase is alwaysOutOfDate (cargo decides what is stale), so replace the
+# library only when its bytes changed: an untouched .a keeps its mtime and the
+# app is not relinked on every build.
 DEST_LIB="${BUILD_OUTPUT_DIR}/${LIB_NAME}"
+STAGED_LIB="${BUILD_OUTPUT_DIR}/.${LIB_NAME}.$$"
+trap 'rm -f "${STAGED_LIB}"' EXIT
 if [ "${#libs[@]}" -eq 1 ]; then
-  rsync -a "${libs[0]}" "${DEST_LIB}"
+  cp "${libs[0]}" "${STAGED_LIB}"
 else
-  lipo -create -output "${DEST_LIB}" "${libs[@]}"
+  lipo -create -output "${STAGED_LIB}" "${libs[@]}"
 fi
-# rsync keeps cargo's mtime; touch so Xcode sees the declared output as fresh.
-touch "${DEST_LIB}"
-echo "built ${DEST_LIB}"
+if [ -f "${DEST_LIB}" ] && cmp -s "${STAGED_LIB}" "${DEST_LIB}"; then
+  echo "unchanged ${DEST_LIB}"
+else
+  mv -f "${STAGED_LIB}" "${DEST_LIB}"
+  echo "built ${DEST_LIB}"
+fi
