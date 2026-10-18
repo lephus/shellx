@@ -59,7 +59,7 @@ fn calls_before_config_fail_not_configured() {
 }
 
 #[test]
-fn unknown_beats_not_configured_and_known_unimplemented_after_config_is_unknown() {
+fn unknown_beats_not_configured_and_session_methods_reach_dispatch_after_login() {
     let c = Core::new();
     assert_eq!(c.call("bogus.thing", json!({})).unwrap_err().code, "unknown_method");
     let tmp = tempfile::tempdir().unwrap();
@@ -67,12 +67,12 @@ fn unknown_beats_not_configured_and_known_unimplemented_after_config_is_unknown(
     c.call("config.set", json!({"api_base":"https://a.b","state_dir":dir.to_str().unwrap()})).unwrap();
     // Ruling R1: session-needing methods fail not_logged_in first ...
     assert_eq!(c.call("machines.list", json!({})).unwrap_err().code, "not_logged_in");
-    // ... and with a session, a known but unimplemented method is unknown_method.
+    // ... and with a session they reach dispatch (here: no machine.json yet).
     shellx_core::store::StateStore::open(&dir)
         .unwrap()
         .write_secret("session.json", br#"{"token":"t","user_id":"u","device_id":"d"}"#)
         .unwrap();
-    assert_eq!(c.call("pair.pending", json!({})).unwrap_err().code, "unknown_method");
+    assert_eq!(c.call("pair.pending", json!({})).unwrap_err().code, "not_registered");
 }
 
 #[test]

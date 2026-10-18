@@ -10,13 +10,23 @@
 //! 32-byte b64url strings.
 //!
 //! Routes so far: `POST /v1/auth/login`, `POST /v1/auth/logout`, `GET /v1/version`,
-//! `POST|GET /v2/machines`, `POST /v2/machines/<id>/heartbeat`, `POST /v2/relay/tickets`.
+//! `POST|GET /v2/machines`, `POST /v2/machines/<id>/heartbeat`, `POST /v2/relay/tickets`,
+//! `POST|GET /v2/pairings`, `POST /v2/pairings/<id>/approve|deny`.
 //!
 //! Machines: registering again with the same (user, key) updates the same machine.
 //! `online` = heartbeat within 90 s. Tickets follow the ledger "Ticket format"
 //! (cmux-relay v2) and are signed with `FakeOptions::hmac_secret`; `connect` is
 //! allowed for the caller's own machine (D3) or a granted target, else 403
 //! `not_granted`.
+//!
+//! Pairings follow the L4 rules (w2-server plan Task 4): `from_machine_id` must be
+//! the caller's own machine (the one registered by its device), code = 6 random
+//! digits unique among the target's live pending requests, `requester_fingerprint`
+//! copied from the requester machine row, pending expires after 300 s (reported
+//! lazily as `expired`), a new (from, to) request supersedes the old pending one,
+//! `role=target` items carry `requester_x25519_b64` (standard base64, D2),
+//! `sealed_invite_b64` is returned verbatim to the requester only once approved,
+//! approve is target-only, refuses plaintext `cmux://` and grants `connect`.
 
 use base64::Engine;
 use hmac::{Hmac, Mac};
@@ -33,6 +43,10 @@ use tiny_http::{Header, Request, Response, Server};
 const DEVICE_KINDS: &[&str] = &["agent", "mobile", "desktop"];
 const DEVICE_PLATFORMS: &[&str] = &["macos", "windows", "ios", "android"];
 const MAX_BODY_BYTES: u64 = 64 * 1024;
+/// Pending pairings expire after 5 minutes (L4 `PAIRING_TTL_MS`).
+pub const PAIRING_TTL_SECS: u64 = 300;
+/// L4 `SEALED_INVITE_MAX_BYTES` (decoded).
+const SEALED_INVITE_MAX_BYTES: usize = 8192;
 
 #[derive(Clone)]
 pub struct FakeOptions {
@@ -122,11 +136,45 @@ struct State {
     machines: HashMap<String, Machine>,
     /// (from machine, target machine) pairs allowed to mint connect tickets.
     grants: HashSet<(String, String)>,
+    /// pairing_id → pairing
+    pairings: HashMap<String, Pairing>,
+    /// Creation counter (newest first ordering).
+    pairing_seq: u64,
+    /// Test hook: `GET /v2/pairings` returns every pairing of the account, ignoring `role`.
+    list_all_pairings: bool,
+}
+
+#[derive(Clone)]
+struct Pairing {
+    user_id: String,
+    from_machine_id: String,
+    to_machine_id: String,
+    /// Raw 32 bytes; `None` after `drop_requester_key` (a server without D2).
+    requester_x25519: Option<Vec<u8>>,
+    requester_fingerprint: String,
+    code: String,
+    status: String,
+    sealed_invite: Option<String>,
+    created_at: u64,
+    seq: u64,
+}
+
+impl Pairing {
+    /// Stored status with lazy expiry of an old pending request.
+    fn current_status(&self, now: u64) -> &str {
+        if self.status == "pending" && now.saturating_sub(self.created_at) > PAIRING_TTL_SECS {
+            "expired"
+        } else {
+            &self.status
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 struct Machine {
     user_id: String,
+    /// The device that registered it ("own machine" of that device's token).
+    device_id: String,
     name: String,
     platform: String,
     os_version: String,
@@ -214,6 +262,56 @@ impl FakeApi {
     /// approved pairing will do). Test hook; empty by default.
     pub fn grant_connect(&self, from_machine: &str, target_machine: &str) {
         self.shared.lock().grants.insert((from_machine.to_string(), target_machine.to_string()));
+    }
+
+    /// Overwrite the stored `requester_fingerprint` of a pairing. Test hook (a
+    /// server lying about who is asking).
+    pub fn tamper_requester_fingerprint(&self, pairing_id: &str, fingerprint: &str) {
+        if let Some(p) = self.shared.lock().pairings.get_mut(pairing_id) {
+            p.requester_fingerprint = fingerprint.to_string();
+        }
+    }
+
+    /// Forget a pairing's requester key, so `role=target` items lack
+    /// `requester_x25519_b64` (a server without D2). Test hook.
+    pub fn drop_requester_key(&self, pairing_id: &str) {
+        if let Some(p) = self.shared.lock().pairings.get_mut(pairing_id) {
+            p.requester_x25519 = None;
+        }
+    }
+
+    /// Move the sealed invite of `from_id` onto `to_id` and mark `to_id` approved
+    /// (a server replaying ciphertext on another pairing). Test hook.
+    pub fn move_sealed_invite(&self, from_id: &str, to_id: &str) {
+        let mut st = self.shared.lock();
+        let sealed = st.pairings.get_mut(from_id).and_then(|p| p.sealed_invite.take());
+        if let Some(p) = st.pairings.get_mut(to_id) {
+            p.sealed_invite = sealed;
+            p.status = "approved".to_string();
+        }
+    }
+
+    /// Age a pairing past its 5-minute expiry. Test hook.
+    pub fn expire(&self, pairing_id: &str) {
+        if let Some(p) = self.shared.lock().pairings.get_mut(pairing_id) {
+            p.created_at = p.created_at.saturating_sub(PAIRING_TTL_SECS + 1);
+        }
+    }
+
+    /// The sealed invite text the server stores for a pairing (empty if none). Test helper.
+    pub fn stored_sealed(&self, pairing_id: &str) -> String {
+        self.shared.lock().pairings.get(pairing_id).and_then(|p| p.sealed_invite.clone()).unwrap_or_default()
+    }
+
+    /// Whether `from_machine` may mint connect tickets for `target_machine`. Test helper.
+    pub fn has_grant(&self, from_machine: &str, target_machine: &str) -> bool {
+        self.shared.lock().grants.contains(&(from_machine.to_string(), target_machine.to_string()))
+    }
+
+    /// Make `GET /v2/pairings` return every pairing of the account whatever the
+    /// role (a misbehaving server). Test hook.
+    pub fn set_list_all_pairings(&self, on: bool) {
+        self.shared.lock().list_all_pairings = on;
     }
 
     /// Stop serving and close the listener.
@@ -331,6 +429,16 @@ fn route(rec: &Recorded, raw: &[u8], opts: &FakeOptions, st: &mut State) -> Repl
         ("POST", "/v2/machines") => register_machine(rec, raw, st),
         ("GET", "/v2/machines") => list_machines(rec, st),
         ("POST", "/v2/relay/tickets") => mint_ticket(rec, opts, st),
+        ("POST", "/v2/pairings") => create_pairing(rec, st),
+        ("GET", "/v2/pairings") => list_pairings(rec, st),
+        ("POST", p) if p.starts_with("/v2/pairings/") && p.ends_with("/approve") => {
+            let id = &p["/v2/pairings/".len()..p.len() - "/approve".len()];
+            approve_pairing(rec, id, st)
+        }
+        ("POST", p) if p.starts_with("/v2/pairings/") && p.ends_with("/deny") => {
+            let id = &p["/v2/pairings/".len()..p.len() - "/deny".len()];
+            deny_pairing(rec, id, st)
+        }
         ("POST", p) if p.starts_with("/v2/machines/") && p.ends_with("/heartbeat") => {
             let id = &p["/v2/machines/".len()..p.len() - "/heartbeat".len()];
             heartbeat(rec, id, st)
@@ -386,6 +494,7 @@ fn register_machine(rec: &Recorded, raw: &[u8], st: &mut State) -> Reply {
         id.clone(),
         Machine {
             user_id: who.user_id,
+            device_id: who.device_id,
             name: name.to_string(),
             platform: platform.to_string(),
             os_version: os.to_string(),
@@ -485,6 +594,197 @@ fn mint_ticket(rec: &Recorded, opts: &FakeOptions, st: &mut State) -> Reply {
         URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes())
     );
     Reply::json(200, json!({"ticket": ticket, "expires_at_unix": exp, "relay_url": opts.relay_url}))
+}
+
+/// Standard or URL alphabet, padded or not (K1 `*_b64` inputs).
+fn decode_any_b64(s: &str) -> Option<Vec<u8>> {
+    use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE};
+    [&URL_SAFE_NO_PAD, &URL_SAFE, &STANDARD, &STANDARD_NO_PAD].iter().find_map(|e| e.decode(s).ok())
+}
+
+/// The caller's own machine id (registered by the caller's device).
+fn own_machine_id(who: &TokenInfo, st: &State) -> Option<String> {
+    st.machines
+        .iter()
+        .find(|(_, m)| m.user_id == who.user_id && m.device_id == who.device_id)
+        .map(|(id, _)| id.clone())
+}
+
+fn random_code() -> String {
+    let mut b = [0u8; 4];
+    getrandom::fill(&mut b).expect("random source");
+    format!("{:06}", u32::from_le_bytes(b) % 1_000_000)
+}
+
+fn create_pairing(rec: &Recorded, st: &mut State) -> Reply {
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    let b = &rec.body;
+    let (Some(from), Some(to)) = (b["from_machine_id"].as_str(), b["to_machine_id"].as_str()) else {
+        return Reply::error(400, "bad_request", "from_machine_id and to_machine_id are required");
+    };
+    match st.machines.get(from) {
+        Some(m) if m.user_id == who.user_id && m.device_id == who.device_id => {}
+        Some(m) if m.user_id == who.user_id => return Reply::error(403, "forbidden", "Not your machine"),
+        _ => return Reply::error(404, "machine_not_found", "Machine not found"),
+    }
+    if !st.machines.get(to).is_some_and(|m| m.user_id == who.user_id) {
+        return Reply::error(404, "machine_not_found", "Machine not found");
+    }
+    if from == to {
+        return Reply::error(400, "bad_request", "A machine cannot pair with itself");
+    }
+    let Some(key) = b["requester_x25519_b64"].as_str().and_then(decode_any_b64).filter(|k| k.len() == 32) else {
+        return Reply::error(400, "bad_request", "requester_x25519_b64 must be a 32-byte key");
+    };
+    let now = now_unix();
+    // Supersede an older pending request with the same (from, to).
+    for p in st.pairings.values_mut() {
+        if p.from_machine_id == from && p.to_machine_id == to && p.current_status(now) == "pending" {
+            p.status = "expired".to_string();
+        }
+    }
+    let live_codes: HashSet<String> = st
+        .pairings
+        .values()
+        .filter(|p| p.to_machine_id == to && p.current_status(now) == "pending")
+        .map(|p| p.code.clone())
+        .collect();
+    let Some(code) = (0..10).map(|_| random_code()).find(|c| !live_codes.contains(c)) else {
+        return Reply::error(500, "internal", "Could not draw a pairing code");
+    };
+    let fingerprint = key_fingerprint(&st.machines[from].noise_public_key_b64);
+    let id = random_id();
+    st.pairing_seq += 1;
+    let seq = st.pairing_seq;
+    st.pairings.insert(
+        id.clone(),
+        Pairing {
+            user_id: who.user_id,
+            from_machine_id: from.to_string(),
+            to_machine_id: to.to_string(),
+            requester_x25519: Some(key),
+            requester_fingerprint: fingerprint,
+            code: code.clone(),
+            status: "pending".to_string(),
+            sealed_invite: None,
+            created_at: now,
+            seq,
+        },
+    );
+    Reply::json(201, json!({"pairing_id": id, "code": code}))
+}
+
+fn list_pairings(rec: &Recorded, st: &State) -> Reply {
+    use base64::engine::general_purpose::STANDARD;
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    let role = match rec.query.split('&').find_map(|kv| kv.strip_prefix("role=")) {
+        Some(r @ ("target" | "requester")) => r,
+        _ => return Reply::error(400, "bad_request", "role must be target or requester"),
+    };
+    let Some(own) = own_machine_id(&who, st) else { return Reply::json(200, json!({"pairings": []})) };
+    let now = now_unix();
+    let mut items: Vec<(&String, &Pairing)> = st
+        .pairings
+        .iter()
+        .filter(|(_, p)| p.user_id == who.user_id)
+        .filter(|(_, p)| {
+            st.list_all_pairings || if role == "target" { p.to_machine_id == own } else { p.from_machine_id == own }
+        })
+        .collect();
+    items.sort_by(|a, b| b.1.seq.cmp(&a.1.seq));
+    let pairings: Vec<Value> = items
+        .into_iter()
+        .map(|(id, p)| {
+            let status = p.current_status(now);
+            let mut v = json!({
+                "pairing_id": id,
+                "from_machine_id": p.from_machine_id,
+                "to_machine_id": p.to_machine_id,
+                "requester_fingerprint": p.requester_fingerprint,
+                "code": p.code,
+                "status": status,
+            });
+            if role == "target"
+                && let Some(k) = &p.requester_x25519
+            {
+                v["requester_x25519_b64"] = json!(STANDARD.encode(k));
+            }
+            if (role == "requester" || st.list_all_pairings)
+                && status == "approved"
+                && let Some(s) = &p.sealed_invite
+            {
+                v["sealed_invite_b64"] = json!(s);
+            }
+            v
+        })
+        .collect();
+    Reply::json(200, json!({"pairings": pairings}))
+}
+
+/// The pairing `id` of the caller's account, or the L4 error reply.
+fn account_pairing<'a>(who: &TokenInfo, id: &str, st: &'a State) -> Result<&'a Pairing, Reply> {
+    st.pairings
+        .get(id)
+        .filter(|p| p.user_id == who.user_id)
+        .ok_or_else(|| Reply::error(404, "pairing_not_found", "Pairing not found"))
+}
+
+fn approve_pairing(rec: &Recorded, id: &str, st: &mut State) -> Reply {
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    let own = own_machine_id(&who, st);
+    let p = match account_pairing(&who, id, st) {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    if own.as_deref() != Some(p.to_machine_id.as_str()) {
+        return Reply::error(403, "forbidden", "Only the target machine can approve");
+    }
+    let Some(sealed) = rec.body["sealed_invite_b64"].as_str() else {
+        return Reply::error(400, "bad_request", "sealed_invite_b64 is required");
+    };
+    let Some(raw) = decode_any_b64(sealed).filter(|r| (1..=SEALED_INVITE_MAX_BYTES).contains(&r.len())) else {
+        return Reply::error(400, "bad_request", "sealed_invite_b64 is not a valid sealed invite");
+    };
+    if raw.starts_with(b"cmux://") {
+        return Reply::error(400, "plaintext_invite", "Invites must be sealed");
+    }
+    let now = now_unix();
+    let status = p.current_status(now).to_string();
+    if status != "pending" {
+        return if p.status == "pending" {
+            Reply::error(410, "pairing_expired", "Pairing expired")
+        } else {
+            Reply::error(409, "pairing_not_pending", "Pairing is not pending")
+        };
+    }
+    let (from, to) = (p.from_machine_id.clone(), p.to_machine_id.clone());
+    let p = st.pairings.get_mut(id).expect("checked above");
+    p.status = "approved".to_string();
+    p.sealed_invite = Some(sealed.to_string());
+    st.grants.insert((from, to));
+    Reply::empty(204)
+}
+
+fn deny_pairing(rec: &Recorded, id: &str, st: &mut State) -> Reply {
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    let own = own_machine_id(&who, st);
+    let p = match account_pairing(&who, id, st) {
+        Ok(p) => p,
+        Err(r) => return r,
+    };
+    // Target denies, requester cancels.
+    if own.as_deref() != Some(p.to_machine_id.as_str()) && own.as_deref() != Some(p.from_machine_id.as_str()) {
+        return Reply::error(403, "forbidden", "Not a party to this pairing");
+    }
+    let status = p.current_status(now_unix()).to_string();
+    match status.as_str() {
+        "pending" => {
+            st.pairings.get_mut(id).expect("checked above").status = "denied".to_string();
+            Reply::empty(204)
+        }
+        "denied" => Reply::empty(204),
+        _ => Reply::error(409, "pairing_not_pending", "Pairing is not pending"),
+    }
 }
 
 /// `{kind, name, platform, public_key}` per v1 `parseDevice` (+ kind `desktop`).

@@ -11,6 +11,7 @@ pub mod ffi;
 pub mod fingerprint;
 pub mod http;
 pub mod machines;
+pub mod pairing;
 pub mod seal;
 pub mod store;
 pub mod tickets;
@@ -101,6 +102,11 @@ impl Core {
             "machines.list" => machines::list(self.agent(), &cfg, &store),
             "machines.heartbeat" => machines::heartbeat(self.agent(), &cfg, &store),
             "tickets.mint" => tickets::mint(self.agent(), &cfg, &store, &params),
+            "pair.request" => pairing::request(self.agent(), &cfg, &store, &params),
+            "pair.pending" => pairing::pending(self.agent(), &cfg, &store),
+            "pair.approve" => pairing::approve(self.agent(), &cfg, &store, &params),
+            "pair.deny" => pairing::deny(self.agent(), &cfg, &store, &params),
+            "pair.poll" => pairing::poll(self.agent(), &cfg, &store, &params),
             _ => Err(CoreError::new("unknown_method", format!("method not implemented: {method}"))),
         }
     }
