@@ -10,7 +10,8 @@
 # the old image with the new, broken config. A staged config identical to the live one is not swapped
 # at all (M5), and then .prev/ keeps the config from before the last deploy that did change it. Then
 # pulls the new images, points .env at them, restarts the stack with --force-recreate and waits up to
-# 60 s for BOTH the relay's and the web's healthcheck. If the pull fails, or either service does not
+# 60 s for BOTH the relay's and the web's healthcheck (plus relay2's when .env enables the relay2
+# profile: it is then built from relay2-src/<sha> first, see deploy/README.md "Relay v2"). If the pull fails, or either service does not
 # come up healthy, puts back the config IT swapped in (only if this run swapped: restoring .prev/ after
 # a code-only deploy would bring back an older, stale config — R3) and the previous IMAGE_TAG,
 # restarts again and fails. On success, best-effort prunes older ShellX images so the disk does not
@@ -184,9 +185,26 @@ main() {
     docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$id"
   }
 
+  # 1 when .env has COMPOSE_PROFILES with relay2 in it (the user adds it by hand once the relay2 source
+  # is staged, deploy/README.md "Relay v2"). Read per call, after the config swap, so it always
+  # reflects the .env the compose commands below will see. Off → every path is exactly as before.
+  relay2_enabled() {
+    local profiles
+    profiles="$(sed -n 's/^COMPOSE_PROFILES=//p' .env | tail -n 1 | tr -d "\"' ")"
+    case ",$profiles," in
+      *,relay2,*) return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+
+  # Names of the services whose health decides the deploy.
+  health_services() {
+    if relay2_enabled; then echo "relay relay2 web"; else echo "relay web"; fi
+  }
+
   all_healthy() {
     local service
-    for service in relay web; do
+    for service in $(health_services); do
       if [[ "$(service_health "$service")" != healthy ]]; then
         return 1
       fi
@@ -205,7 +223,10 @@ main() {
 
   # Best effort: never fails the deploy. Keeps images newer than a week (the tag just deployed, the
   # one just rolled back from, and anything else recent); every older ShellX image built by an earlier
-  # deploy is removed, so the VPS disk does not fill up over time.
+  # deploy is removed, so the VPS disk does not fill up over time. The locally built
+  # shellx-relay2:<sha> image carries the same source label (scripts/shellx/relay2/Dockerfile), so this
+  # one prune covers it too; an image a container uses is never removed. relay2-src/ is user-managed
+  # and never touched here.
   prune_old_images() {
     docker image prune -af \
       --filter "label=org.opencontainers.image.source=https://github.com/lephus/shellx" \
@@ -221,7 +242,25 @@ main() {
   # Pull first: if the images cannot be pulled, put back the config this run swapped in (if any) and
   # leave .env and the running relay and web as they were; `backup` is recreated because the swap and
   # the restore replaced its bind-mounted backup/ directory.
-  if ! IMAGE_TAG="$new_tag" docker compose pull; then
+  # With relay2 enabled, its source must be staged and gets built here; it is not in any registry, so
+  # the pull names the registry services explicitly (bare `compose pull` would try relay2's
+  # shellx-relay2:<sha> tag, and `--ignore-buildable` needs a newer Compose than the VPS is known to
+  # have). A missing source or a failed build ends exactly like a failed pull.
+  local pull_ok=1
+  if relay2_enabled; then
+    local relay2_rev
+    relay2_rev="$(sed -n 's#^ *context: \./relay2-src/\([0-9a-f]\{40\}\) *$#\1#p' docker-compose.yml | head -n 1)"
+    if [[ -z "$relay2_rev" || ! -f "relay2-src/$relay2_rev/scripts/shellx/relay2/Dockerfile" ]]; then
+      echo "::error::COMPOSE_PROFILES has relay2 but relay2-src/${relay2_rev:-<sha>}/scripts/shellx/relay2/Dockerfile is missing in $app_dir: stage the source (deploy/README.md, \"Relay v2\"): on the Mac scripts/shellx/relay2/source-tarball.sh ${relay2_rev:-<sha>} /tmp, scp the tarball to $app_dir, then on the VPS: cd $app_dir && mkdir -p relay2-src && tar -xzf relay2-src-${relay2_rev:-<sha>}.tar.gz -C relay2-src" >&2
+      pull_ok=0
+    elif ! IMAGE_TAG="$new_tag" docker compose pull relay web backup \
+      || ! IMAGE_TAG="$new_tag" docker compose build relay2; then
+      pull_ok=0
+    fi
+  elif ! IMAGE_TAG="$new_tag" docker compose pull; then
+    pull_ok=0
+  fi
+  if ((! pull_ok)); then
     if ((swapped)); then
       restore_config
       recreate_backup
@@ -233,12 +272,19 @@ main() {
   # an unhealthy service: it falls straight into the rollback branch below. --force-recreate recreates
   # every container, not only the ones whose own config changed (see the header comment).
   if docker compose up -d --remove-orphans --force-recreate && wait_healthy; then
-    echo "relay and web are healthy on $new_tag"
+    if relay2_enabled; then
+      echo "relay, relay2 and web are healthy on $new_tag"
+    else
+      echo "relay and web are healthy on $new_tag"
+    fi
     prune_old_images
     exit 0
   fi
 
-  echo "::error::relay/web not healthy within ${health_timeout}s on $new_tag; rolling back to ${old_tag:-nothing} (see why on the VPS: docker compose logs --tail 50 relay web)" >&2
+  local services_slash services_space
+  services_space="$(health_services)"
+  services_slash="${services_space// //}"
+  echo "::error::$services_slash not healthy within ${health_timeout}s on $new_tag; rolling back to ${old_tag:-nothing} (see why on the VPS: docker compose logs --tail 50 $services_space)" >&2
   if ((swapped)); then
     restore_config
   fi

@@ -63,3 +63,87 @@ test('admin: nginx-proxy settings for admin.shellx.pro turn the access log off a
     assert.match(readme, new RegExp(`^ {3}for f in .*(?<= )${host.replaceAll('.', '\\.')}(?= |;)`, 'm'), `README step 5 loop lacks ${host}`);
   }
 });
+
+// --- relay2 (cmux-relay), built on the VPS from a pinned commit, behind nginx-proxy at /v2/relay ---
+
+const R = '57dd520ccf20b55c7eac662f1e09eae1c5069917';
+const relayEnv = readFileSync(join(deployDir, 'relay.env'), 'utf8');
+
+test('relay2: built locally from relay2-src/<R> (no registry image), only under the relay2 profile', () => {
+  const relay2 = service('relay2');
+  assert.match(relay2, /^ {4}profiles: \["relay2"\]$/m);
+  assert.match(relay2, /^ {4}image: shellx-relay2:([0-9a-f]{40})$/m);
+  assert.doesNotMatch(relay2, /ghcr\.io/);
+  assert.match(relay2, /^ {4}pull_policy: never$/m);
+  const sha = relay2.match(/^ {4}image: shellx-relay2:([0-9a-f]{40})$/m)[1];
+  assert.equal(sha, R);
+  assert.match(relay2, new RegExp(`^ {6}context: \\./relay2-src/${sha}$`, 'm'));
+  assert.match(relay2, /^ {6}dockerfile: scripts\/shellx\/relay2\/Dockerfile$/m);
+  assert.match(relay2, new RegExp(`^ {8}REVISION: ${sha}$`, 'm'));
+});
+
+test('relay2: restart, 256 MB ceiling without swap, read-only, no ports, no volumes, proxy network only', () => {
+  const relay2 = service('relay2');
+  assert.match(relay2, /^ {4}restart: unless-stopped$/m);
+  assert.match(relay2, /^ {4}mem_limit: 256m$/m);
+  assert.match(relay2, /^ {4}memswap_limit: 256m$/m);
+  assert.match(relay2, /^ {4}read_only: true$/m);
+  assert.doesNotMatch(relay2, /^ {4}ports:/m);
+  assert.doesNotMatch(relay2, /^ {4}volumes:/m);
+  assert.match(relay2, /^ {4}logging: \*logging$/m);
+  assert.match(relay2, /^ {4}networks: \[proxy\]$/m);
+});
+
+test('relay2: routed by exact path /v2/relay (so /v2/relay/tickets stays on the Node relay), rewritten to /v1/relay, no certificate of its own', () => {
+  const relay2 = service('relay2');
+  assert.match(relay2, /^ {6}VIRTUAL_HOST: relay\.shellx\.pro$/m);
+  assert.match(relay2, /^ {6}VIRTUAL_PATH: "= \/v2\/relay"$/m);
+  assert.match(relay2, /^ {6}VIRTUAL_DEST: \/v1\/relay$/m);
+  assert.match(relay2, /^ {6}VIRTUAL_PORT: "8787"$/m);
+  assert.doesNotMatch(relay2, /LETSENCRYPT/);
+  assert.match(relay2, /^ {6}CMUX_RELAY_BIND: 0\.0\.0\.0:8787$/m);
+});
+
+test('relay2 healthcheck: bash /dev/tcp GET /healthz, 10 s interval, 3 retries, 10 s start period', () => {
+  const relay2 = service('relay2');
+  assert.ok(relay2.includes(
+    String.raw`test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8787 && printf 'GET /healthz HTTP/1.1\\r\\nHost: l\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"status\":\"ok\"' <&3"]`,
+  ));
+  assert.match(relay2, /^ {6}interval: 10s$/m);
+  assert.match(relay2, /^ {6}retries: 3$/m);
+  assert.match(relay2, /^ {6}start_period: 10s$/m);
+});
+
+test('relay and relay2 take CMUX_RELAY_HMAC_SECRET from .env only; the issuer is exactly shellx-relay on both sides', () => {
+  for (const name of ['relay', 'relay2']) {
+    assert.match(service(name), /^ {6}CMUX_RELAY_HMAC_SECRET: \$\{CMUX_RELAY_HMAC_SECRET:-\}$/m, name);
+  }
+  assert.doesNotMatch(relayEnv, /SECRET/);
+  // Node trims the issuer, cmux-relay reads it raw: no whitespace anywhere may differ between them.
+  assert.match(relayEnv, /^CMUX_RELAY_ISSUER=shellx-relay$/m);
+  assert.match(service('relay2'), /^ {6}CMUX_RELAY_ISSUER: shellx-relay$/m);
+  assert.match(relayEnv, /^RELAY_V2_URL=wss:\/\/relay\.shellx\.pro\/v2\/relay$/m);
+});
+
+test('nginx-proxy relay.shellx.pro: 330 s timeouts (above cmux-relay 300 s idle) and still no access log', () => {
+  const vhost = readFileSync(join(deployDir, 'nginx-proxy', 'relay.shellx.pro'), 'utf8');
+  assert.match(vhost, /^proxy_read_timeout 330s;$/m);
+  assert.match(vhost, /^proxy_send_timeout 330s;$/m);
+  assert.match(vhost, /^access_log off;$/m);
+});
+
+test('deploy.yml: /v2/relay check only when RELAY2_ENABLED, /v2/relay/tickets always, relay2-src never synced', () => {
+  const wf = readFileSync(join(deployDir, '..', '.github', 'workflows', 'deploy.yml'), 'utf8');
+  assert.match(wf, /vars\.RELAY2_ENABLED/);
+  assert.match(wf, /https:\/\/relay\.shellx\.pro\/v2\/relay\/tickets/);
+  assert.match(wf, /"code":"unauthorized"/);
+  assert.doesNotMatch(wf, /rsync[^\n]*relay2-src/);
+});
+
+test('README documents Relay v2 without any secret value', () => {
+  const readme = readFileSync(join(deployDir, 'README.md'), 'utf8');
+  assert.match(readme, /^## Relay v2/m);
+  assert.match(readme, new RegExp(`relay2-src-${R}`));
+  assert.match(readme, /COMPOSE_PROFILES=relay2/);
+  assert.doesNotMatch(readme, /shellx-pro/);
+});
