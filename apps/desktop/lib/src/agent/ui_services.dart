@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:shellx_core/shellx_core.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -6,6 +8,7 @@ import '../platform/launch_at_login.dart';
 import '../platform/notifier.dart';
 import '../platform/secure_key_value_store.dart';
 import '../platform/settings_store.dart';
+import '../platform/system_info.dart';
 import '../platform/url_opener.dart';
 import '../terminal/local_sessions_provider.dart';
 import '../terminal_sharing/terminal_sharing_setup.dart';
@@ -34,8 +37,24 @@ DesktopServices buildUiServices({
   secureStore: SecureKeyValueStore(),
   settings: settings,
   // Contract §1: every request reports this build's x.y.z.
-  api: ShellxApi(baseUri: relayBase, clientVersion: appVersion),
-  createApi: () => ShellxApi(baseUri: relayBase, clientVersion: appVersion),
+  api: ShellxApi(
+    baseUri: relayBase,
+    clientVersion: appVersion,
+    clientPlatform: flutterPlatformName(),
+    clientOsVersion: normalizedOsVersion(
+      Platform.operatingSystemVersion,
+      isMacOS: Platform.isMacOS,
+    ),
+  ),
+  createApi: () => ShellxApi(
+    baseUri: relayBase,
+    clientVersion: appVersion,
+    clientPlatform: flutterPlatformName(),
+    clientOsVersion: normalizedOsVersion(
+      Platform.operatingSystemVersion,
+      isMacOS: Platform.isMacOS,
+    ),
+  ),
   runtimeFactory: (_) =>
       throw StateError('the agent runs in the background service'),
   sessions: const UnattachedSessions(),

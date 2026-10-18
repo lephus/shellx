@@ -57,10 +57,14 @@ final class _Recorder {
     String base = 'https://relay.shellx.pro',
     String? token,
     String? clientVersion,
+    String? clientPlatform,
+    String? clientOsVersion,
   }) {
     return ShellxApi(
       baseUri: Uri.parse(base),
       clientVersion: clientVersion,
+      clientPlatform: clientPlatform,
+      clientOsVersion: clientOsVersion,
       httpClient: MockClient((request) async {
         requests.add(request);
         return handler(request);
@@ -540,6 +544,50 @@ void main() {
       final recorder = _Recorder((_) => _json(<Object?>[], 200));
       await recorder.api(token: 'tok').devices();
       expect(recorder.last.headers.containsKey('X-ShellX-Version'), isFalse);
+    });
+  });
+
+  group('X-ShellX-Platform and X-ShellX-OS-Version', () {
+    test('are sent when the app gives both', () async {
+      final recorder = _Recorder(
+        (_) => _json({
+          'min_agent': '1.0.0',
+          'min_mobile': '1.0.0',
+          'latest_agent': {
+            'version': '1.0.0',
+            'mac_url':
+                'https://download.shellx.pro/desktop/1.0.0/ShellX-1.0.0.dmg',
+            'win_url':
+                'https://download.shellx.pro/desktop/1.0.0/ShellX-Setup-1.0.0.exe',
+          },
+        }, 200),
+      );
+      await recorder
+          .api(clientPlatform: 'flutter-macos', clientOsVersion: '14.5')
+          .version();
+      expect(clientPlatformHeader, 'X-ShellX-Platform');
+      expect(clientOsVersionHeader, 'X-ShellX-OS-Version');
+      expect(recorder.last.headers['X-ShellX-Platform'], 'flutter-macos');
+      expect(recorder.last.headers['X-ShellX-OS-Version'], '14.5');
+    });
+
+    test('are not sent when both are null', () async {
+      final recorder = _Recorder(
+        (_) => _json({
+          'min_agent': '1.0.0',
+          'min_mobile': '1.0.0',
+          'latest_agent': {
+            'version': '1.0.0',
+            'mac_url':
+                'https://download.shellx.pro/desktop/1.0.0/ShellX-1.0.0.dmg',
+            'win_url':
+                'https://download.shellx.pro/desktop/1.0.0/ShellX-Setup-1.0.0.exe',
+          },
+        }, 200),
+      );
+      await recorder.api().version();
+      expect(recorder.last.headers.containsKey('X-ShellX-Platform'), isFalse);
+      expect(recorder.last.headers.containsKey('X-ShellX-OS-Version'), isFalse);
     });
   });
 

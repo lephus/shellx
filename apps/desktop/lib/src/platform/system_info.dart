@@ -1,3 +1,5 @@
+import 'dart:io';
+
 /// Minimum Windows build: Windows 10 1809, the first with ConPTY (spec §3.1).
 const int kMinWindowsBuild = 17763;
 
@@ -23,4 +25,26 @@ String deviceNameFromHostname(String hostname) {
   }
   if (name.isEmpty) return 'Computer';
   return name.length > 64 ? name.substring(0, 64) : name;
+}
+
+/// Client kind sent as `X-ShellX-Platform` (matches the relay's `audienceOf`).
+String flutterPlatformName() =>
+    Platform.isMacOS ? 'flutter-macos' : 'flutter-windows';
+
+/// Normalizes dart:io `Platform.operatingSystemVersion` for the relay:
+/// macOS `Version 14.5 (Build 23F79)` -> `14.5`; Windows
+/// `"Windows 10 Pro" 10.0 (Build 22631)` -> `10.0.22631`. Null if unparseable.
+String? normalizedOsVersion(
+  String operatingSystemVersion, {
+  required bool isMacOS,
+}) {
+  if (isMacOS) {
+    return RegExp(
+      r'Version (\d+\.\d+(?:\.\d+)?)',
+    ).firstMatch(operatingSystemVersion)?[1];
+  }
+  final match = RegExp(
+    r'(\d+\.\d+) \(Build (\d+)\)',
+  ).firstMatch(operatingSystemVersion);
+  return match == null ? null : '${match[1]}.${match[2]}';
 }

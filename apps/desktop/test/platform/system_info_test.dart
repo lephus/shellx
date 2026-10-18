@@ -24,4 +24,27 @@ void main() {
     expect(deviceNameFromHostname('  '), 'Computer');
     expect(deviceNameFromHostname('a' * 80), hasLength(64));
   });
+
+  test('normalizes the OS version for the relay', () {
+    expect(
+      normalizedOsVersion('Version 14.5 (Build 23F79)', isMacOS: true),
+      '14.5',
+    );
+    expect(
+      normalizedOsVersion('Version 15.1.1 (Build 24B91)', isMacOS: true),
+      '15.1.1',
+    );
+    expect(
+      normalizedOsVersion('Version 12.7.6 (Build 21H1320)', isMacOS: true),
+      '12.7.6',
+    );
+    expect(
+      normalizedOsVersion(
+        '"Windows 10 Pro" 10.0 (Build 22631)',
+        isMacOS: false,
+      ),
+      '10.0.22631',
+    );
+    expect(normalizedOsVersion('garbage', isMacOS: true), isNull);
+  });
 }

@@ -11,21 +11,40 @@ import 'models.dart';
 /// WebSocket upgrade). Informational only: the relay records it per device.
 const String clientVersionHeader = 'X-ShellX-Version';
 
+/// The header carrying the client kind (`flutter-macos`, `flutter-windows`)
+/// so the relay can answer `/v1/version` per platform. Null sends nothing.
+const String clientPlatformHeader = 'X-ShellX-Platform';
+
+/// The header carrying the client's normalized OS version (`14.5`,
+/// `10.0.22631`). Null sends nothing.
+const String clientOsVersionHeader = 'X-ShellX-OS-Version';
+
 /// REST client for the relay API (spec section 10.2).
 ///
 /// Every failure is reported as [ApiException]: HTTP errors carry the relay's
 /// `{"error": {"code", "message"}}`; transport failures and requests that
 /// get no response within 20 seconds have status 0 and code `network`.
 final class ShellxApi {
-  ShellxApi({required Uri baseUri, http.Client? httpClient, this.clientVersion})
-    : _baseUri = baseUri,
-      _http = httpClient ?? http.Client(),
-      _ownsHttp = httpClient == null;
+  ShellxApi({
+    required Uri baseUri,
+    http.Client? httpClient,
+    this.clientVersion,
+    this.clientPlatform,
+    this.clientOsVersion,
+  }) : _baseUri = baseUri,
+       _http = httpClient ?? http.Client(),
+       _ownsHttp = httpClient == null;
 
   /// This app's `x.y.z`, sent as [clientVersionHeader] on every request so
   /// the relay can record which version each device runs (admin page).
   /// Null sends nothing.
   final String? clientVersion;
+
+  /// Sent as [clientPlatformHeader] on every request when not null.
+  final String? clientPlatform;
+
+  /// Sent as [clientOsVersionHeader] on every request when not null.
+  final String? clientOsVersion;
 
   static const Duration _timeout = Duration(seconds: 20);
 
@@ -273,6 +292,10 @@ final class ShellxApi {
     request.headers['Accept'] = 'application/json';
     final version = clientVersion;
     if (version != null) request.headers[clientVersionHeader] = version;
+    final platform = clientPlatform;
+    if (platform != null) request.headers[clientPlatformHeader] = platform;
+    final osVersion = clientOsVersion;
+    if (osVersion != null) request.headers[clientOsVersionHeader] = osVersion;
     if (authenticated) {
       final current = token;
       if (current == null) {

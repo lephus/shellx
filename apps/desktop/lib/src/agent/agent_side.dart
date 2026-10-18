@@ -9,6 +9,7 @@ import '../cli/cli_install.dart';
 import '../mux/mux_paths.dart';
 import '../mux/windows_pipe_transport.dart';
 import '../platform/keep_awake.dart';
+import '../platform/system_info.dart';
 import '../platform/launch_at_login.dart';
 import '../platform/notifier.dart';
 import '../platform/pty/flutter_pty_factory.dart';
@@ -65,7 +66,15 @@ AgentSide buildAgentSide({
   );
   // The app's one ShellxApi: the controller sets its token at sign-in.
   // Contract §1: every request reports this build's x.y.z.
-  final api = ShellxApi(baseUri: relayBase, clientVersion: appVersion);
+  final api = ShellxApi(
+    baseUri: relayBase,
+    clientVersion: appVersion,
+    clientPlatform: flutterPlatformName(),
+    clientOsVersion: normalizedOsVersion(
+      Platform.operatingSystemVersion,
+      isMacOS: Platform.isMacOS,
+    ),
+  );
   // A1 D7: the process's one SessionManager. It outlives every runtime, so
   // signing out or losing the relay never ends a shell; Quit does.
   final core = SessionCore(
@@ -101,7 +110,15 @@ AgentSide buildAgentSide({
     secureStore: SecureKeyValueStore(),
     settings: settings,
     api: api,
-    createApi: () => ShellxApi(baseUri: relayBase, clientVersion: appVersion),
+    createApi: () => ShellxApi(
+      baseUri: relayBase,
+      clientVersion: appVersion,
+      clientPlatform: flutterPlatformName(),
+      clientOsVersion: normalizedOsVersion(
+        Platform.operatingSystemVersion,
+        isMacOS: Platform.isMacOS,
+      ),
+    ),
     runtimeFactory: (params) => CoreAgentRuntime(
       params,
       core: core,
