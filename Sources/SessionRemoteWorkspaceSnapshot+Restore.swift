@@ -364,7 +364,7 @@ extension SessionRemoteWorkspaceSnapshot {
         let script = ([
             "cmux_restore_fail() { \(failureScript); }",
             "cmux_restore_cli=\"${CMUX_BUNDLED_CLI_PATH:-}\"",
-            "if [ -z \"$cmux_restore_cli\" ] || [ ! -x \"$cmux_restore_cli\" ]; then cmux_restore_cli=\"$(command -v cmux 2>/dev/null || true)\"; fi",
+            "if [ -z \"$cmux_restore_cli\" ] || [ ! -x \"$cmux_restore_cli\" ]; then cmux_restore_cli=\"$(command -v shellx 2>/dev/null || true)\"; fi",
             "if [ -z \"$cmux_restore_cli\" ] || [ -z \"${CMUX_SOCKET_PATH:-}\" ] || [ -z \"${CMUX_WORKSPACE_ID:-}\" ] || [ -z \"${CMUX_SURFACE_ID:-}\" ] || [ -z \"${CMUX_TERMINAL_LIFECYCLE_ID:-}\" ]; then cmux_restore_fail; fi",
             "cmux_restore_register_attempt() { cmux_restore_launch_payload=\"{\\\"workspace_id\\\":\\\"$CMUX_WORKSPACE_ID\\\",\\\"surface_id\\\":\\\"$CMUX_SURFACE_ID\\\",\\\"terminal_lifecycle_id\\\":\\\"$CMUX_TERMINAL_LIFECYCLE_ID\\\",\\\"attempt_id\\\":\\\"$CMUX_SSH_ATTEMPT_ID\\\"}\"; CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC=2 \"$cmux_restore_cli\" --socket \"$CMUX_SOCKET_PATH\" rpc workspace.remote.terminal_session_launching \"$cmux_restore_launch_payload\" >/dev/null 2>&1; }",
         ] + SSHPTYAttachRetryScriptBuilder().launchRegistrationRetryLines(functionPrefix: "cmux_restore") + [
@@ -394,8 +394,8 @@ extension SessionRemoteWorkspaceSnapshot {
             "  cmux_restore_terminal_connected_acknowledged=0",
             "  cmux_restore_terminal_connected_retry=0",
             "  while [ \"$cmux_restore_terminal_connected_retry\" -lt 4 ]; do",
-            "    cmux_restore_remote_cli=\"$HOME/.cmux/bin/cmux\"",
-            "    if [ ! -x \"$cmux_restore_remote_cli\" ]; then cmux_restore_remote_cli=\"$(command -v cmux 2>/dev/null || true)\"; fi",
+            "    cmux_restore_remote_cli=\"$HOME/.shellx/bin/shellx\"",
+            "    if [ ! -x \"$cmux_restore_remote_cli\" ]; then cmux_restore_remote_cli=\"$(command -v shellx 2>/dev/null || true)\"; fi",
             "    if [ -n \"$cmux_restore_remote_cli\" ] && env -u CMUX_SOCKET CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC=0.5 CMUX_SOCKET_PATH=\"127.0.0.1:\(remoteRelayPort)\" \"$cmux_restore_remote_cli\" rpc workspace.remote.terminal_session_connected \"$cmux_restore_terminal_connected\" >/dev/null 2>&1; then",
             "      cmux_restore_terminal_connected_acknowledged=1",
             "      break",
