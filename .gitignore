@@ -91,3 +91,6 @@ build/
 
 # Release builds (published to downloads, never committed)
 release/out/
+
+# ShellX core
+shellx-core/target/
