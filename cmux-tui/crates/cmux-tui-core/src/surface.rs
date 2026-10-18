@@ -2437,8 +2437,13 @@ impl Surface {
             .as_ref()
             .map(crate::mux::KittyImageBudgetReservation::initial_limits)
             .unwrap_or_default();
+        // ShellX: a default-shell terminal becomes a Mac libghostty terminal
+        // (virtual PTY) when the daemon runs with CMUX_SHELLX_BRIDGE_SOCKET.
         #[cfg(unix)]
-        if lifetime == PtyLifetime::SessionOwned
+        let virtual_spec = crate::virtual_pty::spec_for(opts.command.as_ref());
+        #[cfg(unix)]
+        if virtual_spec.is_none()
+            && lifetime == PtyLifetime::SessionOwned
             && let Some(root) = opts.terminal_host_root.clone()
         {
             let default_colors = mux.upgrade().map(|mux| mux.default_colors()).unwrap_or_default();
@@ -2478,42 +2483,78 @@ impl Surface {
             );
         }
         let _ = terminal_id;
-        let initial_geometry = PtyGeometry {
+        // ShellX: mutable so a virtual PTY can start at the Mac's grid.
+        #[cfg_attr(not(unix), allow(unused_mut))]
+        let mut initial_geometry = PtyGeometry {
             cols: opts.cols,
             rows: opts.rows,
             cell_width: cell_pixels.0,
             cell_height: cell_pixels.1,
         };
-        let pty = cmux_pty::open(initial_geometry.pty_size()?)?;
-
-        let launch = match opts.command.clone().filter(|argv| !argv.is_empty()) {
-            Some(argv) => {
-                crate::shell_integration::ShellLaunch { command: argv, env: opts.extra_env.clone() }
+        // ShellX: open the virtual PTY instead of a local one (local path kept below).
+        #[cfg(unix)]
+        let virtual_pty = match virtual_spec {
+            Some(spec) => {
+                let (spawned, handle) = crate::virtual_pty::open(
+                    &spec,
+                    initial_geometry.pty_size()?,
+                    opts.cwd.as_deref(),
+                )?;
+                // The Mac owns the real PTY: start the mirror at its grid.
+                if let Some((cols, rows)) = handle.initial_size() {
+                    opts.cols = cols.max(2);
+                    opts.rows = rows.max(1);
+                    initial_geometry.cols = opts.cols;
+                    initial_geometry.rows = opts.rows;
+                }
+                Some((spawned, handle))
             }
-            None => crate::shell_integration::integrate_default_shell(
-                vec![platform::default_shell()],
-                opts.extra_env.clone(),
-            ),
+            None => None,
         };
-        let argv = launch.command;
-        let mut cmd = PtyCommand::new(&argv[0]);
-        cmd.args(argv[1..].iter().cloned());
-        cmd.env("TERM", &opts.term);
-        // The embedded ghostty-vt terminal always parses 24-bit SGR and every
-        // frontend forwards RGB cells losslessly, so children can rely on
-        // truecolor regardless of where the session server was started
-        // (launchd, ssh, cron strip COLORTERM). Set before extra_env so a
-        // caller can still override it.
-        cmd.env("COLORTERM", "truecolor");
-        for (k, v) in &launch.env {
-            cmd.env(k, v);
-        }
-        let cwd = opts.cwd.clone().or_else(platform::default_terminal_cwd);
-        if let Some(cwd) = cwd.as_deref() {
-            cmd.cwd(cwd);
-        }
+        #[cfg(not(unix))]
+        let virtual_pty: Option<(cmux_pty::SpawnedPty, ())> = None;
+        let is_virtual = virtual_pty.is_some();
+        let (virtual_spawned, virtual_handle) = match virtual_pty {
+            Some((spawned, handle)) => (Some(spawned), Some(handle)),
+            None => (None, None),
+        };
+        let (master, child, argv, cwd) = if let Some(spawned) = virtual_spawned {
+            let cmux_pty::SpawnedPty { master, child } = spawned;
+            (master, child, vec!["shellx-bridge".to_string()], opts.cwd.clone())
+        } else {
+            let pty = cmux_pty::open(initial_geometry.pty_size()?)?;
 
-        let cmux_pty::SpawnedPty { master, child } = pty.spawn(cmd)?;
+            let launch = match opts.command.clone().filter(|argv| !argv.is_empty()) {
+                Some(argv) => crate::shell_integration::ShellLaunch {
+                    command: argv,
+                    env: opts.extra_env.clone(),
+                },
+                None => crate::shell_integration::integrate_default_shell(
+                    vec![platform::default_shell()],
+                    opts.extra_env.clone(),
+                ),
+            };
+            let argv = launch.command;
+            let mut cmd = PtyCommand::new(&argv[0]);
+            cmd.args(argv[1..].iter().cloned());
+            cmd.env("TERM", &opts.term);
+            // The embedded ghostty-vt terminal always parses 24-bit SGR and every
+            // frontend forwards RGB cells losslessly, so children can rely on
+            // truecolor regardless of where the session server was started
+            // (launchd, ssh, cron strip COLORTERM). Set before extra_env so a
+            // caller can still override it.
+            cmd.env("COLORTERM", "truecolor");
+            for (k, v) in &launch.env {
+                cmd.env(k, v);
+            }
+            let cwd = opts.cwd.clone().or_else(platform::default_terminal_cwd);
+            if let Some(cwd) = cwd.as_deref() {
+                cmd.cwd(cwd);
+            }
+
+            let cmux_pty::SpawnedPty { master, child } = pty.spawn(cmd)?;
+            (master, child, argv, cwd)
+        }; // ShellX: end of the local-PTY branch.
         let mut child = PtyChildStartupGuard::new(child);
         let pid = child.process_id();
         let killer = child.clone_killer();
@@ -2532,10 +2573,16 @@ impl Surface {
         let title_changed = Arc::new(AtomicBool::new(false));
 
         let callbacks = Callbacks {
-            on_pty_write: Some(Box::new({
-                let pending = pending_responses.clone();
-                move |bytes| pending.lock().unwrap().extend_from_slice(bytes)
-            })),
+            // ShellX: a virtual (Mac-owned) PTY already has a terminal answering
+            // queries; a second answer from this mirror would reach the shell.
+            on_pty_write: if is_virtual {
+                None
+            } else {
+                Some(Box::new({
+                    let pending = pending_responses.clone();
+                    move |bytes| pending.lock().unwrap().extend_from_slice(bytes)
+                }))
+            },
             on_title_changed: Some(Box::new({
                 let flag = title_changed.clone();
                 move || flag.store(true, Ordering::Relaxed)
@@ -2658,6 +2705,22 @@ impl Surface {
             return Err(error);
         }
         spawn_frame_producer(&surface, frame_rx)?;
+        // ShellX: the Mac's real grid (every `S` frame) resizes the mirror.
+        #[cfg(unix)]
+        if let Some(handle) = virtual_handle.as_ref() {
+            let weak = Arc::downgrade(&surface);
+            handle.set_host_size_handler(Box::new(move |cols, rows| {
+                if let Some(surface) = weak.upgrade()
+                    && let Err(error) = surface.resize(cols, rows)
+                {
+                    eprintln!(
+                        "cmux-tui: shellx bridge: surface {id} resize {cols}x{rows}: {error}"
+                    );
+                }
+            }));
+        }
+        #[cfg(not(unix))]
+        let _ = virtual_handle;
 
         // PTY reader: pty bytes -> terminal state -> SurfaceOutput events.
         let reader_thread =
