@@ -109,7 +109,7 @@ struct RemoteDaemonManifestRepositoryTests {
         {
           "goOS": "linux",
           "goArch": "amd64",
-          "assetName": "cmuxd-remote-linux-amd64",
+          "assetName": "shellx-remote-linux-amd64",
           "downloadURL": "http://127.0.0.1:\(port)\(assetPath)",
           "sha256": "\(sha256)"
         }
@@ -124,13 +124,13 @@ struct RemoteDaemonManifestRepositoryTests {
           "appVersion": "\(appVersion)",
           "releaseTag": "v\(appVersion)",
           "releaseURL": "http://127.0.0.1:\(port)",
-          "checksumsAssetName": "cmuxd-remote-checksums.txt",
-          "checksumsURL": "http://127.0.0.1:\(port)/cmuxd-remote-checksums.txt",
+          "checksumsAssetName": "shellx-remote-checksums.txt",
+          "checksumsURL": "http://127.0.0.1:\(port)/shellx-remote-checksums.txt",
           "entries": [
             {
               "goOS": "linux",
               "goArch": "amd64",
-              "assetName": "cmuxd-remote-linux-amd64",
+              "assetName": "shellx-remote-linux-amd64",
               "downloadURL": "http://127.0.0.1:\(port)\(assetPath)",
               "sha256": "\(sha256)"
             }
@@ -143,7 +143,7 @@ struct RemoteDaemonManifestRepositoryTests {
     func cachePathShape() throws {
         let home = try temporaryHome()
         let url = try makeRepository(home: home).cachedBinaryURL(version: "0.62.0", goOS: "linux", goArch: "arm64")
-        #expect(url.path == home.path + "/.local/state/cmux/remote-daemons/0.62.0/linux-arm64/cmuxd-remote")
+        #expect(url.path == home.path + "/.local/state/cmux/remote-daemons/0.62.0/linux-arm64/shellx-remote")
         var isDirectory: ObjCBool = false
         let rootExists = FileManager.default.fileExists(
             atPath: home.appendingPathComponent(".local/state/cmux/remote-daemons").path,
@@ -159,8 +159,8 @@ struct RemoteDaemonManifestRepositoryTests {
         let home = try temporaryHome()
         let repository = makeRepository(home: home)
         let binary = Data("#!/bin/sh\necho fake daemon\n".utf8)
-        server.setResponse(path: "/cmuxd-remote-linux-amd64", body: binary)
-        let entry = makeEntry(port: server.port, assetPath: "/cmuxd-remote-linux-amd64", sha256: sha256Hex(binary))
+        server.setResponse(path: "/shellx-remote-linux-amd64", body: binary)
+        let entry = makeEntry(port: server.port, assetPath: "/shellx-remote-linux-amd64", sha256: sha256Hex(binary))
 
         let download = try repository.downloadBinary(entry: entry, version: "0.99.0")
         #expect(download.binaryURL == (try repository.cachedBinaryURL(version: "0.99.0", goOS: "linux", goArch: "amd64")))
@@ -176,8 +176,8 @@ struct RemoteDaemonManifestRepositoryTests {
         defer { server.close() }
         let home = try temporaryHome()
         let repository = makeRepository(home: home)
-        server.setResponse(path: "/cmuxd-remote-linux-amd64", body: Data("real bytes".utf8))
-        let entry = makeEntry(port: server.port, assetPath: "/cmuxd-remote-linux-amd64", sha256: String(repeating: "0", count: 64))
+        server.setResponse(path: "/shellx-remote-linux-amd64", body: Data("real bytes".utf8))
+        let entry = makeEntry(port: server.port, assetPath: "/shellx-remote-linux-amd64", sha256: String(repeating: "0", count: 64))
 
         do {
             _ = try repository.downloadBinary(entry: entry, version: "0.99.0")
@@ -186,7 +186,7 @@ struct RemoteDaemonManifestRepositoryTests {
             let nsError = error as NSError
             #expect(nsError.domain == "cmux.remote.daemon")
             #expect(nsError.code == 28)
-            #expect(nsError.localizedDescription == "remote daemon checksum mismatch for cmuxd-remote-linux-amd64")
+            #expect(nsError.localizedDescription == "remote daemon checksum mismatch for shellx-remote-linux-amd64")
         }
         let cacheURL = try repository.cachedBinaryURL(version: "0.99.0", goOS: "linux", goArch: "amd64")
         #expect(!FileManager.default.fileExists(atPath: cacheURL.path))
@@ -202,12 +202,12 @@ struct RemoteDaemonManifestRepositoryTests {
         // the live manifest; only the checksum embedded in the signed app is
         // trustworthy.
         let swappedBinary = Data("attacker-swapped bytes".utf8)
-        server.setResponse(path: "/cmuxd-remote-linux-amd64", body: swappedBinary)
+        server.setResponse(path: "/shellx-remote-linux-amd64", body: swappedBinary)
         server.setResponse(
-            path: "/cmuxd-remote-manifest.json",
-            body: Data(makeManifestJSON(port: server.port, assetPath: "/cmuxd-remote-linux-amd64", sha256: sha256Hex(swappedBinary)).utf8)
+            path: "/shellx-remote-manifest.json",
+            body: Data(makeManifestJSON(port: server.port, assetPath: "/shellx-remote-linux-amd64", sha256: sha256Hex(swappedBinary)).utf8)
         )
-        let embeddedEntry = makeEntry(port: server.port, assetPath: "/cmuxd-remote-linux-amd64", sha256: String(repeating: "f", count: 64))
+        let embeddedEntry = makeEntry(port: server.port, assetPath: "/shellx-remote-linux-amd64", sha256: String(repeating: "f", count: 64))
 
         var thrown: NSError?
         do {
@@ -229,8 +229,8 @@ struct RemoteDaemonManifestRepositoryTests {
         defer { server.close() }
         let home = try temporaryHome()
         let repository = makeRepository(home: home)
-        server.setResponse(path: "/cmuxd-remote-linux-amd64", status: 503, body: Data())
-        let entry = makeEntry(port: server.port, assetPath: "/cmuxd-remote-linux-amd64", sha256: String(repeating: "0", count: 64))
+        server.setResponse(path: "/shellx-remote-linux-amd64", status: 503, body: Data())
+        let entry = makeEntry(port: server.port, assetPath: "/shellx-remote-linux-amd64", sha256: String(repeating: "0", count: 64))
 
         do {
             _ = try repository.downloadBinary(entry: entry, version: "0.99.0")

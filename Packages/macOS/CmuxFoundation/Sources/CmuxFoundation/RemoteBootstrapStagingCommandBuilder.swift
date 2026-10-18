@@ -96,15 +96,15 @@ public struct RemoteBootstrapStagingCommandBuilder: Sendable {
     }
 
     private var stagedBootstrapLauncherScript: String {
-        "exec /bin/sh \"$HOME/.cmux/relay/\(remoteRelayPort).bootstrap.sh\""
+        "exec /bin/sh \"$HOME/.shellx/relay/\(remoteRelayPort).bootstrap.sh\""
     }
 
     private var remoteInstallShellScript: String {
         [
             "set -eu",
             "umask 077",
-            "cmux_bootstrap_path=\"$HOME/.cmux/relay/\(remoteRelayPort).bootstrap.sh\"",
-            "mkdir -p \"$HOME/.cmux/relay\"",
+            "cmux_bootstrap_path=\"$HOME/.shellx/relay/\(remoteRelayPort).bootstrap.sh\"",
+            "mkdir -p \"$HOME/.shellx/relay\"",
             "cat > \"$cmux_bootstrap_path\"",
             "chmod 700 \"$cmux_bootstrap_path\" >/dev/null 2>&1 || true",
         ].joined(separator: "\n")

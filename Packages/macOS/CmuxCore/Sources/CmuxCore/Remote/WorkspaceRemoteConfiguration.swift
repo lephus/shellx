@@ -398,7 +398,7 @@ public struct WorkspaceRemoteConfiguration: Equatable, Sendable {
 
     /// True when `other` addresses the same remote CLI relay metadata namespace.
     ///
-    /// Relay metadata lives under `$HOME/.cmux/relay/<relayPort>` on the remote
+    /// Relay metadata lives under `$HOME/.shellx/relay/<relayPort>` on the remote
     /// transport endpoint. This comparison intentionally ignores persistent
     /// slots, SSH options, and credentials: those inputs may change while still
     /// reaching the same remote account, so treating that case as shared avoids
@@ -609,7 +609,7 @@ extension WorkspaceRemoteConfiguration {
             managedCloudVMID: managedCloudVMID
         )
         // Same rule as the app's routesThroughSSHTui: a configuration carrying a
-        // cmuxd-remote relay or daemon endpoint runs the legacy lifecycle, so its
+        // shellx-remote relay or daemon endpoint runs the legacy lifecycle, so its
         // snapshot must not claim cmux-tui ownership.
         if terminalTransport == .ssh && !skipDaemonBootstrap && relayPort == nil && daemonWebSocketEndpoint == nil {
             snapshot.sshSessionOwner = "cmux-tui"
