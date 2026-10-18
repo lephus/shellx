@@ -343,10 +343,20 @@ before (relay + web + backup). deploy.yml never syncs `relay2-src/`.
    `feat/relay-v2-subdomain` serves relay2 at `wss://relay2.shellx.pro/v1/relay` (own hostname and
    certificate, `nginx-proxy/relay2.shellx.pro`, DNS A record for `relay2.shellx.pro` first, and add
    that file to step 5's loop).
-7. **Roll back / switch off.** Remove `relay2` from `COMPOSE_PROFILES` in `.env` (or the whole line),
-   set `RELAY2_ENABLED` to `false`, then `docker compose up -d --remove-orphans`: relay2 stops, v1 is
-   untouched. A bad deploy rolls back automatically as described above; the images of the previous
-   relay2 commit are rebuilt from its kept `relay2-src/<sha>` directory if the local cache was pruned.
+7. **Roll back / switch off.** On the VPS, first remove the container, then drop the profile:
+
+   ```bash
+   cd ~/phu/shellx
+   docker compose --profile relay2 rm -sf relay2   # stops and removes it; v1 is untouched
+   sed -i '/^COMPOSE_PROFILES=/d' .env             # or remove only `relay2` from the line by hand
+   ```
+
+   and set `RELAY2_ENABLED` to `false`. Order matters: Compose does not treat a service of an
+   inactive profile as an orphan, so neither an `up` with orphan removal nor later deploys touch a relay2
+   container that already runs (`restart: unless-stopped`), and nginx-proxy would keep sending
+   `/v2/relay` to it. A bad deploy rolls back automatically as described above; the images of the
+   previous relay2 commit are rebuilt from its kept `relay2-src/<sha>` directory if the local cache
+   was pruned.
 
 ## Operations
 

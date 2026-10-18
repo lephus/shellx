@@ -147,3 +147,11 @@ test('README documents Relay v2 without any secret value', () => {
   assert.match(readme, /COMPOSE_PROFILES=relay2/);
   assert.doesNotMatch(readme, /shellx-pro/);
 });
+
+test('README switch-off removes the relay2 container (a deactivated profile makes no orphan) before dropping the profile', () => {
+  const readme = readFileSync(join(deployDir, 'README.md'), 'utf8');
+  const step = readme.match(/^7\. \*\*Roll back \/ switch off\.\*\*[\s\S]*?(?=\n## )/m)[0];
+  assert.match(step, /docker compose --profile relay2 rm -sf relay2/);
+  assert.doesNotMatch(step, /--remove-orphans/);
+  assert.ok(step.indexOf('rm -sf relay2') < step.indexOf('COMPOSE_PROFILES'), 'remove the container first, then the profile');
+});
