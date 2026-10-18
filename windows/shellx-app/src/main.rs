@@ -5,8 +5,10 @@
 //! headless and exits; `--version` prints the version and exits.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
-mod session;
+mod fonts;
+mod local_pty;
 mod smoke;
+mod term_core;
 
 #[cfg(windows)]
 mod app;

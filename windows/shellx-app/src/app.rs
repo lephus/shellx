@@ -13,9 +13,14 @@ use gpui::{
     WindowBounds, WindowOptions, div, fill, font, outline, point, prelude::*, px, relative, size,
 };
 
-use crate::session::{
-    CURSOR, DEFAULT_BG, DEFAULT_FG, Session, Spawned, default_shell, spawn_reader,
-};
+use std::borrow::Cow;
+use std::sync::Arc;
+
+use shellx_model::palette::{TERM_BG, TERM_CURSOR, TERM_FG};
+
+use crate::fonts;
+use crate::local_pty::{LocalPty, default_shell, spawn_reader};
+use crate::term_core::{PtyLink, TermCore, rgb};
 
 const FONT_SIZE: f32 = 14.0;
 const LINE_HEIGHT: f32 = 1.3;
@@ -24,6 +29,12 @@ const BASE_TITLE: &str = "ShellX";
 
 pub fn run() {
     Application::new().run(|cx: &mut App| {
+        if let Err(error) = cx
+            .text_system()
+            .add_fonts(fonts::embedded().into_iter().map(Cow::Borrowed).collect())
+        {
+            eprintln!("failed to register the embedded fonts: {error:#}");
+        }
         let bounds = Bounds::centered(None, size(px(960.0), px(600.0)), cx);
         let window = cx
             .open_window(
@@ -77,15 +88,11 @@ fn utf8_to_utf16(s: &str, utf8: usize) -> usize {
     utf16_len(&s[..utf8.min(s.len())])
 }
 
-/// Pick the first installed monospace family (Windows 11 ships Cascadia).
-fn terminal_font(cx: &App) -> Font {
-    let installed = cx.text_system().all_font_names();
-    let family = ["Cascadia Mono", "Cascadia Code", "Consolas", "Courier New"]
-        .into_iter()
-        .find(|name| installed.iter().any(|f| f.eq_ignore_ascii_case(name)))
-        .unwrap_or("Consolas");
-    let mut f = font(family);
+/// The embedded JetBrains Mono, with system fallbacks for glyphs it lacks.
+fn terminal_font() -> Font {
+    let mut f = font(fonts::TERMINAL_FAMILY);
     f.fallbacks = Some(FontFallbacks::from_fonts(vec![
+        "Cascadia Mono".into(),
         "Consolas".into(),
         "Segoe UI".into(),
         "Segoe UI Emoji".into(),
@@ -97,7 +104,8 @@ fn terminal_font(cx: &App) -> Font {
 struct TermView {
     focus_handle: FocusHandle,
     font: Font,
-    session: Option<Session>,
+    session: Option<TermCore>,
+    link: Option<Arc<LocalPty>>,
     error: Option<String>,
     /// IME composition text (preedit), shown inline at the cursor and never
     /// sent to the PTY until committed.
@@ -114,8 +122,9 @@ impl TermView {
     fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut view = TermView {
             focus_handle: cx.focus_handle(),
-            font: terminal_font(cx),
+            font: terminal_font(),
             session: None,
+            link: None,
             error: None,
             marked: None,
             marked_selection: None,
@@ -125,9 +134,14 @@ impl TermView {
             title: BASE_TITLE.to_string(),
         };
         let (program, args) = default_shell();
-        match Session::spawn(&program, &args, 80, 24) {
-            Ok(Spawned { session, reader }) => {
-                view.session = Some(session);
+        let spawned = LocalPty::spawn(&program, &args, 80, 24).and_then(|(link, reader)| {
+            let core = TermCore::new(link.clone(), 80, 24)?;
+            Ok((link, core, reader))
+        });
+        match spawned {
+            Ok((link, core, reader)) => {
+                view.session = Some(core);
+                view.link = Some(link);
                 let (tx, rx) = async_channel::unbounded::<Vec<u8>>();
                 spawn_reader(reader, move |bytes| tx.send_blocking(bytes).is_ok());
                 cx.spawn(async move |this, cx| {
@@ -156,7 +170,7 @@ impl TermView {
                             .await;
                         let exited = this
                             .update(cx, |view, _| {
-                                view.session.as_mut().is_none_or(|s| s.child_exited())
+                                view.link.as_ref().is_none_or(|l| l.is_closed())
                             })
                             .unwrap_or(true);
                         if exited {
@@ -187,7 +201,7 @@ impl TermView {
             if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text())
                 && let Some(session) = self.session.as_mut()
             {
-                session.send_text(&text.replace("\r\n", "\r").replace('\n', "\r"));
+                session.paste(&text);
             }
             cx.stop_propagation();
             return;
@@ -256,8 +270,8 @@ impl Render for TermView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let root = div()
             .size_full()
-            .bg(hsla(DEFAULT_BG))
-            .text_color(hsla(DEFAULT_FG))
+            .bg(hsla(rgb(TERM_BG)))
+            .text_color(hsla(rgb(TERM_FG)))
             .p(px(PADDING))
             .track_focus(&self.focus_handle)
             .key_context("Terminal")
@@ -619,7 +633,7 @@ impl Element for TermElement {
         // Cursor, then the IME preedit drawn inline over the cursor cell.
         if let Some(cursor) = frame.cursor {
             let origin = cell_origin(usize::from(cursor.x), usize::from(cursor.y));
-            let color = hsla(frame.cursor_color.unwrap_or(CURSOR));
+            let color = hsla(frame.cursor_color.unwrap_or(rgb(TERM_CURSOR)));
             let mut cursor_origin = origin;
             if let Some(text) = marked.as_ref() {
                 let run = TextRun {

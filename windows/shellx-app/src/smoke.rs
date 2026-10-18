@@ -9,7 +9,10 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Result, bail, ensure};
 
-use crate::session::{Session, Spawned, default_shell, spawn_reader};
+use crate::fonts;
+use crate::local_pty::{LocalPty, default_shell, spawn_reader};
+use crate::term_core::{PtyLink, TermCore, rgb};
+use shellx_model::palette::TERM_BG;
 
 const TIMEOUT: Duration = Duration::from_secs(45);
 
@@ -22,7 +25,7 @@ impl Pump {
     /// Feed output until `done(lines)` holds or the deadline passes.
     fn until(
         &mut self,
-        session: &mut Session,
+        session: &mut TermCore,
         what: &str,
         mut done: impl FnMut(&[String]) -> bool,
     ) -> Result<Vec<String>> {
@@ -74,13 +77,24 @@ pub fn run() -> Result<()> {
     if program.to_ascii_lowercase().contains("powershell") || program.contains("pwsh") {
         full_args.push("-NoProfile");
     }
-    let Spawned {
-        mut session,
-        reader,
-    } = Session::spawn(&program, &full_args, 100, 30)?;
+    let (link, reader) = LocalPty::spawn(&program, &full_args, 100, 30)?;
+    let mut session = TermCore::new(link.clone(), 100, 30)?;
     let (tx, rx) = mpsc::channel();
     spawn_reader(reader, move |bytes| tx.send(bytes).is_ok());
     let mut pump = Pump { rx, closed: false };
+
+    // 0. Palette and embedded fonts.
+    ensure!(
+        session.frame()?.default_colors.0 == rgb(TERM_BG),
+        "default background is not TERM_BG"
+    );
+    let embedded = fonts::embedded();
+    ensure!(embedded.len() == 5, "expected 5 embedded fonts");
+    ensure!(
+        embedded.iter().all(|f| fonts::has_font_magic(f)),
+        "an embedded font lacks a TrueType/OpenType header"
+    );
+    println!("smoke: palette and fonts ok");
 
     // 1. Key encoding through libghostty-vt (what the window sends).
     ensure!(
@@ -157,7 +171,7 @@ pub fn run() -> Result<()> {
     session.send_text("exit");
     session.send_chord("enter");
     let deadline = Instant::now() + Duration::from_secs(5);
-    while !session.child_exited() && Instant::now() < deadline {
+    while !link.is_closed() && Instant::now() < deadline {
         std::thread::sleep(Duration::from_millis(100));
     }
     println!("smoke: PASS in {:?}", started.elapsed());
