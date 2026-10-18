@@ -155,3 +155,8 @@ test('README switch-off removes the relay2 container (a deactivated profile make
   assert.doesNotMatch(step, /--remove-orphans/);
   assert.ok(step.indexOf('rm -sf relay2') < step.indexOf('COMPOSE_PROFILES'), 'remove the container first, then the profile');
 });
+
+test('native latest manifests: only the relay mounts ./downloads/desktop, read-only, and it needs no other volume change', () => {
+  assert.match(service('relay'), /^ {6}- \.\/downloads\/desktop:\/srv\/downloads\/desktop:ro$/m);
+  assert.doesNotMatch(service('relay2'), /downloads\/desktop/);
+});

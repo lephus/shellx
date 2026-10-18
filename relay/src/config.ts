@@ -15,6 +15,11 @@ export interface Config {
   latestAgentVersion: string;
   macUrl: string;
   winUrl: string;
+  /** MIN_WINDOWS / MIN_MACOS: minimum native version for `X-ShellX-Platform: windows|macos` (default 2.0.0). */
+  minMacos: string;
+  minWindows: string;
+  /** Directory holding `latest-macos.json` / `latest-windows.json` (NATIVE_MANIFEST_DIR), mounted read-only. */
+  nativeManifestDir: string;
   /** Only the exact string "false" in RATE_LIMITS_ENABLED turns the limits off (local dev / E2E). */
   rateLimitsEnabled: boolean;
   /**
@@ -49,6 +54,8 @@ export const REQUIRED_VARIABLES = ["MIN_AGENT", "MIN_MOBILE", "LATEST_AGENT_VERS
 export const DEFAULT_PORT = 8080;
 export const DEFAULT_HOST = "0.0.0.0";
 export const DEFAULT_DB_PATH = "/data/relay.db";
+export const DEFAULT_NATIVE_MIN = "2.0.0";
+export const DEFAULT_NATIVE_MANIFEST_DIR = "/srv/downloads/desktop";
 export const DEFAULT_ADMIN_HOST = "admin.shellx.pro";
 export const DEFAULT_RELAY_ISSUER = "shellx-relay";
 export const DEFAULT_RELAY_V2_URL = "wss://relay.shellx.pro/v2/relay";
@@ -103,6 +110,9 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
     latestAgentVersion: value("LATEST_AGENT_VERSION")!,
     macUrl: value("MAC_URL")!,
     winUrl: value("WIN_URL")!,
+    minMacos: value("MIN_MACOS") ?? DEFAULT_NATIVE_MIN,
+    minWindows: value("MIN_WINDOWS") ?? DEFAULT_NATIVE_MIN,
+    nativeManifestDir: value("NATIVE_MANIFEST_DIR") ?? DEFAULT_NATIVE_MANIFEST_DIR,
     rateLimitsEnabled: env.RATE_LIMITS_ENABLED !== "false",
     adminHost,
     adminPassword: value("ADMIN_PASSWORD") ?? null,

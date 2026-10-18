@@ -4,6 +4,30 @@ import { errorKind, logMeta } from "./log.js";
 /** Request header in which the apps send their own `x.y.z` (shellx_core `clientVersionHeader`). */
 export const CLIENT_VERSION_HEADER = "X-ShellX-Version";
 
+/** Request headers of GET /v1/version that tell the relay which app asks (K6). */
+export const PLATFORM_HEADER = "X-ShellX-Platform";
+export const OS_VERSION_HEADER = "X-ShellX-OS-Version";
+
+export type Audience = "native-macos" | "native-windows" | "flutter-macos-14" | "flutter-windows" | "legacy";
+
+/** Which answer a client gets: exact, case-sensitive platform match; anything unknown is `legacy`. */
+export function audienceOf(platform: string | undefined, osVersion: string | undefined): Audience {
+  switch (platform) {
+    case "macos":
+      return "native-macos";
+    case "windows":
+      return "native-windows";
+    case "flutter-windows":
+      return "flutter-windows";
+    case "flutter-macos": {
+      const major = osVersion === undefined ? null : /^(\d{1,6})(\.|$)/.exec(osVersion)?.[1];
+      return major !== undefined && major !== null && Number(major) >= 14 ? "flutter-macos-14" : "legacy";
+    }
+    default:
+      return "legacy";
+  }
+}
+
 /** What a reported version must look like to be stored; anything else in the header is ignored. */
 const REPORTED_VERSION_RE = /^\d{1,6}\.\d{1,6}\.\d{1,6}$/;
 

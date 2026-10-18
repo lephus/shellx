@@ -25,6 +25,10 @@ export const TEST_CONFIG: Config = {
   latestAgentVersion: "1.0.0",
   macUrl: "https://download.shellx.pro/desktop/1.0.0/ShellX-1.0.0.dmg",
   winUrl: "https://download.shellx.pro/desktop/1.0.0/ShellX-Setup-1.0.0.exe",
+  minMacos: "2.0.0",
+  minWindows: "2.0.0",
+  // makeApp points this at a per-test temp dir; nothing ever reads /srv in tests.
+  nativeManifestDir: join(tmpdir(), "shellx-relay-no-native-manifest"),
   rateLimitsEnabled: false,
   adminHost: "admin.shellx.pro",
   adminPassword: null,
@@ -132,7 +136,7 @@ export interface TestApp {
  */
 export function makeApp(deps: Partial<AppDeps> = {}, listen: Partial<ListenOptions> = {}): TestApp {
   const ready = startRelay(
-    { config: TEST_CONFIG, db: db(), hubs: hubs(), limiters: unlimited, ...deps },
+    { config: { ...TEST_CONFIG, nativeManifestDir: join(tempDir(), "desktop") }, db: db(), hubs: hubs(), limiters: unlimited, ...deps },
     { ...listen, host: "127.0.0.1", port: 0 },
   );
   onCleanup(async () => {

@@ -49,6 +49,8 @@ services:
       # Secrets kept on the VPS only (never synced by deploy.yml), read-only; fcm.json must be
       # readable by uid 1000.
       - ./secrets:/secrets:ro
+      # Native desktop latest manifests (latest-macos.json / latest-windows.json), read-only.
+      - ./downloads/desktop:/srv/downloads/desktop:ro
     healthcheck:
       # dist/scripts/healthcheck.js (relay/src/scripts/healthcheck.ts) checks both the HTTP endpoint
       # and that the SQLite database opens read-only, and prints nothing on success.

@@ -20,7 +20,9 @@ import { relayTicketRoutes } from "./v2/relay-tickets.js";
 import { machinePairingRoutes, randomPairingCode } from "./v2/pairings.js";
 import type { PushGateway } from "./push/fcm.js";
 import { webSocketAuth, webSocketUpgrade } from "./routes/ws.js";
-import { minVersions } from "./settings.js";
+import { readNativeLatest } from "./native-latest.js";
+import { versionAnswer } from "./settings.js";
+import { audienceOf, OS_VERSION_HEADER, PLATFORM_HEADER } from "./versions.js";
 
 export interface AppDeps {
   config: Config;
@@ -91,14 +93,15 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
 
   app.get("/v1/version", (c) => {
     const config = c.get("config");
-    // The admin's override from the dashboard when set, else MIN_AGENT / MIN_MOBILE; latest_agent is
-    // env only (the desktop release pipeline commits it to deploy/relay.env).
-    const min = minVersions(c.get("db"), config);
-    return c.json({
-      min_agent: min.min_agent,
-      min_mobile: min.min_mobile,
-      latest_agent: { version: config.latestAgentVersion, mac_url: config.macUrl, win_url: config.winUrl },
-    });
+    // Per audience (X-ShellX-Platform / X-ShellX-OS-Version, K6); no header, flutter-macos < 14 and
+    // an unparsable OS get today's body: the admin's override or MIN_AGENT / MIN_MOBILE, latest_agent from env.
+    const audience = audienceOf(c.req.header(PLATFORM_HEADER), c.req.header(OS_VERSION_HEADER));
+    const now = c.get("now")();
+    const latest = {
+      macos: audience === "native-macos" || audience === "flutter-macos-14" ? readNativeLatest(config.nativeManifestDir, "macos", now) : null,
+      windows: audience === "native-windows" ? readNativeLatest(config.nativeManifestDir, "windows", now) : null,
+    };
+    return c.json(versionAnswer(c.get("db"), config, audience, latest));
   });
 
   app.route("/v1/auth", authRoutes);
