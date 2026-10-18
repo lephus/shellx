@@ -247,21 +247,18 @@ pub(crate) fn open(
         exited_cv: Condvar::new(),
         ack,
     });
-    if !early_output.is_empty() {
-        pipe_writer.write_all(&early_output)?;
-    }
-
     std::thread::Builder::new().name("shellx-bridge-demux".into()).spawn({
         let shared = shared.clone();
         let mut stream = stream;
         move || {
-            loop {
+            // Output from the handshake goes first, and from this thread: the
+            // mirror's reader starts only after `open` returns, and the pipe
+            // holds a few KB, so writing it in `open` could block forever.
+            let mut alive = pipe_writer.write_all(&early_output).is_ok();
+            drop(early_output);
+            while alive {
                 match read_frame(&mut stream) {
-                    Ok((OUTPUT, payload)) => {
-                        if pipe_writer.write_all(&payload).is_err() {
-                            break;
-                        }
-                    }
+                    Ok((OUTPUT, payload)) => alive = pipe_writer.write_all(&payload).is_ok(),
                     Ok((SIZE, payload)) => {
                         let Some((cols, rows)) = parse_size(&payload) else { continue };
                         *shared.host_size.lock().unwrap() = Some((cols, rows));
@@ -271,7 +268,7 @@ pub(crate) fn open(
                             None => sink.missed = Some((cols, rows)),
                         }
                     }
-                    Ok((EXIT, _)) | Err(_) => break,
+                    Ok((EXIT, _)) | Err(_) => alive = false,
                     Ok(_) => {}
                 }
             }
@@ -593,6 +590,41 @@ mod tests {
         let reader = spawned.master.try_clone_reader().unwrap();
         assert_eq!(read_exactly(reader, 6), "Việt".as_bytes());
         let mut child = spawned.child;
+        child.kill().unwrap();
+        app.join().unwrap();
+    }
+
+    /// A screen snapshot far larger than the in-process pipe's buffer can
+    /// arrive before the size report; `open` must still return, and every
+    /// byte must reach the reader in order, before any later output.
+    #[test]
+    fn large_output_before_size_does_not_block_open() {
+        const EARLY: usize = 96 * 1024;
+        let dir = SocketDir::new("early-big");
+        let listener = UnixListener::bind(dir.socket()).unwrap();
+        let app = std::thread::spawn(move || {
+            let (mut conn, _) = listener.accept().unwrap();
+            let (kind, _) = read_frame(&mut conn).unwrap();
+            assert_eq!(kind, HELLO);
+            conn.write_all(&frame(ACK, br#"{"surface_id":"x","mode":"attach"}"#)).unwrap();
+            let early: Vec<u8> = (0..EARLY).map(|i| b'a' + (i % 26) as u8).collect();
+            for chunk in early.chunks(4096) {
+                conn.write_all(&frame(OUTPUT, chunk)).unwrap();
+            }
+            conn.write_all(&size_frame(80, 24)).unwrap();
+            conn.write_all(&frame(OUTPUT, b"<after>")).unwrap();
+            while read_frame(&mut conn).is_ok() {}
+        });
+        let socket = dir.socket();
+        let (reader, mut child) = within("open with large early output", move || {
+            let (spawned, handle) = open(&VirtualPtySpec { socket }, SIZE_80X24, None).unwrap();
+            assert_eq!(handle.initial_size(), Some((80, 24)));
+            (spawned.master.try_clone_reader().unwrap(), spawned.child)
+        });
+        let got = read_exactly(reader, EARLY + 7);
+        let expected: Vec<u8> = (0..EARLY).map(|i| b'a' + (i % 26) as u8).collect();
+        assert!(got[..EARLY] == expected[..], "early output reordered or corrupted");
+        assert_eq!(&got[EARLY..], b"<after>");
         child.kill().unwrap();
         app.join().unwrap();
     }
