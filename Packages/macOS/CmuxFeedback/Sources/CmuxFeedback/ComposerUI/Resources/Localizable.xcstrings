@@ -1756,6 +1756,201 @@
           }
         }
       }
+    },
+    "shellx.feedback.successBody": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can also reach us at %@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ でもお問い合わせいただけます。"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ви також можете написати нам на %@."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@(으)로도 연락하실 수 있습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sie können uns auch unter %@ erreichen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vous pouvez également nous écrire à %@."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يمكنك أيضًا التواصل معنا عبر %@."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "También puedes escribirnos a %@."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你也可以透過 %@ 聯絡我們。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你也可以通过 %@ 联系我们。"
+          }
+        }
+      }
+    },
+    "shellx.feedback.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A human will read this! You can also reach us at %@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "担当者が必ず読みます！%@ でもお問い合わせいただけます。"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Це прочитає людина! Ви також можете написати нам на %@."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "사람이 직접 읽습니다! %@(으)로도 연락하실 수 있습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das liest ein Mensch! Sie können uns auch unter %@ erreichen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un humain lira ce message ! Vous pouvez également nous écrire à %@."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "سيقرأ شخص حقيقي هذه الرسالة! يمكنك أيضًا التواصل معنا عبر %@."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¡Una persona leerá esto! También puedes escribirnos a %@."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "會有真人閱讀！你也可以透過 %@ 聯絡我們。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会有真人阅读！你也可以通过 %@ 联系我们。"
+          }
+        }
+      }
+    },
+    "shellx.feedback.endpointError": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feedback is unavailable right now. Email %@ instead."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在フィードバックを送信できません。代わりに %@ までメールしてください。"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Відгуки зараз недоступні. Напишіть на %@."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "현재 피드백을 사용할 수 없습니다. 대신 %@(으)로 이메일을 보내주세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feedback ist zurzeit nicht verfügbar. Senden Sie stattdessen eine E-Mail an %@."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les retours ne sont pas disponibles pour le moment. Envoyez plutôt un e-mail à %@."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الملاحظات غير متوفرة الآن. يرجى مراسلة %@ عبر البريد الإلكتروني بدلاً من ذلك."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los comentarios no están disponibles en este momento. Envía un correo a %@ en su lugar."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目前無法使用意見反應功能。請改為傳送電子郵件至 %@。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目前无法使用反馈功能。请改为发送电子邮件至 %@。"
+          }
+        }
+      }
     }
   }
 }

@@ -10276,9 +10276,7 @@ struct ContentView: View {
     }
 
     private func presentFeedbackComposer() {
-        DispatchQueue.main.async {
-            isFeedbackComposerPresented = true
-        }
+        FeedbackComposerBridge.openMailDraft()
     }
 
     static func shouldHandleCommandPaletteRequest(

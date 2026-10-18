@@ -21,12 +21,18 @@ public struct FeedbackComposerBridge {
 
     private var settings: FeedbackComposerSettings { client.settings }
 
-    /// Requests the feedback composer be presented, targeting `window` (defaults
-    /// to the key/main window). `@MainActor` because it reads `NSApp` and posts a
-    /// window-scoped notification.
+    /// Starts feedback. ShellX sends no feedback over HTTP, so this opens a
+    /// mail draft to ShellX (``FeedbackComposerSettings/submissionURL``) instead
+    /// of presenting the upload composer; `window` is kept for API stability.
     @MainActor
     public func openComposer(in window: NSWindow? = NSApp.keyWindow ?? NSApp.mainWindow) {
-        NotificationCenter.default.post(name: .feedbackComposerRequested, object: window)
+        Self.openMailDraft()
+    }
+
+    /// Opens a mail draft addressed to ShellX in the user's mail app.
+    @MainActor
+    public static func openMailDraft() {
+        NSWorkspace.shared.open(FeedbackComposerSettings.submissionURL)
     }
 
     /// Validates and submits feedback, persisting the email on success. Returns
@@ -68,7 +74,7 @@ public struct FeedbackComposerBridge {
                 attachments: attachments
             )
         } catch {
-            throw FeedbackComposerBridgeError.submissionFailed(Self.userFacingMessage(for: error))
+            throw FeedbackComposerBridgeError.submissionFailed(Self.userFacingMessage(for: error, contactEmail: settings.foundersEmail))
         }
 
         userDefaults.set(trimmedEmail, forKey: settings.storedEmailKey)
@@ -82,14 +88,14 @@ public struct FeedbackComposerBridge {
         return NSPredicate(format: "SELF MATCHES %@", pattern).evaluate(with: email)
     }
 
-    private static func userFacingMessage(for error: any Error) -> String {
+    private static func userFacingMessage(for error: any Error, contactEmail: String) -> String {
         guard let submissionError = error as? FeedbackComposerSubmissionError else {
             return "Couldn't send feedback. Please try again."
         }
 
         switch submissionError {
         case .invalidEndpoint:
-            return "Feedback is unavailable right now. Email founders@cmux.com instead."
+            return "Feedback is unavailable right now. Email \(contactEmail) instead."
         case .invalidResponse:
             return "Couldn't send feedback. Please try again."
         case .attachmentReadFailed:
@@ -108,7 +114,7 @@ public struct FeedbackComposerBridge {
             case 429:
                 return "Too many feedback attempts. Please try again later."
             case 500...599:
-                return "Feedback is unavailable right now. Email founders@cmux.com instead."
+                return "Feedback is unavailable right now. Email \(contactEmail) instead."
             default:
                 return "Couldn't send feedback. Please try again."
             }

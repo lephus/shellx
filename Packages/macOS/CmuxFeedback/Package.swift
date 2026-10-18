@@ -16,12 +16,14 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../CmuxFoundation"),
+        .package(path: "../../Shared/ShellXBrand"),
     ],
     targets: [
         .target(
             name: "CmuxFeedback",
             dependencies: [
                 "CmuxFoundation",
+                .product(name: "ShellXBrand", package: "ShellXBrand"),
             ],
             resources: [
                 // Folded from CmuxFeedbackUI: the composer's localized strings.
