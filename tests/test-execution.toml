@@ -1800,5 +1800,13 @@ path = "tests/test_shellx_entitlements.py"
 lane = "linux-guard"
 
 [[test]]
+path = "tests/test_shellx_guard.py"
+lane = "linux-guard"
+
+[[test]]
+path = "tests/test_shellx_identity.py"
+lane = "linux-guard"
+
+[[test]]
 path = "tests/test_shellx_perf_harness.py"
 lane = "linux-guard"
