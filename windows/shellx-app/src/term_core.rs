@@ -9,6 +9,7 @@ use anyhow::{Context as _, Result};
 use ghostty_vt::{Callbacks, KeyEncoder, RenderFrame, RenderState, Rgb, Terminal};
 use shellx_model::palette::{ANSI, Rgba, TERM_BG, TERM_CURSOR, TERM_FG};
 use shellx_model::paste::encode_paste;
+use shellx_model::selection::Viewport;
 
 pub const SCROLLBACK_BYTES: usize = 10 * 1024 * 1024;
 
@@ -172,11 +173,15 @@ impl TermCore {
         self.terminal.selection_text(start, end)
     }
 
-    /// Row offset of the viewport within scrollback + screen. Selections
-    /// live in viewport rows, so a change of this moves them (new output
-    /// scrolling the screen, or the mouse wheel).
-    pub fn viewport_offset(&self) -> Option<u64> {
-        self.terminal.scrollbar().map(|s| s.offset)
+    /// Scrollbar geometry: the viewport within scrollback + screen.
+    /// Selections live in viewport rows, so a change of the offset moves
+    /// them (new output scrolling the screen, or the mouse wheel).
+    pub fn viewport(&self) -> Option<Viewport> {
+        self.terminal.scrollbar().map(|s| Viewport {
+            total: s.total,
+            offset: s.offset,
+            len: s.len,
+        })
     }
 
     pub fn scroll_to_bottom(&mut self) {
@@ -284,22 +289,47 @@ mod tests {
         let two = t.selection_text((2, 0), (4, 1)).unwrap();
         assert_eq!(shellx_model::selection::to_crlf(&two), "漢字c\r\ntiếng");
         assert_eq!(t.cursor_position(), Some((10, 1)));
-        assert_eq!(t.viewport_offset(), Some(0));
+        assert_eq!(t.viewport().map(|v| v.offset), Some(0));
     }
 
     #[test]
     fn viewport_offset_follows_output_and_wheel() {
+        let offset = |t: &TermCore| t.viewport().unwrap().offset;
         let (mut t, _) = core();
         t.feed(b"top\r\n");
-        let before = t.viewport_offset().unwrap();
+        let before = offset(&t);
         t.feed("x\r\n".repeat(30).as_bytes());
-        let after = t.viewport_offset().unwrap();
+        let after = offset(&t);
         // 30 new lines on a 24-row screen: the content moved up by `after - before`.
         assert!(after > before, "{before} -> {after}");
         t.scroll_lines(-3);
-        assert_eq!(t.viewport_offset(), Some(after - 3));
+        assert_eq!(offset(&t), after - 3);
         t.scroll_to_bottom();
-        assert_eq!(t.viewport_offset(), Some(after));
+        assert_eq!(offset(&t), after);
+        assert_eq!(t.viewport().unwrap().len, 24);
+    }
+
+    #[test]
+    fn ime_cell_is_the_live_cursor_while_scrolled_back() {
+        use shellx_model::selection::{Cell, ime_cell};
+        let (mut t, _) = core();
+        t.feed("x\r\n".repeat(40).as_bytes());
+        // Cursor mid-screen (row 10, col 4), so it stays visible scrolled back.
+        t.feed(b"\x1b[11;5H");
+        let live = t.cursor_position();
+        assert_eq!(live, Some((4, 10)));
+        let at_bottom = t.frame().unwrap().cursor.map(|c| (c.x, c.y));
+        assert_eq!(at_bottom, live);
+        t.scroll_lines(-5);
+        // The viewport cursor moved 5 rows down; the IME cell must not.
+        let viewport = t.frame().unwrap().cursor.map(|c| (c.x, c.y));
+        assert_eq!(viewport, live.map(|(x, y)| (x, y + 5)));
+        assert_eq!(t.cursor_position(), live);
+        let (x, y) = live.unwrap();
+        assert_eq!(
+            ime_cell(t.cursor_position(), 24),
+            Some(Cell { row: y, col: x })
+        );
     }
 
     #[test]

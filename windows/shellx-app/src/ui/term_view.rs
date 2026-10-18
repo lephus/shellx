@@ -16,8 +16,8 @@
 //!   rows: they move with the content when output or the wheel scrolls the
 //!   viewport and are dropped once a selected row leaves it, on resize, and
 //!   on any typed input or paste. (When the scrollback is full, output
-//!   scrolls without moving the offset; the selection then stays on the
-//!   same screen rows until the next input.) No mouse reporting to apps in
+//!   scrolls without moving the offset; a newline arriving at the live
+//!   bottom then clears the selection.) No mouse reporting to apps in
 //!   the MVP, so a plain drag selects even when an app enabled mouse
 //!   tracking (Shift+drag does too, as in Windows Terminal).
 //! - Copy (Ctrl+Shift+C, or Ctrl+C while a selection exists) puts the
@@ -50,8 +50,8 @@ use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::Rect;
 use shellx_model::palette::{TERM_BG, TERM_CURSOR, TERM_FG, TERM_SELECTION};
 use shellx_model::selection::{
-    Cell, Selection, cell_at, drag_selection, ime_index_for_point, ime_rect, line_span,
-    selected_text, to_crlf, windows_ime_anchor, word_at,
+    Cell, Follow, Selection, cell_at, drag_selection, follow_viewport, ime_cell,
+    ime_index_for_point, ime_rect, line_span, selected_text, to_crlf, windows_ime_anchor, word_at,
 };
 
 use super::theme;
@@ -118,8 +118,9 @@ struct Grid {
     cell_h: Pixels,
     cols: u16,
     rows: u16,
-    /// Where the IME preedit starts: the cursor cell, also while the cursor
-    /// is hidden or scrolled out of view (composing scrolls to the bottom).
+    /// Where the IME preedit starts: the LIVE cursor cell (also while the
+    /// cursor is hidden or the view is scrolled back; composing scrolls to
+    /// the bottom), see `selection::ime_cell`.
     ime_cell: Option<Cell>,
 }
 
@@ -210,7 +211,8 @@ impl TermView {
                             batch.extend_from_slice(&more);
                         }
                         let fed = this.update(cx, |view, cx| {
-                            view.follow_viewport(|session| session.feed(&batch));
+                            let newline = batch.contains(&b'\n');
+                            view.follow_viewport(newline, |session| session.feed(&batch));
                             cx.notify();
                         });
                         if fed.is_err() {
@@ -314,27 +316,30 @@ impl TermView {
     }
 
     /// Runs `f` (feed output, scroll), then moves the selection with the
-    /// viewport content, dropping it once a selected row left the viewport.
-    fn follow_viewport(&mut self, f: impl FnOnce(&mut TermCore)) {
+    /// viewport content (`selection::follow_viewport`): shifted by the
+    /// offset change, dropped once a selected row left the viewport, and
+    /// cleared when output scrolled a full scrollback without moving the
+    /// offset. `output_newline`: what `f` fed contained a newline.
+    fn follow_viewport(&mut self, output_newline: bool, f: impl FnOnce(&mut TermCore)) {
         let Some(session) = self.session.as_mut() else {
             return;
         };
         let tracking = self.selection.is_some() || self.drag.is_some();
-        let before = if tracking {
-            session.viewport_offset()
-        } else {
-            None
-        };
+        let before = if tracking { session.viewport() } else { None };
         f(session);
-        let (Some(before), Some(after), Some(grid)) =
-            (before, session.viewport_offset(), self.grid)
+        let (Some(before), Some(after), Some(grid)) = (before, session.viewport(), self.grid)
         else {
             return;
         };
-        let delta = before as i64 - after as i64;
-        if delta == 0 {
-            return;
-        }
+        let delta = match follow_viewport(before, after, output_newline) {
+            Follow::Keep => return,
+            Follow::Clear => {
+                self.selection = None;
+                self.drag = None;
+                return;
+            }
+            Follow::Shift(delta) => delta,
+        };
         let shift = |c: Cell| {
             Selection::new(c)
                 .shifted(delta, grid.rows)
@@ -489,7 +494,7 @@ impl TermView {
         let delta = event.delta.pixel_delta(self.line_height);
         let lines = (f32::from(delta.y) / f32::from(self.line_height)).round() as isize;
         if lines != 0 && self.session.is_some() {
-            self.follow_viewport(|session| session.scroll_lines(-lines));
+            self.follow_viewport(false, |session| session.scroll_lines(-lines));
             cx.notify();
         }
     }
@@ -809,13 +814,10 @@ impl Element for TermElement {
                 }
                 let title = session.title();
                 let frame = session.frame().ok();
-                let ime_cell = frame.as_ref().and_then(|f| {
-                    f.cursor
-                        .map(|c| (c.x, c.y))
-                        .or_else(|| session.cursor_position())
-                        .filter(|&(_, y)| y < f.size.1)
-                        .map(|(col, row)| Cell { row, col })
-                });
+                // The live cursor, not the viewport one: see `ime_cell`.
+                let ime_cell = frame
+                    .as_ref()
+                    .and_then(|f| ime_cell(session.cursor_position(), f.size.1));
                 (
                     frame,
                     ime_cell,

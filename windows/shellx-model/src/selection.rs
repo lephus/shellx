@@ -122,6 +122,57 @@ pub fn selected_text(sel: &Selection, lines: &[String], cols: u16) -> String {
         .join("\r\n")
 }
 
+/// Scrollbar geometry of a terminal viewport, in rows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Viewport {
+    /// Scrollback + screen.
+    pub total: u64,
+    /// Row of the viewport top within `total`.
+    pub offset: u64,
+    /// Viewport height.
+    pub len: u64,
+}
+
+/// What a viewport-row selection does after output or a scroll.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Follow {
+    Keep,
+    /// Move the selection down by this many rows (negative: up).
+    Shift(i64),
+    Clear,
+}
+
+/// The offset moved: shift by it. It did not move although output with a
+/// newline arrived at the live bottom of a full scrollback (total pinned:
+/// the oldest rows are pruned, so the content scrolled without the offset
+/// changing): the cells under the selection changed, so clear it. A newline
+/// that only moved the cursor down while scrollback exists clears too; that
+/// over-clearing is accepted.
+pub fn follow_viewport(before: Viewport, after: Viewport, output_newline: bool) -> Follow {
+    let delta = before.offset as i64 - after.offset as i64;
+    if delta != 0 {
+        return Follow::Shift(delta);
+    }
+    let at_bottom = after.offset + after.len >= after.total;
+    let has_scrollback = after.total > after.len;
+    if output_newline && at_bottom && has_scrollback && after.total == before.total {
+        Follow::Clear
+    } else {
+        Follow::Keep
+    }
+}
+
+/// Where the IME preedit starts: the LIVE cursor (active screen
+/// coordinates, also while hidden), never the viewport cursor. Composing
+/// scrolls to the bottom, and GPUI reads the candidate position once, at
+/// WM_IME_STARTCOMPOSITION, before that scroll; while scrolled back the
+/// viewport cursor would put the candidate window rows too low.
+pub fn ime_cell(live_cursor: Option<(u16, u16)>, rows: u16) -> Option<Cell> {
+    live_cursor
+        .filter(|&(_, row)| row < rows)
+        .map(|(col, row)| Cell { row, col })
+}
+
 /// A drag that started on the span `origin` (one cell for a click, the word
 /// for a double-click, the line for a triple-click) and is now over the span
 /// `over` (same granularity). The origin span always stays selected; the
@@ -362,6 +413,51 @@ mod tests {
         assert_eq!(s.shifted(-6, 24), None);
         assert_eq!(s.shifted(17, 24), None);
         assert_eq!(s.shifted(16, 24).unwrap().head(), c(23, 4));
+    }
+
+    #[test]
+    fn follow_viewport_shifts_keeps_or_clears() {
+        let v = |total, offset| Viewport {
+            total,
+            offset,
+            len: 24,
+        };
+        // Output scrolled the live screen by 3 rows: content moved up.
+        assert_eq!(
+            follow_viewport(v(100, 76), v(103, 79), true),
+            Follow::Shift(-3)
+        );
+        // Wheel up 5 rows: content moved down.
+        assert_eq!(
+            follow_viewport(v(100, 76), v(100, 71), false),
+            Follow::Shift(5)
+        );
+        // Full scrollback at the bottom: total and offset pinned, newline.
+        assert_eq!(
+            follow_viewport(v(5000, 4976), v(5000, 4976), true),
+            Follow::Clear
+        );
+        // Same, but output without a newline (prompt redraw): keep.
+        assert_eq!(
+            follow_viewport(v(5000, 4976), v(5000, 4976), false),
+            Follow::Keep
+        );
+        // Scrolled back into history: output does not move the view.
+        assert_eq!(
+            follow_viewport(v(5000, 100), v(5000, 100), true),
+            Follow::Keep
+        );
+        // No scrollback yet (screen not full): a newline only moves the cursor.
+        assert_eq!(follow_viewport(v(24, 0), v(24, 0), true), Follow::Keep);
+    }
+
+    #[test]
+    fn ime_cell_uses_the_live_cursor() {
+        // Scrolled back 5 rows: the viewport shows the cursor 5 rows lower
+        // (row 15), but composing scrolls to the bottom, where it is row 10.
+        assert_eq!(ime_cell(Some((7, 10)), 24), Some(c(10, 7)));
+        assert_eq!(ime_cell(Some((7, 24)), 24), None);
+        assert_eq!(ime_cell(None, 24), None);
     }
 
     #[test]
