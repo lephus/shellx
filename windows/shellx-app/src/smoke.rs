@@ -3,6 +3,9 @@
 //! path as the window (committed text + libghostty-vt-encoded Enter), waits
 //! for the computed result in the libghostty-vt grid, resizes, and exits.
 //! Exit code 0 = pass. No window is opened.
+//!
+//! `--smoke-ui-assets` (also run first by `--smoke`): every icon the window
+//! loads is embedded and is an SVG, and every shell string exists in vi + en.
 
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -10,9 +13,12 @@ use std::time::{Duration, Instant};
 use anyhow::{Result, bail, ensure};
 
 use crate::fonts;
+use crate::icons::{self, Icon};
 use crate::local_pty::{LocalPty, default_shell, spawn_reader};
+use crate::shell_info::SHELL_STRINGS;
 use crate::term_core::{PtyLink, TermCore, rgb};
 use shellx_model::palette::TERM_BG;
+use shellx_model::strings::{Lang, t};
 
 const TIMEOUT: Duration = Duration::from_secs(45);
 
@@ -69,7 +75,34 @@ fn contains(lines: &[String], needle: &str) -> bool {
     lines.iter().any(|line| line.contains(needle))
 }
 
+/// Cross-platform, no GPUI: the icon table and the shell strings.
+pub fn ui_assets() -> Result<()> {
+    for icon in Icon::ALL {
+        let Some(bytes) = icons::by_path(icon.path()) else {
+            bail!("{icon:?}: {} is not embedded", icon.path());
+        };
+        ensure!(
+            icons::looks_like_svg(bytes),
+            "{icon:?}: {} is not an SVG with a viewBox",
+            icon.path()
+        );
+    }
+    for lang in [Lang::Vi, Lang::En] {
+        for s in SHELL_STRINGS {
+            ensure!(!t(lang, *s).trim().is_empty(), "{s:?} is empty in {lang:?}");
+        }
+    }
+    println!(
+        "smoke-ui-assets: {} icons, {} strings x 2 languages",
+        Icon::ALL.len(),
+        SHELL_STRINGS.len()
+    );
+    println!("smoke-ui-assets: PASS");
+    Ok(())
+}
+
 pub fn run() -> Result<()> {
+    ui_assets()?;
     let started = Instant::now();
     let (program, args) = default_shell();
     // `-NoProfile` keeps the runner's profile out of the result.

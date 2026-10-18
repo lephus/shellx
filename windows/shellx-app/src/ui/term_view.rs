@@ -1,23 +1,24 @@
-//! The GPUI window: one terminal grid, cursor, inline IME preedit.
+//! The terminal pane: one libghostty-vt grid, cursor, inline IME preedit
+//! (moved from the spike's app.rs; colors now come from ui/theme.rs).
 
 use std::ops::Range;
 use std::time::Duration;
 
 use ghostty_vt::{CellWidth, CursorShape, Rgb};
 use gpui::{
-    App, Application, BorderStyle, Bounds, Context, Element, ElementId, ElementInputHandler,
-    Entity, EntityInputHandler, FocusHandle, Focusable, Font, FontFallbacks, GlobalElementId, Hsla,
+    App, BorderStyle, Bounds, Context, Element, ElementId, ElementInputHandler, Entity,
+    EntityInputHandler, FocusHandle, Focusable, Font, FontFallbacks, GlobalElementId, Hsla,
     InspectorElementId, IntoElement, KeyDownEvent, LayoutId, MouseButton, MouseDownEvent,
     PaintQuad, Pixels, Point, Render, ScrollWheelEvent, ShapedLine, SharedString,
-    StrikethroughStyle, Style, TextRun, TitlebarOptions, UTF16Selection, UnderlineStyle, Window,
-    WindowBounds, WindowOptions, div, fill, font, outline, point, prelude::*, px, relative, size,
+    StrikethroughStyle, Style, TextRun, UTF16Selection, UnderlineStyle, Window, div, fill, font,
+    outline, point, prelude::*, px, relative, size,
 };
 
-use std::borrow::Cow;
 use std::sync::Arc;
 
 use shellx_model::palette::{TERM_BG, TERM_CURSOR, TERM_FG};
 
+use super::theme;
 use crate::fonts;
 use crate::local_pty::{LocalPty, default_shell, spawn_reader};
 use crate::term_core::{PtyLink, TermCore, rgb};
@@ -25,45 +26,7 @@ use crate::term_core::{PtyLink, TermCore, rgb};
 const FONT_SIZE: f32 = 14.0;
 const LINE_HEIGHT: f32 = 1.3;
 const PADDING: f32 = 6.0;
-const BASE_TITLE: &str = "ShellX";
-
-pub fn run() {
-    Application::new().run(|cx: &mut App| {
-        if let Err(error) = cx
-            .text_system()
-            .add_fonts(fonts::embedded().into_iter().map(Cow::Borrowed).collect())
-        {
-            eprintln!("failed to register the embedded fonts: {error:#}");
-        }
-        let bounds = Bounds::centered(None, size(px(960.0), px(600.0)), cx);
-        let window = cx
-            .open_window(
-                WindowOptions {
-                    window_bounds: Some(WindowBounds::Windowed(bounds)),
-                    titlebar: Some(TitlebarOptions {
-                        title: Some(BASE_TITLE.into()),
-                        ..Default::default()
-                    }),
-                    app_id: Some("pro.shellx.desktop".into()),
-                    ..Default::default()
-                },
-                |window, cx| cx.new(|cx| TermView::new(window, cx)),
-            )
-            .expect("failed to open the terminal window");
-        window
-            .update(cx, |view, window, cx| {
-                window.focus(&view.focus_handle);
-                cx.activate(true);
-            })
-            .ok();
-        cx.on_window_closed(|cx| {
-            if cx.windows().is_empty() {
-                cx.quit();
-            }
-        })
-        .detach();
-    });
-}
+pub(super) const BASE_TITLE: &str = "ShellX";
 
 fn hsla(c: Rgb) -> Hsla {
     gpui::rgb((u32::from(c.r) << 16) | (u32::from(c.g) << 8) | u32::from(c.b)).into()
@@ -101,7 +64,7 @@ fn terminal_font() -> Font {
     f
 }
 
-struct TermView {
+pub(super) struct TermView {
     focus_handle: FocusHandle,
     font: Font,
     session: Option<TermCore>,
@@ -119,7 +82,7 @@ struct TermView {
 }
 
 impl TermView {
-    fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub(super) fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut view = TermView {
             focus_handle: cx.focus_handle(),
             font: terminal_font(),
@@ -184,6 +147,16 @@ impl TermView {
             Err(error) => view.error = Some(format!("{error:#}")),
         }
         view
+    }
+
+    /// True while the IME holds a composition (preedit) for this pane.
+    pub(super) fn composing(&self) -> bool {
+        self.marked.is_some()
+    }
+
+    /// The terminal's own title (OSC 0/2), if the shell set one.
+    pub(super) fn terminal_title(&self) -> Option<String> {
+        self.session.as_ref().and_then(TermCore::title)
     }
 
     fn on_key_down(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
@@ -270,8 +243,8 @@ impl Render for TermView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let root = div()
             .size_full()
-            .bg(hsla(rgb(TERM_BG)))
-            .text_color(hsla(rgb(TERM_FG)))
+            .bg(theme::hsla(TERM_BG))
+            .text_color(theme::hsla(TERM_FG))
             .p(px(PADDING))
             .track_focus(&self.focus_handle)
             .key_context("Terminal")
