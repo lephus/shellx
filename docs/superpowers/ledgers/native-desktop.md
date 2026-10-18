@@ -143,6 +143,22 @@ Both ends are WebSocket clients, so their frames are masked: a raw grep alone gi
 
 Recorded 2026-10-19. Workflow `.github/workflows/shellx-windows-spike.yml` on fork branch `shellx/w0-spikes`. First run `39142103019`: `-gnu` green, `-msvc` test compile failed (`KeyInput { key: u32::MAX }`, bindgen makes `GhosttyKey` `i32` under MSVC). Fix `03e475b590` (`u32::MAX as _`). Run `39146962148`: **both `x86_64-pc-windows-msvc` and `-gnu` green**: libghostty-vt build (Zig 0.16.0), `cmux-tui-core` platform tests, `cmux-tui.exe`, long-path tests, process-exit / ConPTY resize smokes, remote-probe check. Artifacts `cmux-tui-x86_64-pc-windows-msvc` (9.88 MB), `cmux-tui-x86_64-pc-windows-gnu` (9.91 MB). §13 fallback (`alacritty_terminal`) not needed. Note: this proves the core builds and ConPTY works; `cmux-remote` on Windows is still uncompiled (see D-W0-1).
 
+### Mac perf baseline (W0 Task 3 Step 5) — recorded, keystroke pending
+
+Recorded 2026-10-19. App `cmux DEV perf-base` (Release, `reload.sh --tag perf-base`, fork `122037ee4d`), harness fork main `36d7697869`, 5 runs, Mac14,7 (M2), macOS 26.5.2, AC power, no `--purge`. File: fork `scripts/shellx/perf/baselines/cmux-122037ee4d.json`.
+
+| Metric (median of 5) | Value | Per-run |
+| --- | --- | --- |
+| cold_start_ms | 2104 | 5488, 2104, 1881, 2661, 1951 |
+| cat_100mb_ms | 392 | 571, 371, 392, 394, 381 |
+| idle_rss_mb_4panes | 341.6 | 341.6, 325.0, 343.2, 187.9, 342.5 |
+| idle_cpu_pct | 0.61 | 0.56, 0.88, 0.53, 1.12, 0.61 |
+| hitch_ms_per_s | 22.8 | 13.3, 0, 22.8, 76.7, 36.7 |
+| max_hitch_ms | 83.3 | 66.7, 0, 83.3, 100, 83.3 |
+| keystroke_ms | — | Typometer by the user |
+
+Notes: hitches vary 0–77 ms/s between runs, so a 10 % gate on them is noise; W1 Task 13 should compare hitches with more runs (`hitches --runs 5`) or treat them as advisory. xctrace was flaky (hang after `--time-limit`, exit -5 while saving) and each 30 s all-processes recording leaves ~5 GB of `instruments*.ktrace` scratch in `getconf DARWIN_USER_TEMP_DIR`; it filled the disk twice this session (27 GB of scratch removed by hand). The harness now SIGINTs a hung recorder, retries 3 times, deletes the trace and its scratch, and refuses to record under 12 GB free. Fork `main` is 8 local commits ahead of `origin/main` (W0 perf harness, SIL fix, icon merge, harness fixes), not pushed.
+
 ### GPUI terminal spike CI (W0 Task 7 Step 1–2) — PASS
 
 Recorded 2026-10-19. Spike `spikes/windows-term` (own Cargo workspace, GPUI window + `cmux-tui-core` session) on fork branch `shellx/w0-spikes` `ada66c3042`, job `term-spike` in `shellx-windows-spike.yml`. Run `39149103261`: all three jobs green (`windows` msvc 16 min, gnu 28 min, `term spike` msvc 8.6 min). Artifact `shellx-term-spike` (`shellx-term-spike.exe`). Still open: W0 Task 7 Step 3 hands-on checks on the user's Windows 11 PC (Telex/Unikey/EVKey, 150/200 % scaling, Typometer vs Windows Terminal, Narrator) = sprint gate G1. CI note: `actions/upload-artifact` and `mlugg/setup-zig` pins still target Node 20 (forced to Node 24, warning only).
