@@ -150,6 +150,12 @@ pub fn run_account_action(
     }
 }
 
+/// `version.check` (after `config.set`, which `ConfiguredCore` sends first).
+/// Any error is `Unknown`: the app keeps working offline.
+pub fn run_version_check(core: &dyn CoreCall) -> shellx_model::update::UpdateStatus {
+    shellx_model::update::from_result(shellx_model::core_api::version_check(core))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -374,5 +380,26 @@ mod tests {
         assert_eq!(ran, ["CallList"]);
         assert_eq!(flow.state(), &AccountState::LoggedOut);
         api.stop();
+    }
+
+    #[test]
+    fn version_check_maps_status_and_errors() {
+        use shellx_model::core_api::FakeCore;
+        use shellx_model::update::UpdateStatus;
+        let f = FakeCore::new();
+        f.on(
+            "version.check",
+            Ok(json!({"status":"update_required","min_version":"2.0.5","download_url":"https://d"})),
+        );
+        assert_eq!(
+            run_version_check(&f),
+            UpdateStatus::Required {
+                min: "2.0.5".into(),
+                url: Some("https://d".into())
+            }
+        );
+        let down = FakeCore::new();
+        down.on("version.check", Err(CoreErr::new("network", "down")));
+        assert_eq!(run_version_check(&down), UpdateStatus::Unknown);
     }
 }

@@ -43,6 +43,28 @@ pub fn from_result(r: Result<VersionInfo, CoreErr>) -> UpdateStatus {
     r.map_or(UpdateStatus::Unknown, |i| from_version_info(&i))
 }
 
+/// `version.check` runs at startup and then every 6 hours.
+pub const CHECK_INTERVAL_SECS: u64 = 6 * 60 * 60;
+
+/// Only `https://` download links are ever opened.
+pub fn is_https(url: &str) -> bool {
+    url.len() > "https://".len()
+        && url
+            .get(.."https://".len())
+            .is_some_and(|p| p.eq_ignore_ascii_case("https://"))
+        && !url.chars().any(|c| c.is_control() || c.is_whitespace())
+}
+
+/// The URL the Download button opens: the status' link when it is https.
+pub fn download_url(status: &UpdateStatus) -> Option<&str> {
+    match status {
+        UpdateStatus::Available { url, .. } | UpdateStatus::Required { url, .. } => {
+            url.as_deref().filter(|u| is_https(u))
+        }
+        UpdateStatus::UpToDate | UpdateStatus::Unknown => None,
+    }
+}
+
 pub fn banner(status: &UpdateStatus, lang: Lang) -> Option<String> {
     match status {
         UpdateStatus::Available { version, .. } => Some(update_available(lang, version)),
@@ -122,6 +144,37 @@ mod tests {
             from_result(Ok(info("ok", None, None, None))),
             UpdateStatus::UpToDate
         );
+    }
+
+    #[test]
+    fn https_only() {
+        assert!(is_https("https://shellx.pro/download"));
+        assert!(is_https("HTTPS://shellx.pro"));
+        assert!(!is_https("http://shellx.pro"));
+        assert!(!is_https("https://"));
+        assert!(!is_https("file:///C:/x.exe"));
+        assert!(!is_https("javascript:alert(1)"));
+        assert!(!is_https(" https://x"));
+        assert!(!is_https("https://x y"));
+        assert!(!is_https("https://x\n"));
+        assert!(!is_https(""));
+        assert!(!is_https("ttps://é"));
+    }
+
+    #[test]
+    fn download_url_needs_https() {
+        let ok = UpdateStatus::Available {
+            version: "2.0.1".into(),
+            url: Some("https://d".into()),
+        };
+        assert_eq!(download_url(&ok), Some("https://d"));
+        let bad = UpdateStatus::Required {
+            min: "2.0.1".into(),
+            url: Some("http://d".into()),
+        };
+        assert_eq!(download_url(&bad), None);
+        assert_eq!(download_url(&UpdateStatus::UpToDate), None);
+        assert_eq!(CHECK_INTERVAL_SECS, 21_600);
     }
 
     #[test]

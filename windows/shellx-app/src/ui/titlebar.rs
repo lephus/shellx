@@ -30,7 +30,7 @@ pub fn render(lang: Lang, window: &Window, cx: &mut Context<RootView>) -> Div {
     // Notifications are display-only in the MVP (no badge, no panel).
     let bell = icon_button("titlebar-bell", Icon::BellRing);
     let settings = icon_button("titlebar-settings", Icon::Settings)
-        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_settings(cx)));
+        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_settings(window, cx)));
 
     div()
         .flex()

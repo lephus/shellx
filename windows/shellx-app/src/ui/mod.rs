@@ -8,11 +8,13 @@ mod button;
 mod login;
 mod panes;
 mod root;
+mod settings;
 mod sidebar;
 mod term_view;
 mod text_field;
 mod theme;
 mod titlebar;
+mod update_banner;
 
 /// Opens the ShellX window and runs the app until it quits.
 pub fn run() {

@@ -74,6 +74,17 @@ pub enum Str {
     InputPaused,
     NoTerminalOnMachine,
     Error,
+    Account,
+    Updates,
+    Language,
+    LanguageHint,
+    LanguageName,
+    CheckUpdate,
+    Checking,
+    SignedIn,
+    Close,
+    FontCredits,
+    CheckFailed,
 }
 
 impl Str {
@@ -128,6 +139,17 @@ impl Str {
         Str::InputPaused,
         Str::NoTerminalOnMachine,
         Str::Error,
+        Str::Account,
+        Str::Updates,
+        Str::Language,
+        Str::LanguageHint,
+        Str::LanguageName,
+        Str::CheckUpdate,
+        Str::Checking,
+        Str::SignedIn,
+        Str::Close,
+        Str::FontCredits,
+        Str::CheckFailed,
     ];
 }
 
@@ -185,6 +207,17 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::InputPaused => "Mất kết nối, tạm ngừng nhập",
             Str::NoTerminalOnMachine => "Máy này chưa có phiên nào",
             Str::Error => "Lỗi",
+            Str::Account => "Tài khoản",
+            Str::Updates => "Cập nhật",
+            Str::Language => "Ngôn ngữ",
+            Str::LanguageHint => "đặt SHELLX_LANG=en để dùng tiếng Anh",
+            Str::LanguageName => "Tiếng Việt",
+            Str::CheckUpdate => "Kiểm tra cập nhật",
+            Str::Checking => "Đang kiểm tra…",
+            Str::SignedIn => "Đã đăng nhập",
+            Str::Close => "Đóng",
+            Str::FontCredits => "JetBrains Mono, Space Grotesk — SIL OFL 1.1",
+            Str::CheckFailed => "Không kiểm tra được cập nhật",
         },
         Lang::En => match key {
             Str::AppName => "ShellX",
@@ -237,6 +270,17 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::InputPaused => "Disconnected, input paused",
             Str::NoTerminalOnMachine => "No sessions on this machine",
             Str::Error => "Error",
+            Str::Account => "Account",
+            Str::Updates => "Updates",
+            Str::Language => "Language",
+            Str::LanguageHint => "set SHELLX_LANG=vi for Vietnamese",
+            Str::LanguageName => "English",
+            Str::CheckUpdate => "Check for updates",
+            Str::Checking => "Checking…",
+            Str::SignedIn => "Signed in",
+            Str::Close => "Close",
+            Str::FontCredits => "JetBrains Mono, Space Grotesk — SIL OFL 1.1",
+            Str::CheckFailed => "Could not check for updates",
         },
     }
 }
@@ -246,6 +290,14 @@ pub fn offline_last_seen(lang: Lang, hh: u8, mm: u8) -> String {
     match lang {
         Lang::Vi => format!("{} · lần cuối {hh:02}:{mm:02}", t(lang, Str::Offline)),
         Lang::En => format!("{} · last seen {hh:02}:{mm:02}", t(lang, Str::Offline)),
+    }
+}
+
+/// "Yêu cầu phiên bản tối thiểu 2.0.1" / "Minimum version 2.0.1" (forced update).
+pub fn minimum_version(lang: Lang, version: &str) -> String {
+    match lang {
+        Lang::Vi => format!("Cần phiên bản {version} trở lên"),
+        Lang::En => format!("Version {version} or newer is required"),
     }
 }
 
@@ -285,7 +337,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 50);
+        assert_eq!(Str::ALL.len(), 61);
     }
 
     #[test]

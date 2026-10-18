@@ -13,8 +13,8 @@
 use std::convert::Infallible;
 
 use gpui::{
-    App, Context, Div, Entity, Focusable, IntoElement, KeyDownEvent, Render, Subscription, Window,
-    div, prelude::*, px, relative, svg,
+    App, Context, Div, Entity, FocusHandle, Focusable, IntoElement, KeyDownEvent, Render,
+    Subscription, Window, div, prelude::*, px, relative, svg,
 };
 use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::{Axis, PaneId};
@@ -22,16 +22,19 @@ use shellx_model::palette::Status;
 use shellx_model::sidebar::{Access, MachineInfo, build_groups};
 use shellx_model::strings::Lang;
 use shellx_model::tabs::{CloseOutcome, PaneTarget, TabId, Tabs};
+use shellx_model::update::{UpdateStatus, download_url};
 
 use super::account::AccountService;
 use super::app::Services;
 use super::assets::Icon;
 use super::login::{LoginPanel, LoginPanelEvent};
 use super::panes::{self, PaneArea, PaneView};
+use super::settings::{SettingsEvent, SettingsPanel};
 use super::sidebar::{self, SessionRow};
 use super::term_view::{TermEvent, TermView};
 use super::theme;
 use super::titlebar;
+use super::update_banner;
 use crate::core_service::MachineFacts;
 use crate::shell_info::{session_title, sidebar_machines, this_machine_id};
 use crate::workspace::{DIVIDER, PaneHost, SESSION_BAR_H};
@@ -45,6 +48,9 @@ pub struct RootView {
     computer_name: Option<String>,
     account: Entity<AccountService>,
     login: Entity<LoginPanel>,
+    settings: Entity<SettingsPanel>,
+    /// Holds the keyboard while the forced-update overlay is up.
+    overlay_focus: FocusHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -55,8 +61,20 @@ impl RootView {
         let core = cx.global::<Services>().core.clone();
         let account = cx.new(|cx| AccountService::new(core, MachineFacts::this_pc(), cx));
         let login = cx.new(|cx| LoginPanel::new(account.clone(), window, cx));
+        let settings = cx.new(|cx| SettingsPanel::new(account.clone(), cx));
         let subscriptions = vec![
-            cx.observe(&account, |_, _, cx| cx.notify()),
+            // A forced update takes the keyboard from the terminals.
+            cx.observe_in(&account, window, |this, _, window, cx| {
+                if this.required(cx).is_some() {
+                    this.focus_terminal(window, cx);
+                }
+                cx.notify();
+            }),
+            cx.subscribe_in(
+                &settings,
+                window,
+                |this, _, _: &SettingsEvent, window, cx| this.after_focus_change(window, cx),
+            ),
             cx.subscribe_in(
                 &login,
                 window,
@@ -73,17 +91,22 @@ impl RootView {
             computer_name,
             account,
             login,
+            settings,
+            overlay_focus: cx.focus_handle(),
             _subscriptions: subscriptions,
         };
         root.reconcile(window, cx);
         root
     }
 
-    /// The account service (sign in/out, machines); Task 11's settings panel
-    /// calls `logout` on it.
-    #[allow(dead_code)]
-    pub fn account(&self) -> &Entity<AccountService> {
-        &self.account
+    /// The forced update, if any: (minimum version, https download link).
+    fn required(&self, cx: &App) -> Option<(String, Option<String>)> {
+        match self.account.read(cx).update_status() {
+            status @ UpdateStatus::Required { min, .. } => {
+                Some((min.clone(), download_url(status).map(str::to_string)))
+            }
+            _ => None,
+        }
     }
 
     /// Sidebar machines: the account's list, this PC first.
@@ -96,6 +119,14 @@ impl RootView {
 
     /// Gives keyboard focus to the active tab's focused pane.
     pub fn focus_terminal(&self, window: &mut Window, cx: &App) {
+        if self.required(cx).is_some() {
+            window.focus(&self.overlay_focus);
+            return;
+        }
+        if self.settings.read(cx).is_open() {
+            window.focus(&self.settings.read(cx).focus_handle(cx));
+            return;
+        }
         if let Some(live) = self.host.get(self.tabs.active().focused) {
             window.focus(&live.view.read(cx).focus_handle(cx));
         }
@@ -152,6 +183,10 @@ impl RootView {
     }
 
     fn run_command(&mut self, command: AppCommand, window: &mut Window, cx: &mut Context<Self>) {
+        // Forced update: terminals keep running, but no command gets through.
+        if self.required(cx).is_some() {
+            return;
+        }
         match command {
             AppCommand::NewTab => self.new_tab(window, cx),
             AppCommand::ClosePane => {
@@ -182,7 +217,7 @@ impl RootView {
                 }
             }
             AppCommand::ToggleSidebar => self.toggle_sidebar(cx),
-            AppCommand::OpenSettings => self.open_settings(cx),
+            AppCommand::OpenSettings => self.open_settings(window, cx),
             // A focused pane handles these itself; this is the fallback when
             // the key reached the root (focus outside the panes).
             AppCommand::Copy | AppCommand::Paste => {
@@ -227,8 +262,17 @@ impl RootView {
     }
 
     /// Title bar Settings button and `AppCommand::OpenSettings` (Ctrl+,).
-    /// No-op hook until Task 11 attaches the settings panel.
-    pub fn open_settings(&mut self, _cx: &mut Context<Self>) {}
+    /// Toggles the settings panel (blocked while a forced update shows).
+    pub fn open_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.required(cx).is_some() {
+            return;
+        }
+        if self.settings.read(cx).is_open() {
+            self.settings.update(cx, |panel, cx| panel.close(cx));
+        } else {
+            self.settings.update(cx, |panel, cx| panel.open(window, cx));
+        }
+    }
 
     /// Window shortcuts that no pane handled (e.g. focus outside the panes).
     /// A focused TermView maps keys itself and stops the ones it uses.
@@ -242,6 +286,10 @@ impl RootView {
             shift: mods.shift,
             win: mods.platform,
         };
+        if self.required(cx).is_some() {
+            cx.stop_propagation();
+            return;
+        }
         let focused = self.focused_view(cx);
         let ctx = KeyCtx {
             has_selection: focused.is_some_and(TermView::has_selection),
@@ -346,6 +394,26 @@ impl Render for RootView {
             None
         };
         let session_bar = self.session_bar(lang, cx);
+        let account = self.account.read(cx);
+        let banner = match account.update_status() {
+            status @ UpdateStatus::Available { version, .. } if account.banner_visible() => {
+                Some(update_banner::banner(
+                    lang,
+                    version,
+                    download_url(status).map(str::to_string),
+                    self.account.clone(),
+                ))
+            }
+            _ => None,
+        };
+        let overlay = self.required(cx).map(|(min, url)| {
+            update_banner::required_overlay(lang, &min, url, &self.overlay_focus)
+        });
+        let settings = self
+            .settings
+            .read(cx)
+            .is_open()
+            .then(|| self.settings.clone());
         let panes = panes::render(
             self.tabs.active(),
             &self.host,
@@ -362,11 +430,13 @@ impl Render for RootView {
             .h_full()
             .overflow_hidden()
             .bg(theme::bg())
+            .children(banner)
             .child(session_bar)
             .child(panes);
 
         div()
             .size_full()
+            .relative()
             .flex()
             .flex_col()
             .bg(theme::bg())
@@ -386,5 +456,7 @@ impl Render for RootView {
                     .children(sidebar)
                     .child(main),
             )
+            .children(settings)
+            .children(overlay)
     }
 }
