@@ -3,6 +3,7 @@
 
 import plistlib
 import re
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -57,6 +58,30 @@ CMUX_ID_LINE_ALLOW = [
     (r"com\.cmuxterm\.app\.cmux\.sidebar\"", "sidebar extension point id: Task 3"),
     (r"releasePayloadDomain = \"com\.cmuxterm\.app\"", "MDM payload domain: Task 4"),
 ]
+
+def targets_compiling_shellxbrand_without_linking_it(pbx):
+    """`(target, file)` for each Swift file importing ShellXBrand that a target compiles
+    without listing the ShellXBrand package product."""
+    file_refs = dict(re.findall(r"^\t\t(\w+) /\* [^*]+ \*/ = \{isa = PBXFileReference;[^\n]*?path = \"?([^;\"]+)\"?;", pbx, re.M))
+    build_files = dict(re.findall(r"^\t\t(\w+) /\* [^*]+ in Sources \*/ = \{isa = PBXBuildFile; fileRef = (\w+) ", pbx, re.M))
+    phases = {m.group(1): re.findall(r"^\t\t\t\t(\w+) /\*", m.group(2), re.M)
+              for m in re.finditer(r"^\t\t(\w+) /\* Sources \*/ = \{\n\t\t\tisa = PBXSourcesBuildPhase;\n.*?files = \((.*?)\);", pbx, re.S | re.M)}
+    tracked = subprocess.run(["git", "-C", str(ROOT), "ls-files", "*.swift"], capture_output=True, text=True,
+                             check=True).stdout.split()
+    problems = []
+    for m in re.finditer(r"^\t\t(\w+) /\* ([^*]+) \*/ = \{\n\t\t\tisa = PBXNativeTarget;\n(.*?)^\t\t\};", pbx, re.S | re.M):
+        name, body = m.group(2), m.group(3)
+        links = "/* ShellXBrand */" in body
+        for phase_id in re.findall(r"^\t\t\t\t(\w+) /\* Sources \*/", body, re.M):
+            for build_file in phases.get(phase_id, []):
+                rel = file_refs.get(build_files.get(build_file, ""))
+                if not rel:
+                    continue
+                for path in (t for t in tracked if t == rel or t.endswith("/" + rel)):
+                    if re.search(r"^\s*(@\w+ )*(public |internal |package )?import ShellXBrand\b", read(path), re.M) and not links:
+                        problems.append((name, path))
+    return problems
+
 
 # The `cmux` app target's configurations and the dock tile plugin's.
 APP_DEBUG = "A5001082"
@@ -190,6 +215,18 @@ class ShellXIdentityTests(unittest.TestCase):
         self.assertContains('CMUX_CUA_HELPER_BUILD="${CMUX_CUA_HELPER_BUILD:-0}"', script)
         self.assertContains('if [ "$CMUX_CUA_HELPER_BUILD" = 1 ]; then\n  if [ ! -x "$BUILD_CMUX_CUA" ]', script)
         self.assertContains('if [[ "${CMUX_CUA_HELPER_BUILD:-0}" != "1" ]]; then\n  rm -rf "$CMUX_CUA_HELPER_APP"', read("scripts/reload.sh"))
+
+    def test_every_target_compiling_shellxbrand_links_it(self):
+        # A file shared with the dock tile plugin (no package products) must not import ShellXBrand.
+        self.assertEqual(targets_compiling_shellxbrand_without_linking_it(read(PBXPROJ)), [])
+
+    def test_dock_tile_shared_policy_spells_the_shellx_identity(self):
+        brand = read("Packages/Shared/ShellXBrand/Sources/ShellXBrand/ShellXBrand.swift")
+        bundle_id = re.search(r'static let bundleID = "([^"]+)"', brand).group(1)
+        app_name = re.search(r'static let appName = "([^"]+)"', brand).group(1)
+        policy = read("Sources/App/AppBundleIconPersistencePolicy.swift")
+        self.assertContains(f'stableReleaseBundleIdentifier = "{bundle_id}"', policy)
+        self.assertContains(f'stableReleaseAppBundleName = "{app_name}.app"', policy)
 
     def test_reload_script_builds_shellx_dev(self):
         script = read("scripts/reload.sh")

@@ -1,9 +1,11 @@
 import Foundation
-import ShellXBrand
 
 enum AppBundleIconPersistencePolicy {
-    private static let stableReleaseBundleIdentifier = ShellXBrand.bundleID
-    private static let stableReleaseAppBundleName = "\(ShellXBrand.appName).app"
+    // `ShellXBrand.bundleID` / `"\(ShellXBrand.appName).app"`, spelled out: this file is also
+    // compiled into the CmuxDockTilePlugin target, which links no package products.
+    // tests/test_shellx_identity.py checks both values against ShellXBrand.
+    private static let stableReleaseBundleIdentifier = "pro.shellx.desktop"
+    private static let stableReleaseAppBundleName = "ShellX.app"
     static let disablePersistenceArgument = "--cmux-disable-bundle-icon-persistence"
     static let disablePersistenceDefaultsKey = "cmuxDisableBundleIconPersistence"
 
