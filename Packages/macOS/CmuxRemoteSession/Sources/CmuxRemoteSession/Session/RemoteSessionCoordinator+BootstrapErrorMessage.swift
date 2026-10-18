@@ -1,7 +1,7 @@
 public import CmuxRemoteDaemon
 internal import Foundation
 
-// User-facing text for a failed cmuxd-remote bootstrap. Split from the
+// User-facing text for a failed shellx-remote bootstrap. Split from the
 // coordinator's main file verbatim; tests pin this mapping against raw errors.
 extension RemoteSessionCoordinator {
     /// Maps a bootstrap failure to the user-facing message: capability

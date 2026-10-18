@@ -19,7 +19,7 @@ struct RemoteDaemonUploadTests {
         try fileManager.createDirectory(at: remoteDirectory, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: root) }
 
-        let localBinary = root.appendingPathComponent("cmuxd-remote", isDirectory: false)
+        let localBinary = root.appendingPathComponent("shellx-remote", isDirectory: false)
         try Data([0x41, 0x42]).write(to: localBinary)
         let runner = RecordingProcessRunner { request in
             switch Self.uploadStep(for: request) {
@@ -32,8 +32,8 @@ struct RemoteDaemonUploadTests {
         let coordinator = makeCoordinator(runner: runner)
         defer { coordinator.stop() }
         let location = RemoteDaemonInstallLocation(
-            relativePath: "remote/cmuxd-remote",
-            absolutePath: remoteDirectory.appendingPathComponent("cmuxd-remote").path
+            relativePath: "remote/shellx-remote",
+            absolutePath: remoteDirectory.appendingPathComponent("shellx-remote").path
         )
         try coordinator.queue.sync {
             try coordinator.uploadRemoteDaemonBinaryLocked(
@@ -121,7 +121,7 @@ struct RemoteDaemonUploadTests {
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: root) }
 
-        let localBinary = root.appendingPathComponent("cmuxd-remote", isDirectory: false)
+        let localBinary = root.appendingPathComponent("shellx-remote", isDirectory: false)
         try Data("fake daemon".utf8).write(to: localBinary)
 
         let runner = RecordingProcessRunner { request in
@@ -142,8 +142,8 @@ struct RemoteDaemonUploadTests {
         let coordinator = makeCoordinator(runner: runner)
         defer { coordinator.stop() }
         let location = RemoteDaemonInstallLocation(
-            relativePath: ".cmux/bin/cmuxd-remote/test/linux-amd64/cmuxd-remote",
-            absolutePath: "/home/test/.cmux/bin/cmuxd-remote/test/linux-amd64/cmuxd-remote"
+            relativePath: ".shellx/bin/shellx-remote/test/linux-amd64/shellx-remote",
+            absolutePath: "/home/test/.shellx/bin/shellx-remote/test/linux-amd64/shellx-remote"
         )
 
         try coordinator.queue.sync {
@@ -203,8 +203,8 @@ struct RemoteDaemonUploadTests {
         let coordinator = makeCoordinator(runner: runner)
         defer { coordinator.stop() }
         let location = RemoteDaemonInstallLocation(
-            relativePath: ".cmux/bin/cmuxd-remote/test/linux-amd64/cmuxd-remote",
-            absolutePath: "/home/test/.cmux/bin/cmuxd-remote/test/linux-amd64/cmuxd-remote"
+            relativePath: ".shellx/bin/shellx-remote/test/linux-amd64/shellx-remote",
+            absolutePath: "/home/test/.shellx/bin/shellx-remote/test/linux-amd64/shellx-remote"
         )
 
         do {
@@ -270,8 +270,8 @@ struct RemoteDaemonUploadTests {
         let coordinator = makeCoordinator(runner: runner)
         defer { coordinator.stop() }
         let location = RemoteDaemonInstallLocation(
-            relativePath: ".cmux/bin/cmuxd-remote/test/linux-amd64/cmuxd-remote",
-            absolutePath: "/home/test/.cmux/bin/cmuxd-remote/test/linux-amd64/cmuxd-remote"
+            relativePath: ".shellx/bin/shellx-remote/test/linux-amd64/shellx-remote",
+            absolutePath: "/home/test/.shellx/bin/shellx-remote/test/linux-amd64/shellx-remote"
         )
 
         do {
@@ -339,8 +339,8 @@ struct RemoteDaemonUploadTests {
         let coordinator = makeCoordinator(runner: runner)
         defer { coordinator.stop() }
         let location = RemoteDaemonInstallLocation(
-            relativePath: ".cmux/bin/cmuxd-remote/test/linux-amd64/cmuxd-remote",
-            absolutePath: "/home/test/.cmux/bin/cmuxd-remote/test/linux-amd64/cmuxd-remote"
+            relativePath: ".shellx/bin/shellx-remote/test/linux-amd64/shellx-remote",
+            absolutePath: "/home/test/.shellx/bin/shellx-remote/test/linux-amd64/shellx-remote"
         )
 
         do {
@@ -384,7 +384,7 @@ struct RemoteDaemonUploadTests {
         let payload = Data("cached daemon payload".utf8)
         let hash = SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
         let manifestJSON = """
-        {"schemaVersion":1,"appVersion":"test-version","releaseTag":"test","releaseURL":"https://example.invalid","checksumsAssetName":"checksums","checksumsURL":"https://example.invalid/checksums","entries":[{"goOS":"linux","goArch":"amd64","assetName":"cmuxd-remote-linux-amd64","downloadURL":"https://example.invalid/cmuxd-remote","sha256":"\(hash)"}]}
+        {"schemaVersion":1,"appVersion":"test-version","releaseTag":"test","releaseURL":"https://example.invalid","checksumsAssetName":"checksums","checksumsURL":"https://example.invalid/checksums","entries":[{"goOS":"linux","goArch":"amd64","assetName":"shellx-remote-linux-amd64","downloadURL":"https://example.invalid/shellx-remote","sha256":"\(hash)"}]}
         """
         let manifest = try #require(
             WorkspaceRemoteDaemonManifest(
@@ -428,7 +428,7 @@ struct RemoteDaemonUploadTests {
                 if command.contains("hello") {
                     return RemoteCommandResult(
                         status: 0,
-                        stdout: #"{"ok":true,"result":{"name":"cmuxd-remote","version":"test-version","capabilities":[]}}"#,
+                        stdout: #"{"ok":true,"result":{"name":"shellx-remote","version":"test-version","capabilities":[]}}"#,
                         stderr: ""
                     )
                 }
@@ -542,8 +542,8 @@ struct RemoteDaemonUploadTests {
         let coordinator = makeCoordinator(runner: runner)
         defer { coordinator.stop() }
         let location = RemoteDaemonInstallLocation(
-            relativePath: ".cmux/bin/cmuxd-remote/test/linux-amd64/cmuxd-remote",
-            absolutePath: "/home/test/.cmux/bin/cmuxd-remote/test/linux-amd64/cmuxd-remote"
+            relativePath: ".shellx/bin/shellx-remote/test/linux-amd64/shellx-remote",
+            absolutePath: "/home/test/.shellx/bin/shellx-remote/test/linux-amd64/shellx-remote"
         )
 
         do {

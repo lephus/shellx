@@ -1810,3 +1810,7 @@ lane = "linux-guard"
 [[test]]
 path = "tests/test_shellx_perf_harness.py"
 lane = "linux-guard"
+
+[[test]]
+path = "tests/test_shellx_remote_daemon.py"
+lane = "linux-guard"

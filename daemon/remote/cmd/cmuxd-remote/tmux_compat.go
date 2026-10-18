@@ -1293,7 +1293,7 @@ type tmuxCompatStore struct {
 
 func tmuxCompatStoreURL() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".cmuxterm", "tmux-compat-store.json")
+	return filepath.Join(home, remoteStateDirName, "tmux-compat-store.json")
 }
 
 type tmuxCompatStoreDirectory struct {

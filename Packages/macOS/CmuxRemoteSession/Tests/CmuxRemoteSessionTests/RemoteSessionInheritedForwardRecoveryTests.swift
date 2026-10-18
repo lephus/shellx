@@ -14,7 +14,7 @@ struct RemoteSessionInheritedForwardRecoveryTests {
                 isDirectory: true
             )
         let relayDirectory = home
-            .appendingPathComponent(".cmux", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("relay", isDirectory: true)
         try FileManager.default.createDirectory(
             at: relayDirectory,
@@ -71,7 +71,7 @@ struct RemoteSessionInheritedForwardRecoveryTests {
                 isDirectory: true
             )
         let relayDirectory = home
-            .appendingPathComponent(".cmux", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("relay", isDirectory: true)
         try FileManager.default.createDirectory(
             at: relayDirectory,
@@ -134,9 +134,9 @@ struct RemoteSessionInheritedForwardRecoveryTests {
 
         coordinator.queue.sync {
             coordinator.daemonReady = true
-            coordinator.daemonRemotePath = "/tmp/cmuxd-remote"
+            coordinator.daemonRemotePath = "/tmp/shellx-remote"
             coordinator.startReverseRelayLocked(
-                remotePath: "/tmp/cmuxd-remote"
+                remotePath: "/tmp/shellx-remote"
             )
         }
 
@@ -193,9 +193,9 @@ struct RemoteSessionInheritedForwardRecoveryTests {
 
         coordinator.queue.sync {
             coordinator.daemonReady = true
-            coordinator.daemonRemotePath = "/tmp/cmuxd-remote"
+            coordinator.daemonRemotePath = "/tmp/shellx-remote"
             coordinator.startReverseRelayLocked(
-                remotePath: "/tmp/cmuxd-remote"
+                remotePath: "/tmp/shellx-remote"
             )
         }
 
@@ -239,9 +239,9 @@ struct RemoteSessionInheritedForwardRecoveryTests {
 
         coordinator.queue.sync {
             coordinator.daemonReady = true
-            coordinator.daemonRemotePath = "/tmp/cmuxd-remote"
+            coordinator.daemonRemotePath = "/tmp/shellx-remote"
             coordinator.startReverseRelayLocked(
-                remotePath: "/tmp/cmuxd-remote"
+                remotePath: "/tmp/shellx-remote"
             )
         }
 
@@ -291,14 +291,14 @@ struct RemoteSessionInheritedForwardRecoveryTests {
             state: .ready,
             detail: "Remote daemon ready",
             version: "0.64.20",
-            name: "cmuxd-remote",
+            name: "shellx-remote",
             capabilities: ["reverse-relay"],
-            remotePath: "/tmp/cmuxd-remote"
+            remotePath: "/tmp/shellx-remote"
         )
 
         coordinator.queue.sync {
             coordinator.daemonReady = true
-            coordinator.daemonRemotePath = "/tmp/cmuxd-remote"
+            coordinator.daemonRemotePath = "/tmp/shellx-remote"
             coordinator.publishDaemonStatus(
                 readyStatus.state,
                 detail: readyStatus.detail,
@@ -308,7 +308,7 @@ struct RemoteSessionInheritedForwardRecoveryTests {
                 remotePath: readyStatus.remotePath
             )
             coordinator.startReverseRelayLocked(
-                remotePath: "/tmp/cmuxd-remote"
+                remotePath: "/tmp/shellx-remote"
             )
         }
         var statuses = host.daemonStatuses.makeAsyncIterator()

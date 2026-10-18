@@ -115,7 +115,7 @@ func init() {
 	}
 }
 
-// runCLI is the entry point for the "cli" subcommand (or busybox "cmux" invocation).
+// runCLI is the entry point for the "cli" subcommand (or busybox "shellx" invocation).
 func runCLI(args []string) int {
 	socketPath := os.Getenv("CMUX_SOCKET_PATH")
 
@@ -1048,14 +1048,14 @@ func parseFlags(args []string, keys []string, repeatKeys ...[]string) (parsedFla
 	return result, nil
 }
 
-// readSocketAddrFile reads the socket address from ~/.cmux/socket_addr as a fallback
-// when CMUX_SOCKET_PATH is not set. Written by the cmux app after the relay establishes.
+// readSocketAddrFile reads the socket address from ~/.shellx/socket_addr as a fallback
+// when CMUX_SOCKET_PATH is not set. Written by the ShellX app after the relay establishes.
 func readSocketAddrFile() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
-	data, err := os.ReadFile(filepath.Join(home, ".cmux", "socket_addr"))
+	data, err := os.ReadFile(filepath.Join(home, remoteStateDirName, "socket_addr"))
 	if err != nil {
 		return ""
 	}
@@ -1072,7 +1072,7 @@ func readRelayAuthFile(socketPath string) *relayAuthState {
 		if err != nil {
 			return nil
 		}
-		data, err := os.ReadFile(filepath.Join(home, ".cmux", "relay", port+".auth"))
+		data, err := os.ReadFile(filepath.Join(home, remoteStateDirName, "relay", port+".auth"))
 		if err != nil {
 			return nil
 		}

@@ -140,7 +140,7 @@ func TestClaudeArgsWithRelayHooksMergesLauncherSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 	args := []string{"--settings", launcherSettings, "--model", "opus", "--settings={\"theme\":\"dark\"}", "--", "--settings", "literal"}
-	out, err := claudeArgsWithRelayHooks(args, "/home/dev/.cmux/bin/cmux", filepath.Join(dir, "cache"))
+	out, err := claudeArgsWithRelayHooks(args, "/home/dev/.shellx/bin/shellx", filepath.Join(dir, "cache"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestClaudeArgsWithRelayHooksMergesLauncherSettings(t *testing.T) {
 	if len(stopGroups) != 2 || !strings.Contains(string(data), "user-stop") {
 		t.Fatalf("Stop hooks = %v", stopGroups)
 	}
-	if !strings.Contains(string(data), `'/home/dev/.cmux/bin/cmux' claude-hook session-start`) {
+	if !strings.Contains(string(data), `'/home/dev/.shellx/bin/shellx' claude-hook session-start`) {
 		t.Fatalf("cmux session-start hook missing: %s", data)
 	}
 	for _, event := range []string{"SessionStart", "UserPromptSubmit", "StopFailure", "Notification", "SessionEnd", "PreToolUse"} {
@@ -182,7 +182,7 @@ func TestClaudeArgsWithRelayHooksMergesLauncherSettings(t *testing.T) {
 		t.Fatal("decision hooks must not be injected on relay hosts")
 	}
 
-	again, err := claudeArgsWithRelayHooks(args, "/home/dev/.cmux/bin/cmux", filepath.Join(dir, "cache"))
+	again, err := claudeArgsWithRelayHooks(args, "/home/dev/.shellx/bin/shellx", filepath.Join(dir, "cache"))
 	if err != nil || again[1] != out[1] {
 		t.Fatalf("identical launches should reuse one settings file: %v %v", again, err)
 	}
@@ -199,7 +199,7 @@ func TestClaudeArgsWithRelayHooksRejectsUnreadableSettings(t *testing.T) {
 func TestFindRealClaudeSkipsCmuxShims(t *testing.T) {
 	root := t.TempDir()
 	shimDir := filepath.Join(root, "cmux-cli-shims", "surface")
-	cmuxBinDir := filepath.Join(root, ".cmux", "bin")
+	cmuxBinDir := filepath.Join(root, ".shellx", "bin")
 	realDir := filepath.Join(root, "real")
 	for _, dir := range []string{shimDir, cmuxBinDir, realDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -210,7 +210,7 @@ func TestFindRealClaudeSkipsCmuxShims(t *testing.T) {
 		}
 	}
 	pathEnv := strings.Join([]string{shimDir, cmuxBinDir, realDir}, string(os.PathListSeparator))
-	got := findRealClaude(pathEnv, filepath.Join(cmuxBinDir, "cmux"))
+	got := findRealClaude(pathEnv, filepath.Join(cmuxBinDir, "shellx"))
 	if want := filepath.Join(realDir, "claude"); got != want {
 		t.Fatalf("findRealClaude = %q, want %q", got, want)
 	}

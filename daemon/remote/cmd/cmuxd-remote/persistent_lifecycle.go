@@ -62,7 +62,7 @@ func logPersistentDaemonExit(
 	}
 	_, _ = fmt.Fprintf(
 		stderr,
-		"cmuxd-remote persistent daemon exit time=%s reason=%s active_connections=%d active_sessions=%d\n",
+		remoteHelperName+" persistent daemon exit time=%s reason=%s active_connections=%d active_sessions=%d\n",
 		now.UTC().Format(time.RFC3339Nano),
 		reason,
 		activity.activeConnections,
@@ -218,7 +218,7 @@ func persistentDaemonRelayPath(leasePort int, suffix string) (string, error) {
 	if err != nil || strings.TrimSpace(home) == "" {
 		return "", errors.New("cannot resolve remote home directory")
 	}
-	return filepath.Join(home, ".cmux", "relay", strconv.Itoa(leasePort)+suffix), nil
+	return filepath.Join(home, remoteStateDirName, "relay", strconv.Itoa(leasePort)+suffix), nil
 }
 
 func persistentDaemonSlotLeasePresent(slot string, leasePort int) (bool, error) {

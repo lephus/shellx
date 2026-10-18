@@ -1,7 +1,7 @@
 public import Foundation
 public import CmuxCore
 
-/// Synchronous JSON-RPC client for a cmuxd-remote daemon over one of three
+/// Synchronous JSON-RPC client for a shellx-remote daemon over one of three
 /// transports: `ssh ... <remotePath> serve --stdio` (newline-delimited JSON on
 /// stdio), an SSH local forward to the baked VM daemon socket, or a brokered
 /// WebSocket endpoint (faithful lift of the app target's
@@ -156,7 +156,7 @@ public final class RemoteDaemonRPCClient: @unchecked Sendable {
     ///
     /// - Parameters:
     ///   - configuration: The remote connection this daemon serves.
-    ///   - remotePath: Remote path of the cmuxd-remote binary (stdio
+    ///   - remotePath: Remote path of the shellx-remote binary (stdio
     ///     transport only).
     ///   - strings: App-bundle-resolved user-facing error strings (the
     ///     package never localizes).

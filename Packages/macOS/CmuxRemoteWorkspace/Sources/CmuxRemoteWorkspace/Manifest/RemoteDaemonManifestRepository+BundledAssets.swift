@@ -25,7 +25,7 @@ extension RemoteDaemonManifestRepository {
         let cacheURL = try cachedBinaryURL(version: version, goOS: entry.goOS, goArch: entry.goArch)
         let directory = cacheURL.deletingLastPathComponent()
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-        let staging = directory.appendingPathComponent(".cmuxd-remote-\(UUID().uuidString)")
+        let staging = directory.appendingPathComponent(".shellx-remote-\(UUID().uuidString)")
         defer { try? fileManager.removeItem(at: staging) }
         try binary.write(to: staging, options: .withoutOverwriting)
         try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: staging.path)

@@ -59,7 +59,7 @@ final class ReadinessScriptedProcessRunner: RemoteSessionProcessRunning, Sendabl
             "id": 1,
             "ok": true,
             "result": [
-                "name": "cmuxd-remote",
+                "name": "shellx-remote",
                 "version": "test",
                 "capabilities": capabilities,
             ],

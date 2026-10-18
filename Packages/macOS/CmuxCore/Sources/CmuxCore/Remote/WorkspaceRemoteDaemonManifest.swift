@@ -1,6 +1,6 @@
 internal import Foundation
 
-/// The release manifest describing downloadable cmuxd-remote daemon binaries
+/// The release manifest describing downloadable shellx-remote daemon binaries
 /// bundled with the app (read side; decoding only).
 ///
 /// Wire shape: decoded from the JSON manifest embedded in the app's Info

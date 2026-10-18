@@ -77,7 +77,7 @@ extension RemoteSessionCoordinator {
         let safeVersion = normalizedRemotePlatformProbeVersion(version)
         let logPathAssignment: String
         if let slot = normalizedPersistentDaemonSlotForRemoteCleanup(persistentDaemonSlot) {
-            logPathAssignment = "log_path=\"$HOME/.cmux/daemon/\(safeVersion)/\(slot)/daemon.log\""
+            logPathAssignment = "log_path=\"$HOME/.shellx/daemon/\(safeVersion)/\(slot)/daemon.log\""
         } else {
             logPathAssignment = "log_path=''"
         }
@@ -146,10 +146,10 @@ extension RemoteSessionCoordinator {
     /// host-specific username, or arbitrary daemon-log content.
     private static func sanitizedRemoteDaemonPath(_ path: String) -> String {
         let normalized = path.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let marker = normalized.range(of: "/.cmux/bin/cmuxd-remote/") else {
-            return "~/.cmux/bin/cmuxd-remote"
+        guard let marker = normalized.range(of: "/.shellx/bin/shellx-remote/") else {
+            return "~/.shellx/bin/shellx-remote"
         }
-        return "~/.cmux/bin/cmuxd-remote/" + normalized[marker.upperBound...]
+        return "~/.shellx/bin/shellx-remote/" + normalized[marker.upperBound...]
     }
 
     private static func sanitizedRemoteDaemonDiagnostic(

@@ -16,7 +16,7 @@ import (
 )
 
 func TestPersistentDaemonShutdownStopsSlotWithActivePTY(t *testing.T) {
-	socketDir, err := os.MkdirTemp("/tmp", "cmuxd-remote-shutdown-*")
+	socketDir, err := os.MkdirTemp("/tmp", "shellx-remote-shutdown-*")
 	if err != nil {
 		t.Fatalf("create short socket dir: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestPersistentDaemonShutdownStopsSlotWithActivePTY(t *testing.T) {
 
 func TestRunPersistentStopUsesSlotControlPlane(t *testing.T) {
 	rootBase := t.TempDir()
-	socketBase, err := os.MkdirTemp("/tmp", "cmuxd-remote-stop-command-*")
+	socketBase, err := os.MkdirTemp("/tmp", "shellx-remote-stop-command-*")
 	if err != nil {
 		t.Fatalf("create short socket base: %v", err)
 	}
@@ -220,7 +220,7 @@ func TestRunPersistentLeasePortValidation(t *testing.T) {
 
 func TestStopPersistentDaemonWaitsForSlotLockWhenSocketIsAbsent(t *testing.T) {
 	rootBase := t.TempDir()
-	socketBase, err := os.MkdirTemp("/tmp", "cmuxd-remote-stop-lock-*")
+	socketBase, err := os.MkdirTemp("/tmp", "shellx-remote-stop-lock-*")
 	if err != nil {
 		t.Fatalf("create short socket base: %v", err)
 	}
@@ -277,7 +277,7 @@ func TestStopPersistentDaemonHandlesMissingStoredSocketDirectory(t *testing.T) {
 	if err := os.MkdirAll(paths.root, 0o700); err != nil {
 		t.Fatalf("create persistent daemon root: %v", err)
 	}
-	storedSocketDirectory, err := os.MkdirTemp("/tmp", "cmuxd-remote-missing-socket-*")
+	storedSocketDirectory, err := os.MkdirTemp("/tmp", "shellx-remote-missing-socket-*")
 	if err != nil {
 		t.Fatalf("create stored socket directory: %v", err)
 	}
@@ -343,7 +343,7 @@ func TestWaitForPersistentDaemonStopTimesOutWhenOwnershipDoesNotRelease(t *testi
 }
 
 func TestPersistentDaemonPreservesActivePTYAfterObservedSlotLeaseDisappears(t *testing.T) {
-	socketDir, err := os.MkdirTemp("/tmp", "cmuxd-remote-lease-reap-*")
+	socketDir, err := os.MkdirTemp("/tmp", "shellx-remote-lease-reap-*")
 	if err != nil {
 		t.Fatalf("create short socket dir: %v", err)
 	}
@@ -550,7 +550,7 @@ func TestPersistentDaemonSlotLeasePresentMatchesExactRelayPortAndSlot(t *testing
 		t.Fatalf("absent relay lease reported a matching slot")
 	}
 
-	relayDirectory := filepath.Join(home, ".cmux", "relay")
+	relayDirectory := filepath.Join(home, ".shellx", "relay")
 	if err := os.MkdirAll(relayDirectory, 0o700); err != nil {
 		t.Fatalf("create relay directory: %v", err)
 	}
@@ -599,7 +599,7 @@ func TestPersistentDaemonServerArgumentsCarryValidatedLeasePort(t *testing.T) {
 func TestPersistentDaemonRelayShellCleanupPreservesReplacementLease(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	relayDirectory := filepath.Join(home, ".cmux", "relay")
+	relayDirectory := filepath.Join(home, ".shellx", "relay")
 	shellDirectory := filepath.Join(relayDirectory, "64008.shell")
 	if err := os.MkdirAll(shellDirectory, 0o700); err != nil {
 		t.Fatalf("create relay shell directory: %v", err)
