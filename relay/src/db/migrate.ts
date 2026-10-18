@@ -25,7 +25,13 @@ export function migrate(db: Db, dir: string = MIGRATIONS_DIR): string[] {
     .sort();
   for (const name of pending) {
     const sql = readFileSync(join(dir, name), "utf8");
-    const foreignKeysOff = sql.split(/\r?\n/, 1)[0] === FOREIGN_KEYS_OFF_DIRECTIVE;
+    // A UTF-8 BOM and trailing whitespace on the directive line are tolerated.
+    const firstLine = (sql.split(/\r?\n/, 1)[0] ?? "").replace(/^\uFEFF/, "").trimEnd();
+    const foreignKeysOff = firstLine === FOREIGN_KEYS_OFF_DIRECTIVE;
+    // With foreign keys on, DROP TABLE of a referenced table silently cascade-deletes its children.
+    if (!foreignKeysOff && /drop\s+table/i.test(sql)) {
+      throw new Error(`${name} contains DROP TABLE but lacks the "${FOREIGN_KEYS_OFF_DIRECTIVE}" first line`);
+    }
     // The pragma is a no-op inside a transaction, so it is switched outside it and restored in `finally`.
     if (foreignKeysOff) db.exec("PRAGMA foreign_keys = OFF");
     try {
