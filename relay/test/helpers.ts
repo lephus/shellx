@@ -28,11 +28,16 @@ export const TEST_CONFIG: Config = {
   rateLimitsEnabled: false,
   adminHost: "admin.shellx.pro",
   adminPassword: null,
+  relayHmacSecret: new TextEncoder().encode("0123456789abcdef0123456789abcdef"),
+  relayV2DisabledReason: null,
+  relayIssuer: "shellx-relay",
+  relayV2Url: "ws://127.0.0.1:1/v1/relay",
 };
 
 export const allowAll: RateLimiter = { limit: async () => true };
 export const unlimited: RateLimiters = {
   loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll,
+  ticketMint: allowAll, pairingCreate: allowAll,
 };
 
 /** Fake limiter: allows `max` calls per key, then refuses; records every key it saw. */
