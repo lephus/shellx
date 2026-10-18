@@ -50,6 +50,72 @@ jobs:
         working-directory: windows
         run: cargo test --locked -p shellx-model
 
+  remote-e2e:
+    name: remote-e2e (shellx-remote vs cmux-relay + cmux-tui)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Init ghostty submodule
+        shell: bash
+        run: bash scripts/ci/init-submodule.sh ghostty
+
+      - name: Resolve Ghostty Zig version
+        id: ghostty-zig-version
+        shell: bash
+        run: echo "version=$(bash ./scripts/ghostty-zig-version.sh)" >> "$GITHUB_OUTPUT"
+
+      - name: Install zig
+        uses: mlugg/setup-zig@8d6198c65fb0feaa111df26e6b467fea8345e46f # v2.0.5
+        with:
+          version: ${{ steps.ghostty-zig-version.outputs.version }}
+
+      - name: Set up pinned Rust
+        uses: ./.github/actions/setup-cmux-tui-rust
+
+      - name: Cache target dirs
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: |
+            cmux-tui -> target
+            windows -> target
+          key: shellx-remote-e2e
+          cache-on-failure: true
+
+      - name: Build cmux-relay + cmux-tui (test binaries)
+        working-directory: cmux-tui
+        shell: bash
+        env:
+          # Test binaries only: skip the shipping profile's fat LTO.
+          CARGO_PROFILE_RELEASE_LTO: "false"
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+        run: |
+          unset CMUX_GHOSTTY_SRC
+          cargo build --release --locked -p cmux-relay -p cmux-tui
+          ls -la target/release/cmux-relay target/release/cmux-tui
+
+      - name: Test shellx-remote (unit)
+        working-directory: windows
+        shell: bash
+        run: |
+          unset CMUX_GHOSTTY_SRC
+          cargo test --locked -p shellx-remote
+
+      - name: shellx-remote relay e2e
+        working-directory: windows
+        shell: bash
+        env:
+          SHELLX_E2E_BIN_DIR: ${{ github.workspace }}/cmux-tui/target/release
+        run: |
+          unset CMUX_GHOSTTY_SRC
+          cargo test --locked -p shellx-remote --test relay_e2e -- --ignored --nocapture
+
   app:
     name: app (x86_64-pc-windows-msvc)
     runs-on: windows-2025
@@ -115,6 +181,23 @@ jobs:
         run: |
           unset CMUX_GHOSTTY_SRC
           cargo test --locked -p shellx-model --target "$TARGET"
+
+      # Compile proof of the in-process remote client on Windows (relay v2,
+      # Noise, mux control), plus its unit tests on NTFS. Release profile so
+      # it reuses the shellx-app build's dependencies.
+      - name: Build shellx-remote
+        working-directory: windows
+        shell: bash
+        run: |
+          unset CMUX_GHOSTTY_SRC
+          cargo build --release --locked -p shellx-remote --target "$TARGET"
+
+      - name: Test shellx-remote
+        working-directory: windows
+        shell: bash
+        run: |
+          unset CMUX_GHOSTTY_SRC
+          cargo test --release --locked -p shellx-remote --target "$TARGET"
 
       - name: Stage artifact
         id: stage
