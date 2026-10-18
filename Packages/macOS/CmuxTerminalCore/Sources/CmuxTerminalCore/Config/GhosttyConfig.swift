@@ -1,6 +1,7 @@
 public import AppKit
 public import CmuxFoundation
 public import Foundation
+import ShellXBrand
 
 /// The resolved cmux terminal configuration: fonts, colors, theme, scrollback,
 /// and sidebar appearance parsed from the user's ghostty config files.
@@ -20,12 +21,14 @@ public struct GhosttyConfig {
     /// terminal view/engine code.
     public typealias ColorSchemePreference = TerminalColorSchemePreference
 
-    /// Native fallback light theme name used for fresh installs before the user
-    /// has chosen terminal colors.
-    public static let cmuxDefaultLightThemeName = "Apple System Colors Light"
-    /// Native fallback dark theme name used for fresh installs before the user
-    /// has chosen terminal colors.
-    public static let cmuxDefaultDarkThemeName = "Apple System Colors"
+    /// Managed default theme name for a light appearance. ShellX is dark-only
+    /// (spec §7.4), so both appearances use the ShellX theme
+    /// (``ShellXTerminalTheme``). A Ghostty theme file of this name, if one
+    /// exists in a theme search path, is used first; otherwise the built-in
+    /// ShellX palette applies.
+    public static let cmuxDefaultLightThemeName = ShellXTerminalTheme.name
+    /// Managed default theme name for a dark appearance: the ShellX theme.
+    public static let cmuxDefaultDarkThemeName = ShellXTerminalTheme.name
 
     private static let loadCacheLock = NSLock()
     // Every read/write of this cache is serialized by `loadCacheLock`; the
@@ -497,61 +500,13 @@ public struct GhosttyConfig {
         return nil
     }
 
+    /// The built-in managed default: the ShellX terminal theme (background
+    /// `bg`, cursor `primary`, text `text`, 16 ANSI colors tuned to the
+    /// palette; table in ``ShellXTerminalTheme``) for either appearance.
     private static func cmuxDefaultFallbackConfigContents(
-        preferredColorScheme: ColorSchemePreference
+        preferredColorScheme _: ColorSchemePreference
     ) -> String {
-        switch preferredColorScheme {
-        case .light:
-            return """
-            palette = 0=#1a1a1a
-            palette = 1=#cc372e
-            palette = 2=#26a439
-            palette = 3=#cdac08
-            palette = 4=#0869cb
-            palette = 5=#9647bf
-            palette = 6=#479ec2
-            palette = 7=#98989d
-            palette = 8=#464646
-            palette = 9=#ff453a
-            palette = 10=#32d74b
-            palette = 11=#e5bc00
-            palette = 12=#0a84ff
-            palette = 13=#bf5af2
-            palette = 14=#69c9f2
-            palette = 15=#ffffff
-            background = #feffff
-            foreground = #000000
-            cursor-color = #98989d
-            cursor-text = #ffffff
-            selection-background = #abd8ff
-            selection-foreground = #000000
-            """
-        case .dark:
-            return """
-            palette = 0=#1a1a1a
-            palette = 1=#cc372e
-            palette = 2=#26a439
-            palette = 3=#cdac08
-            palette = 4=#0869cb
-            palette = 5=#9647bf
-            palette = 6=#479ec2
-            palette = 7=#98989d
-            palette = 8=#464646
-            palette = 9=#ff453a
-            palette = 10=#32d74b
-            palette = 11=#ffd60a
-            palette = 12=#0a84ff
-            palette = 13=#bf5af2
-            palette = 14=#76d6ff
-            palette = 15=#ffffff
-            background = #1e1e1e
-            foreground = #ffffff
-            cursor-color = #98989d
-            cursor-text = #ffffff
-            selection-background = #3f638b
-            selection-foreground = #ffffff
-            """
-        }
+        ShellXTerminalTheme.ghosttyConfigContents
     }
 
     /// Parses ghostty-format config `contents` into this config. When

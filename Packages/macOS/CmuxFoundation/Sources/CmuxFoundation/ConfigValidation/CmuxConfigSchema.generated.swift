@@ -1948,7 +1948,7 @@ enum CmuxEmbeddedConfigSchema {
         },
         "tintColor": {
           "$ref": "#/$defs/colorHex",
-          "default": "#000000",
+          "default": "#100B1D",
           "description": "Base sidebar tint color used when light/dark overrides are not set."
         },
         "lightModeTintColor": {
@@ -1965,7 +1965,7 @@ enum CmuxEmbeddedConfigSchema {
           "type": "number",
           "minimum": 0,
           "maximum": 1,
-          "default": 0.18,
+          "default": 1.0,
           "description": "Sidebar tint opacity from 0 to 1. Note: this only controls the sidebar tint, not terminal/window transparency. For terminal background transparency or blur, set `background-opacity` and `background-blur` in `~/.config/ghostty/config` and run `cmux reload-config`."
         }
       }

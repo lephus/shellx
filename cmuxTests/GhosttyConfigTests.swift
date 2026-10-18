@@ -353,10 +353,10 @@ final class GhosttyConfigTests: XCTestCase {
         try fileManager.createDirectory(at: firstThemeDir, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: secondThemeDir, withIntermediateDirectories: true)
 
-        let firstTheme = firstThemeDir.appendingPathComponent("Apple System Colors Light", isDirectory: false)
+        let firstTheme = firstThemeDir.appendingPathComponent(GhosttyConfig.cmuxDefaultLightThemeName, isDirectory: false)
         try Data([0xff, 0xfe]).write(to: firstTheme)
 
-        let secondTheme = secondThemeDir.appendingPathComponent("Apple System Colors Light", isDirectory: false)
+        let secondTheme = secondThemeDir.appendingPathComponent(GhosttyConfig.cmuxDefaultLightThemeName, isDirectory: false)
         let expected = "foreground = #123456\n"
         try expected.write(to: secondTheme, atomically: true, encoding: .utf8)
 

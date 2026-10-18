@@ -40,7 +40,7 @@ extension Array where Element == CuratedSettingEntry {
             .init(section: .automation, id: "gemini", title: String(localized: "settings.automation.gemini", defaultValue: "Gemini CLI Integration"), synonyms: "Gemini CLI Integration automation.geminiIntegration gemini cli google agent hooks notifications"),
 
             // Themes
-            .init(section: .themes, id: "appearance", title: String(localized: "settings.app.appearance", defaultValue: "Appearance"), synonyms: "Appearance app.appearance theme color scheme light mode dark mode system mode"),
+            // ShellX is dark-only: the Appearance (light/dark/system) row is hidden.
             .init(section: .themes, id: "accent-color", title: String(localized: "settings.app.accentColor", defaultValue: "Accent Color"), synonyms: "Accent Color app.accentColor accent highlight tint blue purple system accent macOS accent cmux blue"),
             .init(section: .themes, id: "terminal-theme", title: String(localized: "settings.terminal.theme", defaultValue: "Terminal Theme"), synonyms: "Terminal Theme ghostty theme themes color scheme palette colors light dark catppuccin gruvbox nord dracula solarized tokyonight rose pine github cmux themes"),
             .init(

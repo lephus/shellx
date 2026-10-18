@@ -16,6 +16,8 @@ let package = Package(
     dependencies: [
         .package(path: "../CmuxFoundation"),
         .package(path: "../CmuxWorkspaces"),
+        // ShellX look tokens (sidebar tint default).
+        .package(path: "../../Shared/ShellXBrand"),
     ],
     targets: [
         .target(
@@ -23,6 +25,7 @@ let package = Package(
             dependencies: [
                 "CmuxFoundation",
                 "CmuxWorkspaces",
+                .product(name: "ShellXBrand", package: "ShellXBrand"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

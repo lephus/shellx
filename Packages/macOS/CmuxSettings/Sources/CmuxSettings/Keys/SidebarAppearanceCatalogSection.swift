@@ -1,4 +1,5 @@
 import Foundation
+import ShellXBrand
 
 /// Settings under the dotted-id prefix `sidebarAppearance.*`.
 public struct SidebarAppearanceCatalogSection: SettingCatalogSection {
@@ -8,9 +9,11 @@ public struct SidebarAppearanceCatalogSection: SettingCatalogSection {
         userDefaultsKey: "sidebarMatchTerminalBackground"
     )
 
+    /// ShellX: the opaque `panel` token (#100b1d), mirroring
+    /// `WindowChromeSidebarTintDefaults`.
     public let tintColorHex = DefaultsKey<String>(
         id: "sidebarAppearance.tintColor",
-        defaultValue: "#000000",
+        defaultValue: ShellXPalette.panel.hexString.uppercased(),
         userDefaultsKey: "sidebarTintHex"
     )
 
@@ -28,7 +31,7 @@ public struct SidebarAppearanceCatalogSection: SettingCatalogSection {
 
     public let tintOpacity = DefaultsKey<Double>(
         id: "sidebarAppearance.tintOpacity",
-        defaultValue: 0.18,
+        defaultValue: 1.0,
         userDefaultsKey: "sidebarTintOpacity"
     )
 

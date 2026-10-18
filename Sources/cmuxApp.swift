@@ -16,6 +16,7 @@ import Darwin
 import Bonsplit
 import UniformTypeIdentifiers
 import CmuxTerminal
+import ShellXBrand
 struct cmuxApp: App {
     /// App-owned settings graph, injected into each SwiftUI hosting root.
     private let settingsRuntime: SettingsRuntime
@@ -212,6 +213,8 @@ struct cmuxApp: App {
         )
         StartupBreadcrumbLog.append("app.init.settingsRuntime.created")
 
+        // ShellX is dark-only: pin the stored mode before anything resolves it.
+        AppearanceSettings.enforceShellXDarkOnly()
         let startupAppearance = AppearanceSettings.resolvedMode()
         Self.applyAppearance(startupAppearance, duringLaunch: true)
         StartupBreadcrumbLog.append("app.init.appearance.applied", fields: ["mode": startupAppearance.rawValue])
@@ -1338,8 +1341,9 @@ struct cmuxApp: App {
     }
 
     private func applyAppearance() {
+        // ShellX is dark-only: any stored mode applies (and is pinned back) as dark.
         let mode = AppearanceSettings.applyStoredMode(
-            rawValue: appearanceMode,
+            rawValue: ShellXAppearance.forcedModeRawValue,
             source: "cmuxApp.appearanceModeChanged"
         )
         if appearanceMode != mode.rawValue {

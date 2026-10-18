@@ -3,9 +3,10 @@ import CmuxSettings
 import SwiftUI
 
 /// **Themes** section: every color and appearance setting in one place.
-/// App appearance, accent color and app icon, the browser page theme, the adaptive
-/// default theme toggle, and the terminal theme gallery with every theme
-/// Ghostty ships.
+/// Accent color and app icon, the browser page theme, the adaptive default
+/// theme toggle, and the terminal theme gallery with every theme Ghostty
+/// ships. ShellX is dark-only (spec §7.4), so the app Appearance
+/// (light/dark/system) picker is not shown.
 @MainActor
 public struct ThemesSection: View {
     private let hostActions: SettingsHostActions
@@ -75,12 +76,6 @@ public struct ThemesSection: View {
     @ViewBuilder
     private var appCard: some View {
         SettingsCard {
-            ThemePickerRow(
-                selectedMode: appearance.current,
-                onSelect: { appearance.set($0) }
-            )
-            .settingsSearchAnchors(["setting:themes:appearance"])
-            SettingsCardDivider()
             SettingsCardRow(
                 configurationReview: .json("app.accentColor"),
                 String(localized: "settings.app.accentColor", defaultValue: "Accent Color"),

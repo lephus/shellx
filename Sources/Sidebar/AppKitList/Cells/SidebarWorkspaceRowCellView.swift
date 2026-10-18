@@ -900,8 +900,10 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         compactStatusGlyphView.configure(
             glyph,
             pointSize: model.scaled(11),
+            // The ShellX `raise` selection keeps status colors readable, so
+            // only other selection fills flatten the glyph.
             color: glyph.color(
-                isActive: model.isActive,
+                isActive: model.isActive && !palette.usesShellXSelection,
                 selected: palette.selectedForeground(0.95),
                 secondary: palette.secondary(0.8)
             )

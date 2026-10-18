@@ -4,7 +4,8 @@ import Testing
 @testable import CmuxTerminalCore
 
 /// Verifies that cmux preserves configured Ghostty colors while retaining its
-/// adaptive managed palette for configurations without authored terminal colors
+/// managed palette (ShellX: one dark palette) for configurations without
+/// authored terminal colors
 /// (https://github.com/manaflow-ai/cmux/issues/10199).
 @Suite struct GhosttyConfigThemeParityTests {
     enum Scenario: String, CaseIterable, Sendable {
@@ -40,18 +41,13 @@ import Testing
         "#7AA6DA", "#C397D8", "#70C0B1", "#EAEAEA",
     ]
 
-    private static let managedLightPalette = [
-        "#1A1A1A", "#CC372E", "#26A439", "#CDAC08",
-        "#0869CB", "#9647BF", "#479EC2", "#98989D",
-        "#464646", "#FF453A", "#32D74B", "#E5BC00",
-        "#0A84FF", "#BF5AF2", "#69C9F2", "#FFFFFF",
-    ]
-
-    private static let managedDarkPalette = [
-        "#1A1A1A", "#CC372E", "#26A439", "#CDAC08",
-        "#0869CB", "#9647BF", "#479EC2", "#98989D",
-        "#464646", "#FF453A", "#32D74B", "#FFD60A",
-        "#0A84FF", "#BF5AF2", "#76D6FF", "#FFFFFF",
+    /// ShellX's built-in managed palette (ShellXTerminalTheme), the same for
+    /// both appearances: ShellX is dark-only (spec §7.4).
+    private static let managedShellXPalette = [
+        "#211A37", "#E88A8A", "#6FD49A", "#E8C468",
+        "#60A5FA", "#C49AF0", "#6FC8D9", "#CDC7E0",
+        "#6E6790", "#F2A7A7", "#93E2B4", "#F2D68F",
+        "#93C5FD", "#D9B8F7", "#96DBE7", "#E6E2F2",
     ]
 
     private static let fullExplicitPalette = [
@@ -110,27 +106,20 @@ import Testing
     private func makeFixture(for scenario: Scenario, in directory: URL) throws -> ScenarioFixture {
         switch scenario {
         case .noConfig, .nonAppearanceSetting:
+            let shellX = snapshot(
+                foreground: "#CDC7E0",
+                background: "#0B0716",
+                cursor: "#60A5FA",
+                cursorText: "#0B0716",
+                selectionBackground: "#233356",
+                selectionForeground: "#E6E2F2",
+                palette: Self.managedShellXPalette
+            )
             return ScenarioFixture(
                 configContents: scenario == .noConfig ? "# no Ghostty settings\n" : "font-family = Menlo\n",
-                light: snapshot(
-                    foreground: "#000000",
-                    background: "#FEFFFF",
-                    cursor: "#98989D",
-                    cursorText: "#FFFFFF",
-                    selectionBackground: "#ABD8FF",
-                    selectionForeground: "#000000",
-                    palette: Self.managedLightPalette
-                ),
-                dark: snapshot(
-                    foreground: "#FFFFFF",
-                    background: "#1E1E1E",
-                    cursor: "#98989D",
-                    cursorText: "#FFFFFF",
-                    selectionBackground: "#3F638B",
-                    selectionForeground: "#FFFFFF",
-                    palette: Self.managedDarkPalette
-                ),
-                changesWithAppearance: true
+                light: shellX,
+                dark: shellX,
+                changesWithAppearance: false
             )
 
         case .partialExplicitColors:

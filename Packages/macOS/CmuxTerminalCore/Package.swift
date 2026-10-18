@@ -17,6 +17,8 @@ let package = Package(
         .package(path: "../CmuxFoundation"),
         .package(path: "../CMUXDebugLog"),
         .package(path: "../../Shared/CmuxGhosttyKit"),
+        // ShellX built-in terminal theme.
+        .package(path: "../../Shared/ShellXBrand"),
     ],
     targets: [
         .target(
@@ -29,6 +31,7 @@ let package = Package(
                 .product(name: "CmuxGhosttyKit", package: "CmuxGhosttyKit"),
                 .product(name: "CmuxFoundation", package: "CmuxFoundation"),
                 .product(name: "CMUXDebugLog", package: "CMUXDebugLog"),
+                .product(name: "ShellXBrand", package: "ShellXBrand"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
