@@ -175,8 +175,64 @@ private let statusUp = Data(#"{"daemon_name":"Phu's Mac","daemon_fingerprint":"f
     rig.clock.advance(to: supT0 + 1)
     #expect(await eventually { rig.launcher.launches.count == 2 })
     #expect(rig.launcher.launches[1].args == RemoteCommandLine.connect(paths: rig.paths, machine: "m_1", route: supRoute,
-        slot: "S9", ticketFile: ticket, inviteFile: nil, deviceName: "Phu's Mac"))
+        slot: "S9", ticketFile: ticket, inviteFile: nil, deviceName: "Phu's Mac", daemonFingerprint: "a1b2c3d4e5f60718"))
     #expect(rig.core.mintCount == 2)
+}
+
+@Test func clientRestartsAsEnrolledAfterExit() async throws {
+    // Upstream `remote connect` exits for good on a relay rejection or a lost session: restart it on the
+    // backoff, enrolled (no invite, daemon pinned), with a fresh connect ticket before each spawn.
+    let rig = SupervisorRig(); let sup = rig.client(record: rig.record(enrolled: true))
+    await sup.start(inviteFile: nil)
+    let ticket = rig.paths.coreStateDir.appendingPathComponent("tickets/" + rig.paths.connectTicketName(for: "m_1"))
+    let enrolledArgs = RemoteCommandLine.connect(paths: rig.paths, machine: "m_1", route: supRoute, slot: "S9", ticketFile: ticket,
+                                                 inviteFile: nil, deviceName: "Phu's Mac", daemonFingerprint: "a1b2c3d4e5f60718")
+    #expect(rig.launcher.launches.first?.args == enrolledArgs)
+    #expect(!enrolledArgs.contains("--invite-file"))
+    rig.launcher.line(0, #"{"event":"connection-snapshot"}"#)
+    #expect(await eventually { await sup.state == .connected(localSocket: rig.paths.clientSocket(for: "m_1").path) })
+    // Exit after a connection, then two back-to-back failures: backoff 1 s, 2 s, 4 s.
+    var now = supT0
+    for (index, (attempt, delay)) in [(1, 1.0), (2, 2.0), (3, 4.0)].enumerated() {
+        rig.launcher.exit(index, status: 1)
+        let due = now + delay
+        #expect(await eventually { await sup.state == .reconnecting(attempt: attempt, retryAt: due) })
+        now = due
+        rig.clock.advance(to: now)
+        #expect(await eventually { rig.launcher.launches.count == index + 2 })
+        #expect(rig.core.mintCount == index + 2)
+    }
+    #expect(rig.launcher.launches.allSatisfy { $0.args == enrolledArgs })
+    let order = rig.log.all.filter { $0.hasPrefix("mint:") || $0.hasPrefix("launch:") }
+    #expect(order == Array(repeating: ["mint:connect", "launch:remote connect"], count: 4).flatMap { $0 })
+}
+
+@Test func clientUsesRouteFromMintNotRecord() async throws {
+    // cmux strips the path from invite routes; the positional route must be the minted relay_url's.
+    let rig = SupervisorRig()
+    var record = rig.record(enrolled: true); record.route = "relay+wss://relay.test"
+    rig.core.relayURL.with { $0 = "wss://relay.test/v2/relay" }
+    let sup = rig.client(record: record)
+    await sup.start(inviteFile: nil)
+    #expect(rig.launcher.launches.first.map { Array($0.args.prefix(3)) } == ["remote", "connect", "relay+wss://relay.test/v2/relay"])
+    rig.core.relayURL.with { $0 = "wss://relay2.test/v2/relay" }
+    rig.launcher.exit(0, status: 1)
+    #expect(await eventually { await sup.state.retryAt != nil })
+    rig.clock.advance(to: supT0 + 1)
+    #expect(await eventually { rig.launcher.launches.count == 2 })
+    #expect(rig.launcher.launches[1].args[2] == "relay+wss://relay2.test/v2/relay")
+}
+
+@Test func clientPassesNoDaemonPinWithInviteOrWithoutFingerprint() async throws {
+    let rig = SupervisorRig(); let invite = try rig.makeInvite()
+    let sup = rig.client(record: rig.record(enrolled: true))
+    await sup.start(inviteFile: invite)                          // re-pairing: invite, no pin
+    #expect(rig.launcher.launches[0].args.contains("--invite-file"))
+    #expect(!rig.launcher.launches[0].args.contains("--daemon"))
+    var bare = rig.record(enrolled: true); bare.daemonFingerprint = ""
+    let other = SupervisorRig(); let sup2 = other.client(record: bare)
+    await sup2.start(inviteFile: nil)
+    #expect(!other.launcher.launches[0].args.contains("--daemon"))
 }
 
 @Test func clientGoesOfflineWithoutRetrying() async {

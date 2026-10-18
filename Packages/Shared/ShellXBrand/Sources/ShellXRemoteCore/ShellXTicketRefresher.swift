@@ -32,11 +32,13 @@ public actor ShellXTicketRefresher {
     private struct MintReply: Decodable, Sendable {
         let path: String
         let expires_at_unix: Double
+        let relay_url: String
     }
 
     private let core: ShellXCoreClient
     private let clock: any RemoteClock
     private var entries: [String: Entry] = [:]
+    private var relayURLs: [String: String] = [:]
     private var generations = 0
 
     public init(core: ShellXCoreClient, clock: any RemoteClock) {
@@ -65,6 +67,7 @@ public actor ShellXTicketRefresher {
         entries[name] = entry
         let generation = entry.generation
         let reply = try await mint(name: name, entry: entry)
+        relayURLs[name] = reply.relay_url
         if entries[name]?.generation == generation {
             schedule(name: name, generation: generation, expiresAt: Date(timeIntervalSince1970: reply.expires_at_unix))
         }
@@ -74,7 +77,11 @@ public actor ShellXTicketRefresher {
     public func stop(name: String) {
         entries[name]?.task?.cancel()
         entries[name] = nil
+        relayURLs[name] = nil
     }
+
+    /// The `relay_url` of the latest successful mint of `name` (not a secret; the only source of the relay URL).
+    public func relayURL(name: String) -> String? { relayURLs[name] }
 
     public func isRegistered(name: String) -> Bool { entries[name] != nil }
 
@@ -106,6 +113,7 @@ public actor ShellXTicketRefresher {
             do {
                 let reply = try await mint(name: name, entry: entry)
                 guard isCurrent(name, generation) else { return }
+                relayURLs[name] = reply.relay_url
                 failures = 0
                 let expires = Date(timeIntervalSince1970: reply.expires_at_unix)
                 let now = clock.now

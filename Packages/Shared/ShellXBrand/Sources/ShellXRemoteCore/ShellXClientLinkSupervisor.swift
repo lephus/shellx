@@ -10,6 +10,11 @@ import Glibc
 /// A stdout line `{"event":"connection-snapshot",…}` means the link is up. While the machine is
 /// offline nothing is spawned and no ticket is minted.
 ///
+/// Upstream `remote connect` exits for good on a relay rejection (e.g. an expired ticket) or a lost
+/// logical session, so every exit is restarted on the backoff. Once enrolled, restarts run without
+/// `--invite-file` and with `--daemon <record.daemonFingerprint>` (the daemon pinned in the client
+/// state dir). The positional route is always `RelayRoute.cmuxRoute(relay_url)` of the latest mint.
+///
 /// Invite file (single use, from `pair.poll {write_invite_to}`): passed as `--invite-file` until the
 /// first `.connected`, then deleted and `record.enrolled = true` is saved. It is also deleted on every
 /// path where the enrollment can no longer use it: `stop()` before connecting, a fatal failure
@@ -35,6 +40,8 @@ public actor ShellXClientLinkSupervisor: LinkSupervising {
     private var inviteFile: URL?
     private var inviteDeadline: Date?
     private var needsKeepFresh = true
+    /// From the latest mint's `relay_url`; `record.route` is only a fallback before any mint.
+    private var relayRoute: String?
 
     public var state: LinkState { engine.machine.state }
 
@@ -100,15 +107,24 @@ public actor ShellXClientLinkSupervisor: LinkSupervising {
             } else {
                 try await refresher.mintNow(name: ticketName)
             }
-            return nil
         } catch {
             return LinkFailure.code(for: error)
         }
+        // The positional route is always the full relay route from tickets.mint: cmux strips the path
+        // from invite routes, so the invite's (or a stale record's) route must never be used.
+        if let url = await refresher.relayURL(name: ticketName) {
+            guard let route = try? RelayRoute.cmuxRoute(from: url) else { return "bad_relay_url" }
+            relayRoute = route
+        }
+        return nil
     }
 
     func spawnCommand() -> (args: [String], env: [String: String]) {
-        (RemoteCommandLine.connect(paths: paths, machine: machine, route: record.route, slot: record.slot,
-                                   ticketFile: ticketFile, inviteFile: inviteFile, deviceName: deviceName), [:])
+        // Enrolled and no invite: pin the daemon known in the client state dir (as the e2e harness does).
+        let pinned = inviteFile == nil && record.enrolled && !record.daemonFingerprint.isEmpty ? record.daemonFingerprint : nil
+        return (RemoteCommandLine.connect(paths: paths, machine: machine, route: relayRoute ?? record.route, slot: record.slot,
+                                          ticketFile: ticketFile, inviteFile: inviteFile, deviceName: deviceName,
+                                          daemonFingerprint: pinned), [:])
     }
 
     func event(forLine line: String) -> LinkEvent? {

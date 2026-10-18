@@ -206,6 +206,8 @@ private let route = "relay+wss://relay.shellx.pro/v2/relay"
                 "--headless", "--json", "--exit-with-parent", "--device-name", "Mac"]
     #expect(RemoteCommandLine.connect(paths: P, machine: "m_1", route: route, slot: "sl", ticketFile: ticket, inviteFile: nil, deviceName: "Mac") == base)
     #expect(RemoteCommandLine.connect(paths: P, machine: "m_1", route: route, slot: "sl", ticketFile: ticket, inviteFile: URL(fileURLWithPath: "/t/i"), deviceName: "Mac") == base + ["--invite-file", "/t/i"])
+    #expect(RemoteCommandLine.connect(paths: P, machine: "m_1", route: route, slot: "sl", ticketFile: ticket, inviteFile: nil,
+                                      deviceName: "Mac", daemonFingerprint: "a1b2c3d4e5f60718") == base + ["--daemon", "a1b2c3d4e5f60718"])
 }
 
 @Test func attachWrapperQuotesAndLoops() {

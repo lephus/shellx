@@ -127,6 +127,7 @@ final class ScriptedCore: ShellXCoreCalling, @unchecked Sendable {
     /// Error codes returned by the next calls, first in first out.
     let failures = Locked<[String]>([])
     let lifetime = Locked<TimeInterval>(600)
+    let relayURL = Locked("wss://relay.test/v2/relay")
 
     init(clock: ManualClock, log: EventLog, coreStateDir: URL) {
         self.clock = clock; self.log = log; self.coreStateDir = coreStateDir
@@ -152,7 +153,7 @@ final class ScriptedCore: ShellXCoreCalling, @unchecked Sendable {
         let path = coreStateDir.appendingPathComponent("tickets/" + name).path
         let expires = Int(clock.now.timeIntervalSince1970 + lifetime.get())
         let body: [String: JSONValue] = ["ok": .object(["path": .string(path), "expires_at_unix": .number(Double(expires)),
-                                                        "relay_url": .string("wss://relay.test/v2/relay")])]
+                                                        "relay_url": .string(relayURL.get())])]
         return try JSONEncoder().encode(body)
     }
 }
