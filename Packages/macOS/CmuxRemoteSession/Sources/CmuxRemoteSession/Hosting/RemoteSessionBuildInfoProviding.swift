@@ -10,7 +10,7 @@ public import Foundation
 public protocol RemoteSessionBuildInfoProviding: Sendable {
     /// `CFBundleShortVersionString` of the running app, or `nil` when absent.
     func appVersion() -> String?
-    /// The cmuxd-remote manifest release builds embed in the app's Info
+    /// The shellx-remote manifest release builds embed in the app's Info
     /// dictionary, or `nil` for dev builds without one.
     func embeddedDaemonManifest() -> WorkspaceRemoteDaemonManifest?
     /// The directory containing the app executable, used only as a dev-only

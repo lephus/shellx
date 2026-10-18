@@ -38,7 +38,7 @@ extension RemoteSessionCoordinator {
             """
         }
         return """
-        relay_directory="$HOME/.cmux/relay"
+        relay_directory="$HOME/.shellx/relay"
         auth_file="$relay_directory/\(relayPort).auth"
         slot_file="$relay_directory/\(relayPort).slot"
         \(ownershipCheck)
@@ -98,12 +98,12 @@ extension RemoteSessionCoordinator {
 
         return """
         relay_socket='127.0.0.1:\(relayPort)'
-        relay_directory="$HOME/.cmux/relay"
+        relay_directory="$HOME/.shellx/relay"
         daemon_path_file="$relay_directory/\(relayPort).daemon_path"
         slot_file="$relay_directory/\(relayPort).slot"
         \(ownershipCheck)
         \(persistentStop)
-        socket_addr_file="$HOME/.cmux/socket_addr"
+        socket_addr_file="$HOME/.shellx/socket_addr"
         if [ -r "$socket_addr_file" ] && [ "$(tr -d '\\r\\n' < "$socket_addr_file")" = "$relay_socket" ]; then
           rm -f "$socket_addr_file"
         fi
@@ -125,10 +125,10 @@ extension RemoteSessionCoordinator {
         )
         return """
         relay_socket='127.0.0.1:\(relayPort)'
-        relay_directory="$HOME/.cmux/relay"
+        relay_directory="$HOME/.shellx/relay"
         slot_file="$relay_directory/\(relayPort).slot"
         \(ownershipCheck)
-        socket_addr_file="$HOME/.cmux/socket_addr"
+        socket_addr_file="$HOME/.shellx/socket_addr"
         if [ -r "$socket_addr_file" ] && [ "$(tr -d '\\r\\n' < "$socket_addr_file")" = "$relay_socket" ]; then
           rm -f "$socket_addr_file"
         fi
@@ -164,15 +164,15 @@ extension RemoteSessionCoordinator {
         #!/bin/sh
         set -eu
 
-        daemon="$HOME/.cmux/bin/cmuxd-remote-current"
+        daemon="$HOME/.shellx/bin/shellx-remote-current"
         socket_path="${CMUX_SOCKET_PATH:-}"
-        if [ -z "$socket_path" ] && [ -r "$HOME/.cmux/socket_addr" ]; then
-          socket_path="$(tr -d '\\r\\n' < "$HOME/.cmux/socket_addr")"
+        if [ -z "$socket_path" ] && [ -r "$HOME/.shellx/socket_addr" ]; then
+          socket_path="$(tr -d '\\r\\n' < "$HOME/.shellx/socket_addr")"
         fi
 
         if [ -n "$socket_path" ] && [ "${socket_path#/}" = "$socket_path" ] && [ "${socket_path#*:}" != "$socket_path" ]; then
           relay_port="${socket_path##*:}"
-          relay_map="$HOME/.cmux/relay/${relay_port}.daemon_path"
+          relay_map="$HOME/.shellx/relay/${relay_port}.daemon_path"
           if [ -r "$relay_map" ]; then
             mapped_daemon="$(tr -d '\\r\\n' < "$relay_map")"
             if [ -n "$mapped_daemon" ] && [ -x "$mapped_daemon" ]; then
@@ -195,7 +195,7 @@ extension RemoteSessionCoordinator {
         if let codexWrapperScript,
            !codexWrapperScript.components(separatedBy: .newlines).contains("CMUXREMOTE_CODEX_WRAPPER") {
             codexWrapperInstall = """
-            codex_wrapper_tmp="$HOME/.cmux/bin/.codex-wrapper.tmp.$$"
+            codex_wrapper_tmp="$HOME/.shellx/bin/.codex-wrapper.tmp.$$"
             if ! cat > "$codex_wrapper_tmp" <<'CMUXREMOTE_CODEX_WRAPPER'
             \(codexWrapperScript)
             CMUXREMOTE_CODEX_WRAPPER
@@ -204,20 +204,20 @@ extension RemoteSessionCoordinator {
               exit 1
             fi
             chmod 755 "$codex_wrapper_tmp" || { rm -f "$codex_wrapper_tmp"; exit 1; }
-            mv -f "$codex_wrapper_tmp" "$HOME/.cmux/bin/cmux-codex-wrapper" || { rm -f "$codex_wrapper_tmp"; exit 1; }
+            mv -f "$codex_wrapper_tmp" "$HOME/.shellx/bin/cmux-codex-wrapper" || { rm -f "$codex_wrapper_tmp"; exit 1; }
             """
         } else {
             codexWrapperInstall = ""
         }
         return """
-        mkdir -p "$HOME/.cmux/bin" "$HOME/.cmux/relay"
-        ln -sf \(daemonPathExpression) "$HOME/.cmux/bin/cmuxd-remote-current"
-        wrapper_tmp="$HOME/.cmux/bin/.cmux-wrapper.tmp.$$"
+        mkdir -p "$HOME/.shellx/bin" "$HOME/.shellx/relay"
+        ln -sf \(daemonPathExpression) "$HOME/.shellx/bin/shellx-remote-current"
+        wrapper_tmp="$HOME/.shellx/bin/.shellx-wrapper.tmp.$$"
         cat > "$wrapper_tmp" <<'CMUXWRAPPER'
         \(remoteCLIWrapperScript())
         CMUXWRAPPER
         chmod 755 "$wrapper_tmp"
-        mv -f "$wrapper_tmp" "$HOME/.cmux/bin/cmux"
+        mv -f "$wrapper_tmp" "$HOME/.shellx/bin/shellx"
         \(codexWrapperInstall)
         """
     }
@@ -234,28 +234,28 @@ extension RemoteSessionCoordinator {
         let daemonPathExpression = remoteDaemonPathShellExpression(trimmedRemotePath)
         let slotMetadataLine: String
         if let slot = normalizedPersistentDaemonSlotForRemoteCleanup(persistentDaemonSlot) {
-            slotMetadataLine = "printf '%s' \(slot.shellSingleQuoted) > \"$HOME/.cmux/relay/\(relayPort).slot\"\nchmod 600 \"$HOME/.cmux/relay/\(relayPort).slot\""
+            slotMetadataLine = "printf '%s' \(slot.shellSingleQuoted) > \"$HOME/.shellx/relay/\(relayPort).slot\"\nchmod 600 \"$HOME/.shellx/relay/\(relayPort).slot\""
         } else {
-            slotMetadataLine = "rm -f \"$HOME/.cmux/relay/\(relayPort).slot\""
+            slotMetadataLine = "rm -f \"$HOME/.shellx/relay/\(relayPort).slot\""
         }
         let authPayload = """
         {"relay_id":"\(relayID)","relay_token":"\(relayToken)"}
         """
         return """
         umask 077
-        mkdir -p "$HOME/.cmux" "$HOME/.cmux/relay"
-        chmod 700 "$HOME/.cmux/relay"
+        mkdir -p "$HOME/.shellx" "$HOME/.shellx/relay"
+        chmod 700 "$HOME/.shellx/relay"
         \(remoteCLIWrapperInstallScript(
             daemonRemotePath: trimmedRemotePath,
             codexWrapperScript: codexWrapperScript
         ))
-        printf '%s' \(daemonPathExpression) > "$HOME/.cmux/relay/\(relayPort).daemon_path"
+        printf '%s' \(daemonPathExpression) > "$HOME/.shellx/relay/\(relayPort).daemon_path"
         \(slotMetadataLine)
-        cat > "$HOME/.cmux/relay/\(relayPort).auth" <<'CMUXRELAYAUTH'
+        cat > "$HOME/.shellx/relay/\(relayPort).auth" <<'CMUXRELAYAUTH'
         \(authPayload)
         CMUXRELAYAUTH
-        chmod 600 "$HOME/.cmux/relay/\(relayPort).auth"
-        printf '%s' '127.0.0.1:\(relayPort)' > "$HOME/.cmux/socket_addr"
+        chmod 600 "$HOME/.shellx/relay/\(relayPort).auth"
+        printf '%s' '127.0.0.1:\(relayPort)' > "$HOME/.shellx/socket_addr"
         """
     }
 
