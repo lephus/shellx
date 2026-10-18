@@ -187,9 +187,10 @@ describe("migrate", () => {
       join(dir, "0001_base.sql"),
       "CREATE TABLE devices (id TEXT PRIMARY KEY); CREATE TABLE tokens (device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE); INSERT INTO devices VALUES ('d'); INSERT INTO tokens VALUES ('d');",
     );
-    writeFileSync(join(dir, "0002_rebuild.sql"), "CREATE TABLE side (x INTEGER);\ndrop table devices;\n");
     const db = openFresh();
     try {
+      migrate(db, dir);
+      writeFileSync(join(dir, "0002_rebuild.sql"), "CREATE TABLE side (x INTEGER);\ndrop table devices;\n");
       expect(() => migrate(db, dir)).toThrow(/foreign_keys=off/);
       expect(db.all("SELECT 1 FROM tokens")).toHaveLength(1);
       expect(db.get("SELECT 1 FROM sqlite_master WHERE name = 'side'")).toBeUndefined();

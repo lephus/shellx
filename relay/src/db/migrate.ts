@@ -23,7 +23,7 @@ export function migrate(db: Db, dir: string = MIGRATIONS_DIR): string[] {
   const pending = readdirSync(dir)
     .filter((name) => name.endsWith(".sql") && !done.has(name))
     .sort();
-  for (const name of pending) {
+  const parsed = pending.map((name) => {
     const sql = readFileSync(join(dir, name), "utf8");
     // A UTF-8 BOM and trailing whitespace on the directive line are tolerated.
     const firstLine = (sql.split(/\r?\n/, 1)[0] ?? "").replace(/^\uFEFF/, "").trimEnd();
@@ -32,6 +32,9 @@ export function migrate(db: Db, dir: string = MIGRATIONS_DIR): string[] {
     if (!foreignKeysOff && /drop\s+table/i.test(sql)) {
       throw new Error(`${name} contains DROP TABLE but lacks the "${FOREIGN_KEYS_OFF_DIRECTIVE}" first line`);
     }
+    return { name, sql, foreignKeysOff };
+  });
+  for (const { name, sql, foreignKeysOff } of parsed) {
     // The pragma is a no-op inside a transaction, so it is switched outside it and restored in `finally`.
     if (foreignKeysOff) db.exec("PRAGMA foreign_keys = OFF");
     try {
