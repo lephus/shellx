@@ -4,10 +4,15 @@ import PackageDescription
 let package = Package(
     name: "ShellXBrand",
     platforms: [.macOS(.v14)],
-    products: [.library(name: "ShellXBrand", targets: ["ShellXBrand"])],
+    products: [
+        .library(name: "ShellXBrand", targets: ["ShellXBrand"]),
+        .library(name: "ShellXRemoteCore", targets: ["ShellXRemoteCore"])
+    ],
     targets: [
         .target(name: "ShellXBrand"),
-        .testTarget(name: "ShellXBrandTests", dependencies: ["ShellXBrand"])
+        .testTarget(name: "ShellXBrandTests", dependencies: ["ShellXBrand"]),
+        .target(name: "ShellXRemoteCore"),
+        .testTarget(name: "ShellXRemoteCoreTests", dependencies: ["ShellXRemoteCore"])
     ],
     swiftLanguageModes: [.v6]
 )
