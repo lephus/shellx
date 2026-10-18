@@ -143,8 +143,14 @@ impl RootView {
             }
             AppCommand::ToggleSidebar => self.toggle_sidebar(cx),
             AppCommand::OpenSettings => self.open_settings(cx),
-            // Wired in Task 9 (TermView keeps the spike's paste meanwhile).
-            AppCommand::Copy | AppCommand::Paste => {}
+            // A focused pane handles these itself; this is the fallback when
+            // the key reached the root (focus outside the panes).
+            AppCommand::Copy | AppCommand::Paste => {
+                if let Some(live) = self.host.get(self.tabs.active().focused) {
+                    live.view
+                        .update(cx, |view, cx| view.clipboard_command(command, cx));
+                }
+            }
         }
     }
 

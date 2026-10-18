@@ -165,10 +165,28 @@ impl TermCore {
         Ok(self.render.text_lines()?)
     }
 
-    /// Viewport selection text, `start`/`end` as (col, row).
-    #[allow(dead_code)] // used by later tasks (selection copy, pane close)
+    /// Viewport selection text, `start`/`end` as (col, row), inclusive.
+    /// libghostty walks the real cells, so wide (CJK) characters, combining
+    /// marks and soft-wrapped rows come out right; rows join with `\n`.
     pub fn selection_text(&mut self, start: (u16, u16), end: (u16, u16)) -> Option<String> {
         self.terminal.selection_text(start, end)
+    }
+
+    /// Row offset of the viewport within scrollback + screen. Selections
+    /// live in viewport rows, so a change of this moves them (new output
+    /// scrolling the screen, or the mouse wheel).
+    pub fn viewport_offset(&self) -> Option<u64> {
+        self.terminal.scrollbar().map(|s| s.offset)
+    }
+
+    pub fn scroll_to_bottom(&mut self) {
+        self.terminal.scroll_to_bottom();
+    }
+
+    /// Cursor (col, row) in the active screen, also while the cursor is
+    /// hidden; equals the viewport cell when not scrolled back.
+    pub fn cursor_position(&self) -> Option<(u16, u16)> {
+        self.terminal.cursor_position()
     }
 
     #[allow(dead_code)] // used by later tasks (selection copy, pane close)
@@ -255,6 +273,38 @@ mod tests {
         assert_eq!(t.vt_cols_rows(), (100, 30));
         t.resize(0, 0, 8, 16).unwrap();
         assert_eq!(t.size(), (2, 1));
+    }
+
+    #[test]
+    fn selection_text_wide_chars_and_rows() {
+        let (mut t, _) = core();
+        t.feed("ab漢字c\r\ntiếng Việt".as_bytes());
+        // 漢 and 字 take two cells each: "ab漢字c" spans columns 0..=6.
+        assert_eq!(t.selection_text((0, 0), (6, 0)).as_deref(), Some("ab漢字c"));
+        let two = t.selection_text((2, 0), (4, 1)).unwrap();
+        assert_eq!(shellx_model::selection::to_crlf(&two), "漢字c\r\ntiếng");
+        assert_eq!(t.cursor_position(), Some((10, 1)));
+        assert_eq!(t.viewport_offset(), Some(0));
+    }
+
+    #[test]
+    fn viewport_offset_follows_output_and_wheel() {
+        let (mut t, _) = core();
+        t.feed(b"top\r\n");
+        let before = t.viewport_offset().unwrap();
+        t.feed("x\r\n".repeat(30).as_bytes());
+        let after = t.viewport_offset().unwrap();
+        // 30 new lines on a 24-row screen: the content moved up by `after - before`.
+        assert!(after > before, "{before} -> {after}");
+        t.scroll_lines(-3);
+        assert_eq!(t.viewport_offset(), Some(after - 3));
+        t.scroll_to_bottom();
+        assert_eq!(t.viewport_offset(), Some(after));
+    }
+
+    #[test]
+    fn smoke_input_paths() {
+        crate::smoke::input_paths().unwrap();
     }
 
     #[test]

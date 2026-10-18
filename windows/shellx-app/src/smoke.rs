@@ -28,6 +28,7 @@ use crate::shell_info::SHELL_STRINGS;
 use crate::term_core::{PtyLink, TermCore, rgb};
 use crate::workspace::{PaneHost, model_panes, spawn_local_pane};
 use shellx_model::palette::TERM_BG;
+use shellx_model::selection::to_crlf;
 use shellx_model::strings::{Lang, t};
 
 const TIMEOUT: Duration = Duration::from_secs(45);
@@ -128,6 +129,55 @@ pub fn ui_assets() -> Result<()> {
     Ok(())
 }
 
+/// Cross-platform, no GPUI: the window's paste, IME-commit and copy paths
+/// (`TermView` calls exactly these `TermCore` methods) over a recording
+/// link. Paste with mode 2004 on is ONE bracketed write with the embedded
+/// end marker stripped; an IME commit is ONE write of the composed UTF-8;
+/// copy reads the cells through libghostty (wide chars) with CRLF joins.
+pub fn input_paths() -> Result<()> {
+    #[derive(Default)]
+    struct Recorder(std::sync::Mutex<Vec<Vec<u8>>>);
+    impl PtyLink for Recorder {
+        fn write(&self, bytes: &[u8]) {
+            self.0.lock().unwrap().push(bytes.to_vec());
+        }
+        fn resize(&self, _: u16, _: u16, _: u32, _: u32) -> Result<()> {
+            Ok(())
+        }
+        fn is_closed(&self) -> bool {
+            false
+        }
+    }
+    let link = std::sync::Arc::new(Recorder::default());
+    let mut core = TermCore::new(link.clone(), 80, 24)?;
+    let writes = || link.0.lock().unwrap().clone();
+    core.feed(b"\x1b[?2004h");
+    ensure!(core.bracketed_paste(), "mode 2004 not set");
+    core.paste("echo a\x1b[201~b\n");
+    ensure!(
+        writes() == vec![b"\x1b[200~echo ab\r\x1b[201~".to_vec()],
+        "bracketed paste: {:?}",
+        writes()
+    );
+    core.send_text("ti\u{1ebf}ng Vi\u{1ec7}t");
+    let viet = [
+        0x74, 0x69, 0xe1, 0xba, 0xbf, 0x6e, 0x67, 0x20, 0x56, 0x69, 0xe1, 0xbb, 0x87, 0x74,
+    ];
+    ensure!(
+        writes().len() == 2 && writes()[1] == viet,
+        "IME commit: {:?}",
+        writes()
+    );
+    core.feed("ab\u{6f22}\u{5b57}c\r\nok".as_bytes());
+    let copied = core.selection_text((0, 0), (1, 1)).map(|t| to_crlf(&t));
+    ensure!(
+        copied.as_deref() == Some("ab\u{6f22}\u{5b57}c\r\nok"),
+        "copy: {copied:?}"
+    );
+    println!("smoke-input: bracketed paste, IME commit (one UTF-8 write), copy ok");
+    Ok(())
+}
+
 /// Cross-platform, no GPUI: shellx-core links and answers over a temp state
 /// dir. No network is touched (a logged-out core fails before any request).
 pub fn core_bridge() -> Result<()> {
@@ -167,6 +217,7 @@ pub fn core_bridge() -> Result<()> {
 pub fn run() -> Result<()> {
     ui_assets()?;
     core_bridge()?;
+    input_paths()?;
     let started = Instant::now();
     let (program, args) = default_shell();
     let mut full_args = args.clone();
