@@ -39,7 +39,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Result, anyhow, bail};
 use shellx_model::core_api::{CoreCall, CoreErr, TicketFile, mint_connect_ticket};
 use shellx_model::links::RemoteLink as LinkRecord;
-use shellx_model::remote_state::{ConnAction, ConnEvent, ConnPhase, ConnState};
+use shellx_model::remote_state::{ConnAction, ConnEvent, ConnPhase, ConnState, backoff_ms};
 use shellx_model::strings::Str;
 use shellx_remote::{AttachEvent, ConnectConfig, RemoteClient, RemoteTerminal};
 
@@ -117,6 +117,9 @@ pub struct SessionConfig {
     pub connector: Arc<dyn Connector>,
     /// cmux-remote client identity dir (`paths::remote_dir()`).
     pub state_dir: PathBuf,
+    /// shellx-core's tickets dir (`paths::core_dir()?.join("tickets")`):
+    /// an invitation is deleted only from here (and only `invite-*.uri`).
+    pub invite_dir: PathBuf,
     /// Shown on the Mac's approval screen (`os_info::device_name()`).
     pub device_name: String,
     /// Where `enrolled = true` is saved after the first connect.
@@ -147,6 +150,9 @@ pub struct SessionStatus {
     /// Saving `enrolled` to `links.json` failed (the connect still works;
     /// the next start falls back to the client's own enrollment record).
     pub save_error: Option<String>,
+    /// The last attach of a pane failed while the connection is fine; the
+    /// pane retries on its own backoff (cleared when every pane attached).
+    pub attach_error: Option<String>,
     /// The worker stopped (closed, ended or failed for good): open a new
     /// session for this Mac next time.
     pub finished: bool,
@@ -160,6 +166,7 @@ impl SessionStatus {
             reason: None,
             error: None,
             save_error: None,
+            attach_error: None,
             finished: false,
         }
     }
@@ -220,7 +227,10 @@ impl RemoteSession {
         rows: u16,
         sink: PaneSink,
     ) -> Result<RemotePane> {
-        if self.status().finished {
+        // Checked and sent under the status lock: once the worker published
+        // `finished`, no OpenPane can slip in behind its final drain.
+        let status = lock(&self.status);
+        if status.finished {
             bail!("this remote session has finished");
         }
         let id = self.next_pane.fetch_add(1, Ordering::Relaxed);
@@ -233,6 +243,7 @@ impl RemoteSession {
                 sink,
             })
             .map_err(|_| anyhow!("this remote session has finished"))?;
+        drop(status);
         Ok(RemotePane { id, link })
     }
 
@@ -304,6 +315,16 @@ type Attached = (
     (u16, u16),
 );
 
+/// An attached view: its input half, its events and the terminal id.
+type View = (Arc<dyn ViewInput>, Receiver<AttachEvent>, String);
+
+/// An attach that failed; `created` is a terminal this attempt opened on the
+/// Mac (a retry attaches to it instead of opening another).
+struct AttachFail {
+    reason: String,
+    created: Option<String>,
+}
+
 enum EndCheck {
     Gone,
     StillThere,
@@ -333,7 +354,7 @@ enum Msg {
     Attached {
         attempt: u32,
         pane: u64,
-        result: Result<Attached, String>,
+        result: Result<Attached, AttachFail>,
     },
     ViewEnd {
         attempt: u32,
@@ -357,6 +378,10 @@ struct Pane {
     attaching: bool,
     /// Generation of the installed view (`RemoteLink::install`).
     view_gen: Option<u64>,
+    /// Consecutive attach failures on an open connection, and when to retry
+    /// (same 1, 2, 4, 8, 16, 30 s schedule as reconnects).
+    attach_failures: u32,
+    retry_at: Option<u64>,
 }
 
 /// What a job thread needs to mint and connect (cloned into it).
@@ -367,11 +392,21 @@ struct Ctx {
     core: Arc<dyn CoreCall>,
     connector: Arc<dyn Connector>,
     state_dir: PathBuf,
+    invite_dir: PathBuf,
     device_name: String,
     links: Option<Arc<LinksStore>>,
     record: Arc<Mutex<LinkRecord>>,
     /// The last ticket file shellx-core wrote (deleted when the session ends).
     last_ticket: Arc<Mutex<Option<PathBuf>>>,
+}
+
+/// Why the worker loop stopped.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Stop {
+    /// The last pane closed: a queued `OpenPane` revives the session.
+    Idle,
+    /// Closed by the app, the remote side ended, or a session error.
+    Final,
 }
 
 struct Worker {
@@ -382,27 +417,42 @@ struct Worker {
     panes: BTreeMap<u64, Pane>,
     /// Attempt whose connect job is running.
     connecting: Option<u32>,
+    /// Attempt whose connect job enrolls with the invitation (it may outlive
+    /// its attempt: the Mac owner can approve up to 300 s later).
+    enrolling: Option<u32>,
+    /// A connect held back while `enrolling` runs (one invitation, one
+    /// enrollment): (attempt, ticket path).
+    deferred: Option<(u32, String)>,
     live: Option<(u32, Arc<dyn Host>)>,
     next_tick: Option<u64>,
     shown: Option<Str>,
     error: Option<SessionError>,
     save_error: Option<String>,
+    attach_error: Option<String>,
     started: Instant,
     time_scale: u64,
-    done: bool,
+    stop: Option<Stop>,
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-fn spawn_job(name: &str, job: impl FnOnce() + Send + 'static) {
+/// Run `job` on its own thread. If the thread cannot start, `on_fail` goes
+/// to the worker instead, so the attempt fails (and backs off) rather than
+/// hanging.
+fn spawn_job(tx: &Sender<Msg>, name: &str, on_fail: Msg, job: impl FnOnce() + Send + 'static) {
     if let Err(error) = std::thread::Builder::new()
         .name(format!("shellx-remote-{name}"))
         .spawn(job)
     {
         eprintln!("shellx: could not start the {name} job: {error}");
+        let _ = tx.send(on_fail);
     }
+}
+
+fn spawn_failed(name: &str) -> String {
+    format!("could not start the {name} thread")
 }
 
 impl Worker {
@@ -414,6 +464,7 @@ impl Worker {
                 core: cfg.core,
                 connector: cfg.connector,
                 state_dir: cfg.state_dir,
+                invite_dir: cfg.invite_dir,
                 device_name: cfg.device_name,
                 links: cfg.links.map(Arc::new),
                 record: Arc::new(Mutex::new(cfg.record)),
@@ -424,14 +475,17 @@ impl Worker {
             state: ConnState::new(),
             panes: BTreeMap::new(),
             connecting: None,
+            enrolling: None,
+            deferred: None,
             live: None,
             next_tick: None,
             shown: None,
             error: None,
             save_error: None,
+            attach_error: None,
             started: Instant::now(),
             time_scale: cfg.time_scale.max(1),
-            done: false,
+            stop: None,
         }
     }
 
@@ -439,11 +493,79 @@ impl Worker {
         (self.started.elapsed().as_millis() as u64).saturating_mul(self.time_scale)
     }
 
+    /// The first reason to stop wins (closing the last pane sets Idle
+    /// before `ConnEvent::Close` ends the state machine).
+    fn stop(&mut self, how: Stop) {
+        if self.stop.is_none() {
+            self.stop = Some(how);
+        }
+    }
+
     fn run(mut self, rx: Receiver<Msg>) {
-        while !self.done {
+        loop {
+            self.serve(&rx);
+            // `finished` is published under the status lock that
+            // `open_pane` sends under, so every OpenPane sent before it is
+            // already queued here.
+            self.publish();
+            let mut revived = false;
+            let mut late = Vec::new();
+            while let Ok(msg) = rx.try_recv() {
+                match msg {
+                    Msg::OpenPane { .. } if self.stop == Some(Stop::Idle) => {
+                        if !revived {
+                            revived = true;
+                            self.revive();
+                        }
+                        self.handle(msg);
+                    }
+                    Msg::OpenPane { link, sink, .. } => late.push((link, sink)),
+                    other if revived => self.handle(other),
+                    _ => {}
+                }
+            }
+            if revived {
+                continue; // serve again (or re-check the stop it reached)
+            }
+            // Panes opened on a session that ended for good: a session
+            // error stays visible on them, otherwise they end at once.
+            for (link, sink) in late {
+                if self.error.is_some() {
+                    sink(PaneEvent::Status);
+                } else {
+                    link.mark_ended();
+                    sink(PaneEvent::Ended);
+                }
+            }
+            break;
+        }
+        if let Some(path) = lock(&self.ctx.last_ticket).take() {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+
+    /// The last pane closed and a new one was already on its way: start over.
+    fn revive(&mut self) {
+        self.state = ConnState::new();
+        self.stop = None;
+        self.shown = None;
+        self.attach_error = None;
+        self.next_tick = None;
+        self.publish();
+    }
+
+    fn serve(&mut self, rx: &Receiver<Msg>) {
+        while self.stop.is_none() {
             let mut wait = WATCHDOG;
-            if let Some(at) = self.next_tick {
-                let left = at.saturating_sub(self.now_ms()) / self.time_scale;
+            let now = self.now_ms();
+            let next = self
+                .panes
+                .values()
+                .filter_map(|p| p.retry_at)
+                .chain(self.next_tick)
+                .min();
+            if let Some(at) = next {
+                let left = at.saturating_sub(now) / self.time_scale;
                 wait = wait.min(Duration::from_millis(left));
             }
             match rx.recv_timeout(wait) {
@@ -451,9 +573,25 @@ impl Worker {
                 Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => self.handle(Msg::Close),
             }
-            if self.next_tick.is_some_and(|at| self.now_ms() >= at) {
+            if self.stop.is_some() {
+                break;
+            }
+            let now = self.now_ms();
+            if self.next_tick.is_some_and(|at| now >= at) {
                 self.next_tick = None;
                 self.feed(ConnEvent::Tick);
+            }
+            let due: Vec<u64> = self
+                .panes
+                .iter()
+                .filter(|(_, p)| p.retry_at.is_some_and(|at| now >= at))
+                .map(|(id, _)| *id)
+                .collect();
+            for pane in due {
+                if let Some(p) = self.panes.get_mut(&pane) {
+                    p.retry_at = None;
+                }
+                self.attach(pane);
             }
             let closed = self
                 .live
@@ -463,14 +601,9 @@ impl Worker {
                 self.lose(attempt, "the connection to the Mac closed".into());
             }
         }
+        self.connecting = None;
+        self.deferred = None;
         self.drop_live();
-        for pane in self.panes.values() {
-            pane.link.clear_view();
-        }
-        if let Some(path) = lock(&self.ctx.last_ticket).take() {
-            let _ = std::fs::remove_file(path);
-        }
-        self.publish();
     }
 
     fn publish(&self) {
@@ -480,7 +613,8 @@ impl Worker {
             reason: self.state.last_reason().map(str::to_owned),
             error: self.error.clone(),
             save_error: self.save_error.clone(),
-            finished: self.done,
+            attach_error: self.attach_error.clone(),
+            finished: self.stop.is_some(),
         };
         let changed = {
             let mut status = lock(&self.status);
@@ -500,6 +634,10 @@ impl Worker {
         for action in actions {
             self.act(action);
         }
+        if *self.state.phase() == ConnPhase::Connected {
+            // The pill is for the states before Connected only.
+            self.shown = None;
+        }
         self.publish();
     }
 
@@ -507,7 +645,11 @@ impl Worker {
         match action {
             ConnAction::MintTicket { attempt } => {
                 let (ctx, tx) = (self.ctx.clone(), self.tx.clone());
-                spawn_job("mint", move || {
+                let on_fail = Msg::Minted {
+                    attempt,
+                    result: Err(CoreErr::new("spawn", &spawn_failed("mint"))),
+                };
+                spawn_job(&self.tx, "mint", on_fail, move || {
                     let result = ctx.mint();
                     let _ = tx.send(Msg::Minted { attempt, result });
                 });
@@ -517,11 +659,13 @@ impl Worker {
                 ticket_path,
             } => {
                 self.connecting = Some(attempt);
-                let (ctx, tx) = (self.ctx.clone(), self.tx.clone());
-                spawn_job("connect", move || {
-                    let result = ctx.connect(PathBuf::from(ticket_path));
-                    let _ = tx.send(Msg::Linked { attempt, result });
-                });
+                if self.enrolling.is_some_and(|e| e != attempt) {
+                    // The earlier enrollment may still be approved; its
+                    // result decides this attempt (see `linked`).
+                    self.deferred = Some((attempt, ticket_path));
+                } else {
+                    self.spawn_connect(attempt, ticket_path);
+                }
             }
             ConnAction::ScheduleTick { at_ms } => self.next_tick = Some(at_ms),
             ConnAction::ShowStatus(text) => self.shown = Some(text),
@@ -531,18 +675,38 @@ impl Worker {
                 if self.connecting == Some(attempt) {
                     self.connecting = None;
                 }
+                if self.deferred.as_ref().is_some_and(|(d, _)| *d == attempt) {
+                    self.deferred = None;
+                }
                 if self.live.as_ref().is_some_and(|(live, _)| *live == attempt) {
                     self.drop_live();
                 }
             }
             ConnAction::Drop { attempt: None } => {
                 self.connecting = None;
+                self.deferred = None;
                 self.drop_live();
                 if *self.state.phase() == ConnPhase::Ended {
-                    self.done = true;
+                    self.stop(Stop::Final);
                 }
             }
         }
+    }
+
+    fn spawn_connect(&mut self, attempt: u32, ticket_path: String) {
+        let use_invite = self.ctx.uses_invite();
+        if use_invite {
+            self.enrolling = Some(attempt);
+        }
+        let (ctx, tx) = (self.ctx.clone(), self.tx.clone());
+        let on_fail = Msg::Linked {
+            attempt,
+            result: Err(LinkFail::Other(spawn_failed("connect"))),
+        };
+        spawn_job(&self.tx, "connect", on_fail, move || {
+            let result = ctx.connect(PathBuf::from(ticket_path), use_invite);
+            let _ = tx.send(Msg::Linked { attempt, result });
+        });
     }
 
     fn live_attempt(&self) -> Option<u32> {
@@ -556,6 +720,7 @@ impl Worker {
             pane.link.clear_view();
             pane.view_gen = None;
             pane.attaching = false;
+            pane.retry_at = None;
         }
     }
 
@@ -587,6 +752,8 @@ impl Worker {
                         terminal_id,
                         attaching: false,
                         view_gen: None,
+                        attach_failures: 0,
+                        retry_at: None,
                     },
                 );
                 if *self.state.phase() == ConnPhase::Disconnected {
@@ -603,9 +770,8 @@ impl Worker {
                     p.link.clear_view();
                 }
                 if self.panes.is_empty() {
+                    self.stop(Stop::Idle);
                     self.feed(ConnEvent::Close);
-                    self.done = true;
-                    self.publish();
                 }
             }
             Msg::MachineOnline(online) => self.feed(if online {
@@ -614,9 +780,8 @@ impl Worker {
                 ConnEvent::MachineOffline
             }),
             Msg::Close => {
+                self.stop = Some(Stop::Final);
                 self.feed(ConnEvent::Close);
-                self.done = true;
-                self.publish();
             }
             Msg::Minted { attempt, result } => {
                 self.feed(ConnEvent::TicketMinted { attempt, result })
@@ -660,7 +825,23 @@ impl Worker {
     }
 
     fn linked(&mut self, attempt: u32, result: Result<Linked, LinkFail>) {
-        if self.connecting != Some(attempt) || self.done {
+        if self.enrolling == Some(attempt) {
+            self.enrolling = None;
+            if self.connecting != Some(attempt) {
+                // The enrollment outlived its attempt (offline meanwhile).
+                // A connect held back for it takes its result, unless it
+                // simply failed: then that connect runs now.
+                let Some((deferred, ticket_path)) = self.deferred.take() else {
+                    return;
+                };
+                match result {
+                    Err(LinkFail::Other(_)) => self.spawn_connect(deferred, ticket_path),
+                    result => self.linked(deferred, result),
+                }
+                return;
+            }
+        }
+        if self.connecting != Some(attempt) || self.stop.is_some() {
             return; // abandoned attempt: its client (if any) drops here
         }
         self.connecting = None;
@@ -707,13 +888,21 @@ impl Worker {
             return;
         }
         p.attaching = true;
+        p.retry_at = None;
         let want = p.want.clone();
         let size = p.link.size();
         let tx = self.tx.clone();
-        spawn_job("attach", move || {
+        let on_fail = Msg::Attached {
+            attempt,
+            pane,
+            result: Err(AttachFail {
+                reason: spawn_failed("attach"),
+                created: None,
+            }),
+        };
+        spawn_job(&self.tx, "attach", on_fail, move || {
             let result = resolve_and_attach(&*host, &want, &claimed, size)
-                .map(|(view, events, id)| (view, events, id, size))
-                .map_err(|error| format!("{error:#}"));
+                .map(|(view, events, id)| (view, events, id, size));
             let _ = tx.send(Msg::Attached {
                 attempt,
                 pane,
@@ -722,18 +911,37 @@ impl Worker {
         });
     }
 
-    fn attached(&mut self, attempt: u32, pane: u64, result: Result<Attached, String>) {
-        if self.live_attempt() != Some(attempt) {
+    fn attached(&mut self, attempt: u32, pane: u64, result: Result<Attached, AttachFail>) {
+        let Some((live, host)) = self.live.clone() else {
             return; // a view of a dropped client: dropping it here closes it
+        };
+        if live != attempt {
+            return;
         }
+        let now = self.now_ms();
         let Some(p) = self.panes.get_mut(&pane) else {
             return;
         };
         p.attaching = false;
         let (view, events, terminal_id, size) = match result {
             Ok(attached) => attached,
-            Err(reason) => return self.lose(attempt, reason),
+            Err(fail) if host.closed() => return self.lose(attempt, fail.reason),
+            Err(fail) => {
+                // The connection is fine; only this pane's attach failed.
+                // Retry it on its own backoff, never reconnect for it, and
+                // never open a second terminal on the Mac for it.
+                if let Some(created) = fail.created {
+                    p.terminal_id = Some(created.clone());
+                    p.want = Want::Terminal(created);
+                }
+                p.attach_failures = p.attach_failures.saturating_add(1);
+                p.retry_at = Some(now + backoff_ms(p.attach_failures));
+                self.attach_error = Some(fail.reason);
+                self.publish();
+                return;
+            }
         };
+        p.attach_failures = 0;
         if p.terminal_id.as_deref() != Some(terminal_id.as_str())
             || !matches!(p.want, Want::Terminal(_))
         {
@@ -746,7 +954,16 @@ impl Worker {
         let view_gen = p.link.install(view, size);
         p.view_gen = Some(view_gen);
         let (link, sink, tx) = (p.link.clone(), p.sink.clone(), self.tx.clone());
-        spawn_job("pump", move || {
+        if self.panes.values().all(|p| p.attach_failures == 0) {
+            self.attach_error = None;
+        }
+        let on_fail = Msg::ViewEnd {
+            attempt,
+            pane,
+            view_gen,
+            end: PumpEnd::Disconnected(spawn_failed("pump")),
+        };
+        spawn_job(&self.tx, "pump", on_fail, move || {
             let end = pump(&events, &link, view_gen, &sink);
             let _ = tx.send(Msg::ViewEnd {
                 attempt,
@@ -755,6 +972,7 @@ impl Worker {
                 end,
             });
         });
+        self.publish();
     }
 
     fn view_end(&mut self, attempt: u32, pane: u64, view_gen: u64, end: PumpEnd) {
@@ -781,7 +999,13 @@ impl Worker {
                 }
                 let terminal_id = self.panes.get(&pane).and_then(|p| p.terminal_id.clone());
                 let tx = self.tx.clone();
-                spawn_job("end-check", move || {
+                let on_fail = Msg::EndChecked {
+                    attempt,
+                    pane,
+                    view_gen,
+                    check: EndCheck::Lost(spawn_failed("end-check")),
+                };
+                spawn_job(&self.tx, "end-check", on_fail, move || {
                     let check = match host.list_terminals() {
                         Err(error) => EndCheck::Lost(format!("{error:#}")),
                         Ok(_) if host.closed() => {
@@ -831,15 +1055,30 @@ fn resolve_and_attach(
     want: &Want,
     claimed: &[String],
     (cols, rows): (u16, u16),
-) -> Result<(Arc<dyn ViewInput>, Receiver<AttachEvent>, String)> {
+) -> Result<View, AttachFail> {
+    let fail = |error: anyhow::Error, created: Option<String>| AttachFail {
+        reason: format!("{error:#}"),
+        created,
+    };
+    let mut created = None;
+    let create = |created: &mut Option<String>| -> Result<String, AttachFail> {
+        let id = host.create_terminal().map_err(|e| fail(e, None))?.id;
+        *created = Some(id.clone());
+        Ok(id)
+    };
     let id = match want {
-        Want::New => host.create_terminal()?.id,
-        Want::First => match host.list_terminals()?.into_iter().next() {
+        Want::New => create(&mut created)?,
+        Want::First => match host
+            .list_terminals()
+            .map_err(|e| fail(e, None))?
+            .into_iter()
+            .next()
+        {
             Some(terminal) => terminal.id,
-            None => host.create_terminal()?.id,
+            None => create(&mut created)?,
         },
         Want::Terminal(id) => {
-            let list = host.list_terminals()?;
+            let list = host.list_terminals().map_err(|e| fail(e, None))?;
             if list.iter().any(|t| &t.id == id) {
                 id.clone()
             } else {
@@ -847,12 +1086,14 @@ fn resolve_and_attach(
                 // terminal, or a new one, rather than an empty pane.
                 match list.into_iter().find(|t| !claimed.contains(&t.id)) {
                     Some(terminal) => terminal.id,
-                    None => host.create_terminal()?.id,
+                    None => create(&mut created)?,
                 }
             }
         }
     };
-    let (view, events) = host.attach(&id, cols, rows)?;
+    let (view, events) = host
+        .attach(&id, cols, rows)
+        .map_err(|e| fail(e, created.clone()))?;
     Ok((view, events, id))
 }
 
@@ -863,16 +1104,23 @@ impl Ctx {
         Ok(ticket)
     }
 
-    fn connect(&self, first_ticket: PathBuf) -> Result<Linked, LinkFail> {
+    /// The next connect enrolls with the invitation (not enrolled yet by the
+    /// link or by the client's own record, and an invitation exists).
+    fn uses_invite(&self) -> bool {
         let record = lock(&self.record).clone();
-        let enrolled = record.enrolled
-            || self
+        record.invite_path.is_some()
+            && !record.enrolled
+            && !self
                 .connector
-                .is_enrolled(&self.state_dir, &record.daemon_fingerprint);
-        let invite_path = if enrolled {
-            None
-        } else {
+                .is_enrolled(&self.state_dir, &record.daemon_fingerprint)
+    }
+
+    fn connect(&self, first_ticket: PathBuf, use_invite: bool) -> Result<Linked, LinkFail> {
+        let record = lock(&self.record).clone();
+        let invite_path = if use_invite {
             record.invite_path.as_ref().map(PathBuf::from)
+        } else {
+            None
         };
         let first = Mutex::new(Some(first_ticket));
         let ctx = self.clone();
@@ -884,24 +1132,26 @@ impl Ctx {
             let minted = ctx.mint().map_err(|error| anyhow!("{error}"))?;
             Ok(PathBuf::from(minted.path))
         });
-        let host = self
-            .connector
-            .connect(ConnectConfig {
-                state_dir: self.state_dir.clone(),
-                device_name: self.device_name.clone(),
-                relay_route: record.relay_route.clone(),
-                relay_slot: record.relay_slot.clone(),
-                invite_path,
-                ticket,
-            })
-            .map_err(|error| {
+        let connected = self.connector.connect(ConnectConfig {
+            state_dir: self.state_dir.clone(),
+            device_name: self.device_name.clone(),
+            relay_route: record.relay_route.clone(),
+            relay_slot: record.relay_slot.clone(),
+            invite_path,
+            ticket,
+        });
+        let host = match connected {
+            Ok(host) => host,
+            Err(error) => {
                 let reason = format!("{error:#}");
                 if reason.contains("request access again") {
-                    LinkFail::NeedsPairing(reason)
-                } else {
-                    LinkFail::Other(reason)
+                    // Expired or consumed: the invitation is of no use now.
+                    self.forget_invite(&record, false);
+                    return Err(LinkFail::NeedsPairing(reason));
                 }
-            })?;
+                return Err(LinkFail::Other(reason));
+            }
+        };
         let got = host.daemon_fingerprint();
         if got != record.daemon_fingerprint {
             drop(host);
@@ -911,26 +1161,39 @@ impl Ctx {
             });
         }
         let save_error = if !record.enrolled || record.invite_path.is_some() {
-            self.finish_enrollment(&record)
+            self.forget_invite(&record, true)
         } else {
             None
         };
         Ok(Linked { host, save_error })
     }
 
-    /// First verified connect: delete the invitation (PSK + embedded relay
-    /// ticket) and save `enrolled = true`. Returns a save error, if any.
-    fn finish_enrollment(&self, record: &LinkRecord) -> Option<String> {
+    /// Delete the invitation (PSK + embedded relay ticket), only from
+    /// shellx-core's tickets dir and only an `invite-*.uri` file (the path
+    /// comes from links.json), and save the link without it; with
+    /// `enrolled`, also mark it enrolled. Returns a problem, if any.
+    fn forget_invite(&self, record: &LinkRecord, enrolled: bool) -> Option<String> {
         let mut problems = Vec::new();
         if let Some(path) = &record.invite_path {
-            match std::fs::remove_file(path) {
-                Ok(()) => {}
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => problems.push(format!("could not delete the invitation: {error}")),
+            let path = Path::new(path);
+            if !invite_path_ok(&self.invite_dir, path) {
+                problems.push(format!(
+                    "not deleting {} (not an invitation in {})",
+                    path.display(),
+                    self.invite_dir.display()
+                ));
+            } else {
+                match std::fs::remove_file(path) {
+                    Ok(()) => {}
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(error) => {
+                        problems.push(format!("could not delete the invitation: {error}"))
+                    }
+                }
             }
         }
         let mut updated = record.clone();
-        updated.enrolled = true;
+        updated.enrolled |= enrolled;
         updated.invite_path = None;
         *lock(&self.record) = updated.clone();
         if let Some(store) = &self.links {
@@ -939,7 +1202,7 @@ impl Ctx {
                     .get(&updated.machine_id)
                     .cloned()
                     .unwrap_or_else(|| updated.clone());
-                link.enrolled = true;
+                link.enrolled |= enrolled;
                 link.invite_path = None;
                 links.upsert(link);
                 store.save(&links)
@@ -950,6 +1213,19 @@ impl Ctx {
         }
         (!problems.is_empty()).then(|| problems.join("; "))
     }
+}
+
+/// `path` is an `invite-*.uri` file directly inside `invite_dir` (compared
+/// after resolving links; a missing dir or file never matches).
+fn invite_path_ok(invite_dir: &Path, path: &Path) -> bool {
+    let name_ok = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.starts_with("invite-") && n.ends_with(".uri") && n.len() > 11);
+    let (Some(parent), Ok(dir)) = (path.parent(), invite_dir.canonicalize()) else {
+        return false;
+    };
+    name_ok && parent.canonicalize().is_ok_and(|p| p == dir)
 }
 
 // ------------------------------------------------------------ fakes
@@ -1004,6 +1280,10 @@ pub mod fake {
         pub attaches: Mutex<Vec<FakeAttach>>,
         pub closed: AtomicBool,
         pub fail_list: AtomicBool,
+        /// Every attach fails while the connection stays open.
+        pub fail_attach: AtomicBool,
+        pub creates: AtomicU64,
+        pub attach_calls: AtomicU64,
         next_id: AtomicU64,
     }
 
@@ -1015,6 +1295,9 @@ pub mod fake {
                 attaches: Mutex::new(Vec::new()),
                 closed: AtomicBool::new(false),
                 fail_list: AtomicBool::new(false),
+                fail_attach: AtomicBool::new(false),
+                creates: AtomicU64::new(0),
+                attach_calls: AtomicU64::new(0),
                 next_id: AtomicU64::new(1),
             };
             for _ in 0..terminals {
@@ -1088,6 +1371,7 @@ pub mod fake {
             if self.closed.load(Ordering::Acquire) {
                 bail!("the connection to the Mac is closed");
             }
+            self.creates.fetch_add(1, Ordering::AcqRel);
             Ok(self.add_terminal())
         }
         fn attach(
@@ -1098,6 +1382,10 @@ pub mod fake {
         ) -> Result<(Arc<dyn ViewInput>, Receiver<AttachEvent>)> {
             if self.closed.load(Ordering::Acquire) {
                 bail!("the connection to the Mac is closed");
+            }
+            self.attach_calls.fetch_add(1, Ordering::AcqRel);
+            if self.fail_attach.load(Ordering::Acquire) {
+                bail!("the Mac refused the attach");
             }
             if !lock(&self.terminals).iter().any(|t| t.id == terminal_id) {
                 bail!("no terminal {terminal_id}");
@@ -1143,6 +1431,9 @@ pub mod fake {
         script: Mutex<VecDeque<Result<Arc<FakeHost>, String>>>,
         pub seen: Mutex<Vec<SeenConnect>>,
         pub hosts: Mutex<Vec<Arc<FakeHost>>>,
+        /// When set, an enrolling connect (with an invitation) waits here
+        /// until the test sends `()` (the Mac owner approving).
+        pub approval: Mutex<Option<Receiver<()>>>,
     }
 
     impl FakeConnector {
@@ -1155,6 +1446,7 @@ pub mod fake {
                 script: Mutex::new(VecDeque::new()),
                 seen: Mutex::new(Vec::new()),
                 hosts: Mutex::new(Vec::new()),
+                approval: Mutex::new(None),
             }
         }
 
@@ -1199,6 +1491,12 @@ pub mod fake {
                 device_name: cfg.device_name.clone(),
                 tickets,
             });
+            if cfg.invite_path.is_some() {
+                let approval = lock(&self.approval).take();
+                if let Some(approval) = approval {
+                    let _ = approval.recv();
+                }
+            }
             let next = lock(&self.script).pop_front();
             let host = match next {
                 Some(Ok(host)) => host,
@@ -1259,6 +1557,7 @@ pub fn smoke() -> Result<String> {
             core: core.clone(),
             connector: connector.clone(),
             state_dir: dir.clone(),
+            invite_dir: dir.clone(),
             device_name: "PC test".into(),
             links: Some(LinksStore::new(dir.join("links.json"))),
             time_scale: 50,
@@ -1452,17 +1751,22 @@ mod tests {
             machine_name: "Mac".into(),
             relay_route: "wss://relay.example/v2/relay".into(),
             relay_slot: "slot-1".into(),
-            invite_path: (!enrolled).then(|| dir.join("invite.uri").to_string_lossy().into_owned()),
+            invite_path: (!enrolled)
+                .then(|| dir.join("invite-mac-1.uri").to_string_lossy().into_owned()),
             daemon_fingerprint: "fp-1".into(),
             enrolled,
         }
     }
 
     fn rig_with(name: &str, connector: FakeConnector, enrolled: bool) -> Rig {
+        rig_scaled(name, connector, enrolled, 100)
+    }
+
+    fn rig_scaled(name: &str, connector: FakeConnector, enrolled: bool, scale: u64) -> Rig {
         let dir = std::env::temp_dir().join(format!("shellx-rs-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        let invite = dir.join("invite.uri");
+        let invite = dir.join("invite-mac-1.uri");
         if !enrolled {
             std::fs::write(&invite, "cmux://enroll/x").unwrap();
         }
@@ -1480,9 +1784,10 @@ mod tests {
             core: core.clone(),
             connector: connector.clone(),
             state_dir: dir.clone(),
+            invite_dir: dir.clone(),
             device_name: "PC test".into(),
             links: Some(LinksStore::new(dir.join("links.json"))),
-            time_scale: 100,
+            time_scale: scale,
         })
         .unwrap();
         let (tx, events) = mpsc::channel();
@@ -1634,6 +1939,168 @@ mod tests {
         ));
         std::thread::sleep(Duration::from_millis(50));
         assert_eq!(r.connector.seen().len(), 1);
+        // the expired invitation is deleted and dropped from the link
+        assert!(!r.invite.exists());
+        let saved = LinksStore::new(r.dir.join("links.json")).load().unwrap();
+        let link = saved.get("Mac/1").unwrap();
+        assert!(link.invite_path.is_none() && !link.enrolled);
+    }
+
+    #[test]
+    fn attach_failure_backs_off_per_pane_without_reconnecting() {
+        let connector = FakeConnector::new("fp-1", 0);
+        let host = Arc::new(FakeHost::new("fp-1", 0)); // an empty Mac
+        host.fail_attach.store(true, Ordering::Release);
+        connector.push_host(host.clone());
+        // backoff 1, 2, 4, 8 s -> 50, 100, 200, 400 ms
+        let r = rig_scaled("attachfail", connector, true, 20);
+        let pane = r
+            .session
+            .open_pane(Want::First, 80, 24, r.sink.clone())
+            .unwrap();
+        wait("first attach call", || {
+            host.attach_calls.load(Ordering::Acquire) >= 1
+        });
+        std::thread::sleep(Duration::from_millis(600));
+        let calls = host.attach_calls.load(Ordering::Acquire);
+        // attempts at ~0, 50, 150, 350 ms (next at 750): growing delays,
+        // not a 50 ms storm (that would be ~12)
+        assert!((3..=5).contains(&calls), "{calls} attach calls");
+        assert_eq!(
+            r.connector.host_count(),
+            1,
+            "no reconnect for an attach error"
+        );
+        assert_eq!(r.core.mints(), 1);
+        assert_eq!(
+            host.creates.load(Ordering::Acquire),
+            1,
+            "one terminal created, reused"
+        );
+        let status = r.session.status();
+        assert_eq!(status.phase, ConnPhase::Connected);
+        assert!(status.attach_error.is_some());
+        assert!(!pane.link.accepts_input());
+        host.fail_attach.store(false, Ordering::Release);
+        wait("attach", || pane.link.accepts_input());
+        assert_eq!(host.attached_ids(), vec!["1".to_string()]);
+        assert_eq!(host.creates.load(Ordering::Acquire), 1);
+        wait("error cleared", || {
+            r.session.status().attach_error.is_none()
+        });
+    }
+
+    #[test]
+    fn closing_the_last_pane_and_opening_another_revives_the_session() {
+        let r = rig_with("revive", FakeConnector::new("fp-1", 1), true);
+        let mut pane = r
+            .session
+            .open_pane(Want::First, 80, 24, r.sink.clone())
+            .unwrap();
+        wait("attach", || pane.link.accepts_input());
+        for round in 0..10 {
+            r.session.close_pane(pane.id);
+            match r.session.open_pane(Want::First, 80, 24, r.sink.clone()) {
+                Ok(next) => {
+                    pane = next;
+                    wait("attach after reopen", || pane.link.accepts_input());
+                    assert!(!r.session.status().finished, "round {round}");
+                }
+                Err(_) => {
+                    // the worker finished first: the UI opens a new session
+                    assert!(r.session.status().finished);
+                    return;
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_pane_opened_on_a_closed_session_is_answered() {
+        let r = rig_with("late", FakeConnector::new("fp-1", 1), true);
+        let pane = r
+            .session
+            .open_pane(Want::First, 80, 24, r.sink.clone())
+            .unwrap();
+        wait("attach", || pane.link.accepts_input());
+        r.session.close();
+        if let Ok(late) = r.session.open_pane(Want::First, 80, 24, r.sink.clone()) {
+            wait("late pane ended", || late.link.is_closed());
+        }
+        wait("finish", || r.session.status().finished);
+    }
+
+    #[test]
+    fn offline_during_approval_never_enrolls_twice() {
+        let connector = FakeConnector::new("fp-1", 1);
+        let (approve, approval) = mpsc::channel();
+        *lock(&connector.approval) = Some(approval);
+        let r = rig_with("enroll-once", connector, false);
+        let pane = r
+            .session
+            .open_pane(Want::First, 80, 24, r.sink.clone())
+            .unwrap();
+        wait("enrolling connect", || r.connector.seen().len() == 1);
+        r.session.set_machine_online(false);
+        wait("Offline", || r.session.status().phase == ConnPhase::Offline);
+        r.session.set_machine_online(true);
+        wait("next attempt minted", || r.core.mints() == 2);
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(r.connector.seen().len(), 1, "a second enrollment started");
+        approve.send(()).unwrap();
+        wait("attach", || pane.link.accepts_input());
+        assert_eq!(r.connector.seen().len(), 1);
+        assert_eq!(r.connector.host_count(), 1);
+        assert!(!r.invite.exists());
+        assert_eq!(r.session.status().phase, ConnPhase::Connected);
+    }
+
+    #[test]
+    fn invitation_is_deleted_only_from_the_tickets_dir() {
+        let base = std::env::temp_dir().join(format!("shellx-rs-inv-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let tickets = base.join("tickets");
+        let other = base.join("other");
+        std::fs::create_dir_all(&tickets).unwrap();
+        std::fs::create_dir_all(&other).unwrap();
+        for (dir, name) in [
+            (&tickets, "invite-m1.uri"),
+            (&tickets, "links.json"),
+            (&other, "invite-m1.uri"),
+        ] {
+            std::fs::write(dir.join(name), "x").unwrap();
+        }
+        assert!(invite_path_ok(&tickets, &tickets.join("invite-m1.uri")));
+        assert!(!invite_path_ok(&tickets, &tickets.join("links.json")));
+        assert!(!invite_path_ok(&tickets, &other.join("invite-m1.uri")));
+        assert!(!invite_path_ok(
+            &tickets,
+            &tickets.join("../other/invite-m1.uri")
+        ));
+        assert!(!invite_path_ok(&tickets, &tickets.join("invite-.uri")));
+        // a link pointing outside: enrollment completes, the file stays
+        let ctx = Ctx {
+            machine_id: "m1".into(),
+            ticket_name: ticket_file_name("m1"),
+            core: Arc::new(MintingCore::new(tickets.join("t"))),
+            connector: Arc::new(FakeConnector::new("fp-1", 1)),
+            state_dir: base.clone(),
+            invite_dir: tickets.clone(),
+            device_name: "PC".into(),
+            links: None,
+            record: Arc::new(Mutex::new(record(&base, false))),
+            last_ticket: Arc::new(Mutex::new(None)),
+        };
+        let mut rec = record(&base, false);
+        rec.invite_path = Some(other.join("invite-m1.uri").to_string_lossy().into_owned());
+        let problem = ctx.forget_invite(&rec, true).unwrap();
+        assert!(problem.contains("not deleting"), "{problem}");
+        assert!(other.join("invite-m1.uri").exists());
+        assert!(lock(&ctx.record).enrolled && lock(&ctx.record).invite_path.is_none());
+        rec.invite_path = Some(tickets.join("invite-m1.uri").to_string_lossy().into_owned());
+        assert_eq!(ctx.forget_invite(&rec, true), None);
+        assert!(!tickets.join("invite-m1.uri").exists());
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]
@@ -1654,7 +2121,9 @@ mod tests {
         wait("attach", || pane.link.accepts_input());
         assert_eq!(r.connector.seen().len(), 3);
         assert_eq!(r.core.mints(), 3, "one fresh ticket per attempt");
-        assert_eq!(r.session.status().phase, ConnPhase::Connected);
+        let status = r.session.status();
+        assert_eq!(status.phase, ConnPhase::Connected);
+        assert_eq!(status.shown, None, "no Reconnecting pill once connected");
     }
 
     #[test]
