@@ -59,14 +59,14 @@ Recorded 2026-10-18. Fork commit `3bb417b7eb` on `main`: `shellx.release.entitle
 - Signing: `scripts/sign-cmux-bundle.sh` inside-out with "Developer ID Application: Phu Le huu (W4RF3W4VTZ)" (first run needs a one-time keychain "Always Allow"). Every Mach-O in the bundle (13 files: main `cmux`, `Resources/bin` helpers `cmux`, `ghostty`, `cmux-diff-sidecar`…, Sparkle, Sentry, Iroh, `libcmux_command_palette_nucleo_ffi.dylib`, DockTile plugin, Computer Use app) has `TeamIdentifier=W4RF3W4VTZ`.
 - Notarization: submission `19690875-473e-4655-94e6-9b2e45ead5db` **Accepted**; stapled; `spctl` → `accepted`, `source=Notarized Developer ID`.
 - Bundle id collision: the Flutter desktop app installed at `/Applications/ShellX.app` also uses `pro.shellx.desktop`, and cmux's single-instance guard makes the native build exit when that app is running ("another instance with bundle id pro.shellx.desktop is running … exiting"). The two cannot run side by side; the native app replaces the Flutter one in place (same id, good for updates).
-- Launch check: pending (needs the Flutter ShellX quit first).
+- Launch check: **passed** 2026-10-18 after the Flutter app was quit: `open -n ShellX.app` → process alive, RSS ~260 MB.
 
 ### Helpers
 
 | Helper | Signed + notarized under W4RF3W4VTZ | Works | W1 |
 | --- | --- | --- | --- |
 | `cmux Computer Use.app` (`com.cmuxterm.cua`) | yes | **no**: `ComputerUseHelperTrust.swift:19` pins `teamIdentifier = "7WLXT3NR37"` and the requirement includes that team, so ShellX never installs or launches it | exclude; follow-up = rebrand bundle id + team pin or drop Computer Use |
-| `CmuxDockTilePlugin.plugin` | yes | pending launch check | keep if launch check passes |
+| `CmuxDockTilePlugin.plugin` | yes | app launches with it | keep |
 
 ## Decisions
 
@@ -123,3 +123,13 @@ Both ends are WebSocket clients, so their frames are masked: a raw grep alone gi
 **Enroll → approve as observed:** daemon `server start --relay … --relay-slot … --relay-ticket-file register.ticket` → owner `remote enroll create --session S --advertise <relay> --relay-route <relay> --relay-slot … --relay-ticket-file connect.ticket` prints `cmux://enroll/<b64url json>` = `{version:1,id,secret(32B PSK),daemon_public_key,daemon_fingerprint,daemon_name,expires_at_unix,route_hints,relay_access:[{route,slot,ticket}],approval_required:true}` (`identity.rs:65-78`; without `--advertise` the invite carries the same-host `unix://` route and the client bypasses the relay) → client `remote connect <relay> --invite-file … --device-name … --headless` (XXpsk3 through the relay, then waits) → owner `remote enroll pending --json` / `remote enroll approve <invitation_id>` → client opens control + tunnel lanes as `auth:"enrolled"`; normal `cmux-tui --socket <local>` commands then run on the daemon through the relay.
 
 **Spec implication (§8.5):** the invitation URI contains the PSK. If it ever transits the ShellX server in clear, the server could claim the invitation first and only on-site approval would stop it. So: the approval screen must show the device fingerprint (not just the name), and the PSK must travel out of band (QR code or a URL `#fragment` the server never receives). Carry into W2.
+
+## Handoff (2026-10-18 evening)
+
+State for the next session:
+- Done: Task 1, Task 2 (incl. launch), Task 3 code (fork main `5348097e66`), Task 4 PASS, Task 5 desk estimate, Task 6 workflow pushed (`shellx/w0-spikes` on lephus/shellx-pro, pushed over SSH alias `phule9225.github.com:lephus/shellx-pro.git`; the gh token lacks `workflow` scope).
+- Task 6 CI run `39142103019`: `-gnu` all green (libghostty-vt, platform tests, cmux-tui.exe, ConPTY smokes). `-msvc`: libghostty-vt builds; platform tests fail to compile at `cmux-tui-core/src/server.rs:24934` (`KeyInput { key: u32::MAX, .. }`, bindgen gives `i32` on MSVC). Next: patch to `u32::MAX as _` on the spike branch, ask the user before re-pushing, then record artifacts.
+- Task 3 Step 5: `reload.sh --tag perf-base --release` needs `CMUX_WIREGUARD_GO_REQUIRE=0` (no Go); a rebuild was running when the session ended — check `/tmp/cmux-reload-perf-base.log`. Watch for the Xcode 26.2 `-O` SIL linker crash (see Signing). Then run `scripts/shellx/perf/perf_mac.py` per its README (`--commit d0b2cd7e`, `--cli <app>/Contents/Resources/bin/cmux`), with `scratchpad/perf-quiet.lock` style coordination if another build runs; Typometer by the user.
+- Task 5: user ruled (2026-10-18) to replace Step 1 (mobile-RPC spike) with a ~2-day spike of the (b) Mac bridge M-B1. A spike was started in worktree `~/Documents/myProjects/shellx-pro-wt-bridge` (branch `shellx/w0-bridge`, never push/merge); if it has no `spikes/protocol/mac-bridge-spike.md` commit, restart it. Then finalize D-W0-1 and amend spec §8.1/§8.3/C16.
+- Remaining after that: Task 7 (Windows UI toolkit; needs a real Windows 11 PC from the user), Task 8 close-out.
+- Disk is tight (~12 GB free with perf-base DerivedData + bridge worktree).
