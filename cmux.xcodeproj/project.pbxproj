@@ -14344,7 +14344,6 @@
 				5E11A00000000000000000A0 /* XCLocalSwiftPackageReference "ShellXBrand" */,
 				A1329B000000000000000100 /* XCLocalSwiftPackageReference "CmuxTerminalSharing" */,
 				A5001232 /* XCRemoteSwiftPackageReference "Sparkle" */,
-				A5001252 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 				A5001272 /* XCRemoteSwiftPackageReference "posthog-ios" */,
 				A5001292 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 				A5001260 /* XCLocalSwiftPackageReference "bonsplit" */,
@@ -20036,14 +20035,6 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 2.9.0;
-			};
-		};
-		A5001252 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/getsentry/sentry-cocoa.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 9.3.0;
 			};
 		};
 		A5001272 /* XCRemoteSwiftPackageReference "posthog-ios" */ = {

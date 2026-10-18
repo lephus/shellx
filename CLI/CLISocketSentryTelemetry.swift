@@ -1,15 +1,7 @@
 import CmuxFoundation
-import CmuxSentryReporting
 import CmuxSettings
 import Darwin
 import Foundation
-
-#if canImport(Sentry)
-// Sentry Cocoa 9.3.0 is pinned in Package.resolved. This SPI stores the
-// envelope durably without blocking short-lived CLI commands; verify it before
-// any Sentry SDK upgrade.
-@_spi(Private) import Sentry
-#endif
 
 enum CLISocketEnvironment {
     static func socketPath(in environment: [String: String]) throws -> String? {
@@ -34,12 +26,9 @@ enum CLISocketEnvironment {
     }
 }
 
+/// ShellX links no Sentry SDK: failures are still classified (tests and the
+/// capture probe rely on it), but nothing is ever sent.
 final class CLISocketSentryTelemetry {
-    private struct PendingBreadcrumb {
-        let message: String
-        let data: [String: Any]
-    }
-
     private typealias CLIErrorMetadata = (
         code: String?,
         socketPathMissing: Bool,
@@ -64,23 +53,7 @@ final class CLISocketSentryTelemetry {
     private let noiseFilter: SentryNoiseFilter
     private let sentryPolicy: CLISocketSentryPolicy
     private let buildIdentityPolicy: SentryBuildIdentityPolicy
-    private var pendingBreadcrumbs: [PendingBreadcrumb] = []
 
-#if canImport(Sentry)
-    private static let startupLock = NSLock()
-    private static var started = false
-    private static let dsn = "https://ecba1ec90ecaee02a102fba931b6d2b3@o4507547940749312.ingest.us.sentry.io/4510796264636416"
-#endif
-
-    private static func currentSentryReleaseName() -> String? {
-        guard let bundleIdentifier = currentSentryBundleIdentifier(),
-              let version = currentBundleVersionValue(forKey: "CFBundleShortVersionString"),
-              let build = currentBundleVersionValue(forKey: "CFBundleVersion")
-        else {
-            return nil
-        }
-        return "\(bundleIdentifier)@\(version)+\(build)"
-    }
 
     private static func currentSentryBundleIdentifier(
         environment: [String: String] = ProcessInfo.processInfo.environment
@@ -160,9 +133,6 @@ final class CLISocketSentryTelemetry {
 
     func breadcrumb(_ message: String, data: [String: Any] = [:]) {
         guard shouldEmit else { return }
-#if canImport(Sentry)
-        pendingBreadcrumbs.append(PendingBreadcrumb(message: message, data: data))
-#endif
     }
 
     /// Captures an actionable CLI failure while preserving the original error
@@ -198,61 +168,6 @@ final class CLISocketSentryTelemetry {
         }
 #if DEBUG
         recordCaptureProbe(stage: stage, error: error)
-#endif
-#if canImport(Sentry)
-        Self.ensureStarted()
-        var context = baseContext()
-        context["stage"] = stage
-        context["error"] = errorDescription
-        if let code = cliErrorMetadata.code {
-            context["cli_error_code"] = code
-        }
-        if cliErrorMetadata.isStructuredProtocolResponse {
-            context["cli_error_protocol_response"] = true
-        }
-        if cliErrorMetadata.socketPathMissing {
-            context["socket_path_missing"] = true
-        }
-        for (key, value) in socketDiagnostics() {
-            context[key] = value
-        }
-        for (key, value) in data {
-            context[key] = value
-        }
-        let subcommand = self.subcommand
-        let command = self.command
-        let event = Self.makeErrorEvent(
-            error: error,
-            context: context,
-            command: command,
-            subcommand: subcommand,
-            fingerprint: ["cmux-cli", stage, fingerprintKind ?? "{{ default }}"],
-            breadcrumbs: pendingBreadcrumbs.map { pending in
-                makeBreadcrumb(message: pending.message, data: pending.data)
-            }
-        )
-        pendingBreadcrumbs.removeAll()
-        let scrubber = SentryEventScrubber()
-        let scrubbedEvent = scrubber.scrub(event)
-        guard !Self.isExpectedCLISocketTransportEvent(
-            scrubbedEvent,
-            classificationMessage: cliErrorMetadata.legacyMessage
-        ) else {
-            return
-        }
-        let envelopeItem = SentryEnvelopeItem(event: scrubbedEvent)
-        let envelope = SentryEnvelope(id: scrubbedEvent.eventId, singleItem: envelopeItem)
-        PrivateSentrySDKOnly.store(envelope)
-        // `store` is the durable handoff. Calling SentrySDK.flush here—even
-        // with a zero timeout—still enters SentryHttpTransport's synchronous
-        // coordination path. The app's Sentry client will pick up the cached
-        // envelope on its next transport pass.
-#if DEBUG
-        recordStoreProbe(
-            eventId: scrubbedEvent.eventId.sentryIdString,
-            fingerprint: scrubbedEvent.fingerprint ?? []
-        )
-#endif
 #endif
     }
 
@@ -422,155 +337,8 @@ final class CLISocketSentryTelemetry {
         try? payload.write(toFile: NSString(string: path).expandingTildeInPath, atomically: true, encoding: .utf8)
     }
 
-#if canImport(Sentry)
-    private func recordStoreProbe(eventId: String, fingerprint: [String]) {
-        guard let path = processEnv["CMUX_CLI_SENTRY_STORE_PROBE_PATH"]?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !path.isEmpty else {
-            return
-        }
-        let payload = "event_id=\(eventId)\nfingerprint=\(fingerprint.joined(separator: "|"))\n"
-        try? payload.write(toFile: NSString(string: path).expandingTildeInPath, atomically: true, encoding: .utf8)
-    }
-#endif
 #endif
 
-#if canImport(Sentry)
-    private static func makeErrorEvent(
-        error: Error,
-        context: [String: Any],
-        command: String,
-        subcommand: String,
-        fingerprint: [String],
-        breadcrumbs: [Breadcrumb]
-    ) -> Event {
-        let nsError = error as NSError
-        let event = Event(error: nsError)
-        event.exceptions = errorChain(for: nsError).reversed().map(Self.makeException)
-        event.level = .error
-        // Every CLI error shares one NSError domain+code with system-only
-        // frames, so default grouping folds all failure classes into a single
-        // issue. Group by stage plus normalized error kind instead;
-        // "{{ default }}" keeps default grouping inside the stage for
-        // unclassified errors.
-        event.fingerprint = fingerprint
-        event.releaseName = currentSentryReleaseName()
-#if DEBUG
-        event.environment = "development-cli"
-#else
-        event.environment = "production-cli"
-#endif
-        event.tags = [
-            "component": "cmux-cli",
-            "cli_command": command,
-            "cli_subcommand": subcommand
-        ]
-        event.context = ["cli_socket": context]
-        if !breadcrumbs.isEmpty {
-            event.breadcrumbs = breadcrumbs
-        }
-        return event
-    }
-
-    private static func errorChain(for error: NSError) -> [NSError] {
-        var errors = [error]
-        var underlying = error.userInfo[NSUnderlyingErrorKey] as? NSError
-        while let current = underlying {
-            errors.append(current)
-            underlying = current.userInfo[NSUnderlyingErrorKey] as? NSError
-        }
-        return errors
-    }
-
-    private static func makeException(for error: NSError) -> Exception {
-        let value: String
-        if let debugDescription = error.userInfo[NSDebugDescriptionErrorKey] as? String {
-            value = "\(debugDescription) (Code: \(error.code))"
-        } else {
-            value = "Code: \(error.code)"
-        }
-
-        let exception = Exception(value: value, type: error.domain)
-        let mechanism = Mechanism(type: "NSError")
-        let mechanismContext = MechanismContext()
-        mechanismContext.error = SentryNSError(domain: error.domain, code: error.code)
-        mechanism.meta = mechanismContext
-        mechanism.desc = error.description
-        mechanism.data = error.userInfo
-        exception.mechanism = mechanism
-        return exception
-    }
-
-    private static func isExpectedCLISocketTransportEvent(
-        _ event: Event,
-        classificationMessage: String? = nil
-    ) -> Bool {
-        let noiseFilter = SentryNoiseFilter()
-        guard let socketContext = event.context?["cli_socket"] else {
-            return false
-        }
-        let stage = socketContext["stage"] as? String ?? ""
-        let contextMessage = socketContext["error"] as? String ?? ""
-        let cliErrorCode = socketContext["cli_error_code"] as? String
-        let isStructuredProtocolResponse = socketContext["cli_error_protocol_response"] as? Bool ?? false
-        let socketPathMissing = socketContext["socket_path_missing"] as? Bool ?? false
-        let dataKeys = Set(socketContext.keys)
-        let isAgentHookStage = stage.hasPrefix("agent-hook-")
-        let hasStructuredCLIErrorCode =
-            cliErrorCode?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-
-        if isStructuredProtocolResponse,
-           noiseFilter.isExpectedCLIProtocolOutcomeCode(cliErrorCode) {
-            return true
-        }
-
-        if noiseFilter.isExpectedCLISocketTransportFailure(
-            stage: stage,
-            message: contextMessage,
-            dataKeys: dataKeys,
-            cliErrorCode: cliErrorCode,
-            socketPathMissing: socketPathMissing
-        ) {
-            return true
-        }
-
-        // A structured actionable code is authoritative. Do not let a legacy
-        // message in the rendered event override it.
-        guard !hasStructuredCLIErrorCode else { return false }
-
-        var legacyMessages = [String]()
-        // Agent-hook originals are intentionally privacy-reduced out of the
-        // event. The explicit classification message is available on the
-        // synchronous capture path; beforeSend still handles any serialized
-        // legacy text without guessing from a wrapper.
-        if let classificationMessage {
-            legacyMessages.append(classificationMessage)
-        }
-        if let message = event.message?.formatted {
-            legacyMessages.append(message)
-        }
-        legacyMessages.append(contentsOf: event.exceptions?.compactMap(\.value) ?? [])
-        return legacyMessages.contains {
-            noiseFilter.isExpectedCLISocketTransportFailure(
-                stage: stage,
-                message: $0,
-                dataKeys: dataKeys
-            ) ||
-                (isAgentHookStage &&
-                    noiseFilter.isExpectedLegacyCLIAppLifecycleMessage($0))
-        }
-    }
-
-    private func makeBreadcrumb(message: String, data: [String: Any]) -> Breadcrumb {
-        var payload = baseContext()
-        for (key, value) in data {
-            payload[key] = value
-        }
-        let crumb = Breadcrumb(level: .info, category: "cmux.cli")
-        crumb.message = message
-        crumb.data = payload
-        return crumb
-    }
-#endif
 
     private func baseContext() -> [String: Any] {
         var context: [String: Any] = [
@@ -663,39 +431,4 @@ final class CLISocketSentryTelemetry {
         return sockets
     }
 
-#if canImport(Sentry)
-    private static func ensureStarted() {
-        startupLock.lock()
-        defer { startupLock.unlock() }
-        guard !started else { return }
-        SentrySDK.start { options in
-            CLISentryRuntimePolicy().configure(options)
-            options.dsn = dsn
-            options.releaseName = currentSentryReleaseName()
-#if DEBUG
-            options.environment = "development-cli"
-#else
-            options.environment = "production-cli"
-#endif
-            options.debug = false
-            // Defense-in-depth: keep default PII (user, IP, etc.) off the wire.
-            // The scrubber below additionally redacts any user fields that slip in.
-            options.sendDefaultPii = false
-            options.attachStacktrace = true
-            options.tracesSampleRate = 0.0
-            options.enableCaptureFailedRequests = false
-            // Redact file paths, emails, and secrets from every outgoing event
-            // and breadcrumb before it leaves the device.
-            let scrubber = SentryEventScrubber()
-            options.beforeSend = { event in
-                if Self.isExpectedCLISocketTransportEvent(event) {
-                    return nil
-                }
-                return scrubber.scrub(event)
-            }
-            options.beforeBreadcrumb = { breadcrumb in scrubber.scrub(breadcrumb) }
-        }
-        started = true
-    }
-#endif
 }
