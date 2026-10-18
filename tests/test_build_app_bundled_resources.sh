@@ -80,7 +80,10 @@ ln -s "$SRCROOT/scripts-build-helper" "$SRCROOT/scripts/build-ghostty-cli-helper
 ln -s "$SRCROOT/scripts-build-cua" "$SRCROOT/scripts/build-cmux-cua.sh"
 ln -s "$ROOT_DIR/scripts/build-app-bundled-resources.sh" "$SRCROOT/scripts/build-app-bundled-resources.sh"
 
+# Upstream coverage of the Computer Use helper build, which ShellX turns off
+# by default (the ShellX case is at the end).
 run_phase() {
+  CMUX_CUA_HELPER_BUILD="${CMUX_CUA_HELPER_BUILD-1}" \
   TARGET_BUILD_DIR="$BUILD_DIR" \
   DERIVED_FILE_DIR="$BUILD_DIR/Derived" \
   UNLOCALIZED_RESOURCES_FOLDER_PATH=Resources \
@@ -91,6 +94,7 @@ run_phase() {
 }
 
 run_app_phase() {
+  CMUX_CUA_HELPER_BUILD="${CMUX_CUA_HELPER_BUILD-1}" \
   TARGET_BUILD_DIR="$BUILD_DIR" \
   DERIVED_FILE_DIR="$BUILD_DIR/Derived" \
   UNLOCALIZED_RESOURCES_FOLDER_PATH="cmux.app/Contents/Resources" \
@@ -263,3 +267,16 @@ if grep -q 'skipping helper rebuilds' "$TMP_DIR/toolchain-version.log"; then
   echo 'FAIL: changed Zig version did not invalidate the stamp' >&2
   exit 1
 fi
+
+# ShellX: by default no Computer Use helper is built, and one left in the
+# product by an earlier build is removed.
+HELPER_APP="$BUILD_DIR/cmux.app/Contents/Library/cmux Computer Use.app"
+[[ -d "$HELPER_APP" ]]
+CMUX_CUA_HELPER_BUILD=0 run_app_phase > "$TMP_DIR/shellx-no-helper.log"
+if [[ -e "$HELPER_APP" ]]; then
+  echo 'FAIL: the ShellX build kept the cmux Computer Use helper' >&2
+  exit 1
+fi
+CMUX_CUA_HELPER_BUILD=0 run_app_phase > "$TMP_DIR/shellx-no-helper-settled.log"
+grep -q 'skipping helper rebuilds' "$TMP_DIR/shellx-no-helper-settled.log"
+[[ ! -e "$HELPER_APP" ]]

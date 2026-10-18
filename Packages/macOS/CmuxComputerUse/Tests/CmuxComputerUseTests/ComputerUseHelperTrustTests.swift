@@ -98,6 +98,13 @@ struct ComputerUseHelperTrustTests {
         #expect(!FileManager.default.fileExists(atPath: destination.path))
     }
 
+    /// ShellX: only a helper signed by ShellX's Developer ID team is trusted, so an installed
+    /// cmux's helper (cmux's team) is never installed or launched by ShellX.
+    @Test func onlyTheShellXTeamIsTrusted() {
+        #expect(ComputerUseHelperTrust.teamIdentifier == "W4RF3W4VTZ")
+        #expect(ComputerUseHelperTrust.requirementText.hasSuffix(#"certificate leaf[subject.OU] = "W4RF3W4VTZ""#))
+    }
+
     @Test func releaseCandidatesPreferNightlyAndListOnlyInstalledApps() {
         let home = URL(fileURLWithPath: "/Users/someone")
         let candidates = ComputerUseHelperTrust.releaseCandidates(home: home)
