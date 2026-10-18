@@ -1,0 +1,32 @@
+[package]
+name = "shellx-core"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.91"
+license = "GPL-3.0-or-later"
+description = "ShellX account/relay client core: one C entry point for the Mac app, a crate for the Windows app"
+publish = false
+
+[lib]
+name = "shellx_core"
+crate-type = ["staticlib", "rlib"]
+
+[[bin]]
+name = "shellx-core-cli"
+path = "src/bin/shellx-core-cli.rs"
+
+[dependencies]
+serde_json = "1"
+libc = "0.2"
+zeroize = "1"
+getrandom = "0.3"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+panic = "unwind"
+lto = "thin"
+
+[workspace]
+members = ["."]
