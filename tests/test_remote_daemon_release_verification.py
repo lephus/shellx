@@ -25,22 +25,22 @@ class ReleaseVerificationTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
-        self.manifest_path = self.root / "cmuxd-remote-manifest.json"
-        self.app = self.root / "cmux.app"
+        self.manifest_path = self.root / "manifest.json"
+        self.app = self.root / "ShellX.app"
         (self.app / "Contents").mkdir(parents=True)
         self.plist = self.app / "Contents/Info.plist"
         self.plist.write_bytes(plistlib.dumps({"CFBundleShortVersionString": "0.64.25"}))
-        release_url = "https://github.com/manaflow-ai/cmux/releases/download/v0.64.25"
+        release_url = "https://download.shellx.pro/desktop/shellx-remote/0.64.25"
         entries, checksums = [], []
         for go_os, go_arch in sorted(verify.TARGETS):
-            name = f"cmuxd-remote-{go_os}-{go_arch}"
+            name = f"shellx-remote-{go_os}-{go_arch}"
             payload = f"test fixture for {go_os}/{go_arch}".encode()
             (self.root / name).write_bytes(payload)
             digest = hashlib.sha256(payload).hexdigest()
             entries.append(dict(goOS=go_os, goArch=go_arch, assetName=name,
                                 downloadURL=f"{release_url}/{name}", sha256=digest))
             checksums.append(f"{digest}  {name}\n")
-        self.checksums_path = self.root / "cmuxd-remote-checksums.txt"
+        self.checksums_path = self.root / "checksums.txt"
         self.checksums_path.write_text("".join(checksums))
         self.manifest = dict(schemaVersion=1, appVersion="0.64.25", releaseTag="v0.64.25",
                              releaseURL=release_url, checksumsAssetName=self.checksums_path.name,
@@ -101,6 +101,24 @@ class ReleaseVerificationTests(unittest.TestCase):
         self.manifest["entries"][0]["downloadURL"] = "https://example.com/old-daemon"
         self.write_manifest()
         with self.assertRaisesRegex(ValueError, "download URL"):
+            verify.verify_assets(self.manifest_path, self.root)
+
+    def test_release_url_must_be_the_shellx_download_host(self):
+        for url in ("https://github.com/manaflow-ai/cmux/releases/download/v0.64.25",
+                    "https://download.shellx.pro/desktop/shellx-remote/0.64.24"):
+            self.manifest["releaseURL"] = url
+            self.write_manifest()
+            with self.subTest(url=url), self.assertRaisesRegex(ValueError, "release URL"):
+                verify.verify_assets(self.manifest_path, self.root)
+
+    def test_cmux_asset_names_rejected(self):
+        entry = self.manifest["entries"][0]
+        cmux_name = f"cmuxd-remote-{entry['goOS']}-{entry['goArch']}"
+        (self.root / cmux_name).write_bytes((self.root / entry["assetName"]).read_bytes())
+        entry["assetName"] = cmux_name
+        entry["downloadURL"] = f"{self.manifest['releaseURL']}/{cmux_name}"
+        self.write_manifest()
+        with self.assertRaisesRegex(ValueError, "unexpected asset name"):
             verify.verify_assets(self.manifest_path, self.root)
 
     def write_bundled_assets(self):
