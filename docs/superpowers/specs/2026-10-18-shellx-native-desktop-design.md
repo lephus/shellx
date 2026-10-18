@@ -211,9 +211,9 @@ Bản phác: `docs/superpowers/design/2026-10-18-native-desktop/huong-d-mockup.h
  ┌────────────── macOS ──────────────┐   ┌───────────── Windows ─────────────┐
  │ ShellX.app (Swift/AppKit, fork    │   │ ShellX.exe (Rust, UI native vẽ    │
  │ cmux) + libghostty (Metal)        │   │ bằng GPU) + lõi cmux-tui          │
- │   └─ remote: Devices/MobileHost   │   │   └─ remote: (theo bước thử §13)  │
+ │   └─ remote: daemon cmux-remote   │   │   └─ remote: daemon cmux-remote   │
  └───────────────┬───────────────────┘   └───────────────┬───────────────────┘
-                 │  cùng MỘT giao thức (chọn ở bước thử §13), đi trong kênh   │
+                 │  cùng MỘT giao thức (remote cmux-tui, D-W0-1), trong kênh  │
                  │  Noise mã hoá đầu cuối, chuyển qua cmux-relay tự host      │
                  └───────────────┬───────────────────────┘
                      ┌───────────▼────────────┐        ┌───────────────────────┐
@@ -266,7 +266,7 @@ Bản phác: `docs/superpowers/design/2026-10-18-native-desktop/huong-d-mockup.h
   - PTY qua ConPTY;
   - build `libghostty-vt` cho Windows;
   - giao diện native vẽ bằng GPU theo §7.
-- **Kết nối với máy khác:** bản Windows phải làm được cả máy chủ phiên lẫn client, bằng **cùng giao thức với bản Mac** (C16). Giao thức đó chọn ở bước thử §13, giữa hai ứng viên:
+- **Kết nối với máy khác:** bản Windows phải làm được cả máy chủ phiên lẫn client, bằng **cùng giao thức với bản Mac** (C16). **Đã chốt ngày 19/10 (D-W0-1, ledger): giao thức remote của `cmux-tui`.** Bản Mac nhúng daemon `cmux-remote` và chiếu các terminal libghostty sang một "PTY ảo" trong `cmux-tui-core` (bước thử bridge M-B1 đã chạy thật: client `cmux-tui` gốc qua `cmux-relay` xem và gõ được vào terminal của app Mac, tạo được tab mới từ xa). Bản Windows port daemon đó (ConPTY đã có trong `cmux-pty`). Hai ứng viên đã cân nhắc:
   - **mobile RPC protocol:** Mac đã làm máy chủ, iOS đã làm client. Bản Windows phải viết bằng Rust cả máy chủ lẫn client;
   - **giao thức remote của `cmux-tui`:** cần port daemon `cmux-remote` sang Windows. Hiện daemon này chỉ chạy trên Unix: `crates/cmux-tui/src/main.rs:47-64` chặn lệnh remote trên Windows, và `docs/remote.md:260` ghi rõ "PTYs are explicitly unavailable on non-Unix daemons". Bản Mac cũng phải thêm phần phục vụ phiên qua giao thức này.
 - **Ràng buộc cho bộ công cụ giao diện:**
@@ -306,7 +306,7 @@ Bản Windows gọi thư viện này trực tiếp. Bản Mac gọi qua C ABI; c
     - mã hoá đầu cuối bằng `Noise_XX_25519_ChaChaPoly_BLAKE2s` ở `cmux-remote/src/crypto.rs`;
     - đã có luồng mời → máy đích duyệt (`remote enroll create`, `identity.rs approve`), khớp nguyên tắc 2 bên dưới;
   - **API của ShellX:** tài khoản, thiết bị, chấp thuận, link chia sẻ, `/v1/version`. API này **cấp ticket** cho `cmux-relay` sau khi người dùng đăng nhập;
-  - giao thức chạy trong kênh Noise do bước thử §13 chọn. Mac và Windows phải dùng **cùng một** giao thức.
+  - giao thức chạy trong kênh Noise là giao thức remote của `cmux-tui` (D-W0-1, chốt 19/10). Mac và Windows dùng **cùng một** giao thức.
 - **Tài khoản:** dùng lại tài khoản hiện có (email + mật khẩu, argon2id, các giới hạn tần suất của spec v1 §5.2), để người dùng không phải đăng ký lại. Đây là lựa chọn của người viết spec, xem §14. Thiết bị và ghép cặp thì làm mới, vì không cần tương thích.
 - **Nguyên tắc bảo mật, bắt buộc:**
   1. Relay chỉ chuyển gói tin đã mã hoá giữa các thiết bị trong cùng tài khoản, không đọc được nội dung terminal.
@@ -400,7 +400,7 @@ Các phần sau trong app Mac của cmux phải **bỏ hoặc trỏ sang hạ t�
 | Kéo bản sửa từ upstream tốn công vì xung đột | Trung bình | Thử kéo về sau khi xong đợt 1 và ghi số file xung đột | Giãn chu kỳ kéo, hoặc chỉ cherry-pick bản sửa lỗi |
 | Hiệu năng Windows kém xa Windows Terminal | Trung bình | Đo trong bước thử bộ công cụ giao diện | Điều chỉnh kiến trúc vẽ trước khi làm tiếp đợt 4 |
 | `cmux-relay` tự host thực tế không giữ được bản rõ ngoài relay (đọc code thì đạt, nhưng chưa chạy thử), hoặc không gắn được ticket với tài khoản ShellX | Trung bình | Chạy `cmux-relay` cục bộ, nối hai đầu Noise qua nó với một chuỗi đánh dấu, kiểm tra chuỗi đó không bao giờ xuất hiện trong dữ liệu relay nhận | Iroh tự host, hoặc tự viết relay chuyển khung mờ |
-| **Chọn giao thức chung cho Mac và Windows** (C16): mobile RPC protocol hay giao thức remote của `cmux-tui` | Cao | Ước lượng và dựng thử cả hai: (a) mobile RPC giữa hai máy Mac qua `CmxByteTransport` websocket → kênh Noise → `cmux-relay`, không dùng iroh hay Stack Auth; (b) `cmux-remote` daemon trên Windows, xem phải port những gì. Chọn theo bốn tiêu chí: công làm máy chủ phiên trên Windows, Mac phải thêm gì để làm máy chủ, client iOS/Android sau này dùng lại được bao nhiêu, và rủi ro khi kéo bản sửa từ upstream | Bước thử này phải chốt trước khi viết kế hoạch đợt 2 và đợt 4 |
+| **Chọn giao thức chung cho Mac và Windows** (C16): mobile RPC protocol hay giao thức remote của `cmux-tui` | Cao | Ước lượng và dựng thử cả hai: (a) mobile RPC giữa hai máy Mac qua `CmxByteTransport` websocket → kênh Noise → `cmux-relay`, không dùng iroh hay Stack Auth; (b) `cmux-remote` daemon trên Windows, xem phải port những gì. Chọn theo bốn tiêu chí: công làm máy chủ phiên trên Windows, Mac phải thêm gì để làm máy chủ, client iOS/Android sau này dùng lại được bao nhiêu, và rủi ro khi kéo bản sửa từ upstream | Bước thử này phải chốt trước khi viết kế hoạch đợt 2 và đợt 4. **Đã chốt 19/10: (b)**, xem D-W0-1 trong ledger |
 | Phần phản chiếu thiết bị của Mac (`Devices`, `Hive`) gắn chặt với iroh và Stack Auth (grant do broker ký, presence qua WebSocket xác thực bằng Stack), khó đổi đường truyền | Trung bình | Chính là bước (a) ở dòng trên | Chỉ giữ phần giao diện (`DeviceWorkspaceProjection`…), viết lại phần kết nối |
 
 ## 14. Lựa chọn của người viết spec
@@ -424,7 +424,7 @@ Người dùng có thể đổi bất kỳ mục nào. Mỗi mục ghi kèm cái
 | C13 | VPS thuộc về máy đã thêm nó, không đồng bộ qua tài khoản. ShellX được tự cài helper lên VPS như cmux, và ShellX tự host helper | Muốn thấy VPS từ mọi máy thì phải đồng bộ cấu hình SSH qua tài khoản (có mã hoá). Tự host helper tốn thêm một quy trình build và ký cho Linux |
 | C14 | Trang xem trên trình duyệt điện thoại không gửi thông báo đẩy. Thông báo đến cùng app mobile native | Người dùng không nhận được tin "agent cần bạn" trên điện thoại cho tới khi có app mobile |
 | C15 | Phát hành Flutter 1.0.1 để gửi nền tảng và phiên bản hệ điều hành. Chỉ bắt người dùng Flutter trên macOS 14+ cập nhật. macOS 12–13 ở lại bản 1.0.1 | Thêm một bản Flutter, sửa nhỏ ở relay. Người dùng macOS 12–13 không có bản mới |
-| C16 | Giữ các phần remote có sẵn của cmux (phản chiếu thiết bị, chia sẻ kích thước terminal, máy chủ cho điện thoại, presence, `RemoteTui`) và chỉ thay đường truyền và đăng nhập. Relay là bản tự host của `cmux-relay` (khung mờ + Noise). Mac và Windows dùng chung **một** giao thức, chọn giữa mobile RPC và giao thức `cmux-tui` ở bước thử §13 (sửa ngày 18/10 sau khi đọc code: Mac phục vụ phiên bằng mobile RPC chứ không phải giao thức `cmux-tui`) | Nếu cả hai ứng viên đều tốn công, phải viết giao thức riêng. Đợt 2 và đợt 4 kéo dài thêm |
+| C16 | Giữ các phần remote có sẵn của cmux (phản chiếu thiết bị, chia sẻ kích thước terminal, máy chủ cho điện thoại, presence, `RemoteTui`) và chỉ thay đường truyền và đăng nhập. Relay là bản tự host của `cmux-relay` (khung mờ + Noise). Mac và Windows dùng chung **một** giao thức, chọn giữa mobile RPC và giao thức `cmux-tui` ở bước thử §13 (sửa ngày 18/10 sau khi đọc code: Mac phục vụ phiên bằng mobile RPC chứ không phải giao thức `cmux-tui`). **Chốt 19/10: giao thức `cmux-tui`**, Mac thêm cầu nối daemon (~20 ngày công) | Nếu cả hai ứng viên đều tốn công, phải viết giao thức riêng. Đợt 2 và đợt 4 kéo dài thêm |
 | C17 | Trang xem link chia sẻ chỉ dùng code của ShellX và thư viện giấy phép dễ dãi, hoặc nằm trong repo công khai theo GPL | Gần như không có giá, chỉ giới hạn lựa chọn thư viện |
 
 ## 15. Để lại cho người làm

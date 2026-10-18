@@ -70,7 +70,7 @@ Recorded 2026-10-18. Fork commit `3bb417b7eb` on `main`: `shellx.release.entitle
 
 ## Decisions
 
-### D-W0-1 Remote protocol — proposed, not final
+### D-W0-1 Remote protocol — FINAL (2026-10-19): (b) cmux-tui-remote
 
 Desk estimate (Task 5 Step 2, read-only on fork `5348097e66`): `spikes/protocol/windows-daemon-port-estimate.md` on fork branch `shellx/w0-spikes` (`486cc55bf8`). Candidate (a)'s live spike (Step 1) has not run yet (needs two tagged dev builds; disk too full).
 
@@ -88,7 +88,22 @@ Key facts: ConPTY already works in `cmux-pty` (`lib.rs:212-240`); protocol core 
 
 Top risks for (b): the Mac bridge is unproven (terminal size ownership vs `CmuxTerminalSharing`, double parsing must render identically, remote-initiated terminal creation needs a Swift callback); Windows port is security-sensitive and uncompiled (Task 6 CI tells); `cmux-remote` churn (269 commits / 90 d) and Android `ghostty-vt-sys` via Zig/NDK unproven.
 
-Open: replace Step 1 (3-day mobile-RPC spike) with a 2-day spike of the (b) Mac bridge, then finalize D-W0-1 — needs the user's ruling.
+User ruling 2026-10-18: Step 1 (mobile-RPC spike) replaced by a spike of the (b) Mac bridge M-B1. That spike ran and D-W0-1 is final: **(b)**. Spec §8.1/§8.3/§8.5/§13/C16 amended.
+
+#### Mac bridge spike (M-B1) — PASS
+
+Fork branch `shellx/w0-bridge` commit `4e1ed7bc41` (worktree `~/Documents/myProjects/shellx-pro-wt-bridge`; never pushed or merged). Write-up `spikes/protocol/mac-bridge-spike.md`, harness `spikes/protocol/mac-bridge/run.sh` + `fake_app.py`, screenshots/logs in `spikes/protocol/mac-bridge/evidence/`.
+
+- Real tagged app `cmux DEV w0-bridge`: a stock `cmux-tui` client, enrolled + approved through `cmux-relay`, attached to the focused libghostty terminal (VT snapshot, Mac grid 94x37), saw its output, and its input reached the app's zsh (`$((6*7))` → 42; Esc, vim arrows, Ctrl-C work).
+- Double parse renders identically (colored prompt, red SGR, bold/256/truecolor, vim, top); only diffs: cmux's unfocused-split dimming, snapshot turns palette colors into fixed RGB. Cost: 30.7 MB through, mirror done 0.06 s after the Mac pane, daemon 5.1 CPU-s (~0.17 CPU-s/MB) → project a terminal only while a viewer is attached.
+- Sizing: a smaller remote viewer joined the Mac's existing shared sizing via `v2MobileTerminalViewport` (hatch, "46x30 · Fits everyone" chip, viewer badge) with no new sizing code.
+- Remote-initiated `tab create terminal` opened a real libghostty tab (`Workspace.newTerminalSurface`) that ran remote commands.
+- Stubbed / not done: daemon ran as a sidecar `cmux-tui` over a Unix socket (C ABI/xcframework embed B2 not exercised; sidecar is a proven fallback); durable daemon state (`--state`) fails `workspace.create` with `mutation.indeterminate`, `--ephemeral` works (fine: the app owns persistence, else +1 d); spike projection rule only (first daemon terminal = focused Mac terminal, later ones = new tabs; no workspace/pane/title/cwd mapping); input goes through `ghostty_surface_text_input` which turns `\n` into `\r` → needs a raw PTY-write export in the ghostty fork; the `virtual_pty` Rust unit test was never compiled (disk); not run: Kitty graphics, OSC 8/52, IME preedit, iOS `terminal-bytes-v1`, WAN relay.
+- Bugs found and fixed in code but not re-run live (disk guard killed the rebuild): mirror reflowed differently when the viewer was wider than the Mac pane (fix: Mac echoes its real grid after a remote resize); closing a Mac tab left the daemon terminal running (fix: close ends it).
+- Hook points: Swift `Sources/TerminalOutputTeeCallback.swift:17`, `Sources/AppDelegate.swift:1695`, `Sources/Mobile/ShellXBridgeSpike.swift` (bind :333, input :407, remote resize :411, grid echo :435/:455); Rust `cmux-tui-core/src/virtual_pty.rs` (new), `surface.rs:2443/2495` (spawn seam), `:2574` (mirror doesn't answer terminal queries), `:2706` (Mac grid applied to mirror).
+- Dev gotcha: processes started inside a dev app that read `~/Documents` block silently on a macOS TCC prompt (zsh startup stall, client looks hung); run binaries from `/private/tmp`. Shipped app bundles `cmux-tui`, so unaffected.
+
+Revised estimate: M-B1 **20 d (17-23)**; Mac-host score for (b) 2.5 → 3, sum 15 vs 10. (b) MVP ≈ 35 d, full ≈ 43.5 d; (a) 56.5 d. Main open risk for (b) is now the Windows port (Task 6 CI, security review of owner-only ACLs).
 
 ## Spike results
 
