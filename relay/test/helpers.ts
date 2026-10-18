@@ -311,6 +311,32 @@ export async function registerMachine(
   return { ...body, noiseKey };
 }
 
+/** A stand-in sealed invite: random bytes (ciphertext-like), standard base64 with padding. */
+export function randomSealedInvite(bytes = 96): string {
+  return Buffer.from(crypto.getRandomValues(new Uint8Array(bytes))).toString("base64");
+}
+
+/** POST /v2/pairings as `token` (a fresh requester key unless `overrides` say otherwise); throws unless 201. */
+export async function requestPairing(
+  app: TestApp, token: string, fromMachineId: string, toMachineId: string, overrides: Record<string, unknown> = {},
+): Promise<{ pairing_id: string; code: string }> {
+  const res = await call(app, "POST", "/v2/pairings", {
+    token,
+    body: { from_machine_id: fromMachineId, to_machine_id: toMachineId, requester_x25519_b64: randomPublicKey(), ...overrides },
+  });
+  if (res.status !== 201) throw new Error(`request pairing failed: ${res.status} ${await res.text()}`);
+  return res.json<{ pairing_id: string; code: string }>();
+}
+
+/** POST /v2/pairings/:id/approve as the target's `token`; throws unless 204. Returns the sealed invite sent. */
+export async function approvePairing(
+  app: TestApp, token: string, pairingId: string, sealedInvite: string = randomSealedInvite(),
+): Promise<string> {
+  const res = await call(app, "POST", `/v2/pairings/${pairingId}/approve`, { token, body: { sealed_invite_b64: sealedInvite } });
+  if (res.status !== 204) throw new Error(`approve pairing failed: ${res.status} ${await res.text()}`);
+  return sealedInvite;
+}
+
 /** A UUIDv7 (RFC 9562) for unix-millisecond timestamp `ms`, lower case, random in the other bits. */
 export function uuidv7(ms: number): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));

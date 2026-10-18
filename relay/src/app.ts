@@ -16,6 +16,7 @@ import { deviceRoutes } from "./routes/devices.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { pairingRoutes } from "./routes/pairings.js";
 import { machineRoutes } from "./v2/machines.js";
+import { machinePairingRoutes, randomPairingCode } from "./v2/pairings.js";
 import type { PushGateway } from "./push/fcm.js";
 import { webSocketAuth, webSocketUpgrade } from "./routes/ws.js";
 import { minVersions } from "./settings.js";
@@ -33,6 +34,8 @@ export interface AppDeps {
   push?: PushGateway | null;
   /** Directory of the admin UI (index.html, admin.css, admin.js); defaults to `relay/admin/`. */
   adminStaticDir?: string;
+  /** The 6-digit code of a new /v2 pairing; defaults to `randomInt(0, 1_000_000)` zero-padded. Injectable for tests. */
+  pairingCode?: () => string;
 }
 
 export interface AppVariables {
@@ -43,6 +46,7 @@ export interface AppVariables {
   passwords: PasswordHasher;
   now: () => number;
   push: PushGateway | null;
+  pairingCode: () => string;
   /** Set by `requireAuth` / `webSocketAuth` on authenticated routes only. */
   auth: AuthContext;
 }
@@ -80,6 +84,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     c.set("passwords", deps.passwords ?? defaultPasswords);
     c.set("now", deps.now ?? Date.now);
     c.set("push", deps.push ?? null);
+    c.set("pairingCode", deps.pairingCode ?? randomPairingCode);
     await next();
   });
 
@@ -101,6 +106,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   app.route("/v1/pairings", pairingRoutes);
   app.route("/v1/notifications", notificationRoutes);
   app.route("/v2/machines", machineRoutes);
+  app.route("/v2/pairings", machinePairingRoutes);
   app.get("/v1/ws", webSocketAuth, webSocketUpgrade);
 
   app.notFound((c) => {
