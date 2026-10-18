@@ -173,6 +173,13 @@ Sub-plans written: `plans/2026-10-19-native-desktop-w2-server.md` (L4, 12 tasks)
 
 Open for the user at G2: `deploy.yml` and the `production` environment only accept `main`, so the master plan's "`workflow_dispatch` on `feat/relay-v2`" cannot run; options = push the server-only diff to shellx `main` (L4 estimates ~1 ubuntu minute because the pubspec version 1.0.0 is already released; unverified) or widen the environment rule. Also: `/v2/relay` (K2) vs `/v2/relay/tickets` (K1) path overlap → L4 uses an exact-match nginx route, subdomain fallback ready; cmux-relay refuses any `Origin` header, so L7's browser viewer needs a bridge.
 
+## Sprint 2026-10-19
+
+T+0 ≈ 02:50 +07 (user: "chạy"). G0: 37 GB free (Flutter `Runner-*`, `cmux-w0-bridge`, `ModuleCache.noindex` DerivedData and 27 GB xctrace scratch deleted with the user's OK); Typometer, `gh auth refresh -s workflow` and the Windows PC still open. Lanes started: L0.1 (sprint branch + `shellx-mac.yml` + W1 Task 1), L4 (`feat/relay-v2`, local), L5 (`shellx/l5-remote`), L6 (`shellx/l6-windows`). L1–L3 branch off `shellx/sprint` after L0.1.
+
+- User ruling (2026-10-19): new lane branches may be pushed to `lephus/shellx-pro` without asking (never `main`).
+- User ruling (2026-10-19): no public `ghcr.io/lephus/shellx-relay2` image for now; send the MIT/GPL question to Manaflow first. Ruling (L0): relay2 is built on the VPS from a pinned fork commit instead of pulled — costs a slower deploy (~cargo build on the VPS) if wrong.
+
 ## Handoff (2026-10-18 evening)
 
 State for the next session:
