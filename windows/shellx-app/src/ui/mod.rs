@@ -1,8 +1,9 @@
-//! The GPUI window (Windows only): custom title bar, machine sidebar and the
-//! terminal pane, styled per spec §7.1 / §7.4.
+//! The GPUI window (Windows only): custom title bar, machine sidebar, and
+//! tabs of split terminal panes, styled per spec §7.1 / §7.4.
 
 mod app;
 mod assets;
+mod panes;
 mod root;
 mod sidebar;
 mod term_view;

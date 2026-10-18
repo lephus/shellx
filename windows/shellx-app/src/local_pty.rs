@@ -13,8 +13,24 @@ use crate::term_core::PtyLink;
 pub struct LocalPty {
     writer: Mutex<Box<dyn Write + Send>>,
     master: Mutex<Box<dyn MasterPty + Send>>,
-    child: Mutex<Box<dyn Child + Send + Sync>>,
+    child: SharedChild,
     write_failed: AtomicBool,
+}
+
+type SharedChild = Arc<Mutex<Box<dyn Child + Send + Sync>>>;
+
+/// Watches a pane's shell after its `LocalPty` is gone: dropping the link
+/// kills the child, and `exited()` confirms it (`--smoke` pane checks).
+#[derive(Clone)]
+pub struct ExitProbe(SharedChild);
+
+impl ExitProbe {
+    pub fn exited(&self) -> bool {
+        match self.0.lock() {
+            Ok(mut child) => matches!(child.try_wait(), Ok(Some(_))),
+            Err(_) => true,
+        }
+    }
 }
 
 impl LocalPty {
@@ -52,17 +68,24 @@ impl LocalPty {
         let link = Arc::new(LocalPty {
             writer: Mutex::new(writer),
             master: Mutex::new(spawned.master),
-            child: Mutex::new(spawned.child),
+            child: Arc::new(Mutex::new(spawned.child)),
             write_failed: AtomicBool::new(false),
         });
         Ok((link, reader))
+    }
+
+    pub fn exit_probe(&self) -> ExitProbe {
+        ExitProbe(self.child.clone())
     }
 }
 
 impl PtyLink for LocalPty {
     fn write(&self, bytes: &[u8]) {
         if let Ok(mut writer) = self.writer.lock() {
-            let ok = writer.write_all(bytes).and_then(|()| writer.flush()).is_ok();
+            let ok = writer
+                .write_all(bytes)
+                .and_then(|()| writer.flush())
+                .is_ok();
             if !ok {
                 self.write_failed.store(true, Ordering::Relaxed);
             }

@@ -2,24 +2,29 @@
 //! "MÁY CỦA BẠN" header, one group per machine from
 //! `shellx_model::sidebar::build_groups`, and the end-to-end footer.
 //! "THIẾT BỊ ĐANG KẾT NỐI" (item 5) is out of the MVP.
+//! Under this PC: one session row per local tab (click selects the tab),
+//! and a "+" on the group header that opens a new local tab.
 
 use gpui::{
-    ClickEvent, Context, Div, FontWeight, ImageSource, Pixels, Resource, Stateful, div, img,
-    prelude::*, px, svg,
+    AnyView, App, ClickEvent, Context, Div, FontWeight, ImageSource, IntoElement, Pixels, Render,
+    Resource, SharedString, Stateful, Window, div, img, prelude::*, px, svg,
 };
 use shellx_model::palette::{Pill, Status};
 use shellx_model::sidebar::{MachineGroup, MachineIcon};
 use shellx_model::strings::{Lang, Str, t};
+use shellx_model::tabs::TabId;
 
 use super::assets::Icon;
 use super::root::RootView;
 use super::theme;
 use crate::shell_info::LOCAL_MACHINE_ID;
 
-pub const WIDTH: Pixels = px(290.0);
+pub const WIDTH: Pixels = px(crate::workspace::SIDEBAR_W);
 
-/// One session row under this PC (one per local tab; one terminal for now).
+/// One session row under this PC: one per local tab.
 pub struct SessionRow {
+    pub tab: TabId,
+    /// The tab's focused pane title (`session_title`).
     pub title: String,
     pub selected: bool,
     /// `Status::pill` decides the pill; local shells are `Idle` (no pill).
@@ -34,8 +39,9 @@ pub fn render(
 ) -> Div {
     let mut list = div().flex().flex_col().flex_1().min_h_0().overflow_hidden();
     for group in groups {
-        list = list.child(group_header(group));
-        if group.sessions_visible && group.machine_id == LOCAL_MACHINE_ID {
+        let local = group.machine_id == LOCAL_MACHINE_ID;
+        list = list.child(group_header(group, local, lang, cx));
+        if group.sessions_visible && local {
             for (ix, row) in local_sessions.iter().enumerate() {
                 list = list.child(session_row(ix, row, lang, cx));
             }
@@ -118,7 +124,60 @@ fn machines_header(lang: Lang) -> Div {
         )
 }
 
-fn group_header(group: &MachineGroup) -> Div {
+/// "+" on this PC's group header: a new local tab (tooltip "Tab mới").
+fn new_tab_button(lang: Lang, cx: &mut Context<RootView>) -> Stateful<Div> {
+    let tip: SharedString = t(lang, Str::NewTab).into();
+    div()
+        .id("sidebar-new-tab")
+        .group("sidebar-new-tab")
+        .flex()
+        .flex_none()
+        .items_center()
+        .justify_center()
+        .size(px(20.0))
+        .rounded(px(4.0))
+        .cursor_pointer()
+        .tooltip(move |_, cx| Tooltip::view(tip.clone(), cx))
+        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+            this.new_tab(window, cx);
+        }))
+        .child(
+            svg()
+                .path(Icon::AddPlus.path())
+                .size(px(14.0))
+                .text_color(theme::muted())
+                .group_hover("sidebar-new-tab", |style| style.text_color(theme::text())),
+        )
+}
+
+/// Plain tooltip: RAISE box, 1 px BORDER, small TEXT label.
+struct Tooltip {
+    text: SharedString,
+}
+
+impl Tooltip {
+    fn view(text: SharedString, cx: &mut App) -> AnyView {
+        cx.new(|_| Tooltip { text }).into()
+    }
+}
+
+impl Render for Tooltip {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .px(px(8.0))
+            .py(px(4.0))
+            .bg(theme::raise())
+            .border_1()
+            .border_color(theme::border())
+            .rounded(px(6.0))
+            .font(theme::ui_font())
+            .text_size(theme::SMALL_SIZE)
+            .text_color(theme::text())
+            .child(self.text.clone())
+    }
+}
+
+fn group_header(group: &MachineGroup, local: bool, lang: Lang, cx: &mut Context<RootView>) -> Div {
     let icon = match group.icon {
         MachineIcon::Laptop => Icon::Laptop,
         MachineIcon::Desktop => Icon::Desktop,
@@ -157,7 +216,8 @@ fn group_header(group: &MachineGroup) -> Div {
             )
         })
         .child(div().flex_1())
-        .child(div().flex_none().size(px(6.0)).rounded_full().bg(dot));
+        .child(div().flex_none().size(px(6.0)).rounded_full().bg(dot))
+        .when(local, |row| row.child(new_tab_button(lang, cx)));
 
     div()
         .flex()
@@ -185,6 +245,7 @@ fn session_row(
     cx: &mut Context<RootView>,
 ) -> Stateful<Div> {
     let selected = row.selected;
+    let tab = row.tab;
     div()
         .id(("sidebar-session", ix))
         .flex()
@@ -200,8 +261,8 @@ fn session_row(
         .when(!selected, |el| {
             el.hover(|style| style.bg(theme::hsla(theme::SESSION_HOVER)))
         })
-        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-            this.focus_terminal(window, cx);
+        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+            this.select_tab(tab, window, cx);
         }))
         .child(
             svg()

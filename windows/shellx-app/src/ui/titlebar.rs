@@ -13,7 +13,7 @@ use super::assets::Icon;
 use super::root::RootView;
 use super::theme;
 
-pub const HEIGHT: Pixels = px(40.0);
+pub const HEIGHT: Pixels = px(crate::workspace::TITLEBAR_H);
 const CAPTION_WIDTH: Pixels = px(46.0);
 const ICON_SIZE: Pixels = px(16.0);
 const SEARCH_MAX_WIDTH: Pixels = px(360.0);

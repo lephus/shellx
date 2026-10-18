@@ -4,6 +4,7 @@
 //! only committed text reaches the PTY. `--smoke` runs the same session
 //! headless (after the `--smoke-ui-assets` checks) and exits;
 //! `--smoke-ui-assets` checks the embedded icons and shell strings only;
+//! `--smoke-panes` runs only the tabs/splits pane checks of `--smoke`;
 //! `--version` prints the version and exits.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
@@ -13,6 +14,7 @@ mod local_pty;
 mod shell_info;
 mod smoke;
 mod term_core;
+mod workspace;
 
 #[cfg(windows)]
 mod ui;
@@ -30,6 +32,16 @@ fn main() {
             Ok(()) => std::process::exit(0),
             Err(error) => {
                 eprintln!("smoke-ui-assets: FAIL: {error:#}");
+                std::process::exit(1);
+            }
+        }
+    }
+
+    if args.iter().any(|arg| arg == "--smoke-panes") {
+        match smoke::panes() {
+            Ok(()) => std::process::exit(0),
+            Err(error) => {
+                eprintln!("smoke-panes: FAIL: {error:#}");
                 std::process::exit(1);
             }
         }

@@ -24,6 +24,7 @@ pub const SHELL_STRINGS: &[Str] = &[
     Str::Offline,
     Str::LocalShell,
     Str::E2eFooter,
+    Str::NewTab,
 ];
 
 /// This PC as a sidebar machine; `computer_name` is `%COMPUTERNAME%`.

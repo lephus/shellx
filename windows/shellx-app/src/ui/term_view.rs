@@ -1,5 +1,8 @@
 //! The terminal pane: one libghostty-vt grid, cursor, inline IME preedit
 //! (moved from the spike's app.rs; colors now come from ui/theme.rs).
+//! Each split pane is one `TermView` with its own shell. Keys go through
+//! `shellx_model::keys::map_key`; app commands and the shell's exit are
+//! emitted as `TermEvent`s for RootView, which owns the tabs model.
 
 use std::ops::Range;
 use std::time::Duration;
@@ -7,8 +10,8 @@ use std::time::Duration;
 use ghostty_vt::{CellWidth, CursorShape, Rgb};
 use gpui::{
     App, BorderStyle, Bounds, Context, Element, ElementId, ElementInputHandler, Entity,
-    EntityInputHandler, FocusHandle, Focusable, Font, FontFallbacks, GlobalElementId, Hsla,
-    InspectorElementId, IntoElement, KeyDownEvent, LayoutId, MouseButton, MouseDownEvent,
+    EntityInputHandler, EventEmitter, FocusHandle, Focusable, Font, FontFallbacks, GlobalElementId,
+    Hsla, InspectorElementId, IntoElement, KeyDownEvent, LayoutId, MouseButton, MouseDownEvent,
     PaintQuad, Pixels, Point, Render, ScrollWheelEvent, ShapedLine, SharedString,
     StrikethroughStyle, Style, TextRun, UTF16Selection, UnderlineStyle, Window, div, fill, font,
     outline, point, prelude::*, px, relative, size,
@@ -16,12 +19,22 @@ use gpui::{
 
 use std::sync::Arc;
 
+use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::palette::{TERM_BG, TERM_CURSOR, TERM_FG};
 
 use super::theme;
 use crate::fonts;
-use crate::local_pty::{LocalPty, default_shell, spawn_reader};
+use crate::local_pty::{LocalPty, spawn_reader};
 use crate::term_core::{PtyLink, TermCore, rgb};
+use crate::workspace::spawn_local_pane;
+
+/// What a pane tells RootView.
+pub(super) enum TermEvent {
+    /// A window command typed in this pane (new tab, split, close, ...).
+    Command(AppCommand),
+    /// The shell ended (exit, crash, or a failed write): close the pane.
+    Exited,
+}
 
 const FONT_SIZE: f32 = 14.0;
 const LINE_HEIGHT: f32 = 1.3;
@@ -96,13 +109,9 @@ impl TermView {
             line_height: px(18.0),
             title: BASE_TITLE.to_string(),
         };
-        let (program, args) = default_shell();
-        let spawned = LocalPty::spawn(&program, &args, 80, 24).and_then(|(link, reader)| {
-            let core = TermCore::new(link.clone(), 80, 24)?;
-            Ok((link, core, reader))
-        });
-        match spawned {
-            Ok((link, core, reader)) => {
+        match spawn_local_pane(80, 24, &[]) {
+            Ok(started) => {
+                let (link, core, reader) = (started.link, started.core, started.reader);
                 view.session = Some(core);
                 view.link = Some(link);
                 let (tx, rx) = async_channel::unbounded::<Vec<u8>>();
@@ -125,19 +134,22 @@ impl TermView {
                 })
                 .detach();
                 // ConPTY keeps its output pipe open after the shell exits, so
-                // poll the child and close the app when PowerShell is gone.
+                // poll the child (and the sticky write-failure flag) and tell
+                // RootView, which closes this pane through the tabs model.
                 cx.spawn(async move |this, cx| {
                     loop {
                         cx.background_executor()
                             .timer(Duration::from_millis(500))
                             .await;
-                        let exited = this
-                            .update(cx, |view, _| {
-                                view.link.as_ref().is_none_or(|l| l.is_closed())
-                            })
-                            .unwrap_or(true);
-                        if exited {
-                            let _ = cx.update(|cx| cx.quit());
+                        let exited = this.update(cx, |view, cx| {
+                            let exited = view.link.as_ref().is_some_and(|l| l.is_closed());
+                            if exited {
+                                cx.emit(TermEvent::Exited);
+                            }
+                            exited
+                        });
+                        // Err: the pane was dropped (closed by RootView).
+                        if exited.unwrap_or(true) {
                             return;
                         }
                     }
@@ -159,65 +171,52 @@ impl TermView {
         self.session.as_ref().and_then(TermCore::title)
     }
 
+    /// Selection exists only from Task 9 on.
+    pub(super) fn has_selection(&self) -> bool {
+        false
+    }
+
     fn on_key_down(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
-        if self.marked.is_some() {
-            return; // the IME owns keys while composing
-        }
         let keystroke = &event.keystroke;
         let mods = keystroke.modifiers;
-        if mods.platform {
-            return;
-        }
-        let key = keystroke.key.as_str();
-        let paste = (mods.control && mods.shift && key == "v") || (mods.shift && key == "insert");
-        if paste {
-            if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text())
-                && let Some(session) = self.session.as_mut()
-            {
-                session.paste(&text);
+        let key = KeyIn {
+            key: keystroke.key.as_str(),
+            ctrl: mods.control,
+            alt: mods.alt,
+            shift: mods.shift,
+            win: mods.platform,
+        };
+        let ctx = KeyCtx {
+            has_selection: self.has_selection(),
+            // The IME owns keys while composing (map_key ignores them).
+            composing: self.composing(),
+        };
+        match map_key(&key, &ctx) {
+            KeyAction::App(AppCommand::Paste) => {
+                // The spike's paste until Task 9 wires copy/paste properly.
+                if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text())
+                    && let Some(session) = self.session.as_mut()
+                {
+                    session.paste(&text);
+                }
+                cx.stop_propagation();
             }
-            cx.stop_propagation();
-            return;
-        }
-        let named = matches!(
-            key,
-            "enter"
-                | "backspace"
-                | "tab"
-                | "escape"
-                | "up"
-                | "down"
-                | "left"
-                | "right"
-                | "home"
-                | "end"
-                | "pageup"
-                | "pagedown"
-                | "insert"
-                | "delete"
-        ) || (key.len() >= 2 && key.starts_with('f') && key[1..].parse::<u8>().is_ok());
-        // Ctrl+Alt is AltGr on many layouts: leave it to WM_CHAR as text.
-        let altgr = mods.control && mods.alt;
-        if !(named || ((mods.control || mods.alt) && !altgr)) {
+            // Copy needs a selection (Task 9); swallow Ctrl+Shift+C meanwhile.
+            KeyAction::App(AppCommand::Copy) => cx.stop_propagation(),
+            KeyAction::App(command) => {
+                cx.emit(TermEvent::Command(command));
+                cx.stop_propagation();
+            }
+            KeyAction::Chord(chord) => {
+                if let Some(session) = self.session.as_mut()
+                    && session.send_chord(&chord)
+                {
+                    cx.stop_propagation();
+                }
+            }
             // Plain text: Windows turns the key into WM_CHAR / IME messages,
             // which arrive through the EntityInputHandler below.
-            return;
-        }
-        let mut chord = String::new();
-        if mods.control {
-            chord.push_str("ctrl+");
-        }
-        if mods.alt {
-            chord.push_str("alt+");
-        }
-        if mods.shift {
-            chord.push_str("shift+");
-        }
-        chord.push_str(key);
-        if let Some(session) = self.session.as_mut()
-            && session.send_chord(&chord)
-        {
-            cx.stop_propagation();
+            KeyAction::Text | KeyAction::Ignore => {}
         }
     }
 
@@ -232,6 +231,8 @@ impl TermView {
         }
     }
 }
+
+impl EventEmitter<TermEvent> for TermView {}
 
 impl Focusable for TermView {
     fn focus_handle(&self, _: &App) -> FocusHandle {
@@ -665,7 +666,11 @@ impl Element for TermElement {
         }
 
         // Accessibility stopgap: GPUI 0.2.2 has no UIA tree, so expose the
-        // cursor line through the window title (Narrator: Insert+T).
+        // cursor line through the window title (Narrator: Insert+T). Only
+        // the focused pane writes it, so split panes do not fight over it.
+        if !focused {
+            return out;
+        }
         let line = cursor_line_text.trim_end();
         let wanted = match (title, line.is_empty()) {
             (Some(t), true) => format!("{t} - {BASE_TITLE}"),
