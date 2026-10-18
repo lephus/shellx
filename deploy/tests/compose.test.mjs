@@ -148,6 +148,14 @@ test('README documents Relay v2 without any secret value', () => {
   assert.doesNotMatch(readme, /shellx-pro/);
 });
 
+test('README Relay v2 runbook has the G2 foreign_key_check pre-check on a copy of the database', () => {
+  const readme = readFileSync(join(deployDir, 'README.md'), 'utf8');
+  const section = readme.match(/^## Relay v2[\s\S]*?(?=\n## )/m)[0];
+  assert.match(section, /PRAGMA foreign_key_check;/);
+  assert.match(section, /COPY of\s+the production database, never on the live file/);
+  assert.ok(section.indexOf('foreign_key_check') < section.indexOf('1. **VPS prerequisites**'), 'pre-check comes before the steps');
+});
+
 test('README switch-off removes the relay2 container (a deactivated profile makes no orphan) before dropping the profile', () => {
   const readme = readFileSync(join(deployDir, 'README.md'), 'utf8');
   const step = readme.match(/^7\. \*\*Roll back \/ switch off\.\*\*[\s\S]*?(?=\n## )/m)[0];

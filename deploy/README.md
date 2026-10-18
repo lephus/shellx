@@ -274,6 +274,22 @@ upstream authors is open), so nothing is pulled or pushed for it: it is built fr
 profile `relay2`; a deploy without `COMPOSE_PROFILES=relay2` in the VPS's `.env` behaves exactly as
 before (relay + web + backup). deploy.yml never syncs `relay2-src/`.
 
+**G2 pre-check, before the first deploy of migration 0005 (once).** Migration 0005 rebuilds the
+`devices` table (to allow `kind = 'desktop'`) and fails closed: on any dangling reference it rolls back,
+the relay stays unhealthy and the deploy rolls back. So first look for dangling references on a COPY of
+the production database, never on the live file `data/relay.db`. On the VPS, with the newest nightly
+backup as the copy:
+
+```bash
+cd ~/phu/shellx
+B=$(ls -1t backups/relay-*.db | head -n 1)
+mkdir -p /tmp/fkcheck && cp "$B" /tmp/fkcheck/relay.db
+docker run --rm -v /tmp/fkcheck:/w alpine:3.22 sh -c 'apk add -q sqlite && sqlite3 /w/relay.db "PRAGMA foreign_key_check;"'
+rm -rf /tmp/fkcheck
+```
+
+Any output row means a dangling reference: stop, do not deploy, and report it. No output is the go.
+
 1. **VPS prerequisites** (once). The Rust build needs about 2 GB of RAM including swap and 4 GB of
    free disk:
 
