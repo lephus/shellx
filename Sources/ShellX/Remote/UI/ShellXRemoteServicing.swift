@@ -42,9 +42,22 @@ extension ShellXRemoteServicing where Self: ObservableObject, Self.ObjectWillCha
 /// exactly as the local-only W1 sidebar.
 enum ShellXRemoteUIGate {
     static let fixturesEnvironmentKey = "SHELLX_REMOTE_UI_FIXTURES"
+    /// K4's switch, the one L5's `ShellXRemoteGate` reads.
+    static let remoteMachinesEnvironmentKey = "SHELLX_REMOTE_MACHINES"
 
     static var isEnabled: Bool {
-        ShellXFeatures.remoteMachines || usesFixtures
+        ShellXFeatures.remoteMachines || usesFixtures || remoteMachinesRequested
+    }
+
+    /// DEBUG builds launched with `SHELLX_REMOTE_MACHINES=1`. Turns the UI on
+    /// but serves no fixtures: until the real service is bound the provider
+    /// returns nil and nothing remote shows.
+    static var remoteMachinesRequested: Bool {
+#if DEBUG
+        return ProcessInfo.processInfo.environment[remoteMachinesEnvironmentKey] == "1"
+#else
+        return false
+#endif
     }
 
     /// DEBUG builds launched with `SHELLX_REMOTE_UI_FIXTURES=1`.
@@ -68,6 +81,7 @@ enum ShellXRemoteServiceProvider {
         }
 #endif
         // ShellX: bind ShellXRemoteService.shared here when L5 Task 13 lands
+        // ShellX: once it lands, ShellXRemoteUIGate.isEnabled must follow ShellXRemoteGate.
         return nil
     }
 }

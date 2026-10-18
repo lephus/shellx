@@ -157697,6 +157697,12 @@
             "state": "translated",
             "value": "取消"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Huỷ"
+          }
         }
       }
     },

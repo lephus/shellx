@@ -36,15 +36,19 @@ final class SignInSheetModel: ObservableObject {
             do {
                 try await signIn(email, password)
                 self.isSubmitting = false
+                // The password is never kept beyond the call; the email stays for a retry.
+                self.password = ""
                 self.onFinished?(true)
             } catch {
                 self.isSubmitting = false
+                self.password = ""
                 self.errorText = SignInErrorMessage.text(for: error, labels: .localized)
             }
         }
     }
 
     func cancel() {
+        password = ""
         onFinished?(false)
     }
 }
