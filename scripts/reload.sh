@@ -8,10 +8,10 @@ source "$SCRIPT_DIR/lib/mobile-attach.sh"
 # shellcheck source=scripts/lib/dev-secrets.sh
 source "$SCRIPT_DIR/lib/dev-secrets.sh"
 
-APP_NAME="cmux DEV"
-BUNDLE_ID="com.cmuxterm.app.debug"
-BASE_APP_NAME="cmux DEV"
-# The configuration xcodebuild builds and the app it produces (Release: cmux.app).
+APP_NAME="ShellX DEV"
+BUNDLE_ID="pro.shellx.desktop.debug"
+BASE_APP_NAME="ShellX DEV"
+# The configuration xcodebuild builds and the app it produces (Release: ShellX.app).
 BUILD_CONFIGURATION="Debug"
 PRODUCT_APP_NAME="$BASE_APP_NAME"
 DERIVED_DATA=""
@@ -361,7 +361,7 @@ reload_cleanup_tag_state_with_lock() {
       close($fh);
       exit 1;
     }
-    my $cli_suffix = "/cmux DEV ${slug}.app/Contents/Resources/bin/cmux";
+    my $cli_suffix = "/ShellX DEV ${slug}.app/Contents/Resources/bin/cmux";
     my $pointer_ok = length($publish_cli_path)
       ? write_discovery_file($pointer_path, $publish_cli_path)
       : clear_matching_discovery_file($pointer_path, $cli_suffix, 1);
@@ -405,12 +405,12 @@ derive_socket_marker_names() {
   CMUX_RELOAD_MARKER_NAME="last-socket-path"
   CMUX_RELOAD_TMP_MARKER="/tmp/cmux-last-socket-path"
   case "$bundle_id" in
-    com.cmuxterm.app.nightly)
+    pro.shellx.desktop.nightly)
       CMUX_RELOAD_MARKER_NAME="nightly-last-socket-path"
       CMUX_RELOAD_TMP_MARKER="/tmp/cmux-nightly-last-socket-path"
       ;;
-    com.cmuxterm.app.nightly.*)
-      variant_slug="$(sanitize_path "${bundle_id#com.cmuxterm.app.nightly.}")"
+    pro.shellx.desktop.nightly.*)
+      variant_slug="$(sanitize_path "${bundle_id#pro.shellx.desktop.nightly.}")"
       if [[ -n "$variant_slug" ]]; then
         CMUX_RELOAD_MARKER_NAME="nightly-${variant_slug}-last-socket-path"
         CMUX_RELOAD_TMP_MARKER="/tmp/cmux-nightly-${variant_slug}-last-socket-path"
@@ -419,12 +419,12 @@ derive_socket_marker_names() {
         CMUX_RELOAD_TMP_MARKER="/tmp/cmux-nightly-last-socket-path"
       fi
       ;;
-    com.cmuxterm.app.rc)
+    pro.shellx.desktop.rc)
       CMUX_RELOAD_MARKER_NAME="rc-last-socket-path"
       CMUX_RELOAD_TMP_MARKER="/tmp/cmux-rc-last-socket-path"
       ;;
-    com.cmuxterm.app.rc.*)
-      variant_slug="$(sanitize_path "${bundle_id#com.cmuxterm.app.rc.}")"
+    pro.shellx.desktop.rc.*)
+      variant_slug="$(sanitize_path "${bundle_id#pro.shellx.desktop.rc.}")"
       if [[ -n "$variant_slug" ]]; then
         CMUX_RELOAD_MARKER_NAME="rc-${variant_slug}-last-socket-path"
         CMUX_RELOAD_TMP_MARKER="/tmp/cmux-rc-${variant_slug}-last-socket-path"
@@ -433,12 +433,12 @@ derive_socket_marker_names() {
         CMUX_RELOAD_TMP_MARKER="/tmp/cmux-rc-last-socket-path"
       fi
       ;;
-    com.cmuxterm.app.staging)
+    pro.shellx.desktop.staging)
       CMUX_RELOAD_MARKER_NAME="staging-last-socket-path"
       CMUX_RELOAD_TMP_MARKER="/tmp/cmux-staging-last-socket-path"
       ;;
-    com.cmuxterm.app.staging.*)
-      variant_slug="$(sanitize_path "${bundle_id#com.cmuxterm.app.staging.}")"
+    pro.shellx.desktop.staging.*)
+      variant_slug="$(sanitize_path "${bundle_id#pro.shellx.desktop.staging.}")"
       if [[ -n "$variant_slug" ]]; then
         CMUX_RELOAD_MARKER_NAME="staging-${variant_slug}-last-socket-path"
         CMUX_RELOAD_TMP_MARKER="/tmp/cmux-staging-${variant_slug}-last-socket-path"
@@ -447,7 +447,7 @@ derive_socket_marker_names() {
         CMUX_RELOAD_TMP_MARKER="/tmp/cmux-staging-last-socket-path"
       fi
       ;;
-    com.cmuxterm.app.debug)
+    pro.shellx.desktop.debug)
       variant_slug="$(sanitize_path "$tag_slug")"
       if [[ -n "$variant_slug" ]]; then
         CMUX_RELOAD_MARKER_NAME="dev-${variant_slug}-last-socket-path"
@@ -457,8 +457,8 @@ derive_socket_marker_names() {
         CMUX_RELOAD_TMP_MARKER="/tmp/cmux-dev-last-socket-path"
       fi
       ;;
-    com.cmuxterm.app.debug.*)
-      variant_slug="$(sanitize_path "${bundle_id#com.cmuxterm.app.debug.}")"
+    pro.shellx.desktop.debug.*)
+      variant_slug="$(sanitize_path "${bundle_id#pro.shellx.desktop.debug.}")"
       if [[ -n "$variant_slug" ]]; then
         CMUX_RELOAD_MARKER_NAME="dev-${variant_slug}-last-socket-path"
         CMUX_RELOAD_TMP_MARKER="/tmp/cmux-dev-${variant_slug}-last-socket-path"
@@ -516,8 +516,8 @@ cleanup_stale_cli_pointer_target() {
   esac
   local app_name="${bundle_path##*/}"
   app_name="${app_name%.app}"
-  [[ "$app_name" == "cmux DEV "* ]] || return 0
-  local slug="${app_name#cmux DEV }"
+  [[ "$app_name" == "ShellX DEV "* ]] || return 0
+  local slug="${app_name#ShellX DEV }"
   [[ "$slug" =~ ^[A-Za-z0-9_-]+$ ]] || return 0
   local socket_path=""
   if [[ -x /usr/libexec/PlistBuddy && -f "$bundle_path/Contents/Info.plist" ]]; then
@@ -636,8 +636,8 @@ bundle_socket_path() {
 
   local app_name="\${bundle_path##*/}"
   app_name="\${app_name%.app}"
-  if [[ "\$app_name" == "cmux DEV "* ]]; then
-    local tag="\${app_name#cmux DEV }"
+  if [[ "\$app_name" == "ShellX DEV "* ]]; then
+    local tag="\${app_name#ShellX DEV }"
     [[ "\$tag" =~ ^[A-Za-z0-9_-]+\$ ]] || return 1
     printf '/tmp/cmux-debug-%s.sock\\n' "\$tag"
     return 0
@@ -667,7 +667,7 @@ if [[ -n "\$SOCKET_ARG" ]]; then
     if [[ "\$TAG" =~ ^[A-Za-z0-9_-]+$ ]]; then
       # reload.sh links /tmp/cmux-<tag> to the DerivedData it built the tag into,
       # which is not the per-tag default when tags share one.
-      TAG_CLI_SUFFIX="cmux DEV \$TAG.app/Contents/Resources/bin/cmux"
+      TAG_CLI_SUFFIX="ShellX DEV \$TAG.app/Contents/Resources/bin/cmux"
       for TAG_CLI in "/tmp/cmux-\$TAG"/Build/Products/{Debug,Release}/"\$TAG_CLI_SUFFIX" \
         "\$HOME/Library/Developer/Xcode/DerivedData/cmux-\$TAG"/Build/Products/{Debug,Release}/"\$TAG_CLI_SUFFIX"; do
         # /tmp is shared, so only trust a CLI this user owns.
@@ -1162,7 +1162,7 @@ tag_build_cleanup_paths() {
     derived="$(readlink "$link" 2>/dev/null || true)"
   fi
   if [[ -n "$derived" && "$derived" != "$own" && "$derived" != "$link" ]]; then
-    printf '%q ' "${derived%/}/Build/Products/Debug/cmux DEV ${tag}.app" "${derived%/}/Build/Products/Release/cmux DEV ${tag}.app"
+    printf '%q ' "${derived%/}/Build/Products/Debug/ShellX DEV ${tag}.app" "${derived%/}/Build/Products/Release/ShellX DEV ${tag}.app"
     [[ -d "$own" ]] || return 0
   fi
   printf '%q ' "$own"
@@ -1173,7 +1173,7 @@ tag_build_cleanup_paths() {
 # argument is escaped with %q instead of being wrapped in quotes.
 print_tag_cleanup_commands() {
   local tag="$1" derived="${2:-}"
-  printf '  pkill -f %q\n' "cmux DEV ${tag}.app/Contents/MacOS/cmux DEV"
+  printf '  pkill -f %q\n' "ShellX DEV ${tag}.app/Contents/MacOS/ShellX DEV"
   printf '  rm -rf %s%q %q\n' "$(tag_build_cleanup_paths "$tag" "$derived")" "/tmp/cmux-${tag}" "/tmp/cmux-debug-${tag}.sock"
   printf '  rm -f %q\n' "/tmp/cmux-debug-${tag}.log"
   printf '  rm -f %q\n' "$HOME/Library/Application Support/cmux/cmuxd-dev-${tag}.sock"
@@ -1263,8 +1263,9 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       BUNDLE_ID_LOWER="$(printf '%s' "$BUNDLE_ID" | tr '[:upper:]' '[:lower:]')"
-      if [[ "$BUNDLE_ID_LOWER" == "com.cmuxterm.app" || ( "$BUNDLE_ID_LOWER" == com.cmuxterm.app.* && "$BUNDLE_ID_LOWER" != com.cmuxterm.app.debug.* ) ]]; then
-        echo "error: --bundle-id $BUNDLE_ID is not a com.cmuxterm.app.debug.* id; reload.sh would quit a user's running cmux" >&2
+      # ShellX's own release/channel ids and every cmux id belong to apps a user runs.
+      if [[ "$BUNDLE_ID_LOWER" == "pro.shellx.desktop" || ( "$BUNDLE_ID_LOWER" == pro.shellx.desktop.* && "$BUNDLE_ID_LOWER" != pro.shellx.desktop.debug.* ) || "$BUNDLE_ID_LOWER" == "com.cmuxterm.app" || "$BUNDLE_ID_LOWER" == com.cmuxterm.app.* ]]; then
+        echo "error: --bundle-id $BUNDLE_ID is not a pro.shellx.desktop.debug.* id; reload.sh would quit a user's running ShellX or cmux" >&2
         exit 1
       fi
       BUNDLE_SET=1
@@ -1360,11 +1361,11 @@ if [[ -z "$TAG" ]]; then
   exit 1
 fi
 
-# Release's product is cmux.app, which the tag step stages as the tagged app. It
+# Release's product is ShellX.app, which the tag step stages as the tagged app. It
 # bundles the pinned cmux-tui by default; dogfood the checkout's own instead. Its
 # entitlements need a signing team, and the tagged app is signed ad hoc.
 if [[ "$BUILD_CONFIGURATION" == Release ]]; then
-  PRODUCT_APP_NAME="cmux"
+  PRODUCT_APP_NAME="ShellX"
   export CMUX_NEXT_TUI_MODE=tree
 fi
 
@@ -1433,10 +1434,10 @@ if [[ -n "$TAG" ]]; then
       "$TAG_SLUG" "$0" "${RELOAD_ORIGINAL_ARGS[@]}"
   fi
   if [[ "$NAME_SET" -eq 0 ]]; then
-    APP_NAME="cmux DEV ${TAG_SLUG}"
+    APP_NAME="ShellX DEV ${TAG_SLUG}"
   fi
   if [[ "$BUNDLE_SET" -eq 0 ]]; then
-    BUNDLE_ID="com.cmuxterm.app.debug.${TAG_ID}"
+    BUNDLE_ID="pro.shellx.desktop.debug.${TAG_ID}"
   fi
   DERIVED_DATA="$(resolve_tagged_derived_data "$TAG_SLUG" "$DERIVED_SET" "${DERIVED_DATA:-}")"
   if [[ "$BUILD_ONLY" -ne 1 ]]; then

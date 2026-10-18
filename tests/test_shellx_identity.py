@@ -133,7 +133,12 @@ class ShellXIdentityTests(unittest.TestCase):
         self.assertContains('APP_NAME="ShellX DEV ${TAG_SLUG}"', script)
         self.assertContains('BUNDLE_ID="pro.shellx.desktop.debug.${TAG_ID}"', script)
         self.assertLacks("cmux DEV", script)
-        self.assertLacks("com.cmuxterm.app", script)
+        # cmux ids only appear in the --bundle-id refusal: a tagged build never
+        # takes over (and quits) a user's ShellX or cmux.
+        cmux_lines = [line.strip() for line in script.splitlines() if "com.cmuxterm" in line]
+        self.assertEqual(len(cmux_lines), 1, cmux_lines)
+        self.assertTrue(cmux_lines[0].startswith('if [[ "$BUNDLE_ID_LOWER" == "pro.shellx.desktop" ||'), cmux_lines[0])
+        self.assertContains('"$BUNDLE_ID_LOWER" == com.cmuxterm.app.* ]]', cmux_lines[0])
 
 
 if __name__ == "__main__":

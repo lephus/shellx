@@ -1687,7 +1687,6 @@
 		7A1D4C000000000000000106 /* CmuxTuiSurfaceProviderRegistryPollingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D4C000000000000000105 /* CmuxTuiSurfaceProviderRegistryPollingTests.swift */; };		036359ABDB1F58B489D378A4 /* CmuxTuiSurfaceProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63F5BDFB110A8A96C9CA0A75 /* CmuxTuiSurfaceProviders.swift */; };
 		44909912C73D2B3DB8C715F4 /* CmuxTuiSurfaceProviderTests+LinkCancellation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C629AFC3F73DD0690975630 /* CmuxTuiSurfaceProviderTests+LinkCancellation.swift */; };
 		2C636EB7DCD3184EE9E94E31 /* CmuxTuiSurfaceProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC427A4C642EBC36E600FA7F /* CmuxTuiSurfaceProviderTests.swift */; };
-		7A0CE1000000000000000049 /* cmuxTunnel.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = 7A0CE1000000000000000026 /* cmuxTunnel.systemextension */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		CDFEED0300000000CDFEED03 /* CmuxUpdater in Frameworks */ = {isa = PBXBuildFile; productRef = CDFEED0200000000CDFEED02 /* CmuxUpdater */; };
 		CDFEED0600000000CDFEED06 /* CmuxUpdaterUI in Frameworks */ = {isa = PBXBuildFile; productRef = CDFEED0500000000CDFEED05 /* CmuxUpdaterUI */; };
 		9520A0029520A0029520A002 /* CmuxVaultAgentRegistration+Hermes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9520B0029520B0029520B002 /* CmuxVaultAgentRegistration+Hermes.swift */; };
@@ -4688,13 +4687,6 @@
 			remoteGlobalIDString = A5001050;
 			remoteInfo = cmux;
 		};
-		7A0CE1000000000000000061 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = A5001070 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 7A0CE1000000000000000054;
-			remoteInfo = cmuxTunnelExtension;
-		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -4744,17 +4736,6 @@
 				D1320AA0D1320AA0D1320AA2 /* CmuxDockTilePlugin.plugin in Copy Dock Tile Plugin */,
 			);
 			name = "Copy Dock Tile Plugin";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		7A0CE1000000000000000060 /* Embed System Extensions */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = Contents/Library/SystemExtensions;
-			dstSubfolderSpec = 1;
-			files = (
-				7A0CE1000000000000000049 /* cmuxTunnel.systemextension in Embed System Extensions */,
-			);
-			name = "Embed System Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -14055,7 +14036,6 @@
 				D3664003D3664003D3664003 /* Compress Markdown Viewer Assets */,
 				C0DE47000000000000000003 /* Write Extension Point */,
 				D1320AA0D1320AA0D1320AA6 /* Copy Dock Tile Plugin */,
-				7A0CE1000000000000000060 /* Embed System Extensions */,
 				A5001020 /* Embed Frameworks */,
 				B900000AA1B2C3D4E5F60719 /* Copy CLI */,
 				D1FF50000000000000000001 /* Build Diff Sidecar */,
@@ -14070,7 +14050,6 @@
 			dependencies = (
 				B900000EA1B2C3D4E5F60719 /* PBXTargetDependency */,
 				D1320AA0D1320AA0D1320AB1 /* PBXTargetDependency */,
-				7A0CE1000000000000000062 /* PBXTargetDependency */,
 			);
 			name = cmux;
 			packageProductDependencies = (
@@ -19236,11 +19215,6 @@
 			target = A5001050 /* cmux */;
 			targetProxy = F1000008A1B2C3D4E5F60718 /* PBXContainerItemProxy */;
 		};
-		7A0CE1000000000000000062 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 7A0CE1000000000000000054 /* cmuxTunnelExtension */;
-			targetProxy = 7A0CE1000000000000000061 /* PBXContainerItemProxy */;
-		};
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
@@ -19257,7 +19231,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.65.2;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.cmuxterm.clitests;
+				PRODUCT_BUNDLE_IDENTIFIER = pro.shellx.desktop.clitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_VERSION = 5.0;
@@ -19273,7 +19247,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.65.2;
 				ONLY_ACTIVE_ARCH = NO;
-				PRODUCT_BUNDLE_IDENTIFIER = com.cmuxterm.clitests;
+				PRODUCT_BUNDLE_IDENTIFIER = pro.shellx.desktop.clitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 			};
@@ -19288,7 +19262,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.65.2;
 				ONLY_ACTIVE_ARCH = NO;
-				PRODUCT_BUNDLE_IDENTIFIER = com.cmuxterm.appuitests;
+				PRODUCT_BUNDLE_IDENTIFIER = pro.shellx.desktop.appuitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TEST_TARGET_NAME = cmux;
@@ -19365,7 +19339,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-Debug";
-				CMUX_AUTH_CALLBACK_SCHEME = "cmux-dev";
+				CMUX_AUTH_CALLBACK_SCHEME = "shellx-dev";
 				CMUX_IROH_RELAY_POLICY_KEY_ID = "cmux-staging-relay-policy-2026-07";
 				CMUX_IROH_RELAY_POLICY_NEXT_KEY_ID = "cmux-staging-relay-policy-2026-08";
 				CMUX_IROH_RELAY_POLICY_NEXT_PUBLIC_KEY_BASE64 = "KnOZ6gKmH05Mrfan2tXgwRygBKxcSUue4bp34udiQFA=";
@@ -19397,13 +19371,14 @@
 					"-framework",
 					Carbon,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.cmuxterm.app.debug;
-				PRODUCT_NAME = "cmux DEV";
+				PRODUCT_BUNDLE_IDENTIFIER = pro.shellx.desktop.debug;
+				PRODUCT_MODULE_NAME = cmux_DEV;
+				PRODUCT_NAME = "ShellX DEV";
 				OTHER_SWIFT_FLAGS = (
 					"-Xllvm",
 					"-global-isel=0",
 				);
-				SPARKLE_PUBLIC_KEY = "avjcgKibf1FTvhIjLBxhd+0HSpsXU4D0IGlVk8cgqRc=";
+				SPARKLE_PUBLIC_KEY = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_ENABLE_BATCH_MODE = NO;
 				SWIFT_OBJC_BRIDGING_HEADER = "cmux-Bridging-Header.h";
@@ -19416,7 +19391,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CMUX_AUTH_CALLBACK_SCHEME = cmux;
+				CMUX_AUTH_CALLBACK_SCHEME = shellx;
 				CMUX_IROH_RELAY_POLICY_KEY_ID = "cmux-production-relay-policy-2026-07";
 				CMUX_IROH_RELAY_POLICY_NEXT_KEY_ID = "cmux-production-relay-policy-2026-08";
 				CMUX_IROH_RELAY_POLICY_NEXT_PUBLIC_KEY_BASE64 = "k+FND+WlELCkHs9QnWg1TfTuHXBwyv2907umX+mUOOU=";
@@ -19449,9 +19424,10 @@
 					"-framework",
 					Carbon,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.cmuxterm.app;
-				PRODUCT_NAME = cmux;
-				SPARKLE_PUBLIC_KEY = "avjcgKibf1FTvhIjLBxhd+0HSpsXU4D0IGlVk8cgqRc=";
+				PRODUCT_BUNDLE_IDENTIFIER = pro.shellx.desktop;
+				PRODUCT_MODULE_NAME = cmux;
+				PRODUCT_NAME = ShellX;
+				SPARKLE_PUBLIC_KEY = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "cmux-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -19506,7 +19482,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.65.2;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.cmuxterm.appuitests;
+				PRODUCT_BUNDLE_IDENTIFIER = pro.shellx.desktop.appuitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_VERSION = 5.0;
@@ -19529,7 +19505,7 @@
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.65.2;
-				PRODUCT_BUNDLE_IDENTIFIER = com.cmuxterm.app.docktileplugin.debug;
+				PRODUCT_BUNDLE_IDENTIFIER = pro.shellx.desktop.docktileplugin.debug;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
@@ -19554,7 +19530,7 @@
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.65.2;
-				PRODUCT_BUNDLE_IDENTIFIER = com.cmuxterm.app.docktileplugin;
+				PRODUCT_BUNDLE_IDENTIFIER = pro.shellx.desktop.docktileplugin;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
@@ -19574,12 +19550,12 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.65.2;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.cmuxterm.apptests;
+				PRODUCT_BUNDLE_IDENTIFIER = pro.shellx.desktop.apptests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OBJC_INTERFACE_HEADER_NAME = "";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/cmux DEV.app/Contents/MacOS/cmux DEV";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ShellX DEV.app/Contents/MacOS/ShellX DEV";
 				TEST_TARGET_NAME = cmux;
 			};
 			name = Debug;
@@ -19595,11 +19571,11 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.65.2;
 				ONLY_ACTIVE_ARCH = NO;
-				PRODUCT_BUNDLE_IDENTIFIER = com.cmuxterm.apptests;
+				PRODUCT_BUNDLE_IDENTIFIER = pro.shellx.desktop.apptests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_INTERFACE_HEADER_NAME = "";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/cmux.app/Contents/MacOS/cmux";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ShellX.app/Contents/MacOS/ShellX";
 				TEST_TARGET_NAME = cmux;
 			};
 			name = Release;
@@ -19607,7 +19583,7 @@
 		7A0CE1000000000000000063 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CMUX_TEAM_ID_PREFIX = "7WLXT3NR37.";
+				CMUX_TEAM_ID_PREFIX = "W4RF3W4VTZ.";
 				CODE_SIGN_ENTITLEMENTS = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -19626,7 +19602,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.65.2;
-				PRODUCT_BUNDLE_IDENTIFIER = com.cmuxterm.app.debug.tunnel;
+				PRODUCT_BUNDLE_IDENTIFIER = pro.shellx.desktop.debug.tunnel;
 				PRODUCT_MODULE_NAME = cmuxTunnel;
 				PRODUCT_NAME = cmuxTunnel;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -19640,7 +19616,7 @@
 		7A0CE1000000000000000064 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CMUX_TEAM_ID_PREFIX = "7WLXT3NR37.";
+				CMUX_TEAM_ID_PREFIX = "W4RF3W4VTZ.";
 				CODE_SIGN_ENTITLEMENTS = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -19659,7 +19635,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.65.2;
-				PRODUCT_BUNDLE_IDENTIFIER = com.cmuxterm.app.tunnel;
+				PRODUCT_BUNDLE_IDENTIFIER = pro.shellx.desktop.tunnel;
 				PRODUCT_MODULE_NAME = cmuxTunnel;
 				PRODUCT_NAME = cmuxTunnel;
 				PROVISIONING_PROFILE_SPECIFIER = "";

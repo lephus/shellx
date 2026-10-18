@@ -839,7 +839,7 @@ test("ensure-mac self-heals an unarmed running exact-tag app", async () => {
   assert.equal(result.callCount, 2);
   assert.match(
     result.pkillArgs,
-    /^com\.cmuxterm\.app\.debug\.ready .* 5$/,
+    /^pro\.shellx\.desktop\.debug\.ready .* 5$/,
   );
 });
 
@@ -849,7 +849,7 @@ test("ensure-mac rotates an armed exact-tag app before using explicit credential
   assert.equal(result.callCount, 1);
   assert.match(
     result.pkillArgs,
-    /^com\.cmuxterm\.app\.debug\.ready .* 5$/,
+    /^pro\.shellx\.desktop\.debug\.ready .* 5$/,
   );
 });
 
