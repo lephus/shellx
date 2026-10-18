@@ -10,35 +10,14 @@ import os
 import re
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-try:  # Shared helper from Task 2 (tests/shellx_guard.py), when present.
-    from shellx_guard import offenders, read
-except ImportError:  # pragma: no cover - same contract, local fallback.
-    def read(path):
-        return (ROOT / path).read_text(encoding="utf-8")
-
-    def offenders(pattern, roots, allow):
-        regex = re.compile(pattern)
-        hits = []
-        for root in roots:
-            base = ROOT / root
-            files = [base] if base.is_file() else sorted(p for p in base.rglob("*") if p.is_file())
-            for path in files:
-                try:
-                    text = path.read_text(encoding="utf-8")
-                except (UnicodeDecodeError, OSError):
-                    continue
-                rel = path.relative_to(ROOT).as_posix()
-                for number, line in enumerate(text.splitlines(), 1):
-                    hit = f"{rel}:{number}"
-                    if regex.search(line) and not any(a in hit or a in line for a in allow):
-                        hits.append(hit)
-        return hits
+from shellx_guard import ROOT, offenders, read  # noqa: E402
 
 
 BUILD_SCRIPT = "scripts/shellx/build_remote_daemon.sh"
@@ -52,11 +31,29 @@ SWIFT_DAEMON_ROOTS = [
     "Packages/macOS/CmuxFoundation/Sources/CmuxFoundation/RemoteBootstrapStagingCommandBuilder.swift",
     "Sources/RemoteTui",
 ]
-# Cloud VM images bake cmux's own daemon under its name; cloud is switched off (Task 5).
-# The Go package directory keeps upstream's internal name.
-ALLOWED_SWIFT = ["/run/cmuxd-remote.sock", "/usr/local/bin/cmuxd-remote", "cmuxd-remote is pre-baked",
-                 "Cloud VM's cmuxd-remote", "cmuxd-remote baked into the Freestyle snapshot",
-                 'name: "cmuxd-remote",', '"./cmd/cmuxd-remote"']
+# Lines that may still name cmux's helper, as (literal, reason). They sit in files
+# that must otherwise stay clean, so they are filtered per line rather than
+# allow-listing whole files with shellx_guard.offenders.
+ALLOWED_SWIFT_LITERALS = [
+    ("/run/cmuxd-remote.sock", "cloud VM images bake cmux's daemon socket; cloud is off (Task 5)"),
+    ("/usr/local/bin/cmuxd-remote", "cloud VM images bake cmux's daemon binary; cloud is off (Task 5)"),
+    ("cmuxd-remote is pre-baked", "doc comment on the cloud VM path; cloud is off (Task 5)"),
+    ("Cloud VM's cmuxd-remote", "doc comment on the cloud VM endpoint; cloud is off (Task 5)"),
+    ("cmuxd-remote baked into the Freestyle snapshot", "doc comment on the cloud VM hello; cloud is off (Task 5)"),
+    ('name: "cmuxd-remote",', "hello name of the baked cloud VM daemon; cloud is off (Task 5)"),
+    ('"./cmd/cmuxd-remote"', "Go package directory keeps upstream's internal name"),
+]
+
+
+def line_offenders(pattern, roots, allowed_literals):
+    """offenders() hits whose line contains none of the allowed literals."""
+    hits = []
+    for hit in offenders(pattern, roots=roots, allow=[]):
+        path, number = hit.rsplit(":", 1)
+        line = read(path).splitlines()[int(number) - 1]
+        if not any(literal in line for literal, _reason in allowed_literals):
+            hits.append(hit)
+    return hits
 
 
 class ShellXRemoteDaemonTests(unittest.TestCase):
@@ -88,8 +85,8 @@ class ShellXRemoteDaemonTests(unittest.TestCase):
         bootstrap = read("Packages/macOS/CmuxRemoteSession/Sources/CmuxRemoteSession/Session/"
                          "RemoteSessionCoordinator+Bootstrap.swift")
         self.assertIn(".shellx/bin/shellx-remote/", bootstrap)
-        self.assertEqual(offenders(r"\.cmux/|\"\.cmux\"|cmuxd-remote", roots=SWIFT_DAEMON_ROOTS,
-                                   allow=ALLOWED_SWIFT), [])
+        self.assertEqual(line_offenders(r"\.cmux/|\"\.cmux\"|cmuxd-remote", SWIFT_DAEMON_ROOTS,
+                                        ALLOWED_SWIFT_LITERALS), [])
 
     def test_release_builds_ignore_the_dev_daemon_fallback(self):
         bootstrap = read("Packages/macOS/CmuxRemoteSession/Sources/CmuxRemoteSession/Session/"
