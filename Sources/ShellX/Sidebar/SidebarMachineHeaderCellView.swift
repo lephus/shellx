@@ -21,7 +21,7 @@ final class SidebarMachineHeaderCellView: NSTableCellView, ShellXSidebarHeaderCe
         wantsLayer = true
 
         iconImageView.imageScaling = .scaleProportionallyDown
-        iconImageView.contentTintColor = .secondaryLabelColor
+        iconImageView.contentTintColor = ShellXPalette.muted.nsColor
         addSubview(iconImageView)
 
         titleField.lineBreakMode = .byTruncatingTail
@@ -62,18 +62,22 @@ final class SidebarMachineHeaderCellView: NSTableCellView, ShellXSidebarHeaderCe
             pointSize: ShellXSidebarHeaderMetrics.iconSide
         )
 
+        let truncating = NSMutableParagraphStyle()
+        truncating.lineBreakMode = .byTruncatingTail
         let title = NSMutableAttributedString(
             string: header.title,
             attributes: [
                 .font: NSFont.systemFont(ofSize: 12, weight: .semibold),
-                .foregroundColor: NSColor.labelColor,
+                .foregroundColor: ShellXPalette.textHi.nsColor,
+                .paragraphStyle: truncating,
             ]
         )
         title.append(NSAttributedString(
             string: " \u{00B7} " + header.note,
             attributes: [
                 .font: NSFont.systemFont(ofSize: 11, weight: .regular),
-                .foregroundColor: NSColor.secondaryLabelColor,
+                .foregroundColor: ShellXPalette.muted.nsColor,
+                .paragraphStyle: truncating,
             ]
         ))
         titleField.attributedStringValue = title

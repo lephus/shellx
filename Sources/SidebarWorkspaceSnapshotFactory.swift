@@ -153,6 +153,23 @@ struct SidebarWorkspaceSnapshotFactory {
                 orderedPanelIds: orderedPanelIds
             ))
             : nil
+        // ShellX: the status pill shows with default settings, so resolve its
+        // agent state even when the compact glyph is off. Only agent entries
+        // and lifecycle states matter to the pill (PR/branch/idle map to no
+        // pill), so this reuses the sorted entries and skips PR/branch lookups.
+        let statusPillGlyphKind = compactStatusGlyph?.kind
+            ?? SidebarCompactStatusGlyph.resolve(SidebarCompactStatusGlyph.Input(
+                agentEntries: SidebarCompactStatusGlyph.partition(
+                    detailVisibility.showsMetadata
+                        ? statusEntries.rows
+                        : workspace.sidebarStatusEntriesInDisplayOrder(),
+                    compacts: true
+                ).agent,
+                lifecycleStates: workspace.agentLifecycleStatesByPanelId.values.flatMap { states in
+                    states.filter { !AgentHibernationLifecycleStatusKeys.isManualKey($0.key) }.values
+                },
+                hasActiveAgent: activeCodingAgentCount > 0
+            )).kind
         return SidebarWorkspaceSnapshotBuilder.Snapshot(
             presentationKey: presentationKey,
             title: workspace.title,
@@ -212,6 +229,7 @@ struct SidebarWorkspaceSnapshotFactory {
             taskStatusInput: taskStatusInput,
             deviceWorkspaceLabel: cloud?.deviceLabel,
             compactStatusGlyph: compactStatusGlyph,
+            statusPillGlyphKind: statusPillGlyphKind, // ShellX
             hostTitleSuffix: hostTitleSuffix
         )
     }

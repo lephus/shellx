@@ -12525,12 +12525,11 @@ struct VerticalTabsSidebar: View, Equatable {
             shellXHeader: .brand,
             environment: renderContext.environment
         )
-        var emittedGroupHeaderIds: Set<UUID> = []
-        var currentMachineSectionId: UUID?
-        return [brandHeaderRow] + renderContext.workspaceRenderItems.compactMap { item -> SidebarWorkspaceTableRowConfiguration? in
+        let shellXRowIds = SidebarMachineSectionRenderItems.rowIds(for: renderContext.workspaceRenderItems)
+        return [brandHeaderRow] + zip(renderContext.workspaceRenderItems, shellXRowIds).compactMap { pair -> SidebarWorkspaceTableRowConfiguration? in
+            let (item, shellXRowId) = pair
             switch item {
             case .machineHeader(let header): // ShellX
-                currentMachineSectionId = header.key.stableID
                 return SidebarWorkspaceTableRowConfiguration(
                     shellXHeader: .machine(header),
                     environment: renderContext.environment
@@ -12544,11 +12543,9 @@ struct VerticalTabsSidebar: View, Equatable {
                     renderContext: renderContext
                 )
                 // ShellX: first appearance keeps `.group(id)`; repeats are keyed by section.
-                guard !emittedGroupHeaderIds.insert(groupId).inserted,
-                      let currentMachineSectionId else { return configuration }
-                return configuration.reidentifiedGroupHeader(
-                    as: .group(groupId, repeatedInMachineSection: currentMachineSectionId)
-                )
+                return shellXRowId == configuration.id
+                    ? configuration
+                    : configuration.reidentifiedGroupHeader(as: shellXRowId)
             case .workspace(let workspaceId):
                 guard let workspace = renderContext.workspaceById[workspaceId],
                       let input = workspaceRowInputsById[workspaceId] else { return nil }

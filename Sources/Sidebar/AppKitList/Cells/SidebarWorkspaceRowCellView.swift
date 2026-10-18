@@ -898,7 +898,12 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         )
         compactStatusGlyphView.isPresentationActive = isPresentationActive
         compactStatusGlyphView.isHidden = glyph?.isDrawn != true
-        statusPillView.configure(glyphKind: glyph?.kind, fontScale: model.fontScale) // ShellX: status pill
+        // ShellX: the status pill shows with default settings; unread still turns a settled row "done".
+        let pillGlyph = glyph ?? SidebarCompactStatusGlyph(
+            kind: model.snapshot.statusPillGlyphKind ?? .terminal,
+            tooltip: ""
+        ).applyingUnread(model.unreadCount, latestNotificationText: nil)
+        statusPillView.configure(glyphKind: pillGlyph.kind, fontScale: model.fontScale)
         guard let glyph, glyph.isDrawn else { return }
         compactStatusGlyphView.configure(
             glyph,

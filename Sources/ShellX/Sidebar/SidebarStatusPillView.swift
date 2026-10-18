@@ -62,6 +62,15 @@ final class SidebarStatusPillView: NSView {
         let path = NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius)
         pill.color.nsColor.withAlphaComponent(CGFloat(SidebarStatusPill.fillAlpha)).setFill()
         path.fill()
+        if pill == .waiting {
+            // Waiting for you = primary + ring: a 1 px primaryLine stroke inside the bounds.
+            let ringRect = bounds.insetBy(dx: 0.5, dy: 0.5)
+            let ringRadius = ringRect.height / 2
+            let ring = NSBezierPath(roundedRect: ringRect, xRadius: ringRadius, yRadius: ringRadius)
+            ring.lineWidth = 1
+            ShellXPalette.primaryLine.nsColor.setStroke()
+            ring.stroke()
+        }
         let title = Self.attributedTitle(pill, fontScale: fontScale)
         let textSize = title.size()
         title.draw(at: NSPoint(

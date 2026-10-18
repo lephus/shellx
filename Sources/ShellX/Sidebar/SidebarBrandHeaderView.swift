@@ -27,27 +27,35 @@ final class SidebarBrandHeaderCellView: NSTableCellView, ShellXSidebarHeaderCell
         nameField.stringValue = ShellXBrand.appName
         // ShellX: swap for ShellXIcon/ShellXFonts/ShellXLogo after W1 Tasks 7-9 merge
         nameField.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
-        nameField.textColor = .labelColor
+        nameField.textColor = ShellXPalette.textHi.nsColor
         nameField.lineBreakMode = .byTruncatingTail
+        nameField.maximumNumberOfLines = 1
         nameField.isSelectable = false
         addSubview(nameField)
 
+        let truncating = NSMutableParagraphStyle()
+        truncating.lineBreakMode = .byTruncatingTail
         sectionField.attributedStringValue = NSAttributedString(
-            string: String(localized: "sidebar.machines.title", defaultValue: "YOUR MACHINES"),
+            // Section labels render uppercase in every locale ("MÁY CỦA BẠN").
+            string: String(localized: "sidebar.machines.title", defaultValue: "YOUR MACHINES")
+                .uppercased(with: .current),
             attributes: [
                 .font: NSFont.systemFont(ofSize: 10.5, weight: .medium),
-                .foregroundColor: NSColor.secondaryLabelColor,
+                .foregroundColor: ShellXPalette.muted.nsColor,
                 .kern: 0.8,
+                .paragraphStyle: truncating,
             ]
         )
         sectionField.lineBreakMode = .byTruncatingTail
+        sectionField.maximumNumberOfLines = 1
+        sectionField.cell?.truncatesLastVisibleLine = true
         sectionField.isSelectable = false
         addSubview(sectionField)
 
         let addTitle = String(localized: "sidebar.machines.add.ssh", defaultValue: "Add a machine over SSH…")
         // ShellX: swap for ShellXIcon/ShellXFonts/ShellXLogo after W1 Tasks 7-9 merge
         addButton.glyphImage = ShellXSidebarIcon.image(named: "Add_Plus", pointSize: 12)
-        addButton.contentTintColor = .secondaryLabelColor
+        addButton.contentTintColor = ShellXPalette.muted.nsColor
         addButton.toolTip = addTitle
         addButton.setAccessibilityLabel(addTitle)
         addButton.onClick = {

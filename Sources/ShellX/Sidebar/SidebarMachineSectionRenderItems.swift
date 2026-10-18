@@ -70,4 +70,25 @@ enum SidebarMachineSectionRenderItems {
         }
         return items
     }
+
+    /// The table row id for each item, in order. A group header keeps
+    /// `.group(id)` the first time it appears; each repeat in a later machine
+    /// section is keyed by that section, so NSTableView never sees duplicates.
+    static func rowIds(for items: [SidebarWorkspaceRenderItem]) -> [SidebarWorkspaceRenderItemID] {
+        var emittedGroupIds: Set<UUID> = []
+        var currentSectionId: UUID?
+        return items.map { item -> SidebarWorkspaceRenderItemID in
+            switch item {
+            case .machineHeader(let header):
+                currentSectionId = header.key.stableID
+                return item.id
+            case .groupHeader(let groupId, _):
+                guard !emittedGroupIds.insert(groupId).inserted,
+                      let sectionId = currentSectionId else { return item.id }
+                return .group(groupId, repeatedInMachineSection: sectionId)
+            case .workspace:
+                return item.id
+            }
+        }
+    }
 }
