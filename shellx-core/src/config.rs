@@ -67,6 +67,11 @@ impl Config {
         if !state_dir.is_absolute() {
             return Err(CoreError::invalid_params("state_dir must be an absolute path"));
         }
+        if !crate::store::root_path_ok(&state_dir) {
+            return Err(CoreError::invalid_params(
+                "state_dir must name a directory without a trailing slash, '.' or '..'",
+            ));
+        }
         let default_platform = if cfg!(target_os = "windows") { "windows" } else { "macos" };
         let platform = opt_str(obj, "platform")?.unwrap_or_else(|| default_platform.to_string());
         if platform != "macos" && platform != "windows" {

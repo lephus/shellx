@@ -202,3 +202,48 @@ fn secret_read_buffer_is_zeroizing() {
     let z: zeroize::Zeroizing<Vec<u8>> = s.read_secret("device.key").unwrap().unwrap();
     assert_eq!(z.len(), 32);
 }
+
+#[test]
+fn refuses_symlinked_root_via_trailing_slash_or_dot() {
+    let _g = serial();
+    let d = tempdir().unwrap();
+    let real = d.path().join("real");
+    fs::create_dir(&real).unwrap();
+    fs::set_permissions(&real, fs::Permissions::from_mode(0o700)).unwrap();
+    symlink(&real, d.path().join("core")).unwrap();
+    for suffix in ["/", "/.", "//", "/./", "/.."] {
+        let p = format!("{}/core{suffix}", d.path().display());
+        let e = StateStore::open(Path::new(&p)).unwrap_err();
+        assert_eq!(e.code, "state_dir_insecure", "{p}");
+    }
+    assert_eq!(fs::read_dir(&real).unwrap().count(), 0, "target untouched");
+}
+
+#[test]
+fn open_sweeps_only_own_stale_temp_files() {
+    let _g = serial();
+    let (d, s) = fresh();
+    s.write_secret("session.json", b"keep").unwrap();
+    let root = d.path().join("core");
+    let stale = "0123456789abcdef0123456789abcdef";
+    for f in [format!("session.json.tmp.{stale}"), format!("tickets/t.ticket.tmp.{stale}")] {
+        fs::write(root.join(&f), b"x").unwrap();
+    }
+    // lookalikes and non-files must survive
+    fs::write(root.join("notes.tmp.short"), b"x").unwrap();
+    fs::write(root.join(format!("UPPER.tmp.{stale}")), b"x").unwrap();
+    let outside = d.path().join("outside");
+    fs::write(&outside, b"x").unwrap();
+    symlink(&outside, root.join(format!("link.tmp.{stale}"))).unwrap();
+    fs::create_dir(root.join(format!("dir.tmp.{stale}"))).unwrap();
+    drop(s);
+    let s = StateStore::open(&root).unwrap();
+    assert!(!root.join(format!("session.json.tmp.{stale}")).exists());
+    assert!(!root.join(format!("tickets/t.ticket.tmp.{stale}")).exists());
+    assert!(root.join("notes.tmp.short").exists());
+    assert!(root.join(format!("UPPER.tmp.{stale}")).exists());
+    assert!(root.join(format!("dir.tmp.{stale}")).is_dir());
+    assert!(fs::symlink_metadata(root.join(format!("link.tmp.{stale}"))).is_ok());
+    assert!(outside.exists());
+    assert_eq!(&s.read_secret("session.json").unwrap().unwrap()[..], b"keep");
+}

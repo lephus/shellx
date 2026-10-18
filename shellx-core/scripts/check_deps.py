@@ -9,22 +9,36 @@ ALLOWED = {
     "MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Zlib",
     "Unicode-3.0", "MPL-2.0", "CDLA-Permissive-2.0",
 }
-FORBIDDEN = {"aws-lc-rs", "aws-lc-sys", "openssl", "openssl-sys", "native-tls", "iroh"}
+FORBIDDEN_EXACT = {"openssl", "openssl-sys", "native-tls"}
+FORBIDDEN_FAMILIES = ("iroh", "aws-lc")  # the name itself, or "<family>-*"
+KNOWN_EXCEPTIONS = {"LLVM-exception"}
+
+
+def is_forbidden(name: str) -> bool:
+    return name in FORBIDDEN_EXACT or any(
+        name == f or name.startswith(f + "-") for f in FORBIDDEN_FAMILIES
+    )
+
+
 # Workspace members are ours (GPL-3.0-or-later).
 OWN_LICENSE = "GPL-3.0-or-later"
 
 
 def ok_expr(expr: str) -> bool:
-    """SPDX subset: `A OR B` passes if any alternative passes, `A AND B` needs all."""
+    """SPDX subset, fail closed: `A OR B` passes if any alternative passes, `A AND B`
+    needs all. Operators are case-insensitive; `WITH` only for KNOWN_EXCEPTIONS; every
+    token must be consumed; anything unparsable fails."""
     expr = expr.replace("/", " OR ")
-    expr = re.sub(r"\s+WITH\s+\S+", "", expr)
     tokens = re.findall(r"\(|\)|[^\s()]+", expr)
     pos = 0
+
+    def peek():
+        return tokens[pos].upper() if pos < len(tokens) else None
 
     def parse_or():
         nonlocal pos
         v = parse_and()
-        while pos < len(tokens) and tokens[pos] == "OR":
+        while peek() == "OR":
             pos += 1
             r = parse_and()
             v = v or r
@@ -33,7 +47,7 @@ def ok_expr(expr: str) -> bool:
     def parse_and():
         nonlocal pos
         v = parse_atom()
-        while pos < len(tokens) and tokens[pos] == "AND":
+        while peek() == "AND":
             pos += 1
             r = parse_atom()
             v = v and r
@@ -41,17 +55,28 @@ def ok_expr(expr: str) -> bool:
 
     def parse_atom():
         nonlocal pos
-        t = tokens[pos]
+        t = tokens[pos]  # IndexError -> fail closed
         pos += 1
         if t == "(":
             v = parse_or()
-            pos += 1  # ')'
+            if pos >= len(tokens) or tokens[pos] != ")":
+                raise ValueError("unclosed (")
+            pos += 1
             return v
-        return t in ALLOWED
+        if t == ")" or t.upper() in ("AND", "OR", "WITH"):
+            raise ValueError("unexpected token")
+        v = t in ALLOWED
+        if peek() == "WITH":
+            pos += 1
+            exc = tokens[pos]
+            pos += 1
+            v = v and exc in KNOWN_EXCEPTIONS
+        return v
 
     try:
-        return parse_or()
-    except IndexError:
+        v = parse_or()
+        return v and pos == len(tokens)
+    except (IndexError, ValueError):
         return False
 
 
@@ -65,7 +90,7 @@ def main() -> int:
     bad = []
     for p in meta["packages"]:
         name = p["name"]
-        if name in FORBIDDEN:
+        if is_forbidden(name):
             bad.append(f"{name} {p['version']}: forbidden crate")
             continue
         lic = p.get("license") or ""

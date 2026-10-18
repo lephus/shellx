@@ -67,6 +67,22 @@ fn parse_name(name: &str) -> Result<(Place, &str), CoreError> {
     Ok((place, file))
 }
 
+/// A root path is acceptable only if its last segment is a plain name. A trailing
+/// separator, `.` or `..` would make the kernel resolve a symlinked root as its
+/// target directory and defeat the O_NOFOLLOW check on the final component.
+pub fn root_path_ok(root: &Path) -> bool {
+    let s = root.to_string_lossy();
+    let last = s.rsplit(['/', '\\']).next().unwrap_or("");
+    !last.is_empty() && last != "." && last != ".." && root.file_name().is_some()
+}
+
+/// Stale temp files from a crashed write: `<valid name>.tmp.<32 lowercase hex>`.
+#[cfg(unix)]
+fn is_temp_name(n: &str) -> bool {
+    let Some((base, hex)) = n.rsplit_once(".tmp.") else { return false };
+    valid_file_part(base) && hex.len() == 32 && hex.bytes().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f'))
+}
+
 pub struct StateStore {
     root: PathBuf,
     #[cfg(unix)]
@@ -181,6 +197,52 @@ mod imp {
         Ok(fd)
     }
 
+    /// Best-effort removal of crash leftovers matching the store's own temp pattern.
+    /// Works through the dir fd, only unlinks regular files (symlinks, dirs and
+    /// lookalike names are left alone). Assumes one process owns a state dir.
+    fn sweep_stale_temps(dir: &OwnedFd) {
+        // SAFETY: dup of a live fd; fdopendir takes ownership of the dup on success.
+        let dup = unsafe { libc::fcntl(dir.as_raw_fd(), libc::F_DUPFD_CLOEXEC, 0) };
+        if dup < 0 {
+            return;
+        }
+        // SAFETY: dup is a valid directory fd.
+        let dp = unsafe { libc::fdopendir(dup) };
+        if dp.is_null() {
+            // SAFETY: fdopendir failed, so we still own dup.
+            unsafe { libc::close(dup) };
+            return;
+        }
+        // SAFETY: dp is a valid DIR*.
+        unsafe { libc::rewinddir(dp) };
+        let mut victims: Vec<CString> = Vec::new();
+        loop {
+            // SAFETY: dp is a valid DIR*.
+            let ent = unsafe { libc::readdir(dp) };
+            if ent.is_null() {
+                break;
+            }
+            // SAFETY: d_name is a NUL-terminated array inside a valid dirent.
+            let name = unsafe { std::ffi::CStr::from_ptr((*ent).d_name.as_ptr()) };
+            if name.to_str().is_ok_and(is_temp_name) {
+                victims.push(name.to_owned());
+            }
+        }
+        // SAFETY: closes the dup'd fd too.
+        unsafe { libc::closedir(dp) };
+        for v in victims {
+            let mut st: libc::stat = unsafe { std::mem::zeroed() };
+            // SAFETY: valid C string and out pointer.
+            let is_file = unsafe { libc::fstatat(dir.as_raw_fd(), v.as_ptr(), &mut st, libc::AT_SYMLINK_NOFOLLOW) } == 0
+                && st.st_mode & libc::S_IFMT == libc::S_IFREG
+                && st.st_uid == euid();
+            if is_file {
+                // SAFETY: valid C string.
+                unsafe { libc::unlinkat(dir.as_raw_fd(), v.as_ptr(), 0) };
+            }
+        }
+    }
+
     fn random_hex() -> Result<String, CoreError> {
         let mut b = [0u8; 16];
         getrandom::fill(&mut b).map_err(|_| CoreError::new("crypto", "random source unavailable"))?;
@@ -195,11 +257,28 @@ mod imp {
                         .map_err(|e| CoreError::new("io", format!("mkdir {}: {e}", parent.display())))?;
                 }
             }
-            let root_c = CString::new(root.as_os_str().as_bytes())
+            if !root_path_ok(root) {
+                return Err(dir_insecure(root, "path must end in a plain directory name"));
+            }
+            // Open the parent (symlinks above the root are the user's business), then
+            // resolve the root's own final component relative to it with O_NOFOLLOW.
+            let parent = root.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+            let parent_c = CString::new(parent.as_os_str().as_bytes())
                 .map_err(|_| CoreError::invalid_params("state_dir contains a NUL byte"))?;
-            let root_fd = ensure_dir(libc::AT_FDCWD, &root_c, root)?;
+            // SAFETY: valid C string.
+            let pfd = unsafe { libc::open(parent_c.as_ptr(), libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC) };
+            if pfd < 0 {
+                return Err(io_err("open parent", parent));
+            }
+            // SAFETY: fresh descriptor we own.
+            let parent_fd = unsafe { OwnedFd::from_raw_fd(pfd) };
+            let name_c = CString::new(root.file_name().map(|n| n.as_bytes()).unwrap_or_default())
+                .map_err(|_| CoreError::invalid_params("state_dir contains a NUL byte"))?;
+            let root_fd = ensure_dir(parent_fd.as_raw_fd(), &name_c, root)?;
             let tickets_path = root.join("tickets");
             let tickets_fd = ensure_dir(root_fd.as_raw_fd(), &cstr(b"tickets"), &tickets_path)?;
+            sweep_stale_temps(&root_fd);
+            sweep_stale_temps(&tickets_fd);
             Ok(StateStore { root: root.to_path_buf(), root_fd, tickets_fd })
         }
 

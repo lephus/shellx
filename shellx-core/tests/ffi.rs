@@ -43,6 +43,9 @@ fn config_rejects_bad_optional_fields_and_lookalike_hosts() {
         json!({"api_base":"https://","state_dir":"/tmp/x"}),
         json!({"api_base":"https://a.b","state_dir":"/tmp/x","platform":"linux"}),
         json!({"api_base":"https://a.b","state_dir":"/tmp/x","app_version":5}),
+        json!({"api_base":"https://a.b","state_dir":"/tmp/x/"}),
+        json!({"api_base":"https://a.b","state_dir":"/tmp/x/."}),
+        json!({"api_base":"https://a.b","state_dir":"/tmp/x/.."}),
         json!([]),
     ] {
         assert_eq!(c.call("config.set", p.clone()).unwrap_err().code, "invalid_params", "{p}");
