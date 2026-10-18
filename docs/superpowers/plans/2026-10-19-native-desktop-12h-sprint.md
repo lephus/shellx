@@ -6,9 +6,11 @@
 
 **Goal:** In 12 wall-clock hours, take the W0 results to: ShellX for Mac usable daily (Wave 1 done), Mac↔Mac remote sessions over a self-hosted relay v2 with on-site approval (Wave 2 core), and a Windows MVP that runs a local terminal and views a Mac remotely (Wave 4 subset), all pushed, built by CI, and recorded in the ledger.
 
-**Architecture:** Seven lanes in separate git worktrees, joined by contracts frozen in this file (§Contracts) so no lane waits on another's code. Compile and test on GitHub Actions (`lephus/shellx-pro` is public: macOS and Windows runners are free); the dev Mac only does fast package-level tests and two integration builds (T+6, T+10). Integration branch `shellx/sprint` in the fork, `feat/relay-v2` in the shellx repo; `main` in both is updated only at the T+12 close.
+**Architecture:** Seven lanes in separate git worktrees, joined by contracts frozen in this file (§Contracts) so no lane waits on another's code. Compile and test on GitHub Actions (`lephus/shellx` is public: macOS and Windows runners are free); the dev Mac only does fast package-level tests and two integration builds (T+6, T+10). Integration branch `shellx/sprint` in the fork, `feat/relay-v2` in the shellx repo; `main` in both is updated only at the T+12 close.
 
 **Tech Stack:** fork = Swift 6 / SwiftUI + AppKit (Xcode 26.2), Rust (cmux-tui workspace, GPUI 0.2.2 on Windows), Zig 0.16.0 for libghostty; shellx repo = Node 22 + Hono + better-sqlite3 (relay/API), Astro (web), Docker on the VPS behind `nginx-proxy`.
+
+**Repo move (2026-10-19, T+0:25):** the cmux fork now lives on `main` of `lephus/shellx` (ledger "Repo move"). Everywhere below, "fork" and "shellx repo" are the same repository; fork branches `shellx/<lane>` are branches of `lephus/shellx`. Pushing any branch except `main` is allowed; `main` pushes of `relay/`, `web/`, `deploy/` deploy production.
 
 **Spec:** `docs/superpowers/specs/2026-10-18-shellx-native-desktop-design.md` (D-W0-1 amendments of 2026-10-19 included). Ledger: `docs/superpowers/ledgers/native-desktop.md` (binding for spike facts: ticket format, PSK out of band, bridge hook points, Windows CI).
 
@@ -114,7 +116,7 @@ T+0 is when the user says "chạy". Durations are agent wall-clock; CI round-tri
 
 ## Gates (user, batched)
 
-- **G0 before T+0 (15 min):** free ≥ 30 GB (delete old Flutter `~/Library/Developer/Xcode/DerivedData/Runner-*` and `Pods-*`; the lead lists sizes and asks before deleting); run Typometer on the perf-base app if not done; have the Windows 11 PC on; confirm Actions are enabled on `lephus/shellx-pro`; `! gh auth refresh -s workflow` (lets agents push workflow files over https; SSH alias `phule9225.github.com` works meanwhile).
+- **G0 before T+0 (15 min):** free ≥ 30 GB (delete old Flutter `~/Library/Developer/Xcode/DerivedData/Runner-*` and `Pods-*`; the lead lists sizes and asks before deleting); run Typometer on the perf-base app if not done; have the Windows 11 PC on; confirm Actions are enabled on `lephus/shellx`; `! gh auth refresh -s workflow` (lets agents push workflow files over https; SSH alias `phule9225.github.com` works meanwhile).
 - **G1 ~T+1 (20 min, Windows PC):** run `shellx-term-spike.exe` checks from W0 Task 7 Step 3 (Telex/Unikey/EVKey, 150/200 %, Typometer vs Windows Terminal, Narrator). Pass → L6 stays on GPUI; fail on IME → L6 switches to the plan's fallback order (winit + wgpu, then Win32 + DirectWrite) and the Windows target shrinks to local terminal only.
 - **G2 ~T+3:30 (10 min, VPS):** set `CMUX_RELAY_HMAC_SECRET` (`openssl rand -base64 48`) in `~/phu/shellx/.env` by hand; approve the deploy of `relay2` + API v2 (deploy.yml, `workflow_dispatch` on `feat/relay-v2` — the API change ships in the existing `relay` image, so it is a relay deploy too); DNS only if K2 falls back to a subdomain.
 - **G3 ~T+10 (20 min):** hands-on acceptance: on the Mac, Release ShellX + tagged dev build pair and view each other; on Windows, the MVP installs, types Vietnamese, logs in, views the Mac. Also decides whether `main` gets the sprint merge tonight.
@@ -131,7 +133,7 @@ T+0 is when the user says "chạy". Durations are agent wall-clock; CI round-tri
 
 **Files (fork):** Create `.github/workflows/shellx-mac.yml`; branch `shellx/sprint` from `main`.
 
-- [ ] **Step 1:** `git -C ~/Documents/myProjects/shellx-pro switch -c shellx/sprint main`; create worktrees for L1–L3, L5, L6 (`~/Documents/myProjects/shellx-pro-wt-<lane>`) from `shellx/sprint` after Step 4, and L4/L7 in the shellx repo (`~/Documents/myProjects/shellx-wt-<lane>`).
+- [ ] **Step 1:** `git -C ~/Documents/myProjects/shellx switch -c shellx/sprint main`; create worktrees for L1–L3, L5, L6 (`~/Documents/myProjects/shellx-wt-<lane>`) from `shellx/sprint` after Step 4, and L4/L7 in the shellx repo (`~/Documents/myProjects/shellx-wt-<lane>`).
 - [ ] **Step 2:** write `shellx-mac.yml`: on push to `shellx/**`, `runs-on: macos-26`, steps = checkout with submodules, `./scripts/ensure-ghosttykit.sh` (prebuilt GhosttyKit, sha-pinned), cache DerivedData keyed on `Package.resolved` + GhosttyKit key, `xcodebuild -scheme cmux -configuration Debug build` with `CMUX_WIREGUARD_GO_REQUIRE=0`, `python3 scripts/verify-local.py --all`, `swift test --package-path Packages/Shared/ShellXBrand`, and the ShellX tests (`tests/test_shellx_*.py`). Concurrency group per branch, cancel in progress.
 - [ ] **Step 3:** run W1 Task 1 (ShellXBrand package + test runner) on `shellx/sprint` yourself — every Mac lane depends on it.
 - [ ] **Step 4:** push `shellx/sprint`; expected: `shellx-mac` green within ~50 min (cold); then branch L1–L3 off it.

@@ -4,7 +4,7 @@
 
 **Goal:** Settle the five unknowns that block the later waves: the fork builds and signs as ShellX; we have cmux's own performance numbers to compare against; `cmux-relay` really hides terminal content; Mac and Windows get one shared remote protocol; and a Windows terminal can be built natively with Vietnamese input working.
 
-**Architecture:** Spike work lives in the fork `lephus/shellx-pro` (local clone `~/Documents/myProjects/shellx-pro`). Code that later waves reuse (perf harness, signing entitlements) lands on the fork's `main`. Throwaway spike code stays on branch `shellx/w0-spikes` and is never merged. Every result, number and decision goes into the ledger `docs/superpowers/ledgers/native-desktop.md` in the `shellx` repo. The spec gets amended where a spike decides one of its open choices (C16 protocol, Windows UI toolkit).
+**Architecture:** Spike work lives in the fork `lephus/shellx` (local clone `~/Documents/myProjects/shellx`). Code that later waves reuse (perf harness, signing entitlements) lands on the fork's `main`. Throwaway spike code stays on branch `shellx/w0-spikes` and is never merged. Every result, number and decision goes into the ledger `docs/superpowers/ledgers/native-desktop.md` in the `shellx` repo. The spec gets amended where a spike decides one of its open choices (C16 protocol, Windows UI toolkit).
 
 **Tech Stack:** Xcode 26.2 (installed), Zig 0.16.0 (to install), Rust 1.95 (installed; cmux-tui needs ≥ 1.91), Swift 6.0 language mode for app-linked code, Python 3 for harness scripts, GitHub Actions `windows-latest` for Windows builds.
 
@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Upstream base: `lephus/shellx-pro` `main` at `d0b2cd7e` (= `manaflow-ai/cmux`). Add remote `upstream` = `https://github.com/manaflow-ai/cmux.git`.
+- Upstream base: `lephus/shellx` `main` at `d0b2cd7e` (= `manaflow-ai/cmux`). Add remote `upstream` = `https://github.com/manaflow-ai/cmux.git`.
 - ShellX identity: bundle id `pro.shellx.desktop` (Release), `pro.shellx.desktop.debug` (Debug); Apple Team ID `W4RF3W4VTZ`; signing identity "Developer ID Application: Phu Le huu (W4RF3W4VTZ)".
 - Never ask for a certificate, password, API key or HMAC secret in chat. When a step needs one, the user runs it with `! <command>`.
 - Never `git push` and never deploy to the VPS without asking the user first (each time). Pushing the fork triggers its CI.
@@ -35,7 +35,7 @@
 
 **Files:**
 - Create: `docs/superpowers/ledgers/native-desktop.md` (shellx repo)
-- Clone: `~/Documents/myProjects/shellx-pro` (fork)
+- Clone: `~/Documents/myProjects/shellx` (fork)
 
 **Interfaces:**
 - Produces: a working clone with submodules, remote `upstream`, Zig 0.16.0 on `PATH`, a built tagged dev app `ShellX`-unbranded (`cmux DEV shellx-w0.app`), and the ledger with a "Baseline environment" section that later tasks append to.
@@ -44,7 +44,7 @@
 
 ```bash
 cd ~/Documents/myProjects
-git clone --recursive https://github.com/lephus/shellx-pro.git
+git clone --recursive https://github.com/lephus/shellx.git
 cd shellx-pro && git remote add upstream https://github.com/manaflow-ai/cmux.git
 git log --oneline -1   # expect d0b2cd7e…
 git submodule status   # expect ghostty, homebrew-cmux, vendor/bonsplit all checked out
@@ -276,13 +276,13 @@ Score both on: Windows host effort; Mac host additions; reuse by future iOS/Andr
 
 - [ ] **Step 2: Ask the user before pushing**
 
-Pushing `shellx/w0-spikes` to `lephus/shellx-pro` starts CI on a public repo. Ask; on yes: `git push -u origin shellx/w0-spikes`.
+Pushing `shellx/w0-spikes` to `lephus/shellx` starts CI on a public repo. Ask; on yes: `git push -u origin shellx/w0-spikes`.
 
 - [ ] **Step 3: Read the run and record**
 
 ```bash
-gh run list --repo lephus/shellx-pro --branch shellx/w0-spikes --limit 1
-gh run view --repo lephus/shellx-pro <run-id> --log-failed | tail -40
+gh run list --repo lephus/shellx --branch shellx/w0-spikes --limit 1
+gh run view --repo lephus/shellx <run-id> --log-failed | tail -40
 ```
 
 Expected: both targets build and the platform tests pass. If `ghostty-vt-sys` fails, record the error and mark the §13 fallback (`alacritty_terminal`) as active for Task 7.

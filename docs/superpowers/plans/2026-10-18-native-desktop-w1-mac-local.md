@@ -4,7 +4,7 @@
 
 **Goal:** Turn the cmux fork into ShellX for Mac that runs fully on its own: ShellX name, icon, colors, coolicons and Vietnamese; nothing talks to Manaflow or any third party; cloud-only features are gone; the sidebar groups sessions by machine (this Mac + SSH hosts) with status pills; and it is no slower than cmux.
 
-**Architecture:** Work in the fork `~/Documents/myProjects/shellx-pro` on branch `shellx/w1-mac-local`. ShellX-only code lives in a new Swift package `Packages/Shared/ShellXBrand` (identity constants, palette, coolicons + icon map, feature switches) and in `Sources/ShellX/` (app-side views and pure models). Edits to upstream files are kept to wiring so later `upstream` merges stay small. Internal identifiers (`CMUX_*` env vars, `Cmux*` types/modules, package names) are not renamed. Remote machines (device mirroring) stay compiled but switched off behind `ShellXFeatures.remoteMachines = false` until Wave 2.
+**Architecture:** Work in the fork `~/Documents/myProjects/shellx` on branch `shellx/w1-mac-local`. ShellX-only code lives in a new Swift package `Packages/Shared/ShellXBrand` (identity constants, palette, coolicons + icon map, feature switches) and in `Sources/ShellX/` (app-side views and pure models). Edits to upstream files are kept to wiring so later `upstream` merges stay small. Internal identifiers (`CMUX_*` env vars, `Cmux*` types/modules, package names) are not renamed. Remote machines (device mirroring) stay compiled but switched off behind `ShellXFeatures.remoteMachines = false` until Wave 2.
 
 **Tech Stack:** Swift 6.0 language mode for app-linked code (Xcode targets `SWIFT_VERSION = 5.0` stay), SwiftUI + AppKit, Swift Testing for new tests (XCTest only for UI tests), Python 3 + pytest for static guard tests in `tests/`, `rsvg-convert` (installed) for icons, Sparkle 2.9.5 (kept).
 
@@ -51,7 +51,7 @@
 **Interfaces:**
 - Produces:
   - `scripts/shellx/test-app.sh <Suite> [<Suite>…]` — runs the app-hosted `cmux-unit` scheme limited to `-only-testing:cmuxTests/<Suite>` via `scripts/test-unit.sh` (extend that script to forward extra `xcodebuild` args if it doesn't).
-  - `public enum ShellXBrand` with `static let` values: `appName = "ShellX"`, `cliName = "shellx"`, `bundleID = "pro.shellx.desktop"`, `teamID = "W4RF3W4VTZ"`, `urlScheme = "shellx"`, `configDirectoryName = "shellx"`, `configFileName = "shellx.json"`, `projectConfigDirectoryName = ".shellx"`, `appSupportDirectoryName = "ShellX"`, `socketBaseName = "shellx"`, `hookMarker = "__shellx"`, `utiPrefix = "pro.shellx"`, `websiteURL: URL` = `https://shellx.pro`, `sourceCodeURL: URL` = `https://github.com/lephus/shellx-pro`, `contactEmail = "phule9225@gmail.com"`, `updateFeedURL: URL` = `https://download.shellx.pro/desktop/appcast.xml`.
+  - `public enum ShellXBrand` with `static let` values: `appName = "ShellX"`, `cliName = "shellx"`, `bundleID = "pro.shellx.desktop"`, `teamID = "W4RF3W4VTZ"`, `urlScheme = "shellx"`, `configDirectoryName = "shellx"`, `configFileName = "shellx.json"`, `projectConfigDirectoryName = ".shellx"`, `appSupportDirectoryName = "ShellX"`, `socketBaseName = "shellx"`, `hookMarker = "__shellx"`, `utiPrefix = "pro.shellx"`, `websiteURL: URL` = `https://shellx.pro`, `sourceCodeURL: URL` = `https://github.com/lephus/shellx`, `contactEmail = "phule9225@gmail.com"`, `updateFeedURL: URL` = `https://download.shellx.pro/desktop/appcast.xml`.
   - `public struct ShellXColor: Equatable, Sendable { init(hex: UInt32, alpha: Double = 1); var hexString: String /* "#rrggbb" */; var alpha: Double; var color: SwiftUI.Color; var nsColor: NSColor }`.
   - `public enum ShellXPalette` with `static let` `bg, panel, raise, line, border, text, textHi, muted, primary, primarySoft, primaryLine, primaryText, running, done, error: ShellXColor` (values in Global Constraints).
   - `public enum ShellXFeatures { public static let remoteMachines = false }` — Wave 2 flips it.
@@ -59,7 +59,7 @@
 - [ ] **Step 1: Branch**
 
 ```bash
-cd ~/Documents/myProjects/shellx-pro && git switch main && git switch -c shellx/w1-mac-local
+cd ~/Documents/myProjects/shellx && git switch main && git switch -c shellx/w1-mac-local
 ```
 
 - [ ] **Step 2: Write the failing package tests**
@@ -388,7 +388,7 @@ def test_rebrand_script_is_idempotent():
 
 - [ ] **Step 2: Run** both tests — Expected: FAIL.
 
-- [ ] **Step 3: Write `rebrand_strings.py`, run it, and make the About/menu/CLI edits.** About shows the logo (Task 9 asset; use a placeholder until then), "ShellX", version, "GPL-3.0-or-later — source: github.com/lephus/shellx-pro", and the attribution list with licenses (cmux: GPL-3.0-or-later; Ghostty: MIT; coolicons: CC BY 4.0; Space Grotesk: OFL-1.1).
+- [ ] **Step 3: Write `rebrand_strings.py`, run it, and make the About/menu/CLI edits.** About shows the logo (Task 9 asset; use a placeholder until then), "ShellX", version, "GPL-3.0-or-later — source: github.com/lephus/shellx", and the attribution list with licenses (cmux: GPL-3.0-or-later; Ghostty: MIT; coolicons: CC BY 4.0; Space Grotesk: OFL-1.1).
 
 - [ ] **Step 4: Run** the new tests plus the existing catalog tests (`python3 -m pytest tests/test_localizable_xcstrings_structure.py tests/test_localization_defaults.py tests/test_lint_xcstrings.py -q`, `python3 scripts/localization_catalog.py check`) — Expected: PASS.
 
