@@ -70,7 +70,25 @@ Recorded 2026-10-18. Fork commit `3bb417b7eb` on `main`: `shellx.release.entitle
 
 ## Decisions
 
-(none yet)
+### D-W0-1 Remote protocol — proposed, not final
+
+Desk estimate (Task 5 Step 2, read-only on fork `5348097e66`): `spikes/protocol/windows-daemon-port-estimate.md` on fork branch `shellx/w0-spikes` (`486cc55bf8`). Candidate (a)'s live spike (Step 1) has not run yet (needs two tagged dev builds; disk too full).
+
+| Criterion (1-5, 5 = least effort/risk) | (a) mobile RPC | (b) cmux-tui remote |
+| --- | --- | --- |
+| Windows host effort (incl. its client) | 2 (host 30-40 d + client 10-14 d) | 4 (min 12-19 d, full 20-27 d) |
+| Mac host additions | 4 (9-12 d) | 2.5 (17-25 d bridge) |
+| Reuse by future iOS/Android | 2 | 4.5 (iOS already links the Rust `cmux-terminal-client` C ABI) |
+| Upstream-merge risk | 2 (`Sources/Mobile` 92 commits / 30 d) | 3.5 (`cmux-remote` 22 / 30 d, mostly new files + `cfg` hooks) |
+| Sum | 10 | 14.5 |
+
+Totals: (b) minimum 36 d (Windows 15 + Mac 21, clients use `attach-surface` only), full 44.5 d (37-52); (a) 56.5 d (49-66). Recommendation **(b) cmux-tui-remote, ~70 % confidence**.
+
+Key facts: ConPTY already works in `cmux-pty` (`lib.rs:212-240`); protocol core has no Unix code; `cmux-remote` has never compiled for Windows (`cmux-tui/Cargo.toml:55-56` Unix-only dep, unguarded `UnixStream` in `provider/dial.rs:21`); security blockers `secure_directory.rs:33-45`, `secret_file.rs:68-76` (Unsupported off Unix) and no-op `restrict_file` (`identity.rs:2136-2143`, core `platform.rs:1527`) — Windows owner-only ACLs need a security review; `__terminal-host` / `terminal-bytes-v1` is Unix-only but not needed for the minimum; the daemon can be embedded (enroll/approve in-process `daemon.rs:1090-1327`, ticket callback `provider/relay.rs:70-75`) once `remote_runtime.rs` moves from the binary crate into a library. Mac serving = bridge M-B1: embed the Rust daemon + a "virtual PTY" in cmux-tui-core fed by `MobileTerminalByteTee.swift` / `ghostty_surface_set_pty_tee_cb`.
+
+Top risks for (b): the Mac bridge is unproven (terminal size ownership vs `CmuxTerminalSharing`, double parsing must render identically, remote-initiated terminal creation needs a Swift callback); Windows port is security-sensitive and uncompiled (Task 6 CI tells); `cmux-remote` churn (269 commits / 90 d) and Android `ghostty-vt-sys` via Zig/NDK unproven.
+
+Open: replace Step 1 (3-day mobile-RPC spike) with a 2-day spike of the (b) Mac bridge, then finalize D-W0-1 — needs the user's ruling.
 
 ## Spike results
 
