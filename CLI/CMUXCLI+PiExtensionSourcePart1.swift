@@ -541,7 +541,7 @@ async function warn(
 }
 
 function cmuxExecutable(): string {
-  return process.env.CMUX_PI_CMUX_BIN || "cmux";
+  return process.env.CMUX_PI_CMUX_BIN || "shellx";
 }
 """#
 }

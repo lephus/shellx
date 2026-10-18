@@ -83,18 +83,18 @@ private func agentHookDebugLogPath(socketPath: String?, env: [String: String]) -
     }
     if let socketPath {
         let socketName = URL(fileURLWithPath: socketPath).lastPathComponent
-        if socketName.hasPrefix("cmux-debug-"), socketName.hasSuffix(".sock") {
+        if socketName.hasPrefix("shellx-debug-"), socketName.hasSuffix(".sock") {
             let logName = String(socketName.dropLast(".sock".count)) + ".log"
             return URL(fileURLWithPath: "/tmp", isDirectory: true)
                 .appendingPathComponent(logName, isDirectory: false)
                 .path
         }
     }
-    if let lastPath = OwnedMarkerFileReader().trimmedContents(atPath: "/tmp/cmux-last-debug-log-path"),
+    if let lastPath = OwnedMarkerFileReader().trimmedContents(atPath: "/tmp/shellx-last-debug-log-path"),
        let normalized = agentHookDebugNonEmpty(lastPath) {
         return NSString(string: normalized).expandingTildeInPath
     }
-    return "/tmp/cmux-debug.log"
+    return "/tmp/shellx-debug.log"
 }
 private func agentHookDebugNonEmpty(_ value: String?) -> String? {
     guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -387,7 +387,7 @@ final class ClaudeHookSessionStore {
             release()
         }
     }
-    private static let defaultStatePath = "~/.cmuxterm/claude-hook-sessions.json"
+    private static let defaultStatePath = "~/.shellx/claude-hook-sessions.json"
     private static let maxStateAgeSeconds: TimeInterval = 60 * 60 * 24 * 7
     private static let maxPendingCursorShellApprovals = 16
     private static let maxPendingCursorShellCommandLength = 64 * 1024
@@ -2991,7 +2991,7 @@ private enum TopTextFormat: Equatable {
 }
 
 enum SocketPasswordResolver {
-    private static let service = "com.cmuxterm.app.socket-control"
+    private static let service = "\(ShellXBrand.bundleID).socket-control"
     private static let account = "local-socket-password"
 
     static func resolve(explicit: String?, socketPath: String) -> String? {
@@ -3052,7 +3052,7 @@ enum SocketPasswordResolver {
         }
 
         let candidate = URL(fileURLWithPath: socketPath).lastPathComponent
-        let prefixes = ["cmux-debug-", "cmux-"]
+        let prefixes = ["shellx-debug-", "shellx-"]
         for prefix in prefixes {
             guard candidate.hasPrefix(prefix), candidate.hasSuffix(".sock") else { continue }
             let start = candidate.index(candidate.startIndex, offsetBy: prefix.count)
@@ -5397,7 +5397,7 @@ struct CMUXCLI {
 
     private static func vmCreateIdempotencyStoreURL() -> URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".cmuxterm", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("vm-create-idempotency.json", isDirectory: false)
     }
 
@@ -14120,7 +14120,7 @@ struct CMUXCLI {
         let reusableTerminalStartupCommand: String
         if let vmIDForSplitAttach,
            sshOptions.skipDaemonBootstrap {
-            let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "cmux")
+            let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "shellx")
             if usesPersistentFreestyleCloud {
                 let splitAttachCommand = defaultFreestyleCloudSSHAttachLoopCommand(
                     vmID: vmIDForSplitAttach,
@@ -16202,7 +16202,7 @@ struct CMUXCLI {
     ) throws -> String {
         let startedAt = Date()
         let configURL = try writeVMPtyWebSocketConfig(endpoint)
-        let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "cmux")
+        let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "shellx")
         let initialStartupCommand = "\(shellQuote(executablePath)) vm-pty-connect --config \(shellQuote(configURL.path)) --id \(shellQuote(id))"
         let splitStartupCommand = "\(shellQuote(executablePath)) vm-pty-attach --id \(shellQuote(id))"
         var params: [String: Any] = [
@@ -16713,7 +16713,7 @@ struct CMUXCLI {
         /// Set after run() returns: true when the server sent a normal/going-away close,
         /// i.e. the remote shell ended on purpose and reconnecting would respawn it.
         private(set) var endedCleanly = false
-        private let sendQueue = DispatchQueue(label: "com.cmux.vm-pty.websocket.send")
+        private let sendQueue = DispatchQueue(label: "pro.shellx.vm-pty.websocket.send")
         private let stopLock = NSLock()
         private var stopped = false
         private var task: URLSessionWebSocketTask?
@@ -16802,7 +16802,7 @@ struct CMUXCLI {
             signal(SIGWINCH, SIG_IGN)
             let source = DispatchSource.makeSignalSource(
                 signal: SIGWINCH,
-                queue: DispatchQueue(label: "com.cmux.vm-pty.resize")
+                queue: DispatchQueue(label: "pro.shellx.vm-pty.resize")
             )
             source.setEventHandler { [weak self] in
                 guard let self else { return }
@@ -17350,12 +17350,12 @@ struct CMUXCLI {
 
     private func sshSessionAttachStartupCommand(sessionID: String) -> String {
         let quotedSessionID = shellQuote(sessionID)
-        let currentExecutable = shellQuote(resolvedExecutableURL()?.path ?? (args.first ?? "cmux"))
+        let currentExecutable = shellQuote(resolvedExecutableURL()?.path ?? (args.first ?? "shellx"))
         let attachCommand = "\"$cmux_ssh_attach_cli\" --socket \"$CMUX_SOCKET_PATH\" ssh-pty-attach --wait --require-existing --workspace \"$CMUX_WORKSPACE_ID\" --session-id \(quotedSessionID) --lifecycle-id \"$cmux_ssh_attach_lifecycle_id\" --attachment-id \"${CMUX_SURFACE_ID:-}\""
         let script = ([
             "cmux_ssh_attach_cli=\"${CMUX_BUNDLED_CLI_PATH:-}\"",
             "if [ -z \"$cmux_ssh_attach_cli\" ] || [ ! -x \"$cmux_ssh_attach_cli\" ]; then cmux_ssh_attach_cli=\(currentExecutable); fi",
-            "if [ -z \"$cmux_ssh_attach_cli\" ] || [ ! -x \"$cmux_ssh_attach_cli\" ]; then cmux_ssh_attach_cli=\"$(command -v cmux 2>/dev/null || true)\"; fi",
+            "if [ -z \"$cmux_ssh_attach_cli\" ] || [ ! -x \"$cmux_ssh_attach_cli\" ]; then cmux_ssh_attach_cli=\"$(command -v shellx 2>/dev/null || true)\"; fi",
             "if [ -z \"$cmux_ssh_attach_cli\" ]; then printf '%s\\n' '[cmux] bundled CLI not found for SSH PTY attach.' >&2; exit 127; fi",
             "if [ -z \"${CMUX_SOCKET_PATH:-}\" ]; then printf '%s\\n' '[cmux] required configuration missing for SSH PTY attach.' >&2; exit 1; fi",
             "if [ -z \"${CMUX_WORKSPACE_ID:-}\" ]; then printf '%s\\n' '[cmux] required workspace context missing for SSH PTY attach.' >&2; exit 1; fi",
@@ -18164,7 +18164,7 @@ struct CMUXCLI {
             preferredCLIPath.map { "cmux_reconnect_cli=\(shellQuote($0));" } ?? "cmux_reconnect_cli=\"\";",
             "cmux_reconnect_socket=\"${CMUX_SOCKET_PATH:-${CMUX_SOCKET:-}}\";",
             "if [ -z \"$cmux_reconnect_cli\" ] && [ -n \"${CMUX_BUNDLED_CLI_PATH:-}\" ]; then cmux_reconnect_cli=\"$CMUX_BUNDLED_CLI_PATH\"; fi;",
-            "if [ ! -x \"$cmux_reconnect_cli\" ]; then cmux_reconnect_cli=\"$(command -v cmux 2>/dev/null || true)\"; fi;",
+            "if [ ! -x \"$cmux_reconnect_cli\" ]; then cmux_reconnect_cli=\"$(command -v shellx 2>/dev/null || true)\"; fi;",
             "if [ -n \"${CMUX_WORKSPACE_ID:-}\" ]; then",
             "if [ -z \"$cmux_reconnect_socket\" ]; then printf '%s\\n' 'cmux: deferred SSH reconnect skipped, local cmux socket not found' >&2;",
             "elif [ -z \"$cmux_reconnect_cli\" ] || [ ! -x \"$cmux_reconnect_cli\" ]; then printf '%s\\n' 'cmux: deferred SSH reconnect skipped, local cmux CLI not found' >&2;",
@@ -18273,7 +18273,7 @@ struct CMUXCLI {
             if let trimmedExplicit, !trimmedExplicit.isEmpty {
                 return trimmedExplicit
             }
-            return OwnedMarkerFileReader().trimmedContents(atPath: "/tmp/cmux-last-debug-log-path")
+            return OwnedMarkerFileReader().trimmedContents(atPath: "/tmp/shellx-last-debug-log-path")
         }()
         guard let path else { return }
         let timestamp = ISO8601DateFormatter().string(from: Date())
@@ -22618,7 +22618,7 @@ struct CMUXCLI {
             Usage: cmux reload-config
 
             Run the same configuration reload as the Reload Configuration shortcut.
-            This reloads Ghostty config, re-reads ~/.config/cmux/cmux.json, and refreshes terminals.
+            This reloads Ghostty config, re-reads ~/.config/shellx/shellx.json, and refreshes terminals.
 
             Example:
               cmux reload-config
@@ -23300,7 +23300,7 @@ struct CMUXCLI {
               set <files|find|vault|sessions|feed|dock|cloud|devices|custom> [sidebar-name]
                                              Show, switch mode, and focus. `custom`
                                              renders a JS/Swift sidebar from
-                                             ~/.config/cmux/sidebars as a right panel;
+                                             ~/.config/shellx/sidebars as a right panel;
                                              the optional name picks which one.
               mode                           Print {"visible":bool,"mode":string}
               files|find|vault|sessions|feed|dock|cloud|devices|custom
@@ -23320,7 +23320,7 @@ struct CMUXCLI {
         case "sidebar":
             return String(localized: "cli.sidebar.usage", defaultValue: """
             Usage: cmux sidebar <templates|try|new|validate|reload|select|open> [name|--all] [--json]
-            Validate, reload, select, or open custom sidebars from ~/.config/cmux/sidebars.
+            Validate, reload, select, or open custom sidebars from ~/.config/shellx/sidebars.
             Commands:
               templates [--json] List the curated built-in templates
               try <template>    Create a temporary preview file and show open/remove commands
@@ -23956,7 +23956,7 @@ struct CMUXCLI {
             }
             let previewName = "sidebar-preview-\(UUID().uuidString.prefix(8).lowercased())"
             let directory = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent(".config/cmux/sidebars", isDirectory: true)
+                .appendingPathComponent(".config/shellx/sidebars", isDirectory: true)
             do {
                 let path = try CustomSidebarTemplateInstaller().install(
                     name: previewName,
@@ -24002,7 +24002,7 @@ struct CMUXCLI {
                 throw CLIError(message: String(localized: "cli.sidebar.new.missingTemplate", defaultValue: "sidebar new requires --from <template>"))
             }
             let directory = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent(".config/cmux/sidebars", isDirectory: true)
+                .appendingPathComponent(".config/shellx/sidebars", isDirectory: true)
             do {
                 let path = try CustomSidebarTemplateInstaller().install(
                     name: name,
@@ -26895,7 +26895,7 @@ struct CMUXCLI {
             explicitPassword: explicitPassword
         )
         let shimDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("cmux-debug-tmux-shim-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("shellx-debug-tmux-shim-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: shimDirectory, withIntermediateDirectories: true)
         // This is the one-shot debug dump (it never spawns a long-lived agent that would need the
         // shims on PATH), so remove the shim dir on exit instead of leaking a /tmp dir per invocation.
@@ -26903,11 +26903,11 @@ struct CMUXCLI {
         configureTmuxCompatEnvironment(
             processEnvironment: processEnvironment,
             shimDirectory: shimDirectory,
-            executablePath: processEnvironment["CMUX_BUNDLED_CLI_PATH"] ?? "cmux",
+            executablePath: processEnvironment["CMUX_BUNDLED_CLI_PATH"] ?? "shellx",
             socketPath: socketPath,
             explicitPassword: explicitPassword,
             launchContext: launchContext,
-            tmuxPathPrefix: "cmux-debug",
+            tmuxPathPrefix: "shellx-debug",
             cmuxBinEnvVar: "CMUX_BIN",
             termOverrideEnvVar: "TERM"
         )
@@ -26992,7 +26992,7 @@ struct CMUXCLI {
     ) throws -> URL {
         let homePath = ProcessInfo.processInfo.environment["HOME"] ?? NSHomeDirectory()
         let root = URL(fileURLWithPath: homePath, isDirectory: true)
-            .appendingPathComponent(".cmuxterm", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent(directoryName, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true, attributes: nil)
         let tmuxURL = root.appendingPathComponent("tmux", isDirectory: false)
@@ -27001,7 +27001,7 @@ struct CMUXCLI {
     }
 
     /// Every Node child of Claude loads this preload through NODE_OPTIONS for the
-    /// whole session, so it lives in ~/.cmuxterm with the other CLI shims rather
+    /// whole session, so it lives in ~/.shellx with the other CLI shims rather
     /// than in $TMPDIR, which macOS purges under long-lived sessions (#12022).
     private func createClaudeNodeOptionsRestoreModule() throws -> URL {
         // Match the wrapper: refuse a relative HOME and symlinked paths.
@@ -27011,7 +27011,7 @@ struct CMUXCLI {
             throw CLIError(message: "Claude NODE_OPTIONS restore module needs an absolute HOME")
         }
         let root = URL(fileURLWithPath: homePath, isDirectory: true)
-            .appendingPathComponent(".cmuxterm", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("cmux-claude-node-options", isDirectory: true)
         let restoreModuleURL = root.appendingPathComponent("restore-node-options.cjs", isDirectory: false)
         let fileManager = FileManager.default
@@ -27043,7 +27043,7 @@ struct CMUXCLI {
            !explicitPassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             launcherEnvironment["CMUX_SOCKET_PASSWORD"] = explicitPassword
         }
-        let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "cmux")
+        let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "shellx")
         let launchContext = try tmuxCompatLaunchContext(
             processEnvironment: launcherEnvironment,
             explicitPassword: explicitPassword
@@ -28277,7 +28277,7 @@ struct CMUXCLI {
 
         let appServerLogURL = codexTeamsLogURL(port: appServerPort, name: "app-server")
         let watcherLogURL = codexTeamsLogURL(port: appServerPort, name: "watcher")
-        let launchExecutable = resolvedExecutableURL()?.path ?? (args.first ?? "cmux")
+        let launchExecutable = resolvedExecutableURL()?.path ?? (args.first ?? "shellx")
         let appServer = try CodexTeamsAppServerProcess(
             supervisorExecutablePath: launchExecutable,
             executablePath: codexExecutablePath,
@@ -28357,7 +28357,7 @@ struct CMUXCLI {
             }
         }
 
-        let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "cmux")
+        let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "shellx")
         let watcherInvocation = CodexTeamsWatcherInvocation(
             socketPath: socketPath,
             workspaceID: rootWorkspaceId,
@@ -28751,7 +28751,7 @@ struct CMUXCLI {
         case "${1:-}" in
           -V|-v) echo "tmux 3.4"; exit 0 ;;
         esac
-        exec "${CMUX_OMO_CMUX_BIN:-cmux}" __tmux-compat "$@"
+        exec "${CMUX_OMO_CMUX_BIN:-shellx}" __tmux-compat "$@"
         """
         let root = try createTmuxCompatShimDirectory(
             directoryName: "omo-bin",
@@ -28772,7 +28772,7 @@ struct CMUXCLI {
             *)        shift ;;
           esac
         done
-        exec "${CMUX_OMO_CMUX_BIN:-cmux}" notify --title "${TITLE:-OpenCode}" --body "${BODY:-}"
+        exec "${CMUX_OMO_CMUX_BIN:-shellx}" notify --title "${TITLE:-OpenCode}" --body "${BODY:-}"
         """
         try writeShimIfChanged(notifierScript, to: notifierURL)
 
@@ -28859,7 +28859,7 @@ struct CMUXCLI {
     private func omoShadowConfigDir() -> URL {
         let homePath = ProcessInfo.processInfo.environment["HOME"] ?? NSHomeDirectory()
         return URL(fileURLWithPath: homePath, isDirectory: true)
-            .appendingPathComponent(".cmuxterm", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("omo-config", isDirectory: true)
     }
 
@@ -29347,7 +29347,7 @@ struct CMUXCLI {
             includingExecutableAt: openCodeExecutablePath
         )
 
-        let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "cmux")
+        let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "shellx")
         let launchContext = try tmuxCompatLaunchContext(
             processEnvironment: launcherEnvironment,
             explicitPassword: explicitPassword
@@ -29451,7 +29451,7 @@ struct CMUXCLI {
             esac
             ;;
         esac
-        exec "${CMUX_OMX_CMUX_BIN:-cmux}" __tmux-compat "$@"
+        exec "${CMUX_OMX_CMUX_BIN:-shellx}" __tmux-compat "$@"
         """
         return try createTmuxCompatShimDirectory(
             directoryName: "omx-bin",
@@ -29501,7 +29501,7 @@ struct CMUXCLI {
             includingExecutableAt: omxExecutablePath
         )
 
-        let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "cmux")
+        let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "shellx")
         let launchContext = try tmuxCompatLaunchContext(
             processEnvironment: launcherEnvironment,
             explicitPassword: explicitPassword
@@ -29553,7 +29553,7 @@ struct CMUXCLI {
         case "${1:-}" in
           -V|-v) echo "tmux 3.4"; exit 0 ;;
         esac
-        exec "${CMUX_OMC_CMUX_BIN:-cmux}" __tmux-compat "$@"
+        exec "${CMUX_OMC_CMUX_BIN:-shellx}" __tmux-compat "$@"
         """
         return try createTmuxCompatShimDirectory(
             directoryName: "omc-bin",
@@ -29626,7 +29626,7 @@ struct CMUXCLI {
         )
 
         let shimDirectory = try createOMCShimDirectory()
-        let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "cmux")
+        let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "shellx")
         let launchContext = try tmuxCompatLaunchContext(
             processEnvironment: launcherEnvironment,
             explicitPassword: explicitPassword
@@ -34431,7 +34431,7 @@ struct CMUXCLI {
         ]
         telemetry.breadcrumb("codex-hook.monitor.start", data: monitorTelemetry)
 
-        let executablePath = resolvedExecutableURL()?.path ?? args.first ?? "cmux"
+        let executablePath = resolvedExecutableURL()?.path ?? args.first ?? "shellx"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executablePath)
         var monitorArgs = [
@@ -36313,7 +36313,7 @@ struct CMUXCLI {
     func agentHookStatePath(sessionStoreSuffix: String, env: [String: String]) -> String {
         let filename = "\(sessionStoreSuffix)-hook-sessions.json"
         guard let overrideDirectory = normalizedHookValue(env["CMUX_AGENT_HOOK_STATE_DIR"]) else {
-            return "~/.cmuxterm/\(filename)"
+            return "~/.shellx/\(filename)"
         }
         return URL(fileURLWithPath: NSString(string: overrideDirectory).expandingTildeInPath, isDirectory: true)
             .appendingPathComponent(filename, isDirectory: false)
@@ -36735,7 +36735,7 @@ function sendHook(subcommand, ctx, event, extra = {}) {
   };
   const context = extra.context || contextForSession(sessionId);
   if (context) payload.context = context;
-  const cmux = process.env.CMUX_OPENCODE_CMUX_BIN || "cmux";
+  const cmux = process.env.CMUX_OPENCODE_CMUX_BIN || "shellx";
   try {
     const child = spawn(cmux, ["hooks", "enqueue", "opencode", subcommand], {
       env: { ...hookEnvironment(cwd), CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC: "1" },
@@ -38056,7 +38056,7 @@ export default {
         func insertHashes(eventLabel: String, command: String, timeouts: [Int]) {
             let commands = [
                 command,
-                "[ -n \"$CMUX_SURFACE_ID\" ] && [ \"$\(def.disableEnvVar)\" != \"1\" ] && command -v cmux >/dev/null 2>&1 && \(command) || echo '{}'",
+                "[ -n \"$CMUX_SURFACE_ID\" ] && [ \"$\(def.disableEnvVar)\" != \"1\" ] && command -v shellx >/dev/null 2>&1 && \(command) || echo '{}'",
             ]
             for command in commands {
                 for timeout in timeouts {
@@ -38080,7 +38080,7 @@ export default {
             )
             insertHashes(
                 eventLabel: eventLabel,
-                command: "cmux codex-hook \(event.cmuxSubcommand)",
+                command: "shellx codex-hook \(event.cmuxSubcommand)",
                 timeouts: [hookTimeoutMs, 5, 5_000, 600]
             )
         }
@@ -38094,7 +38094,7 @@ export default {
             )
             insertHashes(
                 eventLabel: eventLabel,
-                command: "cmux feed-hook --source \(def.name) --event \(agentEvent)",
+                command: "shellx feed-hook --source \(def.name) --event \(agentEvent)",
                 timeouts: [120_000, 600]
             )
         }
@@ -43014,7 +43014,7 @@ export default {
         let fileManager = FileManager.default
         let homePath = ProcessInfo.processInfo.environment["HOME"] ?? NSHomeDirectory()
         let appDirectory = URL(fileURLWithPath: homePath, isDirectory: true)
-            .appendingPathComponent(".cmuxterm", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("feed-tui-opentui", isDirectory: true)
         try fileManager.createDirectory(at: appDirectory, withIntermediateDirectories: true)
 
@@ -43877,7 +43877,7 @@ export default {
     private func runFeedClear() throws {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let path = home
-            .appendingPathComponent(".cmuxterm", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("workstream.jsonl", isDirectory: false)
         let fm = FileManager.default
         guard fm.fileExists(atPath: path.path) else {
@@ -43920,7 +43920,7 @@ export default {
 
     private func bundledOpenCodePluginSource() throws -> String {
         // The plugin JS is bundled into the .app via `Resources/opencode-plugin.js`.
-        // The `cmux` CLI is often launched from `Contents/Resources/bin/cmux`,
+        // The `cmux` CLI is often launched from `Contents/Resources/bin/shellx`,
         // where Bundle.main can be the CLI executable rather than the containing
         // app. Search the real executable path before falling back to repo dev
         // paths used by `swift run`-style local builds.
@@ -44246,7 +44246,7 @@ export default {
         _ = telemetry
         let source = optionValue(commandArgs, name: "--source") ?? ""
         guard !source.isEmpty else {
-            throw CLIError(message: "cmux hooks feed requires --source <agent-name>")
+            throw CLIError(message: "shellx hooks feed requires --source <agent-name>")
         }
         let lifecycleProbeDeadline = Date.now.addingTimeInterval(0.75)
         var lifecycleProbeClient: SocketClient?
@@ -45452,7 +45452,7 @@ export default {
                 return true
             case "inject-args" where def.name == "codex":
                 // Hidden: emit the NUL-separated codex arg list the wrapper
-                // (Resources/bin/cmux-codex-wrapper) splices to inject cmux's
+                // (Resources/bin/shellx-codex-wrapper) splices to inject cmux's
                 // hooks for one invocation. No socket required.
                 try emitCodexWrapperInjectArgs()
                 return true
@@ -45685,7 +45685,7 @@ export default {
         let isUninstall = uninstall || arguments.uninstall
         let fm = FileManager.default
         let verb = isUninstall ? "uninstalling" : "installing"
-        print("cmux hooks \(isUninstall ? "uninstall" : "setup"): \(verb) agent hooks")
+        print("shellx hooks \(isUninstall ? "uninstall" : "setup"): \(verb) agent hooks")
         if !isUninstall { print(String(localized: "cli.hooks.setup.wrapperNote", defaultValue: "  (Antigravity, Claude Code, Grok, Muse, and Pi hooks are injected automatically via cmux wrappers)")) }
         print("")
         var count = 0

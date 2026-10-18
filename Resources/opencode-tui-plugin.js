@@ -190,7 +190,7 @@ function launchEnvironment(cwdValue, baseEnvironment = process.env) {
 /** Admit session restore without blocking the shared OpenCode service. */
 export function dispatchSessionHook(eventName, payload, spawnImpl = spawn, baseEnvironment = process.env) {
   if (baseEnvironment.CMUX_OPENCODE_HOOKS_DISABLED === "1" || !baseEnvironment.CMUX_SURFACE_ID) return false;
-  const cmux = baseEnvironment.CMUX_OPENCODE_CMUX_BIN || "cmux";
+  const cmux = baseEnvironment.CMUX_OPENCODE_CMUX_BIN || "shellx";
   try {
     const child = spawnImpl(cmux, ["hooks", "enqueue", "opencode", eventName], {
       env: launchEnvironment(payload.cwd, baseEnvironment),

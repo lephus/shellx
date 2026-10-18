@@ -46,7 +46,7 @@ public final class RemoteProxyBroker: @unchecked Sendable {
 
     private let tunnelProvider: any RemoteProxyTunnelProviding
     private let clock: any RemoteProxyRetryClock
-    private let queue = DispatchQueue(label: "com.cmux.remote-ssh.proxy-broker", qos: .utility)
+    private let queue = DispatchQueue(label: "pro.shellx.remote-ssh.proxy-broker", qos: .utility)
     private var entries: [String: Entry] = [:]
     private var ptyLifecycleOwnership = RemotePTYLifecycleOwnershipRegistry()
 

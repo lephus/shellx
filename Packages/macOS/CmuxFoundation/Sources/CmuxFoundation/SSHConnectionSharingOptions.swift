@@ -15,7 +15,7 @@ internal import Foundation
 /// policy and similar) therefore gets its own socket, named by a digest of
 /// its resolved route, or shares nothing when no resolved route is known.
 ///
-/// The sockets live in `~/.cmux/ssh`. OpenSSH trusts whatever socket is at
+/// The sockets live in `~/.shellx/ssh`. OpenSSH trusts whatever socket is at
 /// `ControlPath`, so when no directory only this user can write to is
 /// available, cmux adds no sharing defaults and the user's SSH configuration
 /// applies as is.
@@ -67,7 +67,7 @@ public struct SSHConnectionSharingOptions: Sendable {
     ]
 
     /// Creates an option merger for the current local user, creating
-    /// `~/.cmux/ssh` if needed.
+    /// `~/.shellx/ssh` if needed.
     public init() {
         let userID = Int(getuid())
         self.userID = userID

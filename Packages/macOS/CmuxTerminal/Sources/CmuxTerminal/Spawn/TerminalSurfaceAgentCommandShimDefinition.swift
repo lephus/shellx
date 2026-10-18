@@ -20,27 +20,27 @@ struct TerminalSurfaceAgentCommandShimDefinition: Sendable {
     static let bundled: [Self] = [
         Self(
             command: .claude,
-            wrapperName: "cmux-claude-wrapper",
+            wrapperName: "shellx-claude-wrapper",
             environmentVariablePrefix: "CMUX_CLAUDE"
         ),
         Self(
             command: .codex,
-            wrapperName: "cmux-codex-wrapper",
+            wrapperName: "shellx-codex-wrapper",
             environmentVariablePrefix: "CMUX_CODEX"
         ),
         Self(
             command: .pi,
-            wrapperName: "cmux-pi-wrapper",
+            wrapperName: "shellx-pi-wrapper",
             environmentVariablePrefix: "CMUX_PI"
         ),
         Self(
             command: .amp,
-            wrapperName: "cmux-amp-wrapper",
+            wrapperName: "shellx-amp-wrapper",
             environmentVariablePrefix: "CMUX_AMP"
         ),
         Self(
             command: .hermes,
-            wrapperName: "cmux-hermes-agent-wrapper",
+            wrapperName: "shellx-hermes-agent-wrapper",
             environmentVariablePrefix: "CMUX_HERMES_AGENT"
         ),
         Self(

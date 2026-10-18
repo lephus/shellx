@@ -48,7 +48,7 @@ static void SimCamStartAttachmentHeartbeat(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         dispatch_queue_t queue = dispatch_queue_create(
-            "com.cmux.simcam.attachment-heartbeat",
+            "pro.shellx.simcam.attachment-heartbeat",
             DISPATCH_QUEUE_SERIAL
         );
         timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);

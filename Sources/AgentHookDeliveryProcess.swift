@@ -25,7 +25,7 @@ struct AgentHookDeliveryProcess: Sendable {
 
     init(
         executableURLProvider: @escaping @Sendable () -> URL? = {
-            Bundle.main.resourceURL?.appendingPathComponent("bin/cmux", isDirectory: false)
+            Bundle.main.resourceURL?.appendingPathComponent("bin/shellx", isDirectory: false)
         },
         processTimeout: Duration = .seconds(15),
         deliveryTimeout: Duration = .seconds(16),
@@ -252,7 +252,7 @@ struct AgentHookDeliveryProcess: Sendable {
                 ?? "unrouted"
         )
         return URL(fileURLWithPath: homePath, isDirectory: true)
-            .appendingPathComponent(".cmuxterm", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("relay-hook-state", isDirectory: true)
             .appendingPathComponent(appScope, isDirectory: true)
             .appendingPathComponent(routeScope, isDirectory: true)

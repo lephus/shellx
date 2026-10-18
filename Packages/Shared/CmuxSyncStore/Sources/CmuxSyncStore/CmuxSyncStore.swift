@@ -24,7 +24,7 @@ public actor CmuxSyncStore: CmuxSyncStoring {
     nonisolated private let db: SyncDatabase
 
     /// The default on-disk location, `cmux-sync.sqlite3` next to the paired-Mac
-    /// db under Application Support/cmux.
+    /// db under Application Support/ShellX.
     public static func defaultDatabaseURL(fileManager: FileManager = .default) throws -> URL {
         let appSupport = try fileManager.url(
             for: .applicationSupportDirectory,
@@ -32,7 +32,7 @@ public actor CmuxSyncStore: CmuxSyncStoring {
             appropriateFor: nil,
             create: true
         )
-        let dir = appSupport.appendingPathComponent("cmux", isDirectory: true)
+        let dir = appSupport.appendingPathComponent("ShellX", isDirectory: true)
         if !fileManager.fileExists(atPath: dir.path) {
             try fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
         }

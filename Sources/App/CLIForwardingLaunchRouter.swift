@@ -18,7 +18,7 @@ enum CLIForwardingLaunchRouter {
     }
 
     /// If `argv` looks like a CLI invocation, exec the bundled CLI at
-    /// `Contents/Resources/bin/cmux` and never return. macOS-launch arguments
+    /// `Contents/Resources/bin/shellx` and never return. macOS-launch arguments
     /// (`-psn_...`, other `-` flags) and `cmux://` URLs are left to the GUI.
     /// A CLI invocation that cannot be forwarded (the forwarding guard is
     /// already set) exits with an error instead of falling through to the GUI.
@@ -39,7 +39,7 @@ enum CLIForwardingLaunchRouter {
 
         guard let cliURL = bundledCLIURL(bundle: bundle, fileManager: fileManager) else {
             #if DEBUG
-            let resourcePath = bundle.resourceURL?.appendingPathComponent("bin/cmux").path ?? "<missing>"
+            let resourcePath = bundle.resourceURL?.appendingPathComponent("bin/shellx").path ?? "<missing>"
             let executablePath = processExecutableURL()?.path ?? "<missing>"
             cliForwardingLogger.debug("bundled CLI not found for forwarding; bundleID=\(bundle.bundleIdentifier ?? "<missing>", privacy: .public) resourcePath=\(resourcePath, privacy: .public) executablePath=\(executablePath, privacy: .public)")
             #endif
@@ -83,7 +83,7 @@ enum CLIForwardingLaunchRouter {
         fileManager: FileManager = .default,
         executableURL: URL? = processExecutableURL()
     ) -> URL? {
-        let bundleCandidate = bundle.resourceURL?.appendingPathComponent("bin/cmux")
+        let bundleCandidate = bundle.resourceURL?.appendingPathComponent("bin/shellx")
         if let bundleCandidate, fileManager.isExecutableFile(atPath: bundleCandidate.path) {
             return bundleCandidate
         }
@@ -93,7 +93,7 @@ enum CLIForwardingLaunchRouter {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("Resources")
-        let executableCandidate = resourcesURL.appendingPathComponent("bin/cmux")
+        let executableCandidate = resourcesURL.appendingPathComponent("bin/shellx")
         if fileManager.isExecutableFile(atPath: executableCandidate.path) {
             return executableCandidate
         }

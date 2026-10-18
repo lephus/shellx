@@ -267,9 +267,9 @@ extension CMUXCLI {
                 return nil
             }
             let candidates = [
-                ((current as NSString).appendingPathComponent(".cmux") as NSString)
-                    .appendingPathComponent("cmux.json"),
-                (current as NSString).appendingPathComponent("cmux.json"),
+                ((current as NSString).appendingPathComponent(".shellx") as NSString)
+                    .appendingPathComponent("shellx.json"),
+                (current as NSString).appendingPathComponent("shellx.json"),
             ]
             for candidate in candidates {
                 var isDirectory = ObjCBool(false)
@@ -528,7 +528,7 @@ extension CMUXCLI {
             return .project
         }
         let parent = (normalized as NSString).deletingLastPathComponent
-        if (parent as NSString).lastPathComponent == ".cmux" {
+        if (parent as NSString).lastPathComponent == ".shellx" {
             return .project
         }
         return .global

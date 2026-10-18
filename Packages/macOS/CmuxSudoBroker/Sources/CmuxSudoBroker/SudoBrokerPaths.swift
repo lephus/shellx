@@ -30,7 +30,7 @@ public struct SudoBrokerPaths: Sendable, Equatable {
             ? "pro.shellx.desktop"
             : sanitizedScope
         base = applicationSupportDirectory
-            .appendingPathComponent("cmux", isDirectory: true)
+            .appendingPathComponent("ShellX", isDirectory: true)
             .appendingPathComponent("sudo", isDirectory: true)
             .appendingPathComponent(scope, isDirectory: true)
             .standardizedFileURL

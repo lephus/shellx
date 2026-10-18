@@ -109,7 +109,7 @@ public actor FileWatcher {
         self.path = path
         self.throttle = throttle
         self.clock = clock
-        self.queue = DispatchQueue(label: "com.cmux.file-watcher", qos: .utility)
+        self.queue = DispatchQueue(label: "pro.shellx.file-watcher", qos: .utility)
         let (events, eventsContinuation) = AsyncStream<Void>.makeStream(
             bufferingPolicy: .bufferingNewest(1)
         )

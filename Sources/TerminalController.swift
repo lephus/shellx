@@ -264,7 +264,7 @@ class TerminalController {
     /// tool such as Instruments records signposts, so
     /// `socketMainHopSignpostingActive` genuinely gates all per-hop work.
     private nonisolated static let socketMainHopSignposter = OSSignposter(
-        subsystem: "com.cmux.socket",
+        subsystem: "pro.shellx.socket",
         category: .dynamicTracing
     )
     /// True while a tool (e.g. Instruments' os_signpost instrument) is
@@ -639,12 +639,12 @@ class TerminalController {
         )[0]
         let simulatorDurableRecoveryDirectory = simulatorApplicationSupportDirectory
             .appendingPathComponent(
-                "com.cmux.simulator-ownership",
+                "pro.shellx.simulator-ownership",
                 isDirectory: true
             )
         let simulatorOwnershipDirectory = simulatorOwnershipFileManager.temporaryDirectory
             .appendingPathComponent(
-                "com.cmux.simulator-ownership",
+                "pro.shellx.simulator-ownership",
                 isDirectory: true
             )
         self.simulatorLocationOwnershipScope = SimulatorLocationOwnershipScope(
@@ -3812,7 +3812,7 @@ class TerminalController {
         }
         if let cliPath = Bundle.main.resourceURL?
             .appendingPathComponent("bin", isDirectory: true)
-            .appendingPathComponent("cmux", isDirectory: false)
+            .appendingPathComponent("shellx", isDirectory: false)
             .path {
             result["app_cli_path"] = cliPath
         }
@@ -10838,7 +10838,7 @@ class TerminalController {
             semaphore.signal()
         }
 
-        let watcherQueue = DispatchQueue(label: "com.cmux.browser.download.wait.file")
+        let watcherQueue = DispatchQueue(label: "pro.shellx.browser.download.wait.file")
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
             eventMask: [.write, .extend, .attrib, .link, .rename],
@@ -13014,7 +13014,7 @@ class TerminalController {
         case "tabtransfer", "tab-transfer", "com.splittabbar.tabtransfer":
             return DragOverlayRoutingPolicy.bonsplitTabTransferType
         case "sidebarreorder", "sidebar-reorder", "sidebar_tab_reorder",
-            "com.cmux.sidebar-tab-reorder":
+            "pro.shellx.sidebar-tab-reorder":
             return DragOverlayRoutingPolicy.sidebarTabReorderType
         default:
             // Allow explicit UTI strings for ad-hoc debug probes.

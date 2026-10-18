@@ -45,7 +45,7 @@ actor SSHPTYResizeMonitor {
         self.eventContinuation = events.continuation
         self.source = DispatchSource.makeSignalSource(
             signal: SIGWINCH,
-            queue: DispatchQueue(label: "com.cmux.ssh-pty.resize.signal")
+            queue: DispatchQueue(label: "pro.shellx.ssh-pty.resize.signal")
         )
         signal(SIGWINCH, SIG_IGN)
         source.setEventHandler { [eventContinuation] in

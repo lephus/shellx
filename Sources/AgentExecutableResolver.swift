@@ -224,7 +224,7 @@ struct AgentExecutableResolver {
         if let home = environment["HOME"], home.hasPrefix("/") {
             shimRoots.append(
                 URL(fileURLWithPath: home, isDirectory: true)
-                    .appendingPathComponent(".cmuxterm/cmux-cli-shims", isDirectory: true)
+                    .appendingPathComponent(".shellx/cmux-cli-shims", isDirectory: true)
                     .standardizedFileURL.path
             )
         }
@@ -233,7 +233,7 @@ struct AgentExecutableResolver {
                 .appendingPathComponent("cmux-cli-shims", isDirectory: true)
                 .standardizedFileURL
                 .path,
-            "/tmp/cmux-cli-shims",
+            "/tmp/shellx-cli-shims",
         ])
         for shimRoot in shimRoots {
             let shimRoot = shimRoot.trimmingCharacters(in: .whitespacesAndNewlines)

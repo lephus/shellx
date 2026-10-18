@@ -52,9 +52,6 @@ CMUX_ID_LINE_ALLOW = [
     (r"Notification\.Name\(\"com\.cmuxterm\.app\.(displayReconfiguration|screenChangeReconcile)\"\)",
      "in-process NotificationCenter names (R3)"),
     (r"\"com\.cmuxterm\.app\.userNotification", "UNNotification category ids, scoped to this app (R3)"),
-    (r"com\.cmuxterm\.app\.socket-control\"", "keychain service: Task 3"),
-    (r"com\.cmuxterm\.app\.surface-resume-approvals\"", "keychain service: Task 3"),
-    (r"com\.cmuxterm\.app\.cmux\.sidebar\"", "sidebar extension point id: Task 3"),
     (r"releasePayloadDomain = \"com\.cmuxterm\.app\"", "MDM payload domain: Task 4"),
 ]
 

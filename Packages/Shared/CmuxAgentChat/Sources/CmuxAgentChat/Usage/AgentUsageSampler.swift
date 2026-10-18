@@ -48,7 +48,7 @@ public actor AgentUsageSampler {
     // cooperative-pool thread. It only runs work; it guards no state (all
     // state lives in the actor), and `maxConcurrentReads` bounds its load.
     private let readQueue = DispatchQueue(
-        label: "com.cmux.agent-usage.transcript-reads",
+        label: "pro.shellx.agent-usage.transcript-reads",
         qos: .utility,
         attributes: .concurrent
     )

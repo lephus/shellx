@@ -40,7 +40,7 @@ public actor CmxIrohCustomRelayProfileStore {
     ///     silently relaxing a custom override back to managed relays.
     public init(
         secureStore: any CmxIrohSecureCredentialStoring = CmxIrohKeychainCredentialStore(
-            service: "com.cmuxterm.iroh.custom-relays.v1"
+            service: "pro.shellx.desktop.iroh.custom-relays.v1"
         ),
         selectionStore: any CmxIrohInstallStateStoring = CmxIrohUserDefaultsInstallStateStore()
     ) {

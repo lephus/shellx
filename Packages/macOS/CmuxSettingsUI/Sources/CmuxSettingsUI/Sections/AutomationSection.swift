@@ -185,7 +185,7 @@ public struct AutomationSection: View {
             SettingsCardDivider()
             SettingsCardNote(String(
                 localized: "settings.automation.rules.note",
-                defaultValue: "Rules live in ~/.cmuxterm/automations.json. Edit the JSON directly, then reload the running engine. The cmux automation CLI remains available for test and log diagnostics.",
+                defaultValue: "Rules live in ~/.shellx/automations.json. Edit the JSON directly, then reload the running engine. The cmux automation CLI remains available for test and log diagnostics.",
                 bundle: .module
             ))
 
@@ -509,7 +509,7 @@ public struct AutomationSection: View {
                     .accessibilityIdentifier("SettingsCanonicalAgentScratchToggle")
             }
             SettingsCardDivider()
-            SettingsCardNote(String(localized: "settings.automation.canonicalAgentScratch.note", defaultValue: "Opt in to organize new Claude, Codex, and OpenCode panel scratch files under ~/.local/state/cmux/agent-artifacts. Provider transcripts and existing files are not moved."))
+            SettingsCardNote(String(localized: "settings.automation.canonicalAgentScratch.note", defaultValue: "Opt in to organize new Claude, Codex, and OpenCode panel scratch files under ~/.local/state/shellx/agent-artifacts. Provider transcripts and existing files are not moved."))
         }
     }
     @ViewBuilder

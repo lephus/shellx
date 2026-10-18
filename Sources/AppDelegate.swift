@@ -615,7 +615,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     let accentColorObserver = CmuxAccentColorObserver()
     /// The resolved cmux accent for chrome drawing.
     var accentColor: CmuxAccentColor { accentColorObserver.current }
-    private static let reloadConfigurationMenuItemIdentifier = NSUserInterfaceItemIdentifier("com.cmux.reloadConfiguration")
+    private static let reloadConfigurationMenuItemIdentifier = NSUserInterfaceItemIdentifier("pro.shellx.reloadConfiguration")
     private static let cachedIsRunningUnderXCTest = MacSentryStartupPolicy.isRunningUnderXCTest(
         environment: ProcessInfo.processInfo.environment
     )
@@ -1510,7 +1510,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                in: .userDomainMask
            ).first,
            let runnerExecutableURL = Bundle.main.resourceURL?
-               .appendingPathComponent("bin/cmux", isDirectory: false),
+               .appendingPathComponent("bin/shellx", isDirectory: false),
            fileManager.isExecutableFile(atPath: runnerExecutableURL.path) {
             let broker = SudoBroker(
                 paths: SudoBrokerPaths(
@@ -1532,7 +1532,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             in: .userDomainMask
         ).first?
             .appendingPathComponent("Logs", isDirectory: true)
-            .appendingPathComponent("cmux", isDirectory: true)
+            .appendingPathComponent("ShellX", isDirectory: true)
             .appendingPathComponent("hangs", isDirectory: true)
         let captureStore = hangDirectory.map {
             MainThreadHangCaptureStore(
@@ -2839,7 +2839,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
         }
         // Best-effort one-time migration: a value previously stored in the
-        // legacy ~/.config/cmux/dev-window-display file moves into the shared
+        // legacy ~/.config/shellx/dev-window-display file moves into the shared
         // cmux.json (app.devWindowDisplay) so an existing dev-display default
         // keeps working. No-op when already set or the legacy file is absent.
         Task { await DevWindowDisplayDefault.migrateLegacyFileIfNeeded(runtime: settingsRuntime) }
@@ -7267,7 +7267,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
 #endif
         guard let workspace = tabManager?.selectedWorkspace,
-              let cliURL = Bundle.main.resourceURL?.appendingPathComponent("bin/cmux"),
+              let cliURL = Bundle.main.resourceURL?.appendingPathComponent("bin/shellx"),
               FileManager.default.isExecutableFile(atPath: cliURL.path) else {
             return false
         }
@@ -7881,7 +7881,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
             if let name {
                 guard CmuxExtensionSidebarSelection.customSidebarFileURL(forName: name) != nil else {
-                    return .failure(String(localized: "rightSidebar.remote.error.customSidebarNotFound", defaultValue: "ERROR: No custom sidebar named '\(name)' in ~/.config/cmux/sidebars"))
+                    return .failure(String(localized: "rightSidebar.remote.error.customSidebarNotFound", defaultValue: "ERROR: No custom sidebar named '\(name)' in ~/.config/shellx/sidebars"))
                 }
                 state.selectCustomSidebar(name: name)
             }
@@ -14312,7 +14312,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             "windowRouteFailure": "",
         ], at: path)
 
-        guard let cliURL = Bundle.main.resourceURL?.appendingPathComponent("bin/cmux"),
+        guard let cliURL = Bundle.main.resourceURL?.appendingPathComponent("bin/shellx"),
               FileManager.default.isExecutableFile(atPath: cliURL.path) else {
             writeMultiWindowNotificationTestData([
                 "windowRouteStatus": "0",

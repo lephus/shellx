@@ -4,7 +4,7 @@ import Foundation
 // and the runner exposes no mutable state outside that queue.
 final class SimulatorCameraSessionRunner: @unchecked Sendable {
     private let queue = DispatchQueue(
-        label: "com.cmux.simulator.camera.session",
+        label: "pro.shellx.simulator.camera.session",
         qos: .userInitiated
     )
 

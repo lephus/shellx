@@ -186,7 +186,7 @@ function hookInvocation(subcommand: string, ctx: ExtensionContext, extra: Record
     event: eventName(subcommand),
     ...extra,
   };
-  const cmux = process.env.CMUX_CAMPFIRE_CMUX_BIN || "cmux";
+  const cmux = process.env.CMUX_CAMPFIRE_CMUX_BIN || "shellx";
   return {
     cmux,
     cwd,

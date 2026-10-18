@@ -33,7 +33,7 @@ extension Bundle {
 
 /// Generic-password items in the host app's keychain access group.
 public struct PhonePushKeychainStateStorage: PhonePushSharedStateStorage {
-    static let service = "ai.manaflow.cmux.phone-push.shared-state"
+    static let service = "pro.shellx.desktop.phone-push.shared-state"
 
     private let accessGroup: String?
 

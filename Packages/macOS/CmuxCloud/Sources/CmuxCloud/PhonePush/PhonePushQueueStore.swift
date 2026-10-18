@@ -37,7 +37,7 @@ public actor PhonePushQueueStore {
             in: .userDomainMask
         ).first ?? FileManager.default.temporaryDirectory
         return Self(fileURL: root
-            .appendingPathComponent("cmux", isDirectory: true)
+            .appendingPathComponent("ShellX", isDirectory: true)
             .appendingPathComponent("phone-push-queue-v1.json"))
     }
 

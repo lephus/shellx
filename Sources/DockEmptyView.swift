@@ -14,7 +14,7 @@ struct DockEmptyView: View {
                 .cmuxFont(size: 13, weight: .semibold)
             Text(String(
                 localized: "dock.empty.subtitle",
-                defaultValue: "Add controls to .cmux/dock.json."
+                defaultValue: "Add controls to .shellx/dock.json."
             ))
             .cmuxFont(size: 12)
             .foregroundStyle(.secondary)
@@ -106,9 +106,9 @@ struct DockEmptyView: View {
             Dock is cmux's right-sidebar terminal and browser control area. A Dock config is JSON with a top-level `controls` array. Terminal controls run commands in Ghostty-backed sections using the user's login shell; browser controls embed URLs. Controls are useful for project dashboards, git/status views, dev server or build status, test watchers, log tails, queues, local services, or fixed web dashboards.
 
             Choose where to write the config:
-            - In a repository or project directory, create or edit `.cmux/dock.json` so teammates can share it.
-            - For a personal default outside a repo, create or edit `~/.config/cmux/dock.json`.
-            - If both exist, project `.cmux/dock.json` is more specific for that project. Nested project configs apply to that directory tree; use the nearest relevant project config instead of writing unrelated controls globally.
+            - In a repository or project directory, create or edit `.shellx/dock.json` so teammates can share it.
+            - For a personal default outside a repo, create or edit `~/.config/shellx/dock.json`.
+            - If both exist, project `.shellx/dock.json` is more specific for that project. Nested project configs apply to that directory tree; use the nearest relevant project config instead of writing unrelated controls globally.
             - If there is no repo and no clear project root, use the global config only after confirming the user wants a personal Dock.
 
             Schema:

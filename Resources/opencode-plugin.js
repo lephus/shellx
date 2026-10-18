@@ -8,7 +8,7 @@ import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
 
-const DEFAULT_SOCKET = `${os.homedir()}/.config/cmux/cmux.sock`;
+const DEFAULT_SOCKET = `${os.homedir()}/.local/state/shellx/shellx.sock`;
 const REPLY_TIMEOUT_MS = 120_000;
 const MAX_PLAN_BYTES = 128 * 1024;
 

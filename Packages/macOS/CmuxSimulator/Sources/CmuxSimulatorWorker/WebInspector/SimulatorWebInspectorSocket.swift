@@ -20,7 +20,7 @@ final class SimulatorWebInspectorSocket: SimulatorWebInspectorTransport, @unchec
     private let frameCodec: SimulatorWebInspectorPlistFrameCodec
     private let continuation: AsyncStream<Data>.Continuation
     private let descriptor: Int32
-    private let writerQueue = DispatchQueue(label: "com.cmux.simulator.web-inspector-writer")
+    private let writerQueue = DispatchQueue(label: "pro.shellx.simulator.web-inspector-writer")
     @MainActor private var pendingWriteBytes = 0
     @MainActor private var writesClosed = false
 

@@ -141,7 +141,7 @@ struct TerminalUploadCommand: Sendable, Equatable {
             boundedExtension.unicodeScalars.append(scalar)
         }
         let suffix = boundedExtension.isEmpty ? "" : "." + boundedExtension
-        return "/tmp/cmux-drop-\(uuid.uuidString.lowercased())\(suffix)"
+        return "/tmp/shellx-drop-\(uuid.uuidString.lowercased())\(suffix)"
     }
 
     /// The ready-to-type string cmux inserts for one file after the command runs.

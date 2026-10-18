@@ -222,7 +222,7 @@ extension Workspace {
           IFS= read -r _ || exit 0
           cmux_reconnect_cli="${CMUX_BUNDLED_CLI_PATH:-}"
           if [ -z "$cmux_reconnect_cli" ] || [ ! -x "$cmux_reconnect_cli" ]; then
-            cmux_reconnect_cli="$(command -v cmux 2>/dev/null || true)"
+            cmux_reconnect_cli="$(command -v shellx 2>/dev/null || true)"
           fi
           cmux_reconnect_socket="${CMUX_SOCKET_PATH:-${CMUX_SOCKET:-}}"
           if [ -n "$cmux_reconnect_cli" ] && [ -n "$cmux_reconnect_socket" ] && [ -n "${CMUX_WORKSPACE_ID:-}" ]; then

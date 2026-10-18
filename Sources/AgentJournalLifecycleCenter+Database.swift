@@ -31,7 +31,7 @@ extension AgentJournalLifecycleCenter {
             options: .regularExpression
         )
         return appSupport
-            .appendingPathComponent("cmux", isDirectory: true)
+            .appendingPathComponent("ShellX", isDirectory: true)
             .appendingPathComponent("agent-journal-\(safeBundleID).sqlite3", isDirectory: false)
     }
 }

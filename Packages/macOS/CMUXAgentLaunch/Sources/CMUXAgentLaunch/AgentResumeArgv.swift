@@ -56,7 +56,7 @@ public struct AgentResumeArgv: Sendable, Equatable {
     /// When the codex resume argv emits a bare `codex` executable, the captured
     /// auto-resume command (`codex resume <id>`) can resolve to the *real* codex
     /// binary inside the `$SHELL -lic` restore launcher, bypassing
-    /// `cmux-codex-wrapper` and dropping every cmux hook (no `SessionStart`, the
+    /// `shellx-codex-wrapper` and dropping every cmux hook (no `SessionStart`, the
     /// session registry never marks the resumed session live, so the iOS GUI
     /// stays read-only). This mirrors the claude wrapper-shim mechanism: the
     /// per-surface `codex` shim path is exported as the *managed* terminal
@@ -84,7 +84,7 @@ public struct AgentResumeArgv: Sendable, Equatable {
 
     /// The managed Codex wrapper token with a captured executable as its fallback.
     ///
-    /// Remote restore shells can lack the `bash` required by `cmux-codex-wrapper`,
+    /// Remote restore shells can lack the `bash` required by `shellx-codex-wrapper`,
     /// or a previously installed shim can disappear. In those cases a routed
     /// restore must retain the captured Codex executable instead of assuming a
     /// separate `codex` is available on `PATH`.
@@ -564,7 +564,7 @@ public struct AgentResumeArgv: Sendable, Equatable {
     /// Builds the claude resume argv, routing it through cmux's `claude` wrapper
     /// so cmux hooks fire on the resumed session.
     ///
-    /// cmux injects Claude Code's hook `--settings` from the `cmux-claude-wrapper`,
+    /// cmux injects Claude Code's hook `--settings` from the `shellx-claude-wrapper`,
     /// which re-injects those hooks whenever it sees `--resume`, exactly as it does on
     /// a fresh launch (and it also re-applies the rest of the fresh-launch setup:
     /// `CLAUDE_CONFIG_DIR` normalization, auth-selection env handling, NODE_OPTIONS,

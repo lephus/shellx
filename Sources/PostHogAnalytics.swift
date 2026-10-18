@@ -47,7 +47,7 @@ final class PostHogAnalytics: @unchecked Sendable {
     private var activeCheckTimer: Timer?
 
     init(
-        workQueue: DispatchQueue = DispatchQueue(label: "com.cmux.posthog.analytics", qos: .utility),
+        workQueue: DispatchQueue = DispatchQueue(label: "pro.shellx.posthog.analytics", qos: .utility),
         didStart: Bool = false,
         userDefaults: UserDefaults = .standard,
         now: @escaping @Sendable () -> Date = { Date() },
