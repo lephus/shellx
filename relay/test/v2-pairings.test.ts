@@ -14,16 +14,16 @@ interface Item {
   requester_x25519_b64?: string; code: string; status: string; sealed_invite_b64?: string;
 }
 
-interface Desk { session: Session; machineId: string; fingerprint: string }
+interface Desk { session: Session; machineId: string; fingerprint: string; noiseKey: string }
 
 /** Account 1 with desktops A (requester), B (target) and C (third machine); account 2 with desktop D. */
 async function setup(app: TestApp) {
   const account = await registerAccount(app);
   const desk = async (acc = account): Promise<Desk> => {
     const session = await loginDesktop(app, acc);
-    const { machine_id } = await registerMachine(app, session.token);
+    const { machine_id, noiseKey } = await registerMachine(app, session.token);
     const row = db().get<{ fingerprint: string }>("SELECT fingerprint FROM machines WHERE id = ?", machine_id)!;
-    return { session, machineId: machine_id, fingerprint: row.fingerprint };
+    return { session, machineId: machine_id, fingerprint: row.fingerprint, noiseKey };
   };
   const a = await desk();
   const b = await desk();
@@ -62,7 +62,7 @@ describe("happy path", () => {
   it("A requests B, B sees the code and fingerprint, approves, A gets the sealed invite verbatim", async () => {
     const app = makeApp();
     const { a, b } = await setup(app);
-    const x25519 = randomPublicKey(); // URL alphabet, no padding
+    const x25519 = a.noiseKey; // URL alphabet, no padding
     const res = await post(app, a.session.token, { from_machine_id: a.machineId, to_machine_id: b.machineId, requester_x25519_b64: x25519 });
     expect(res.status).toBe(201);
     const created = await res.json<{ pairing_id: string; code: string }>();
@@ -109,7 +109,7 @@ describe("happy path", () => {
   it("is desktop-only and needs a token", async () => {
     const app = makeApp();
     const { account, a, b } = await setup(app);
-    const agent = await post(app, account.agent.token, { from_machine_id: a.machineId, to_machine_id: b.machineId, requester_x25519_b64: randomPublicKey() });
+    const agent = await post(app, account.agent.token, { from_machine_id: a.machineId, to_machine_id: b.machineId, requester_x25519_b64: a.noiseKey });
     expect(agent.status).toBe(403);
     expect(await errorCode(agent)).toBe("desktop_only");
     expect((await call(app, "GET", "/v2/pairings?role=target")).status).toBe(401);
@@ -134,10 +134,10 @@ describe("spoofing", () => {
   it("(a) a requester cannot send another machine's id as from_machine_id", async () => {
     const app = makeApp();
     const { a, b, c, d } = await setup(app);
-    const same = await post(app, a.session.token, { from_machine_id: c.machineId, to_machine_id: b.machineId, requester_x25519_b64: randomPublicKey() });
+    const same = await post(app, a.session.token, { from_machine_id: c.machineId, to_machine_id: b.machineId, requester_x25519_b64: c.noiseKey });
     expect(same.status).toBe(403);
     expect(await errorCode(same)).toBe("forbidden");
-    const foreign = await post(app, a.session.token, { from_machine_id: d.machineId, to_machine_id: b.machineId, requester_x25519_b64: randomPublicKey() });
+    const foreign = await post(app, a.session.token, { from_machine_id: d.machineId, to_machine_id: b.machineId, requester_x25519_b64: d.noiseKey });
     expect(foreign.status).toBe(404);
     expect(await errorCode(foreign)).toBe("machine_not_found");
     for (const bad of ["not-a-uuid", crypto.randomUUID(), 5, null]) {
@@ -151,7 +151,7 @@ describe("spoofing", () => {
     const app = makeApp({ pairingCode: () => "654321" });
     const { a, b } = await setup(app);
     const res = await post(app, a.session.token, {
-      from_machine_id: a.machineId, to_machine_id: b.machineId, requester_x25519_b64: randomPublicKey(),
+      from_machine_id: a.machineId, to_machine_id: b.machineId, requester_x25519_b64: a.noiseKey,
       code: "123456", requester_fingerprint: "0".repeat(16), status: "approved",
     });
     expect(res.status).toBe(201);
@@ -250,7 +250,7 @@ describe("spoofing", () => {
     const { a, b, c } = await setup(app);
     await requestPairing(app, a.session.token, a.machineId, b.machineId);
     // still live: every draw collides, the server gives up with 500 and stores nothing
-    const stuck = await post(app, c.session.token, { from_machine_id: c.machineId, to_machine_id: b.machineId, requester_x25519_b64: randomPublicKey() });
+    const stuck = await post(app, c.session.token, { from_machine_id: c.machineId, to_machine_id: b.machineId, requester_x25519_b64: c.noiseKey });
     expect(stuck.status).toBe(500);
     expect(db().all("SELECT id FROM machine_pairings WHERE from_machine_id = ?", c.machineId)).toEqual([]);
     clock = T0 + 300_001;
@@ -266,7 +266,7 @@ describe("spoofing", () => {
     for (let i = 0; i < MAX_PENDING_PER_TARGET + 1; i++) requesters.push(await desk(account));
     for (const r of requesters.slice(0, MAX_PENDING_PER_TARGET)) await requestPairing(app, r.session.token, r.machineId, b.machineId);
     const last = requesters[MAX_PENDING_PER_TARGET]!;
-    const refused = await post(app, last.session.token, { from_machine_id: last.machineId, to_machine_id: b.machineId, requester_x25519_b64: randomPublicKey() });
+    const refused = await post(app, last.session.token, { from_machine_id: last.machineId, to_machine_id: b.machineId, requester_x25519_b64: last.noiseKey });
     expect(refused.status).toBe(429);
     expect(await errorCode(refused)).toBe("rate_limited");
     expect(db().get("SELECT COUNT(*) AS n FROM machine_pairings")).toEqual({ n: MAX_PENDING_PER_TARGET });
@@ -296,12 +296,12 @@ describe("validation", () => {
   it("to_machine_id must be in the account and not the requester itself", async () => {
     const app = makeApp();
     const { a, d } = await setup(app);
-    const foreign = await post(app, a.session.token, { from_machine_id: a.machineId, to_machine_id: d.machineId, requester_x25519_b64: randomPublicKey() });
+    const foreign = await post(app, a.session.token, { from_machine_id: a.machineId, to_machine_id: d.machineId, requester_x25519_b64: a.noiseKey });
     expect(foreign.status).toBe(404);
     expect(await errorCode(foreign)).toBe("machine_not_found");
-    const unknown = await post(app, a.session.token, { from_machine_id: a.machineId, to_machine_id: crypto.randomUUID(), requester_x25519_b64: randomPublicKey() });
+    const unknown = await post(app, a.session.token, { from_machine_id: a.machineId, to_machine_id: crypto.randomUUID(), requester_x25519_b64: a.noiseKey });
     expect(unknown.status).toBe(404);
-    const self = await post(app, a.session.token, { from_machine_id: a.machineId, to_machine_id: a.machineId, requester_x25519_b64: randomPublicKey() });
+    const self = await post(app, a.session.token, { from_machine_id: a.machineId, to_machine_id: a.machineId, requester_x25519_b64: a.noiseKey });
     expect(self.status).toBe(400);
     expect(await errorCode(self)).toBe("bad_request");
     expect(db().all("SELECT id FROM machine_pairings")).toEqual([]);
@@ -319,6 +319,24 @@ describe("validation", () => {
     const res = await post(app, a.session.token, { from_machine_id: a.machineId, to_machine_id: b.machineId, requester_x25519_b64: value });
     expect(res.status).toBe(400);
     expect(await errorCode(res)).toBe("bad_request");
+  });
+
+  it("(i) the requester key must be the requester machine's noise key (D1)", async () => {
+    const app = makeApp();
+    const { a, b } = await setup(app);
+    const body = (key: string) => ({ from_machine_id: a.machineId, to_machine_id: b.machineId, requester_x25519_b64: key });
+    const other = randomPublicKey();
+    const wrong = await post(app, a.session.token, body(other));
+    expect(wrong.status).toBe(400);
+    expect(await errorCode(wrong)).toBe("bad_request");
+    expect(db().all("SELECT id FROM machine_pairings")).toEqual([]);
+
+    const rotated = randomPublicKey();
+    await registerMachine(app, a.session.token, { noise_public_key_b64: rotated });
+    const old = await post(app, a.session.token, body(a.noiseKey));
+    expect(old.status).toBe(400);
+    expect(db().all("SELECT id FROM machine_pairings")).toEqual([]);
+    expect((await post(app, a.session.token, body(rotated))).status).toBe(201);
   });
 
   it("refuses a malformed body", async () => {
@@ -467,8 +485,8 @@ describe("logging", () => {
     try {
       const app = makeApp({ pairingCode: () => "987123" });
       const { a, b } = await setup(app);
-      const x25519 = randomPublicKey();
-      const { pairing_id } = await requestPairing(app, a.session.token, a.machineId, b.machineId, { requester_x25519_b64: x25519 });
+      const x25519 = a.noiseKey;
+      const { pairing_id } = await requestPairing(app, a.session.token, a.machineId, b.machineId);
       const sealed = await approvePairing(app, b.session.token, pairing_id);
       const events = lines.filter((l) => l.includes("pairing_")).map((l) => JSON.parse(l) as Record<string, unknown>);
       expect(events.map((e) => e.event)).toEqual(["pairing_created", "pairing_approved"]);

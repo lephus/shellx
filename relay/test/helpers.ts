@@ -320,13 +320,17 @@ export function randomSealedInvite(bytes = 96): string {
   return Buffer.from(crypto.getRandomValues(new Uint8Array(bytes))).toString("base64");
 }
 
-/** POST /v2/pairings as `token` (a fresh requester key unless `overrides` say otherwise); throws unless 201. */
+/** POST /v2/pairings as `token` (requester key = the from-machine's noise key, D1, unless `overrides` say otherwise); throws unless 201. */
 export async function requestPairing(
   app: TestApp, token: string, fromMachineId: string, toMachineId: string, overrides: Record<string, unknown> = {},
 ): Promise<{ pairing_id: string; code: string }> {
+  const own = db().get<{ noise_public_key: Buffer }>("SELECT noise_public_key FROM machines WHERE id = ?", fromMachineId);
   const res = await call(app, "POST", "/v2/pairings", {
     token,
-    body: { from_machine_id: fromMachineId, to_machine_id: toMachineId, requester_x25519_b64: randomPublicKey(), ...overrides },
+    body: {
+      from_machine_id: fromMachineId, to_machine_id: toMachineId,
+      requester_x25519_b64: own?.noise_public_key.toString("base64url") ?? randomPublicKey(), ...overrides,
+    },
   });
   if (res.status !== 201) throw new Error(`request pairing failed: ${res.status} ${await res.text()}`);
   return res.json<{ pairing_id: string; code: string }>();

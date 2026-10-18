@@ -151,7 +151,7 @@ Error codes: `desktop_only` (403), `invalid_machine` (400), `machine_not_found` 
   fingerprint from the stored key; nothing of either is read from the body. Pending requests expire
   after 5 minutes; a newer request from the same requester supersedes the older one; at most 10
   pending per target (429). `requester_x25519_b64` (the public key to seal the invite to) is on both
-  roles' items. Only the target approves (a second approve after the TTL is 410, after a decision
+  roles' items and must equal the requester machine's `noise_public_key_b64` (D1; else 400). Only the target approves (a second approve after the TTL is 410, after a decision
   409); approving stores `sealed_invite_b64` verbatim (at most 8192 decoded bytes) and grants
   `from -> to` `connect`. The server never reads the invite beyond a length check and a guard that
   refuses a plaintext `cmux://` URI (case-insensitive, 400 `plaintext_invite`). Only the requester

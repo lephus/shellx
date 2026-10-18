@@ -99,6 +99,8 @@ machinePairingRoutes.post("/", requireAuth, requireDesktop, jsonBodyLimit, async
   if (to.id === from.id) throw Errors.badRequest();
   const x25519 = decodeB64(body.requester_x25519_b64, 32, 32);
   if (x25519 === null) throw Errors.badRequest();
+  // D1: the invite is sealed to this key and the fingerprint shown is the machine's, so they must be one key.
+  if (!Buffer.from(x25519).equals(from.noise_public_key)) throw Errors.badRequest();
 
   // Code and fingerprint are the server's: `code`, `requester_fingerprint` and `status` in the body are ignored.
   const pairingCode = c.get("pairingCode");
