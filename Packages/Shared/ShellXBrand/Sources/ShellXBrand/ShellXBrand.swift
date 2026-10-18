@@ -15,7 +15,7 @@ public enum ShellXBrand {
     public static let hookMarker = "__shellx"
     public static let utiPrefix = "pro.shellx"
     public static let websiteURL = URL(string: "https://shellx.pro")!
-    public static let sourceCodeURL = URL(string: "https://github.com/lephus/shellx-pro")!
+    public static let sourceCodeURL = URL(string: "https://github.com/lephus/shellx")!
     public static let contactEmail = "phule9225@gmail.com"
     public static let updateFeedURL = URL(string: "https://download.shellx.pro/desktop/appcast.xml")!
 }

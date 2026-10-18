@@ -51,7 +51,7 @@ import Foundation
         #expect(ShellXBrand.hookMarker == "__shellx")
         #expect(ShellXBrand.utiPrefix == "pro.shellx")
         #expect(ShellXBrand.websiteURL.absoluteString == "https://shellx.pro")
-        #expect(ShellXBrand.sourceCodeURL.absoluteString == "https://github.com/lephus/shellx-pro")
+        #expect(ShellXBrand.sourceCodeURL.absoluteString == "https://github.com/lephus/shellx")
         #expect(ShellXBrand.contactEmail == "phule9225@gmail.com")
         #expect(ShellXBrand.updateFeedURL.absoluteString == "https://download.shellx.pro/desktop/appcast.xml")
         #expect(ShellXFeatures.remoteMachines == false)
