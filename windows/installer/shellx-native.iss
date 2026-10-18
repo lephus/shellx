@@ -1,4 +1,4 @@
-; ShellX 2 (native) installer, Inno Setup 6.7.1. Unsigned, per-user, coexists with the Flutter ShellX.
+﻿; ShellX 2 (native) installer, Inno Setup 6.7.1. Unsigned, per-user, coexists with the Flutter ShellX.
 ; Compiled by windows/installer/build-installer.ps1:
 ;   ISCC.exe /DAppVersion=2.0.0 /DSourceDir=<folder with shellx-desktop.exe> /DOutputDir=<folder>
 ;            [/DAppIcon=<app_icon.ico>] shellx-native.iss

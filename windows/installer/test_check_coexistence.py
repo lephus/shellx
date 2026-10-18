@@ -4,7 +4,7 @@ import unittest
 import check_coexistence as cc
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ISS = open(os.path.join(HERE, "shellx-native.iss"), encoding="utf-8").read()
+ISS = open(os.path.join(HERE, "shellx-native.iss"), encoding="utf-8-sig").read()
 
 
 class Coexistence(unittest.TestCase):

@@ -99,7 +99,7 @@ def check(text):
 
 def main(argv):
     path = argv[1] if len(argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "shellx-native.iss")
-    with open(path, encoding="utf-8") as f:
+    with open(path, encoding="utf-8-sig") as f:
         problems = check(f.read())
     for p in problems:
         print("FAIL:", p)
