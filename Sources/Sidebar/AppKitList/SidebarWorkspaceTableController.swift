@@ -1040,6 +1040,11 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             || configuration.appKitGroupHeaderModel != nil {
             return .awaitingActions
         }
+        // ShellX: sign-in row opens the sheet; an accessible remote machine header opens a session (W2 Task U1).
+        if let shellXHeaderRow = configuration.shellXHeaderRow,
+           ShellXRemoteUIActions.handleClick(on: shellXHeaderRow) {
+            return .dispatched
+        }
         return .invalid
     }
 

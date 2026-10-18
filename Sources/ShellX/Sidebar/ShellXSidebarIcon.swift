@@ -1,7 +1,7 @@
 import AppKit
 
 /// Resolves the coolicons names the sidebar models carry ("Laptop",
-/// "Desktop", "Data", "Add_Plus") to template images.
+/// "Desktop", "Data", "Add_Plus", "User_Circle") to template images.
 // ShellX: swap for ShellXIcon/ShellXFonts/ShellXLogo after W1 Tasks 7-9 merge
 @MainActor
 enum ShellXSidebarIcon {
@@ -10,6 +10,7 @@ enum ShellXSidebarIcon {
         "Desktop": "desktopcomputer",
         "Data": "server.rack",
         "Add_Plus": "plus",
+        "User_Circle": "person.crop.circle",
     ]
 
     /// The bundled coolicon when the asset exists, else an SF Symbol stand-in.

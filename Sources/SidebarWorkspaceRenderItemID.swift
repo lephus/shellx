@@ -40,6 +40,14 @@ struct SidebarWorkspaceRenderItemID: Hashable {
     /// The ShellX brand header row at the top of the sidebar.
     static let shellXBrandHeader = Self(kind: 4, uuid: shellXBrandHeaderUUID)
 
+    // ShellX: the remote sign-in row under "YOUR MACHINES" (W2 Task U1).
+    static let shellXSignInRowUUID = UUID(uuid: (
+        0x53, 0x68, 0x65, 0x6C, 0x6C, 0x58, 0x80, 0x00,
+        0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02
+    ))
+
+    static let shellXSignInRow = Self(kind: 5, uuid: shellXSignInRowUUID)
+
     /// Returns the durable group identifier when this row represents a group.
     /// Workspace rows return `nil`; callers should use their row-specific
     /// fallback identity for those rows.

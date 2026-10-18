@@ -2,14 +2,16 @@ import CmuxCore
 import CmuxWorkspaces
 import Foundation
 import ShellXBrand
+import ShellXRemoteUI
 
 extension SidebarMachineInput where ID == UUID {
     @MainActor
-    init(workspace: Workspace) {
+    init(workspace: Workspace, remoteMachineID: String? = nil) {
         self.init(
             workspaceID: workspace.id,
             sshTarget: workspace.remoteDisplayTarget,
-            sshConnected: workspace.remoteConnectionState == .connected
+            sshConnected: workspace.remoteConnectionState == .connected,
+            remoteMachineID: remoteMachineID
         )
     }
 }
@@ -29,6 +31,8 @@ extension SidebarMachineLabels {
 /// in every section holding one of its rows, with only that section's rows.
 @MainActor
 enum SidebarMachineSectionRenderItems {
+    /// Reads the live remote snapshot (nil while the remote UI is off), so
+    /// ⌘1–9 numbering agrees with what the sidebar shows.
     static func renderItems(
         tabs: [Workspace],
         groupsById: [UUID: WorkspaceGroup],
@@ -36,13 +40,48 @@ enum SidebarMachineSectionRenderItems {
         effectiveMembership: [UUID: UUID?]? = nil,
         local: LocalMachineInfo = .current()
     ) -> [SidebarWorkspaceRenderItem] {
+        renderItems(
+            tabs: tabs,
+            groupsById: groupsById,
+            orderedGroups: orderedGroups,
+            effectiveMembership: effectiveMembership,
+            local: local,
+            remote: ShellXRemoteUIModel.shared.snapshot
+        )
+    }
+
+    /// `remote` nil (remote UI off) or signed out gives exactly the W1
+    /// local + SSH sections. Signed in, the account's machines sit between
+    /// them; workspaces attached to an offline machine are not listed.
+    static func renderItems(
+        tabs: [Workspace],
+        groupsById: [UUID: WorkspaceGroup],
+        orderedGroups: [WorkspaceGroup]?,
+        effectiveMembership: [UUID: UUID?]?,
+        local: LocalMachineInfo = .current(),
+        remote: RemoteUISnapshot?
+    ) -> [SidebarWorkspaceRenderItem] {
         let membership = effectiveMembership
             ?? SidebarWorkspaceRenderItem.effectiveGroupIdByWorkspaceId(tabs: tabs, groupsById: groupsById)
-        let sections = SidebarMachineGrouping.sections(
-            for: tabs.map { SidebarMachineInput<UUID>(workspace: $0) },
-            local: local,
-            labels: .localized
-        )
+        let sections: [SidebarMachineSection<UUID>]
+        if let remote, remote.isSignedIn {
+            sections = SidebarMachineGrouping.sections(
+                for: tabs.map {
+                    SidebarMachineInput<UUID>(workspace: $0, remoteMachineID: remote.remoteMachineID(forWorkspace: $0.id))
+                },
+                local: local,
+                remote: remote.machines,
+                now: Date(),
+                labels: .localized,
+                remoteLabels: .localized
+            )
+        } else {
+            sections = SidebarMachineGrouping.sections(
+                for: tabs.map { SidebarMachineInput<UUID>(workspace: $0) },
+                local: local,
+                labels: .localized
+            )
+        }
         let tabsById = Dictionary(uniqueKeysWithValues: tabs.map { ($0.id, $0) })
         // Groups no section references (durable empty groups) stay with the
         // local section, which always comes first.

@@ -77,10 +77,7 @@ public enum RemoteMachineSections {
     ) -> SidebarMachineHeaderModel {
         let note = machine.online
             ? ""
-            : labels.offlineLastSeen.replacingOccurrences(
-                of: "%@",
-                with: lastSeenText(machine.lastSeen, labels: labels, timeZone: timeZone)
-            )
+            : String(format: labels.offlineLastSeen, lastSeenText(machine.lastSeen, labels: labels, timeZone: timeZone))
         return SidebarMachineHeaderModel(
             key: .remote(machineID: machine.id),
             title: machine.name,

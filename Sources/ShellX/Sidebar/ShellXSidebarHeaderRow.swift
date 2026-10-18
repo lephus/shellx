@@ -3,10 +3,12 @@ import Foundation
 import ShellXBrand
 
 /// The non-workspace rows ShellX adds to the AppKit sidebar table: the brand
-/// header at the top and one header per machine section. They are not
-/// selectable, draggable or drop targets.
+/// header at the top, the "Sign in to see your other machines" row while the
+/// remote UI is on and signed out, and one header per machine section. They
+/// are not selectable, draggable or drop targets.
 enum ShellXSidebarHeaderRow: Equatable {
     case brand
+    case signIn
     case machine(SidebarMachineHeaderModel)
 
     /// Fixed heights: neither header grows with its text (long names truncate).
@@ -14,6 +16,8 @@ enum ShellXSidebarHeaderRow: Equatable {
         switch self {
         case .brand:
             return ShellXSidebarHeaderMetrics.brandHeight
+        case .signIn:
+            return ShellXSidebarHeaderMetrics.signInHeight
         case .machine(let header):
             return SidebarWorkspaceTableRowHeightCalculator.height(forMachineHeaderTitle: header.title)
         }
@@ -23,6 +27,8 @@ enum ShellXSidebarHeaderRow: Equatable {
         switch self {
         case .brand:
             return .shellXBrandHeader
+        case .signIn:
+            return .shellXSignInRow
         case .machine(let header):
             return .machine(header.key.stableID)
         }
@@ -34,6 +40,8 @@ enum ShellXSidebarHeaderRow: Equatable {
         switch self {
         case .brand:
             return SidebarWorkspaceRenderItemID.shellXBrandHeaderUUID
+        case .signIn:
+            return SidebarWorkspaceRenderItemID.shellXSignInRowUUID
         case .machine(let header):
             return header.key.stableID
         }
@@ -48,6 +56,10 @@ enum ShellXSidebarHeaderMetrics {
     static let iconSide: CGFloat = 14
     static let onlineDotSide: CGFloat = 6
     static let addButtonSide: CGFloat = 18
+    /// The sign-in row has the machine header's fixed height.
+    static let signInHeight: CGFloat = SidebarMachineHeaderLayout.height
+    /// The remote header's trailing "Request access" button.
+    static let actionButtonHeight: CGFloat = 18
 }
 
 /// Cells that render a `ShellXSidebarHeaderRow`.
@@ -71,6 +83,11 @@ enum ShellXSidebarHeaderCells {
                 withIdentifier: SidebarBrandHeaderCellView.reuseIdentifier,
                 owner: owner
             ) as? SidebarBrandHeaderCellView ?? SidebarBrandHeaderCellView()
+        case .signIn:
+            cell = tableView.makeView(
+                withIdentifier: SidebarSignInRowCellView.reuseIdentifier,
+                owner: owner
+            ) as? SidebarSignInRowCellView ?? SidebarSignInRowCellView()
         case .machine:
             cell = tableView.makeView(
                 withIdentifier: SidebarMachineHeaderCellView.reuseIdentifier,

@@ -119,6 +119,95 @@ final class SidebarBrandHeaderCellView: NSTableCellView, ShellXSidebarHeaderCell
     }
 }
 
+/// The row under "YOUR MACHINES" while the remote UI is on and signed out:
+/// "Sign in to see your other machines". Clicking the row (routed by the
+/// table controller to `ShellXRemoteUIActions.handleClick`) opens the
+/// sign-in sheet. Fixed height; the label truncates.
+@MainActor
+final class SidebarSignInRowCellView: NSTableCellView, ShellXSidebarHeaderCell {
+    static let reuseIdentifier = NSUserInterfaceItemIdentifier("SidebarSignInRowCellView")
+
+    private let iconImageView = NSImageView()
+    private let titleField = NSTextField(labelWithString: "")
+
+    override var isFlipped: Bool { true }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        identifier = Self.reuseIdentifier
+        wantsLayer = true
+
+        iconImageView.imageScaling = .scaleProportionallyDown
+        iconImageView.contentTintColor = ShellXPalette.primaryText.nsColor
+        // ShellX: swap for ShellXIcon/ShellXFonts/ShellXLogo after W1 Tasks 7-9 merge
+        iconImageView.image = ShellXSidebarIcon.image(
+            named: "User_Circle",
+            pointSize: ShellXSidebarHeaderMetrics.iconSide
+        )
+        addSubview(iconImageView)
+
+        let text = String(localized: "remote.signin.row", defaultValue: "Sign in to see your other machines")
+        let truncating = NSMutableParagraphStyle()
+        truncating.lineBreakMode = .byTruncatingTail
+        titleField.attributedStringValue = NSAttributedString(
+            string: text,
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 11.5, weight: .medium),
+                .foregroundColor: ShellXPalette.primaryText.nsColor,
+                .paragraphStyle: truncating,
+            ]
+        )
+        titleField.lineBreakMode = .byTruncatingTail
+        titleField.maximumNumberOfLines = 1
+        titleField.cell?.truncatesLastVisibleLine = true
+        titleField.isSelectable = false
+        titleField.toolTip = text
+        addSubview(titleField)
+
+        setAccessibilityElement(true)
+        setAccessibilityRole(.button)
+        setAccessibilityLabel(text)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        let changed = newSize != frame.size
+        super.setFrameSize(newSize)
+        if changed {
+            needsLayout = true
+        }
+    }
+
+    func configure(header: ShellXSidebarHeaderRow) {
+        // Static content.
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        ShellXRemoteUIActions.handleClick(on: .signIn)
+    }
+
+    override func layout() {
+        super.layout()
+        let leading = SidebarWorkspaceListMetrics.rowOuterHorizontalPadding
+            + SidebarWorkspaceListMetrics.rowContentHorizontalPadding
+        let trailing = bounds.width - leading
+        let midY = bounds.height / 2
+        let iconSide = ShellXSidebarHeaderMetrics.iconSide
+        iconImageView.frame = NSRect(x: leading, y: midY - iconSide / 2, width: iconSide, height: iconSide)
+        let textX = iconImageView.frame.maxX + 8
+        let textHeight = ceil(titleField.attributedStringValue.size().height)
+        titleField.frame = NSRect(
+            x: textX,
+            y: midY - textHeight / 2,
+            width: max(0, trailing - textX),
+            height: textHeight
+        )
+    }
+}
+
 /// "Add a machine over SSH…": asks for `user@host`, then hands an
 /// `ssh://` link to the existing SSH link flow (managed-policy check, trust
 /// confirmation, `cmux ssh` launch).

@@ -11396,6 +11396,8 @@ struct VerticalTabsSidebar: View, Equatable {
         initialSidebarFontSize: GhosttyConfig.loadForCmux().sidebarFontSize
     )
     @State private var keyboardShortcutSettingsObserver = KeyboardShortcutSettingsObserver.shared
+    // ShellX: remote machine sections and sign-in row (W2 Task U1); never publishes while the gate is off.
+    @ObservedObject private var shellXRemoteUI = ShellXRemoteUIModel.shared
     @State var dragState = SidebarDragState()
     // Bonsplit tab drags arrive through AppKit pasteboard callbacks, not
     // `SidebarDragState`, so they need a separate transient collection flag.
@@ -11897,12 +11899,13 @@ struct VerticalTabsSidebar: View, Equatable {
         let workspaceGroupMenuSnapshot = WorkspaceGroupMenuSnapshot(
             items: workspaceGroups.map { WorkspaceGroupMenuSnapshot.Item(id: $0.id, name: $0.name) }
         )
-        // ShellX: group the sidebar by machine (W1 Task 10).
+        // ShellX: group the sidebar by machine (W1 Task 10), remote machines included (W2 Task U1).
         let workspaceRenderItems = SidebarMachineSectionRenderItems.renderItems(
             tabs: tabs,
             groupsById: workspaceGroupById,
             orderedGroups: workspaceGroups,
-            effectiveMembership: workspaceGroupIdByWorkspaceId
+            effectiveMembership: workspaceGroupIdByWorkspaceId,
+            remote: shellXRemoteUI.snapshot
         )
         let numberedWorkspaceIndexById = SidebarWorkspaceRenderItem.numberedWorkspaceIndexById(
             from: workspaceRenderItems
@@ -12525,8 +12528,12 @@ struct VerticalTabsSidebar: View, Equatable {
             shellXHeader: .brand,
             environment: renderContext.environment
         )
+        // ShellX: the sign-in row sits under "YOUR MACHINES" while signed out (W2 Task U1).
+        let signInRows: [SidebarWorkspaceTableRowConfiguration] = shellXRemoteUI.showsSignInRow
+            ? [SidebarWorkspaceTableRowConfiguration(shellXHeader: .signIn, environment: renderContext.environment)]
+            : []
         let shellXRowIds = SidebarMachineSectionRenderItems.rowIds(for: renderContext.workspaceRenderItems)
-        return [brandHeaderRow] + zip(renderContext.workspaceRenderItems, shellXRowIds).compactMap { pair -> SidebarWorkspaceTableRowConfiguration? in
+        return [brandHeaderRow] + signInRows + zip(renderContext.workspaceRenderItems, shellXRowIds).compactMap { pair -> SidebarWorkspaceTableRowConfiguration? in
             let (item, shellXRowId) = pair
             switch item {
             case .machineHeader(let header): // ShellX
