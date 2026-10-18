@@ -74,4 +74,34 @@ Recorded 2026-10-18. Fork commit `3bb417b7eb` on `main`: `shellx.release.entitle
 
 ## Spike results
 
-(none yet)
+### Relay spike (W0 Task 4) — PASS
+
+Recorded 2026-10-18. Fork branch `shellx/w0-relay` commit `5d688467de` (`spikes/relay/tap_proxy.py`, `run.sh`, `NOTES.md` with the full write-up); built from fork `5348097e66`. Reproduce: `bash spikes/relay/run.sh` (everything under `env -i`, state in `/tmp/shxrelay.*`, secret and tickets deleted at the end).
+
+Topology run for real: `cmux-relay` 127.0.0.1:8787 ← tap proxy 8788 ← `cmux-tui server start --relay …` daemon (register ticket) and a second `cmux-tui remote connect` client (connect ticket), enrolled and approved, marker typed in workspace `shellx-secret-ws`, cwd `/tmp/shellx-secret-dir`. The client really saw the content; 228 opaque frames (31 KB) crossed the relay.
+
+| Grep (raw / after WebSocket unmasking) | Count |
+| --- | --- |
+| `SHELLX-MARKER-7f3a` | 0 / 0 |
+| `shellx-secret-ws` | 0 / 0 |
+| `shellx-secret-dir` | 0 / 0 |
+| `hostname -s` (also used as the client device name) | 0 / 0 |
+| user name, `zsh`, `ws_`/`term_` ids, `/private/tmp` | 0 / 0 |
+| positive controls: `"type":"connect"`, the slot id | 0 / 3, 0 / 10 (decoder works) |
+
+Both ends are WebSocket clients, so their frames are masked: a raw grep alone gives false zeros; the tap writes an unmasked copy. No compression negotiated; `relay+ws` = one binary message per frame.
+
+**Plaintext visible to the relay:** HTTP upgrade (`GET /v1/relay`, `Host`, `Authorization: Bearer <ticket>`, ignored by the native relay); JSON control messages `register/registered/connect/allocated/incoming/join/ready/ping/pong/error` (`cmux-remote-protocol/src/relay.rs:97-152`) carrying only opaque slot/circuit/lane/generation values and tickets; and **a plaintext `ClientPrelude`** as the first binary frame of each circuit (also the Noise prologue, `cmux-remote/src/crypto.rs:269-279`): `{name:"cmux-remote-noise", protocol:5, auth:"invitation"|"enrolled", invitation_id, session[16B], lane, lanes, generation, connection_attempt[16B]}`. So the relay learns each circuit's traffic class, whether it is a first enrollment (and the invitation id), and a stable session id linking reconnects; no content, names or paths. Noise is `Noise_XX_25519_ChaChaPoly_BLAKE2s` (`XXpsk3` with an invitation); the device name travels in the encrypted 3rd handshake message; records = 8-byte BE nonce + ChaCha20-Poly1305 ciphertext. Side channels: timing, sizes, 3 circuits per client, peer IPs. Accepted for v1.
+
+**Ticket format the ShellX API must mint** (register and connect only; join tickets are minted by the relay itself, TTL 30 s, `relay.rs:1337`):
+
+- `ticket = "v2." + b64url_nopad(json(claims)) + "." + b64url_nopad(HMAC-SHA256(key, signing_payload))`
+- claims `{"version":2,"issuer":"cmux-relay","permission":"register"|"connect","role":"daemon"|"client","slot":"<opaque>","circuit":null,"lane":null,"generation":null,"issued_at_unix":…,"expires_at_unix":…}`
+- signing payload (HMAC covers this string, not the JSON): `"cmux-relay-ticket-v2\n{version}\n{issuer}\n{permission}\n{role}\n{slot}\n{circuit|''}\n{lane|''}\n{generation|''}\n{issued_at}\n{expires_at}"`
+- key = raw UTF-8 bytes of `CMUX_RELAY_HMAC_SECRET` (≥ 32 bytes, `cmux-relay/src/config.rs:182-184, :249`); issuer must equal `CMUX_RELAY_ISSUER`
+- rules: register ⇒ role daemon, circuit/lane/generation null; connect ⇒ role client, circuit null; 0 < lifetime ≤ 300 s, skew 30 s; scope strings 1–256 bytes without CR/LF; ticket ≤ 4096 bytes
+- refs: claims `cmux-remote-protocol/src/relay.rs:34-67`, payload `:69-94`; issue `cmux-relay/src/ticket.rs:76-86`, verify `:136-178`, shape `:182-234`, scope `:242-260`; CLI mint `cmux-relay/src/main.rs:18-46`
+
+**Enroll → approve as observed:** daemon `server start --relay … --relay-slot … --relay-ticket-file register.ticket` → owner `remote enroll create --session S --advertise <relay> --relay-route <relay> --relay-slot … --relay-ticket-file connect.ticket` prints `cmux://enroll/<b64url json>` = `{version:1,id,secret(32B PSK),daemon_public_key,daemon_fingerprint,daemon_name,expires_at_unix,route_hints,relay_access:[{route,slot,ticket}],approval_required:true}` (`identity.rs:65-78`; without `--advertise` the invite carries the same-host `unix://` route and the client bypasses the relay) → client `remote connect <relay> --invite-file … --device-name … --headless` (XXpsk3 through the relay, then waits) → owner `remote enroll pending --json` / `remote enroll approve <invitation_id>` → client opens control + tunnel lanes as `auth:"enrolled"`; normal `cmux-tui --socket <local>` commands then run on the daemon through the relay.
+
+**Spec implication (§8.5):** the invitation URI contains the PSK. If it ever transits the ShellX server in clear, the server could claim the invitation first and only on-site approval would stop it. So: the approval screen must show the device fingerprint (not just the name), and the PSK must travel out of band (QR code or a URL `#fragment` the server never receives). Carry into W2.
