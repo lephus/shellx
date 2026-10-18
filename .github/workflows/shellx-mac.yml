@@ -2,9 +2,16 @@ name: shellx-mac
 
 # ShellX for Mac: fast static checks, the ShellXBrand package tests, the ShellX
 # guard tests, and a Debug build of the `cmux` app scheme on a GitHub-hosted
-# macOS 26 runner (this fork is public, so the minutes are free).
+# macOS 26 runner (lephus/shellx is public, so the minutes are free).
 #
-# Modeled on upstream's fork path in ci-macos-compat.yml / main-compile-probe.yml:
+# lephus/shellx carries the cmux tree at its root next to ShellX's relay/, web/
+# and deploy/. cmux's own .github/ workflows and its BUSL directories are not in
+# this repo, so nothing here may depend on them (verify-local's config-schema
+# check is dropped for that reason). Branches that only touch the server, the
+# site or docs skip this workflow (paths-ignore); deploy.yml covers those on main.
+#
+# Modeled on upstream cmux's fork path in ci-macos-compat.yml / main-compile-probe.yml
+# (those workflows live in manaflow-ai/cmux, not here):
 # scripts/select-ci-xcode.sh, the sha-pinned prebuilt GhosttyKit
 # (scripts/download-prebuilt-ghosttykit.sh, checked against
 # scripts/ghosttykit-checksums.txt), Rust + Bun for the bundled helpers, and
@@ -20,6 +27,12 @@ on:
   push:
     branches:
       - "shellx/**"
+    paths-ignore:
+      - "relay/**"
+      - "web/**"
+      - "deploy/**"
+      - "docs/**"
+      - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
 permissions:
