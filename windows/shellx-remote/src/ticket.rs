@@ -4,7 +4,10 @@
 //! WebSocket (the control socket and each of the ~3 circuits of one
 //! connect, and again on every reconnect). One mint covers the whole burst:
 //! a ticket is reused for at most `REUSE_WINDOW`, far inside the server's
-//! 120 s ticket lifetime, so each (re)connect asks the callback once.
+//! 120 s ticket lifetime, and never across bursts: every connect attempt
+//! and every reconnect group starts with `new_burst`, and a failed burst
+//! drops its ticket too, so a ticket the relay rejected is never retried by
+//! a later attempt.
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -53,6 +56,11 @@ impl TicketSource {
                     .map_err(|_| ())
             }
         })
+    }
+
+    /// Forget the cached ticket: the next fetch mints a fresh one.
+    pub(crate) fn new_burst(&self) {
+        self.cache.lock().unwrap_or_else(|e| e.into_inner()).ticket = None;
     }
 
     pub(crate) fn last_error(&self) -> Option<String> {
@@ -164,6 +172,30 @@ mod tests {
         assert_eq!(&*source.fetch().unwrap(), "v2.ticket-0");
         assert_eq!(mints.load(Ordering::SeqCst), 1);
         assert!(!dir.join("t0").exists());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_new_burst_never_reuses_the_previous_ticket() {
+        let dir = std::env::temp_dir().join(format!("shellx-ticket-burst-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let mints = Arc::new(AtomicUsize::new(0));
+        let mint: TicketFn = {
+            let dir = dir.clone();
+            let mints = mints.clone();
+            Arc::new(move || {
+                let n = mints.fetch_add(1, Ordering::SeqCst);
+                let path = dir.join(format!("b{n}"));
+                write_ticket(&path, &format!("v2.burst-{n}"));
+                Ok(path)
+            })
+        };
+        let source = TicketSource::new(mint);
+        assert_eq!(&*source.fetch().unwrap(), "v2.burst-0");
+        source.new_burst();
+        assert_eq!(&*source.fetch().unwrap(), "v2.burst-1");
+        assert_eq!(&*source.fetch().unwrap(), "v2.burst-1");
+        assert_eq!(mints.load(Ordering::SeqCst), 2);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

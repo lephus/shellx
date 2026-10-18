@@ -161,32 +161,14 @@ impl Store {
 /// Whether `state_dir` holds a pinned daemon with this fingerprint. Never
 /// creates the state dir.
 pub(crate) fn is_enrolled(state_dir: &Path, daemon_fingerprint: &str) -> bool {
-    if !state_dir.is_dir() {
-        return false;
-    }
-    #[cfg(unix)]
-    {
-        let Ok(store) = cmux_remote::identity::ClientIdentityStore::load_or_create(state_dir)
-        else {
-            return false;
-        };
-        let Ok(runtime) = tokio::runtime::Builder::new_current_thread().build() else {
-            return false;
-        };
-        runtime
-            .block_on(store.daemon_key(daemon_fingerprint))
-            .ok()
-            .flatten()
-            .is_some()
-    }
-    #[cfg(not(unix))]
-    {
-        PlainStore::open(state_dir)
-            .and_then(|store| store.daemon_key(daemon_fingerprint))
-            .ok()
-            .flatten()
-            .is_some()
-    }
+    // Read-only: no identity is created, no lock taken, no runtime built.
+    // The slot map is written only after the daemon key was pinned, so a
+    // fingerprint in it means a completed enrollment.
+    read_json::<SlotMap>(&state_dir.join(SLOTS_FILE)).is_ok_and(|map| {
+        map.slots
+            .values()
+            .any(|fingerprint| fingerprint == daemon_fingerprint)
+    })
 }
 
 /// Plain JSON client store for platforms without upstream owner-only file
@@ -342,6 +324,16 @@ mod tests {
         let dir = scratch("missing");
         assert!(!is_enrolled(&dir, "x"));
         assert!(!dir.exists());
+    }
+
+    #[test]
+    fn is_enrolled_has_no_side_effects() {
+        let dir = scratch("readonly");
+        fs::create_dir_all(&dir).unwrap();
+        assert!(!is_enrolled(&dir, "x"));
+        // No identity key, lock or state file appears in an existing dir.
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 0);
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[cfg(unix)]

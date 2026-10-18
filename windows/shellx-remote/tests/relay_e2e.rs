@@ -236,8 +236,17 @@ fn reconnects_after_daemon_restart() {
         );
         std::thread::sleep(Duration::from_millis(200));
     }
+    // Dropping a client whose daemon is gone must not stall the caller
+    // (Task 13 drops clients from the UI side).
+    let dropping = Instant::now();
     drop(attachment);
     drop(client);
+    let took = dropping.elapsed();
+    eprintln!("dropping the dead client took {took:?}");
+    assert!(
+        took < Duration::from_millis(100),
+        "drop blocked for {took:?}"
+    );
 
     let mut reconnected = None;
     let started = Instant::now();

@@ -15,6 +15,20 @@
 //! never block. Events arrive on a `std::sync::mpsc` channel; a hung-up
 //! channel means the client was dropped.
 //!
+//! Contract notes for the app (Task 13):
+//! - Channels are unbounded (events to the app, commands to the Mac): there
+//!   is no backpressure, so drain `events()` promptly; a stalled reader
+//!   grows memory by the terminal's output rate.
+//! - `Ended` means the view is gone: the surface exited, or the daemon was
+//!   stopped gracefully (it detaches every view first). Treat `Ended`
+//!   together with `closed()` as "reconnect", like `Disconnected`.
+//! - After a successful enrollment (`connect` with `invite_path`), the caller
+//!   must delete the invitation file (it holds the one-time PSK), and should
+//!   check that `pair.poll`'s `daemon_fingerprint` equals
+//!   `RemoteClient::daemon_fingerprint()` before trusting the pairing.
+//! - Dropping a `RemoteClient` returns immediately; the graceful close runs
+//!   on a detached thread.
+//!
 //! Reference implementations read for this port (MIT, cmux-tui workspace):
 //! `crates/cmux-terminal-client/src/lib.rs` (`connect_route_client`),
 //! `crates/cmux-tui/src/remote_runtime.rs` (`run_client`) and
@@ -112,11 +126,18 @@ impl RemoteClient {
             .enable_all()
             .build()
             .context("could not start the remote client runtime")?;
-        let inner = runtime.block_on(connect_inner(cfg))?;
-        Ok(RemoteClient {
-            runtime: Some(runtime),
-            inner: Arc::new(inner),
-        })
+        match runtime.block_on(connect_inner(cfg)) {
+            Ok(inner) => Ok(RemoteClient {
+                runtime: Some(runtime),
+                inner: Arc::new(inner),
+            }),
+            Err(error) => {
+                // Do not wait for blocking work still in flight (the app's
+                // ticket callback): the connect budget is already spent.
+                runtime.shutdown_background();
+                Err(error)
+            }
+        }
     }
 
     /// Whether `state_dir` already holds an enrollment with this daemon
@@ -194,18 +215,31 @@ impl RemoteClient {
 }
 
 impl Drop for RemoteClient {
+    /// Returns at once: the graceful close (bounded by `CLOSE_TIMEOUT` per
+    /// step) and the runtime shutdown run on a detached thread, so dropping
+    /// a client whose Mac is gone never stalls the caller, and dropping it
+    /// from inside another tokio runtime does not panic.
     fn drop(&mut self) {
         let Some(runtime) = self.runtime.take() else {
             return;
         };
         let inner = self.inner.clone();
         inner.closed.store(true, Ordering::Release);
-        runtime.block_on(async move {
-            let _ = tokio::time::timeout(CLOSE_TIMEOUT, inner.control.close()).await;
-            let _ = tokio::time::timeout(CLOSE_TIMEOUT, inner.connection.close()).await;
-            let _ = tokio::time::timeout(CLOSE_TIMEOUT, inner.multiplexer.shutdown()).await;
-        });
-        runtime.shutdown_timeout(Duration::from_millis(500));
+        let closer = move || {
+            runtime.block_on(async move {
+                let _ = tokio::time::timeout(CLOSE_TIMEOUT, inner.control.close()).await;
+                let _ = tokio::time::timeout(CLOSE_TIMEOUT, inner.connection.close()).await;
+                let _ = tokio::time::timeout(CLOSE_TIMEOUT, inner.multiplexer.shutdown()).await;
+            });
+            runtime.shutdown_timeout(Duration::from_millis(500));
+        };
+        if let Err(error) = std::thread::Builder::new()
+            .name("shellx-remote-close".into())
+            .spawn(closer)
+        {
+            // No thread: skip the graceful close rather than block.
+            drop(error);
+        }
     }
 }
 
@@ -273,12 +307,20 @@ fn reconnect_policy() -> ReconnectPolicy {
 struct RelayReconnect {
     provider: Arc<RelayProvider>,
     request: ConnectRequest,
+    tickets: ticket::TicketSource,
 }
 
 #[async_trait]
 impl ReconnectGroupSource for RelayReconnect {
     async fn next_group(&self) -> Result<Arc<dyn LinkGroup>, ProviderError> {
-        self.provider.connect(self.request.clone()).await
+        // A reconnect is a new burst: never reuse the previous connect's
+        // ticket, which may be the one the relay just rejected.
+        self.tickets.new_burst();
+        let group = self.provider.connect(self.request.clone()).await;
+        if group.is_err() {
+            self.tickets.new_burst();
+        }
+        group
     }
 }
 
@@ -378,6 +420,7 @@ async fn connect_inner(cfg: ConnectConfig) -> anyhow::Result<Inner> {
         let reconnect: Arc<dyn ReconnectGroupSource> = Arc::new(RelayReconnect {
             provider: provider.clone(),
             request: request.clone(),
+            tickets: tickets.clone(),
         });
         let connected =
             ClientConnection::connect_with_reconnect_groups(group.clone(), config, Some(reconnect))
