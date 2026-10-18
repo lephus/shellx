@@ -56,6 +56,19 @@ pub const SHELL_STRINGS: &[Str] = &[
     Str::UpdateRequired,
     Str::UpToDate,
     Str::Download,
+    Str::PairingCodeHint,
+    Str::WaitingApproval,
+    Str::Approved,
+    Str::Denied,
+    Str::Expired,
+    Str::Open,
+    Str::Retry,
+    Str::ComingSoon,
+    Str::YourDeviceCode,
+    Str::SaveLinkFailed,
+    Str::SendingRequest,
+    Str::NoOtherMachines,
+    Str::AddMachine,
 ];
 
 /// This PC as a sidebar machine; `computer_name` is `%COMPUTERNAME%`.

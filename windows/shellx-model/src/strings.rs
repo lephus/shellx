@@ -85,6 +85,12 @@ pub enum Str {
     Close,
     FontCredits,
     CheckFailed,
+    ComingSoon,
+    YourDeviceCode,
+    SaveLinkFailed,
+    SendingRequest,
+    NoOtherMachines,
+    AddMachine,
 }
 
 impl Str {
@@ -150,6 +156,12 @@ impl Str {
         Str::Close,
         Str::FontCredits,
         Str::CheckFailed,
+        Str::ComingSoon,
+        Str::YourDeviceCode,
+        Str::SaveLinkFailed,
+        Str::SendingRequest,
+        Str::NoOtherMachines,
+        Str::AddMachine,
     ];
 }
 
@@ -218,6 +230,12 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::Close => "Đóng",
             Str::FontCredits => "JetBrains Mono, Space Grotesk — SIL OFL 1.1",
             Str::CheckFailed => "Không kiểm tra được cập nhật",
+            Str::ComingSoon => "sắp có",
+            Str::YourDeviceCode => "Mã thiết bị của bạn",
+            Str::SaveLinkFailed => "Không lưu được quyền truy cập",
+            Str::SendingRequest => "Đang gửi yêu cầu…",
+            Str::NoOtherMachines => "Không còn máy nào để xin quyền",
+            Str::AddMachine => "Xin quyền truy cập máy khác",
         },
         Lang::En => match key {
             Str::AppName => "ShellX",
@@ -281,6 +299,12 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::Close => "Close",
             Str::FontCredits => "JetBrains Mono, Space Grotesk — SIL OFL 1.1",
             Str::CheckFailed => "Could not check for updates",
+            Str::ComingSoon => "coming soon",
+            Str::YourDeviceCode => "Your device code",
+            Str::SaveLinkFailed => "Could not save the access",
+            Str::SendingRequest => "Sending the request…",
+            Str::NoOtherMachines => "No other machines to request",
+            Str::AddMachine => "Request access to another machine",
         },
     }
 }
@@ -320,6 +344,54 @@ pub fn update_available(lang: Lang, version: &str) -> String {
     }
 }
 
+/// Pairing panel title: "Xin quyền truy cập <máy>" / "Request access to <machine>".
+pub fn request_access_to(lang: Lang, machine: &str) -> String {
+    match lang {
+        Lang::Vi => format!("{} {machine}", t(lang, Str::RequestAccess)),
+        Lang::En => format!("Request access to {machine}"),
+    }
+}
+
+/// The 6-digit pairing code as shown: "123 456" (other lengths unchanged).
+pub fn pairing_code_display(code: &str) -> String {
+    let code = code.trim();
+    if code.chars().count() == 6 {
+        let (a, b) = code.split_at(code.char_indices().nth(3).map_or(code.len(), |(i, _)| i));
+        format!("{a} {b}")
+    } else {
+        code.to_string()
+    }
+}
+
+/// A device fingerprint (16 hex chars) in groups of 4: "0123 4567 89ab cdef".
+pub fn fingerprint_groups(fingerprint: &str) -> String {
+    let chars: Vec<char> = fingerprint.trim().chars().collect();
+    chars
+        .chunks(4)
+        .map(|c| c.iter().collect::<String>())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// "Mã thiết bị của bạn: 0123 4567 89ab cdef".
+pub fn your_device_code(lang: Lang, fingerprint: &str) -> String {
+    format!(
+        "{}: {}",
+        t(lang, Str::YourDeviceCode),
+        fingerprint_groups(fingerprint)
+    )
+}
+
+/// "Không lưu được quyền truy cập: <error>" (just the label without one).
+pub fn save_link_failed(lang: Lang, message: &str) -> String {
+    let message = message.trim();
+    if message.is_empty() {
+        t(lang, Str::SaveLinkFailed).to_string()
+    } else {
+        format!("{}: {message}", t(lang, Str::SaveLinkFailed))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -337,7 +409,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 61);
+        assert_eq!(Str::ALL.len(), 67);
     }
 
     #[test]
@@ -392,5 +464,31 @@ mod tests {
             update_available(Lang::En, "2.0.1"),
             "Update available: 2.0.1"
         );
+    }
+
+    #[test]
+    fn pairing_helpers() {
+        assert_eq!(
+            request_access_to(Lang::Vi, "Mac của Phú"),
+            "Xin quyền truy cập Mac của Phú"
+        );
+        assert_eq!(request_access_to(Lang::En, "Mac"), "Request access to Mac");
+        assert_eq!(pairing_code_display("482913"), "482 913");
+        assert_eq!(pairing_code_display(" 12345 "), "12345");
+        assert_eq!(
+            fingerprint_groups("0123456789abcdef"),
+            "0123 4567 89ab cdef"
+        );
+        assert_eq!(fingerprint_groups("abcdef"), "abcd ef");
+        assert_eq!(
+            your_device_code(Lang::Vi, "0123456789abcdef"),
+            "Mã thiết bị của bạn: 0123 4567 89ab cdef"
+        );
+        assert_eq!(t(Lang::Vi, Str::ComingSoon), "sắp có");
+        assert_eq!(
+            save_link_failed(Lang::Vi, "denied"),
+            "Không lưu được quyền truy cập: denied"
+        );
+        assert_eq!(save_link_failed(Lang::En, ""), "Could not save the access");
     }
 }

@@ -8,7 +8,9 @@
 //! active tab gets keyboard focus.
 //!
 //! The sidebar's machines come from the `AccountService` (signed in: the
-//! account's machines; signed out: this PC and the sign-in card).
+//! account's machines; signed out: this PC and the sign-in card). Access to
+//! the other machines (links, the code being waited on) comes from the
+//! `PairingPanel`, which is drawn over the main area while it is open.
 
 use std::convert::Infallible;
 
@@ -19,7 +21,7 @@ use gpui::{
 use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::{Axis, PaneId};
 use shellx_model::palette::Status;
-use shellx_model::sidebar::{Access, MachineInfo, build_groups};
+use shellx_model::sidebar::{MachineInfo, build_groups};
 use shellx_model::strings::Lang;
 use shellx_model::tabs::{CloseOutcome, PaneTarget, TabId, Tabs};
 use shellx_model::update::{UpdateStatus, download_url};
@@ -28,9 +30,10 @@ use super::account::AccountService;
 use super::app::Services;
 use super::assets::Icon;
 use super::login::{LoginPanel, LoginPanelEvent};
+use super::pairing::{PairingEvent, PairingPanel};
 use super::panes::{self, PaneArea, PaneView};
 use super::settings::{SettingsEvent, SettingsPanel};
-use super::sidebar::{self, SessionRow};
+use super::sidebar::{self, PickerEntry, SessionRow};
 use super::term_view::{TermEvent, TermView};
 use super::theme;
 use super::titlebar;
@@ -49,6 +52,7 @@ pub struct RootView {
     account: Entity<AccountService>,
     login: Entity<LoginPanel>,
     settings: Entity<SettingsPanel>,
+    pairing: Entity<PairingPanel>,
     /// Holds the keyboard while the forced-update overlay is up.
     overlay_focus: FocusHandle,
     _subscriptions: Vec<Subscription>,
@@ -59,6 +63,7 @@ impl RootView {
         let (tabs, _) = Tabs::new();
         let computer_name = std::env::var("COMPUTERNAME").ok();
         let core = cx.global::<Services>().core.clone();
+        let pairing = cx.new(|cx| PairingPanel::new(core.clone(), cx));
         let account = cx.new(|cx| AccountService::new(core, MachineFacts::this_pc(), cx));
         let login = cx.new(|cx| LoginPanel::new(account.clone(), window, cx));
         let settings = cx.new(|cx| SettingsPanel::new(account.clone(), cx));
@@ -70,6 +75,14 @@ impl RootView {
                 }
                 cx.notify();
             }),
+            cx.observe(&pairing, |_, _, cx| cx.notify()),
+            cx.subscribe_in(
+                &pairing,
+                window,
+                |this, _, event: &PairingEvent, window, cx| match event {
+                    PairingEvent::Closed => this.after_focus_change(window, cx),
+                },
+            ),
             cx.subscribe_in(
                 &settings,
                 window,
@@ -92,6 +105,7 @@ impl RootView {
             account,
             login,
             settings,
+            pairing,
             overlay_focus: cx.focus_handle(),
             _subscriptions: subscriptions,
         };
@@ -121,6 +135,10 @@ impl RootView {
     pub fn focus_terminal(&self, window: &mut Window, cx: &App) {
         if self.required(cx).is_some() {
             window.focus(&self.overlay_focus);
+            return;
+        }
+        if self.pairing.read(cx).is_open() {
+            window.focus(&self.pairing.read(cx).focus_handle(cx));
             return;
         }
         if self.settings.read(cx).is_open() {
@@ -255,6 +273,28 @@ impl RootView {
         }
     }
 
+    /// Sidebar "Xin quyền truy cập" (row button or the "+" list): opens the
+    /// pairing panel for that machine (blocked while a forced update shows).
+    pub fn request_access(
+        &mut self,
+        machine_id: String,
+        machine_name: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.required(cx).is_some() {
+            return;
+        }
+        self.pairing.update(cx, |panel, cx| {
+            panel.request(machine_id, machine_name, window, cx);
+        });
+    }
+
+    /// The machines-header "+": the list of machines to request access to.
+    pub fn toggle_machine_picker(&mut self, cx: &mut Context<Self>) {
+        self.pairing.update(cx, |panel, cx| panel.toggle_picker(cx));
+    }
+
     /// Title bar button and `AppCommand::ToggleSidebar` (Ctrl+Shift+B).
     pub fn toggle_sidebar(&mut self, cx: &mut Context<Self>) {
         self.sidebar_visible = !self.sidebar_visible;
@@ -374,8 +414,24 @@ impl Render for RootView {
             let machines = self.machines(cx);
             let local_id = this_machine_id(&machines).to_string();
             let utc_offset = self.account.read(cx).utc_offset_secs();
-            // Access to other machines comes with pairing (Task 12).
-            let groups = build_groups(&machines, &|_| Access::None, utc_offset, lang);
+            let pairing = self.pairing.read(cx);
+            let groups = build_groups(
+                &machines,
+                &|id: &str| pairing.access_for(id),
+                utc_offset,
+                lang,
+            );
+            let picker: Option<Vec<PickerEntry>> = pairing.picker_open().then(|| {
+                machines
+                    .iter()
+                    .filter(|m| !m.is_this_machine && !pairing.has_link(&m.machine_id))
+                    .map(|m| PickerEntry {
+                        machine_id: m.machine_id.clone(),
+                        name: m.name.clone(),
+                        online: m.online,
+                    })
+                    .collect()
+            });
             let active = self.tabs.active().id;
             let rows: Vec<SessionRow> = self
                 .tabs
@@ -389,7 +445,15 @@ impl Render for RootView {
                 })
                 .collect();
             let login = self.login.clone();
-            Some(sidebar::render(&groups, &rows, &local_id, &login, lang, cx))
+            Some(sidebar::render(
+                &groups,
+                &rows,
+                &local_id,
+                &login,
+                picker.as_deref(),
+                lang,
+                cx,
+            ))
         } else {
             None
         };
@@ -414,6 +478,11 @@ impl Render for RootView {
             .read(cx)
             .is_open()
             .then(|| self.settings.clone());
+        let pairing = self
+            .pairing
+            .read(cx)
+            .is_open()
+            .then(|| self.pairing.clone());
         let panes = panes::render(
             self.tabs.active(),
             &self.host,
@@ -428,11 +497,14 @@ impl Render for RootView {
             .flex_1()
             .min_w_0()
             .h_full()
+            .relative()
             .overflow_hidden()
             .bg(theme::bg())
             .children(banner)
             .child(session_bar)
-            .child(panes);
+            .child(panes)
+            // The pairing card, centered over the main area.
+            .children(pairing);
 
         div()
             .size_full()

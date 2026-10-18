@@ -7,8 +7,10 @@
 //! Signed in, the groups are the account's machines (this PC first, the
 //! others below, offline ones dimmed with "ngoại tuyến · lần cuối HH:MM");
 //! signed out, the sign-in card (`login.rs`) sits under this PC.
-//! Another online machine without access shows "Xin quyền truy cập" as a
-//! disabled button until the pairing panel (Task 12) wires it.
+//! Another online machine without access shows "Xin quyền truy cập", which
+//! opens the pairing panel (`pairing.rs`); while waiting, the row shows the
+//! code instead. The "+" in the machines header opens a small list of the
+//! account's other machines without a link (same action).
 
 use gpui::{
     AnyView, App, ClickEvent, Context, Div, Entity, FontWeight, ImageSource, IntoElement, Pixels,
@@ -16,7 +18,7 @@ use gpui::{
 };
 use shellx_model::palette::{Pill, Status};
 use shellx_model::sidebar::{MachineGroup, MachineIcon, RowAction};
-use shellx_model::strings::{Lang, Str, t};
+use shellx_model::strings::{Lang, Str, pairing_code_display, t};
 use shellx_model::tabs::TabId;
 
 use super::assets::Icon;
@@ -37,17 +39,29 @@ pub struct SessionRow {
     pub status: Status,
 }
 
+/// A machine in the machines-header "+" list (another machine, no link).
+pub struct PickerEntry {
+    pub machine_id: String,
+    pub name: String,
+    pub online: bool,
+}
+
 /// `local_id`: this PC's group (its server id when signed in).
 /// `login`: the sign-in card, drawn under this PC's sessions.
+/// `picker`: the "+" list, when open.
 pub fn render(
     groups: &[MachineGroup],
     local_sessions: &[SessionRow],
     local_id: &str,
     login: &Entity<LoginPanel>,
+    picker: Option<&[PickerEntry]>,
     lang: Lang,
     cx: &mut Context<RootView>,
 ) -> Div {
     let mut list = div().flex().flex_col().flex_1().min_h_0().overflow_hidden();
+    if let Some(entries) = picker {
+        list = list.child(machine_picker(entries, lang, cx));
+    }
     for (ix, group) in groups.iter().enumerate() {
         let local = group.machine_id == local_id;
         list = list.child(group_header(ix, group, local, lang, cx));
@@ -69,7 +83,7 @@ pub fn render(
         .border_r_1()
         .border_color(theme::line())
         .child(brand(lang))
-        .child(machines_header(lang))
+        .child(machines_header(lang, cx))
         .child(list)
         .child(footer(lang))
 }
@@ -99,7 +113,8 @@ fn brand(lang: Lang) -> Div {
         )
 }
 
-fn machines_header(lang: Lang) -> Div {
+fn machines_header(lang: Lang, cx: &mut Context<RootView>) -> Div {
+    let tip: SharedString = t(lang, Str::AddMachine).into();
     // GPUI 0.2.2 has no letter-spacing, so the mockup's .08em tracking is
     // not reproduced; the string is upper-case already.
     div()
@@ -113,7 +128,7 @@ fn machines_header(lang: Lang) -> Div {
         .text_color(theme::muted())
         .child(t(lang, Str::MachinesHeader))
         .child(
-            // Add a machine: no-op until Task 12 hooks pairing.
+            // Request access to another machine: toggles the "+" list.
             div()
                 .id("sidebar-add-machine")
                 .group("sidebar-add-machine")
@@ -123,6 +138,10 @@ fn machines_header(lang: Lang) -> Div {
                 .size(px(20.0))
                 .rounded(px(4.0))
                 .cursor_pointer()
+                .tooltip(move |_, cx| Tooltip::view(tip.clone(), cx))
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.toggle_machine_picker(cx);
+                }))
                 .child(
                     svg()
                         .path(Icon::AddPlus.path())
@@ -161,13 +180,74 @@ fn new_tab_button(lang: Lang, cx: &mut Context<RootView>) -> Stateful<Div> {
         )
 }
 
+/// The "+" list: the account's other machines without a link. Online ones
+/// request access on click; offline ones are dimmed (approval needs the
+/// other machine).
+fn machine_picker(entries: &[PickerEntry], lang: Lang, cx: &mut Context<RootView>) -> Div {
+    let mut list = div()
+        .flex()
+        .flex_col()
+        .mx(px(10.0))
+        .mb(px(6.0))
+        .py(px(4.0))
+        .rounded(px(8.0))
+        .border_1()
+        .border_color(theme::border())
+        .bg(theme::raise())
+        .text_size(theme::SMALL_SIZE);
+    if entries.is_empty() {
+        list = list.child(
+            div()
+                .px(px(10.0))
+                .py(px(6.0))
+                .text_color(theme::muted())
+                .child(t(lang, Str::NoOtherMachines)),
+        );
+    }
+    for (ix, entry) in entries.iter().enumerate() {
+        let dot = if entry.online {
+            theme::done()
+        } else {
+            theme::muted()
+        };
+        let row = div()
+            .id(("sidebar-picker", ix))
+            .flex()
+            .items_center()
+            .gap(px(8.0))
+            .px(px(10.0))
+            .py(px(6.0))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .truncate()
+                    .text_color(theme::text_hi())
+                    .child(entry.name.clone()),
+            )
+            .child(div().flex_none().size(px(6.0)).rounded_full().bg(dot));
+        let row = if entry.online {
+            let (id, name) = (entry.machine_id.clone(), entry.name.clone());
+            row.cursor_pointer()
+                .hover(|style| style.bg(theme::hsla(theme::SESSION_HOVER)))
+                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                    this.request_access(id.clone(), name.clone(), window, cx);
+                }))
+        } else {
+            row.opacity(0.5)
+        };
+        list = list.child(row);
+    }
+    list
+}
+
 /// Plain tooltip: RAISE box, 1 px BORDER, small TEXT label.
-struct Tooltip {
+pub(super) struct Tooltip {
     text: SharedString,
 }
 
 impl Tooltip {
-    fn view(text: SharedString, cx: &mut App) -> AnyView {
+    pub(super) fn view(text: SharedString, cx: &mut App) -> AnyView {
         cx.new(|_| Tooltip { text }).into()
     }
 }
@@ -253,31 +333,44 @@ fn group_header(
                     .child(subtitle),
             )
         })
-        .when_some(row_action(ix, &group.action, lang), |header, action| {
+        .when_some(row_action(ix, group, lang, cx), |header, action| {
             header.child(div().flex().pl(px(24.0)).pt(px(4.0)).child(action))
         })
 }
 
-/// The action under another machine's name. RequestAccess is a disabled
-/// button until Task 12 wires pairing; Open is drawn by Task 13.
-fn row_action(ix: usize, action: &RowAction, lang: Lang) -> Option<Div> {
-    match action {
-        RowAction::RequestAccess => Some(
-            div().child(
-                button(
-                    ("sidebar-request-access", ix),
-                    t(lang, Str::RequestAccess),
-                    Kind::Secondary,
-                    true,
-                )
-                .text_size(theme::SMALL_SIZE),
-            ),
-        ),
+/// The action under another machine's name. RequestAccess opens the pairing
+/// panel; ShowCode shows the code being waited on; Open is drawn by Task 13.
+fn row_action(
+    ix: usize,
+    group: &MachineGroup,
+    lang: Lang,
+    cx: &mut Context<RootView>,
+) -> Option<Div> {
+    match &group.action {
+        RowAction::RequestAccess => {
+            let (id, name) = (group.machine_id.clone(), group.title.clone());
+            Some(
+                div().child(
+                    button(
+                        ("sidebar-request-access", ix),
+                        t(lang, Str::RequestAccess),
+                        Kind::Secondary,
+                        false,
+                    )
+                    .text_size(theme::SMALL_SIZE)
+                    .on_click(cx.listener(
+                        move |this, _: &ClickEvent, window, cx| {
+                            this.request_access(id.clone(), name.clone(), window, cx);
+                        },
+                    )),
+                ),
+            )
+        }
         RowAction::ShowCode(code) => Some(
             div()
                 .text_size(theme::SMALL_SIZE)
                 .text_color(theme::hsla(shellx_model::palette::PRIMARY_TEXT))
-                .child(code.clone()),
+                .child(pairing_code_display(code)),
         ),
         RowAction::Open | RowAction::None => None,
     }

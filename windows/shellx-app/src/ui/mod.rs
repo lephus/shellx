@@ -6,6 +6,7 @@ mod app;
 mod assets;
 mod button;
 mod login;
+mod pairing;
 mod panes;
 mod root;
 mod settings;
