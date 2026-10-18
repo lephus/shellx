@@ -107,7 +107,7 @@ extension CMUXCLI {
                 throw CLIError(
                     message: CmuxConfigValidationLocalization().format(
                         "config.validation.cli.errorCount",
-                        defaultValue: "cmux config %@ found %lld error(s)",
+                        defaultValue: "shellx config %@ found %lld error(s)",
                         subcommand,
                         Int64(report.errorCount)
                     )
@@ -159,7 +159,7 @@ extension CMUXCLI {
     func configUsage() -> String {
         let validationHelp = CmuxConfigValidationLocalization().string(
             "config.validation.cli.help",
-            defaultValue: "Validate JSONC syntax and cmux config semantics."
+            defaultValue: "Validate JSONC syntax and ShellX config semantics."
         )
         return """
         Usage: shellx config <doctor|check|validate|path|paths|docs|documentation|reload|get|set|unset|toggle|cycle|preset|sidebar-font-size|surface-tab-bar-font-size>

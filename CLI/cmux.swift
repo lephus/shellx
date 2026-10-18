@@ -5648,7 +5648,7 @@ struct CMUXCLI {
     }
 
     private func localizedCoderouterHandoffFailed() -> String {
-        let defaultValue = "Could not prepare the CodeRouter handoff. Keep cmux signed in and try again."
+        let defaultValue = "Could not prepare the CodeRouter handoff. Keep ShellX signed in and try again."
         let bundle = CLIExecutableLocator.enclosingAppBundle() ?? .main
         let catalogValue = String(
             localized: "cli.coderouter.handoff.failed",
@@ -5663,7 +5663,7 @@ struct CMUXCLI {
     }
 
     private func localizedCoderouterHandoffNotAuthenticated() -> String {
-        let defaultValue = "CodeRouter handoff requires a signed-in cmux account. Run `cmux auth login`, then retry."
+        let defaultValue = "CodeRouter handoff requires a signed-in ShellX account. Run `shellx auth login`, then retry."
         let bundle = CLIExecutableLocator.enclosingAppBundle() ?? .main
         let catalogValue = String(
             localized: "cli.coderouter.handoff.notAuthenticated",
@@ -5678,7 +5678,7 @@ struct CMUXCLI {
     }
 
     private func localizedCoderouterHandoffTeamRequired() -> String {
-        let defaultValue = "CodeRouter handoff requires a selected cmux team. Select a team in cmux, then retry."
+        let defaultValue = "CodeRouter handoff requires a selected ShellX team. Select a team in ShellX, then retry."
         let bundle = CLIExecutableLocator.enclosingAppBundle() ?? .main
         let catalogValue = String(
             localized: "cli.coderouter.handoff.teamRequired",
@@ -5693,7 +5693,7 @@ struct CMUXCLI {
     }
 
     private func localizedCoderouterHandoffUnsupported() -> String {
-        let defaultValue = "The installed CodeRouter CLI does not support secure cmux handoff. Update CodeRouter and try again."
+        let defaultValue = "The installed CodeRouter CLI does not support secure ShellX handoff. Update CodeRouter and try again."
         let bundle = CLIExecutableLocator.enclosingAppBundle() ?? .main
         let catalogValue = String(
             localized: "cli.coderouter.handoff.unsupported",

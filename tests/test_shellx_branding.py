@@ -145,6 +145,60 @@ class ShellXBrandingTests(unittest.TestCase):
         self.assertNotIn("SHELLX_", texts)
         self.assertNotIn("shellx-tui", texts)
 
+    _swift_defaults = None
+
+    def swift_defaults(self):
+        """(path, line, key, decoded default) for every localization default literal the script can see."""
+        if ShellXBrandingTests._swift_defaults is not None:
+            return ShellXBrandingTests._swift_defaults
+        module = load_script()
+        sites = []
+        for path in module.swift_files():
+            raw = path.read_text(encoding="utf-8")
+            for start, (end, key) in module.default_sites(raw).items():
+                decoded = module.decode_literal(raw[start:end])
+                if decoded:
+                    sites.append((path.relative_to(ROOT).as_posix(), raw.count("\n", 0, start) + 1, key, decoded[0]))
+        ShellXBrandingTests._swift_defaults = (module, sites)
+        return module, sites
+
+    def test_helper_defaults_are_found(self):
+        _, sites = self.swift_defaults()
+        found = {(path, key) for path, _line, key, _text in sites}
+        for expected in (
+            ("CLI/CMUXCLI+Config.swift", "config.validation.cli.errorCount"),  # CmuxConfigValidationLocalization().format
+            ("CLI/CMUXCLI+DocsSettings.swift", "cli.workflow.guidance.validate"),  # positional workflowText("k", "d")
+            ("CLI/cmux.swift", "cli.coderouter.handoff.notAuthenticated"),  # let defaultValue = "..."
+            ("Packages/macOS/CmuxSudoBroker/Sources/CmuxSudoBroker/SudoCLIMessages.swift", "sudo.cli.queued"),
+            ("Sources/TerminalController+MobileSurfaces.swift", "mobile.chat.artifact.error.permissionDenied"),
+        ):
+            self.assertIn(expected, found)
+
+    def test_no_cmux_in_swift_localization_defaults(self):
+        module, sites = self.swift_defaults()
+        hits = [f"{path}:{line}:{key}" for path, line, key, text in sites
+                if module.edits(text, key)[0] and key not in module.PRESERVE_KEYS]
+        self.assertEqual(hits, [], f"{len(hits)} Swift defaults still say cmux, e.g. {hits[:10]}")
+
+    def test_swift_defaults_match_catalog_english(self):
+        module, sites = self.swift_defaults()
+        drift = set(json.loads(read("tests/shellx_default_drift.json"))["keys"])
+        english = {}
+        for path in MACOS_CATALOGS + ["TunnelExtension/InfoPlist.xcstrings"]:
+            for key, entry in json.loads(read(path))["strings"].items():
+                unit = entry.get("localizations", {}).get("en", {})
+                if "stringUnit" in unit:
+                    english.setdefault(key, set()).add(unit["stringUnit"]["value"])
+        compared, hits = 0, []
+        for path, line, key, text in sites:
+            if module.INTERPOLATION in text or key not in english:
+                continue
+            compared += 1
+            if text not in english[key] and key not in drift:
+                hits.append(f"{path}:{line}:{key}: {text[:60]!r} != {sorted(english[key])[0][:60]!r}")
+        self.assertGreater(compared, 9000)
+        self.assertEqual(hits, [], f"{len(hits)} Swift defaults differ from the catalog English, e.g. {hits[:5]}")
+
     def test_rules(self):
         rebrand = load_script().rebrand
         cases = {

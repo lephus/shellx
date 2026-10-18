@@ -16,11 +16,14 @@ What it rewrites (values only, never catalog keys, never code identifiers):
     metadata keeps next to the catalog: scripts/localization-allowed-omissions.json,
     scripts/localization-plurals.json (the checker matches them byte for byte);
   * Resources/Info.plist `NS*UsageDescription` strings;
-  * the string literal passed as `defaultValue:` to String(localized:),
-    LocalizedStringResource(...), localized(...), localizedCount/Format(...),
-    automationLocalized(...) and *.string(...) localization helpers in Sources/,
-    CLI/, Packages/macOS/*/Sources and Packages/Shared/*/Sources, with the same
-    rules as the catalog so catalog English and the Swift default stay identical;
+  * every Swift localization default in Sources/, CLI/, Packages/macOS/*/Sources
+    and Packages/Shared/*/Sources (see default_sites): the `defaultValue:` of
+    String(localized:)/LocalizedStringResource and of any helper whose key
+    argument is a catalog key (`.format("key", defaultValue:)`, `key:`), a
+    positional default (`workflowText("key", "Default")`), and a
+    `let defaultValue = "..."` local handed to the next localized call in the
+    same function. Same rules as the catalog, so catalog English and the Swift
+    default stay identical (tests/test_shellx_branding.py checks text parity);
   * plain CLI help/usage literals in CLI/*.swift (a literal that contains
     "Usage: cmux ", "Run 'cmux " or "'cmux --help'"). Program-name plumbing and
     every other literal are left alone.
@@ -582,22 +585,82 @@ def rewrite_literal(literal: str, key: str | None) -> tuple[list[tuple[int, str]
     return raw_changes, text, apply(text, changes)
 
 
+_CATALOG_KEYS: frozenset[str] | None = None
+
+
+def catalog_keys() -> frozenset[str]:
+    """Every key of the catalogs this script rewrites (loaded once)."""
+    global _CATALOG_KEYS
+    if _CATALOG_KEYS is None:
+        keys: set[str] = set()
+        for relative in catalogs():
+            keys.update(json.loads((ROOT / relative).read_text(encoding="utf-8"))["strings"])
+        _CATALOG_KEYS = frozenset(keys)
+    return _CATALOG_KEYS
+
+
+KEY_ARGUMENT_BEFORE = re.compile(r"(?:\(|,|\b(?:key|localized|[A-Za-z]*Key)\s*:)\s*$")
+LOCAL_DEFAULT = re.compile(r"\b(?:let|var)\s+defaultValue\s*(?::\s*String\s*)?=\s*")
+SCOPE_END = re.compile(r"\n\s*(?:(?:private|fileprivate|public|internal|static|override|@\w+)\s+)*func\s")
+
+
+def default_sites(raw: str) -> dict[int, tuple[int, str]]:
+    """Start -> (end, catalog key) of every Swift string literal that is a localization default.
+
+    Covers String(localized:)/LocalizedStringResource and every helper that takes a
+    key literal (first argument, `key:` or `localized:`) plus either a `defaultValue:`
+    literal or a positional second literal (`workflowText("key", "Default")`), and
+    `let defaultValue = "..."` locals handed to the next localized call in the same body.
+    """
+    targets: dict[int, tuple[int, str]] = {}
+
+    def literal_at(position: int) -> int | None:
+        if raw[position:position + 1] == '"' or re.match(r'#+"', raw[position:position + 8]):
+            return skip_string(raw, position)
+        return None
+
+    for call in LOCALIZED_CALL.finditer(raw):
+        key = json.loads(call.group("key")) if "\\" not in call.group("key") else call.group("key")[1:-1]
+        suffix_end = skip_call(raw, call.end())
+        label = DEFAULT_LABEL.search(raw, call.end(), suffix_end)
+        if label and (end := literal_at(label.end())):
+            targets.setdefault(label.end(), (end, key))
+    keys = catalog_keys()
+    literals = list(string_literals(raw))
+    for start, end in literals:
+        decoded = decode_literal(raw[start:end])
+        if not decoded or decoded[0] not in keys or not KEY_ARGUMENT_BEFORE.search(raw[max(0, start - 80):start]):
+            continue
+        key = decoded[0]
+        after = re.match(r"\s*,\s*", raw[end:])
+        if after and (default_end := literal_at(end + after.end())):
+            targets.setdefault(end + after.end(), (default_end, key))  # positional default
+            continue
+        call_end = skip_call(raw, end)
+        label = DEFAULT_LABEL.search(raw, end, call_end)
+        if label and (default_end := literal_at(label.end())):
+            targets.setdefault(label.end(), (default_end, key))
+    for local in LOCAL_DEFAULT.finditer(raw):
+        end = literal_at(local.end())
+        if not end:
+            continue
+        scope = SCOPE_END.search(raw, end)
+        limit = scope.start() if scope else len(raw)
+        for start, literal_end in literals:
+            if end <= start < limit:
+                decoded = decode_literal(raw[start:literal_end])
+                if decoded and decoded[0] in keys:
+                    targets.setdefault(local.end(), (end, decoded[0]))
+                    break
+    return targets
+
+
 def rewrite_swift(path: Path, changes: list[Change]) -> str | None:
     raw = path.read_text(encoding="utf-8")
     if "mux" not in raw and "MUX" not in raw:
         return None
     relative = path.relative_to(ROOT).as_posix()
-    targets: dict[int, tuple[int, str | None]] = {}
-    for call in LOCALIZED_CALL.finditer(raw):
-        key = json.loads(call.group("key")) if "\\" not in call.group("key") else call.group("key")[1:-1]
-        suffix_end = skip_call(raw, call.end())
-        label = DEFAULT_LABEL.search(raw, call.end(), suffix_end)
-        if not label:
-            continue
-        start = label.end()
-        if raw[start:start + 1] not in ('"', "#"):
-            continue
-        targets.setdefault(start, (skip_string(raw, start), key))
+    targets: dict[int, tuple[int, str | None]] = dict(default_sites(raw))
     defaults = set(targets)
     if relative.startswith("CLI/"):
         for start, end in string_literals(raw):

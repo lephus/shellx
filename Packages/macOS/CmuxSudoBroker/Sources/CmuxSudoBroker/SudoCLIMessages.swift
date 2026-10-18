@@ -137,13 +137,13 @@ struct SudoCLIMessages: Sendable {
         if timeoutSeconds == 1 {
             return format(
                 key: "sudo.cli.queued.singular",
-                defaultValue: "sudo: request %@ queued; waiting up to 1 second for approval in cmux…",
+                defaultValue: "sudo: request %@ queued; waiting up to 1 second for approval in ShellX…",
                 id
             )
         }
         return format(
             key: "sudo.cli.queued",
-            defaultValue: "sudo: request %@ queued; waiting up to %d seconds for approval in cmux…",
+            defaultValue: "sudo: request %@ queued; waiting up to %d seconds for approval in ShellX…",
             id,
             timeoutSeconds
         )

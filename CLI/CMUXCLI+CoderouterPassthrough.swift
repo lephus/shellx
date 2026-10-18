@@ -101,7 +101,7 @@ extension CMUXCLI {
         cliWriteStderr(String(
             format: Self.localizedPassthroughString(
                 "cli.coderouter.bootstrap.offer",
-                defaultValue: "CodeRouter CLI is not installed. cmux can install it now by running the official installer:\n  %1$@\nThis downloads the checksum-verified CodeRouter binary into %2$@ and adds that directory to your shell PATH."
+                defaultValue: "CodeRouter CLI is not installed. ShellX can install it now by running the official installer:\n  %1$@\nThis downloads the checksum-verified CodeRouter binary into %2$@ and adds that directory to your shell PATH."
             ),
             installCommand,
             binDirectory.path

@@ -132,7 +132,7 @@ extension CMUXCLI {
                     throw CLIError(
                         message: CmuxConfigValidationLocalization().format(
                             "config.validation.cli.pathRequired",
-                            defaultValue: "cmux config %@ --path requires a path",
+                            defaultValue: "shellx config %@ --path requires a path",
                             commandName
                         )
                     )
@@ -147,7 +147,7 @@ extension CMUXCLI {
                     throw CLIError(
                         message: CmuxConfigValidationLocalization().format(
                             "config.validation.cli.pathRequired",
-                            defaultValue: "cmux config %@ --path requires a path",
+                            defaultValue: "shellx config %@ --path requires a path",
                             commandName
                         )
                     )
@@ -163,7 +163,7 @@ extension CMUXCLI {
                     throw CLIError(
                         message: CmuxConfigValidationLocalization().format(
                             "config.validation.cli.scopeRequired",
-                            defaultValue: "cmux config %@ --scope requires global or project",
+                            defaultValue: "shellx config %@ --scope requires global or project",
                             commandName
                         )
                     )
@@ -178,7 +178,7 @@ extension CMUXCLI {
                     throw CLIError(
                         message: CmuxConfigValidationLocalization().format(
                             "config.validation.cli.scopeRequired",
-                            defaultValue: "cmux config %@ --scope requires global or project",
+                            defaultValue: "shellx config %@ --scope requires global or project",
                             commandName
                         )
                     )
@@ -297,7 +297,7 @@ extension CMUXCLI {
                 )
                 : CmuxConfigValidationLocalization().string(
                     "config.validation.cli.doctor.missingDefaults",
-                    defaultValue: "not found; cmux will use defaults until this file exists"
+                    defaultValue: "not found; ShellX will use defaults until this file exists"
                 )
             return ConfigDoctorFinding(
                 label: target.label,

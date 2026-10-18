@@ -285,7 +285,7 @@ extension TerminalController {
                 return mobilePanelArtifactFileError(
                     code: "permission_denied",
                     key: "mobile.chat.artifact.error.permissionDenied",
-                    defaultValue: "cmux does not have permission to read that file.",
+                    defaultValue: "ShellX does not have permission to read that file.",
                     path: v2RawString(params, "path")
                 )
             case .notRegularFile:

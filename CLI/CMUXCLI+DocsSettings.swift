@@ -59,10 +59,10 @@ extension CMUXCLI {
 
     private static let workflowAdaptAndSave = [
         workflowText("cli.workflow.guidance.choose", "Pick an example that fits the task and lists requirements you have."),
-        workflowText("cli.workflow.guidance.recipe", "Open the recipe and copy only the needed top-level keys into .cmux/cmux.json or ~/.config/cmux/cmux.json. Add .cmux/dock.json when the example uses Dock."),
+        workflowText("cli.workflow.guidance.recipe", "Open the recipe and copy only the needed top-level keys into .shellx/shellx.json or ~/.config/shellx/shellx.json. Add .shellx/dock.json when the example uses Dock."),
         workflowText("cli.workflow.guidance.adapt", "Replace sample paths, commands, URLs, tool names, and placements with values for this repository."),
-        workflowText("cli.workflow.guidance.validate", "Validate the JSON or JSONC, run cmux reload-config, and check the resulting entry point."),
-        workflowText("cli.workflow.guidance.save", "When the workspace looks right, save it with cmux layout save <name> --description \"<what this creates>\"."),
+        workflowText("cli.workflow.guidance.validate", "Validate the JSON or JSONC, run shellx reload-config, and check the resulting entry point."),
+        workflowText("cli.workflow.guidance.save", "When the workspace looks right, save it with shellx layout save <name> --description \"<what this creates>\"."),
     ]
 
     private static let workflowExamples: [WorkflowExample] = [
@@ -94,7 +94,7 @@ extension CMUXCLI {
                 "claude"
             ],
             instantiate: [
-                workflowText("cli.workflow.worktree-agents.instantiate.0", "Open the Worktree Agents recipe, merge its actions/ui/commands entries into cmux.json, adapt the worktree cwd and agent commands, then run cmux reload-config.")
+                workflowText("cli.workflow.worktree-agents.instantiate.0", "Open the Worktree Agents recipe, merge its actions/ui/commands entries into shellx.json, adapt the worktree cwd and agent commands, then run shellx reload-config.")
             ],
             adapt: [
                 workflowText("cli.workflow.worktree-agents.adapt.0", "change the worktree path"),
@@ -132,7 +132,7 @@ extension CMUXCLI {
                 workflowText("cli.workflow.full-stack-dev.requires.2", "optional lazygit")
             ],
             instantiate: [
-                workflowText("cli.workflow.full-stack-dev.instantiate.0", "Open the Full-Stack Dev recipe, merge the workspace command and optional Dock controls, replace the sample bun commands and preview URL, then run cmux reload-config.")
+                workflowText("cli.workflow.full-stack-dev.instantiate.0", "Open the Full-Stack Dev recipe, merge the workspace command and optional Dock controls, replace the sample bun commands and preview URL, then run shellx reload-config.")
             ],
             adapt: [
                 workflowText("cli.workflow.full-stack-dev.adapt.0", "use the repository's package manager and scripts"),
@@ -164,7 +164,7 @@ extension CMUXCLI {
                 workflowText("cli.workflow.ssh-devbox.requires.0", "a working ssh target or alias")
             ],
             instantiate: [
-                workflowText("cli.workflow.ssh-devbox.instantiate.0", "Open the SSH Devbox recipe, replace ssh devbox and the preview URL for the project, merge the command into cmux.json, then run cmux reload-config.")
+                workflowText("cli.workflow.ssh-devbox.instantiate.0", "Open the SSH Devbox recipe, replace ssh devbox and the preview URL for the project, merge the command into shellx.json, then run shellx reload-config.")
             ],
             adapt: [
                 workflowText("cli.workflow.ssh-devbox.adapt.0", "change the SSH host/command"),
@@ -196,7 +196,7 @@ extension CMUXCLI {
                 workflowText("cli.workflow.review-pr.requires.0", "gh for the sample terminal command")
             ],
             instantiate: [
-                workflowText("cli.workflow.review-pr.instantiate.0", "Open the Review PR recipe, point its command and URL at the repository's review flow, merge it into cmux.json, then run cmux reload-config.")
+                workflowText("cli.workflow.review-pr.instantiate.0", "Open the Review PR recipe, point its command and URL at the repository's review flow, merge it into shellx.json, then run shellx reload-config.")
             ],
             adapt: [
                 workflowText("cli.workflow.review-pr.adapt.0", "replace gh pr status with the team's review command"),
@@ -216,7 +216,7 @@ extension CMUXCLI {
             ],
             creates: [
                 workflowText("cli.workflow.docs-workspace.creates.0", "a docs-server terminal"),
-                workflowText("cli.workflow.docs-workspace.creates.1", "a cmux Markdown viewer terminal"),
+                workflowText("cli.workflow.docs-workspace.creates.1", "a ShellX Markdown viewer terminal"),
                 workflowText("cli.workflow.docs-workspace.creates.2", "a browser docs preview")
             ],
             configFiles: [".cmux/cmux.json", "~/.config/cmux/cmux.json"],
@@ -230,7 +230,7 @@ extension CMUXCLI {
                 workflowText("cli.workflow.docs-workspace.requires.0", "the project's docs-dev command")
             ],
             instantiate: [
-                workflowText("cli.workflow.docs-workspace.instantiate.0", "Open the Docs Workspace recipe, replace the docs command, Markdown path, and preview URL, merge it into cmux.json, then run cmux reload-config.")
+                workflowText("cli.workflow.docs-workspace.instantiate.0", "Open the Docs Workspace recipe, replace the docs command, Markdown path, and preview URL, merge it into shellx.json, then run shellx reload-config.")
             ],
             adapt: [
                 workflowText("cli.workflow.docs-workspace.adapt.0", "use the repository's docs command"),
@@ -264,7 +264,7 @@ extension CMUXCLI {
                 workflowText("cli.workflow.quick-agent-buttons.requires.0", "the agent binaries you keep in the recipe")
             ],
             instantiate: [
-                workflowText("cli.workflow.quick-agent-buttons.instantiate.0", "Open the Quick Agent Buttons recipe, keep the agent actions you use, merge actions/ui into cmux.json, then run cmux reload-config.")
+                workflowText("cli.workflow.quick-agent-buttons.instantiate.0", "Open the Quick Agent Buttons recipe, keep the agent actions you use, merge actions/ui into shellx.json, then run shellx reload-config.")
             ],
             adapt: [
                 workflowText("cli.workflow.quick-agent-buttons.adapt.0", "remove unused agents"),
@@ -296,7 +296,7 @@ extension CMUXCLI {
                 workflowText("cli.workflow.ci-watch.requires.0", "gh for the sample GitHub Runs control")
             ],
             instantiate: [
-                workflowText("cli.workflow.ci-watch.instantiate.0", "Open the CI Watch recipe, merge the controls into .cmux/dock.json, adapt commands for the repository, validate the JSON, then reload the Dock/config.")
+                workflowText("cli.workflow.ci-watch.instantiate.0", "Open the CI Watch recipe, merge the controls into .shellx/dock.json, adapt commands for the repository, validate the JSON, then reload the Dock/config.")
             ],
             adapt: [
                 workflowText("cli.workflow.ci-watch.adapt.0", "change the CI command"),
