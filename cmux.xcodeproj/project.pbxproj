@@ -2881,7 +2881,6 @@
 		B79500080000000000000001 /* PortScanPublicationBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B79500080000000000000002 /* PortScanPublicationBuffer.swift */; };
 		B79500060000000000000001 /* PortScanPublicationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B79500060000000000000002 /* PortScanPublicationState.swift */; };
 		9262420B51295D47DC7065BD /* PortTerminalDeviceLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = C037CA7A6B20B3F495BAB401 /* PortTerminalDeviceLookup.swift */; };
-		A5001270 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = A5001271 /* PostHog */; };
 		A5001521 /* PostHogAnalytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001520 /* PostHogAnalytics.swift */; };
 		B8E9500A0000000000000001 /* PostHogAnalyticsPropertiesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8E9500A0000000000000002 /* PostHogAnalyticsPropertiesTests.swift */; };
 		72ED5F6AB93363EDB369E867 /* PostHogContextCalls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34F76A7191862A9BFADE3869 /* PostHogContextCalls.swift */; };
@@ -9278,7 +9277,6 @@
 				A5001006 /* GhosttyKit.xcframework in Frameworks */,
 				1A0B0C0D0E0F101112132213 /* IrohLib in Frameworks */,
 				A5001290 /* MarkdownUI in Frameworks */,
-				A5001270 /* PostHog in Frameworks */,
 				5E11A00000000000000000A2 /* ShellXBrand in Frameworks */,
 				A5001230 /* Sparkle in Frameworks */,
 				F20F85FC5900550685FA33AD /* StackAuth in Frameworks */,
@@ -14065,7 +14063,6 @@
 				5E11A00000000000000000A1 /* ShellXBrand */,
 				A1329B000000000000000101 /* CmuxTerminalSharing */,
 				A5001231 /* Sparkle */,
-				A5001271 /* PostHog */,
 				A5001261 /* Bonsplit */,
 				A5001291 /* MarkdownUI */,
 				29813FE5A6CBC1019289A251 /* CMUXAuthCore */,
@@ -14344,7 +14341,6 @@
 				5E11A00000000000000000A0 /* XCLocalSwiftPackageReference "ShellXBrand" */,
 				A1329B000000000000000100 /* XCLocalSwiftPackageReference "CmuxTerminalSharing" */,
 				A5001232 /* XCRemoteSwiftPackageReference "Sparkle" */,
-				A5001272 /* XCRemoteSwiftPackageReference "posthog-ios" */,
 				A5001292 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 				A5001260 /* XCLocalSwiftPackageReference "bonsplit" */,
 				7A0CE1000000000000000065 /* XCLocalSwiftPackageReference "WireGuardKit" */,
@@ -20037,14 +20033,6 @@
 				minimumVersion = 2.9.0;
 			};
 		};
-		A5001272 /* XCRemoteSwiftPackageReference "posthog-ios" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/PostHog/posthog-ios.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 3.41.0;
-			};
-		};
 		A5001292 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui";
@@ -20444,11 +20432,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A5001260 /* XCLocalSwiftPackageReference "bonsplit" */;
 			productName = Bonsplit;
-		};
-		A5001271 /* PostHog */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A5001272 /* XCRemoteSwiftPackageReference "posthog-ios" */;
-			productName = PostHog;
 		};
 		A5001291 /* MarkdownUI */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -2,7 +2,6 @@ import CMUXMobileCore
 import CmuxSettings
 import Foundation
 import Observation
-import PostHog
 import os
 
 /// PostHog-backed runtime feature flags for the macOS app (PostHog project
@@ -455,7 +454,7 @@ final class CmuxFeatureFlags {
         defaults: UserDefaults = .standard,
         overrideCapability: CmuxFeatureFlagOverrideCapability = .init(),
         telemetryEnabled: Bool = TelemetrySettings.enabledForCurrentLaunch,
-        remoteFlagValueProvider: @escaping (String) -> Any? = { PostHogSDK.shared.getFeatureFlag($0) },
+        remoteFlagValueProvider: @escaping (String) -> Any? = { _ in nil },
         remoteFlagLoader: (@Sendable () async -> [String: Bool]?)? = nil,
         publishesOffMainSnapshot: Bool = false,
         pinsFlagsToLocalValues: Bool = CmuxFeatureFlags.pinsFlagsToLocalValuesForCurrentLaunch

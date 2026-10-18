@@ -1837,12 +1837,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
 #endif
 
-        // ShellX starts no crash reporter (Sentry).
-        if telemetryEnabled && !isRunningUnderXCTest {
-            StartupBreadcrumbLog.append("appDelegate.didFinish.posthog.begin")
-            PostHogAnalytics.shared.startIfNeeded()
-            StartupBreadcrumbLog.append("appDelegate.didFinish.posthog.complete")
-        }
+        // ShellX starts no crash reporter (Sentry) and no analytics SDK
+        // (PostHog). Product analytics stays a disabled no-op.
         startProductAnalytics()
         // `DisableTelemetry` (MDM) also stops the remote feature-flag fetch: it
         // carries the same anonymous install id, and flags then use their
