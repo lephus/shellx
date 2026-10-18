@@ -507,6 +507,13 @@ enum Command {
 /// One attached remote terminal: its own mux control stream.
 pub struct Attachment {
     events: std::sync::mpsc::Receiver<AttachEvent>,
+    input: AttachmentInput,
+}
+
+/// The input half of an [`Attachment`] (`write`/`resize`), `Send + Sync`
+/// so a pane's link can hold it while a pump thread owns the event
+/// receiver (`Attachment::into_parts`). Dropping it closes the view.
+pub struct AttachmentInput {
     commands: mpsc::UnboundedSender<Command>,
     surface: u64,
     alive: Arc<AtomicBool>,
@@ -520,6 +527,30 @@ impl Attachment {
     /// Input bytes as ONE `send` message (a composed IME commit stays one
     /// UTF-8 write). Fails once the view ended or the link is down.
     pub fn write(&self, bytes: &[u8]) -> anyhow::Result<()> {
+        self.input.write(bytes)
+    }
+
+    /// Report this viewer's grid; a `Resized` + `Snapshot` follows when the
+    /// Mac applies it.
+    pub fn resize(&self, cols: u16, rows: u16) -> anyhow::Result<()> {
+        self.input.resize(cols, rows)
+    }
+
+    /// Split into the input half and the event receiver (the receiver is
+    /// not `Sync`, so a pump thread owns it). Dropping the input half
+    /// closes the view, as dropping the `Attachment` does.
+    pub fn into_parts(self) -> (AttachmentInput, std::sync::mpsc::Receiver<AttachEvent>) {
+        (self.input, self.events)
+    }
+
+    pub fn detach(self) {
+        // Drop closes the stream.
+    }
+}
+
+impl AttachmentInput {
+    /// See [`Attachment::write`].
+    pub fn write(&self, bytes: &[u8]) -> anyhow::Result<()> {
         if bytes.is_empty() {
             return Ok(());
         }
@@ -527,8 +558,7 @@ impl Attachment {
         self.send(json!({"cmd": "send", "surface": self.surface, "bytes": encoded}))
     }
 
-    /// Report this viewer's grid; a `Resized` + `Snapshot` follows when the
-    /// Mac applies it.
+    /// See [`Attachment::resize`].
     pub fn resize(&self, cols: u16, rows: u16) -> anyhow::Result<()> {
         if cols == 0 || rows == 0 {
             bail!("resize needs a non-empty grid");
@@ -536,10 +566,6 @@ impl Attachment {
         self.send(
             json!({"cmd": "resize-surface", "surface": self.surface, "cols": cols, "rows": rows}),
         )
-    }
-
-    pub fn detach(self) {
-        // Drop closes the stream.
     }
 
     fn send(&self, request: Value) -> anyhow::Result<()> {
@@ -555,7 +581,7 @@ impl Attachment {
     }
 }
 
-impl Drop for Attachment {
+impl Drop for AttachmentInput {
     fn drop(&mut self) {
         self.alive.store(false, Ordering::Release);
         let _ = self.commands.send(Command::Close);
@@ -596,9 +622,11 @@ async fn open_attachment(
     ));
     let attachment = Attachment {
         events,
-        commands,
-        surface,
-        alive,
+        input: AttachmentInput {
+            commands,
+            surface,
+            alive,
+        },
     };
 
     let identity = attachment_request(&attachment, json!({"cmd": "identify"})).await?;
@@ -624,6 +652,7 @@ async fn open_attachment(
 async fn attachment_request(attachment: &Attachment, request: Value) -> anyhow::Result<Value> {
     let (reply, response) = oneshot::channel();
     attachment
+        .input
         .commands
         .send(Command::Request {
             request,
@@ -768,6 +797,34 @@ async fn wait_fatal(fatal: &mut watch::Receiver<Option<String>>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn attachment_parts_split_send_sync_input_from_the_receiver() {
+        fn send_sync<T: Send + Sync>() {}
+        send_sync::<AttachmentInput>();
+        send_sync::<RemoteClient>();
+        let (_event_tx, events) = std::sync::mpsc::channel();
+        let (commands, mut command_rx) = mpsc::unbounded_channel();
+        let alive = Arc::new(AtomicBool::new(true));
+        let attachment = Attachment {
+            events,
+            input: AttachmentInput {
+                commands,
+                surface: 7,
+                alive: alive.clone(),
+            },
+        };
+        let (input, _events) = attachment.into_parts();
+        input.write("tiếng Việt".as_bytes()).unwrap();
+        let Some(Command::Request { request, .. }) = command_rx.try_recv().ok() else {
+            panic!("no send request");
+        };
+        assert_eq!(request["cmd"], "send");
+        assert_eq!(request["surface"], 7);
+        drop(input);
+        assert!(!alive.load(Ordering::Acquire));
+        assert!(matches!(command_rx.try_recv(), Ok(Command::Close)));
+    }
 
     #[test]
     fn relay_routes_map_to_the_relay_scheme_family() {

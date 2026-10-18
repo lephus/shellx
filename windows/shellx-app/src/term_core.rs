@@ -40,11 +40,31 @@ pub struct TermCore {
 
 impl TermCore {
     pub fn new(link: Arc<dyn PtyLink>, cols: u16, rows: u16) -> Result<TermCore> {
+        TermCore::build(link, cols, rows, true)
+    }
+
+    /// A mirror of a remote terminal (Task 13): the Mac's terminal host
+    /// already answers queries (DSR, DA, ...), so this one never writes
+    /// replies; only user input goes over the link.
+    pub fn new_mirror(link: Arc<dyn PtyLink>, cols: u16, rows: u16) -> Result<TermCore> {
+        TermCore::build(link, cols, rows, false)
+    }
+
+    fn build(
+        link: Arc<dyn PtyLink>,
+        cols: u16,
+        rows: u16,
+        answer_queries: bool,
+    ) -> Result<TermCore> {
         // Query replies (DSR, DA, ...) go straight back over the link. ConPTY
         // asks for the cursor position at startup and waits for the answer.
         let reply = link.clone();
         let callbacks = Callbacks {
-            on_pty_write: Some(Box::new(move |bytes: &[u8]| reply.write(bytes))),
+            on_pty_write: if answer_queries {
+                Some(Box::new(move |bytes: &[u8]| reply.write(bytes)))
+            } else {
+                None
+            },
             ..Default::default()
         };
         let mut terminal = Terminal::new(cols, rows, SCROLLBACK_BYTES, callbacks)

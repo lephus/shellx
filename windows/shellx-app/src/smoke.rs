@@ -214,6 +214,14 @@ pub fn core_bridge() -> Result<()> {
     Ok(())
 }
 
+/// Remote session against a fake Mac (Task 13a): enroll, mirror, one UTF-8
+/// write, input refused while reconnecting, reconnect with a fresh ticket.
+pub fn remote_session() -> Result<()> {
+    let summary = crate::remote_session::smoke()?;
+    println!("smoke-remote: {summary}");
+    Ok(())
+}
+
 /// Scripted pairing: pending, pending, approved saves the link; denied saves none.
 pub fn pairing_flow() -> Result<()> {
     use serde_json::json;
@@ -315,6 +323,7 @@ pub fn run() -> Result<()> {
     core_bridge()?;
     account_flow()?;
     pairing_flow()?;
+    remote_session()?;
     input_paths()?;
     let started = Instant::now();
     let (program, args) = default_shell();

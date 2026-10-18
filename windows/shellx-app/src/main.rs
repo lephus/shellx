@@ -17,6 +17,8 @@ mod local_pty;
 mod os_info;
 mod pairing_service;
 mod paths;
+mod remote_link;
+mod remote_session;
 mod shell_info;
 mod smoke;
 mod term_core;

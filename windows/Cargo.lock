@@ -4865,6 +4865,7 @@ dependencies = [
  "shellx-core",
  "shellx-fake-api",
  "shellx-model",
+ "shellx-remote",
  "tempfile",
  "windows-sys 0.61.2",
  "winreg 0.55.0",

@@ -17,6 +17,7 @@ cmux-pty = { path = "../../cmux-tui/crates/cmux-pty" }
 ghostty-vt = { path = "../../cmux-tui/crates/ghostty-vt" }
 shellx-core = { path = "../../shellx-core" }
 shellx-model = { path = "../shellx-model" }
+shellx-remote = { path = "../shellx-remote" }
 serde_json = { workspace = true }
 
 # GPUI from crates.io, pinned exactly. Default features are off so gpui does
