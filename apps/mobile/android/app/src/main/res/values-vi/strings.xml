@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="notification_channel_name">Thông báo từ máy tính</string>
-    <string name="notification_channel_description">Lệnh chạy lâu đã xong và thông báo của chương trình trên các máy tính đã ghép nối.</string>
-</resources>
