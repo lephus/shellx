@@ -11,7 +11,8 @@ let package = Package(
     targets: [
         .target(name: "ShellXBrand"),
         .testTarget(name: "ShellXBrandTests", dependencies: ["ShellXBrand"]),
-        .target(name: "ShellXRemoteCore"),
+        .target(name: "ShellXRemoteAtomicsC", publicHeadersPath: "include"),
+        .target(name: "ShellXRemoteCore", dependencies: ["ShellXRemoteAtomicsC"]),
         .testTarget(name: "ShellXRemoteCoreTests", dependencies: ["ShellXRemoteCore"])
     ],
     swiftLanguageModes: [.v6]
