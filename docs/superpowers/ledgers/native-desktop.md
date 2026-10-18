@@ -133,3 +133,26 @@ State for the next session:
 - Task 5: user ruled (2026-10-18) to replace Step 1 (mobile-RPC spike) with a ~2-day spike of the (b) Mac bridge M-B1. A spike was started in worktree `~/Documents/myProjects/shellx-pro-wt-bridge` (branch `shellx/w0-bridge`, never push/merge); if it has no `spikes/protocol/mac-bridge-spike.md` commit, restart it. Then finalize D-W0-1 and amend spec §8.1/§8.3/C16.
 - Remaining after that: Task 7 (Windows UI toolkit; needs a real Windows 11 PC from the user), Task 8 close-out.
 - Disk is tight (~12 GB free with perf-base DerivedData + bridge worktree).
+
+## License question to Manaflow (draft, not sent)
+
+Drafted 2026-10-18 (W0 Task 8 Step 2). Sending it is the user's call.
+
+Facts behind it (fork `5348097e66`): root `LICENSE` makes everything GPL-3.0-or-later "except where a file or accompanying notice states otherwise", and puts only `web/`, `workers/*`, `services/iroh-relay-minter/` and `cmux-tui/relays/cloudflare-do/` under BUSL-1.1. `cmux-tui/Cargo.toml:60` sets the workspace `license = "MIT"`, inherited by every crate (`cmux-pty`, `cmux-remote`, `cmux-relay`, `cmux-terminal-client`, …). ShellX would self-host `cmux-tui/crates/cmux-relay` (not the BUSL `cloudflare-do` relay).
+
+> To: founders@cmux.com
+> Subject: License of cmux-tui crates (MIT vs GPL) for a downstream fork
+>
+> Hi Manaflow team,
+>
+> I'm building ShellX, a GPL-3.0 fork of cmux (github.com/lephus/shellx-pro) that adds a Windows desktop app and a phone companion. Before we ship, I'd like to confirm the license of the Rust code under `cmux-tui/`.
+>
+> The root LICENSE puts the project under GPL-3.0-or-later except where a file or notice says otherwise, while `cmux-tui/Cargo.toml` declares `license = "MIT"` for the whole workspace (cmux-pty, cmux-remote, cmux-relay, cmux-terminal-client and the rest).
+>
+> 1. Is the `cmux-tui/` workspace (including `crates/cmux-relay`) licensed under MIT, or does the root GPL apply and the Cargo field is just metadata?
+> 2. If it is MIT, is it fine for us to self-host `cmux-relay` from that crate in production? We don't plan to use anything under the BUSL directories (`cmux-tui/relays/cloudflare-do/`, `web/`, `workers/`).
+>
+> ShellX itself will stay GPL-3.0 and credit cmux in the app and README either way. Thanks for building cmux.
+>
+> Best,
+> Phu Le
