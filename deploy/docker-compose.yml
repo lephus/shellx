@@ -82,6 +82,9 @@ services:
     mem_limit: 256m
     memswap_limit: 256m
     read_only: true
+    # Listens on 8787 as uid 10001: no capability needed, and no setuid escalation.
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     environment:
       # Same host as the relay, exact path match: a prefix location would also swallow
       # POST /v2/relay/tickets, which the Node relay serves. VIRTUAL_DEST rewrites to cmux-relay's only

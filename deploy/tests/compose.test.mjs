@@ -104,6 +104,12 @@ test('relay2: routed by exact path /v2/relay (so /v2/relay/tickets stays on the 
   assert.match(relay2, /^ {6}CMUX_RELAY_BIND: 0\.0\.0\.0:8787$/m);
 });
 
+test('relay2 drops every capability and cannot gain privileges (uid 10001, port 8787)', () => {
+  const relay2 = service('relay2');
+  assert.match(relay2, /^ {4}cap_drop: \[ALL\]$/m);
+  assert.match(relay2, /^ {4}security_opt: \["no-new-privileges:true"\]$/m);
+});
+
 test('relay2 healthcheck: bash /dev/tcp GET /healthz, 10 s interval, 3 retries, 10 s start period', () => {
   const relay2 = service('relay2');
   assert.ok(relay2.includes(
