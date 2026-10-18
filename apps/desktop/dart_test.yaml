@@ -1,8 +1,0 @@
-# A hung test must fail in minutes, not hold the run for hours (a 15-hour hang
-# was once seen inside terminal_workspace_test). The slowest legitimate test
-# takes seconds; testWidgets applies its own binding timeout on top.
-timeout: 2m
-
-tags:
-  benchmark:
-    skip: "Benchmark (prints numbers): flutter test --run-skipped --tags benchmark <one of test/terminal/xterm_benchmark_test.dart, test/cli/cli_benchmark_test.dart, test/restore/restore_benchmark_test.dart, test/config/config_benchmark_test.dart>"

@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Accent of push notifications (the app's primary colour). -->
-    <color name="notification_color">#0097A8</color>
-</resources>

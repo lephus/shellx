@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Push notifications: the one channel (MainActivity creates it). -->
-    <string name="notification_channel_id" translatable="false">shellx_notifications</string>
-    <string name="notification_channel_name">Notifications from your computers</string>
-    <string name="notification_channel_description">Long-running commands that finished and messages from programs on your paired computers.</string>
-</resources>
