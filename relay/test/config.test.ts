@@ -93,6 +93,19 @@ describe("loadConfig", () => {
       expect(loadConfig(REQUIRED).relayV2DisabledReason).toBe("missing_secret");
       expect(loadConfig({ ...REQUIRED, CMUX_RELAY_HMAC_SECRET: "" }).relayV2DisabledReason).toBe("missing_secret");
     });
+    it("refuses a CMUX_RELAY_ISSUER with surrounding whitespace (cmux-relay reads it raw) without echoing it", () => {
+      expect(() => loadConfig({ ...REQUIRED, CMUX_RELAY_ISSUER: "shellx-relay " })).toThrow(ConfigError);
+      expect(() => loadConfig({ ...REQUIRED, CMUX_RELAY_ISSUER: " shellx-relay" })).toThrow(/CMUX_RELAY_ISSUER/);
+      try {
+        loadConfig({ ...REQUIRED, CMUX_RELAY_ISSUER: "sekret-issuer\t" });
+        expect.unreachable();
+      } catch (e) {
+        expect((e as Error).message).not.toContain("sekret-issuer");
+      }
+      expect(loadConfig({ ...REQUIRED, CMUX_RELAY_ISSUER: "shellx-relay" }).relayIssuer).toBe("shellx-relay");
+      expect(loadConfig(REQUIRED).relayIssuer).toBe("shellx-relay");
+    });
+
     it("validates CMUX_RELAY_ISSUER and RELAY_V2_URL", () => {
       expect(loadConfig({ ...REQUIRED, CMUX_RELAY_ISSUER: "x" }).relayIssuer).toBe("x");
       expect(() => loadConfig({ ...REQUIRED, CMUX_RELAY_ISSUER: "a\nb" })).toThrow(ConfigError);

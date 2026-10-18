@@ -82,6 +82,11 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
   if (!HOST_NAME_RE.test(adminHost)) {
     throw new ConfigError(`ADMIN_HOST must be a host name such as ${DEFAULT_ADMIN_HOST} (no scheme, port or path), got "${adminHost}"`);
   }
+  // cmux-relay reads the issuer raw: whitespace that `value()` would trim away would mint tickets it refuses.
+  const rawIssuer = env["CMUX_RELAY_ISSUER"];
+  if (rawIssuer !== undefined && rawIssuer !== rawIssuer.trim()) {
+    throw new ConfigError("CMUX_RELAY_ISSUER must not have leading or trailing whitespace");
+  }
   const relayIssuer = value("CMUX_RELAY_ISSUER") ?? DEFAULT_RELAY_ISSUER;
   const issuerBytes = Buffer.byteLength(relayIssuer, "utf8");
   if (issuerBytes < 1 || issuerBytes > 256 || /[\r\n]/.test(relayIssuer)) {
