@@ -29,7 +29,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: shellx-mac-unit-${{ github.ref }}
+  # Concurrency is evaluated before the job `if:`; give runs that will be
+  # skipped their own group so they cannot cancel a running unit run.
+  group: shellx-mac-unit-${{ github.ref }}-${{ (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[unit]')) && 'run' || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -187,6 +189,21 @@ jobs:
             || ! grep -q "\*\* TEST SUCCEEDED \*\*" "$RUNNER_TEMP/unit.log"; then
             echo "::error::unit tests failed or did not finish; last 200 lines:"
             tail -n 200 "$RUNNER_TEMP/unit.log"
+            exit 1
+          fi
+          # TEST SUCCEEDED also prints when nothing matched; require proof that
+          # tests ran and that every requested suite shows up as a suite line
+          # (the echoed -only-testing argument must not count).
+          if ! grep -Eq "Test run with [1-9][0-9]* tests?|Executed [1-9][0-9]* tests?" "$RUNNER_TEMP/unit.log"; then
+            echo "::error::TEST SUCCEEDED but no tests ran (check suite names)"
+            exit 1
+          fi
+          missing=""
+          for s in $SUITE_LIST; do
+            grep -Eq "Suite \"?${s}\"? (started|passed|failed)|Test Suite '${s}'" "$RUNNER_TEMP/unit.log" || missing="${missing:+$missing }$s"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Requested suites not found in test output: $missing"
             exit 1
           fi
 
