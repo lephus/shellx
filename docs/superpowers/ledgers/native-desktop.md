@@ -190,7 +190,9 @@ State for the next session:
 - Remaining after that: Task 7 (Windows UI toolkit; needs a real Windows 11 PC from the user), Task 8 close-out.
 - Disk is tight (~12 GB free with perf-base DerivedData + bridge worktree).
 
-## License question to Manaflow (draft, not sent)
+## License question to Manaflow (SENT 2026-10-19 by the user, awaiting reply)
+
+Sent version adds two questions: may we publish a container image of `cmux-relay` built from the fork, and ship the cmux-tui crates inside our own Windows app under GPL-3.0. Until a reply: no public relay image (build on the VPS).
 
 Drafted 2026-10-18 (W0 Task 8 Step 2). Sending it is the user's call.
 
