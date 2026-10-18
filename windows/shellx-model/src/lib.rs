@@ -12,6 +12,7 @@ pub mod selection;
 pub mod sidebar;
 pub mod strings;
 pub mod tabs;
+pub mod text_edit;
 pub mod update;
 
 pub use keys::Dir;

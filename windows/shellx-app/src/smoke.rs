@@ -247,9 +247,73 @@ pub fn pairing_flow() -> Result<()> {
     Ok(())
 }
 
+/// The account service's path (what the window runs off the UI thread):
+/// shellx-core configured on its first call (temp state dir), `AccountFlow`
+/// actions run through `run_account_action` in order. Start without a
+/// session -> LoggedOut (the sign-in card); a login against a closed local
+/// port -> Error with a readable message (the panel's error line).
+pub fn account_flow() -> Result<()> {
+    use std::collections::VecDeque;
+
+    use shellx_model::account::{AccountEvent, AccountFlow, AccountState};
+    use shellx_model::core_api::CoreConfig;
+    use shellx_model::strings::login_failed;
+
+    use crate::core_bridge::CoreBridge;
+    use crate::core_service::{ConfiguredCore, MachineFacts, run_account_action};
+
+    let dir = std::env::temp_dir().join(format!("shellx-smoke-account-{}", std::process::id()));
+    let facts = MachineFacts::this_pc();
+    let (cfg_dir, cfg_facts) = (dir.clone(), facts.clone());
+    let core = ConfiguredCore::new(Box::new(CoreBridge::new()), move || {
+        Ok(CoreConfig {
+            api_base: "http://127.0.0.1:9".into(),
+            state_dir: cfg_dir.to_string_lossy().into_owned(),
+            app_version: shellx_model::VERSION.into(),
+            os_version: cfg_facts.os_version.clone(),
+            device_name: cfg_facts.device_name.clone(),
+        })
+    });
+    let drive = |flow: &mut AccountFlow, event: AccountEvent| {
+        let mut queue: VecDeque<_> = flow.on(event, 0).into();
+        while let Some(action) = queue.pop_front() {
+            if let Some(result) = run_account_action(&core, &facts, action) {
+                queue.extend(flow.on(result, 0));
+            }
+        }
+    };
+    let mut flow = AccountFlow::new();
+    drive(&mut flow, AccountEvent::Started);
+    let started = flow.state().clone();
+    drive(
+        &mut flow,
+        AccountEvent::LoginSubmitted {
+            email: "smoke@shellx.invalid".into(),
+            password: "not-a-password".into(),
+        },
+    );
+    let after_login = flow.state().clone();
+    let _ = std::fs::remove_dir_all(&dir);
+    ensure!(
+        started == AccountState::LoggedOut,
+        "account start without a session: {started:?}, want LoggedOut"
+    );
+    let AccountState::Error(err) = after_login else {
+        bail!("login against a closed port: {after_login:?}, want Error");
+    };
+    ensure!(!err.code.is_empty(), "login error without a code");
+    println!(
+        "smoke-account: start -> LoggedOut (sign-in card); login offline -> {} ({})",
+        err.code,
+        login_failed(Lang::Vi, &err.message)
+    );
+    Ok(())
+}
+
 pub fn run() -> Result<()> {
     ui_assets()?;
     core_bridge()?;
+    account_flow()?;
     pairing_flow()?;
     input_paths()?;
     let started = Instant::now();

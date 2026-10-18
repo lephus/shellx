@@ -1,7 +1,6 @@
 //! `shellx_model::core_api::CoreCall` over the real `shellx_core::Core` (K3).
 //! `Core` serializes its own state files; calls block, so run them off the UI
 //! thread. The account token never leaves shellx-core.
-#![allow(dead_code)] // used by the sign-in wiring (Task 10b)
 
 use serde_json::Value;
 use shellx_model::core_api::{CoreCall, CoreErr};

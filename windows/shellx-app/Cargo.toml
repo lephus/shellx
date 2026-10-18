@@ -24,6 +24,9 @@ serde_json = { workspace = true }
 # the Windows backend (Direct3D 11 + DirectWrite) is not feature-gated.
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
+# GetTimeZoneInformation (local offset for "lần cuối HH:MM"); 0.61 is already
+# in the tree through gpui's dependencies.
+windows-sys = { version = "0.61", features = ["Win32_System_Time"] }
 gpui = { version = "=0.2.2", default-features = false }
 
 [build-dependencies]

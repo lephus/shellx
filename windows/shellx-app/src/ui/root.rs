@@ -6,12 +6,15 @@
 //! first; `reconcile` then creates views for new panes and drops the views
 //! of removed ones (which kills their shells), and the focused pane of the
 //! active tab gets keyboard focus.
+//!
+//! The sidebar's machines come from the `AccountService` (signed in: the
+//! account's machines; signed out: this PC and the sign-in card).
 
 use std::convert::Infallible;
 
 use gpui::{
-    App, Context, Div, Focusable, IntoElement, KeyDownEvent, Render, Window, div, prelude::*, px,
-    relative, svg,
+    App, Context, Div, Entity, Focusable, IntoElement, KeyDownEvent, Render, Subscription, Window,
+    div, prelude::*, px, relative, svg,
 };
 use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::{Axis, PaneId};
@@ -20,14 +23,17 @@ use shellx_model::sidebar::{Access, MachineInfo, build_groups};
 use shellx_model::strings::Lang;
 use shellx_model::tabs::{CloseOutcome, PaneTarget, TabId, Tabs};
 
+use super::account::AccountService;
 use super::app::Services;
 use super::assets::Icon;
+use super::login::{LoginPanel, LoginPanelEvent};
 use super::panes::{self, PaneArea, PaneView};
 use super::sidebar::{self, SessionRow};
 use super::term_view::{TermEvent, TermView};
 use super::theme;
 use super::titlebar;
-use crate::shell_info::{session_title, this_machine};
+use crate::core_service::MachineFacts;
+use crate::shell_info::{session_title, sidebar_machines, this_machine_id};
 use crate::workspace::{DIVIDER, PaneHost, SESSION_BAR_H};
 
 pub struct RootView {
@@ -35,23 +41,57 @@ pub struct RootView {
     host: PaneHost<PaneView>,
     area: PaneArea,
     sidebar_visible: bool,
-    /// Machines shown in the sidebar: only this PC until pairing (Task 12).
-    machines: Vec<MachineInfo>,
+    /// `%COMPUTERNAME%`: this PC's name while it has no server entry.
+    computer_name: Option<String>,
+    account: Entity<AccountService>,
+    login: Entity<LoginPanel>,
+    _subscriptions: Vec<Subscription>,
 }
 
 impl RootView {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let (tabs, _) = Tabs::new();
         let computer_name = std::env::var("COMPUTERNAME").ok();
+        let core = cx.global::<Services>().core.clone();
+        let account = cx.new(|cx| AccountService::new(core, MachineFacts::this_pc(), cx));
+        let login = cx.new(|cx| LoginPanel::new(account.clone(), window, cx));
+        let subscriptions = vec![
+            cx.observe(&account, |_, _, cx| cx.notify()),
+            cx.subscribe_in(
+                &login,
+                window,
+                |this, _, event: &LoginPanelEvent, window, cx| match event {
+                    LoginPanelEvent::Closed => this.after_focus_change(window, cx),
+                },
+            ),
+        ];
         let mut root = RootView {
             tabs,
             host: PaneHost::new(),
             area: PaneArea::default(),
             sidebar_visible: true,
-            machines: vec![this_machine(computer_name.as_deref())],
+            computer_name,
+            account,
+            login,
+            _subscriptions: subscriptions,
         };
         root.reconcile(window, cx);
         root
+    }
+
+    /// The account service (sign in/out, machines); Task 11's settings panel
+    /// calls `logout` on it.
+    #[allow(dead_code)]
+    pub fn account(&self) -> &Entity<AccountService> {
+        &self.account
+    }
+
+    /// Sidebar machines: the account's list, this PC first.
+    fn machines(&self, cx: &App) -> Vec<MachineInfo> {
+        sidebar_machines(
+            self.account.read(cx).machines(),
+            self.computer_name.as_deref(),
+        )
     }
 
     /// Gives keyboard focus to the active tab's focused pane.
@@ -232,9 +272,11 @@ impl RootView {
     /// 36 px bar over the panes: terminal icon, "<tab title> › <machine>".
     fn session_bar(&self, lang: Lang, cx: &App) -> Div {
         let title = self.tab_title(self.tabs.active().focused, lang, cx);
-        let machine = self
-            .machines
-            .first()
+        let machines = self.machines(cx);
+        let local_id = this_machine_id(&machines);
+        let machine = machines
+            .iter()
+            .find(|m| m.machine_id == local_id)
             .map(|m| m.name.clone())
             .unwrap_or_default();
         div()
@@ -281,8 +323,11 @@ impl Render for RootView {
         let lang = cx.global::<Services>().lang;
         let titlebar = titlebar::render(lang, window, cx);
         let sidebar = if self.sidebar_visible {
-            // utc offset 0: only this PC is listed, and it is never offline.
-            let groups = build_groups(&self.machines, &|_| Access::None, 0, lang);
+            let machines = self.machines(cx);
+            let local_id = this_machine_id(&machines).to_string();
+            let utc_offset = self.account.read(cx).utc_offset_secs();
+            // Access to other machines comes with pairing (Task 12).
+            let groups = build_groups(&machines, &|_| Access::None, utc_offset, lang);
             let active = self.tabs.active().id;
             let rows: Vec<SessionRow> = self
                 .tabs
@@ -295,7 +340,8 @@ impl Render for RootView {
                     status: Status::Idle,
                 })
                 .collect();
-            Some(sidebar::render(&groups, &rows, lang, cx))
+            let login = self.login.clone();
+            Some(sidebar::render(&groups, &rows, &local_id, &login, lang, cx))
         } else {
             None
         };

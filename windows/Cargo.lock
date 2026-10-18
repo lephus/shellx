@@ -4866,6 +4866,7 @@ dependencies = [
  "shellx-fake-api",
  "shellx-model",
  "tempfile",
+ "windows-sys 0.61.2",
  "winreg 0.55.0",
 ]
 

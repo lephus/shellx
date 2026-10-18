@@ -2,22 +2,28 @@
 //! main window with the system title bar hidden (ShellX draws its own).
 
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use gpui::{
     App, Application, Bounds, Global, TitlebarOptions, WindowBounds, WindowOptions, prelude::*, px,
     size,
 };
+use shellx_model::core_api::CoreCall;
 use shellx_model::strings::Lang;
 
 use super::assets::Assets;
 use super::root::RootView;
 use super::term_view::BASE_TITLE;
+use crate::core_service::{ConfiguredCore, MachineFacts};
 use crate::fonts;
 
 /// App-wide services the views read with `cx.global::<Services>()`.
-/// Later tasks add the shellx-core bridge and the remote client here.
+/// Later tasks add the remote client here.
 pub struct Services {
     pub lang: Lang,
+    /// shellx-core, configured for this PC before its first call. Its calls
+    /// block: run them off the UI thread (`cx.background_spawn`).
+    pub core: Arc<dyn CoreCall>,
 }
 
 impl Global for Services {}
@@ -32,6 +38,7 @@ pub fn run() {
         }
         cx.set_global(Services {
             lang: Lang::from_env(),
+            core: Arc::new(ConfiguredCore::this_pc(MachineFacts::this_pc())),
         });
 
         let bounds = Bounds::centered(None, size(px(1200.0), px(760.0)), cx);

@@ -4,20 +4,26 @@
 //! "THIẾT BỊ ĐANG KẾT NỐI" (item 5) is out of the MVP.
 //! Under this PC: one session row per local tab (click selects the tab),
 //! and a "+" on the group header that opens a new local tab.
+//! Signed in, the groups are the account's machines (this PC first, the
+//! others below, offline ones dimmed with "ngoại tuyến · lần cuối HH:MM");
+//! signed out, the sign-in card (`login.rs`) sits under this PC.
+//! Another online machine without access shows "Xin quyền truy cập" as a
+//! disabled button until the pairing panel (Task 12) wires it.
 
 use gpui::{
-    AnyView, App, ClickEvent, Context, Div, FontWeight, ImageSource, IntoElement, Pixels, Render,
-    Resource, SharedString, Stateful, Window, div, img, prelude::*, px, svg,
+    AnyView, App, ClickEvent, Context, Div, Entity, FontWeight, ImageSource, IntoElement, Pixels,
+    Render, Resource, SharedString, Stateful, Window, div, img, prelude::*, px, svg,
 };
 use shellx_model::palette::{Pill, Status};
-use shellx_model::sidebar::{MachineGroup, MachineIcon};
+use shellx_model::sidebar::{MachineGroup, MachineIcon, RowAction};
 use shellx_model::strings::{Lang, Str, t};
 use shellx_model::tabs::TabId;
 
 use super::assets::Icon;
+use super::button::{Kind, button};
+use super::login::LoginPanel;
 use super::root::RootView;
 use super::theme;
-use crate::shell_info::LOCAL_MACHINE_ID;
 
 pub const WIDTH: Pixels = px(crate::workspace::SIDEBAR_W);
 
@@ -31,20 +37,25 @@ pub struct SessionRow {
     pub status: Status,
 }
 
+/// `local_id`: this PC's group (its server id when signed in).
+/// `login`: the sign-in card, drawn under this PC's sessions.
 pub fn render(
     groups: &[MachineGroup],
     local_sessions: &[SessionRow],
+    local_id: &str,
+    login: &Entity<LoginPanel>,
     lang: Lang,
     cx: &mut Context<RootView>,
 ) -> Div {
     let mut list = div().flex().flex_col().flex_1().min_h_0().overflow_hidden();
-    for group in groups {
-        let local = group.machine_id == LOCAL_MACHINE_ID;
-        list = list.child(group_header(group, local, lang, cx));
+    for (ix, group) in groups.iter().enumerate() {
+        let local = group.machine_id == local_id;
+        list = list.child(group_header(ix, group, local, lang, cx));
         if group.sessions_visible && local {
             for (ix, row) in local_sessions.iter().enumerate() {
                 list = list.child(session_row(ix, row, lang, cx));
             }
+            list = list.child(login.clone());
         }
     }
 
@@ -177,7 +188,13 @@ impl Render for Tooltip {
     }
 }
 
-fn group_header(group: &MachineGroup, local: bool, lang: Lang, cx: &mut Context<RootView>) -> Div {
+fn group_header(
+    ix: usize,
+    group: &MachineGroup,
+    local: bool,
+    lang: Lang,
+    cx: &mut Context<RootView>,
+) -> Div {
     let icon = match group.icon {
         MachineIcon::Laptop => Icon::Laptop,
         MachineIcon::Desktop => Icon::Desktop,
@@ -236,6 +253,34 @@ fn group_header(group: &MachineGroup, local: bool, lang: Lang, cx: &mut Context<
                     .child(subtitle),
             )
         })
+        .when_some(row_action(ix, &group.action, lang), |header, action| {
+            header.child(div().flex().pl(px(24.0)).pt(px(4.0)).child(action))
+        })
+}
+
+/// The action under another machine's name. RequestAccess is a disabled
+/// button until Task 12 wires pairing; Open is drawn by Task 13.
+fn row_action(ix: usize, action: &RowAction, lang: Lang) -> Option<Div> {
+    match action {
+        RowAction::RequestAccess => Some(
+            div().child(
+                button(
+                    ("sidebar-request-access", ix),
+                    t(lang, Str::RequestAccess),
+                    Kind::Secondary,
+                    true,
+                )
+                .text_size(theme::SMALL_SIZE),
+            ),
+        ),
+        RowAction::ShowCode(code) => Some(
+            div()
+                .text_size(theme::SMALL_SIZE)
+                .text_color(theme::hsla(shellx_model::palette::PRIMARY_TEXT))
+                .child(code.clone()),
+        ),
+        RowAction::Open | RowAction::None => None,
+    }
 }
 
 fn session_row(

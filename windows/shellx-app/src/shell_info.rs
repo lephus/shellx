@@ -8,7 +8,8 @@
 use shellx_model::sidebar::MachineInfo;
 use shellx_model::strings::{Lang, Str, t};
 
-/// Machine id of this PC in the sidebar (the only machine until Task 12).
+/// Machine id of this PC in the sidebar while it has no server entry
+/// (signed out, or not registered yet).
 pub const LOCAL_MACHINE_ID: &str = "local";
 
 /// Name shown when `COMPUTERNAME` is missing or blank.
@@ -25,6 +26,15 @@ pub const SHELL_STRINGS: &[Str] = &[
     Str::LocalShell,
     Str::E2eFooter,
     Str::NewTab,
+    Str::NotLoggedIn,
+    Str::Login,
+    Str::Email,
+    Str::Password,
+    Str::LoginFailed,
+    Str::SigningIn,
+    Str::Cancel,
+    Str::RequestAccess,
+    Str::Error,
 ];
 
 /// This PC as a sidebar machine; `computer_name` is `%COMPUTERNAME%`.
@@ -42,6 +52,24 @@ pub fn this_machine(computer_name: Option<&str>) -> MachineInfo {
         fingerprint: String::new(),
         is_this_machine: true,
     }
+}
+
+/// Machines for the sidebar: the server's list when there is one (this PC is
+/// its `is_this_machine` entry), with this PC added first when the list
+/// lacks it (signed out, or not registered yet).
+pub fn sidebar_machines(server: &[MachineInfo], computer_name: Option<&str>) -> Vec<MachineInfo> {
+    let mut list = server.to_vec();
+    if !list.iter().any(|m| m.is_this_machine) {
+        list.insert(0, this_machine(computer_name));
+    }
+    list
+}
+
+/// The group id of this PC in a `sidebar_machines` list.
+pub fn this_machine_id(list: &[MachineInfo]) -> &str {
+    list.iter()
+        .find(|m| m.is_this_machine)
+        .map_or(LOCAL_MACHINE_ID, |m| m.machine_id.as_str())
 }
 
 /// Session row title: the terminal's OSC title, else `Str::LocalShell`.
@@ -85,6 +113,52 @@ mod tests {
         assert_eq!(g.icon, MachineIcon::Desktop);
         assert!(g.online && !g.dimmed && g.sessions_visible);
         assert_eq!(g.action, RowAction::None);
+    }
+
+    #[test]
+    fn sidebar_machines_this_pc_first_then_server_list() {
+        // signed out: only this PC
+        let list = sidebar_machines(&[], Some("PC-1"));
+        assert_eq!(list.len(), 1);
+        assert_eq!(this_machine_id(&list), LOCAL_MACHINE_ID);
+        // signed in: the server entry is this PC (no duplicate), others follow
+        let mac = MachineInfo {
+            machine_id: "m-mac".into(),
+            name: "MacBook".into(),
+            platform: "macos".into(),
+            online: false,
+            last_seen_unix: 1_760_841_900,
+            fingerprint: "f".into(),
+            is_this_machine: false,
+        };
+        let me = MachineInfo {
+            machine_id: "m-pc".into(),
+            name: "PC-1".into(),
+            platform: "windows".into(),
+            online: true,
+            last_seen_unix: 0,
+            fingerprint: "g".into(),
+            is_this_machine: true,
+        };
+        let list = sidebar_machines(&[mac.clone(), me.clone()], Some("PC-1"));
+        assert_eq!(list.len(), 2);
+        assert_eq!(this_machine_id(&list), "m-pc");
+        let groups = build_groups(&list, &|_| Access::None, 7 * 3600, Lang::Vi);
+        assert_eq!(groups[0].machine_id, "m-pc");
+        assert_eq!(
+            groups[1].subtitle.as_deref(),
+            Some("ngoại tuyến · lần cuối 09:45")
+        );
+        assert!(groups[1].dimmed);
+        // registered list without this PC yet: this PC is added first
+        let list = sidebar_machines(&[mac], None);
+        assert_eq!(list[0].machine_id, LOCAL_MACHINE_ID);
+        assert_eq!(list.len(), 2);
+        let mut online = me;
+        online.is_this_machine = false;
+        online.machine_id = "m-other".into();
+        let groups = build_groups(&[online], &|_| Access::None, 0, Lang::Vi);
+        assert_eq!(groups[0].action, RowAction::RequestAccess);
     }
 
     #[test]

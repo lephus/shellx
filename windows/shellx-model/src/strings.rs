@@ -39,6 +39,7 @@ pub enum Str {
     Password,
     LoginFailed,
     NotLoggedIn,
+    SigningIn,
     RequestAccess,
     PairingCodeHint,
     WaitingApproval,
@@ -92,6 +93,7 @@ impl Str {
         Str::Password,
         Str::LoginFailed,
         Str::NotLoggedIn,
+        Str::SigningIn,
         Str::RequestAccess,
         Str::PairingCodeHint,
         Str::WaitingApproval,
@@ -148,6 +150,7 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::Password => "Mật khẩu",
             Str::LoginFailed => "Đăng nhập không thành công",
             Str::NotLoggedIn => "Chưa đăng nhập",
+            Str::SigningIn => "Đang đăng nhập…",
             Str::RequestAccess => "Xin quyền truy cập",
             Str::PairingCodeHint => "Kiểm tra mã này trên máy kia rồi bấm Chấp thuận",
             Str::WaitingApproval => "Đang chờ máy kia chấp thuận…",
@@ -199,6 +202,7 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::Password => "Password",
             Str::LoginFailed => "Sign-in failed",
             Str::NotLoggedIn => "Not signed in",
+            Str::SigningIn => "Signing in…",
             Str::RequestAccess => "Request access",
             Str::PairingCodeHint => "Check this code on the other machine, then approve",
             Str::WaitingApproval => "Waiting for the other machine to approve…",
@@ -245,6 +249,17 @@ pub fn offline_last_seen(lang: Lang, hh: u8, mm: u8) -> String {
     }
 }
 
+/// Login error line: "Đăng nhập không thành công: <core message>" (just the
+/// label when the core gave no message).
+pub fn login_failed(lang: Lang, message: &str) -> String {
+    let message = message.trim();
+    if message.is_empty() {
+        t(lang, Str::LoginFailed).to_string()
+    } else {
+        format!("{}: {message}", t(lang, Str::LoginFailed))
+    }
+}
+
 /// "Có bản cập nhật 2.0.1" / "Update available: 2.0.1".
 pub fn update_available(lang: Lang, version: &str) -> String {
     match lang {
@@ -270,7 +285,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 49);
+        assert_eq!(Str::ALL.len(), 50);
     }
 
     #[test]
@@ -315,6 +330,11 @@ mod tests {
             offline_last_seen(Lang::En, 23, 59),
             "offline · last seen 23:59"
         );
+        assert_eq!(
+            login_failed(Lang::Vi, "invalid credentials"),
+            "Đăng nhập không thành công: invalid credentials"
+        );
+        assert_eq!(login_failed(Lang::En, "  "), "Sign-in failed");
         assert_eq!(update_available(Lang::Vi, "2.0.1"), "Có bản cập nhật 2.0.1");
         assert_eq!(
             update_available(Lang::En, "2.0.1"),
