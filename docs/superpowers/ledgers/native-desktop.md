@@ -180,6 +180,14 @@ T+0 ≈ 02:50 +07 (user: "chạy"). G0: 37 GB free (Flutter `Runner-*`, `cmux-w0
 - User ruling (2026-10-19): new lane branches may be pushed to `lephus/shellx-pro` without asking (never `main`).
 - User ruling (2026-10-19): no public `ghcr.io/lephus/shellx-relay2` image for now; send the MIT/GPL question to Manaflow first. Ruling (L0): relay2 is built on the VPS from a pinned fork commit instead of pulled — costs a slower deploy (~cargo build on the VPS) if wrong.
 
+## Repo move (2026-10-19, user ruling)
+
+User: ShellX inherits cmux and lives on `main` of `lephus/shellx` ("đưa thẳng vào main; code cũ flutter shellX có thể xoá đi"; "xoá hết, kể cả điện thoại"; "push luôn khi xong"). Done on branch `native-merge`: `e986a28cd4` removes the Flutter apps (desktop + mobile), `packages/`, `third_party/`, `term/`, `agent-skills/`, `release/`, `release-desktop.yml`, `windows-check.yml` (all kept at tag `flutter-final` = `d53d608a`); `902806ec30` merges fork `main` `36d7697869` with full cmux history at the repo root, dropping the BUSL dirs, `workers/` except `workers/cmux-paste-text` (Xcode build needs it), cmux's `.github/` and translated READMEs.
+
+From now on "fork" in the spec, plans and this ledger means **this repo** (`lephus/shellx`): fork paths `~/Documents/myProjects/shellx-pro/...` → `~/Documents/myProjects/shellx/...`, fork branches `shellx/<lane>` → branches of `lephus/shellx`. `lephus/shellx-pro` is frozen (W0 history only; its `shellx/sprint`, `shellx/l4-relay2`, `shellx/l5-remote` work is merged/rebased here when the sprint resumes). Sprint stopped at T+0:25 for the move; lane worktrees on the old repo are paused.
+
+Rulings (L0): (1) cmux CI workflows removed instead of disabled — cmux's ~147 workflows would run here; ShellX writes its own (`shellx-mac.yml` etc.) — cost if wrong: re-adding a few upstream jobs by hand. (2) cmux tests that check the removed `web/`, `workers/` and workflows (`tests/test_ci_*`, `tests/test_web_validation.py`, `tests/test_tui_publish_workflow_security.py`, `scripts/ci/web_subareas.py` …) are left for W1 to delete or skip — cost: red local test runs until then. (3) Upstream updates: `git merge upstream/main` with `upstream = manaflow-ai/cmux`, re-deleting the dirs above (README "Updating from cmux"). (4) Push of `main` triggers `deploy.yml` (push > 1000 commits ignores the path filter): it redeploys today's relay/web, unchanged code.
+
 ## Handoff (2026-10-18 evening)
 
 State for the next session:
