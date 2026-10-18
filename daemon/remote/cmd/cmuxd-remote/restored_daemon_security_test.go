@@ -116,7 +116,7 @@ func TestWaitSignalIsPrivateAndDoesNotTruncateExistingSignal(t *testing.T) {
 func TestWaitSignalRejectsSymlinkedParent(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	if err := os.Symlink(t.TempDir(), filepath.Join(home, ".cmux")); err != nil {
+	if err := os.Symlink(t.TempDir(), filepath.Join(home, ".shellx")); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := tmuxWaitForSignalPath("unsafe-parent"); err == nil {

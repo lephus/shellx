@@ -122,7 +122,7 @@ func claudeHookInstalledCmuxBinary() (string, error) {
 	if err != nil || home == "" {
 		return "", errors.New("could not locate the home directory for the cmux CLI path")
 	}
-	return filepath.Join(home, ".cmux", "bin", "cmux"), nil
+	return filepath.Join(home, remoteStateDirName, "bin", remoteCLIName), nil
 }
 
 // installedClaudeHookSettings is the hook fragment for Claude's user settings.

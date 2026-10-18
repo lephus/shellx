@@ -99,7 +99,7 @@ func (b *cloudCLIBridge) start(ctx context.Context, socketPath string, stderr io
 	b.listener = listener
 	b.socketInfo = socketInfo
 	b.mu.Unlock()
-	_, _ = fmt.Fprintf(stderr, "cmuxd-remote cloud CLI bridge listening on %s\n", socketPath)
+	_, _ = fmt.Fprintf(stderr, remoteHelperName+" cloud CLI bridge listening on %s\n", socketPath)
 	go func() {
 		<-ctx.Done()
 		_ = listener.Close()

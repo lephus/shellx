@@ -1717,7 +1717,7 @@ func TestPersistentPTYCommandOverridesStaleExecHelperEnvironment(t *testing.T) {
 	}
 	cmd := exec.Command("/bin/sh", "-c", `test "$CMUX_PERSISTENT_PTY_EXEC_HELPER" = "$CMUX_EXPECTED_PTY_EXEC_HELPER"`)
 	cmd.Env = append(os.Environ(),
-		persistentPTYExecHelperEnvironment+"=/missing/cmuxd-remote",
+		persistentPTYExecHelperEnvironment+"=/missing/shellx-remote",
 		"CMUX_EXPECTED_PTY_EXEC_HELPER="+executable,
 	)
 	wrapped, err := persistentPTYCommand(cmd)

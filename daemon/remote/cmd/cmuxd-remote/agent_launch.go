@@ -443,7 +443,7 @@ func configureAgentEnvironment(cfg agentConfig) {
 	// Find our own executable path for the shim to call back
 	selfPath, _ := os.Executable()
 	if selfPath == "" {
-		selfPath = "cmux"
+		selfPath = remoteCLIName
 	}
 	os.Setenv(cfg.cmuxBinEnvVar, selfPath)
 
