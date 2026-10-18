@@ -655948,6 +655948,301 @@
         "ko": { "stringUnit": { "state": "translated", "value": "재개 제안이 변경되었거나 승인할 수 없습니다. 대체 명령은 등록되지 않았습니다. 현재 제안을 검토한 후 다시 시도하세요." } },
         "ja": { "stringUnit": { "state": "translated", "value": "再開の提案が変更されたか、承認できませんでした。代わりのコマンドは登録されていません。現在の提案を確認して、もう一度お試しください。" } }
       }
+    },
+    "singleInstance.olderShellX.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The previous ShellX app (at %@) is open. Quit it to use the new ShellX."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تطبيق ShellX السابق (في %@) مفتوح. أغلقه لاستخدام ShellX الجديد."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La app anterior de ShellX (en %@) está abierta. Ciérrala para usar el nuevo ShellX."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先前的 ShellX App（位於 %@）仍在開啟中。請結束它以使用新版 ShellX。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "之前的 ShellX 应用（位于 %@）仍处于打开状态。请退出它以使用新版 ShellX。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전 ShellX 앱(%@)이 열려 있습니다. 새 ShellX를 사용하려면 종료하세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die vorherige ShellX-App (unter %@) ist geöffnet. Beende sie, um die neue ShellX zu verwenden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’ancienne app ShellX (dans %@) est ouverte. Quittez-la pour utiliser le nouveau ShellX."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以前の ShellX アプリ（%@）が開いています。新しい ShellX を使うには終了してください。"
+          }
+        }
+      }
+    },
+    "singleInstance.olderShellX.quit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quit Old ShellX and Continue"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إنهاء ShellX القديم والمتابعة"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerrar el ShellX anterior y continuar"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "結束舊版 ShellX 並繼續"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退出旧版 ShellX 并继续"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전 ShellX 종료 후 계속"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alte ShellX beenden und fortfahren"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitter l’ancien ShellX et continuer"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "古い ShellX を終了して続行"
+          }
+        }
+      }
+    },
+    "singleInstance.olderShellX.quitFailed.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quit the app at %@ yourself, then open ShellX again."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أغلق التطبيق الموجود في %@ بنفسك، ثم افتح ShellX مرة أخرى."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cierra tú mismo la app en %@ y vuelve a abrir ShellX."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請自行結束位於 %@ 的 App，然後再次開啟 ShellX。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请自行退出位于 %@ 的应用，然后重新打开 ShellX。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@에 있는 앱을 직접 종료한 다음 ShellX를 다시 여세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beende die App unter %@ selbst und öffne ShellX dann erneut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quittez vous-même l’app située dans %@, puis rouvrez ShellX."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ のアプリを手動で終了してから、ShellX をもう一度開いてください。"
+          }
+        }
+      }
+    },
+    "singleInstance.olderShellX.quitFailed.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The older ShellX didn't quit"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لم يُغلق ShellX الأقدم"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El ShellX anterior no se cerró"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "舊版 ShellX 未能結束"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "旧版 ShellX 未能退出"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전 ShellX가 종료되지 않았습니다"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die ältere ShellX wurde nicht beendet"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’ancien ShellX ne s’est pas fermé"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "古い ShellX が終了しませんでした"
+          }
+        }
+      }
+    },
+    "singleInstance.olderShellX.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An older ShellX is running"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إصدار أقدم من ShellX قيد التشغيل"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hay una versión anterior de ShellX abierta"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "舊版 ShellX 正在執行"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "旧版 ShellX 正在运行"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전 ShellX가 실행 중입니다"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eine ältere ShellX-Version läuft"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une ancienne version de ShellX est ouverte"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "古い ShellX が実行中です"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

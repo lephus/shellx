@@ -1687,6 +1687,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // An older ShellX (the Flutter app) shares our bundle id. Ask before
+        // anything else runs; this returns only once it has quit.
+        if !isRunningUnderXCTest(ProcessInfo.processInfo.environment) {
+            resolveOlderShellXBeforeLaunch()
+        }
         // Start the one browser-availability watcher before any gated view or
         // menu mounts: it is lazy, and its consumers only observe its
         // notification, so nothing else would bring it up (#10866).
@@ -18677,8 +18682,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             ) else { continue }
             switch SingleInstanceConflictPolicy(environment: environment).action(
                 currentBundleURL: Bundle.main.bundleURL,
-                existingBundleURL: app.bundleURL
+                existingBundleURL: app.bundleURL,
+                existingKind: Self.singleInstanceKind(of: app)
             ) {
+            case .askToQuitOlderShellX:
+                // Never quit it without the user's click; exits on Cancel.
+                promptToQuitOlderShellX(app)
             case .yieldToExisting:
                 // Another bundle sharing this id (a local Release build, a
                 // tool-launched copy) must not kill the user's running app.
@@ -18723,6 +18732,92 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 "quitRequestedPids": quitRequestedPids.joined(separator: ",")
             ]
         )
+    }
+
+    /// Shows the "older ShellX is running" prompt for every non-native app
+    /// that shares our bundle id (the Flutter ShellX at /Applications/ShellX.app).
+    private func resolveOlderShellXBeforeLaunch() {
+        guard let bundleId = Bundle.main.bundleIdentifier else { return }
+        let currentPid = ProcessInfo.processInfo.processIdentifier
+        for app in NSRunningApplication.runningApplications(withBundleIdentifier: bundleId) {
+            guard app.processIdentifier != currentPid, !app.isTerminated else { continue }
+            guard Self.isDuplicateApplicationExecutable(
+                app.executableURL,
+                mainExecutableURL: Self.bundleExecutableURL(of: app)
+            ) else { continue }
+            guard Self.singleInstanceKind(of: app) == .olderShellX else { continue }
+            promptToQuitOlderShellX(app)
+        }
+    }
+
+    /// Asks the user to quit the older ShellX `app`. Cancel exits this launch
+    /// (as a silent yield did before); Quit asks the app to terminate, waits
+    /// the graceful timeout and continues. If it refuses, says so and exits.
+    /// The older app is never force-terminated.
+    private func promptToQuitOlderShellX(_ app: NSRunningApplication) {
+        let path = app.bundleURL?.path ?? String(app.processIdentifier)
+        StartupBreadcrumbLog.append(
+            "singleInstance.olderShellX.prompt",
+            fields: ["existingPid": String(app.processIdentifier), "existingBundlePath": path]
+        )
+        NSApp.activate()
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(
+            localized: "singleInstance.olderShellX.title",
+            defaultValue: "An older ShellX is running"
+        )
+        alert.informativeText = String.localizedStringWithFormat(
+            String(
+                localized: "singleInstance.olderShellX.message",
+                defaultValue: "The previous ShellX app (at %@) is open. Quit it to use the new ShellX."
+            ),
+            path
+        )
+        alert.addButton(withTitle: String(
+            localized: "singleInstance.olderShellX.quit",
+            defaultValue: "Quit Old ShellX and Continue"
+        ))
+        alert.addButton(withTitle: String(localized: "common.cancel", defaultValue: "Cancel"))
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            StartupBreadcrumbLog.append("singleInstance.olderShellX.cancel")
+            // _exit: skip atexit handlers, as the yield path does.
+            _exit(0)
+        }
+        _ = app.terminate()
+        let deadline = Date().addingTimeInterval(SingleInstanceConflictPolicy.gracefulTerminationTimeout)
+        while !app.isTerminated, Date() < deadline {
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.1))
+        }
+        guard app.isTerminated else {
+            StartupBreadcrumbLog.append("singleInstance.olderShellX.quitRefused")
+            let failure = NSAlert()
+            failure.alertStyle = .critical
+            failure.messageText = String(
+                localized: "singleInstance.olderShellX.quitFailed.title",
+                defaultValue: "The older ShellX didn't quit"
+            )
+            failure.informativeText = String.localizedStringWithFormat(
+                String(
+                    localized: "singleInstance.olderShellX.quitFailed.message",
+                    defaultValue: "Quit the app at %@ yourself, then open ShellX again."
+                ),
+                path
+            )
+            failure.addButton(withTitle: String(localized: "common.ok", defaultValue: "OK"))
+            failure.runModal()
+            _exit(0)
+        }
+        StartupBreadcrumbLog.append("singleInstance.olderShellX.quit")
+    }
+
+    /// Whether `app` is a native ShellX or another app sharing our bundle id.
+    nonisolated private static func singleInstanceKind(
+        of app: NSRunningApplication
+    ) -> SingleInstanceConflictPolicy.ExistingInstanceKind {
+        SingleInstanceConflictPolicy.classifyExistingBundle(at: app.bundleURL) { path in
+            FileManager.default.fileExists(atPath: path)
+        }
     }
 
     /// The main executable of the bundle `app` was registered with, if any.
@@ -18771,16 +18866,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             ) else {
                 return
             }
-            // Leave same-bundle launches to the incoming process. It yields to
-            // this instance by default and can replace it only with the
-            // explicit reload override.
-            if let launchedBundleURL = app.bundleURL,
-               SingleInstanceConflictPolicy.isSameBundle(launchedBundleURL, Bundle.main.bundleURL) {
+            switch SingleInstanceConflictPolicy.duplicateLaunchAction(
+                launchedBundleURL: app.bundleURL,
+                currentBundleURL: Bundle.main.bundleURL,
+                launchedKind: Self.singleInstanceKind(of: app)
+            ) {
+            case .ignoreSameBundle:
+                // Leave same-bundle launches to the incoming process. It yields to
+                // this instance by default and can replace it only with the
+                // explicit reload override.
                 StartupBreadcrumbLog.append(
                     "singleInstance.observe.sameBundleLaunch",
                     fields: ["duplicatePid": String(app.processIdentifier)]
                 )
                 return
+            case .leaveOlderShellXRunning:
+                // The older (Flutter) ShellX the user just opened keeps running;
+                // it used to be force-terminated here without a word.
+                StartupBreadcrumbLog.append(
+                    "singleInstance.observe.olderShellXLaunch",
+                    fields: [
+                        "launchedPid": String(app.processIdentifier),
+                        "launchedBundlePath": app.bundleURL?.path ?? "nil"
+                    ]
+                )
+                return
+            case .terminateDuplicate:
+                break
             }
 
             StartupBreadcrumbLog.append(
