@@ -139,6 +139,10 @@ Both ends are WebSocket clients, so their frames are masked: a raw grep alone gi
 
 **Spec implication (§8.5):** the invitation URI contains the PSK. If it ever transits the ShellX server in clear, the server could claim the invitation first and only on-site approval would stop it. So: the approval screen must show the device fingerprint (not just the name), and the PSK must travel out of band (QR code or a URL `#fragment` the server never receives). Carry into W2.
 
+### Windows build (W0 Task 6) — PASS
+
+Recorded 2026-10-19. Workflow `.github/workflows/shellx-windows-spike.yml` on fork branch `shellx/w0-spikes`. First run `39142103019`: `-gnu` green, `-msvc` test compile failed (`KeyInput { key: u32::MAX }`, bindgen makes `GhosttyKey` `i32` under MSVC). Fix `03e475b590` (`u32::MAX as _`). Run `39146962148`: **both `x86_64-pc-windows-msvc` and `-gnu` green**: libghostty-vt build (Zig 0.16.0), `cmux-tui-core` platform tests, `cmux-tui.exe`, long-path tests, process-exit / ConPTY resize smokes, remote-probe check. Artifacts `cmux-tui-x86_64-pc-windows-msvc` (9.88 MB), `cmux-tui-x86_64-pc-windows-gnu` (9.91 MB). §13 fallback (`alacritty_terminal`) not needed. Note: this proves the core builds and ConPTY works; `cmux-remote` on Windows is still uncompiled (see D-W0-1).
+
 ## Handoff (2026-10-18 evening)
 
 State for the next session:
