@@ -79,7 +79,9 @@ class RemoteE2E(unittest.TestCase):
     def tearDown(self):
         if self._failed():
             self.h.dump_logs(sys.stderr)
+        leaks = self.h.secret_leaks()  # before close removes the dir; every test, every file
         self.h.close()
+        self.assertEqual(leaks, [], "invite URI, HMAC secret or account password found in these files")
         self.assertFalse(os.path.exists(self.h.root), "harness dir (and every temp secret) must be removed")
 
     def _failed(self) -> bool:

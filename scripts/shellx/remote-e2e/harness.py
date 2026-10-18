@@ -58,12 +58,15 @@ INVITE_RE = re.compile(r"cmux://enroll/[A-Za-z0-9_=-]+")
 
 def wait_until(timeout: float, check: Callable[[], object], interval: float = 0.5) -> bool:
     """Polls `check` until it returns something truthy or `timeout` seconds pass.
-    An exception counts as "not yet"."""
+    A `HarnessError` (a dead process) is re-raised at once; any other exception
+    counts as "not yet"."""
     deadline = time.monotonic() + timeout
     while True:
         try:
             if check():
                 return True
+        except HarnessError:
+            raise
         except Exception:
             pass
         if time.monotonic() >= deadline:
@@ -592,6 +595,26 @@ class Harness:
             if path.is_file() and not path.is_symlink():
                 out.append(path.read_text(errors="replace"))
         return out
+
+    def secret_leaks(self) -> list[str]:
+        """Relative paths of files under the harness dir (all of them, not only
+        logs; the fake app's input hex log excluded) that contain an invite URI,
+        the run's HMAC secret or the fake account password. Names only, never
+        the secret."""
+        needles = (b"cmux://enroll/", self.secret.encode(), self.password.encode())
+        leaks = []
+        if not self.root.exists():
+            return leaks
+        for path in sorted(self.root.rglob("*")):
+            if not path.is_file() or path.is_symlink() or path.name.endswith(".input.log"):
+                continue
+            try:
+                data = path.read_bytes()
+            except OSError:
+                continue
+            if any(n in data for n in needles):
+                leaks.append(str(path.relative_to(self.root)))
+        return leaks
 
     def dump_logs(self, stream, lines: int = 80) -> None:
         if not self.root.exists():
