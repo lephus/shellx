@@ -11,10 +11,15 @@ pub struct MachineInfo {
     /// "macos" | "windows"
     pub platform: String,
     pub online: bool,
+    #[serde(default, deserialize_with = "null_as_zero")]
     pub last_seen_unix: i64,
     pub fingerprint: String,
     #[serde(default)]
     pub is_this_machine: bool,
+}
+
+fn null_as_zero<'de, D: serde::Deserializer<'de>>(d: D) -> Result<i64, D::Error> {
+    Ok(Option::<i64>::deserialize(d)?.unwrap_or(0))
 }
 
 /// Local knowledge of access to a machine.
@@ -233,5 +238,18 @@ mod tests {
         )
         .unwrap();
         assert!(!v.is_this_machine);
+    }
+
+    #[test]
+    fn null_or_absent_last_seen_is_zero_and_does_not_fail_the_list() {
+        let v: Vec<MachineInfo> = serde_json::from_str(
+            r#"[{"machine_id":"a","name":"n","platform":"macos","online":false,"last_seen_unix":null,"fingerprint":"f"},
+                {"machine_id":"b","name":"n","platform":"macos","online":false,"fingerprint":"f"}]"#,
+        )
+        .unwrap();
+        assert_eq!(v[0].last_seen_unix, 0);
+        assert_eq!(v[1].last_seen_unix, 0);
+        let g = build_groups(&v, &|_| Access::None, 0, Lang::Vi);
+        assert_eq!(g[0].subtitle.as_deref(), Some("ngoại tuyến"));
     }
 }

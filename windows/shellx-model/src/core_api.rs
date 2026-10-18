@@ -84,7 +84,7 @@ pub struct LoginInfo {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct Registered {
     pub machine_id: String,
-    pub slot: i64,
+    pub slot: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -372,13 +372,16 @@ mod tests {
 
     #[test]
     fn register_machine_sends_no_key() {
-        let f = fake_with("machines.register", json!({"machine_id":"m1","slot":2}));
+        let f = fake_with(
+            "machines.register",
+            json!({"machine_id":"m1","slot":"q3vN8x0wK1tY5pB2cD7fGg"}),
+        );
         let r = register_machine(&f, "PC", "10.0", "2.0.0").unwrap();
         assert_eq!(
             r,
             Registered {
                 machine_id: "m1".into(),
-                slot: 2
+                slot: "q3vN8x0wK1tY5pB2cD7fGg".into()
             }
         );
         let (m, p) = &f.calls()[0];
