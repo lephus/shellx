@@ -1,0 +1,132 @@
+<style>
+  .sx-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(460px,1fr)); gap:1.25rem; }
+  .sx-grid .card-image { aspect-ratio:auto; display:block; background:#0b0f14; padding:0; }
+  .sxw { font:11px/1.45 "JetBrains Mono",ui-monospace,Menlo,monospace; color:#c9d4e0; background:#0b0f14; height:300px; display:flex; flex-direction:column; overflow:hidden; text-align:left; }
+  .sxw .tb { height:24px; flex:none; display:flex; align-items:center; gap:6px; padding:0 10px; background:#121820; border-bottom:1px solid #1d2630; color:#6b7a8a; font-size:10px; }
+  .sxw .dot { width:9px; height:9px; border-radius:50%; background:#2a3542; }
+  .sxw .dot.r{background:#ff5f57}.sxw .dot.y{background:#febc2e}.sxw .dot.g{background:#28c840}
+  .sxw .row { display:flex; flex:1; min-height:0; }
+  .sxw .side { width:34%; flex:none; background:#0f141b; border-right:1px solid #1d2630; padding:8px 6px; overflow:hidden; }
+  .sxw .ws { padding:6px 7px; border-radius:6px; margin-bottom:4px; }
+  .sxw .ws.on { background:#16202b; }
+  .sxw .ws b { color:#e6edf5; font-weight:600; }
+  .sxw .meta { color:#6b7a8a; font-size:9.5px; }
+  .sxw .att { box-shadow:0 0 0 1.5px #22d3ee; background:#0e1d24; }
+  .sxw .pill { display:inline-block; padding:0 5px; border-radius:8px; font-size:9px; line-height:14px; }
+  .sxw .p-wait{background:#083344;color:#67e8f9}.sxw .p-run{background:#1a2733;color:#93a4b5}.sxw .p-ok{background:#052e1c;color:#4ade80}.sxw .p-err{background:#3b0d0d;color:#f87171}
+  .sxw .pane { flex:1; padding:8px 10px; overflow:hidden; border-right:1px solid #1d2630; }
+  .sxw .pane:last-child { border-right:0; }
+  .sxw .pane.ring { box-shadow:inset 0 0 0 1.5px #22d3ee; }
+  .sxw .c { color:#22d3ee; } .sxw .g { color:#4ade80; } .sxw .m { color:#6b7a8a; } .sxw .w { color:#e6edf5; }
+  .sxw .tiles { flex:1; display:grid; grid-template-columns:repeat(3,1fr); gap:6px; padding:8px; }
+  .sxw .tile { background:#0f141b; border:1px solid #1d2630; border-radius:7px; padding:6px 7px; overflow:hidden; font-size:9.5px; }
+  .sxw .tile.att { border-color:#22d3ee; box-shadow:0 0 12px rgba(34,211,238,.25); }
+  .sxw .bar { flex:none; height:26px; display:flex; align-items:center; gap:8px; padding:0 10px; border-top:1px solid #1d2630; background:#0f141b; color:#6b7a8a; }
+  .sxw .blk { border:1px solid #1d2630; border-radius:6px; margin-bottom:6px; overflow:hidden; }
+  .sxw .blk .h { background:#121820; padding:3px 8px; display:flex; justify-content:space-between; }
+  .sxw .blk .o { padding:4px 8px; color:#93a4b5; }
+  .sxw .pal { position:absolute; left:50%; top:34px; transform:translateX(-50%); width:62%; background:#141b24; border:1px solid #2a3542; border-radius:9px; box-shadow:0 12px 40px rgba(0,0,0,.6); }
+  .sxw .pal .q { padding:7px 10px; border-bottom:1px solid #2a3542; color:#e6edf5; }
+  .sxw .pal .it { padding:4px 10px; display:flex; justify-content:space-between; }
+  .sxw .pal .it.on { background:#16202b; }
+  .sxw .grp { color:#6b7a8a; font-size:9px; text-transform:uppercase; letter-spacing:.06em; margin:6px 4px 3px; }
+  .sxw .btn { border:1px solid #2a3542; border-radius:5px; padding:1px 7px; color:#c9d4e0; font-size:9.5px; }
+  .sxw .btn.pri { border-color:#22d3ee; color:#22d3ee; }
+</style>
+
+<h2>Hướng giao diện nào khiến bạn thấy "bứt phá"?</h2>
+<p class="subtitle">Bốn hướng cho cửa sổ chính của ShellX desktop. Cả bốn dùng chung một bảng màu để bạn so bố cục và cách dùng, màu chưa phải màu cuối. Bấm chọn một hoặc nhiều hướng, rồi nói trong terminal bạn thích hay muốn trộn chỗ nào.</p>
+
+<div class="cards sx-grid" data-multiselect>
+
+  <!-- A -->
+  <div class="card" data-choice="a-sidebar" onclick="toggleSelect(this)">
+    <div class="card-image"><div class="sxw">
+      <div class="tb"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>&nbsp; ShellX</div>
+      <div class="row">
+        <div class="side">
+          <div class="ws on att"><b>api-server</b> <span class="pill p-wait">chờ bạn</span><div class="meta">⎇ feat/auth · PR #42 · :3000</div><div class="meta c">Claude: "Cho phép sửa 3 file?"</div></div>
+          <div class="ws"><b>web</b> <span class="pill p-run">chạy</span><div class="meta">⎇ main · :5173</div></div>
+          <div class="ws"><b>mobile-ios</b> <span class="pill p-ok">xong</span><div class="meta">⎇ fix/login · PR #40 ✓</div></div>
+          <div class="ws"><b>vps-prod</b><div class="meta">ssh · ubuntu@vm01</div></div>
+        </div>
+        <div class="pane ring"><span class="m">~/api</span> <span class="c">❯</span> claude<br><br><span class="w">● Sửa middleware xác thực</span><br><span class="m">  src/auth.ts  +24 −6</span><br><span class="m">  src/session.ts  +8</span><br><br><span class="c">Cho phép sửa 3 file?</span><br><span class="w">❯ 1. Có</span><br><span class="m">  2. Không</span></div>
+        <div class="pane"><span class="m">~/api</span> <span class="c">❯</span> pnpm dev<br><span class="g">✓ ready</span> <span class="m">in 412ms</span><br><span class="m">GET /health 200</span><br><span class="m">POST /login 401</span><br><span class="m">POST /login 200</span></div>
+      </div>
+    </div></div>
+    <div class="card-body">
+      <h3>A · Sidebar giàu thông tin</h3>
+      <p>Giữ bố cục của cmux rồi làm kỹ hơn. Mỗi workspace hiện nhánh git, PR, cổng đang mở và câu cuối agent nói. Phiên nào đang chờ bạn thì sáng viền. Đây là hướng an toàn và quen tay nhất.</p>
+    </div>
+  </div>
+
+  <!-- B -->
+  <div class="card" data-choice="b-mission" onclick="toggleSelect(this)">
+    <div class="card-image"><div class="sxw">
+      <div class="tb"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>&nbsp; ShellX · Điều phối &nbsp;<span class="pill p-wait">2 chờ bạn</span> <span class="pill p-run">3 đang chạy</span> <span class="pill p-ok">1 xong</span></div>
+      <div class="tiles">
+        <div class="tile att"><b class="w">api-server</b> <span class="pill p-wait">chờ</span><br><span class="m">● sửa auth.ts</span><br><span class="c">Cho phép sửa 3 file?</span></div>
+        <div class="tile att"><b class="w">web</b> <span class="pill p-wait">chờ</span><br><span class="m">● viết test e2e</span><br><span class="c">Chạy lệnh pnpm i?</span></div>
+        <div class="tile"><b class="w">docs</b> <span class="pill p-run">chạy</span><br><span class="m">● dịch README sang vi</span><br><span class="m">▓▓▓▓▓░░░ 62%</span></div>
+        <div class="tile"><b class="w">mobile-ios</b> <span class="pill p-ok">xong</span><br><span class="g">✓ 14 test pass</span><br><span class="m">PR #40 sẵn sàng</span></div>
+        <div class="tile"><b class="w">relay</b> <span class="pill p-run">chạy</span><br><span class="m">● tìm test chập chờn</span><br><span class="m">vòng 7/24</span></div>
+        <div class="tile"><b class="w">infra</b> <span class="pill p-err">lỗi</span><br><span class="m">● deploy staging</span><br><span style="color:#f87171">exit 1: thiếu biến môi trường</span></div>
+      </div>
+      <div class="bar"><span class="c">↳ api-server</span><span style="flex:1;border:1px solid #2a3542;border-radius:5px;padding:2px 8px;">Trả lời nhanh mà không cần mở phiên…</span><span class="btn pri">Gửi ⏎</span></div>
+    </div></div>
+    <div class="card-body">
+      <h3>B · Bảng điều phối agent</h3>
+      <p>Màn hình chính là một lưới các phiên đang chạy trực tiếp, giống phòng điều khiển. Phiên chờ bạn được đẩy lên trước, và bạn trả lời ngay từ thanh dưới. Bấm vào ô nào thì phóng to thành terminal đầy đủ.</p>
+    </div>
+  </div>
+
+  <!-- C -->
+  <div class="card" data-choice="c-command" onclick="toggleSelect(this)">
+    <div class="card-image"><div class="sxw" style="position:relative;">
+      <div class="tb"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>&nbsp; api-server — ~/api</div>
+      <div class="pane" style="opacity:.45;">
+        <div class="blk"><div class="h"><span><span class="c">❯</span> <span class="w">pnpm test</span></span><span class="g">✓ 2.1s</span></div><div class="o">48 passed · 0 failed</div></div>
+        <div class="blk"><div class="h"><span><span class="c">❯</span> <span class="w">git push</span></span><span class="g">✓ 0.8s</span></div><div class="o">feat/auth → origin</div></div>
+        <div class="blk"><div class="h"><span><span class="c">❯</span> <span class="w">claude</span></span><span class="c">● đang chờ</span></div><div class="o">Cho phép sửa 3 file?</div></div>
+      </div>
+      <div class="pal">
+        <div class="q"><span class="c">⌘K</span>&nbsp; gửi sang điện|</div>
+        <div class="grp">Hành động</div>
+        <div class="it on"><span class="w">📱 Gửi phiên này sang điện thoại</span><span class="m">⌘⇧P</span></div>
+        <div class="it"><span>🔗 Chia sẻ phiên bằng link</span><span class="m">⌘⇧L</span></div>
+        <div class="grp">Phiên</div>
+        <div class="it"><span>web · pnpm dev</span><span class="m">⌃2</span></div>
+        <div class="it"><span>vps-prod · ssh</span><span class="m">⌃4</span></div>
+      </div>
+      <div class="bar"><span class="pill p-wait">api</span><span class="pill p-run">web</span><span class="pill p-ok">ios</span><span class="pill p-run">vps</span><span style="flex:1"></span><span>⌘K để làm mọi thứ</span></div>
+    </div></div>
+    <div class="card-body">
+      <h3>C · Tối giản, lệnh là trung tâm</h3>
+      <p>Không có sidebar, terminal chiếm trọn màn hình. Mỗi lệnh và kết quả gom thành một khối gọn, gập lại được. Mọi thao tác, từ chuyển phiên, chia sẻ đến gửi sang điện thoại, đều đi qua ⌘K. Hợp với người dùng phím tắt là chính.</p>
+    </div>
+  </div>
+
+  <!-- D -->
+  <div class="card" data-choice="d-devices" onclick="toggleSelect(this)">
+    <div class="card-image"><div class="sxw">
+      <div class="tb"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>&nbsp; ShellX <span style="flex:1"></span><span class="btn">🔗 Chia sẻ</span><span class="btn pri">📱 Tiếp tục trên điện thoại</span></div>
+      <div class="row">
+        <div class="side">
+          <div class="grp">💻 MacBook này</div>
+          <div class="ws on att"><b>api-server</b> <span class="pill p-wait">chờ</span></div>
+          <div class="ws"><b>web</b> <span class="pill p-run">chạy</span></div>
+          <div class="grp">🖥 PC Windows · văn phòng</div>
+          <div class="ws"><b>build-win</b> <span class="pill p-ok">xong</span></div>
+          <div class="grp">☁️ VPS vm01</div>
+          <div class="ws"><b>logs</b> <span class="meta">ssh</span></div>
+        </div>
+        <div class="pane"><div style="display:flex;justify-content:space-between;"><span class="m">~/api</span><span class="pill p-wait">📱 iPhone đang xem</span></div><span class="c">❯</span> claude<br><br><span class="w">● Sửa middleware xác thực</span><br><span class="m">  src/auth.ts  +24 −6</span><br><br><span class="c">Cho phép sửa 3 file?</span><br><span class="w">❯ 1. Có</span><br><span class="m">  2. Không</span><br><br><span class="m">— đồng bộ với điện thoại, mã hoá đầu cuối —</span></div>
+      </div>
+    </div></div>
+    <div class="card-body">
+      <h3>D · Mọi máy, một chỗ</h3>
+      <p>Sidebar gom phiên theo từng máy: Mac này, PC Windows, VPS. Mỗi phiên chuyển sang điện thoại hoặc chia sẻ cho người khác chỉ bằng một nút. Đây là thứ cmux không có, nên nó là chất riêng của ShellX.</p>
+    </div>
+  </div>
+
+</div>
