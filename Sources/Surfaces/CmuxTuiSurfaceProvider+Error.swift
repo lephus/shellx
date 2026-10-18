@@ -132,12 +132,12 @@ extension CmuxTuiSurfaceProvider {
             case .hubUnavailable:
                 return String(
                     localized: "cloudTree.error.hubUnavailable",
-                    defaultValue: "This cmux build has no user-space WireGuard hub, so it cannot reach ports on Cloud machines."
+                    defaultValue: "This ShellX build has no user-space WireGuard hub, so it cannot reach ports on Cloud machines."
                 )
             case .localForwardURLUnavailable:
                 return String(
                     localized: "cloudTree.error.localForwardURLUnavailable",
-                    defaultValue: "cmux could not build a local address for this port forward."
+                    defaultValue: "ShellX could not build a local address for this port forward."
                 )
             }
         }

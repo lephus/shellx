@@ -535,7 +535,7 @@ final class NewMachineModel {
         guard supportsSize, !lockedMemoryOptions.isEmpty, let memoryUpgradePlanNames = lockedMemoryUpgradePlanNames else { return nil }
         let sizes = lockedMemoryOptions.compactMap { upgradePlan(for: $0) == nil ? nil : Self.memoryLabel(mb: $0) }
         let joined = ListFormatter.localizedString(byJoining: sizes)
-        let format = String(localized: "machines.new.size.locked.note", defaultValue: "%1$@ machines need cmux %2$@.")
+        let format = String(localized: "machines.new.size.locked.note", defaultValue: "%1$@ machines need ShellX %2$@.")
         return String(format: format, joined, memoryUpgradePlanNames)
     }
 
@@ -669,7 +669,7 @@ final class NewMachineModel {
         guard submit(createRequest) else {
             errorText = String(
                 localized: "machines.new.error.launch",
-                defaultValue: "cmux could not start the create command. Sign in and try again."
+                defaultValue: "ShellX could not start the create command. Sign in and try again."
             )
             return
         }

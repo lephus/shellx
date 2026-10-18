@@ -481,7 +481,7 @@ extension CMUXCLI {
         }
 
         guard args.count == 1 else {
-            throw CLIError(message: "Usage: cmux docs [settings|shortcuts|api|browser|capture|agents|workflows|dock|managed-policies]")
+            throw CLIError(message: "Usage: shellx docs [settings|shortcuts|api|browser|capture|agents|workflows|dock|managed-policies]")
         }
 
         if topic == "list" || topic == "all" {
@@ -494,7 +494,7 @@ extension CMUXCLI {
         }
 
         guard let reference = docsReference(for: topic) else {
-            throw CLIError(message: "Unknown docs topic '\(topic)'. Run 'cmux docs' for topics.")
+            throw CLIError(message: "Unknown docs topic '\(topic)'. Run 'shellx docs' for topics.")
         }
 
         if wantsJSON {
@@ -506,17 +506,17 @@ extension CMUXCLI {
 
     func docsUsage() -> String {
         return """
-        Usage: cmux docs [settings|shortcuts|api|browser|capture|agents|workflows|dock|managed-policies]
+        Usage: shellx docs [settings|shortcuts|api|browser|capture|agents|workflows|dock|managed-policies]
 
-        Print the canonical docs URL, raw GitHub resources, and useful commands for a cmux topic.
-        This command does not require a running cmux app or socket.
+        Print the canonical docs URL, raw GitHub resources, and useful commands for a ShellX topic.
+        This command does not require a running ShellX app or socket.
 
         Agents:
-          Use `cmux docs settings` before editing ~/.config/cmux/cmux.json.
+          Use `shellx docs settings` before editing ~/.config/shellx/shellx.json.
           \(Self.workflowText("cli.workflow.guidance.discover", "Use `cmux docs workflows --json` to choose a shipped workflow example or discover the saved-layout lifecycle."))
-          Use `cmux docs dock` before creating or editing .cmux/dock.json.
-          Use `cmux docs capture` to screenshot or record a window for a pull request or a bug report.
-          Back up any existing cmux.json file to a timestamped .bak copy before editing so the user can revert.
+          Use `shellx docs dock` before creating or editing .shellx/dock.json.
+          Use `shellx docs capture` to screenshot or record a window for a pull request or a bug report.
+          Back up any existing shellx.json file to a timestamped .bak copy before editing so the user can revert.
           Fetch raw resources with the printed curl commands when you need the latest schema.
         """
     }
@@ -701,13 +701,13 @@ extension CMUXCLI {
         switch subcommand {
         case "path", "paths":
             guard args.count == 1 else {
-                throw CLIError(message: "Usage: cmux settings path")
+                throw CLIError(message: "Usage: shellx settings path")
             }
             printSettingsPaths(jsonOutput: wantsJSON)
             return
         case "docs", "documentation":
             guard args.count == 1 else {
-                throw CLIError(message: "Usage: cmux settings docs")
+                throw CLIError(message: "Usage: shellx settings docs")
             }
             if wantsJSON, let reference = docsReference(for: "settings") {
                 print(jsonString(docsPayload(reference)))
@@ -718,10 +718,10 @@ extension CMUXCLI {
         case "open":
             let targetRaw: String?
             if args.count > 2 {
-                throw CLIError(message: "Usage: cmux settings open [target]")
+                throw CLIError(message: "Usage: shellx settings open [target]")
             } else if let rawTarget = args.dropFirst().first {
                 guard let target = settingsTargetRawValue(for: rawTarget) else {
-                    throw CLIError(message: "Unknown settings target '\(rawTarget)'. Run 'cmux settings --help'.")
+                    throw CLIError(message: "Unknown settings target '\(rawTarget)'. Run 'shellx settings --help'.")
                 }
                 targetRaw = target
             } else {
@@ -736,10 +736,10 @@ extension CMUXCLI {
             return
         default:
             guard let targetRaw = settingsTargetRawValue(for: subcommand) else {
-                throw CLIError(message: "Unknown settings subcommand '\(subcommand)'. Run 'cmux settings --help'.")
+                throw CLIError(message: "Unknown settings subcommand '\(subcommand)'. Run 'shellx settings --help'.")
             }
             guard args.count == 1 else {
-                throw CLIError(message: "Usage: cmux settings [open [target]|path|docs|<target>]")
+                throw CLIError(message: "Usage: shellx settings [open [target]|path|docs|<target>]")
             }
             try openSettingsTarget(
                 targetRaw,
@@ -759,14 +759,14 @@ extension CMUXCLI {
 
     func settingsUsage() -> String {
         return """
-        Usage: cmux settings [open [target]|path|docs|<target>]
+        Usage: shellx settings [open [target]|path|docs|<target>]
 
-        Open cmux Settings, print cmux.json paths, or show settings documentation.
+        Open ShellX Settings, print shellx.json paths, or show settings documentation.
 
         Subcommands:
           open [target]       Open Settings, optionally to a target section.
-          path                Print cmux.json paths, docs URL, and schema URL.
-          docs                Print the same output as `cmux docs settings`.
+          path                Print shellx.json paths, docs URL, and schema URL.
+          docs                Print the same output as `shellx docs settings`.
 
         Targets:
           account, app, themes, terminal, networking, computers, devices, sidebar-appearance,
@@ -779,14 +779,14 @@ extension CMUXCLI {
           legacy config: \(Self.legacySettingsDisplayPath)
           legacy app support: \(Self.fallbackSettingsDisplayPath)
 
-        Related (not cmux-owned, but cmux reads it for terminal behavior):
+        Related (not ShellX-owned, but ShellX reads it for terminal behavior):
           \(Self.ghosttyConfigDisplayPath)
 
-        Before editing cmux.json:
-          Back up any existing cmux.json file to a timestamped .bak copy so the user can revert.
+        Before editing shellx.json:
+          Back up any existing shellx.json file to a timestamped .bak copy so the user can revert.
 
-        Reload after editing cmux.json or Ghostty config:
-          cmux reload-config   (reloads BOTH and refreshes terminals; no app restart needed)
+        Reload after editing shellx.json or Ghostty config:
+          shellx reload-config   (reloads BOTH and refreshes terminals; no app restart needed)
         """
     }
 

@@ -1,26 +1,26 @@
 {
   "cloud.welcome.title.eyebrow": {
     "class": "brand",
-    "source": "cmux cloud"
+    "source": "ShellX cloud"
   },
   "actions.discovery.menuTitle": {
-    "source": "Actions · cmux.json…",
+    "source": "Actions · shellx.json…",
     "identityLocales": {
       "fr": {
         "reason": "Actions is the standard French noun for this UI label, and cmux.json is an invariant filename. The translated French entry is still required.",
         "values": [
-          "Actions · cmux.json…"
+          "Actions · shellx.json…"
         ]
       }
     }
   },
   "actions.discovery.dialogTitle": {
-    "source": "Actions · cmux.json",
+    "source": "Actions · shellx.json",
     "identityLocales": {
       "fr": {
         "reason": "Actions is the standard French noun for this UI label, and cmux.json is an invariant filename. The translated French entry is still required.",
         "values": [
-          "Actions · cmux.json"
+          "Actions · shellx.json"
         ]
       }
     }
@@ -64,12 +64,12 @@
     }
   },
   "CFBundleDisplayName": {
-    "source": "cmux Cloud Tunnel",
+    "source": "ShellX Cloud Tunnel",
     "class": "brand"
   },
   "about.appName": {
     "class": "brand",
-    "source": "cmux"
+    "source": "ShellX"
   },
   "about.commit": {
     "source": "Commit",
@@ -693,7 +693,7 @@
     }
   },
   "cloudTunnel.vpnConfiguration.name": {
-    "source": "cmux Cloud",
+    "source": "ShellX Cloud",
     "class": "brand"
   },
   "command.applyUpdateIfAvailable.subtitle": {
@@ -783,7 +783,7 @@
   },
   "command.cmuxConfig.builtInSubtitle": {
     "class": "brand",
-    "source": "cmux"
+    "source": "ShellX"
   },
   "command.cmuxConfig.defaultClaudeCodeTitle": {
     "source": "Claude Code",
@@ -867,7 +867,7 @@
   },
   "command.cmuxConfig.subtitle": {
     "class": "syntax",
-    "source": "cmux.json"
+    "source": "shellx.json"
   },
   "command.installCLI.subtitle": {
     "class": "technical",
@@ -1033,7 +1033,7 @@
   },
   "computerUse.menu.title": {
     "class": "brand",
-    "source": "cmux Computer Use"
+    "source": "ShellX Computer Use"
   },
   "computerUse.menu.unknownTarget": {
     "source": "App",
@@ -2036,23 +2036,23 @@
   },
   "mobile.pairing.target.appStore": {
     "class": "brand",
-    "source": "cmux"
+    "source": "ShellX"
   },
   "mobile.pairing.target.beta": {
     "class": "brand",
-    "source": "cmux BETA"
+    "source": "ShellX BETA"
   },
   "mobile.pairing.target.demo": {
     "class": "brand",
-    "source": "cmux DEMO"
+    "source": "ShellX DEMO"
   },
   "mobile.pairing.target.dev": {
     "class": "brand",
-    "source": "cmux DEV %@"
+    "source": "ShellX DEV %@"
   },
   "mobile.pairing.target.internal": {
     "class": "brand",
-    "source": "cmux INTERNAL"
+    "source": "ShellX INTERNAL"
   },
   "mode.compact": {
     "source": "Compact",
@@ -2135,7 +2135,7 @@
   },
   "pricing.native.eyebrow": {
     "class": "brand",
-    "source": "cmux Pro"
+    "source": "ShellX Pro"
   },
   "pricing.native.free.price": {
     "class": "price",
@@ -2183,11 +2183,11 @@
   },
   "pricing.pro.name": {
     "class": "brand",
-    "source": "cmux Pro"
+    "source": "ShellX Pro"
   },
   "pricing.pro.workspace.title": {
     "class": "brand",
-    "source": "cmux Pro"
+    "source": "ShellX Pro"
   },
   "pricing.team.name": {
     "source": "Team",
@@ -2197,7 +2197,7 @@
   },
   "pricing.window.title": {
     "class": "brand",
-    "source": "cmux Pro"
+    "source": "ShellX Pro"
   },
   "projectSchemes.badge.personal": {
     "source": "personal",
@@ -2506,7 +2506,7 @@
   },
   "settings.account.pro.title": {
     "class": "brand",
-    "source": "cmux Pro"
+    "source": "ShellX Pro"
   },
   "settings.app.markdownFontFamily.placeholder": {
     "source": "System",
@@ -2700,7 +2700,7 @@
   },
   "settings.config.source.cmux": {
     "class": "brand",
-    "source": "cmux"
+    "source": "ShellX"
   },
   "settings.customSidebars.renderer": {
     "source": "Renderer",
@@ -2909,7 +2909,7 @@
   },
   "settings.section.settingsJSON": {
     "class": "technical",
-    "source": "cmux.json"
+    "source": "shellx.json"
   },
   "globalSearch.kind.terminal": {
     "source": "Terminal",
@@ -3162,7 +3162,7 @@
   },
   "sidebar.provider.default.subtitle": {
     "class": "brand",
-    "source": "cmux"
+    "source": "ShellX"
   },
   "sidebar.remote.badge": {
     "class": "technical",
@@ -3426,11 +3426,11 @@
   },
   "sleepyMode.glow.cmux": {
     "class": "brand",
-    "source": "cmux"
+    "source": "ShellX"
   },
   "sleepyMode.theme.cmux": {
     "class": "brand",
-    "source": "cmux"
+    "source": "ShellX"
   },
   "sleepyMode.theme.mono": {
     "source": "Mono",
@@ -4230,17 +4230,17 @@
     "reason": "Literal command, executable, JSON path, or filesystem path in CLI/CMUXCLI+DocsSettings.swift. Kept invariant for execution and configuration."
   },
   "cli.workflow.literal..cmux/cmux.json": {
-    "source": ".cmux/cmux.json",
+    "source": ".shellx/shellx.json",
     "class": "syntax",
     "reason": "Literal command, executable, JSON path, or filesystem path in CLI/CMUXCLI+DocsSettings.swift. Kept invariant for execution and configuration."
   },
   "cli.workflow.literal.~/.config/cmux/cmux.json": {
-    "source": "~/.config/cmux/cmux.json",
+    "source": "~/.config/shellx/shellx.json",
     "class": "syntax",
     "reason": "Literal command, executable, JSON path, or filesystem path in CLI/CMUXCLI+DocsSettings.swift. Kept invariant for execution and configuration."
   },
   "cli.workflow.literal..cmux/dock.json": {
-    "source": ".cmux/dock.json",
+    "source": ".shellx/dock.json",
     "class": "syntax",
     "reason": "Literal command, executable, JSON path, or filesystem path in CLI/CMUXCLI+DocsSettings.swift. Kept invariant for execution and configuration."
   },
@@ -4275,47 +4275,47 @@
     "reason": "Literal command, executable, JSON path, or filesystem path in CLI/CMUXCLI+DocsSettings.swift. Kept invariant for execution and configuration."
   },
   "cli.workflow.literal.cmux markdown": {
-    "source": "cmux markdown",
+    "source": "shellx markdown",
     "class": "syntax",
     "reason": "Literal command, executable, JSON path, or filesystem path in CLI/CMUXCLI+DocsSettings.swift. Kept invariant for execution and configuration."
   },
   "cli.workflow.literal.cmux feed tui --opentui": {
-    "source": "cmux feed tui --opentui",
+    "source": "shellx feed tui --opentui",
     "class": "syntax",
     "reason": "Literal command, executable, JSON path, or filesystem path in CLI/CMUXCLI+DocsSettings.swift. Kept invariant for execution and configuration."
   },
   "cli.workflow.literal.cmux reload-config": {
-    "source": "cmux reload-config",
+    "source": "shellx reload-config",
     "class": "syntax",
     "reason": "Literal command, executable, JSON path, or filesystem path in CLI/CMUXCLI+DocsSettings.swift. Kept invariant for execution and configuration."
   },
   "cli.workflow.literal.cmux docs workflows --json": {
-    "source": "cmux docs workflows --json",
+    "source": "shellx docs workflows --json",
     "class": "syntax",
     "reason": "Literal command, executable, JSON path, or filesystem path in CLI/CMUXCLI+DocsSettings.swift. Kept invariant for execution and configuration."
   },
   "cli.workflow.literal.cmux layout list --json": {
-    "source": "cmux layout list --json",
+    "source": "shellx layout list --json",
     "class": "syntax",
     "reason": "Literal command, executable, JSON path, or filesystem path in CLI/CMUXCLI+DocsSettings.swift. Kept invariant for execution and configuration."
   },
   "cli.workflow.literal.cmux layout get <name>": {
-    "source": "cmux layout get <name>",
+    "source": "shellx layout get <name>",
     "class": "syntax",
     "reason": "Literal command, executable, JSON path, or filesystem path in CLI/CMUXCLI+DocsSettings.swift. Kept invariant for execution and configuration."
   },
   "cli.workflow.literal.cmux layout open <name> --cwd <project>": {
-    "source": "cmux layout open <name> --cwd <project>",
+    "source": "shellx layout open <name> --cwd <project>",
     "class": "syntax",
     "reason": "Literal command, executable, JSON path, or filesystem path in CLI/CMUXCLI+DocsSettings.swift. Kept invariant for execution and configuration."
   },
   "cli.workflow.literal.cmux layout save <name> --description \"<what this creates>\"": {
-    "source": "cmux layout save <name> --description \"<what this creates>\"",
+    "source": "shellx layout save <name> --description \"<what this creates>\"",
     "class": "syntax",
     "reason": "Literal command, executable, JSON path, or filesystem path in CLI/CMUXCLI+DocsSettings.swift. Kept invariant for execution and configuration."
   },
   "cli.workflow.literal.cmux layout delete <name>": {
-    "source": "cmux layout delete <name>",
+    "source": "shellx layout delete <name>",
     "class": "syntax",
     "reason": "Literal command, executable, JSON path, or filesystem path in CLI/CMUXCLI+DocsSettings.swift. Kept invariant for execution and configuration."
   },
@@ -4983,54 +4983,54 @@
     "source": "Claude"
   },
   "settings.account.max.title": {
-    "source": "cmux Max",
+    "source": "ShellX Max",
     "identityLocales": {
       "de": {
         "reason": "Product and plan name cmux Max is a brand name and is not translated.",
         "values": [
-          "cmux Max"
+          "ShellX Max"
         ]
       },
       "fr": {
         "reason": "Product and plan name cmux Max is a brand name and is not translated.",
         "values": [
-          "cmux Max"
+          "ShellX Max"
         ]
       },
       "ar": {
         "reason": "Product and plan name cmux Max is a brand name and is not translated.",
         "values": [
-          "cmux Max"
+          "ShellX Max"
         ]
       },
       "es": {
         "reason": "Product and plan name cmux Max is a brand name and is not translated.",
         "values": [
-          "cmux Max"
+          "ShellX Max"
         ]
       },
       "zh-Hant": {
         "reason": "Product and plan name cmux Max is a brand name and is not translated.",
         "values": [
-          "cmux Max"
+          "ShellX Max"
         ]
       },
       "zh-Hans": {
         "reason": "Product and plan name cmux Max is a brand name and is not translated.",
         "values": [
-          "cmux Max"
+          "ShellX Max"
         ]
       },
       "ko": {
         "reason": "Product and plan name cmux Max is a brand name and is not translated.",
         "values": [
-          "cmux Max"
+          "ShellX Max"
         ]
       },
       "ja": {
         "reason": "Product and plan name cmux Max is a brand name and is not translated.",
         "values": [
-          "cmux Max"
+          "ShellX Max"
         ]
       }
     }

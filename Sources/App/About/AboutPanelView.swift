@@ -23,15 +23,16 @@ struct AboutPanelView: View {
 
     var body: some View {
         VStack(alignment: .center) {
-            Image(nsImage: NSApplication.shared.applicationIconImage)
+            Image("ShellXLogo")
                 .resizable()
                 .renderingMode(.original)
+                .aspectRatio(contentMode: .fit)
                 .frame(width: 96, height: 96)
-                .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 3)
+                .accessibilityHidden(true)
 
             VStack(alignment: .center, spacing: 32) {
                 VStack(alignment: .center, spacing: 8) {
-                    Text(String(localized: "about.appName", defaultValue: "cmux"))
+                    Text(String(localized: "about.appName", defaultValue: "ShellX"))
                         .cmuxFont(.title)
                         .bold()
                     Text(String(localized: "about.description", defaultValue: "A Ghostty-based terminal with vertical tabs\nand a notification panel for macOS."))
@@ -55,6 +56,21 @@ struct AboutPanelView: View {
                         URL(string: "https://github.com/manaflow-ai/cmux/commit/\(hash)")
                     }
                     AboutPropertyRow(label: String(localized: "about.commit", defaultValue: "Commit"), text: commitText, url: commitURL)
+                }
+                .frame(maxWidth: .infinity)
+
+                Link(AboutLicenseContent.licenseLine, destination: AboutLicenseContent.sourceCodeURL)
+                    .cmuxFont(.caption)
+                    .multilineTextAlignment(.center)
+
+                VStack(spacing: 2) {
+                    Text(String(localized: "about.shellx.credits", defaultValue: "Credits"))
+                        .cmuxFont(.caption)
+                        .bold()
+                        .padding(.bottom, 2)
+                    ForEach(AboutLicenseContent.attributions, id: \.name) { attribution in
+                        AboutPropertyRow(label: attribution.name, text: attribution.license, url: attribution.url)
+                    }
                 }
                 .frame(maxWidth: .infinity)
 

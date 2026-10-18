@@ -720,7 +720,7 @@ final class CloseWorkspaceCmdDUITests: XCTestCase {
     private func waitForQuitCmuxAlert(app: XCUIApplication, timeout: TimeInterval) -> Bool {
         let expectation = XCTNSPredicateExpectation(
             predicate: NSPredicate { _, _ in
-                app.staticTexts["Quit cmux?"].exists
+                app.staticTexts["Quit ShellX?"].exists
             },
             object: NSObject()
         )
@@ -730,7 +730,7 @@ final class CloseWorkspaceCmdDUITests: XCTestCase {
     private func waitForQuitCmuxAlertToDisappear(app: XCUIApplication, timeout: TimeInterval) -> Bool {
         let expectation = XCTNSPredicateExpectation(
             predicate: NSPredicate { _, _ in
-                !app.staticTexts["Quit cmux?"].exists
+                !app.staticTexts["Quit ShellX?"].exists
             },
             object: NSObject()
         )

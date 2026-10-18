@@ -197,7 +197,7 @@ struct SettingsWindowHostRoot: View {
             // surfaces as a visible message instead of a silent no-op.
             Text(String(
                 localized: "settings.window.runtimeUnavailable",
-                defaultValue: "Settings could not load. Please restart cmux and report this issue."
+                defaultValue: "Settings could not load. Please restart ShellX and report this issue."
             ))
             .padding(40)
             .frame(

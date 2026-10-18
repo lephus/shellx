@@ -9,7 +9,7 @@ extension CMUXCLI {
     static let commentsUsage = CMUXDiffViewerLocalization.string(
         "cli.comments.usage",
         defaultValue: """
-        Usage: cmux comments <subcommand> [options]
+        Usage: shellx comments <subcommand> [options]
 
         Review comments saved from the diff viewer, stored per git repository.
 
@@ -26,10 +26,10 @@ extension CMUXCLI {
     static let reviewUsage = String(
         localized: "cli.review.usage",
         defaultValue: """
-        Usage: cmux review <subcommand> [options]
+        Usage: shellx review <subcommand> [options]
 
         Read local adversarial-review receipts stored in the repository's Git metadata.
-        This command does not require a running cmux app or socket.
+        This command does not require a running ShellX app or socket.
 
         Subcommands:
           list [--repo <path>]
@@ -169,7 +169,7 @@ extension CMUXCLI {
         throw CLIError(message: String.localizedStringWithFormat(
             String(
                 localized: "cli.review.error.unexpectedArgument",
-                defaultValue: "Unexpected argument '%1$@' for cmux review %2$@"
+                defaultValue: "Unexpected argument '%1$@' for shellx review %2$@"
             ),
             unexpected,
             subcommand
@@ -187,7 +187,7 @@ extension CMUXCLI {
             throw CLIError(message: String.localizedStringWithFormat(
                 String(
                     localized: "cli.review.error.notARepository",
-                    defaultValue: "cmux review requires a git repository: %@"
+                    defaultValue: "shellx review requires a git repository: %@"
                 ),
                 directory
             ))
@@ -225,7 +225,7 @@ extension CMUXCLI {
             CLIError(message: String.localizedStringWithFormat(
                 String(
                     localized: "cli.review.error.invalidReceiptDetail",
-                    defaultValue: "Invalid cmux review receipt '%1$@': %2$@"
+                    defaultValue: "Invalid ShellX review receipt '%1$@': %2$@"
                 ),
                 fileName,
                 detail
@@ -726,7 +726,7 @@ extension CMUXCLI {
                 throw CLIError(message: String.localizedStringWithFormat(
                     String(
                         localized: "cli.review.error.invalidReceipt",
-                        defaultValue: "Invalid cmux review receipt: %@"
+                        defaultValue: "Invalid ShellX review receipt: %@"
                     ),
                     file.lastPathComponent
                 ))
@@ -760,7 +760,7 @@ extension CMUXCLI {
         guard !receipts.isEmpty else {
             throw CLIError(message: String(
                 localized: "cli.review.error.noReceipts",
-                defaultValue: "No cmux review receipts found for this repository."
+                defaultValue: "No ShellX review receipts found for this repository."
             ))
         }
 
@@ -958,7 +958,7 @@ extension CMUXCLI {
                 throw CLIError(message: String.localizedStringWithFormat(
                     CMUXDiffViewerLocalization.string(
                         "cli.comments.error.unexpectedArgument",
-                        defaultValue: "Unexpected argument '%@' for cmux comments list. Supported: --repo <path>, --all, --json"
+                        defaultValue: "Unexpected argument '%@' for shellx comments list. Supported: --repo <path>, --all, --json"
                     ),
                     unexpected
                 ))
@@ -995,7 +995,7 @@ extension CMUXCLI {
             throw CLIError(message: String.localizedStringWithFormat(
                 CMUXDiffViewerLocalization.string(
                     "cli.comments.error.notARepository",
-                    defaultValue: "cmux comments requires a git repository: %@"
+                    defaultValue: "shellx comments requires a git repository: %@"
                 ),
                 directory
             ))

@@ -11609,55 +11609,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Iroh and transport report"
+            "value": "ShellX Iroh and transport report"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Irohとトランスポートのレポート"
+            "value": "ShellX Irohとトランスポートのレポート"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Iroh und Transportbericht"
+            "value": "ShellX Iroh und Transportbericht"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Iroh et rapport de transport"
+            "value": "ShellX Iroh et rapport de transport"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Iroh وتقرير النقل"
+            "value": "ShellX Iroh وتقرير النقل"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Iroh y informe de transporte"
+            "value": "ShellX Iroh y informe de transporte"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Iroh 和運輸報告"
+            "value": "ShellX Iroh 和運輸報告"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Iroh 和运输报告"
+            "value": "ShellX Iroh 和运输报告"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Iroh 및 운송 보고서"
+            "value": "ShellX Iroh 및 운송 보고서"
           }
         }
       }

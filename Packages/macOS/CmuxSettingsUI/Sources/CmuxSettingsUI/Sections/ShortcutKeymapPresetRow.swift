@@ -46,7 +46,7 @@ struct ShortcutKeymapPresetRow: View {
                 String(localized: "settings.shortcuts.baseKeymap", defaultValue: "Base Keymap"),
                 subtitle: String(
                     localized: "settings.shortcuts.baseKeymap.subtitle",
-                    defaultValue: "Start from another terminal's shortcuts. Only the differences are written to cmux.json; choose cmux to remove them."
+                    defaultValue: "Start from another terminal's shortcuts. Only the differences are written to shellx.json; choose ShellX to remove them."
                 ),
                 controlWidth: 220
             ) {

@@ -135,7 +135,7 @@ extension TerminalController {
                 code: ControlOverloadResponder.errorCode,
                 message: String(
                     localized: "socket.overloaded.message",
-                    defaultValue: "cmux is handling too many control-socket requests right now, so this one was not run. Retry in a moment."
+                    defaultValue: "ShellX is handling too many control-socket requests right now, so this one was not run. Retry in a moment."
                 )
             )
         }

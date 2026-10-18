@@ -78,7 +78,7 @@ public enum ManagedFileTransferPolicy: Sendable {
         let message = disabledMessage
         let detail = String(
             localized: "managedPolicy.fileTransfer.refusalDetail",
-            defaultValue: "cmux did not upload the file. Your organization's device policy disables file transfer through cmux."
+            defaultValue: "ShellX did not upload the file. Your organization's device policy disables file transfer through ShellX."
         )
         let present: @MainActor () -> Void = {
             let alert = NSAlert()
@@ -179,7 +179,7 @@ public enum ManagedIrohNetworkingPolicy: Sendable {
     public static var disabledMessage: String {
         String(
             localized: "managedPolicy.irohNetworking.disabled",
-            defaultValue: "cmux relay networking is disabled by your organization."
+            defaultValue: "ShellX relay networking is disabled by your organization."
         )
     }
 }

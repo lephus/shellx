@@ -38,7 +38,7 @@ extension CMUXCLI {
                     detail: "kind=\(record.kind)",
                     message: String(
                         localized: "cli.restore.error.admissionIdentityMissing",
-                        defaultValue: "restore: this session's live ownership could not be verified. Run 'cmux restore --surface' again."
+                        defaultValue: "restore: this session's live ownership could not be verified. Run 'shellx restore --surface' again."
                     )
                 )
             }
@@ -51,7 +51,7 @@ extension CMUXCLI {
                 detail: "kind=\(record.kind)",
                 message: String(
                     localized: "cli.restore.error.admissionIdentityMissing",
-                    defaultValue: "restore: this session's live ownership could not be verified. Run 'cmux restore --surface' again."
+                    defaultValue: "restore: this session's live ownership could not be verified. Run 'shellx restore --surface' again."
                 )
             )
         }
@@ -87,7 +87,7 @@ extension CMUXCLI {
                 detail: "kind=\(record.kind) session=\(sessionID)",
                 message: String(
                     localized: "cli.restore.error.admissionIdentityMissing",
-                    defaultValue: "restore: this session's live ownership could not be verified. Run 'cmux restore --surface' again."
+                    defaultValue: "restore: this session's live ownership could not be verified. Run 'shellx restore --surface' again."
                 )
             )
         }

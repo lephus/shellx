@@ -6,7 +6,7 @@ extension CMUXCLI {
         if let processID, processID > 0 {
             let format = String(
                 localized: "cli.restore.error.liveOwner",
-                defaultValue: "restore: this agent session is already running in process %1$lld. cmux did not start another copy. To take it over here, stop process %1$lld, then run 'cmux restore --surface' again."
+                defaultValue: "restore: this agent session is already running in process %1$lld. ShellX did not start another copy. To take it over here, stop process %1$lld, then run 'shellx restore --surface' again."
             )
             return loggedRestoreError(
                 stage: "admission.live-owner",
@@ -19,7 +19,7 @@ extension CMUXCLI {
             detail: "kind=\(kind) session=\(sessionID)",
             message: String(
                 localized: "cli.restore.error.launchPending",
-                defaultValue: "restore: another launch of this agent session is already starting. Wait for it to appear, or retry 'cmux restore --surface'."
+                defaultValue: "restore: another launch of this agent session is already starting. Wait for it to appear, or retry 'shellx restore --surface'."
             )
         )
     }

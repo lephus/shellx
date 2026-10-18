@@ -72,7 +72,7 @@ struct CLIVersionSkewMessageTests {
     @Test("An older app gets the relaunch fix")
     func olderAppSaysRelaunch() throws {
         let peer = CLIVersionSkew.Peer(app: "cmux", version: "0.64.2", build: "100", cliPath: nil)
-        #expect(try #require(message(peer: peer)).contains("Quit and reopen cmux"))
+        #expect(try #require(message(peer: peer)).contains("Quit and reopen ShellX"))
     }
 
     @Test("An unparsable app version does not guess a direction")

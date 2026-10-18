@@ -261,7 +261,7 @@ final class ComputerUseOnboardingWindowController: NSObject, NSWindowDelegate {
             defer: false
         )
         window.identifier = NSUserInterfaceItemIdentifier("cmux.computerUse.onboarding")
-        window.title = String(localized: "computerUse.onboarding.windowTitle", defaultValue: "cmux Computer Use Setup")
+        window.title = String(localized: "computerUse.onboarding.windowTitle", defaultValue: "ShellX Computer Use Setup")
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false

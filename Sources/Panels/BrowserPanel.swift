@@ -1217,7 +1217,7 @@ private func browserPresentExternalNavigationPrompt(
     )
     alert.informativeText = String(
         localized: "browser.externalOpenPrompt.message",
-        defaultValue: "A web page in cmux wants to open a link in another app. You can stay in the browser instead."
+        defaultValue: "A web page in ShellX wants to open a link in another app. You can stay in the browser instead."
     )
     alert.addButton(withTitle: String(
         localized: "browser.externalOpenPrompt.openApp",
@@ -1250,7 +1250,7 @@ func browserPresentExternalNavigationFailure(
     )
     alert.informativeText = String(
         localized: "browser.externalOpenFailure.message",
-        defaultValue: "cmux could not open this link. You can copy it and open it in another app."
+        defaultValue: "ShellX could not open this link. You can copy it and open it in another app."
     )
     alert.addButton(withTitle: String(localized: "common.ok", defaultValue: "OK"))
     alert.addButton(withTitle: String(
@@ -6267,12 +6267,12 @@ final class BrowserPanel: Panel, ObservableObject {
         let alert = insecureHTTPAlertFactory()
         alert.alertStyle = .warning
         alert.messageText = String(localized: "browser.error.insecure.title", defaultValue: "Connection isn\u{2019}t secure")
-        alert.informativeText = String(localized: "browser.error.insecure.message", defaultValue: "\(host) uses plain HTTP, so traffic can be read or modified on the network.\n\nOpen this URL in your default browser, or proceed in cmux.")
+        alert.informativeText = String(localized: "browser.error.insecure.message", defaultValue: "\(host) uses plain HTTP, so traffic can be read or modified on the network.\n\nOpen this URL in your default browser, or proceed in ShellX.")
         alert.addButton(withTitle: String(localized: "browser.openInDefaultBrowser", defaultValue: "Open in Default Browser"))
-        alert.addButton(withTitle: String(localized: "browser.proceedInCmux", defaultValue: "Proceed in cmux"))
+        alert.addButton(withTitle: String(localized: "browser.proceedInCmux", defaultValue: "Proceed in ShellX"))
         alert.addButton(withTitle: String(localized: "common.cancel", defaultValue: "Cancel"))
         alert.showsSuppressionButton = true
-        alert.suppressionButton?.title = String(localized: "browser.alwaysAllowHost", defaultValue: "Always allow this host in cmux")
+        alert.suppressionButton?.title = String(localized: "browser.alwaysAllowHost", defaultValue: "Always allow this host in ShellX")
 
         let buttons = [
             MobileBrowserDialogButton(
@@ -9827,13 +9827,13 @@ enum BrowserImportPlanRealizationError: LocalizedError {
         case .missingDestinationProfile:
             return String(
                 localized: "browser.import.error.destinationMissing",
-                defaultValue: "The selected cmux browser profile no longer exists. Pick a destination profile again."
+                defaultValue: "The selected ShellX browser profile no longer exists. Pick a destination profile again."
             )
         case .profileCreationFailed(let name):
             return String(
                 format: String(
                     localized: "browser.import.error.destinationCreateFailed",
-                    defaultValue: "cmux could not create the destination profile \"%@\"."
+                    defaultValue: "ShellX could not create the destination profile \"%@\"."
                 ),
                 name
             )
@@ -11640,7 +11640,7 @@ extension BrowserDataImportCoordinator {
             sourceProfilesHelpLabel.preferredMaxLayoutWidth = 500
             sourceProfilesHelpLabel.stringValue = String(
                 localized: "browser.import.sourceProfiles.help",
-                defaultValue: "Choose one or more source profiles. Step 3 lets you keep them separate or merge them into one cmux profile."
+                defaultValue: "Choose one or more source profiles. Step 3 lets you keep them separate or merge them into one ShellX profile."
             )
 
             sourceProfilesContainer.orientation = .vertical
@@ -11689,7 +11689,7 @@ extension BrowserDataImportCoordinator {
             )
             mergeProfilesRadio.title = String(
                 localized: "browser.import.destinationMode.merge",
-                defaultValue: "Merge all into one cmux profile"
+                defaultValue: "Merge all into one ShellX profile"
             )
             separateProfilesRadio.target = self
             separateProfilesRadio.action = #selector(handleDestinationModeChanged(_:))
@@ -11735,7 +11735,7 @@ extension BrowserDataImportCoordinator {
             let destinationTitleLabel = NSTextField(
                 labelWithString: String(
                     localized: "browser.import.destination.cmux",
-                    defaultValue: "cmux destination"
+                    defaultValue: "ShellX destination"
                 )
             )
             registerStaticFont(destinationTitleLabel, size: 12, weight: .semibold)
@@ -11984,13 +11984,13 @@ extension BrowserDataImportCoordinator {
             if presentation.showsSeparateRows {
                 destinationHelpLabel.stringValue = String(
                     localized: "browser.import.destinationProfile.separateHelp",
-                    defaultValue: "Missing cmux profiles are created when import starts."
+                    defaultValue: "Missing ShellX profiles are created when import starts."
                 )
                 destinationHelpLabel.isHidden = false
             } else if plan.entries.count > 1 {
                 destinationHelpLabel.stringValue = String(
                     localized: "browser.import.destinationProfile.mergeHelp",
-                    defaultValue: "All selected source profiles will be merged into the chosen cmux browser profile."
+                    defaultValue: "All selected source profiles will be merged into the chosen ShellX browser profile."
                 )
                 destinationHelpLabel.isHidden = false
             } else {

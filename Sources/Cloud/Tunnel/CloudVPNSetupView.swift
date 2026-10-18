@@ -41,10 +41,10 @@ struct CloudVPNSetupView: View {
         VStack(alignment: .leading, spacing: 9) {
             Text(String(localized: "cloud.vpn.setup.howItWorks.title", defaultValue: "How it works"))
                 .cmuxFont(size: 14, weight: .semibold)
-            Text(String(localized: "cloud.vpn.setup.howItWorks.body", defaultValue: "Connect Safari, Chrome, and other apps to your Cloud machines. Each machine keeps its private IP address and original ports. Only traffic to your Cloud network uses this encrypted connection. cmux terminals, Ports, and Desktop work without it."))
+            Text(String(localized: "cloud.vpn.setup.howItWorks.body", defaultValue: "Connect Safari, Chrome, and other apps to your Cloud machines. Each machine keeps its private IP address and original ports. Only traffic to your Cloud network uses this encrypted connection. ShellX terminals, Ports, and Desktop work without it."))
                 .cmuxFont(size: 13).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(String(localized: "cloud.vpn.setup.permission.body", defaultValue: "The VPN software is included in cmux. You do not need another app. macOS may require your password or Touch ID during approval."))
+            Text(String(localized: "cloud.vpn.setup.permission.body", defaultValue: "The VPN software is included in ShellX. You do not need another app. macOS may require your password or Touch ID during approval."))
                 .cmuxFont(size: 13).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -66,7 +66,7 @@ struct CloudVPNSetupView: View {
                 Text(message).cmuxFont(size: 12).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                Text(String(localized: "cloud.vpn.setup.status.off", defaultValue: "Off. Your Cloud panes continue to work through cmux's built-in route."))
+                Text(String(localized: "cloud.vpn.setup.status.off", defaultValue: "Off. Your Cloud panes continue to work through ShellX's built-in route."))
                     .cmuxFont(size: 12).foregroundStyle(.secondary)
             }
         }
@@ -120,13 +120,13 @@ struct CloudVPNSetupView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(String(localized: "cloud.vpn.setup.steps.title", defaultValue: "First-time setup"))
                 .cmuxFont(size: 14, weight: .semibold)
-            Text(String(localized: "cloud.vpn.setup.steps.extension", defaultValue: "1. Click Connect Cloud VPN. When macOS asks, allow the cmux network extension in System Settings."))
+            Text(String(localized: "cloud.vpn.setup.steps.extension", defaultValue: "1. Click Connect Cloud VPN. When macOS asks, allow the ShellX network extension in System Settings."))
             Text(ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15
-                ? String(localized: "cloud.vpn.setup.steps.settings", defaultValue: "Open General > Login Items & Extensions > Network Extensions, then enable cmux.")
-                : String(localized: "cloud.vpn.setup.steps.settingsLegacy", defaultValue: "Open Privacy & Security and allow the cmux extension."))
+                ? String(localized: "cloud.vpn.setup.steps.settings", defaultValue: "Open General > Login Items & Extensions > Network Extensions, then enable ShellX.")
+                : String(localized: "cloud.vpn.setup.steps.settingsLegacy", defaultValue: "Open Privacy & Security and allow the ShellX extension."))
                 .foregroundStyle(.secondary)
-            Text(String(localized: "cloud.vpn.setup.steps.configuration", defaultValue: "2. Allow cmux to add a VPN configuration named cmux Cloud. This is a separate macOS permission."))
-            Text(String(localized: "cloud.vpn.setup.steps.return", defaultValue: "3. Return to this pane. The connection continues automatically after approval. Disconnect here when finished. Quitting cmux or signing out also disconnects it."))
+            Text(String(localized: "cloud.vpn.setup.steps.configuration", defaultValue: "2. Allow ShellX to add a VPN configuration named ShellX Cloud. This is a separate macOS permission."))
+            Text(String(localized: "cloud.vpn.setup.steps.return", defaultValue: "3. Return to this pane. The connection continues automatically after approval. Disconnect here when finished. Quitting ShellX or signing out also disconnects it."))
         }
         .cmuxFont(size: 13).fixedSize(horizontal: false, vertical: true)
     }

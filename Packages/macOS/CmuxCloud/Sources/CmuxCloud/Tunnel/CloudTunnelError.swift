@@ -41,22 +41,22 @@ public enum CloudTunnelError: Error, CustomStringConvertible, Equatable {
         case .backendUnavailable:
             return String(
                 localized: "cloudTunnel.error.backendUnavailable",
-                defaultValue: "This cmux build does not include the signed Network Extension required for browser access."
+                defaultValue: "This ShellX build does not include the signed Network Extension required for browser access."
             )
         case .notSignedIn:
             return String(
                 localized: "cloudTunnel.error.notSignedIn",
-                defaultValue: "Sign in to cmux Cloud first (`cmux auth login`), then retry."
+                defaultValue: "Sign in to ShellX Cloud first (`shellx auth login`), then retry."
             )
         case .rebootRequired:
             return String(
                 localized: "cloudTunnel.error.rebootRequired",
-                defaultValue: "macOS needs a restart to finish installing the cmux Cloud Tunnel extension."
+                defaultValue: "macOS needs a restart to finish installing the ShellX Cloud Tunnel extension."
             )
         case .appNotInApplicationsFolder:
             return String(
                 localized: "cloudTunnel.error.appNotInApplicationsFolder",
-                defaultValue: "macOS only loads the cmux Cloud Tunnel extension from the Applications folder. Move cmux.app to /Applications and retry."
+                defaultValue: "macOS only loads the ShellX Cloud Tunnel extension from the Applications folder. Move ShellX.app to /Applications and retry."
             )
         case .startFailed(let message):
             let format = String(
@@ -84,7 +84,7 @@ public enum CloudTunnelError: Error, CustomStringConvertible, Equatable {
         case .noCloudMachine:
             return String(
                 localized: "cloudTunnel.error.noCloudMachine",
-                defaultValue: "Create a Cloud machine first. The cmux Cloud Tunnel runs only for an account with at least one machine."
+                defaultValue: "Create a Cloud machine first. The ShellX Cloud Tunnel runs only for an account with at least one machine."
             )
         }
     }

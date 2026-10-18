@@ -6,21 +6,21 @@ import Foundation
 /// a snapshot can only be removed by naming the machine it belongs to.
 extension CMUXCLI {
     static let vmSnapshotUsage = """
-        Usage: cmux vm snapshot <machine> [--name <name>]        Create a snapshot; prints its id. Alias: `checkpoint`.
-               cmux vm snapshot ls <machine> [--json]             List the machine's snapshots, newest first:
+        Usage: shellx vm snapshot <machine> [--name <name>]        Create a snapshot; prints its id. Alias: `checkpoint`.
+               shellx vm snapshot ls <machine> [--json]             List the machine's snapshots, newest first:
                                                                   <id>  <created ISO-8601>  <name|->
-               cmux vm snapshot rm <machine> <snapshot-id> [--json]
+               shellx vm snapshot rm <machine> <snapshot-id> [--json]
                                                                   Delete one snapshot of the machine. Permanent.
-               cmux vm restore <snapshot-id>                      Start a new machine from a snapshot.
+               shellx vm restore <snapshot-id>                      Start a new machine from a snapshot.
 
         Snapshots are provider checkpoints of the whole machine (files, installed tools,
-        ~/.config/cmux/env — `cmux vm env rm` secrets before you promote one). Forks and
+        ~/.config/shellx/env — `shellx vm env rm` secrets before you promote one). Forks and
         `vm restore` start from them. A provider without list/delete support says so.
 
         Examples:
-          cmux vm snapshot brave-otter --name before-upgrade
-          cmux vm snapshot ls brave-otter
-          cmux vm snapshot rm brave-otter snap_01H…
+          shellx vm snapshot brave-otter --name before-upgrade
+          shellx vm snapshot ls brave-otter
+          shellx vm snapshot rm brave-otter snap_01H…
         """
 
     /// `cmux vm snapshot ls <machine> [--json]`.

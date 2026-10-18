@@ -161,7 +161,7 @@ struct SSHPTYAttachRetryScriptBuilderTests {
         )
 
         #expect(result.status == SSHPTYAttachExitCode.launchAcknowledgementTimedOut.rawValue)
-        #expect(result.stderr.contains("could not contact cmux to start the remote session"))
+        #expect(result.stderr.contains("could not contact ShellX to start the remote session"))
         #expect(!FileManager.default.fileExists(atPath: log.path))
     }
 

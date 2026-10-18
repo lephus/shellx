@@ -79,7 +79,7 @@ struct MachineListStatusPresentation {
             title = String(localized: "machines.listUnavailable.title", defaultValue: "Can’t load the machine list")
             subtitle = String(
                 localized: "machines.listUnavailable.subtitle",
-                defaultValue: "Your machines are unchanged. cmux couldn’t load the list from the Cloud service and retries on its own."
+                defaultValue: "Your machines are unchanged. ShellX couldn’t load the list from the Cloud service and retries on its own."
             )
             action = .retry
             isFailure = true
@@ -98,14 +98,14 @@ struct MachineListStatusPresentation {
         case .failed(.requiresPro):
             // HTTP 402: the fix is an upgrade, not a retry and not a sign-in.
             symbolName = "sparkles"
-            title = String(localized: "machines.requiresPro.title", defaultValue: "Cloud machines need cmux Pro")
+            title = String(localized: "machines.requiresPro.title", defaultValue: "Cloud machines need ShellX Pro")
             subtitle = String(
                 localized: "machines.requiresPro.subtitle",
                 defaultValue: "This account’s plan doesn’t include Cloud machine access. Upgrade to create and reconnect machines."
             )
             action = .upgrade
             isFailure = true
-            staleTitle = String(localized: "machines.requiresPro.stale", defaultValue: "Cloud machines need cmux Pro — showing last known")
+            staleTitle = String(localized: "machines.requiresPro.stale", defaultValue: "Cloud machines need ShellX Pro — showing last known")
         }
     }
 }

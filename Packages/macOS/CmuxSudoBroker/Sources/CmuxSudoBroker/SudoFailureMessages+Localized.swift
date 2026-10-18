@@ -6,7 +6,7 @@ extension SudoFailureMessages {
         SudoFailureMessages(
             pamTidUnavailable: String(
                 localized: "sudo.error.pam_tid_unavailable",
-                defaultValue: "Touch ID for sudo is not configured. Run cmux sudo setup-touch-id."
+                defaultValue: "Touch ID for sudo is not configured. Run shellx sudo setup-touch-id."
             ),
             approvalTimedOut: String(
                 localized: "sudo.error.approval_timeout",

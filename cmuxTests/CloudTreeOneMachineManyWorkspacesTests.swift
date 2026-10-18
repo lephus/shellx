@@ -902,7 +902,7 @@ struct CloudTreeOneMachineManyWorkspacesTests {
             "status": "running",
             "link_state": "error",
             "link_error": "cloud_api_unavailable",
-            "link_error_message": "cmux cannot reach the Cloud service for this machine right now.",
+            "link_error_message": "ShellX cannot reach the Cloud service for this machine right now.",
             "remote_workspaces": [],
         ]
 
@@ -910,7 +910,7 @@ struct CloudTreeOneMachineManyWorkspacesTests {
         #expect(result.status == 0, Comment(rawValue: result.stderr))
         let lines = result.stdout.split(whereSeparator: \.isNewline).map(String.init)
 
-        #expect(lines.contains { $0.contains("cmux cannot reach the Cloud service") })
+        #expect(lines.contains { $0.contains("ShellX cannot reach the Cloud service") })
         #expect(!lines.contains { $0.contains("cloud_api_unavailable") })
     }
 

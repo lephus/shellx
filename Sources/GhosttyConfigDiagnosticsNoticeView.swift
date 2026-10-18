@@ -41,7 +41,7 @@ struct GhosttyConfigDiagnosticsNoticeView: View {
 
             Text(String(
                 localized: "ghosttyConfigDiagnostics.notice.hint",
-                defaultValue: "Fix the file and save it; cmux reloads the config automatically."
+                defaultValue: "Fix the file and save it; ShellX reloads the config automatically."
             ))
             .cmuxFont(.caption)
             .foregroundStyle(.secondary)

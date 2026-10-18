@@ -36,7 +36,7 @@ extension CloudTunnelCoordinator {
         }
         return String(
             localized: "cloudTunnel.error.genericFailure",
-            defaultValue: "cmux could not start the Cloud VPN. Try again."
+            defaultValue: "ShellX could not start the Cloud VPN. Try again."
         )
     }
 }

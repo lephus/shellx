@@ -49,14 +49,14 @@ public struct ComputerUseSection: View {
     public var body: some View {
         Group {
             SettingsSectionHeader(
-                String(localized: "settings.section.computerUse", defaultValue: "cmux Computer Use"),
+                String(localized: "settings.section.computerUse", defaultValue: "ShellX Computer Use"),
                 section: .computerUse
             )
 
             SettingsCard {
                 SettingsCardRow(
                     configurationReview: .json("computerUse.enabled"),
-                    String(localized: "settings.computerUse.enabled", defaultValue: "Enable cmux Computer Use"),
+                    String(localized: "settings.computerUse.enabled", defaultValue: "Enable ShellX Computer Use"),
                     subtitle: managedByPolicy
                         ? String(localized: "settings.managedByOrganization", defaultValue: "Managed by your organization")
                         : String(localized: "settings.computerUse.enabled.subtitle", defaultValue: "Lets supported agents see and control apps on this Mac. An agent's first Computer Use request starts setup automatically.")
@@ -69,7 +69,7 @@ public struct ComputerUseSection: View {
                 }
                 SettingsCardDivider()
                 SettingsCardNote(
-                    String(localized: "settings.computerUse.enabled.note", defaultValue: "cmux Computer Use runs locally in the bundled cmux Computer Use app. Its permissions and restart lifecycle are independent from cmux. Telemetry and update checks are disabled.")
+                    String(localized: "settings.computerUse.enabled.note", defaultValue: "ShellX Computer Use runs locally in the bundled ShellX Computer Use app. Its permissions and restart lifecycle are independent from ShellX. Telemetry and update checks are disabled.")
                 )
             }
             .task {
@@ -100,7 +100,7 @@ public struct ComputerUseSection: View {
             SettingsCard {
                 SettingsCardRow(
                     configurationReview: .json("computerUse.showInMenuBar"),
-                    String(localized: "settings.computerUse.showInMenuBar", defaultValue: "Show cmux Computer Use in Menu Bar"),
+                    String(localized: "settings.computerUse.showInMenuBar", defaultValue: "Show ShellX Computer Use in Menu Bar"),
                     subtitle: String(localized: "settings.computerUse.showInMenuBar.subtitle", defaultValue: "Show live agent sessions and shortcuts to their terminal and driven app.")
                 ) {
                     Toggle("", isOn: Binding(get: { showInMenuBar.current }, set: { showInMenuBar.set($0) }))
@@ -137,7 +137,7 @@ public struct ComputerUseSection: View {
             configurationReview: .settingsOnly,
             searchAnchorID: "setting:computerUse:permissions",
             String(localized: "settings.computerUse.permission.accessibility", defaultValue: "Accessibility"),
-            subtitle: String(localized: "settings.computerUse.permission.accessibility.subtitle", defaultValue: "Lets cmux Computer Use inspect and control app interfaces.")
+            subtitle: String(localized: "settings.computerUse.permission.accessibility.subtitle", defaultValue: "Lets ShellX Computer Use inspect and control app interfaces.")
         ) {
             permissionControls(
                 granted: setupSnapshot.accessibilityGranted,
@@ -160,7 +160,7 @@ public struct ComputerUseSection: View {
             // "setting:computerUse:permissions" anchor; a duplicate SwiftUI id
             // breaks search scroll resolution.
             String(localized: "settings.computerUse.permission.screenRecording", defaultValue: "Screen Recording"),
-            subtitle: String(localized: "settings.computerUse.permission.screenRecording.subtitle", defaultValue: "Lets cmux Computer Use see app windows and screen content.")
+            subtitle: String(localized: "settings.computerUse.permission.screenRecording.subtitle", defaultValue: "Lets ShellX Computer Use see app windows and screen content.")
         ) {
             permissionControls(
                 granted: setupSnapshot.screenRecordingGranted,

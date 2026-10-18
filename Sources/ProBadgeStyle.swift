@@ -261,7 +261,7 @@ struct ProBadgeView: View {
     var actions = ProBadgeActions()
 
     private var helpTitle: String {
-        String(localized: "menu.help.upgradeToPro", defaultValue: "Upgrade to cmux Pro…")
+        String(localized: "menu.help.upgradeToPro", defaultValue: "Upgrade to ShellX Pro…")
     }
 
     private var dismissTitle: String {

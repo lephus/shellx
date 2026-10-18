@@ -38,7 +38,7 @@ final class SystemExtensionActivationDelegate: NSObject, OSSystemExtensionReques
         @unknown default:
             complete(.failure(CloudTunnelError.startFailed(String(
                 localized: "cloudTunnel.error.genericFailure",
-                defaultValue: "cmux could not start the Cloud VPN. Try again."
+                defaultValue: "ShellX could not start the Cloud VPN. Try again."
             ))))
         }
     }
@@ -61,7 +61,7 @@ final class SystemExtensionActivationDelegate: NSObject, OSSystemExtensionReques
               let code = OSSystemExtensionError.Code(rawValue: nsError.code) else {
             return CloudTunnelError.startFailed(String(
                 localized: "cloudTunnel.error.genericFailure",
-                defaultValue: "cmux could not start the Cloud VPN. Try again."
+                defaultValue: "ShellX could not start the Cloud VPN. Try again."
             ))
         }
         switch code {
@@ -70,17 +70,17 @@ final class SystemExtensionActivationDelegate: NSObject, OSSystemExtensionReques
         case .requestCanceled, .requestSuperseded:
             return CloudTunnelError.startFailed(String(
                 localized: "cloudTunnel.error.activationCanceled",
-                defaultValue: "The request to load the cmux Cloud Tunnel extension was canceled."
+                defaultValue: "The request to load the ShellX Cloud Tunnel extension was canceled."
             ))
         case .authorizationRequired, .forbiddenBySystemPolicy:
             return CloudTunnelError.startFailed(String(
                 localized: "cloudTunnel.error.activationNotAllowed",
-                defaultValue: "macOS did not allow the cmux Cloud Tunnel extension to load. Allow it in System Settings › General › Login Items & Extensions, then retry."
+                defaultValue: "macOS did not allow the ShellX Cloud Tunnel extension to load. Allow it in System Settings › General › Login Items & Extensions, then retry."
             ))
         default:
             let format = String(
                 localized: "cloudTunnel.error.activationFailed",
-                defaultValue: "macOS could not load the cmux Cloud Tunnel extension (code %d)."
+                defaultValue: "macOS could not load the ShellX Cloud Tunnel extension (code %d)."
             )
             return CloudTunnelError.startFailed(String(format: format, nsError.code))
         }

@@ -59,7 +59,7 @@ extension CMUXCLI {
             writeSudoError(
                 String(
                     localized: "sudo.cli.error.runner_context",
-                    defaultValue: "sudo: could not start secure execution; retry from a cmux terminal"
+                    defaultValue: "sudo: could not start secure execution; retry from a ShellX terminal"
                 )
             )
             return 126
@@ -83,7 +83,7 @@ extension CMUXCLI {
             throw CLIError(
                 message: String(
                     localized: "sudo.cli.error.enclosing_app",
-                    defaultValue: "sudo: use the cmux CLI included with the cmux app, then retry"
+                    defaultValue: "sudo: use the ShellX CLI included with the ShellX app, then retry"
                 )
             )
         }

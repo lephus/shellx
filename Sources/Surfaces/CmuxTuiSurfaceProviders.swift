@@ -1863,7 +1863,7 @@ extension SurfaceMachineInfo {
     var linkFailureMessage: String {
         let machineUnavailableMessage = String(
             localized: "cloud.operation.failure.machineUnavailable",
-            defaultValue: "cmux cannot reach the Cloud service for this machine right now."
+            defaultValue: "ShellX cannot reach the Cloud service for this machine right now."
         )
         switch linkState {
         case .asleep:

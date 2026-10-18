@@ -38,7 +38,7 @@ struct TerminalThemeSettingsRows: View {
                     .help(
                         String(
                             localized: "settings.terminal.themeGallery.openInTerminal.help",
-                            defaultValue: "Runs the searchable cmux themes picker in a new terminal tab.",
+                            defaultValue: "Runs the searchable ShellX themes picker in a new terminal tab.",
                             bundle: .module
                         )
                     )

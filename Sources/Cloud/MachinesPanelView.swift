@@ -331,7 +331,7 @@ struct MachinesPanelView: View {
                 .controlSize(.small)
             Text(String(
                 localized: "machines.auth.checking",
-                defaultValue: "Checking your cmux account…"
+                defaultValue: "Checking your ShellX account…"
             ))
             .cmuxFont(size: 13)
             .foregroundColor(.secondary)
@@ -358,7 +358,7 @@ struct MachinesPanelView: View {
                 .cmuxFont(size: 13, weight: .semibold)
                 Text(String(
                     localized: "machines.auth.subtitle",
-                    defaultValue: "Sign in to see and manage the machines in your cmux account."
+                    defaultValue: "Sign in to see and manage the machines in your ShellX account."
                 ))
                 .cmuxFont(size: 12)
                 .foregroundColor(.secondary)
@@ -394,7 +394,7 @@ struct MachinesPanelView: View {
                 ),
                 idleSubtitle: String(
                     localized: "machines.auth.subtitle",
-                    defaultValue: "Sign in to see and manage the machines in your cmux account."
+                    defaultValue: "Sign in to see and manage the machines in your ShellX account."
                 )
             )
             .frame(maxWidth: 440)
@@ -692,7 +692,7 @@ struct MachinesPanelView: View {
                     .foregroundStyle(.secondary)
                 Text(String(localized: "devices.empty.title", defaultValue: "No other devices yet"))
                     .font(.callout.weight(.medium))
-                Text(String(localized: "devices.empty.help", defaultValue: "Sign in to cmux on another Mac and make it discoverable in Settings › Devices."))
+                Text(String(localized: "devices.empty.help", defaultValue: "Sign in to ShellX on another Mac and make it discoverable in Settings › Devices."))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -767,7 +767,7 @@ struct MachinesPanelView: View {
         guard let maxActiveVms = plan.maxActiveVms, maxActiveVms > 0 else {
             return String(
                 localized: "machines.empty.upgrade.none",
-                defaultValue: "Subscribe to cmux Pro to create Cloud machines"
+                defaultValue: "Subscribe to ShellX Pro to create Cloud machines"
             )
         }
         if plan.isSingleMachinePlan {

@@ -33,7 +33,7 @@ struct TerminalGhosttyOptionsCard: View {
         SettingsCard {
             SettingsCardNote(String(
                 localized: "settings.terminal.ghostty.note",
-                defaultValue: "These rows show the value in effect and save to cmux's Ghostty config, which loads after your own Ghostty config. The caption under each row is its config key."
+                defaultValue: "These rows show the value in effect and save to ShellX's Ghostty config, which loads after your own Ghostty config. The caption under each row is its config key."
             ))
             if saveFailed {
                 Text(String(

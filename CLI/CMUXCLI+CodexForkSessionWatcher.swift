@@ -367,12 +367,12 @@ extension CMUXCLI {
         if clearStatus == "cleared" {
             body = String(
                 localized: "agent.codex.fork.notice.body",
-                defaultValue: "cmux could not identify the new fork session. Start the fork again from the parent pane."
+                defaultValue: "ShellX could not identify the new fork session. Start the fork again from the parent pane."
             )
         } else {
             body = String(
                 localized: "agent.codex.fork.notice.parentClearFailed.body",
-                defaultValue: "cmux could not safely detach the parent session, so the fork was not started. Retry the fork from the parent pane."
+                defaultValue: "ShellX could not safely detach the parent session, so the fork was not started. Retry the fork from the parent pane."
             )
         }
         _ = try? client.sendV2(method: "notification.create_for_target", params: [

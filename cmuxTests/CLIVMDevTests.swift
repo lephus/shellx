@@ -702,7 +702,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
             expectsSocketConnection: false
         ) { _, _ in nil }
         XCTAssertNotEqual(noMachine.status, 0)
-        XCTAssertTrue(noMachine.stderr.contains("Usage: cmux vm dev <machine>"), noMachine.stderr)
+        XCTAssertTrue(noMachine.stderr.contains("Usage: shellx vm dev <machine>"), noMachine.stderr)
         XCTAssertTrue(noMachineLog.methods.isEmpty, noMachineLog.methods.description)
     }
 
@@ -716,7 +716,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
             let result = runProcess(executablePath: cliPath, arguments: arguments, environment: environment, timeout: 30)
             XCTAssertFalse(result.timedOut, "\(arguments) timed out")
             XCTAssertEqual(result.status, 0, "\(arguments): stdout=\(result.stdout) stderr=\(result.stderr)")
-            for expected in ["Usage: cmux vm dev <machine>", "--dry-run", "--no-sync", "package.json", "Cargo.toml", "manage.py"] {
+            for expected in ["Usage: shellx vm dev <machine>", "--dry-run", "--no-sync", "package.json", "Cargo.toml", "manage.py"] {
                 XCTAssertTrue(result.stdout.contains(expected), "\(arguments) should mention '\(expected)':\n\(result.stdout)")
             }
         }

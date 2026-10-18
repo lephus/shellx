@@ -84,12 +84,12 @@ public struct ThemesSection: View {
             SettingsCardRow(
                 configurationReview: .json("app.accentColor"),
                 String(localized: "settings.app.accentColor", defaultValue: "Accent Color"),
-                subtitle: String(localized: "settings.app.accentColor.subtitle", defaultValue: "Color of the selected workspace, attention ring, agent status, and other cmux highlights. System follows the macOS accent color."),
+                subtitle: String(localized: "settings.app.accentColor.subtitle", defaultValue: "Color of the selected workspace, attention ring, agent status, and other ShellX highlights. System follows the macOS accent color."),
                 controlWidth: Self.columnWidth
             ) {
                 HStack(spacing: 8) {
                     Picker("", selection: Binding(get: { displayedAccentColor.mode }, set: { selectAccentColorMode($0) })) {
-                        Text(String(localized: "settings.app.accentColor.cmux", defaultValue: "cmux Blue")).tag(CmuxAccentColorMode.cmux)
+                        Text(String(localized: "settings.app.accentColor.cmux", defaultValue: "ShellX Blue")).tag(CmuxAccentColorMode.cmux)
                         Text(String(localized: "settings.app.accentColor.system", defaultValue: "System")).tag(CmuxAccentColorMode.system)
                         Text(String(localized: "settings.app.accentColor.custom", defaultValue: "Custom")).tag(CmuxAccentColorMode.custom)
                     }

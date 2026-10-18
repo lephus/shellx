@@ -61,7 +61,7 @@ enum SettingsSearchAliasIndex {
     private static let settingAliases: [String: String] = [
         "account:account": localized("settings.search.alias.setting.account.account", defaultValue: "auth authentication login logout signin sign-in signout sign-out email user profile stack team"),
         "app:language": localized("settings.search.alias.setting.app.language", defaultValue: "app.language locale l10n localization translation japanese english ja en nihongo restart"),
-        "themes:accent-color": localized("settings.search.alias.setting.app.accent-color", defaultValue: "app.accentColor accent color highlight tint blue purple system accent macOS accent cmux blue"),
+        "themes:accent-color": localized("settings.search.alias.setting.app.accent-color", defaultValue: "app.accentColor accent color highlight tint blue purple system accent macOS accent ShellX blue"),
         "themes:appearance": localized("settings.search.alias.setting.app.appearance", defaultValue: "app.appearance theme color scheme light mode dark mode system mode"),
         "app:app-icon": localized("settings.search.alias.setting.app.app-icon", defaultValue: "app.appIcon dock icon application icon app switcher alternate icon"),
         "app:default-terminal": localized("settings.search.alias.setting.app.default-terminal", defaultValue: "app.defaultTerminal default terminal ssh links command tool unix executable launch services handler"),
@@ -176,7 +176,7 @@ enum SettingsSearchAliasIndex {
         "mobile:iOSPairingDisplayName": localized("settings.search.alias.setting.mobile.iOSPairingDisplayName", defaultValue: "mobile ios iphone pairing display name mac hostname device label"),
         "mobile:artifactFolderAccess": localized("settings.search.alias.setting.mobile.artifactFolderAccess", defaultValue: "mobile ios iphone files folders directory subtree one level authorization security"),
         "mobile:browserTunnelAllowOtherHosts": localized("settings.search.alias.setting.mobile.browserTunnelAllowOtherHosts", defaultValue: "mobile ios iphone browser on iphone tunnel proxy localhost lan vpn internet hosts network security"),
-        "networking:relayPreference": localized("settings.search.alias.setting.networking.relayPreference", defaultValue: "iroh relay preference automatic managed selected cmux fleet provider region account"),
+        "networking:relayPreference": localized("settings.search.alias.setting.networking.relayPreference", defaultValue: "iroh relay preference automatic managed selected ShellX fleet provider region account"),
         "networking:customRelays": localized("settings.search.alias.setting.networking.customRelays", defaultValue: "iroh custom relay self hosted server url secret credential device authentication"),
         "networking:privateNetworks": localized("settings.search.alias.setting.networking.privateNetworks", defaultValue: "private network lan vpn direct peer path local address generic provider automatic"),
         "networking:tailscaleCompatibility": localized("settings.search.alias.setting.networking.tailscaleCompatibility", defaultValue: "tailscale tailnet private ip compatibility vpn legacy tcp automatic"),
@@ -224,9 +224,9 @@ enum SettingsSearchAliasIndex {
         "globalHotkey:enable-hotkey": localized("settings.search.alias.setting.globalHotkey.enable-hotkey", defaultValue: "global hotkey enable system wide show hide all windows"),
         "globalHotkey:shortcut": localized("settings.search.alias.setting.globalHotkey.shortcut", defaultValue: "global hotkey shortcut recorder key command option control"),
         "keyboardShortcuts:base-keymap": localized("settings.search.alias.setting.keyboardShortcuts.base-keymap", defaultValue: "base keymap preset iterm iterm2 terminal app tmux prefix keybindings coming from another terminal"),
-        "keyboardShortcuts:shortcut-chords": localized("settings.search.alias.setting.keyboardShortcuts.shortcut-chords", defaultValue: "tmux prefix ctrl-b control-b multi key sequence chord cmux json"),
+        "keyboardShortcuts:shortcut-chords": localized("settings.search.alias.setting.keyboardShortcuts.shortcut-chords", defaultValue: "tmux prefix ctrl-b control-b multi key sequence chord ShellX json"),
         "keyboardShortcuts:reset-defaults": localized("settings.search.alias.setting.keyboardShortcuts.reset-defaults", defaultValue: "reset restore default defaults built in builtin shortcuts hotkeys keybindings commands"),
-        "keyboardShortcuts:shortcuts": localized("settings.search.alias.setting.keyboardShortcuts.shortcuts", defaultValue: "hotkeys keybindings key bindings commands keyboard accelerators shortcuts cmux json"),
+        "keyboardShortcuts:shortcuts": localized("settings.search.alias.setting.keyboardShortcuts.shortcuts", defaultValue: "hotkeys keybindings key bindings commands keyboard accelerators shortcuts ShellX json"),
         "workspaceColors:indicator": localized("settings.search.alias.setting.workspaceColors.indicator", defaultValue: "workspaceColors.indicatorStyle tab indicator active workspace style color stripe dot"),
         "workspaceColors:selection": localized("settings.search.alias.setting.workspaceColors.selection", defaultValue: "workspaceColors.selectionColor selected workspace color highlight background active tab"),
         "workspaceColors:subtle-selection": localized("settings.search.alias.setting.workspaceColors.subtle-selection", defaultValue: "workspaceColors.subtleSelection subtle calm quiet selection highlight tint hairline edge selected workspace accent"),
@@ -234,8 +234,8 @@ enum SettingsSearchAliasIndex {
         "workspaceColors:unselected-fill-opacity": localized("settings.search.alias.setting.workspaceColors.unselected-fill-opacity", defaultValue: "workspaceColors.unselectedFillOpacity opacity transparency alpha solid fill unselected inactive workspace row color dull faded strength"),
         "workspaceColors:badge": localized("settings.search.alias.setting.workspaceColors.badge", defaultValue: "workspaceColors.notificationBadgeColor unread notification badge color dot count"),
         "workspaceColors:palette": localized("settings.search.alias.setting.workspaceColors.palette", defaultValue: "workspaceColors.colors workspace palette named colors custom color reset built-in"),
-        "settingsJSON:open-file": localized("settings.search.alias.setting.settingsJSON.open-file", defaultValue: "open config file json jsonc config editor ~/.config cmux preferences"),
-        "settingsJSON:documentation": localized("settings.search.alias.setting.settingsJSON.documentation", defaultValue: "docs documentation schema reference cmux json keys configuration"),
+        "settingsJSON:open-file": localized("settings.search.alias.setting.settingsJSON.open-file", defaultValue: "open config file json jsonc config editor ~/.config ShellX preferences"),
+        "settingsJSON:documentation": localized("settings.search.alias.setting.settingsJSON.documentation", defaultValue: "docs documentation schema reference ShellX json keys configuration"),
         "reset:reset-all": localized("settings.search.alias.setting.reset.reset-all", defaultValue: "factory reset restore defaults clear preferences")
     ]
 

@@ -104,7 +104,7 @@ struct MobilePairingView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(String(
                         localized: "mobile.pairing.getApp.badge.caption",
-                        defaultValue: "Download cmux for"
+                        defaultValue: "Download ShellX for"
                     ))
                         .cmuxFont(.caption2)
                     Text(String(
@@ -126,7 +126,7 @@ struct MobilePairingView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(String(
             localized: "mobile.pairing.getApp.link",
-            defaultValue: "Get cmux for iPhone"
+            defaultValue: "Get ShellX for iPhone"
         ))
     }
 
@@ -183,7 +183,7 @@ struct MobilePairingView: View {
                 .cmuxFont(.headline)
             Text(String(
                 localized: "mobile.pairing.disabled.body",
-                defaultValue: "iOS pairing is off on this Mac. Open Settings and enable iOS pairing to discover this Mac from cmux on your iPhone."
+                defaultValue: "iOS pairing is off on this Mac. Open Settings and enable iOS pairing to discover this Mac from ShellX on your iPhone."
             ))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
@@ -251,7 +251,7 @@ struct MobilePairingView: View {
                 .foregroundStyle(.green)
             Text(String(
                 localized: "mobile.pairing.irohInstruction",
-                defaultValue: "Install cmux on your iPhone and sign in with the same account. It connects automatically, with no code needed."
+                defaultValue: "Install ShellX on your iPhone and sign in with the same account. It connects automatically, with no code needed."
             ))
                 .cmuxFont(.callout)
                 .foregroundStyle(.secondary)
@@ -287,7 +287,7 @@ struct MobilePairingView: View {
 
         Text(String(
             localized: "mobile.pairing.scanInstruction",
-            defaultValue: "In cmux on your iPhone, sign in with the same account, choose Tailscale, then scan this code."
+            defaultValue: "In ShellX on your iPhone, sign in with the same account, choose Tailscale, then scan this code."
         ))
         .cmuxFont(.caption)
         .foregroundStyle(.secondary)
@@ -357,7 +357,7 @@ struct MobilePairingView: View {
             if reachableViaIroh {
                 Text(String(
                     localized: "mobile.pairing.irohInstruction",
-                    defaultValue: "Install cmux on your iPhone and sign in with the same account. It connects automatically — no code needed."
+                    defaultValue: "Install ShellX on your iPhone and sign in with the same account. It connects automatically — no code needed."
                 ))
                 .cmuxFont(.caption)
                 .foregroundStyle(.secondary)
@@ -412,7 +412,7 @@ struct MobilePairingView: View {
                 localized: "mobile.pairing.transport.iroh.detail",
                 defaultValue: """
                 iPhones signed in to your account find this Mac automatically over Iroh — \
-                end-to-end encrypted, direct when possible, through a cmux relay when not. No code needed.
+                end-to-end encrypted, direct when possible, through a ShellX relay when not. No code needed.
                 """
             )
         ) {

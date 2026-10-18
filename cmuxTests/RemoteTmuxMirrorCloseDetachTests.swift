@@ -389,7 +389,7 @@ import Testing
 
         #expect(message == String(
             localized: "remoteTmux.error.windowCreationFailed",
-            defaultValue: "cmux could not create a new window"
+            defaultValue: "ShellX could not create a new window"
         ))
         #expect(!message.localizedCaseInsensitiveContains("host unreachable"))
     }

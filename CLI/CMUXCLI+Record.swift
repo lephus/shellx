@@ -3,13 +3,13 @@ import Foundation
 extension CMUXCLI {
     static var recordHelp: String {
         String(localized: "cli.help.record", defaultValue: """
-        Usage: cmux record [start] [flags]
-               cmux record stop|status [--id <id>]
-               cmux record note [--id <id>] <text>
-               cmux record list
+        Usage: shellx record [start] [flags]
+               shellx record stop|status [--id <id>]
+               shellx record note [--id <id>] <text>
+               shellx record list
 
-        Record a cmux window to an mp4 or gif, for a pull request or a bug
-        report. Only cmux's own windows can be recorded, and no Screen
+        Record a ShellX window to an mp4 or gif, for a pull request or a bug
+        report. Only ShellX's own windows can be recorded, and no Screen
         Recording permission is involved.
 
         Flags for start:
@@ -31,9 +31,9 @@ extension CMUXCLI {
         running by an agent that goes away. One recording at a time.
 
         Example:
-          cmux record start --gif --max-seconds 8 --label sidebar-drag
-          cmux record note "dragging the workspace"
-          cmux record stop
+          shellx record start --gif --max-seconds 8 --label sidebar-drag
+          shellx record note "dragging the workspace"
+          shellx record stop
         """)
     }
 

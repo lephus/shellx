@@ -12,10 +12,10 @@ extension CMUXCLI {
 
     func sessionRestoreUsage() -> String {
         String(localized: "cli.session.help", defaultValue: """
-        Usage: cmux session restore [--list] [--session <id>]...
+        Usage: shellx session restore [--list] [--session <id>]...
 
-        Reopen Claude sessions that were running when cmux last quit unexpectedly.
-        cmux finds them in the agent journal, skips any that are running or already
+        Reopen Claude sessions that were running when ShellX last quit unexpectedly.
+        ShellX finds them in the agent journal, skips any that are running or already
         open, and resumes each in its own workspace through the launcher that started
         it.
 
@@ -31,7 +31,7 @@ extension CMUXCLI {
         String(
             localized: "cli.session.usage",
             // One literal so the localization tooling reads the English source.
-            defaultValue: "Usage: cmux session move <session-id> --to <ssh-destination|local> [options]\n\nMove a stopped Claude Code session to another machine and resume it there.\nExit the agent first: the move refuses while the session runs on either side.\n\nThe move carries:\n  - the cwd's git checkout: HEAD (on the same branch when safe) plus modified,\n    deleted and untracked non-ignored files; a worktree is added when the\n    repository exists on the destination but the path does not\n  - the transcript, its session directory, file history, and the project\n    memory directory (merged both ways, newest wins, nothing deleted)\n\nIt then opens a workspace on the destination (`cmux ssh` for a host, a local\nworkspace for `local`) that resumes the session with its recorded launcher.\nWhen the destination home is not at the same absolute path, paths under the\nhome are mapped and the project is re-slugged.\n\nOptions:\n  --to <destination>      SSH destination (user@host or ssh_config alias), or local\n  --from <destination>    Where the session is now (default: where the last move put it, else local)\n  --name <title>          Workspace title (default: the first 8 characters of the id)\n  --no-code               Do not carry the git checkout\n  --port <n>              SSH port\n  --identity <path>       SSH identity file\n  --ssh-option <opt>      Extra SSH -o option (repeatable)\n  --no-focus              Open the workspace without switching to it\n\nExamples:\n  cmux session move 0b7a1e7c-3f0a-4c6e-9d59-8a0d8f7c2b11 --to dev@my-host\n  cmux session move 0b7a1e7c-3f0a-4c6e-9d59-8a0d8f7c2b11 --to local"
+            defaultValue: "Usage: shellx session move <session-id> --to <ssh-destination|local> [options]\n\nMove a stopped Claude Code session to another machine and resume it there.\nExit the agent first: the move refuses while the session runs on either side.\n\nThe move carries:\n  - the cwd's git checkout: HEAD (on the same branch when safe) plus modified,\n    deleted and untracked non-ignored files; a worktree is added when the\n    repository exists on the destination but the path does not\n  - the transcript, its session directory, file history, and the project\n    memory directory (merged both ways, newest wins, nothing deleted)\n\nIt then opens a workspace on the destination (`shellx ssh` for a host, a local\nworkspace for `local`) that resumes the session with its recorded launcher.\nWhen the destination home is not at the same absolute path, paths under the\nhome are mapped and the project is re-slugged.\n\nOptions:\n  --to <destination>      SSH destination (user@host or ssh_config alias), or local\n  --from <destination>    Where the session is now (default: where the last move put it, else local)\n  --name <title>          Workspace title (default: the first 8 characters of the id)\n  --no-code               Do not carry the git checkout\n  --port <n>              SSH port\n  --identity <path>       SSH identity file\n  --ssh-option <opt>      Extra SSH -o option (repeatable)\n  --no-focus              Open the workspace without switching to it\n\nExamples:\n  shellx session move 0b7a1e7c-3f0a-4c6e-9d59-8a0d8f7c2b11 --to dev@my-host\n  shellx session move 0b7a1e7c-3f0a-4c6e-9d59-8a0d8f7c2b11 --to local"
         )
     }
 
@@ -58,7 +58,7 @@ extension CMUXCLI {
                 return
             }
             throw CLIError(message: String(
-                format: String(localized: "cli.session.error.unknownSubcommand", defaultValue: "Unknown session subcommand: %@. Usage: cmux session move <session-id> --to <ssh-destination|local>"),
+                format: String(localized: "cli.session.error.unknownSubcommand", defaultValue: "Unknown session subcommand: %@. Usage: shellx session move <session-id> --to <ssh-destination|local>"),
                 commandArgs.first ?? ""
             ))
         }
@@ -332,7 +332,7 @@ struct SessionMoveOptions {
         guard positional.count == 1, !to.isEmpty else {
             throw CLIError(message: String(
                 localized: "cli.session.move.error.usage",
-                defaultValue: "Usage: cmux session move <session-id> --to <ssh-destination|local>"
+                defaultValue: "Usage: shellx session move <session-id> --to <ssh-destination|local>"
             ))
         }
         sessionID = positional[0]

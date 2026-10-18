@@ -40,7 +40,7 @@ extension TerminalController {
             return socketWorkerFileTransferFailureResponse(id: id, params: params)
         case "vm.billing_checkout":
             guard let plan = params["plan"] as? String, plan == "go" || plan == "max" || plan == "pro" else {
-                return v2Error(id: id, code: "invalid_params", message: String(localized: "socket.cloudVM.billingCheckout.invalidPlan", defaultValue: "Choose Go, Pro, or Max: cmux billing checkout --plan <go|pro|max>"))
+                return v2Error(id: id, code: "invalid_params", message: String(localized: "socket.cloudVM.billingCheckout.invalidPlan", defaultValue: "Choose Go, Pro, or Max: shellx billing checkout --plan <go|pro|max>"))
             }
             return v2VmCall(id: id) { try await VMClient.shared.billingCheckout(plan: plan) }
         case "vm.list":
@@ -337,7 +337,7 @@ extension TerminalController {
                     code: "invalid_params",
                     message: String(
                         localized: "socket.cloudVM.resize.idRequired",
-                        defaultValue: "vm.resize requires `id`. Run `cmux vm ls` to find one."
+                        defaultValue: "vm.resize requires `id`. Run `shellx vm ls` to find one."
                     )
                 )
             }

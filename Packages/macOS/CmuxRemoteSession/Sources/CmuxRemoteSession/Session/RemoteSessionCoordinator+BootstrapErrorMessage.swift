@@ -31,7 +31,7 @@ extension RemoteSessionCoordinator {
             // help, and nothing on the remote host needs repair.
             return String(
                 localized: "remoteDaemon.bootstrap.noDaemonForPlatform",
-                defaultValue: "This cmux build has no remote daemon for the remote host's platform"
+                defaultValue: "This ShellX build has no remote daemon for the remote host's platform"
             )
         case 24:
             return String(

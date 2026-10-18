@@ -130,121 +130,121 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Named local-tmux sessions keep processes and scrollback alive across cmux quit, crashes, and updates. Ordinary terminals keep their current behavior."
+            "value": "Named local-tmux sessions keep processes and scrollback alive across ShellX quit, crashes, and updates. Ordinary terminals keep their current behavior."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Benannte local-tmux-Sitzungen halten Prozesse und Scrollback über das Beenden, Abstürze und Updates von cmux hinweg am Leben. Normale Terminals behalten ihr aktuelles Verhalten."
+            "value": "Benannte local-tmux-Sitzungen halten Prozesse und Scrollback über das Beenden, Abstürze und Updates von ShellX hinweg am Leben. Normale Terminals behalten ihr aktuelles Verhalten."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les sessions local-tmux nommées conservent les processus et l’historique lors de la fermeture, des plantages et des mises à jour de cmux. Les terminaux ordinaires conservent leur comportement actuel."
+            "value": "Les sessions local-tmux nommées conservent les processus et l’historique lors de la fermeture, des plantages et des mises à jour de ShellX. Les terminaux ordinaires conservent leur comportement actuel."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las sesiones local-tmux con nombre mantienen los procesos y el historial al salir de cmux, tras fallos y durante actualizaciones. Los terminales normales conservan su comportamiento actual."
+            "value": "Las sesiones local-tmux con nombre mantienen los procesos y el historial al salir de ShellX, tras fallos y durante actualizaciones. Los terminales normales conservan su comportamiento actual."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le sessioni local-tmux con nome mantengono processi e cronologia attivi dopo chiusure, arresti anomali e aggiornamenti di cmux. I terminali normali mantengono il comportamento attuale."
+            "value": "Le sessioni local-tmux con nome mantengono processi e cronologia attivi dopo chiusure, arresti anomali e aggiornamenti di ShellX. I terminali normali mantengono il comportamento attuale."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "名前付き local-tmux セッションは、cmux の終了、クラッシュ、更新後もプロセスとスクロールバックを維持します。通常のターミナルの動作は変わりません。"
+            "value": "名前付き local-tmux セッションは、ShellX の終了、クラッシュ、更新後もプロセスとスクロールバックを維持します。通常のターミナルの動作は変わりません。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이름이 지정된 local-tmux 세션은 cmux 종료, 충돌 및 업데이트 후에도 프로세스와 스크롤백을 유지합니다. 일반 터미널의 현재 동작은 그대로 유지됩니다."
+            "value": "이름이 지정된 local-tmux 세션은 ShellX 종료, 충돌 및 업데이트 후에도 프로세스와 스크롤백을 유지합니다. 일반 터미널의 현재 동작은 그대로 유지됩니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "命名的 local-tmux 会话可在 cmux 退出、崩溃和更新后继续保留进程与回滚内容。普通终端保持现有行为。"
+            "value": "命名的 local-tmux 会话可在 ShellX 退出、崩溃和更新后继续保留进程与回滚内容。普通终端保持现有行为。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "具名 local-tmux 工作階段可在 cmux 結束、當機與更新後繼續保留程序及捲動記錄。一般終端機維持目前行為。"
+            "value": "具名 local-tmux 工作階段可在 ShellX 結束、當機與更新後繼續保留程序及捲動記錄。一般終端機維持目前行為。"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "تحافظ جلسات local-tmux المسماة على العمليات وسجل التمرير بعد إنهاء cmux أو تعطله أو تحديثه. وتبقى المحطات العادية على سلوكها الحالي."
+            "value": "تحافظ جلسات local-tmux المسماة على العمليات وسجل التمرير بعد إنهاء ShellX أو تعطله أو تحديثه. وتبقى المحطات العادية على سلوكها الحالي."
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Imenovane local-tmux sesije čuvaju procese i historiju pomjeranja nakon izlaska iz cmux-a, rušenja i ažuriranja. Obični terminali zadržavaju trenutno ponašanje."
+            "value": "Imenovane local-tmux sesije čuvaju procese i historiju pomjeranja nakon izlaska iz ShellX-a, rušenja i ažuriranja. Obični terminali zadržavaju trenutno ponašanje."
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Navngivne local-tmux-sessioner holder processer og scrollback i live på tværs af afslutning, nedbrud og opdateringer af cmux. Almindelige terminaler beholder deres nuværende adfærd."
+            "value": "Navngivne local-tmux-sessioner holder processer og scrollback i live på tværs af afslutning, nedbrud og opdateringer af ShellX. Almindelige terminaler beholder deres nuværende adfærd."
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "សម័យ local-tmux ដែលមានឈ្មោះរក្សាដំណើរការ និងប្រវត្តិរំកិលឱ្យនៅសល់បន្ទាប់ពីបិទ cmux គាំង ឬធ្វើបច្ចុប្បន្នភាព។ ស្ថានីយធម្មតារក្សាឥរិយាបថបច្ចុប្បន្ន។"
+            "value": "សម័យ local-tmux ដែលមានឈ្មោះរក្សាដំណើរការ និងប្រវត្តិរំកិលឱ្យនៅសល់បន្ទាប់ពីបិទ ShellX គាំង ឬធ្វើបច្ចុប្បន្នភាព។ ស្ថានីយធម្មតារក្សាឥរិយាបថបច្ចុប្បន្ន។"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Navngitte local-tmux-økter holder prosesser og tilbakerulling i live gjennom avslutning, krasj og oppdateringer av cmux. Vanlige terminaler beholder dagens oppførsel."
+            "value": "Navngitte local-tmux-økter holder prosesser og tilbakerulling i live gjennom avslutning, krasj og oppdateringer av ShellX. Vanlige terminaler beholder dagens oppførsel."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nazwane sesje local-tmux zachowują procesy i historię przewijania po zamknięciu, awarii i aktualizacji cmux. Zwykłe terminale zachowują dotychczasowe działanie."
+            "value": "Nazwane sesje local-tmux zachowują procesy i historię przewijania po zamknięciu, awarii i aktualizacji ShellX. Zwykłe terminale zachowują dotychczasowe działanie."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sessões local-tmux nomeadas mantêm processos e histórico de rolagem após o encerramento, falhas e atualizações do cmux. Terminais comuns mantêm o comportamento atual."
+            "value": "Sessões local-tmux nomeadas mantêm processos e histórico de rolagem após o encerramento, falhas e atualizações do ShellX. Terminais comuns mantêm o comportamento atual."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Именованные сеансы local-tmux сохраняют процессы и историю прокрутки после выхода, сбоев и обновлений cmux. Обычные терминалы сохраняют текущее поведение."
+            "value": "Именованные сеансы local-tmux сохраняют процессы и историю прокрутки после выхода, сбоев и обновлений ShellX. Обычные терминалы сохраняют текущее поведение."
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "เซสชัน local-tmux ที่ตั้งชื่อจะเก็บโปรเซสและประวัติการเลื่อนไว้เมื่อออกจาก cmux เกิดข้อขัดข้อง หรืออัปเดต เทอร์มินัลทั่วไปยังคงทำงานแบบเดิม"
+            "value": "เซสชัน local-tmux ที่ตั้งชื่อจะเก็บโปรเซสและประวัติการเลื่อนไว้เมื่อออกจาก ShellX เกิดข้อขัดข้อง หรืออัปเดต เทอร์มินัลทั่วไปยังคงทำงานแบบเดิม"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Adlandırılmış local-tmux oturumları cmux kapanışları, çökmeleri ve güncellemeleri boyunca süreçleri ve geri kaydırma geçmişini korur. Normal terminaller mevcut davranışlarını sürdürür."
+            "value": "Adlandırılmış local-tmux oturumları ShellX kapanışları, çökmeleri ve güncellemeleri boyunca süreçleri ve geri kaydırma geçmişini korur. Normal terminaller mevcut davranışlarını sürdürür."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Іменовані сеанси local-tmux зберігають процеси й історію прокручування після виходу, збоїв та оновлень cmux. Звичайні термінали зберігають поточну поведінку."
+            "value": "Іменовані сеанси local-tmux зберігають процеси й історію прокручування після виходу, збоїв та оновлень ShellX. Звичайні термінали зберігають поточну поведінку."
           }
         }
       }
@@ -626,121 +626,121 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Creates a named local-tmux session in the selected workspace directory and attaches it to cmux."
+            "value": "Creates a named local-tmux session in the selected workspace directory and attaches it to ShellX."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Erstellt im Verzeichnis des ausgewählten Arbeitsbereichs eine benannte local-tmux-Sitzung und verbindet sie mit cmux."
+            "value": "Erstellt im Verzeichnis des ausgewählten Arbeitsbereichs eine benannte local-tmux-Sitzung und verbindet sie mit ShellX."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Crée une session local-tmux nommée dans le dossier de l’espace de travail sélectionné et l’attache à cmux."
+            "value": "Crée une session local-tmux nommée dans le dossier de l’espace de travail sélectionné et l’attache à ShellX."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Crea una sesión local-tmux con nombre en el directorio del espacio de trabajo seleccionado y la adjunta a cmux."
+            "value": "Crea una sesión local-tmux con nombre en el directorio del espacio de trabajo seleccionado y la adjunta a ShellX."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Crea una sessione local-tmux con nome nella directory dell’area di lavoro selezionata e la collega a cmux."
+            "value": "Crea una sessione local-tmux con nome nella directory dell’area di lavoro selezionata e la collega a ShellX."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "選択中のワークスペースのディレクトリに名前付き local-tmux セッションを作成し、cmux に接続します。"
+            "value": "選択中のワークスペースのディレクトリに名前付き local-tmux セッションを作成し、ShellX に接続します。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "선택한 작업 공간 디렉터리에 이름이 지정된 local-tmux 세션을 만들고 cmux에 연결합니다."
+            "value": "선택한 작업 공간 디렉터리에 이름이 지정된 local-tmux 세션을 만들고 ShellX에 연결합니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在所选工作区目录中创建命名的 local-tmux 会话并将其附加到 cmux。"
+            "value": "在所选工作区目录中创建命名的 local-tmux 会话并将其附加到 ShellX。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "在所選工作區目錄中建立具名 local-tmux 工作階段，並將其附加至 cmux。"
+            "value": "在所選工作區目錄中建立具名 local-tmux 工作階段，並將其附加至 ShellX。"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "ينشئ جلسة local-tmux مسماة في مجلد مساحة العمل المحددة ويربطها بـ cmux."
+            "value": "ينشئ جلسة local-tmux مسماة في مجلد مساحة العمل المحددة ويربطها بـ ShellX."
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kreira imenovanu local-tmux sesiju u direktoriju odabranog radnog prostora i povezuje je s cmux-om."
+            "value": "Kreira imenovanu local-tmux sesiju u direktoriju odabranog radnog prostora i povezuje je s ShellX-om."
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Opretter en navngiven local-tmux-session i den valgte arbejdsområdemappe og knytter den til cmux."
+            "value": "Opretter en navngiven local-tmux-session i den valgte arbejdsområdemappe og knytter den til ShellX."
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "បង្កើតសម័យ local-tmux ដែលមានឈ្មោះក្នុងថតកន្លែងធ្វើការដែលបានជ្រើស ហើយភ្ជាប់វាទៅ cmux។"
+            "value": "បង្កើតសម័យ local-tmux ដែលមានឈ្មោះក្នុងថតកន្លែងធ្វើការដែលបានជ្រើស ហើយភ្ជាប់វាទៅ ShellX។"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Oppretter en navngitt local-tmux-økt i mappen til det valgte arbeidsområdet og kobler den til cmux."
+            "value": "Oppretter en navngitt local-tmux-økt i mappen til det valgte arbeidsområdet og kobler den til ShellX."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tworzy nazwaną sesję local-tmux w katalogu wybranego obszaru roboczego i dołącza ją do cmux."
+            "value": "Tworzy nazwaną sesję local-tmux w katalogu wybranego obszaru roboczego i dołącza ją do ShellX."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cria uma sessão local-tmux nomeada no diretório do espaço de trabalho selecionado e a anexa ao cmux."
+            "value": "Cria uma sessão local-tmux nomeada no diretório do espaço de trabalho selecionado e a anexa ao ShellX."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Создаёт именованный сеанс local-tmux в каталоге выбранной рабочей области и подключает его к cmux."
+            "value": "Создаёт именованный сеанс local-tmux в каталоге выбранной рабочей области и подключает его к ShellX."
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "สร้างเซสชัน local-tmux ที่ตั้งชื่อในไดเรกทอรีเวิร์กสเปซที่เลือกและแนบเข้ากับ cmux"
+            "value": "สร้างเซสชัน local-tmux ที่ตั้งชื่อในไดเรกทอรีเวิร์กสเปซที่เลือกและแนบเข้ากับ ShellX"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Seçili çalışma alanı dizininde adlandırılmış bir local-tmux oturumu oluşturur ve cmux'a bağlar."
+            "value": "Seçili çalışma alanı dizininde adlandırılmış bir local-tmux oturumu oluşturur ve ShellX'a bağlar."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Створює іменований сеанс local-tmux у каталозі вибраного робочого простору та підключає його до cmux."
+            "value": "Створює іменований сеанс local-tmux у каталозі вибраного робочого простору та підключає його до ShellX."
           }
         }
       }
@@ -2362,121 +2362,121 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Session persistence is unavailable. Reinstall cmux and try again."
+            "value": "Session persistence is unavailable. Reinstall ShellX and try again."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sitzungen können nicht dauerhaft gespeichert werden. Installiere cmux neu und versuche es erneut."
+            "value": "Sitzungen können nicht dauerhaft gespeichert werden. Installiere ShellX neu und versuche es erneut."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "La persistance des sessions est indisponible. Réinstallez cmux et réessayez."
+            "value": "La persistance des sessions est indisponible. Réinstallez ShellX et réessayez."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La persistencia de sesiones no está disponible. Reinstala cmux e inténtalo de nuevo."
+            "value": "La persistencia de sesiones no está disponible. Reinstala ShellX e inténtalo de nuevo."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "La persistenza delle sessioni non è disponibile. Reinstalla cmux e riprova."
+            "value": "La persistenza delle sessioni non è disponibile. Reinstalla ShellX e riprova."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "セッションの永続化を利用できません。cmux を再インストールして、もう一度お試しください。"
+            "value": "セッションの永続化を利用できません。ShellX を再インストールして、もう一度お試しください。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "세션 유지를 사용할 수 없습니다. cmux를 다시 설치하고 다시 시도하세요."
+            "value": "세션 유지를 사용할 수 없습니다. ShellX를 다시 설치하고 다시 시도하세요."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "会话持久化不可用。请重新安装 cmux，然后重试。"
+            "value": "会话持久化不可用。请重新安装 ShellX，然后重试。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "工作階段持續保存功能無法使用。請重新安裝 cmux，然後重試。"
+            "value": "工作階段持續保存功能無法使用。請重新安裝 ShellX，然後重試。"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "الاحتفاظ بالجلسات غير متاح. أعد تثبيت cmux وحاول مرة أخرى."
+            "value": "الاحتفاظ بالجلسات غير متاح. أعد تثبيت ShellX وحاول مرة أخرى."
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Trajno čuvanje sesija nije dostupno. Ponovo instalirajte cmux i pokušajte ponovo."
+            "value": "Trajno čuvanje sesija nije dostupno. Ponovo instalirajte ShellX i pokušajte ponovo."
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bevaring af sessioner er ikke tilgængelig. Geninstaller cmux, og prøv igen."
+            "value": "Bevaring af sessioner er ikke tilgængelig. Geninstaller ShellX, og prøv igen."
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "មិនអាចប្រើមុខងាររក្សាទុកសម័យបានទេ។ ដំឡើង cmux ឡើងវិញ ហើយព្យាយាមម្តងទៀត។"
+            "value": "មិនអាចប្រើមុខងាររក្សាទុកសម័យបានទេ។ ដំឡើង ShellX ឡើងវិញ ហើយព្យាយាមម្តងទៀត។"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lagring av vedvarende økter er utilgjengelig. Installer cmux på nytt og prøv igjen."
+            "value": "Lagring av vedvarende økter er utilgjengelig. Installer ShellX på nytt og prøv igjen."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zachowywanie sesji jest niedostępne. Zainstaluj ponownie cmux i spróbuj jeszcze raz."
+            "value": "Zachowywanie sesji jest niedostępne. Zainstaluj ponownie ShellX i spróbuj jeszcze raz."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "A persistência de sessões está indisponível. Reinstale o cmux e tente novamente."
+            "value": "A persistência de sessões está indisponível. Reinstale o ShellX e tente novamente."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Сохранение сеансов недоступно. Переустановите cmux и повторите попытку."
+            "value": "Сохранение сеансов недоступно. Переустановите ShellX и повторите попытку."
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "ไม่สามารถใช้การเก็บรักษาเซสชันได้ โปรดติดตั้ง cmux ใหม่แล้วลองอีกครั้ง"
+            "value": "ไม่สามารถใช้การเก็บรักษาเซสชันได้ โปรดติดตั้ง ShellX ใหม่แล้วลองอีกครั้ง"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Oturum kalıcılığı kullanılamıyor. cmux uygulamasını yeniden yükleyip tekrar deneyin."
+            "value": "Oturum kalıcılığı kullanılamıyor. ShellX uygulamasını yeniden yükleyip tekrar deneyin."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Збереження сеансів недоступне. Перевстановіть cmux і спробуйте ще раз."
+            "value": "Збереження сеансів недоступне. Перевстановіть ShellX і спробуйте ще раз."
           }
         }
       }
@@ -3726,121 +3726,121 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "توجد القواعد في ~/.cmuxterm/automations.json. حرّر ملف JSON مباشرة، ثم أعد تحميل المحرك قيد التشغيل. تظل واجهة سطر الأوامر `cmux automation` متاحة للاختبار وتشخيص السجلات."
+            "value": "توجد القواعد في ~/.cmuxterm/automations.json. حرّر ملف JSON مباشرة، ثم أعد تحميل المحرك قيد التشغيل. تظل واجهة سطر الأوامر `shellx automation` متاحة للاختبار وتشخيص السجلات."
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pravila se nalaze u ~/.cmuxterm/automations.json. Uredite JSON direktno, zatim ponovo učitajte pokrenuti mehanizam. CLI `cmux automation` ostaje dostupan za testiranje i dijagnostiku zapisa."
+            "value": "Pravila se nalaze u ~/.cmuxterm/automations.json. Uredite JSON direktno, zatim ponovo učitajte pokrenuti mehanizam. CLI `shellx automation` ostaje dostupan za testiranje i dijagnostiku zapisa."
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Regler findes i ~/.cmuxterm/automations.json. Rediger JSON-filen direkte, og genindlæs derefter den kørende motor. CLI'en `cmux automation` er fortsat tilgængelig til test og logdiagnostik."
+            "value": "Regler findes i ~/.cmuxterm/automations.json. Rediger JSON-filen direkte, og genindlæs derefter den kørende motor. CLI'en `shellx automation` er fortsat tilgængelig til test og logdiagnostik."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Regeln befinden sich in ~/.cmuxterm/automations.json. Bearbeite die JSON-Datei direkt und lade anschließend die laufende Engine neu. Die CLI `cmux automation` bleibt für Tests und Logdiagnosen verfügbar."
+            "value": "Regeln befinden sich in ~/.cmuxterm/automations.json. Bearbeite die JSON-Datei direkt und lade anschließend die laufende Engine neu. Die CLI `shellx automation` bleibt für Tests und Logdiagnosen verfügbar."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rules live in ~/.cmuxterm/automations.json. Edit the JSON directly, then reload the running engine. The cmux automation CLI remains available for test and log diagnostics."
+            "value": "Rules live in ~/.cmuxterm/automations.json. Edit the JSON directly, then reload the running engine. The ShellX automation CLI remains available for test and log diagnostics."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las reglas se guardan en ~/.cmuxterm/automations.json. Edita el JSON directamente y después recarga el motor en ejecución. La CLI `cmux automation` sigue disponible para pruebas y diagnóstico de registros."
+            "value": "Las reglas se guardan en ~/.cmuxterm/automations.json. Edita el JSON directamente y después recarga el motor en ejecución. La CLI `shellx automation` sigue disponible para pruebas y diagnóstico de registros."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les règles se trouvent dans ~/.cmuxterm/automations.json. Modifiez directement le fichier JSON, puis rechargez le moteur en cours d’exécution. La CLI `cmux automation` reste disponible pour les tests et le diagnostic des journaux."
+            "value": "Les règles se trouvent dans ~/.cmuxterm/automations.json. Modifiez directement le fichier JSON, puis rechargez le moteur en cours d’exécution. La CLI `shellx automation` reste disponible pour les tests et le diagnostic des journaux."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le regole si trovano in ~/.cmuxterm/automations.json. Modifica direttamente il JSON, quindi ricarica il motore in esecuzione. La CLI `cmux automation` resta disponibile per test e diagnostica dei log."
+            "value": "Le regole si trovano in ~/.cmuxterm/automations.json. Modifica direttamente il JSON, quindi ricarica il motore in esecuzione. La CLI `shellx automation` resta disponibile per test e diagnostica dei log."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "ルールは ~/.cmuxterm/automations.json にあります。JSON を直接編集してから、実行中のエンジンを再読み込みしてください。テストやログ診断には引き続き `cmux automation` CLI を使用できます。"
+            "value": "ルールは ~/.cmuxterm/automations.json にあります。JSON を直接編集してから、実行中のエンジンを再読み込みしてください。テストやログ診断には引き続き `shellx automation` CLI を使用できます。"
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "ច្បាប់ស្ថិតនៅក្នុង ~/.cmuxterm/automations.json។ កែសម្រួល JSON ដោយផ្ទាល់ រួចផ្ទុកម៉ាស៊ីនដែលកំពុងដំណើរការឡើងវិញ។ CLI `cmux automation` នៅតែអាចប្រើសម្រាប់ការសាកល្បង និងវិនិច្ឆ័យកំណត់ហេតុ។"
+            "value": "ច្បាប់ស្ថិតនៅក្នុង ~/.cmuxterm/automations.json។ កែសម្រួល JSON ដោយផ្ទាល់ រួចផ្ទុកម៉ាស៊ីនដែលកំពុងដំណើរការឡើងវិញ។ CLI `shellx automation` នៅតែអាចប្រើសម្រាប់ការសាកល្បង និងវិនិច្ឆ័យកំណត់ហេតុ។"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "규칙은 ~/.cmuxterm/automations.json에 있습니다. JSON을 직접 편집한 다음 실행 중인 엔진을 다시 로드하세요. 테스트와 로그 진단에는 `cmux automation` CLI를 계속 사용할 수 있습니다."
+            "value": "규칙은 ~/.cmuxterm/automations.json에 있습니다. JSON을 직접 편집한 다음 실행 중인 엔진을 다시 로드하세요. 테스트와 로그 진단에는 `shellx automation` CLI를 계속 사용할 수 있습니다."
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reglene ligger i ~/.cmuxterm/automations.json. Rediger JSON-filen direkte, og last deretter inn den kjørende motoren på nytt. CLI-en `cmux automation` er fortsatt tilgjengelig for testing og loggdiagnostikk."
+            "value": "Reglene ligger i ~/.cmuxterm/automations.json. Rediger JSON-filen direkte, og last deretter inn den kjørende motoren på nytt. CLI-en `shellx automation` er fortsatt tilgjengelig for testing og loggdiagnostikk."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reguły znajdują się w ~/.cmuxterm/automations.json. Edytuj JSON bezpośrednio, a następnie przeładuj działający silnik. Interfejs CLI `cmux automation` pozostaje dostępny do testów i diagnostyki logów."
+            "value": "Reguły znajdują się w ~/.cmuxterm/automations.json. Edytuj JSON bezpośrednio, a następnie przeładuj działający silnik. Interfejs CLI `shellx automation` pozostaje dostępny do testów i diagnostyki logów."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As regras ficam em ~/.cmuxterm/automations.json. Edite o JSON diretamente e depois recarregue o mecanismo em execução. A CLI `cmux automation` continua disponível para testes e diagnóstico de logs."
+            "value": "As regras ficam em ~/.cmuxterm/automations.json. Edite o JSON diretamente e depois recarregue o mecanismo em execução. A CLI `shellx automation` continua disponível para testes e diagnóstico de logs."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Правила находятся в ~/.cmuxterm/automations.json. Отредактируйте JSON напрямую, затем перезагрузите работающий движок. CLI `cmux automation` по-прежнему доступен для тестирования и диагностики журналов."
+            "value": "Правила находятся в ~/.cmuxterm/automations.json. Отредактируйте JSON напрямую, затем перезагрузите работающий движок. CLI `shellx automation` по-прежнему доступен для тестирования и диагностики журналов."
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "กฎอยู่ที่ ~/.cmuxterm/automations.json แก้ไข JSON โดยตรง แล้วโหลดเอนจินที่กำลังทำงานใหม่ CLI `cmux automation` ยังใช้สำหรับทดสอบและวินิจฉัยบันทึกได้"
+            "value": "กฎอยู่ที่ ~/.cmuxterm/automations.json แก้ไข JSON โดยตรง แล้วโหลดเอนจินที่กำลังทำงานใหม่ CLI `shellx automation` ยังใช้สำหรับทดสอบและวินิจฉัยบันทึกได้"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kurallar ~/.cmuxterm/automations.json içinde bulunur. JSON'u doğrudan düzenleyin, ardından çalışan motoru yeniden yükleyin. `cmux automation` CLI'si test ve günlük tanılama için kullanılmaya devam eder."
+            "value": "Kurallar ~/.cmuxterm/automations.json içinde bulunur. JSON'u doğrudan düzenleyin, ardından çalışan motoru yeniden yükleyin. `shellx automation` CLI'si test ve günlük tanılama için kullanılmaya devam eder."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Правила містяться в ~/.cmuxterm/automations.json. Відредагуйте JSON безпосередньо, а потім перезавантажте запущений рушій. CLI `cmux automation` залишається доступним для тестування та діагностики журналів."
+            "value": "Правила містяться в ~/.cmuxterm/automations.json. Відредагуйте JSON безпосередньо, а потім перезавантажте запущений рушій. CLI `shellx automation` залишається доступним для тестування та діагностики журналів."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "规则位于 ~/.cmuxterm/automations.json。直接编辑 JSON，然后重新加载正在运行的引擎。`cmux automation` CLI 仍可用于测试和日志诊断。"
+            "value": "规则位于 ~/.cmuxterm/automations.json。直接编辑 JSON，然后重新加载正在运行的引擎。`shellx automation` CLI 仍可用于测试和日志诊断。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "規則位於 ~/.cmuxterm/automations.json。直接編輯 JSON，然後重新載入正在執行的引擎。`cmux automation` CLI 仍可用於測試與記錄診斷。"
+            "value": "規則位於 ~/.cmuxterm/automations.json。直接編輯 JSON，然後重新載入正在執行的引擎。`shellx automation` CLI 仍可用於測試與記錄診斷。"
           }
         }
       }
@@ -5004,121 +5004,121 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Esegue il selettore di temi cmux con ricerca in una nuova scheda del terminale."
+            "value": "Esegue il selettore di temi ShellX con ricerca in una nuova scheda del terminale."
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pokreće pretraživi birač tema cmux u novoj kartici terminala."
+            "value": "Pokreće pretraživi birač tema ShellX u novoj kartici terminala."
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kører den søgbare cmux-temavælger i en ny terminalfane."
+            "value": "Kører den søgbare ShellX-temavælger i en ny terminalfane."
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "ដំណើរការកម្មវិធីជ្រើសស្បែក cmux ដែលអាចស្វែងរកបាន ក្នុងផ្ទាំងទែមីណាល់ថ្មី។"
+            "value": "ដំណើរការកម្មវិធីជ្រើសស្បែក ShellX ដែលអាចស្វែងរកបាន ក្នុងផ្ទាំងទែមីណាល់ថ្មី។"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kjører den søkbare cmux-temavelgeren i en ny terminalfane."
+            "value": "Kjører den søkbare ShellX-temavelgeren i en ny terminalfane."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uruchamia wyszukiwarkę motywów cmux w nowej karcie terminala."
+            "value": "Uruchamia wyszukiwarkę motywów ShellX w nowej karcie terminala."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Executa o seletor de temas do cmux com busca em uma nova aba do terminal."
+            "value": "Executa o seletor de temas do ShellX com busca em uma nova aba do terminal."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Запускает окно выбора тем cmux с поиском в новой вкладке терминала."
+            "value": "Запускает окно выбора тем ShellX с поиском в новой вкладке терминала."
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "เรียกใช้ตัวเลือกธีม cmux ที่ค้นหาได้ในแท็บเทอร์มินัลใหม่"
+            "value": "เรียกใช้ตัวเลือกธีม ShellX ที่ค้นหาได้ในแท็บเทอร์มินัลใหม่"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aranabilir cmux tema seçicisini yeni bir terminal sekmesinde çalıştırır."
+            "value": "Aranabilir ShellX tema seçicisini yeni bir terminal sekmesinde çalıştırır."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Запускає вибір тем cmux із пошуком у новій вкладці термінала."
+            "value": "Запускає вибір тем ShellX із пошуком у новій вкладці термінала."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Runs the searchable cmux themes picker in a new terminal tab."
+            "value": "Runs the searchable ShellX themes picker in a new terminal tab."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يشغّل منتقي سمات cmux القابل للبحث في علامة تبويب طرفية جديدة."
+            "value": "يشغّل منتقي سمات ShellX القابل للبحث في علامة تبويب طرفية جديدة."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Startet die durchsuchbare cmux-Themes-Auswahl in einem neuen Terminal-Tab."
+            "value": "Startet die durchsuchbare ShellX-Themes-Auswahl in einem neuen Terminal-Tab."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ejecuta el selector de temas de cmux con búsqueda en una nueva pestaña de terminal."
+            "value": "Ejecuta el selector de temas de ShellX con búsqueda en una nueva pestaña de terminal."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lance le sélecteur de thèmes cmux avec recherche dans un nouvel onglet de terminal."
+            "value": "Lance le sélecteur de thèmes ShellX avec recherche dans un nouvel onglet de terminal."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "検索できる cmux テーマピッカーを新しいターミナルタブで実行します。"
+            "value": "検索できる ShellX テーマピッカーを新しいターミナルタブで実行します。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "새 터미널 탭에서 검색 가능한 cmux 테마 선택기를 실행합니다."
+            "value": "새 터미널 탭에서 검색 가능한 ShellX 테마 선택기를 실행합니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在新的终端标签页中运行可搜索的 cmux 主题选择器。"
+            "value": "在新的终端标签页中运行可搜索的 ShellX 主题选择器。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "在新的終端機分頁中執行可搜尋的 cmux 主題選擇器。"
+            "value": "在新的終端機分頁中執行可搜尋的 ShellX 主題選擇器。"
           }
         }
       }
@@ -6188,55 +6188,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open cmux NIGHTLY, built daily from the latest code. It installs next to this app and updates separately."
+            "value": "Open ShellX NIGHTLY, built daily from the latest code. It installs next to this app and updates separately."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "افتح cmux NIGHTLY، المبني يوميًا من أحدث شيفرة. يُثبَّت بجانب هذا التطبيق ويُحدَّث بشكل منفصل."
+            "value": "افتح ShellX NIGHTLY، المبني يوميًا من أحدث شيفرة. يُثبَّت بجانب هذا التطبيق ويُحدَّث بشكل منفصل."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux NIGHTLY öffnen, täglich aus dem neuesten Code gebaut. Es wird neben dieser App installiert und separat aktualisiert."
+            "value": "ShellX NIGHTLY öffnen, täglich aus dem neuesten Code gebaut. Es wird neben dieser App installiert und separat aktualisiert."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abre cmux NIGHTLY, compilado a diario con el código más reciente. Se instala junto a esta app y se actualiza por separado."
+            "value": "Abre ShellX NIGHTLY, compilado a diario con el código más reciente. Se instala junto a esta app y se actualiza por separado."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ouvrir cmux NIGHTLY, compilé chaque jour à partir du code le plus récent. Il s’installe à côté de cette app et se met à jour séparément."
+            "value": "Ouvrir ShellX NIGHTLY, compilé chaque jour à partir du code le plus récent. Il s’installe à côté de cette app et se met à jour séparément."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "最新のコードから毎日ビルドされる cmux NIGHTLY を開きます。このアプリと並べてインストールされ、別々にアップデートされます。"
+            "value": "最新のコードから毎日ビルドされる ShellX NIGHTLY を開きます。このアプリと並べてインストールされ、別々にアップデートされます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "최신 코드로 매일 빌드되는 cmux NIGHTLY를 엽니다. 이 앱과 나란히 설치되며 별도로 업데이트됩니다."
+            "value": "최신 코드로 매일 빌드되는 ShellX NIGHTLY를 엽니다. 이 앱과 나란히 설치되며 별도로 업데이트됩니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开 cmux NIGHTLY，每天基于最新代码构建。它会安装在此应用旁边，并单独更新。"
+            "value": "打开 ShellX NIGHTLY，每天基于最新代码构建。它会安装在此应用旁边，并单独更新。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "開啟 cmux NIGHTLY，每天以最新程式碼建置。它會安裝在此 App 旁邊，並獨立更新。"
+            "value": "開啟 ShellX NIGHTLY，每天以最新程式碼建置。它會安裝在此 App 旁邊，並獨立更新。"
           }
         }
       }
@@ -6365,55 +6365,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open the stable cmux app. It installs next to this one if it is missing."
+            "value": "Open the stable ShellX app. It installs next to this one if it is missing."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "افتح تطبيق cmux المستقر. إذا لم يكن مثبتًا، فسيُثبَّت بجانب هذا التطبيق."
+            "value": "افتح تطبيق ShellX المستقر. إذا لم يكن مثبتًا، فسيُثبَّت بجانب هذا التطبيق."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Die stabile cmux-App öffnen. Fehlt sie, wird sie neben dieser installiert."
+            "value": "Die stabile ShellX-App öffnen. Fehlt sie, wird sie neben dieser installiert."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abre la app estable de cmux. Si no está, se instala junto a esta."
+            "value": "Abre la app estable de ShellX. Si no está, se instala junto a esta."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ouvrir l’app cmux stable. Si elle est absente, elle s’installe à côté de celle-ci."
+            "value": "Ouvrir l’app ShellX stable. Si elle est absente, elle s’installe à côté de celle-ci."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "安定版の cmux アプリを開きます。見つからない場合は、このアプリと並べてインストールされます。"
+            "value": "安定版の ShellX アプリを開きます。見つからない場合は、このアプリと並べてインストールされます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "안정 버전 cmux 앱을 엽니다. 설치되어 있지 않으면 이 앱 옆에 설치됩니다."
+            "value": "안정 버전 ShellX 앱을 엽니다. 설치되어 있지 않으면 이 앱 옆에 설치됩니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开稳定版 cmux 应用。如果尚未安装，会安装在此应用旁边。"
+            "value": "打开稳定版 ShellX 应用。如果尚未安装，会安装在此应用旁边。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "開啟穩定版 cmux App。若尚未安裝，會安裝在此 App 旁邊。"
+            "value": "開啟穩定版 ShellX App。若尚未安裝，會安裝在此 App 旁邊。"
           }
         }
       }
@@ -6726,121 +6726,121 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "When enabled, cmux wraps the pi command and loads its bundled session extension without changing your Pi configuration. Disable if you prefer to manage Pi hooks yourself."
+            "value": "When enabled, ShellX wraps the pi command and loads its bundled session extension without changing your Pi configuration. Disable if you prefer to manage Pi hooks yourself."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "عند التفعيل، يغلّف cmux أمر pi ويحمّل امتداد الجلسة المضمّن دون تغيير إعدادات Pi. عطّل هذا الخيار إذا كنت تفضّل إدارة خطافات Pi بنفسك."
+            "value": "عند التفعيل، يغلّف ShellX أمر pi ويحمّل امتداد الجلسة المضمّن دون تغيير إعدادات Pi. عطّل هذا الخيار إذا كنت تفضّل إدارة خطافات Pi بنفسك."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wenn aktiviert, umhüllt cmux den pi-Befehl und lädt seine gebündelte Sitzungserweiterung, ohne deine Pi-Konfiguration zu ändern. Deaktiviere dies, wenn du die Pi-Hooks selbst verwalten möchtest."
+            "value": "Wenn aktiviert, umhüllt ShellX den pi-Befehl und lädt seine gebündelte Sitzungserweiterung, ohne deine Pi-Konfiguration zu ändern. Deaktiviere dies, wenn du die Pi-Hooks selbst verwalten möchtest."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cuando está activado, cmux envuelve el comando pi y carga su extensión de sesión integrada sin cambiar tu configuración de Pi. Desactívalo si prefieres gestionar tú mismo los hooks de Pi."
+            "value": "Cuando está activado, ShellX envuelve el comando pi y carga su extensión de sesión integrada sin cambiar tu configuración de Pi. Desactívalo si prefieres gestionar tú mismo los hooks de Pi."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lorsque cette option est activée, cmux encapsule la commande pi et charge son extension de session intégrée sans modifier votre configuration Pi. Désactivez-la si vous préférez gérer les hooks Pi vous-même."
+            "value": "Lorsque cette option est activée, ShellX encapsule la commande pi et charge son extension de session intégrée sans modifier votre configuration Pi. Désactivez-la si vous préférez gérer les hooks Pi vous-même."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "有効にすると、cmuxはpiコマンドをラップし、Piの設定を変更せずにバンドルされたセッション拡張機能を読み込みます。Piのフックを自分で管理する場合は無効にしてください。"
+            "value": "有効にすると、ShellXはpiコマンドをラップし、Piの設定を変更せずにバンドルされたセッション拡張機能を読み込みます。Piのフックを自分で管理する場合は無効にしてください。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "활성화하면 cmux가 pi 명령을 래핑하고 Pi 설정을 변경하지 않고 번들 세션 확장을 로드합니다. Pi 훅을 직접 관리하려면 비활성화하세요."
+            "value": "활성화하면 ShellX가 pi 명령을 래핑하고 Pi 설정을 변경하지 않고 번들 세션 확장을 로드합니다. Pi 훅을 직접 관리하려면 비활성화하세요."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "启用后，cmux 会包装 pi 命令并加载内置会话扩展，不会更改你的 Pi 配置。如果你希望自行管理 Pi 钩子，请禁用此选项。"
+            "value": "启用后，ShellX 会包装 pi 命令并加载内置会话扩展，不会更改你的 Pi 配置。如果你希望自行管理 Pi 钩子，请禁用此选项。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "啟用後，cmux 會包裝 pi 指令並載入內建工作階段擴充功能，不會變更你的 Pi 設定。若偏好自行管理 Pi 掛鉤，請停用此選項。"
+            "value": "啟用後，ShellX 會包裝 pi 指令並載入內建工作階段擴充功能，不會變更你的 Pi 設定。若偏好自行管理 Pi 掛鉤，請停用此選項。"
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kada je omogućeno, cmux obavija naredbu pi i učitava ugrađeno proširenje sesije bez mijenjanja vaše Pi konfiguracije. Onemogućite ako želite sami upravljati Pi kukama."
+            "value": "Kada je omogućeno, ShellX obavija naredbu pi i učitava ugrađeno proširenje sesije bez mijenjanja vaše Pi konfiguracije. Onemogućite ako želite sami upravljati Pi kukama."
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Når funktionen er aktiveret, indpakker cmux pi-kommandoen og indlæser den medfølgende sessionsudvidelse uden at ændre din Pi-konfiguration. Deaktiver den, hvis du selv vil administrere Pi-hooks."
+            "value": "Når funktionen er aktiveret, indpakker ShellX pi-kommandoen og indlæser den medfølgende sessionsudvidelse uden at ændre din Pi-konfiguration. Deaktiver den, hvis du selv vil administrere Pi-hooks."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quando è abilitata, cmux avvolge il comando pi e carica l'estensione di sessione inclusa senza modificare la configurazione di Pi. Disabilitala se preferisci gestire autonomamente gli hook di Pi."
+            "value": "Quando è abilitata, ShellX avvolge il comando pi e carica l'estensione di sessione inclusa senza modificare la configurazione di Pi. Disabilitala se preferisci gestire autonomamente gli hook di Pi."
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "នៅពេលបើកដំណើរការ cmux នឹងរុំពាក្យបញ្ជា pi ហើយផ្ទុកផ្នែកបន្ថែមសម័យដែលភ្ជាប់មកជាមួយ ដោយមិនផ្លាស់ប្តូរការកំណត់ Pi របស់អ្នក។ បិទវា ប្រសិនបើអ្នកចង់គ្រប់គ្រង hooks របស់ Pi ដោយខ្លួនឯង។"
+            "value": "នៅពេលបើកដំណើរការ ShellX នឹងរុំពាក្យបញ្ជា pi ហើយផ្ទុកផ្នែកបន្ថែមសម័យដែលភ្ជាប់មកជាមួយ ដោយមិនផ្លាស់ប្តូរការកំណត់ Pi របស់អ្នក។ បិទវា ប្រសិនបើអ្នកចង់គ្រប់គ្រង hooks របស់ Pi ដោយខ្លួនឯង។"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Når dette er aktivert, pakker cmux inn pi-kommandoen og laster den medfølgende øktutvidelsen uten å endre Pi-konfigurasjonen din. Deaktiver hvis du vil administrere Pi-hookene selv."
+            "value": "Når dette er aktivert, pakker ShellX inn pi-kommandoen og laster den medfølgende øktutvidelsen uten å endre Pi-konfigurasjonen din. Deaktiver hvis du vil administrere Pi-hookene selv."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Po włączeniu cmux opakuje polecenie pi i załaduje dołączone rozszerzenie sesji bez zmieniania konfiguracji Pi. Wyłącz tę opcję, jeśli wolisz samodzielnie zarządzać hookami Pi."
+            "value": "Po włączeniu ShellX opakuje polecenie pi i załaduje dołączone rozszerzenie sesji bez zmieniania konfiguracji Pi. Wyłącz tę opcję, jeśli wolisz samodzielnie zarządzać hookami Pi."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quando ativado, o cmux envolve o comando pi e carrega a extensão de sessão incluída sem alterar sua configuração do Pi. Desative se preferir gerenciar os hooks do Pi por conta própria."
+            "value": "Quando ativado, o ShellX envolve o comando pi e carrega a extensão de sessão incluída sem alterar sua configuração do Pi. Desative se preferir gerenciar os hooks do Pi por conta própria."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "При включении cmux оборачивает команду pi и загружает встроенное расширение сеанса, не изменяя конфигурацию Pi. Отключите этот параметр, если предпочитаете управлять хуками Pi самостоятельно."
+            "value": "При включении ShellX оборачивает команду pi и загружает встроенное расширение сеанса, не изменяя конфигурацию Pi. Отключите этот параметр, если предпочитаете управлять хуками Pi самостоятельно."
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "เมื่อเปิดใช้งาน cmux จะครอบคำสั่ง pi และโหลดส่วนขยายเซสชันที่มาพร้อมกับโปรแกรมโดยไม่เปลี่ยนการตั้งค่า Pi ของคุณ ปิดใช้งานหากต้องการจัดการ hooks ของ Pi เอง"
+            "value": "เมื่อเปิดใช้งาน ShellX จะครอบคำสั่ง pi และโหลดส่วนขยายเซสชันที่มาพร้อมกับโปรแกรมโดยไม่เปลี่ยนการตั้งค่า Pi ของคุณ ปิดใช้งานหากต้องการจัดการ hooks ของ Pi เอง"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Etkinleştirildiğinde cmux, Pi yapılandırmanızı değiştirmeden pi komutunu sarar ve birlikte gelen oturum uzantısını yükler. Pi kancalarını kendiniz yönetmeyi tercih ediyorsanız devre dışı bırakın."
+            "value": "Etkinleştirildiğinde ShellX, Pi yapılandırmanızı değiştirmeden pi komutunu sarar ve birlikte gelen oturum uzantısını yükler. Pi kancalarını kendiniz yönetmeyi tercih ediyorsanız devre dışı bırakın."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Якщо ввімкнено, cmux обгортає команду pi й завантажує вбудоване розширення сеансу, не змінюючи конфігурацію Pi. Вимкніть цей параметр, якщо хочете самостійно керувати хуками Pi."
+            "value": "Якщо ввімкнено, ShellX обгортає команду pi й завантажує вбудоване розширення сеансу, не змінюючи конфігурацію Pi. Вимкніть цей параметр, якщо хочете самостійно керувати хуками Pi."
           }
         }
       }
@@ -6851,121 +6851,121 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi runs without cmux integration."
+            "value": "Pi runs without ShellX integration."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يعمل Pi بدون تكامل cmux."
+            "value": "يعمل Pi بدون تكامل ShellX."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi läuft ohne cmux-Integration."
+            "value": "Pi läuft ohne ShellX-Integration."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi se ejecuta sin integración con cmux."
+            "value": "Pi se ejecuta sin integración con ShellX."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi s’exécute sans intégration cmux."
+            "value": "Pi s’exécute sans intégration ShellX."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Piはcmux連携なしで実行されます。"
+            "value": "PiはShellX連携なしで実行されます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi가 cmux 연동 없이 실행됩니다."
+            "value": "Pi가 ShellX 연동 없이 실행됩니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi 在没有 cmux 集成的情况下运行。"
+            "value": "Pi 在没有 ShellX 集成的情况下运行。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi 會在不使用 cmux 整合的情況下執行。"
+            "value": "Pi 會在不使用 ShellX 整合的情況下執行。"
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi radi bez cmux integracije."
+            "value": "Pi radi bez ShellX integracije."
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi kører uden cmux-integration."
+            "value": "Pi kører uden ShellX-integration."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi viene eseguito senza l'integrazione con cmux."
+            "value": "Pi viene eseguito senza l'integrazione con ShellX."
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi ដំណើរការដោយគ្មានការរួមបញ្ចូល cmux។"
+            "value": "Pi ដំណើរការដោយគ្មានការរួមបញ្ចូល ShellX។"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi kjører uten cmux-integrasjon."
+            "value": "Pi kjører uten ShellX-integrasjon."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi działa bez integracji z cmux."
+            "value": "Pi działa bez integracji z ShellX."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O Pi é executado sem a integração com o cmux."
+            "value": "O Pi é executado sem a integração com o ShellX."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi работает без интеграции с cmux."
+            "value": "Pi работает без интеграции с ShellX."
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi ทำงานโดยไม่มีการผสานรวมกับ cmux"
+            "value": "Pi ทำงานโดยไม่มีการผสานรวมกับ ShellX"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi, cmux entegrasyonu olmadan çalışır."
+            "value": "Pi, ShellX entegrasyonu olmadan çalışır."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi працює без інтеграції з cmux."
+            "value": "Pi працює без інтеграції з ShellX."
           }
         }
       }
@@ -13345,55 +13345,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Use the terminal theme foreground for flashes; unread rings stay cmux blue."
+            "value": "Use the terminal theme foreground for flashes; unread rings stay ShellX blue."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Verwende die Vordergrundfarbe des Terminaldesigns für Blitze; ungelesene Ringe bleiben cmux-blau."
+            "value": "Verwende die Vordergrundfarbe des Terminaldesigns für Blitze; ungelesene Ringe bleiben ShellX-blau."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Utiliser le premier plan du thème du terminal pour les flashs ; les anneaux non lus restent bleus cmux."
+            "value": "Utiliser le premier plan du thème du terminal pour les flashs ; les anneaux non lus restent bleus ShellX."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "استخدم مقدمة سمة الطرفية للومضات؛ تبقى حلقات عدم القراءة باللون الأزرق لـ cmux."
+            "value": "استخدم مقدمة سمة الطرفية للومضات؛ تبقى حلقات عدم القراءة باللون الأزرق لـ ShellX."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Usa el primer plano del tema de la terminal para los destellos; los anillos no leídos siguen siendo azules de cmux."
+            "value": "Usa el primer plano del tema de la terminal para los destellos; los anillos no leídos siguen siendo azules de ShellX."
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用終端主題前景色顯示閃爍；未讀環維持 cmux 藍色。"
+            "value": "使用終端主題前景色顯示閃爍；未讀環維持 ShellX 藍色。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用终端主题前景色显示闪烁；未读环保持 cmux 蓝色。"
+            "value": "使用终端主题前景色显示闪烁；未读环保持 ShellX 蓝色。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "플래시에 터미널 테마 전경색을 사용하며 읽지 않은 링은 cmux 파란색으로 유지합니다."
+            "value": "플래시에 터미널 테마 전경색을 사용하며 읽지 않은 링은 ShellX 파란색으로 유지합니다."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "フラッシュにターミナルテーマの前景色を使い、未読リングは cmux ブルーのままにします。"
+            "value": "フラッシュにターミナルテーマの前景色を使い、未読リングは ShellX ブルーのままにします。"
           }
         }
       }
@@ -13522,55 +13522,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Turning this off also fails messages that are waiting to be delivered. To turn messages off for one agent, run cmux agent messages off in its terminal."
+            "value": "Turning this off also fails messages that are waiting to be delivered. To turn messages off for one agent, run shellx agent messages off in its terminal."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يؤدي إيقاف هذا الخيار أيضًا إلى إفشال الرسائل التي تنتظر التسليم. لإيقاف الرسائل لوكيل واحد، شغّل cmux agent messages off في طرفيته."
+            "value": "يؤدي إيقاف هذا الخيار أيضًا إلى إفشال الرسائل التي تنتظر التسليم. لإيقاف الرسائل لوكيل واحد، شغّل shellx agent messages off في طرفيته."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Beim Ausschalten schlagen auch Nachrichten fehl, die noch auf Zustellung warten. Um Nachrichten nur für einen Agenten auszuschalten, führe cmux agent messages off in seinem Terminal aus."
+            "value": "Beim Ausschalten schlagen auch Nachrichten fehl, die noch auf Zustellung warten. Um Nachrichten nur für einen Agenten auszuschalten, führe shellx agent messages off in seinem Terminal aus."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Al desactivarlo también fallan los mensajes que esperan entrega. Para desactivar los mensajes de un solo agente, ejecuta cmux agent messages off en su terminal."
+            "value": "Al desactivarlo también fallan los mensajes que esperan entrega. Para desactivar los mensajes de un solo agente, ejecuta shellx agent messages off en su terminal."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "La désactivation fait aussi échouer les messages en attente de remise. Pour désactiver les messages d'un seul agent, exécutez cmux agent messages off dans son terminal."
+            "value": "La désactivation fait aussi échouer les messages en attente de remise. Pour désactiver les messages d'un seul agent, exécutez shellx agent messages off dans son terminal."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "オフにすると、配信待ちのメッセージも失敗になります。1 つのエージェントだけメッセージをオフにするには、そのターミナルで cmux agent messages off を実行してください。"
+            "value": "オフにすると、配信待ちのメッセージも失敗になります。1 つのエージェントだけメッセージをオフにするには、そのターミナルで shellx agent messages off を実行してください。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "끄면 전달을 기다리는 메시지도 실패 처리됩니다. 에이전트 하나만 메시지를 끄려면 해당 터미널에서 cmux agent messages off를 실행하세요."
+            "value": "끄면 전달을 기다리는 메시지도 실패 처리됩니다. 에이전트 하나만 메시지를 끄려면 해당 터미널에서 shellx agent messages off를 실행하세요."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "关闭后，等待投递的消息也会标记为失败。若只想关闭某个代理的消息，请在它的终端中运行 cmux agent messages off。"
+            "value": "关闭后，等待投递的消息也会标记为失败。若只想关闭某个代理的消息，请在它的终端中运行 shellx agent messages off。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "關閉後，等待遞送的訊息也會標為失敗。若只要關閉某個代理的訊息，請在它的終端機中執行 cmux agent messages off。"
+            "value": "關閉後，等待遞送的訊息也會標為失敗。若只要關閉某個代理的訊息，請在它的終端機中執行 shellx agent messages off。"
           }
         }
       }
@@ -13640,55 +13640,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Agents can message each other with cmux agent message."
+            "value": "Agents can message each other with ShellX agent message."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يمكن للوكلاء مراسلة بعضهم باستخدام cmux agent message."
+            "value": "يمكن للوكلاء مراسلة بعضهم باستخدام ShellX agent message."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Agenten können sich mit cmux agent message gegenseitig Nachrichten senden."
+            "value": "Agenten können sich mit ShellX agent message gegenseitig Nachrichten senden."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Los agentes pueden enviarse mensajes con cmux agent message."
+            "value": "Los agentes pueden enviarse mensajes con ShellX agent message."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les agents peuvent s’envoyer des messages avec cmux agent message."
+            "value": "Les agents peuvent s’envoyer des messages avec ShellX agent message."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "エージェント同士が cmux agent message でメッセージを送り合えます。"
+            "value": "エージェント同士が ShellX agent message でメッセージを送り合えます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "에이전트끼리 cmux agent message로 메시지를 보낼 수 있습니다."
+            "value": "에이전트끼리 ShellX agent message로 메시지를 보낼 수 있습니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "代理可以使用 cmux agent message 互相发送消息。"
+            "value": "代理可以使用 ShellX agent message 互相发送消息。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "代理可以使用 cmux agent message 互相傳送訊息。"
+            "value": "代理可以使用 ShellX agent message 互相傳送訊息。"
           }
         }
       }
@@ -13935,55 +13935,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Opt in to organize new Claude, Codex, and OpenCode panel scratch files under ~/.local/state/cmux/agent-artifacts. Provider transcripts and existing files are not moved."
+            "value": "Opt in to organize new Claude, Codex, and OpenCode panel scratch files under ~/.local/state/shellx/agent-artifacts. Provider transcripts and existing files are not moved."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "فعّل هذا الخيار لتنظيم الملفات المؤقتة الجديدة للوحات Claude وCodex وOpenCode ضمن ~/.local/state/cmux/agent-artifacts. لا يتم نقل نصوص جلسات الموفّرين والملفات الموجودة."
+            "value": "فعّل هذا الخيار لتنظيم الملفات المؤقتة الجديدة للوحات Claude وCodex وOpenCode ضمن ~/.local/state/shellx/agent-artifacts. لا يتم نقل نصوص جلسات الموفّرين والملفات الموجودة."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aktivieren, um neue Scratch-Dateien der Claude-, Codex- und OpenCode-Panels unter ~/.local/state/cmux/agent-artifacts abzulegen. Anbieter-Transkripte und vorhandene Dateien werden nicht verschoben."
+            "value": "Aktivieren, um neue Scratch-Dateien der Claude-, Codex- und OpenCode-Panels unter ~/.local/state/shellx/agent-artifacts abzulegen. Anbieter-Transkripte und vorhandene Dateien werden nicht verschoben."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Actívalo para organizar los nuevos archivos temporales de los paneles de Claude, Codex y OpenCode en ~/.local/state/cmux/agent-artifacts. Las transcripciones de los proveedores y los archivos existentes no se mueven."
+            "value": "Actívalo para organizar los nuevos archivos temporales de los paneles de Claude, Codex y OpenCode en ~/.local/state/shellx/agent-artifacts. Las transcripciones de los proveedores y los archivos existentes no se mueven."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Activez cette option pour ranger les nouveaux fichiers de travail des panneaux Claude, Codex et OpenCode dans ~/.local/state/cmux/agent-artifacts. Les transcriptions des fournisseurs et les fichiers existants ne sont pas déplacés."
+            "value": "Activez cette option pour ranger les nouveaux fichiers de travail des panneaux Claude, Codex et OpenCode dans ~/.local/state/shellx/agent-artifacts. Les transcriptions des fournisseurs et les fichiers existants ne sont pas déplacés."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "オンにすると、新しい Claude、Codex、OpenCode パネルのスクラッチファイルを ~/.local/state/cmux/agent-artifacts にまとめます。プロバイダのトランスクリプトや既存のファイルは移動されません。"
+            "value": "オンにすると、新しい Claude、Codex、OpenCode パネルのスクラッチファイルを ~/.local/state/shellx/agent-artifacts にまとめます。プロバイダのトランスクリプトや既存のファイルは移動されません。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "켜면 새 Claude, Codex, OpenCode 패널 스크래치 파일을 ~/.local/state/cmux/agent-artifacts 아래에 정리합니다. 제공자 대화 기록과 기존 파일은 이동되지 않습니다."
+            "value": "켜면 새 Claude, Codex, OpenCode 패널 스크래치 파일을 ~/.local/state/shellx/agent-artifacts 아래에 정리합니다. 제공자 대화 기록과 기존 파일은 이동되지 않습니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "启用后，新的 Claude、Codex 和 OpenCode 面板临时文件将统一存放在 ~/.local/state/cmux/agent-artifacts 下。提供方的对话记录和现有文件不会被移动。"
+            "value": "启用后，新的 Claude、Codex 和 OpenCode 面板临时文件将统一存放在 ~/.local/state/shellx/agent-artifacts 下。提供方的对话记录和现有文件不会被移动。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "啟用後，新的 Claude、Codex 和 OpenCode 面板暫存檔案將統一存放在 ~/.local/state/cmux/agent-artifacts 下。提供者的對話紀錄和現有檔案不會被移動。"
+            "value": "啟用後，新的 Claude、Codex 和 OpenCode 面板暫存檔案將統一存放在 ~/.local/state/shellx/agent-artifacts 下。提供者的對話紀錄和現有檔案不會被移動。"
           }
         }
       }
@@ -14053,55 +14053,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Native agent panels use a cmux-owned scratch directory per session."
+            "value": "Native agent panels use a ShellX-owned scratch directory per session."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "تستخدم لوحات الوكلاء الأصلية دليلًا مؤقتًا خاصًا بـ cmux لكل جلسة."
+            "value": "تستخدم لوحات الوكلاء الأصلية دليلًا مؤقتًا خاصًا بـ ShellX لكل جلسة."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Native Agent-Panels verwenden pro Sitzung ein eigenes Scratch-Verzeichnis von cmux."
+            "value": "Native Agent-Panels verwenden pro Sitzung ein eigenes Scratch-Verzeichnis von ShellX."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Los paneles nativos de agentes usan un directorio temporal propio de cmux por sesión."
+            "value": "Los paneles nativos de agentes usan un directorio temporal propio de ShellX por sesión."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les panneaux d’agent natifs utilisent un répertoire de travail géré par cmux pour chaque session."
+            "value": "Les panneaux d’agent natifs utilisent un répertoire de travail géré par ShellX pour chaque session."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "ネイティブエージェントパネルはセッションごとに cmux 管理のスクラッチディレクトリを使用します。"
+            "value": "ネイティブエージェントパネルはセッションごとに ShellX 管理のスクラッチディレクトリを使用します。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "네이티브 에이전트 패널이 세션마다 cmux 소유의 스크래치 디렉터리를 사용합니다."
+            "value": "네이티브 에이전트 패널이 세션마다 ShellX 소유의 스크래치 디렉터리를 사용합니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "原生代理面板为每个会话使用由 cmux 管理的临时目录。"
+            "value": "原生代理面板为每个会话使用由 ShellX 管理的临时目录。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "原生代理程式面板為每個工作階段使用由 cmux 管理的暫存目錄。"
+            "value": "原生代理程式面板為每個工作階段使用由 ShellX 管理的暫存目錄。"
           }
         }
       }
@@ -15379,55 +15379,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         }
       }

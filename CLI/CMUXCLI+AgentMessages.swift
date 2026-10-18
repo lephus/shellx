@@ -5,10 +5,10 @@ import Foundation
 extension CMUXCLI {
     static var agentMessageHelp: String {
         String(localized: "cli.help.agentMessage", defaultValue: """
-        Usage: cmux agent message <target> [--from <name>] [--thread <id>] [--json] [--] <text|->
-               cmux agent message --reply-to <message-id> [--from <name>] [--json] [--] <text|->
+        Usage: shellx agent message <target> [--from <name>] [--thread <id>] [--json] [--] <text|->
+               shellx agent message --reply-to <message-id> [--from <name>] [--json] [--] <text|->
 
-        Send a message to the agent running in another workspace or surface. cmux
+        Send a message to the agent running in another workspace or surface. ShellX
         delivers it through that agent's hooks, never by typing into its terminal,
         so it cannot land in a half-typed prompt. An idle Claude Code session wakes
         up to read it; a busy one reads it at its next step.
@@ -18,14 +18,14 @@ extension CMUXCLI {
         stdin. --from defaults to the sending workspace's title.
 
         Examples:
-          cmux agent message cmux-remote-status "The relay fix is on main, rebase when free."
-          cmux agent message --reply-to 3f2a... "Done, PR is #123."
+          shellx agent message cmux-remote-status "The relay fix is on main, rebase when free."
+          shellx agent message --reply-to 3f2a... "Done, PR is #123."
         """)
     }
 
     static var agentInboxHelp: String {
         String(localized: "cli.help.agentInbox", defaultValue: """
-        Usage: cmux agent inbox [--surface <target>] [--state queued|delivered|read|failed] [--limit <n>] [--mark-read] [--json]
+        Usage: shellx agent inbox [--surface <target>] [--state queued|delivered|read|failed] [--limit <n>] [--mark-read] [--json]
 
         List agent messages, newest first. Without --surface, lists messages for
         every surface. --mark-read marks the listed messages read.

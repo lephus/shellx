@@ -21,16 +21,16 @@ import Foundation
 extension CMUXCLI {
     static let vmLayoutUsage = String(localized: "cli.vm.layout.usage", defaultValue: """
         Usage:
-          cmux vm layout export <machine> [<workspace-id|name>] [--raw]
+          shellx vm layout export <machine> [<workspace-id|name>] [--raw]
                                                               Print a machine workspace's layout as a declarative layout
-                                                              document — the same JSON `cmux new-workspace --layout`,
-                                                              `cmux layout save/open`, and cmux.json use. Default: the
+                                                              document — the same JSON `shellx new-workspace --layout`,
+                                                              `shellx layout save/open`, and shellx.json use. Default: the
                                                               machine's focused workspace. --raw prints the daemon's own
                                                               LayoutDocument (exact pane/tab ids) instead.
-          cmux vm layout apply <machine> (<file>|- | --from-saved <name>) [--workspace <workspace-id>|--name <name>] [--cwd <dir>] [--open]
+          shellx vm layout apply <machine> (<file>|- | --from-saved <name>) [--workspace <workspace-id>|--name <name>] [--cwd <dir>] [--open]
                                                               Build panes, splits, and tabs on the machine from a layout
                                                               document: a file, stdin (-), or a layout saved on this Mac
-                                                              (`cmux layout list`). Default: a NEW machine workspace named
+                                                              (`shellx layout list`). Default: a NEW machine workspace named
                                                               after the document (--name overrides); --workspace targets an
                                                               existing EMPTY workspace. Terminal `command`s are typed into
                                                               login shells started in each surface's `cwd` (relative to
@@ -44,28 +44,28 @@ extension CMUXCLI {
         `horizontal` = side by side (first child left), `vertical` = stacked (first child top); `split` is the
         first child's share (0.1–0.9, default 0.5). Surface types: terminal (name, command, cwd, env),
         browser (url, name); project surfaces are Mac-only and skipped on a machine.
-        Workspace ids come from `cmux vm tree`. Add --json for the raw result. Exit 2 = the document is invalid.
+        Workspace ids come from `shellx vm tree`. Add --json for the raw result. Exit 2 = the document is invalid.
         """)
 
     static let vmEnvUsage = String(localized: "cli.vm.env.usage", defaultValue: """
         Usage:
-          cmux vm env set <machine> KEY=VALUE [KEY2=VALUE2 …] [--from-file <.env>] [-]
+          shellx vm env set <machine> KEY=VALUE [KEY2=VALUE2 …] [--from-file <.env>] [-]
                                                               Set environment variables for every terminal, agent, and
-                                                              command cmux starts on the machine. They persist in
-                                                              ~/.config/cmux/env on its durable volume (mode 0600) and are
+                                                              command ShellX starts on the machine. They persist in
+                                                              ~/.config/shellx/env on its durable volume (mode 0600) and are
                                                               sourced by login and interactive shells there. --from-file
                                                               and `-` (stdin) read KEY=VALUE lines (dotenv rules: blank
                                                               lines and # comments skipped, optional `export `, matching
                                                               quotes stripped) — prefer them over KEY=VALUE on the command
                                                               line so values stay out of your shell history and `ps`.
-          cmux vm env ls <machine> [--show]                   List the variable names; --show prints the values too.
-          cmux vm env rm <machine> KEY [KEY2 …]               Remove variables.
+          shellx vm env ls <machine> [--show]                   List the variable names; --show prints the values too.
+          shellx vm env rm <machine> KEY [KEY2 …]               Remove variables.
 
         How values travel: over the machine's cmux-tui link (end-to-end encrypted, brokered but never
-        read by the control plane) into the machine's `cmux env receive`, which turns terminal echo
+        read by the control plane) into the machine's `shellx env receive`, which turns terminal echo
         off before it reads. Nothing passes through vm.exec, a command line, or a terminal's screen,
         and only names are ever printed back (use --show to see values). Forks, snapshots, and
-        templates of the machine inherit the file; `cmux vm env rm` before you promote one.
+        templates of the machine inherit the file; `shellx vm env rm` before you promote one.
         Keys match [A-Za-z_][A-Za-z0-9_]*. Add --json for the raw result.
         """)
 
@@ -197,7 +197,7 @@ extension CMUXCLI {
             let opened = (openedPayload["opened"] as? Int) ?? 0
             print("OK opened workspace=\(local) opened=\(opened) machine=\(machine)")
         } else if let remoteWorkspace {
-            print(String(format: String(localized: "cli.vm.layoutEnv.openItCmuxVmWorkspaceOpenValueValue", defaultValue: "Open it: cmux vm workspace open %1$@ %2$@"), String(describing: machine), String(describing: remoteWorkspace)))
+            print(String(format: String(localized: "cli.vm.layoutEnv.openItCmuxVmWorkspaceOpenValueValue", defaultValue: "Open it: shellx vm workspace open %1$@ %2$@"), String(describing: machine), String(describing: remoteWorkspace)))
         }
     }
 
@@ -247,7 +247,7 @@ extension CMUXCLI {
                 Thread.sleep(forTimeInterval: Self.vmLayoutOpenRetryDelay())
             }
         }
-        throw CLIError(message: String(format: String(localized: "cli.vm.layout.applyTheLayoutIsAppliedToWorkspace", defaultValue: "vm layout apply: the layout is applied to workspace %1$@ on %2$@, but it could not be opened here yet (%3$@). Open it with: cmux vm workspace open %4$@ %5$@"), String(describing: remoteWorkspace), String(describing: machine), String(describing: lastFailure), String(describing: machine), String(describing: remoteWorkspace)))
+        throw CLIError(message: String(format: String(localized: "cli.vm.layout.applyTheLayoutIsAppliedToWorkspace", defaultValue: "vm layout apply: the layout is applied to workspace %1$@ on %2$@, but it could not be opened here yet (%3$@). Open it with: shellx vm workspace open %4$@ %5$@"), String(describing: remoteWorkspace), String(describing: machine), String(describing: lastFailure), String(describing: machine), String(describing: remoteWorkspace)))
     }
 
     /// The transient shapes of "the catalog has not caught up": a not-found code, or
@@ -268,7 +268,7 @@ extension CMUXCLI {
         if let savedName {
             let trimmed = savedName.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else {
-                throw CLIError(message: String(localized: "cli.vm.layout.applyFromSavedNeedsALayoutNameSee", defaultValue: "vm layout apply: --from-saved needs a layout name (see `cmux layout list`)"))
+                throw CLIError(message: String(localized: "cli.vm.layout.applyFromSavedNeedsALayoutNameSee", defaultValue: "vm layout apply: --from-saved needs a layout name (see `shellx layout list`)"))
             }
             let payload = try client.sendV2(method: "layout.get", params: ["name": trimmed])
             guard JSONSerialization.isValidJSONObject(payload) else {
@@ -449,7 +449,7 @@ extension CMUXCLI {
         if exitCode != 0 {
             let detail = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
             let fallback = stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-            let text = detail.isEmpty ? (fallback.isEmpty ? String(format: String(localized: "cli.vm.layoutEnv.cmuxValueFailedOnValueExitValue", defaultValue: "cmux %1$@ failed on %2$@ (exit %3$@)"), String(describing: feature), String(describing: machine), String(describing: exitCode)) : fallback) : detail
+            let text = detail.isEmpty ? (fallback.isEmpty ? String(format: String(localized: "cli.vm.layoutEnv.cmuxValueFailedOnValueExitValue", defaultValue: "shellx %1$@ failed on %2$@ (exit %3$@)"), String(describing: feature), String(describing: machine), String(describing: exitCode)) : fallback) : detail
             // The shim's exit status is part of its contract (2 = bad input); pass the
             // small ones through, and never let a timeout's 124 masquerade as ours.
             let passthrough: Int32 = (1...3).contains(exitCode) ? Int32(exitCode) : 1
@@ -477,7 +477,7 @@ extension CMUXCLI {
     }
 
     static func vmShimOutdatedMessage(machine: String, feature: String) -> String {
-        String(format: String(localized: "cli.vm.layoutEnv.thisMachineSCmuxShimPredatesValueSupportReconnectIt", defaultValue: "this machine's cmux shim predates %1$@ support — reconnect it (cmux vm tree %2$@ --refresh) to heal, then retry"), String(describing: feature), String(describing: machine))
+        String(format: String(localized: "cli.vm.layoutEnv.thisMachineSCmuxShimPredatesValueSupportReconnectIt", defaultValue: "this machine's ShellX shim predates %1$@ support — reconnect it (shellx vm tree %2$@ --refresh) to heal, then retry"), String(describing: feature), String(describing: machine))
     }
 
     /// `cmux layout export --json [--workspace <ws>] [--raw]`, run on the machine.

@@ -21,9 +21,9 @@ enum ProUpgradePresenter {
     nonisolated static func upgradeMenuTitle(for tier: CmuxPlanTier) -> String {
         switch tier {
         case .max:
-            String(localized: "menu.help.upgradeToMax", defaultValue: "Upgrade to cmux Max…")
+            String(localized: "menu.help.upgradeToMax", defaultValue: "Upgrade to ShellX Max…")
         case .free, .go, .pro:
-            String(localized: "menu.help.upgradeToPro", defaultValue: "Upgrade to cmux Pro…")
+            String(localized: "menu.help.upgradeToPro", defaultValue: "Upgrade to ShellX Pro…")
         }
     }
 
@@ -31,9 +31,9 @@ enum ProUpgradePresenter {
     nonisolated static func upgradeCommandTitle(for tier: CmuxPlanTier) -> String {
         switch tier {
         case .max:
-            String(localized: "command.pro.upgradeToMax.title", defaultValue: "Upgrade to cmux Max")
+            String(localized: "command.pro.upgradeToMax.title", defaultValue: "Upgrade to ShellX Max")
         case .free, .go, .pro:
-            String(localized: "command.pro.upgrade.title", defaultValue: "Upgrade to cmux Pro")
+            String(localized: "command.pro.upgrade.title", defaultValue: "Upgrade to ShellX Pro")
         }
     }
 
@@ -141,7 +141,7 @@ enum ProUpgradePresenter {
             workspaceReuseState.clear()
         }
 
-        let title = String(localized: "pricing.pro.workspace.title", defaultValue: "cmux Pro")
+        let title = String(localized: "pricing.pro.workspace.title", defaultValue: "ShellX Pro")
         guard let workspace = appDelegate.performProUpgradeWorkspaceAction(
             title: title,
             url: url,
@@ -216,7 +216,7 @@ private final class NativePricingWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = String(localized: "pricing.native.window.title", defaultValue: "cmux Upgrade")
+        window.title = String(localized: "pricing.native.window.title", defaultValue: "ShellX Upgrade")
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
         window.minSize = NSSize(width: 760, height: 520)
@@ -540,7 +540,7 @@ private struct NativePricingPlansView: View {
                     String(localized: "pricing.native.pro.feature.vms", defaultValue: "Cloud agents on isolated Cloud VMs"),
                     String(localized: "pricing.native.pro.feature.hours", defaultValue: "Up to 5 Cloud VMs sharing 20 vCPUs and 40 GB RAM; one VM can use up to 16 GB RAM / 8 vCPU. The 24 GB / 12 vCPU and 32 GB / 16 vCPU sizes require Max."),
                     String(localized: "pricing.native.pro.feature.gateway", defaultValue: "Unlimited workspaces"),
-                    String(localized: "pricing.native.pro.feature.ios", defaultValue: "cmux iOS app and email support"),
+                    String(localized: "pricing.native.pro.feature.ios", defaultValue: "ShellX iOS app and email support"),
                 ]
             )
             NativePricingPlanCard(

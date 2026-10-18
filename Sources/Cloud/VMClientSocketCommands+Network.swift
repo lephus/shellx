@@ -9,7 +9,7 @@ extension TerminalController {
         guard let vmId = Self.socketWorkerString(params["id"]), !vmId.isEmpty else {
             let format = String(
                 localized: "socket.cloudVM.network.idRequired",
-                defaultValue: "%@ requires `id`. Run `cmux vm ls` to find one."
+                defaultValue: "%@ requires `id`. Run `shellx vm ls` to find one."
             )
             return v2Error(id: id, code: "invalid_params", message: String(format: format, method))
         }
@@ -27,7 +27,7 @@ extension TerminalController {
                     code: "invalid_params",
                     message: String(
                         localized: "socket.cloudVM.network.invalidEdit",
-                        defaultValue: "vm.network_update received an edit it does not understand. Use `cmux vm network --help`."
+                        defaultValue: "vm.network_update received an edit it does not understand. Use `shellx vm network --help`."
                     )
                 )
             }

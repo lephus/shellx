@@ -283,11 +283,11 @@ struct CloudWelcomeMediaCarousel: View {
     private var introducingText: String {
         posterHeadline == nil
             ? String(localized: "cloud.welcome.introducing", defaultValue: "Introducing")
-            : String(localized: "cloud.welcome.introducingCloud", defaultValue: "Introducing cmux cloud")
+            : String(localized: "cloud.welcome.introducingCloud", defaultValue: "Introducing ShellX cloud")
     }
 
     private var titleText: String {
-        posterHeadline ?? String(localized: "cloud.welcome.title.eyebrow", defaultValue: "cmux cloud")
+        posterHeadline ?? String(localized: "cloud.welcome.title.eyebrow", defaultValue: "ShellX cloud")
     }
 
     // MARK: Feature list

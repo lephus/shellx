@@ -19,7 +19,7 @@ struct CloudLinkFailureMessageTests {
         #expect(CloudMachineLink.errorText(asleepError) == asleep.linkFailureMessage)
 
         let unavailable = machineInfo(linkState: .unavailable, linkError: "cloud_api_unavailable")
-        #expect(unavailable.linkFailureMessage == "cmux cannot reach the Cloud service for this machine right now.")
+        #expect(unavailable.linkFailureMessage == "ShellX cannot reach the Cloud service for this machine right now.")
 
         let unavailableError = CloudMachineLink.LinkError.failureMessage(unavailable.linkFailureMessage)
         #expect(CloudMachineLink.errorText(unavailableError) == unavailable.linkFailureMessage)

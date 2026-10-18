@@ -29,9 +29,9 @@ extension CMUXCLI {
 
     static var vmPushUsage: String {
         """
-        Usage: cmux vm push <id> <local-path> [remote-path] [--exclude <pattern>]... [--no-default-excludes]
-               cmux vm push <id> <local-path> [remote-path] --watch [--interval <seconds>] [--exclude <pattern>]...
-               cmux vm push --secret <id> <local-file> [remote-path] [--mode <octal>]
+        Usage: shellx vm push <id> <local-path> [remote-path] [--exclude <pattern>]... [--no-default-excludes]
+               shellx vm push <id> <local-path> [remote-path] --watch [--interval <seconds>] [--exclude <pattern>]...
+               shellx vm push --secret <id> <local-file> [remote-path] [--mode <octal>]
 
         Copy a local file or directory onto a cloud machine over its private
         WireGuard connection with SSH/SCP. Directories travel as tarballs; by default \(vmPushDefaultExcludes.joined(separator: ", "))
@@ -44,38 +44,38 @@ extension CMUXCLI {
 
         --secret is for a file that must never transit the control plane (a token
         file, a deploy key, an .npmrc). It travels over the machine's cmux-tui link
-        into the in-VM `cmux file receive`, which turns terminal echo off before it
+        into the in-VM `shellx file receive`, which turns terminal echo off before it
         reads, writes the file with --mode (default 600), and moves it into place
-        atomically — the same path `cmux vm env set` uses. One file up to 256 KiB;
+        atomically — the same path `shellx vm env set` uses. One file up to 256 KiB;
         not combinable with --watch or --exclude.
 
         Examples:
-          cmux vm push brave-otter ./script.sh
-          cmux vm push brave-otter ./myrepo work/myrepo
-          cmux vm push brave-otter ./site --exclude dist
-          cmux vm push brave-otter . work/app --watch
-          cmux vm push --secret brave-otter ~/.npmrc .npmrc
-          cmux vm push --secret brave-otter ./deploy_key .ssh/deploy_key --mode 600
+          shellx vm push brave-otter ./script.sh
+          shellx vm push brave-otter ./myrepo work/myrepo
+          shellx vm push brave-otter ./site --exclude dist
+          shellx vm push brave-otter . work/app --watch
+          shellx vm push --secret brave-otter ~/.npmrc .npmrc
+          shellx vm push --secret brave-otter ./deploy_key .ssh/deploy_key --mode 600
         """
     }
 
     static var vmPullUsage: String {
         """
-        Usage: cmux vm pull <id> <remote-path> [local-path]
+        Usage: shellx vm pull <id> <remote-path> [local-path]
 
         Copy a file or directory from a cloud machine to the local disk over the
         exec channel. The local path defaults to the remote basename in the
         current directory.
 
         Examples:
-          cmux vm pull brave-otter work/report.pdf
-          cmux vm pull brave-otter /var/log/app ./app-logs
+          shellx vm pull brave-otter work/report.pdf
+          shellx vm pull brave-otter /var/log/app ./app-logs
         """
     }
 
     static var vmWaitUsage: String {
         """
-        Usage: cmux vm wait <id> [--timeout <seconds>] [--wake]
+        Usage: shellx vm wait <id> [--timeout <seconds>] [--wake]
 
         Block until the machine reports a ready status (running, ready, standby,
         or paused). --wake additionally runs a trivial exec so a sleeping machine
@@ -960,7 +960,7 @@ extension CMUXCLI {
             if totalChunks > 1 {
                 let template = CMUXDiffViewerLocalization.string(
                     "cli.vm.pull.progress",
-                    defaultValue: "cmux vm pull: %1$d/%2$d chunks"
+                    defaultValue: "shellx vm pull: %1$d/%2$d chunks"
                 )
                 progressLineOpen = vmTransferProgress(String(format: template, chunkIndex + 1, totalChunks), final: chunkIndex + 1 == totalChunks)
             }
@@ -994,11 +994,11 @@ extension CMUXCLI {
 
     static var vmRunUsage: String {
         """
-        Usage: cmux vm run [--sync] [--pull <remote-path>] [--machine <id>] [--new] [--size <4g|8g|16g|24g|32g|64g|MB>] [--timeout <seconds>] -- <command...>
+        Usage: shellx vm run [--sync] [--pull <remote-path>] [--machine <id>] [--new] [--size <4g|8g|16g|24g|32g|64g|MB>] [--timeout <seconds>] -- <command...>
 
         Run a command on a cloud machine without naming one: reuses an idle
         machine the router itself provisioned earlier (shown as "\(vmRunPoolLabel)"
-        in `cmux vm ls`), wakes a sleeping one, or provisions a fresh machine
+        in `shellx vm ls`), wakes a sleeping one, or provisions a fresh machine
         when the pool is empty or busy — then executes the command and passes
         its exit code through. Machines you created by hand are never drafted;
         use --machine <id> to run on one deliberately.
@@ -1012,15 +1012,15 @@ extension CMUXCLI {
           --new                 Force a fresh pool machine.
           --size <4g|8g|16g|24g|32g|64g|MB>
                                 Memory preset for a machine this run creates
-                                (4g to 16g on Pro; 24g, 32g, and 64g need cmux Max).
+                                (4g to 16g on Pro; 24g, 32g, and 64g need ShellX Max).
           --timeout <seconds>   Command timeout (default \(vmRunDefaultTimeoutSeconds)s, max 15 minutes).
           --wait, --output      Accepted for symmetry with `vm agent`; `vm run` always
                                 blocks on the command and prints its output.
 
         Examples:
-          cmux vm run -- uname -a
-          cmux vm run --sync -- bun test
-          cmux vm run --sync --pull work/app/dist -- sh -c 'cd work/app && bun run build'
+          shellx vm run -- uname -a
+          ShellX vm run --sync -- bun test
+          shellx vm run --sync --pull work/app/dist -- sh -c 'cd work/app && bun run build'
         """
     }
 
@@ -1480,7 +1480,7 @@ extension CMUXCLI {
             // and raw OS text, which do not belong in user-facing output.
             let template = CMUXDiffViewerLocalization.string(
                 "cli.vm.run.poolRecordFailed",
-                defaultValue: "vm run: provisioned %1$@ but could not record it in the pool store, so later runs will not reuse it. Use `cmux vm run --machine %1$@` to keep using it or `cmux vm rm %1$@` to remove it."
+                defaultValue: "vm run: provisioned %1$@ but could not record it in the pool store, so later runs will not reuse it. Use `shellx vm run --machine %1$@` to keep using it or `shellx vm rm %1$@` to remove it."
             )
             throw CLIError(message: String(format: template, id))
         }
@@ -1676,9 +1676,9 @@ extension CMUXCLI {
 extension CMUXCLI {
     static var vmRouteUsage: String {
         """
-        Usage: cmux vm route [--cwd <dir>] [--new] [--provision] [--size <4g|8g|16g|24g|32g|64g|MB>] [--json]
+        Usage: shellx vm route [--cwd <dir>] [--new] [--provision] [--size <4g|8g|16g|24g|32g|64g|MB>] [--json]
 
-        Print the machine `cmux vm run` / `cmux vm agent` would use for work in a
+        Print the machine `shellx vm run` / `shellx vm agent` would use for work in a
         directory, and why — without running anything. The policy is the router's
         own: the machine already bound to the directory (warm checkout, installed
         deps), else an awake idle pool machine, else a sleeping one. When the pool
@@ -1691,7 +1691,7 @@ extension CMUXCLI {
           --provision    Actually create the machine when routing would.
           --size <4g|8g|16g|24g|32g|64g|MB>
                          Memory preset for a machine --provision creates
-                         (4g to 16g on Pro; 24g, 32g, and 64g need cmux Max).
+                         (4g to 16g on Pro; 24g, 32g, and 64g need ShellX Max).
           --json         {machine, created, reason, would_provision, directory}
         """
     }
@@ -1700,17 +1700,17 @@ extension CMUXCLI {
 
     static var vmAgentUsage: String {
         """
-        Usage: cmux vm agent --agent <claude|codex|opencode|pi> [--machine <id>] [--sync] [--cwd <dir>] [--name <name>] [--no-open] [--focus|--no-focus] [--remote-workspace <ws>] [--wait [--output] [--timeout <seconds>]] [--new] [--size <4g|8g|16g|24g|32g|64g|MB>] [--json] -- <prompt or args...>
+        Usage: shellx vm agent --agent <claude|codex|opencode|pi> [--machine <id>] [--sync] [--cwd <dir>] [--name <name>] [--no-open] [--focus|--no-focus] [--remote-workspace <ws>] [--wait [--output] [--timeout <seconds>]] [--new] [--size <4g|8g|16g|24g|32g|64g|MB>] [--json] -- <prompt or args...>
 
         Short forms:
-          cmux agent <claude|codex|opencode|pi> [vm-agent-options] -- <prompt or args...>
-          cmux coderouter agent <claude|codex|opencode|pi> [vm-agent-options] -- <prompt or args...>
+          shellx agent <claude|codex|opencode|pi> [vm-agent-options] -- <prompt or args...>
+          shellx coderouter agent <claude|codex|opencode|pi> [vm-agent-options] -- <prompt or args...>
 
         Run a coding agent on a cloud machine. The machine is chosen like `vm run`
         (sticky per directory, then idle pool machine, then a fresh one) unless
         --machine pins one. The agent starts as a detached terminal in the
         machine's cmux-tui session, so it keeps running when you close the pane
-        and can be reattached from any device with `cmux vm open <machine>/<ws>/<term>`.
+        and can be reattached from any device with `shellx vm open <machine>/<ws>/<term>`.
 
         A bare prompt runs the agent's one-shot form (claude -p, codex exec,
         opencode run, pi -p). Arguments that start with a flag or a subcommand
@@ -1741,13 +1741,13 @@ extension CMUXCLI {
           --new            Force a fresh pool machine.
           --size <4g|8g|16g|24g|32g|64g|MB>
                            Memory preset for a machine this call creates
-                           (4g to 16g on Pro; 24g, 32g, and 64g need cmux Max).
+                           (4g to 16g on Pro; 24g, 32g, and 64g need ShellX Max).
 
         Examples:
-          cmux vm agent --agent claude --sync -- "run the test suite and fix failures"
-          cmux vm agent --agent codex --machine vivid-newt -- exec "summarize work/app"
-          cmux vm agent --agent opencode --no-open --json -- "add a README"
-          cmux vm agent --agent claude --machine vivid-newt --no-open --wait --output -- "fix the failing test"
+          shellx vm agent --agent claude --sync -- "run the test suite and fix failures"
+          shellx vm agent --agent codex --machine vivid-newt -- exec "summarize work/app"
+          shellx vm agent --agent opencode --no-open --json -- "add a README"
+          shellx vm agent --agent claude --machine vivid-newt --no-open --wait --output -- "fix the failing test"
         """
     }
 
@@ -1871,7 +1871,7 @@ extension CMUXCLI {
         }
         if selection.wouldProvision {
             print(String(
-                format: String(localized: "cli.vm.route.wouldProvision", defaultValue: "No pool machine is free for %@ \u{2014} `cmux vm run` would provision a fresh one (add --provision to create it now)."),
+                format: String(localized: "cli.vm.route.wouldProvision", defaultValue: "No pool machine is free for %@ \u{2014} `shellx vm run` would provision a fresh one (add --provision to create it now)."),
                 workDirectory
             ))
             return
@@ -2052,7 +2052,7 @@ extension CMUXCLI {
             agent, selection.id, terminalId, workspaceId
         )
         let reattachLine = String(
-            format: String(localized: "cli.vm.agent.reattach", defaultValue: "Reattach: cmux vm open %1$@/%2$@/%3$@"),
+            format: String(localized: "cli.vm.agent.reattach", defaultValue: "Reattach: shellx vm open %1$@/%2$@/%3$@"),
             selection.id, workspaceId, terminalId
         )
 

@@ -911,7 +911,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
         // after the retry loop gave up and reported the session end.
         XCTAssertTrue(
             child.waitForStandardError(
-                containing: "[cmux] press Enter to close this pane.",
+                containing: "[ShellX] press Enter to close this pane.",
                 timeout: 20
             ),
             child.standardError
@@ -980,7 +980,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
 
         XCTAssertTrue(
             child.waitForStandardError(
-                containing: "[cmux] press Enter to close this pane.",
+                containing: "[ShellX] press Enter to close this pane.",
                 timeout: 20
             ),
             child.standardError
@@ -1044,7 +1044,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
         // must not dismiss the failure prompt (the #9966 contract).
         XCTAssertTrue(
             child.waitForStandardError(
-                containing: "[cmux] press Enter to close this pane.",
+                containing: "[ShellX] press Enter to close this pane.",
                 timeout: 20
             ),
             child.standardError
@@ -1197,7 +1197,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
 
         XCTAssertTrue(
             child.waitForStandardError(
-                containing: "[cmux] press Enter to close this pane.",
+                containing: "[ShellX] press Enter to close this pane.",
                 timeout: 20
             ),
             child.standardError

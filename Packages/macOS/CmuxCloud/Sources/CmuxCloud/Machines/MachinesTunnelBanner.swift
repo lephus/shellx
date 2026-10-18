@@ -77,7 +77,7 @@ public struct MachinesTunnelBanner: View {
     private var helpText: String {
         String(
             localized: "cloud.vpn.setup.howItWorks.body",
-            defaultValue: "Connect Safari, Chrome, and other apps to your Cloud machines. Each machine keeps its private IP address and original ports. Only traffic to your Cloud network uses this encrypted connection. cmux terminals, Ports, and Desktop work without it."
+            defaultValue: "Connect Safari, Chrome, and other apps to your Cloud machines. Each machine keeps its private IP address and original ports. Only traffic to your Cloud network uses this encrypted connection. ShellX terminals, Ports, and Desktop work without it."
         )
     }
 }

@@ -120,7 +120,7 @@ final class DeviceDiscoverabilityUITests: SettingsUITestCase {
         XCTAssertEqual(app.sheets.count, 1)
         XCTAssertTrue(app.sheets.staticTexts["Make this Mac discoverable?"].exists)
         XCTAssertTrue(app.sheets.staticTexts[
-            "Other Macs signed in to your cmux account may discover this Mac and connect to its workspaces. Do you want to continue?"
+            "Other Macs signed in to your ShellX account may discover this Mac and connect to its workspaces. Do you want to continue?"
         ].exists)
     }
 

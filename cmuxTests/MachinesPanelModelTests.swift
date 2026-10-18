@@ -1271,7 +1271,7 @@ struct MachinesPanelPaidPlanTests {
     func requiresProErrorIncludesUpgradePathWhenServerOmitsAction() {
         let error = VMClientError.httpStatus(402, #"{"error":"vm_requires_pro"}"#)
         #expect(error.description.contains("https://cmux.com/pricing"))
-        #expect(error.description.contains("Upgrade to cmux Pro"))
+        #expect(error.description.contains("Upgrade to ShellX Pro"))
     }
 }
 

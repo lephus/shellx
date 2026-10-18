@@ -33,7 +33,7 @@ extension CMUXCLI {
         let usage = String(
             localized: "cli.simulator.usage",
             defaultValue: """
-            Usage: cmux simulator <subcommand> [args] [--surface <id|ref|index>]
+            Usage: shellx simulator <subcommand> [args] [--surface <id|ref|index>]
 
             Subcommands:
               type [text] [--stdin|--file <path>]  Type text and wait for transmission completion
@@ -75,9 +75,9 @@ extension CMUXCLI {
         String(
             localized: "cli.ios.usage",
             defaultValue: """
-            Usage: cmux ios <subcommand> [args] [--surface <ref>]
+            Usage: shellx ios <subcommand> [args] [--surface <ref>]
 
-            Every native `cmux simulator` subcommand is accepted unchanged.
+            Every native `shellx simulator` subcommand is accepted unchanged.
 
             Additional subcommands:
               list [--workspace <ref>]            List Simulator panes and device identifiers
@@ -86,10 +86,10 @@ extension CMUXCLI {
               screenshot [--out <path>]           Capture one or up to 8 selected Simulators
 
             Examples:
-              cmux ios list --json
-              cmux ios screenshot --surface surface:2 --out phone.png
-              cmux ios screenshot --all --out screenshots/
-              cmux ios rotate landscape-left
+              shellx ios list --json
+              shellx ios screenshot --surface surface:2 --out phone.png
+              shellx ios screenshot --all --out screenshots/
+              shellx ios rotate landscape-left
             """
         )
     }

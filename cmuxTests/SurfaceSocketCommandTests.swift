@@ -401,12 +401,12 @@ struct SurfaceSocketCommandTests {
 
     private static let requestFailedMessage = String(
         localized: "socket.cloudVM.requestFailed",
-        defaultValue: "The Cloud VM request failed. Retry, or check the machine's status with `cmux vm ls`."
+        defaultValue: "The Cloud VM request failed. Retry, or check the machine's status with `shellx vm ls`."
     )
 
     private static let workspaceDaemonUnavailableMessage = String(
         localized: "socket.cloudVM.tuiDaemonUnavailable",
-        defaultValue: "Could not create a workspace on this Cloud VM. Wake the machine or retry `cmux vm workspace new`."
+        defaultValue: "Could not create a workspace on this Cloud VM. Wake the machine or retry `shellx vm workspace new`."
     )
 
     private static func error(_ response: [String: Any]) throws -> [String: Any] {

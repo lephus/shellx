@@ -58,7 +58,7 @@ extension CMUXCLIErrorOutputRegressionTests {
         #expect(result.stdout.contains("verification: provider_setup_failed"))
         #expect(result.stdout.contains("cmux cloud domains verify retry.example.com"))
         #expect(result.stdout.contains("cmux cloud domains verify preview.example.com"))
-        #expect(result.stdout.contains("verification: not required (cmux domain)"))
+        #expect(result.stdout.contains("verification: not required (ShellX domain)"))
         let request = try cloudDomainsRequest(from: try #require(responder.receivedRequests.first))
         #expect(request["method"] as? String == "vm.publication_list")
     }

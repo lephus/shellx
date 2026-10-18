@@ -3,10 +3,10 @@ import Foundation
 extension CMUXCLI {
     static var sshCommandUsage: String {
         let help = String(localized: "cli.help.ssh", defaultValue: """
-        Usage: cmux ssh <destination> [flags] [-- <remote-command-args>]
+        Usage: shellx ssh <destination> [flags] [-- <remote-command-args>]
 
         Create a new workspace, mark it as remote-SSH, and start an SSH session in that workspace.
-        cmux will also establish a local SSH proxy endpoint so browser traffic can egress from the remote host.
+        ShellX will also establish a local SSH proxy endpoint so browser traffic can egress from the remote host.
 
         Flags:
           --name <title>          Optional workspace title
@@ -19,10 +19,10 @@ extension CMUXCLI {
           --no-focus              Create workspace without switching to it
 
         Example:
-          cmux ssh dev@my-host
-          cmux ssh dev@my-host --name "gpu-box" --port 2222 --identity ~/.ssh/id_ed25519
-          cmux ssh dev@my-host --forward-agent
-          cmux ssh dev@my-host --ssh-option UserKnownHostsFile=/dev/null --ssh-option StrictHostKeyChecking=no
+          shellx ssh dev@my-host
+          shellx ssh dev@my-host --name "gpu-box" --port 2222 --identity ~/.ssh/id_ed25519
+          shellx ssh dev@my-host --forward-agent
+          shellx ssh dev@my-host --ssh-option UserKnownHostsFile=/dev/null --ssh-option StrictHostKeyChecking=no
         """)
         let moshHelp = String(
             localized: "cli.help.ssh.mosh",
@@ -31,10 +31,10 @@ extension CMUXCLI {
               --transport <ssh|mosh>  Interactive terminal transport (default: ssh)
 
             SSH continues to handle remote features; Mosh carries only the interactive
-            terminal. If Mosh is missing locally or remotely, cmux reports it and uses SSH.
+            terminal. If Mosh is missing locally or remotely, ShellX reports it and uses SSH.
 
             Example:
-              cmux ssh dev@my-host --transport mosh
+              shellx ssh dev@my-host --transport mosh
             """
         )
         let initialCommandHelp = String(
@@ -44,7 +44,7 @@ extension CMUXCLI {
               --command <text>        Run text once in the initial remote terminal after shell startup
 
             Example:
-              cmux ssh dev@my-host --command 'omp "investigate auth"'
+              shellx ssh dev@my-host --command 'omp "investigate auth"'
             """
         )
         return "\(help)\n\n\(initialCommandHelp)\n\n\(moshHelp)\n\n\(openFocusFlagsHelp)"
@@ -52,39 +52,39 @@ extension CMUXCLI {
 
     static var moshCommandUsage: String {
         String(localized: "cli.help.mosh", defaultValue: """
-        Usage: cmux mosh <destination> [flags] [-- <remote-command-args>]
+        Usage: shellx mosh <destination> [flags] [-- <remote-command-args>]
 
         Create a first-class remote workspace with Mosh as the interactive terminal
         transport. SSH remains the management lane for remote metadata, daemon control,
         proxy/egress, uploads, cwd/git integration, and reconnect actions.
 
-        Accepts the same workspace and SSH bootstrap flags as `cmux ssh`. If Mosh is
-        unavailable locally or remotely, cmux explains why and falls back to SSH.
+        Accepts the same workspace and SSH bootstrap flags as `shellx ssh`. If Mosh is
+        unavailable locally or remotely, ShellX explains why and falls back to SSH.
 
         Example:
-          cmux mosh dev@my-host
+          shellx mosh dev@my-host
         """)
     }
 
     static var moshTmuxCommandUsage: String {
         String(localized: "cli.help.mosh-tmux", defaultValue: """
-        Usage: cmux mosh-tmux <destination> [--session <name>] [flags]
+        Usage: shellx mosh-tmux <destination> [--session <name>] [flags]
 
         Create a first-class remote workspace whose Mosh terminal creates or attaches
-        to a named tmux session (default: main). The tmux profile persists across cmux
+        to a named tmux session (default: main). The tmux profile persists across ShellX
         workspace reconnect and app session restore.
 
         This is a terminal-attached tmux session that roams with Mosh. It is distinct
-        from `cmux ssh-tmux`, which uses SSH and tmux control mode to mirror sessions,
-        windows, and panes as native cmux workspaces, tabs, and splits.
+        from `shellx ssh-tmux`, which uses SSH and tmux control mode to mirror sessions,
+        windows, and panes as native ShellX workspaces, tabs, and splits.
 
         `--session <name>` selects the tmux session. All other workspace and SSH
-        bootstrap flags match `cmux mosh`. If Mosh is unavailable, cmux runs the
+        bootstrap flags match `shellx mosh`. If Mosh is unavailable, ShellX runs the
         same managed tmux profile over SSH.
 
         Example:
-          cmux mosh-tmux dev@my-host
-          cmux mosh-tmux dev@my-host --session agent-main
+          shellx mosh-tmux dev@my-host
+          shellx mosh-tmux dev@my-host --session agent-main
         """)
     }
 }

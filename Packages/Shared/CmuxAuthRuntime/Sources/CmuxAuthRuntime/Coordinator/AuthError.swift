@@ -98,7 +98,7 @@ public enum AuthError: Error, LocalizedError, Equatable, Sendable {
         case .rateLimited:
             return String(
                 localized: "auth.error.rate_limited",
-                defaultValue: "Too many sign-in requests from this network. cmux retries automatically.",
+                defaultValue: "Too many sign-in requests from this network. ShellX retries automatically.",
                 bundle: .main
             )
         }

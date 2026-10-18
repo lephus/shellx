@@ -56,6 +56,6 @@ struct AboutLicensesResourceTests {
             commit: "abcdef123"
         )
 
-        #expect(url.absoluteString == "https://github.com/manaflow-ai/cmux/tree/abcdef123")
+        #expect(url.absoluteString == "https://github.com/lephus/shellx/tree/abcdef123")
     }
 }

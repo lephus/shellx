@@ -460,7 +460,7 @@ public actor CloudMachineLinkManager {
         }
         guard let clientURL, let hub else { throw ManagerError.wireGuardHubMissing }
         guard resolvedClientCapabilities(clientURL: clientURL).contains(remoteNetwork ? "cloud-browser-network" : "browser-proxy") else {
-            throw ManagerError.retryLater(String(localized: "cloud.browser.clientUpdateRequired", defaultValue: "Update cmux to connect to this Cloud page."))
+            throw ManagerError.retryLater(String(localized: "cloud.browser.clientUpdateRequired", defaultValue: "Update ShellX to connect to this Cloud page."))
         }
         let proxy = CloudBrowserProxyProcess(addresses: addresses)
         browserProxies[key] = proxy

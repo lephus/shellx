@@ -79,8 +79,8 @@ extension Array where Element == CuratedSettingEntry {
             ),
             .init(section: .app, id: "file-drops", title: String(localized: "settings.app.fileDrop.defaultBehavior", defaultValue: "File Drops"), synonyms: "File Drops drag drop files finder path text terminal editor split preview shift"),
             .init(section: .app, id: "preferred-editor", title: String(localized: "settings.app.preferredEditor", defaultValue: "Open Files With"), synonyms: "Open Files With app.preferredEditor editor open file code vscode visual studio zed sublime subl cursor"),
-            .init(section: .app, id: "supported-file-previews", title: String(localized: "settings.app.openSupportedFilesInCmux", defaultValue: "Open Supported Files in cmux"), synonyms: "Open Supported Files in cmux app.openSupportedFilesInCmux cmd click file preview pdf image video audio quicklook quick look editor external"),
-            .init(section: .app, id: "markdown-viewer", title: String(localized: "settings.app.openMarkdownInCmuxViewer", defaultValue: "Open Markdown in cmux Viewer"), synonyms: "Open Markdown in cmux Viewer app.openMarkdownInCmuxViewer md markdown mdx viewer preview readme"),
+            .init(section: .app, id: "supported-file-previews", title: String(localized: "settings.app.openSupportedFilesInCmux", defaultValue: "Open Supported Files in ShellX"), synonyms: "Open Supported Files in cmux app.openSupportedFilesInCmux cmd click file preview pdf image video audio quicklook quick look editor external"),
+            .init(section: .app, id: "markdown-viewer", title: String(localized: "settings.app.openMarkdownInCmuxViewer", defaultValue: "Open Markdown in ShellX Viewer"), synonyms: "Open Markdown in cmux Viewer app.openMarkdownInCmuxViewer md markdown mdx viewer preview readme"),
             .init(section: .app, id: "file-editor-word-wrap", title: String(localized: "settings.app.fileEditorWordWrap", defaultValue: "File Editor Word Wrap"), synonyms: "fileEditor.wordWrap " + String(localized: "settings.search.fileEditor.wordWrap", defaultValue: "file editor word wrap soft wrap reflow lines text horizontal scroll preview")),
             .init(
                 section: .app,
@@ -247,7 +247,7 @@ extension Array where Element == CuratedSettingEntry {
                 section: .terminal,
                 id: "password-input-dots",
                 title: String(localized: "settings.terminal.showPasswordInputDots", defaultValue: "Show Typed Password Dots"),
-                detailText: String(localized: "settings.terminal.showPasswordInputDots.subtitle", defaultValue: "Shows one dot in the badge per typed character. cmux keeps only a count, never the characters. Pasted text is not counted."),
+                detailText: String(localized: "settings.terminal.showPasswordInputDots.subtitle", defaultValue: "Shows one dot in the badge per typed character. ShellX keeps only a count, never the characters. Pasted text is not counted."),
                 paths: ["terminal.showPasswordInputDots"],
                 synonyms: "terminal.showPasswordInputDots password dots typed characters count bullets feedback sudo ssh prompt"
             ),
@@ -270,7 +270,7 @@ extension Array where Element == CuratedSettingEntry {
                 ),
                 detailText: String(
                     localized: "settings.terminal.localTmux.subtitle",
-                    defaultValue: "Named local-tmux sessions keep processes and scrollback alive across cmux quit, crashes, and updates. Ordinary terminals keep their current behavior.",
+                    defaultValue: "Named local-tmux sessions keep processes and scrollback alive across ShellX quit, crashes, and updates. Ordinary terminals keep their current behavior.",
                     bundle: .module
                 ),
                 synonyms: "session persistence keep local sessions alive local tmux local-tmux tmux detach reattach crash update quit durable terminal process scrollback"
@@ -330,8 +330,8 @@ extension Array where Element == CuratedSettingEntry {
             .init(section: .sidebarAppearance, id: "show-pull-requests", title: String(localized: "settings.app.showPullRequests", defaultValue: "Show Pull Requests in Sidebar"), synonyms: "Show Pull Requests in Sidebar sidebar.showPullRequests pr mr review github gitlab bitbucket pull request merge request"),
             .init(section: .sidebarAppearance, id: "watch-git-status", title: String(localized: "settings.app.watchGitStatus", defaultValue: "Watch Git Status in Sidebar"), synonyms: "Watch Git Status in Sidebar sidebar.watchGitStatus git status branch watcher index lock"),
             .init(section: .sidebarAppearance, id: "make-pr-clickable", title: String(localized: "settings.app.makeSidebarPullRequestClickable", defaultValue: "Make Sidebar PR Clickable"), synonyms: "Make Sidebar PR Clickable sidebar.makePullRequestsClickable clickable pull requests pr mr reviews links select workspace row"),
-            .init(section: .sidebarAppearance, id: "open-pr-links", title: String(localized: "settings.app.openSidebarPRLinks", defaultValue: "Open Sidebar PR Links in cmux Browser"), synonyms: "Open Sidebar PR Links in cmux Browser sidebar.openPullRequestLinksInCmuxBrowser pr links github browser default external embedded"),
-            .init(section: .sidebarAppearance, id: "open-port-links", title: String(localized: "settings.app.openSidebarPortLinks", defaultValue: "Open Sidebar Port Links in cmux Browser"), synonyms: "Open Sidebar Port Links in cmux Browser sidebar.openPortLinksInCmuxBrowser ports localhost links browser default external embedded"),
+            .init(section: .sidebarAppearance, id: "open-pr-links", title: String(localized: "settings.app.openSidebarPRLinks", defaultValue: "Open Sidebar PR Links in ShellX Browser"), synonyms: "Open Sidebar PR Links in cmux Browser sidebar.openPullRequestLinksInCmuxBrowser pr links github browser default external embedded"),
+            .init(section: .sidebarAppearance, id: "open-port-links", title: String(localized: "settings.app.openSidebarPortLinks", defaultValue: "Open Sidebar Port Links in ShellX Browser"), synonyms: "Open Sidebar Port Links in cmux Browser sidebar.openPortLinksInCmuxBrowser ports localhost links browser default external embedded"),
             .init(section: .sidebarAppearance, id: "show-ssh", title: String(localized: "settings.app.showSSH", defaultValue: "Show SSH in Sidebar"), synonyms: "Show SSH in Sidebar sidebar.showSSH remote host target ssh server"),
             .init(section: .sidebarAppearance, id: "show-ports", title: String(localized: "settings.app.showPorts", defaultValue: "Show Listening Ports in Sidebar"), synonyms: "Show Listening Ports in Sidebar sidebar.showPorts localhost port listener dev server url"),
             .init(section: .sidebarAppearance, id: "show-log", title: String(localized: "settings.app.showLog", defaultValue: "Show Latest Log in Sidebar"), synonyms: "Show Latest Log in Sidebar sidebar.showLog log status latest message imperative"),
@@ -388,7 +388,7 @@ extension Array where Element == CuratedSettingEntry {
                     localized: "settings.mobile.phonePush.forwarding",
                     defaultValue: "Forward Notifications to iPhone"
                 ),
-                detailText: String(localized: "settings.mobile.phonePush.forwarding.subtitle", defaultValue: "Sends agent notifications from this Mac to cmux on iPhone and iPad."),
+                detailText: String(localized: "settings.mobile.phonePush.forwarding.subtitle", defaultValue: "Sends agent notifications from this Mac to ShellX on iPhone and iPad."),
                 synonyms: "push notifications iphone ipad mobile forwarding agent alerts forwardNotificationsToPhone"
             ),
             .init(
@@ -479,7 +479,7 @@ extension Array where Element == CuratedSettingEntry {
                 title: String(localized: "settings.automation.workspaceAutoNaming", defaultValue: "Workspace Auto-Naming"),
                 detailText: [
                     String(localized: "settings.automation.workspaceAutoNaming.subtitle", defaultValue: "Generates workspace and tab titles from agent conversations."),
-                    String(localized: "settings.automation.workspaceAutoNaming.note", defaultValue: "When enabled, cmux summarizes supported agent sessions into short workspace and tab names using each agent's own binary, refreshed as the topic shifts. Manual renames always win and stop auto-naming for that workspace or tab. Uses your agent account for the short summarization calls."),
+                    String(localized: "settings.automation.workspaceAutoNaming.note", defaultValue: "When enabled, ShellX summarizes supported agent sessions into short workspace and tab names using each agent's own binary, refreshed as the topic shifts. Manual renames always win and stop auto-naming for that workspace or tab. Uses your agent account for the short summarization calls."),
                     String(localized: "settings.automation.autoNamingAgent", defaultValue: "Naming Agent"),
                     String(localized: "settings.automation.autoNamingAgent.auto", defaultValue: "Automatic"),
                 ].joined(separator: " "),
@@ -497,7 +497,7 @@ extension Array where Element == CuratedSettingEntry {
             .init(
                 section: .computerUse,
                 id: "enabled",
-                title: String(localized: "settings.computerUse.enabled", defaultValue: "Enable cmux Computer Use"),
+                title: String(localized: "settings.computerUse.enabled", defaultValue: "Enable ShellX Computer Use"),
                 paths: ["computerUse.enabled"],
                 synonyms: String(localized: "settings.search.alias.setting.computerUse.enabled", defaultValue: "computerUse.enabled enable disable computer use cua mcp agent sessions")
             ),
@@ -510,12 +510,12 @@ extension Array where Element == CuratedSettingEntry {
             .init(
                 section: .computerUse,
                 id: "show-in-menu-bar",
-                title: String(localized: "settings.computerUse.showInMenuBar", defaultValue: "Show cmux Computer Use in Menu Bar"),
+                title: String(localized: "settings.computerUse.showInMenuBar", defaultValue: "Show ShellX Computer Use in Menu Bar"),
                 paths: ["computerUse.showInMenuBar"],
                 synonyms: String(localized: "settings.search.alias.setting.computerUse.showInMenuBar", defaultValue: "computerUse.showInMenuBar menu bar menubar status item cursor agents")
             ),
             // Browser
-            .init(section: .browser, id: "enable-browser", title: String(localized: "settings.browser.enabled", defaultValue: "Enable cmux Browser"), synonyms: "Enable cmux Browser browser.disabled enable disable webview embedded browser tabs links"),
+            .init(section: .browser, id: "enable-browser", title: String(localized: "settings.browser.enabled", defaultValue: "Enable ShellX Browser"), synonyms: "Enable cmux Browser browser.disabled enable disable webview embedded browser tabs links"),
             .init(section: .browser, id: "search-engine", title: String(localized: "settings.browser.searchEngine", defaultValue: "Default Search Engine"), synonyms: "Default Search Engine browser.defaultSearchEngine omnibar address bar google duckduckgo bing kagi brave startpage perplexity exa yahoo ecosia qwant mojeek wikipedia github baidu yandex custom search provider engine name url template"),
             .init(section: .browser, id: "search-suggestions", title: String(localized: "settings.browser.searchSuggestions", defaultValue: "Show Search Suggestions"), synonyms: "Show Search Suggestions browser.showSearchSuggestions suggest autocomplete address bar search suggestions"),
         ], and: [
@@ -533,7 +533,7 @@ extension Array where Element == CuratedSettingEntry {
                 detailText: String(localized: "settings.browser.showLinkHoverURL.subtitle", defaultValue: "Shows a link's destination at the bottom of a browser pane while the pointer is over it or it has keyboard focus."),
                 synonyms: String(localized: "settings.search.alias.setting.browser.link-hover-url", defaultValue: "browser.showLinkHoverURL link hover url destination address status bar preview")
             ),
-            .init(section: .browser, id: "terminal-links", title: String(localized: "settings.browser.openTerminalLinks", defaultValue: "Open Terminal Links in cmux Browser"), synonyms: "Open Terminal Links in cmux Browser browser.openTerminalLinksInCmuxBrowser click url terminal links open in browser href"),
+            .init(section: .browser, id: "terminal-links", title: String(localized: "settings.browser.openTerminalLinks", defaultValue: "Open Terminal Links in ShellX Browser"), synonyms: "Open Terminal Links in cmux Browser browser.openTerminalLinksInCmuxBrowser click url terminal links open in browser href"),
             .init(section: .browser, id: "intercept-open", title: String(localized: "settings.browser.interceptOpen", defaultValue: "Intercept open http(s) in Terminal"), synonyms: "Intercept open http(s) in Terminal browser.interceptTerminalOpenCommandInCmuxBrowser open command http https url terminal intercept"),
             .init(section: .browser, id: "host-whitelist", title: String(localized: "settings.browser.hostWhitelist", defaultValue: "Hosts to Open in Embedded Browser"), synonyms: "Hosts to Open in Embedded Browser browser.hostsToOpenInEmbeddedBrowser allowlist whitelist host wildcard domain embedded browser"),
             .init(section: .browser, id: "external-patterns", title: String(localized: "settings.browser.externalPatterns", defaultValue: "URLs to Always Open Externally"), synonyms: "URLs to Always Open Externally browser.urlsToAlwaysOpenExternally denylist blocklist regex rules external default browser"),

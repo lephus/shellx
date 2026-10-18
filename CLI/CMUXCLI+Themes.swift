@@ -289,7 +289,7 @@ extension CMUXCLI {
             )
         default:
             if subcommand.hasPrefix("-") {
-                throw CLIError(message: "Unknown themes subcommand '\(subcommand)'. Run 'cmux themes --help'.")
+                throw CLIError(message: "Unknown themes subcommand '\(subcommand)'. Run 'shellx themes --help'.")
             }
 
             try runThemesSet(

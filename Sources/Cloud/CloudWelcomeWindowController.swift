@@ -288,7 +288,7 @@ final class CloudWelcomeWindowController: NSObject, NSWindowDelegate {
             defer: false
         )
         window.identifier = NSUserInterfaceItemIdentifier("cmux.cloud.welcome")
-        window.title = String(localized: "cloud.welcome.title.eyebrow", defaultValue: "cmux cloud")
+        window.title = String(localized: "cloud.welcome.title.eyebrow", defaultValue: "ShellX cloud")
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true

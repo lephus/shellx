@@ -135,7 +135,7 @@ import Testing
             #expect(!result.timedOut, Comment(rawValue: output))
             #expect(result.status != 0, Comment(rawValue: output))
             #expect(
-                output.contains("Usage: cmux workspace loading"),
+                output.contains("Usage: shellx workspace loading"),
                 Comment(rawValue: "Expected usage for \(arguments), got: \(output)")
             )
         }

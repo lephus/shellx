@@ -335,13 +335,13 @@ final class HiveComputersService {
         case .thisMac:
             String(localized: "settings.computers.selfPairing", defaultValue: "This code belongs to this Mac. Enter the other Mac’s pairing code.")
         case .missingIdentity, .identityMismatch:
-            String(localized: "settings.computers.identityFailed", defaultValue: "The Mac’s authenticated identity could not be verified. Update cmux on both Macs and copy a fresh pairing code.")
+            String(localized: "settings.computers.identityFailed", defaultValue: "The Mac’s authenticated identity could not be verified. Update ShellX on both Macs and copy a fresh pairing code.")
         case .busy:
             String(localized: "settings.computers.pairingBusy", defaultValue: "Wait for the current pairing attempt to finish.")
         case .stopped:
             signInMessage
         case .storageFailed:
-            String(localized: "settings.computers.storageFailed", defaultValue: "Your paired Macs could not be loaded. Check available disk space and restart cmux.")
+            String(localized: "settings.computers.storageFailed", defaultValue: "Your paired Macs could not be loaded. Check available disk space and restart ShellX.")
         case nil:
             String(localized: "settings.computers.operationFailed", defaultValue: "The computer operation failed. Check that both Macs are signed in and online, then try again.")
         }

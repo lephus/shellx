@@ -1088,7 +1088,7 @@ final class MarkdownPanelTests: XCTestCase {
         )
         let expectedConsentMessage = String(
             localized: "markdown.web.remoteImageConsentMessage",
-            defaultValue: "cmux will not contact this image URL until you load this image."
+            defaultValue: "ShellX will not contact this image URL until you load this image."
         )
         let expectedLoadButton = String(
             localized: "markdown.web.remoteImageLoadImage",

@@ -445,7 +445,7 @@ public struct SidebarSection: View {
 
             SettingsCardRow(
                 configurationReview: .json("sidebar.openPullRequestLinksInCmuxBrowser"),
-                String(localized: "settings.app.openSidebarPRLinks", defaultValue: "Open Sidebar PR Links in cmux Browser"),
+                String(localized: "settings.app.openSidebarPRLinks", defaultValue: "Open Sidebar PR Links in ShellX Browser"),
                 subtitle: prLinksSubtitle(prVisible: showPR.current, prClickable: prClickable.current, openInCmux: prLinks.current)
             ) {
                 Toggle("", isOn: Binding(get: { prLinks.current }, set: { prLinks.set($0) }))
@@ -457,8 +457,8 @@ public struct SidebarSection: View {
 
             SettingsCardRow(
                 configurationReview: .json("sidebar.openPortLinksInCmuxBrowser"),
-                String(localized: "settings.app.openSidebarPortLinks", defaultValue: "Open Sidebar Port Links in cmux Browser"),
-                subtitle: String(localized: "settings.app.openSidebarPortLinks.subtitle", defaultValue: "Clicking a port link in the sidebar opens it in the cmux browser.")
+                String(localized: "settings.app.openSidebarPortLinks", defaultValue: "Open Sidebar Port Links in ShellX Browser"),
+                subtitle: String(localized: "settings.app.openSidebarPortLinks.subtitle", defaultValue: "Clicking a port link in the sidebar opens it in the ShellX browser.")
             ) {
                 Toggle("", isOn: Binding(get: { portLinks.current }, set: { portLinks.set($0) }))
                     .labelsHidden()
@@ -548,6 +548,6 @@ public struct SidebarSection: View {
         if !prClickable {
             return String(localized: "settings.app.openSidebarPRLinks.subtitleDisabled", defaultValue: "Enable sidebar PR clickability to choose where PR links open.")
         }
-        return String(localized: "settings.app.openSidebarPRLinks.subtitle", defaultValue: "Clicking a pull request link in the sidebar opens it in the cmux browser.")
+        return String(localized: "settings.app.openSidebarPRLinks.subtitle", defaultValue: "Clicking a pull request link in the sidebar opens it in the ShellX browser.")
     }
 }

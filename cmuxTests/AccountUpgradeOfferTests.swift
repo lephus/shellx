@@ -16,10 +16,10 @@ import Testing
 struct AccountUpgradeOfferTests {
     @Test func menuTitlesNameTheOfferedTier() {
         #expect(ProUpgradePresenter.upgradeMenuTitle(for: .pro) == String(
-            localized: "menu.help.upgradeToPro", defaultValue: "Upgrade to cmux Pro…"
+            localized: "menu.help.upgradeToPro", defaultValue: "Upgrade to ShellX Pro…"
         ))
         #expect(ProUpgradePresenter.upgradeMenuTitle(for: .max) == String(
-            localized: "menu.help.upgradeToMax", defaultValue: "Upgrade to cmux Max…"
+            localized: "menu.help.upgradeToMax", defaultValue: "Upgrade to ShellX Max…"
         ))
     }
 

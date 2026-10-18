@@ -6,7 +6,7 @@ extension ShortcutKeymapPreset {
     public var displayName: String {
         switch self {
         case .cmux:
-            return String(localized: "shortcut.keymap.preset.cmux", defaultValue: "cmux (Default)")
+            return String(localized: "shortcut.keymap.preset.cmux", defaultValue: "ShellX (Default)")
         case .iTerm2:
             return String(localized: "shortcut.keymap.preset.iterm2", defaultValue: "iTerm2")
         case .terminal:
@@ -90,7 +90,7 @@ extension ShortcutKeymapPlan {
         let changeFormat = String(localized: "shortcut.keymap.summary.change", defaultValue: "%1$@: %2$@ → %3$@")
         let conflictFormat = String(
             localized: "shortcut.keymap.summary.conflict",
-            defaultValue: "%1$@ is also a macOS shortcut (%2$@). macOS may handle it before cmux."
+            defaultValue: "%1$@ is also a macOS shortcut (%2$@). macOS may handle it before ShellX."
         )
         let keptFormat = String(
             localized: "shortcut.keymap.summary.kept",

@@ -101,7 +101,7 @@ extension CMUXCLI {
         let invocation = try LocalTmuxInvocation.parse(effectiveArguments)
         guard invocation.canRunWithoutCmux else {
             throw CLIError(message: String.localizedStringWithFormat(
-                String(localized: "cli.localTmux.error.requiresApp", defaultValue: "local-tmux %@ requires a running cmux app; use --headless for a direct tmux client"),
+                String(localized: "cli.localTmux.error.requiresApp", defaultValue: "local-tmux %@ requires a running ShellX app; use --headless for a direct tmux client"),
                 invocation.action.rawValue
             ))
         }

@@ -49,9 +49,9 @@ struct CloudTunnelBannerTests {
         let failed = try #require(CloudTunnelBanner(status: CloudTunnelStatus(backend: networkExtension, state: .failed("no route"), isPinned: false)))
         #expect(failed.kind == .failed && failed.text.contains("no route"))
         let pinned = try #require(CloudTunnelBanner(status: CloudTunnelStatus(backend: networkExtension, state: .up, isPinned: true)))
-        #expect(pinned.kind == .connected && pinned.text.contains("cmux vpn down"))
+        #expect(pinned.kind == .connected && pinned.text.contains("shellx vpn down"))
         let unpinned = try #require(CloudTunnelBanner(status: CloudTunnelStatus(backend: networkExtension, state: .up, isPinned: false)))
-        #expect(unpinned.kind == .connected && !unpinned.text.contains("cmux vpn down"))
+        #expect(unpinned.kind == .connected && !unpinned.text.contains("shellx vpn down"))
     }
 
     @Test("the settings link lands on Login Items & Extensions on macOS 15 and Privacy & Security before")

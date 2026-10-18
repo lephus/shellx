@@ -11,62 +11,62 @@ import Foundation
 // handoff for routed providers and installation when missing.
 extension CMUXCLI {
     static let coderouterUsage = """
-        Usage: cmux coderouter <status|machines|claude|agent> [options]
+        Usage: shellx coderouter <status|machines|claude|agent> [options]
 
-        Team settings for the cmux coderouter model plane that Cloud machines
+        Team settings for the ShellX coderouter model plane that Cloud machines
         route codex, claude, pi, and opencode through. Any other verb, and every
-        `cmux cr ...`, runs the CodeRouter CLI unchanged, offering to install it
+        `shellx cr ...`, runs the CodeRouter CLI unchanged, offering to install it
         first when this machine has none.
 
-          cmux coderouter status [--team <id>] [--json]
+          shellx coderouter status [--team <id>] [--json]
               Sign-in state, selected team, and the team's Claude upstream accounts.
 
-          cmux coderouter machines [--team <id>] [--json]
+          shellx coderouter machines [--team <id>] [--json]
               30-day coderouter usage per Cloud machine (tokens, API-equivalent USD).
 
-          cmux coderouter agent <claude|codex|opencode|pi> [vm-agent-options] -- <prompt or args...>
+          shellx coderouter agent <claude|codex|opencode|pi> [vm-agent-options] -- <prompt or args...>
               Start an agent on a routed Cloud machine. This is the same path as
-              `cmux vm agent`; the `agent` form keeps CodeRouter and compute in
+              `shellx vm agent`; the `agent` form keeps CodeRouter and compute in
               one command family.
 
-          cmux coderouter claude list [--team <id>] [--json]
+          shellx coderouter claude list [--team <id>] [--json]
               Every Claude upstream account of the team: id, kind, masked
               identifier, label, health. Secrets are never printed. Alias: show.
 
-          cmux coderouter claude add oauth-token [--label <s>] [--stdin] [--team <id>] [--json]
+          shellx coderouter claude add oauth-token [--label <s>] [--stdin] [--team <id>] [--json]
               Add a Claude Code OAuth token (sk-ant-oat01-...). Run
               `claude setup-token` to mint one automatically, or provide it in
               CLAUDE_CODE_OAUTH_TOKEN, or pipe it in with --stdin. Never pass
               a token as an argument. Without --label, a terminal offers your
               Claude Code login's email as the label. Alias: set.
 
-          cmux coderouter claude add api-key [--label <s>] [--stdin] [--team <id>] [--json]
+          shellx coderouter claude add api-key [--label <s>] [--stdin] [--team <id>] [--json]
               Add an Anthropic API key (sk-ant-...) from ANTHROPIC_API_KEY,
               --stdin, or a hidden prompt.
 
-          cmux coderouter claude add bedrock [--label <s>] [--region <r>] [--model <claude-id>=<bedrock-id>]... [--team <id>] [--json]
+          shellx coderouter claude add bedrock [--label <s>] [--region <r>] [--model <claude-id>=<bedrock-id>]... [--team <id>] [--json]
               Add Amazon Bedrock credentials from AWS_ACCESS_KEY_ID,
               AWS_SECRET_ACCESS_KEY, and optional AWS_SESSION_TOKEN in your
               shell environment. --region defaults to AWS_REGION or
               AWS_DEFAULT_REGION.
 
-          cmux coderouter claude remove <account> [--team <id>] [--json]
+          shellx coderouter claude remove <account> [--team <id>] [--json]
               Remove one account by id, label, or masked identifier.
 
-          cmux coderouter claude disable <account> | enable <account> [--team <id>] [--json]
+          shellx coderouter claude disable <account> | enable <account> [--team <id>] [--json]
               Take an account out of rotation, or put it back.
 
-          cmux coderouter claude clear [--team <id>] [--json]
+          shellx coderouter claude clear [--team <id>] [--json]
               Remove every Claude upstream account of the team.
 
         A team routes each Cloud machine to one of its accounts and moves it to
         another when that account is rate limited, rejected, or unavailable.
-        Requires `cmux auth login` and a team where you can manage coderouter.
+        Requires `shellx auth login` and a team where you can manage coderouter.
 
         Examples:
-          cmux coderouter claude add oauth-token --label work
-          cmux coderouter claude list
-          cmux coderouter machines --json
+          shellx coderouter claude add oauth-token --label work
+          shellx coderouter claude list
+          shellx coderouter machines --json
         """
 
     /// The first-argument verbs cmux owns under `cmux coderouter`. Everything

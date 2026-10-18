@@ -166,7 +166,7 @@ struct CLIExplicitSurfaceRoutingTests {
                         "status": "running",
                         "link_state": "error",
                         "link_error": "cloud_api_unavailable",
-                        "link_error_message": "cmux cannot reach the Cloud service for this machine right now."
+                        "link_error_message": "ShellX cannot reach the Cloud service for this machine right now."
                     ]],
                     "resources": []
                 ]
@@ -175,7 +175,7 @@ struct CLIExplicitSurfaceRoutingTests {
 
         #expect(execution.result.status == 0, Comment(rawValue: execution.result.stderr))
         #expect(
-            execution.result.stdout.contains("cmux cannot reach the Cloud service"),
+            execution.result.stdout.contains("ShellX cannot reach the Cloud service"),
             Comment(rawValue: execution.result.stdout)
         )
         #expect(!execution.result.stdout.contains("cloud_api_unavailable"))

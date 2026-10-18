@@ -4,7 +4,7 @@ extension CMUXCLI {
     static var agentHibernationUsage: String {
         String(
             localized: "cli.agentHibernation.usage",
-            defaultValue: "Usage: cmux agent-hibernation <on|off> [--json]\n       cmux agent-hibernation <hibernate|wake> <surface> [--workspace <id|ref|index>] [--json]"
+            defaultValue: "Usage: shellx agent-hibernation <on|off> [--json]\n       shellx agent-hibernation <hibernate|wake> <surface> [--workspace <id|ref|index>] [--json]"
         )
     }
 

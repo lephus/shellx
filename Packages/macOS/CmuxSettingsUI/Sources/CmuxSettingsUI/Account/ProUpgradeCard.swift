@@ -114,7 +114,7 @@ struct ProUpgradeCardModel: Equatable {
         self.tier = tier
         switch tier {
         case .max:
-            title = String(localized: "settings.account.max.title", defaultValue: "cmux Max", bundle: .module)
+            title = String(localized: "settings.account.max.title", defaultValue: "ShellX Max", bundle: .module)
             subtitle = String(
                 localized: "settings.account.max.activeSubtitle",
                 defaultValue: "Your Max subscription is active. It includes everything in Pro.",
@@ -122,7 +122,7 @@ struct ProUpgradeCardModel: Equatable {
             )
             actions = canManageBilling ? [.manageBilling] : []
         case .pro:
-            title = String(localized: "settings.account.pro.title", defaultValue: "cmux Pro")
+            title = String(localized: "settings.account.pro.title", defaultValue: "ShellX Pro")
             if canManageBilling {
                 subtitle = String(
                     localized: "settings.account.pro.activeSubtitle",
@@ -134,7 +134,7 @@ struct ProUpgradeCardModel: Equatable {
                 actions = [.upgradeToMax]
             }
         case .free, .go, nil:
-            title = String(localized: "settings.account.pro.title", defaultValue: "cmux Pro")
+            title = String(localized: "settings.account.pro.title", defaultValue: "ShellX Pro")
             subtitle = String(
                 localized: "settings.account.pro.subtitle",
                 defaultValue: "Up to 5 Cloud VMs sharing 20 vCPUs and 40 GB RAM, plus the iOS app. $50/month."

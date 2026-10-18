@@ -135,7 +135,7 @@ extension CMUXCLI {
             feedHookEvents: ["preToolUse", "postToolUse"],
             postInstallNote: String(
                 localized: "cli.hooks.kiro.postInstallNote",
-                defaultValue: "Kiro applies these hooks only when run as the cmux agent. Start Kiro with `kiro-cli chat --agent cmux`, or make it the default with `kiro-cli settings chat.defaultAgent cmux`."
+                defaultValue: "Kiro applies these hooks only when run as the ShellX agent. Start Kiro with `kiro-cli chat --agent cmux`, or make it the default with `kiro-cli settings chat.defaultAgent cmux`."
             )
         ),
         AgentHookDef(

@@ -23,7 +23,7 @@ extension CMUXCLI {
         if let unknown = commandArgs.first(where: {
             $0.hasPrefix("-") && !["--dry-run", "--yes", "-y", "--path"].contains($0) && !$0.hasPrefix("--path=")
         }) {
-            throw CLIError(message: "import: unknown flag '\(unknown)'. Run 'cmux import --help'.")
+            throw CLIError(message: "import: unknown flag '\(unknown)'. Run 'shellx import --help'.")
         }
 
         let importer = terminalImporter()

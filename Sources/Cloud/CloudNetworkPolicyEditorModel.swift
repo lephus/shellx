@@ -44,7 +44,7 @@ final class CloudNetworkPolicyEditorModel {
     /// restrictive modes; nil in Full mode or before the catalog loads.
     var requiredDomainsNote: String? {
         guard policy.mode != .full, !requiredDomains.isEmpty else { return nil }
-        let format = String(localized: "cloud.network.required.note", defaultValue: "Always allowed so cmux keeps working: %@.")
+        let format = String(localized: "cloud.network.required.note", defaultValue: "Always allowed so ShellX keeps working: %@.")
         return String(format: format, ListFormatter.localizedString(byJoining: requiredDomains))
     }
 

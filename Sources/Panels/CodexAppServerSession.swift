@@ -124,7 +124,7 @@ final class CodexAppServerSession {
         guard let data = line.data(using: .utf8),
               let decoded = try? JSONSerialization.jsonObject(with: data),
               let object = decoded as? [String: Any] else {
-            outputSink("stderr", String(localized: "agentSession.codex.error.invalidJSON", defaultValue: "cmux could not read the response from Codex. Try again."))
+            outputSink("stderr", String(localized: "agentSession.codex.error.invalidJSON", defaultValue: "ShellX could not read the response from Codex. Try again."))
             return
         }
 

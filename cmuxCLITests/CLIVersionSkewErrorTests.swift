@@ -36,7 +36,7 @@ struct CLIVersionSkewErrorTests {
         #expect(outcome.stderr.contains("\(rejected) is not supported by the app on"), Comment(rawValue: outcome.stderr))
         #expect(outcome.stderr.contains(outcome.cliVersion), Comment(rawValue: outcome.stderr))
         #expect(outcome.stderr.contains("does not report its version"), Comment(rawValue: outcome.stderr))
-        #expect(outcome.stderr.contains("Quit and reopen cmux"), Comment(rawValue: outcome.stderr))
+        #expect(outcome.stderr.contains("Quit and reopen ShellX"), Comment(rawValue: outcome.stderr))
     }
 
     @Test("An app whose identity cannot be read is not called older")

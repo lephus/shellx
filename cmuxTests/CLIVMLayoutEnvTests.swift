@@ -1110,7 +1110,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
             arguments: ["vm", "resize", "brave-otter"]
         ) { _, _ in nil }
         XCTAssertNotEqual(result.status, 0, result.stdout)
-        XCTAssertTrue(result.stderr.contains("cmux vm resize <id>"), result.stderr)
+        XCTAssertTrue(result.stderr.contains("shellx vm resize <id>"), result.stderr)
         XCTAssertTrue(result.stderr.contains("Specify at least one resource"), result.stderr)
         XCTAssertTrue(log.methods.isEmpty, "invalid resize arguments must not reach the app: \(log.methods)")
     }
@@ -1293,12 +1293,12 @@ extension CLINotifyProcessIntegrationRegressionTests {
             (["cloud", "exec", "-h"], ["cmux vm exec", "[--timeout <seconds>]", "1…900"], ["cmux vm new"]),
             (["vm", "pause", "--help"], ["cmux vm pause", "Park the machine", "cmux vm resume <machine>"], []),
             (["vm", "workspace", "--help"], ["cmux vm workspace", "[--reuse]"], []),
-            (["vm", "layout", "--help"], ["cmux vm layout"], ["cmux vm new"]),
+            (["vm", "layout", "--help"], ["shellx vm layout"], ["cmux vm new"]),
             // The family text stays for the family itself and for verbs without their own usage.
             (["vm", "--help"], ["pause|resume", "terminal wait-exit", "exec [--timeout <s>]", "workspace new <machine> [--name <name>] [--reuse]", "resize <id>"], []),
             (["vm", "new", "--help"], ["Usage:", "cmux vm new", "--size", "--detach"], ["Usage: cmux vm <"]),
             (["vm", "ls", "--help"], ["Usage:", "cmux vm ls", "List your Cloud VMs"], ["Usage: cmux vm <"]),
-            (["vm", "ports", "--help"], ["Usage:", "cmux vm ports", "listening TCP ports"], ["Usage: cmux vm <"]),
+            (["vm", "ports", "--help"], ["Usage:", "shellx vm ports", "listening TCP ports"], ["Usage: cmux vm <"]),
         ]
         for testCase in cases {
             let result = runProcess(executablePath: cliPath, arguments: testCase.arguments, environment: environment, timeout: 30)

@@ -162,7 +162,7 @@ extension TerminalController {
                 code: "storage_failed",
                 message: String(
                     localized: "socket.agentMessage.error.notSaved",
-                    defaultValue: "The message was not sent: cmux could not save it to the message journal."
+                    defaultValue: "The message was not sent: ShellX could not save it to the message journal."
                 ),
                 data: ["reason": error.reason]
             )
@@ -356,11 +356,11 @@ extension TerminalController {
             let message = timeout.retryable
                 ? String(
                     localized: "socket.mainActorHop.timeout.notRun",
-                    defaultValue: "cmux did not respond within 10 seconds, so the command was not run. Retry in a moment."
+                    defaultValue: "ShellX did not respond within 10 seconds, so the command was not run. Retry in a moment."
                 )
                 : String(
                     localized: "socket.mainActorHop.timeout.mayHaveRun",
-                    defaultValue: "cmux did not respond within 10 seconds after the command started, so its result is unknown. Check the effect before retrying."
+                    defaultValue: "ShellX did not respond within 10 seconds after the command started, so its result is unknown. Check the effect before retrying."
                 )
             return .err(
                 code: "timeout",

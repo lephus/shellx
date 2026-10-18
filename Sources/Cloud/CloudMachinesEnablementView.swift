@@ -129,14 +129,14 @@ struct CloudMachinesEnablementView: View {
                 .padding(.bottom, 16)
             // A known Free plan is told what it needs; Pro and an unknown plan are invited.
             Text(isProGated
-                ? String(localized: "cloud.enable.intro.requiresPro", defaultValue: "Upgrade to use cmux cloud")
-                : String(localized: "cloud.enable.intro.title", defaultValue: "Use cmux cloud"))
+                ? String(localized: "cloud.enable.intro.requiresPro", defaultValue: "Upgrade to use ShellX cloud")
+                : String(localized: "cloud.enable.intro.title", defaultValue: "Use ShellX cloud"))
                 .cmuxFont(size: 20, weight: .bold)
                 .multilineTextAlignment(.center)
                 .accessibilityAddTraits(.isHeader)
             Text(String(
                 localized: "cloud.enable.subtitle",
-                defaultValue: "Persistent cloud computers that open as regular cmux workspaces."
+                defaultValue: "Persistent cloud computers that open as regular ShellX workspaces."
             ))
             .cmuxFont(size: 12)
             .foregroundStyle(.secondary)
@@ -215,7 +215,7 @@ struct CloudMachinesEnablementView: View {
                 defaultValue: "Cloud can be enabled through your team; machine access follows the team’s plan."
             )
         }
-        return String(localized: "cloud.welcome.note.available", defaultValue: "Cloud is available on cmux Pro and Max.")
+        return String(localized: "cloud.welcome.note.available", defaultValue: "Cloud is available on ShellX Pro and Max.")
     }
 
     // MARK: Status (every other outcome)
@@ -225,7 +225,7 @@ struct CloudMachinesEnablementView: View {
         VStack(spacing: 10) {
             ProgressView()
                 .controlSize(.small)
-            Text(String(localized: "cloud.enable.planChecking", defaultValue: "Checking your cmux plan…"))
+            Text(String(localized: "cloud.enable.planChecking", defaultValue: "Checking your ShellX plan…"))
                 .cmuxFont(size: 13)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -338,7 +338,7 @@ struct CloudMachinesEnablementView: View {
 
     private var title: String {
         if isProGated {
-            return String(localized: "cloud.enable.requiresPro.title", defaultValue: "Cloud Machines require cmux Pro")
+            return String(localized: "cloud.enable.requiresPro.title", defaultValue: "Cloud Machines require ShellX Pro")
         }
         switch phase {
         case .disabled, .cancelled, .enabled:
@@ -346,7 +346,7 @@ struct CloudMachinesEnablementView: View {
         case .enabling:
             return String(localized: "cloud.enable.loading.title", defaultValue: "Setting up Cloud Machines…")
         case .failed(.requiresPro):
-            return String(localized: "cloud.enable.requiresPro.title", defaultValue: "Cloud Machines require cmux Pro")
+            return String(localized: "cloud.enable.requiresPro.title", defaultValue: "Cloud Machines require ShellX Pro")
         case .failed(.signInRequired):
             return String(localized: "cloud.enable.signIn.title", defaultValue: "Sign in to use Cloud Machines")
         case .failed(.serviceUnavailable):
@@ -365,7 +365,7 @@ struct CloudMachinesEnablementView: View {
         case .disabled, .enabled:
             return String(
                 localized: "cloud.enable.subtitle",
-                defaultValue: "Persistent cloud computers that open as regular cmux workspaces."
+                defaultValue: "Persistent cloud computers that open as regular ShellX workspaces."
             )
         case .cancelled:
             return String(
@@ -375,7 +375,7 @@ struct CloudMachinesEnablementView: View {
         case .enabling:
             return String(
                 localized: "cloud.enable.loading.subtitle",
-                defaultValue: "cmux is preparing the shared Cloud connection. This can take a moment."
+                defaultValue: "ShellX is preparing the shared Cloud connection. This can take a moment."
             )
         case .failed(.requiresPro):
             return String(
@@ -385,7 +385,7 @@ struct CloudMachinesEnablementView: View {
         case .failed(.signInRequired):
             return String(
                 localized: "cloud.enable.signIn.subtitle",
-                defaultValue: "Sign in to your cmux account, then retry Cloud setup."
+                defaultValue: "Sign in to your ShellX account, then retry Cloud setup."
             )
         case .failed(.serviceUnavailable):
             return String(

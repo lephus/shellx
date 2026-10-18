@@ -28,7 +28,7 @@ enum DeviceLinkError: Error, LocalizedError, Equatable {
         case .hostRejected:
             return String(localized: "devices.link.error.hostRejected", defaultValue: "The other Mac could not complete this action. Check its connection and try again.")
         case .malformedResponse:
-            return String(localized: "devices.link.error.malformed", defaultValue: "The Mac sent an unexpected reply. Update cmux on both Macs and try again.")
+            return String(localized: "devices.link.error.malformed", defaultValue: "The Mac sent an unexpected reply. Update ShellX on both Macs and try again.")
         case .identityUnproven:
             return String(localized: "devices.link.error.identityUnproven", defaultValue: "This Mac did not confirm it is signed into your account.")
         case .identityMismatch:

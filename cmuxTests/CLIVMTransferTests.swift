@@ -1399,12 +1399,12 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let missing = runProcess(executablePath: cliPath, arguments: ["vm", "snapshot", "rm", "brave-otter", "snap_gone"], environment: environment, timeout: 30)
         XCTAssertNotEqual(missing.status, 0, missing.stdout)
         XCTAssertTrue(missing.stderr.contains("no snapshot snap_gone on brave-otter"), missing.stderr)
-        XCTAssertTrue(missing.stderr.contains("cmux vm snapshot ls brave-otter"), missing.stderr)
+        XCTAssertTrue(missing.stderr.contains("shellx vm snapshot ls brave-otter"), missing.stderr)
 
         // Arity is checked locally: a bare `snapshot rm <machine>` never reaches the socket.
         let short = runProcess(executablePath: cliPath, arguments: ["vm", "snapshot", "rm", "brave-otter"], environment: environment, timeout: 30)
         XCTAssertNotEqual(short.status, 0, short.stdout)
-        XCTAssertTrue(short.stderr.contains("cmux vm snapshot rm <machine> <snapshot-id>"), short.stderr)
+        XCTAssertTrue(short.stderr.contains("shellx vm snapshot rm <machine> <snapshot-id>"), short.stderr)
 
         wait(for: [serverHandled], timeout: 30)
         let deleteRequests = state.snapshot().filter { $0.contains(#""method":"vm.snapshot_delete""#) }

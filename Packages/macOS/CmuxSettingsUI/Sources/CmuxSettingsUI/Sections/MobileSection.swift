@@ -123,7 +123,7 @@ public struct MobileSection: View {
                     }
                     SettingsCardNote(String(
                         localized: "settings.mobile.port.note",
-                        defaultValue: "Apply saves the port for the next pairing start. Current connections continue. To use the new port, turn iOS Pairing off and on. If the port is unavailable, cmux chooses an available port."
+                        defaultValue: "Apply saves the port for the next pairing start. Current connections continue. To use the new port, turn iOS Pairing off and on. If the port is unavailable, ShellX chooses an available port."
                     ))
                 }
                 .disabled(remoteControlManagedByPolicy)
@@ -159,7 +159,7 @@ public struct MobileSection: View {
                 localized: "settings.mobile.phonePush.forwarding",
                 defaultValue: "Forward Notifications to iPhone"
             ),
-            subtitle: String(localized: "settings.mobile.phonePush.forwarding.subtitle", defaultValue: "Sends agent notifications from this Mac to cmux on iPhone and iPad.")
+            subtitle: String(localized: "settings.mobile.phonePush.forwarding.subtitle", defaultValue: "Sends agent notifications from this Mac to ShellX on iPhone and iPad.")
         ) {
             Toggle(
                 "",
@@ -251,7 +251,7 @@ public struct MobileSection: View {
             subtitle: String(
                 localized: "settings.mobile.pairDevice.subtitle",
                 defaultValue: """
-                Sign in to cmux on your iPhone with the same account and it \
+                Sign in to ShellX on your iPhone with the same account and it \
                 connects automatically. No QR code is needed.
                 """
             )
@@ -524,7 +524,7 @@ public struct MobileSection: View {
             if snapshot.routes.isEmpty {
                 SettingsCardNote(String(
                     localized: "settings.mobile.routes.empty",
-                    defaultValue: "No reachable addresses yet. Iroh routes need this Mac signed in to your cmux account; Tailscale routes need Tailscale running on this Mac."
+                    defaultValue: "No reachable addresses yet. Iroh routes need this Mac signed in to your ShellX account; Tailscale routes need Tailscale running on this Mac."
                 ))
             } else {
                 VStack(alignment: .leading, spacing: 4) {

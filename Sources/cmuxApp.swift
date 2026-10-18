@@ -534,7 +534,7 @@ struct cmuxApp: App {
                         preferredWindow: NSApp.keyWindow ?? NSApp.mainWindow
                     )
                 }
-                Button(String(localized: "menu.app.openCmuxSettingsFile", defaultValue: "Open cmux.json")) {
+                Button(String(localized: "menu.app.openCmuxSettingsFile", defaultValue: "Open shellx.json")) {
                     openCmuxSettingsFileInEditor()
                 }
                 Button(String(localized: "menu.app.ghosttySettings", defaultValue: "Ghostty Settings…")) {
@@ -543,7 +543,7 @@ struct cmuxApp: App {
                 splitCommandButton(title: String(localized: "menu.app.reloadConfiguration", defaultValue: "Reload Configuration"), shortcut: menuShortcut(for: .reloadConfiguration)) {
                     dispatchReloadConfigurationMenuCommand()
                 }
-                Button(String(localized: "menu.app.makeDefaultTerminal", defaultValue: "Make cmux the Default Terminal")) {
+                Button(String(localized: "menu.app.makeDefaultTerminal", defaultValue: "Make ShellX the Default Terminal")) {
                     DefaultTerminalUserAction.setAsDefault(debugSource: "menu.makeDefaultTerminal")
                 }
                 Divider()
@@ -557,7 +557,7 @@ struct cmuxApp: App {
             }
 
             CommandGroup(replacing: .appInfo) {
-                Button(String(localized: "menu.app.about", defaultValue: "About cmux")) {
+                Button(String(localized: "menu.app.about", defaultValue: "About ShellX")) {
                     showAboutPanel()
                 }
                 Button(String(localized: "menu.app.checkForUpdates", defaultValue: "Check for Updates…")) {
@@ -567,7 +567,7 @@ struct cmuxApp: App {
             }
 
             CommandGroup(replacing: .appTermination) {
-                splitCommandButton(title: String(localized: "menu.quitCmux", defaultValue: "Quit cmux"), shortcut: menuShortcut(for: .quit)) {
+                splitCommandButton(title: String(localized: "menu.quitCmux", defaultValue: "Quit ShellX"), shortcut: menuShortcut(for: .quit)) {
                     AppDelegate.requestApplicationTermination()
                 }
             }
@@ -4397,7 +4397,7 @@ private struct TabBarBackdropLabSample: View {
 
         let titles = [
             String(localized: "debug.tabBarBackdropLab.tab.agentBrowserLogs", defaultValue: "agent-browser logs"),
-            String(localized: "debug.tabBarBackdropLab.tab.terminalTransparency", defaultValue: "cmux terminal transparency"),
+            String(localized: "debug.tabBarBackdropLab.tab.terminalTransparency", defaultValue: "ShellX terminal transparency"),
             String(localized: "debug.tabBarBackdropLab.tab.underlayText", defaultValue: "underlay tab text visible here"),
             String(localized: "debug.tabBarBackdropLab.tab.backdropCheck", defaultValue: "split button backdrop check"),
             String(localized: "debug.tabBarBackdropLab.tab.rightEdgeOverflow", defaultValue: "right edge overflow sample"),

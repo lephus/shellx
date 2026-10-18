@@ -102,7 +102,7 @@ enum CmuxSettingActionRunner {
         alert.informativeText = String(
             format: String(
                 localized: "settingAction.confirm.message",
-                defaultValue: "This action edits your cmux.json:\n\n%@"
+                defaultValue: "This action edits your shellx.json:\n\n%@"
             ),
             confirmationDescription
         )
@@ -153,7 +153,7 @@ enum CmuxSettingActionRunner {
         alert.informativeText = (error as? LocalizedError)?.errorDescription
             ?? String(
                 localized: "settingAction.failed.unreadable",
-                defaultValue: "cmux couldn't read or save ~/.config/cmux/cmux.json. Check it for a syntax error, then try again."
+                defaultValue: "ShellX couldn't read or save ~/.config/shellx/shellx.json. Check it for a syntax error, then try again."
             )
         if let window = window ?? NSApp.keyWindow {
             alert.beginSheetModal(for: window)

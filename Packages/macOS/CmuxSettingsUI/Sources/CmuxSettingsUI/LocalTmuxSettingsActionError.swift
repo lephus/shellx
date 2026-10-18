@@ -19,7 +19,7 @@ public enum LocalTmuxSettingsActionError: LocalizedError, Sendable {
         case .invalidResponse:
             return String(localized: "settings.terminal.localTmux.invalidResponse", defaultValue: "Could not update saved sessions. Try again.", bundle: .module)
         case .cliMissing:
-            return String(localized: "settings.terminal.localTmux.cliMissing", defaultValue: "Session persistence is unavailable. Reinstall cmux and try again.", bundle: .module)
+            return String(localized: "settings.terminal.localTmux.cliMissing", defaultValue: "Session persistence is unavailable. Reinstall ShellX and try again.", bundle: .module)
         case .commandFailed:
             return String(localized: "settings.terminal.localTmux.commandFailed", defaultValue: "Could not update saved sessions. Try again.", bundle: .module)
         }

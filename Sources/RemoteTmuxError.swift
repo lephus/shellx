@@ -76,12 +76,12 @@ extension RemoteTmuxError {
         case .windowCreationFailed:
             return String(
                 localized: "remoteTmux.error.windowCreationFailed",
-                defaultValue: "cmux could not create a new window"
+                defaultValue: "ShellX could not create a new window"
             )
         case let .unsupportedTmux(detected):
             let format = String(
                 localized: "remoteTmux.error.unsupportedVersion",
-                defaultValue: "remote session server is too old (found %@; cmux needs version %@ or newer)"
+                defaultValue: "remote session server is too old (found %@; ShellX needs version %@ or newer)"
             )
             return String(
                 format: format,
@@ -91,13 +91,13 @@ extension RemoteTmuxError {
         case let .authenticationRequired(detail):
             let format = String(
                 localized: "remoteTmux.error.authenticationRequired",
-                defaultValue: "%@ asked for credentials and cmux has nowhere to type them. Log in to the host, then try again."
+                defaultValue: "%@ asked for credentials and ShellX has nowhere to type them. Log in to the host, then try again."
             )
             return String(format: format, Self.sanitizedDetail(detail))
         case let .tmuxNotFound(destination):
             let format = String(
                 localized: "remoteTmux.error.tmuxNotFound",
-                defaultValue: "tmux was not found on %@. cmux ssh-tmux mirrors a remote tmux server (tmux %@ or newer required).\nInstall it on the host: brew install tmux (macOS), apt install tmux (Debian/Ubuntu), dnf install tmux (Fedora)."
+                defaultValue: "tmux was not found on %@. shellx ssh-tmux mirrors a remote tmux server (tmux %@ or newer required).\nInstall it on the host: brew install tmux (macOS), apt install tmux (Debian/Ubuntu), dnf install tmux (Fedora)."
             )
             return String(
                 format: format,

@@ -373,7 +373,7 @@ extension AppDelegate {
         )
         alert.informativeText = String(
             localized: "agentRecovery.alert.message",
-            defaultValue: "cmux quit unexpectedly while agent sessions were running. Sessions to restore: \(candidates.count). Each one reopens in its own workspace and resumes where it left off."
+            defaultValue: "ShellX quit unexpectedly while agent sessions were running. Sessions to restore: \(candidates.count). Each one reopens in its own workspace and resumes where it left off."
         )
         alert.addButton(withTitle: String(
             localized: "agentRecovery.alert.restore",

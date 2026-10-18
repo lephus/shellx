@@ -53,7 +53,7 @@ struct BrowserMemorySaverSettingsRows: View {
         SettingsCardRow(
             configurationReview: .json("browser.hiddenWebViewMemoryBudgetMB"),
             String(localized: "settings.browser.hiddenWebViewMemoryBudget", defaultValue: "Hidden Tab Memory Budget"),
-            subtitle: String(localized: "settings.browser.hiddenWebViewMemoryBudget.subtitle", defaultValue: "How much memory hidden browser tabs may use before cmux frees the ones hidden longest."),
+            subtitle: String(localized: "settings.browser.hiddenWebViewMemoryBudget.subtitle", defaultValue: "How much memory hidden browser tabs may use before ShellX frees the ones hidden longest."),
             controlWidth: controlWidth
         ) {
             HStack(spacing: 8) {
@@ -73,7 +73,7 @@ struct BrowserMemorySaverSettingsRows: View {
         SettingsCardRow(
             configurationReview: .json("browser.hiddenWebViewDiscardDelaySeconds"),
             String(localized: "settings.browser.hiddenWebViewDiscardDelay", defaultValue: "Memory Saver Delay"),
-            subtitle: String(localized: "settings.browser.hiddenWebViewDiscardDelay.subtitle", defaultValue: "How long a browser tab must stay hidden before cmux may free its page memory. Active downloads, popups, developer tools, fullscreen, and loading pages are skipped."),
+            subtitle: String(localized: "settings.browser.hiddenWebViewDiscardDelay.subtitle", defaultValue: "How long a browser tab must stay hidden before ShellX may free its page memory. Active downloads, popups, developer tools, fullscreen, and loading pages are skipped."),
             controlWidth: controlWidth
         ) {
             HStack(spacing: 8) {

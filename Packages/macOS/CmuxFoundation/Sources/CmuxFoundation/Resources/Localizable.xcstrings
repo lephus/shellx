@@ -184,55 +184,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ found %lld error(s)"
+            "value": "shellx config %@ found %lld error(s)"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ hat %lld Fehler gefunden"
+            "value": "shellx config %@ hat %lld Fehler gefunden"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ a trouvé %lld erreur(s)"
+            "value": "shellx config %@ a trouvé %lld erreur(s)"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "عثر cmux config %@ على %lld خطأ"
+            "value": "عثر shellx config %@ على %lld خطأ"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ encontró %lld error(es)"
+            "value": "shellx config %@ encontró %lld error(es)"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ 發現 %lld 個錯誤"
+            "value": "shellx config %@ 發現 %lld 個錯誤"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ 发现 %lld 个错误"
+            "value": "shellx config %@ 发现 %lld 个错误"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@에서 %lld개의 오류를 찾았습니다"
+            "value": "shellx config %@에서 %lld개의 오류를 찾았습니다"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ で %lld 件のエラーが見つかりました"
+            "value": "shellx config %@ で %lld 件のエラーが見つかりました"
           }
         }
       }
@@ -302,55 +302,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Validate JSONC syntax and cmux config semantics."
+            "value": "Validate JSONC syntax and ShellX config semantics."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "JSONC-Syntax und cmux-Konfigurationssemantik prüfen."
+            "value": "JSONC-Syntax und ShellX-Konfigurationssemantik prüfen."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Valider la syntaxe JSONC et la sémantique de configuration cmux."
+            "value": "Valider la syntaxe JSONC et la sémantique de configuration ShellX."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "تحقق من صياغة JSONC ودلالات إعداد cmux."
+            "value": "تحقق من صياغة JSONC ودلالات إعداد ShellX."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Valida la sintaxis JSONC y la semántica de configuración de cmux."
+            "value": "Valida la sintaxis JSONC y la semántica de configuración de ShellX."
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "驗證 JSONC 語法與 cmux 設定語意。"
+            "value": "驗證 JSONC 語法與 ShellX 設定語意。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "验证 JSONC 语法和 cmux 配置语义。"
+            "value": "验证 JSONC 语法和 ShellX 配置语义。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "JSONC 구문과 cmux 구성 의미를 검증합니다."
+            "value": "JSONC 구문과 ShellX 구성 의미를 검증합니다."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "JSONC 構文と cmux 設定の意味を検証します。"
+            "value": "JSONC 構文と ShellX 設定の意味を検証します。"
           }
         }
       }
@@ -420,55 +420,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ --path requires a path"
+            "value": "shellx config %@ --path requires a path"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ --path benötigt einen Pfad"
+            "value": "shellx config %@ --path benötigt einen Pfad"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ --path nécessite un chemin"
+            "value": "shellx config %@ --path nécessite un chemin"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يتطلب cmux config %@ --path مسارًا"
+            "value": "يتطلب shellx config %@ --path مسارًا"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ --path requiere una ruta"
+            "value": "shellx config %@ --path requiere una ruta"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ --path 需要路徑"
+            "value": "shellx config %@ --path 需要路徑"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ --path 需要路径"
+            "value": "shellx config %@ --path 需要路径"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ --path에는 경로가 필요합니다"
+            "value": "shellx config %@ --path에는 경로가 필요합니다"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ --path にはパスが必要です"
+            "value": "shellx config %@ --path にはパスが必要です"
           }
         }
       }
@@ -479,55 +479,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ --scope requires global or project"
+            "value": "shellx config %@ --scope requires global or project"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ --scope benötigt global oder project"
+            "value": "shellx config %@ --scope benötigt global oder project"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ --scope nécessite global ou project"
+            "value": "shellx config %@ --scope nécessite global ou project"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يتطلب cmux config %@ --scope القيمة global أو project"
+            "value": "يتطلب shellx config %@ --scope القيمة global أو project"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ --scope requiere global o project"
+            "value": "shellx config %@ --scope requiere global o project"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ --scope 需要 global 或 project"
+            "value": "shellx config %@ --scope 需要 global 或 project"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ --scope 需要 global 或 project"
+            "value": "shellx config %@ --scope 需要 global 或 project"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ --scope에는 global 또는 project가 필요합니다"
+            "value": "shellx config %@ --scope에는 global 또는 project가 필요합니다"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux config %@ --scope には global または project が必要です"
+            "value": "shellx config %@ --scope には global または project が必要です"
           }
         }
       }
@@ -1364,55 +1364,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "is only supported in the global cmux.json"
+            "value": "is only supported in the global shellx.json"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "wird nur in der globalen cmux.json unterstützt"
+            "value": "wird nur in der globalen shellx.json unterstützt"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "est uniquement pris en charge dans le fichier cmux.json global"
+            "value": "est uniquement pris en charge dans le fichier shellx.json global"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "مدعوم فقط في ملف cmux.json العام"
+            "value": "مدعوم فقط في ملف shellx.json العام"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "solo se admite en el cmux.json global"
+            "value": "solo se admite en el shellx.json global"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "僅支援於全域 cmux.json"
+            "value": "僅支援於全域 shellx.json"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "仅支持在全局 cmux.json 中使用"
+            "value": "仅支持在全局 shellx.json 中使用"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "전역 cmux.json에서만 지원됩니다"
+            "value": "전역 shellx.json에서만 지원됩니다"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "グローバル cmux.json でのみサポートされています"
+            "value": "グローバル shellx.json でのみサポートされています"
           }
         }
       }
@@ -3487,55 +3487,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Usage: cmux glaeda <request|observe> [options]\n\nExchange one semantic execution request with the execution service.\n\nSubcommands:\n  request\n    --request-ref <ref>        CMUX caller correlation reference\n    --work-ref <ref>           CMUX work correlation reference\n    --repository <owner/repo>  Canonical Git repository identity\n    --commit <40-hex>          Exact Git commit\n    --tree <40-hex>            Exact Git tree\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    Emits canonical execution-request JSON to stdout.\n    CMUX workspace, machine, shell command, and environment stay outside this request.\n\n  observe\n    --request <path>           Exact request document previously emitted\n    --receipt <path|->         Bounded execution receipt, or - for stdin\n\n    Validates request/result correlation and emits a bounded CMUX observation.\n    Terminal states require a workload-receipt digest.\n\nExamples:\n  cmux glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  cmux glaeda observe --request request.json --receipt result.json"
+            "value": "Usage: shellx glaeda <request|observe> [options]\n\nExchange one semantic execution request with the execution service.\n\nSubcommands:\n  request\n    --request-ref <ref>        ShellX caller correlation reference\n    --work-ref <ref>           ShellX work correlation reference\n    --repository <owner/repo>  Canonical Git repository identity\n    --commit <40-hex>          Exact Git commit\n    --tree <40-hex>            Exact Git tree\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    Emits canonical execution-request JSON to stdout.\n    ShellX workspace, machine, shell command, and environment stay outside this request.\n\n  observe\n    --request <path>           Exact request document previously emitted\n    --receipt <path|->         Bounded execution receipt, or - for stdin\n\n    Validates request/result correlation and emits a bounded ShellX observation.\n    Terminal states require a workload-receipt digest.\n\nExamples:\n  shellx glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  shellx glaeda observe --request request.json --receipt result.json"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Verwendung: cmux glaeda <request|observe> [Optionen]\n\nTauscht eine semantische Ausführungsanfrage mit dem Ausführungsdienst aus.\n\nUnterbefehle:\n  request\n    --request-ref <ref>        CMUX-Korrelationsreferenz der Anfrage\n    --work-ref <ref>           CMUX-Korrelationsreferenz der Arbeit\n    --repository <owner/repo>  Kanonische Git-Repository-Identität\n    --commit <40-hex>          Exakter Git-Commit\n    --tree <40-hex>            Exakter Git-Tree\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    Gibt kanonisches Ausführungsanfrage-JSON auf stdout aus.\n    CMUX-Arbeitsbereich, Maschine, Shell-Befehl und Umgebung bleiben außerhalb dieser Anfrage.\n\n  observe\n    --request <pfad>           Zuvor ausgegebenes exaktes Anfragedokument\n    --receipt <pfad|->         Begrenzter Ausführungsbeleg oder - für stdin\n\n    Prüft die Korrelation von Anfrage und Ergebnis und gibt eine begrenzte CMUX-Beobachtung aus.\n    Terminale Zustände benötigen einen Workload-Beleg-Digest.\n\nBeispiele:\n  cmux glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  cmux glaeda observe --request request.json --receipt result.json"
+            "value": "Verwendung: shellx glaeda <request|observe> [Optionen]\n\nTauscht eine semantische Ausführungsanfrage mit dem Ausführungsdienst aus.\n\nUnterbefehle:\n  request\n    --request-ref <ref>        ShellX-Korrelationsreferenz der Anfrage\n    --work-ref <ref>           ShellX-Korrelationsreferenz der Arbeit\n    --repository <owner/repo>  Kanonische Git-Repository-Identität\n    --commit <40-hex>          Exakter Git-Commit\n    --tree <40-hex>            Exakter Git-Tree\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    Gibt kanonisches Ausführungsanfrage-JSON auf stdout aus.\n    ShellX-Arbeitsbereich, Maschine, Shell-Befehl und Umgebung bleiben außerhalb dieser Anfrage.\n\n  observe\n    --request <pfad>           Zuvor ausgegebenes exaktes Anfragedokument\n    --receipt <pfad|->         Begrenzter Ausführungsbeleg oder - für stdin\n\n    Prüft die Korrelation von Anfrage und Ergebnis und gibt eine begrenzte ShellX-Beobachtung aus.\n    Terminale Zustände benötigen einen Workload-Beleg-Digest.\n\nBeispiele:\n  shellx glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  shellx glaeda observe --request request.json --receipt result.json"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Utilisation : cmux glaeda <request|observe> [options]\n\nÉchange une demande d’exécution sémantique avec le service d’exécution.\n\nSous-commandes :\n  request\n    --request-ref <ref>        Référence de corrélation CMUX de la demande\n    --work-ref <ref>           Référence de corrélation CMUX du travail\n    --repository <owner/repo>  Identité canonique du dépôt Git\n    --commit <40-hex>          Commit Git exact\n    --tree <40-hex>            Arbre Git exact\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    Émet le JSON canonique de demande d’exécution sur stdout.\n    L’espace de travail CMUX, la machine, la commande shell et l’environnement restent hors de cette demande.\n\n  observe\n    --request <chemin>         Document exact de demande émis auparavant\n    --receipt <chemin|->       Reçu d’exécution borné, ou - pour stdin\n\n    Valide la corrélation demande/résultat et émet une observation CMUX bornée.\n    Les états terminaux exigent un condensat de reçu de charge.\n\nExemples :\n  cmux glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  cmux glaeda observe --request request.json --receipt result.json"
+            "value": "Utilisation : shellx glaeda <request|observe> [options]\n\nÉchange une demande d’exécution sémantique avec le service d’exécution.\n\nSous-commandes :\n  request\n    --request-ref <ref>        Référence de corrélation ShellX de la demande\n    --work-ref <ref>           Référence de corrélation ShellX du travail\n    --repository <owner/repo>  Identité canonique du dépôt Git\n    --commit <40-hex>          Commit Git exact\n    --tree <40-hex>            Arbre Git exact\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    Émet le JSON canonique de demande d’exécution sur stdout.\n    L’espace de travail ShellX, la machine, la commande shell et l’environnement restent hors de cette demande.\n\n  observe\n    --request <chemin>         Document exact de demande émis auparavant\n    --receipt <chemin|->       Reçu d’exécution borné, ou - pour stdin\n\n    Valide la corrélation demande/résultat et émet une observation ShellX bornée.\n    Les états terminaux exigent un condensat de reçu de charge.\n\nExemples :\n  shellx glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  shellx glaeda observe --request request.json --receipt result.json"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "الاستخدام: cmux glaeda <request|observe> [خيارات]\n\nيتبادل طلب تنفيذ دلالي واحد مع خدمة التنفيذ.\n\nالأوامر الفرعية:\n  request\n    --request-ref <ref>        مرجع ربط الطلب في CMUX\n    --work-ref <ref>           مرجع ربط العمل في CMUX\n    --repository <owner/repo>  هوية مستودع Git الأساسية\n    --commit <40-hex>          معرّف Git commit الدقيق\n    --tree <40-hex>            معرّف Git tree الدقيق\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    يطبع JSON أساسيًا لطلب التنفيذ إلى stdout.\n    تبقى مساحة عمل CMUX والجهاز وأمر shell والبيئة خارج هذا الطلب.\n\n  observe\n    --request <path>           مستند الطلب الدقيق الذي تم إنشاؤه سابقًا\n    --receipt <path|->         إيصال تنفيذ محدود، أو - لـ stdin\n\n    يتحقق من ربط الطلب بالنتيجة ويطبع ملاحظة CMUX محدودة.\n    تتطلب الحالات النهائية بصمة إيصال حمل العمل.\n\nأمثلة:\n  cmux glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  cmux glaeda observe --request request.json --receipt result.json"
+            "value": "الاستخدام: shellx glaeda <request|observe> [خيارات]\n\nيتبادل طلب تنفيذ دلالي واحد مع خدمة التنفيذ.\n\nالأوامر الفرعية:\n  request\n    --request-ref <ref>        مرجع ربط الطلب في ShellX\n    --work-ref <ref>           مرجع ربط العمل في ShellX\n    --repository <owner/repo>  هوية مستودع Git الأساسية\n    --commit <40-hex>          معرّف Git commit الدقيق\n    --tree <40-hex>            معرّف Git tree الدقيق\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    يطبع JSON أساسيًا لطلب التنفيذ إلى stdout.\n    تبقى مساحة عمل ShellX والجهاز وأمر shell والبيئة خارج هذا الطلب.\n\n  observe\n    --request <path>           مستند الطلب الدقيق الذي تم إنشاؤه سابقًا\n    --receipt <path|->         إيصال تنفيذ محدود، أو - لـ stdin\n\n    يتحقق من ربط الطلب بالنتيجة ويطبع ملاحظة ShellX محدودة.\n    تتطلب الحالات النهائية بصمة إيصال حمل العمل.\n\nأمثلة:\n  shellx glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  shellx glaeda observe --request request.json --receipt result.json"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uso: cmux glaeda <request|observe> [opciones]\n\nIntercambia una solicitud de ejecución semántica con el servicio de ejecución.\n\nSubcomandos:\n  request\n    --request-ref <ref>        Referencia de correlación de solicitud de CMUX\n    --work-ref <ref>           Referencia de correlación de trabajo de CMUX\n    --repository <owner/repo>  Identidad canónica del repositorio Git\n    --commit <40-hex>          Commit Git exacto\n    --tree <40-hex>            Árbol Git exacto\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    Emite JSON canónico de solicitud de ejecución por stdout.\n    El espacio de trabajo de CMUX, la máquina, el comando shell y el entorno quedan fuera de esta solicitud.\n\n  observe\n    --request <ruta>           Documento exacto de solicitud emitido antes\n    --receipt <ruta|->         Recibo de ejecución acotado, o - para stdin\n\n    Valida la correlación solicitud/resultado y emite una observación acotada de CMUX.\n    Los estados terminales requieren un hash de recibo de carga.\n\nEjemplos:\n  cmux glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  cmux glaeda observe --request request.json --receipt result.json"
+            "value": "Uso: shellx glaeda <request|observe> [opciones]\n\nIntercambia una solicitud de ejecución semántica con el servicio de ejecución.\n\nSubcomandos:\n  request\n    --request-ref <ref>        Referencia de correlación de solicitud de ShellX\n    --work-ref <ref>           Referencia de correlación de trabajo de ShellX\n    --repository <owner/repo>  Identidad canónica del repositorio Git\n    --commit <40-hex>          Commit Git exacto\n    --tree <40-hex>            Árbol Git exacto\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    Emite JSON canónico de solicitud de ejecución por stdout.\n    El espacio de trabajo de ShellX, la máquina, el comando shell y el entorno quedan fuera de esta solicitud.\n\n  observe\n    --request <ruta>           Documento exacto de solicitud emitido antes\n    --receipt <ruta|->         Recibo de ejecución acotado, o - para stdin\n\n    Valida la correlación solicitud/resultado y emite una observación acotada de ShellX.\n    Los estados terminales requieren un hash de recibo de carga.\n\nEjemplos:\n  shellx glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  shellx glaeda observe --request request.json --receipt result.json"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "用法：cmux glaeda <request|observe> [選項]\n\n與執行服務交換一個語意執行要求。\n\n子命令：\n  request\n    --request-ref <ref>        CMUX 要求關聯參照\n    --work-ref <ref>           CMUX 工作關聯參照\n    --repository <owner/repo>  標準 Git 儲存庫識別\n    --commit <40-hex>          精確 Git commit\n    --tree <40-hex>            精確 Git tree\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    將標準執行要求 JSON 輸出到 stdout。\n    CMUX 工作區、機器、shell 命令與環境不會進入此要求。\n\n  observe\n    --request <path>           先前輸出的精確要求文件\n    --receipt <path|->         有界執行收據，或以 - 讀取 stdin\n\n    驗證要求與結果的關聯，並輸出有界 CMUX 觀察。\n    終止狀態需要工作負載收據摘要。\n\n範例：\n  cmux glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  cmux glaeda observe --request request.json --receipt result.json"
+            "value": "用法：shellx glaeda <request|observe> [選項]\n\n與執行服務交換一個語意執行要求。\n\n子命令：\n  request\n    --request-ref <ref>        ShellX 要求關聯參照\n    --work-ref <ref>           ShellX 工作關聯參照\n    --repository <owner/repo>  標準 Git 儲存庫識別\n    --commit <40-hex>          精確 Git commit\n    --tree <40-hex>            精確 Git tree\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    將標準執行要求 JSON 輸出到 stdout。\n    ShellX 工作區、機器、shell 命令與環境不會進入此要求。\n\n  observe\n    --request <path>           先前輸出的精確要求文件\n    --receipt <path|->         有界執行收據，或以 - 讀取 stdin\n\n    驗證要求與結果的關聯，並輸出有界 ShellX 觀察。\n    終止狀態需要工作負載收據摘要。\n\n範例：\n  shellx glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  shellx glaeda observe --request request.json --receipt result.json"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "用法：cmux glaeda <request|observe> [选项]\n\n与执行服务交换一个语义执行请求。\n\n子命令：\n  request\n    --request-ref <ref>        CMUX 请求关联引用\n    --work-ref <ref>           CMUX 工作关联引用\n    --repository <owner/repo>  规范 Git 仓库标识\n    --commit <40-hex>          精确 Git commit\n    --tree <40-hex>            精确 Git tree\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    将规范执行请求 JSON 输出到 stdout。\n    CMUX 工作区、机器、shell 命令和环境不会进入此请求。\n\n  observe\n    --request <path>           先前输出的精确请求文档\n    --receipt <path|->         有界执行收据，或用 - 读取 stdin\n\n    验证请求与结果的关联，并输出有界 CMUX 观察。\n    终止状态需要工作负载收据摘要。\n\n示例：\n  cmux glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  cmux glaeda observe --request request.json --receipt result.json"
+            "value": "用法：shellx glaeda <request|observe> [选项]\n\n与执行服务交换一个语义执行请求。\n\n子命令：\n  request\n    --request-ref <ref>        ShellX 请求关联引用\n    --work-ref <ref>           ShellX 工作关联引用\n    --repository <owner/repo>  规范 Git 仓库标识\n    --commit <40-hex>          精确 Git commit\n    --tree <40-hex>            精确 Git tree\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    将规范执行请求 JSON 输出到 stdout。\n    ShellX 工作区、机器、shell 命令和环境不会进入此请求。\n\n  observe\n    --request <path>           先前输出的精确请求文档\n    --receipt <path|->         有界执行收据，或用 - 读取 stdin\n\n    验证请求与结果的关联，并输出有界 ShellX 观察。\n    终止状态需要工作负载收据摘要。\n\n示例：\n  shellx glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  shellx glaeda observe --request request.json --receipt result.json"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "사용법: cmux glaeda <request|observe> [옵션]\n\n실행 서비스와 하나의 의미 기반 실행 요청을 교환합니다.\n\n하위 명령:\n  request\n    --request-ref <ref>        CMUX 요청 상관 참조\n    --work-ref <ref>           CMUX 작업 상관 참조\n    --repository <owner/repo>  표준 Git 저장소 식별자\n    --commit <40-hex>          정확한 Git commit\n    --tree <40-hex>            정확한 Git tree\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    표준 실행 요청 JSON을 stdout으로 출력합니다.\n    CMUX 작업 공간, 머신, shell 명령, 환경은 이 요청에 포함되지 않습니다.\n\n  observe\n    --request <path>           이전에 출력한 정확한 요청 문서\n    --receipt <path|->         제한된 실행 영수증 또는 stdin용 -\n\n    요청/결과 상관관계를 검증하고 제한된 CMUX 관찰을 출력합니다.\n    종료 상태에는 워크로드 영수증 다이제스트가 필요합니다.\n\n예:\n  cmux glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  cmux glaeda observe --request request.json --receipt result.json"
+            "value": "사용법: shellx glaeda <request|observe> [옵션]\n\n실행 서비스와 하나의 의미 기반 실행 요청을 교환합니다.\n\n하위 명령:\n  request\n    --request-ref <ref>        ShellX 요청 상관 참조\n    --work-ref <ref>           ShellX 작업 상관 참조\n    --repository <owner/repo>  표준 Git 저장소 식별자\n    --commit <40-hex>          정확한 Git commit\n    --tree <40-hex>            정확한 Git tree\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    표준 실행 요청 JSON을 stdout으로 출력합니다.\n    ShellX 작업 공간, 머신, shell 명령, 환경은 이 요청에 포함되지 않습니다.\n\n  observe\n    --request <path>           이전에 출력한 정확한 요청 문서\n    --receipt <path|->         제한된 실행 영수증 또는 stdin용 -\n\n    요청/결과 상관관계를 검증하고 제한된 ShellX 관찰을 출력합니다.\n    종료 상태에는 워크로드 영수증 다이제스트가 필요합니다.\n\n예:\n  shellx glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  shellx glaeda observe --request request.json --receipt result.json"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用法: cmux glaeda <request|observe> [オプション]\n\n実行サービスと 1 件の意味的な実行リクエストを交換します。\n\nサブコマンド:\n  request\n    --request-ref <ref>        CMUX リクエスト相関参照\n    --work-ref <ref>           CMUX 作業相関参照\n    --repository <owner/repo>  正規 Git リポジトリ識別子\n    --commit <40-hex>          正確な Git commit\n    --tree <40-hex>            正確な Git tree\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    正規実行リクエスト JSON を stdout に出力します。\n    CMUX ワークスペース、マシン、shell コマンド、環境はこのリクエストに含めません。\n\n  observe\n    --request <path>           以前出力した正確なリクエスト文書\n    --receipt <path|->         制限付き実行レシート、または stdin 用の -\n\n    リクエストと結果の相関を検証し、制限付き CMUX 観察を出力します。\n    終了状態にはワークロードレシートのダイジェストが必要です。\n\n例:\n  cmux glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  cmux glaeda observe --request request.json --receipt result.json"
+            "value": "使用法: shellx glaeda <request|observe> [オプション]\n\n実行サービスと 1 件の意味的な実行リクエストを交換します。\n\nサブコマンド:\n  request\n    --request-ref <ref>        ShellX リクエスト相関参照\n    --work-ref <ref>           ShellX 作業相関参照\n    --repository <owner/repo>  正規 Git リポジトリ識別子\n    --commit <40-hex>          正確な Git commit\n    --tree <40-hex>            正確な Git tree\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    正規実行リクエスト JSON を stdout に出力します。\n    ShellX ワークスペース、マシン、shell コマンド、環境はこのリクエストに含めません。\n\n  observe\n    --request <path>           以前出力した正確なリクエスト文書\n    --receipt <path|->         制限付き実行レシート、または stdin 用の -\n\n    リクエストと結果の相関を検証し、制限付き ShellX 観察を出力します。\n    終了状態にはワークロードレシートのダイジェストが必要です。\n\n例:\n  shellx glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  shellx glaeda observe --request request.json --receipt result.json"
           }
         }
       }
@@ -4195,55 +4195,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "not found; cmux will use defaults until this file exists"
+            "value": "not found; ShellX will use defaults until this file exists"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nicht gefunden; cmux verwendet die Standardwerte, bis diese Datei vorhanden ist"
+            "value": "Nicht gefunden; ShellX verwendet die Standardwerte, bis diese Datei vorhanden ist"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "introuvable ; cmux utilisera les valeurs par défaut jusqu’à la création de ce fichier"
+            "value": "introuvable ; ShellX utilisera les valeurs par défaut jusqu’à la création de ce fichier"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "غير موجود؛ سيستخدم cmux القيم الافتراضية حتى يوجد هذا الملف"
+            "value": "غير موجود؛ سيستخدم ShellX القيم الافتراضية حتى يوجد هذا الملف"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "no encontrado; cmux usará los valores predeterminados hasta que exista este archivo"
+            "value": "no encontrado; ShellX usará los valores predeterminados hasta que exista este archivo"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "找不到；在此檔案建立前，cmux 將使用預設值"
+            "value": "找不到；在此檔案建立前，ShellX 將使用預設值"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "未找到；在此文件创建之前，cmux 将使用默认值"
+            "value": "未找到；在此文件创建之前，ShellX 将使用默认值"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "찾을 수 없습니다. 이 파일이 생길 때까지 cmux는 기본값을 사용합니다"
+            "value": "찾을 수 없습니다. 이 파일이 생길 때까지 ShellX는 기본값을 사용합니다"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "見つかりません。このファイルが作成されるまで cmux はデフォルト値を使用します"
+            "value": "見つかりません。このファイルが作成されるまで ShellX はデフォルト値を使用します"
           }
         }
       }
@@ -4962,55 +4962,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' isn't a cmux setting. Run `cmux docs settings` to list them."
+            "value": "'%@' isn't a ShellX setting. Run `shellx docs settings` to list them."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' ist keine cmux-Einstellung. Führe `cmux docs settings` aus, um alle aufzulisten."
+            "value": "'%@' ist keine ShellX-Einstellung. Führe `shellx docs settings` aus, um alle aufzulisten."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' n'est pas un réglage cmux. Exécutez `cmux docs settings` pour les lister."
+            "value": "'%@' n'est pas un réglage ShellX. Exécutez `shellx docs settings` pour les lister."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' ليس إعدادًا في cmux. شغّل `cmux docs settings` لعرض الإعدادات."
+            "value": "'%@' ليس إعدادًا في ShellX. شغّل `shellx docs settings` لعرض الإعدادات."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' no es un ajuste de cmux. Ejecuta `cmux docs settings` para ver la lista."
+            "value": "'%@' no es un ajuste de ShellX. Ejecuta `shellx docs settings` para ver la lista."
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' 不是 cmux 設定。執行 `cmux docs settings` 可列出所有設定。"
+            "value": "'%@' 不是 ShellX 設定。執行 `shellx docs settings` 可列出所有設定。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' 不是 cmux 设置。运行 `cmux docs settings` 可列出所有设置。"
+            "value": "'%@' 不是 ShellX 设置。运行 `shellx docs settings` 可列出所有设置。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@'은(는) cmux 설정이 아닙니다. `cmux docs settings`를 실행해 목록을 확인하세요."
+            "value": "'%@'은(는) ShellX 설정이 아닙니다. `shellx docs settings`를 실행해 목록을 확인하세요."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' は cmux の設定ではありません。`cmux docs settings` を実行すると一覧を表示できます。"
+            "value": "'%@' は ShellX の設定ではありません。`shellx docs settings` を実行すると一覧を表示できます。"
           }
         }
       }
@@ -5021,55 +5021,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' isn't a setting. Edit that section of cmux.json directly."
+            "value": "'%@' isn't a setting. Edit that section of shellx.json directly."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' ist keine Einstellung. Bearbeite diesen Abschnitt von cmux.json direkt."
+            "value": "'%@' ist keine Einstellung. Bearbeite diesen Abschnitt von shellx.json direkt."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' n'est pas un réglage. Modifiez directement cette section de cmux.json."
+            "value": "'%@' n'est pas un réglage. Modifiez directement cette section de shellx.json."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' ليس إعدادًا. عدّل هذا القسم من cmux.json مباشرةً."
+            "value": "'%@' ليس إعدادًا. عدّل هذا القسم من shellx.json مباشرةً."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' no es un ajuste. Edita esa sección de cmux.json directamente."
+            "value": "'%@' no es un ajuste. Edita esa sección de shellx.json directamente."
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' 不是設定。請直接編輯 cmux.json 的該區段。"
+            "value": "'%@' 不是設定。請直接編輯 shellx.json 的該區段。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' 不是设置。请直接编辑 cmux.json 的该部分。"
+            "value": "'%@' 不是设置。请直接编辑 shellx.json 的该部分。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@'은(는) 설정이 아닙니다. cmux.json의 해당 섹션을 직접 편집하세요."
+            "value": "'%@'은(는) 설정이 아닙니다. shellx.json의 해당 섹션을 직접 편집하세요."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' は設定ではありません。cmux.json の該当セクションを直接編集してください。"
+            "value": "'%@' は設定ではありません。shellx.json の該当セクションを直接編集してください。"
           }
         }
       }
@@ -5198,55 +5198,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No setting preset named '%@'. Add it under settingPresets in ~/.config/cmux/cmux.json."
+            "value": "No setting preset named '%@'. Add it under settingPresets in ~/.config/shellx/shellx.json."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Es gibt keine Einstellungsvorlage namens '%@'. Füge sie unter settingPresets in ~/.config/cmux/cmux.json hinzu."
+            "value": "Es gibt keine Einstellungsvorlage namens '%@'. Füge sie unter settingPresets in ~/.config/shellx/shellx.json hinzu."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aucun préréglage nommé '%@'. Ajoutez-le sous settingPresets dans ~/.config/cmux/cmux.json."
+            "value": "Aucun préréglage nommé '%@'. Ajoutez-le sous settingPresets dans ~/.config/shellx/shellx.json."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "لا يوجد إعداد مسبق باسم '%@'. أضفه ضمن settingPresets في ~/.config/cmux/cmux.json."
+            "value": "لا يوجد إعداد مسبق باسم '%@'. أضفه ضمن settingPresets في ~/.config/shellx/shellx.json."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "No hay ningún preajuste llamado '%@'. Añádelo en settingPresets en ~/.config/cmux/cmux.json."
+            "value": "No hay ningún preajuste llamado '%@'. Añádelo en settingPresets en ~/.config/shellx/shellx.json."
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "沒有名為 '%@' 的設定預設組。請在 ~/.config/cmux/cmux.json 的 settingPresets 下新增。"
+            "value": "沒有名為 '%@' 的設定預設組。請在 ~/.config/shellx/shellx.json 的 settingPresets 下新增。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "没有名为 '%@' 的设置预设。请在 ~/.config/cmux/cmux.json 的 settingPresets 下添加。"
+            "value": "没有名为 '%@' 的设置预设。请在 ~/.config/shellx/shellx.json 的 settingPresets 下添加。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@'(이)라는 설정 프리셋이 없습니다. ~/.config/cmux/cmux.json의 settingPresets 아래에 추가하세요."
+            "value": "'%@'(이)라는 설정 프리셋이 없습니다. ~/.config/shellx/shellx.json의 settingPresets 아래에 추가하세요."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' という名前の設定プリセットはありません。~/.config/cmux/cmux.json の settingPresets に追加してください。"
+            "value": "'%@' という名前の設定プリセットはありません。~/.config/shellx/shellx.json の settingPresets に追加してください。"
           }
         }
       }
@@ -5316,55 +5316,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' names a key that contains \".\", such as a workspaceGroups.byCwd path. Setting paths split on every \".\", so that key can't be changed this way. Edit it in cmux.json directly."
+            "value": "'%@' names a key that contains \".\", such as a workspaceGroups.byCwd path. Setting paths split on every \".\", so that key can't be changed this way. Edit it in shellx.json directly."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' verweist auf einen Schlüssel mit \".\", etwa einen workspaceGroups.byCwd-Pfad. Einstellungspfade werden an jedem \".\" geteilt, daher lässt sich dieser Schlüssel so nicht ändern. Bearbeite ihn direkt in cmux.json."
+            "value": "'%@' verweist auf einen Schlüssel mit \".\", etwa einen workspaceGroups.byCwd-Pfad. Einstellungspfade werden an jedem \".\" geteilt, daher lässt sich dieser Schlüssel so nicht ändern. Bearbeite ihn direkt in shellx.json."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' désigne une clé qui contient \".\", par exemple un chemin workspaceGroups.byCwd. Les chemins de réglage sont découpés à chaque \".\", donc cette clé ne peut pas être modifiée ainsi. Modifiez-la directement dans cmux.json."
+            "value": "'%@' désigne une clé qui contient \".\", par exemple un chemin workspaceGroups.byCwd. Les chemins de réglage sont découpés à chaque \".\", donc cette clé ne peut pas être modifiée ainsi. Modifiez-la directement dans shellx.json."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' يشير إلى مفتاح يحتوي على \".\"، مثل مسار workspaceGroups.byCwd. تُقسَّم مسارات الإعدادات عند كل \".\"، لذا لا يمكن تغيير هذا المفتاح بهذه الطريقة. عدّله في cmux.json مباشرةً."
+            "value": "'%@' يشير إلى مفتاح يحتوي على \".\"، مثل مسار workspaceGroups.byCwd. تُقسَّم مسارات الإعدادات عند كل \".\"، لذا لا يمكن تغيير هذا المفتاح بهذه الطريقة. عدّله في shellx.json مباشرةً."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' se refiere a una clave que contiene \".\", como una ruta de workspaceGroups.byCwd. Las rutas de ajustes se dividen en cada \".\", así que esa clave no se puede cambiar de esta forma. Edítala directamente en cmux.json."
+            "value": "'%@' se refiere a una clave que contiene \".\", como una ruta de workspaceGroups.byCwd. Las rutas de ajustes se dividen en cada \".\", así que esa clave no se puede cambiar de esta forma. Edítala directamente en shellx.json."
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' 指向含有 \".\" 的鍵，例如 workspaceGroups.byCwd 路徑。設定路徑會在每個 \".\" 處分割，因此無法用這種方式變更該鍵。請直接在 cmux.json 中編輯。"
+            "value": "'%@' 指向含有 \".\" 的鍵，例如 workspaceGroups.byCwd 路徑。設定路徑會在每個 \".\" 處分割，因此無法用這種方式變更該鍵。請直接在 shellx.json 中編輯。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' 指向包含 \".\" 的键，例如 workspaceGroups.byCwd 路径。设置路径会在每个 \".\" 处拆分，因此无法用这种方式更改该键。请直接在 cmux.json 中编辑。"
+            "value": "'%@' 指向包含 \".\" 的键，例如 workspaceGroups.byCwd 路径。设置路径会在每个 \".\" 处拆分，因此无法用这种方式更改该键。请直接在 shellx.json 中编辑。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@'은(는) \".\"이 포함된 키를 가리킵니다(예: workspaceGroups.byCwd 경로). 설정 경로는 모든 \".\"에서 나뉘므로 이 방법으로는 해당 키를 변경할 수 없습니다. cmux.json에서 직접 편집하세요."
+            "value": "'%@'은(는) \".\"이 포함된 키를 가리킵니다(예: workspaceGroups.byCwd 경로). 설정 경로는 모든 \".\"에서 나뉘므로 이 방법으로는 해당 키를 변경할 수 없습니다. shellx.json에서 직접 편집하세요."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "'%@' は \".\" を含むキー（workspaceGroups.byCwd のパスなど）を指しています。設定パスはすべての \".\" で分割されるため、この方法ではそのキーを変更できません。cmux.json で直接編集してください。"
+            "value": "'%@' は \".\" を含むキー（workspaceGroups.byCwd のパスなど）を指しています。設定パスはすべての \".\" で分割されるため、この方法ではそのキーを変更できません。shellx.json で直接編集してください。"
           }
         }
       }
@@ -5375,55 +5375,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "[cmux] SSH pane could not contact cmux to start the remote session after %s attempts; reconnect to try again."
+            "value": "[ShellX] SSH pane could not contact ShellX to start the remote session after %s attempts; reconnect to try again."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "[cmux] Das SSH-Fenster konnte cmux nach %s Versuchen nicht erreichen, um die Remotesitzung zu starten; verbinden Sie sich erneut."
+            "value": "[ShellX] Das SSH-Fenster konnte ShellX nach %s Versuchen nicht erreichen, um die Remotesitzung zu starten; verbinden Sie sich erneut."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "[cmux] Le panneau SSH n’a pas pu joindre cmux pour démarrer la session distante après %s tentatives ; reconnectez-vous pour réessayer."
+            "value": "[ShellX] Le panneau SSH n’a pas pu joindre ShellX pour démarrer la session distante après %s tentatives ; reconnectez-vous pour réessayer."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "[cmux] تعذر على لوحة SSH الاتصال بـ cmux لبدء الجلسة البعيدة بعد %s محاولات؛ أعد الاتصال للمحاولة مرة أخرى."
+            "value": "[ShellX] تعذر على لوحة SSH الاتصال بـ ShellX لبدء الجلسة البعيدة بعد %s محاولات؛ أعد الاتصال للمحاولة مرة أخرى."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "[cmux] El panel SSH no pudo contactar con cmux para iniciar la sesión remota después de %s intentos; vuelve a conectarte para intentarlo de nuevo."
+            "value": "[ShellX] El panel SSH no pudo contactar con ShellX para iniciar la sesión remota después de %s intentos; vuelve a conectarte para intentarlo de nuevo."
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "[cmux] SSH 窗格嘗試 %s 次後仍無法聯絡 cmux 以啟動遠端工作階段；請重新連線再試。"
+            "value": "[ShellX] SSH 窗格嘗試 %s 次後仍無法聯絡 ShellX 以啟動遠端工作階段；請重新連線再試。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "[cmux] SSH 窗格尝试 %s 次后仍无法联系 cmux 以启动远程会话；请重新连接再试。"
+            "value": "[ShellX] SSH 窗格尝试 %s 次后仍无法联系 ShellX 以启动远程会话；请重新连接再试。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "[cmux] SSH 패널이 %s번 시도 후에도 원격 세션을 시작하기 위해 cmux에 연결하지 못했습니다. 다시 연결해 보세요."
+            "value": "[ShellX] SSH 패널이 %s번 시도 후에도 원격 세션을 시작하기 위해 ShellX에 연결하지 못했습니다. 다시 연결해 보세요."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "[cmux] SSH ペインは %s 回試行しても cmux に接続してリモートセッションを開始できませんでした。再接続してください。"
+            "value": "[ShellX] SSH ペインは %s 回試行しても ShellX に接続してリモートセッションを開始できませんでした。再接続してください。"
           }
         }
       }
@@ -5434,55 +5434,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux did not acknowledge the SSH launch"
+            "value": "ShellX did not acknowledge the SSH launch"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux hat den SSH-Start nicht bestätigt"
+            "value": "ShellX hat den SSH-Start nicht bestätigt"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux n’a pas confirmé le démarrage SSH"
+            "value": "ShellX n’a pas confirmé le démarrage SSH"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "لم يؤكد cmux بدء SSH"
+            "value": "لم يؤكد ShellX بدء SSH"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux no confirmó el inicio de SSH"
+            "value": "ShellX no confirmó el inicio de SSH"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux 未確認 SSH 啟動"
+            "value": "ShellX 未確認 SSH 啟動"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux 未确认 SSH 启动"
+            "value": "ShellX 未确认 SSH 启动"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux가 SSH 시작을 확인하지 않음"
+            "value": "ShellX가 SSH 시작을 확인하지 않음"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux が SSH の起動を確認できませんでした"
+            "value": "ShellX が SSH の起動を確認できませんでした"
           }
         }
       }

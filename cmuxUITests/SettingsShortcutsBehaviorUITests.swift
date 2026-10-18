@@ -72,7 +72,7 @@ final class SettingsShortcutsBehaviorUITests: SettingsUITestCase {
         defer { closeSettings(app, window) }
         navigate(window, to: "Global Hotkey")
 
-        let subtitle = "Pressing the shortcut in any app shows or hides all cmux windows."
+        let subtitle = "Pressing the shortcut in any app shows or hides all ShellX windows."
 
         XCTAssertTrue(
             poll(timeout: 5.0) { window.staticTexts[subtitle].exists },

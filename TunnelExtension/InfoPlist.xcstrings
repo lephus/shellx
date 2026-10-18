@@ -7,55 +7,55 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "cmux Cloud Tunnel"
+            "value" : "ShellX Cloud Tunnel"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "cmux クラウドトンネル"
+            "value" : "ShellX クラウドトンネル"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Cloud Tunnel"
+            "value": "ShellX Cloud Tunnel"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Cloud Tunnel"
+            "value": "ShellX Cloud Tunnel"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Cloud Tunnel"
+            "value": "ShellX Cloud Tunnel"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Cloud Tunnel"
+            "value": "ShellX Cloud Tunnel"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Cloud Tunnel"
+            "value": "ShellX Cloud Tunnel"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Cloud Tunnel"
+            "value": "ShellX Cloud Tunnel"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Cloud Tunnel"
+            "value": "ShellX Cloud Tunnel"
           }
         }
       }
