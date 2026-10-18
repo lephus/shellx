@@ -11,6 +11,7 @@ pub mod ffi;
 pub mod fingerprint;
 pub mod http;
 pub mod machines;
+pub mod seal;
 pub mod store;
 pub mod tickets;
 pub mod version;
