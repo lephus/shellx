@@ -3337,6 +3337,8 @@
 		C0F16C000000000000000001 /* ShellStartupMissingBundleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F16C000000000000000002 /* ShellStartupMissingBundleTests.swift */; };
 		5E11A00000000000000000A2 /* ShellXBrand in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000A1 /* ShellXBrand */; };
 		5E11A00000000000000000A3 /* ShellXBrand in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000A1 /* ShellXBrand */; };
+		0C0CF1B5A6F9AF1DFDC29B01 /* ShellXSidebarHeaderRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1123DE0D564CD722CC853FA0 /* ShellXSidebarHeaderRow.swift */; };
+		E4A2B0CAB6AAA1AC7127FD53 /* ShellXSidebarIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82421054CBFF9ECFC3CA2E2B /* ShellXSidebarIcon.swift */; };
 		1521D55DC63D5E5FC4955E31 /* ShortcutAndCommandPaletteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6083A7DAD962E287FC2FFE94 /* ShortcutAndCommandPaletteTests.swift */; };
 		76027A12C93B4538BF22C71E /* ShortcutBareStartRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB7F2E9143904957AAA70726 /* ShortcutBareStartRouting.swift */; };
 		5C0DE0DE0000000000000004 /* ShortcutDiscoveryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0DE0DE0000000000000003 /* ShortcutDiscoveryButton.swift */; };
@@ -3363,6 +3365,7 @@
 		41C32603305047F29AA29D23 /* SidebarBonsplitTabWorkspaceDropView+Ownership.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68E424C90C324EFA98F5671E /* SidebarBonsplitTabWorkspaceDropView+Ownership.swift */; };
 		BB406674610D41C58244647A /* SidebarBonsplitTabWorkspaceDropView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4AF802DEBFA433C9B779F5F /* SidebarBonsplitTabWorkspaceDropView.swift */; };
 		FE9F9435374CB344628420AB /* SidebarBoundedDisplayStringTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7A99CD111C8F6166A22186B /* SidebarBoundedDisplayStringTests.swift */; };
+		1821C8A1201DDAB35FFF6412 /* SidebarBrandHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F39358ECE09B0CA33D85E679 /* SidebarBrandHeaderView.swift */; };
 		4C537C8FEE6305828A74F1A6 /* SidebarCloudButtonAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = A986CE6A5E2D281B2CE3C7E1 /* SidebarCloudButtonAction.swift */; };
 		9A720A7DE3190737E7D77170 /* SidebarCloudButtonActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B8ACF56AB5811EEC9D0203F /* SidebarCloudButtonActionTests.swift */; };
 		9BE45B94B05D471FA386203D /* SidebarCloudWorkspaceBadgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CA5C526315D4C2B88B1CA55 /* SidebarCloudWorkspaceBadgeTests.swift */; };
@@ -3403,6 +3406,9 @@
 		5732A0125732A0125732A012 /* SidebarLazyContractProbeKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5732B0125732B0125732B012 /* SidebarLazyContractProbeKey.swift */; };
 		D41A7C01D41A7C01D41A7C01 /* SidebarLazyLayoutScaleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D41A7C02D41A7C02D41A7C02 /* SidebarLazyLayoutScaleTests.swift */; };
 		C0DE10085100000000000001 /* SidebarLeadingEdgeAnchorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE10085100000000000002 /* SidebarLeadingEdgeAnchorTests.swift */; };
+		72B0CBEC7A92C1B5BE6F005A /* SidebarMachineGroupingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72D3C928EB79E009EBF1F71F /* SidebarMachineGroupingTests.swift */; };
+		E735DBFB32293BF4E223B806 /* SidebarMachineHeaderCellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC6DADC8C19E0B21D2636E1A /* SidebarMachineHeaderCellView.swift */; };
+		8D15132F3071D4B8B0940EC8 /* SidebarMachineSectionRenderItems.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D817C244372B88950E6580 /* SidebarMachineSectionRenderItems.swift */; };
 		385C6BA7E78DB87460E5D930 /* SidebarMarkdownRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1C3F1DBF6BF5D7223C4A30C /* SidebarMarkdownRendererTests.swift */; };
 			A6AC73F20000000000000001 /* SidebarMediaActivityIndicators.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6AC73F20000000000000002 /* SidebarMediaActivityIndicators.swift */; };
 		C0DE5F210000000000000001 /* SidebarMetadataMarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE5F210000000000000002 /* SidebarMetadataMarkdownRenderer.swift */; };
@@ -3461,6 +3467,9 @@
 		E62155868BB29FEB5DAAAF25 /* SidebarSelectionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD52285508B1D6A9875E7B3 /* SidebarSelectionState.swift */; };
 		C12791000000000000000007 /* SidebarSnapshotOwnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12791000000000000000008 /* SidebarSnapshotOwnerTests.swift */; };
 		F57072635F25EBCA741E125D /* SidebarState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1614EAD3CCF70A177A51BD1 /* SidebarState.swift */; };
+		CBCC5B6364B0EE92099C3613 /* SidebarStatusPill+CompactGlyph.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C522143E2F081CF49F740DF /* SidebarStatusPill+CompactGlyph.swift */; };
+		00827987BD6B69C9EB2DB705 /* SidebarStatusPillTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCFD07260C4FCB7D87552C48 /* SidebarStatusPillTests.swift */; };
+		DEC176DF2A4098692CA89B30 /* SidebarStatusPillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AC5F8AFB381B7E4A81C3976 /* SidebarStatusPillView.swift */; };
 		D7344F010000000000000001 /* SidebarTabDragPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7344F010000000000000002 /* SidebarTabDragPayload.swift */; };
 		D73440010000000000000001 /* SidebarTabDragPayloadProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D73440010000000000000002 /* SidebarTabDragPayloadProviderTests.swift */; };
 		F7216006000000000000001 /* SidebarTabItemContextMenuState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7216006000000000000002 /* SidebarTabItemContextMenuState.swift */; };
@@ -7901,6 +7910,8 @@
 		831E0F65E3D945CE8970852E /* ShellIntegrationSendTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellIntegrationSendTransportTests.swift; sourceTree = "<group>"; };
 		C0F16A000000000000000002 /* ShellStartupMatrixTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellStartupMatrixTests.swift; sourceTree = "<group>"; };
 		C0F16C000000000000000002 /* ShellStartupMissingBundleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellStartupMissingBundleTests.swift; sourceTree = "<group>"; };
+		1123DE0D564CD722CC853FA0 /* ShellXSidebarHeaderRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Sidebar/ShellXSidebarHeaderRow.swift; sourceTree = "<group>"; };
+		82421054CBFF9ECFC3CA2E2B /* ShellXSidebarIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Sidebar/ShellXSidebarIcon.swift; sourceTree = "<group>"; };
 		6083A7DAD962E287FC2FFE94 /* ShortcutAndCommandPaletteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutAndCommandPaletteTests.swift; sourceTree = "<group>"; };
 		AB7F2E9143904957AAA70726 /* ShortcutBareStartRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/ShortcutBareStartRouting.swift; sourceTree = "<group>"; };
 		5C0DE0DE0000000000000003 /* ShortcutDiscoveryButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutDiscoveryButton.swift; sourceTree = "<group>"; };
@@ -7928,6 +7939,7 @@
 		68E424C90C324EFA98F5671E /* SidebarBonsplitTabWorkspaceDropView+Ownership.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sidebar/SidebarBonsplitTabWorkspaceDropView+Ownership.swift"; sourceTree = "<group>"; };
 		C4AF802DEBFA433C9B779F5F /* SidebarBonsplitTabWorkspaceDropView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar/SidebarBonsplitTabWorkspaceDropView.swift; sourceTree = "<group>"; };
 		C7A99CD111C8F6166A22186B /* SidebarBoundedDisplayStringTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarBoundedDisplayStringTests.swift"; sourceTree = "<group>"; };
+		F39358ECE09B0CA33D85E679 /* SidebarBrandHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Sidebar/SidebarBrandHeaderView.swift; sourceTree = "<group>"; };
 		A986CE6A5E2D281B2CE3C7E1 /* SidebarCloudButtonAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarCloudButtonAction.swift; sourceTree = "<group>"; };
 		2B8ACF56AB5811EEC9D0203F /* SidebarCloudButtonActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarCloudButtonActionTests.swift"; sourceTree = "<group>"; };
 		9CA5C526315D4C2B88B1CA55 /* SidebarCloudWorkspaceBadgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarCloudWorkspaceBadgeTests.swift"; sourceTree = "<group>"; };
@@ -7968,6 +7980,9 @@
 		5732B0125732B0125732B012 /* SidebarLazyContractProbeKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Debug/SidebarLazyContractProbeKey.swift"; sourceTree = "<group>"; };
 		D41A7C02D41A7C02D41A7C02 /* SidebarLazyLayoutScaleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarLazyLayoutScaleTests.swift; sourceTree = "<group>"; };
 		C0DE10085100000000000002 /* SidebarLeadingEdgeAnchorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarLeadingEdgeAnchorTests.swift; sourceTree = "<group>"; };
+		72D3C928EB79E009EBF1F71F /* SidebarMachineGroupingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarMachineGroupingTests.swift"; sourceTree = "<group>"; };
+		FC6DADC8C19E0B21D2636E1A /* SidebarMachineHeaderCellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Sidebar/SidebarMachineHeaderCellView.swift; sourceTree = "<group>"; };
+		96D817C244372B88950E6580 /* SidebarMachineSectionRenderItems.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Sidebar/SidebarMachineSectionRenderItems.swift; sourceTree = "<group>"; };
 		F1C3F1DBF6BF5D7223C4A30C /* SidebarMarkdownRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarMarkdownRendererTests.swift; sourceTree = "<group>"; };
 			A6AC73F20000000000000002 /* SidebarMediaActivityIndicators.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar/SidebarMediaActivityIndicators.swift; sourceTree = "<group>"; };
 		C0DE5F210000000000000002 /* SidebarMetadataMarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarMetadataMarkdownRenderer.swift; sourceTree = "<group>"; };
@@ -8025,6 +8040,9 @@
 		9AD52285508B1D6A9875E7B3 /* SidebarSelectionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarSelectionState.swift; sourceTree = "<group>"; };
 		C12791000000000000000008 /* SidebarSnapshotOwnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarSnapshotOwnerTests.swift; sourceTree = "<group>"; };
 		D1614EAD3CCF70A177A51BD1 /* SidebarState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar/SidebarState.swift; sourceTree = "<group>"; };
+		2C522143E2F081CF49F740DF /* SidebarStatusPill+CompactGlyph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellX/Sidebar/SidebarStatusPill+CompactGlyph.swift"; sourceTree = "<group>"; };
+		CCFD07260C4FCB7D87552C48 /* SidebarStatusPillTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarStatusPillTests.swift"; sourceTree = "<group>"; };
+		6AC5F8AFB381B7E4A81C3976 /* SidebarStatusPillView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Sidebar/SidebarStatusPillView.swift; sourceTree = "<group>"; };
 		D7344F010000000000000002 /* SidebarTabDragPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar/SidebarTabDragPayload.swift; sourceTree = "<group>"; };
 		D73440010000000000000002 /* SidebarTabDragPayloadProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarTabDragPayloadProviderTests.swift; sourceTree = "<group>"; };
 		F7216006000000000000002 /* SidebarTabItemContextMenuState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarTabItemContextMenuState.swift; sourceTree = "<group>"; };
@@ -12364,6 +12382,13 @@
 				899EDFB4688088904AEC67B4 /* RightSidebarMode+ProductFeature.swift */,
 				34F76A7191862A9BFADE3869 /* PostHogContextCalls.swift */,
 				30AA2D44945B6C4A24A6D837 /* TerminalController+BrowserEmulation.swift */,
+				1123DE0D564CD722CC853FA0 /* ShellXSidebarHeaderRow.swift */,
+				82421054CBFF9ECFC3CA2E2B /* ShellXSidebarIcon.swift */,
+				F39358ECE09B0CA33D85E679 /* SidebarBrandHeaderView.swift */,
+				FC6DADC8C19E0B21D2636E1A /* SidebarMachineHeaderCellView.swift */,
+				96D817C244372B88950E6580 /* SidebarMachineSectionRenderItems.swift */,
+				2C522143E2F081CF49F740DF /* SidebarStatusPill+CompactGlyph.swift */,
+				6AC5F8AFB381B7E4A81C3976 /* SidebarStatusPillView.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -13947,6 +13972,8 @@
 				FBA69A8DB9EBB531DD11DFE5 /* AccountUpgradeOfferTests.swift */,
 				A1CE8E303102A963A8DE21E7 /* BrowserAutomationRestoredPanelTests.swift */,
 				6C52E5BCE0CCFD00CD9ED561 /* AgentPreviousGenerationSessionEndTests.swift */,
+				72D3C928EB79E009EBF1F71F /* SidebarMachineGroupingTests.swift */,
+				CCFD07260C4FCB7D87552C48 /* SidebarStatusPillTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -14290,6 +14317,7 @@
 				D0F3A0000000000000000002 /* CmuxCloudImagePaste */,
 				C4B1E0000000000000000002 /* CmuxMobileHost */,
 				D0F7A0000000000000000003 /* CmuxMemoryPressure */,
+				5E11A00000000000000000A1 /* ShellXBrand */,
 			);
 			productName = cmuxTests;
 			productReference = F1000002A1B2C3D4E5F60718 /* cmuxTests.xctest */;
@@ -16547,6 +16575,8 @@
 				F0ACC0DE0000000000000011 /* SharedLiveAgentIndex.swift in Sources */,
 				F0ACC0DE0000000000000007 /* SharedLiveAgentIndexLoader.swift in Sources */,
 				121580061215800612158006 /* SharedLiveAgentIndexRefreshOutcome.swift in Sources */,
+				0C0CF1B5A6F9AF1DFDC29B01 /* ShellXSidebarHeaderRow.swift in Sources */,
+				E4A2B0CAB6AAA1AC7127FD53 /* ShellXSidebarIcon.swift in Sources */,
 				76027A12C93B4538BF22C71E /* ShortcutBareStartRouting.swift in Sources */,
 				5C0DE0DE0000000000000004 /* ShortcutDiscoveryButton.swift in Sources */,
 				125BAEF2FE3B454547B964D1 /* ShortcutHintPill.swift in Sources */,
@@ -16564,6 +16594,7 @@
 				D7AB34300000000000000003 /* SidebarBonsplitTabWorkspaceDropOverlay.swift in Sources */,
 				41C32603305047F29AA29D23 /* SidebarBonsplitTabWorkspaceDropView+Ownership.swift in Sources */,
 				BB406674610D41C58244647A /* SidebarBonsplitTabWorkspaceDropView.swift in Sources */,
+				1821C8A1201DDAB35FFF6412 /* SidebarBrandHeaderView.swift in Sources */,
 				4C537C8FEE6305828A74F1A6 /* SidebarCloudButtonAction.swift in Sources */,
 				71ABCB8E029B4E69997C8EB4 /* SidebarCloudWorkspaceBadgeView.swift in Sources */,
 				71D6C8FB21FA9335AC60ECD2 /* SidebarCompactStatusGlyph+Resolve.swift in Sources */,
@@ -16587,6 +16618,8 @@
 				B804A0290000000000000029 /* SidebarLayoutModel.swift in Sources */,
 				5732A0115732A0115732A011 /* SidebarLazyContractProbe.swift in Sources */,
 				5732A0125732A0125732A012 /* SidebarLazyContractProbeKey.swift in Sources */,
+				E735DBFB32293BF4E223B806 /* SidebarMachineHeaderCellView.swift in Sources */,
+				8D15132F3071D4B8B0940EC8 /* SidebarMachineSectionRenderItems.swift in Sources */,
 				A6AC73F20000000000000001 /* SidebarMediaActivityIndicators.swift in Sources */,
 				C0DE5F210000000000000001 /* SidebarMetadataMarkdownRenderer.swift in Sources */,
 				EA1F00000000000000000001 /* SidebarPathFormatter.swift in Sources */,
@@ -16628,6 +16661,8 @@
 				B804A0280000000000000028 /* SidebarSelectionCoalescer.swift in Sources */,
 				E62155868BB29FEB5DAAAF25 /* SidebarSelectionState.swift in Sources */,
 				F57072635F25EBCA741E125D /* SidebarState.swift in Sources */,
+				CBCC5B6364B0EE92099C3613 /* SidebarStatusPill+CompactGlyph.swift in Sources */,
+				DEC176DF2A4098692CA89B30 /* SidebarStatusPillView.swift in Sources */,
 				D7344F010000000000000001 /* SidebarTabDragPayload.swift in Sources */,
 				F7216006000000000000001 /* SidebarTabItemContextMenuState.swift in Sources */,
 				8430A0030000000000000003 /* SidebarTabItemSettingsSnapshot.swift in Sources */,
@@ -18902,6 +18937,7 @@
 				AABBCC000000000000000206 /* SidebarInlineRenameKeyResolverTests.swift in Sources */,
 				D41A7C01D41A7C01D41A7C01 /* SidebarLazyLayoutScaleTests.swift in Sources */,
 				C0DE10085100000000000001 /* SidebarLeadingEdgeAnchorTests.swift in Sources */,
+				72B0CBEC7A92C1B5BE6F005A /* SidebarMachineGroupingTests.swift in Sources */,
 				385C6BA7E78DB87460E5D930 /* SidebarMarkdownRendererTests.swift in Sources */,
 				130160000000000000000001 /* SidebarNewLocalWorkspaceTests.swift in Sources */,
 				CB23911D7E131E8FBC9B82B6 /* SidebarOrderingTests.swift in Sources */,
@@ -18917,6 +18953,7 @@
 				4A435919EC29E25A2E139D7A /* SidebarSelectedRowScrollTests.swift in Sources */,
 				B804C0020000000000000002 /* SidebarSelectionCoalescerTests.swift in Sources */,
 				C12791000000000000000007 /* SidebarSnapshotOwnerTests.swift in Sources */,
+				00827987BD6B69C9EB2DB705 /* SidebarStatusPillTests.swift in Sources */,
 				D73440010000000000000001 /* SidebarTabDragPayloadProviderTests.swift in Sources */,
 				CA39C0304FE351A21C372429 /* SidebarWidthPolicyTests.swift in Sources */,
 				6707F0176707F0176707F017 /* SidebarWorkspaceContextMenuWindowTargetsTests.swift in Sources */,

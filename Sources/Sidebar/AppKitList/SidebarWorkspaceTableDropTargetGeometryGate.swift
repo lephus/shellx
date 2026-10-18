@@ -48,7 +48,8 @@ final class SidebarWorkspaceTableDropTargetGeometryGate {
 
         let lower = max(0, visibleRange.location)
         let upper = min(rows.count, visibleRange.location + visibleRange.length)
-        bonsplitTargetBridge.updateTargets((lower..<upper).map { row in
+        // ShellX: brand / machine header rows are not drop targets.
+        bonsplitTargetBridge.updateTargets((lower..<upper).filter { rows[$0].shellXHeaderRow == nil }.map { row in
             let configuration = rows[row]
             return SidebarDropPlanner.WorkspaceDropTarget(
                 workspaceId: configuration.workspaceId,

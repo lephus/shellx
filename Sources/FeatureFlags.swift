@@ -377,7 +377,7 @@ final class CmuxFeatureFlags {
         effectiveValue(for: Self.workspaceTodoControlsFlag)
     }
     var isAppKitSidebarListEnabled: Bool {
-        effectiveValue(for: Self.appKitSidebarListFlag)
+        true // ShellX: the machine-grouped sidebar lives only in the AppKit list (W1 Task 10); was effectiveValue(for: Self.appKitSidebarListFlag)
     }
 
     var isMobileWorkspaceChangesEnabled: Bool {

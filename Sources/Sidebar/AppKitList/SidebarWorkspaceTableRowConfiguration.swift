@@ -37,6 +37,8 @@ struct SidebarWorkspaceTableRowConfiguration {
     let appKitUnreadDependencyWorkspaceIds: Set<UUID>
     let appKitWorkspaceUnreadRebuild: (@MainActor (SidebarUnreadSnapshot) -> SidebarWorkspaceRowModel)?
     let appKitGroupHeaderUnreadRebuild: (@MainActor (SidebarUnreadSnapshot) -> SidebarGroupHeaderRowModel)?
+    // ShellX: present for the brand header and machine section header rows (W1 Task 10).
+    private(set) var shellXHeaderRow: ShellXSidebarHeaderRow? = nil
 
     private let environment: SidebarWorkspaceTableEnvironmentSnapshot
     private let equivalenceValue: Any
@@ -117,9 +119,10 @@ struct SidebarWorkspaceTableRowConfiguration {
         actions: SidebarGroupHeaderRowActions,
         environment: SidebarWorkspaceTableEnvironmentSnapshot,
         unreadDependencyWorkspaceIds: Set<UUID> = [],
-        unreadRebuild: (@MainActor (SidebarUnreadSnapshot) -> SidebarGroupHeaderRowModel)? = nil
+        unreadRebuild: (@MainActor (SidebarUnreadSnapshot) -> SidebarGroupHeaderRowModel)? = nil,
+        rowId: SidebarWorkspaceRenderItemID? = nil // ShellX: repeated per machine section
     ) {
-        self.id = .group(groupHeaderModel.groupId)
+        self.id = rowId ?? .group(groupHeaderModel.groupId)
         self.workspaceId = groupHeaderModel.anchorWorkspaceId
         self.groupId = groupHeaderModel.groupId
         self.isGroupHeader = true
@@ -180,6 +183,42 @@ struct SidebarWorkspaceTableRowConfiguration {
         }
     }
 
+    // ShellX: brand and machine section header rows (W1 Task 10).
+    init(
+        shellXHeader header: ShellXSidebarHeaderRow,
+        environment: SidebarWorkspaceTableEnvironmentSnapshot
+    ) {
+        self.init(
+            id: header.rowId,
+            workspaceId: header.placeholderWorkspaceId,
+            groupId: nil,
+            isGroupHeader: false,
+            isPinned: false,
+            makeContent: { _, _ in AnyView(EmptyView()) },
+            appKitGroupHeaderModel: nil,
+            appKitWorkspaceRowModel: nil,
+            environment: environment,
+            equivalenceValue: header,
+            isEquivalentValue: { ($0 as? ShellXSidebarHeaderRow) == header }
+        )
+        self.shellXHeaderRow = header
+    }
+
+    /// ShellX: the same group header under another identity, for a group
+    /// whose rows span machine sections. Other rows are returned unchanged.
+    func reidentifiedGroupHeader(as rowId: SidebarWorkspaceRenderItemID) -> Self {
+        guard let model = appKitGroupHeaderModel,
+              let actions = appKitGroupHeaderActions else { return self }
+        return Self(
+            groupHeaderModel: model,
+            actions: actions,
+            environment: environment,
+            unreadDependencyWorkspaceIds: appKitUnreadDependencyWorkspaceIds,
+            unreadRebuild: appKitGroupHeaderUnreadRebuild,
+            rowId: rowId
+        )
+    }
+
     func hasEquivalentContent(to other: Self) -> Bool {
         environment.hasEquivalentPresentation(to: other.environment)
             && isEquivalentValue(other.equivalenceValue)
@@ -220,7 +259,8 @@ struct SidebarWorkspaceTableRowConfiguration {
                 actions: actions,
                 environment: environment,
                 unreadDependencyWorkspaceIds: appKitUnreadDependencyWorkspaceIds,
-                unreadRebuild: rebuild
+                unreadRebuild: rebuild,
+                rowId: id // ShellX: keep a repeated header's per-section identity
             )
         }
         return self
@@ -229,7 +269,7 @@ struct SidebarWorkspaceTableRowConfiguration {
     /// Keeps the immutable paint model while dropping every live action,
     /// workspace, and hosted-content capture during retained hidden display.
     func presentationSnapshot() -> Self {
-        Self(
+        var snapshot = Self(
             id: id,
             workspaceId: workspaceId,
             groupId: groupId,
@@ -242,11 +282,14 @@ struct SidebarWorkspaceTableRowConfiguration {
             equivalenceValue: id,
             isEquivalentValue: { [id] in ($0 as? SidebarWorkspaceRenderItemID) == id }
         )
+        snapshot.shellXHeaderRow = shellXHeaderRow // ShellX: header rows keep their paint
+        return snapshot
     }
 
     var estimatedHeight: CGFloat {
         let fontScale = CGFloat(environment.globalFontMagnificationPercent) / 100
         let calculator = SidebarWorkspaceTableRowHeightCalculator()
+        if let shellXHeaderRow { return shellXHeaderRow.rowHeight } // ShellX: fixed header heights
         if isGroupHeader {
             return calculator.estimatedGroupHeaderHeight(fontScale: fontScale)
         }

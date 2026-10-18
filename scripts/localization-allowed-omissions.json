@@ -3146,6 +3146,10 @@
       "ja": "Reviewed native UI spelling, established developer terminology, or the named macOS Dock component; an explicit translated entry remains required."
     }
   },
+  "sidebar.machine.ssh": {
+    "class": "technical",
+    "source": "SSH"
+  },
   "sidebar.pathMenu.macintoshHD": {
     "class": "brand",
     "source": "Macintosh HD"

@@ -178,6 +178,9 @@ final class SidebarWorkspaceTableRowHeightCache {
     ) -> CGFloat {
         // Pure-AppKit rows have deterministic heights; never spin up the
         // hosted SwiftUI measurement path for them.
+        if let shellXHeaderRow = row.shellXHeaderRow { // ShellX: fixed-height header rows
+            return shellXHeaderRow.rowHeight
+        }
         if let headerModel = row.appKitGroupHeaderModel {
             return SidebarGroupHeaderTableCellView.preferredHeight(model: headerModel)
         }

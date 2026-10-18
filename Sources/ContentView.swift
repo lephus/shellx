@@ -28,6 +28,7 @@ import CmuxUpdaterUI
 import ImageIO
 import Observation
 import CmuxProductAnalytics
+import ShellXBrand // ShellX: machine-grouped sidebar
 import SwiftUI
 import ObjectiveC
 import UniformTypeIdentifiers
@@ -11896,7 +11897,8 @@ struct VerticalTabsSidebar: View, Equatable {
         let workspaceGroupMenuSnapshot = WorkspaceGroupMenuSnapshot(
             items: workspaceGroups.map { WorkspaceGroupMenuSnapshot.Item(id: $0.id, name: $0.name) }
         )
-        let workspaceRenderItems = SidebarWorkspaceRenderItem.renderItems(
+        // ShellX: group the sidebar by machine (W1 Task 10).
+        let workspaceRenderItems = SidebarMachineSectionRenderItems.renderItems(
             tabs: tabs,
             groupsById: workspaceGroupById,
             orderedGroups: workspaceGroups,
@@ -12517,15 +12519,35 @@ struct VerticalTabsSidebar: View, Equatable {
             canCreateEmptyGroup: tabManager.selectedTab?.isRemoteTmuxMirror != true,
             notificationIndex: notificationIndex
         )
-        return renderContext.workspaceRenderItems.compactMap { item -> SidebarWorkspaceTableRowConfiguration? in
+        // ShellX: brand header row first; a group header repeated in a later
+        // machine section gets a per-section row id (W1 Task 10).
+        let brandHeaderRow = SidebarWorkspaceTableRowConfiguration(
+            shellXHeader: .brand,
+            environment: renderContext.environment
+        )
+        var emittedGroupHeaderIds: Set<UUID> = []
+        var currentMachineSectionId: UUID?
+        return [brandHeaderRow] + renderContext.workspaceRenderItems.compactMap { item -> SidebarWorkspaceTableRowConfiguration? in
             switch item {
+            case .machineHeader(let header): // ShellX
+                currentMachineSectionId = header.key.stableID
+                return SidebarWorkspaceTableRowConfiguration(
+                    shellXHeader: .machine(header),
+                    environment: renderContext.environment
+                )
             case .groupHeader(let groupId, _):
                 guard let group = renderContext.workspaceGroupById[groupId] else { return nil }
-                return sidebarWorkspaceGroupTableConfiguration(
+                let configuration = sidebarWorkspaceGroupTableConfiguration(
                     group: group,
                     memberWorkspaceIds: renderContext.memberWorkspaceIdsByGroupId[groupId] ?? [],
                     memberStatusGlyphs: memberStatusGlyphs,
                     renderContext: renderContext
+                )
+                // ShellX: first appearance keeps `.group(id)`; repeats are keyed by section.
+                guard !emittedGroupHeaderIds.insert(groupId).inserted,
+                      let currentMachineSectionId else { return configuration }
+                return configuration.reidentifiedGroupHeader(
+                    as: .group(groupId, repeatedInMachineSection: currentMachineSectionId)
                 )
             case .workspace(let workspaceId):
                 guard let workspace = renderContext.workspaceById[workspaceId],
@@ -14456,6 +14478,8 @@ struct VerticalTabsSidebar: View, Equatable {
                             shouldCollectWorkspaceDropTargets: shouldCollectWorkspaceDropTargets
                         )
                     }
+                case .machineHeader: // ShellX: the legacy SwiftUI list is not extended
+                    EmptyView()
                 }
             }
         }
