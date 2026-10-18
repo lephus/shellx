@@ -4190,7 +4190,7 @@ final class SocketClient {
         }
 
         let authURL = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
-            .appendingPathComponent(".cmux/relay/\(endpoint.port).auth", isDirectory: false)
+            .appendingPathComponent(".shellx/relay/\(endpoint.port).auth", isDirectory: false)
         guard let authData = try? Data(contentsOf: authURL),
               let authObject = try? JSONSerialization.jsonObject(with: authData) as? [String: Any],
               let relayID = trimmedEnvValue(authObject["relay_id"] as? String),
@@ -13862,7 +13862,7 @@ struct CMUXCLI {
         }
     }
 
-    /// Generic "open a workspace, SSH into the remote, bootstrap cmuxd-remote, forward socket,
+    /// Generic "open a workspace, SSH into the remote, bootstrap shellx-remote, forward socket,
     /// drop the user in a shell" pipeline. The inner loop of `cmux ssh`; also called from
     /// `cmux vm new`/`shell`/`attach` so cloud VMs reuse the exact same bootstrap.
     private func runSSHWithOptions(
@@ -14923,7 +14923,7 @@ struct CMUXCLI {
     ) -> String {
         var lines = remoteBootstrapTTYCaptureLines(remoteRelayPort: remoteRelayPort, includeRelayRPC: true)
         lines += remoteTerminalConnectedReportLines(remoteRelayPort: remoteRelayPort)
-        lines.append("/bin/sh \"$HOME/.cmux/relay/\(remoteRelayPort).bootstrap.sh\"")
+        lines.append("/bin/sh \"$HOME/.shellx/relay/\(remoteRelayPort).bootstrap.sh\"")
         return lines.joined(separator: "\n")
     }
 
@@ -14937,15 +14937,15 @@ struct CMUXCLI {
             "cmux_bootstrap_tty=\"$(tty 2>/dev/null || true)\"",
             "cmux_bootstrap_tty=\"${cmux_bootstrap_tty##*/}\"",
             "if [ -n \"$cmux_bootstrap_tty\" ] && [ \"$cmux_bootstrap_tty\" != \"not a tty\" ]; then",
-            "  mkdir -p \"$HOME/.cmux/relay\" >/dev/null 2>&1 || true",
-            "  printf '%s' \"$cmux_bootstrap_tty\" > \"$HOME/.cmux/relay/\(remoteRelayPort).tty\" 2>/dev/null || true",
+            "  mkdir -p \"$HOME/.shellx/relay\" >/dev/null 2>&1 || true",
+            "  printf '%s' \"$cmux_bootstrap_tty\" > \"$HOME/.shellx/relay/\(remoteRelayPort).tty\" 2>/dev/null || true",
             "  export CMUX_BOOTSTRAP_TTY=\"$cmux_bootstrap_tty\"",
         ]
 
         if includeRelayRPC {
             lines += [
-                "  cmux_relay_cli=\"$HOME/.cmux/bin/cmux\"",
-                "  if [ ! -x \"$cmux_relay_cli\" ]; then cmux_relay_cli=\"$(command -v cmux 2>/dev/null || true)\"; fi",
+                "  cmux_relay_cli=\"$HOME/.shellx/bin/shellx\"",
+                "  if [ ! -x \"$cmux_relay_cli\" ]; then cmux_relay_cli=\"$(command -v shellx 2>/dev/null || true)\"; fi",
                 "  if [ -n \"$cmux_relay_cli\" ]; then",
                 "    ( cmux_relay_report_tty='{\"workspace_id\":\"__CMUX_WORKSPACE_ID__\",\"tty_name\":\"'$cmux_bootstrap_tty'\",\"terminal_lifecycle_id\":\"__CMUX_TERMINAL_LIFECYCLE_ID__\",\"attempt_id\":\"__CMUX_SSH_ATTEMPT_ID__\"}'",
                 "      cmux_relay_ports_kick='{\"workspace_id\":\"__CMUX_WORKSPACE_ID__\",\"reason\":\"command\"}'",
@@ -14976,8 +14976,8 @@ struct CMUXCLI {
             "  cmux_relay_terminal_connected_acknowledged=0",
             "  cmux_relay_terminal_connected_retry=0",
             "  while [ \"$cmux_relay_terminal_connected_retry\" -lt \(maximumAttempts) ]; do",
-            "    cmux_relay_cli=\"$HOME/.cmux/bin/cmux\"",
-            "    if [ ! -x \"$cmux_relay_cli\" ]; then cmux_relay_cli=\"$(command -v cmux 2>/dev/null || true)\"; fi",
+            "    cmux_relay_cli=\"$HOME/.shellx/bin/shellx\"",
+            "    if [ ! -x \"$cmux_relay_cli\" ]; then cmux_relay_cli=\"$(command -v shellx 2>/dev/null || true)\"; fi",
             "    if [ -n \"$cmux_relay_cli\" ] && env -u CMUX_SOCKET CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC=0.5 CMUX_SOCKET_PATH=\"127.0.0.1:\(remoteRelayPort)\" \"$cmux_relay_cli\" rpc workspace.remote.terminal_session_connected \"$cmux_relay_terminal_connected\" >/dev/null 2>&1; then",
             "      cmux_relay_terminal_connected_acknowledged=1",
             "      break",
@@ -18002,13 +18002,20 @@ struct CMUXCLI {
         let downloadURL = entry?.downloadURL ?? "unknown"
         let checksumsAssetName = manifest?.checksumsAssetName ?? "unknown"
         let checksumsURL = manifest?.checksumsURL ?? "unknown"
-        let downloadCommand = "gh release download \(releaseTag) --repo manaflow-ai/cmux --pattern \(assetName)"
-        let downloadChecksumsCommand = "gh release download \(releaseTag) --repo manaflow-ai/cmux --pattern \(checksumsAssetName)"
+        // ShellX serves shellx-remote from download.shellx.pro (no GitHub
+        // release attestations); the pinned SHA-256 is the integrity check.
+        let downloadCommand = "curl -fLO \(downloadURL)"
+        let downloadChecksumsCommand = "curl -fLO \(checksumsURL)"
         let checksumVerifyCommand = "shasum -a 256 -c \(checksumsAssetName) --ignore-missing"
-        let signerWorkflow = releaseTag == "nightly" || releaseTag == "rc"
-            ? "manaflow-ai/cmux/.github/workflows/nightly.yml"
-            : "manaflow-ai/cmux/.github/workflows/release.yml"
-        let verifyCommand = "gh attestation verify ./\(assetName) --repo manaflow-ai/cmux --signer-workflow \(signerWorkflow)"
+        // Release builds ignore the dev-only local daemon fallback (see
+        // RemoteSessionCoordinator.isDebugBuild), so report it only in Debug.
+        let devLocalBuildFallback: Bool = {
+            #if DEBUG
+            return ProcessInfo.processInfo.environment["CMUX_REMOTE_DAEMON_ALLOW_LOCAL_BUILD"] == "1"
+            #else
+            return false
+            #endif
+        }()
 
         let payload: [String: Any] = [
             "app_version": remoteDaemonVersionString(from: info),
@@ -18028,11 +18035,10 @@ struct CMUXCLI {
             "cache_exists": cacheExists,
             "cache_sha256": cacheSHA ?? NSNull(),
             "cache_verified": cacheVerified,
-            "dev_local_build_fallback": ProcessInfo.processInfo.environment["CMUX_REMOTE_DAEMON_ALLOW_LOCAL_BUILD"] == "1",
+            "dev_local_build_fallback": devLocalBuildFallback,
             "download_command": downloadCommand,
             "download_checksums_command": downloadChecksumsCommand,
             "checksum_verify_command": checksumVerifyCommand,
-            "attestation_verify_command": verifyCommand,
         ]
 
         if jsonOutput {
@@ -18066,9 +18072,8 @@ struct CMUXCLI {
         print("download command: \(downloadCommand)")
         print("download checksums: \(downloadChecksumsCommand)")
         print("verify checksum: \(checksumVerifyCommand)")
-        print("attestation verify: \(verifyCommand)")
         if manifest == nil {
-            print("note: this build has no embedded remote daemon manifest. Set CMUX_REMOTE_DAEMON_ALLOW_LOCAL_BUILD=1 only for dev builds.")
+            print("note: this build has no embedded remote daemon manifest. CMUX_REMOTE_DAEMON_ALLOW_LOCAL_BUILD=1 works only in Debug builds.")
         }
     }
 
@@ -18133,7 +18138,7 @@ struct CMUXCLI {
             .appendingPathComponent("remote-daemons", isDirectory: true)
             .appendingPathComponent(version, isDirectory: true)
             .appendingPathComponent("\(goOS)-\(goArch)", isDirectory: true)
-            .appendingPathComponent("cmuxd-remote", isDirectory: false)
+            .appendingPathComponent("shellx-remote", isDirectory: false)
     }
 
     private func sha256Hex(forFile url: URL) throws -> String {
@@ -22341,8 +22346,8 @@ struct CMUXCLI {
             return """
             Usage: cmux remote-daemon-status [--os <darwin|linux>] [--arch <arm64|amd64>]
 
-            Show the embedded cmuxd-remote release manifest, local cache status, checksum verification state,
-            and the GitHub attestation verification command for a target platform.
+            Show the embedded shellx-remote release manifest, local cache status, checksum verification state,
+            and the download and checksum commands for a target platform.
 
             Example:
               cmux remote-daemon-status
