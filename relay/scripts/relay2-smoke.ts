@@ -90,10 +90,23 @@ function registerOnRelay(Ws: typeof WebSocket, url: string, slot: string, ticket
   });
 }
 
+/** https anywhere, plain http only to this machine (local runs): the password must never cross the network in clear. */
+export function isSecureBase(base: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(base);
+  } catch {
+    return false;
+  }
+  if (url.protocol === "https:") return true;
+  return url.protocol === "http:" && url.username === "" && (url.hostname === "127.0.0.1" || url.hostname === "localhost");
+}
+
 export async function runRelay2Smoke(options: SmokeOptions): Promise<SmokeResult> {
   const f = options.fetch ?? fetch;
   const Ws = options.WebSocket ?? WebSocket;
   const base = options.base;
+  if (!isSecureBase(base)) return { ok: false, step: "base", code: "insecure URL" };
   let token: string | undefined;
   let machineId: string | undefined;
   try {
@@ -138,6 +151,10 @@ async function main(): Promise<number> {
   let base: string, email: string, password: string;
   try {
     base = (await prompter.ask("API base [https://relay.shellx.pro]: ")).trim() || "https://relay.shellx.pro";
+    if (!isSecureBase(base)) {
+      console.log(formatResult({ ok: false, step: "base", code: "insecure URL" }));
+      return 1;
+    }
     email = (await prompter.ask("E-mail: ")).trim();
     password = await prompter.ask("Password: ", { hidden: true });
   } catch {
