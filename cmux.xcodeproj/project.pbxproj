@@ -1180,15 +1180,15 @@
 		D3D88AECC723469EAF760A5D /* CloudWorkspaceSidebarPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD117951D664D05A4D9612C /* CloudWorkspaceSidebarPresentation.swift */; };
 		D13184000000000000000008 /* CloudWorkspaceTargetingFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = D13184000000000000000007 /* CloudWorkspaceTargetingFixture.swift */; };
 		D1318400000000000000000A /* CloudWorkspaceTargetingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D13184000000000000000009 /* CloudWorkspaceTargetingTests.swift */; };
-		B900000BA1B2C3D4E5F60719 /* cmux in Copy CLI */ = {isa = PBXBuildFile; fileRef = B9000004A1B2C3D4E5F60719 /* cmux */; };
-		9758A0029758A0029758A002 /* cmux-amp-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = 9758A0019758A0019758A001 /* cmux-amp-wrapper */; };
-		C1ADE20002A1B2C3D4E5F719 /* cmux-claude-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE20001A1B2C3D4E5F719 /* cmux-claude-wrapper */; };
-		C1ADE30002A1B2C3D4E5F719 /* cmux-codex-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE30001A1B2C3D4E5F719 /* cmux-codex-wrapper */; };
+		B900000BA1B2C3D4E5F60719 /* shellx in Copy CLI */ = {isa = PBXBuildFile; fileRef = B9000004A1B2C3D4E5F60719 /* shellx */; };
+		9758A0029758A0029758A002 /* shellx-amp-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = 9758A0019758A0019758A001 /* shellx-amp-wrapper */; };
+		C1ADE20002A1B2C3D4E5F719 /* shellx-claude-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE20001A1B2C3D4E5F719 /* shellx-claude-wrapper */; };
+		C1ADE30002A1B2C3D4E5F719 /* shellx-codex-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE30001A1B2C3D4E5F719 /* shellx-codex-wrapper */; };
 		C0DEC0DE0000000000000011 /* cmux-cua in Resources */ = {isa = PBXBuildFile; fileRef = C0DEC0DE0000000000000012 /* cmux-cua */; };
-		C1ADE40002A1B2C3D4E5F719 /* cmux-hermes-agent-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE40001A1B2C3D4E5F719 /* cmux-hermes-agent-wrapper */; };
-		C1ADE50002A1B2C3D4E5F719 /* cmux-hermes-python-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE50001A1B2C3D4E5F719 /* cmux-hermes-python-wrapper */; };
+		C1ADE40002A1B2C3D4E5F719 /* shellx-hermes-agent-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE40001A1B2C3D4E5F719 /* shellx-hermes-agent-wrapper */; };
+		C1ADE50002A1B2C3D4E5F719 /* shellx-hermes-python-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE50001A1B2C3D4E5F719 /* shellx-hermes-python-wrapper */; };
 		C1ADE60002A1B2C3D4E5F719 /* cmux-hermes-sitecustomize.py in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE60001A1B2C3D4E5F719 /* cmux-hermes-sitecustomize.py */; };
-		C1ADE70002A1B2C3D4E5F719 /* cmux-pi-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE70001A1B2C3D4E5F719 /* cmux-pi-wrapper */; };
+		C1ADE70002A1B2C3D4E5F719 /* shellx-pi-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE70001A1B2C3D4E5F719 /* shellx-pi-wrapper */; };
 		D96970000000000000000007 /* cmux-sudo in Copy CLI */ = {isa = PBXBuildFile; fileRef = D96971000000000000000002 /* cmux-sudo */; };
 		F390E470FA17BD417C031111 /* cmux-tmux-agent.py in Copy CLI */ = {isa = PBXBuildFile; fileRef = F390E470FA17BD417C032222 /* cmux-tmux-agent.py */; };
 		A5001623 /* cmux.sdef in Resources */ = {isa = PBXBuildFile; fileRef = A5001622 /* cmux.sdef */; };
@@ -4708,14 +4708,14 @@
 			dstSubfolderSpec = 7;
 			files = (
 				C1ADE80002A1B2C3D4E5F719 /* agy in Copy CLI */,
-				B900000BA1B2C3D4E5F60719 /* cmux in Copy CLI */,
-				9758A0029758A0029758A002 /* cmux-amp-wrapper in Copy CLI */,
-				C1ADE20002A1B2C3D4E5F719 /* cmux-claude-wrapper in Copy CLI */,
-				C1ADE30002A1B2C3D4E5F719 /* cmux-codex-wrapper in Copy CLI */,
-				C1ADE40002A1B2C3D4E5F719 /* cmux-hermes-agent-wrapper in Copy CLI */,
-				C1ADE50002A1B2C3D4E5F719 /* cmux-hermes-python-wrapper in Copy CLI */,
+				B900000BA1B2C3D4E5F60719 /* shellx in Copy CLI */,
+				9758A0029758A0029758A002 /* shellx-amp-wrapper in Copy CLI */,
+				C1ADE20002A1B2C3D4E5F719 /* shellx-claude-wrapper in Copy CLI */,
+				C1ADE30002A1B2C3D4E5F719 /* shellx-codex-wrapper in Copy CLI */,
+				C1ADE40002A1B2C3D4E5F719 /* shellx-hermes-agent-wrapper in Copy CLI */,
+				C1ADE50002A1B2C3D4E5F719 /* shellx-hermes-python-wrapper in Copy CLI */,
 				C1ADE60002A1B2C3D4E5F719 /* cmux-hermes-sitecustomize.py in Copy CLI */,
-				C1ADE70002A1B2C3D4E5F719 /* cmux-pi-wrapper in Copy CLI */,
+				C1ADE70002A1B2C3D4E5F719 /* shellx-pi-wrapper in Copy CLI */,
 				D96970000000000000000007 /* cmux-sudo in Copy CLI */,
 				F390E470FA17BD417C031111 /* cmux-tmux-agent.py in Copy CLI */,
 				C1ADE10002A1B2C3D4E5F719 /* grok in Copy CLI */,
@@ -5884,16 +5884,16 @@
 		7AD117951D664D05A4D9612C /* CloudWorkspaceSidebarPresentation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudWorkspaceSidebarPresentation.swift; sourceTree = "<group>"; };
 		D13184000000000000000007 /* CloudWorkspaceTargetingFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudWorkspaceTargetingFixture.swift"; sourceTree = "<group>"; };
 		D13184000000000000000009 /* CloudWorkspaceTargetingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudWorkspaceTargetingTests.swift"; sourceTree = "<group>"; };
-		B9000004A1B2C3D4E5F60719 /* cmux */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = cmux; sourceTree = BUILT_PRODUCTS_DIR; };
-		9758A0019758A0019758A001 /* cmux-amp-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/cmux-amp-wrapper"; sourceTree = SOURCE_ROOT; };
+		B9000004A1B2C3D4E5F60719 /* shellx */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = shellx; sourceTree = BUILT_PRODUCTS_DIR; };
+		9758A0019758A0019758A001 /* shellx-amp-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-amp-wrapper"; sourceTree = SOURCE_ROOT; };
 		A5001018 /* cmux-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "cmux-Bridging-Header.h"; sourceTree = "<group>"; };
-		C1ADE20001A1B2C3D4E5F719 /* cmux-claude-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/cmux-claude-wrapper"; sourceTree = SOURCE_ROOT; };
-		C1ADE30001A1B2C3D4E5F719 /* cmux-codex-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/cmux-codex-wrapper"; sourceTree = SOURCE_ROOT; };
+		C1ADE20001A1B2C3D4E5F719 /* shellx-claude-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-claude-wrapper"; sourceTree = SOURCE_ROOT; };
+		C1ADE30001A1B2C3D4E5F719 /* shellx-codex-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-codex-wrapper"; sourceTree = SOURCE_ROOT; };
 		C0DEC0DE0000000000000012 /* cmux-cua */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "cmux-cua"; path = "skills/cmux-cua"; sourceTree = SOURCE_ROOT; };
-		C1ADE40001A1B2C3D4E5F719 /* cmux-hermes-agent-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/cmux-hermes-agent-wrapper"; sourceTree = SOURCE_ROOT; };
-		C1ADE50001A1B2C3D4E5F719 /* cmux-hermes-python-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/cmux-hermes-python-wrapper"; sourceTree = SOURCE_ROOT; };
+		C1ADE40001A1B2C3D4E5F719 /* shellx-hermes-agent-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-hermes-agent-wrapper"; sourceTree = SOURCE_ROOT; };
+		C1ADE50001A1B2C3D4E5F719 /* shellx-hermes-python-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-hermes-python-wrapper"; sourceTree = SOURCE_ROOT; };
 		C1ADE60001A1B2C3D4E5F719 /* cmux-hermes-sitecustomize.py */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.python; path = "Resources/bin/cmux-hermes-sitecustomize.py"; sourceTree = SOURCE_ROOT; };
-		C1ADE70001A1B2C3D4E5F719 /* cmux-pi-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/cmux-pi-wrapper"; sourceTree = SOURCE_ROOT; };
+		C1ADE70001A1B2C3D4E5F719 /* shellx-pi-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-pi-wrapper"; sourceTree = SOURCE_ROOT; };
 		D96971000000000000000002 /* cmux-sudo */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/cmux-sudo"; sourceTree = SOURCE_ROOT; };
 		F390E470FA17BD417C032222 /* cmux-tmux-agent.py */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.python; path = "Resources/bin/cmux-tmux-agent.py"; sourceTree = SOURCE_ROOT; };
 		A5001000 /* cmux.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = cmux.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -9465,14 +9465,14 @@
 				A5002001 /* THIRD_PARTY_LICENSES.md */,
 				C0DEC0DE0000000000000012 /* cmux-cua */,
 				D1BEF00001A1B2C3D4E5F719 /* open */,
-					C1ADE20001A1B2C3D4E5F719 /* cmux-claude-wrapper */,
-					C1ADE30001A1B2C3D4E5F719 /* cmux-codex-wrapper */,
+					C1ADE20001A1B2C3D4E5F719 /* shellx-claude-wrapper */,
+					C1ADE30001A1B2C3D4E5F719 /* shellx-codex-wrapper */,
 					F390E470FA17BD417C032222 /* cmux-tmux-agent.py */,
-					C1ADE70001A1B2C3D4E5F719 /* cmux-pi-wrapper */,
-					C1ADE40001A1B2C3D4E5F719 /* cmux-hermes-agent-wrapper */,
-					C1ADE50001A1B2C3D4E5F719 /* cmux-hermes-python-wrapper */,
+					C1ADE70001A1B2C3D4E5F719 /* shellx-pi-wrapper */,
+					C1ADE40001A1B2C3D4E5F719 /* shellx-hermes-agent-wrapper */,
+					C1ADE50001A1B2C3D4E5F719 /* shellx-hermes-python-wrapper */,
 					C1ADE60001A1B2C3D4E5F719 /* cmux-hermes-sitecustomize.py */,
-					9758A0019758A0019758A001 /* cmux-amp-wrapper */,
+					9758A0019758A0019758A001 /* shellx-amp-wrapper */,
 					C1ADE10001A1B2C3D4E5F719 /* grok */,
 					C1ADE80001A1B2C3D4E5F719 /* agy */,
 					C1ADE10003A1B2C3D4E5F719 /* muse */,
@@ -12372,7 +12372,7 @@
 			isa = PBXGroup;
 			children = (
 				A5001000 /* cmux.app */,
-				B9000004A1B2C3D4E5F60719 /* cmux */,
+				B9000004A1B2C3D4E5F60719 /* shellx */,
 				D1320AA0D1320AA0D1320AA5 /* CmuxDockTilePlugin.plugin */,
 				7A0CE1000000000000000026 /* cmuxTunnel.systemextension */,
 				7E7E6EF344A568AC7FEE3715 /* cmuxUITests.xctest */,
@@ -14171,7 +14171,7 @@
 				CE57E10000000000000000A2 /* CmuxSentryScrubbing */,
 			);
 			productName = cmux;
-			productReference = B9000004A1B2C3D4E5F60719 /* cmux */;
+			productReference = B9000004A1B2C3D4E5F60719 /* shellx */;
 			productType = "com.apple.product-type.tool";
 		};
 		CB450DF0F0B3839599082C4D /* cmuxUITests */ = {
@@ -19348,7 +19348,7 @@
 				CMUX_IROH_RELAY_POLICY_NEXT_KEY_ID = "cmux-staging-relay-policy-2026-08";
 				CMUX_IROH_RELAY_POLICY_NEXT_PUBLIC_KEY_BASE64 = "KnOZ6gKmH05Mrfan2tXgwRygBKxcSUue4bp34udiQFA=";
 				CMUX_IROH_RELAY_POLICY_PUBLIC_KEY_BASE64 = "Otx9S0B4d/tlwIKYRf5evJaqhjCltFLPjMfXrLFd6lk=";
-				CMUX_SIDEBAR_EXTENSION_POINT_ID = com.cmuxterm.app.cmux.sidebar;
+				CMUX_SIDEBAR_EXTENSION_POINT_ID = pro.shellx.desktop.sidebar;
 				CODE_SIGN_ENTITLEMENTS = "";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -19400,7 +19400,7 @@
 				CMUX_IROH_RELAY_POLICY_NEXT_KEY_ID = "cmux-production-relay-policy-2026-08";
 				CMUX_IROH_RELAY_POLICY_NEXT_PUBLIC_KEY_BASE64 = "k+FND+WlELCkHs9QnWg1TfTuHXBwyv2907umX+mUOOU=";
 				CMUX_IROH_RELAY_POLICY_PUBLIC_KEY_BASE64 = "qoBinRqX4TI1Ro6xAuOQxKUkeZT3pkFJuERP/+R+9aw=";
-				CMUX_SIDEBAR_EXTENSION_POINT_ID = com.cmuxterm.app.cmux.sidebar;
+				CMUX_SIDEBAR_EXTENSION_POINT_ID = pro.shellx.desktop.sidebar;
 				CODE_SIGN_ENTITLEMENTS = Resources/cmux.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -19450,7 +19450,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_MODULE_NAME = cmux_cli;
-				PRODUCT_NAME = cmux;
+				PRODUCT_NAME = shellx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -19470,7 +19470,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_MODULE_NAME = cmux_cli;
-				PRODUCT_NAME = cmux;
+				PRODUCT_NAME = shellx;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;

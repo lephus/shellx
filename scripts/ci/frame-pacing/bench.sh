@@ -23,7 +23,7 @@ out="$work/out"
 mkdir -p "$out"
 app="$(ls -d "$work"/app/*.app 2>/dev/null | head -1)"
 [ -n "$app" ] || { echo "no app under $work/app" >&2; exit 1; }
-cli="$app/Contents/Resources/bin/cmux"
+cli="$app/Contents/Resources/bin/shellx"
 # The debug socket follows the tag's path slug (scripts/cmux-debug-cli.sh).
 slug="$(printf '%s' "$tag" | tr '[:upper:]' '[:lower:]' | sed -E -e 's/[^a-z0-9]+/-/g' -e 's/^-+//' -e 's/-+$//')"
 socket="/tmp/cmux-debug-$slug.sock"

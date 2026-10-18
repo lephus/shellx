@@ -62,6 +62,10 @@ LINE_ALLOW = [
     ('"/usr/local/bin/cmux"', "CLI path baked into cmux cloud VM images; cloud is off (Task 5)"),
     ("/usr/local/bin/cmux >/dev/null", "cloud VM bootstrap links its baked daemon to the baked CLI path (Task 5)"),
     ("[ ! -x /usr/local/bin/cmux ]", "cloud VM bootstrap links its baked daemon to the baked CLI path (Task 5)"),
+    ("/tmp/cmux-ssh-[0-9]+", "recognizes the flat /tmp ControlPath of older cmux builds so ShellX never reuses it"),
+    (".config/cmux/env", "env file on cmux cloud VMs written by their baked CLI; cloud is off (Task 5)"),
+    (".cmux/bin/cmux", "cloud VM TUI client path (cloud is off); ~/.shellx/bin/shellx is the SSH relay CLI (Task 5B)"),
+    ("$cmux_home/.config/cmux", "cloud VM bootstrap for the VM's baked cmux user; cloud is off (Task 5)"),
 ]
 
 
@@ -91,8 +95,27 @@ WRAPPERS = ["amp", "claude", "codex", "hermes-agent", "hermes-python", "pi"]
 
 
 class ShellXCoexistenceTests(unittest.TestCase):
+    def assertIn(self, member, container, msg=None):  # noqa: N802 - keep failure output short
+        if member not in container:
+            self.fail(msg or f"{member!r} not found")
+
+    def assertNotIn(self, member, container, msg=None):  # noqa: N802
+        if member in container:
+            self.fail(msg or f"{member!r} unexpectedly found")
+
+    def assertNotRegex(self, text, pattern, msg=None):  # noqa: N802
+        match = re.search(pattern, text)
+        if match:
+            line = text[:match.start()].count("\n") + 1
+            self.fail(msg or f"{pattern!r} matched at line {line}")
+
     def test_no_cmux_runtime_names(self):
         for pat in FORBIDDEN:
+            self.assertEqual(coexistence_offenders(pat), [], pat)
+
+    def test_no_cmux_app_support_dir_or_bundled_cli(self):
+        # `<Application Support|state|cache>/cmux` directory names and `Resources/bin/cmux`.
+        for pat in (r'appendingPathComponent\("cmux"(, isDirectory: (true|false))?\)', r"(?<![\w.])bin/cmux(?![-\w.])"):
             self.assertEqual(coexistence_offenders(pat), [], pat)
 
     def test_cli_product_is_shellx(self):
@@ -164,7 +187,7 @@ class ShellXCoexistenceTests(unittest.TestCase):
         self.assertIn("$HOME/.shellx/bin/shellx-codex-wrapper", builder)
 
     def test_keychain_services_are_shellx(self):
-        self.assertIn('private static let service = "pro.shellx.desktop.socket-control"', read("CLI/cmux.swift"))
+        self.assertIn('private static let service = "\\(ShellXBrand.bundleID).socket-control"', read("CLI/cmux.swift"))
         store = read("Packages/macOS/CmuxSettings/Sources/CmuxSettings/SocketControl/SocketControlPasswordStore.swift")
         self.assertNotIn("com.cmuxterm.app.socket-control", store)
         self.assertIn('"pro.shellx.desktop.surface-resume-approvals"', read("Sources/SessionPersistence.swift"))

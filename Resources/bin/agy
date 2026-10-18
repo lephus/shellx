@@ -40,7 +40,7 @@ resolve_cmux_bin() {
         return 0
     fi
 
-    bundled_cli="$(command -v cmux || true)"
+    bundled_cli="$(command -v shellx || true)"
     if [[ -n "$bundled_cli" ]]; then
         printf '%s' "$bundled_cli"
         return 0

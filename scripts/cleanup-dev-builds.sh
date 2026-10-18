@@ -4,8 +4,8 @@
 # Each `./scripts/reload.sh --tag <tag>` produces:
 #   ~/Library/Developer/Xcode/DerivedData/cmux-<tag>/      (multi-GB)
 #   /tmp/cmux-<tag>/                                       (build scratch)
-#   /tmp/cmux-debug-<tag>.sock                             (control socket)
-#   /tmp/cmux-debug-<tag>.log                              (debug log)
+#   /tmp/shellx-debug-<tag>.sock                             (control socket)
+#   /tmp/shellx-debug-<tag>.log                              (debug log)
 #   /tmp/cmux-reload-<tag>.log                             (build log)
 #   ~/Library/Application Support/cmux/cmuxd-dev-<tag>.sock (cmuxd socket)
 #
@@ -84,8 +84,8 @@ artifact_paths_for_tag() {
         "$DERIVED_DATA_ROOT/cmux-${tag}" \
         "/tmp/cmux-${tag}" \
         "/tmp/cmux-${tag}.tar" \
-        "/tmp/cmux-debug-${tag}.sock" \
-        "/tmp/cmux-debug-${tag}.log" \
+        "/tmp/shellx-debug-${tag}.sock" \
+        "/tmp/shellx-debug-${tag}.log" \
         "/tmp/cmux-reload-${tag}.log" \
         "$APP_SUPPORT_DIR/cmuxd-dev-${tag}.sock"
 }

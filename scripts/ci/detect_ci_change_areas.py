@@ -1796,12 +1796,12 @@ RELEASE_BUILD_NEUTRAL_INPUTS = frozenset({
     # compiled binaries' slices. Their focused regression suites and app-host
     # tests are the useful signal, so avoid paying for a universal app build.
     # Text scripts only: test_resources_bin_release_neutral_inputs_are_text_scripts
-    # fails if one of these becomes a binary. cmux-claude-wrapper is absent
+    # fails if one of these becomes a binary. shellx-claude-wrapper is absent
     # because its own standalone lane already owns it.
-    "Resources/bin/cmux-amp-wrapper",
-    "Resources/bin/cmux-codex-wrapper",
-    "Resources/bin/cmux-hermes-agent-wrapper",
-    "Resources/bin/cmux-hermes-python-wrapper",
+    "Resources/bin/shellx-amp-wrapper",
+    "Resources/bin/shellx-codex-wrapper",
+    "Resources/bin/shellx-hermes-agent-wrapper",
+    "Resources/bin/shellx-hermes-python-wrapper",
     "Resources/bin/cmux-hermes-sitecustomize.py",
     "Resources/bin/cmux-sudo",
     "Resources/bin/grok",
@@ -1886,7 +1886,7 @@ def classify_files(paths: Iterable[str], *,
         path = normalize_path(raw_path)
         if not path:
             continue
-        if path in {"Resources/bin/cmux-claude-wrapper", "tests/test_claude_wrapper_hooks.py"}:
+        if path in {"Resources/bin/shellx-claude-wrapper", "tests/test_claude_wrapper_hooks.py"}:
             # The independent macos-claude-wrapper lane executes the wrapper
             # with fake clients and a Unix socket; it does not need app bytes.
             continue

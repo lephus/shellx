@@ -86,7 +86,7 @@ resolve_cmux_cli() {
         return 0
     fi
 
-    candidate="$(command -v cmux 2>/dev/null || true)"
+    candidate="$(command -v shellx 2>/dev/null || true)"
     if [[ -n "$candidate" && -f "$candidate" && -x "$candidate" ]]; then
         printf '%s' "$candidate"
         return 0

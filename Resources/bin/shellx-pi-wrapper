@@ -79,7 +79,7 @@ fi
 
 cmux_cli="${CMUX_BUNDLED_CLI_PATH:-}"
 if [ -z "$cmux_cli" ] || [ ! -x "$cmux_cli" ]; then
-    cmux_cli="$(command -v cmux 2>/dev/null || true)"
+    cmux_cli="$(command -v shellx 2>/dev/null || true)"
 fi
 if [ -z "$cmux_cli" ] || [ ! -x "$cmux_cli" ]; then
     exec "$cmux_pi" "$@"

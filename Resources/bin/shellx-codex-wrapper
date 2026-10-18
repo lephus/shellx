@@ -130,7 +130,7 @@ resolve_hook_cmux_bin() {
         return 0
     fi
 
-    bundled_cli="$(command -v cmux 2>/dev/null || true)"
+    bundled_cli="$(command -v shellx 2>/dev/null || true)"
     if [[ -n "$bundled_cli" ]]; then
         printf '%s' "$bundled_cli"
         return 0
@@ -247,8 +247,8 @@ cmux_codex_computer_use_app_enabled() {
     local enabled="${CMUX_COMPUTER_USE_APP_ENABLED:-1}"
     local home="${HOME:-}"
     if [[ "$home" = /* ]]; then
-        local setting_file="$home/Library/Application Support/cmux/cmux-cua/enabled"
-        local legacy_setting_file="$home/Library/Application Support/cmux/computer-use/enabled"
+        local setting_file="$home/Library/Application Support/ShellX/cmux-cua/enabled"
+        local legacy_setting_file="$home/Library/Application Support/ShellX/computer-use/enabled"
         if [[ ! -r "$setting_file" && -r "$legacy_setting_file" ]]; then
             setting_file="$legacy_setting_file"
         fi
@@ -357,8 +357,8 @@ cmux_codex_emit_computer_use_args() {
     fi
     [[ -n "$runtime_scope" ]] || runtime_scope="default"
     runtime_uid="$cmux_codex_wrapper_uid"
-    cua_socket="${CMUX_CUA_CODEX_SOCKET_PATH:-/tmp/cmux-cua-${runtime_uid}/${runtime_scope}/cmux-cua-codex.sock}"
-    state_dir="${CMUX_CUA_STATE_DIR:-${HOME}/Library/Application Support/cmux/cmux-cua/runtime/${runtime_scope}/state}"
+    cua_socket="${CMUX_CUA_CODEX_SOCKET_PATH:-/tmp/shellx-cua-${runtime_uid}/${runtime_scope}/cmux-cua-codex.sock}"
+    state_dir="${CMUX_CUA_STATE_DIR:-${HOME}/Library/Application Support/ShellX/cmux-cua/runtime/${runtime_scope}/state}"
     # The helper owns external onboarding. Mark that contract explicitly so
     # protected calls also wait for cmux's post-verification readiness signal.
     printf '%s\0' \
