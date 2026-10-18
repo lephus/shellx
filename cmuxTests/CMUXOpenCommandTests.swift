@@ -547,7 +547,7 @@ final class CMUXOpenCommandTests: XCTestCase {
         let cmuxAppSupportConfigURL = homeURL
             .appendingPathComponent("Library", isDirectory: true)
             .appendingPathComponent("Application Support", isDirectory: true)
-            .appendingPathComponent("com.cmuxterm.app", isDirectory: true)
+            .appendingPathComponent("pro.shellx.desktop", isDirectory: true)
             .appendingPathComponent("config.ghostty", isDirectory: false)
         let ghosttyResourcesURL = rootURL.appendingPathComponent("ghostty-resources", isDirectory: true)
         let ghosttyThemesURL = ghosttyResourcesURL.appendingPathComponent("themes", isDirectory: true)
@@ -808,7 +808,7 @@ final class CMUXOpenCommandTests: XCTestCase {
         let homeURL = rootURL.appendingPathComponent("home", isDirectory: true)
         let targetCLIURL = homeURL
             .appendingPathComponent("Library/Developer/Xcode/DerivedData/cmux-\(tag)", isDirectory: true)
-            .appendingPathComponent("Build/Products/Debug/cmux DEV \(tag).app", isDirectory: true)
+            .appendingPathComponent("Build/Products/Debug/ShellX DEV \(tag).app", isDirectory: true)
             .appendingPathComponent("Contents/Resources/bin/cmux", isDirectory: false)
         let targetResourcesURL = targetCLIURL
             .deletingLastPathComponent()

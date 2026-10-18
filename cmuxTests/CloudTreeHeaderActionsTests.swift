@@ -489,7 +489,7 @@ struct CloudTreeHeaderActionsTests {
                 memoryMb: nil, diskMb: nil, linkState: .connected, linkError: nil,
                 cpuPercent: nil, memoryUsedMb: nil, diskUsedMb: nil, remoteWorkspaces: [],
                 presence: SurfaceDevicePresence(
-                    state: .online, lastSeenAt: nil, tag: "default", bundleID: "com.cmuxterm.app", accountTrust: .sameAccount
+                    state: .online, lastSeenAt: nil, tag: "default", bundleID: "pro.shellx.desktop", accountTrust: .sameAccount
                 )
             )
         }

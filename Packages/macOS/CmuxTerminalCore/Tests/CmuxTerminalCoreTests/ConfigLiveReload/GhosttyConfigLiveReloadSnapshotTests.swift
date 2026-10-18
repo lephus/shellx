@@ -115,15 +115,15 @@ private struct NoFonts: GhosttyFontProbing {
         let appSupport = URL(fileURLWithPath: "/nonexistent-cmux-live-reload-test/Application Support")
 
         let paths = discovery.liveReloadTopLevelPaths(
-            currentBundleIdentifier: "com.cmuxterm.app.debug.tag",
+            currentBundleIdentifier: "pro.shellx.desktop.debug.tag",
             appSupportDirectory: appSupport
         )
 
         let base = appSupport.path
         #expect(paths.contains("\(base)/com.mitchellh.ghostty/config.ghostty"))
         #expect(paths.contains("\(base)/com.mitchellh.ghostty/config"))
-        #expect(paths.contains("\(base)/com.cmuxterm.app/config.ghostty"))
-        #expect(paths.contains("\(base)/com.cmuxterm.app.debug.tag/config.ghostty"))
+        #expect(paths.contains("\(base)/pro.shellx.desktop/config.ghostty"))
+        #expect(paths.contains("\(base)/pro.shellx.desktop.debug.tag/config.ghostty"))
         #expect(Set(paths).count == paths.count)
     }
 

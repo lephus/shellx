@@ -369,7 +369,7 @@ import Testing
         harness.factory.sessions[0].cancel()
         await harness.waitForCondition { harness.flow.isSigningIn == false }
 
-        let failedRetry = URL(string: "cmux-dev://auth-callback?other=1&cmux_auth_state=\(fallbackState)")!
+        let failedRetry = URL(string: "shellx-dev://auth-callback?other=1&cmux_auth_state=\(fallbackState)")!
         #expect(await harness.flow.handleCallbackURL(failedRetry) == false)
         #expect(harness.flow.lastFailure == .invalidCallback)
         #expect(harness.coordinator.isAuthenticated == false)

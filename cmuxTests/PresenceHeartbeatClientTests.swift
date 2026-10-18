@@ -39,7 +39,7 @@ import Testing
         let body = PresenceHeartbeatClient.heartbeatBody(
             deviceID: "11111111-2222-4333-8444-555555555555",
             tag: "default",
-            bundleID: "com.cmuxterm.app.nightly",
+            bundleID: "pro.shellx.desktop.nightly",
             displayName: "Studio",
             routes: routes,
             stopping: false
@@ -55,7 +55,7 @@ import Testing
         #expect(body["tag"] as? String == "default")
         #expect(body["displayName"] as? String == "Studio")
         // The bundle id is carried so the phone can label the build channel.
-        #expect(body["bundleId"] as? String == "com.cmuxterm.app.nightly")
+        #expect(body["bundleId"] as? String == "pro.shellx.desktop.nightly")
         #expect(body["stopping"] == nil)
     }
 
@@ -65,13 +65,13 @@ import Testing
         let body = PresenceHeartbeatClient.heartbeatBody(
             deviceID: "11111111-2222-4333-8444-555555555555",
             tag: "rc",
-            bundleID: "com.cmuxterm.app.rc",
+            bundleID: "pro.shellx.desktop.rc",
             displayName: "Studio",
             routes: [try route(host: "100.0.0.1", port: 51000)],
             stopping: false
         )
         #expect(body["tag"] as? String == "rc")
-        #expect(body["bundleId"] as? String == "com.cmuxterm.app.rc")
+        #expect(body["bundleId"] as? String == "pro.shellx.desktop.rc")
     }
 
     @Test func emptyRoutesAreStatedNotOmitted() throws {
@@ -81,7 +81,7 @@ import Testing
         let body = PresenceHeartbeatClient.heartbeatBody(
             deviceID: "11111111-2222-4333-8444-555555555555",
             tag: "default",
-            bundleID: "com.cmuxterm.app.nightly",
+            bundleID: "pro.shellx.desktop.nightly",
             displayName: nil,
             routes: [],
             stopping: false
@@ -120,7 +120,7 @@ import Testing
         let body = PresenceHeartbeatClient.heartbeatBody(
             deviceID: "11111111-2222-4333-8444-555555555555",
             tag: "default",
-            bundleID: "com.cmuxterm.app",
+            bundleID: "pro.shellx.desktop",
             displayName: "Studio",
             routes: [route],
             stopping: false
@@ -136,7 +136,7 @@ import Testing
         let body = PresenceHeartbeatClient.heartbeatBody(
             deviceID: "11111111-2222-4333-8444-555555555555",
             tag: "presvc",
-            bundleID: "com.cmuxterm.app.nightly",
+            bundleID: "pro.shellx.desktop.nightly",
             displayName: nil,
             routes: [try route(host: "192.168.1.4", port: 50123)],
             stopping: true
@@ -149,7 +149,7 @@ import Testing
         let body = PresenceHeartbeatClient.heartbeatBody(
             deviceID: "11111111-2222-4333-8444-555555555555",
             tag: "default",
-            bundleID: "com.cmuxterm.app.nightly",
+            bundleID: "pro.shellx.desktop.nightly",
             displayName: "Studio",
             routes: [try route(host: "100.0.0.1", port: 51000)],
             stopping: true

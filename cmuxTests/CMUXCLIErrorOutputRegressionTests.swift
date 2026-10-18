@@ -2734,7 +2734,7 @@ import Testing
             sourceCLIPath: cliPath,
             tagSlug: tagSlug
         )
-        let bundleIdentifier = "com.cmuxterm.app.debug.\(tagSlug.replacingOccurrences(of: "-", with: "."))"
+        let bundleIdentifier = "pro.shellx.desktop.debug.\(tagSlug.replacingOccurrences(of: "-", with: "."))"
         let tmpMarkerPath = SocketPathMarkerFiles.variant(
             bundleIdentifier: bundleIdentifier,
             environment: ["CMUX_TAG": tagSlug]
@@ -2774,7 +2774,7 @@ import Testing
         let stateDirectory = CmuxStateDirectory.url(homeDirectory: home)
         try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
         let tagSlug = "resolver-isolated-\(UUID().uuidString.prefix(8).lowercased())"
-        let bundleIdentifier = "com.cmuxterm.app.debug.\(tagSlug.replacingOccurrences(of: "-", with: "."))"
+        let bundleIdentifier = "pro.shellx.desktop.debug.\(tagSlug.replacingOccurrences(of: "-", with: "."))"
         let tagEnvironment = ["CMUX_TAG": tagSlug]
         let variant = SocketPathMarkerFiles.variant(
             bundleIdentifier: bundleIdentifier,
@@ -3048,7 +3048,7 @@ import Testing
         let fakeStableCLIPath = try fakeTaggedBundledCLIPath(
             sourceCLIPath: cliPath,
             tagSlug: "stable-\(UUID().uuidString.lowercased())",
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "pro.shellx.desktop",
             bundleName: "cmux"
         )
         let defaultResponder = try UnixSocketResponder(path: defaultStableSocketPath, response: "OK DEFAULT")
@@ -3108,7 +3108,7 @@ import Testing
         let fakeStableCLIPath = try fakeTaggedBundledCLIPath(
             sourceCLIPath: cliPath,
             tagSlug: "stable-\(UUID().uuidString.lowercased())",
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "pro.shellx.desktop",
             bundleName: "cmux"
         )
         let defaultResponder = try UnixSocketResponder(path: defaultStableSocketPath, response: "OK DEFAULT")
@@ -3157,7 +3157,7 @@ import Testing
         let fakeStableCLIPath = try fakeTaggedBundledCLIPath(
             sourceCLIPath: cliPath,
             tagSlug: "stable-\(UUID().uuidString.lowercased())",
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "pro.shellx.desktop",
             bundleName: "cmux"
         )
         let defaultResponder = try UnixSocketResponder(path: defaultStableSocketPath, response: "OK DEFAULT")
@@ -3328,7 +3328,7 @@ import Testing
         // run's expectation and appends to its list, so the identifier carries a per-run
         // suffix. The CLI takes the identifier from CMUX_BUNDLE_ID here because this
         // socket file name has no channel prefix to derive one from.
-        let bundleIdentifier = "com.cmuxterm.app.debug.issue-4355-test."
+        let bundleIdentifier = "pro.shellx.desktop.debug.issue-4355-test."
             + UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
         let notificationQueue = OperationQueue()
         notificationQueue.maxConcurrentOperationCount = 1
@@ -3352,7 +3352,7 @@ import Testing
             expectedCount: 3
         ) { reloadConfirmed in
             let observer = DistributedNotificationCenter.default().addObserver(
-                forName: Notification.Name("com.cmuxterm.themes.reload-config"),
+                forName: Notification.Name("pro.shellx.desktop.themes.reload-config"),
                 object: nil,
                 queue: notificationQueue
             ) { notification in
@@ -3404,21 +3404,21 @@ import Testing
         try writeTheme(named: "Theme A", background: "#101010", to: themesURL)
 
         // The reload target is derived from the socket file name, not from CMUX_BUNDLE_ID:
-        // `cmux-debug-<slug>.sock` becomes `com.cmuxterm.app.debug.<slug>`, where every run of
+        // `cmux-debug-<slug>.sock` becomes `pro.shellx.desktop.debug.<slug>`, where every run of
         // non-alphanumerics in the slug collapses to a dot. A raw UUID here would put its dashes
         // into the identifier as dots, so keep the unique part hex-only and the expected
         // identifier stays a plain template rather than a call into the CLI's own helper.
         let uniqueSuffix = UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
         let socketPath = "/tmp/cmux-debug-active-theme-\(uniqueSuffix).sock"
-        let staleBundleIdentifier = "com.cmuxterm.app.debug.stale.theme"
-        let targetBundleIdentifier = "com.cmuxterm.app.debug.active.theme.\(uniqueSuffix)"
+        let staleBundleIdentifier = "pro.shellx.desktop.debug.stale.theme"
+        let targetBundleIdentifier = "pro.shellx.desktop.debug.active.theme.\(uniqueSuffix)"
         let reloadExpectation = expectation(description: "cmux themes set targets the resolved socket bundle")
         let notificationQueue = OperationQueue()
         notificationQueue.maxConcurrentOperationCount = 1
         let notificationLock = NSLock()
         var observedReloads: [(bundleIdentifier: String?, phase: String?, socketPath: String?)] = []
         let observer = DistributedNotificationCenter.default().addObserver(
-            forName: Notification.Name("com.cmuxterm.themes.reload-config"),
+            forName: Notification.Name("pro.shellx.desktop.themes.reload-config"),
             object: nil,
             queue: notificationQueue
         ) { notification in
@@ -3514,14 +3514,14 @@ import Testing
         let socketPath = "/tmp/cmux-theme-picker-\(UUID().uuidString.prefix(8)).sock"
         let responder = try UnixSocketResponder(path: socketPath, response: "OK")
         defer { responder.stop() }
-        let bundleIdentifier = "com.cmuxterm.app.debug.theme-picker.\(UUID().uuidString.lowercased())"
+        let bundleIdentifier = "pro.shellx.desktop.debug.theme-picker.\(UUID().uuidString.lowercased())"
         let reloadExpectation = expectation(description: "bare cmux themes posts final reload notification")
         let notificationQueue = OperationQueue()
         notificationQueue.maxConcurrentOperationCount = 1
         let notificationLock = NSLock()
         var observedReloads: [(bundleIdentifier: String?, phase: String?)] = []
         let observer = DistributedNotificationCenter.default().addObserver(
-            forName: Notification.Name("com.cmuxterm.themes.reload-config"),
+            forName: Notification.Name("pro.shellx.desktop.themes.reload-config"),
             object: nil,
             queue: notificationQueue
         ) { notification in
@@ -4317,7 +4317,7 @@ import Testing
         try FileManager.default.createDirectory(at: binURL, withIntermediateDirectories: true)
 
         let info: [String: Any] = [
-            "CFBundleIdentifier": bundleIdentifier ?? "com.cmuxterm.app.debug.\(tagSlug.replacingOccurrences(of: "-", with: "."))",
+            "CFBundleIdentifier": bundleIdentifier ?? "pro.shellx.desktop.debug.\(tagSlug.replacingOccurrences(of: "-", with: "."))",
             "CFBundleName": bundleName ?? "cmux DEV \(tagSlug)",
             "CFBundlePackageType": "APPL"
         ]

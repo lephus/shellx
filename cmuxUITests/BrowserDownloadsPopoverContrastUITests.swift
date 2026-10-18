@@ -46,7 +46,7 @@ final class BrowserDownloadsPopoverContrastUITests: XCTestCase {
             .appendingPathComponent("error.txt", isDirectory: false)
         try Data(repeating: 0x41, count: 5_400).write(to: fixtureURL, options: .atomic)
 
-        let app = XCUIApplication(bundleIdentifier: "com.cmuxterm.app.debug")
+        let app = XCUIApplication(bundleIdentifier: "pro.shellx.desktop.debug")
         self.app = app
         app.terminate()
 
@@ -179,8 +179,8 @@ final class BrowserDownloadsPopoverContrastUITests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
         let binaryPath = productsDirectory
-            .appendingPathComponent("cmux DEV.app")
-            .appendingPathComponent("Contents/MacOS/cmux DEV")
+            .appendingPathComponent("ShellX DEV.app")
+            .appendingPathComponent("Contents/MacOS/ShellX DEV")
             .path
         guard FileManager.default.fileExists(atPath: binaryPath) else {
             throw NSError(

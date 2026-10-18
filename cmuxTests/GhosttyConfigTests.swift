@@ -275,7 +275,7 @@ final class GhosttyConfigTests: XCTestCase {
 
         XCTAssertTrue(
             paths.contains(
-                "\(NSHomeDirectory())/Library/Application Support/com.cmuxterm.app/themes/Zag Light"
+                "\(NSHomeDirectory())/Library/Application Support/pro.shellx.desktop/themes/Zag Light"
             )
         )
     }
@@ -290,7 +290,7 @@ final class GhosttyConfigTests: XCTestCase {
 
         XCTAssertTrue(
             paths.contains(
-                "\(fixedHome)/Library/Application Support/com.cmuxterm.app/themes/Zag Light"
+                "\(fixedHome)/Library/Application Support/pro.shellx.desktop/themes/Zag Light"
             )
         )
     }
@@ -303,7 +303,7 @@ final class GhosttyConfigTests: XCTestCase {
         defer { try? fileManager.removeItem(at: root) }
 
         let themesDirectory = root
-            .appendingPathComponent("Library/Application Support/com.cmuxterm.app/themes", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/pro.shellx.desktop/themes", isDirectory: true)
         try fileManager.createDirectory(at: themesDirectory, withIntermediateDirectories: true)
         try "background = #ffffff\nforeground = #1f2328\n".write(
             to: themesDirectory.appendingPathComponent("Zag Light", isDirectory: false),

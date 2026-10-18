@@ -24,8 +24,8 @@ import Testing
                 == "com.cmuxterm.iroh.identity.\(bundleIdentifier)"
         )
         #expect(
-            namespace.keychainAccessGroup(teamIdentifier: "7WLXT3NR37")
-                == "7WLXT3NR37.\(bundleIdentifier)"
+            namespace.keychainAccessGroup(teamIdentifier: "W4RF3W4VTZ")
+                == "W4RF3W4VTZ.\(bundleIdentifier)"
         )
         #expect(
             namespace.pairingURLScheme

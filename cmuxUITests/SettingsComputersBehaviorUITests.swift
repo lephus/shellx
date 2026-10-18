@@ -318,7 +318,7 @@ final class SettingsComputersBehaviorUITests: SettingsUITestCase {
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
         let cli = try XCTUnwrap(
-            ["cmux DEV", "cmux"]
+            ["ShellX DEV", "ShellX"]
                 .map { products.appendingPathComponent("\($0).app/Contents/Resources/bin/cmux").path }
                 .first { FileManager.default.isExecutableFile(atPath: $0) },
             "bundled cmux CLI not found under \(products.path)"

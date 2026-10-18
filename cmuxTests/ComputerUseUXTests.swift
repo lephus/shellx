@@ -1724,7 +1724,7 @@ struct ComputerUseUXTests {
             socketRootDirectoryURL: URL(fileURLWithPath: "/tmp"),
             userIdentifier: 501,
             environment: [:],
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "pro.shellx.desktop",
             authenticationToken: "production-token"
         )
         let staging = ComputerUseRuntimePaths(
@@ -1732,12 +1732,12 @@ struct ComputerUseUXTests {
             socketRootDirectoryURL: URL(fileURLWithPath: "/tmp"),
             userIdentifier: 501,
             environment: [:],
-            bundleIdentifier: "com.cmuxterm.app.staging",
+            bundleIdentifier: "pro.shellx.desktop.staging",
             authenticationToken: "staging-token"
         )
 
-        #expect(production.scope == "com.cmuxterm.app")
-        #expect(staging.scope == "com.cmuxterm.app.staging")
+        #expect(production.scope == "pro.shellx.desktop")
+        #expect(staging.scope == "pro.shellx.desktop.staging")
         #expect(production.daemonSocketURL != staging.daemonSocketURL)
         #expect(production.installedHelperAppURL != staging.installedHelperAppURL)
     }

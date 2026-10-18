@@ -2114,28 +2114,28 @@ final class QuitWarningSettingsTests: XCTestCase {
 final class BuildFlavorTests: XCTestCase {
     func testDetectsDevFromBundleName() {
         XCTAssertEqual(
-            BuildFlavor.detect(bundleName: "cmux DEV noqdlg", bundleIdentifier: "com.cmuxterm.app"),
+            BuildFlavor.detect(bundleName: "cmux DEV noqdlg", bundleIdentifier: "pro.shellx.desktop"),
             .dev
         )
     }
 
     func testDetectsDevBeforeTagTextCanLookNightly() {
         XCTAssertEqual(
-            BuildFlavor.detect(bundleName: "cmux DEV nightly", bundleIdentifier: "com.cmuxterm.app"),
+            BuildFlavor.detect(bundleName: "cmux DEV nightly", bundleIdentifier: "pro.shellx.desktop"),
             .dev
         )
     }
 
     func testDetectsNightlyFromBundleIdentifier() {
         XCTAssertEqual(
-            BuildFlavor.detect(bundleName: "cmux", bundleIdentifier: "com.cmuxterm.app.nightly"),
+            BuildFlavor.detect(bundleName: "cmux", bundleIdentifier: "pro.shellx.desktop.nightly"),
             .nightly
         )
     }
 
     func testDetectsStableByDefault() {
         XCTAssertEqual(
-            BuildFlavor.detect(bundleName: "cmux", bundleIdentifier: "com.cmuxterm.app"),
+            BuildFlavor.detect(bundleName: "cmux", bundleIdentifier: "pro.shellx.desktop"),
             .stable
         )
     }

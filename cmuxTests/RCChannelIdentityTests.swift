@@ -9,7 +9,7 @@ import XCTest
 @testable import cmux
 #endif
 
-/// The `rc` release channel (`com.cmuxterm.app.rc`, "cmux RC.app") is a fourth
+/// The `rc` release channel (`pro.shellx.desktop.rc`, "cmux RC.app") is a fourth
 /// lane next to stable, nightly, and staging. These tests pin the identity
 /// surfaces that key off the channel: build flavor, socket path, icon
 /// persistence, and the update feed.
@@ -18,14 +18,14 @@ final class RCChannelIdentityTests: XCTestCase {
     func testBundleIconPersistenceSkipsRCBundles() {
         XCTAssertFalse(
             AppBundleIconPersistencePolicy.shouldPersist(
-                bundleIdentifier: "com.cmuxterm.app.rc",
+                bundleIdentifier: "pro.shellx.desktop.rc",
                 appBundleLastPathComponent: "cmux RC.app",
                 persistenceDisabled: false
             )
         )
         XCTAssertFalse(
             AppBundleIconPersistencePolicy.shouldPersist(
-                bundleIdentifier: "com.cmuxterm.app.rc.candidate1",
+                bundleIdentifier: "pro.shellx.desktop.rc.candidate1",
                 appBundleLastPathComponent: "cmux RC candidate1.app",
                 persistenceDisabled: false
             )
@@ -37,7 +37,7 @@ final class RCChannelIdentityTests: XCTestCase {
             environment: [
                 "CMUX_SOCKET_PATH": "/tmp/cmux-debug-issue-153-tmux-compat.sock",
             ],
-            bundleIdentifier: "com.cmuxterm.app.rc",
+            bundleIdentifier: "pro.shellx.desktop.rc",
             isDebugBuild: false,
             probeStableDefaultPathEntry: { _ in .missing }
         )
@@ -48,7 +48,7 @@ final class RCChannelIdentityTests: XCTestCase {
     func testDefaultSocketPathForRCBundles() {
         XCTAssertEqual(
             SocketControlSettings.defaultSocketPath(
-                bundleIdentifier: "com.cmuxterm.app.rc",
+                bundleIdentifier: "pro.shellx.desktop.rc",
                 isDebugBuild: false,
                 probeStableDefaultPathEntry: { _ in .missing }
             ),
@@ -56,7 +56,7 @@ final class RCChannelIdentityTests: XCTestCase {
         )
         XCTAssertEqual(
             SocketControlSettings.defaultSocketPath(
-                bundleIdentifier: "com.cmuxterm.app.rc.tag",
+                bundleIdentifier: "pro.shellx.desktop.rc.tag",
                 isDebugBuild: false,
                 probeStableDefaultPathEntry: { _ in .missing }
             ),
@@ -66,18 +66,18 @@ final class RCChannelIdentityTests: XCTestCase {
 
     func testDetectsRCFromBundleIdentifier() {
         XCTAssertEqual(
-            BuildFlavor.detect(bundleName: "cmux", bundleIdentifier: "com.cmuxterm.app.rc"),
+            BuildFlavor.detect(bundleName: "cmux", bundleIdentifier: "pro.shellx.desktop.rc"),
             .rc
         )
         XCTAssertEqual(
-            BuildFlavor.detect(bundleName: "cmux", bundleIdentifier: "com.cmuxterm.app.rc.candidate1"),
+            BuildFlavor.detect(bundleName: "cmux", bundleIdentifier: "pro.shellx.desktop.rc.candidate1"),
             .rc
         )
     }
 
     func testDetectsRCFromBundleName() {
         XCTAssertEqual(
-            BuildFlavor.detect(bundleName: "cmux RC", bundleIdentifier: "com.cmuxterm.app"),
+            BuildFlavor.detect(bundleName: "cmux RC", bundleIdentifier: "pro.shellx.desktop"),
             .rc
         )
     }
@@ -98,14 +98,14 @@ extension GhosttyConfigPathResolverTests {
         try withTemporaryAppSupportDirectory { appSupportDirectory in
             let releaseConfigURL = try writeAppSupportConfig(
                 appSupportDirectory: appSupportDirectory,
-                bundleIdentifier: "com.cmuxterm.app",
+                bundleIdentifier: "pro.shellx.desktop",
                 filename: "config.ghostty",
                 contents: "font-size = 13\n"
             )
 
             XCTAssertEqual(
                 GhosttyApp.cmuxAppSupportConfigURLs(
-                    currentBundleIdentifier: "com.cmuxterm.app.rc",
+                    currentBundleIdentifier: "pro.shellx.desktop.rc",
                     appSupportDirectory: appSupportDirectory
                 ),
                 [releaseConfigURL]
@@ -117,20 +117,20 @@ extension GhosttyConfigPathResolverTests {
         try withTemporaryAppSupportDirectory { appSupportDirectory in
             _ = try writeAppSupportConfig(
                 appSupportDirectory: appSupportDirectory,
-                bundleIdentifier: "com.cmuxterm.app",
+                bundleIdentifier: "pro.shellx.desktop",
                 filename: "config.ghostty",
                 contents: "font-size = 13\n"
             )
             let rcConfigURL = try writeAppSupportConfig(
                 appSupportDirectory: appSupportDirectory,
-                bundleIdentifier: "com.cmuxterm.app.rc",
+                bundleIdentifier: "pro.shellx.desktop.rc",
                 filename: "config.ghostty",
                 contents: "font-size = 15\n"
             )
 
             XCTAssertEqual(
                 GhosttyApp.cmuxAppSupportConfigURLs(
-                    currentBundleIdentifier: "com.cmuxterm.app.rc",
+                    currentBundleIdentifier: "pro.shellx.desktop.rc",
                     appSupportDirectory: appSupportDirectory
                 ),
                 [rcConfigURL]

@@ -40,6 +40,24 @@ def target_block(pbx, target_id):
     return match.group(1)
 
 
+# Swift that ships in the Mac app or its CLI (the iOS packages are cmux's iOS app).
+SWIFT_ROOTS = ["Sources", "CLI", "Packages/macOS", "Packages/Shared"]
+
+# `com.cmuxterm.app…` strings that are not ShellX's bundle id, each with the
+# reason it stays. Matched against the source line.
+CMUX_ID_LINE_ALLOW = [
+    (r"subsystem", "os_log subsystem: in-process label (ruling R3)"),
+    (r"label: \"com\.cmuxterm\.app\.", "DispatchQueue label: in-process (R3)"),
+    (r"releaseBundleIdentifier = \"com\.cmuxterm\.app\"", "GhosttyTerminalView: only an os_log subsystem (R3)"),
+    (r"Notification\.Name\(\"com\.cmuxterm\.app\.(displayReconfiguration|screenChangeReconcile)\"\)",
+     "in-process NotificationCenter names (R3)"),
+    (r"\"com\.cmuxterm\.app\.userNotification", "UNNotification category ids, scoped to this app (R3)"),
+    (r"com\.cmuxterm\.app\.socket-control\"", "keychain service: Task 3"),
+    (r"com\.cmuxterm\.app\.surface-resume-approvals\"", "keychain service: Task 3"),
+    (r"com\.cmuxterm\.app\.cmux\.sidebar\"", "sidebar extension point id: Task 3"),
+    (r"releasePayloadDomain = \"com\.cmuxterm\.app\"", "MDM payload domain: Task 4"),
+]
+
 # The `cmux` app target's configurations and the dock tile plugin's.
 APP_DEBUG = "A5001082"
 APP_RELEASE = "A5001083"
@@ -47,6 +65,8 @@ APP_TARGET = "A5001050"
 
 
 class ShellXIdentityTests(unittest.TestCase):
+    maxDiff = None
+
     # Short failure messages: the haystacks are whole project files.
     def assertContains(self, needle, haystack):
         self.assertTrue(needle in haystack, f"missing: {needle!r}")
@@ -124,6 +144,52 @@ class ShellXIdentityTests(unittest.TestCase):
         self.assertContains("$(CMUX_AUTH_CALLBACK_SCHEME)", schemes)
         self.assertLacks("cmux", schemes)
         self.assertLacks("cmux-dev", schemes)
+
+    def test_swift_names_shellx_not_cmux_as_its_bundle_id(self):
+        hits = [hit for hit in offenders(r"com\.cmuxterm\.app", roots=SWIFT_ROOTS, allow=[]) if "/Tests/" not in hit
+                and hit.split(":")[0].endswith(".swift")]
+        unexpected = []
+        for hit in hits:
+            path, line_number = hit.rsplit(":", 1)
+            line = read(path).splitlines()[int(line_number) - 1]
+            if line.lstrip().startswith("//"):
+                continue  # documentation
+            if any(re.search(pattern, line) for pattern, _reason in CMUX_ID_LINE_ALLOW):
+                continue
+            unexpected.append(f"{hit}: {line.strip()}")
+        self.assertEqual(unexpected, [])
+
+    def test_team_ids_in_swift_come_from_shellx(self):
+        cli = read("CLI/cmux.swift")
+        self.assertContains('certificate leaf[subject.OU] = "\\#(ShellXBrand.teamID)""#', cli)
+        self.assertContains("== ShellXBrand.teamID else {", cli)
+        self.assertContains("sudoReleaseTeamIdentifier = ShellXBrand.teamID", read("CLI/CMUXCLI+Sudo.swift"))
+        trust = read("Packages/macOS/CmuxComputerUse/Sources/CmuxComputerUse/ComputerUseHelperTrust.swift")
+        self.assertContains('public static let teamIdentifier = "W4RF3W4VTZ"', trust)
+
+    def test_distributed_notifications_are_shellx_scoped(self):
+        # Both ends of each cross-process notification use the same ShellX name.
+        self.assertContains('"\\(ShellXBrand.bundleID).themes.reload-config"', read("CLI/CMUXCLI+Themes.swift"))
+        self.assertContains('Notification.Name("\\(ShellXBrand.bundleID).themes.reload-config")', read("Sources/AppDelegate.swift"))
+        for path in ("Sources/AppIconDockTilePlugin.swift", "Sources/cmuxApp.swift"):
+            self.assertContains('Notification.Name("pro.shellx.desktop.appIconDidChange")', read(path))
+
+    def test_auth_and_ssh_url_schemes_are_shellx(self):
+        auth = read("Packages/macOS/CmuxCloud/Sources/CmuxCloud/Environment/AuthEnvironment.swift")
+        for scheme in ('"shellx-dev"', '"shellx-dev-\\(schemeTag)"', '"shellx-nightly"', '"shellx-rc"', 'return "shellx"'):
+            self.assertContains(scheme, auth)
+        family = '["shellx", "shellx-nightly", "shellx-rc", "shellx-dev"]'
+        self.assertContains(family, read("Packages/Shared/CmuxAuthRuntime/Sources/CmuxAuthRuntime/BrowserSignIn/AuthCallbackRouter.swift"))
+        self.assertContains(family, read("Sources/CmuxSSHURLRequest.swift"))
+        reload_script = read("scripts/reload.sh")
+        self.assertContains('CMUX_AUTH_CALLBACK_SCHEME_VALUE="shellx-dev-${TAG_SLUG}"', reload_script)
+        self.assertLacks('"cmux-dev', reload_script)
+
+    def test_computer_use_helper_is_not_built_by_default(self):
+        script = read("scripts/build-app-bundled-resources.sh")
+        self.assertContains('CMUX_CUA_HELPER_BUILD="${CMUX_CUA_HELPER_BUILD:-0}"', script)
+        self.assertContains('if [ "$CMUX_CUA_HELPER_BUILD" = 1 ]; then\n  if [ ! -x "$BUILD_CMUX_CUA" ]', script)
+        self.assertContains('if [[ "${CMUX_CUA_HELPER_BUILD:-0}" != "1" ]]; then\n  rm -rf "$CMUX_CUA_HELPER_APP"', read("scripts/reload.sh"))
 
     def test_reload_script_builds_shellx_dev(self):
         script = read("scripts/reload.sh")

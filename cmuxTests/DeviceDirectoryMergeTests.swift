@@ -40,7 +40,7 @@ struct DeviceDirectoryMergeTests {
 
     @Test("Only outgoing directory changes refresh My Devices", arguments: [false, true])
     func hostingMetadataDoesNotReloadDiscovery(peerChanged: Bool) async {
-        let identity = V2Identity(appNamespace: "com.cmuxterm.app", buildTag: "default", deviceID: "self",
+        let identity = V2Identity(appNamespace: "pro.shellx.desktop", buildTag: "default", deviceID: "self",
             environment: "development", projectID: "project", teamID: "team", userID: "user")
         func record(_ identity: V2Identity, hosting: Bool) -> V2DeviceRecord {
             V2DeviceRecord(descriptor: V2DeviceDescriptor(endpointID: "endpoint", identity: identity, identityGeneration: 1,
@@ -77,7 +77,7 @@ struct DeviceDirectoryMergeTests {
     @Test("Only Mac opt-in admits a row, even with mobile hosting and cached sources", arguments: [true, false], [true, false])
     func authenticatedDiscovery(enabled: Bool, mobileEnabled: Bool) throws {
         func record(deviceID: String, endpoint: String, hosting: Bool) -> V2DeviceRecord {
-            let identity = V2Identity(appNamespace: "com.cmuxterm.app", buildTag: "default",
+            let identity = V2Identity(appNamespace: "pro.shellx.desktop", buildTag: "default",
                 deviceID: deviceID, environment: "development", projectID: "project",
                 teamID: "work-team", userID: "my-account")
             let metadata = V2DeviceMetadata(appVersion: "1",
@@ -153,7 +153,7 @@ struct DeviceDirectoryMergeTests {
         platform: String = "mac"
     ) -> (SurfaceDeviceInstanceID, DevicePresenceInstance) {
         let instance = DevicePresenceInstance(
-            deviceId: deviceID, tag: tag, platform: platform, displayName: name, bundleId: "com.cmuxterm.app",
+            deviceId: deviceID, tag: tag, platform: platform, displayName: name, bundleId: "pro.shellx.desktop",
             online: online, lastSeenAt: lastSeenAt, routes: routes
         )
         return (instance.instanceID, instance)
@@ -201,7 +201,7 @@ struct DeviceDirectoryMergeTests {
     /// The Macs a live v2 directory authorizes, through the production projection.
     private func directoryMacs(peerDeviceID: String, endpoint: String) -> [DeviceDiscoveredMac] {
         func record(deviceID: String, endpoint: String, hosting: Bool) -> V2DeviceRecord {
-            let identity = V2Identity(appNamespace: "com.cmuxterm.app", buildTag: "default",
+            let identity = V2Identity(appNamespace: "pro.shellx.desktop", buildTag: "default",
                 deviceID: deviceID, environment: "development", projectID: "project",
                 teamID: "work-team", userID: "my-account")
             let metadata = V2DeviceMetadata(appVersion: "1", capabilities: ["cmux.mac-devices.v1", "cmux.mac-host.v1"],
@@ -249,7 +249,7 @@ struct DeviceDirectoryMergeTests {
         // transport authorizes and the host proves in its status reply.
         #expect(record.instance == studioDirectoryInstance)
         #expect(record.presenceState == .online)
-        #expect(record.bundleID == "com.cmuxterm.app")
+        #expect(record.bundleID == "pro.shellx.desktop")
         #expect(record.isDialable)
         #expect(record.routes.filter { $0.kind == .iroh }.count == 1)
     }
@@ -388,7 +388,7 @@ struct DeviceDirectoryMergeTests {
         #expect(studioRecord.isOnline)
         #expect(studioRecord.deviceName == "Studio", "the live presence name wins over the registry's")
         #expect(studioRecord.routes.map(\.id) == ["live", "stale"], "live routes lead the registry candidates")
-        #expect(studioRecord.bundleID == "com.cmuxterm.app")
+        #expect(studioRecord.bundleID == "pro.shellx.desktop")
         #expect(studioRecord.presence.isOnline)
         #expect(records[1].isOnline == false)
         #expect(records[1].presenceState == .offline, "absent from a live presence snapshot means offline")

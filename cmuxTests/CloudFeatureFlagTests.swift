@@ -21,7 +21,7 @@ struct CloudFeatureFlagTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         let flags = CmuxFeatureFlags(
             defaults: defaults,
-            overrideCapability: .init(bundleIdentifier: "com.cmuxterm.app", isDebugBuild: false),
+            overrideCapability: .init(bundleIdentifier: "pro.shellx.desktop", isDebugBuild: false),
             remoteFlagValueProvider: { _ in nil }
         )
         flags.applyLoadedFlags()
@@ -63,7 +63,7 @@ struct CloudFeatureFlagTests {
         var requestedKeys: [String] = []
         let flags = CmuxFeatureFlags(
             defaults: defaults,
-            overrideCapability: .init(bundleIdentifier: "com.cmuxterm.app", isDebugBuild: false),
+            overrideCapability: .init(bundleIdentifier: "pro.shellx.desktop", isDebugBuild: false),
             remoteFlagValueProvider: { key in
                 requestedKeys.append(key)
                 return remoteValue

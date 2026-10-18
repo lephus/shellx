@@ -64,7 +64,7 @@ struct DevicePresenceWireTests {
                 "deviceId": uuid,
                 "instances": [[
                     "deviceId": uuid, "tag": "default", "platform": "mac", "displayName": "Studio",
-                    "bundleId": "com.cmuxterm.app", "online": true, "lastSeenAt": 1_700_000_000_000,
+                    "bundleId": "pro.shellx.desktop", "online": true, "lastSeenAt": 1_700_000_000_000,
                     "routes": [
                         ["id": "ts", "kind": "tailscale", "endpoint": ["type": "host_port", "host": "100.64.0.9", "port": 51000], "priority": 10],
                         ["id": "future", "kind": "quantum", "endpoint": ["type": "wormhole"], "priority": 0],

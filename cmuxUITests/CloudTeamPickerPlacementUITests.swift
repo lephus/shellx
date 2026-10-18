@@ -11,7 +11,7 @@ final class CloudTeamPickerPlacementUITests: XCTestCase {
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: "com.cmuxterm.app.debug"))
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "pro.shellx.desktop.debug"))
         fixtureDefaults = defaults
         savedTeamPickerShortcut = defaults.object(forKey: teamPickerShortcutKey)
         defaults.set(Self.defaultTeamPickerShortcutData, forKey: teamPickerShortcutKey)

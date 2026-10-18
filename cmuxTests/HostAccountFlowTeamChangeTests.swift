@@ -32,7 +32,7 @@ struct HostAccountFlowTeamChangeTests {
             billingPlanClient: planClient
         )
 
-        let callback = URL(string: "cmux://auth-callback?stack_refresh=refresh-1&stack_access=access-1")!
+        let callback = URL(string: "shellx://auth-callback?stack_refresh=refresh-1&stack_access=access-1")!
         #expect(await flow.handleCallbackURL(callback, delivery: .trustedEmbeddedBrowser))
         #expect(flow.billingPlanState == BillingPlanState(
             accountID: "fixture",

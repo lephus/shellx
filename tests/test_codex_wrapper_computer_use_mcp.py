@@ -666,7 +666,7 @@ exit 1
             env["CMUX_BUNDLED_CLI_PATH"] = str(wrapper_dir / "cmux")
             if dev_tag is not None:
                 env["CMUX_TAG"] = dev_tag
-                env["CMUX_BUNDLE_ID"] = f"com.cmuxterm.app.debug.{dev_tag}"
+                env["CMUX_BUNDLE_ID"] = f"pro.shellx.desktop.debug.{dev_tag}"
             env["FAKE_CODEX_ARGS_LOG"] = str(args_log)
             env["FAKE_MCP_TRACE_LOG"] = str(mcp_trace_log)
             env["FAKE_MCP_HANDSHAKE"] = "1" if mcp_handshake else "0"

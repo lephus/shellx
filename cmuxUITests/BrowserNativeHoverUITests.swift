@@ -22,7 +22,7 @@ final class BrowserNativeHoverUITests: XCTestCase {
         if let bundleID = environment["CMUX_HOVER_TEST_APP_BUNDLE_ID"] {
             // A standalone runner can test the reporter's OS against a
             // cloud-built tagged app without rebuilding or launching main.
-            XCTAssertTrue(bundleID.hasPrefix("com.cmuxterm.app.debug."))
+            XCTAssertTrue(bundleID.hasPrefix("pro.shellx.desktop.debug."))
             app = XCUIApplication(bundleIdentifier: bundleID)
             app.activate()
         } else {

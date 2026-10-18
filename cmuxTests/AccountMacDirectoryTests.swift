@@ -21,7 +21,7 @@ private enum AccountFixture {
     static let now = Date(timeIntervalSince1970: 1500)
 
     static func identity(device: String, team: String, user: String = "user", tag: String = "default",
-                         namespace: String = "com.cmuxterm.app", environment: String = "production") -> V2Identity {
+                         namespace: String = "pro.shellx.desktop", environment: String = "production") -> V2Identity {
         V2Identity(appNamespace: namespace, buildTag: tag, deviceID: device, environment: environment,
             projectID: "project", teamID: team, userID: user)
     }
@@ -137,7 +137,7 @@ struct AccountMacPeerAuthorizationTests {
         case .otherUser:
             account = peer(F.identity(device: "peer", team: "B", user: "someone-else")); expected = .identityMismatch
         case .otherNamespace:
-            account = peer(F.identity(device: "peer", team: "B", namespace: "com.cmuxterm.app.nightly")); expected = .identityMismatch
+            account = peer(F.identity(device: "peer", team: "B", namespace: "pro.shellx.desktop.nightly")); expected = .identityMismatch
         case .otherEnvironment:
             account = peer(F.identity(device: "peer", team: "B", environment: "development")); expected = .identityMismatch
         case .otherTag:
