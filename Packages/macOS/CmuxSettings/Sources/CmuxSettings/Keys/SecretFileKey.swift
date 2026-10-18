@@ -8,7 +8,7 @@
 ///
 /// The matching store is ``SecretFileStore``. The secret lives at
 /// `<baseDirectory>/<fileName>`, where `baseDirectory` is supplied by the
-/// store (the app uses `~/.config/cmux`, the same directory as `cmux.json`).
+/// store (the app uses `~/.config/shellx`, the same directory as `cmux.json`).
 ///
 /// ```swift
 /// public let socketPassword = SecretFileKey(

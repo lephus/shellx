@@ -3,7 +3,7 @@
 // first-prompt title, live elapsed time, kind + directory metadata, and a
 // working/needs-input/idle summary. Click a row to jump to the workspace and
 // focus the terminal the agent runs in.
-//   cp Examples/CustomSidebars/panel-subagents.js ~/.config/cmux/sidebars/
+//   cp Examples/CustomSidebars/panel-subagents.js ~/.config/shellx/sidebars/
 //   cmux right-sidebar set custom panel-subagents
 
 const [query, setQuery] = signal("");

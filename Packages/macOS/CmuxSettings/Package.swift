@@ -16,6 +16,7 @@ let package = Package(
     dependencies: [
         .package(path: "../CmuxFoundation"),
         .package(path: "../CmuxCore"),
+        .package(path: "../../Shared/ShellXBrand"),
     ],
     targets: [
         .target(
@@ -23,6 +24,7 @@ let package = Package(
             dependencies: [
                 .product(name: "CmuxFoundation", package: "CmuxFoundation"),
                 .product(name: "CmuxCore", package: "CmuxCore"),
+                .product(name: "ShellXBrand", package: "ShellXBrand"),
             ],
             resources: [
                 .copy("Resources/CustomSidebarTemplates"),

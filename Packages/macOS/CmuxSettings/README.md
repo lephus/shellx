@@ -9,7 +9,7 @@ Settings live in one of two stores:
 
 - **`UserDefaultsSettingsStore`** — wraps `UserDefaults`. User-toggled
   preferences that the Settings UI writes.
-- **`JSONConfigStore`** — wraps `~/.config/cmux/cmux.json`. Structured config
+- **`JSONConfigStore`** — wraps `~/.config/shellx/shellx.json`. Structured config
   authored by users (hooks, shortcut bindings) or MDM profiles.
 
 MDM-enforced (configuration-profile forced) policy values are resolved by
@@ -25,7 +25,7 @@ of key — wrong-store mismatches are compile errors, not runtime traps.
 - **UserDefaults** persists under the normal Apple-managed plist for the
   process's `Bundle.main.bundleIdentifier`, viewable with
   `defaults read <bundle-id>`.
-- **JSON config** lives at `~/.config/cmux/cmux.json` by default
+- **JSON config** lives at `~/.config/shellx/shellx.json` by default
   (`CmuxConfigLocation().userConfigFile`). The store creates the file (and
   parent directory) on first write. File is missing on first launch, in
   which case every read returns the key's default value.

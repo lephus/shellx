@@ -1,7 +1,7 @@
 // panel-sessions: right-sidebar demo. Every session (terminal/browser tab)
 // with live search and a scope toggle: just the selected workspace, or all
 // workspaces. Click a row to jump to that session.
-//   cp Examples/CustomSidebars/panel-sessions.js ~/.config/cmux/sidebars/
+//   cp Examples/CustomSidebars/panel-sessions.js ~/.config/shellx/sidebars/
 //   cmux right-sidebar set custom panel-sessions
 
 const [query, setQuery] = signal("");

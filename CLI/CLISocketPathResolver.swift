@@ -131,12 +131,14 @@ struct CLISocketPathResolver {
         case inaccessible(errnoCode: Int32)
     }
 
-    private static let stableSocketFileName = "cmux.sock"
-    static let legacyDefaultSocketPath = "/tmp/cmux.sock"
-    private static let fallbackSocketPath = "/tmp/cmux-debug.sock"
-    private static let nightlySocketPath = "/tmp/cmux-nightly.sock"
-    private static let rcSocketPath = "/tmp/cmux-rc.sock"
-    private static let stagingSocketPath = "/tmp/cmux-staging.sock"
+    // ShellX socket names, shared with the app through CmuxSettings so the CLI
+    // and app always agree (and never reach an installed cmux's sockets).
+    private static let stableSocketFileName = SocketControlSettings.stableSocketFileName
+    static let legacyDefaultSocketPath = SocketControlSettings.legacyStableDefaultSocketPath
+    private static let fallbackSocketPath = SocketPathMarkerFiles.defaultDebugSocketPath
+    private static let nightlySocketPath = SocketPathMarkerFiles.defaultNightlySocketPath
+    private static let rcSocketPath = SocketPathMarkerFiles.defaultRCSocketPath
+    private static let stagingSocketPath = SocketPathMarkerFiles.defaultStagingSocketPath
 
     private let environment: [String: String]
     private let bundleIdentifier: String?
@@ -219,12 +221,15 @@ struct CLISocketPathResolver {
 
     private static func userScopedStableSocketPath(currentUserID: uid_t = getuid()) -> String {
         stableSocketDirectoryURL()?
-            .appendingPathComponent("cmux-\(currentUserID).sock", isDirectory: false)
+            .appendingPathComponent(
+                SocketControlSettings.userScopedSocketFileName(currentUserID: currentUserID),
+                isDirectory: false
+            )
             .path ?? legacyUserScopedStableSocketPath(currentUserID: currentUserID)
     }
 
     private static func legacyUserScopedStableSocketPath(currentUserID: uid_t = getuid()) -> String {
-        "/tmp/cmux-\(currentUserID).sock"
+        SocketControlSettings.legacyUserScopedStableSocketPath(currentUserID: currentUserID)
     }
 
     static func isImplicitDefaultPath(
@@ -347,7 +352,10 @@ struct CLISocketPathResolver {
         Self.dedupe([
             resolvedStableDefaultSocketPath,
             Self.legacyDefaultSocketPath,
-            stateDirectory.appendingPathComponent("cmux-\(currentUserID).sock", isDirectory: false).path,
+            stateDirectory.appendingPathComponent(
+                SocketControlSettings.userScopedSocketFileName(currentUserID: currentUserID),
+                isDirectory: false
+            ).path,
             Self.legacyUserScopedStableSocketPath(currentUserID: currentUserID),
         ])
     }
@@ -525,7 +533,7 @@ struct CLISocketPathResolver {
 
     /// The directory holding the control socket and its marker files.
     ///
-    /// Resolves to ``CmuxStateDirectory`` (`~/.local/state/cmux`), matching the
+    /// Resolves to ``CmuxStateDirectory`` (`~/.local/state/shellx`), matching the
     /// app's `SocketControlSettings.stableSocketDirectoryURL()`. This keeps the
     /// CLI off the app's TCC-protected Application Support data on the agent hook
     /// path (https://github.com/manaflow-ai/cmux/issues/5146). The CLI is a

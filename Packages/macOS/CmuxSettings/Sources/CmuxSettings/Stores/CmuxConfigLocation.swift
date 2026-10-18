@@ -1,4 +1,5 @@
 import Foundation
+import ShellXBrand
 
 /// Conventional on-disk locations for the cmux JSON config.
 ///
@@ -12,10 +13,10 @@ import Foundation
 /// let store = JSONConfigStore(fileURL: locations.userConfigFile)
 /// ```
 public struct CmuxConfigLocation: Sendable, Hashable {
-    /// The primary cmux config file: `<home>/.config/cmux/cmux.json`.
+    /// The primary cmux config file: `<home>/.config/shellx/shellx.json`.
     public let userConfigFile: URL
 
-    /// The legacy fallback: `<home>/.config/cmux/settings.json`. The app's
+    /// The legacy fallback: `<home>/.config/shellx/settings.json`. The app's
     /// settings reader checks this when the primary file is absent.
     public let legacyFallbackFile: URL
 
@@ -27,7 +28,7 @@ public struct CmuxConfigLocation: Sendable, Hashable {
     public init(home: URL = FileManager.default.homeDirectoryForCurrentUser) {
         // `URL.appending(path:)` is the modern Foundation API (macOS 13+);
         // returns a non-optional URL without the legacy `isDirectory` flag.
-        self.userConfigFile = home.appending(path: ".config/cmux/cmux.json")
-        self.legacyFallbackFile = home.appending(path: ".config/cmux/settings.json")
+        self.userConfigFile = home.appending(path: ".config/\(ShellXBrand.configDirectoryName)/\(ShellXBrand.configFileName)")
+        self.legacyFallbackFile = home.appending(path: ".config/\(ShellXBrand.configDirectoryName)/settings.json")
     }
 }
