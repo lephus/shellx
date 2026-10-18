@@ -40,13 +40,28 @@ public enum RemoteCommandLine {
             + (inviteFile.map { ["--invite-file", $0.path] } ?? [])
     }
 
+    /// Pane patience: give up after this many consecutive failed attaches (about 90 s at 2 s sleeps),
+    /// which must outlast the link's own backoff (1+2+4+8+16+30 s).
+    static let attachMaxConsecutiveFailures = 45
+    static let attachRetryDelaySeconds = 2
+    /// An attach that ran at least this long counts as a good connection and resets the failure counter.
+    static let attachResetAfterSeconds = 10
+
     /// D8: `sh -c` reconnect loop around `<client> --socket <sock> attach --terminal <id>`.
     /// The values travel as quoted positional parameters, so nothing is ever re-parsed as shell code.
     public static func attachShellCommand(clientPath: String, socketPath: String, terminalID: String) -> String {
+        attachShellCommand(clientPath: clientPath, socketPath: socketPath, terminalID: terminalID,
+                           retryDelaySeconds: attachRetryDelaySeconds, maxFailures: attachMaxConsecutiveFailures,
+                           resetAfterSeconds: attachResetAfterSeconds)
+    }
+
+    static func attachShellCommand(clientPath: String, socketPath: String, terminalID: String,
+                                   retryDelaySeconds: Int, maxFailures: Int, resetAfterSeconds: Int) -> String {
         let script = """
-        n=0; while :; do "$1" --socket "$2" attach --terminal "$3"; [ $? -eq 0 ] && exit 0; n=$((n+1)); \
-        if [ "$n" -ge 10 ]; then printf '\\r\\n[ShellX] phiên đã kết thúc / session ended\\r\\n'; exit 0; fi; \
-        printf '\\r\\n[ShellX] đang kết nối lại… / reconnecting…\\r\\n'; sleep 2; done
+        n=0; while :; do s=$(date +%s); "$1" --socket "$2" attach --terminal "$3"; [ $? -eq 0 ] && exit 0; \
+        e=$(date +%s); [ $((e-s)) -ge \(resetAfterSeconds) ] && n=0; n=$((n+1)); \
+        if [ "$n" -ge \(maxFailures) ]; then printf '\\r\\n[ShellX] phiên đã kết thúc / session ended\\r\\n'; exit 0; fi; \
+        printf '\\r\\n[ShellX] đang kết nối lại… / reconnecting…\\r\\n'; sleep \(retryDelaySeconds); done
         """
         return (["sh", "-c", script, "sh", clientPath, socketPath, terminalID]).map(quote).joined(separator: " ")
     }

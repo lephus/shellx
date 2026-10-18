@@ -250,3 +250,45 @@ private struct Machines: Decodable, Equatable { let n: Int }
     let r = PairingRequest(id: "p", fromMachineID: "m", requesterName: "n", code: "123456", fingerprint: "ab", suspicious: false, firstSeen: t0)
     #expect(r.expiresAt == t0 + 300)
 }
+
+private func runWrapper(maxFailures: Int, resetAfter: Int, clientBody: String) throws -> (status: Int32, out: String, attempts: Int) {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("sx-wrap-" + UUID().uuidString)
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let client = dir.appendingPathComponent("fake client")
+    let count = dir.appendingPathComponent("count").path
+    try ("#!/bin/sh\nn=$(cat '\(count)' 2>/dev/null || echo 0); n=$((n+1)); echo $n > '\(count)'\n" + clientBody)
+        .write(to: client, atomically: true, encoding: .utf8)
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: client.path)
+    let cmd = RemoteCommandLine.attachShellCommand(clientPath: client.path, socketPath: "/s", terminalID: "t",
+                                                   retryDelaySeconds: 0, maxFailures: maxFailures, resetAfterSeconds: resetAfter)
+    let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh"); p.arguments = ["-c", cmd]
+    let pipe = Pipe(); p.standardOutput = pipe
+    try p.run(); p.waitUntilExit()
+    let out = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    let attempts = Int((try? String(contentsOfFile: count, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "") ?? 0
+    return (p.terminationStatus, out, attempts)
+}
+
+@Test func attachWrapperGivesUpAfterMaxConsecutiveFailures() throws {
+    let r = try runWrapper(maxFailures: 3, resetAfter: 2, clientBody: "exit 1\n")
+    #expect(r.attempts == 3); #expect(r.status == 0)
+    #expect(r.out.contains("phiên đã kết thúc / session ended")); #expect(r.out.contains("reconnecting"))
+}
+
+@Test func attachWrapperCleanExitStopsWithoutMessage() throws {
+    let r = try runWrapper(maxFailures: 3, resetAfter: 2, clientBody: "exit 0\n")
+    #expect(r.attempts == 1); #expect(r.status == 0); #expect(r.out.isEmpty)
+}
+
+@Test func attachWrapperResetsCounterAfterLongAttach() throws {
+    // attempt 3 runs >= 2 s then fails: the counter resets, so give-up comes at attempt 5, not 3.
+    let r = try runWrapper(maxFailures: 3, resetAfter: 2, clientBody: "[ $n -eq 3 ] && sleep 3\nexit 1\n")
+    #expect(r.attempts == 5); #expect(r.status == 0)
+    #expect(r.out.contains("session ended"))
+}
+
+@Test func attachWrapperProductionDefaults() {
+    let c = RemoteCommandLine.attachShellCommand(clientPath: "/c", socketPath: "/s", terminalID: "t")
+    #expect(c.contains("-ge 45")); #expect(c.contains("sleep 2")); #expect(c.contains("-ge 10 ]"))
+}
