@@ -32,6 +32,12 @@ impl Drop for SessionFile {
     }
 }
 
+impl Drop for crate::api::MintResponse {
+    fn drop(&mut self) {
+        self.ticket.zeroize();
+    }
+}
+
 impl Drop for LoginResponse {
     fn drop(&mut self) {
         self.token.zeroize();
@@ -125,6 +131,7 @@ pub fn login(agent: &ureq::Agent, cfg: &Config, store: &StateStore, params: &Val
     // A stale session (re-login) still authenticates the request, per "every request".
     let old = load_session(store).ok().flatten();
     let reply = http::send(agent, cfg, old.as_ref().map(|s| s.token.as_str()), Method::Post, PATH, Some(&body), None)?;
+    let previous_user = old.as_ref().map(|s| s.user_id.clone());
     drop(old);
     let resp: LoginResponse = http::parse_json(PATH, &reply)?;
     if resp.token.is_empty() || resp.user_id.is_empty() || resp.device_id.is_empty() {
@@ -139,6 +146,10 @@ pub fn login(agent: &ureq::Agent, cfg: &Config, store: &StateStore, params: &Val
         serde_json::to_vec(&session).map_err(|_| CoreError::new("io", "session is not serializable"))?,
     );
     store.write_secret(SESSION_FILE, &bytes)?;
+    // A machine registered under another account must not be reused.
+    if previous_user.as_deref().is_some_and(|u| u != resp.user_id) {
+        store.remove(MACHINE_FILE)?;
+    }
     Ok(json!({
         "user_id": resp.user_id,
         "device_id": resp.device_id,

@@ -58,6 +58,81 @@ impl fmt::Debug for SessionFile {
     }
 }
 
+/// `machine.json` in the state dir.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MachineFile {
+    pub machine_id: String,
+    pub slot: String,
+}
+
+/// `POST /v2/machines` body.
+#[derive(Debug, Serialize)]
+pub struct RegisterRequest<'a> {
+    pub name: &'a str,
+    pub platform: &'a str,
+    pub os_version: &'a str,
+    pub app_version: &'a str,
+    pub noise_public_key_b64: &'a str,
+}
+
+/// `POST /v2/machines` 200 response.
+#[derive(Debug, Deserialize)]
+pub struct RegisterResponse {
+    pub machine_id: String,
+    pub slot: String,
+}
+
+/// One item of `GET /v2/machines`.
+#[derive(Debug, Deserialize)]
+pub struct MachineItem {
+    pub machine_id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub platform: String,
+    #[serde(default)]
+    pub online: bool,
+    #[serde(default)]
+    pub last_seen_unix: Option<u64>,
+    #[serde(default)]
+    pub noise_public_key_b64: Option<String>,
+    #[serde(default)]
+    pub fingerprint: Option<String>,
+}
+
+/// `GET /v2/machines` 200 response.
+#[derive(Debug, Deserialize)]
+pub struct ListResponse {
+    pub machines: Vec<MachineItem>,
+}
+
+/// `POST /v2/relay/tickets` body.
+#[derive(Debug, Serialize)]
+pub struct MintRequest<'a> {
+    pub machine_id: &'a str,
+    pub permission: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_machine_id: Option<&'a str>,
+}
+
+/// `POST /v2/relay/tickets` 200 response. `Debug` hides the ticket.
+#[derive(Deserialize)]
+pub struct MintResponse {
+    pub ticket: String,
+    pub expires_at_unix: u64,
+    pub relay_url: String,
+}
+
+impl fmt::Debug for MintResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MintResponse")
+            .field("ticket", &format_args!("<{} bytes>", self.ticket.len()))
+            .field("expires_at_unix", &self.expires_at_unix)
+            .field("relay_url", &self.relay_url)
+            .finish()
+    }
+}
+
 /// `latest_agent` of `GET /v1/version`.
 #[derive(Debug, Default, Deserialize)]
 pub struct LatestAgent {

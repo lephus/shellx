@@ -59,6 +59,9 @@ pub fn new_agent() -> Agent {
         .timeout_global(Some(GLOBAL_TIMEOUT))
         .http_status_as_error(false)
         .max_redirects(0)
+        // ureq reads ALL_PROXY/HTTPS_PROXY/HTTP_PROXY by default; no proxy support is
+        // required, and a stray env proxy must not see the bearer or tickets.
+        .proxy(None)
         .user_agent(AutoHeaderValue::None)
         .build()
         .new_agent()

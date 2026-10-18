@@ -54,6 +54,11 @@ fn valid_file_part(s: &str) -> bool {
         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, b'.' | b'_' | b'-'))
 }
 
+/// Whether `file` is a valid bare file name (`^[a-z0-9][a-z0-9._-]{0,63}$`).
+pub fn bare_file_name_ok(file: &str) -> bool {
+    valid_file_part(file)
+}
+
 /// `name` is a bare file name or `tickets/<file>`.
 fn parse_name(name: &str) -> Result<(Place, &str), CoreError> {
     let bad = || CoreError::invalid_params("invalid state file name");

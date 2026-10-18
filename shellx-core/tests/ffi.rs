@@ -72,7 +72,7 @@ fn unknown_beats_not_configured_and_known_unimplemented_after_config_is_unknown(
         .unwrap()
         .write_secret("session.json", br#"{"token":"t","user_id":"u","device_id":"d"}"#)
         .unwrap();
-    assert_eq!(c.call("machines.list", json!({})).unwrap_err().code, "unknown_method");
+    assert_eq!(c.call("pair.pending", json!({})).unwrap_err().code, "unknown_method");
 }
 
 #[test]

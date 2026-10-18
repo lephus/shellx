@@ -10,7 +10,9 @@ pub mod envelope;
 pub mod ffi;
 pub mod fingerprint;
 pub mod http;
+pub mod machines;
 pub mod store;
+pub mod tickets;
 pub mod version;
 
 pub use config::Config;
@@ -94,6 +96,10 @@ impl Core {
                 let _g = self.auth_lock.lock().unwrap_or_else(|p| p.into_inner());
                 auth::logout(self.agent(), &cfg, &store)
             }
+            "machines.register" => machines::register(self.agent(), &cfg, &store, &params),
+            "machines.list" => machines::list(self.agent(), &cfg, &store),
+            "machines.heartbeat" => machines::heartbeat(self.agent(), &cfg, &store),
+            "tickets.mint" => tickets::mint(self.agent(), &cfg, &store, &params),
             _ => Err(CoreError::new("unknown_method", format!("method not implemented: {method}"))),
         }
     }
