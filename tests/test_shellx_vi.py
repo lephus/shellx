@@ -98,6 +98,96 @@ def problems(english: dict, vi: dict | None) -> list[str]:
     return found
 
 
+def localization_values(localization: dict):
+    """Every string value of one locale block: unit, plural variations and substitutions."""
+    value = leaf(localization)
+    if value is not None:
+        yield value
+    for variants in localization.get("variations", {}).values():
+        for node in variants.values():
+            yield from localization_values(node)
+    for substitution in localization.get("substitutions", {}).values():
+        yield from localization_values(substitution)
+
+
+# Glossary: workspace -> "phiên", pane -> "khung", command palette -> "bảng lệnh".
+PHRASES_NEVER_USED = re.compile(r"không gian làm việc|bảng điều khiển lệnh|bảng màu lệnh", re.I)
+# "bề mặt" is the literal rendering of "surface"; the glossary word is "tab". Never right, anywhere.
+LITERAL_SURFACE = re.compile(r"bề mặt", re.I)
+# Glossary: surface -> "tab", machine -> "máy". The English word must not survive in prose.
+ENGLISH_TERM = re.compile(r"\b(?:surfaces?|machines?)\b", re.I)
+# Real CLI command names that contain "surface" (CLI/cmux.swift `case "..."`, CLI/CMUXCLI+CommandSuggestions.swift,
+# CLI/CMUXCLI+TaskHelp.swift). A user types them, so they are never translated to "tab".
+CLI_COMMAND_NAMES = (
+    "close-surface",
+    "new-surface",
+    "move-surface",
+    "reorder-surface",
+    "drag-surface-to-split",
+    "list-pane-surfaces",
+    "refresh-surfaces",
+    "surface-health",
+    "surface-resume",
+)
+COMMAND_NAME = re.compile(r"(?<![\w-])(?:%s)(?![\w-])" % "|".join(map(re.escape, CLI_COMMAND_NAMES)))
+# Flags that carry the word ("--surface", "--machine"): English and Vietnamese must spell them alike.
+FLAG_WITH_TERM = re.compile(r"(?<![\w-])--[A-Za-z0-9-]*(?:surface|machine)[A-Za-z0-9-]*")
+# Code and identifier tokens that legitimately keep the English word: the CLI/socket surface mirrors
+# them, so a user types or reads exactly these characters.
+CODE_TOKENS = re.compile(
+    "|".join(
+        [
+            COMMAND_NAME.pattern,  # close-surface, new-surface, list-pane-surfaces, ...
+            r"`[^`\n]*`",  # `machine`, `vm open <machine>/<workspace>`
+            r"--[A-Za-z0-9-]*(?:surface|machine)[A-Za-z0-9-]*",  # --surface, --machine, --surface=<id>
+            r"\bsurface:[^\s,)'\"]+",  # handles: surface:2, surface:<id>
+            r"<[^<>\n]*\b(?:surfaces?|machines?)\b[^<>\n]*>",  # usage placeholders: <surface>, <status|machines|claude>
+            r"\bshellx surface\b",  # the `shellx surface` command group
+            r"\bsurface (?:ls|open|new-terminal|resume|size|participants|size-policy|size-to-me|"
+            r"disconnect-others|size-counts|disconnect-participant)\b",  # its sub-commands in diagnostics
+            r"\bsurface\.[a-z_]+",  # socket method names: surface.sync_codex_native_title
+            r"\bsurface-[a-z-]+",  # ids: surface-needs-input
+            r"\bsurface=",  # machine-readable output: session=%@ surface=%@
+            r"([\"'])surfaces\1",  # JSON key: "surfaces"
+            r"\{[A-Za-z_]+(?:,\s*[A-Za-z_]+)*\}",  # payload shape: {machines, resources, projections}
+        ]
+    )
+)
+# Settings search aliases deliberately keep the English keywords next to the Vietnamese ones (see
+# vi-glossary.md), and the debug.* strings are the developer-only Debug menu windows.
+ENGLISH_TERMS_ALLOWED_KEY_PREFIXES = {
+    "settings.search.alias.": "keyword strings keep English words so both languages find the row",
+    "debug.": "developer-only Debug menu windows",
+}
+
+
+def glossary_problems(key: str, value: str, english: list[str]) -> list[str]:
+    """Glossary violations of one Vietnamese value; `english` are the English values of the same entry."""
+    found = []
+    if PHRASES_NEVER_USED.search(value):
+        found.append("banned phrase")
+    if LITERAL_SURFACE.search(value):
+        found.append('"bề mặt" (use "tab")')
+    if value in english or key.startswith(tuple(ENGLISH_TERMS_ALLOWED_KEY_PREFIXES)):
+        return found  # identity strings (a token spelled like the English) and the allowed keys
+    leftover = ENGLISH_TERM.findall(CODE_TOKENS.sub(" ", value))
+    if leftover:
+        found.append(f'English {sorted({word.lower() for word in leftover})} (use "tab" / "máy")')
+    return found
+
+
+def dropped_cli_tokens(key: str, english: list[str], vi: list[str]) -> list[str]:
+    """Command names and flags of a cli.*/socket.* English value that the Vietnamese value lost.
+
+    Rewriting `close-surface` as `close-tab` makes the message name a command that does not exist.
+    """
+    if not key.startswith(("cli.", "socket.")):
+        return []
+    source, target = " ".join(english), " ".join(vi)
+    tokens = COMMAND_NAME.findall(source) + FLAG_WITH_TERM.findall(source)
+    return sorted({token for token in tokens if token not in target})
+
+
 class VietnameseCatalogTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -152,15 +242,92 @@ class VietnameseCatalogTests(unittest.TestCase):
         self.assertEqual(self.vi("sidebar.machine.thisMac"), "máy này")
 
     def test_glossary_words_are_used(self):
-        # workspace is "phiên", pane is "khung", command palette is "bảng lệnh".
-        banned = re.compile(r"không gian làm việc|bảng điều khiển lệnh|bảng màu lệnh", re.I)
         hits = []
         for path, strings in self.catalogs.items():
             for key, entry in strings.items():
-                for _, unit in CATALOG_TOOL.units(entry.get("localizations", {}).get("vi", {})):
-                    if banned.search(str(unit.get("value", ""))):
-                        hits.append(f"{path}:{key}")
-        self.assertEqual(hits, [], f"glossary violations: {hits[:10]}")
+                if entry.get("shouldTranslate") is False:
+                    continue
+                localizations = entry.get("localizations", {})
+                english = list(localization_values(localizations.get("en", {})))
+                for value in localization_values(localizations.get("vi", {})):
+                    for problem in glossary_problems(key, value, english):
+                        hits.append(f"{path}:{key}: {problem}: {value[:80]!r}")
+        self.assertEqual(hits, [], f"{len(hits)} glossary violations, e.g. {hits[:10]}")
+
+    def test_cli_strings_keep_command_names_and_flags_from_english(self):
+        hits = []
+        for path, strings in self.catalogs.items():
+            for key, entry in strings.items():
+                if entry.get("shouldTranslate") is False:
+                    continue
+                localizations = entry.get("localizations", {})
+                english = list(localization_values(localizations.get("en", {})))
+                vi = list(localization_values(localizations.get("vi", {})))
+                for token in dropped_cli_tokens(key, english, vi):
+                    hits.append(f"{path}:{key}: vi lost {token!r}")
+        self.assertEqual(hits, [], f"{len(hits)} command names or flags dropped, e.g. {hits[:10]}")
+
+    def test_command_names_are_real(self):
+        # Every pinned name is a command or sub-command the CLI source really defines.
+        sources = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted((ROOT / "CLI").glob("*.swift"))
+        )
+        for name in CLI_COMMAND_NAMES:
+            self.assertTrue(f'"{name}"' in sources, f"{name} is not a CLI command or sub-command name")
+
+    def test_dropped_command_name_check(self):
+        key = "cli.closeSurface.error.x"
+        english = ["close-surface requires --workspace or --window with explicit --surface"]
+        self.assertEqual(
+            dropped_cli_tokens(key, english, ["close-tab yêu cầu --workspace hoặc --window cùng với --surface"]),
+            ["close-surface"],
+        )
+        self.assertEqual(
+            dropped_cli_tokens(key, english, ["close-surface yêu cầu --workspace hoặc --window cùng với --surface"]),
+            [],
+        )
+        self.assertEqual(dropped_cli_tokens(key, english, ["close-surface yêu cầu --workspace, --window và tab"]), ["--surface"])
+        self.assertEqual(
+            dropped_cli_tokens("cli.vault.usage", ["machine-readable output"], ["đầu ra cho máy đọc"]), []
+        )  # prose compounds are not command names
+        self.assertEqual(dropped_cli_tokens("menu.x", english, ["Đóng tab"]), [])  # only cli.*/socket.* keys
+
+    def test_glossary_check_flags_wrong_terms_and_spares_code_tokens(self):
+        for value in (
+            "Surface tiếp theo",
+            "Sao chép ID bề mặt",
+            "Cloud machine không khả dụng",
+            "Không tìm thấy surface: %@",
+            "Dùng shellx surface ls để xem machines",
+            "Không có surface nào, hãy chạy lại 'shellx restore --surface'",
+        ):
+            self.assertTrue(glossary_problems("menu.x", value, ["English"]), value)
+        for value in (
+            "close-surface yêu cầu --workspace hoặc --window cùng với --surface tường minh",
+            "Dùng shellx new-surface, move-surface, reorder-surface hoặc drag-surface-to-split",
+            "Chạy shellx list-pane-surfaces và shellx refresh-surfaces",
+            "Chạy shellx surface-health hoặc surface-resume",
+            "Hãy thử lại 'shellx restore --surface'.",
+            'Cách dùng: shellx send --surface surface:2 "ls"',
+            "Cách dùng: shellx surface ls [<machine>|local] [--refresh]",
+            "OK session=%@ surface=%@ mode=local-tmux",
+            "Khi `machine` là null, dùng `vm open <machine>/<workspace>`",
+            "{\"pane\": {\"surfaces\": []}} và 'surfaces' phải là mảng",
+            "In payload danh mục ({machines, resources, projections}).",
+            "chạy shellx automation show surface-needs-input",
+            "surface.sync_codex_native_title yêu cầu hàng đợi",
+            "surface resume set: cờ không xác định",
+            "coderouter <status|machines|claude> [--team <id>]",
+        ):
+            self.assertEqual(glossary_problems("cli.x", value, ["English"]), [], value)
+        self.assertEqual(glossary_problems("cli.localTmux.target.surface", "surface", ["surface"]), [])
+        self.assertEqual(glossary_problems("settings.search.alias.x", "terminal surface máy", ["terminal surface"]), [])
+        self.assertEqual(glossary_problems("debug.x", "Surface opacity", ["Surface opacity"]), [])
+        # The allowlists never excuse the literal "bề mặt".
+        self.assertTrue(glossary_problems("settings.search.alias.x", "bề mặt", ["x"]))
+        self.assertTrue(glossary_problems("debug.x", "Độ mờ bề mặt", ["x"]))
+        self.assertTrue(glossary_problems("cli.localTmux.target.surface", "bề mặt", ["surface"]))
 
 
 class VietnameseProjectWiringTests(unittest.TestCase):
