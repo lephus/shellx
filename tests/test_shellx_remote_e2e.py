@@ -28,11 +28,12 @@ import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Optional
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts" / "shellx" / "remote-e2e"))
 
-from harness import CoreError, Harness, Machine, is_socket, wait_until  # noqa: E402
+from harness import CoreError, Harness, MacEnv, Machine, is_socket, wait_until  # noqa: E402
 
 BUILD = (
     "(cd cmux-tui && CARGO_INCREMENTAL=0 cargo build -p cmux-tui -p cmux-relay --locked) && "
@@ -53,6 +54,8 @@ RECONNECT_BUDGET = 120
 # client, which stays up, redials on its own.
 OUTAGE = 30
 OUTAGE_RECOVERY_BUDGET = 35
+# Seconds for an enrolled viewer to be back after its host's daemon was replaced.
+DAEMON_RESTART_BUDGET = 45
 
 
 def missing_binaries() -> list[str]:
@@ -67,9 +70,10 @@ def missing_binaries() -> list[str]:
 
 class E2ECase(unittest.TestCase):
     """One harness per test: relay and fake API, then `prepare` (machines, daemons, viewers).
-    Every test ends with no invite, HMAC secret or password in any file, and the harness dir gone."""
+    Every test ends with no invite, HMAC secret or password in any file, and the harness dir gone.
+    Tickets live 120 s as in production unless a class needs the 2 s stress setting."""
 
-    TICKET_TTL = 2
+    TICKET_TTL = 120
 
     def setUp(self):
         missing = missing_binaries()
@@ -91,9 +95,10 @@ class E2ECase(unittest.TestCase):
     def prepare(self) -> None:
         raise NotImplementedError
 
-    def signed_in(self, *names: str) -> list[Machine]:
-        """Machines of the one e2e account, each logged in and registered (own slot)."""
-        machines = [self.h.machine(name) for name in names]
+    def signed_in(self, *names: str, env: Optional[MacEnv] = None) -> list[Machine]:
+        """Machines of the one e2e account, each logged in and registered (own slot); with `env`
+        they are installs on one Mac (shared HOME, TMPDIR, XDG_RUNTIME_DIR)."""
+        machines = [self.h.machine(name, env) for name in names]
         for machine in machines:
             machine.login()
             machine.register()
@@ -127,6 +132,8 @@ class E2ECase(unittest.TestCase):
 
 
 class RemoteE2E(E2ECase):
+    TICKET_TTL = 2   # Review Focus 2 stress: every ticket expires within 1-2 s
+
     def prepare(self) -> None:
         self.host, self.viewer = self.signed_in("host", "viewer")
         self.h.start_host_daemon(self.host)
@@ -166,6 +173,17 @@ class RemoteE2E(E2ECase):
         self.assertTrue(wait_until(45, lambda: self.h.viewer_ok("workspace", "list", "--json")))
         self.assertEqual(self.h.host_cli(self.host, "remote", "enroll", "pending", "--json"), [])
 
+
+class PairedCase(E2ECase):
+    """A host daemon and a viewer that is paired, enrolled, connected and sees a terminal."""
+
+    def prepare(self) -> None:
+        self.host, self.viewer = self.signed_in("host", "viewer")
+        self.h.start_host_daemon(self.host)
+        self.term = self.view(self.viewer, self.host)
+
+
+class StaleDaemon(PairedCase):
     def test_stale_daemon_is_stopped_before_start(self):                     # plan Step 5, Review Focus 5
         # A force-quit or crashed app leaves its daemon running (`server start` has no
         # --exit-with-parent). The next launch runs the app's spawn: RemoteCommandLine.serverStop
@@ -176,7 +194,7 @@ class RemoteE2E(E2ECase):
         self.assertEqual(self.host.last_stop_rc, 0)
         self.assertTrue(wait_until(15, lambda: stale.poll() is not None, 0.2), "the stale daemon is still running")
         self.assertEqual(self.h.session_daemon_pids(self.host), [self.h.daemon_proc(self.host).pid])
-        self.assertTrue(wait_until(45, lambda: self.h.viewer_ok("workspace", "list", "--json")))
+        self.assertTrue(wait_until(DAEMON_RESTART_BUDGET, lambda: self.h.viewer_ok("workspace", "list", "--json")))
 
         # kill -9: nothing stops it cleanly, its mux, admin and link socket files stay behind.
         killed = self.h.abandon_host_daemon(self.host, kill=True)
@@ -185,7 +203,7 @@ class RemoteE2E(E2ECase):
         self.h.start_host_daemon(self.host)
         self.assertEqual(self.host.last_stop_rc, 0)                    # `not_running`
         self.assertEqual(self.h.session_daemon_pids(self.host), [self.h.daemon_proc(self.host).pid])
-        self.assertTrue(wait_until(45, lambda: self.h.viewer_ok("workspace", "list", "--json")))
+        self.assertTrue(wait_until(DAEMON_RESTART_BUDGET, lambda: self.h.viewer_ok("workspace", "list", "--json")))
         self.h.viewer_cli("workspace", "create", "--name", "after-kill", "--json")
         self.assertIn("SHELLX-FAKE-APP", self.h.viewer_cli("terminal", self.h.first_terminal(), "screen", "read"))
         self.assertEqual(self.h.host_cli(self.host, "remote", "enroll", "pending", "--json"), [])
@@ -193,13 +211,8 @@ class RemoteE2E(E2ECase):
         self.assertEqual([d["name"] for d in devices], [self.viewer.session])   # still enrolled, no new pairing
 
 
-class ProductionTicketOutage(E2ECase):
+class ProductionTicketOutage(PairedCase):
     TICKET_TTL = 120                                                         # production ticket lifetime
-
-    def prepare(self) -> None:
-        self.host, self.viewer = self.signed_in("host", "viewer")
-        self.h.start_host_daemon(self.host)
-        self.term = self.view(self.viewer, self.host)
 
     def test_thirty_second_relay_outage_recovers_with_long_tickets(self):  # plan Step 5, Review Focus 2
         self.h.stop_relay()
@@ -216,16 +229,29 @@ class ProductionTicketOutage(E2ECase):
         print(f"[e2e] viewer back {elapsed:.1f} s after the relay restart (budget {OUTAGE_RECOVERY_BUDGET} s)",
               file=sys.stderr)
         self.assertTrue(back and elapsed <= OUTAGE_RECOVERY_BUDGET,
-                        f"viewer not back within {OUTAGE_RECOVERY_BUDGET} s of the relay restart ({elapsed:.1f} s)")
+                        f"viewer not back within {OUTAGE_RECOVERY_BUDGET} s of the relay restart ({elapsed:.1f} s; "
+                        f"the viewer's client was started {self.viewer.client_runs} times)")
         self.assertIn("SHELLX-FAKE-APP", self.h.viewer_cli("terminal", self.term, "screen", "read"))
 
 
 class ConcurrentPairing(E2ECase):
+    """Plan Step 6: the two ShellX installs of one Mac (viewers A and B share HOME, TMPDIR and
+    XDG_RUNTIME_DIR) request access to a third session at the same time."""
+
     def prepare(self) -> None:
-        self.host, self.a, self.b = self.signed_in("host", "viewera", "viewerb")
+        self.host, = self.signed_in("host")
+        self.a, self.b = self.signed_in("viewera", "viewerb", env=self.h.mac_env("viewers-mac"))
         self.h.start_host_daemon(self.host)
 
     def test_concurrent_requests_only_approved_viewer_gets_in(self):        # plan Step 6, Review Focus 3
+        """Two requests at once: only the approved requester gets in.
+
+        Proves that the concurrent unapproved requester stays out: it gets no invite and no connect
+        ticket, stock cmux refuses its uninvited connect client-side before dialling, and the host
+        never lists it as pending or enrolled. It does not prove the daemon-side enrollment gate
+        or the spoofing paths (fingerprint swap, an invite moved to another pairing, an unknown
+        pending enrollment); those are covered by the Swift ApprovalGate tests and the
+        shellx-core pairing tests, not here."""
         with ThreadPoolExecutor(2) as pool:
             req_a, req_b = pool.map(lambda viewer: viewer.core("pair.request", to_machine_id=self.host.machine_id),
                                     (self.a, self.b))
@@ -250,8 +276,11 @@ class ConcurrentPairing(E2ECase):
                          [inv])
         self.h.approve_pending(self.host, inv, viewer=self.a)                # the daemon approves only A's invitation
 
-        # B runs the app's connect without an invite, even holding a valid connect ticket for the
-        # host's slot (worst case, e.g. a leaked file): it knows no daemon, so it never enrolls.
+        # B runs the app's connect argv without an invite. It is even handed a valid connect ticket
+        # for the host's slot (as if leaked), but stock cmux refuses before it dials: with no invite
+        # and no known daemon it has nothing to authenticate to (remote_cli.rs select_known_daemon).
+        # This checks that client-side refusal only; neither the relay's ticket check nor the
+        # daemon's enrollment gate is reached.
         leaked = self.host.core("tickets.mint", permission="connect", target_machine_id=self.host.machine_id,
                                 write_to="leaked-connect.ticket")["path"]
         try:
@@ -260,6 +289,7 @@ class ConcurrentPairing(E2ECase):
             os.unlink(leaked)
         self.assertIsNotNone(rc, "B's uninvited connect was still running")
         self.assertNotEqual(rc, 0)
+        self.assertIn("no known daemon matches this route", self.h.process_log(f"client-{self.b.name}-uninvited"))
         self.assertFalse(self.h.viewer_ok("workspace", "list", "--json", viewer=self.b))
         self.assertEqual(self.h.host_cli(self.host, "remote", "enroll", "pending", "--json"), [])
         devices = self.h.host_cli(self.host, "remote", "enroll", "devices", "--json")
@@ -272,13 +302,26 @@ class ConcurrentPairing(E2ECase):
 
 
 class TwoHosts(E2ECase):
+    """Plan Step 3 at binary level: two ShellX installs on one Mac (the Release and a tagged debug
+    build) serve at the same time. They share HOME, TMPDIR and XDG_RUNTIME_DIR, as on a real Mac;
+    only the paths the app passes explicitly differ."""
+
     def prepare(self) -> None:
-        self.host1, self.host2, self.viewer = self.signed_in("host1", "host2", "viewer")
+        self.host1, self.host2 = self.signed_in("host1", "host2", env=self.h.mac_env("hosts-mac"))
+        self.viewer, = self.signed_in("viewer")
         self.h.start_host_daemon(self.host1)
         self.h.start_host_daemon(self.host2)
 
     def test_two_host_daemons_coexist_with_distinct_paths(self):            # plan Step 3, Review Focus 1
+        """Two host daemons of one account on one Mac stay apart.
+
+        Proves that with a shared HOME, TMPDIR and XDG_RUNTIME_DIR and only the explicit paths
+        apart (session, mux/bridge/admin/link sockets, remote and core state dirs, as
+        RemoteCommandLine passes them), both daemons run at once with distinct identities and
+        relay slots, and a viewer paired with host 1 reaches host 1's app only. It does not prove
+        the app's own path derivation (RemotePaths, Swift tests) or anything the GUI adds."""
         h1, h2 = self.host1, self.host2
+        self.assertEqual(h1.env_dirs(), h2.env_dirs())                       # one Mac
         listed = {m["machine_id"] for m in self.viewer.core("machines.list")["machines"]}
         self.assertLessEqual({h1.machine_id, h2.machine_id}, listed)          # one account, two machines
         self.assertNotEqual(h1.slot, h2.slot)
