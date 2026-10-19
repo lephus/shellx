@@ -106,6 +106,106 @@ class EnrolledArgv(unittest.TestCase):
         self.assertEqual([f for f in swift_flags if f != "--invite-file"], harness_flags)
 
 
+SWIFT = ROOT / "Packages/Shared/ShellXBrand/Sources/ShellXRemoteCore/RemoteCommandLine.swift"
+
+
+def swift_array(function: str) -> list[str]:
+    """The argv array literal a `RemoteCommandLine.<function>(...)` returns, element by element:
+    a string literal as its value, anything else (`paths.session`, `route`) as its Swift text."""
+    source = SWIFT.read_text()
+    body = source[source.index(f"public static func {function}("):]
+    body = body[body.index("{") + 1:]
+    literal = body[body.index("[") + 1:body.index("]")]
+    return [item[1:-1] if item.startswith('"') else item
+            for item in (part.strip() for part in literal.split(",")) if item]
+
+
+class ServerArgv(unittest.TestCase):
+    """The daemon spawns of ShellXDaemonSupervisor, mirrored byte for byte: every element of the
+    Swift array, with each Swift expression passed in as the value it names."""
+
+    def test_stop_is_the_swift_server_stop(self):
+        self.assertEqual(harness.server_stop_argv(CMUX, "paths.session", "paths.muxSocket.path"),
+                         [CMUX, *swift_array("serverStop")])
+
+    def test_start_is_the_swift_server_start(self):
+        argv = harness.server_start_argv(
+            CMUX, "paths.session", "paths.muxSocket.path", "paths.daemonStateDir.path", "paths.adminSocket.path",
+            "paths.linkSocket.path", "route", "slot", "ticketFile.path")
+        self.assertEqual(argv, [CMUX, *swift_array("serverStart")])
+
+    def test_stop_names_the_session_and_its_mux_socket_and_forces(self):
+        argv = harness.server_stop_argv(CMUX, "e2e-host", "/h/run/mux.sock")
+        self.assertEqual(argv, [CMUX, "server", "stop", "--session", "e2e-host", "--socket", "/h/run/mux.sock", "--force"])
+
+
+class UninvitedConnect(unittest.TestCase):
+    def test_the_app_connect_argv_without_invite_or_daemon(self):
+        # RemoteCommandLine.connect with inviteFile nil and daemonFingerprint nil: what a viewer whose
+        # pairing was not approved could run. It must equal the enrolled argv minus `--daemon FP`.
+        argv = harness.uninvited_connect_argv(CMUX, ROUTE, SLOT, TICKET, STATE, SOCKET, DEVICE)
+        self.assertEqual(argv + ["--daemon", FINGERPRINT], enrolled_argv())
+        self.assertNotIn("--invite-file", argv)
+        self.assertNotIn("--daemon", argv)
+
+
+class DaemonProcesses(unittest.TestCase):
+    MUX = "/private/tmp/sx-abc/host/run/mux.sock"
+    START = f"/b/cmux-tui server start --session e2e-host --socket {MUX} --headless --ephemeral"
+
+    def test_only_live_daemons_of_this_session_and_socket(self):
+        ps = "\n".join([
+            f"  101 Ss   {self.START} --relay relay+ws://127.0.0.1:1/v1/relay",
+            f"  102 S    /b/cmux-tui server start --session e2e-host2 --socket {self.MUX}2 --headless",
+            f"  103 Z    {self.START}",                                                   # zombie
+            "  104 S    /b/cmux-tui server start --session e2e-host --socket /private/tmp/sx-other/host/run/mux.sock",
+            f"  105 S    /b/cmux-tui server stop --session e2e-host --socket {self.MUX} --force",
+            f"  106 S+   grep server start --session e2e-host --socket {self.MUX}x",
+            f"  107 R    {self.START}",
+            "garbage",
+        ])
+        self.assertEqual(harness.session_daemon_pids(ps, "e2e-host", self.MUX), [101, 107])
+
+    def test_no_daemon(self):
+        self.assertEqual(harness.session_daemon_pids("", "e2e-host", self.MUX), [])
+
+
+class MachinePaths(unittest.TestCase):
+    """Review Focus 1 at harness level: no two machines of one harness share a path (state dirs,
+    sockets, logs), and every socket fits macOS sun_path (104 bytes with the NUL)."""
+
+    def setUp(self):
+        self.h = harness.Harness("/nonexistent/bin", "/nonexistent/core")
+        self.machines = [self.h.machine(name) for name in ("host1", "host2", "viewer")]
+
+    def tearDown(self):
+        self.h.close()
+        self.assertFalse(Path(self.h.root).exists())
+
+    def test_no_two_machines_share_a_path(self):
+        seen: dict[str, str] = {}
+        for machine in self.machines:
+            for key, path in machine.paths().items():
+                self.assertNotIn(str(path), seen, f"{machine.name}.{key} == {seen.get(str(path))}")
+                seen[str(path)] = f"{machine.name}.{key}"
+        for machine in self.machines:
+            others = [m for m in self.machines if m is not machine]
+            for key, path in machine.paths().items():
+                for other in others:
+                    self.assertFalse(Path(path).is_relative_to(other.dir) if hasattr(Path, "is_relative_to")
+                                     else str(path).startswith(str(other.dir) + "/"), f"{machine.name}.{key}")
+
+    def test_every_socket_and_the_daemon_dirs_are_per_machine(self):
+        names = {"bridge_sock", "mux_sock", "admin_sock", "link_sock", "client_sock", "dstate", "cstate", "core_dir"}
+        for machine in self.machines:
+            self.assertLessEqual(names, set(machine.paths()), machine.name)
+            for key in ("bridge_sock", "mux_sock", "admin_sock", "link_sock", "client_sock"):
+                self.assertLessEqual(len(str(machine.paths()[key]).encode()), 103, key)
+
+    def test_sessions_are_distinct(self):
+        self.assertEqual(len({m.session for m in self.machines}), len(self.machines))
+
+
 class RefreshSchedule(unittest.TestCase):
     def test_half_life_when_mints_are_fast(self):
         self.assertAlmostEqual(harness.refresh_delay(2.0, [0.1]), 1.0)

@@ -39,6 +39,9 @@ ShellXClientLinkSupervisor, ShellXTicketRefresher, ReconnectBackoff):
 (c) The app mints a fresh ticket before every spawn (LinkStateMachine
     mintTicket); the harness only relies on the refresher keeping the file
     fresh and does not mint on each restart.
+The daemon side is the app's: every daemon spawn runs `server stop --force` for
+the session first, then `server start` with the app's argv (`server_stop_argv`,
+`server_start_argv`), and the enroll commands name the admin socket.
 """
 
 from __future__ import annotations
@@ -52,6 +55,7 @@ import secrets
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -186,6 +190,49 @@ def enrolled_connect_argv(cmux_tui: str, route: str, slot: str, ticket_file: str
             *_connect_flags(state_dir, local_socket, device_name), "--daemon", daemon_fingerprint]
 
 
+def uninvited_connect_argv(cmux_tui: str, route: str, slot: str, ticket_file: str,
+                           state_dir: str, local_socket: str, device_name: str) -> list[str]:
+    """Swift RemoteCommandLine.connect with neither an invite nor a pinned
+    daemon: what a viewer whose pairing was not approved could run."""
+    return [cmux_tui, "remote", "connect", route, "--relay-slot", slot, "--relay-ticket-file", ticket_file,
+            *_connect_flags(state_dir, local_socket, device_name)]
+
+
+def server_start_argv(cmux_tui: str, session: str, mux_socket: str, state_dir: str, admin_socket: str,
+                      link_socket: str, route: str, slot: str, ticket_file: str) -> list[str]:
+    """The host daemon: byte for byte Swift RemoteCommandLine.serverStart
+    (ShellXDaemonSupervisor.spawnCommand). No `--exit-with-parent`: the daemon
+    outlives its parent, which is why every spawn stops the session first."""
+    return [cmux_tui, "server", "start", "--session", session, "--socket", mux_socket, "--headless", "--ephemeral",
+            "--remote-state-dir", state_dir, "--remote-admin-socket", admin_socket,
+            "--remote-link-socket", link_socket, "--relay", route, "--relay-slot", slot,
+            "--relay-ticket-file", ticket_file]
+
+
+def server_stop_argv(cmux_tui: str, session: str, mux_socket: str) -> list[str]:
+    """Byte for byte Swift RemoteCommandLine.serverStop: what the app runs
+    before every daemon spawn (Review Focus 5). cmux connects to the mux socket,
+    checks that the daemon there serves `session` and asks it to shut down;
+    nothing listening is `not_running` (cli/lifecycle.rs)."""
+    return [cmux_tui, "server", "stop", "--session", session, "--socket", mux_socket, "--force"]
+
+
+def session_daemon_pids(ps_output: str, session: str, mux_socket: str) -> list[int]:
+    """Pids of the live `cmux-tui server start --session <session> --socket
+    <mux_socket>` processes in `ps -A -ww -o pid=,stat=,args=` output. The mux
+    socket lives in the harness dir, so this sees only this harness's daemons;
+    zombies (stat Z) are not running."""
+    needle = f" server start --session {session} --socket {mux_socket} "
+    pids = []
+    for line in ps_output.splitlines():
+        parts = line.split(None, 2)
+        if len(parts) != 3 or not parts[0].isdigit() or parts[1].startswith("Z"):
+            continue
+        if needle in f" {parts[2]} ":
+            pids.append(int(parts[0]))
+    return pids
+
+
 def refresh_delay(left: float, latencies: Sequence[float]) -> float:
     """Seconds to wait before the next mint of a ticket that has `left` seconds
     of life: half the remaining life, or earlier so that the mint (as slow as
@@ -236,6 +283,14 @@ def mkdir_private(path: Path) -> Path:
     return path
 
 
+def is_socket(path: Path) -> bool:
+    """True if `path` is a Unix socket (a symlink to one counts)."""
+    try:
+        return stat.S_ISSOCK(os.stat(path).st_mode)
+    except OSError:
+        return False
+
+
 class HarnessError(RuntimeError):
     pass
 
@@ -284,8 +339,12 @@ class Machine:
         self.bridge_dir = mkdir_private(self.dir / "b")
         self.bridge_sock = self.bridge_dir / "s.sock"
         self.mux_sock = self.run_dir / "mux.sock"
+        self.admin_sock = self.run_dir / "admin.sock"   # daemon --remote-admin-socket
+        self.link_sock = self.run_dir / "link.sock"     # daemon --remote-link-socket
         self.client_sock = self.run_dir / "client.sock"
         self.app_input_log = harness.log_dir / f"fake-app-{name}.input.log"
+        self.app_events_log = harness.log_dir / f"fake-app-{name}.events.log"
+        self.app_external = False  # True: bridge_sock is a running ShellX app's (--app-bridge)
         self.config = json.dumps({
             "api_base": harness.api_base,
             "state_dir": str(self.core_dir),
@@ -305,6 +364,19 @@ class Machine:
         self.client_runs = 0
         self.client_route = ""     # the full relay route of the viewer's client
         self.client_ticket = ""    # the refreshed connect ticket file of the viewer's client
+        self.last_stop_rc: Optional[int] = None  # `server stop` before the latest daemon spawn
+
+    def paths(self) -> dict[str, Path]:
+        """Every file system path this machine uses (Review Focus 1: no two
+        machines may share one)."""
+        return {
+            "dir": self.dir, "core_dir": self.core_dir, "tickets": self.core_dir / "tickets",
+            "home": self.home, "tmp": self.tmp, "run_dir": self.run_dir, "dstate": self.dstate,
+            "cstate": self.cstate, "bridge_dir": self.bridge_dir, "bridge_sock": self.bridge_sock,
+            "mux_sock": self.mux_sock, "admin_sock": self.admin_sock, "link_sock": self.link_sock,
+            "client_sock": self.client_sock, "app_input_log": self.app_input_log,
+            "app_events_log": self.app_events_log,
+        }
 
     # shellx-core ---------------------------------------------------------
     def core(self, method: str, **params) -> dict:
@@ -436,12 +508,13 @@ class Harness:
         self.user = pwd.getpwuid(os.getuid()).pw_name
         self.procs: dict[str, subprocess.Popen] = {}
         self.machines: dict[str, Machine] = {}
-        self.viewer: Optional[Machine] = None
+        self.viewer: Optional[Machine] = None   # the latest connect_viewer() viewer, the default viewer
+        self.abandoned: list[subprocess.Popen] = []   # daemons left running (abandon_host_daemon)
         self.relay_runs = 0
         self._note_lock = threading.Lock()
         self._proc_lock = threading.Lock()
         self._stopping = threading.Event()
-        self._supervisor: Optional[threading.Thread] = None
+        self._supervisors: list[threading.Thread] = []
         self._closed = False
 
     # plumbing ------------------------------------------------------------
@@ -488,6 +561,12 @@ class Harness:
         proc = self.procs.pop(name, None)
         if proc is None or proc.poll() is not None:
             return
+        self._terminate(proc, sig, grace)
+        self.note(f"stop {name} rc={proc.returncode}")
+
+    @staticmethod
+    def _terminate(proc: subprocess.Popen, sig: int, grace: float) -> None:
+        """`sig` to the process group of `proc`, SIGKILL after `grace` s."""
         for current in (sig, signal.SIGKILL):
             try:
                 os.killpg(proc.pid, current)
@@ -498,7 +577,6 @@ class Harness:
                 break
             except subprocess.TimeoutExpired:
                 continue
-        self.note(f"stop {name} rc={proc.returncode}")
 
     def _proc(self, name: str) -> Optional[subprocess.Popen]:
         with self._proc_lock:
@@ -560,33 +638,49 @@ class Harness:
 
     # host ----------------------------------------------------------------
     def host_cli(self, host: Machine, *args: str):
-        """`cmux-tui <args> --session e2e-<name> --state-dir <remote state>`;
-        parsed JSON when `--json` is among the args."""
-        out = self._tui_ok(host, [*args, "--session", host.session, "--state-dir", str(host.dstate)])
+        """`cmux-tui <args> --session e2e-<name> --state-dir <remote state>
+        --admin-socket <admin socket>` (the app's enroll flags); parsed JSON
+        when `--json` is among the args."""
+        out = self._tui_ok(host, [*args, *self._enroll_flags(host)])
         return json.loads(out) if "--json" in args else out
 
+    @staticmethod
+    def _enroll_flags(host: Machine) -> list[str]:
+        """What Swift RemoteCommandLine.enroll adds to every `remote enroll` call."""
+        return ["--session", host.session, "--state-dir", str(host.dstate), "--admin-socket", str(host.admin_sock)]
+
     def start_fake_app(self, host: Machine) -> None:
-        if self._proc(f"fake-app-{host.name}") is not None:
+        """fake_app.py on the host's bridge socket; its banner names the host
+        session, so a viewer can tell two hosts' apps apart."""
+        if host.app_external or self._proc(f"fake-app-{host.name}") is not None:
             return
         argv = [sys.executable, "-I", str(FAKE_APP), "--socket", str(host.bridge_sock),
-                "--log", str(self.log_dir / f"fake-app-{host.name}.events.log"),
-                "--input-log", str(host.app_input_log)]
+                "--log", str(host.app_events_log), "--input-log", str(host.app_input_log), "--name", host.session]
         proc = self._spawn(f"fake-app-{host.name}", argv, self.env(host))
         if not wait_until(15, lambda: proc.poll() is None and host.bridge_sock.exists(), 0.1):
             raise HarnessError("fake app did not start")
 
+    def use_app_bridge(self, host: Machine, socket_path: Path) -> None:
+        """The host daemon serves a running ShellX app's bridge socket instead of
+        fake_app.py (`--app-bridge`)."""
+        host.bridge_sock = Path(socket_path)
+        host.app_external = True
+
     def start_host_daemon(self, host: Machine) -> None:
-        """Fake app + `cmux-tui server start` (patched daemon, virtual PTY via
-        CMUX_SHELLX_BRIDGE_SOCKET), registered at the relay with a refreshed
-        register ticket. Returns once the admin socket answers."""
+        """The app's daemon spawn (ShellXDaemonSupervisor): `server stop --force`
+        for this session first (a daemon left by a crash or force quit, Review
+        Focus 5; status ignored, kept in `host.last_stop_rc`), then `cmux-tui
+        server start` with the app's argv (patched daemon, virtual PTY via
+        CMUX_SHELLX_BRIDGE_SOCKET) registered at the relay with a refreshed
+        register ticket. The fake app is started first unless the host serves
+        a real app. Returns once `remote enroll status` answers."""
         self.start_fake_app(host)
         ticket = host.start_ticket_refresher("register.ticket", "register")
         route = relay_route(host.relay_url)
+        host.last_stop_rc = self.stop_session_daemon(host)
         host.daemon_runs += 1
-        argv = [str(self.bin / "cmux-tui"), "server", "start", "--session", host.session,
-                "--headless", "--ephemeral", "--socket", str(host.mux_sock),
-                "--remote-state-dir", str(host.dstate), "--relay", route, "--relay-slot", host.slot,
-                "--relay-ticket-file", ticket]
+        argv = server_start_argv(str(self.bin / "cmux-tui"), host.session, str(host.mux_sock), str(host.dstate),
+                                 str(host.admin_sock), str(host.link_sock), route, host.slot, ticket)
         env = self.env(host, {"CMUX_SHELLX_BRIDGE_SOCKET": str(host.bridge_sock)})
         name = f"daemon-{host.name}-{host.daemon_runs}"
         proc = self._spawn(name, argv, env)
@@ -594,8 +688,8 @@ class Harness:
         def ready() -> bool:
             if proc.poll() is not None:
                 raise HarnessError("daemon exited")
-            return self._tui(host, ["remote", "enroll", "status", "--session", host.session,
-                                    "--state-dir", str(host.dstate), "--json"], 10).returncode == 0
+            return self._tui(host, ["remote", "enroll", "status", *self._enroll_flags(host), "--json"],
+                             10).returncode == 0
 
         if not wait_until(90, ready):
             raise HarnessError(f"host daemon did not come up (rc={proc.poll()})")
@@ -606,22 +700,72 @@ class Harness:
         self._stop(f"daemon-{host.name}-{host.daemon_runs}", signal.SIGTERM, 20)
         self.start_host_daemon(host)
 
+    def stop_session_daemon(self, host: Machine) -> int:
+        """`server stop --force` for the host's session and mux socket (the
+        app's step before every spawn). Returns the exit code."""
+        argv = server_stop_argv(str(self.bin / "cmux-tui"), host.session, str(host.mux_sock))
+        return self._tui(host, argv[1:], 30).returncode
+
+    def daemon_proc(self, host: Machine) -> subprocess.Popen:
+        proc = self._proc(f"daemon-{host.name}-{host.daemon_runs}")
+        if proc is None:
+            raise HarnessError("no daemon running for this host")
+        return proc
+
+    def abandon_host_daemon(self, host: Machine, kill: bool = False) -> subprocess.Popen:
+        """Leaves the host's daemon behind as a quit app would: the harness
+        forgets it without stopping it (an app that is force-quit or crashes),
+        or with `kill` it is first killed with SIGKILL alone (`kill -9 <pid>`,
+        nothing else in its process group). `close()` still kills whatever of
+        it is left."""
+        name = f"daemon-{host.name}-{host.daemon_runs}"
+        with self._proc_lock:
+            proc = self.procs.pop(name, None)
+        if proc is None:
+            raise HarnessError("no daemon running for this host")
+        self.abandoned.append(proc)
+        if kill:
+            os.kill(proc.pid, signal.SIGKILL)
+            proc.wait(timeout=10)
+        self.note(f"abandon {name} pid={proc.pid} killed={kill}")
+        return proc
+
+    def session_daemon_pids(self, host: Machine) -> list[int]:
+        """Live `cmux-tui server start --session <session>` processes on this
+        host's mux socket (this harness only), from `ps`."""
+        out = subprocess.run(["ps", "-A", "-ww", "-o", "pid=,stat=,args="], capture_output=True, text=True,
+                             check=True, timeout=30).stdout
+        return session_daemon_pids(out, host.session, str(host.mux_sock))
+
     # pairing and viewing -------------------------------------------------
     def pair(self, viewer: Machine, host: Machine) -> str:
         """ShellX pairing that carries a cmux enrollment invite sealed to the
         viewer's device key. Returns the cmux invitation id."""
         request = viewer.core("pair.request", to_machine_id=host.machine_id)
-        pending = host.core("pair.pending")["pairings"]
+        return self.approve_pairing(viewer, host, request, self.pending_item(host, request))
+
+    def pending_item(self, host: Machine, request: dict, pending: Optional[list] = None) -> dict:
+        """The host's `pair.pending` item for the viewer's `pair.request`,
+        checked against what the viewer shows (code, fingerprint, not
+        suspicious). `pending` is a `pair.pending` list already fetched."""
+        if pending is None:
+            pending = host.core("pair.pending")["pairings"]
         item = next((p for p in pending if p["pairing_id"] == request["pairing_id"]), None)
         if item is None:
             raise HarnessError("host does not see the pairing request")
         if item["suspicious"] or item["fingerprint"] != request["fingerprint"] or item["code"] != request["code"]:
             raise HarnessError("pairing request does not match what the viewer shows")
+        return item
+
+    def approve_pairing(self, viewer: Machine, host: Machine, request: dict, item: dict) -> str:
+        """What the host app does on Approve for one pairing: a cmux invite
+        (`remote enroll create`), sealed to that requester by `pair.approve`
+        with the fingerprint shown; then the viewer's `pair.poll` writes it to a
+        file. Returns the cmux invitation id."""
         ticket = host.core("tickets.mint", permission="connect", target_machine_id=host.machine_id,
                            write_to="invite-connect.ticket")["path"]
         route = relay_route(host.relay_url)
-        uri = self._tui_ok(host, ["remote", "enroll", "create", "--session", host.session,
-                                  "--state-dir", str(host.dstate), "--advertise", route,
+        uri = self._tui_ok(host, ["remote", "enroll", "create", *self._enroll_flags(host), "--advertise", route,
                                   "--relay-route", route, "--relay-slot", host.slot,
                                   "--relay-ticket-file", ticket, "--ttl", "300"]).strip()
         os.unlink(ticket)  # it lives on inside the invite only
@@ -666,13 +810,14 @@ class Harness:
         if not wait_until(90, pending):
             raise HarnessError(f"no pending enrollment reached the host (client rc={proc.poll()})")
 
-    def approve_pending(self, host: Machine, invitation_id: str) -> None:
+    def approve_pending(self, host: Machine, invitation_id: str, viewer: Optional[Machine] = None) -> None:
         """Approves exactly this invitation at the daemon and waits until the
         viewer's local socket answers; then drops the invite file and starts
         supervising the viewer's client."""
         self.host_cli(host, "remote", "enroll", "approve", invitation_id)
-        viewer = self._need_viewer()
-        if not wait_until(90, lambda: viewer.client_sock.exists() and self.viewer_ok("workspace", "list", "--json")):
+        viewer = self._need_viewer(viewer)
+        if not wait_until(90, lambda: viewer.client_sock.exists()
+                          and self.viewer_ok("workspace", "list", "--json", viewer=viewer)):
             raise HarnessError("viewer did not come up after approval")
         if viewer.invite_path and os.path.exists(viewer.invite_path):
             os.unlink(viewer.invite_path)
@@ -729,28 +874,49 @@ class Harness:
                     viewer.client_runs += 1
                     self._spawn(f"client-{viewer.name}-{viewer.client_runs}", argv, self.env(viewer))
 
-        self._supervisor = threading.Thread(target=loop, name=f"client-{viewer.name}", daemon=True)
-        self._supervisor.start()
+        supervisor = threading.Thread(target=loop, name=f"client-{viewer.name}", daemon=True)
+        self._supervisors.append(supervisor)
+        supervisor.start()
 
-    def _need_viewer(self) -> Machine:
-        if self.viewer is None:
+    def try_uninvited_connect(self, viewer: Machine, host: Machine, ticket_file: str,
+                              timeout: float = 30) -> Optional[int]:
+        """A viewer that holds no invite and knows no daemon runs the app's
+        connect argv (`uninvited_connect_argv`) against the host's relay slot
+        with `ticket_file`. Returns its exit code, or None when it was still
+        running after `timeout` s (it is stopped then)."""
+        argv = uninvited_connect_argv(str(self.bin / "cmux-tui"), relay_route(host.relay_url), host.slot,
+                                      ticket_file, str(viewer.cstate), str(viewer.client_sock), viewer.session)
+        name = f"client-{viewer.name}-uninvited"
+        proc = self._spawn(name, argv, self.env(viewer))
+        try:
+            return proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            self._stop(name, signal.SIGTERM, 5)
+            return None
+
+    def _need_viewer(self, viewer: Optional[Machine] = None) -> Machine:
+        viewer = viewer or self.viewer
+        if viewer is None:
             raise HarnessError("connect_viewer() first")
-        return self.viewer
+        return viewer
 
-    def viewer_cli(self, *args: str) -> str:
-        viewer = self._need_viewer()
-        return self._tui_ok(viewer, ["--socket", str(viewer.client_sock), *args])
+    def viewer_argv(self, viewer: Optional[Machine], *args: str) -> list[str]:
+        return ["--socket", str(self._need_viewer(viewer).client_sock), *args]
 
-    def viewer_ok(self, *args: str) -> bool:
-        viewer = self._need_viewer()
-        return self._tui(viewer, ["--socket", str(viewer.client_sock), *args], 20).returncode == 0
+    def viewer_cli(self, *args: str, viewer: Optional[Machine] = None) -> str:
+        """`cmux-tui --socket <viewer's local socket> <args>` (the latest
+        connected viewer unless `viewer` is given); stdout."""
+        return self._tui_ok(self._need_viewer(viewer), self.viewer_argv(viewer, *args))
 
-    def first_terminal(self) -> str:
+    def viewer_ok(self, *args: str, viewer: Optional[Machine] = None) -> bool:
+        return self._tui(self._need_viewer(viewer), self.viewer_argv(viewer, *args), 20).returncode == 0
+
+    def first_terminal(self, viewer: Optional[Machine] = None) -> str:
         """Id of the first terminal the viewer sees (waits for one to appear)."""
         found: list[str] = []
 
         def look() -> bool:
-            found[:] = terminal_ids(json.loads(self.viewer_cli("terminal", "list", "--json")))
+            found[:] = terminal_ids(json.loads(self.viewer_cli("terminal", "list", "--json", viewer=viewer)))
             return bool(found)
 
         if not wait_until(30, look):
@@ -833,8 +999,8 @@ class Harness:
             return
         self._closed = True
         self._stopping.set()
-        if self._supervisor is not None:
-            self._supervisor.join(timeout=10)
+        for supervisor in self._supervisors:
+            supervisor.join(timeout=10)
         for machine in self.machines.values():
             for stop, _, _ in machine.refreshers.values():
                 stop.set()
@@ -844,6 +1010,8 @@ class Harness:
             self._stop(name, signal.SIGTERM, 10)
         for name in list(self.procs):
             self._stop(name, signal.SIGTERM, 5)
+        for proc in self.abandoned:
+            self._terminate(proc, signal.SIGKILL, 10)
         for machine in self.machines.values():
             machine.stop_refreshers()
         shutil.rmtree(self.root, ignore_errors=True)
@@ -860,3 +1028,4 @@ def terminal_ids(listing) -> list[str]:
             if ident:
                 ids.append(str(ident))
     return ids
+

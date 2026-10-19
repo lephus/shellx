@@ -20,8 +20,9 @@ back as output the way a shell with echo on would.
 
 --log gets one line per event; --input-log gets the hex of every I payload,
 one frame per line ("<conn> <hex>"), so a test can check input byte-exact.
+--name puts a name in the banner, so a viewer can tell two hosts' apps apart.
 
-    fake_app.py --socket <dir>/s.sock --log app.log --input-log input.hex
+    fake_app.py --socket <dir>/s.sock --log app.log --input-log input.hex [--name e2e-host]
 """
 
 from __future__ import annotations
@@ -38,7 +39,13 @@ import time
 
 PROTOCOL = 1
 MAX_FRAME = 16 * 1024 * 1024
-BANNER = b"\x1b[1;32mSHELLX-FAKE-APP\x1b[0m ready\r\n\x1b[34mfake@mac\x1b[0m:~$ "
+
+
+def banner(name: str = "") -> bytes:
+    """`SHELLX-FAKE-APP [<name> ]ready` and a prompt."""
+    label = f"{name} " if name else ""
+    return (b"\x1b[1;32mSHELLX-FAKE-APP\x1b[0m " + label.encode() + b"ready\r\n"
+            b"\x1b[34mfake@mac\x1b[0m:~$ ")
 
 
 class App:
@@ -75,7 +82,7 @@ class App:
             ack = {"surface_id": f"fake-surface-{n}", "workspace_id": "fake-workspace", "mode": mode}
             conn.sendall(frame("A", json.dumps(ack).encode()))
             conn.sendall(frame("S", struct.pack(">HH", self.args.cols, self.args.rows)))
-            conn.sendall(frame("O", BANNER))
+            conn.sendall(frame("O", banner(self.args.name)))
             while True:
                 kind, payload = read_frame(conn)
                 if kind == "I":
@@ -146,6 +153,7 @@ def main() -> None:
     ap.add_argument("--input-log", required=True)
     ap.add_argument("--cols", type=int, default=100)
     ap.add_argument("--rows", type=int, default=30)
+    ap.add_argument("--name", default="")
     args = ap.parse_args()
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     App(args).run()
