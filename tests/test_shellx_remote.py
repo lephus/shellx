@@ -112,6 +112,39 @@ class ShellXRemoteGuards(unittest.TestCase):
     def test_remote_sources_import_no_cloud_stack(self):
         self.assertEqual(offenders(r"^\s*import (CmuxCloud|CmuxIrohTransport|CmuxIrxTransport|CMUXAuthCore|CmuxAuthRuntime)\b", roots=["Sources/ShellX/Remote"], allow=[]), [])
 
+    def test_app_delegate_runs_the_remote_service_not_the_debug_bridge(self):
+        s = read("Sources/AppDelegate.swift")
+        self.assertNotIn("ShellXBridgeDebugStart", s, "the Task 11 DEBUG bridge start must be gone")
+        self.assertEqual(offenders(r"ShellXBridgeDebugStart", roots=["Sources"], allow=[]), [])
+        lines = s.splitlines()
+        for call in ["ShellXRemoteService.shared.startIfEnabled()", "ShellXRemoteService.shared.stopForTermination()"]:
+            hits = [line for line in lines if call in line]
+            self.assertEqual(len(hits), 1, f"expected one {call} line")
+            self.assertIn("// ShellX:", hits[0], f"{call} must be marked // ShellX:")
+        terminate = s.index("func applicationWillTerminate(")
+        self.assertLess(terminate, s.index("ShellXRemoteService.shared.stopForTermination()"))
+        self.assertLess(s.index("ShellXRemoteService.shared.stopForTermination()"), s.index("\n    }", terminate))
+
+    def test_remote_machines_flag_stays_off(self):
+        s = read("Packages/Shared/ShellXBrand/Sources/ShellXBrand/ShellXFeatures.swift")
+        self.assertIn("public static let remoteMachines = false", s)
+        self.assertIn("public static let upstreamDeviceMirroring = false", s)
+
+    def test_dev_overrides_exist_only_in_debug_builds(self):
+        # SHELLX_API_BASE, SHELLX_DEV_* and SHELLX_REMOTE_MACHINES are read only inside `#if DEBUG` blocks.
+        for path in ["Sources/ShellX/Remote/ShellXRemoteService+App.swift", "Sources/ShellX/Remote/ShellXRemoteGate.swift"]:
+            debug = []
+            for number, line in enumerate(read(path).splitlines(), start=1):
+                stripped = line.strip()
+                if stripped.startswith("#if"):
+                    debug.append(stripped == "#if DEBUG")
+                elif stripped.startswith("#else") and debug:
+                    debug[-1] = False
+                elif stripped.startswith("#endif") and debug:
+                    debug.pop()
+                elif re.search(r'"SHELLX_(API_BASE|DEV_[A-Z]+|REMOTE_MACHINES)"', line):
+                    self.assertTrue(debug and debug[-1], f"{path}:{number} reads a dev override outside #if DEBUG")
+
 
 if __name__ == "__main__":
     unittest.main()

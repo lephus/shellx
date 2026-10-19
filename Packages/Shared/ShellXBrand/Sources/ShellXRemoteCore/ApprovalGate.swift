@@ -18,4 +18,17 @@ public struct ApprovalGate: Sendable {
               now.timeIntervalSince(entry.at) <= Self.lifetime else { return .deny }
         return .approve(pairingID: entry.pairingID)
     }
+
+    /// Forgets an invitation that will never be handed out (its pairing was not approved after all).
+    public mutating func revoke(invitationID: String) {
+        issued[invitationID] = nil
+    }
+
+    /// Drops invitations older than their 300 s lifetime.
+    public mutating func pruneExpired(now: Date) {
+        issued = issued.filter { now.timeIntervalSince($0.value.at) <= Self.lifetime }
+    }
+
+    /// True when no invitation is expected (the daemon's pending list need not be polled).
+    public var isEmpty: Bool { issued.isEmpty }
 }

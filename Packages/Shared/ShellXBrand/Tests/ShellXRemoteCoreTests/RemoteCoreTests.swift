@@ -210,6 +210,32 @@ private let route = "relay+wss://relay.shellx.pro/v2/relay"
                                       deviceName: "Mac", daemonFingerprint: "a1b2c3d4e5f60718") == base + ["--daemon", "a1b2c3d4e5f60718"])
 }
 
+@Test func remoteSessionCliArgv() {                         // cmux-tui cli/command.rs parse_terminal / parse_workspace
+    let sock = URL(fileURLWithPath: "/tmp/sx-1/c-2.sock")
+    #expect(RemoteCommandLine.terminalList(clientSocket: sock) == ["--socket", "/tmp/sx-1/c-2.sock", "terminal", "list", "--json"])
+    #expect(RemoteCommandLine.workspaceCreate(clientSocket: sock, name: "ShellX")
+            == ["--socket", "/tmp/sx-1/c-2.sock", "workspace", "create", "--name", "ShellX", "--json"])
+}
+
+@Test func machineNameMarksDevBuilds() {
+    #expect(ShellXRemoteDevice.machineName(base: "Phu's Mac", bundleID: "pro.shellx.desktop") == "Phu's Mac")
+    #expect(ShellXRemoteDevice.machineName(base: "Phu's Mac", bundleID: "pro.shellx.desktop.debug.l5") == "Phu's Mac (DEV l5)")
+    #expect(ShellXRemoteDevice.machineName(base: "Phu's Mac", bundleID: "pro.shellx.desktop.debug.") == "Phu's Mac (DEV)")
+}
+
+@Test func gateRevokesAndPrunes() {
+    var g = ApprovalGate()
+    #expect(g.isEmpty)
+    g.expect(invitationID: "a", pairingID: "p", now: t0); g.expect(invitationID: "b", pairingID: "q", now: t0 + 100)
+    g.revoke(invitationID: "a")
+    #expect(g.decide(pendingInvitationID: "a", now: t0 + 1) == .deny)
+    g.pruneExpired(now: t0 + 401)
+    #expect(g.isEmpty)
+    g.expect(invitationID: "c", pairingID: "r", now: t0)
+    g.pruneExpired(now: t0 + 300)
+    #expect(!g.isEmpty)
+}
+
 @Test func attachWrapperQuotesAndLoops() {
     let c = RemoteCommandLine.attachShellCommand(clientPath: "/App/cmux tui", socketPath: "/tmp/a b/c.sock", terminalID: "term_1")
     #expect(c.contains("attach")); #expect(c.contains("--terminal")); #expect(c.contains("'term_1'"))
