@@ -15,6 +15,8 @@
 //!   created `O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC` mode `0600`, then `fchmod 0600`
 //!   (umask-proof), written, `fsync`ed, `renameat`ed over the target inside the
 //!   same directory, and the directory is `fsync`ed. Failed writes remove the temp.
+//!   `create_secret` (create-if-absent) `linkat`s the finished temp instead, so
+//!   concurrent creators agree on one file; the temp is always removed.
 //! * Reads return `Zeroizing` buffers (allocated once, never grown). Errors and
 //!   `Debug` carry paths and error kinds only, never file bytes.
 //! * File names must match `^[a-z0-9][a-z0-9._-]{0,63}$`, optionally prefixed by
@@ -256,11 +258,11 @@ mod imp {
 
     impl StateStore {
         pub fn open(root: &Path) -> Result<StateStore, CoreError> {
-            if let Some(parent) = root.parent() {
-                if !parent.as_os_str().is_empty() {
-                    std::fs::create_dir_all(parent)
-                        .map_err(|e| CoreError::new("io", format!("mkdir {}: {e}", parent.display())))?;
-                }
+            if let Some(parent) = root.parent()
+                && !parent.as_os_str().is_empty()
+            {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| CoreError::new("io", format!("mkdir {}: {e}", parent.display())))?;
             }
             if !root_path_ok(root) {
                 return Err(dir_insecure(root, "path must end in a plain directory name"));
@@ -300,6 +302,19 @@ mod imp {
         }
 
         pub fn write_secret(&self, name: &str, bytes: &[u8]) -> Result<PathBuf, CoreError> {
+            self.publish(name, bytes, false).map(|(path, _)| path)
+        }
+
+        /// Create `name` with `bytes` only if it does not exist yet (atomic across
+        /// threads and processes: the full temp file is `linkat`ed, which fails with
+        /// `EEXIST` instead of replacing). `Ok(false)` = it already existed, untouched.
+        pub fn create_secret(&self, name: &str, bytes: &[u8]) -> Result<bool, CoreError> {
+            self.publish(name, bytes, true).map(|(_, created)| created)
+        }
+
+        /// Write a temp file, then `renameat` it over `name` (replace) or `linkat`
+        /// it to `name` (create only). Returns whether `name` now holds `bytes`.
+        fn publish(&self, name: &str, bytes: &[u8], create_only: bool) -> Result<(PathBuf, bool), CoreError> {
             let (dirfd, file, path) = self.locate(name)?;
             let dfd = dirfd.as_raw_fd();
             let final_c = cstr(file.as_bytes());
@@ -311,6 +326,9 @@ mod imp {
             if unsafe { libc::fstatat(dfd, final_c.as_ptr(), &mut st, libc::AT_SYMLINK_NOFOLLOW) } == 0 {
                 if st.st_mode & libc::S_IFMT != libc::S_IFREG {
                     return Err(file_insecure(&path, "is a symlink or not a regular file"));
+                }
+                if create_only {
+                    return Ok((path, false));
                 }
             } else if errno() != libc::ENOENT {
                 return Err(io_err("stat", &path));
@@ -337,22 +355,29 @@ mod imp {
                 }
                 f.write_all(bytes).map_err(|e| CoreError::new("io", format!("write {}: {e}", path.display())))?;
                 f.sync_all().map_err(|e| CoreError::new("io", format!("fsync {}: {e}", path.display())))?;
+                if create_only {
+                    // SAFETY: valid C strings; both names are in the same directory.
+                    if unsafe { libc::linkat(dfd, tmp_c.as_ptr(), dfd, final_c.as_ptr(), 0) } != 0 {
+                        return if errno() == libc::EEXIST { Ok(false) } else { Err(io_err("link", &path)) };
+                    }
+                    return Ok(true);
+                }
                 // SAFETY: valid C strings; both names are in the same directory.
                 if unsafe { libc::renameat(dfd, tmp_c.as_ptr(), dfd, final_c.as_ptr()) } != 0 {
                     return Err(io_err("rename", &path));
                 }
-                Ok(())
+                Ok(true)
             })();
             drop(f);
-            if let Err(e) = res {
+            if create_only || res.is_err() {
                 cleanup(&tmp_c);
-                return Err(e);
             }
+            let created = res?;
             // SAFETY: live directory fd.
             if unsafe { libc::fsync(dfd) } != 0 {
                 return Err(io_err("fsync dir", &path));
             }
-            Ok(path)
+            Ok((path, created))
         }
 
         pub fn read_secret(&self, name: &str) -> Result<Option<Zeroizing<Vec<u8>>>, CoreError> {
@@ -440,6 +465,16 @@ mod imp {
         }
 
         pub fn write_secret(&self, name: &str, bytes: &[u8]) -> Result<PathBuf, CoreError> {
+            self.publish(name, bytes, false).map(|(path, _)| path)
+        }
+
+        /// Create `name` only if it does not exist yet (hard link of the full temp
+        /// file, which fails instead of replacing). `Ok(false)` = it already existed.
+        pub fn create_secret(&self, name: &str, bytes: &[u8]) -> Result<bool, CoreError> {
+            self.publish(name, bytes, true).map(|(_, created)| created)
+        }
+
+        fn publish(&self, name: &str, bytes: &[u8], create_only: bool) -> Result<(PathBuf, bool), CoreError> {
             let path = self.path_for(name)?;
             let tmp = path.with_file_name(format!(
                 "{}.tmp.{}",
@@ -455,13 +490,19 @@ mod imp {
                 f.write_all(bytes).map_err(|e| io("write", &path, e))?;
                 f.sync_all().map_err(|e| io("fsync", &path, e))?;
                 drop(f);
-                std::fs::rename(&tmp, &path).map_err(|e| io("rename", &path, e))
+                if create_only {
+                    return match std::fs::hard_link(&tmp, &path) {
+                        Ok(()) => Ok(true),
+                        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
+                        Err(e) => Err(io("link", &path, e)),
+                    };
+                }
+                std::fs::rename(&tmp, &path).map_err(|e| io("rename", &path, e)).map(|()| true)
             })();
-            if let Err(e) = res {
+            if create_only || res.is_err() {
                 let _ = std::fs::remove_file(&tmp);
-                return Err(e);
             }
-            Ok(path)
+            Ok((path, res?))
         }
 
         pub fn read_secret(&self, name: &str) -> Result<Option<Zeroizing<Vec<u8>>>, CoreError> {

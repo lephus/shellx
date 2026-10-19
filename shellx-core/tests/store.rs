@@ -247,3 +247,16 @@ fn open_sweeps_only_own_stale_temp_files() {
     assert!(outside.exists());
     assert_eq!(&s.read_secret("session.json").unwrap().unwrap()[..], b"keep");
 }
+
+#[test]
+fn create_secret_never_replaces_and_leaves_no_temp() {
+    let _g = serial();
+    let (d, s) = fresh();
+    assert!(s.create_secret("device.key", b"first").unwrap());
+    assert!(!s.create_secret("device.key", b"second").unwrap());
+    assert_eq!(&s.read_secret("device.key").unwrap().unwrap()[..], b"first");
+    assert_eq!(mode(d.path().join("core/device.key")), 0o600);
+    let names: Vec<String> =
+        fs::read_dir(d.path().join("core")).unwrap().map(|e| e.unwrap().file_name().into_string().unwrap()).collect();
+    assert!(names.iter().all(|n| !n.contains(".tmp.")), "{names:?}");
+}

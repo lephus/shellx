@@ -168,3 +168,57 @@ fn login_as_another_user_drops_machine_json() {
     assert_eq!(core.call("machines.heartbeat", json!({})).unwrap_err().code, "not_registered");
     let _ = StateStore::open(&dir);
 }
+
+#[test]
+fn list_fingerprint_is_computed_from_a_padded_standard_key() {
+    use base64::engine::general_purpose::STANDARD;
+    let (core, fake, _dir) = support::logged_in();
+    let id = core.call("machines.register", reg_params()).unwrap()["machine_id"].as_str().unwrap().to_string();
+    let key = [0xfbu8; 32]; // encodes with '+', '/' and '=' in standard base64
+    let b64 = STANDARD.encode(key);
+    assert!(b64.contains('=') && (b64.contains('+') || b64.contains('/')));
+    fake.set_machine_key_b64(&id, &b64);
+    let r = core.call("machines.list", json!({})).unwrap();
+    assert_eq!(r["machines"][0]["fingerprint"], json!(shellx_core::fingerprint::fingerprint(&key)));
+}
+
+#[test]
+fn list_never_falls_back_to_the_server_fingerprint() {
+    let (core, fake, _dir) = support::logged_in();
+    let id = core.call("machines.register", reg_params()).unwrap()["machine_id"].as_str().unwrap().to_string();
+    fake.set_machine_key_b64(&id, "not a key!");
+    let r = core.call("machines.list", json!({})).unwrap();
+    let m = &r["machines"][0];
+    assert_eq!(m["machine_id"], json!(id));
+    assert_eq!(m["fingerprint"], Value::Null, "an undecodable key has no fingerprint (D1: computed locally only)");
+}
+
+#[test]
+fn heartbeat_refuses_a_machine_id_that_is_not_path_safe() {
+    let (core, fake, dir) = support::logged_in();
+    let store = StateStore::open(&dir).unwrap();
+    for id in ["../x", "a/b", "a?b", "a b", "a%2f"] {
+        store.write_secret("machine.json", json!({"machine_id": id, "slot": "s"}).to_string().as_bytes()).unwrap();
+        let before = fake.requests().len();
+        let e = core.call("machines.heartbeat", json!({})).unwrap_err();
+        assert_eq!(e.code, "io", "{id}");
+        assert_eq!(fake.requests().len(), before, "{id}: nothing is sent");
+    }
+}
+
+#[test]
+fn unauthorized_reply_forgets_the_session_but_keeps_the_machine() {
+    let (core, fake, dir) = support::logged_in();
+    core.call("machines.register", reg_params()).unwrap();
+    let token = fake.issued_token();
+    fake.revoke_token(&token);
+    assert_eq!(core.call("machines.list", json!({})).unwrap_err().code, "unauthorized");
+    assert!(!dir.join("session.json").exists(), "a token the server refuses is forgotten");
+    assert!(dir.join("machine.json").exists());
+    assert_eq!(core.call("machines.list", json!({})).unwrap_err().code, "not_logged_in");
+    let before = fake.requests().len();
+    login(&core);
+    let req = &fake.requests()[before];
+    assert_eq!(req.path, "/v1/auth/login");
+    assert_eq!(support::header(req, "Authorization"), None, "no stale bearer on the next login");
+}

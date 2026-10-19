@@ -58,6 +58,7 @@ pub struct Core {
     auth_lock: Mutex<()>,
     /// `pairing_id → fingerprint` shown by the most recent `pair.pending`
     /// (Ruling R14, see `pairing`). Public keys' fingerprints only, no secrets.
+    /// Cleared by `config.set`, `auth.login` and `auth.logout`.
     shown_fingerprints: Mutex<HashMap<String, String>>,
 }
 
@@ -78,7 +79,7 @@ impl Core {
         if method == "config.set" {
             let cfg = Config::from_params(&params)?;
             *self.config.lock().unwrap_or_else(|p| p.into_inner()) = Some(cfg);
-            self.shown_fingerprints.lock().unwrap_or_else(|p| p.into_inner()).clear();
+            self.forget_shown_fingerprints();
             return Ok(json!({}));
         }
         let cfg = self
@@ -91,37 +92,72 @@ impl Core {
             return version::check(self.agent(), &cfg, session.as_ref().map(|s| s.token.as_str()));
         }
         let store = self.store(&cfg)?;
-        if needs_session(method) && auth::load_session(&store)?.is_none() {
-            return Err(CoreError::new("not_logged_in", "auth.login has not been called"));
+        if needs_session(method) {
+            let Some(session) = auth::load_session(&store)? else {
+                return Err(CoreError::new("not_logged_in", "auth.login has not been called"));
+            };
+            let used = zeroize::Zeroizing::new(session.token.clone());
+            drop(session);
+            let result = self.dispatch(method, &params, &cfg, &store);
+            if let Err(e) = &result
+                && (e.code == "unauthorized" || e.code == "http_401")
+            {
+                self.forget_refused_session(&store, &used);
+            }
+            return result;
         }
+        self.dispatch(method, &params, &cfg, &store)
+    }
+
+    /// The server refused `used` (401): forget `session.json` so the next
+    /// `auth.login` sends no stale bearer. `machine.json` is kept (same semantics
+    /// as before: only logout or a login as another account drops it). A session
+    /// replaced meanwhile by a concurrent `auth.login` is left alone.
+    fn forget_refused_session(&self, store: &StateStore, used: &str) {
+        let _g = self.auth_lock.lock().unwrap_or_else(|p| p.into_inner());
+        if let Ok(Some(current)) = auth::load_session(store)
+            && current.token == used
+        {
+            let _ = store.remove(auth::SESSION_FILE);
+        }
+    }
+
+    fn forget_shown_fingerprints(&self) {
+        self.shown_fingerprints.lock().unwrap_or_else(|p| p.into_inner()).clear();
+    }
+
+    fn dispatch(&self, method: &str, params: &Value, cfg: &Config, store: &StateStore) -> Result<Value, CoreError> {
         match method {
             "auth.login" => {
                 let _g = self.auth_lock.lock().unwrap_or_else(|p| p.into_inner());
-                auth::login(self.agent(), &cfg, &store, &params)
+                self.forget_shown_fingerprints();
+                auth::login(self.agent(), cfg, store, params)
             }
             "auth.logout" => {
                 let _g = self.auth_lock.lock().unwrap_or_else(|p| p.into_inner());
-                auth::logout(self.agent(), &cfg, &store)
+                self.forget_shown_fingerprints();
+                auth::logout(self.agent(), cfg, store)
             }
-            "machines.register" => machines::register(self.agent(), &cfg, &store, &params),
-            "machines.list" => machines::list(self.agent(), &cfg, &store),
-            "machines.heartbeat" => machines::heartbeat(self.agent(), &cfg, &store),
-            "tickets.mint" => tickets::mint(self.agent(), &cfg, &store, &params),
-            "pair.request" => pairing::request(self.agent(), &cfg, &store, &params),
+            "machines.register" => machines::register(self.agent(), cfg, store, params),
+            "machines.list" => machines::list(self.agent(), cfg, store),
+            "machines.heartbeat" => machines::heartbeat(self.agent(), cfg, store),
+            "tickets.mint" => tickets::mint(self.agent(), cfg, store, params),
+            "pair.request" => pairing::request(self.agent(), cfg, store, params),
             "pair.pending" => {
-                let shown = pairing::pending(self.agent(), &cfg, &store)?;
+                let shown = pairing::pending(self.agent(), cfg, store)?;
                 *self.shown_fingerprints.lock().unwrap_or_else(|p| p.into_inner()) =
                     pairing::shown_fingerprints(&shown);
                 Ok(shown)
             }
             "pair.approve" => {
-                let remembered = params.get("pairing_id").and_then(Value::as_str).and_then(|id| {
-                    self.shown_fingerprints.lock().unwrap_or_else(|p| p.into_inner()).get(id).cloned()
-                });
-                pairing::approve(self.agent(), &cfg, &store, &params, remembered.as_deref())
+                let remembered = params
+                    .get("pairing_id")
+                    .and_then(Value::as_str)
+                    .and_then(|id| self.shown_fingerprints.lock().unwrap_or_else(|p| p.into_inner()).get(id).cloned());
+                pairing::approve(self.agent(), cfg, store, params, remembered.as_deref())
             }
-            "pair.deny" => pairing::deny(self.agent(), &cfg, &store, &params),
-            "pair.poll" => pairing::poll(self.agent(), &cfg, &store, &params),
+            "pair.deny" => pairing::deny(self.agent(), cfg, store, params),
+            "pair.poll" => pairing::poll(self.agent(), cfg, store, params),
             _ => Err(CoreError::new("unknown_method", format!("method not implemented: {method}"))),
         }
     }

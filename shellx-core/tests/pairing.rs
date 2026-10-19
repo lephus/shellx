@@ -416,3 +416,23 @@ fn requester_list_items_carry_the_requester_key() {
     let own = URL_SAFE_NO_PAD.decode(p.a_login["device_public_key_b64"].as_str().unwrap()).unwrap();
     assert_eq!(shown, own, "{item}");
 }
+
+#[test]
+fn login_and_logout_forget_the_shown_fingerprints() {
+    let p = pair();
+    let pid = p.request();
+    p.show();
+    // Re-login (same account, machine kept) forgets what was shown.
+    p.b.call("auth.login", json!({"email": "a@b.c", "password": "pw"})).unwrap();
+    let e = p.b.call("pair.approve", json!({"pairing_id": pid, "invite_uri": uri()})).unwrap_err();
+    assert_eq!(e.code, "fingerprint_mismatch");
+    // So does logout (then sign back in and re-register the same machine).
+    p.show();
+    p.b.call("auth.logout", json!({})).unwrap();
+    p.b.call("auth.login", json!({"email": "a@b.c", "password": "pw"})).unwrap();
+    let reg = json!({"name": "Mac B", "platform": "macos", "os_version": "15", "app_version": "2.0.0"});
+    p.b.call("machines.register", reg).unwrap();
+    let e = p.b.call("pair.approve", json!({"pairing_id": pid, "invite_uri": uri()})).unwrap_err();
+    assert_eq!(e.code, "fingerprint_mismatch");
+    assert_eq!(p.approve_posts(), 0);
+}
