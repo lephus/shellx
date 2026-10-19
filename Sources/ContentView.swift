@@ -4,6 +4,7 @@ import CmuxAppKitSupportUI
 import CmuxCommandPalette
 import CmuxCore
 import CmuxFeedback
+import ShellXBrand
 import CmuxFoundation
 import CmuxAgentJournal
 import CmuxNotifications
@@ -10276,9 +10277,7 @@ struct ContentView: View {
     }
 
     private func presentFeedbackComposer() {
-        DispatchQueue.main.async {
-            isFeedbackComposerPresented = true
-        }
+        FeedbackComposerBridge.openMailDraft()
     }
 
     static func shouldHandleCommandPaletteRequest(
@@ -15810,11 +15809,13 @@ private enum SidebarHelpMenuAction {
 }
 
 private struct SidebarHelpMenuButton: View {
-    private let docsURL = URL(string: "https://cmux.com/docs")
-    private let changelogURL = URL(string: "https://cmux.com/docs/changelog")
-    private let githubURL = URL(string: "https://github.com/manaflow-ai/cmux")
-    private let githubIssuesURL = URL(string: "https://github.com/manaflow-ai/cmux/issues")
-    private let discordURL = URL(string: "https://discord.gg/xsgFEVrWCZ")
+    // ShellX: the website stands in for docs; links with no ShellX page
+    // (changelog, cmux's Discord) are nil, which hides their rows.
+    private let docsURL: URL? = ShellXBrand.websiteURL
+    private let changelogURL: URL? = nil
+    private let githubURL: URL? = ShellXBrand.sourceCodeURL
+    private let githubIssuesURL: URL? = ShellXBrand.sourceCodeURL.appendingPathComponent("issues")
+    private let discordURL: URL? = nil
     private let helpTitle = String(localized: "sidebar.help.button", defaultValue: "Help")
     private let buttonSize = SidebarFooterButtonMetrics.buttonSize
 #if DEBUG

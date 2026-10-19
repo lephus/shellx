@@ -44,7 +44,7 @@ struct LocalTmuxSettingsCard: View {
 
                     Link(
                         String(localized: "settings.terminal.localTmux.details", defaultValue: "Details", bundle: .module),
-                        destination: URL(string: "https://github.com/manaflow-ai/cmux/blob/main/docs/local-tmux.md")!
+                        destination: URL(string: "https://github.com/lephus/shellx/blob/main/docs/local-tmux.md")!
                     )
                     .cmuxFont(.caption)
                     .accessibilityIdentifier("SettingsTerminalLocalTmuxDocsLink")

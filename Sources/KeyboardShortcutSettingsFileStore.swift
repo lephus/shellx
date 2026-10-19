@@ -9,7 +9,8 @@ nonisolated private let cmuxSettingsFileStoreLogger = Logger(subsystem: "com.cmu
 
 final class CmuxSettingsFileStore {
     static let currentSchemaVersion = 1
-    static let schemaURLString = "https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux.schema.json"
+    /// ShellX's own schema location (no cmux/Manaflow URL in written files).
+    static let schemaURLString = "https://shellx.pro/schema/shellx.json"
     private static let legacySchemaURLString = "https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux-settings.schema.json"
     private static let releaseBundleIdentifier = ShellXBrand.bundleID
     private static let backupsDefaultsKey = "cmux.settingsFile.backups.v1"

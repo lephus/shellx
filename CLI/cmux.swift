@@ -7055,7 +7055,7 @@ struct CMUXCLI {
             }
             let response = try client.sendV2(method: "vm.billing_checkout", params: ["plan": plan])
             guard let url = response["url"] as? String else {
-                throw CLIError(message: "Checkout URL is missing. Open https://cmux.com/pricing.")
+                throw CLIError(message: "Checkout URL is missing.")
             }
             if !rest.contains("--no-open") && !jsonOutput {
                 let process = Process()
@@ -7270,8 +7270,8 @@ struct CMUXCLI {
                     if let expiresAtMs {
                         let expiresAt = Date(timeIntervalSince1970: TimeInterval(expiresAtMs) / 1000)
                         let remaining = expiresAt.timeIntervalSinceNow
-                        // Attribution only: the pricing page forwards it to checkout.
-                        let upgradeURL = "https://cmux.com/pricing?cmux_source=cli_free_access_expiry&cmux_client=cli"
+                        // ShellX has no pricing page; the website stands in.
+                        let upgradeURL = ShellXBrand.websiteURL.absoluteString
                         // "6d 23h" / "5h 12m" / "1m": whole units, truncated, never overstated.
                         func countdown(_ remaining: TimeInterval) -> String {
                             let total = max(Int(remaining), 60)
@@ -45830,10 +45830,9 @@ export default {
         print()
         print(shortcuts)
         print()
-        print("  \(bold)Docs\(reset)\(subdued)                https://cmux.com/docs\(reset)")
-        print("  \(bold)Discord\(reset)\(subdued)             https://discord.gg/xsgFEVrWCZ\(reset)")
-        print("  \(bold)GitHub\(reset)\(subdued)              https://github.com/manaflow-ai/cmux (please leave a star ⭐)\(reset)")
-        print("  \(bold)Email\(reset)\(subdued)               founders@cmux.com\(reset)")
+        print("  \(bold)Docs\(reset)\(subdued)                \(ShellXBrand.websiteURL.absoluteString)\(reset)")
+        print("  \(bold)GitHub\(reset)\(subdued)              \(ShellXBrand.sourceCodeURL.absoluteString)\(reset)")
+        print("  \(bold)Email\(reset)\(subdued)               \(ShellXBrand.contactEmail)\(reset)")
         print()
         print("  \(subdued)Run \(reset)\(bold)cmux --help\(reset)\(subdued) for all commands.\(reset)")
         print("  \(subdued)Run \(reset)\(bold)cmux shortcuts\(reset)\(subdued) to edit shortcuts.\(reset)")

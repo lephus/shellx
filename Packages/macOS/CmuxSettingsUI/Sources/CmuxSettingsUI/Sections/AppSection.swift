@@ -156,6 +156,8 @@ public struct AppSection: View {
     }
 
     private static let columnWidth: CGFloat = 196
+    /// ShellX sends no telemetry, so the `sendAnonymousTelemetry` row is hidden.
+    static let showsTelemetrySetting = false
 
     /// Languages legacy `AppLanguage` exposes (cmuxApp.swift line
     /// 4338). The shared `CmuxSettings.AppLanguage` adds `.vi` for a
@@ -867,22 +869,24 @@ public struct AppSection: View {
             }
             SettingsCardDivider()
 
-            // Telemetry
-            SettingsCardRow(
-                configurationReview: .json("app.sendAnonymousTelemetry"),
-                String(localized: "settings.app.telemetry", defaultValue: "Send anonymous telemetry"),
-                subtitle: telemetryManagedByPolicy
-                    ? String(localized: "settings.managedByOrganization", defaultValue: "Managed by your organization")
-                    : (telemetryAtAppear != nil && telemetry.current != telemetryAtAppear)
-                        ? String(localized: "settings.app.telemetry.subtitleChanged", defaultValue: "Change takes effect on next launch.")
-                        : String(localized: "settings.app.telemetry.subtitle", defaultValue: "Share anonymized crash and usage data to help improve cmux.")
-            ) {
-                Toggle("", isOn: Binding(get: { telemetry.current && !telemetryManagedByPolicy }, set: { telemetry.set($0) }))
-                    .labelsHidden()
-                    .controlSize(.small)
-                    .disabled(telemetryManagedByPolicy)
+            // Telemetry: ShellX sends none, so the opt-in row is hidden.
+            if Self.showsTelemetrySetting {
+                SettingsCardRow(
+                    configurationReview: .json("app.sendAnonymousTelemetry"),
+                    String(localized: "settings.app.telemetry", defaultValue: "Send anonymous telemetry"),
+                    subtitle: telemetryManagedByPolicy
+                        ? String(localized: "settings.managedByOrganization", defaultValue: "Managed by your organization")
+                        : (telemetryAtAppear != nil && telemetry.current != telemetryAtAppear)
+                            ? String(localized: "settings.app.telemetry.subtitleChanged", defaultValue: "Change takes effect on next launch.")
+                            : String(localized: "settings.app.telemetry.subtitle", defaultValue: "Share anonymized crash and usage data to help improve cmux.")
+                ) {
+                    Toggle("", isOn: Binding(get: { telemetry.current && !telemetryManagedByPolicy }, set: { telemetry.set($0) }))
+                        .labelsHidden()
+                        .controlSize(.small)
+                        .disabled(telemetryManagedByPolicy)
+                }
+                SettingsCardDivider()
             }
-            SettingsCardDivider()
 
             // Warn Before Quit
             SettingsCardRow(

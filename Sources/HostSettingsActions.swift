@@ -11,6 +11,7 @@ import CmuxFoundation
 import Foundation
 import OSLog
 import SwiftUI
+import ShellXBrand
 nonisolated private let hostSettingsLogger = Logger(subsystem: "com.cmuxterm.app", category: "Settings")
 /// Routes Settings actions to app-owned services, keeping the package independent.
 @MainActor
@@ -462,7 +463,8 @@ final class HostSettingsActions: SettingsHostActions {
     }
 
     func sendFeedback() {
-        guard let url = URL(string: "https://github.com/manaflow-ai/cmux/issues/new") else { return }
+        // ShellX takes feedback by mail (see FeedbackComposerSettings.submissionURL).
+        guard let url = URL(string: "mailto:" + ShellXBrand.contactEmail) else { return }
         NSWorkspace.shared.open(url)
     }
 

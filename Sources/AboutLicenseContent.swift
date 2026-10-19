@@ -7,7 +7,7 @@ struct AboutLicenseContent {
 
     init(
         bundle: Bundle,
-        repositoryURL: URL = URL(string: "https://github.com/manaflow-ai/cmux")!
+        repositoryURL: URL = ShellXBrand.sourceCodeURL
     ) {
         self.bundle = bundle
         self.repositoryURL = repositoryURL

@@ -1,7 +1,9 @@
 import Foundation
+import ShellXBrand
 
 enum MenuBarProfilingProfilePreview {
-    static let recipient = "founders@cmux.com"
+    /// Profiles go to ShellX, never to cmux/Manaflow.
+    static let recipient = ShellXBrand.contactEmail
 
     static func text(outputURL: URL, email: String, summary: String) -> String {
         [
