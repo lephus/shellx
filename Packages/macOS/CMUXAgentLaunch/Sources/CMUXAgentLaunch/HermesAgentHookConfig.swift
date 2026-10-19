@@ -20,8 +20,8 @@ public enum HermesAgentHookConfig {
         var events: [Event]
     }
 
-    private static let beginMarker = "# cmux hooks hermes-agent begin"
-    private static let endMarker = "# cmux hooks hermes-agent end"
+    private static let beginMarker = "# shellx hooks hermes-agent begin"
+    private static let endMarker = "# shellx hooks hermes-agent end"
     private static let restoreLineMarkerPrefix = "\(beginMarker) restore-line-base64:"
 
     public static func installing(events: [Event], in existing: String) -> String {

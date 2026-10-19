@@ -80,7 +80,7 @@ done
 exec node -e 'process.stdout.write(process.env.NODE_OPTIONS || "__UNSET__")'
 """,
         )
-        make_executable(wrapper_dir / "cmux", "#!/usr/bin/env bash\nexit 0\n")
+        make_executable(wrapper_dir / "shellx", "#!/usr/bin/env bash\nexit 0\n")
 
         socket_path = root / "cmux.sock"
         test_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -98,7 +98,7 @@ exec node -e 'process.stdout.write(process.env.NODE_OPTIONS || "__UNSET__")'
                     "TMPDIR": str(session_tmpdir),
                     "CMUX_SURFACE_ID": "surface:test",
                     "CMUX_SOCKET_PATH": str(socket_path),
-                    "CMUX_BUNDLED_CLI_PATH": str(wrapper_dir / "cmux"),
+                    "CMUX_BUNDLED_CLI_PATH": str(wrapper_dir / "shellx"),
                     "CMUX_CUSTOM_CLAUDE_PATH": str(real_dir / "claude"),
                     "NODE_OPTIONS": f"--require={user_preload}",
                     "FAKE_READY_PATH": str(ready_path),

@@ -48,12 +48,12 @@ SWIFT_ROOTS = ["Sources", "CLI", "Packages/macOS", "Packages/Shared"]
 # reason it stays. Matched against the source line.
 CMUX_ID_LINE_ALLOW = [
     (r"subsystem", "os_log subsystem: in-process label (ruling R3)"),
-    (r"label: \"com\.shellx\.app\.", "DispatchQueue label: in-process (R3)"),
-    (r"releaseBundleIdentifier = \"com\.shellx\.app\"", "GhosttyTerminalView: only an os_log subsystem (R3)"),
-    (r"Notification\.Name\(\"com\.shellx\.app\.(displayReconfiguration|screenChangeReconcile)\"\)",
+    (r"label: \"com\.cmuxterm\.app\.", "DispatchQueue label: in-process (R3)"),
+    (r"releaseBundleIdentifier = \"com\.cmuxterm\.app\"", "GhosttyTerminalView: only an os_log subsystem (R3)"),
+    (r"Notification\.Name\(\"com\.cmuxterm\.app\.(displayReconfiguration|screenChangeReconcile)\"\)",
      "in-process NotificationCenter names (R3)"),
-    (r"\"com\.shellx\.app\.userNotification", "UNNotification category ids, scoped to this app (R3)"),
-    (r"releasePayloadDomain = \"com\.shellx\.app\"", "MDM payload domain: Task 4"),
+    (r"\"com\.cmuxterm\.app\.userNotification", "UNNotification category ids, scoped to this app (R3)"),
+    (r"releasePayloadDomain = \"com\.cmuxterm\.app\"", "MDM payload domain: Task 4"),
 ]
 
 def targets_compiling_shellxbrand_without_linking_it(pbx):
@@ -168,7 +168,7 @@ class ShellXIdentityTests(unittest.TestCase):
         self.assertLacks("cmux-dev", schemes)
 
     def test_swift_names_shellx_not_cmux_as_its_bundle_id(self):
-        hits = [hit for hit in offenders(r"com\.shellx\.app", roots=SWIFT_ROOTS, allow=[]) if "/Tests/" not in hit
+        hits = [hit for hit in offenders(r"com\.cmuxterm\.app", roots=SWIFT_ROOTS, allow=[]) if "/Tests/" not in hit
                 and hit.split(":")[0].endswith(".swift")]
         unexpected = []
         for hit in hits:

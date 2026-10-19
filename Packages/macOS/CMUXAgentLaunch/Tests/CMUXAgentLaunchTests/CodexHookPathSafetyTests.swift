@@ -6,7 +6,7 @@ struct CodexHookPathSafetyTests {
     @Test("Strips shell-quoted content-addressed hooks below a shell-significant home path")
     func stripsShellQuotedContentAddressedHooksBelowShellSignificantHomePath() {
         let arguments = ["codex"] + codexWrapperHookArguments { subcommand in
-            let path = "/Volumes/Home Disk/Example $HOME/O'Reilly/.cmux/hooks/cmux-codex-hook-0123456789abcdef-\(subcommand).sh"
+            let path = "/Volumes/Home Disk/Example $HOME/O'Reilly/.shellx/hooks/shellx-codex-hook-0123456789abcdef-\(subcommand).sh"
             return "'\(path.replacingOccurrences(of: "'", with: "'\"'\"'"))'"
         } + ["--model", "gpt-5.5"]
         #expect(
@@ -21,7 +21,7 @@ struct CodexHookPathSafetyTests {
     @Test("Strips canonical quoted hooks with boundary whitespace in path components")
     func stripsCanonicalQuotedHooksWithBoundaryWhitespaceInPathComponents() {
         let arguments = ["codex"] + codexWrapperHookArguments { subcommand in
-            let path = "/Volumes/ Home /Example $HOME/O'Reilly/.cmux/hooks/cmux-codex-hook-0123456789abcdef-\(subcommand).sh"
+            let path = "/Volumes/ Home /Example $HOME/O'Reilly/.shellx/hooks/shellx-codex-hook-0123456789abcdef-\(subcommand).sh"
             return CodexHookScriptName.shellCommand(forScriptPath: path)
         } + ["--model", "gpt-5.5"]
 
@@ -37,7 +37,7 @@ struct CodexHookPathSafetyTests {
     @Test("Preserves legacy bare hook paths with control characters")
     func preservesLegacyBareHookPathsWithControlCharacters() {
         let arguments = ["codex"] + codexWrapperHookArguments { subcommand in
-            "/Users/Example\nName/.cmux/hooks/cmux-codex-hook-0123456789abcdef-\(subcommand).sh"
+            "/Users/Example\nName/.shellx/hooks/shellx-codex-hook-0123456789abcdef-\(subcommand).sh"
         } + ["--model", "gpt-5.5"]
 
         #expect(
@@ -52,7 +52,7 @@ struct CodexHookPathSafetyTests {
     @Test("Preserves legacy bare hook paths with shell metacharacters")
     func preservesLegacyBareHookPathsWithShellMetacharacters() {
         let arguments = ["codex"] + codexWrapperHookArguments { subcommand in
-            "/Users/Example;Name/.cmux/hooks/cmux-codex-hook-0123456789abcdef-\(subcommand).sh"
+            "/Users/Example;Name/.shellx/hooks/shellx-codex-hook-0123456789abcdef-\(subcommand).sh"
         } + ["--model", "gpt-5.5"]
 
         #expect(

@@ -45,7 +45,7 @@ def main() -> int:
         shell_dir.mkdir()
         for name in ("cmux-bash-bootstrap.bash", "cmux-bash-integration.bash", "cmux-zsh-integration.zsh", ".zshenv"):
             (shell_dir / name).symlink_to(integration_dir / name)
-        fake_cli = bundle / "bin" / "cmux"
+        fake_cli = bundle / "bin" / "shellx"
         fake_cli.write_text('#!/bin/sh\nprintf "FAKE-CMUX-%s\\n" "$1"\n', encoding="utf-8")
         fake_cli.chmod(0o755)
         home = Path(tmp) / "home"

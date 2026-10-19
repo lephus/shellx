@@ -18687,7 +18687,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         )
         alert.addButton(withTitle: String(
             localized: "singleInstance.olderShellX.quit",
-            defaultValue: "Quit Old ShellX and Continue"
+            defaultValue: "Quit it and open ShellX"
         ))
         alert.addButton(withTitle: String(localized: "common.cancel", defaultValue: "Cancel"))
         guard alert.runModal() == .alertFirstButtonReturn else {

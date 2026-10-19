@@ -93,7 +93,7 @@ import Testing
     }
 
     @Test func startupTokenIsTheReadableManagedPATHCommand() {
-        #expect(AgentRestoreLaunch.cliStartupExecutableToken == "cmux")
+        #expect(AgentRestoreLaunch.cliStartupExecutableToken == "shellx")
     }
 
     @Test func structuredCodexRestorePlansDirectArgvEnvironmentAndCwd() throws {

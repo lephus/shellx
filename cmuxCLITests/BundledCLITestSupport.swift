@@ -66,7 +66,7 @@ enum BundledCLITestSupport {
     /// Resolution order:
     ///   1. `CMUX_CLI_PATH` — CI and local runs point this at the binary they
     ///      built, which is what makes this bundle independent of an app host.
-    ///   2. `<products>/cmux` — the `cmux-cli` target's own product, which sits
+    ///   2. `<products>/shellx` — the `cmux-cli` target's own product, which sits
     ///      beside this .xctest bundle in `Build/Products/<config>`.
     ///   3. Any `*.app/Contents/Resources/bin/shellx` below the products
     ///      directory — the copy the app bundle ships.
@@ -99,7 +99,7 @@ enum BundledCLITestSupport {
 
         let productsURL = Bundle(for: bundleClass).bundleURL.deletingLastPathComponent()
 
-        let siblingCLI = productsURL.appendingPathComponent("cmux", isDirectory: false)
+        let siblingCLI = productsURL.appendingPathComponent("shellx", isDirectory: false)
         if fileManager.isExecutableFile(atPath: siblingCLI.path) {
             return siblingCLI
         }
@@ -110,7 +110,7 @@ enum BundledCLITestSupport {
             options: [.skipsHiddenFiles]
         )
         while let item = enumerator?.nextObject() as? URL {
-            guard item.lastPathComponent == "cmux",
+            guard item.lastPathComponent == "shellx",
                   item.path.contains(".app/Contents/Resources/bin/shellx"),
                   fileManager.isExecutableFile(atPath: item.path) else { continue }
             return item

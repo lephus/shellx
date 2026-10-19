@@ -3,7 +3,7 @@
 
 Sockets, config/state/Application Support paths, the CLI command, the bundled
 agent wrappers, hook markers, pasteboard/UTI types, keychain services and the
-`~/.shellx` / `~/.cmux` state trees all carry ShellX names (plan Task 3).
+`~/.cmuxterm` / `~/.cmux` state trees all carry ShellX names (plan Task 3).
 """
 
 import plistlib
@@ -66,6 +66,7 @@ LINE_ALLOW = [
     (".config/cmux/env", "env file on cmux cloud VMs written by their baked CLI; cloud is off (Task 5)"),
     (".cmux/bin/cmux", "cloud VM TUI client path (cloud is off); ~/.shellx/bin/shellx is the SSH relay CLI (Task 5B)"),
     ("$cmux_home/.config/cmux", "cloud VM bootstrap for the VM's baked cmux user; cloud is off (Task 5)"),
+    ("! -f /etc/cmux/zsh-bootstrap-v5", "cloud VM bootstrap probes the VM's baked cmux CLI; cloud is off (Task 5)"),
 ]
 
 
@@ -118,6 +119,26 @@ class ShellXCoexistenceTests(unittest.TestCase):
         for pat in (r'appendingPathComponent\("cmux"(, isDirectory: (true|false))?\)', r"(?<![\w.])bin/cmux(?![-\w.])"):
             self.assertEqual(coexistence_offenders(pat), [], pat)
 
+    def test_app_runs_and_types_the_shellx_cli(self):
+        # The app finds its bundled CLI by name and types it into terminals (session
+        # restore, welcome banner, wake hint); a bare `cmux` would reach an installed cmux.
+        for pat in (r'forResource: "cmux", withExtension: nil, subdirectory: "bin"',
+                    r'cliStartupExecutableToken = "cmux"', r'fallbackExecutable: "cmux"',
+                    r'typedCommandText = " cmux ', r'"cmux focus-panel ', r'_cmux_wrapper_path "cmux"',
+                    r"\bwhich cmux \|", r"command -v cmux\b"):
+            self.assertEqual(coexistence_offenders(pat), [], pat)
+        self.assertIn('public static let cliStartupExecutableToken = "shellx"',
+                      read("Packages/macOS/CMUXAgentLaunch/Sources/CMUXAgentLaunch/AgentRestoreLaunch.swift"))
+
+    def test_agent_config_block_markers_are_shellx(self):
+        # Hook blocks ShellX writes into third-party agent configs carry its own markers,
+        # so installing or removing them never touches cmux's blocks.
+        base = "Packages/macOS/CMUXAgentLaunch/Sources/CMUXAgentLaunch/"
+        self.assertIn('"# shellx hooks rovodev begin"', read(base + "RovoDevHookConfig.swift"))
+        self.assertIn('"# shellx hooks hermes-agent begin"', read(base + "HermesAgentHookConfig.swift"))
+        self.assertIn('"# shellx-kimi-hooks-', read(base + "KimiCodeHookConfig.swift"))
+        self.assertEqual(coexistence_offenders(r'"# cmux hooks (rovodev|hermes-agent) |"# cmux-kimi-hooks-'), [])
+
     def test_cli_product_is_shellx(self):
         pbx = read(PBXPROJ)
         self.assertRegex(pbx, r"PRODUCT_NAME = shellx;")
@@ -163,8 +184,8 @@ class ShellXCoexistenceTests(unittest.TestCase):
         self.assertIn('"/tmp/shellx-debug-\\(slug).sock"', definitions)
 
     def test_no_cmuxterm_state_dir(self):
-        # Local `~/.shellx` moved to `~/.shellx` (ruling R12), like the remote helper (Task 5B).
-        pattern = r'(["/~]|\$HOME/|HOME%/}/)\.shellx\b|"\.shellx'
+        # Local `~/.cmuxterm` moved to `~/.shellx` (ruling R12), like the remote helper (Task 5B).
+        pattern = r'(["/~]|\$HOME/|HOME%/}/)\.cmuxterm\b|"\.cmuxterm'
         self.assertEqual(coexistence_offenders(pattern), [])
 
     def test_local_dot_cmux_trees_are_shellx(self):
@@ -191,7 +212,7 @@ class ShellXCoexistenceTests(unittest.TestCase):
         store = read("Packages/macOS/CmuxSettings/Sources/CmuxSettings/SocketControl/SocketControlPasswordStore.swift")
         self.assertNotIn("com.cmuxterm.app.socket-control", store)
         self.assertIn('"pro.shellx.desktop.surface-resume-approvals"', read("Sources/SessionPersistence.swift"))
-        iroh = offenders(r"com\.shellx\.iroh\.", roots=["Packages/Shared", "Packages/macOS", "Sources", "CLI"],
+        iroh = offenders(r"com\.cmuxterm\.iroh\.", roots=["Packages/Shared", "Packages/macOS", "Sources", "CLI"],
                          allow=_package_test_dirs())
         self.assertEqual(iroh, [])
         self.assertIn('"pro.shellx.desktop.iroh.endpoint-identity.v1"',

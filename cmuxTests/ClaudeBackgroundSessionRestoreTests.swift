@@ -277,7 +277,7 @@ struct ClaudeBackgroundSessionRestoreTests {
         }
 
         let input = try #require(restored.input)
-        #expect(input == " cmux restore claude \(sessionID)\n", Comment(rawValue: input))
+        #expect(input == " shellx restore claude \(sessionID)\n", Comment(rawValue: input))
         // The CLI must be able to take the launch claim immediately before exec.
         let canClaimAtExecution = AgentResumeLaunchGuard.shared.claimResumeLaunch(
             kind: "claude", sessionId: sessionID
@@ -322,7 +322,7 @@ struct ClaudeBackgroundSessionRestoreTests {
             }
         }
         #expect(inputs.count == 2)
-        #expect(inputs.allSatisfy { $0 == " cmux restore claude \(sessionID)\n" })
+        #expect(inputs.allSatisfy { $0 == " shellx restore claude \(sessionID)\n" })
         let firstClaim = AgentResumeLaunchGuard.shared.claimResumeLaunchWithToken(
             kind: "claude", sessionId: sessionID
         )
@@ -439,7 +439,7 @@ struct ClaudeBackgroundSessionRestoreTests {
             #expect(!input.contains("--resume"), Comment(rawValue: input))
         } else {
             let input = try #require(restored.input)
-            #expect(input == " cmux restore claude \(sessionID)\n", Comment(rawValue: input))
+            #expect(input == " shellx restore claude \(sessionID)\n", Comment(rawValue: input))
             let record = try #require(restored.record)
             #expect(record.preparedArguments == [
                 "claude", "--resume", sessionID, "--permission-mode", "auto"

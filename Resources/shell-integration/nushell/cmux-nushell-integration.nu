@@ -49,7 +49,7 @@ def --env _cmux_socket_is_unix [] {
 def _cmux_relay_cli_path [] {
     let bundled = ($env.CMUX_BUNDLED_CLI_PATH? | default "")
     if ($bundled != "") and ($bundled | path exists) { return $bundled }
-    which cmux | get -o 0.path | default ""
+    which shellx | get -o 0.path | default ""
 }
 
 # Whether CMUX_SOCKET_PATH is a host:port relay address reachable through the cmux CLI.
@@ -279,7 +279,7 @@ def --env _cmux_show_welcome_once [] {
     hide-env CMUX_SHOW_WELCOME_FILE
     if (^/bin/rm -- $token | complete | get exit_code) != 0 { return }
     if not (($env.TMUX? | default "") | is-empty) { return }
-    let cli = (_cmux_wrapper_path "cmux")
+    let cli = (_cmux_wrapper_path "shellx")
     if ($cli | is-empty) { return }
     try { ^$cli welcome }
 }

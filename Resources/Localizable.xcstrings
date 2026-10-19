@@ -656250,55 +656250,55 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quit Old ShellX and Continue"
+            "value": "Quit it and open ShellX"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "إنهاء ShellX القديم والمتابعة"
+            "value": "إنهاؤه وفتح ShellX"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cerrar el ShellX anterior y continuar"
+            "value": "Cerrarlo y abrir ShellX"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "結束舊版 ShellX 並繼續"
+            "value": "結束並開啟 ShellX"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "退出旧版 ShellX 并继续"
+            "value": "退出并打开 ShellX"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이전 ShellX 종료 후 계속"
+            "value": "종료하고 ShellX 열기"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Alte ShellX beenden und fortfahren"
+            "value": "Beenden und ShellX öffnen"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quitter l’ancien ShellX et continuer"
+            "value": "Le quitter et ouvrir ShellX"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "古い ShellX を終了して続行"
+            "value": "終了して ShellX を開く"
           }
         }
       }

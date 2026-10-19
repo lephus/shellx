@@ -16,7 +16,7 @@ import Testing
 @MainActor
 @Suite("Restored startup input ownership")
 struct RestoredStartupInputOwnershipTests {
-    private let selector = " cmux restore antigravity 6e8458c7-7970-41e0-8d3e-00beda48097b\n"
+    private let selector = " shellx restore antigravity 6e8458c7-7970-41e0-8d3e-00beda48097b\n"
 
     private func awaitingCoordinator(panelId: UUID) -> RestoredAgentLifecycleCoordinator {
         let coordinator = RestoredAgentLifecycleCoordinator(dateProvider: { 1_788_868_000 })

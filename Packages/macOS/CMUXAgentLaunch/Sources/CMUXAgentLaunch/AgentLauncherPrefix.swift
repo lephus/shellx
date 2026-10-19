@@ -13,7 +13,7 @@ public struct AgentLauncherPrefix: Equatable, Sendable {
     private static let nonLauncherNames: Set<String> = [
         "sh", "bash", "zsh", "fish", "csh", "tcsh", "ksh", "dash", "nu", "login",
         "tmux", "screen", "zellij", "script", "sudo", "su", "env", "launchd",
-        "cmux", "shellx-claude-wrapper",
+        "cmux", "shellx", "shellx-claude-wrapper",
     ]
 
     /// The agent kind (`claude`, `codex`).

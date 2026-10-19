@@ -77,7 +77,7 @@ def queued_hook_command(agent: str, subcommand: str, disabled_key: str) -> str:
     return "; ".join(
         [
             f'cmux_cli="{executable}"',
-            'if [ -z "$cmux_cli" ] || [ ! -x "$cmux_cli" ]; then cmux_cli="$(command -v cmux 2>/dev/null || true)"; fi',
+            'if [ -z "$cmux_cli" ] || [ ! -x "$cmux_cli" ]; then cmux_cli="$(command -v shellx 2>/dev/null || true)"; fi',
             f'agent_pid="${{{pid_key}:-${{PPID:-}}}}"',
             f'if [ -n "$CMUX_SURFACE_ID" ] && [ "${disabled_key}" != "1" ] && [ -n "$cmux_cli" ]; then if [ -n "${{CMUX_SOCKET_PATH:-}}" ]; then {pid_key}="$agent_pid" CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC=0.5 "$cmux_cli" --socket "$CMUX_SOCKET_PATH" hooks enqueue {agent} {subcommand} 2>/dev/null || {{ cat >/dev/null; echo \'{{}}\'; }}; else {pid_key}="$agent_pid" CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC=0.5 "$cmux_cli" hooks enqueue {agent} {subcommand} 2>/dev/null || {{ cat >/dev/null; echo \'{{}}\'; }}; fi; else cat >/dev/null; echo \'{{}}\'; fi',
         ]
@@ -128,7 +128,7 @@ def spool_producer_command(agent: str, subcommand: str, fallback: str) -> str:
 
 
 def generated_claude_hook_settings() -> str:
-    direct_cli = '"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}"'
+    direct_cli = '"${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}"'
 
     def direct(
         command: str,
@@ -394,7 +394,7 @@ fs.writeFileSync(
         )
 
         make_executable(
-            wrapper_dir / "cmux",
+            wrapper_dir / "shellx",
             """#!/usr/bin/env bash
 set -euo pipefail
 printf '%s timeout=%s\\n' "$*" "${CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC-__UNSET__}" >> "$FAKE_CMUX_LOG"
@@ -410,7 +410,7 @@ fi
 exit 0
 """,
         )
-        bundled_cli_path = bundled_dir / "cmux"
+        bundled_cli_path = bundled_dir / "shellx"
         make_executable(
             bundled_cli_path,
             """#!/usr/bin/env bash
@@ -568,7 +568,7 @@ def run_wrapper_terminal_env_probe(
         socket_path = str(tmp / "cmux.sock")
         fingerprint_env = {
             "CMUX_BUNDLE_ID": "com.cmuxterm.app.debug.envprobe",
-            "CMUX_BUNDLED_CLI_PATH": str(wrapper_dir / "cmux"),
+            "CMUX_BUNDLED_CLI_PATH": str(wrapper_dir / "shellx"),
             "CMUX_LOAD_GHOSTTY_ZSH_INTEGRATION": "1",
             "CMUX_PANEL_ID": "panel:test",
             "CMUX_PORT": "9170",
@@ -616,7 +616,7 @@ done
         )
 
         make_executable(
-            wrapper_dir / "cmux",
+            wrapper_dir / "shellx",
             """#!/usr/bin/env bash
 set -euo pipefail
 if [[ "${1:-}" == "--socket" ]]; then
@@ -735,7 +735,7 @@ done
         )
 
         make_executable(
-            wrapper_dir / "cmux",
+            wrapper_dir / "shellx",
             """#!/usr/bin/env bash
 set -euo pipefail
 if [[ "${1:-}" == "--socket" ]]; then
@@ -845,7 +845,7 @@ def test_live_socket_injects_supported_hooks_without_unlocking_bypass(failures: 
     )
     expect(runtime_node_options == "__UNSET__", f"live socket: expected runtime NODE_OPTIONS restored, got {runtime_node_options!r}", failures)
     expect(child_node_options == "__UNSET__", f"live socket: expected child NODE_OPTIONS restored, got {child_node_options!r}", failures)
-    expect(hook_cmux_bin.endswith("/bundled cli/cmux"), f"live socket: expected bundled cmux pin, got {hook_cmux_bin!r}", failures)
+    expect(hook_cmux_bin.endswith("/bundled cli/shellx"), f"live socket: expected bundled cmux pin, got {hook_cmux_bin!r}", failures)
 
     settings = parse_settings_arg(real_argv)
     expect(
@@ -876,7 +876,7 @@ def test_live_socket_injects_supported_hooks_without_unlocking_bypass(failures: 
         cron_guard_hooks = cron_guard_groups[0].get("hooks", [])
         expect(
             any(
-                h.get("command") == '"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks claude cron-create-guard'
+                h.get("command") == '"${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}" hooks claude cron-create-guard'
                 and h.get("async") is not True
                 for h in cron_guard_hooks
             ),
@@ -926,7 +926,7 @@ def test_live_socket_injects_supported_hooks_without_unlocking_bypass(failures: 
     )
     permission_request_hooks = hooks.get("PermissionRequest", [{}])[0].get("hooks", [{}])
     expect(
-        any(h.get("command") == '"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks feed --source claude' for h in permission_request_hooks),
+        any(h.get("command") == '"${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}" hooks feed --source claude' for h in permission_request_hooks),
         f"PermissionRequest hook should call hooks feed, got {permission_request_hooks}",
         failures,
     )
@@ -2020,7 +2020,7 @@ def installed_helper_executable(home: Path, scope: str = "default") -> Path:
         home
         / "Library"
         / "Application Support"
-        / "cmux"
+        / "ShellX"
         / "cmux-cua"
         / "helper"
         / scope
@@ -2206,7 +2206,7 @@ def expect_computer_use_env_scrubbed(
     )
     state_dir = env.get("CMUX_CUA_STATE_DIR", "")
     expect(
-        state_dir.endswith("/Library/Application Support/cmux/cmux-cua/runtime/default/state"),
+        state_dir.endswith("/Library/Application Support/ShellX/cmux-cua/runtime/default/state"),
         f"{context}: unexpected state directory {state_dir!r}",
         failures,
     )
@@ -2241,7 +2241,7 @@ def expect_cmux_cua_config(
     )
     if len(args) == 3:
         expect(
-            args[2].startswith("/tmp/cmux-cua-") and args[2].endswith("/default/cmux-cua.sock"),
+            args[2].startswith("/tmp/shellx-cua-") and args[2].endswith("/default/cmux-cua.sock"),
             f"{context}: expected short per-user daemon socket, got {args[2]!r}",
             failures,
         )

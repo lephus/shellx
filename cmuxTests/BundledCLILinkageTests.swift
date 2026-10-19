@@ -28,7 +28,7 @@ enum BundledCLITestSupport {
             .appendingPathComponent("Contents", isDirectory: true)
             .appendingPathComponent("Resources", isDirectory: true)
             .appendingPathComponent("bin", isDirectory: true)
-            .appendingPathComponent("cmux", isDirectory: false)
+            .appendingPathComponent("shellx", isDirectory: false)
 
         if fileManager.isExecutableFile(atPath: expectedCLIURL.path) {
             return expectedCLIURL
@@ -40,7 +40,7 @@ enum BundledCLITestSupport {
             options: [.skipsHiddenFiles]
         )
         while let item = enumerator?.nextObject() as? URL {
-            guard item.lastPathComponent == "cmux",
+            guard item.lastPathComponent == "shellx",
                   item.path.contains(".app/Contents/Resources/bin/shellx"),
                   fileManager.isExecutableFile(atPath: item.path) else { continue }
             return item

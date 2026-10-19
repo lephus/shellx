@@ -655,11 +655,11 @@ import Testing
         let project = root.appendingPathComponent("project/nested", isDirectory: true)
         let fileManager = FileManager.default
         try fileManager.createDirectory(
-            at: home.appendingPathComponent(".config/cmux", isDirectory: true),
+            at: home.appendingPathComponent(".config/shellx", isDirectory: true),
             withIntermediateDirectories: true
         )
         try fileManager.createDirectory(
-            at: root.appendingPathComponent("project/.cmux", isDirectory: true),
+            at: root.appendingPathComponent("project/.shellx", isDirectory: true),
             withIntermediateDirectories: true
         )
         try fileManager.createDirectory(at: project, withIntermediateDirectories: true)
@@ -675,13 +675,13 @@ import Testing
               "resumeArgvPrefix": ["llm-gateway", "exec", "--"] }
           ] }
         }
-        """.utf8).write(to: home.appendingPathComponent(".config/cmux/cmux.json"))
+        """.utf8).write(to: home.appendingPathComponent(".config/shellx/shellx.json"))
         try Data("""
         { "agents": { "launchers": [
           { "id": "teamclaude", "detect": { "argvExecutables": "teamclaude" },
             "resumeArgvPrefix": ["teamclaude", "run", "--auto-fallback", "--"] }
         ] } }
-        """.utf8).write(to: root.appendingPathComponent("project/.cmux/cmux.json"))
+        """.utf8).write(to: root.appendingPathComponent("project/.shellx/shellx.json"))
 
         let loaded = AgentExternalLauncherRegistry.load(
             homeDirectory: home.path,

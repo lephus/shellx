@@ -59,7 +59,7 @@ import Testing
             } > \(shellQuotedForTest(recordURL.path))
             """
         )
-        let fakeCmuxURL = binDir.appendingPathComponent("cmux", isDirectory: false)
+        let fakeCmuxURL = binDir.appendingPathComponent("shellx", isDirectory: false)
         try writeExecutable(
             fakeCmuxURL,
             """

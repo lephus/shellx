@@ -25,9 +25,9 @@ public enum KimiCodeHookConfig {
     }
 
     private static let beginMarker =
-        "# cmux-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f begin"
+        "# shellx-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f begin"
     private static let endMarker =
-        "# cmux-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f end"
+        "# shellx-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f end"
 
     /// Returns TOML content with exactly one cmux-owned Kimi Code hooks block.
     /// - Parameters:

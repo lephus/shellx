@@ -12,7 +12,7 @@ struct CodexHookScriptNameTests {
         let contentID = try #require(name.contentID)
 
         #expect(contentID.count == 16)
-        #expect(name.filename == "cmux-codex-hook-\(contentID)-stop.sh")
+        #expect(name.filename == "shellx-codex-hook-\(contentID)-stop.sh")
         #expect(try #require(CodexHookScriptName(filename: name.filename)) == name)
     }
 
@@ -30,16 +30,16 @@ struct CodexHookScriptNameTests {
 
     @Test("Shell command paths round-trip shell-significant characters")
     func shellCommandPathsRoundTripShellSignificantCharacters() throws {
-        let safePath = "/Users/example/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh"
+        let safePath = "/Users/example/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh"
         #expect(CodexHookScriptName.shellCommand(forScriptPath: safePath) == safePath)
 
         let paths = [
-            "/Users/Example Name/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh",
-            "/Users/Example $HOME/O'Reilly/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh",
-            "/Users/Example;Name/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh",
-            "/Users/Example/back\\slash [glob]/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh",
-            "/Users/Example/\"double\"/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh",
-            "/Users/Example/three'''quotes/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh",
+            "/Users/Example Name/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh",
+            "/Users/Example $HOME/O'Reilly/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh",
+            "/Users/Example;Name/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh",
+            "/Users/Example/back\\slash [glob]/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh",
+            "/Users/Example/\"double\"/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh",
+            "/Users/Example/three'''quotes/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh",
         ]
         for path in paths {
             let command = CodexHookScriptName.shellCommand(forScriptPath: path)
@@ -51,10 +51,10 @@ struct CodexHookScriptNameTests {
     @Test(
         "Shell command paths quote line terminators",
         arguments: [
-            "/tmp/cmux-codex-hook-0123456789abcdef-stop.sh\n",
-            "/tmp/cmux-codex-hook-0123456789abcdef-stop.sh\r",
-            "/tmp/cmux-codex-hook-0123456789abcdef-stop.sh\r\n",
-            "/tmp/hooks\n/cmux-codex-hook-0123456789abcdef-stop.sh",
+            "/tmp/shellx-codex-hook-0123456789abcdef-stop.sh\n",
+            "/tmp/shellx-codex-hook-0123456789abcdef-stop.sh\r",
+            "/tmp/shellx-codex-hook-0123456789abcdef-stop.sh\r\n",
+            "/tmp/hooks\n/shellx-codex-hook-0123456789abcdef-stop.sh",
         ]
     )
     func shellCommandPathsQuoteLineTerminators(path: String) {
@@ -67,12 +67,12 @@ struct CodexHookScriptNameTests {
     func shellCommandParserRejectsMalformedCompoundCommands() {
         #expect(
             CodexHookScriptName.scriptPath(
-                fromShellCommand: "'/Users/Example Name/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh' && echo bad"
+                fromShellCommand: "'/Users/Example Name/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh' && echo bad"
             ) == nil
         )
         #expect(
             CodexHookScriptName.scriptPath(
-                fromShellCommand: "'/Users/Example Name/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh'; echo bad"
+                fromShellCommand: "'/Users/Example Name/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh'; echo bad"
             ) == nil
         )
     }
@@ -80,9 +80,9 @@ struct CodexHookScriptNameTests {
     @Test("Legacy bare paths with shell characters remain parseable for ownership")
     func legacyBarePathsWithShellCharactersRemainParseableForOwnership() {
         let paths = [
-            "/Users/O'Reilly/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh",
-            "/Users/Example $HOME/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh",
-            "/Users/Example;Name/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh",
+            "/Users/O'Reilly/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh",
+            "/Users/Example $HOME/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh",
+            "/Users/Example;Name/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh",
         ]
         for path in paths {
             #expect(CodexHookScriptName.scriptPath(fromShellCommand: path) == nil)
@@ -105,9 +105,9 @@ struct CodexHookScriptNameTests {
     @Test(
         "Recognized legacy generated filenames parse",
         arguments: [
-            "cmux-codex-hook-stop.sh",
-            "cmux-codex-hook-persistent-stop.sh",
-            "cmux-codex-hook-persistent-feed-PreToolUse.sh",
+            "shellx-codex-hook-stop.sh",
+            "shellx-codex-hook-persistent-stop.sh",
+            "shellx-codex-hook-persistent-feed-PreToolUse.sh",
         ]
     )
     func recognizedLegacyGeneratedFilenamesParse(filename: String) throws {
@@ -120,12 +120,12 @@ struct CodexHookScriptNameTests {
     @Test(
         "Malformed generated filenames are rejected",
         arguments: [
-            "cmux-codex-hook-0123456789abcde-stop.sh",
-            "cmux-codex-hook-0123456789abcdef-.sh",
-            "cmux-codex-hook-0123456789ABCDEF-stop.sh",
-            "cmux-codex-hook-0123456789abcdef-stop!.sh",
-            "cmux-codex-hook-unrecognized.sh",
-            "prefix-cmux-codex-hook-0123456789abcdef-stop.sh",
+            "shellx-codex-hook-0123456789abcde-stop.sh",
+            "shellx-codex-hook-0123456789abcdef-.sh",
+            "shellx-codex-hook-0123456789ABCDEF-stop.sh",
+            "shellx-codex-hook-0123456789abcdef-stop!.sh",
+            "shellx-codex-hook-unrecognized.sh",
+            "prefix-shellx-codex-hook-0123456789abcdef-stop.sh",
         ]
     )
     func malformedGeneratedFilenamesAreRejected(filename: String) {

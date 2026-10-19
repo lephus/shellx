@@ -4517,7 +4517,7 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
         defer { try? fileManager.removeItem(at: root) }
 
         try writeExecutableScript(
-            at: binDir.appendingPathComponent("cmux", isDirectory: false),
+            at: binDir.appendingPathComponent("shellx", isDirectory: false),
             contents: """
             #!/bin/sh
             printf '%s\\n' "$*" >> "\(logPath.path)"
@@ -4562,7 +4562,7 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
         defer { try? fileManager.removeItem(at: root) }
 
         try writeExecutableScript(
-            at: binDir.appendingPathComponent("cmux", isDirectory: false),
+            at: binDir.appendingPathComponent("shellx", isDirectory: false),
             contents: """
             #!/bin/sh
             printf '%s\\n' "$*" >> "\(logPath.path)"
@@ -4609,7 +4609,7 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
         defer { try? fileManager.removeItem(at: root) }
 
         try writeExecutableScript(
-            at: binDir.appendingPathComponent("cmux", isDirectory: false),
+            at: binDir.appendingPathComponent("shellx", isDirectory: false),
             contents: """
             #!/bin/sh
             printf '%s\\n' "$*" >> "\(logPath.path)"
@@ -4660,7 +4660,7 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
         defer { try? fileManager.removeItem(at: root) }
 
         try writeExecutableScript(
-            at: binDir.appendingPathComponent("cmux", isDirectory: false),
+            at: binDir.appendingPathComponent("shellx", isDirectory: false),
             contents: """
             #!/bin/sh
             printf '%s\\n' "$*" >> "\(logPath.path)"
@@ -4704,7 +4704,7 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
         defer { try? fileManager.removeItem(at: root) }
 
         try writeExecutableScript(
-            at: binDir.appendingPathComponent("cmux", isDirectory: false),
+            at: binDir.appendingPathComponent("shellx", isDirectory: false),
             contents: """
             #!/bin/sh
             printf '%s\\n' "$*" >> "\(logPath.path)"
@@ -4758,7 +4758,7 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
         defer { try? fileManager.removeItem(at: root) }
 
         try writeExecutableScript(
-            at: binDir.appendingPathComponent("cmux", isDirectory: false),
+            at: binDir.appendingPathComponent("shellx", isDirectory: false),
             contents: """
             #!/bin/sh
             printf '%s\\n' "$*" >> "\(logPath.path)"

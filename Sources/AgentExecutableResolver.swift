@@ -297,7 +297,8 @@ struct AgentExecutableResolver {
         guard components.count >= 4 else { return nil }
         for index in components.indices {
             guard components[index].hasSuffix(".app"),
-                  components[index].lowercased().contains("cmux"),
+                  components[index].lowercased().contains("cmux")
+                    || components[index].lowercased().contains("shellx"),
                   components.indices.contains(index + 3),
                   components[index + 1] == "Contents",
                   components[index + 2] == "Resources",

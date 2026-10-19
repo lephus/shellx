@@ -8,7 +8,7 @@ struct HermesAgentHookCommandOwnership {
         case double
     }
 
-    private let pinnedMarker = "cmux-hermes-agent-hook-v2"
+    private let pinnedMarker = "shellx-hermes-agent-hook-v2"
 
     func containsOwnedCommand(_ command: String) -> Bool {
         let body = shellBody(from: command)

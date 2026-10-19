@@ -799,7 +799,7 @@ final class CMUXOpenCommandTests: XCTestCase {
         let cliPath = try bundledCLIPath()
         let tag = "asset\(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(6).lowercased())"
         let socketPath = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("cmux-debug-\(tag).sock", isDirectory: false)
+            .appendingPathComponent("shellx-debug-\(tag).sock", isDirectory: false)
             .path
         unlink(socketPath)
         let listenerFD = try bindUnixSocket(at: socketPath)

@@ -343,7 +343,7 @@ class TerminalController {
     }
     /// The command that shows, and so wakes, a hibernated terminal.
     nonisolated static func terminalWakeCommand(workspaceID: UUID, surfaceID: UUID) -> String {
-        "cmux focus-panel --workspace \(workspaceID.uuidString) --panel \(surfaceID.uuidString)"
+        "shellx focus-panel --workspace \(workspaceID.uuidString) --panel \(surfaceID.uuidString)"
     }
 
     /// Explains why a terminal has no running runtime and how to get one.

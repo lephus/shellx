@@ -110,7 +110,7 @@ cmux_computer_use_resolve_client() {
     # executable beside the wrapper: that would create a second TCC identity.
     if [[ -z "$installed_client" && "${HOME:-}" = /* ]]; then
         local runtime_scope="${CMUX_CUA_RUNTIME_SCOPE:-${CMUX_TAG:-default}}"
-        installed_client="${HOME}/Library/Application Support/cmux/cmux-cua/helper/${runtime_scope}/cmux Computer Use.app/Contents/MacOS/cmux-cua"
+        installed_client="${HOME}/Library/Application Support/ShellX/cmux-cua/helper/${runtime_scope}/cmux Computer Use.app/Contents/MacOS/cmux-cua"
     fi
     [[ -n "$installed_client" ]] || return 1
     client_real="$(cmux_computer_use_canonical_executable "$installed_client")" || return 1

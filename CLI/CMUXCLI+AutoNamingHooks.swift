@@ -129,7 +129,7 @@ extension CMUXCLI {
                FileManager.default.isExecutableFile(atPath: bundled) {
                 return bundled
             }
-            return "cmux"
+            return "shellx"
         }()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")

@@ -35,7 +35,7 @@ struct AgentRestoreRecoveryRegressionTests {
         let binding = SurfaceResumeBindingSnapshot(
             name: "Codex",
             kind: "codex",
-            command: "cmux restore codex \(sessionID)",
+            command: "shellx restore codex \(sessionID)",
             cwd: "/tmp",
             checkpointId: sessionID,
             source: "agent-hook",
@@ -46,7 +46,7 @@ struct AgentRestoreRecoveryRegressionTests {
         source.surfaceResumeBindingsByPanelId[sourcePanelID] = binding
         sourceTerminal.restoreRecovery.state = .failed(
             reason: "startup-admission-rejected",
-            recoveryInput: " cmux restore codex \(sessionID)\n"
+            recoveryInput: " shellx restore codex \(sessionID)\n"
         )
 
         let snapshot = source.sessionSnapshot(includeScrollback: false)
@@ -86,7 +86,7 @@ struct AgentRestoreRecoveryRegressionTests {
         let binding = SurfaceResumeBindingSnapshot(
             name: "Codex",
             kind: "codex",
-            command: "cmux restore codex \(sessionID)",
+            command: "shellx restore codex \(sessionID)",
             cwd: "/tmp",
             checkpointId: sessionID,
             source: "agent-hook",
@@ -105,7 +105,7 @@ struct AgentRestoreRecoveryRegressionTests {
         )
         terminal.restoreRecovery.state = .failed(
             reason: "startup-admission-rejected",
-            recoveryInput: " cmux restore codex \(sessionID)\n"
+            recoveryInput: " shellx restore codex \(sessionID)\n"
         )
 
         workspace.resolveDeferredAgentResumeRestores(using: .unavailable)

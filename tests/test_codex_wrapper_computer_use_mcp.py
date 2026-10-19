@@ -748,7 +748,7 @@ exit 1
                     sandbox_home
                     / "Library"
                     / "Application Support"
-                    / "cmux"
+                    / "ShellX"
                     / "computer-use"
                     / "enabled"
                 )
@@ -762,7 +762,7 @@ exit 1
                     sandbox_home
                     / "Library"
                     / "Application Support"
-                    / "cmux"
+                    / "ShellX"
                     / "computer-use"
                     / "helper"
                     / "default"

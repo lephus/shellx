@@ -236,7 +236,7 @@ import Testing
     }
 
     @Test func taggedDebugSocketFilenamesMayReplaceUnmarkedRefusedSockets() throws {
-        let path = "/tmp/cmux-debug-reclaim-\(UUID().uuidString.lowercased()).sock"
+        let path = "/tmp/shellx-debug-reclaim-\(UUID().uuidString.lowercased()).sock"
         defer {
             unlink(path)
             unlink(path + ".lock")
