@@ -1,6 +1,6 @@
 // Focus: the selected workspace, front and center, then whatever needs you.
 // Minimal zen sidebar showing off the reactive JS lane: signals, hover, taps.
-//   cp Examples/CustomSidebars/focus.js ~/.config/cmux/sidebars/ && cmux sidebar open focus
+//   cp Examples/CustomSidebars/focus.js ~/.config/shellx/sidebars/ && cmux sidebar open focus
 
 const unreadRows = () =>
   (data.workspaces() ?? []).filter((w) => w.unread > 0 && !w.selected);

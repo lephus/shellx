@@ -80,7 +80,7 @@ resolve_cmux_cli() {
 
     local self_dir
     self_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
-    candidate="$self_dir/cmux"
+    candidate="$self_dir/shellx"
     if [[ -f "$candidate" && -x "$candidate" ]]; then
         printf '%s' "$candidate"
         return 0

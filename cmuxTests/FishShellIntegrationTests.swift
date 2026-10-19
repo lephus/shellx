@@ -432,7 +432,7 @@ struct FishShellIntegrationTests {
         try fileManager.copyItem(at: integrationDir, to: testIntegrationDir)
         let testBinDir = testIntegrationDir.appendingPathComponent("bin", isDirectory: true)
         try fileManager.createDirectory(at: testBinDir, withIntermediateDirectories: true)
-        try writeExecutableShellFile(at: testBinDir.appendingPathComponent("cmux-claude-wrapper"), body: "#!/bin/sh\necho cmux-claude-wrapper \"$@\"\n")
+        try writeExecutableShellFile(at: testBinDir.appendingPathComponent("shellx-claude-wrapper"), body: "#!/bin/sh\necho shellx-claude-wrapper \"$@\"\n")
         try writeExecutableShellFile(at: testBinDir.appendingPathComponent("grok"), body: "#!/bin/sh\necho cmux-grok-wrapper \"$@\"\n")
         let integrationFile = testIntegrationDir.appendingPathComponent("fish/config.fish", isDirectory: false)
 

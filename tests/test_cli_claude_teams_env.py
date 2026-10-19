@@ -73,7 +73,7 @@ def run_claude_teams(
         if block_preload_directory:
             # A regular file where the restore preload's directory belongs
             # makes creating the preload fail without touching the tmux shim.
-            cmuxterm = fake_home / ".cmuxterm"
+            cmuxterm = fake_home / ".shellx"
             cmuxterm.mkdir(parents=True, exist_ok=True)
             (cmuxterm / "cmux-claude-node-options").write_text("occupied", encoding="utf-8")
 
@@ -519,7 +519,7 @@ def main() -> int:
         )
         return 1
 
-    # The restore preload lives in ~/.cmuxterm, not $TMPDIR (#14814), so an
+    # The restore preload lives in ~/.shellx, not $TMPDIR (#14814), so an
     # unusable TMPDIR must not cost the session its NODE_OPTIONS restore.
     with tempfile.TemporaryDirectory(prefix="cmux-claude-teams-bad-tmp-") as td:
         bad_tmpdir = Path(td) / "not-a-directory"
@@ -540,11 +540,11 @@ def main() -> int:
     require_flag, _, remaining_flags = node_options_value.partition(" ")
     if (
         not require_flag.startswith("--require=")
-        or "/.cmuxterm/cmux-claude-node-options/" not in require_flag
+        or "/.shellx/cmux-claude-node-options/" not in require_flag
         or str(bad_tmpdir) in require_flag
     ):
         print(
-            "FAIL: expected claude-teams to inject the ~/.cmuxterm restore preload when TMPDIR is unusable, "
+            "FAIL: expected claude-teams to inject the ~/.shellx restore preload when TMPDIR is unusable, "
             f"got {node_options_value!r}"
         )
         return 1

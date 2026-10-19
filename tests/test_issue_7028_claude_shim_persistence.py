@@ -35,7 +35,7 @@ def test_claude_shim_root_survives_tmpdir_reaping() -> None:
                 user_bin = root / "user-bin"
                 for directory in (home, tmpdir, bundle_bin, user_bin):
                     directory.mkdir()
-                wrapper = bundle_bin / "cmux-claude-wrapper"
+                wrapper = bundle_bin / "shellx-claude-wrapper"
                 wrapper.write_text(
                     '#!/bin/sh\nprintf "wrapped:%s\\n" "$*"\n', encoding="utf-8"
                 )
@@ -43,7 +43,7 @@ def test_claude_shim_root_survives_tmpdir_reaping() -> None:
                 real_claude = user_bin / "claude"
                 real_claude.write_text('#!/bin/sh\necho UNWRAPPED\n', encoding="utf-8")
                 real_claude.chmod(0o700)
-                expected_root = home / ".cmuxterm/cmux-cli-shims" / SURFACE_ID
+                expected_root = home / ".shellx/cmux-cli-shims" / SURFACE_ID
                 legacy_root = tmpdir / "cmux-cli-shims" / SURFACE_ID
                 legacy_root.mkdir(parents=True)
                 env = {

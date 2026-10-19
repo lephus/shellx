@@ -76,7 +76,7 @@ def main() -> int:
     if validations != 0:
         failures.append(
             "the CLI's inject-settings document took the Node validation path; update "
-            "cmux_claude_build_standard_hook_settings in Resources/bin/cmux-claude-wrapper "
+            "cmux_claude_build_standard_hook_settings in Resources/bin/shellx-claude-wrapper "
             "and generated_claude_hook_settings in tests/test_claude_wrapper_hooks.py "
             "to match CLI/CMUXCLI+ClaudeHookSettings.swift"
         )

@@ -3,7 +3,7 @@
 
 Sockets, config/state/Application Support paths, the CLI command, the bundled
 agent wrappers, hook markers, pasteboard/UTI types, keychain services and the
-`~/.cmuxterm` / `~/.cmux` state trees all carry ShellX names (plan Task 3).
+`~/.shellx` / `~/.cmux` state trees all carry ShellX names (plan Task 3).
 """
 
 import plistlib
@@ -163,8 +163,8 @@ class ShellXCoexistenceTests(unittest.TestCase):
         self.assertIn('"/tmp/shellx-debug-\\(slug).sock"', definitions)
 
     def test_no_cmuxterm_state_dir(self):
-        # Local `~/.cmuxterm` moved to `~/.shellx` (ruling R12), like the remote helper (Task 5B).
-        pattern = r'(["/~]|\$HOME/|HOME%/}/)\.cmuxterm\b|"\.cmuxterm'
+        # Local `~/.shellx` moved to `~/.shellx` (ruling R12), like the remote helper (Task 5B).
+        pattern = r'(["/~]|\$HOME/|HOME%/}/)\.shellx\b|"\.shellx'
         self.assertEqual(coexistence_offenders(pattern), [])
 
     def test_local_dot_cmux_trees_are_shellx(self):
@@ -191,7 +191,7 @@ class ShellXCoexistenceTests(unittest.TestCase):
         store = read("Packages/macOS/CmuxSettings/Sources/CmuxSettings/SocketControl/SocketControlPasswordStore.swift")
         self.assertNotIn("com.cmuxterm.app.socket-control", store)
         self.assertIn('"pro.shellx.desktop.surface-resume-approvals"', read("Sources/SessionPersistence.swift"))
-        iroh = offenders(r"com\.cmuxterm\.iroh\.", roots=["Packages/Shared", "Packages/macOS", "Sources", "CLI"],
+        iroh = offenders(r"com\.shellx\.iroh\.", roots=["Packages/Shared", "Packages/macOS", "Sources", "CLI"],
                          allow=_package_test_dirs())
         self.assertEqual(iroh, [])
         self.assertIn('"pro.shellx.desktop.iroh.endpoint-identity.v1"',

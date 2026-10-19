@@ -1,6 +1,6 @@
 // panel-info: right-sidebar demo. Everything about the SELECTED workspace:
 // branch, directory, listening ports (click to open), PRs, activity.
-//   cp Examples/CustomSidebars/panel-info.js ~/.config/cmux/sidebars/
+//   cp Examples/CustomSidebars/panel-info.js ~/.config/shellx/sidebars/
 //   cmux right-sidebar set custom panel-info
 
 const ws = () => (data.workspaces() ?? []).find((w) => w.selected) ?? null;

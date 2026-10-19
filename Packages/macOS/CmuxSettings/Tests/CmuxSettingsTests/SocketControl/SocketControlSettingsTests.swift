@@ -160,7 +160,7 @@ import CmuxSettings
     @Test func socketPathHonorsOverrideForTaggedDevWhenAllowed() {
         let path = SocketControlSettings.socketPath(
             environment: [
-                "CMUX_SOCKET_PATH": "/tmp/cmux-custom.sock",
+                "CMUX_SOCKET_PATH": "/tmp/shellx-custom.sock",
                 "CMUX_ALLOW_SOCKET_OVERRIDE": "1",
             ],
             bundleIdentifier: "pro.shellx.desktop.debug.tag",
@@ -168,7 +168,7 @@ import CmuxSettings
             currentUserID: 501,
             probeStableDefaultPathEntry: { _ in .missing }
         )
-        #expect(path == "/tmp/cmux-custom.sock")
+        #expect(path == "/tmp/shellx-custom.sock")
     }
 
     @Test func bareDebugXCTestLaunchUsesScopedSocketFallback() {
@@ -189,16 +189,16 @@ import CmuxSettings
             currentUserID: 501,
             probeStableDefaultPathEntry: { _ in .missing }
         )
-        #expect(path.hasPrefix("/tmp/cmux-xctest-"))
+        #expect(path.hasPrefix("/tmp/shellx-xctest-"))
         #expect(path.hasSuffix(".sock"))
-        #expect(path != "/tmp/cmux-debug.sock")
+        #expect(path != "/tmp/shellx-debug.sock")
         #expect(path == defaultPath)
     }
 
     @Test func explicitSocketOverrideStillWinsUnderXCTest() {
         let path = SocketControlSettings.socketPath(
             environment: [
-                "CMUX_SOCKET_PATH": "/tmp/cmux-forced.sock",
+                "CMUX_SOCKET_PATH": "/tmp/shellx-forced.sock",
                 "XCTestConfigurationFilePath": "/tmp/Test-cmux-unit-2026.06.17.xctestconfiguration",
             ],
             bundleIdentifier: "pro.shellx.desktop.debug",
@@ -206,7 +206,7 @@ import CmuxSettings
             currentUserID: 501,
             probeStableDefaultPathEntry: { _ in .missing }
         )
-        #expect(path == "/tmp/cmux-forced.sock")
+        #expect(path == "/tmp/shellx-forced.sock")
     }
 
     @Test func dyldOnlyXCTestLaunchUsesScopedSocketFallback() {
@@ -219,9 +219,9 @@ import CmuxSettings
             currentUserID: 501,
             probeStableDefaultPathEntry: { _ in .missing }
         )
-        #expect(path.hasPrefix("/tmp/cmux-xctest-"))
+        #expect(path.hasPrefix("/tmp/shellx-xctest-"))
         #expect(path.hasSuffix(".sock"))
-        #expect(path != "/tmp/cmux-debug.sock")
+        #expect(path != "/tmp/shellx-debug.sock")
     }
 
     @Test func xctestSocketFallbackHashesFullPath() {
@@ -243,8 +243,8 @@ import CmuxSettings
             currentUserID: 501,
             probeStableDefaultPathEntry: { _ in .missing }
         )
-        #expect(first.hasPrefix("/tmp/cmux-xctest-"))
-        #expect(second.hasPrefix("/tmp/cmux-xctest-"))
+        #expect(first.hasPrefix("/tmp/shellx-xctest-"))
+        #expect(second.hasPrefix("/tmp/shellx-xctest-"))
         #expect(first != second)
     }
 
@@ -259,7 +259,7 @@ import CmuxSettings
             currentUserID: 501,
             probeStableDefaultPathEntry: { _ in .missing }
         )
-        #expect(path == "/tmp/cmux-debug-ci-split-theme.sock")
+        #expect(path == "/tmp/shellx-debug-ci-split-theme.sock")
     }
 
     @Test func initialStableLaunchReclaimsSameUserStaleSocketWhenLockIsFree() {

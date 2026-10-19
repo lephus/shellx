@@ -64,7 +64,7 @@ class ShellXRemoteDaemonTests(unittest.TestCase):
         self.assertNotIn("github\\.com", src)
 
     def test_no_cmux_runtime_names_in_go_daemon(self):
-        self.assertEqual(offenders(r"\.cmux/|\.cmuxterm|cmuxd-remote-|/tmp/cmuxd", roots=["daemon/remote"], allow=[]), [])
+        self.assertEqual(offenders(r"\.cmux/|\.shellx|cmuxd-remote-|/tmp/cmuxd", roots=["daemon/remote"], allow=[]), [])
 
     def test_go_daemon_uses_shellx_runtime_names(self):
         names = read("daemon/remote/cmd/cmuxd-remote/shellx_names.go")

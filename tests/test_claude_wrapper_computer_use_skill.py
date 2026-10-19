@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Regression tests for cmux-claude-wrapper's explicit-install policy,
+Regression tests for shellx-claude-wrapper's explicit-install policy,
 ownership-safe migration, and collision handling. Ordinary Claude launches do
 not add a skill directory or plugin; legacy aliases are migrated only when
 their targets prove cmux ownership.
@@ -17,7 +17,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WRAPPER = ROOT / "Resources" / "bin" / "cmux-claude-wrapper"
+WRAPPER = ROOT / "Resources" / "bin" / "shellx-claude-wrapper"
 LINK_POLICY = ROOT / "skills" / "cmux-cua" / "link-policy.sh"
 CLIENT_POLICY = ROOT / "skills" / "cmux-cua" / "client-policy.sh"
 
@@ -59,7 +59,7 @@ def run_wrapper(
 
     Returns (result, skill_link_path, bundled_skill_dir, claude_args).
     """
-    td = tempfile.mkdtemp(prefix="cmux-claude-wrapper-skill-")
+    td = tempfile.mkdtemp(prefix="shellx-claude-wrapper-skill-")
     root = Path(td)
     home = root / "home"
     bundle_bin = root / "cmux.app" / "Contents" / "Resources" / "bin"
@@ -67,7 +67,7 @@ def run_wrapper(
     for directory in (home, bundle_bin, real_bin):
         directory.mkdir(parents=True, exist_ok=True)
 
-    wrapper = bundle_bin / "cmux-claude-wrapper"
+    wrapper = bundle_bin / "shellx-claude-wrapper"
     wrapper.write_bytes(WRAPPER.read_bytes())
     wrapper.chmod(0o755)
 

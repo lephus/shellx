@@ -14,7 +14,7 @@ from test_claude_wrapper_hooks import generated_claude_hook_settings
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WRAPPER = ROOT / "Resources" / "bin" / "cmux-claude-wrapper"
+WRAPPER = ROOT / "Resources" / "bin" / "shellx-claude-wrapper"
 GENERATED_HOOK_SETTINGS = generated_claude_hook_settings()
 
 

@@ -49,11 +49,11 @@ def read_text(path: Path) -> str:
 def install_surface_shims(home: Path, surface_id: str) -> Path:
     """Mirror the app's install with the Claude integration off.
 
-    The live app roots per-surface shims at ~/.cmuxterm/cmux-cli-shims and,
+    The live app roots per-surface shims at ~/.shellx/cmux-cli-shims and,
     with Claude disabled, installs every other bundled agent shim but not
     `claude`.
     """
-    root = home / ".cmuxterm" / "cmux-cli-shims" / surface_id
+    root = home / ".shellx" / "cmux-cli-shims" / surface_id
     root.mkdir(parents=True)
     for directory in (root.parent.parent, root.parent, root):
         directory.chmod(0o700)
@@ -167,7 +167,7 @@ printf '%s\\n' "$@" > "$FAKE_CLAUDE_ARGV_LOG"
         #     when cmux itself was started from a cmux terminal) must not win
         #     over this surface's own agent shim root while the integration is
         #     off: the app exports no Claude shim keys for such a surface.
-        parent_root = home / ".cmuxterm" / "cmux-cli-shims" / str(uuid.uuid4())
+        parent_root = home / ".shellx" / "cmux-cli-shims" / str(uuid.uuid4())
         parent_root.mkdir()
         parent_root.chmod(0o700)
         make_executable(parent_root / "claude", "#!/usr/bin/env bash\nexit 97\n")

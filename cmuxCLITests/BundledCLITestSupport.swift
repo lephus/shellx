@@ -37,7 +37,7 @@ enum BundledCLITestSupport {
         roots.append(URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true))
         return roots.first(where: {
             FileManager.default.isExecutableFile(
-                atPath: $0.appendingPathComponent("Resources/bin/cmux-claude-wrapper").path
+                atPath: $0.appendingPathComponent("Resources/bin/shellx-claude-wrapper").path
             )
         }) ?? fileRoot
     }
@@ -68,7 +68,7 @@ enum BundledCLITestSupport {
     ///      built, which is what makes this bundle independent of an app host.
     ///   2. `<products>/cmux` — the `cmux-cli` target's own product, which sits
     ///      beside this .xctest bundle in `Build/Products/<config>`.
-    ///   3. Any `*.app/Contents/Resources/bin/cmux` below the products
+    ///   3. Any `*.app/Contents/Resources/bin/shellx` below the products
     ///      directory — the copy the app bundle ships.
     static func bundledCLIPath(
         for bundleClass: AnyClass = CLITestBundleAnchor.self,
@@ -111,7 +111,7 @@ enum BundledCLITestSupport {
         )
         while let item = enumerator?.nextObject() as? URL {
             guard item.lastPathComponent == "cmux",
-                  item.path.contains(".app/Contents/Resources/bin/cmux"),
+                  item.path.contains(".app/Contents/Resources/bin/shellx"),
                   fileManager.isExecutableFile(atPath: item.path) else { continue }
             return item
         }

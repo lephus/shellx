@@ -59,7 +59,7 @@ def main() -> int:
         wrapper_marker_log = tmp / "wrapper-marker.log"
         claude_argv_log = tmp / "claude-argv.log"
 
-        shim_dir = home / ".cmuxterm" / "claude-teams-bin"
+        shim_dir = home / ".shellx" / "claude-teams-bin"
         shim_dir.mkdir(parents=True, exist_ok=True)
         shim_path = shim_dir / "tmux"
         shim_path.write_text(
@@ -75,7 +75,7 @@ def main() -> int:
             Path(__file__).resolve().parents[1]
             / "Resources"
             / "bin"
-            / "cmux-claude-wrapper"
+            / "shellx-claude-wrapper"
         )
         shutil.copyfile(wrapper_source, cmux_shim_bin / "claude")
         (cmux_shim_bin / "claude").chmod(0o755)

@@ -809,7 +809,7 @@ final class CMUXOpenCommandTests: XCTestCase {
         let targetCLIURL = homeURL
             .appendingPathComponent("Library/Developer/Xcode/DerivedData/cmux-\(tag)", isDirectory: true)
             .appendingPathComponent("Build/Products/Debug/ShellX DEV \(tag).app", isDirectory: true)
-            .appendingPathComponent("Contents/Resources/bin/cmux", isDirectory: false)
+            .appendingPathComponent("Contents/Resources/bin/shellx", isDirectory: false)
         let targetResourcesURL = targetCLIURL
             .deletingLastPathComponent()
             .deletingLastPathComponent()

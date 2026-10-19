@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WRAPPER = ROOT / "Resources" / "bin" / "cmux-codex-wrapper"
+WRAPPER = ROOT / "Resources" / "bin" / "shellx-codex-wrapper"
 SESSION_ID = "0198f073-0a5b-7000-8000-000000000059"
 
 
@@ -28,7 +28,7 @@ def main() -> int:
         real_dir = root / "real"
         wrapper_dir.mkdir()
         real_dir.mkdir()
-        wrapper = wrapper_dir / "cmux-codex-wrapper"
+        wrapper = wrapper_dir / "shellx-codex-wrapper"
         shutil.copy2(WRAPPER, wrapper)
         wrapper.chmod(0o755)
         state_path = root / "state.json"

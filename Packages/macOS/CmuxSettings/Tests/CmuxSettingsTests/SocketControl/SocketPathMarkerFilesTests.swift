@@ -44,29 +44,29 @@ import Testing
         environment: [:],
         isDebugBuild: false,
         stableSocketPath: "/stable/cmux.sock"
-    ) == "/tmp/cmux-nightly.sock")
+    ) == "/tmp/shellx-nightly.sock")
     #expect(SocketPathMarkerFiles.defaultSocketPath(
         bundleIdentifier: "pro.shellx.desktop.rc",
         environment: [:],
         isDebugBuild: false,
         stableSocketPath: "/stable/cmux.sock"
-    ) == "/tmp/cmux-rc.sock")
+    ) == "/tmp/shellx-rc.sock")
     #expect(SocketPathMarkerFiles.defaultSocketPath(
         bundleIdentifier: "pro.shellx.desktop.rc.candidate1",
         environment: [:],
         isDebugBuild: false,
         stableSocketPath: "/stable/cmux.sock"
-    ) == "/tmp/cmux-rc-candidate1.sock")
+    ) == "/tmp/shellx-rc-candidate1.sock")
     #expect(SocketPathMarkerFiles.defaultSocketPath(
         bundleIdentifier: "pro.shellx.desktop.staging.my-feature",
         environment: [:],
         isDebugBuild: false,
         stableSocketPath: "/stable/cmux.sock"
-    ) == "/tmp/cmux-staging-my-feature.sock")
+    ) == "/tmp/shellx-staging-my-feature.sock")
     #expect(SocketPathMarkerFiles.defaultSocketPath(
         bundleIdentifier: "pro.shellx.desktop.debug",
         environment: ["CMUX_TAG": "Issue 3542"],
         isDebugBuild: false,
         stableSocketPath: "/stable/cmux.sock"
-    ) == "/tmp/cmux-debug-issue-3542.sock")
+    ) == "/tmp/shellx-debug-issue-3542.sock")
 }

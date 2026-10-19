@@ -1,7 +1,7 @@
 // panel-todo: right-sidebar demo. A scratch checklist living entirely in
 // sidebar signals (resets on reload) - shows TextField, signals, context
 // menus, and derived state in the JS lane.
-//   cp Examples/CustomSidebars/panel-todo.js ~/.config/cmux/sidebars/
+//   cp Examples/CustomSidebars/panel-todo.js ~/.config/shellx/sidebars/
 //   cmux right-sidebar set custom panel-todo
 
 const [items, setItems] = signal([]);

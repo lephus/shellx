@@ -340,7 +340,7 @@ def test_what_the_nightly_ships_is_read_back_from_the_project() -> None:
     assert "skills/cmux-cua" in bundled
     # And it finds the two the router calls neutral: each needs no Release
     # compile, so `release_build` alone would let a change to them skip.
-    for path in ("Resources/bin/open", "Resources/bin/cmux-claude-wrapper"):
+    for path in ("Resources/bin/open", "Resources/bin/shellx-claude-wrapper"):
         assert path in bundled, f"{path} is bundled but was not derived"
         assert not detect.classify_files([path]).release_build
         assert nightly.build_inputs_changed([path])[0]
