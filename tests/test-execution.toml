@@ -1807,3 +1807,7 @@ lane = "linux-guard"
 path = "tests/test_shellx_remote_e2e.py"
 lane = "manual"
 reason = "needs built cmux-tui, cmux-relay, shellx-core-cli and shellx-fake-api; run by .github/workflows/shellx-remote.yml"
+
+[[test]]
+path = "tests/test_shellx_remote.py"
+lane = "linux-guard"

@@ -32,12 +32,16 @@ public enum RemoteCommandLine {
                                                    "--relay-ticket-file", ticketFile.path, "--ttl", String(ttlSeconds)], json: false)
     }
 
+    /// `daemonFingerprint` pins the daemon already known in the client state dir (`--daemon`,
+    /// `cmux-tui/src/remote_cli.rs` `parse_connect_flags`); used for enrolled restarts without an invite.
     public static func connect(paths: RemotePaths, machine: RemoteMachine.ID, route: String, slot: String,
-                               ticketFile: URL, inviteFile: URL?, deviceName: String) -> [String] {
+                               ticketFile: URL, inviteFile: URL?, deviceName: String,
+                               daemonFingerprint: String? = nil) -> [String] {
         ["remote", "connect", route, "--relay-slot", slot, "--relay-ticket-file", ticketFile.path,
          "--state-dir", paths.clientStateDir.path, "--local-socket", paths.clientSocket(for: machine).path,
          "--headless", "--json", "--exit-with-parent", "--device-name", deviceName]
             + (inviteFile.map { ["--invite-file", $0.path] } ?? [])
+            + (daemonFingerprint.map { ["--daemon", $0] } ?? [])
     }
 
     /// Pane patience: give up after this many consecutive failed attaches (about 90 s at 2 s sleeps),
