@@ -3,6 +3,7 @@ import CmuxSettings
 import CmuxTerminal
 import CmuxTerminalCore
 import GhosttyKit
+import ShellXIcons
 
 final class GhosttyPassthroughVisualEffectView: NSVisualEffectView {
     override var acceptsFirstResponder: Bool { false }
@@ -56,7 +57,7 @@ final class TerminalPasswordInputIndicatorView: NSView {
         backdrop.alphaValue = 0.96
 
         iconView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.image = NSImage(systemSymbolName: "lock.fill", accessibilityDescription: nil)
+        iconView.image = ShellXIcon.nsImage("lock.fill", accessibilityDescription: nil)
         iconView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
         iconView.contentTintColor = .secondaryLabelColor
         iconView.setAccessibilityElement(false)

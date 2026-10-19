@@ -1,6 +1,7 @@
 import AppKit
 import CmuxSwiftRender
 import SwiftUI
+import ShellXIcons
 
 /// The surface style a JS sidebar requests via `sidebar(fn, { surface: ... })`.
 /// Hosts read it to swap their opaque backdrop for translucent material.
@@ -66,9 +67,9 @@ public struct JSSidebarHostView: View {
             FileHandle.standardError.write(Data("sidebar error: \(message)\n".utf8))
         }
         return VStack(alignment: .leading, spacing: 6) {
-            Label(
+            ShellXLabel(
                 String(localized: "sidebar.custom.error", defaultValue: "Sidebar error", bundle: .module),
-                systemImage: "exclamationmark.triangle.fill"
+                icon: "exclamationmark.triangle.fill"
             )
             .cmuxFont(.caption, weight: .bold)
             .foregroundStyle(.orange)

@@ -1,6 +1,7 @@
 import AppKit
 import CmuxSettings
 import SwiftUI
+import ShellXIcons
 
 /// **Custom Sidebars** section — renderer controls plus a small native
 /// onboarding surface for creating, installing, locating, and editing the
@@ -144,9 +145,9 @@ public struct CustomSidebarsSection: View {
                 Button {
                     galleryPresented = true
                 } label: {
-                    Label(
+                    ShellXLabel(
                         String(localized: "settings.customSidebars.browseTemplates", defaultValue: "Browse Templates…", bundle: .module),
-                        systemImage: "square.grid.2x2"
+                        icon: "square.grid.2x2"
                     )
                 }
                 .controlSize(.small)
@@ -292,7 +293,7 @@ private struct CustomSidebarTemplateGallery: View {
 
             if previewingID != nil {
                 HStack {
-                    Label(String(localized: "settings.customSidebars.gallery.previewing", defaultValue: "Previewing in your sidebar", bundle: .module), systemImage: "eye")
+                    ShellXLabel(String(localized: "settings.customSidebars.gallery.previewing", defaultValue: "Previewing in your sidebar", bundle: .module), icon: "eye")
                     Spacer()
                     Button(String(localized: "settings.customSidebars.gallery.revert", defaultValue: "Revert", bundle: .module)) {
                         hostActions.revertCustomSidebarPreview()

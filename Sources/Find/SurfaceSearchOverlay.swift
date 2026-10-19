@@ -3,6 +3,7 @@ import AppKit
 import Bonsplit
 import SwiftUI
 import CmuxTerminal
+import ShellXIcons
 
 private extension NSView {
     func cmuxAncestor<T: NSView>(of type: T.Type) -> T? {
@@ -95,7 +96,7 @@ struct SurfaceSearchOverlay: View {
                     #endif
                     onNavigateSearch(.next)
                 }) {
-                    Image(systemName: "chevron.up")
+                    ShellXIcon.image("chevron.up")
                 }
                 .buttonStyle(SearchButtonStyle())
                 .safeHelp(String(localized: "search.nextMatch.help", defaultValue: "Next match (Return)"))
@@ -106,7 +107,7 @@ struct SurfaceSearchOverlay: View {
                     #endif
                     onNavigateSearch(.previous)
                 }) {
-                    Image(systemName: "chevron.down")
+                    ShellXIcon.image("chevron.down")
                 }
                 .buttonStyle(SearchButtonStyle())
                 .safeHelp(String(localized: "search.previousMatch.help", defaultValue: "Previous match (Shift+Return)"))
@@ -117,7 +118,7 @@ struct SurfaceSearchOverlay: View {
                     #endif
                     onClose()
                 }) {
-                    Image(systemName: "xmark")
+                    ShellXIcon.image("xmark")
                 }
                 .buttonStyle(SearchButtonStyle())
                 .safeHelp(String(localized: "search.close.help", defaultValue: "Close (Esc)"))

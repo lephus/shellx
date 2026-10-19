@@ -1,6 +1,7 @@
 import CmuxFoundation
 import CmuxTerminalCore
 import SwiftUI
+import ShellXIcons
 
 /// Compact card listing the first Ghostty config errors, shown by
 /// ``GhosttyConfigDiagnosticsNoticePresenter`` in the corner of a main window.
@@ -13,7 +14,7 @@ struct GhosttyConfigDiagnosticsNoticeView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                Image(systemName: "exclamationmark.triangle.fill")
+                ShellXIcon.image("exclamationmark.triangle.fill")
                     .foregroundStyle(.yellow)
                 Text(String(
                     localized: "ghosttyConfigDiagnostics.notice.title",

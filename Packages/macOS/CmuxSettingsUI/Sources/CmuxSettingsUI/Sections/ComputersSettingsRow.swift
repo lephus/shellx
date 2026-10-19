@@ -1,4 +1,5 @@
 import SwiftUI
+import ShellXIcons
 
 struct ComputersSettingsRow: View {
     let computer: ComputersSettingsSnapshot.Computer
@@ -8,7 +9,7 @@ struct ComputersSettingsRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "desktopcomputer")
+            ShellXIcon.image("desktopcomputer")
                 .font(.system(size: 23, weight: .light))
                 .foregroundStyle(computer.isHidden ? .tertiary : .secondary)
                 .frame(width: 30)
@@ -58,7 +59,7 @@ struct ComputersSettingsRow: View {
                     }
                 }
             } label: {
-                Image(systemName: "ellipsis.circle")
+                ShellXIcon.image("ellipsis.circle")
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)

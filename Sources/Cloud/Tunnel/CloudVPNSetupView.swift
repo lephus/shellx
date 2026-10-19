@@ -1,4 +1,5 @@
 import SwiftUI
+import ShellXIcons
 
 /// The Cloud VPN setup page shared by Ports and Cloud Settings.
 @MainActor
@@ -29,7 +30,7 @@ struct CloudVPNSetupView: View {
                 Text(String(localized: "cloud.vpn.setup.heading", defaultValue: "Use Cloud machines from any app"))
                     .cmuxFont(.title2, weight: .semibold)
             } icon: {
-                Image(systemName: "network").foregroundStyle(.blue)
+                ShellXIcon.image("network").foregroundStyle(.blue)
             }
             Text(String(localized: "cloud.vpn.setup.subtitle", defaultValue: "Optional access to each VM's private address and original ports, such as 10.40.0.10:3000."))
                 .cmuxFont(size: 13)
@@ -78,13 +79,13 @@ struct CloudVPNSetupView: View {
     private var statusLabel: some View {
         switch model.state {
         case .up:
-            Label(String(localized: "cloud.vpn.setup.connected", defaultValue: "Connected"), systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            ShellXLabel(String(localized: "cloud.vpn.setup.connected", defaultValue: "Connected"), icon: "checkmark.circle.fill").foregroundStyle(.green)
         case .starting, .awaitingApproval, .stopping:
-            Label(String(localized: "cloud.vpn.setup.waiting", defaultValue: "Waiting"), systemImage: "clock").foregroundStyle(.orange)
+            ShellXLabel(String(localized: "cloud.vpn.setup.waiting", defaultValue: "Waiting"), icon: "clock").foregroundStyle(.orange)
         case .failed:
-            Label(String(localized: "cloud.vpn.setup.failed", defaultValue: "Needs attention"), systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            ShellXLabel(String(localized: "cloud.vpn.setup.failed", defaultValue: "Needs attention"), icon: "exclamationmark.triangle.fill").foregroundStyle(.orange)
         default:
-            Label(String(localized: "cloud.vpn.setup.off", defaultValue: "Off"), systemImage: "circle").foregroundStyle(.secondary)
+            ShellXLabel(String(localized: "cloud.vpn.setup.off", defaultValue: "Off"), icon: "circle").foregroundStyle(.secondary)
         }
     }
 

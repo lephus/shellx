@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import ShellXIcons
 
 /// A localized close affordance shared by persistent Cloud banners.
 public struct CloudBannerDismissButton: View {
@@ -14,7 +15,7 @@ public struct CloudBannerDismissButton: View {
 
     public var body: some View {
         Button(action: action) {
-            Image(systemName: "xmark")
+            ShellXIcon.image("xmark")
                 .font(.system(size: 9, weight: .semibold))
                 .frame(width: 20, height: 20)
                 .contentShape(Rectangle())

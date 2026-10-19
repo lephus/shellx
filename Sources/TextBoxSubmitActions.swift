@@ -2,6 +2,7 @@ import AppKit
 import CmuxAppKitSupportUI
 import CmuxWorkspaces
 import SwiftUI
+import ShellXIcons
 
 extension TextBoxInputContainer {
     static let pendingProviderLaunchTimeoutSeconds: TimeInterval = 12
@@ -325,9 +326,9 @@ extension TextBoxInputContainer {
                 Button {
                     cancelPendingProviderLaunch()
                 } label: {
-                    Label(
+                    ShellXLabel(
                         String(localized: "textbox.submitAction.cancelPending", defaultValue: "Cancel Pending Launch"),
-                        systemImage: "xmark.circle"
+                        icon: "xmark.circle"
                     )
                 }
                 Divider()
@@ -345,9 +346,9 @@ extension TextBoxInputContainer {
             Button {
                 openSubmitActionsDocumentation()
             } label: {
-                Label(
+                ShellXLabel(
                     String(localized: "textbox.submitAction.docs", defaultValue: "TextBox Submit Actions Docs"),
-                    systemImage: "book"
+                    icon: "book"
                 )
             }
         }
@@ -378,7 +379,7 @@ extension TextBoxInputContainer {
                     height: TextBoxSubmitActionImageSupport.iconSize
                 )
         } else {
-            Image(systemName: action.systemImage)
+            ShellXIcon.image(action.systemImage)
                 .foregroundStyle(Color.black)
                 .opacity(iconOpacity)
                 .frame(
@@ -405,7 +406,7 @@ extension TextBoxInputContainer {
                     height: TextBoxSubmitActionImageSupport.iconSize
                 )
         } else {
-            Image(systemName: action.systemImage)
+            ShellXIcon.image(action.systemImage)
                 .frame(
                     width: TextBoxSubmitActionImageSupport.iconSize,
                     height: TextBoxSubmitActionImageSupport.iconSize
@@ -417,7 +418,7 @@ extension TextBoxInputContainer {
     func submitActionMenuLabel(_ action: TextBoxSubmitAction) -> some View {
         let title = TextBoxSubmitActionPresentation.localizedTitle(for: action)
         if action.id == selectedSubmitAction.id {
-            Label(title, systemImage: "checkmark")
+            ShellXLabel(title, icon: "checkmark")
         } else {
             Label {
                 Text(title)

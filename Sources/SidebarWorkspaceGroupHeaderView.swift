@@ -166,7 +166,7 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
                 .accessibilityLabel(Text(pinnedGroupTooltip))
             }
             CmuxSystemSymbolImage(
-                systemName: isCollapsed ? "chevron.right" : "chevron.down",
+                symbolName: isCollapsed ? "chevron.right" : "chevron.down",
                 pointSize: metrics.chevronFontSize,
                 weight: .semibold,
                 tint: .secondary,
@@ -185,7 +185,7 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
 
             HStack(spacing: 6) {
                 CmuxSystemSymbolImage(
-                    systemName: displayedIconSymbol,
+                    symbolName: displayedIconSymbol,
                     pointSize: metrics.iconFontSize,
                     weight: .semibold,
                     tint: iconColor,
@@ -235,7 +235,7 @@ struct SidebarWorkspaceGroupHeaderView: View, Equatable {
             let plusVisible = isPointerHovering && !contextMenuVisible && !showsShortcutHint
             Button(action: actions.onTapPlus) {
                 CmuxSystemSymbolImage(
-                    systemName: "plus",
+                    symbolName: "plus",
                     pointSize: metrics.plusFontSize,
                     weight: .medium,
                     tint: .secondary,

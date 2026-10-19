@@ -1,5 +1,6 @@
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// A small info button next to the Network control that explains what
 /// isolates a Cloud machine, with a link to the full security page.
@@ -62,7 +63,7 @@ struct CloudInfoPopoverButton: View {
         Button {
             showsDetails.toggle()
         } label: {
-            Image(systemName: "info.circle")
+            ShellXIcon.image("info.circle")
                 .foregroundStyle(.secondary)
         }
         .buttonStyle(.borderless)

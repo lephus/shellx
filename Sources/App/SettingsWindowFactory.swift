@@ -3,6 +3,7 @@ import CmuxFoundation
 import CmuxSettingsUI
 import SwiftUI
 import os
+import ShellXIcons
 
 /// Builds the AppKit-owned Settings window
 /// (https://github.com/manaflow-ai/cmux/issues/7777).
@@ -115,7 +116,7 @@ final class SettingsSidebarToolbarController: NSObject, NSToolbarDelegate {
         let label = String(localized: "shortcut.toggleLeftSidebar.label", defaultValue: "Toggle Left Sidebar")
         let item = NSToolbarItem(itemIdentifier: itemIdentifier)
         item.isBordered = true
-        item.image = NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: label)
+        item.image = ShellXIcon.nsImage("sidebar.left", accessibilityDescription: label)
         item.label = label
         item.toolTip = String(localized: "titlebar.sidebar.tooltip", defaultValue: "Show or hide the sidebar")
         item.target = self

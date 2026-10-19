@@ -1411,7 +1411,7 @@ private struct TitlebarControlSymbol: View {
 
     var body: some View {
         CmuxSystemSymbolImage(
-            systemName: systemName,
+            symbolName: systemName,
             pointSize: config.iconSize,
             weight: TitlebarControlIconStyle.weight,
             tint: foregroundColor.opacity(foregroundOpacity)
@@ -2502,7 +2502,7 @@ private struct NotificationsPopoverView: View {
             Button(action: jumpToLatestUnread) {
                 HStack(spacing: 5) {
                     CmuxSystemSymbolImage(
-                        systemName: "arrow.down.to.line",
+                        symbolName: "arrow.down.to.line",
                         pointSize: 10,
                         weight: .semibold,
                         tint: hasUnreadNotifications ? .primary : .secondary
@@ -2564,7 +2564,7 @@ private struct NotificationsPopoverView: View {
     private var phoneForwardingEntry: some View {
         Button(action: onOpenPhoneForwarding) {
             HStack(spacing: 8) {
-                CmuxSystemSymbolImage(systemName: "iphone", pointSize: 12, weight: .medium, tint: .secondary)
+                CmuxSystemSymbolImage(symbolName: "iphone", pointSize: 12, weight: .medium, tint: .secondary)
                 Text(
                     String(
                         localized: "notifications.forwardToPhone.title",
@@ -2573,7 +2573,7 @@ private struct NotificationsPopoverView: View {
                 )
                 .cmuxFont(size: 12, weight: .medium)
                 Spacer()
-                CmuxSystemSymbolImage(systemName: "chevron.right", pointSize: 9, weight: .semibold, tint: .secondary)
+                CmuxSystemSymbolImage(symbolName: "chevron.right", pointSize: 9, weight: .semibold, tint: .secondary)
             }
             .contentShape(Rectangle())
             .padding(.horizontal, 14)
@@ -2593,13 +2593,13 @@ private struct NotificationsPopoverView: View {
     private var content: some View {
         if !notificationStore.notificationMenuSnapshot.hasNotifications {
             emptyState(
-                systemImage: "bell.slash",
+                icon: "bell.slash",
                 title: String(localized: "notifications.empty.title", defaultValue: "No notifications yet"),
                 subtitle: String(localized: "notifications.empty.subtitle", defaultValue: "Desktop notifications will appear here.")
             )
         } else if notificationStore.notifications.isEmpty {
             emptyState(
-                systemImage: "bell.badge",
+                icon: "bell.badge",
                 title: notificationStore.notificationMenuSnapshot.stateHintTitle,
                 subtitle: nil
             )
@@ -2707,9 +2707,9 @@ private struct NotificationsPopoverView: View {
         loadedWorkspaceTitles = nextTitles
     }
 
-    private func emptyState(systemImage: String, title: String, subtitle: String?) -> some View {
+    private func emptyState(icon: String, title: String, subtitle: String?) -> some View {
         VStack(spacing: 10) {
-            CmuxSystemSymbolImage(systemName: systemImage, pointSize: 30, weight: .light, tint: .secondary.opacity(0.7))
+            CmuxSystemSymbolImage(symbolName: icon, pointSize: 30, weight: .light, tint: .secondary.opacity(0.7))
             Text(title)
                 .cmuxFont(size: 14, weight: .medium)
                 .foregroundColor(.primary)

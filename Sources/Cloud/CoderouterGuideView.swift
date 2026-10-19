@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ShellXIcons
 
 /// The compact guide the Coderouter header's "?" opens: why CodeRouter helps,
 /// how to start, and how the section's rows work.
@@ -40,7 +41,7 @@ struct CoderouterGuideView: View {
     private var guideContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "chevron.left.forwardslash.chevron.right")
+                ShellXIcon.image("chevron.left.forwardslash.chevron.right")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.tint)
                     .frame(width: 22, height: 22)
@@ -98,7 +99,7 @@ struct CoderouterGuideView: View {
                     onOpenAsPane()
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "rectangle.split.2x1")
+                        ShellXIcon.image("rectangle.split.2x1")
                             .font(.system(size: 11, weight: .medium))
                         Text(String(
                             localized: "coderouter.guide.openAsPane",
@@ -135,7 +136,7 @@ struct CoderouterGuideView: View {
 
     private func benefit(icon: String, title: String, body: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: icon)
+            ShellXIcon.image(icon)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 16, height: 16)

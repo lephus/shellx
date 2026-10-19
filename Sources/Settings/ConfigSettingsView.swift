@@ -2,6 +2,7 @@ import AppKit
 import CmuxFoundation
 import CmuxWorkspaces
 import SwiftUI
+import ShellXIcons
 
 struct ConfigSettingsView: View {
     static let windowID = "config-editor"
@@ -323,7 +324,7 @@ private struct ConfigSettingsBanner: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "info.circle")
+            ShellXIcon.image("info.circle")
                 .foregroundStyle(.secondary)
             Text(text)
                 .cmuxFont(.footnote)

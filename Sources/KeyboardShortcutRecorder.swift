@@ -1,6 +1,7 @@
 import CmuxFoundation
 import AppKit
 import SwiftUI
+import ShellXIcons
 
 /// View for recording a keyboard shortcut
 struct KeyboardShortcutRecorder: View {
@@ -65,7 +66,7 @@ struct KeyboardShortcutRecorder: View {
 
                     onRecorderFeedbackChanged(nil)
                 } label: {
-                    Image(systemName: canRestoreShortcut ? "arrow.counterclockwise.circle.fill" : "xmark.circle.fill")
+                    ShellXIcon.image(canRestoreShortcut ? "arrow.counterclockwise.circle.fill" : "xmark.circle.fill")
                         .imageScale(.medium)
                 }
                 .buttonStyle(.borderless)
@@ -85,7 +86,7 @@ struct KeyboardShortcutRecorder: View {
 
             if let validationMessage {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
+                    ShellXIcon.image("exclamationmark.triangle.fill")
                         .cmuxFont(.caption)
                         .foregroundStyle(.red)
 

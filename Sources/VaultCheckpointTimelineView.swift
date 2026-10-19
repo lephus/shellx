@@ -2,6 +2,7 @@ import Foundation
 import os
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 private let vaultCheckpointTimelineLogger = Logger(
     subsystem: Bundle.main.bundleIdentifier ?? "com.cmuxterm.app",
@@ -45,7 +46,7 @@ struct VaultCheckpointTimelineView: View {
             }
             if !supportsFork && !isLoading {
                 checkpointNotice(
-                    systemImage: "info.circle",
+                    icon: "info.circle",
                     text: String(localized: "sessionIndex.checkpoints.forkUnavailable",
                                  defaultValue: "Fork from checkpoint isn't available for this agent yet — the timeline is view-only")
                 )
@@ -73,7 +74,7 @@ struct VaultCheckpointTimelineView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else if mergedCheckpoints.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
-                Image(systemName: "flag")
+                ShellXIcon.image("flag")
                     .cmuxFont(size: 18, weight: .regular)
                     .foregroundColor(.secondary.opacity(0.7))
                 Text(String(localized: "sessionIndex.checkpoints.empty", defaultValue: "No checkpoints yet"))
@@ -92,7 +93,7 @@ struct VaultCheckpointTimelineView: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     if derivation?.isTruncated == true {
                         checkpointNotice(
-                            systemImage: "exclamationmark.triangle",
+                            icon: "exclamationmark.triangle",
                             text: String(localized: "sessionIndex.checkpoints.truncated",
                                          defaultValue: "Long transcript — earliest turns not shown")
                         )
@@ -137,9 +138,9 @@ struct VaultCheckpointTimelineView: View {
             Button {
                 createManualCheckpoint()
             } label: {
-                Label(
+                ShellXLabel(
                     String(localized: "sessionIndex.checkpoints.now", defaultValue: "Checkpoint Now"),
-                    systemImage: "flag"
+                    icon: "flag"
                 )
                 .cmuxFont(size: 11, weight: .semibold)
                 .foregroundColor(cmuxAccent.color)
@@ -168,9 +169,9 @@ struct VaultCheckpointTimelineView: View {
         .padding(.vertical, 8)
     }
 
-    private func checkpointNotice(systemImage: String, text: String) -> some View {
+    private func checkpointNotice(icon: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 7) {
-            Image(systemName: systemImage)
+            ShellXIcon.image(icon)
                 .cmuxFont(size: 11, weight: .medium)
                 .foregroundColor(.secondary)
             Text(text)
@@ -186,7 +187,7 @@ struct VaultCheckpointTimelineView: View {
 
     private func errorRow(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 6) {
-            Image(systemName: "exclamationmark.triangle.fill")
+            ShellXIcon.image("exclamationmark.triangle.fill")
                 .cmuxFont(size: 10)
                 .foregroundColor(.orange)
             Text(text)
@@ -364,7 +365,7 @@ private struct VaultCheckpointRow: View, Equatable {
                         Button {
                             GhosttyApp.terminalPasteboard.writeString(sha, to: .general)
                         } label: {
-                            Label(String(sha.prefix(7)), systemImage: "doc.on.doc")
+                            ShellXLabel(String(sha.prefix(7)), icon: "doc.on.doc")
                                 .cmuxFont(size: 10, monospacedDigit: true)
                                 .foregroundColor(.secondary)
                         }
@@ -412,9 +413,9 @@ private struct VaultCheckpointRow: View, Equatable {
         Button {
             onFork()
         } label: {
-            Label(
+            ShellXLabel(
                 String(localized: "sessionIndex.checkpoints.forkShort", defaultValue: "Fork"),
-                systemImage: "arrow.triangle.branch"
+                icon: "arrow.triangle.branch"
             )
             .cmuxFont(size: 10, weight: .semibold)
             .foregroundColor(isForkEnabled ? cmuxAccent.color : .secondary)

@@ -1,5 +1,6 @@
 import CmuxSimulator
 import SwiftUI
+import ShellXIcons
 
 struct SimulatorDeviceQuickControls: View {
   let coordinator: SimulatorPaneCoordinator
@@ -22,7 +23,7 @@ struct SimulatorDeviceQuickControls: View {
   private func button(for control: SimulatorDeviceQuickControl) -> some View {
     let presentation = presentation(for: control)
     Button(action: presentation.action) {
-      Image(systemName: presentation.symbol)
+      ShellXIcon.image(presentation.symbol)
         .font(.system(size: 17, weight: .medium))
         .frame(width: 28, height: 28)
         .background(presentation.isActive ? Color.accentColor.opacity(0.2) : .clear)

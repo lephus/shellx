@@ -1,6 +1,7 @@
 import CmuxFoundation
 import CmuxSettings
 import SwiftUI
+import ShellXIcons
 
 /// **Beta Features** section — a warning note followed by the experimental
 /// toggles. Each toggle gates an unstable feature that is off by default.
@@ -289,7 +290,7 @@ private struct BetaFeaturesWarningNote: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
+            ShellXIcon.image("exclamationmark.triangle.fill")
                 .cmuxFont(size: 12, weight: .semibold)
                 .foregroundStyle(.yellow)
                 .accessibilityHidden(true)

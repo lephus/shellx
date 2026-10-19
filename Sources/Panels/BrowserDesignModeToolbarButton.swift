@@ -16,7 +16,7 @@ struct BrowserDesignModeToolbarButton: View {
             }
         } label: {
             CmuxSystemSymbolImage(
-                systemName: controller.isActive ? "paintbrush.pointed.fill" : "paintbrush.pointed",
+                symbolName: controller.isActive ? "paintbrush.pointed.fill" : "paintbrush.pointed",
                 pointSize: iconPointSize,
                 weight: .medium,
                 tint: controller.isActive ? cmuxAccent.color : inactiveColor

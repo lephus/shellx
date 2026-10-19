@@ -1,6 +1,7 @@
 import AppKit
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// **Cloud Machines** settings: first-use activation, plan details, and
 /// optional system VPN setup. The activation control calls the host's shared
@@ -163,7 +164,7 @@ public struct CloudMachinesSection: View {
                 .accessibilityIdentifier("SettingsCloudEnableRetry")
             }
         case .unavailable:
-            Image(systemName: "lock.slash")
+            ShellXIcon.image("lock.slash")
                 .foregroundStyle(.secondary)
                 .accessibilityLabel(String(localized: "settings.cloudMachines.enable.unavailable", defaultValue: "Cloud unavailable"))
         }

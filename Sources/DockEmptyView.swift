@@ -1,13 +1,14 @@
 import CmuxFoundation
 import AppKit
 import SwiftUI
+import ShellXIcons
 
 struct DockEmptyView: View {
     @State private var isPromptPopoverPresented = false
 
     var body: some View {
         VStack(spacing: 10) {
-            Image(systemName: "dock.rectangle")
+            ShellXIcon.image("dock.rectangle")
                 .cmuxFont(size: 24)
                 .foregroundStyle(.secondary)
             Text(String(localized: "dock.empty.title", defaultValue: "No Dock Controls"))
@@ -23,9 +24,9 @@ struct DockEmptyView: View {
                     Button {
                         copyAgentPrompt()
                     } label: {
-                        Label(
+                        ShellXLabel(
                             String(localized: "dock.empty.copyPrompt", defaultValue: "Copy Agent Prompt"),
-                            systemImage: "doc.on.doc"
+                            icon: "doc.on.doc"
                         )
                     }
                     .buttonStyle(.bordered)
@@ -35,7 +36,7 @@ struct DockEmptyView: View {
                     Button {
                         isPromptPopoverPresented.toggle()
                     } label: {
-                        Image(systemName: "info.circle")
+                        ShellXIcon.image("info.circle")
                     }
                     .buttonStyle(.borderless)
                     .controlSize(.small)
@@ -49,9 +50,9 @@ struct DockEmptyView: View {
                 Button {
                     openDockDocs()
                 } label: {
-                    Label(
+                    ShellXLabel(
                         String(localized: "dock.empty.openDocs", defaultValue: "Docs"),
-                        systemImage: "questionmark.circle"
+                        icon: "questionmark.circle"
                     )
                 }
                 .buttonStyle(.bordered)

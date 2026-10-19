@@ -1,5 +1,6 @@
 import CmuxSimulator
 import SwiftUI
+import ShellXIcons
 
 struct SimulatorPaneToolbar: View {
     let coordinator: SimulatorPaneCoordinator
@@ -14,7 +15,7 @@ struct SimulatorPaneToolbar: View {
             Button {
                 coordinator.showsTools.toggle()
             } label: {
-                resourceLabel(simulatorStrings.tools, systemImage: "slider.horizontal.3")
+                resourceLabel(simulatorStrings.tools, icon: "slider.horizontal.3")
                     .labelStyle(.iconOnly)
             }
             .help(Text(simulatorStrings.tools))
@@ -30,7 +31,7 @@ private extension SimulatorPaneToolbar {
     @ViewBuilder var statusView: some View {
         switch coordinator.status {
         case .idle:
-            resourceLabel(simulatorStrings.selectToStart, systemImage: "circle")
+            resourceLabel(simulatorStrings.selectToStart, icon: "circle")
                 .foregroundStyle(.secondary)
         case .connecting:
             HStack(spacing: 5) {
@@ -39,7 +40,7 @@ private extension SimulatorPaneToolbar {
             }
             .foregroundStyle(.secondary)
         case .streaming:
-            resourceLabel(simulatorStrings.streaming, systemImage: "circle.fill")
+            resourceLabel(simulatorStrings.streaming, icon: "circle.fill")
                 .foregroundStyle(.green)
         case .deviceUnavailable:
             recoveryStatus(simulatorStrings.unavailable)
@@ -52,7 +53,7 @@ private extension SimulatorPaneToolbar {
 
     private func recoveryStatus(_ label: LocalizedStringResource) -> some View {
         HStack(spacing: 5) {
-            resourceLabel(label, systemImage: "exclamationmark.triangle.fill")
+            resourceLabel(label, icon: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
             Button(action: coordinator.recover) {
                 Text(simulatorStrings.reconnect)
@@ -83,7 +84,7 @@ private extension SimulatorPaneToolbar {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            resourceLabel(label, systemImage: symbol).labelStyle(.iconOnly)
+            resourceLabel(label, icon: symbol).labelStyle(.iconOnly)
         }
         .buttonStyle(.borderless)
         .help(Text(label))
@@ -91,12 +92,12 @@ private extension SimulatorPaneToolbar {
 
     private func resourceLabel(
         _ label: LocalizedStringResource,
-        systemImage: String
+        icon: String
     ) -> some View {
         Label {
             Text(label)
         } icon: {
-            Image(systemName: systemImage)
+            ShellXIcon.image(icon)
         }
     }
 

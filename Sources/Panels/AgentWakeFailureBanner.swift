@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ShellXIcons
 
 /// Shown above the terminal when an agent woken from hibernation did not come back.
 struct AgentWakeFailureBanner: View {
@@ -12,7 +13,7 @@ struct AgentWakeFailureBanner: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "exclamationmark.triangle.fill")
+                ShellXIcon.image("exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
@@ -37,7 +38,7 @@ struct AgentWakeFailureBanner: View {
                 .controlSize(.small)
                 .accessibilityIdentifier("agent-wake-failure-show-command")
                 Button(action: onDismiss) {
-                    Image(systemName: "xmark")
+                    ShellXIcon.image("xmark")
                 }
                 .buttonStyle(.borderless)
                 .help(closeTitle)

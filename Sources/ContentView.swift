@@ -32,6 +32,7 @@ import SwiftUI
 import ObjectiveC
 import UniformTypeIdentifiers
 import WebKit
+import ShellXIcons
 
 var fileDropOverlayKey: UInt8 = 0
 private var commandPaletteWindowOverlayKey: UInt8 = 0
@@ -16018,7 +16019,7 @@ private struct SidebarHelpMenuButton: View {
     }
 
     private func helpOptionTrailingIcon(systemName: String, size: CGFloat = 13) -> some View {
-        CmuxSystemSymbolImage(systemName: systemName, pointSize: size, tint: Color(nsColor: .secondaryLabelColor))
+        CmuxSystemSymbolImage(symbolName: systemName, pointSize: size, tint: Color(nsColor: .secondaryLabelColor))
     }
 
     private func perform(_ action: SidebarHelpMenuAction) {
@@ -16367,9 +16368,9 @@ struct TabItemView: View, Equatable {
                         Button {
                             actions.reconnectTargets([workspaceId])
                         } label: {
-                            Label(
+                            ShellXLabel(
                                 String(localized: "sidebar.remote.reconnect.button", defaultValue: "Reconnect"),
-                                systemImage: "arrow.clockwise"
+                                icon: "arrow.clockwise"
                             )
                             .labelStyle(.titleAndIcon)
                             .font(magnifiedFont(scaledFontSize(9), weight: .semibold))

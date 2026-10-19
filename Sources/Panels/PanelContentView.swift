@@ -283,7 +283,7 @@ struct PanelFilePathHeader<TrailingContent: View>: View {
     var body: some View {
         HStack(spacing: 8) {
             CmuxSystemSymbolImage(
-                systemName: iconSystemName,
+                symbolName: iconSystemName,
                 pointSize: RightSidebarChromeMetrics.contentIconFrameSize,
                 tint: .secondary
             )
@@ -326,7 +326,7 @@ struct PanelHeaderIconGlyph: View {
 
     var body: some View {
         CmuxSystemSymbolImage(
-            systemName: systemName,
+            symbolName: systemName,
             pointSize: RightSidebarChromeMetrics.headerIconSize,
             tint: .secondary
         )

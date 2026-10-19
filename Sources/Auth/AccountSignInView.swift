@@ -1,5 +1,6 @@
 import CmuxSettingsUI
 import SwiftUI
+import ShellXIcons
 
 /// Shared Stack sign-in status UI used by the Account and Mobile Pairing panes.
 struct AccountSignInView: View {
@@ -66,7 +67,7 @@ private struct AccountSignInIdleView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "person.crop.circle.badge.plus")
+            ShellXIcon.image("person.crop.circle.badge.plus")
                 .cmuxFont(size: 34)
                 .foregroundStyle(.tint)
             Text(title)
@@ -128,7 +129,7 @@ private struct AccountSignInFailureView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
+            ShellXIcon.image("exclamationmark.triangle")
                 .cmuxFont(size: 30)
                 .foregroundStyle(.orange)
             Text(failure.title)

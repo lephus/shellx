@@ -1,6 +1,7 @@
 import AppKit
 import CmuxTerminalCore
 import GhosttyKit
+import ShellXIcons
 
 /// Carries both spellings of the link from the menu item to its action: the
 /// raw text for the open coordinator, the resolved URL for the pasteboard.
@@ -87,7 +88,7 @@ extension GhosttyNSView {
             )
             menuItem.target = self
             menuItem.representedObject = payload
-            menuItem.image = NSImage(systemSymbolName: symbolName(for: item), accessibilityDescription: nil)
+            menuItem.image = ShellXIcon.nsImage(symbolName(for: item), accessibilityDescription: nil)
         }
         menu.addItem(.separator())
     }

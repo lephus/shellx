@@ -1,12 +1,13 @@
 import AppKit
 import CMUXMobileCore
 import SwiftUI
+import ShellXIcons
 
 extension MobilePairingView {
     @ViewBuilder
     var connectedContent: some View {
         VStack(spacing: 12) {
-            Image(systemName: "checkmark.circle.fill")
+            ShellXIcon.image("checkmark.circle.fill")
                 .cmuxFont(size: 36)
                 .foregroundStyle(.green)
             Text(String(localized: "mobile.pairing.connected.title", defaultValue: "iPhone connected"))
@@ -28,7 +29,7 @@ extension MobilePairingView {
             flashCopied(value)
         } label: {
             HStack(spacing: 4) {
-                Image(systemName: copiedValue == value ? "checkmark" : "doc.on.doc")
+                ShellXIcon.image(copiedValue == value ? "checkmark" : "doc.on.doc")
                 Text(copiedValue == value
                     ? String(localized: "mobile.pairing.manual.copied", defaultValue: "Copied")
                     : label)

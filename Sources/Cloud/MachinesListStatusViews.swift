@@ -1,5 +1,6 @@
 import CmuxCloud
 import SwiftUI
+import ShellXIcons
 
 /// Symbol, copy and action for one ``MachineListStatus``. The compact notice,
 /// the empty state and the toolbar row all read it, so they never disagree.
@@ -119,7 +120,7 @@ struct MachinesListStatusNotice: View {
         let presentation = MachineListStatusPresentation(status)
         HStack(spacing: 6) {
             if let symbolName = presentation.symbolName {
-                Image(systemName: symbolName)
+                ShellXIcon.image(symbolName)
                     .font(.system(size: 11, weight: .semibold))
             } else {
                 ProgressView().controlSize(.mini)
@@ -152,7 +153,7 @@ struct MachinesListStatusEmptyState: View {
         let presentation = MachineListStatusPresentation(status)
         VStack(spacing: 10) {
             if let symbolName = presentation.symbolName {
-                Image(systemName: symbolName)
+                ShellXIcon.image(symbolName)
                     .font(.system(size: 26, weight: .light))
                     .foregroundColor(.secondary.opacity(0.55))
             } else {
@@ -215,7 +216,7 @@ struct MachinesListStatusToolbarRow: View {
         let failure = presentation.isFailure ? dismissalSignature : nil
         let row = HStack(spacing: 5) {
             if let symbolName = presentation.symbolName {
-                Image(systemName: symbolName)
+                ShellXIcon.image(symbolName)
                     .font(.system(size: 10, weight: .semibold))
             } else {
                 ProgressView().controlSize(.mini)

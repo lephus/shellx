@@ -1,5 +1,6 @@
 import CmuxSimulator
 import SwiftUI
+import ShellXIcons
 
 struct SimulatorAccessibilityTreeRow: View {
     let row: SimulatorAccessibilityPresentationRow
@@ -13,7 +14,7 @@ struct SimulatorAccessibilityTreeRow: View {
                     .lineLimit(1)
                     .padding(.leading, CGFloat(min(row.depth, 8)) * 10)
                 Spacer()
-                if isHighlighted { Image(systemName: "scope") }
+                if isHighlighted { ShellXIcon.image("scope") }
             }
         }
         .buttonStyle(.plain)

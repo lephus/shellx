@@ -1,5 +1,6 @@
 import CMUXMobileCore
 import SwiftUI
+import ShellXIcons
 
 @MainActor
 struct IrohConnectionCheckCard: View {
@@ -60,7 +61,7 @@ struct IrohConnectionCheckCard: View {
                 searchAnchorID: "setting:networking:connectionCheck:\(stage.id)",
                 stageTitle(stage.kind)
             ) {
-                Label(stageStatus(stage.status), systemImage: stageSymbol(stage.status))
+                ShellXLabel(stageStatus(stage.status), icon: stageSymbol(stage.status))
                     .foregroundStyle(stageColor(stage.status))
             }
         }
@@ -78,9 +79,9 @@ struct IrohConnectionCheckCard: View {
                 )
             ) {
                 ShareLink(item: relayAllowlistText) {
-                    Label(
+                    ShellXLabel(
                         String(localized: "settings.networking.check.share", defaultValue: "Share…"),
-                        systemImage: "square.and.arrow.up"
+                        icon: "square.and.arrow.up"
                     )
                 }
                 .buttonStyle(.bordered)
@@ -98,9 +99,9 @@ struct IrohConnectionCheckCard: View {
             )
         ) {
             ShareLink(item: supportReportText(report)) {
-                Label(
+                ShellXLabel(
                     String(localized: "settings.networking.check.share", defaultValue: "Share…"),
-                    systemImage: "square.and.arrow.up"
+                    icon: "square.and.arrow.up"
                 )
             }
             .buttonStyle(.bordered)

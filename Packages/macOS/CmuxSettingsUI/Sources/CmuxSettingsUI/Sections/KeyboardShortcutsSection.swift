@@ -1,6 +1,7 @@
 import CmuxFoundation
 import CmuxSettings
 import SwiftUI
+import ShellXIcons
 
 /// **Keyboard Shortcuts** section — mirrors the legacy in-app
 /// section: one `SettingsCard` containing the base keymap picker,
@@ -165,9 +166,9 @@ public struct KeyboardShortcutsSection: View {
             Button {
                 Task { await model.resetAll() }
             } label: {
-                Label(
+                ShellXLabel(
                     String(localized: "settings.shortcuts.resetDefaults.button", defaultValue: "Reset Defaults"),
-                    systemImage: "arrow.counterclockwise"
+                    icon: "arrow.counterclockwise"
                 )
             }
             .buttonStyle(.bordered)

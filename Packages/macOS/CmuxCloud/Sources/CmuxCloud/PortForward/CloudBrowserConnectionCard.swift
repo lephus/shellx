@@ -1,4 +1,5 @@
 import SwiftUI
+import ShellXIcons
 
 /// Inline progress and retry UI for a private Cloud browser connection.
 public struct CloudBrowserConnectionCard: View {
@@ -22,7 +23,7 @@ public struct CloudBrowserConnectionCard: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Image(systemName: isDesktop ? "display" : "network").font(.system(size: 28)).foregroundStyle(.secondary)
+                ShellXIcon.image(isDesktop ? "display" : "network").font(.system(size: 28)).foregroundStyle(.secondary)
                 Text(isDesktop
                     ? String(localized: "cloud.display.connectTitle", defaultValue: "Connect to this Cloud display")
                     : String(localized: "cloud.ports.accessTitle", defaultValue: "Connect to this Cloud port"))

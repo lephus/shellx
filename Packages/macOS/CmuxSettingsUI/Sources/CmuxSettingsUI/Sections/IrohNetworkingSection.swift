@@ -1,6 +1,7 @@
 import CMUXMobileCore
 import CmuxSettings
 import SwiftUI
+import ShellXIcons
 
 /// Iroh relay policy, custom relay, and private-path diagnostics.
 @MainActor
@@ -193,7 +194,7 @@ public struct IrohNetworkingSection: View {
                         Button(role: .destructive) {
                             pendingCustomRemovalID = relay.id
                         } label: {
-                            Image(systemName: "trash")
+                            ShellXIcon.image("trash")
                         }
                         .accessibilityLabel(String(localized: "settings.common.remove", defaultValue: "Remove"))
                     }
@@ -266,7 +267,7 @@ public struct IrohNetworkingSection: View {
                 String(localized: "settings.networking.policy", defaultValue: "Relay Policy"),
                 subtitle: policyStatusText
             ) {
-                Image(systemName: policySymbol)
+                ShellXIcon.image(policySymbol)
                     .foregroundStyle(model.snapshot.policySource == .unavailable ? .orange : .secondary)
             }
             IrohDiagnosticsReportRows(
@@ -464,12 +465,12 @@ private struct IrohDiagnosticsReportRows: View {
         ) {
             HStack(spacing: 6) {
                 ShareLink(item: exportText) {
-                    Label(
+                    ShellXLabel(
                         String(
                             localized: "settings.networking.diagnostics.share",
                             defaultValue: "Share…"
                         ),
-                        systemImage: "square.and.arrow.up"
+                        icon: "square.and.arrow.up"
                     )
                 }
                 .disabled(exportText.isEmpty || isMutating)
@@ -478,7 +479,7 @@ private struct IrohDiagnosticsReportRows: View {
                 Button(role: .destructive) {
                     showsClearConfirmation = true
                 } label: {
-                    Image(systemName: "trash")
+                    ShellXIcon.image("trash")
                 }
                 .disabled(report.events.isEmpty || isMutating)
                 .accessibilityLabel(String(

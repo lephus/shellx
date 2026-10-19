@@ -2,6 +2,7 @@ import CmuxAppKitSupportUI
 import CmuxCloud
 import AppKit
 import SwiftUI
+import ShellXIcons
 
 /// One line under the header on free plans: how long the fleet stays
 /// reachable, counting down to the earliest machine's expiry, and the way out
@@ -21,7 +22,7 @@ struct MachinesFreeAccessBanner: View {
                 ProUpgradePresenter.present(source: .machinesPanelTrialBanner)
             } label: {
                 HStack(spacing: 5) {
-                    Image(systemName: isExpired ? "lock.fill" : "clock")
+                    ShellXIcon.image(isExpired ? "lock.fill" : "clock")
                         .font(.system(size: 10, weight: .semibold))
                     Text(text)
                         .cmuxFont(size: 11, monospacedDigit: true)
@@ -122,7 +123,7 @@ struct MachinesChromeLabelButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 4) {
-                Image(systemName: symbolName)
+                ShellXIcon.image(symbolName)
                     .font(.system(size: 10, weight: .semibold))
                 Text(title)
                     .cmuxFont(size: 11, weight: .medium)

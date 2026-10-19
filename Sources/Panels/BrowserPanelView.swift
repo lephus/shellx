@@ -8,6 +8,7 @@ import ShellXBrand
 import SwiftUI
 import WebKit
 import AppKit
+import ShellXIcons
 
 let browserOmnibarTextFieldIdentifier = NSUserInterfaceItemIdentifier("cmux.browserOmnibarTextField")
 
@@ -1270,7 +1271,7 @@ struct BrowserPanelView: View {
                 #endif
                 panel.goBack()
             }) {
-                CmuxSystemSymbolImage(systemName: "chevron.left", pointSize: chromeMetrics.navigationIconFontSize, weight: .medium, tint: .primary)
+                CmuxSystemSymbolImage(symbolName: "chevron.left", pointSize: chromeMetrics.navigationIconFontSize, weight: .medium, tint: .primary)
                     .frame(width: addressBarButtonHitSize, height: addressBarButtonHitSize, alignment: .center)
                     .contentShape(Rectangle())
             }
@@ -1286,7 +1287,7 @@ struct BrowserPanelView: View {
                 #endif
                 panel.goForward()
             }) {
-                CmuxSystemSymbolImage(systemName: "chevron.right", pointSize: chromeMetrics.navigationIconFontSize, weight: .medium, tint: .primary)
+                CmuxSystemSymbolImage(symbolName: "chevron.right", pointSize: chromeMetrics.navigationIconFontSize, weight: .medium, tint: .primary)
                     .frame(width: addressBarButtonHitSize, height: addressBarButtonHitSize, alignment: .center)
                     .contentShape(Rectangle())
             }
@@ -1297,7 +1298,7 @@ struct BrowserPanelView: View {
             .accessibilityLabel(String(localized: "browser.goForward", defaultValue: "Go Forward"))
 
             Button(action: handleReloadOrStopButtonAction) {
-                CmuxSystemSymbolImage(systemName: panel.isLoading ? "xmark" : "arrow.clockwise", pointSize: chromeMetrics.navigationIconFontSize, weight: .medium, tint: .primary)
+                CmuxSystemSymbolImage(symbolName: panel.isLoading ? "xmark" : "arrow.clockwise", pointSize: chromeMetrics.navigationIconFontSize, weight: .medium, tint: .primary)
                     .frame(width: addressBarButtonHitSize, height: addressBarButtonHitSize, alignment: .center)
                     .contentShape(Rectangle())
             }
@@ -1357,9 +1358,9 @@ struct BrowserPanelView: View {
                 .fixedSize()
                 .allowsHitTesting(false)
                 .accessibilityRepresentation {
-                    Label(
+                    ShellXLabel(
                         String(localized: "browser.screenshotPage.copied", defaultValue: "Copied"),
-                        systemImage: "checkmark"
+                        icon: "checkmark"
                     )
                 }
                 .accessibilityIdentifier("BrowserScreenshotPageCopied")
@@ -1391,7 +1392,7 @@ struct BrowserPanelView: View {
             HStack(spacing: 5) {
                 if let activeToolbarModeIconName {
                     CmuxSystemSymbolImage(
-                        systemName: activeToolbarModeIconName,
+                        symbolName: activeToolbarModeIconName,
                         pointSize: devToolsButtonIconSize,
                         weight: .medium,
                         tint: activeToolbarModeColor
@@ -1520,7 +1521,7 @@ struct BrowserPanelView: View {
         Button(action: {
             openDevTools()
         }) {
-            CmuxSystemSymbolImage(systemName: devToolsIconOption.rawValue, pointSize: devToolsButtonIconSize, weight: .medium, tint: devToolsColorOption.color(accent: cmuxAccent))
+            CmuxSystemSymbolImage(symbolName: devToolsIconOption.rawValue, pointSize: devToolsButtonIconSize, weight: .medium, tint: devToolsColorOption.color(accent: cmuxAccent))
                 .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
         }
         .buttonStyle(OmnibarAddressButtonStyle())
@@ -1534,7 +1535,7 @@ struct BrowserPanelView: View {
         Button(action: {
             isBrowserProfileMenuPresented.toggle()
         }) {
-            CmuxSystemSymbolImage(systemName: "person.crop.circle", pointSize: devToolsButtonIconSize, weight: .medium, tint: devToolsColorOption.color(accent: cmuxAccent))
+            CmuxSystemSymbolImage(symbolName: "person.crop.circle", pointSize: devToolsButtonIconSize, weight: .medium, tint: devToolsColorOption.color(accent: cmuxAccent))
                 .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
         }
         .buttonStyle(OmnibarAddressButtonStyle())
@@ -1563,25 +1564,25 @@ struct BrowserPanelView: View {
     private var browserOverflowMenu: some View {
         Menu {
             Button(action: handleBrowserFocusModeButtonAction) {
-                Label(
+                ShellXLabel(
                     String(localized: "browser.focusMode.active", defaultValue: "Focus Mode"),
-                    systemImage: "keyboard"
+                    icon: "keyboard"
                 )
             }
             .disabled(!panel.canToggleBrowserFocusMode)
             .accessibilityIdentifier("BrowserOverflowFocusModeButton")
             Button(action: handleScreenshotPageButtonAction) {
-                Label(
+                ShellXLabel(
                     String(localized: "browser.contextMenu.screenshotPage", defaultValue: "Screenshot Page"),
-                    systemImage: "camera"
+                    icon: "camera"
                 )
             }
             .disabled(!panel.shouldRenderWebView || screenshotPageCaptureInProgress)
             .accessibilityIdentifier("BrowserScreenshotPageButton")
             Button(action: handleScreenshotSectionButtonAction) {
-                Label(
+                ShellXLabel(
                     String(localized: "browser.contextMenu.screenshotSection", defaultValue: "Screenshot Section"),
-                    systemImage: "viewfinder"
+                    icon: "viewfinder"
                 )
             }
             .disabled(!panel.shouldRenderWebView)
@@ -1595,7 +1596,7 @@ struct BrowserPanelView: View {
                 )
                 .accessibilityIdentifier("BrowserOverflowDesignModeButton")
                 Button(action: openDevTools) {
-                    Label(developerToolsButtonHelp, systemImage: devToolsIconOption.rawValue)
+                    ShellXLabel(developerToolsButtonHelp, icon: devToolsIconOption.rawValue)
                 }
                 .accessibilityIdentifier("BrowserToggleDevToolsButton")
             }
@@ -1624,7 +1625,7 @@ struct BrowserPanelView: View {
         Button(action: {
             isBrowserThemeMenuPresented.toggle()
         }) {
-            CmuxSystemSymbolImage(systemName: browserThemeMode.iconName, pointSize: devToolsButtonIconSize, weight: .medium, tint: browserThemeModeIconColor)
+            CmuxSystemSymbolImage(symbolName: browserThemeMode.iconName, pointSize: devToolsButtonIconSize, weight: .medium, tint: browserThemeModeIconColor)
                 .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
         }
         .buttonStyle(OmnibarAddressButtonStyle())
@@ -1652,7 +1653,7 @@ struct BrowserPanelView: View {
             isBrowserImportHintPopoverPresented.toggle()
         }) {
             HStack(spacing: 4) {
-                CmuxSystemSymbolImage(systemName: "square.and.arrow.down.on.square", pointSize: 10, weight: .medium, tint: devToolsColorOption.color(accent: cmuxAccent))
+                CmuxSystemSymbolImage(symbolName: "square.and.arrow.down.on.square", pointSize: 10, weight: .medium, tint: devToolsColorOption.color(accent: cmuxAccent))
                 Text(String(localized: "browser.import.hint.toolbar", defaultValue: "Import"))
                     .cmuxFont(size: 11, weight: .medium)
                     .lineLimit(1)
@@ -1681,7 +1682,7 @@ struct BrowserPanelView: View {
                         applyBrowserProfileSelection(profile.id)
                     } label: {
                         HStack(spacing: 8) {
-                            CmuxSystemSymbolImage(systemName: profile.id == panel.profileID ? "checkmark" : "circle", pointSize: 10, weight: .semibold, tint: .primary)
+                            CmuxSystemSymbolImage(symbolName: profile.id == panel.profileID ? "checkmark" : "circle", pointSize: 10, weight: .semibold, tint: .primary)
                                 .opacity(profile.id == panel.profileID ? 1.0 : 0.0)
                                 .frame(width: 12, alignment: .center)
                             Text(profile.displayName)
@@ -1743,7 +1744,7 @@ struct BrowserPanelView: View {
                     isBrowserThemeMenuPresented = false
                 } label: {
                     HStack(spacing: 8) {
-                        CmuxSystemSymbolImage(systemName: mode == browserThemeMode ? "checkmark" : "circle", pointSize: 10, weight: .semibold, tint: .primary)
+                        CmuxSystemSymbolImage(symbolName: mode == browserThemeMode ? "checkmark" : "circle", pointSize: 10, weight: .semibold, tint: .primary)
                             .opacity(mode == browserThemeMode ? 1.0 : 0.0)
                             .frame(width: 12, alignment: .center)
                         Text(mode.displayName)
@@ -1775,7 +1776,7 @@ struct BrowserPanelView: View {
 
         return HStack(spacing: 4) {
             if showSecureBadge {
-                CmuxSystemSymbolImage(systemName: "lock.fill", pointSize: chromeMetrics.secureBadgeFontSize, tint: .secondary)
+                CmuxSystemSymbolImage(symbolName: "lock.fill", pointSize: chromeMetrics.secureBadgeFontSize, tint: .secondary)
             }
 
             OmnibarTextFieldRepresentable(

@@ -17,6 +17,7 @@ import Bonsplit
 import UniformTypeIdentifiers
 import CmuxTerminal
 import ShellXBrand
+import ShellXIcons
 struct cmuxApp: App {
     /// App-owned settings graph, injected into each SwiftUI hosting root.
     private let settingsRuntime: SettingsRuntime
@@ -845,7 +846,7 @@ struct cmuxApp: App {
                                 Label {
                                     Text(verbatim: "\(spacing)")
                                 } icon: {
-                                    Image(systemName: "checkmark")
+                                    ShellXIcon.image("checkmark")
                                 }
                             } else {
                                 Text(verbatim: "\(spacing)")
@@ -2095,7 +2096,7 @@ private struct DebugWindowControlsView: View {
                         HStack(spacing: 8) {
                             Text("Preview")
                             Spacer()
-                            Image(systemName: selectedDevToolsIconOption.rawValue)
+                            ShellXIcon.image(selectedDevToolsIconOption.rawValue)
                                 .cmuxFont(size: 12, weight: .medium)
                                 .foregroundStyle(selectedDevToolsColorOption.color(accent: cmuxAccent))
                         }
@@ -2317,7 +2318,7 @@ private struct BrowserProfilePopoverDebugView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
-                    Image(systemName: "checkmark")
+                    ShellXIcon.image("checkmark")
                         .cmuxFont(size: 10, weight: .semibold)
                         .frame(width: 12, alignment: .center)
                     Text(String(localized: "browser.profile.default", defaultValue: "Default"))
@@ -2559,7 +2560,7 @@ private struct FileExplorerStyleDebugView: View {
                         NotificationCenter.default.post(name: .fileExplorerStyleDidChange, object: nil)
                     }) {
                         HStack(spacing: 8) {
-                            Image(systemName: styleRawValue == style.rawValue ? "checkmark.circle.fill" : "circle")
+                            ShellXIcon.image(styleRawValue == style.rawValue ? "checkmark.circle.fill" : "circle")
                                 .foregroundColor(styleRawValue == style.rawValue ? .accentColor : .secondary)
                                 .frame(width: 16)
                             VStack(alignment: .leading, spacing: 2) {
@@ -2952,7 +2953,7 @@ private struct SidebarFooterIconChoiceControls: View {
                         Label {
                             Text(verbatim: choice.rawValue)
                         } icon: {
-                            Image(systemName: choice.rawValue)
+                            ShellXIcon.image(choice.rawValue)
                         }
                         .tag(choice.rawValue)
                     }
@@ -2985,7 +2986,7 @@ private struct SidebarFooterIconChoiceControls: View {
                         Label {
                             Text(verbatim: choice.rawValue)
                         } icon: {
-                            Image(systemName: choice.rawValue)
+                            ShellXIcon.image(choice.rawValue)
                         }
                         .tag(choice.rawValue)
                     }
@@ -3282,7 +3283,7 @@ private struct SidebarFooterHoverIntensityPreview: View {
             .accessibilityLabel(accessibilityLabel)
 
             Button(action: {}) {
-                CmuxSystemSymbolImage(systemName: "iphone", pointSize: CGFloat(mobileSize), weight: .medium, tint: Color(nsColor: .secondaryLabelColor))
+                CmuxSystemSymbolImage(symbolName: "iphone", pointSize: CGFloat(mobileSize), weight: .medium, tint: Color(nsColor: .secondaryLabelColor))
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(SidebarFooterIconButtonStyle())
@@ -3315,7 +3316,7 @@ private struct SidebarFooterIconBalanceVariantCard: View {
         Button(action: onSelect) {
             VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 5) {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    ShellXIcon.image(isSelected ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(isSelected ? Color.accentColor : .secondary)
                     Text(verbatim: "\(Int(variant.pointSize)) pt · \(variant.weight.displayName)")
@@ -3432,7 +3433,7 @@ private struct SidebarFooterMobileIconReference: View {
     let size: Double
 
     var body: some View {
-        CmuxSystemSymbolImage(systemName: "iphone", pointSize: CGFloat(size), weight: .medium, tint: Color(nsColor: .secondaryLabelColor))
+        CmuxSystemSymbolImage(symbolName: "iphone", pointSize: CGFloat(size), weight: .medium, tint: Color(nsColor: .secondaryLabelColor))
             .frame(width: 22, height: 22)
     }
 }

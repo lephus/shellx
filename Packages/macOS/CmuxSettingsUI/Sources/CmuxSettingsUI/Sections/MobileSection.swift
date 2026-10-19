@@ -1,6 +1,7 @@
 import CmuxFoundation
 import CmuxSettings
 import SwiftUI
+import ShellXIcons
 
 /// **Mobile** section — Mac-side controls for pairing and syncing with
 /// cmux on iOS: the pairing-host toggle, the preferred listener port (with a
@@ -333,19 +334,19 @@ public struct MobileSection: View {
     private var boundPortStatusRow: some View {
         if !isDraftValid {
             statusCaption {
-                Label(
+                ShellXLabel(
                     String(localized: "settings.mobile.port.status.invalid", defaultValue: "Port must be between 1 and 65535."),
-                    systemImage: "exclamationmark.triangle.fill"
+                    icon: "exclamationmark.triangle.fill"
                 )
                 .foregroundStyle(.orange)
             }
         } else if iOSPairingHost.current, let current = status.current,
                   current.pendingPortChange, let bound = current.boundPort {
             statusCaption {
-                Label(
+                ShellXLabel(
                     String(localized: "settings.mobile.port.pending",
                         defaultValue: "Port \(current.configuredPort) is saved for the next pairing start. Currently using port \(bound)."),
-                    systemImage: "info.circle"
+                    icon: "info.circle"
                 )
                 .foregroundStyle(.secondary)
             }
@@ -353,20 +354,20 @@ public struct MobileSection: View {
             // Only while pairing is on — toggling off stops the listener, which
             // would make "still listening on …" wrong.
             statusCaption {
-                Label(
+                ShellXLabel(
                     String(
                         localized: "settings.mobile.port.apply.inUse",
                         defaultValue: "Port \(requested) is in use. The pairing listener is still on \(status.current?.boundPort ?? requested)."
                     ),
-                    systemImage: "exclamationmark.triangle.fill"
+                    icon: "exclamationmark.triangle.fill"
                 )
                 .foregroundStyle(.orange)
             }
         } else if case let .savedForLater(saved) = applyResult, status.current?.isRunning != true {
             statusCaption {
-                Label(
+                ShellXLabel(
                     String(localized: "settings.mobile.port.apply.saved", defaultValue: "Saved port \(saved). It takes effect the next time iOS Pairing starts."),
-                    systemImage: "checkmark.circle.fill"
+                    icon: "checkmark.circle.fill"
                 )
                 .foregroundStyle(.secondary)
             }
@@ -390,18 +391,18 @@ public struct MobileSection: View {
             Text(String(localized: "settings.mobile.port.status.starting", defaultValue: "Starting the pairing listener…"))
                 .foregroundStyle(.secondary)
         } else if snapshot.usesEphemeralFallback, let bound = snapshot.boundPort {
-            Label(
+            ShellXLabel(
                 String(
                     localized: "settings.mobile.port.status.fallback",
                     defaultValue: "Port \(snapshot.configuredPort) is in use. The pairing listener is on \(bound) instead."
                 ),
-                systemImage: "exclamationmark.triangle.fill"
+                icon: "exclamationmark.triangle.fill"
             )
             .foregroundStyle(.orange)
         } else if let bound = snapshot.boundPort {
-            Label(
+            ShellXLabel(
                 String(localized: "settings.mobile.port.status.ok", defaultValue: "Pairing listener on port \(bound)."),
-                systemImage: "checkmark.circle.fill"
+                icon: "checkmark.circle.fill"
             )
             .foregroundStyle(.secondary)
         }

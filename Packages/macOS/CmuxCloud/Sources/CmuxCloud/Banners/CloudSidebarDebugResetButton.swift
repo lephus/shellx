@@ -1,3 +1,4 @@
+import ShellXIcons
 #if DEBUG
 import SwiftUI
 
@@ -32,7 +33,7 @@ public struct CloudSidebarDebugResetButton<Value: Equatable>: View {
         Button {
             value = defaultValue
         } label: {
-            Image(systemName: "arrow.counterclockwise")
+            ShellXIcon.image("arrow.counterclockwise")
                 .frame(width: 16, height: 16)
         }
         .buttonStyle(.borderless)

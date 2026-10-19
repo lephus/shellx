@@ -1,5 +1,6 @@
 import CmuxSimulator
 import SwiftUI
+import ShellXIcons
 
 struct SimulatorActivityEntryView: View {
     let entry: SimulatorActionLogEntry
@@ -7,7 +8,7 @@ struct SimulatorActivityEntryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Image(systemName: entry.succeeded == false ? "xmark.circle.fill" : "circle.fill")
+                ShellXIcon.image(entry.succeeded == false ? "xmark.circle.fill" : "circle.fill")
                     .font(.system(size: 6))
                     .foregroundStyle(entry.succeeded == false ? .red : .secondary)
                 Text(simulatorStrings.actionLog(entry.action))

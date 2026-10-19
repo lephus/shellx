@@ -2,6 +2,7 @@ import AppKit
 import CMUXAgentLaunch
 import CmuxAgentJournal
 import SwiftUI
+import ShellXIcons
 
 struct AgentInboxView: View {
     let items: [AgentInboxItem]
@@ -105,7 +106,7 @@ struct AgentInboxView: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Image(systemName: "tray.full")
+            ShellXIcon.image("tray.full")
                 .foregroundStyle(.secondary)
             TextField(
                 String(localized: "agentInbox.search.placeholder", defaultValue: "Search agents, workspaces, and messages"),
@@ -118,7 +119,7 @@ struct AgentInboxView: View {
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
             Button(action: onDismiss) {
-                Image(systemName: "xmark")
+                ShellXIcon.image("xmark")
             }
             .buttonStyle(.borderless)
             .help(String(localized: "agentInbox.close.help", defaultValue: "Close Agent Inbox"))
@@ -190,17 +191,20 @@ struct AgentInboxView: View {
             }
             .onAppear { markSelectedMessageRead() }
         } else {
-            ContentUnavailableView(
-                String(localized: "agentInbox.select.title", defaultValue: "Select an agent update"),
-                systemImage: "bubble.left.and.bubble.right",
-                description: Text(String(localized: "agentInbox.select.description", defaultValue: "Choose an item to inspect its exchange."))
-            )
+            ContentUnavailableView {
+                ShellXLabel(
+                    String(localized: "agentInbox.select.title", defaultValue: "Select an agent update"),
+                    icon: "bubble.left.and.bubble.right"
+                )
+            } description: {
+                Text(String(localized: "agentInbox.select.description", defaultValue: "Choose an item to inspect its exchange."))
+            }
         }
     }
 
     private func detailHeader(_ item: AgentInboxItem) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: item.kind.symbolName)
+            ShellXIcon.image(item.kind.symbolName)
                 .font(.title3)
                 .foregroundStyle(item.kind.tint)
             VStack(alignment: .leading, spacing: 3) {
@@ -467,7 +471,7 @@ private struct AgentInboxRow: View {
     var body: some View {
         Button(action: onActivate) {
             HStack(alignment: .top, spacing: 10) {
-                Image(systemName: item.kind.symbolName)
+                ShellXIcon.image(item.kind.symbolName)
                     .foregroundStyle(item.kind.tint)
                     .frame(width: 18)
                 VStack(alignment: .leading, spacing: 3) {

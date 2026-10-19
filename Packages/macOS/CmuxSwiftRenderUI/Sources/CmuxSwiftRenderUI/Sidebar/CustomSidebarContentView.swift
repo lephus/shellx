@@ -1,6 +1,7 @@
 import CmuxFoundation
 import CmuxSwiftRender
 import SwiftUI
+import ShellXIcons
 
 /// The pure presentation of a custom sidebar: file state in, pixels out.
 ///
@@ -126,9 +127,9 @@ public struct CustomSidebarContentView: View {
 
     private func errorView(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label(
+            ShellXLabel(
                 String(localized: "sidebar.custom.error", defaultValue: "Sidebar error", bundle: .module),
-                systemImage: "exclamationmark.triangle.fill"
+                icon: "exclamationmark.triangle.fill"
             )
             .cmuxFont(.caption, weight: .bold)
             .foregroundStyle(.orange)

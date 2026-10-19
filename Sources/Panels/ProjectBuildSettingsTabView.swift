@@ -1,6 +1,7 @@
 import CmuxFoundation
 import CMUXProjectModel
 import SwiftUI
+import ShellXIcons
 
 /// Build Settings tab inside ``ProjectPanelView``.
 ///
@@ -34,7 +35,7 @@ struct ProjectBuildSettingsTabView: View {
                     .foregroundStyle(.secondary)
                 targetPicker
                 Spacer(minLength: 4)
-                Image(systemName: "magnifyingglass")
+                ShellXIcon.image("magnifyingglass")
                     .foregroundStyle(.secondary)
                 TextField("Filter settings", text: $panel.settingsSearchText)
                     .textFieldStyle(.plain)

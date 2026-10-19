@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ShellXIcons
 
 /// The view receives values, so a growing diagnostic history does not invalidate machine rows.
 struct CloudOperationActivityView: View {
@@ -15,7 +16,7 @@ struct CloudOperationActivityView: View {
             ForEach(Array(visible.suffix(3))) { operation in
                 HStack(alignment: .top, spacing: 6) {
                     if operation.isRunning { ProgressView().controlSize(.mini) }
-                    else { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange) }
+                    else { ShellXIcon.image("exclamationmark.triangle.fill").foregroundStyle(.orange) }
                     VStack(alignment: .leading, spacing: 2) {
                         Text(operation.operation.label).font(.caption.bold())
                         Text(operation.isRunning ? operation.currentPhase.label : (operation.failure ?? operation.steps.last(where: { $0.failure != nil })?.failure ?? .unknown).label)
@@ -24,7 +25,7 @@ struct CloudOperationActivityView: View {
                     }
                     Spacer(minLength: 0)
                     if !operation.isRunning {
-                        Button { dismiss(operation.id) } label: { Image(systemName: "xmark") }
+                        Button { dismiss(operation.id) } label: { ShellXIcon.image("xmark") }
                             .buttonStyle(.plain)
                             .accessibilityLabel(String(localized: "cloud.operation.dismiss", defaultValue: "Dismiss operation"))
                     }

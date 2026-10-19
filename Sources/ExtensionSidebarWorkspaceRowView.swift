@@ -4,6 +4,7 @@ import AppKit
 import CmuxSidebarProviderKit
 import SwiftUI
 import WebKit
+import ShellXIcons
 
 struct CmuxExtensionSidebarWorkspaceRowView: View, Equatable {
     let row: CmuxSidebarProviderRow
@@ -70,7 +71,7 @@ struct CmuxExtensionSidebarWorkspaceRowView: View, Equatable {
                     }
                     showsInspector = true
                 } label: {
-                    Image(systemName: accessory.systemImageName)
+                    ShellXIcon.image(accessory.systemImageName)
                         .cmuxFont(size: isSuperCompact ? 10 : 12, weight: .regular)
                         .frame(width: isSuperCompact ? 14 : 18, height: isSuperCompact ? 14 : 18)
                 }
@@ -194,7 +195,7 @@ struct CmuxExtensionWorkspaceInspectorView: View {
                 .pickerStyle(.segmented)
 
                 Button(action: onOpenWindow) {
-                    Image(systemName: "macwindow")
+                    ShellXIcon.image("macwindow")
                         .frame(width: 20, height: 20)
                 }
                 .buttonStyle(.plain)
@@ -214,7 +215,7 @@ struct CmuxExtensionWorkspaceInspectorView: View {
             case .browser, .pullRequest:
                 VStack(spacing: 0) {
                     HStack(spacing: 6) {
-                        Image(systemName: "magnifyingglass")
+                        ShellXIcon.image("magnifyingglass")
                             .foregroundColor(.secondary)
                         TextField(
                             String(localized: "sidebar.extension.browserAddress", defaultValue: "Search or enter URL"),

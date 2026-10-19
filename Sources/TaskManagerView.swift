@@ -2,6 +2,7 @@ import CmuxAppKitSupportUI
 import CmuxFoundation
 import Observation
 import SwiftUI
+import ShellXIcons
 
 struct CmuxTaskManagerView: View {
     @Bindable var model: CmuxTaskManagerModel
@@ -62,7 +63,7 @@ struct CmuxTaskManagerView: View {
             Button {
                 model.refresh(force: true)
             } label: {
-                Label(String(localized: "taskManager.refresh", defaultValue: "Refresh"), systemImage: "arrow.clockwise")
+                ShellXLabel(String(localized: "taskManager.refresh", defaultValue: "Refresh"), icon: "arrow.clockwise")
             }
         }
         .padding(.horizontal, 16)
@@ -396,9 +397,9 @@ struct CmuxTaskManagerRowView: View, Equatable {
                 Button {
                     onViewWorkspace()
                 } label: {
-                    Label(
+                    ShellXLabel(
                         String(localized: "taskManager.contextMenu.viewWorkspace", defaultValue: "View Workspace"),
-                        systemImage: "rectangle.stack"
+                        icon: "rectangle.stack"
                     )
                 }
             }
@@ -406,9 +407,9 @@ struct CmuxTaskManagerRowView: View, Equatable {
                 Button {
                     onViewTerminal()
                 } label: {
-                    Label(
+                    ShellXLabel(
                         String(localized: "taskManager.contextMenu.viewTerminal", defaultValue: "View Terminal"),
-                        systemImage: "terminal"
+                        icon: "terminal"
                     )
                 }
             }
@@ -419,9 +420,9 @@ struct CmuxTaskManagerRowView: View, Equatable {
                 Button {
                     onKillProcess()
                 } label: {
-                    Label(
+                    ShellXLabel(
                         String(localized: "taskManager.contextMenu.killProcess", defaultValue: "Kill Process..."),
-                        systemImage: "xmark.octagon"
+                        icon: "xmark.octagon"
                     )
                 }
             }
@@ -472,7 +473,7 @@ struct CmuxTaskManagerRowView: View, Equatable {
             ))
             .frame(width: 14, height: 14)
         } else {
-            CmuxSystemSymbolImage(magnified: row.kind.systemImage, pointSize: 12, tint: row.kind.tint)
+            CmuxSystemSymbolImage(magnified: row.kind.icon, pointSize: 12, tint: row.kind.tint)
                 .frame(width: 14)
         }
     }

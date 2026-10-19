@@ -1,6 +1,7 @@
 import CmuxFoundation
 import AppKit
 import SwiftUI
+import ShellXIcons
 
 /// Debug-menu window for the shared, cross-tag default display that new DEBUG
 /// cmux windows open on.
@@ -68,7 +69,7 @@ private struct DevWindowDisplayDebugView: View {
                             write(name)
                         } label: {
                             HStack(spacing: 8) {
-                                Image(systemName: current == name ? "checkmark.circle.fill" : "circle")
+                                ShellXIcon.image(current == name ? "checkmark.circle.fill" : "circle")
                                     .foregroundStyle(current == name ? Color.accentColor : Color.secondary)
                                 Text(name)
                                 Spacer()

@@ -2,6 +2,7 @@ import CmuxFoundation
 public import SwiftUI
 public import CmuxUpdater
 import AppKit
+import ShellXIcons
 
 struct UpdateErrorView: View {
     let error: UpdateState.Error
@@ -28,7 +29,7 @@ struct UpdateErrorView: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
+                    ShellXIcon.image("exclamationmark.triangle.fill")
                         .foregroundColor(.orange)
                         .cmuxFont(size: 13)
                     Text(title)
@@ -46,7 +47,7 @@ struct UpdateErrorView: View {
                     openURL(downloadURL)
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "arrow.down.circle")
+                        ShellXIcon.image("arrow.down.circle")
                         Text(String(localized: "update.error.downloadLatest.button", defaultValue: "Download Latest Version"))
                     }
                     .frame(maxWidth: .infinity)

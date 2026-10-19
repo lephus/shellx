@@ -1,6 +1,7 @@
 import CmuxFoundation
 import CmuxSettings
 import SwiftUI
+import ShellXIcons
 
 /// The **Base Keymap** picker. Choosing a preset (here or from the Command
 /// Palette) previews what would change, including shortcuts macOS may take
@@ -90,12 +91,12 @@ struct ShortcutKeymapPresetRow: View {
                     .textSelection(.enabled)
             }
             if !plan.systemConflicts.isEmpty {
-                Label(
+                ShellXLabel(
                     String(
                         localized: "settings.shortcuts.baseKeymap.conflictHint",
                         defaultValue: "Change or turn off the macOS shortcut in System Settings > Keyboard > Keyboard Shortcuts."
                     ),
-                    systemImage: "exclamationmark.triangle"
+                    icon: "exclamationmark.triangle"
                 )
                 .cmuxFont(.caption)
                 .foregroundColor(.orange)

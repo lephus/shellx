@@ -1,6 +1,7 @@
 import AppKit
 import GhosttyKit
 import SwiftUI
+import ShellXIcons
 
 extension GhosttyNSView {
     func addTranslateSelectionMenuItem(to menu: NSMenu, surface: ghostty_surface_t) {
@@ -16,7 +17,7 @@ extension GhosttyNSView {
             keyEquivalent: ""
         )
         translateItem.target = self
-        translateItem.image = NSImage(systemSymbolName: "translate", accessibilityDescription: nil)
+        translateItem.image = ShellXIcon.nsImage("translate", accessibilityDescription: nil)
     }
 
     /// Presents the system Translation popover for the current selection.

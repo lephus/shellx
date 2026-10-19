@@ -1,6 +1,7 @@
 import AppKit
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// The Cloud tab's first-use outcome. Mirrors
 /// ``CloudActivationCoordinator/State`` so the screen renders from plain
@@ -165,7 +166,7 @@ struct CloudMachinesEnablementView: View {
             Image(nsImage: NSImage(named: "AppIconDark") ?? NSApp.applicationIconImage)
                 .resizable()
                 .frame(width: 60, height: 60)
-            Image(systemName: isProGated ? "lock.fill" : "cloud.fill")
+            ShellXIcon.image(isProGated ? "lock.fill" : "cloud.fill")
                 .cmuxFont(size: isProGated ? 11 : 12, weight: .semibold)
                 .foregroundStyle(.white)
                 .frame(width: 24, height: 24)
@@ -260,7 +261,7 @@ struct CloudMachinesEnablementView: View {
                 .controlSize(.regular)
                 .accessibilityLabel(title)
         } else {
-            Image(systemName: statusSymbolName)
+            ShellXIcon.image(statusSymbolName)
                 .font(.system(size: 30, weight: .regular))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(.secondary)
@@ -502,7 +503,7 @@ private struct CloudMachinesEnablementReasons: View {
 
     private func row(symbol: String, title: String, detail: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: symbol)
+            ShellXIcon.image(symbol)
                 .cmuxFont(size: 16)
                 .foregroundStyle(Color.accentColor)
                 .frame(width: 24)

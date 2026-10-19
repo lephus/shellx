@@ -380,7 +380,7 @@ struct NotificationRow: View, Equatable {
             .modifier(DefaultActionModifier(isActive: isFocused))
 
             Button(action: onClear) {
-                CmuxSystemSymbolImage(systemName: "xmark.circle.fill", pointSize: 14, tint: .secondary)
+                CmuxSystemSymbolImage(symbolName: "xmark.circle.fill", pointSize: 14, tint: .secondary)
             }
             .buttonStyle(.plain)
             // CmuxSystemSymbolImage renders an AppKit NSImage with no accessibility

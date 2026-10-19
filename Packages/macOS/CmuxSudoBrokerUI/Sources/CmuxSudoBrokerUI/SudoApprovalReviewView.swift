@@ -1,4 +1,5 @@
 import SwiftUI
+import ShellXIcons
 
 struct SudoApprovalReviewView: View {
     let presentation: SudoApprovalPresentation
@@ -7,7 +8,7 @@ struct SudoApprovalReviewView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label(presentation.heading, systemImage: "lock.shield")
+            ShellXLabel(presentation.heading, icon: "lock.shield")
                 .font(.title2.weight(.semibold))
 
             Text(presentation.warning)
@@ -16,7 +17,7 @@ struct SudoApprovalReviewView: View {
 
             if presentation.containsHiddenCharacters {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Label(presentation.hiddenCharacterBadge, systemImage: "exclamationmark.triangle.fill")
+                    ShellXLabel(presentation.hiddenCharacterBadge, icon: "exclamationmark.triangle.fill")
                         .font(.callout.weight(.semibold))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)

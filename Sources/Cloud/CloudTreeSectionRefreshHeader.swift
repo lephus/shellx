@@ -44,7 +44,7 @@ struct CloudTreeSectionRefreshHeader: View {
                         .scaleEffect(0.7)
                 } else {
                     CmuxSystemSymbolImage(
-                        systemName: "arrow.clockwise",
+                        symbolName: "arrow.clockwise",
                         pointSize: scaled(max(8, style.detailSize - 2)),
                         weight: .semibold,
                         tint: Color(nsColor: isHovered ? .secondaryLabelColor : .tertiaryLabelColor),

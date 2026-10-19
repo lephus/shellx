@@ -5,6 +5,7 @@ import CmuxAuthRuntime
 import CmuxMobileHost
 import Foundation
 import SwiftUI
+import ShellXIcons
 
 /// The macOS window for pairing an iPhone with this Mac.
 ///
@@ -99,7 +100,7 @@ struct MobilePairingView: View {
     private var getIPhoneAppBadge: some View {
         Link(destination: Self.iphoneAppURL) {
             HStack(spacing: 8) {
-                Image(systemName: "apple.logo")
+                ShellXIcon.image("apple.logo")
                     .cmuxFont(size: 20)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(String(
@@ -173,7 +174,7 @@ struct MobilePairingView: View {
 
     private var pairingDisabledContent: some View {
         VStack(spacing: 12) {
-            Image(systemName: "iphone.slash")
+            ShellXIcon.image("iphone.slash")
                 .cmuxFont(size: 28)
                 .foregroundStyle(.secondary)
             Text(String(
@@ -203,7 +204,7 @@ struct MobilePairingView: View {
 
     private func failure(message: String) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
+            ShellXIcon.image("exclamationmark.triangle")
                 .cmuxFont(size: 28)
                 .foregroundStyle(.orange)
             Text(message)
@@ -246,7 +247,7 @@ struct MobilePairingView: View {
     private var irohReadyContent: some View {
         VStack(alignment: .center, spacing: 14) {
             getIPhoneAppBadge
-            Image(systemName: "checkmark.shield")
+            ShellXIcon.image("checkmark.shield")
                 .cmuxFont(size: 34)
                 .foregroundStyle(.green)
             Text(String(
@@ -378,7 +379,7 @@ struct MobilePairingView: View {
 
     @ViewBuilder
     private var tailscaleMissingBody: some View {
-        Image(systemName: "network.slash")
+        ShellXIcon.image("network.slash")
             .cmuxFont(size: 28)
             .foregroundStyle(.orange)
         Text(String(

@@ -57,7 +57,7 @@ struct StackAccountAvatarView: View {
                     }
                 } else if let loadingSystemName {
                     CmuxSystemSymbolImage(
-                        systemName: loadingSystemName,
+                        symbolName: loadingSystemName,
                         pointSize: size,
                         weight: .regular,
                         tint: Color(nsColor: .secondaryLabelColor)
@@ -91,7 +91,7 @@ struct StackAccountAvatarView: View {
                     .foregroundStyle(fallbackForegroundColor)
             } else {
                 CmuxSystemSymbolImage(
-                    systemName: "person.fill",
+                    symbolName: "person.fill",
                     pointSize: max(8, size * 0.45),
                     weight: .medium,
                     tint: fallbackForegroundColor

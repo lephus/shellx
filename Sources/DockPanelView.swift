@@ -4,6 +4,7 @@ import CmuxAppKitSupportUI
 import CmuxNotifications
 import CmuxTerminal
 import SwiftUI
+import ShellXIcons
 
 /// Right-sidebar Dock. Renders the window's own Dock `BonsplitController` tree
 /// (terminals + browsers) using the same split machinery as the main content
@@ -161,7 +162,7 @@ struct DockEmptyPaneView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "dock.rectangle")
+            ShellXIcon.image("dock.rectangle")
                 .font(.system(size: 30))
                 .foregroundStyle(.tertiary)
             Text(String(localized: "dock.emptyPane.title", defaultValue: "Empty Dock Pane"))
@@ -169,16 +170,16 @@ struct DockEmptyPaneView: View {
                 .foregroundStyle(.secondary)
             HStack(spacing: 8) {
                 Button(action: onNewTerminal) {
-                    Label(
+                    ShellXLabel(
                         String(localized: "dock.action.newTerminal", defaultValue: "New Terminal"),
-                        systemImage: "terminal.fill"
+                        icon: "terminal.fill"
                     )
                 }
                 if BrowserAvailabilitySettings.offersBrowserAffordance(isEnabled: browserAvailable) {
                     Button(action: onNewBrowser) {
-                        Label(
+                        ShellXLabel(
                             String(localized: "dock.action.newBrowser", defaultValue: "New Browser"),
-                            systemImage: "globe"
+                            icon: "globe"
                         )
                     }
                 }
@@ -198,7 +199,7 @@ private struct DockTrustView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Image(systemName: "exclamationmark.shield")
+            ShellXIcon.image("exclamationmark.shield")
                 .font(.system(size: 28))
                 .foregroundStyle(.orange)
             Text(String(localized: "dock.trust.title", defaultValue: "Trust Project Dock?"))
@@ -231,7 +232,7 @@ private struct DockErrorView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle")
+            ShellXIcon.image("exclamationmark.triangle")
                 .font(.system(size: 24))
                 .foregroundStyle(.orange)
             Text(String(localized: "dock.error.title", defaultValue: "Dock Config Error"))

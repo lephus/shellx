@@ -2,6 +2,7 @@ import AppKit
 import CmuxFoundation
 import CmuxSettings
 import SwiftUI
+import ShellXIcons
 
 /// The existing global notification-sound picker and asynchronous custom-file validator.
 @MainActor
@@ -66,7 +67,7 @@ struct NotificationSoundGlobalRow: View {
                             customFilePath: customFileModel.current
                         )
                     } label: {
-                        Image(systemName: "play.fill")
+                        ShellXIcon.image("play.fill")
                             .cmuxFont(size: 9)
                     }
                     .buttonStyle(.bordered)

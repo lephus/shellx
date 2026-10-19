@@ -1,6 +1,7 @@
 import AppKit
 import CmuxTerminalCore
 import GhosttyKit
+import ShellXIcons
 
 extension GhosttyNSView {
     /// Adds "Reveal in Finder" when the hovered link, the selection, or the
@@ -36,7 +37,7 @@ extension GhosttyNSView {
         )
         item.target = self
         item.representedObject = path
-        item.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
+        item.image = ShellXIcon.nsImage("folder", accessibilityDescription: nil)
     }
 
     /// Selects the menu item's resolved file in Finder.

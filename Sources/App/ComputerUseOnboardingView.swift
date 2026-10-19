@@ -2,6 +2,7 @@ import CmuxComputerUse
 import AppKit
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// Two-card onboarding for the standalone local computer-use helper.
 ///
@@ -209,7 +210,7 @@ struct ComputerUseOnboardingView: View {
             ZStack {
                 Circle()
                     .fill(Color.green)
-                Image(systemName: "checkmark")
+                ShellXIcon.image("checkmark")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(.white)
             }
@@ -263,7 +264,7 @@ struct ComputerUseOnboardingView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(Self.brandBlue)
-                    Image(systemName: "cursorarrow.motionlines")
+                    ShellXIcon.image("cursorarrow.motionlines")
                         .font(.system(size: 26, weight: .semibold))
                         .foregroundStyle(.white)
                 }
@@ -368,8 +369,8 @@ struct ComputerUseOnboardingView: View {
         ZStack {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .fill(permissionStep == .accessibility ? Self.brandBlue : Self.brandViolet)
-            Image(
-                systemName: permissionStep == .accessibility
+            ShellXIcon.image(
+                permissionStep == .accessibility
                     ? "accessibility"
                     : "camera.viewfinder"
             )
@@ -395,7 +396,7 @@ struct ComputerUseOnboardingView: View {
         )
         if action == .done {
             HStack(spacing: 6) {
-                Image(systemName: "checkmark.circle.fill")
+                ShellXIcon.image("checkmark.circle.fill")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.green)
                 Text(String(localized: "computerUse.onboarding.done", defaultValue: "Done"))
@@ -702,7 +703,7 @@ struct ComputerUsePermissionCompanionView: View {
     var body: some View {
         VStack(spacing: ComputerUsePermissionCompanionLayout.rowSpacing) {
             HStack(spacing: ComputerUsePermissionCompanionLayout.columnSpacing) {
-                Image(systemName: "arrow.up")
+                ShellXIcon.image("arrow.up")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(ComputerUseOnboardingView.brandBlue)
                     .frame(width: 30, height: 30)
@@ -739,7 +740,7 @@ struct ComputerUsePermissionCompanionView: View {
 
             HStack(spacing: ComputerUsePermissionCompanionLayout.columnSpacing) {
                 Button(action: onBack) {
-                    Image(systemName: "chevron.left")
+                    ShellXIcon.image("chevron.left")
                         .font(.system(size: 12, weight: .semibold))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .contentShape(Rectangle())
@@ -798,7 +799,7 @@ struct ComputerUsePermissionCompanionView: View {
                         .resizable()
                         .interpolation(.high)
                 } else {
-                    Image(systemName: "app.dashed")
+                    ShellXIcon.image("app.dashed")
                         .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(.secondary)
                 }

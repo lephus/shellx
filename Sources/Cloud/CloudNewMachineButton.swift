@@ -2,6 +2,7 @@ import CmuxFoundation
 import CmuxSettings
 import CmuxSettingsUI
 import SwiftUI
+import ShellXIcons
 
 /// The Cloud panel's full-width New Cloud Machine button, between the team
 /// header and the machine list. It runs the same action as Cmd-Shift-Y, so the list
@@ -35,7 +36,7 @@ struct CloudNewMachineButton: View {
         )
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: "plus")
+                ShellXIcon.image("plus")
                     .font(.system(size: 11, weight: .semibold))
                 Text(title)
                     .cmuxFont(size: 12, weight: .medium)

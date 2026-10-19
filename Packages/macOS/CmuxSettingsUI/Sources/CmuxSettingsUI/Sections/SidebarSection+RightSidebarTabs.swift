@@ -1,5 +1,6 @@
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 extension SidebarSection {
     /// **Right Sidebar Tabs** card: one row per customizable tab with its
@@ -33,7 +34,7 @@ extension SidebarSection {
         let index = rightSidebarTabs.firstIndex(of: tab)
         let visibleCount = rightSidebarTabs.filter(\.isVisible).count
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: tab.symbolName)
+            ShellXIcon.image(tab.symbolName)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.secondary)
                 .frame(width: 18)
@@ -51,7 +52,7 @@ extension SidebarSection {
                     hostActions.moveRightSidebarTab(id: tab.id, offset: -1)
                     rightSidebarTabs = hostActions.rightSidebarTabs()
                 } label: {
-                    Image(systemName: "chevron.up")
+                    ShellXIcon.image("chevron.up")
                 }
                 .buttonStyle(.borderless)
                 .disabled(index == rightSidebarTabs.startIndex)
@@ -66,7 +67,7 @@ extension SidebarSection {
                     hostActions.moveRightSidebarTab(id: tab.id, offset: 1)
                     rightSidebarTabs = hostActions.rightSidebarTabs()
                 } label: {
-                    Image(systemName: "chevron.down")
+                    ShellXIcon.image("chevron.down")
                 }
                 .buttonStyle(.borderless)
                 .disabled(index == rightSidebarTabs.index(before: rightSidebarTabs.endIndex))

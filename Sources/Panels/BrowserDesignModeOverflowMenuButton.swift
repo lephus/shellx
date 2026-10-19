@@ -1,4 +1,5 @@
 import SwiftUI
+import ShellXIcons
 
 struct BrowserDesignModeOverflowMenuButton: View {
     let controller: BrowserDesignModeController
@@ -10,9 +11,9 @@ struct BrowserDesignModeOverflowMenuButton: View {
                 guard await onToggle() else { return }
             }
         } label: {
-            Label(
+            ShellXLabel(
                 String(localized: "browser.designMode.title", defaultValue: "Design Mode"),
-                systemImage: "paintbrush.pointed"
+                icon: "paintbrush.pointed"
             )
         }
         .disabled(!controller.canToggle)

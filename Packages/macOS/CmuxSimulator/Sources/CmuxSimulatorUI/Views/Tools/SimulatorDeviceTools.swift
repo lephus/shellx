@@ -65,13 +65,13 @@ struct SimulatorDeviceTools: View {
     private var hardwareButtons: some View {
         Group {
             Button { coordinator.press(.sideButton) } label: {
-                SimulatorLocalizedLabel(simulatorStrings.sideButton, systemImage: "button.programmable")
+                SimulatorLocalizedLabel(simulatorStrings.sideButton, icon: "button.programmable")
             }
             Button { coordinator.press(.volumeUp) } label: {
-                SimulatorLocalizedLabel(simulatorStrings.volumeUp, systemImage: "speaker.plus")
+                SimulatorLocalizedLabel(simulatorStrings.volumeUp, icon: "speaker.plus")
             }
             Button { coordinator.press(.volumeDown) } label: {
-                SimulatorLocalizedLabel(simulatorStrings.volumeDown, systemImage: "speaker.minus")
+                SimulatorLocalizedLabel(simulatorStrings.volumeDown, icon: "speaker.minus")
             }
         }
         .disabled(!coordinator.supports(.hardwareButtons))

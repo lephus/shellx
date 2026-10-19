@@ -5,6 +5,7 @@ import CMUXMobileCore
 import Bonsplit
 import Foundation
 import SwiftUI
+import ShellXIcons
 
 /// Shared entrypoint for every "Upgrade to cmux Pro" surface (sidebar badge,
 /// titlebar badge, Settings Account card, command palette, Help menu). Opens
@@ -670,7 +671,7 @@ private struct NativePricingPlanCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(features, id: \.self) { feature in
                     HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "checkmark")
+                        ShellXIcon.image("checkmark")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(.secondary)
                             .frame(width: 14)
@@ -907,7 +908,7 @@ private struct NativePricingCompareCell: View {
         Group {
             switch value {
             case .included:
-                Image(systemName: "checkmark")
+                ShellXIcon.image("checkmark")
                     .font(.system(size: 12, weight: .semibold))
             case .unavailable:
                 Text("-")

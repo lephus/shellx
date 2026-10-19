@@ -106,7 +106,7 @@ struct WorkspaceChecklistAttachmentMenu: View {
             }
         } label: {
             HStack(spacing: 2) {
-                CmuxSystemSymbolImage(systemName: "paperclip", pointSize: iconPointSize, tint: foregroundColor)
+                CmuxSystemSymbolImage(symbolName: "paperclip", pointSize: iconPointSize, tint: foregroundColor)
                 if item.attachmentCount > 0 {
                     Text(verbatim: "\(item.attachmentCount)")
                         .font(countFont)
