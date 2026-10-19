@@ -204,6 +204,42 @@ private let vi = ApprovalPromptLabels(
         #expect(!m.title.contains("\n"))
     }
 
+    @Test func approveWaitsForTheArmingMomentButDenyDoesNot() {
+        let r = request("a")
+        let armsAt = t0.addingTimeInterval(11)
+        let early = ApprovalPromptModel(queue: [r], now: t0.addingTimeInterval(10), approvalArmsAt: armsAt)
+        #expect(!early.canApprove)
+        #expect(early.canDeny)
+        #expect(early.armsAt == armsAt)
+        // The warning is for fingerprint problems; waiting is not one.
+        #expect(early.warning == nil)
+        #expect(early.errorText == nil)
+
+        let atTheMoment = ApprovalPromptModel(queue: [r], now: armsAt, approvalArmsAt: armsAt)
+        #expect(atTheMoment.canApprove)
+        #expect(atTheMoment.armsAt == nil)
+        // Without a moment the request is armed (the plain model of the brief).
+        #expect(ApprovalPromptModel(queue: [r], now: t0).canApprove)
+    }
+
+    @Test func aRequestChangedSinceItWasFirstShownShowsTheSuspiciousTextAndCannotBeApproved() {
+        let m = ApprovalPromptModel(queue: [request("a")], now: t0, contentChanged: true)
+        #expect(m.warning == "The fingerprint does not match what the server reports. Do not approve.")
+        #expect(m.errorText == nil)
+        #expect(!m.canApprove)
+        #expect(m.canDeny)
+    }
+
+    @Test func nextWakeIsTheEarlierOfTheArmingMomentAndTheExpiry() {
+        let r = request("a", firstSeen: t0)
+        let armsAt = t0.addingTimeInterval(11)
+        let m = ApprovalPromptModel(queue: [r], now: t0.addingTimeInterval(10), approvalArmsAt: armsAt)
+        #expect(m.nextWake == armsAt)
+        let armed = ApprovalPromptModel(queue: [r], now: t0.addingTimeInterval(12), approvalArmsAt: armsAt)
+        #expect(armed.nextWake == t0.addingTimeInterval(300))
+        #expect(ApprovalPromptModel(queue: [], now: t0).nextWake == nil)
+    }
+
     @Test func modelsWithTheSameInputsAreEqual() {
         let r = request("a")
         #expect(ApprovalPromptModel(queue: [r], now: t0) == ApprovalPromptModel(queue: [r], now: t0))

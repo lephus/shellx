@@ -6,8 +6,10 @@ import ShellXRemoteUI
 
 /// Shows the approval panel while the service has pending approvals and
 /// closes it when none is left. It follows `pendingApprovals` live, drops a
-/// request on its own when it expires (no click needed), and turns Approve and
-/// Deny into service calls. Everything the person may or may not do is decided
+/// request on its own when it expires (no click needed), enables Approve only
+/// after the request has been on screen for `ApprovalPromptTracker.armingDelay`
+/// (a timer re-checks at that moment), and turns Approve and Deny into service
+/// calls. Everything the person may or may not do is decided
 /// by the package's `ApprovalPromptTracker`; this class owns the Tasks, the
 /// timer and the panel.
 ///
@@ -28,8 +30,8 @@ final class ApprovalPromptController {
     init(service: any ShellXRemoteServicing, now: @escaping () -> Date = { Date() }) {
         self.service = service
         self.now = now
-        viewModel.onApprove = { [weak self] id in self?.decide(.approve, requestID: id) }
-        viewModel.onDeny = { [weak self] id in self?.decide(.deny, requestID: id) }
+        viewModel.onApprove = { [weak self] request in self?.decide(.approve, request: request) }
+        viewModel.onDeny = { [weak self] request in self?.decide(.deny, request: request) }
     }
 
     /// Starts following the service. The first pass runs on the next turn, so
@@ -59,8 +61,9 @@ final class ApprovalPromptController {
     func refresh() {
         guard !tracker.isStopped else { return }
         let queue = service.pendingApprovals
-        tracker.prune(queue: queue)
-        let state = tracker.model(queue: queue, now: now(), labels: .localized)
+        let current = now()
+        tracker.observe(queue: queue, now: current)
+        let state = tracker.model(queue: queue, now: current, labels: .localized)
         // ShellX: TODO bell item (W1 Task 11, after checkpoint 1)
         guard state.current != nil else {
             closePanel()
@@ -70,14 +73,16 @@ final class ApprovalPromptController {
             viewModel.state = state
         }
         present(title: state.title)
-        scheduleExpiry(at: state.nextExpiry)
+        scheduleWake(at: state.nextWake)
     }
 
-    /// Approve or Deny on the request the buttons were drawn for. The tracker
-    /// refuses a stale button, an expired or suspicious request and a second
+    /// Approve or Deny on the request exactly as the buttons were drawn. The
+    /// tracker refuses a stale button, a request that changed, expired or is
+    /// suspicious, an Approve before the request is armed and a second
     /// decision; a refused click just redraws what is true now.
-    private func decide(_ decision: ApprovalPromptTracker.Decision, requestID: PairingRequest.ID) {
-        let began = tracker.begin(decision, requestID: requestID, queue: service.pendingApprovals, now: now())
+    private func decide(_ decision: ApprovalPromptTracker.Decision, request: PairingRequest) {
+        let requestID = request.id
+        let began = tracker.begin(decision, request: request, queue: service.pendingApprovals, now: now())
         guard began else {
             refresh()
             return
@@ -111,9 +116,9 @@ final class ApprovalPromptController {
         guard !panel.isVisible else { return }
         panel.center()
         // In front of other apps' windows too, so the person at this Mac sees
-        // it, and key so the buttons take clicks. It does not activate the app.
+        // it. It neither activates the app nor takes key status: the person may
+        // be typing in a terminal, and a click on a button works without it.
         panel.orderFrontRegardless()
-        panel.makeKey()
     }
 
     private func closePanel() {
@@ -124,10 +129,11 @@ final class ApprovalPromptController {
         self.panel = nil
     }
 
-    /// Wakes once the shown request expires and asks for a new model, so an
-    /// expired request disappears without a click. The delay is bounded, so a
-    /// far-off deadline only re-arms the timer.
-    private func scheduleExpiry(at deadline: Date?) {
+    /// Wakes when the model next changes by itself (Approve arms, or the shown
+    /// request expires) and asks for a new model, so an expired request
+    /// disappears without a click and Approve enables without one. The delay is
+    /// bounded, so a far-off deadline only re-arms the timer.
+    private func scheduleWake(at deadline: Date?) {
         expiryTask?.cancel()
         expiryTask = nil
         guard let deadline else { return }

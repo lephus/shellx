@@ -30,13 +30,14 @@ extension ApprovalPromptLabels {
 }
 
 /// What the approval panel shows and the two actions it reports. The panel's
-/// controller owns it; the view only reads `state` and calls back with the id
-/// of the request the buttons were drawn for.
+/// controller owns it; the view only reads `state` and calls back with the
+/// request exactly as the buttons were drawn (id, code and fingerprint), so a
+/// click can never act on content the person did not see.
 @MainActor
 final class ApprovalPromptViewModel: ObservableObject {
     @Published var state: ApprovalPromptModel
-    var onApprove: ((PairingRequest.ID) -> Void)?
-    var onDeny: ((PairingRequest.ID) -> Void)?
+    var onApprove: ((PairingRequest) -> Void)?
+    var onDeny: ((PairingRequest) -> Void)?
 
     init(state: ApprovalPromptModel = ApprovalPromptModel(queue: [], now: Date())) {
         self.state = state
@@ -45,9 +46,10 @@ final class ApprovalPromptViewModel: ObservableObject {
 
 /// The target Mac's half of pairing: the code and the requester's
 /// fingerprint, always side by side, for the person to compare with the other
-/// screen. Approve is disabled for a suspicious request; Deny is always
-/// there. There is no default action and no keyboard shortcut: only a click
-/// decides.
+/// screen. Approve is disabled for a suspicious or changed request and for the
+/// first moment after a request appears; Deny is always there. There is no
+/// default action, no keyboard shortcut and neither button takes keyboard
+/// focus: only a click decides.
 struct ApprovalPromptView: View {
     static let width: CGFloat = 400
 
@@ -56,8 +58,9 @@ struct ApprovalPromptView: View {
 
     var body: some View {
         let state = model.state
-        // The id the buttons were drawn for; a click acts on this request only.
-        let shownID = state.current?.id
+        // The request the buttons were drawn for; a click acts on exactly this
+        // request (id, code and fingerprint), or on nothing.
+        let shown = state.current
         VStack(alignment: .leading, spacing: 12) {
             header(state)
             Text(state.compareText)
@@ -96,14 +99,16 @@ struct ApprovalPromptView: View {
                 }
                 Spacer(minLength: 0)
                 Button(state.denyTitle) {
-                    if let shownID { model.onDeny?(shownID) }
+                    if let shown { model.onDeny?(shown) }
                 }
                 .buttonStyle(ShellXSheetButtonStyle(kind: .secondary))
+                .focusable(false)
                 .disabled(!state.canDeny)
                 Button(state.approveTitle) {
-                    if let shownID { model.onApprove?(shownID) }
+                    if let shown { model.onApprove?(shown) }
                 }
                 .buttonStyle(ShellXSheetButtonStyle(kind: .primary))
+                .focusable(false)
                 .disabled(!state.canApprove)
             }
         }
@@ -182,11 +187,13 @@ struct ApprovalPromptView: View {
     }
 }
 
-/// The floating, titled panel that holds the approval prompt. It becomes key
-/// so its buttons take clicks. A stray keypress must never approve, so the
-/// panel structurally has no default button, and Esc and the close command do
-/// nothing while a request is shown: the panel leaves only through the
-/// controller (decision, expiry, or the queue emptying).
+/// The floating, titled panel that holds the approval prompt. A stray keypress
+/// must never approve, so the panel structurally has no default button, its
+/// buttons take no keyboard focus, it does not take key status when it appears
+/// (the person may be typing in a terminal) and a click on a button works
+/// without making it key (`becomesKeyOnlyIfNeeded`), and Esc and the close
+/// command do nothing while a request is shown: the panel leaves only through
+/// the controller (decision, expiry, or the queue emptying).
 @MainActor
 final class ApprovalPromptPanel: NSPanel {
     private var pendingContentSize: NSSize?
@@ -202,7 +209,7 @@ final class ApprovalPromptPanel: NSPanel {
         isFloatingPanel = true
         level = .floating
         hidesOnDeactivate = false
-        becomesKeyOnlyIfNeeded = false
+        becomesKeyOnlyIfNeeded = true
         isReleasedWhenClosed = false
         collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         titleVisibility = .hidden

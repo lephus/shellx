@@ -23,13 +23,15 @@ struct ShellXApprovalPromptPanelTests {
         #expect(panel.defaultButtonCell == nil)
     }
 
-    @Test("The panel floats, takes clicks, and cannot be closed by the user")
+    @Test("The panel floats, takes clicks without taking key status, and cannot be closed by the user")
     func panelIsFloatingKeyAndNotClosable() {
         let panel = ApprovalPromptPanel(viewModel: ApprovalPromptViewModel())
         defer { panel.orderOut(nil) }
         #expect(panel.isFloatingPanel)
         #expect(panel.level == .floating)
         #expect(panel.canBecomeKey)
+        // Arriving must not take the keyboard from a terminal; a click still works.
+        #expect(panel.becomesKeyOnlyIfNeeded)
         #expect(panel.styleMask.contains(.titled))
         #expect(!panel.styleMask.contains(.closable))
         #expect(!panel.hidesOnDeactivate)

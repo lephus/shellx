@@ -79,16 +79,32 @@ public struct ApprovalPromptModel: Equatable, Sendable {
     public let fingerprintLabel: String
     /// When the shown request expires: when the view must ask for a new model.
     public let nextExpiry: Date?
+    /// While Approve is held back so the person has time to compare the code
+    /// and fingerprint: the moment it becomes available. Nil once armed, and
+    /// for a model built without one.
+    public let armsAt: Date?
+
+    /// The next moment the model changes by itself: Approve arms, or the
+    /// shown request expires. The view asks for a new model then.
+    public var nextWake: Date? {
+        [armsAt, nextExpiry].compactMap { $0 }.min()
+    }
 
     /// `queue` is the service's `pendingApprovals`, in any order. Requests with
     /// `now >= expiresAt` are dropped. `failureCode` is the last failed
     /// approval of the shown request; `isBusy` while a decision is in flight.
+    /// `contentChanged` marks a request whose code, fingerprint or requester
+    /// differs from what was first shown for its id: it is treated like a
+    /// fingerprint mismatch. `approvalArmsAt` holds Approve back (never Deny)
+    /// until that moment; nil means armed.
     public init(
         queue: [PairingRequest],
         now: Date,
         labels: ApprovalPromptLabels = .english,
         failureCode: String? = nil,
-        isBusy: Bool = false
+        isBusy: Bool = false,
+        contentChanged: Bool = false,
+        approvalArmsAt: Date? = nil
     ) {
         // Stable: requests seen at the same time keep the order they were listed in.
         let live = queue.enumerated()
@@ -107,6 +123,8 @@ public struct ApprovalPromptModel: Equatable, Sendable {
         fingerprintLabel = labels.fingerprintLabel
         self.isBusy = isBusy
         nextExpiry = live.first?.expiresAt
+        let waiting = live.first != nil ? approvalArmsAt.flatMap { $0 > now ? $0 : nil } : nil
+        armsAt = waiting
         queueText = live.count > 1
             ? String(format: labels.queue, Int64(1), Int64(live.count))
             : nil
@@ -125,14 +143,14 @@ public struct ApprovalPromptModel: Equatable, Sendable {
         codeText = PairingDisplay.code(request.code)
         fingerprintText = PairingDisplay.fingerprint(request.fingerprint)
         let mismatch = failureCode == Self.fingerprintMismatchCode
-        let blocked = request.suspicious || mismatch
+        let blocked = request.suspicious || mismatch || contentChanged
         warning = blocked ? labels.suspicious : nil
         if let failureCode, !mismatch {
             errorText = failureCode == "network" ? labels.network : failureCode
         } else {
             errorText = nil
         }
-        canApprove = !blocked && !isBusy
+        canApprove = !blocked && !isBusy && waiting == nil
         canDeny = !isBusy
     }
 }
