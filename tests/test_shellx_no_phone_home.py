@@ -336,8 +336,13 @@ class ShellXNoPhoneHomeTests(unittest.TestCase):
         self.assertSourceHas(settings, 'defaultEndpoint: String = ""')
         self.assertSourceHas("Packages/macOS/CmuxFeedback/Sources/CmuxFeedback/Bridge/FeedbackComposerBridge.swift",
                              "NSWorkspace.shared.open(FeedbackComposerSettings.submissionURL)")
-        self.assertSourceMatches("Sources/ContentView.swift",
-                                 r"private func presentFeedbackComposer\(\) \{\s*FeedbackComposerBridge\.openMailDraft\(\)")
+        # The sheet is never presented: the function ends in the mail draft
+        # (UI tests record it through the DEBUG-only capture seam instead).
+        body = re.search(r"private func presentFeedbackComposer\(\) \{\n(.*?)\n    \}\n",
+                         read("Sources/ContentView.swift"), re.S)
+        self.assertTrue(body, "presentFeedbackComposer() not found")
+        self.assertTrue(body.group(1).rstrip().endswith("FeedbackComposerBridge.openMailDraft()"), body.group(1))
+        self.assertNotIn("isFeedbackComposerPresented", body.group(1))
 
     def test_help_menu_points_to_shellx(self):
         resource = "Sources/App/CmuxHelpResource.swift"
@@ -348,6 +353,31 @@ class ShellXNoPhoneHomeTests(unittest.TestCase):
         self.assertSourceHas(commands, "helpResourceButton(.website)")
         self.assertSourceHas(commands, "helpResourceButton(.sourceCode)")
         self.assertSourceLacks(commands, "helpResourceButton(.discord)")
+
+    def test_docs_links_without_a_shellx_page_are_hidden(self):
+        # cmux's "Chord docs" and custom-commands "Open Docs" pages were on
+        # cmux.com, and nothing under docs/ covers them, so both are hidden.
+        shortcuts = "\n".join(code_lines(
+            "Packages/macOS/CmuxSettingsUI/Sources/CmuxSettingsUI/Sections/KeyboardShortcutsSection.swift"))
+        self.assertNotIn("settings.shortcuts.chords.docsButton", shortcuts)
+        self.assertNotIn("SettingsKeyboardShortcutsChordDocsLink", shortcuts)
+        actions = "\n".join(code_lines("Sources/AppDelegate+WorkspaceActionSave.swift"))
+        self.assertNotIn("settings.settingsJSON.docsButton", actions)
+        self.assertNotIn("alertSecondButtonReturn", actions)
+        self.assertNotIn("websiteURL", actions)
+
+    def test_repository_docs_links_name_existing_files(self):
+        # Docs links that stay point at a file in this repository.
+        link = re.compile(r'(?:github\.com/lephus/shellx|sourceCodeURL\.absoluteString \+ ")/blob/main/([^"#)`\s]+)')
+        hits = offenders(link.pattern, roots=["Sources", "CLI", "Packages/macOS", "Packages/Shared"], allow=[])
+        self.assertTrue(hits)
+        missing = []
+        for hit in hits:
+            path, number = hit.rsplit(":", 1)
+            for target in link.findall(read(path).splitlines()[int(number) - 1]):
+                if not (ROOT / target.rstrip(".")).is_file():
+                    missing.append(f"{hit}: {target}")
+        self.assertEqual(missing, [])
 
     def test_coderouter_is_never_downloaded_or_run(self):
         # CodeRouter is a Manaflow service no ShellX wave replaces, so its gate
