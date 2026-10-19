@@ -3,8 +3,9 @@
 //! Bold 32 px, spaced digits, `123 456`), the hint to compare it on the Mac,
 //! this PC's device fingerprint in 4x4 groups (the Mac's approval screen
 //! shows it too), and a status line with a running-yellow dot while waiting.
-//! Approved: "Đã được chấp thuận" + Mở (disabled, "sắp có", until Task 13b
-//! opens the remote session); a failed links.json write shows an ERROR line.
+//! Approved: "Đã được chấp thuận" + Mở, which closes the panel and opens a
+//! tab with the machine's terminal (Task 13b; disabled while the link is not
+//! saved); a failed links.json write shows an ERROR line.
 //! Denied / Expired / Failed: Thử lại. Huỷ, Esc or closing while waiting
 //! cancels (polling stops).
 //!
@@ -25,6 +26,7 @@ use gpui::{
     IntoElement, KeyDownEvent, Render, SharedString, Window, div, prelude::*, px,
 };
 use shellx_model::core_api::CoreCall;
+use shellx_model::links::Links;
 use shellx_model::palette;
 use shellx_model::remote_state::PairState;
 use shellx_model::sidebar::Access;
@@ -34,7 +36,6 @@ use shellx_model::strings::{
 
 use super::app::Services;
 use super::button::{Kind, button};
-use super::sidebar::Tooltip;
 use super::theme;
 use crate::fonts;
 use crate::links_store::LinksStore;
@@ -43,10 +44,13 @@ use crate::pairing_service::{Cmd, PairingService, Snapshot, execute_caught};
 pub const CARD_W: f32 = 400.0;
 pub const CODE_SIZE: f32 = 32.0;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PairingEvent {
     /// Huỷ / Đóng / Esc: RootView gives the keyboard back to the terminal.
     Closed,
+    /// Mở after the approval (the panel closed itself): RootView opens a tab
+    /// with this machine's terminal.
+    Open(String),
 }
 
 pub struct PairingPanel {
@@ -154,6 +158,18 @@ impl PairingPanel {
 
     pub fn has_link(&self, machine_id: &str) -> bool {
         self.snap.links.get(machine_id).is_some()
+    }
+
+    /// The saved links (links.json) as last loaded or saved.
+    pub fn links(&self) -> &Links {
+        &self.snap.links
+    }
+
+    /// Re-reads links.json on the panel's task (a remote session saved
+    /// `enrolled = true` or dropped its invitation through the same store).
+    pub fn reload_links(&self) {
+        // Unbounded: never full.
+        let _ = self.cmds.try_send(Cmd::LoadLinks);
     }
 
     /// "Xin quyền truy cập" (row button or the "+" list): cancels any current
@@ -278,12 +294,32 @@ impl PairingPanel {
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.retry(window, cx)))
     }
 
-    /// Mở: disabled with the tooltip "sắp có" until Task 13b opens the
-    /// remote session from here.
-    fn open_button(lang: Lang) -> impl IntoElement {
-        let tip: SharedString = t(lang, Str::ComingSoon).into();
-        button("pairing-open", t(lang, Str::Open), Kind::Primary, true)
-            .tooltip(move |_, cx| Tooltip::view(tip.clone(), cx))
+    /// Mở: closes the panel and opens the machine's terminal in a new tab.
+    /// Disabled while no link is saved for it (the save error line says why).
+    fn open_button(&self, lang: Lang, cx: &mut Context<Self>) -> impl IntoElement {
+        let target = self
+            .snap
+            .target
+            .as_ref()
+            .map(|(id, _)| id.clone())
+            .filter(|id| self.snap.links.get(id).is_some());
+        button(
+            "pairing-open",
+            t(lang, Str::Open),
+            Kind::Primary,
+            target.is_none(),
+        )
+        .when_some(target, |el, machine_id| {
+            el.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                this.open_remote(machine_id.clone(), cx);
+            }))
+        })
+    }
+
+    fn open_remote(&mut self, machine_id: String, cx: &mut Context<Self>) {
+        self.open = false;
+        cx.emit(PairingEvent::Open(machine_id));
+        cx.notify();
     }
 }
 
@@ -365,7 +401,7 @@ impl Render for PairingPanel {
                 .child(
                     buttons
                         .child(Self::close_button(lang, cx))
-                        .child(Self::open_button(lang)),
+                        .child(self.open_button(lang, cx)),
                 ),
             PairState::Denied => card
                 .child(Self::status_line(error, t(lang, Str::Denied), error))

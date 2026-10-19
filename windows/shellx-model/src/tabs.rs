@@ -194,6 +194,29 @@ impl Tabs {
             .map(|(p, _)| *p)
             .collect()
     }
+
+    /// Every remote pane, in id order (sign-out closes them all).
+    pub fn remote_panes(&self) -> Vec<PaneId> {
+        self.targets
+            .iter()
+            .filter(|(_, t)| matches!(t, PaneTarget::Remote { .. }))
+            .map(|(p, _)| *p)
+            .collect()
+    }
+
+    /// A remote pane now shows `terminal_id` (its first attach, or another
+    /// terminal after the Mac restarted). False for a local or unknown pane.
+    pub fn retarget(&mut self, pane: PaneId, terminal_id: &str) -> bool {
+        match self.targets.get_mut(&pane) {
+            Some(PaneTarget::Remote {
+                terminal_id: shown, ..
+            }) => {
+                *shown = terminal_id.to_string();
+                true
+            }
+            _ => false,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -360,6 +383,41 @@ mod tests {
         t.close_pane(r2);
         assert_eq!(t.target(r2), None);
         assert_eq!(t.panes_on_machine("m1"), vec![r1]);
+    }
+
+    #[test]
+    fn retarget_updates_only_remote_panes() {
+        let (mut t, local) = Tabs::new();
+        let (_, r) = t.new_tab(remote("m1", ""));
+        assert!(t.retarget(r, "7"));
+        assert_eq!(t.target(r), Some(&remote("m1", "7")));
+        assert!(!t.retarget(local, "7"));
+        assert_eq!(t.target(local), Some(&PaneTarget::Local));
+        assert!(!t.retarget(PaneId(999), "7"));
+        assert_eq!(t.remote_panes(), vec![r]);
+    }
+
+    #[test]
+    fn closing_every_remote_pane_leaves_a_local_tab() {
+        // sign-out: remote tabs close through the normal path
+        let (mut t, local) = Tabs::new();
+        let (_, r1) = t.new_tab(remote("m1", "1"));
+        let r2 = t.split_focused(Axis::Row, remote("m1", "2"));
+        let (_, r3) = t.new_tab(remote("m2", "1"));
+        assert_eq!(t.remote_panes(), vec![r1, r2, r3]);
+        for p in t.remote_panes() {
+            assert_ne!(t.close_pane(p), CloseOutcome::NotFound);
+        }
+        assert!(t.remote_panes().is_empty());
+        assert_eq!(t.tabs().len(), 1);
+        assert_eq!(t.active().layout.panes(), vec![local]);
+        // the last tab remote: closing it respawns a local tab
+        let (mut t, first) = Tabs::new();
+        let (_, r) = t.new_tab(remote("m1", "1"));
+        t.close_pane(first);
+        assert!(matches!(t.close_pane(r), CloseOutcome::Respawned { .. }));
+        let pane = t.active().focused;
+        assert_eq!(t.target(pane), Some(&PaneTarget::Local));
     }
 
     #[test]

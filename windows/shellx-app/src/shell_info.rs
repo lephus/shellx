@@ -69,6 +69,14 @@ pub const SHELL_STRINGS: &[Str] = &[
     Str::SendingRequest,
     Str::NoOtherMachines,
     Str::AddMachine,
+    // remote panes (Task 13b): overlay pill and the input-paused flash
+    Str::Connecting,
+    Str::Reconnecting,
+    Str::RemoteEnded,
+    Str::InputPaused,
+    Str::FingerprintMismatch,
+    Str::NeedsPairing,
+    Str::RemoteAttachFailed,
 ];
 
 /// This PC as a sidebar machine; `computer_name` is `%COMPUTERNAME%`.
@@ -113,6 +121,16 @@ pub fn session_title(terminal_title: Option<&str>, lang: Lang) -> String {
         .filter(|title| !title.is_empty())
         .map(str::to_string)
         .unwrap_or_else(|| t(lang, Str::LocalShell).to_string())
+}
+
+/// Session row title of a remote (Mac) tab: the terminal's OSC title, else
+/// the machine's name.
+pub fn remote_session_title(terminal_title: Option<&str>, machine_name: &str) -> String {
+    terminal_title
+        .map(str::trim)
+        .filter(|title| !title.is_empty())
+        .unwrap_or(machine_name)
+        .to_string()
 }
 
 #[cfg(test)]
@@ -203,6 +221,12 @@ mod tests {
         );
         assert_eq!(session_title(Some("   "), Lang::En), "PowerShell");
         assert_eq!(session_title(None, Lang::Vi), "PowerShell");
+        assert_eq!(
+            remote_session_title(Some("phu@mac: ~"), "MacBook"),
+            "phu@mac: ~"
+        );
+        assert_eq!(remote_session_title(Some(" "), "MacBook"), "MacBook");
+        assert_eq!(remote_session_title(None, "MacBook"), "MacBook");
     }
 
     #[test]

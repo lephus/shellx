@@ -11,15 +11,29 @@
 //! account's machines; signed out: this PC and the sign-in card). Access to
 //! the other machines (links, the code being waited on) comes from the
 //! `PairingPanel`, which is drawn over the main area while it is open.
+//!
+//! Remote panes (Task 13b): "Mở" on a Mac (sidebar row, or the pairing
+//! panel after approval) opens a new tab whose pane is
+//! `PaneTarget::Remote`; `reconcile` opens it through `RemoteTabs` (one
+//! session per Mac, shared by its panes) and a remote `TermView`. A split of
+//! a remote pane opens a new shell on the same Mac; a split of a local pane
+//! and Ctrl+Shift+T stay local. A remote terminal ending closes only its
+//! pane (the normal close path, so the last pane respawns a local tab);
+//! every pane the model drops is closed on its session. The machine list
+//! feeds the sessions' online flags; signing out closes every session and
+//! every remote pane.
 
 use std::convert::Infallible;
+use std::sync::Arc;
 
 use gpui::{
     App, Context, Div, Entity, FocusHandle, Focusable, IntoElement, KeyDownEvent, Render,
     Subscription, Window, div, prelude::*, px, relative, svg,
 };
+use shellx_model::core_api::CoreCall;
 use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::{Axis, PaneId};
+use shellx_model::links::RemoteLink as LinkRecord;
 use shellx_model::palette::Status;
 use shellx_model::sidebar::{MachineInfo, build_groups};
 use shellx_model::strings::Lang;
@@ -39,7 +53,10 @@ use super::theme;
 use super::titlebar;
 use super::update_banner;
 use crate::core_service::MachineFacts;
-use crate::shell_info::{session_title, sidebar_machines, this_machine_id};
+use crate::remote_link::{PaneEvent, PaneSink};
+use crate::remote_session::RemoteSession;
+use crate::remote_tabs::{AccountWatch, RemoteTabs, open_want, split_target, start_app_session};
+use crate::shell_info::{remote_session_title, session_title, sidebar_machines, this_machine_id};
 use crate::workspace::{DIVIDER, PaneHost, SESSION_BAR_H};
 
 pub struct RootView {
@@ -53,6 +70,10 @@ pub struct RootView {
     login: Entity<LoginPanel>,
     settings: Entity<SettingsPanel>,
     pairing: Entity<PairingPanel>,
+    /// The remote panes' sessions (one per Mac) and pane ids.
+    remotes: RemoteTabs<RemoteSession>,
+    /// Sign-out (or another account) closes the remote sessions.
+    account_watch: AccountWatch,
     /// Holds the keyboard while the forced-update overlay is up.
     overlay_focus: FocusHandle,
     _subscriptions: Vec<Subscription>,
@@ -73,6 +94,7 @@ impl RootView {
                 if this.required(cx).is_some() {
                     this.focus_terminal(window, cx);
                 }
+                this.account_changed(window, cx);
                 cx.notify();
             }),
             cx.observe(&pairing, |_, _, cx| cx.notify()),
@@ -81,6 +103,10 @@ impl RootView {
                 window,
                 |this, _, event: &PairingEvent, window, cx| match event {
                     PairingEvent::Closed => this.after_focus_change(window, cx),
+                    // "Mở" after the approval: the panel closed itself.
+                    PairingEvent::Open(machine_id) => {
+                        this.open_remote(machine_id.clone(), window, cx);
+                    }
                 },
             ),
             cx.subscribe_in(
@@ -106,6 +132,8 @@ impl RootView {
             login,
             settings,
             pairing,
+            remotes: RemoteTabs::new(),
+            account_watch: AccountWatch::default(),
             overlay_focus: cx.focus_handle(),
             _subscriptions: subscriptions,
         };
@@ -152,9 +180,40 @@ impl RootView {
 
     /// Brings the views in line with the model, then refocuses.
     fn reconcile(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let changed = self.host.reconcile(&self.tabs, |pane, _target| {
-            // Every pane is local until Task 13 adds remote links.
-            let view = cx.new(|cx| TermView::new(window, cx));
+        // What a new remote pane needs: the shared core (minting tickets),
+        // the cached links (the Mac's relay route and key) and whether the
+        // Mac is online (the last machine list).
+        let core: Arc<dyn CoreCall> = cx.global::<Services>().core.clone();
+        let links = self.pairing.read(cx).links().clone();
+        let machines = self.machines(cx);
+        let remotes = &mut self.remotes;
+        let changed = self.host.reconcile(&self.tabs, |pane, target| {
+            let view = match target {
+                PaneTarget::Local => cx.new(|cx| TermView::new(window, cx)),
+                PaneTarget::Remote {
+                    machine_id,
+                    terminal_id,
+                } => {
+                    // Sent from the session's threads; one UI task per pane
+                    // drains it. `false` (UI gone) stops the sending.
+                    let (tx, rx) = async_channel::unbounded::<PaneEvent>();
+                    let sink: PaneSink = Arc::new(move |event| tx.send_blocking(event).is_ok());
+                    let online = machines
+                        .iter()
+                        .find(|m| &m.machine_id == machine_id)
+                        .map(|m| m.online);
+                    let opened = remotes.open(
+                        pane,
+                        machine_id,
+                        terminal_id,
+                        links.get(machine_id),
+                        online,
+                        sink,
+                        &mut |record: LinkRecord| start_app_session(record, core.clone()),
+                    );
+                    cx.new(|cx| TermView::new_remote(opened, rx, window, cx))
+                }
+            };
             let events = cx.subscribe_in(
                 &view,
                 window,
@@ -167,8 +226,13 @@ impl RootView {
                 _events: events,
             })
         });
-        // Dropping the removed views ends their shells (LocalPty::drop).
+        // Dropping the removed views ends their shells (LocalPty::drop);
+        // a removed remote pane is closed on its session (its view on the
+        // Mac detaches, the shell there keeps running).
         let Ok(changed) = changed;
+        for (pane, _) in &changed.removed {
+            self.remotes.pane_closed(*pane);
+        }
         drop(changed);
         self.focus_terminal(window, cx);
         cx.notify();
@@ -184,7 +248,43 @@ impl RootView {
         match event {
             TermEvent::Command(command) => self.run_command(*command, window, cx),
             TermEvent::Exited => self.close_pane(pane, window, cx),
+            TermEvent::Retargeted(terminal_id) => {
+                self.tabs.retarget(pane, terminal_id);
+            }
+            TermEvent::RemoteStatus => {
+                // The session rewrote links.json (enrolled, or dropped an
+                // expired invitation): reload the cached links.
+                if self.remotes.status_changed(pane) {
+                    self.pairing.read(cx).reload_links();
+                }
+            }
         }
+    }
+
+    /// The account changed (every list, sign-in, sign-out): feed the remote
+    /// sessions whether their Mac is online; sign-out (or another account)
+    /// closes them all.
+    fn account_changed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let account = self.account.read(cx);
+        let close = self.account_watch.update(account.state());
+        self.remotes.machines_updated(account.machines());
+        if close {
+            self.close_all_remote(window, cx);
+        }
+    }
+
+    /// Closes every remote session, then every remote pane through the
+    /// tabs model (the last pane of the last tab respawns a local tab).
+    fn close_all_remote(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.remotes.close_all();
+        let panes = self.tabs.remote_panes();
+        if panes.is_empty() {
+            return;
+        }
+        for pane in panes {
+            self.tabs.close_pane(pane);
+        }
+        self.reconcile(window, cx);
     }
 
     /// Shell exit and Ctrl+Shift+W. PaneClosed: the sibling takes the space
@@ -219,14 +319,8 @@ impl RootView {
                 self.tabs.prev_tab();
                 self.after_focus_change(window, cx);
             }
-            AppCommand::SplitRight => {
-                self.tabs.split_focused(Axis::Row, PaneTarget::Local);
-                self.reconcile(window, cx);
-            }
-            AppCommand::SplitDown => {
-                self.tabs.split_focused(Axis::Column, PaneTarget::Local);
-                self.reconcile(window, cx);
-            }
+            AppCommand::SplitRight => self.split(Axis::Row, window, cx),
+            AppCommand::SplitDown => self.split(Axis::Column, window, cx),
             AppCommand::FocusPane(dir) => {
                 // The same rect the panes are rendered in.
                 let bounds = self.area.bounds(window, self.sidebar_visible);
@@ -252,9 +346,36 @@ impl RootView {
         cx.notify();
     }
 
-    /// Ctrl+Shift+T and the "+" on this PC's sidebar group.
+    /// Ctrl+Shift+T and the "+" on this PC's sidebar group (always local).
     pub fn new_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.tabs.new_tab(PaneTarget::Local);
+        self.reconcile(window, cx);
+    }
+
+    /// Splits the focused pane: a remote pane gets a new shell on the same
+    /// Mac (spec §8.6 C12), a local pane a new local shell.
+    fn split(&mut self, axis: Axis, window: &mut Window, cx: &mut Context<Self>) {
+        let (target, want) = split_target(&self.tabs, self.tabs.active().focused);
+        let pane = self.tabs.split_focused(axis, target);
+        if let Some(want) = want {
+            self.remotes.plan(pane, want);
+        }
+        self.reconcile(window, cx);
+    }
+
+    /// "Mở" on a Mac (sidebar row, or the pairing panel after approval): a
+    /// new tab with that Mac's terminal (its first one; another Open makes a
+    /// new terminal there). Blocked while a forced update shows.
+    pub fn open_remote(&mut self, machine_id: String, window: &mut Window, cx: &mut Context<Self>) {
+        if self.required(cx).is_some() {
+            return;
+        }
+        let want = open_want(&self.tabs, &machine_id);
+        let (_, pane) = self.tabs.new_tab(PaneTarget::Remote {
+            machine_id,
+            terminal_id: String::new(),
+        });
+        self.remotes.plan(pane, want);
         self.reconcile(window, cx);
     }
 
@@ -347,26 +468,63 @@ impl RootView {
             .map(|live| live.view.read(cx))
     }
 
+    /// The Mac a remote pane shows; `None` for a local pane.
+    fn pane_machine(&self, pane: PaneId) -> Option<&str> {
+        match self.tabs.target(pane) {
+            Some(PaneTarget::Remote { machine_id, .. }) => Some(machine_id.as_str()),
+            _ => None,
+        }
+    }
+
+    /// A machine's name: the account's list, else the saved link, else its id.
+    fn machine_name(&self, machine_id: &str, cx: &App) -> String {
+        self.account
+            .read(cx)
+            .machines()
+            .iter()
+            .find(|m| m.machine_id == machine_id)
+            .map(|m| m.name.clone())
+            .or_else(|| {
+                self.pairing
+                    .read(cx)
+                    .links()
+                    .get(machine_id)
+                    .map(|l| l.machine_name.clone())
+            })
+            .unwrap_or_else(|| machine_id.to_string())
+    }
+
     /// Sidebar / session bar title of a tab: its focused pane's terminal
-    /// title, else "PowerShell".
+    /// title, else "PowerShell" (a Mac tab: else the Mac's name).
     fn tab_title(&self, focused: PaneId, lang: Lang, cx: &App) -> String {
         let title = self
             .host
             .get(focused)
             .and_then(|live| live.view.read(cx).terminal_title());
-        session_title(title.as_deref(), lang)
+        match self.pane_machine(focused) {
+            Some(machine) => {
+                remote_session_title(title.as_deref(), &self.machine_name(machine, cx))
+            }
+            None => session_title(title.as_deref(), lang),
+        }
     }
 
     /// 36 px bar over the panes: terminal icon, "<tab title> › <machine>".
     fn session_bar(&self, lang: Lang, cx: &App) -> Div {
-        let title = self.tab_title(self.tabs.active().focused, lang, cx);
-        let machines = self.machines(cx);
-        let local_id = this_machine_id(&machines);
-        let machine = machines
-            .iter()
-            .find(|m| m.machine_id == local_id)
-            .map(|m| m.name.clone())
-            .unwrap_or_default();
+        let focused = self.tabs.active().focused;
+        let title = self.tab_title(focused, lang, cx);
+        let machine = match self.pane_machine(focused) {
+            Some(remote) => self.machine_name(remote, cx),
+            None => {
+                let machines = self.machines(cx);
+                let local_id = this_machine_id(&machines);
+                machines
+                    .iter()
+                    .find(|m| m.machine_id == local_id)
+                    .map(|m| m.name.clone())
+                    .unwrap_or_default()
+            }
+        };
         div()
             .flex()
             .flex_row()
@@ -433,12 +591,19 @@ impl Render for RootView {
                     .collect()
             });
             let active = self.tabs.active().id;
+            // A tab is listed under the machine its panes run on (a Mac tab
+            // under that Mac's group; under this PC if the Mac is not listed).
             let rows: Vec<SessionRow> = self
                 .tabs
                 .tabs()
                 .iter()
                 .map(|tab| SessionRow {
                     tab: tab.id,
+                    machine_id: self
+                        .pane_machine(tab.focused)
+                        .filter(|m| groups.iter().any(|g| g.machine_id == *m))
+                        .unwrap_or(local_id.as_str())
+                        .to_string(),
                     title: self.tab_title(tab.focused, lang, cx),
                     selected: tab.id == active,
                     status: Status::Idle,

@@ -10,7 +10,9 @@
 //! Another online machine without access shows "Xin quyền truy cập", which
 //! opens the pairing panel (`pairing.rs`); while waiting, the row shows the
 //! code instead. The "+" in the machines header opens a small list of the
-//! account's other machines without a link (same action).
+//! account's other machines without a link (same action). An online machine
+//! with access shows "Mở", which opens a tab with its terminal (Task 13b);
+//! that machine's tabs are listed under it.
 
 use gpui::{
     AnyView, App, ClickEvent, Context, Div, Entity, FontWeight, ImageSource, IntoElement, Pixels,
@@ -29,9 +31,11 @@ use super::theme;
 
 pub const WIDTH: Pixels = px(crate::workspace::SIDEBAR_W);
 
-/// One session row under this PC: one per local tab.
+/// One session row: one per tab, under the machine its panes run on.
 pub struct SessionRow {
     pub tab: TabId,
+    /// The group it is listed under (this PC's id for a local tab).
+    pub machine_id: String,
     /// The tab's focused pane title (`session_title`).
     pub title: String,
     pub selected: bool,
@@ -47,11 +51,12 @@ pub struct PickerEntry {
 }
 
 /// `local_id`: this PC's group (its server id when signed in).
+/// `sessions`: every tab, each listed under its `machine_id` group.
 /// `login`: the sign-in card, drawn under this PC's sessions.
 /// `picker`: the "+" list, when open.
 pub fn render(
     groups: &[MachineGroup],
-    local_sessions: &[SessionRow],
+    sessions: &[SessionRow],
     local_id: &str,
     login: &Entity<LoginPanel>,
     picker: Option<&[PickerEntry]>,
@@ -65,10 +70,17 @@ pub fn render(
     for (ix, group) in groups.iter().enumerate() {
         let local = group.machine_id == local_id;
         list = list.child(group_header(ix, group, local, lang, cx));
-        if group.sessions_visible && local {
-            for (ix, row) in local_sessions.iter().enumerate() {
+        if local && !group.sessions_visible {
+            continue;
+        }
+        // A Mac's open tabs stay listed (and selectable) while it is
+        // offline: their panes show "ngoại tuyến".
+        for (ix, row) in sessions.iter().enumerate() {
+            if row.machine_id == group.machine_id {
                 list = list.child(session_row(ix, row, lang, cx));
             }
+        }
+        if local {
             list = list.child(login.clone());
         }
     }
@@ -339,7 +351,8 @@ fn group_header(
 }
 
 /// The action under another machine's name. RequestAccess opens the pairing
-/// panel; ShowCode shows the code being waited on; Open is drawn by Task 13.
+/// panel; ShowCode shows the code being waited on; Open opens a tab with the
+/// machine's terminal.
 fn row_action(
     ix: usize,
     group: &MachineGroup,
@@ -372,7 +385,26 @@ fn row_action(
                 .text_color(theme::hsla(shellx_model::palette::PRIMARY_TEXT))
                 .child(pairing_code_display(code)),
         ),
-        RowAction::Open | RowAction::None => None,
+        RowAction::Open => {
+            let id = group.machine_id.clone();
+            Some(
+                div().child(
+                    button(
+                        ("sidebar-open", ix),
+                        t(lang, Str::Open),
+                        Kind::Primary,
+                        false,
+                    )
+                    .text_size(theme::SMALL_SIZE)
+                    .on_click(cx.listener(
+                        move |this, _: &ClickEvent, window, cx| {
+                            this.open_remote(id.clone(), window, cx);
+                        },
+                    )),
+                ),
+            )
+        }
+        RowAction::None => None,
     }
 }
 

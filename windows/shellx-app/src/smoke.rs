@@ -222,6 +222,15 @@ pub fn remote_session() -> Result<()> {
     Ok(())
 }
 
+/// The window's remote-tab path (Task 13b) against the fake Mac: open,
+/// split on the same session, one UTF-8 write, a terminal end closes only
+/// its pane, sign-out closes the session and the remote tabs.
+pub fn remote_tabs() -> Result<()> {
+    let summary = crate::remote_tabs::smoke()?;
+    println!("smoke-remote-tabs: {summary}");
+    Ok(())
+}
+
 /// Scripted pairing: pending, pending, approved saves the link; denied saves none.
 pub fn pairing_flow() -> Result<()> {
     use serde_json::json;
@@ -324,6 +333,7 @@ pub fn run() -> Result<()> {
     account_flow()?;
     pairing_flow()?;
     remote_session()?;
+    remote_tabs()?;
     input_paths()?;
     let started = Instant::now();
     let (program, args) = default_shell();

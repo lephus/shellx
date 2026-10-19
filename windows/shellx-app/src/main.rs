@@ -19,6 +19,7 @@ mod pairing_service;
 mod paths;
 mod remote_link;
 mod remote_session;
+mod remote_tabs;
 mod shell_info;
 mod smoke;
 mod term_core;

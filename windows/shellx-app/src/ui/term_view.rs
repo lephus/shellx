@@ -29,13 +29,25 @@
 //! - DPI: cell metrics come from the window's current scale factor on every
 //!   prepaint (and a scale change redraws), the grid origin is snapped to
 //!   whole device pixels, and the PTY is resized when cols/rows change.
+//!
+//! Remote panes (Task 13b): a Mac terminal over relay v2 is the same view
+//! with another byte link. Its `TermCore` is the `RemoteMirror`'s, which the
+//! mirror REPLACES on every snapshot reset, so the core is looked up through
+//! `Backend::core` on every use and never kept across frames. Rendering,
+//! selection, copy, bracketed paste, IME placement and the window title are
+//! shared; keyboard text, chords and paste go through the gated
+//! `RemoteLink`: while the pane is not attached input is refused (dropped,
+//! never queued) and "Mất kết nối, tạm ngừng nhập" flashes. A composed IME
+//! commit is ONE write of its UTF-8. A centered pill shows the session
+//! status while it is not connected (`remote_tabs::overlay`). One UI task
+//! per pane drains its `PaneEvent`s (sent by the session's threads).
 
 use std::ops::Range;
 use std::time::Duration;
 
 use ghostty_vt::{CellWidth, CursorShape, Rgb};
 use gpui::{
-    App, BorderStyle, Bounds, ClipboardItem, Context, DispatchPhase, Element, ElementId,
+    App, BorderStyle, Bounds, ClipboardItem, Context, DispatchPhase, Div, Element, ElementId,
     ElementInputHandler, Entity, EntityInputHandler, EventEmitter, FocusHandle, Focusable, Font,
     FontFallbacks, GlobalElementId, Hitbox, HitboxBehavior, Hsla, InspectorElementId, IntoElement,
     KeyDownEvent, LayoutId, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PaintQuad,
@@ -48,15 +60,20 @@ use std::sync::Arc;
 
 use shellx_model::keys::{AppCommand, KeyAction, KeyCtx, KeyIn, map_key};
 use shellx_model::layout::Rect;
-use shellx_model::palette::{TERM_BG, TERM_CURSOR, TERM_FG, TERM_SELECTION};
+use shellx_model::palette::{ERROR, RUNNING, TERM_BG, TERM_CURSOR, TERM_FG, TERM_SELECTION};
 use shellx_model::selection::{
     Cell, Follow, Selection, cell_at, drag_selection, follow_viewport, ime_cell,
     ime_index_for_point, ime_rect, line_span, selected_text, to_crlf, windows_ime_anchor, word_at,
 };
+use shellx_model::strings::{Lang, Str, save_link_failed, t};
 
+use super::app::Services;
 use super::theme;
 use crate::fonts;
 use crate::local_pty::{LocalPty, spawn_reader};
+use crate::remote_link::{Applied, PaneEvent, RemoteMirror};
+use crate::remote_session::{RemotePane, RemoteSession, SessionStatus};
+use crate::remote_tabs::{OpenError, Overlay, Tone, coalesce, failed_overlay, overlay};
 use crate::term_core::{PtyLink, TermCore, rgb};
 use crate::workspace::spawn_local_pane;
 
@@ -64,14 +81,63 @@ use crate::workspace::spawn_local_pane;
 pub(super) enum TermEvent {
     /// A window command typed in this pane (new tab, split, close, ...).
     Command(AppCommand),
-    /// The shell ended (exit, crash, or a failed write): close the pane.
+    /// The shell ended (exit, crash, or a failed write), or the remote
+    /// terminal ended on the Mac: close the pane.
     Exited,
+    /// A remote pane now shows this Mac terminal (its first attach, or
+    /// another one after the Mac restarted): update `PaneTarget::Remote`.
+    Retargeted(String),
+    /// A remote pane's session status changed (links.json may have been
+    /// rewritten by the enrollment).
+    RemoteStatus,
 }
 
 const FONT_SIZE: f32 = 14.0;
 const LINE_HEIGHT: f32 = 1.3;
 const PADDING: f32 = 6.0;
 pub(super) const BASE_TITLE: &str = "ShellX";
+/// How long a status flash ("Mất kết nối, tạm ngừng nhập") stays up.
+const FLASH: Duration = Duration::from_millis(2500);
+
+/// Where a pane's bytes come from and go to.
+enum Backend {
+    /// Nothing to draw: the shell or the remote session could not start.
+    None,
+    /// PowerShell on ConPTY.
+    Local { core: TermCore, link: Arc<LocalPty> },
+    /// A Mac terminal over relay v2.
+    Remote(Box<Remote>),
+}
+
+struct Remote {
+    /// The mirror `TermCore` (replaced on every snapshot reset) over the
+    /// pane's gated `RemoteLink`.
+    mirror: RemoteMirror,
+    session: Arc<RemoteSession>,
+    /// The last `status()` snapshot, re-read on every `PaneEvent::Status`.
+    status: SessionStatus,
+    /// The mirror's OSC title after the last update (read from the core of
+    /// that moment; RootView asks for it without a `&mut`).
+    title: Option<String>,
+}
+
+impl Backend {
+    /// The terminal core of this moment. A remote mirror replaces its core
+    /// on every snapshot reset: call this per use, never keep the result.
+    fn core(&mut self) -> Option<&mut TermCore> {
+        match self {
+            Backend::None => None,
+            Backend::Local { core, .. } => Some(core),
+            Backend::Remote(remote) => Some(remote.mirror.core()),
+        }
+    }
+
+    /// A remote pane that is not attached (connecting, reconnecting,
+    /// offline, failed, ended): its link drops input, never queues it.
+    fn input_refused(&self) -> bool {
+        matches!(self, Backend::Remote(remote) if !remote.mirror.link().accepts_input())
+    }
+}
 
 fn hsla(c: Rgb) -> Hsla {
     gpui::rgb((u32::from(c.r) << 16) | (u32::from(c.g) << 8) | u32::from(c.b)).into()
@@ -148,9 +214,15 @@ struct Drag {
 pub(super) struct TermView {
     focus_handle: FocusHandle,
     font: Font,
-    session: Option<TermCore>,
-    link: Option<Arc<LocalPty>>,
+    backend: Backend,
+    /// The local shell could not start (drawn instead of the grid).
     error: Option<String>,
+    /// The remote pane could not open: the pill shows why.
+    failed: Option<Overlay>,
+    /// A short status line at the bottom of the pane ("Mất kết nối, tạm
+    /// ngừng nhập"), cleared after `FLASH`.
+    flash: Option<String>,
+    flash_seq: u64,
     /// IME composition text (preedit), shown inline at the cursor and never
     /// sent to the PTY until committed.
     marked: Option<String>,
@@ -171,7 +243,8 @@ pub(super) struct TermView {
 }
 
 impl TermView {
-    pub(super) fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+    /// The view without a backend yet.
+    fn blank(window: &mut Window, cx: &mut Context<Self>) -> Self {
         // Per-monitor DPI: moving the window to a display with another scale
         // (WM_DPICHANGED) changes the bounds; re-measure the grid then.
         let window_bounds = cx.observe_window_bounds(window, |view, window, cx| {
@@ -180,12 +253,14 @@ impl TermView {
                 cx.notify();
             }
         });
-        let mut view = TermView {
+        TermView {
             focus_handle: cx.focus_handle(),
             font: terminal_font(),
-            session: None,
-            link: None,
+            backend: Backend::None,
             error: None,
+            failed: None,
+            flash: None,
+            flash_seq: 0,
             marked: None,
             marked_selection: None,
             selection: None,
@@ -197,12 +272,16 @@ impl TermView {
             cell_width: px(8.0),
             line_height: px(18.0),
             title: BASE_TITLE.to_string(),
-        };
+        }
+    }
+
+    /// A local pane: PowerShell (or `SHELLX_SHELL`) on ConPTY.
+    pub(super) fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let mut view = TermView::blank(window, cx);
         match spawn_local_pane(80, 24, &[]) {
             Ok(started) => {
                 let (link, core, reader) = (started.link, started.core, started.reader);
-                view.session = Some(core);
-                view.link = Some(link);
+                view.backend = Backend::Local { core, link };
                 let (tx, rx) = async_channel::unbounded::<Vec<u8>>();
                 spawn_reader(reader, move |bytes| tx.send_blocking(bytes).is_ok());
                 cx.spawn(async move |this, cx| {
@@ -212,7 +291,11 @@ impl TermView {
                         }
                         let fed = this.update(cx, |view, cx| {
                             let newline = batch.contains(&b'\n');
-                            view.follow_viewport(newline, |session| session.feed(&batch));
+                            view.follow_viewport(newline, |backend| {
+                                if let Some(core) = backend.core() {
+                                    core.feed(&batch);
+                                }
+                            });
                             cx.notify();
                         });
                         if fed.is_err() {
@@ -230,7 +313,10 @@ impl TermView {
                             .timer(Duration::from_millis(500))
                             .await;
                         let exited = this.update(cx, |view, cx| {
-                            let exited = view.link.as_ref().is_some_and(|l| l.is_closed());
+                            let exited = matches!(
+                                &view.backend,
+                                Backend::Local { link, .. } if link.is_closed()
+                            );
                             if exited {
                                 cx.emit(TermEvent::Exited);
                             }
@@ -249,6 +335,132 @@ impl TermView {
         view
     }
 
+    /// A remote pane (a Mac terminal) opened by `RemoteTabs::open`; its
+    /// session sends this pane's events through `events`. One UI task
+    /// applies them in order: screen bytes to the mirror, status changes to
+    /// the pill, the terminal id and the end to RootView.
+    pub(super) fn new_remote(
+        opened: Result<(Arc<RemoteSession>, RemotePane), OpenError>,
+        events: async_channel::Receiver<PaneEvent>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let mut view = TermView::blank(window, cx);
+        let started = opened.and_then(|(session, pane)| {
+            RemoteMirror::new(pane.link)
+                .map(|mirror| (session, mirror))
+                .map_err(|e| OpenError::Failed(format!("{e:#}")))
+        });
+        match started {
+            Ok((session, mirror)) => {
+                let status = session.status();
+                view.backend = Backend::Remote(Box::new(Remote {
+                    mirror,
+                    session,
+                    status,
+                    title: None,
+                }));
+                cx.spawn(async move |this, cx| {
+                    while let Ok(first) = events.recv().await {
+                        let mut batch = vec![first];
+                        while let Ok(more) = events.try_recv() {
+                            batch.push(more);
+                        }
+                        let applied = this.update(cx, |view, cx| {
+                            for event in coalesce(batch) {
+                                view.apply_remote(event, cx);
+                            }
+                            cx.notify();
+                        });
+                        // Err: the pane was dropped; the sink then reports the
+                        // UI gone and the session stops sending.
+                        if applied.is_err() {
+                            return;
+                        }
+                    }
+                })
+                .detach();
+            }
+            Err(error) => view.failed = Some(failed_overlay(&error)),
+        }
+        view
+    }
+
+    /// One event of a remote pane, in arrival order.
+    fn apply_remote(&mut self, event: PaneEvent, cx: &mut Context<Self>) {
+        let newline = matches!(
+            &event,
+            PaneEvent::Snapshot(bytes) | PaneEvent::Output(bytes) if bytes.contains(&b'\n')
+        );
+        let mut applied = None;
+        self.follow_viewport(newline, |backend| {
+            if let Backend::Remote(remote) = backend {
+                applied = Some(remote.mirror.apply(event));
+                remote.title = remote.mirror.core().title();
+            }
+        });
+        match applied {
+            // A fresh core at the Mac's grid: the old cells mean nothing.
+            Some(Ok(Applied::Reset)) => {
+                self.selection = None;
+                self.drag = None;
+            }
+            Some(Ok(Applied::Fed { .. })) | None => {}
+            Some(Ok(Applied::Status)) => self.remote_status(cx),
+            Some(Ok(Applied::Retargeted(terminal_id))) => {
+                cx.emit(TermEvent::Retargeted(terminal_id));
+            }
+            // Only this pane closes (RootView's close path; the last pane of
+            // the last tab respawns a local tab).
+            Some(Ok(Applied::Ended)) => cx.emit(TermEvent::Exited),
+            Some(Err(error)) => eprintln!("shellx: remote pane update failed: {error:#}"),
+        }
+    }
+
+    /// Re-reads the session status snapshot (the UI thread only reads it).
+    fn remote_status(&mut self, cx: &mut Context<Self>) {
+        let Backend::Remote(remote) = &mut self.backend else {
+            return;
+        };
+        let status = remote.session.status();
+        let save_error = status
+            .save_error
+            .clone()
+            .filter(|e| remote.status.save_error.as_ref() != Some(e));
+        remote.status = status;
+        if let Some(error) = save_error {
+            // links.json could not record the enrollment: the pill is gone
+            // once connected, so say it once here.
+            let lang = cx.global::<Services>().lang;
+            self.flash(save_link_failed(lang, &error), cx);
+        }
+        cx.emit(TermEvent::RemoteStatus);
+    }
+
+    /// Shows `text` at the bottom of the pane for `FLASH`.
+    fn flash(&mut self, text: String, cx: &mut Context<Self>) {
+        self.flash_seq += 1;
+        let seq = self.flash_seq;
+        self.flash = Some(text);
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(FLASH).await;
+            let _ = this.update(cx, |view, cx| {
+                if view.flash_seq == seq {
+                    view.flash = None;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    /// Input reached a remote pane that is not attached: it was dropped.
+    fn flash_input_paused(&mut self, cx: &mut Context<Self>) {
+        let lang = cx.global::<Services>().lang;
+        self.flash(t(lang, Str::InputPaused).to_string(), cx);
+    }
+
     /// True while the IME holds a composition (preedit) for this pane.
     pub(super) fn composing(&self) -> bool {
         self.marked.is_some()
@@ -256,7 +468,11 @@ impl TermView {
 
     /// The terminal's own title (OSC 0/2), if the shell set one.
     pub(super) fn terminal_title(&self) -> Option<String> {
-        self.session.as_ref().and_then(TermCore::title)
+        match &self.backend {
+            Backend::None => None,
+            Backend::Local { core, .. } => core.title(),
+            Backend::Remote(remote) => remote.title.clone(),
+        }
     }
 
     /// A visible selection exists (Ctrl+C then copies instead of SIGINT).
@@ -282,8 +498,8 @@ impl TermView {
         let (start, end) = sel.ordered();
         let last_col = grid.cols.saturating_sub(1);
         let text = self
-            .session
-            .as_mut()
+            .backend
+            .core()
             .and_then(|s| {
                 s.selection_text((start.col, start.row), (end.col.min(last_col), end.row))
             })
@@ -297,13 +513,18 @@ impl TermView {
 
     /// Clipboard text as data: `TermCore::paste` normalizes newlines, strips
     /// embedded `ESC[200~` / `ESC[201~` and brackets only under mode 2004.
+    /// A remote pane that is not attached refuses it (never queued).
     fn paste_clipboard(&mut self, cx: &mut Context<Self>) {
         let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) else {
             return;
         };
+        if self.backend.input_refused() {
+            self.flash_input_paused(cx);
+            return;
+        }
         self.clear_selection(cx);
-        if let Some(session) = self.session.as_mut() {
-            session.paste(&text);
+        if let Some(core) = self.backend.core() {
+            core.paste(&text);
         }
         cx.notify();
     }
@@ -319,16 +540,18 @@ impl TermView {
     /// viewport content (`selection::follow_viewport`): shifted by the
     /// offset change, dropped once a selected row left the viewport, and
     /// cleared when output scrolled a full scrollback without moving the
-    /// offset. `output_newline`: what `f` fed contained a newline.
-    fn follow_viewport(&mut self, output_newline: bool, f: impl FnOnce(&mut TermCore)) {
-        let Some(session) = self.session.as_mut() else {
-            return;
-        };
+    /// offset. `output_newline`: what `f` fed contained a newline. The core
+    /// is looked up again after `f` (a remote reset replaces it).
+    fn follow_viewport(&mut self, output_newline: bool, f: impl FnOnce(&mut Backend)) {
         let tracking = self.selection.is_some() || self.drag.is_some();
-        let before = if tracking { session.viewport() } else { None };
-        f(session);
-        let (Some(before), Some(after), Some(grid)) = (before, session.viewport(), self.grid)
-        else {
+        let before = if tracking {
+            self.backend.core().and_then(|core| core.viewport())
+        } else {
+            None
+        };
+        f(&mut self.backend);
+        let after = self.backend.core().and_then(|core| core.viewport());
+        let (Some(before), Some(after), Some(grid)) = (before, after, self.grid) else {
             return;
         };
         let delta = match follow_viewport(before, after, output_newline) {
@@ -476,11 +699,17 @@ impl TermView {
                 cx.stop_propagation();
             }
             KeyAction::Chord(chord) => {
-                if let Some(session) = self.session.as_mut()
-                    && session.send_chord(&chord)
+                // A remote pane that is not attached drops the bytes (its
+                // link refuses them, never queues them): say so.
+                let refused = self.backend.input_refused();
+                if let Some(core) = self.backend.core()
+                    && core.send_chord(&chord)
                 {
                     // Typed input ends the selection (Windows Terminal).
                     self.clear_selection(cx);
+                    if refused {
+                        self.flash_input_paused(cx);
+                    }
                     cx.stop_propagation();
                 }
             }
@@ -493,8 +722,12 @@ impl TermView {
     fn on_scroll(&mut self, event: &ScrollWheelEvent, _: &mut Window, cx: &mut Context<Self>) {
         let delta = event.delta.pixel_delta(self.line_height);
         let lines = (f32::from(delta.y) / f32::from(self.line_height)).round() as isize;
-        if lines != 0 && self.session.is_some() {
-            self.follow_viewport(false, |session| session.scroll_lines(-lines));
+        if lines != 0 && !matches!(self.backend, Backend::None) {
+            self.follow_viewport(false, |backend| {
+                if let Some(core) = backend.core() {
+                    core.scroll_lines(-lines);
+                }
+            });
             cx.notify();
         }
     }
@@ -508,9 +741,98 @@ impl Focusable for TermView {
     }
 }
 
+/// The status pill centered on a remote pane (spec §7.4: RAISE fill, 1 px
+/// BORDER, a status dot; no gradient, glow or shadow). Clicks pass through
+/// the layer around it.
+fn status_pill(pill: &Overlay, lang: Lang) -> Div {
+    let dot = match pill.tone {
+        Tone::Running => theme::hsla(RUNNING),
+        Tone::Muted => theme::muted(),
+        Tone::Error => theme::hsla(ERROR),
+    };
+    let title_color = match pill.tone {
+        Tone::Error => theme::hsla(ERROR),
+        _ => theme::text_hi(),
+    };
+    let card = div()
+        .flex()
+        .flex_col()
+        .items_center()
+        .gap(px(4.0))
+        .max_w(px(440.0))
+        .mx(px(16.0))
+        .px(px(14.0))
+        .py(px(8.0))
+        .rounded(px(10.0))
+        .border_1()
+        .border_color(theme::border())
+        .bg(theme::raise())
+        .font(theme::ui_font())
+        .text_size(theme::UI_SIZE)
+        .line_height(relative(1.4))
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(px(8.0))
+                .child(div().flex_none().size(px(8.0)).rounded_full().bg(dot))
+                .child(div().text_color(title_color).child(t(lang, pill.title))),
+        )
+        .children(pill.details.iter().map(|detail| {
+            div()
+                .text_size(theme::SMALL_SIZE)
+                .text_color(theme::muted())
+                .text_center()
+                .child(detail.clone())
+        }));
+    div()
+        .absolute()
+        .top_0()
+        .left_0()
+        .right_0()
+        .bottom_0()
+        .flex()
+        .items_center()
+        .justify_center()
+        .child(card)
+}
+
+/// The short status line at the bottom of a pane (`TermView::flash`).
+fn flash_line(text: String) -> Div {
+    div()
+        .absolute()
+        .left_0()
+        .right_0()
+        .bottom(px(12.0))
+        .flex()
+        .justify_center()
+        .child(
+            div()
+                .mx(px(16.0))
+                .px(px(12.0))
+                .py(px(5.0))
+                .rounded(px(8.0))
+                .border_1()
+                .border_color(theme::border())
+                .bg(theme::raise())
+                .font(theme::ui_font())
+                .text_size(theme::SMALL_SIZE)
+                .text_color(theme::text())
+                .child(text),
+        )
+}
+
 impl Render for TermView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let lang = cx.global::<Services>().lang;
+        let pill = match &self.backend {
+            Backend::Remote(remote) => overlay(&remote.status, lang),
+            _ => self.failed.clone(),
+        };
+        let flash = self.flash.clone();
         let root = div()
+            .relative()
             .size_full()
             .bg(theme::hsla(TERM_BG))
             .text_color(theme::hsla(TERM_FG))
@@ -526,10 +848,12 @@ impl Render for TermView {
                     window.focus(&this.focus_handle);
                 }),
             );
-        match &self.error {
+        let root = match &self.error {
             Some(error) => root.child(format!("Could not start the shell: {error}")),
             None => root.child(TermElement { view: cx.entity() }),
-        }
+        };
+        root.children(pill.map(|pill| status_pill(&pill, lang)))
+            .children(flash.map(flash_line))
     }
 }
 
@@ -589,8 +913,18 @@ impl EntityInputHandler for TermView {
         if !text.is_empty() {
             self.clear_selection(cx);
         }
-        if let Some(session) = self.session.as_mut() {
-            session.send_text(&text);
+        let sent = match &mut self.backend {
+            Backend::None => true,
+            Backend::Local { core, .. } => {
+                core.send_text(&text);
+                true
+            }
+            // ONE write of the committed UTF-8 while attached; otherwise
+            // refused: dropped, never queued for later.
+            Backend::Remote(remote) => text.is_empty() || remote.mirror.send_text(&text),
+        };
+        if !sent {
+            self.flash_input_paused(cx);
         }
         cx.notify();
     }
@@ -610,8 +944,8 @@ impl EntityInputHandler for TermView {
             // Composing is typing: drop the selection and show the live
             // screen, where the preedit is drawn (nothing is sent yet).
             self.clear_selection(cx);
-            if let Some(session) = self.session.as_mut() {
-                session.scroll_to_bottom();
+            if let Some(core) = self.backend.core() {
+                core.scroll_to_bottom();
             }
             self.marked = Some(new_text.to_string());
             self.marked_selection = new_selected_range;
@@ -802,22 +1136,25 @@ impl Element for TermElement {
                 view.line_height = line_h;
                 view.scale = scale;
                 let focused = view.focus_handle.is_focused(window);
-                let Some(session) = view.session.as_mut() else {
+                // This frame's core (a remote reset may have replaced it).
+                let Some(session) = view.backend.core() else {
                     return (None, None, None, None, focused, None);
                 };
                 let size_before = session.vt_cols_rows();
+                // Remote: the link records the grid and tells the Mac.
                 let _ = session.resize(cols, rows, cell_w_px, cell_h_px);
-                if session.vt_cols_rows() != size_before {
-                    // Reflow moves the text: the old cells mean nothing now.
-                    view.selection = None;
-                    view.drag = None;
-                }
+                let reflowed = session.vt_cols_rows() != size_before;
                 let title = session.title();
                 let frame = session.frame().ok();
                 // The live cursor, not the viewport one: see `ime_cell`.
                 let ime_cell = frame
                     .as_ref()
                     .and_then(|f| ime_cell(session.cursor_position(), f.size.1));
+                if reflowed {
+                    // Reflow moves the text: the old cells mean nothing now.
+                    view.selection = None;
+                    view.drag = None;
+                }
                 (
                     frame,
                     ime_cell,

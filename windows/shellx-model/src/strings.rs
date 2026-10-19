@@ -91,6 +91,9 @@ pub enum Str {
     SendingRequest,
     NoOtherMachines,
     AddMachine,
+    FingerprintMismatch,
+    NeedsPairing,
+    RemoteAttachFailed,
 }
 
 impl Str {
@@ -162,6 +165,9 @@ impl Str {
         Str::SendingRequest,
         Str::NoOtherMachines,
         Str::AddMachine,
+        Str::FingerprintMismatch,
+        Str::NeedsPairing,
+        Str::RemoteAttachFailed,
     ];
 }
 
@@ -236,6 +242,9 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::SendingRequest => "Đang gửi yêu cầu…",
             Str::NoOtherMachines => "Không còn máy nào để xin quyền",
             Str::AddMachine => "Xin quyền truy cập máy khác",
+            Str::FingerprintMismatch => "Khóa của máy không khớp, không kết nối",
+            Str::NeedsPairing => "Cần xin quyền truy cập lại",
+            Str::RemoteAttachFailed => "Không mở được phiên trên máy kia, đang thử lại…",
         },
         Lang::En => match key {
             Str::AppName => "ShellX",
@@ -305,6 +314,9 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::SendingRequest => "Sending the request…",
             Str::NoOtherMachines => "No other machines to request",
             Str::AddMachine => "Request access to another machine",
+            Str::FingerprintMismatch => "The machine's key does not match; not connecting",
+            Str::NeedsPairing => "Request access again",
+            Str::RemoteAttachFailed => "Could not open the session on the other machine, retrying…",
         },
     }
 }
@@ -409,7 +421,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 67);
+        assert_eq!(Str::ALL.len(), 70);
     }
 
     #[test]
@@ -490,5 +502,18 @@ mod tests {
             "Không lưu được quyền truy cập: denied"
         );
         assert_eq!(save_link_failed(Lang::En, ""), "Could not save the access");
+    }
+
+    #[test]
+    fn remote_pane_strings() {
+        assert_eq!(
+            t(Lang::Vi, Str::FingerprintMismatch),
+            "Khóa của máy không khớp, không kết nối"
+        );
+        assert_eq!(t(Lang::Vi, Str::NeedsPairing), "Cần xin quyền truy cập lại");
+        assert_eq!(t(Lang::Vi, Str::Connecting), "đang kết nối…");
+        assert_eq!(t(Lang::Vi, Str::Offline), "ngoại tuyến");
+        assert_eq!(t(Lang::Vi, Str::InputPaused), "Mất kết nối, tạm ngừng nhập");
+        assert_eq!(t(Lang::En, Str::NeedsPairing), "Request access again");
     }
 }
