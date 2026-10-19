@@ -257,9 +257,16 @@ private func sizeOf(_ frame: BridgeFrame?) -> [UInt16]? {
         client.hello()
         _ = await client.handshake()
         let bytes = Data("tiếng Việt\r".utf8)
-        client.send(.input, bytes.prefix(8))
-        client.send(.input, bytes.dropFirst(8))
+        // Frame boundary inside "ế" (e1 ba | bf).
+        client.send(.input, bytes.prefix(4))
+        client.send(.input, bytes.dropFirst(4))
         #expect(await eventually { host.receivedInput == bytes })
+        // One frame split across two socket writes, inside "ệ" (e1 bb | 87).
+        let encoded = BridgeFrame(type: .input, payload: Data("Việt".utf8)).encoded()
+        client.sendRaw(encoded.prefix(5 + 3))
+        try? await Task.sleep(nanoseconds: 20_000_000)
+        client.sendRaw(encoded.dropFirst(5 + 3))
+        #expect(await eventually { host.receivedInput == bytes + Data("Việt".utf8) })
         #expect(Array(host.receivedInput.prefix(14)) == [0x74, 0x69, 0xe1, 0xba, 0xbf, 0x6e, 0x67, 0x20, 0x56, 0x69, 0xe1, 0xbb, 0x87, 0x74])
     }
 
@@ -365,6 +372,25 @@ private func sizeOf(_ frame: BridgeFrame?) -> [UInt16]? {
                              UInt8((len >> 8) & 0xff), UInt8(len & 0xff)]))
         #expect(await client.closedWithoutFrame())
         #expect(host.hellos.isEmpty)
+    }
+
+    @Test func silentConnectionIsClosedAfterHelloDeadline() async throws {
+        let host = FakeBridgeHost()
+        let dir = shortDir()
+        let server = ShellXBridgeServer(socket: dir.appendingPathComponent("bridge.sock"), host: host, helloTimeout: 0.2)
+        try server.start()
+        defer { server.stop(); try? FileManager.default.removeItem(at: dir) }
+        let silent = try BridgeTestClient(path: dir.appendingPathComponent("bridge.sock").path)
+        #expect(await eventually { server.connectionCount == 1 })
+        #expect(await silent.closedWithoutFrame())
+        #expect(await eventually { server.connectionCount == 0 }, "the slot is freed")
+        // A connection that says hello in time is not affected by the deadline.
+        let talker = try BridgeTestClient(path: dir.appendingPathComponent("bridge.sock").path)
+        talker.hello()
+        #expect(await talker.next()?.type == .ack)
+        try? await Task.sleep(nanoseconds: 400_000_000)
+        #expect(server.connectionCount == 1)
+        #expect(host.hellos.count == 1)
     }
 
     @Test func connectionCapIs32() async throws {

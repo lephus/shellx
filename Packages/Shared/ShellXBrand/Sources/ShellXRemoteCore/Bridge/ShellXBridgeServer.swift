@@ -30,9 +30,14 @@ public final class ShellXBridgeServer: @unchecked Sendable {
     }
 
     public static let maxConnections = 32
+    /// Default time a connection has to send a valid `H` before it is closed (frees its slot).
+    public static let defaultHelloTimeout: TimeInterval = 10
+    /// Pause of the accept source after `EMFILE`/`ENFILE`, so a level-triggered source does not spin.
+    static let acceptBackoff: DispatchTimeInterval = .milliseconds(100)
 
     public let socket: URL
     private let uid: () -> uid_t
+    private let helloTimeout: TimeInterval
     private let router: BridgeRouter
     private let acceptQueue = DispatchQueue(label: "pro.shellx.remote-bridge.accept")
 
@@ -43,10 +48,13 @@ public final class ShellXBridgeServer: @unchecked Sendable {
     private var nextConnectionID = 1
     private var refusedPeers = 0
     private var refusedOverCap = 0
+    private var acceptStalls = 0
 
-    public init(socket: URL, host: any ShellXBridgeHost, uid: @escaping () -> uid_t = getuid) {
+    public init(socket: URL, host: any ShellXBridgeHost, uid: @escaping () -> uid_t = getuid,
+                helloTimeout: TimeInterval = ShellXBridgeServer.defaultHelloTimeout) {
         self.socket = socket
         self.uid = uid
+        self.helloTimeout = helloTimeout
         self.router = BridgeRouter(host: host)
     }
 
@@ -134,15 +142,31 @@ public final class ShellXBridgeServer: @unchecked Sendable {
 
     // MARK: - Accept
 
+    /// acceptQueue.
     private func acceptPending(listenFD: Int32) {
         while true {
             let client = accept(listenFD, nil, nil)
             if client < 0 {
-                if errno == EINTR || errno == ECONNABORTED { continue }
+                let code = errno
+                if code == EINTR || code == ECONNABORTED { continue }
+                if code == EMFILE || code == ENFILE { pauseAccepting() }
                 return // EAGAIN: drained; anything else: the source fires again or is cancelled.
             }
             admit(client)
         }
+    }
+
+    /// Out of descriptors: the pending connection stays queued and the level-triggered source would
+    /// fire again at once, so suspend it briefly instead of spinning.
+    private func pauseAccepting() {
+        lock.lock()
+        guard let source = listenSource else { lock.unlock(); return }
+        acceptStalls += 1
+        let total = acceptStalls
+        lock.unlock()
+        source.suspend()
+        bridgeLog.error("bridge accept out of descriptors, pausing (total \(total))")
+        acceptQueue.asyncAfter(deadline: .now() + Self.acceptBackoff) { source.resume() }
     }
 
     private func admit(_ fd: Int32) {
@@ -175,7 +199,7 @@ public final class ShellXBridgeServer: @unchecked Sendable {
         nextConnectionID += 1
         // The router is captured strongly: a connection closed after the server is released
         // must still be unbound (tee unregistered, viewport participant cleared).
-        let connection = BridgeConnection(fd: fd, id: id, router: router) { [weak self, router] id in
+        let connection = BridgeConnection(fd: fd, id: id, router: router, helloTimeout: helloTimeout) { [weak self, router] id in
             self?.forget(id)
             DispatchQueue.main.async { MainActor.assumeIsolated { router.unbind(connectionID: id) } }
         }
@@ -250,6 +274,7 @@ final class BridgeConnection: @unchecked Sendable {
     private let fd: Int32
     private let router: BridgeRouter
     private let onClosed: @Sendable (Int) -> Void
+    private let helloTimeout: TimeInterval
     private let readQueue: DispatchQueue
     private let writeQueue: DispatchQueue
 
@@ -270,10 +295,12 @@ final class BridgeConnection: @unchecked Sendable {
     private var bytesIn = 0
     private var bytesOut = 0
 
-    init(fd: Int32, id: Int, router: BridgeRouter, onClosed: @escaping @Sendable (Int) -> Void) {
+    init(fd: Int32, id: Int, router: BridgeRouter, helloTimeout: TimeInterval,
+         onClosed: @escaping @Sendable (Int) -> Void) {
         self.fd = fd
         self.id = id
         self.router = router
+        self.helloTimeout = helloTimeout
         self.onClosed = onClosed
         readQueue = DispatchQueue(label: "pro.shellx.remote-bridge.read.\(id)")
         writeQueue = DispatchQueue(label: "pro.shellx.remote-bridge.write.\(id)", qos: .userInitiated)
@@ -294,6 +321,12 @@ final class BridgeConnection: @unchecked Sendable {
             }
             readSource = source
             source.resume()
+            // A peer that never sends a valid hello must not hold one of the capped slots.
+            readQueue.asyncAfter(deadline: .now() + helloTimeout) { [self] in
+                guard !sawHello else { return }
+                bridgeLog.error("bridge conn \(self.id) no hello in time, closing")
+                end(graceful: false)
+            }
         }
     }
 
