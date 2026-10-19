@@ -58,7 +58,6 @@ HOST_ROOTS = ["Sources", "CLI", "Packages/macOS", "Packages/Shared", "Resources"
 TASK5_GATED = "gated in Task 5 (hard-off Cloud, socket handlers + CLI)"
 TASK5_PARKED = ("parked behind ShellXFeatures.remoteMachines == false (Task 5); "
                 "Wave 2 swaps the transport before flipping it")
-TASK3_KEYCHAIN = "keychain service name, renamed by Task 3 (coexistence); entry becomes stale at merge"
 NOT_A_HOST = "email domain comparison, not a network host"
 
 # Whole files whose forbidden-host code runs only behind a Cloud, account,
@@ -100,8 +99,6 @@ NOT_A_HOST_ALLOWLIST = [
     ("Packages/macOS/CmuxCloud/Sources/CmuxCloud/VMClient/VMTunnelManager.swift",
      "host string comparison that labels a Cloud tunnel as cmux's, not a network request"),
     ("Packages/macOS/CmuxFeedback/Sources/CmuxFeedback/DogfoodSink/DogfoodFeedbackService.swift", NOT_A_HOST),
-    ("Packages/macOS/CmuxPhonePush/Sources/CmuxPhonePush/PhonePushCrypto.swift", TASK3_KEYCHAIN),
-    ("Packages/macOS/CmuxPhonePush/Sources/CmuxPhonePush/PhonePushSharedStateStorage.swift", TASK3_KEYCHAIN),
 ]
 
 # Build-time inputs: SwiftPM, Xcode or a dev script reads these while
