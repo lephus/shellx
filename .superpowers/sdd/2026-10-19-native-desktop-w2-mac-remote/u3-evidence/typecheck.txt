@@ -1,9 +1,0 @@
-# Partial type-check of the U3 app files (not a build; CI is the first real build)
-# swiftc -typecheck -swift-version 5 -target arm64-apple-macos14.0 against the SwiftPM-built ShellXBrand/ShellXRemoteCore/ShellXRemoteUI modules,
-# with every Sources/ShellX/Remote/UI/*.swift + Sources/Cloud/CloudSheetWindow.swift, and stubs for NSApplication.cmuxMainWindowForModalPresentation and ShellXSidebarHeaderRow.
---- flags: '-D DEBUG'
-rc=0
---- flags: '' (release)
-rc=0
---- cmuxTests/ShellXRemoteUITests.swift compiled in one module with the app files (the #if canImport @testable imports drop out), DEBUG
-rc=0
