@@ -313,6 +313,17 @@ impl ConnState {
         }
     }
 
+    /// A fresh machine (as `new()`) whose attempt ids continue after this
+    /// one's, for a session that starts over while jobs of this machine's
+    /// attempts may still report back: their results never match the new
+    /// machine's attempts.
+    pub fn restarted(&self) -> ConnState {
+        ConnState {
+            cur: self.cur,
+            ..ConnState::new()
+        }
+    }
+
     pub fn phase(&self) -> &ConnPhase {
         &self.phase
     }
@@ -684,6 +695,38 @@ mod tests {
         // the old link dying does not take the new one down
         assert!(c.on(dis(id1), 9).is_empty());
         assert!(c.accepts_input());
+    }
+
+    #[test]
+    fn restarted_machine_never_reuses_an_attempt_id() {
+        let mut c = ConnState::new();
+        let old = mint_id(&c.on(ConnEvent::Open, 0));
+        assert_eq!(c.on(minted(old), 1), vec![connect(old)]);
+        // closed while the old link is still opening
+        assert_eq!(
+            c.on(ConnEvent::Close, 2),
+            vec![ConnAction::Drop { attempt: None }]
+        );
+        let mut r = c.restarted();
+        assert_eq!(r.phase(), &ConnPhase::Disconnected);
+        let a = r.on(ConnEvent::Open, 3);
+        assert_eq!(a[0], ConnAction::ShowStatus(Str::Connecting));
+        let new = mint_id(&a);
+        assert!(new > old, "attempt ids continue: {old} then {new}");
+        assert_eq!(r.phase(), &ConnPhase::Connecting { attempt: 1 });
+        // the old attempt's late results are not the new attempt's
+        assert!(r.on(minted(old), 4).is_empty());
+        assert_eq!(
+            r.on(ConnEvent::Connected { attempt: old }, 5),
+            vec![drop_of(old)]
+        );
+        assert!(r.on(dis(old), 6).is_empty());
+        assert_eq!(r.on(minted(new), 7), vec![connect(new)]);
+        assert!(r.on(ConnEvent::Connected { attempt: new }, 8).is_empty());
+        assert!(r.accepts_input());
+        // a restart of the restart keeps counting
+        let mut again = r.restarted();
+        assert!(mint_id(&again.on(ConnEvent::Open, 9)) > new);
     }
 
     #[test]

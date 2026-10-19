@@ -374,7 +374,11 @@ struct Pane {
     link: Arc<RemoteLink>,
     sink: PaneSink,
     want: Want,
+    /// The terminal this pane wants or created (claimed against splits).
     terminal_id: Option<String>,
+    /// The terminal id the UI knows: given in `Want::Terminal`, or the last
+    /// `Retargeted` its sink took. Differs from the attached id -> announce.
+    announced: Option<String>,
     attaching: bool,
     /// Generation of the installed view (`RemoteLink::install`).
     view_gen: Option<u64>,
@@ -520,8 +524,11 @@ impl Worker {
                         self.handle(msg);
                     }
                     Msg::OpenPane { link, sink, .. } => late.push((link, sink)),
-                    other if revived => self.handle(other),
-                    _ => {}
+                    // Handled even while stopped: an enrollment result
+                    // must end `enrolling` (else a revived connect waits
+                    // for it forever), a `Close` makes the stop final, and
+                    // every other late result is ignored by `handle`.
+                    other => self.handle(other),
                 }
             }
             if revived {
@@ -545,8 +552,13 @@ impl Worker {
     }
 
     /// The last pane closed and a new one was already on its way: start over.
+    /// Attempt ids continue (`restarted`), so a job of the old incarnation
+    /// that reports late (an enrollment can wait 300 s for approval) never
+    /// passes for the new attempt's. `enrolling` stays: that job still
+    /// runs, and a new connect waits for it (one invitation, one
+    /// enrollment); `connecting` and `deferred` were cleared by `serve`.
     fn revive(&mut self) {
-        self.state = ConnState::new();
+        self.state = self.state.restarted();
         self.stop = None;
         self.shown = None;
         self.attach_error = None;
@@ -749,6 +761,7 @@ impl Worker {
                         link,
                         sink,
                         want,
+                        announced: terminal_id.clone(),
                         terminal_id,
                         attaching: false,
                         view_gen: None,
@@ -942,12 +955,15 @@ impl Worker {
             }
         };
         p.attach_failures = 0;
-        if p.terminal_id.as_deref() != Some(terminal_id.as_str())
-            || !matches!(p.want, Want::Terminal(_))
-        {
-            (p.sink)(PaneEvent::Retargeted {
+        // Compared with what the UI was told, not with `terminal_id`: a
+        // failed attach may have recorded a created terminal the UI has
+        // never heard of.
+        if p.announced.as_deref() != Some(terminal_id.as_str())
+            && (p.sink)(PaneEvent::Retargeted {
                 terminal_id: terminal_id.clone(),
-            });
+            })
+        {
+            p.announced = Some(terminal_id.clone());
         }
         p.terminal_id = Some(terminal_id.clone());
         p.want = Want::Terminal(terminal_id);
@@ -1282,6 +1298,8 @@ pub mod fake {
         pub fail_list: AtomicBool,
         /// Every attach fails while the connection stays open.
         pub fail_attach: AtomicBool,
+        /// The next n attaches fail (then they work again).
+        pub fail_next_attaches: AtomicU64,
         pub creates: AtomicU64,
         pub attach_calls: AtomicU64,
         next_id: AtomicU64,
@@ -1296,6 +1314,7 @@ pub mod fake {
                 closed: AtomicBool::new(false),
                 fail_list: AtomicBool::new(false),
                 fail_attach: AtomicBool::new(false),
+                fail_next_attaches: AtomicU64::new(0),
                 creates: AtomicU64::new(0),
                 attach_calls: AtomicU64::new(0),
                 next_id: AtomicU64::new(1),
@@ -1384,7 +1403,11 @@ pub mod fake {
                 bail!("the connection to the Mac is closed");
             }
             self.attach_calls.fetch_add(1, Ordering::AcqRel);
-            if self.fail_attach.load(Ordering::Acquire) {
+            let fail_once = self
+                .fail_next_attaches
+                .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| n.checked_sub(1))
+                .is_ok();
+            if fail_once || self.fail_attach.load(Ordering::Acquire) {
                 bail!("the Mac refused the attach");
             }
             if !lock(&self.terminals).iter().any(|t| t.id == terminal_id) {
@@ -1991,6 +2014,41 @@ mod tests {
     }
 
     #[test]
+    fn a_terminal_created_by_a_failed_attach_is_announced_once() {
+        let connector = FakeConnector::new("fp-1", 1);
+        let host = Arc::new(FakeHost::new("fp-1", 0)); // an empty Mac
+        host.fail_next_attaches.store(1, Ordering::Release);
+        connector.push_host(host.clone());
+        let r = rig_scaled("announce", connector, true, 100);
+        let pane = r
+            .session
+            .open_pane(Want::First, 80, 24, r.sink.clone())
+            .unwrap();
+        // create "1", its attach fails, the retry attaches "1"
+        wait("attach", || pane.link.accepts_input());
+        assert_eq!(host.attach_calls.load(Ordering::Acquire), 2);
+        assert_eq!(host.creates.load(Ordering::Acquire), 1);
+        assert_eq!(host.attached_ids(), vec!["1".to_string()]);
+        // the reconnected Mac still lists "1": nothing new to announce
+        host.disconnect("relay restarted");
+        wait("reconnect", || {
+            r.connector.host_count() == 2 && pane.link.accepts_input()
+        });
+        assert_eq!(r.connector.host(1).unwrap().attached_ids(), vec!["1"]);
+        let retargeted: Vec<PaneEvent> = r
+            .events()
+            .into_iter()
+            .filter(|e| matches!(e, PaneEvent::Retargeted { .. }))
+            .collect();
+        assert_eq!(
+            retargeted,
+            vec![PaneEvent::Retargeted {
+                terminal_id: "1".into()
+            }]
+        );
+    }
+
+    #[test]
     fn closing_the_last_pane_and_opening_another_revives_the_session() {
         let r = rig_with("revive", FakeConnector::new("fp-1", 1), true);
         let mut pane = r
@@ -2052,6 +2110,149 @@ mod tests {
         assert_eq!(r.connector.seen().len(), 1);
         assert_eq!(r.connector.host_count(), 1);
         assert!(!r.invite.exists());
+        assert_eq!(r.session.status().phase, ConnPhase::Connected);
+    }
+
+    /// Close `pane` and open a new one in one go. Both messages are queued
+    /// before the worker can publish `finished` (it publishes under the
+    /// status lock held here), so the worker always revives.
+    fn close_and_reopen(r: &Rig, pane: u64, want: Want) -> RemotePane {
+        let status = lock(&r.session.status);
+        let id = r.session.next_pane.fetch_add(1, Ordering::Relaxed);
+        let link = RemoteLink::new(80, 24);
+        r.session.tx.send(Msg::ClosePane { pane }).unwrap();
+        r.session
+            .tx
+            .send(Msg::OpenPane {
+                pane: id,
+                want,
+                link: link.clone(),
+                sink: r.sink.clone(),
+            })
+            .unwrap();
+        drop(status);
+        RemotePane { id, link }
+    }
+
+    #[test]
+    fn reviving_during_an_enrollment_never_enrolls_twice() {
+        let connector = FakeConnector::new("fp-1", 1);
+        let (approve, approval) = mpsc::channel();
+        *lock(&connector.approval) = Some(approval);
+        let r = rig_with("revive-enroll", connector, false);
+        let first = r
+            .session
+            .open_pane(Want::First, 80, 24, r.sink.clone())
+            .unwrap();
+        wait("enrolling connect", || r.connector.seen().len() == 1);
+        // the last pane closes during the approval wait and a new one opens
+        let pane = close_and_reopen(&r, first.id, Want::First);
+        wait("the revived attempt minted", || r.core.mints() == 2);
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(r.connector.seen().len(), 1, "a second enrollment started");
+        assert!(!r.session.status().finished);
+        approve.send(()).unwrap();
+        wait("attach", || pane.link.accepts_input());
+        let seen = r.connector.seen();
+        assert_eq!(seen.len(), 1);
+        assert!(seen[0].invite_path.is_some());
+        assert_eq!(r.connector.host_count(), 1);
+        let host = r.connector.host(0).unwrap();
+        assert_eq!(host.attach_count(), 1, "the pane attaches once");
+        assert!(!r.invite.exists());
+        let saved = LinksStore::new(r.dir.join("links.json")).load().unwrap();
+        let link = saved.get("Mac/1").unwrap();
+        assert!(link.enrolled && link.invite_path.is_none());
+        let status = r.session.status();
+        assert_eq!(
+            (status.phase, status.save_error),
+            (ConnPhase::Connected, None)
+        );
+
+        // Results of the old incarnation's attempt (1) are not the revived
+        // attempt's. Pane ids never repeat, so the live pane's id is the
+        // worst case: the attempt id alone must reject them.
+        let view_gen = pane.link.current_gen().unwrap();
+        let (_stale_tx, stale_rx) = mpsc::channel();
+        let stale_view: Arc<dyn ViewInput> = Arc::new(super::fake::FakeView::default());
+        let stale = [
+            Msg::Minted {
+                attempt: 1,
+                result: Ok(TicketFile {
+                    path: "stale.ticket".into(),
+                    expires_at_unix: 1,
+                    relay_url: "wss://relay.example/v2/relay".into(),
+                }),
+            },
+            Msg::Linked {
+                attempt: 1,
+                result: Err(LinkFail::Other("stale".into())),
+            },
+            Msg::Attached {
+                attempt: 1,
+                pane: pane.id,
+                result: Ok((stale_view, stale_rx, "1".into(), (80, 24))),
+            },
+            Msg::ViewEnd {
+                attempt: 1,
+                pane: pane.id,
+                view_gen,
+                end: PumpEnd::Disconnected("stale".into()),
+            },
+        ];
+        for msg in stale {
+            r.session.tx.send(msg).unwrap();
+        }
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(pane.link.current_gen(), Some(view_gen), "view replaced");
+        assert!(pane.link.accepts_input(), "stale disconnect taken");
+        assert_eq!(r.session.status().phase, ConnPhase::Connected);
+        assert_eq!((r.connector.seen().len(), r.core.mints()), (1, 2));
+        PtyLink::write(&*pane.link, b"ok");
+        assert_eq!(host.view(0).unwrap().writes(), vec![b"ok".to_vec()]);
+    }
+
+    #[test]
+    fn an_enrollment_ending_while_the_session_stops_is_not_lost() {
+        let connector = FakeConnector::new("fp-1", 1);
+        let (approve, approval) = mpsc::channel();
+        *lock(&connector.approval) = Some(approval);
+        let r = rig_with("revive-drain", connector, false);
+        let first = r
+            .session
+            .open_pane(Want::First, 80, 24, r.sink.clone())
+            .unwrap();
+        wait("enrolling connect", || r.connector.seen().len() == 1);
+        // The worker stops (last pane closed) and the enrollment result is
+        // queued before the new pane: it is read while the worker is
+        // stopped, and must still end `enrolling`.
+        let status = lock(&r.session.status); // the worker cannot publish
+        r.session
+            .tx
+            .send(Msg::ClosePane { pane: first.id })
+            .unwrap();
+        approve.send(()).unwrap();
+        wait("enrolled", || {
+            r.connector.host_count() == 1 && !r.invite.exists()
+        });
+        std::thread::sleep(Duration::from_millis(30)); // Linked is queued
+        let id = r.session.next_pane.fetch_add(1, Ordering::Relaxed);
+        let link = RemoteLink::new(80, 24);
+        r.session
+            .tx
+            .send(Msg::OpenPane {
+                pane: id,
+                want: Want::First,
+                link: link.clone(),
+                sink: r.sink.clone(),
+            })
+            .unwrap();
+        drop(status);
+        wait("attach", || link.accepts_input());
+        let seen = r.connector.seen();
+        assert_eq!(seen.len(), 2);
+        assert!(seen[1].invite_path.is_none(), "enrolled once");
+        assert_eq!(r.connector.host(1).unwrap().attach_count(), 1);
         assert_eq!(r.session.status().phase, ConnPhase::Connected);
     }
 
