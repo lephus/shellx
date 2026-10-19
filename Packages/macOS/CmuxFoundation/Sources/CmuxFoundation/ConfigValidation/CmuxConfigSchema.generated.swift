@@ -724,7 +724,8 @@ enum CmuxEmbeddedConfigSchema {
             "pt-BR",
             "ru",
             "th",
-            "tr"
+            "tr",
+            "vi"
           ],
           "default": "system",
           "description": "Preferred app language."

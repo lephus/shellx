@@ -57,6 +57,12 @@
             "state": "translated",
             "value": "تداخل الحزم عميق جدًا."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pack lồng nhau quá sâu."
+          }
         }
       }
     },
@@ -115,6 +121,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "تم تجاهل دورة الحزم."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã bỏ qua vòng lặp Pack."
           }
         }
       }
@@ -175,6 +187,12 @@
             "state": "translated",
             "value": "ملف الحزمة غير موجود."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tệp Pack không tồn tại."
+          }
         }
       }
     },
@@ -234,6 +252,12 @@
             "state": "translated",
             "value": "تم تجاوز حد تحميل الحزم."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vượt quá giới hạn tải Pack."
+          }
         }
       }
     },
@@ -292,6 +316,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "تعذر قراءة حجم ملف الحزمة."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không đọc được kích thước tệp Pack."
           }
         }
       }

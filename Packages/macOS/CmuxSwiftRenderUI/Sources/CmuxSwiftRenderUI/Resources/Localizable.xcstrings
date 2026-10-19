@@ -57,6 +57,12 @@
             "state": "translated",
             "value": "사이드바 오류"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lỗi thanh bên"
+          }
         }
       }
     },
@@ -116,6 +122,12 @@
             "state": "translated",
             "value": "사이드바 파일이 비어 있거나 누락되었습니다."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tệp thanh bên trống hoặc bị thiếu."
+          }
         }
       }
     },
@@ -174,6 +186,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "지원되는 SwiftUI 뷰를 찾을 수 없습니다."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không tìm thấy view SwiftUI được hỗ trợ."
           }
         }
       }

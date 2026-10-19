@@ -58,6 +58,12 @@
             "state": "translated",
             "value": "ShellX 내에서 실행 중인 프로그램이 다른 앱의 콘텐츠에 접근하려고 합니다."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn truy cập nội dung của các ứng dụng khác."
+          }
         }
       }
     },
@@ -116,6 +122,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ShellX 내에서 실행 중인 프로그램이 다른 앱의 데이터에 접근하려고 합니다."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn truy cập dữ liệu từ các ứng dụng khác."
           }
         }
       }
@@ -176,6 +188,12 @@
             "state": "translated",
             "value": "ShellX 내에서 실행 중인 프로그램이 AppleScript를 사용하려고 합니다."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn sử dụng AppleScript."
+          }
         }
       }
     },
@@ -234,6 +252,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ShellX 내에서 실행 중인 프로그램이 패스키 및 보안 키를 탐색하기 위해 Bluetooth를 사용하려고 합니다."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn dùng Bluetooth để tìm passkey và khóa bảo mật."
           }
         }
       }
@@ -294,6 +318,12 @@
             "state": "translated",
             "value": "ShellX 내에서 실행 중인 프로그램이 캘린더를 읽고 쓰려고 합니다."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn đọc và ghi lịch của bạn."
+          }
         }
       }
     },
@@ -352,6 +382,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ShellX 내에서 실행 중인 프로그램이 캘린더에 일정을 추가하려고 합니다."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn thêm sự kiện vào lịch của bạn."
           }
         }
       }
@@ -412,6 +448,12 @@
             "state": "translated",
             "value": "ShellX 내에서 실행 중인 프로그램이 카메라를 사용하려고 합니다."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn sử dụng camera của bạn."
+          }
         }
       }
     },
@@ -470,6 +512,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ShellX 내에서 실행 중인 프로그램이 데스크탑 폴더의 파일에 접근하려고 합니다."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn truy cập các tệp trong thư mục Desktop của bạn."
           }
         }
       }
@@ -530,6 +578,12 @@
             "state": "translated",
             "value": "ShellX 내에서 실행 중인 프로그램이 문서 폴더의 파일에 접근하려고 합니다."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn truy cập các tệp trong thư mục Tài liệu của bạn."
+          }
         }
       }
     },
@@ -589,6 +643,12 @@
             "state": "translated",
             "value": "ShellX 내에서 실행 중인 프로그램이 다운로드 폴더의 파일에 접근하려고 합니다."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn truy cập các tệp trong thư mục Tải về của bạn."
+          }
         }
       }
     },
@@ -647,6 +707,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ShellX 내에서 실행 중인 프로그램이 파일 제공업체에서 관리하는 파일에 접근하려고 합니다."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn truy cập các tệp do nhà cung cấp tệp quản lý."
           }
         }
       }
@@ -761,6 +827,12 @@
             "state": "translated",
             "value": "ShellX içinde çalışan bir program yerel ağa erişmek istiyor."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn tìm các thiết bị trên mạng cục bộ của bạn."
+          }
         }
       }
     },
@@ -819,6 +891,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ShellX 내에서 실행 중인 프로그램이 위치 정보에 접근하려고 합니다."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn truy cập vị trí của bạn."
           }
         }
       }
@@ -933,6 +1011,12 @@
             "state": "translated",
             "value": "ShellX içinde çalışan bir program mikrofonunuzu kullanmak istiyor."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn sử dụng micrô của bạn."
+          }
         }
       }
     },
@@ -1046,6 +1130,12 @@
             "state": "translated",
             "value": "ShellX içinde çalışan bir program hareket verilerine erişmek istiyor."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn truy cập dữ liệu chuyển động."
+          }
         }
       }
     },
@@ -1104,6 +1194,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ShellX 내에서 실행 중인 프로그램이 네트워크 볼륨의 파일에 접근하려고 합니다."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn truy cập các tệp trên ổ đĩa mạng."
           }
         }
       }
@@ -1164,6 +1260,12 @@
             "state": "translated",
             "value": "ShellX 내에서 실행 중인 프로그램이 미리 알림을 읽고 쓰려고 합니다."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn đọc và ghi lời nhắc của bạn."
+          }
         }
       }
     },
@@ -1222,6 +1324,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ShellX 내에서 실행 중인 프로그램이 외장 볼륨의 파일에 접근하려고 합니다."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn truy cập các tệp trên ổ đĩa di động."
           }
         }
       }
@@ -1336,6 +1444,12 @@
             "state": "translated",
             "value": "ShellX içinde çalışan bir program konuşma tanımayı kullanmak istiyor."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn sử dụng nhận dạng giọng nói."
+          }
         }
       }
     },
@@ -1448,6 +1562,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ShellX içinde çalışan bir program yükseltilmiş ayrıcalıklar gerektiriyor."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn thực hiện các tác vụ quản trị hệ thống."
           }
         }
       }
@@ -1562,6 +1682,12 @@
             "state": "translated",
             "value": "Buraya Yeni $(PRODUCT_NAME) Çalışma Alanı"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên $(PRODUCT_NAME) mới tại đây"
+          }
         }
       }
     },
@@ -1674,6 +1800,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Buraya Yeni $(PRODUCT_NAME) Penceresi"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cửa sổ $(PRODUCT_NAME) mới tại đây"
           }
         }
       }
@@ -1788,6 +1920,12 @@
             "state": "translated",
             "value": "ShellX içinde çalışan bir program takvimlerinize erişmek istiyor."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn truy cập lịch của bạn."
+          }
         }
       }
     },
@@ -1900,6 +2038,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ShellX içinde çalışan bir program hatırlatıcılarınıza erişmek istiyor."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn truy cập lời nhắc của bạn."
           }
         }
       }
@@ -2014,6 +2158,12 @@
             "state": "translated",
             "value": "ShellX içinde çalışan bir program kişilerinize erişmek istiyor."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn truy cập danh bạ của bạn."
+          }
         }
       }
     },
@@ -2126,6 +2276,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ShellX içinde çalışan bir program konumunuza erişmek istiyor."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn truy cập vị trí của bạn."
           }
         }
       }
@@ -2240,6 +2396,12 @@
             "state": "translated",
             "value": "ShellX içinde çalışan bir program fotoğraf kitaplığınıza erişmek istiyor."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn truy cập thư viện ảnh của bạn."
+          }
         }
       }
     },
@@ -2353,6 +2515,12 @@
             "state": "translated",
             "value": "ShellX içinde çalışan bir program sistem sesine erişmek istiyor."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Một chương trình chạy trong ShellX muốn truy cập âm thanh hệ thống của bạn."
+          }
         }
       }
     },
@@ -2411,6 +2579,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "ShellX는 이 Mac이 사설 네트워크의 Cloud 머신에 연결할 수 있도록 네트워크 확장을 설치합니다. 이 확장은 ShellX Cloud를 사용하는 동안에만 실행됩니다."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX cài một tiện ích mạng để Mac này có thể truy cập các máy Cloud của bạn trên mạng riêng của chúng. Tiện ích chỉ chạy khi bạn dùng ShellX Cloud."
           }
         }
       }

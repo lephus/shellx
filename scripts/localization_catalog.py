@@ -15,11 +15,12 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-LOCALES = ("en", "de", "fr", "ar", "es", "zh-Hant", "zh-Hans", "ko", "ja")
+LOCALES = ("en", "de", "fr", "ar", "es", "zh-Hant", "zh-Hans", "ko", "ja", "vi")
 CATEGORIES = {
     "ar": {"zero", "one", "two", "few", "many", "other"},
     "fr": {"one", "many", "other"},
     "es": {"one", "many", "other"},
+    "vi": {"other"},
 }
 OMISSION_CLASSES = {"brand", "technical", "format", "price", "syntax"}
 FORMAT = re.compile(

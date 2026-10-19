@@ -14358,6 +14358,7 @@
 				ru,
 				th,
 				tr,
+				vi,
 				"zh-Hans",
 				"zh-Hant",
 			);
