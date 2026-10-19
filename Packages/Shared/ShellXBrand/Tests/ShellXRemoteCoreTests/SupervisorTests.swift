@@ -168,7 +168,7 @@ private let statusUp = Data(#"{"daemon_name":"Phu's Mac","daemon_fingerprint":"f
     #expect(await eventually { await sup.state == .connected(localSocket: rig.paths.clientSocket(for: "m_1").path) })
     #expect(!FileManager.default.fileExists(atPath: invite.path))
     #expect(await sup.record.enrolled)
-    #expect(try rig.store.load() == [rig.record(enrolled: true)])
+    #expect(await eventually { (try? rig.store.load()) == [rig.record(enrolled: true)] })   // saved on the links queue
     // The next spawn runs without the (consumed) invite.
     rig.launcher.exit(0, status: 1)
     #expect(await eventually { await sup.state == .reconnecting(attempt: 1, retryAt: supT0 + 1) })

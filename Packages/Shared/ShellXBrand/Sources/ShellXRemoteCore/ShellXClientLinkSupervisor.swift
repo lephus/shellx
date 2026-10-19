@@ -151,7 +151,9 @@ public actor ShellXClientLinkSupervisor: LinkSupervising {
                 dropInvite()
                 record.enrolled = true
                 // The enrollment itself lives in cmux-tui's client state; this flag only skips invites later.
-                do { try store.upsert(record) } catch {
+                // Saved on the service's serial links.json queue, in order with its loads and removals.
+                let store = self.store, saved = record
+                do { try await ShellXRemoteService.onLinkStore { try store.upsert(saved) } } catch {
                     RemoteLog.service.error("link record not saved machine=\(self.machine, privacy: .public) error=\(RemoteLog.code(error), privacy: .public)")
                 }
             }

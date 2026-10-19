@@ -239,7 +239,10 @@ public final class ShellXRemoteService: ObservableObject {
     func runSession(_ gen: Int) async {
         // Links this Mac already holds; enrolled ones reconnect by themselves while their machine is online.
         // A grant that never enrolled cannot succeed now: its invite file was swept at launch, or dropped when
-        // the previous session stopped its link (R33). Such records are removed.
+        // the previous session stopped its link (R33). Such records are removed, but only once the last
+        // session's links stopped: one of them may still connect and save `enrolled = true` while stopping.
+        await teardown?.value
+        guard isCurrent(gen) else { return }
         let store = env.store
         let loaded: [RemoteLinkRecord]
         do {
