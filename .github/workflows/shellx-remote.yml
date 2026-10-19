@@ -148,6 +148,12 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Harness pins and guards (no binaries)
+        run: |
+          set -euo pipefail
+          python3 tests/test_shellx_remote_harness.py
+          python3 tests/test_shellx_remote.py
+
       - name: Init ghostty submodule
         shell: bash
         run: bash scripts/ci/init-submodule.sh ghostty
@@ -211,6 +217,7 @@ jobs:
         run: cargo build --workspace --locked
 
       - name: Remote e2e (fake API, cmux-relay, patched daemon, two machines)
+        id: e2e
         env:
           SHELLX_E2E_REQUIRE: "1"
         run: |
@@ -222,5 +229,5 @@ jobs:
           python3 -u tests/test_shellx_remote_e2e.py -v 2>&1 | tee "$RUNNER_TEMP/e2e.log"
 
       - name: Annotate the e2e log (job logs need auth, annotations do not)
-        if: failure()
+        if: failure() && steps.e2e.outcome == 'failure'
         run: python3 scripts/shellx/remote-e2e/annotate_log.py "$RUNNER_TEMP/e2e.log"

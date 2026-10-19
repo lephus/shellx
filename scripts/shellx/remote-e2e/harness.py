@@ -78,6 +78,8 @@ LATENCY_WINDOW = 5
 # `remote connect --headless --json` prints one JSON object per line with this
 # `event` when connected and on every topology change.
 SNAPSHOT_EVENT = "connection-snapshot"
+# The first lines of every dump_logs block; annotate_log.py anchors on it.
+DUMP_MARKER = "----- process"
 
 TICKET_RE = re.compile(r"v2\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]*")
 INVITE_RE = re.compile(r"cmux://enroll/[A-Za-z0-9_=-]+")
@@ -813,8 +815,10 @@ class Harness:
             return
         for machine in list(self.machines.values()):
             machine.note_mint_stats()
-        for name, proc in list(self.procs.items()):
-            print(f"----- process {name} pid={proc.pid} rc={proc.poll()}", file=stream)
+        procs = list(self.procs.items())
+        print(f"{DUMP_MARKER} table: {len(procs)} processes -----", file=stream)
+        for name, proc in procs:
+            print(f"{DUMP_MARKER} {name} pid={proc.pid} rc={proc.poll()}", file=stream)
         for path in sorted(self.root.rglob("*.log")):
             if not path.is_file() or path.name.endswith(".input.log"):
                 continue

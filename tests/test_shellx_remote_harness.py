@@ -241,6 +241,63 @@ class AnnotateLog(unittest.TestCase):
         self.assertIn("after", output)
         self.assertIn(annotate_log.DROPPED.split(":")[0], output)
 
+    def test_a_ticket_split_by_a_control_character_is_dropped(self):
+        # Stripping control characters joins the two halves into a ticket: the filter must run after.
+        half = "A" * 12
+        for joint in ("\x00", "\x1b", "\x07", "\x1b[31m", "\x1b[0m\x00"):
+            line = f"token v2.{half}{joint}{half}.{'B' * 10} end"
+            self.assertEqual(annotate_log.clean_line(line), annotate_log.DROPPED, repr(joint))
+            output = "\n".join(annotate_log.build_commands(f"FAIL: x\n{line}\n"))
+            self.assertNotIn(half * 2, output, repr(joint))
+        invite = "cmux://enroll/" + "Q" * 10 + "\x01" + "Q" * 10
+        self.assertEqual(annotate_log.clean_line(invite), annotate_log.DROPPED)
+
+    def test_the_window_starts_at_the_last_process_dump(self):
+        dump = [f"{annotate_log.DUMP_MARKER} table: 2 processes -----", f"{annotate_log.DUMP_MARKER} relay-1 pid=1 rc=None",
+                f"{annotate_log.DUMP_MARKER} api pid=2 rc=None", "----- logs/harness.log (last 80 lines, redacted) -----"]
+        lines = ([f"early {n}" for n in range(300)] + dump + [f"first dump {n}" for n in range(50)]
+                 + ["test_b ... FAIL"] + dump + [f"last dump {n}" for n in range(400)]
+                 + ["FAIL: test_b (m.C.test_b)", "Ran 2 tests"])
+        window = annotate_log.window(lines)
+        self.assertEqual(window[0], dump[0])                       # the start of the LAST dump
+        self.assertNotIn("first dump 49", window)
+        self.assertEqual(window[-1], "Ran 2 tests")
+        self.assertIn("last dump 0", window)                       # more than the last 200 lines
+        commands = annotate_log.build_commands("\n".join(lines))
+        self.assertLessEqual(len(commands) - 1, annotate_log.MAX_CHUNKS)
+        body = "%0A".join(c.split("::", 2)[2] for c in commands[1:])
+        self.assertTrue(body.startswith(dump[0]))
+        self.assertTrue(body.endswith("Ran 2 tests"))
+
+    def test_a_long_dump_keeps_its_head_and_the_tail(self):
+        lines = [f"{annotate_log.DUMP_MARKER} table: 1 processes -----"] + [f"x {n}" for n in range(5000)] + ["Ran 1 test"]
+        window = annotate_log.window(lines)
+        self.assertEqual(len(window), annotate_log.MAX_WINDOW_LINES)
+        self.assertEqual(window[0], lines[0])
+        self.assertEqual(window[-annotate_log.TAIL_LINES:], lines[-annotate_log.TAIL_LINES:])
+        self.assertIn("lines omitted", window[-annotate_log.TAIL_LINES - 1])
+
+    def test_no_dump_marker_keeps_the_last_lines(self):
+        lines = [f"line {n}" for n in range(500)]
+        self.assertEqual(annotate_log.window(lines), lines[-annotate_log.TAIL_LINES:])
+
+    def test_each_annotation_stays_under_the_64_kb_message_limit(self):
+        log = "\n".join([f"{annotate_log.DUMP_MARKER} table -----"] + ["%" * 2000] * 6000)
+        for command in annotate_log.build_commands(log):
+            self.assertLess(len(command.encode()), 64 * 1024)
+
+    def test_every_harness_dump_starts_with_the_marker(self):
+        import io
+        h = harness.Harness("/nonexistent/bin", "/nonexistent/core")
+        try:
+            out = io.StringIO()
+            h.dump_logs(out)                                   # even with no process
+        finally:
+            h.close()
+        self.assertEqual(harness.DUMP_MARKER, annotate_log.DUMP_MARKER)
+        self.assertTrue(out.getvalue().splitlines()[0].startswith(annotate_log.DUMP_MARKER))
+        self.assertEqual(annotate_log.window(out.getvalue().splitlines())[0], out.getvalue().splitlines()[0])
+
     def test_no_failing_line_still_gives_a_summary(self):
         commands = annotate_log.build_commands("only noise\n")
         self.assertEqual(len(commands), 2)
