@@ -433,7 +433,7 @@ public struct AgentResumeArgv: Sendable, Equatable {
         }
         switch launcher {
         case "claudeTeams":
-            let parts = commandParts(executablePath: executablePath, arguments: arguments, fallbackExecutable: "cmux")
+            let parts = commandParts(executablePath: executablePath, arguments: arguments, fallbackExecutable: AgentRestoreLaunch.cliStartupExecutableToken)
             var tail = parts.tail
             if tail.first == "claude-teams" { tail.removeFirst() }
             guard let preserved = AgentLaunchSanitizer.preservedClaudeTeamsLaunchArguments(args: tail) else {
@@ -441,7 +441,7 @@ public struct AgentResumeArgv: Sendable, Equatable {
             }
             return .resolved([parts.executable, "claude-teams", "--resume", sessionId] + preserved)
         case "codexTeams":
-            let parts = commandParts(executablePath: executablePath, arguments: arguments, fallbackExecutable: "cmux")
+            let parts = commandParts(executablePath: executablePath, arguments: arguments, fallbackExecutable: AgentRestoreLaunch.cliStartupExecutableToken)
             var tail = parts.tail
             if tail.first == "codex-teams" { tail.removeFirst() }
             guard let preserved = AgentLaunchSanitizer.preservedArguments(kind: "codex-fork-restore", args: tail) else {
@@ -452,7 +452,7 @@ public struct AgentResumeArgv: Sendable, Equatable {
                     + codexResumeConfigOverrides(preserved: preserved) + preserved
             )
         case "omo":
-            let parts = commandParts(executablePath: executablePath, arguments: arguments, fallbackExecutable: "cmux")
+            let parts = commandParts(executablePath: executablePath, arguments: arguments, fallbackExecutable: AgentRestoreLaunch.cliStartupExecutableToken)
             var tail = parts.tail
             if tail.first == "omo" { tail.removeFirst() }
             guard let preserved = AgentLaunchSanitizer.preservedArguments(kind: "opencode", args: tail) else {

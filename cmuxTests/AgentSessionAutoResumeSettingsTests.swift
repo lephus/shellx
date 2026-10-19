@@ -273,7 +273,7 @@ final class AgentSessionAutoResumeSettingsTests: XCTestCase {
             XCTAssertTrue(input.contains("'resume'"), input)
             XCTAssertTrue(input.contains("codex-remote-running-session"), input)
             XCTAssertFalse(input.contains("cmux-agent-resume"), input)
-            XCTAssertFalse(input.contains(" cmux restore "), input)
+            XCTAssertFalse(input.contains(" \(AgentRestoreLaunch.cliStartupExecutableToken) restore "), input)
             let remoteCwdPrefix = try XCTUnwrap(
                 TerminalStartupWorkingDirectoryPrefix.optionalChangeDirectoryPrefix(
                     for: remoteWorkingDirectory

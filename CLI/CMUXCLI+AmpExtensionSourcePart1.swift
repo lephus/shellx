@@ -92,7 +92,7 @@ function cmuxBin(): string {
   }
   const bundled = firstString(process.env.CMUX_BUNDLED_CLI_PATH);
   if (bundled && isExecutableFile(bundled)) return bundled;
-  return resolveExecutable("cmux");
+  return resolveExecutable("shellx");
 }
 
 function looksLikeAmpExecutable(value: string): boolean {

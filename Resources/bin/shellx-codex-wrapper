@@ -136,7 +136,7 @@ resolve_hook_cmux_bin() {
         return 0
     fi
 
-    printf '%s' "cmux"
+    printf '%s' "shellx"
 }
 
 cmux_codex_load_skill_link_policy() {

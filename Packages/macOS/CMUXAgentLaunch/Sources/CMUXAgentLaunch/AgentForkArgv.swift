@@ -25,7 +25,7 @@ public struct AgentForkArgv: Sendable, Equatable {
     ) -> AgentForkLauncherResolution {
         switch launcher {
         case "claudeTeams":
-            let parts = commandParts(executablePath: executablePath, arguments: arguments, fallbackExecutable: "cmux")
+            let parts = commandParts(executablePath: executablePath, arguments: arguments, fallbackExecutable: AgentRestoreLaunch.cliStartupExecutableToken)
             var tail = parts.tail
             if tail.first == "claude-teams" { tail.removeFirst() }
             guard let preserved = AgentLaunchSanitizer.preservedClaudeTeamsLaunchArguments(args: tail) else {
@@ -33,7 +33,7 @@ public struct AgentForkArgv: Sendable, Equatable {
             }
             return .resolved([parts.executable, "claude-teams", "--resume", sessionId, "--fork-session"] + preserved)
         case "codexTeams":
-            let parts = commandParts(executablePath: executablePath, arguments: arguments, fallbackExecutable: "cmux")
+            let parts = commandParts(executablePath: executablePath, arguments: arguments, fallbackExecutable: AgentRestoreLaunch.cliStartupExecutableToken)
             var tail = parts.tail
             if tail.first == "codex-teams" { tail.removeFirst() }
             guard let preserved = AgentLaunchSanitizer.preservedArguments(kind: "codex-fork-replay", args: tail) else {
@@ -41,7 +41,7 @@ public struct AgentForkArgv: Sendable, Equatable {
             }
             return .resolved([parts.executable, "codex-teams", "fork", sessionId] + preserved)
         case "omo":
-            let parts = commandParts(executablePath: executablePath, arguments: arguments, fallbackExecutable: "cmux")
+            let parts = commandParts(executablePath: executablePath, arguments: arguments, fallbackExecutable: AgentRestoreLaunch.cliStartupExecutableToken)
             var tail = parts.tail
             if tail.first == "omo" { tail.removeFirst() }
             guard let preserved = AgentLaunchSanitizer.preservedArguments(kind: "opencode", args: tail) else {

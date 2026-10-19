@@ -57,7 +57,7 @@ struct AgentRestoreLeaseOwner {
     private func watchedProcessID(pid: Int32) -> Int32? {
         var path = [CChar](repeating: 0, count: 4_096)
         guard path.withUnsafeMutableBytes({ proc_pidpath(pid, $0.baseAddress, UInt32($0.count)) }) > 0,
-              path.withUnsafeBufferPointer({ URL(fileURLWithPath: String(cString: $0.baseAddress!)).lastPathComponent }) == "cmux"
+              path.withUnsafeBufferPointer({ URL(fileURLWithPath: String(cString: $0.baseAddress!)).lastPathComponent }) == AgentRestoreLaunch.cliStartupExecutableToken
         else { return nil }
         // Read only argv from the kernel's bounded process-argument buffer.
         // Never expose or interpret the environment that follows it.

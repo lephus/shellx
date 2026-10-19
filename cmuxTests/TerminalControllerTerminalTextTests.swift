@@ -47,7 +47,7 @@ final class TerminalControllerTerminalTextTests: XCTestCase {
             return XCTFail("expected an error reply")
         }
         let data = try XCTUnwrap(rawData as? [String: Any])
-        let expectedCommand = "cmux focus-panel --workspace \(workspaceID.uuidString) --panel \(surfaceID.uuidString)"
+        let expectedCommand = "shellx focus-panel --workspace \(workspaceID.uuidString) --panel \(surfaceID.uuidString)"
         XCTAssertEqual(code, "surface_unavailable")
         XCTAssertEqual(data["reason"] as? String, "hibernated")
         XCTAssertEqual(data["surface_id"] as? String, surfaceID.uuidString)
