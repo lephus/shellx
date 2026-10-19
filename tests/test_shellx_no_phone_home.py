@@ -72,6 +72,8 @@ CLOUD_ALLOWLIST = [
     ("Packages/macOS/CmuxCloud/Sources/CmuxCloud/VMClient/VMClient.swift", CLOUD_REASON),
     ("Packages/macOS/CmuxCloud/Sources/CmuxCloud/VMClient/VMTunnelManager.swift", CLOUD_REASON),
     ("Packages/macOS/CmuxFeedback/Sources/CmuxFeedback/DogfoodSink/DogfoodFeedbackService.swift", CLOUD_REASON),
+    ("Packages/macOS/CmuxPhonePush/Sources/CmuxPhonePush/PhonePushCrypto.swift", CLOUD_REASON),
+    ("Packages/macOS/CmuxPhonePush/Sources/CmuxPhonePush/PhonePushSharedStateStorage.swift", CLOUD_REASON),
     ("Resources/coderouter-cli.json", CLOUD_REASON),
     ("Resources/en.lproj/cloud-agent-skill.md", CLOUD_REASON),
     ("Sources/Cloud/CloudSecurityExplainer.swift", CLOUD_REASON),
@@ -80,6 +82,13 @@ CLOUD_ALLOWLIST = [
     ("Sources/Mobile/MobileHostV2Installation.swift", CLOUD_REASON),
     ("Sources/Mobile/Pairing/MobilePairingView.swift", CLOUD_REASON),
     ("Sources/PricingPlansScreen.swift", CLOUD_REASON),
+]
+
+# Build-time inputs: SwiftPM fetches these while building, the app never does.
+# Re-hosting the binaries is release work (Wave 3).
+BUILD_TIME_ALLOWLIST = [
+    ("Packages/Shared/CmuxTerminalClient/Package.swift",
+     "build-time: SwiftPM downloads the prebuilt cmux-terminal-client xcframework; the app never contacts it"),
 ]
 
 # Literals that name a forbidden host but never reach it. They are removed from
@@ -93,12 +102,15 @@ NON_NETWORK_LITERALS = [
      "UpdateFeedResolver prefix that classifies a feed URL; never fetched (ShellX's feed is download.shellx.pro)"),
     ('"https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux-settings.schema.json"',
      "legacy $schema value matched to migrate an old settings file; never fetched"),
-    ('"https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux.schema.json"',
-     "$id/default inside the embedded config schema, generated from upstream's web/data (not in ShellX); used for local validation only"),
+    ('"$id": "https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux.schema.json",',
+     "$id inside the embedded config schema (generated from upstream's web/data, not in ShellX); local validation only"),
+    ('"default": "https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux.schema.json",',
+     "default of $schema inside the embedded config schema; local validation only, never written or fetched"),
 ]
 
 # Package test targets never ship in the app; their fixtures use upstream URLs.
 SKIPPED_PATH_PARTS = [("/Tests/", "package test targets are not shipped")]
+SKIPPED_FILES = [(POLICY_SWIFT, "the forbidden-host list itself")]
 
 SLASH_COMMENT_SUFFIXES = {".swift", ".m", ".mm", ".h", ".c", ".cc", ".cpp", ".js", ".mjs", ".ts", ".tsx", ".go", ".rs", ".zig"}
 HASH_COMMENT_SUFFIXES = {"", ".sh", ".bash", ".zsh", ".fish", ".py", ".rb", ".toml", ".yml", ".yaml", ".conf"}
@@ -121,16 +133,22 @@ def is_comment(path, line):
 
 
 def is_skipped(path):
-    return path.endswith(".xcstrings") or any(part in path for part, _reason in SKIPPED_PATH_PARTS)
+    return (path.endswith(".xcstrings")
+            or any(path == skipped for skipped, _reason in SKIPPED_FILES)
+            or any(part in path for part, _reason in SKIPPED_PATH_PARTS))
 
 
-def reachable_offenders(pattern, roots, allow):
-    """offenders() hits outside comments, package tests and catalogs, after
-    removing NON_NETWORK_LITERALS from each line."""
-    regex = re.compile(pattern)
+def reachable_offenders(hosts, roots, allow):
+    """`{host: ["path:line", ...]}` for lines that name a host, outside
+    comments, package tests and catalogs, after removing NON_NETWORK_LITERALS.
+    One walk over the roots serves every host."""
+    regexes = {host: re.compile(host_pattern(host)) for host in hosts}
+    catalog_allow = [(path, "string catalogs: see test_catalog_strings_naming_forbidden_hosts_are_unused")
+                     for path in catalogs()]
+    combined = "|".join(host_pattern(host) for host in hosts)
     lines_by_path = {}
-    hits = []
-    for hit in offenders(pattern, roots=roots, allow=allow):
+    hits = {host: [] for host in hosts}
+    for hit in offenders(combined, roots=roots, allow=list(allow) + catalog_allow):
         path, number = hit.rsplit(":", 1)
         if is_skipped(path):
             continue
@@ -141,8 +159,9 @@ def reachable_offenders(pattern, roots, allow):
             continue
         for literal, _reason in NON_NETWORK_LITERALS:
             line = line.replace(literal, "")
-        if regex.search(line):
-            hits.append(hit)
+        for host, regex in regexes.items():
+            if regex.search(line):
+                hits[host].append(hit)
     return hits
 
 
@@ -181,13 +200,15 @@ class ShellXNoPhoneHomeTests(unittest.TestCase):
 
     def test_no_forbidden_hosts_in_reachable_code(self):
         self.assertTrue(FORBIDDEN_HOSTS, "ShellXNetworkPolicy.forbiddenHosts is missing")
+        hits = reachable_offenders(FORBIDDEN_HOSTS, HOST_ROOTS, CLOUD_ALLOWLIST + BUILD_TIME_ALLOWLIST)
         for host in FORBIDDEN_HOSTS:
-            self.assertEqual(reachable_offenders(host_pattern(host), HOST_ROOTS, CLOUD_ALLOWLIST), [], host)
+            self.assertEqual(hits[host], [], host)
 
     def test_cloud_allowlist_entries_are_live(self):
         pattern = "|".join(host_pattern(h) for h in EXPECTED_FORBIDDEN_HOSTS)
-        for path, reason in CLOUD_ALLOWLIST:
-            self.assertEqual(reason, CLOUD_REASON, path)
+        for path, reason in CLOUD_ALLOWLIST + BUILD_TIME_ALLOWLIST:
+            if (path, reason) in CLOUD_ALLOWLIST:
+                self.assertEqual(reason, CLOUD_REASON, path)
             self.assertTrue((ROOT / path).is_file(), f"stale allowlist entry: {path}")
             self.assertTrue(re.search(pattern, read(path)), f"allowlisted file no longer names a forbidden host: {path}")
 
@@ -202,11 +223,17 @@ class ShellXNoPhoneHomeTests(unittest.TestCase):
                 if pattern.search(key) or pattern.search(json.dumps(entry, ensure_ascii=False)):
                     keys.add(key)
         self.assertTrue(keys)  # the upstream catalogs do carry such keys
-        key_pattern = "|".join(re.escape(f'"{key}"') for key in sorted(keys))
-        hits = [
-            hit for hit in offenders(key_pattern, roots=["Sources", "CLI", "Packages/macOS", "Packages/Shared"], allow=CLOUD_ALLOWLIST)
-            if not is_skipped(hit.rsplit(":", 1)[0])
-        ]
+        allowed = {path for path, _reason in CLOUD_ALLOWLIST}
+        literal = re.compile(r'"([^"\\\s]+)"')
+        hits = []
+        for root in ["Sources", "CLI", "Packages/macOS", "Packages/Shared"]:
+            for path in sorted((ROOT / root).rglob("*.swift")):
+                rel = path.relative_to(ROOT).as_posix()
+                if ".build" in path.parts or rel in allowed or is_skipped(rel):
+                    continue
+                for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+                    if any(m in keys for m in literal.findall(line)) and not is_comment(rel, line):
+                        hits.append(f"{rel}:{number}")
         self.assertEqual(hits, [])
 
     def test_telemetry_and_remote_flag_fetch_are_off(self):

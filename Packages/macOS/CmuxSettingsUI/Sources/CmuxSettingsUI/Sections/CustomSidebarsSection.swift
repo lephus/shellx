@@ -176,7 +176,7 @@ public struct CustomSidebarsSection: View {
             ) {
                 Link(
                     String(localized: "settings.settingsJSON.docsButton", defaultValue: "Open Docs"),
-                    destination: URL(string: "https://cmux.com/docs/custom-sidebars")!
+                    destination: URL(string: "https://github.com/lephus/shellx/blob/main/docs/custom-sidebars.md")!
                 )
                 .cmuxFont(.caption)
                 .accessibilityIdentifier("SettingsCustomSidebarsDocsLink")

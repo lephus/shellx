@@ -1,6 +1,7 @@
 import AppKit
 import CmuxWorkspaces
 import Foundation
+import ShellXBrand
 
 /// Opens workspace-group configuration and documentation surfaces.
 enum SidebarWorkspaceGroupConfigOpener {
@@ -55,7 +56,7 @@ enum SidebarWorkspaceGroupConfigOpener {
 
     static func openWorkspaceGroupsDocs() {
         guard let url = URL(
-            string: "https://github.com/manaflow-ai/cmux/blob/main/docs/workspace-groups.md"
+            string: ShellXBrand.sourceCodeURL.absoluteString + "/blob/main/docs/workspace-groups.md"
         ) else { return }
         NSWorkspace.shared.open(url)
     }

@@ -88,7 +88,9 @@ extension CMUXCLI {
     /// both must be terminals.
     func bootstrapCoderouter(environment: [String: String]) throws -> String {
         let installCommand = Self.coderouterInstallCommand
-        guard isatty(STDIN_FILENO) == 1, isatty(STDERR_FILENO) == 1 else {
+        // ShellX never downloads CodeRouter (a Manaflow service) on its own;
+        // with remote machines off it only reports that it is not installed.
+        guard ShellXFeatures.remoteMachines, isatty(STDIN_FILENO) == 1, isatty(STDERR_FILENO) == 1 else {
             throw Self.coderouterUnavailable(String(
                 format: Self.localizedPassthroughString(
                     "cli.coderouter.bootstrap.notInstalled",

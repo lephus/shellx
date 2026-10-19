@@ -6,8 +6,8 @@ extension cmuxApp {
     @CommandsBuilder
     var helpCommands: some Commands {
         CommandGroup(replacing: .help) {
-            primaryDocsHelpMenuItems
-            secondaryDocsHelpMenuItems
+            helpResourceButton(.website)
+            helpResourceButton(.sourceCode)
 
             Divider()
 
@@ -23,10 +23,6 @@ extension cmuxApp {
                 AppDelegate.shared?.checkForUpdates(nil)
             }
 
-            Divider()
-
-            helpResourceButton(.githubIssues)
-            helpResourceButton(.discord)
             if let offer = ProUpgradePresenter.currentUpgradeOffer {
                 Button(ProUpgradePresenter.upgradeMenuTitle(for: offer)) {
                     ProUpgradePresenter.present(source: .helpMenu)
@@ -61,36 +57,6 @@ extension cmuxApp {
             Button(String(localized: "menu.help.keyboardShortcutsSettings", defaultValue: "Keyboard Shortcuts Settings…")) {
                 openKeyboardShortcutsFromHelpMenu()
             }
-        }
-    }
-
-    @ViewBuilder
-    private var primaryDocsHelpMenuItems: some View {
-        helpResourceButton(.gettingStarted)
-        helpResourceButton(.concepts)
-        helpResourceButton(.configuration)
-        helpResourceButton(.customCommands)
-        helpResourceButton(.dock)
-        helpResourceButton(.keyboardShortcuts)
-        helpResourceButton(.apiReference)
-        helpResourceButton(.browserAutomation)
-    }
-
-    @ViewBuilder
-    private var secondaryDocsHelpMenuItems: some View {
-        helpResourceButton(.notifications)
-        helpResourceButton(.ssh)
-        helpResourceButton(.skills)
-        agentIntegrationsHelpMenu
-        helpResourceButton(.changelog)
-    }
-
-    private var agentIntegrationsHelpMenu: some View {
-        Menu(String(localized: "menu.help.agentIntegrations", defaultValue: "Agent Integrations")) {
-            helpResourceButton(.claudeCodeTeams)
-            helpResourceButton(.ohMyOpenCode)
-            helpResourceButton(.ohMyCodex)
-            helpResourceButton(.ohMyClaudeCode)
         }
     }
 

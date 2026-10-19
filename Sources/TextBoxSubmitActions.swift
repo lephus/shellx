@@ -2,6 +2,7 @@ import AppKit
 import CmuxAppKitSupportUI
 import CmuxWorkspaces
 import SwiftUI
+import ShellXBrand
 
 extension TextBoxInputContainer {
     static let pendingProviderLaunchTimeoutSeconds: TimeInterval = 12
@@ -599,7 +600,7 @@ extension TextBoxInputContainer {
     }
 
     func openSubmitActionsDocumentation() {
-        guard let url = URL(string: "https://github.com/manaflow-ai/cmux/blob/main/docs/configuration.md#terminaltextboxsubmitactions") else {
+        guard let url = URL(string: ShellXBrand.sourceCodeURL.absoluteString + "/blob/main/docs/configuration.md#terminaltextboxsubmitactions") else {
             return
         }
         NSWorkspace.shared.open(url)

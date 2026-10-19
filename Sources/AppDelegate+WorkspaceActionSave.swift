@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ShellXBrand
 
 // MARK: - Save Workspace Layout (new-workspace plus-button menu)
 
@@ -272,8 +273,8 @@ extension AppDelegate {
             // workspace-layout customization.
             openWorkspaceLayoutsCustomization()
         case .alertSecondButtonReturn:
-            guard let url = URL(string: "https://cmux.com/docs/custom-commands") else { return }
-            NSWorkspace.shared.open(url)
+            // No ShellX custom-commands page yet: the website stands in.
+            NSWorkspace.shared.open(ShellXBrand.websiteURL)
         default:
             break
         }

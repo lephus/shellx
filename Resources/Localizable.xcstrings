@@ -655948,6 +655948,183 @@
         "ko": { "stringUnit": { "state": "translated", "value": "재개 제안이 변경되었거나 승인할 수 없습니다. 대체 명령은 등록되지 않았습니다. 현재 제안을 검토한 후 다시 시도하세요." } },
         "ja": { "stringUnit": { "state": "translated", "value": "再開の提案が変更されたか、承認できませんでした。代わりのコマンドは登録されていません。現在の提案を確認して、もう一度お試しください。" } }
       }
+    },
+    "menu.help.shellxWebsite": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX website"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX-Website"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Site web de ShellX"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "موقع ShellX"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sitio web de ShellX"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX 網站"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX 网站"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX 웹사이트"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX ウェブサイト"
+          }
+        }
+      }
+    },
+    "menu.help.sourceCode": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source code"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quellcode"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code source"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الشيفرة المصدرية"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Código fuente"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原始碼"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "源代码"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "소스 코드"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ソースコード"
+          }
+        }
+      }
+    },
+    "shellx.dock.empty.agentPrompt": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set up cmux Dock controls for the current context.\n\nFirst, learn the feature before editing:\n1. Run `cmux docs dock` if the cmux CLI is available. If it is not, read https://github.com/lephus/shellx/blob/main/docs/dock.md.\n2. Inspect the repository or current directory to understand the project type, scripts, package manager, dev servers, logs, task runners, test commands, and any existing TUI tools.\n3. If the desired Dock is ambiguous, ask the user what they want monitored or controlled before writing files.\n\nDock is cmux's right-sidebar terminal and browser control area. A Dock config is JSON with a top-level `controls` array. Terminal controls run commands in Ghostty-backed sections using the user's login shell; browser controls embed URLs. Controls are useful for project dashboards, git/status views, dev server or build status, test watchers, log tails, queues, local services, or fixed web dashboards.\n\nChoose where to write the config:\n- In a repository or project directory, create or edit `.cmux/dock.json` so teammates can share it.\n- For a personal default outside a repo, create or edit `~/.config/cmux/dock.json`.\n- If both exist, project `.cmux/dock.json` is more specific for that project. Nested project configs apply to that directory tree; use the nearest relevant project config instead of writing unrelated controls globally.\n- If there is no repo and no clear project root, use the global config only after confirming the user wants a personal Dock.\n\nSchema:\n{\n  \"controls\": [\n    {\n      \"id\": \"short-stable-id\",\n      \"title\": \"Human label\",\n      \"command\": \"safe command to run\",\n      \"cwd\": \"optional/path\",\n      \"height\": 220,\n      \"env\": { \"NAME\": \"value\" }\n    },\n    {\n      \"id\": \"dashboard\",\n      \"title\": \"Dashboard\",\n      \"type\": \"browser\",\n      \"url\": \"http://127.0.0.1:3000\",\n      \"chrome\": false\n    }\n  ]\n}\n\nRules:\n- Keep ids stable, lowercase, and unique.\n- `type` is optional: `terminal` is the default, or use `browser`.\n- Terminal controls require `command`; browser controls require `url`.\n- Browser controls default to `chrome: true`. Set `chrome: false` to hide browser chrome, including the address bar and toolbar; Focus Address Bar then does nothing for that pane, while `cmux browser goto` and `cmux browser reload` remain available.\n- Use `cwd` for subdirectories; relative paths resolve from the config base.\n- Use `height` only when a control needs a fixed amount of vertical space.\n- Use `env` only for non-secret values needed by one control.\n- Do not put secrets, tokens, or machine-specific private paths in a shared project config.\n- Prefer commands that are safe to start repeatedly and make sense in a terminal.\n- Do not invent unavailable scripts. Read package files, Makefiles, Procfiles, README docs, config files, and existing tooling first.\n- Keep shared project Docks portable for teammates. Put personal or machine-specific controls in the global Dock.\n\nDeliverable:\n- Create or update the appropriate dock.json.\n- Preserve existing useful controls unless the user asked to replace them.\n- Validate that the JSON parses.\n- Summarize what each control does and any commands the user should review before trusting the Dock config."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Richte die cmux-Dock-Steuerungen für den aktuellen Kontext ein.\n\nLerne die Funktion vor dem Bearbeiten kennen:\n1. Führe `cmux docs dock` aus, wenn die cmux-CLI verfügbar ist. Falls nicht, lies https://github.com/lephus/shellx/blob/main/docs/dock.md.\n2. Untersuche das Repository oder das aktuelle Verzeichnis, um den Projekttyp, Skripte, Paketmanager, Entwicklungsserver, Protokolle, Task-Runner, Testbefehle und vorhandene TUI-Tools zu verstehen.\n3. Wenn das gewünschte Dock unklar ist, frage den Benutzer vor dem Schreiben von Dateien, was überwacht oder gesteuert werden soll.\n\nDas Dock ist der Terminal- und Browser-Steuerungsbereich in der rechten Seitenleiste von cmux. Eine Dock-Konfiguration ist eine JSON-Datei mit einem `controls`-Array auf oberster Ebene. Terminal-Steuerungen führen Befehle in Ghostty-gestützten Abschnitten unter Verwendung der Login-Shell des Benutzers aus; Browser-Steuerungen betten URLs ein. Steuerungen sind nützlich für Projekt-Dashboards, Git-/Statusansichten, den Status von Entwicklungsservern oder Builds, Test-Watcher, Log-Tails, Warteschlangen, lokale Dienste oder feste Web-Dashboards.\n\nWähle aus, wo die Konfiguration gespeichert werden soll:\n- Erstelle oder bearbeite in einem Repository- oder Projektverzeichnis die Datei `.cmux/dock.json`, damit Teamkollegen sie teilen können.\n- Für ein persönliches Standardverhalten außerhalb eines Repositories erstelle oder bearbeite `~/.config/cmux/dock.json`.\n- Wenn beide existieren, ist die Projektdatei `.cmux/dock.json` spezifischer für dieses Projekt. Verschachtelte Projektkonfigurationen gelten für den entsprechenden Verzeichnisbaum; verwende die nächstgelegene relevante Projektkonfiguration, anstatt irrelevante Steuerungen global zu definieren.\n- Wenn kein Repository und kein klarer Projekt-Root vorhanden sind, verwende die globale Konfiguration erst, nachdem du bestätigt hast, dass der Benutzer ein persönliches Dock wünscht.\n\nSchema:\n{\n  \"controls\": [\n    {\n      \"id\": \"short-stable-id\",\n      \"title\": \"Menschliche Bezeichnung\",\n      \"command\": \"Sicher auszuführender Befehl\",\n      \"cwd\": \"optionaler/Pfad\",\n      \"height\": 220,\n      \"env\": { \"NAME\": \"Wert\" }\n    },\n    {\n      \"id\": \"dashboard\",\n      \"title\": \"Dashboard\",\n      \"type\": \"browser\",\n      \"url\": \"http://127.0.0.1:3000\",\n      \"chrome\": false\n    }\n  ]\n}\n\nRegeln:\n- Halte IDs stabil, kleingeschrieben und eindeutig.\n- `type` ist optional: `terminal` ist der Standard, oder verwende `browser`.\n- Terminal-Steuerungen erfordern `command`; Browser-Steuerungen erfordern `url`.\n- Browser-Steuerungen sind standardmäßig auf `chrome: true` eingestellt. Setze `chrome: false`, um die Browser-Bedienoberfläche auszublenden, einschließlich der Adressleiste und der Symbolleiste; „Adressleiste fokussieren“ hat dann keine Auswirkung auf dieses Teilfenster, während `cmux browser goto` und `cmux browser reload` weiterhin verfügbar bleiben.\n- Verwende `cwd` für Unterverzeichnisse; relative Pfade werden ausgehend von der Konfigurationsbasis aufgelöst.\n- Verwende `height` nur, wenn eine Steuerung eine feste vertikale Höhe benötigt.\n- Verwende `env` nur für nicht-geheime Werte, die von einer einzelnen Steuerung benötigt werden.\n- Lege keine Geheimnisse, Token oder maschinenspezifischen privaten Pfade in einer gemeinsamen Projektkonfiguration ab.\n- Bevorzuge Befehle, die sicher wiederholt gestartet werden können und in einem Terminal sinnvoll sind.\n- Erfinde keine nicht verfügbaren Skripte. Lies zuerst Paketdateien, Makefiles, Procfiles, README-Dokumente, Konfigurationsdateien und vorhandene Werkzeuge.\n- Halte gemeinsam genutzte Projekt-Docks für Teammitglieder portabel. Verschiebe persönliche oder maschinenspezifische Steuerungen in das globale Dock.\n\nErgebnis:\n- Erstelle oder aktualisiere die entsprechende dock.json.\n- Behalte vorhandene nützliche Steuerungen bei, es sei denn, der Benutzer hat darum gebeten, sie zu ersetzen.\n- Überprüfe, ob das JSON geparst werden kann.\n- Fasse zusammen, was jede Steuerung tut, sowie alle Befehle, die der Benutzer überprüfen sollte, bevor er der Dock-Konfiguration vertraut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configurez les contrôles du Dock cmux pour le contexte actuel.\n\nTout d’abord, découvrez la fonctionnalité avant de la modifier :\n1. Exécutez `cmux docs dock` si l’interface CLI de cmux est disponible. Si elle ne l’est pas, lisez https://github.com/lephus/shellx/blob/main/docs/dock.md.\n2. Inspectez le dépôt ou le répertoire actuel pour comprendre le type de projet, les scripts, le gestionnaire de paquets, les serveurs de développement, les journaux, les exécuteurs de tâches, les commandes de test et tous les outils TUI existants.\n3. Si le Dock souhaité est ambigu, demandez à l’utilisateur ce qu’il souhaite surveiller ou contrôler avant d’écrire des fichiers.\n\nLe Dock est la zone de contrôle du terminal de la barre latérale droite et du navigateur de cmux. Une configuration de Dock est un fichier JSON contenant un tableau de niveau supérieur `controls`. Les contrôles de terminal exécutent des commandes dans des sections basées sur Ghostty à l’aide du shell de connexion de l’utilisateur ; les contrôles de navigateur intègrent des URL. Les contrôles sont utiles pour les tableaux de bord de projet, les vues git/statut, l’état du serveur de développement ou de build, les observateurs de tests, le suivi des journaux (log tails), les files d’attente, les services locaux ou les tableaux de bord web fixes.\n\nChoisissez où écrire la configuration :\n- Dans un dépôt ou un répertoire de projet, créez ou modifiez `.cmux/dock.json` afin que vos collaborateurs puissent le partager.\n- Pour une configuration personnelle par défaut en dehors d’un dépôt, créez ou modifiez `~/.config/cmux/dock.json`.\n- Si les deux existent, le fichier `.cmux/dock.json` du projet est plus spécifique à ce projet. Les configurations de projet imbriquées s’appliquent à cette arborescence de répertoires ; utilisez la configuration de projet pertinente la plus proche plutôt que d’écrire des contrôles sans rapport de manière globale.\n- S’il n’y a pas de dépôt ni de racine de projet claire, utilisez la configuration globale uniquement après avoir confirmé que l’utilisateur souhaite un Dock personnel.\n\nSchéma :\n{\n  \"controls\": [\n    {\n      \"id\": \"id-stable-court\",\n      \"title\": \"Libellé lisible\",\n      \"command\": \"commande sûre à exécuter\",\n      \"cwd\": \"chemin/optionnel\",\n      \"height\": 220,\n      \"env\": { \"NOM\": \"valeur\" }\n    },\n    {\n      \"id\": \"dashboard\",\n      \"title\": \"Tableau de bord\",\n      \"type\": \"browser\",\n      \"url\": \"http://127.0.0.1:3000\",\n      \"chrome\": false\n    }\n  ]\n}\n\nRègles :\n- Conservez des identifiants stables, en minuscules et uniques.\n- `type` est facultatif : `terminal` est la valeur par défaut, ou utilisez `browser`.\n- Les contrôles de terminal nécessitent `command` ; les contrôles de navigateur nécessitent `url`.\n- Les contrôles de navigateur sont définis par défaut sur `chrome: true`. Définissez `chrome: false` pour masquer l’interface du navigateur, y compris la barre d’adresse et la barre d’outils ; l’action d’activation de la mise au point sur la barre d’adresse ne fait alors rien pour ce volet, tandis que `cmux browser goto` et `cmux browser reload` restent disponibles.\n- Utilisez `cwd` pour les sous-répertoires ; les chemins relatifs sont résolus à partir de la base de la configuration.\n- Utilisez `height` uniquement lorsqu’un contrôle nécessite un espace vertical fixe.\n- Utilisez `env` uniquement pour les valeurs non secrètes requises par un seul contrôle.\n- Ne placez pas de secrets, de jetons ou de chemins privés spécifiques à une machine dans une configuration de projet partagée.\n- Privilégiez des commandes qui peuvent être démarrées à plusieurs reprises en toute sécurité et qui ont du sens dans un terminal.\n- N’inventez pas de scripts non disponibles. Lisez d’abord les fichiers de paquets, les fichiers Makefile, Procfile, les documents README, les fichiers de configuration et les outils existants.\n- Veillez à ce que les Docks de projet partagés restent portables pour vos collaborateurs. Placez les contrôles personnels ou spécifiques à une machine dans le Dock global.\n\nLivrable :\n- Créez ou mettez à jour le fichier dock.json approprié.\n- Préservez les contrôles utiles existants à moins que l’utilisateur n’ait demandé de les remplacer.\n- Validez que le fichier JSON est correctement analysé.\n- Résumez ce que fait chaque contrôle et toutes les commandes que l’utilisateur doit examiner avant de faire confiance à la configuration du Dock."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "قم بإعداد عناصر تحكم cmux Dock للسياق الحالي.\n\nأولاً، تعرف على الميزة قبل التعديل:\n1. قم بتشغيل `cmux docs dock` إذا كان cmux CLI متاحاً. وإذا لم يكن كذلك، فاقرأ https://github.com/lephus/shellx/blob/main/docs/dock.md.\n2. افحص المستودع أو الدليل الحالي لفهم نوع المشروع، والبرامج النصية، ومدير الحزم، وخوادم التطوير، والسجلات، ومشغلي المهام، وأوامر الاختبار، وأي أدوات TUI موجودة.\n3. إذا كان Dock المطلوب غامضاً، فاسأل المستخدم عما يريد مراقبته أو التحكم فيه قبل كتابة الملفات.\n\nDock هو منطقة التحكم في المتصفح والطرفية في الشريط الجانبي الأيمن لـ cmux. تكوين Dock هو ملف JSON يحتوي على مصفوفة `controls` في المستوى الأعلى. تقوم عناصر تحكم الطرفية بتشغيل الأوامر في أقسام مدعومة بـ Ghostty باستخدام login shell للمستخدم؛ بينما تقوم عناصر تحكم المتصفح بتضمين عناوين URL. عناصر التحكم مفيدة للوحات معلومات المشروع، وعروض git/status، وحالة خادم التطوير أو البناء، ومراقبي الاختبار، وتتبع السجلات، وقوائم الانتظار، والخدمات المحلية، أو لوحات معلومات الويب الثابتة.\n\nاختر مكان كتابة التكوين:\n- في مستودع أو دليل مشروع، قم بإنشاء أو تحرير `.cmux/dock.json` حتى يتمكن زملاء العمل من مشاركته.\n- للإعداد الافتراضي الشخصي خارج المستودع، قم بإنشاء أو تحرير `~/.config/cmux/dock.json`.\n- إذا كان كلاهما موجوداً، فإن `.cmux/dock.json` الخاص بالمشروع يكون أكثر تحديداً لهذا المشروع. تنطبق تكوينات المشروع المتداخلة على شجرة الدليل تلك؛ استخدم أقرب تكوين مشروع ذي صلة بدلاً من كتابة عناصر تحكم غير ذات صلة على مستوى العالم.\n- في حالة عدم وجود مستودع وعدم وجود جذر مشروع واضح، استخدم التكوين العالمي فقط بعد تأكيد رغبة المستخدم في الحصول على Dock شخصي.\n\nالمخطط:\n{\n  \"controls\": [\n    {\n      \"id\": \"short-stable-id\",\n      \"title\": \"Human label\",\n      \"command\": \"safe command to run\",\n      \"cwd\": \"optional/path\",\n      \"height\": 220,\n      \"env\": { \"NAME\": \"value\" }\n    },\n    {\n      \"id\": \"dashboard\",\n      \"title\": \"Dashboard\",\n      \"type\": \"browser\",\n      \"url\": \"http://127.0.0.1:3000\",\n      \"chrome\": false\n    }\n  ]\n}\n\nالقواعد:\n- حافظ على ثبات المعرفات (ids)، وأن تكون بأحرف صغيرة وفريدة.\n- إن `type` اختياري: `terminal` هو الافتراضي، أو استخدم `browser`.\n- تتطلب عناصر تحكم الطرفية `command`؛ بينما تتطلب عناصر تحكم المتصفح `url`.\n- تأتي عناصر تحكم المتصفح افتراضياً بـ `chrome: true`. اضبط `chrome: false` لإخفاء واجهة المتصفح (browser chrome)، بما في ذلك شريط العنوان وشريط الأدوات؛ وعندها لن يفعل تركيز شريط العنوان أي شيء لذلك الجزء، بينما يظل `cmux browser goto` و`cmux browser reload` متاحين.\n- استخدم `cwd` للأدلة الفرعية؛ ويتم حل المسارات النسبية من قاعدة التكوين.\n- استخدم `height` فقط عندما يحتاج عنصر التحكم إلى مساحة عمودية ثابتة.\n- استخدم `env` فقط للقيم غير السرية التي يحتاجها عنصر تحكم واحد.\n- لا تضع أسراراً أو رموزاً مميزة (tokens) أو مسارات خاصة بجهاز معين في تكوين المشروع المشترك.\n- يفضل استخدام الأوامر التي يسهل تشغيلها بشكل متكرر وتكون منطقية في الطرفية.\n- لا تخترع نصوصاً برمجية غير متوفرة. اقرأ ملفات الحزم، وMakefiles، وProcfiles، ومستندات README، وملفات التكوين، والأدوات الحالية أولاً.\n- حافظ على قابلية نقل ملفات Dock للمشروع المشترك لزملائك في الفريق. ضع عناصر التحكم الشخصية أو المخصصة لجهاز معين في Dock العالمي.\n\nالمخرجات:\n- قم بإنشاء أو تحديث ملف dock.json المناسب.\n- حافظ على عناصر التحكم المفيدة الموجودة ما لم يطلب المستخدم استبدالها.\n- تحقق من صحة تحليل ملف JSON.\n- لخص ما يفعله كل عنصر تحكم وأي أوامر يجب على المستخدم مراجعتها قبل الوثوق بتكوين Dock."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configura los controles del Dock de cmux para el contexto actual.\n\nPrimero, aprende sobre la función antes de editar:\n1. Ejecuta `cmux docs dock` si la CLI de cmux está disponible. Si no lo está, lee https://github.com/lephus/shellx/blob/main/docs/dock.md.\n2. Inspecciona el repositorio o el directorio actual para comprender el tipo de proyecto, scripts, gestor de paquetes, servidores de desarrollo, registros, ejecutores de tareas, comandos de prueba y cualquier herramienta TUI existente.\n3. Si el Dock deseado es ambiguo, pregunta al usuario qué desea monitorear o controlar antes de escribir archivos.\n\nEl Dock es el área de control de terminal y navegador de la barra lateral derecha de cmux. Una configuración de Dock es un JSON con una matriz de nivel superior `controls`. Los controles de terminal ejecutan comandos en secciones respaldadas por Ghostty utilizando el shell de inicio de sesión del usuario; los controles de navegador incrustan URL. Los controles son útiles para paneles de proyectos, vistas de git/estado, estado del servidor de desarrollo o compilación, observadores de pruebas, colas de registros, colas, servicios locales o paneles web fijos.\n\nElige dónde escribir la configuración:\n- En un repositorio o directorio de proyecto, crea o edita `.cmux/dock.json` para que los compañeros de equipo puedan compartirlo.\n- Para un valor predeterminado personal fuera de un repositorio, crea o edita `~/.config/cmux/dock.json`.\n- Si existen ambos, el archivo del proyecto `.cmux/dock.json` es más específico para ese proyecto. Las configuraciones de proyecto anidadas se aplican a ese árbol de directorios; usa la configuración de proyecto relevante más cercana en lugar de escribir controles no relacionados de forma global.\n- Si no hay repositorio ni una raíz de proyecto clara, usa la configuración global solo después de confirmar que el usuario desea un Dock personal.\n\nEsquema:\n{\n  \"controls\": [\n    {\n      \"id\": \"short-stable-id\",\n      \"title\": \"Etiqueta legible\",\n      \"command\": \"comando seguro para ejecutar\",\n      \"cwd\": \"ruta/opcional\",\n      \"height\": 220,\n      \"env\": { \"NAME\": \"valor\" }\n    },\n    {\n      \"id\": \"dashboard\",\n      \"title\": \"Panel de control\",\n      \"type\": \"browser\",\n      \"url\": \"http://127.0.0.1:3000\",\n      \"chrome\": false\n    }\n  ]\n}\n\nReglas:\n- Mantén los id estables, en minúsculas y únicos.\n- `type` es opcional: `terminal` es el valor predeterminado, o usa `browser`.\n- Los controles de terminal requieren `command`; los controles de navegador requieren `url`.\n- Los controles de navegador tienen por defecto `chrome: true`. Establece `chrome: false` para ocultar el marco (chrome) del navegador, incluidas la barra de direcciones y la barra de herramientas; Enfocar barra de direcciones (Focus Address Bar) no hará nada para ese panel, mientras que `cmux browser goto` y `cmux browser reload` seguirán disponibles.\n- Usa `cwd` para subdirectorios; las rutas relativas se resuelven a partir de la base de configuración.\n- Usa `height` solo cuando un control necesite una cantidad fija de espacio vertical.\n- Usa `env` solo para valores no secretos necesarios para un control.\n- No coloques secretos, tokens o rutas privadas específicas de la máquina en una configuración de proyecto compartida.\n- Prefiere comandos que sean seguros de iniciar repetidamente y que tengan sentido en una terminal.\n- No inventes scripts no disponibles. Lee primero los archivos de paquete, Makefiles, Procfiles, documentos README, archivos de configuración y herramientas existentes.\n- Mantén los Docks de proyectos compartidos portables para los compañeros de equipo. Coloca los controles personales o específicos de la máquina en el Dock global.\n\nEntregable:\n- Crea o actualiza el dock.json correspondiente.\n- Preserva los controles útiles existentes a menos que el usuario haya solicitado reemplazarlos.\n- Valida que el JSON se analice correctamente.\n- Resume lo que hace cada control y cualquier comando que el usuario deba revisar antes de confiar en la configuración de Dock."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "為目前情境設定 cmux Dock 控制。\n\n在編輯前，先了解此功能：\n1. 如果 cmux CLI 可用，請執行 `cmux docs dock`。如果不可用，請閱讀 https://github.com/lephus/shellx/blob/main/docs/dock.md。\n2. 檢查存放庫或目前目錄，以了解專案類型、指令碼、套件管理器、開發伺服器、記錄、任務執行器、測試指令以及任何現有的 TUI 工具。\n3. 如果期望的 Dock 不明確，在寫入檔案之前，請先詢問使用者他們想要監控或控制什麼。\n\nDock 是 cmux 的右側邊欄終端機和瀏覽器控制區域。Dock 設定是包含頂層 `controls` 陣列的 JSON。終端機控制會在以 Ghostty 為基礎的區段中，使用使用者的登入 shell 執行指令；瀏覽器控制則內嵌 URL。控制項對於專案儀表板、git/狀態檢視、開發伺服器或組建狀態、測試監看器、記錄尾端追蹤、佇列、本機服務或固定的網頁儀表板非常實用。\n\n選擇寫入設定的位置：\n- 在存放庫或專案目錄中，建立或編輯 `.cmux/dock.json`，以便團隊成員共用。\n- 對於存放庫之外的個人預設，請建立或編輯 `~/.config/cmux/dock.json`。\n- 如果兩者皆存在，專案 `.cmux/dock.json` 對該專案而言更具體。巢狀專案設定適用於該目錄樹；請使用最接近的相關專案設定，而不是全域寫入不相關的控制項。\n- 如果沒有存放庫且沒有明確的專案根目錄，請僅在確認使用者想要個人 Dock 之後才使用全域設定。\n\nSchema：\n{\n  \"controls\": [\n    {\n      \"id\": \"short-stable-id\",\n      \"title\": \"Human label\",\n      \"command\": \"safe command to run\",\n      \"cwd\": \"optional/path\",\n      \"height\": 220,\n      \"env\": { \"NAME\": \"value\" }\n    },\n    {\n      \"id\": \"dashboard\",\n      \"title\": \"Dashboard\",\n      \"type\": \"browser\",\n      \"url\": \"http://127.0.0.1:3000\",\n      \"chrome\": false\n    }\n  ]\n}\n\n規則：\n- 保持 id 穩定、小寫且不重複。\n- `type` 為選填：預設為 `terminal`，或使用 `browser`。\n- 終端機控制項需要 `command`；瀏覽器控制項需要 `url`。\n- 瀏覽器控制項預設為 `chrome: true`。將其設定為 `chrome: false` 可隱藏瀏覽器外框（包含網址列和工具列）；此時「聚焦網址列」將不對該窗格產生任何作用，但 `cmux browser goto` and `cmux browser reload` 仍可使用。\n- 對子目錄使用 `cwd`；相對路徑自設定檔基準開始解析。\n- 僅在控制項需要固定大小的垂直空間時使用 `height`。\n- 僅對單一控制項所需之非敏感值使用 `env`。\n- 切勿在共用專案設定中放入秘密、Token 或特定電腦的私人路徑。\n- 優先選擇可安全重複啟動且適合在終端機中執行的指令。\n- 請勿虛構不可用的指令碼。請先閱讀 package 檔案、Makefile、Procfile、README 文件、設定檔以及現有工具。\n- 保持共用專案 Dock 在團隊成員間的可攜性。請將個人或特定電腦的控制項放入全域 Dock 中。\n\n交付成果：\n- 建立或更新適當的 dock.json。\n- 保留現有實用的控制項，除非使用者要求替換它們。\n- 驗證 JSON 能被正確解析。\n- 摘要說明每個控制項的功能，以及使用者在信任 Dock 設定前應檢視的任何指令。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "为当前上下文设置 cmux Dock 控件。\n\n在编辑之前，先了解这个功能：\n1. 如果 cmux CLI 可用，运行 `cmux docs dock`。如果不可用，请阅读 https://github.com/lephus/shellx/blob/main/docs/dock.md。\n2. 检查仓库或当前目录，弄清项目类型、脚本、包管理器、开发服务器、日志、任务运行器、测试命令，以及已有的 TUI 工具。\n3. 如果不清楚用户想要什么样的 Dock，请在写文件之前先问清楚他们想监控或操作什么。\n\nDock 是 cmux 右侧边栏中的终端与浏览器控制区。Dock 配置是一份 JSON，顶层有一个 `controls` 数组。终端控件在基于 Ghostty 的分区中用用户的登录 shell 运行命令；浏览器控件则内嵌 URL。控件适合用于项目仪表板、git/状态视图、开发服务器或构建状态、测试监视器、日志跟踪、队列、本地服务，或固定的网页仪表板。\n\n选择把配置写到哪里：\n- 在仓库或项目目录中，创建或编辑 `.cmux/dock.json`，以便队友共享。\n- 若要在仓库之外设个人默认值，创建或编辑 `~/.config/cmux/dock.json`。\n- 若两者都存在，项目内的 `.cmux/dock.json` 对该项目更具体。嵌套的项目配置只作用于该目录树；请使用最近的相关项目配置，不要把无关控件写到全局。\n- 若既没有仓库也没有明确的项目根目录，只有在确认用户想要个人 Dock 后，才使用全局配置。\n\nSchema:\n{\n  \"controls\": [\n    {\n      \"id\": \"short-stable-id\",\n      \"title\": \"Human label\",\n      \"command\": \"safe command to run\",\n      \"cwd\": \"optional/path\",\n      \"height\": 220,\n      \"env\": { \"NAME\": \"value\" }\n    },\n    {\n      \"id\": \"dashboard\",\n      \"title\": \"Dashboard\",\n      \"type\": \"browser\",\n      \"url\": \"http://127.0.0.1:3000\",\n      \"chrome\": false\n    }\n  ]\n}\n\n规则：\n- id 要保持稳定、小写且唯一。\n- `type` 可选：默认是 `terminal`，也可以用 `browser`。\n- 终端控件必须有 `command`；浏览器控件必须有 `url`。\n- 浏览器控件默认 `chrome: true`。设为 `chrome: false` 可隐藏浏览器界面，包括地址栏和工具栏；此时「聚焦地址栏」对该窗格不起作用，而 `cmux browser goto` 与 `cmux browser reload` 仍然可用。\n- 子目录用 `cwd`；相对路径相对配置文件所在目录解析。\n- 只有当某个控件需要固定的垂直空间时才用 `height`。\n- `env` 只用于某个控件所需的非机密值。\n- 不要把密钥、令牌或机器专属的私有路径写进共享的项目配置。\n- 优先选择可以反复启动、且在终端中有意义的命令。\n- 不要臆造并不存在的脚本。请先阅读包文件、Makefile、Procfile、README 文档、配置文件和现有工具链。\n- 共享的项目 Dock 要对队友保持可移植。个人或机器专属的控件请放进全局 Dock。\n\n交付内容：\n- 创建或更新相应的 dock.json。\n- 除非用户要求替换，否则保留已有的有用控件。\n- 验证该 JSON 能被解析。\n- 概述每个控件的作用，以及用户在信任这份 Dock 配置前应当复核的命令。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "현재 컨텍스트에 맞게 cmux Dock 컨트롤을 설정하세요.\n\n먼저, 편집하기 전에 이 기능에 대해 알아보세요:\n1. cmux CLI를 사용할 수 있다면 `cmux docs dock`을 실행하세요. 사용할 수 없다면 https://github.com/lephus/shellx/blob/main/docs/dock.md을 읽어보세요.\n2. 저장소 또는 현재 디렉터리를 탐색하여 프로젝트 유형, 스크립트, 패키지 관리자, 개발 서버, 로그, 태스크 러너, 테스트 명령어 및 기존 TUI 도구 등을 파악하세요.\n3. 어떤 Dock을 구성해야 할지 모호한 경우, 파일을 작성하기 전에 사용자에게 어떤 대상을 모니터링하거나 컨트롤하길 원하는지 물어보세요.\n\nDock은 cmux의 우측 사이드바 터미널 및 브라우저 컨트롤 영역입니다. Dock 설정은 최상위에 `controls` 배열이 있는 JSON 파일입니다. 터미널 컨트롤은 사용자의 로그인 셸을 사용하여 Ghostty 기반의 섹션에서 명령어를 실행하며, 브라우저 컨트롤은 URL을 내장합니다. 컨트롤은 프로젝트 대시보드, git/상태 뷰, 개발 서버 또는 빌드 상태, 테스트 감시 도구, 실시간 로그(log tail), 대기열, 로컬 서비스, 고정된 웹 대시보드 등에 유용합니다.\n\n설정을 작성할 위치를 선택하세요:\n- 팀원들과 공유할 수 있도록 저장소 또는 프로젝트 디렉터리에 `.cmux/dock.json` 파일을 생성하거나 편집하세요.\n- 저장소 외부의 개인용 기본 설정을 원한다면 `~/.config/cmux/dock.json` 파일을 생성하거나 편집하세요.\n- 두 설정이 모두 존재하는 경우, 프로젝트의 `.cmux/dock.json`이 해당 프로젝트에 대해 더 우선 적용됩니다. 중첩된 프로젝트 설정은 해당 디렉터리 트리에 적용되므로, 무관한 컨트롤을 전역으로 작성하는 대신 가장 가까운 관련 프로젝트 설정을 사용하세요.\n- 저장소가 없고 명확한 프로젝트 루트가 없다면, 사용자가 개인용 Dock을 원하는지 확인한 후에만 전역 설정을 사용하세요.\n\n스키마:\n{\n  \"controls\": [\n    {\n      \"id\": \"short-stable-id\",\n      \"title\": \"Human label\",\n      \"command\": \"safe command to run\",\n      \"cwd\": \"optional/path\",\n      \"height\": 220,\n      \"env\": { \"NAME\": \"value\" }\n    },\n    {\n      \"id\": \"dashboard\",\n      \"title\": \"Dashboard\",\n      \"type\": \"browser\",\n      \"url\": \"http://127.0.0.1:3000\",\n      \"chrome\": false\n    }\n  ]\n}\n\n규칙:\n- id는 고유하고 소문자이며 일관되게 유지하세요.\n- `type`은 선택 사항입니다. 기본값은 `terminal`이며, 필요 시 `browser`를 사용하세요.\n- 터미널 컨트롤에는 `command`가 필수이고, 브라우저 컨트롤에는 `url`이 필수입니다.\n- 브라우저 컨트롤은 기본적으로 `chrome: true`로 설정됩니다. 주소창 및 도구 모음을 포함하여 브라우저 크롬을 숨기려면 `chrome: false`로 설정하세요. 이 경우 해당 분할 창에서 '주소창 포커스'는 작동하지 않지만, `cmux browser goto` 및 `cmux browser reload`는 계속 사용할 수 있습니다.\n- 하위 디렉터리에는 `cwd`를 사용하세요. 상대 경로는 설정 파일의 위치를 기준으로 해석됩니다.\n- 컨트롤에 고정된 수직 공간이 필요한 경우에만 `height`를 사용하세요.\n- 단일 컨트롤에 필요한 보안에 무관한 값에만 `env`를 사용하세요.\n- 공유 프로젝트 설정에는 비밀 정보(secrets), 토큰, 기기 전용 비공개 경로 등을 입력하지 마세요.\n- 터미널에서 실행하기에 합당하고 반복적으로 안전하게 실행할 수 있는 명령어를 사용하는 것이 좋습니다.\n- 존재하지 않는 임의의 스크립트를 작성하지 마세요. 먼저 패키지 파일, Makefile, Procfile, README 문서, 설정 파일 및 기존 도구들을 확인하세요.\n- 공유 프로젝트 Dock은 팀원들 간에 이식 가능하게 유지하세요. 개인용 또는 기기 전용 컨트롤은 전역 Dock에 넣으세요.\n\n결과물:\n- 적절한 dock.json을 생성하거나 업데이트하세요.\n- 사용자가 교체를 요청하지 않은 한, 유용한 기존 컨트롤은 유지하세요.\n- JSON 파싱에 오류가 없는지 검증하세요.\n- 각 컨트롤이 수행하는 작업과 사용자가 Dock 설정을 신뢰하기 전에 검토해야 할 명령어를 요약해 알려주세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在のコンテキストに合わせて cmux Dock コントロールを設定してください。\n\n編集する前に機能を確認してください:\n1. cmux CLI が使える場合は `cmux docs dock` を実行してください。使えない場合は https://github.com/lephus/shellx/blob/main/docs/dock.md を読んでください。\n2. リポジトリまたは現在のディレクトリを調べ、プロジェクト種別、スクリプト、パッケージマネージャー、開発サーバー、ログ、タスクランナー、テストコマンド、既存の TUI ツールを把握してください。\n3. どの Dock を作るべきか曖昧な場合は、ファイルを書く前に何を監視または操作したいかユーザーに確認してください。\n\nDock は cmux の右サイドバーにあるターミナルとブラウザのコントロール領域です。Dock 設定はトップレベルに `controls` 配列を持つ JSON です。ターミナルコントロールはユーザーのログインシェルを使う Ghostty ベースのセクションでコマンドを実行し、ブラウザコントロールは URL を埋め込みます。プロジェクトダッシュボード、git/status、開発サーバーやビルド状態、テストウォッチャー、ログ tail、キュー、ローカルサービス、固定 Web ダッシュボードなどに向いています。\n\n設定を書く場所を選んでください:\n- リポジトリまたはプロジェクトディレクトリでは、チームで共有できるように `.cmux/dock.json` を作成または編集してください。\n- リポジトリ外の個人用デフォルトでは、`~/.config/cmux/dock.json` を作成または編集してください。\n- 両方がある場合、そのプロジェクトでは `.cmux/dock.json` がより具体的です。ネストしたプロジェクト設定はそのディレクトリツリーに適用されます。無関係なコントロールをグローバルに書かず、最も近い適切なプロジェクト設定を使ってください。\n- リポジトリがなく、明確なプロジェクトルートもない場合は、個人用 Dock でよいかユーザーに確認してからグローバル設定を使ってください。\n\nスキーマ:\n{\n  \"controls\": [\n    {\n      \"id\": \"short-stable-id\",\n      \"title\": \"Human label\",\n      \"command\": \"safe command to run\",\n      \"cwd\": \"optional/path\",\n      \"height\": 220,\n      \"env\": { \"NAME\": \"value\" }\n    },\n    {\n      \"id\": \"dashboard\",\n      \"title\": \"Dashboard\",\n      \"type\": \"browser\",\n      \"url\": \"http://127.0.0.1:3000\",\n      \"chrome\": false\n    }\n  ]\n}\n\nルール:\n- id は安定した小文字の一意な値にしてください。\n- `type` は省略可能です。デフォルトは `terminal` で、ブラウザには `browser` を指定します。\n- ターミナルコントロールには `command`、ブラウザコントロールには `url` が必要です。\n- ブラウザコントロールのデフォルトは `chrome: true` です。`chrome: false` にするとブラウザクローム（アドレスバーとツールバー）が非表示になり、そのペインでは「アドレスバーにフォーカス」は何もしません。`cmux browser goto` と `cmux browser reload` は引き続き利用できます。\n- サブディレクトリで実行する場合は `cwd` を使ってください。相対パスは設定ファイルの基準ディレクトリから解決されます。\n- `height` は固定の縦幅が必要なコントロールにだけ使ってください。\n- `env` はそのコントロールだけに必要な非秘密の値にだけ使ってください。\n- 共有するプロジェクト設定にシークレット、トークン、マシン固有の非公開パスを入れないでください。\n- 繰り返し起動しても安全で、ターミナル内で意味のあるコマンドを優先してください。\n- 存在しないスクリプトを作り上げないでください。先に package ファイル、Makefile、Procfile、README、設定ファイル、既存ツールを読んでください。\n- 共有プロジェクト Dock はチームメイトが使えるよう移植性を保ってください。個人用またはマシン固有のコントロールはグローバル Dock に入れてください。\n\n成果物:\n- 適切な dock.json を作成または更新してください。\n- ユーザーが置き換えを依頼していない限り、既存の有用なコントロールは残してください。\n- JSON がパースできることを検証してください。\n- 各コントロールの役割と、信頼する前にユーザーが確認すべきコマンドを要約してください。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
