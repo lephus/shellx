@@ -6,6 +6,7 @@ import CmuxCore
 import CmuxFeedback
 import ShellXBrand
 import CmuxFoundation
+import CmuxTestSupport
 import CmuxAgentJournal
 import CmuxNotifications
 import CmuxPanes
@@ -10277,6 +10278,15 @@ struct ContentView: View {
     }
 
     private func presentFeedbackComposer() {
+#if DEBUG
+        // UI tests record the mail draft instead of opening the mail app.
+        if UITestCaptureSink().appendLineIfConfigured(
+            envKey: "CMUX_UI_TEST_CAPTURE_OPEN_URL_PATH",
+            line: FeedbackComposerSettings.submissionURL.absoluteString
+        ) {
+            return
+        }
+#endif
         FeedbackComposerBridge.openMailDraft()
     }
 
