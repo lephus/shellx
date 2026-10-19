@@ -3,7 +3,7 @@ public import Foundation
 /// Where a cmux install keeps its session snapshot files.
 ///
 /// Every install (stable, nightly, rc, staging, tagged debug builds) writes
-/// `Application Support/cmux/session-<bundleId>.json` plus a
+/// `Application Support/ShellX/session-<bundleId>.json` plus a
 /// `session-<bundleId>-previous.json` manual-restore backup. Keying the file
 /// on the bundle identifier keeps channels from clobbering each other; this
 /// type lets one install locate another install's files so a session can be
@@ -112,7 +112,7 @@ public struct SessionSnapshotFileLocation: Sendable, Equatable {
     /// `<appSupport>/cmux/`, the folder holding every install's snapshot
     /// files and the shared `session-history/` archive.
     public var cmuxDirectoryURL: URL {
-        appSupportDirectory.appendingPathComponent("cmux", isDirectory: true)
+        appSupportDirectory.appendingPathComponent("ShellX", isDirectory: true)
     }
 
     /// The file-name-safe form of `bundleIdentifier` used in snapshot and

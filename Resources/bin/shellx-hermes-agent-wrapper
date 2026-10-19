@@ -103,13 +103,13 @@ resolve_cmux_cli() {
 
     local self_dir
     self_dir="$(cd "$(dirname "$0")" && pwd)"
-    candidate="$self_dir/cmux"
+    candidate="$self_dir/shellx"
     if [[ -f "$candidate" && -x "$candidate" ]]; then
         printf '%s' "$candidate"
         return 0
     fi
 
-    candidate="$(command -v cmux 2>/dev/null || true)"
+    candidate="$(command -v shellx 2>/dev/null || true)"
     if [[ -n "$candidate" && -f "$candidate" && -x "$candidate" ]]; then
         printf '%s' "$candidate"
         return 0
@@ -365,7 +365,7 @@ should_watch_hermes_tui() {
 }
 
 hermes_tui_python_bridge_value_is_wrapper() {
-    [[ "${1##*/}" == "cmux-hermes-python-wrapper" ]]
+    [[ "${1##*/}" == "shellx-hermes-python-wrapper" ]]
 }
 
 sanitize_hermes_tui_python_bridge_environment() {
@@ -381,7 +381,7 @@ sanitize_hermes_tui_python_bridge_environment() {
 configure_hermes_tui_python_bridge() {
     local self_dir python_wrapper sitecustomize configured resolved
     self_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd -P)" || return 0
-    python_wrapper="$self_dir/cmux-hermes-python-wrapper"
+    python_wrapper="$self_dir/shellx-hermes-python-wrapper"
     sitecustomize="$self_dir/cmux-hermes-sitecustomize.py"
     [[ -f "$python_wrapper" && -x "$python_wrapper" && ! -L "$python_wrapper" &&
        -f "$sitecustomize" && ! -L "$sitecustomize" ]] || return 0

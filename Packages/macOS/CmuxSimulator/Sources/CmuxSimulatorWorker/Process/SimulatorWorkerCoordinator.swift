@@ -3,7 +3,7 @@ import Foundation
 import os
 
 nonisolated let coordinatorLogger = Logger(
-    subsystem: "com.cmux.simulator.worker",
+    subsystem: "pro.shellx.simulator.worker",
     category: "Coordinator"
 )
 @MainActor

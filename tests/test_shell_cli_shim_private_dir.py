@@ -124,10 +124,10 @@ class Case:
         integration.mkdir(parents=True)
         (base / "bundle/Resources/bin").mkdir()
         self.integration_dir = integration
-        self.wrapper = base / "bundle/Resources/bin/cmux-claude-wrapper"
+        self.wrapper = base / "bundle/Resources/bin/shellx-claude-wrapper"
         write_script(self.wrapper, "wrapper")
         self.markers = base / "markers"
-        self.state = self.home / ".cmuxterm"
+        self.state = self.home / ".shellx"
         self.state.mkdir(mode=0o700)
         self.parent = self.state / "cmux-cli-shims"
         self.root = self.parent / SURFACE_ID

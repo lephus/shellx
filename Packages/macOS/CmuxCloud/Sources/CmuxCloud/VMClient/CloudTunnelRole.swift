@@ -21,7 +21,7 @@ extension VMTunnelManager {
     /// Read before local credentials are removed: the fingerprints are the
     /// only record of which server-side tunnels belong to this build.
     ///
-    /// - Parameter home: The home directory holding `~/.cmuxterm/wireguard`.
+    /// - Parameter home: The home directory holding `~/.shellx/wireguard`.
     /// - Returns: One role per purpose that has a stored fingerprint.
     public static func storedRoles(
         home: URL = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)

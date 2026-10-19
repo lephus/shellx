@@ -11,7 +11,7 @@ public import Foundation
 ///
 /// ```swift
 /// let store = FileStackTokenStore(directory: appSupport
-///     .appendingPathComponent("cmux", isDirectory: true)
+///     .appendingPathComponent("ShellX", isDirectory: true)
 ///     .appendingPathComponent(bundleID, isDirectory: true))
 /// ```
 public actor FileStackTokenStore: StackAuthTokenStoreProtocol {

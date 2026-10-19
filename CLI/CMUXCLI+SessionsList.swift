@@ -76,7 +76,7 @@ extension CMUXCLI {
             stateDirRaw
                 ?? processEnv["CMUX_AGENT_HOOK_STATE_DIR"]
                 ?? URL(fileURLWithPath: processEnv["HOME"] ?? NSHomeDirectory(), isDirectory: true)
-                    .appendingPathComponent(".cmuxterm", isDirectory: true)
+                    .appendingPathComponent(".shellx", isDirectory: true)
                     .path
         )
         let defaultCodexHome = sessionsListExpandedPath(
@@ -314,7 +314,7 @@ extension CMUXCLI {
         Usage: cmux sessions list [options]
                cmux sessions [options]
 
-        Print saved agent session records from ~/.cmuxterm/*-hook-sessions.json.
+        Print saved agent session records from ~/.shellx/*-hook-sessions.json.
         This command does not require a running cmux socket.
         By default, broad output shows active, restorable, or transcript-backed records.
         Pass --all to inspect every saved hook record.
@@ -477,7 +477,7 @@ extension CMUXCLI {
         let root = URL(fileURLWithPath: homeDirectory, isDirectory: true)
             .appendingPathComponent(".local", isDirectory: true)
             .appendingPathComponent("state", isDirectory: true)
-            .appendingPathComponent("cmux", isDirectory: true)
+            .appendingPathComponent("shellx", isDirectory: true)
             .appendingPathComponent("agent-artifacts", isDirectory: true)
             .appendingPathComponent(provider, isDirectory: true)
             .appendingPathComponent(sessionID, isDirectory: true)

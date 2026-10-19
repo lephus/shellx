@@ -123,7 +123,7 @@ enum AgentMessageCenter {
             options: .regularExpression
         )
         return appSupport
-            .appendingPathComponent("cmux", isDirectory: true)
+            .appendingPathComponent("ShellX", isDirectory: true)
             .appendingPathComponent("agent-messages-\(safeBundleID).jsonl", isDirectory: false)
     }
 

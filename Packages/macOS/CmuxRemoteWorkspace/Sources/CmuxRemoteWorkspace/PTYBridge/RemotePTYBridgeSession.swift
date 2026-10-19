@@ -33,7 +33,7 @@ extension RemotePTYBridgeServer {
         private let token: String
         private let onAuthenticated: () -> Void
         let queue: DispatchQueue
-        let rpcQueue = DispatchQueue(label: "com.cmux.remote-ssh.pty-bridge.rpc.\(UUID().uuidString)", qos: .userInitiated)
+        let rpcQueue = DispatchQueue(label: "pro.shellx.remote-ssh.pty-bridge.rpc.\(UUID().uuidString)", qos: .userInitiated)
         let strings: any RemotePTYBridgeStrings
         private let clock: any RemoteProxyRetryClock
         let onClose: () -> Void

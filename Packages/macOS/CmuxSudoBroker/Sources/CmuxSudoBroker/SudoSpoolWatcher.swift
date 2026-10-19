@@ -20,7 +20,7 @@ actor SudoSpoolWatcher: SudoSpoolWatching {
             let source = DispatchSource.makeFileSystemObjectSource(
                 fileDescriptor: descriptor,
                 eventMask: [.write, .delete, .rename],
-                queue: DispatchQueue(label: "com.cmux.sudo-spool-watcher")
+                queue: DispatchQueue(label: "pro.shellx.sudo-spool-watcher")
             )
             source.setEventHandler(handler: onChange)
             source.setCancelHandler {

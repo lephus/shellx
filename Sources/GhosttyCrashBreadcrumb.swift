@@ -220,12 +220,12 @@ enum GhosttyCrashBreadcrumb {
                 fileURLWithPath: (xdgStateHome as NSString).expandingTildeInPath,
                 isDirectory: true
             )
-            .appendingPathComponent("cmux", isDirectory: true)
+            .appendingPathComponent("shellx", isDirectory: true)
         } else {
             stateRoot = homeDirectory
                 .appendingPathComponent(".local", isDirectory: true)
                 .appendingPathComponent("state", isDirectory: true)
-                .appendingPathComponent("cmux", isDirectory: true)
+                .appendingPathComponent("shellx", isDirectory: true)
         }
 
         return stateRoot

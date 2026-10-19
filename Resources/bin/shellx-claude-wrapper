@@ -86,14 +86,14 @@ cmux_claude_wrapper_settings_value_is_managed() {
     local trimmed="${value#"${value%%[![:space:]]*}"}"
     if [[ "$trimmed" == \{* || "$trimmed" == \[* ]]; then
         case "$trimmed" in
-            *'"__cmux":{"managed":"claude-hooks"'*|*'hooks feed --source claude'*)
+            *'"__shellx":{"managed":"claude-hooks"'*|*'hooks feed --source claude'*)
                 return 0
                 ;;
         esac
         return 1
     fi
     [[ -f "$trimmed" ]] || return 1
-    grep -Fq '"__cmux":{"managed":"claude-hooks"' "$trimmed" 2>/dev/null && return 0
+    grep -Fq '"__shellx":{"managed":"claude-hooks"' "$trimmed" 2>/dev/null && return 0
     grep -Fq 'hooks feed --source claude' "$trimmed" 2>/dev/null
 }
 
@@ -471,8 +471,8 @@ cmux_socket_available() {
 
     local self_dir cmux_bin
     self_dir="$(cd "$(dirname "$0")" && pwd)"
-    cmux_bin="$self_dir/cmux"
-    [[ -x "$cmux_bin" ]] || cmux_bin="$(command -v cmux || true)"
+    cmux_bin="$self_dir/shellx"
+    [[ -x "$cmux_bin" ]] || cmux_bin="$(command -v shellx || true)"
     [[ -n "$cmux_bin" ]] || return 1
 
     # Keep stale/hung socket checks bounded so claude startup does not block
@@ -490,13 +490,13 @@ resolve_hook_cmux_bin() {
     fi
 
     self_dir="$(cd "$(dirname "$0")" && pwd)"
-    bundled_cli="$self_dir/cmux"
+    bundled_cli="$self_dir/shellx"
     if [[ -x "$bundled_cli" ]]; then
         printf '%s' "$bundled_cli"
         return 0
     fi
 
-    bundled_cli="$(command -v cmux || true)"
+    bundled_cli="$(command -v shellx || true)"
     if [[ -n "$bundled_cli" ]]; then
         printf '%s' "$bundled_cli"
         return 0
@@ -978,9 +978,9 @@ ensure_node_options_restore_module() {
     # The restore preload must outlive the Claude session: every Node child
     # loads it via NODE_OPTIONS, and macOS purges $TMPDIR under long-lived
     # sessions (https://github.com/manaflow-ai/cmux/issues/12022). Keep it
-    # next to the other CLI shims in ~/.cmuxterm.
+    # next to the other CLI shims in ~/.shellx.
     [[ -n "${HOME:-}" && "$HOME" == /* ]] || return 1
-    local guard_dir="${HOME%/}/.cmuxterm/cmux-claude-node-options"
+    local guard_dir="${HOME%/}/.shellx/cmux-claude-node-options"
     local guard_path="$guard_dir/restore-node-options.cjs"
     [[ ! -L "$guard_dir" && ! -L "$guard_path" ]] || return 1
     mkdir -p "$guard_dir" || return 1
@@ -1233,7 +1233,7 @@ cmux_claude_wrapper_create_settings_values_file() {
 # immediately after launch construction.
 cmux_claude_wrapper_durable_settings_dir() {
     [[ -n "${HOME:-}" && "$HOME" == /* ]] || return 1
-    local cmux_dir="${HOME%/}/.cmuxterm"
+    local cmux_dir="${HOME%/}/.shellx"
     local settings_dir="$cmux_dir/claude-settings"
     # Do not follow a pre-existing link into a location cmux does not own.
     [[ ! -L "$cmux_dir" && ! -L "$settings_dir" ]] || return 1
@@ -1477,8 +1477,8 @@ cmux_computer_use_config() {
     runtime_scope="$(printf '%s' "$runtime_scope" | LC_ALL=C /usr/bin/tr -c 'A-Za-z0-9_.-' '-' | /usr/bin/sed -E 's/^[.-]+//; s/[.-]+$//' | /usr/bin/cut -c1-64)"
     [[ -n "$runtime_scope" ]] || runtime_scope="default"
     runtime_uid="$(/usr/bin/id -u)"
-    state_dir="${CMUX_CUA_STATE_DIR:-${HOME}/Library/Application Support/cmux/cmux-cua/runtime/${runtime_scope}/state}"
-    cua_socket="${CMUX_CUA_SOCKET_PATH:-/tmp/cmux-cua-${runtime_uid}/${runtime_scope}/cmux-cua.sock}"
+    state_dir="${CMUX_CUA_STATE_DIR:-${HOME}/Library/Application Support/ShellX/cmux-cua/runtime/${runtime_scope}/state}"
+    cua_socket="${CMUX_CUA_SOCKET_PATH:-/tmp/shellx-cua-${runtime_uid}/${runtime_scope}/cmux-cua.sock}"
     # Stable per-terminal session id so the branded agent cursor survives helper
     # restarts in the same surface.
     default_session="cmux-${CMUX_SURFACE_ID:-$$}"
@@ -2046,9 +2046,9 @@ cmux_claude_build_standard_hook_settings() {
     # JSON-escaped body of AgentHookSpoolProducer(agent: "claude").command(...)
     # wrapping CMUXCLI.queuedAgentHookShellCommand(agent: "claude") as its fallback.
     IFS= read -r queued <<'CMUX_CLAUDE_QUEUED_HOOK_COMMAND'
-if [ -n \"${CMUX_CLAUDE_HOOK_SPOOL_DIR:-}\" ] && [ -x /bin/zsh ]; then exec /bin/zsh -fc 'LC_ALL=C\nexport CMUX_CLAUDE_PID=${CMUX_CLAUDE_PID:-$PPID}\nexport CMUX_AGENT_HOOK_INVOKER_PID=$PPID\ncmux_fallback() { { print -rn -- \"$cmux_p\"; /bin/cat; } | /bin/sh -c \"$1\" >&3; exit $?; }\nzmodload zsh/system zsh/datetime zsh/files 2>/dev/null || exec /bin/sh -c \"$1\" >&3\ncmux_p= cmux_c= cmux_e=0\nwhile (( ${#cmux_p} < 262144 )); do sysread -i 0 -s 65536 cmux_c || { cmux_e=$?; break; }; cmux_p+=$cmux_c; done\n[[ -n ${CMUX_SURFACE_ID:-} && ${CMUX_CLAUDE_HOOKS_DISABLED:-} != 1 ]] || { (( cmux_e == 5 )) || /bin/cat >/dev/null; print -r -- '\\''{}'\\'' >&3; exit 0; }\ncmux_d=$CMUX_CLAUDE_HOOK_SPOOL_DIR\n(( cmux_e == 5 )) && [[ -f $cmux_d/keys ]] || cmux_fallback \"$1\"\ncmux_r=\"cmux-agent-hook-v1\"$'\\''\\n'\\''\"claude\"$'\\''\\n'\\''\"$2\"$'\\''\\n'\\''\nfor cmux_k in ${(f)\"$(<$cmux_d/keys)\"}; do (( ${+parameters[$cmux_k]} )) && cmux_r+=\"$cmux_k=${(P)cmux_k}\"$'\\''\\0'\\''; done\ncmux_r+=$'\\''\\0'\\''\"$cmux_p\"\n(( ${#cmux_r} <= 524288 )) || cmux_fallback \"$1\"\numask 077\ncmux_n=$cmux_d/$epochtime[1].$epochtime[2]-$$\n{ print -rn -- \"$cmux_r\" >| $cmux_n.tmp && mv -f -- $cmux_n.tmp $cmux_n.rec; } 2>/dev/null || { rm -f -- $cmux_n.tmp 2>/dev/null; cmux_fallback \"$1\"; }\nif zsystem flock -t 0 -r -f cmux_l $cmux_d/forwarder.lock 2>/dev/null; then\n  zsystem flock -u $cmux_l\n  rm -- $cmux_n.rec 2>/dev/null && cmux_fallback \"$1\"\nfi\nprint -r -- '\\''{}'\\'' >&3' cmux-hook 'cmux_cli=\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-${CMUX_BUNDLED_CLI_PATH:-}}\"; if [ -z \"$cmux_cli\" ] || [ ! -x \"$cmux_cli\" ]; then cmux_cli=\"$(command -v cmux 2>/dev/null || true)\"; fi; agent_pid=\"${CMUX_CLAUDE_PID:-${PPID:-}}\"; if [ -n \"$CMUX_SURFACE_ID\" ] && [ \"$CMUX_CLAUDE_HOOKS_DISABLED\" != \"1\" ] && [ -n \"$cmux_cli\" ]; then if [ -n \"${CMUX_SOCKET_PATH:-}\" ]; then CMUX_CLAUDE_PID=\"$agent_pid\" CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC=0.5 \"$cmux_cli\" --socket \"$CMUX_SOCKET_PATH\" hooks enqueue claude @SUBCOMMAND@ 2>/dev/null || { cat >/dev/null; echo '\\''{}'\\''; }; else CMUX_CLAUDE_PID=\"$agent_pid\" CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC=0.5 \"$cmux_cli\" hooks enqueue claude @SUBCOMMAND@ 2>/dev/null || { cat >/dev/null; echo '\\''{}'\\''; }; fi; else cat >/dev/null; echo '\\''{}'\\''; fi' @SUBCOMMAND@ 3>&1 1>&2; else cmux_cli=\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-${CMUX_BUNDLED_CLI_PATH:-}}\"; if [ -z \"$cmux_cli\" ] || [ ! -x \"$cmux_cli\" ]; then cmux_cli=\"$(command -v cmux 2>/dev/null || true)\"; fi; agent_pid=\"${CMUX_CLAUDE_PID:-${PPID:-}}\"; if [ -n \"$CMUX_SURFACE_ID\" ] && [ \"$CMUX_CLAUDE_HOOKS_DISABLED\" != \"1\" ] && [ -n \"$cmux_cli\" ]; then if [ -n \"${CMUX_SOCKET_PATH:-}\" ]; then CMUX_CLAUDE_PID=\"$agent_pid\" CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC=0.5 \"$cmux_cli\" --socket \"$CMUX_SOCKET_PATH\" hooks enqueue claude @SUBCOMMAND@ 2>/dev/null || { cat >/dev/null; echo '{}'; }; else CMUX_CLAUDE_PID=\"$agent_pid\" CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC=0.5 \"$cmux_cli\" hooks enqueue claude @SUBCOMMAND@ 2>/dev/null || { cat >/dev/null; echo '{}'; }; fi; else cat >/dev/null; echo '{}'; fi; fi
+if [ -n \"${CMUX_CLAUDE_HOOK_SPOOL_DIR:-}\" ] && [ -x /bin/zsh ]; then exec /bin/zsh -fc 'LC_ALL=C\nexport CMUX_CLAUDE_PID=${CMUX_CLAUDE_PID:-$PPID}\nexport CMUX_AGENT_HOOK_INVOKER_PID=$PPID\ncmux_fallback() { { print -rn -- \"$cmux_p\"; /bin/cat; } | /bin/sh -c \"$1\" >&3; exit $?; }\nzmodload zsh/system zsh/datetime zsh/files 2>/dev/null || exec /bin/sh -c \"$1\" >&3\ncmux_p= cmux_c= cmux_e=0\nwhile (( ${#cmux_p} < 262144 )); do sysread -i 0 -s 65536 cmux_c || { cmux_e=$?; break; }; cmux_p+=$cmux_c; done\n[[ -n ${CMUX_SURFACE_ID:-} && ${CMUX_CLAUDE_HOOKS_DISABLED:-} != 1 ]] || { (( cmux_e == 5 )) || /bin/cat >/dev/null; print -r -- '\\''{}'\\'' >&3; exit 0; }\ncmux_d=$CMUX_CLAUDE_HOOK_SPOOL_DIR\n(( cmux_e == 5 )) && [[ -f $cmux_d/keys ]] || cmux_fallback \"$1\"\ncmux_r=\"cmux-agent-hook-v1\"$'\\''\\n'\\''\"claude\"$'\\''\\n'\\''\"$2\"$'\\''\\n'\\''\nfor cmux_k in ${(f)\"$(<$cmux_d/keys)\"}; do (( ${+parameters[$cmux_k]} )) && cmux_r+=\"$cmux_k=${(P)cmux_k}\"$'\\''\\0'\\''; done\ncmux_r+=$'\\''\\0'\\''\"$cmux_p\"\n(( ${#cmux_r} <= 524288 )) || cmux_fallback \"$1\"\numask 077\ncmux_n=$cmux_d/$epochtime[1].$epochtime[2]-$$\n{ print -rn -- \"$cmux_r\" >| $cmux_n.tmp && mv -f -- $cmux_n.tmp $cmux_n.rec; } 2>/dev/null || { rm -f -- $cmux_n.tmp 2>/dev/null; cmux_fallback \"$1\"; }\nif zsystem flock -t 0 -r -f cmux_l $cmux_d/forwarder.lock 2>/dev/null; then\n  zsystem flock -u $cmux_l\n  rm -- $cmux_n.rec 2>/dev/null && cmux_fallback \"$1\"\nfi\nprint -r -- '\\''{}'\\'' >&3' cmux-hook 'cmux_cli=\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-${CMUX_BUNDLED_CLI_PATH:-}}\"; if [ -z \"$cmux_cli\" ] || [ ! -x \"$cmux_cli\" ]; then cmux_cli=\"$(command -v shellx 2>/dev/null || true)\"; fi; agent_pid=\"${CMUX_CLAUDE_PID:-${PPID:-}}\"; if [ -n \"$CMUX_SURFACE_ID\" ] && [ \"$CMUX_CLAUDE_HOOKS_DISABLED\" != \"1\" ] && [ -n \"$cmux_cli\" ]; then if [ -n \"${CMUX_SOCKET_PATH:-}\" ]; then CMUX_CLAUDE_PID=\"$agent_pid\" CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC=0.5 \"$cmux_cli\" --socket \"$CMUX_SOCKET_PATH\" hooks enqueue claude @SUBCOMMAND@ 2>/dev/null || { cat >/dev/null; echo '\\''{}'\\''; }; else CMUX_CLAUDE_PID=\"$agent_pid\" CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC=0.5 \"$cmux_cli\" hooks enqueue claude @SUBCOMMAND@ 2>/dev/null || { cat >/dev/null; echo '\\''{}'\\''; }; fi; else cat >/dev/null; echo '\\''{}'\\''; fi' @SUBCOMMAND@ 3>&1 1>&2; else cmux_cli=\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-${CMUX_BUNDLED_CLI_PATH:-}}\"; if [ -z \"$cmux_cli\" ] || [ ! -x \"$cmux_cli\" ]; then cmux_cli=\"$(command -v shellx 2>/dev/null || true)\"; fi; agent_pid=\"${CMUX_CLAUDE_PID:-${PPID:-}}\"; if [ -n \"$CMUX_SURFACE_ID\" ] && [ \"$CMUX_CLAUDE_HOOKS_DISABLED\" != \"1\" ] && [ -n \"$cmux_cli\" ]; then if [ -n \"${CMUX_SOCKET_PATH:-}\" ]; then CMUX_CLAUDE_PID=\"$agent_pid\" CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC=0.5 \"$cmux_cli\" --socket \"$CMUX_SOCKET_PATH\" hooks enqueue claude @SUBCOMMAND@ 2>/dev/null || { cat >/dev/null; echo '{}'; }; else CMUX_CLAUDE_PID=\"$agent_pid\" CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC=0.5 \"$cmux_cli\" hooks enqueue claude @SUBCOMMAND@ 2>/dev/null || { cat >/dev/null; echo '{}'; }; fi; else cat >/dev/null; echo '{}'; fi; fi
 CMUX_CLAUDE_QUEUED_HOOK_COMMAND
-    direct_cli='\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}\"'
+    direct_cli='\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}\"'
 
     local q_prefix='{"hooks":[{"command":"' q_suffix='","timeout":5,"type":"command"}],"matcher":"'
     local notification="${queued//@SUBCOMMAND@/notification}"
@@ -2180,7 +2180,7 @@ catch (_) { process.exit(1); }
 #   timeout because it may run a summarization subprocess; it gates itself
 #   on the workspaceAutoNaming setting via a socket probe, so it is a
 #   no-op when the feature is disabled.
-HOOKS_JSON='{"hooks":{"PreToolUse":[{"matcher":"CronCreate","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}\" hooks claude cron-create-guard","timeout":5}]}],"PermissionRequest":[{"matcher":"","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}\" hooks feed --source claude","timeout":125}]}]}}'
+HOOKS_JSON='{"hooks":{"PreToolUse":[{"matcher":"CronCreate","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}\" hooks claude cron-create-guard","timeout":5}]}],"PermissionRequest":[{"matcher":"","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}\" hooks feed --source claude","timeout":125}]}]}}'
 if cmux_claude_collect_hook_settings "$CMUX_CLAUDE_HOOK_CMUX_BIN" \
     && cmux_claude_generated_hook_settings_are_safe "$cmux_claude_hook_settings_value"; then
     HOOKS_JSON="$cmux_claude_hook_settings_value"
@@ -2282,7 +2282,7 @@ const canonical=x=>JSON.stringify(x,(key,value)=>{
   if(!isObj(value)) return value;
   return Object.keys(value).sort().reduce((out,k)=>{out[k]=value[k];return out;},{});
 });
-const marker=x=>isObj(x)&&isObj(x.__cmux)&&x.__cmux.managed==="claude-hooks";
+const marker=x=>isObj(x)&&isObj(x.__shellx)&&x.__shellx.managed==="claude-hooks";
 const expand=p=>p.indexOf("~/")===0?path.join(os.homedir(),p.slice(2)):p;
 const load=value=>{
   const text=String(value).trim();
@@ -2303,8 +2303,8 @@ const stripManaged=(settings,base,hasMarker)=>{
   if(!isObj(settings)||!isObj(settings.hooks)) return settings;
   const out=clone(settings);
   const fingerprints=new Set(
-    hasMarker&&isObj(settings.__cmux)&&Array.isArray(settings.__cmux.hookFingerprints)
-      ? settings.__cmux.hookFingerprints
+    hasMarker&&isObj(settings.__shellx)&&Array.isArray(settings.__shellx.hookFingerprints)
+      ? settings.__shellx.hookFingerprints
       : []
   );
   for(const event of Object.keys(out.hooks)){
@@ -2337,14 +2337,14 @@ try{
   process.stderr.write("cmux: settings merge failed; using user settings unchanged\n");
   process.exit(1);
 }
-const baseMarker=clone(base.__cmux||{managed:"claude-hooks",version:1});
+const baseMarker=clone(base.__shellx||{managed:"claude-hooks",version:1});
 const hookFingerprints=[];
 for(const event of Object.keys(base.hooks||{})){
   const groups=Array.isArray(base.hooks[event])?base.hooks[event]:[];
   for(const group of groups) hookFingerprints.push(canonical(group));
 }
 baseMarker.hookFingerprints=hookFingerprints;
-acc.__cmux=baseMarker;
+acc.__shellx=baseMarker;
 fs.writeFileSync(process.env.CMUX_MERGED_SETTINGS_PATH,JSON.stringify(acc),{encoding:"utf8",mode:0o600});
 '
         cmux_merge_status=$?

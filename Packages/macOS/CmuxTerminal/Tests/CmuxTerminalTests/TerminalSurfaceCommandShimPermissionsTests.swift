@@ -63,7 +63,7 @@ struct TerminalSurfaceCommandShimPermissionsTests {
         let shimDirectory = parentDirectory.appending(path: surfaceId.uuidString, directoryHint: .isDirectory)
         let staleShim = shimDirectory.appending(path: "stale-agent", directoryHint: .notDirectory)
         let wrapperDirectory = root.appending(path: "bin", directoryHint: .isDirectory)
-        let wrapper = wrapperDirectory.appending(path: "cmux-claude-wrapper", directoryHint: .notDirectory)
+        let wrapper = wrapperDirectory.appending(path: "shellx-claude-wrapper", directoryHint: .notDirectory)
         defer { try? fileManager.removeItem(at: root) }
 
         try fileManager.createDirectory(at: shimDirectory, withIntermediateDirectories: true)
@@ -198,7 +198,7 @@ struct TerminalSurfaceCommandShimPermissionsTests {
         defer { try? fileManager.removeItem(at: root) }
 
         try fileManager.createDirectory(at: wrapperDirectory, withIntermediateDirectories: true)
-        for wrapperName in ["cmux-claude-wrapper", "cmux-codex-wrapper"] {
+        for wrapperName in ["shellx-claude-wrapper", "shellx-codex-wrapper"] {
             let wrapper = wrapperDirectory.appending(path: wrapperName, directoryHint: .notDirectory)
             try "#!/bin/sh\nexit 0\n".write(to: wrapper, atomically: true, encoding: .utf8)
             try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: wrapper.path)
@@ -332,7 +332,7 @@ struct TerminalSurfaceCommandShimPermissionsTests {
         )
         let temporaryDirectory = root.appending(path: "tmp", directoryHint: .isDirectory)
         let wrapperDirectory = root.appending(path: "bin", directoryHint: .isDirectory)
-        let wrapper = wrapperDirectory.appending(path: "cmux-claude-wrapper", directoryHint: .notDirectory)
+        let wrapper = wrapperDirectory.appending(path: "shellx-claude-wrapper", directoryHint: .notDirectory)
         let literalPathDirectory = root.appending(path: "literal-[z]", directoryHint: .isDirectory)
         let globMatchDirectory = root.appending(path: "literal-z", directoryHint: .isDirectory)
         defer { try? fileManager.removeItem(at: root) }
@@ -398,7 +398,7 @@ struct TerminalSurfaceCommandShimPermissionsTests {
         let shadowDirectory = root.appending(path: "shadow", directoryHint: .isDirectory)
         let aliasDirectory = root.appending(path: ".local/bin", directoryHint: .isDirectory)
         let hermesWrapper = wrapperDirectory.appending(
-            path: "cmux-hermes-agent-wrapper",
+            path: "shellx-hermes-agent-wrapper",
             directoryHint: .notDirectory
         )
         let officialAlias = aliasDirectory.appending(path: "coder", directoryHint: .notDirectory)
@@ -470,7 +470,7 @@ struct TerminalSurfaceCommandShimPermissionsTests {
         let wrapperDirectory = root.appending(path: "bin", directoryHint: .isDirectory)
         let aliasDirectory = root.appending(path: ".local/bin", directoryHint: .isDirectory)
         let hermesWrapper = wrapperDirectory.appending(
-            path: "cmux-hermes-agent-wrapper",
+            path: "shellx-hermes-agent-wrapper",
             directoryHint: .notDirectory
         )
         let officialAlias = aliasDirectory.appending(path: "coder", directoryHint: .notDirectory)
@@ -585,7 +585,7 @@ struct TerminalSurfaceCommandShimPermissionsTests {
     private func makeClaudeWrapperDirectory(in root: URL) throws -> URL {
         let fileManager = FileManager.default
         let wrapperDirectory = root.appending(path: "bin", directoryHint: .isDirectory)
-        let wrapper = wrapperDirectory.appending(path: "cmux-claude-wrapper", directoryHint: .notDirectory)
+        let wrapper = wrapperDirectory.appending(path: "shellx-claude-wrapper", directoryHint: .notDirectory)
         try fileManager.createDirectory(at: wrapperDirectory, withIntermediateDirectories: true)
         try "#!/bin/sh\nexit 0\n".write(to: wrapper, atomically: true, encoding: .utf8)
         try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: wrapper.path)

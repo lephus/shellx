@@ -210,7 +210,7 @@ final class DiffSidecarBridge: NSObject, WKScriptMessageHandlerWithReply {
         let resources = Bundle.main.bundleURL
             .appendingPathComponent("Contents/Resources/bin", isDirectory: true)
         let sidecar = resources.appendingPathComponent("cmux-diff-sidecar", isDirectory: false)
-        let cmux = resources.appendingPathComponent("cmux", isDirectory: false)
+        let cmux = resources.appendingPathComponent("shellx", isDirectory: false)
         guard FileManager.default.isExecutableFile(atPath: sidecar.path),
               FileManager.default.isExecutableFile(atPath: cmux.path) else {
             throw CocoaError(.fileNoSuchFile)

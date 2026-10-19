@@ -1,6 +1,6 @@
 // Triage: unread workspaces first with one-tap mark-read, everything else
 // dimmed below. Uses reactive partitioning, buttons, and hover.
-//   cp Examples/CustomSidebars/activity.js ~/.config/cmux/sidebars/ && cmux sidebar open activity
+//   cp Examples/CustomSidebars/activity.js ~/.config/shellx/sidebars/ && cmux sidebar open activity
 
 const unread = () => (data.workspaces() ?? []).filter((w) => w.unread > 0);
 const read = () => (data.workspaces() ?? []).filter((w) => !(w.unread > 0));

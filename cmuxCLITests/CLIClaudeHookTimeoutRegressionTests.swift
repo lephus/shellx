@@ -40,7 +40,7 @@ struct CLIClaudeHookTimeoutRegressionTests {
     @Test("Claude launch fallback omits blocking lifecycle hooks")
     func settingsGenerationFailureInstallsOnlyDecisionHooks() throws {
         let fileManager = FileManager.default
-        let wrapper = repositoryRoot.appendingPathComponent("Resources/bin/cmux-claude-wrapper")
+        let wrapper = repositoryRoot.appendingPathComponent("Resources/bin/shellx-claude-wrapper")
         let root = fileManager.temporaryDirectory.appendingPathComponent(
             "cmux-claude-settings-deadline-\(UUID().uuidString)",
             isDirectory: true
@@ -104,7 +104,7 @@ struct CLIClaudeHookTimeoutRegressionTests {
     func generatedSettingsUseQueuedAdmissionAndPreserveDecisionHooks() throws {
         let fileManager = FileManager.default
         let cliPath = try BundledCLITestSupport.bundledCLIPath(for: CLITestBundleAnchor.self)
-        let wrapper = repositoryRoot.appendingPathComponent("Resources/bin/cmux-claude-wrapper")
+        let wrapper = repositoryRoot.appendingPathComponent("Resources/bin/shellx-claude-wrapper")
         let root = fileManager.temporaryDirectory.appendingPathComponent(
             "cmux-claude-queued-hooks-\(UUID().uuidString)",
             isDirectory: true

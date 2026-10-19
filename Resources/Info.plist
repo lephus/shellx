@@ -356,7 +356,7 @@
 	<array>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.cmux.cloud-sidebar-row</string>
+			<string>pro.shellx.cloud-sidebar-row</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>
@@ -376,7 +376,7 @@
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.cmux.sidebar-tab-reorder</string>
+			<string>pro.shellx.sidebar-tab-reorder</string>
 			<key>UTTypeDescription</key>
 			<string>cmux Sidebar Tab Reorder</string>
 			<key>UTTypeConformsTo</key>
@@ -386,7 +386,7 @@
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.cmux.right-sidebar-mode-reorder</string>
+			<string>pro.shellx.right-sidebar-mode-reorder</string>
 			<key>UTTypeDescription</key>
 			<string>cmux Right Sidebar Tab Reorder</string>
 			<key>UTTypeConformsTo</key>
@@ -396,7 +396,7 @@
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.cmux.filepreview.transfer</string>
+			<string>pro.shellx.filepreview.transfer</string>
 			<key>UTTypeDescription</key>
 			<string>cmux File Preview Transfer</string>
 			<key>UTTypeConformsTo</key>
@@ -406,7 +406,7 @@
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>com.cmux.surface-resource</string>
+			<string>pro.shellx.surface-resource</string>
 			<key>UTTypeDescription</key>
 			<string>cmux Surface Resource</string>
 			<key>UTTypeConformsTo</key>

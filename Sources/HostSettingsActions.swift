@@ -158,7 +158,7 @@ final class HostSettingsActions: SettingsHostActions {
     /// cmux CLI with `arguments`, the shared path for Settings rows backed by a CLI command.
     private func openBundledCLIInTerminalTab(arguments: String, purpose: String) {
         let cliURL = Bundle.main.bundleURL
-            .appendingPathComponent("Contents/Resources/bin/cmux", isDirectory: false)
+            .appendingPathComponent("Contents/Resources/bin/shellx", isDirectory: false)
         guard FileManager.default.isExecutableFile(atPath: cliURL.path) else {
             hostSettingsLogger.error("Settings \(purpose, privacy: .public) unavailable: bundled cmux CLI missing")
             return

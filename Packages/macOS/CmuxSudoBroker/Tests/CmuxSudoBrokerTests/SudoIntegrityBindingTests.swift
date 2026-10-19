@@ -166,7 +166,7 @@ struct SudoIntegrityBindingTests {
             now: now
         )
 
-        #expect(checker.calls.map(\.resourcePath) == ["Resources/bin/cmux"])
+        #expect(checker.calls.map(\.resourcePath) == ["Resources/bin/shellx"])
         #expect(spawner.commands.isEmpty)
         #expect(fixture.store.authoritativeResult(id: request.id)?.errorCode == .processLaunchFailed)
     }
@@ -203,7 +203,7 @@ struct SudoIntegrityBindingTests {
         #expect(afterSudo[0] == "/bin/sh")
         #expect(afterSudo[1] == "-c")
         #expect(afterSudo[3] == SudoHelperStagingCommand.argumentZero)
-        #expect(afterSudo[4] == "/Applications/cmux.app/Contents/Resources/bin/cmux")
+        #expect(afterSudo[4] == "/Applications/cmux.app/Contents/Resources/bin/shellx")
         #expect(afterSudo[5] == String(repeating: "5a", count: 32))
         #expect(afterSudo[7] == policy.executorRequirement.text)
         #expect(afterSudo[10] == SudoPrivilegedExecutor.hiddenCommand)

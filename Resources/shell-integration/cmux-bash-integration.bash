@@ -91,7 +91,7 @@ _cmux_relay_cli_path() {
         printf '%s\n' "${CMUX_BUNDLED_CLI_PATH}"
         return 0
     fi
-    command -v cmux 2>/dev/null
+    command -v shellx 2>/dev/null
 }
 
 _cmux_socket_uses_remote_relay() {
@@ -274,7 +274,7 @@ _cmux_show_welcome_once() {
     /bin/rm -- "$token" >/dev/null 2>&1 || return 0
     [[ -z "${TMUX:-}" ]] || return 0
     local cli="${CMUX_SHELL_INTEGRATION_DIR%/}"
-    cli="${cli%/shell-integration}/bin/cmux"
+    cli="${cli%/shell-integration}/bin/shellx"
     [[ -x "$cli" ]] || cli="$(_cmux_relay_cli_path)"
     [[ -n "$cli" ]] || return 0
     "$cli" welcome 2>/dev/null || true
@@ -416,7 +416,7 @@ _cmux_install_cli_command_shim() {
     local shim_parent="${shim_root%/*}"
     local tmp_root="${TMPDIR:-/tmp}"
     local legacy_shim_root="${tmp_root%/}/cmux-cli-shims/$surface_component"
-    local shim_state="${HOME:-}/.cmuxterm"
+    local shim_state="${HOME:-}/.shellx"
     local rejected_root=""
     local REPLY
     # An inherited root is reused only while it is still private. Otherwise
@@ -455,15 +455,15 @@ _cmux_install_cli_command_shim() {
         if [[ "$command_name" == "claude" ]]; then
             printf 'cmux_wrapper="%s"\n' "$escaped_wrapper"
             printf '%s\n' 'if [[ ! -x "$cmux_wrapper" && -n "${CMUX_BUNDLED_CLI_PATH:-}" ]]; then'
-            printf '%s\n' '    cmux_candidate="$(dirname "$CMUX_BUNDLED_CLI_PATH")/cmux-claude-wrapper"'
+            printf '%s\n' '    cmux_candidate="$(dirname "$CMUX_BUNDLED_CLI_PATH")/shellx-claude-wrapper"'
             printf '%s\n' '    if [[ -x "$cmux_candidate" ]]; then'
             printf '%s\n' '        cmux_wrapper="$cmux_candidate"'
             printf '%s\n' '    fi'
             printf '%s\n' 'fi'
             printf '%s\n' 'if [[ ! -x "$cmux_wrapper" ]]; then'
-            printf '%s\n' '    cmux_cli="$(command -v cmux 2>/dev/null || true)"'
+            printf '%s\n' '    cmux_cli="$(command -v shellx 2>/dev/null || true)"'
             printf '%s\n' '    if [[ -n "$cmux_cli" ]]; then'
-            printf '%s\n' '        cmux_candidate="$(dirname "$cmux_cli")/cmux-claude-wrapper"'
+            printf '%s\n' '        cmux_candidate="$(dirname "$cmux_cli")/shellx-claude-wrapper"'
             printf '%s\n' '        if [[ -x "$cmux_candidate" ]]; then'
             printf '%s\n' '            cmux_wrapper="$cmux_candidate"'
             printf '%s\n' '        fi'
@@ -557,7 +557,7 @@ _cmux_install_cli_wrapper() {
         eval "$command_name() { \"\${$wrapper_variable}\" \"\$@\"; }"
     fi
 }
-_cmux_install_cli_wrapper claude _CMUX_CLAUDE_WRAPPER cmux-claude-wrapper
+_cmux_install_cli_wrapper claude _CMUX_CLAUDE_WRAPPER shellx-claude-wrapper
 _cmux_install_cli_wrapper agy _CMUX_AGY_WRAPPER
 _cmux_install_cli_wrapper grok _CMUX_GROK_WRAPPER
 _cmux_install_cli_wrapper muse _CMUX_MUSE_WRAPPER

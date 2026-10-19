@@ -12,7 +12,7 @@ public import Foundation
 /// version, or template.
 ///
 /// Files resolve to `<baseDirectory>/<key.fileName>`. The app constructs the
-/// store with `~/.config/cmux` (the same directory as `cmux.json`); tests pass
+/// store with `~/.config/shellx` (the same directory as `cmux.json`); tests pass
 /// a temporary directory.
 ///
 /// ```swift
@@ -37,7 +37,7 @@ public actor SecretFileStore {
 
     /// Creates a store rooted at `baseDirectory`.
     /// - Parameter baseDirectory: The directory holding the secret files
-    ///   (created on first write if absent). The app uses `~/.config/cmux`.
+    ///   (created on first write if absent). The app uses `~/.config/shellx`.
     public init(baseDirectory: URL) {
         self.baseDirectory = baseDirectory
     }

@@ -3,7 +3,7 @@
 // minutes, a state glyph, and a tiny progress meter; the header graphs how
 // many workspaces are busy right now. Click a row to jump to the workspace,
 // drag to reorder, click the ALL/BUSY chip to hide quiet workspaces.
-//   cp Examples/CustomSidebars/btop-agents.js ~/.config/cmux/sidebars/
+//   cp Examples/CustomSidebars/btop-agents.js ~/.config/shellx/sidebars/
 //   cmux sidebar select btop-agents          (or: cmux sidebar open btop-agents)
 //
 // History lives in this sidebar, sampled once per clock tick, so graphs start

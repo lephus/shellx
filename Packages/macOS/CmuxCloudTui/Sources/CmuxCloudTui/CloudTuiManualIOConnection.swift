@@ -67,7 +67,7 @@ public final class CloudTuiManualIOConnection: @unchecked Sendable {
         socketPath: String,
         deliversJSONMessages: Bool = false,
         queue: DispatchQueue = DispatchQueue(
-            label: "com.cmux.cloud-manual-io",
+            label: "pro.shellx.cloud-manual-io",
             qos: .userInitiated
         ),
         commandBuilder: CloudTuiManualIOCommand = CloudTuiManualIOCommand()

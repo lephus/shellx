@@ -204,7 +204,7 @@ extension RemoteSessionCoordinator {
               exit 1
             fi
             chmod 755 "$codex_wrapper_tmp" || { rm -f "$codex_wrapper_tmp"; exit 1; }
-            mv -f "$codex_wrapper_tmp" "$HOME/.shellx/bin/cmux-codex-wrapper" || { rm -f "$codex_wrapper_tmp"; exit 1; }
+            mv -f "$codex_wrapper_tmp" "$HOME/.shellx/bin/shellx-codex-wrapper" || { rm -f "$codex_wrapper_tmp"; exit 1; }
             """
         } else {
             codexWrapperInstall = ""

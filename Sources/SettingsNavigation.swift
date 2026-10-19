@@ -71,7 +71,7 @@ enum SettingsNavigationTarget: String, CaseIterable, Identifiable {
         case .keyboardShortcuts:
             return String(localized: "settings.section.keyboardShortcuts", defaultValue: "Keyboard Shortcuts")
         case .settingsJSON:
-            return String(localized: "settings.section.settingsJSON", defaultValue: "cmux.json")
+            return String(localized: "settings.section.settingsJSON", defaultValue: "shellx.json")
         case .reset:
             return String(localized: "settings.section.reset", defaultValue: "Reset")
         }

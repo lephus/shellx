@@ -20,7 +20,7 @@ extension CMUXCLI {
         let inspection = CodexWriterLockInspector().inspect(sessionID: sessionID, codexHome: home)
         let lease = try AgentRestoreLaunchLease(
             directory: URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
-                .appendingPathComponent(".cmuxterm/agent-restore-launches", isDirectory: true),
+                .appendingPathComponent(".shellx/agent-restore-launches", isDirectory: true),
             account: inspection.codexHome, sessionID: sessionID
         )
         if try !lease.tryAcquire() {

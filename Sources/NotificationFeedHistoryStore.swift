@@ -156,7 +156,7 @@ final class NotificationFeedHistoryStore {
             options: .regularExpression
         )
         return resolvedAppSupport
-            .appendingPathComponent("cmux", isDirectory: true)
+            .appendingPathComponent("ShellX", isDirectory: true)
             .appendingPathComponent(
                 "notification-feed-history-\(safeBundleID).json",
                 isDirectory: false

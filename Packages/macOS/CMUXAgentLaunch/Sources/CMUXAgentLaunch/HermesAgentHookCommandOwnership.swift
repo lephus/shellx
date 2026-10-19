@@ -71,7 +71,7 @@ struct HermesAgentHookCommandOwnership {
         if ["$cmux_cli", "${cmux_cli}", "$CMUX_cli", "${CMUX_cli}"].contains(word) {
             return true
         }
-        return URL(fileURLWithPath: word).lastPathComponent == "cmux"
+        return URL(fileURLWithPath: word).lastPathComponent == "shellx"
     }
 
     private func isEnvironmentAssignment(_ word: String) -> Bool {

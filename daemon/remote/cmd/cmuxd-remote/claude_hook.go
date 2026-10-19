@@ -379,7 +379,7 @@ func findRealClaude(pathEnv string, cmuxBin string) string {
 		if err != nil || info.IsDir() || info.Mode()&0o111 == 0 {
 			continue
 		}
-		if resolved, err := filepath.EvalSymlinks(candidate); err == nil && filepath.Base(resolved) == "cmux-claude-wrapper" {
+		if resolved, err := filepath.EvalSymlinks(candidate); err == nil && filepath.Base(resolved) == "shellx-claude-wrapper" {
 			continue
 		}
 		return candidate

@@ -55,7 +55,7 @@ enum RemoteInteractiveShellBootstrapBuilder {
         }
 
         var outerLines: [String] = [
-            "mkdir -p \"$HOME/.cmux/relay\"",
+            "mkdir -p \"$HOME/.shellx/relay\"",
             "cmux_shell_dir=\"\(shellStateDir)\"",
             "mkdir -p \"$cmux_shell_dir\"",
         ]
@@ -270,9 +270,9 @@ enum RemoteInteractiveShellBootstrapBuilder {
         var lines = terminalSetupLines(terminfoSource: terminfoSource)
         lines.append(contentsOf: RemoteShellEnvironment.utf8LocaleSetupLines())
         lines.append(contentsOf: shellExportLines(shellFeatures: shellFeatures))
-        lines.append("export PATH=\"$HOME/.cmux/bin:$PATH\"")
-        lines.append("export CMUX_BUNDLED_CLI_PATH=\"$HOME/.cmux/bin/cmux\"")
-        lines.append("unset CMUX_CODEX_WRAPPER_SHIM; if [ -x \"$HOME/.cmux/bin/cmux-codex-wrapper\" ] && command -v bash >/dev/null 2>&1; then export CMUX_CODEX_WRAPPER_SHIM=\"$HOME/.cmux/bin/cmux-codex-wrapper\"; fi")
+        lines.append("export PATH=\"$HOME/.shellx/bin:$PATH\"")
+        lines.append("export CMUX_BUNDLED_CLI_PATH=\"$HOME/.shellx/bin/shellx\"")
+        lines.append("unset CMUX_CODEX_WRAPPER_SHIM; if [ -x \"$HOME/.shellx/bin/shellx-codex-wrapper\" ] && command -v bash >/dev/null 2>&1; then export CMUX_CODEX_WRAPPER_SHIM=\"$HOME/.shellx/bin/shellx-codex-wrapper\"; fi")
         lines.append(
             "export CMUX_PERSISTENT_PTY_EXEC_HELPER=\"${CMUX_PERSISTENT_PTY_EXEC_HELPER:-$CMUX_BUNDLED_CLI_PATH}\""
         )
@@ -391,14 +391,14 @@ enum RemoteInteractiveShellBootstrapBuilder {
             return []
         }
         return [
-            "cmux_relay_cli=\"${CMUX_BUNDLED_CLI_PATH:-$HOME/.cmux/bin/cmux}\"",
-            "if [ ! -x \"$cmux_relay_cli\" ]; then cmux_relay_cli=\"$(command -v cmux 2>/dev/null || true)\"; fi",
+            "cmux_relay_cli=\"${CMUX_BUNDLED_CLI_PATH:-$HOME/.shellx/bin/shellx}\"",
+            "if [ ! -x \"$cmux_relay_cli\" ]; then cmux_relay_cli=\"$(command -v shellx 2>/dev/null || true)\"; fi",
             "cmux_relay_tty=\"${CMUX_BOOTSTRAP_TTY:-}\"",
             "if [ -z \"$cmux_relay_tty\" ]; then cmux_relay_tty=\"$(tty 2>/dev/null || true)\"; fi",
             "cmux_relay_tty=\"${cmux_relay_tty##*/}\"",
             "if [ -n \"$cmux_relay_tty\" ] && [ \"$cmux_relay_tty\" != \"not a tty\" ]; then",
-            "  mkdir -p \"$HOME/.cmux/relay\" >/dev/null 2>&1 || true",
-            "  printf '%s' \"$cmux_relay_tty\" > \"$HOME/.cmux/relay/\(remoteRelayPort).tty\" 2>/dev/null || true",
+            "  mkdir -p \"$HOME/.shellx/relay\" >/dev/null 2>&1 || true",
+            "  printf '%s' \"$cmux_relay_tty\" > \"$HOME/.shellx/relay/\(remoteRelayPort).tty\" 2>/dev/null || true",
             "fi",
             "if [ -n \"$cmux_relay_cli\" ] && [ -n \"$CMUX_WORKSPACE_ID\" ] && [ -n \"$CMUX_TERMINAL_LIFECYCLE_ID\" ] && [ -n \"$CMUX_SSH_ATTEMPT_ID\" ] && [ -n \"$cmux_relay_tty\" ] && [ \"$cmux_relay_tty\" != \"not a tty\" ]; then",
             "  cmux_relay_report_tty=\"{\\\"workspace_id\\\":\\\"$CMUX_WORKSPACE_ID\\\",\\\"tty_name\\\":\\\"$cmux_relay_tty\\\",\\\"terminal_lifecycle_id\\\":\\\"$CMUX_TERMINAL_LIFECYCLE_ID\\\",\\\"attempt_id\\\":\\\"$CMUX_SSH_ATTEMPT_ID\\\"}\"",
@@ -415,7 +415,7 @@ enum RemoteInteractiveShellBootstrapBuilder {
     }
 
     /// The shell integration's `claude` shim execs
-    /// `$CMUX_SHELL_INTEGRATION_DIR/bin/cmux-claude-wrapper` when present. On a
+    /// `$CMUX_SHELL_INTEGRATION_DIR/bin/shellx-claude-wrapper` when present. On a
     /// relay host that wrapper hands off to the remote CLI, which injects the
     /// relay hooks through `--settings`, so launchers that resolve `claude`
     /// from PATH (and set their own CLAUDE_CONFIG_DIR) still report status.
@@ -423,9 +423,9 @@ enum RemoteInteractiveShellBootstrapBuilder {
     /// (no relay round trip), so the wrapper falls back to plain `claude`.
     static let claudeWrapperInstallLines: [String] = [
         "mkdir -p \"$cmux_shell_dir/bin\"",
-        "cat > \"$cmux_shell_dir/bin/cmux-claude-wrapper\" <<'CMUXCLAUDEWRAPPER'",
+        "cat > \"$cmux_shell_dir/bin/shellx-claude-wrapper\" <<'CMUXCLAUDEWRAPPER'",
         "#!/bin/sh",
-        "cmux_cli=\"$HOME/.cmux/bin/cmux\"",
+        "cmux_cli=\"$HOME/.shellx/bin/shellx\"",
         "if [ -x \"$cmux_cli\" ] && \"$cmux_cli\" claude-wrapper --cmux-probe >/dev/null 2>&1; then exec \"$cmux_cli\" claude-wrapper \"$@\"; fi",
         "cmux_path=",
         "cmux_ifs=$IFS; IFS=:",
@@ -433,11 +433,11 @@ enum RemoteInteractiveShellBootstrapBuilder {
         "IFS=$cmux_ifs; PATH=$cmux_path; export PATH",
         "exec claude \"$@\"",
         "CMUXCLAUDEWRAPPER",
-        "chmod 700 \"$cmux_shell_dir/bin/cmux-claude-wrapper\"",
+        "chmod 700 \"$cmux_shell_dir/bin/shellx-claude-wrapper\"",
     ]
 
     private static func shellStateDirForRemoteRelayPort(_ remoteRelayPort: Int) -> String {
-        "$HOME/.cmux/relay/\(max(remoteRelayPort, 0)).shell"
+        "$HOME/.shellx/relay/\(max(remoteRelayPort, 0)).shell"
     }
 
     private static func normalizedEnvValue(_ value: String?) -> String? {

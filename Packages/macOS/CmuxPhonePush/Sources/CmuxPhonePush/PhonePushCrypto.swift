@@ -233,7 +233,7 @@ public struct PhonePushKeyMaterial: Sendable {
 
 extension PhonePushKeyMaterial {
     public static func current(bundleID: String, accessGroup: String? = nil) throws -> PhonePushKeyMaterial {
-        let service = "ai.manaflow.cmux.phone-push.\(bundleID)"
+        let service = "pro.shellx.desktop.phone-push.\(bundleID)"
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

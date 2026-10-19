@@ -789,7 +789,7 @@ def cmd_compare(args: argparse.Namespace) -> int:
 
 def _add_session_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--app", required=True, help="tagged build to measure (never /Applications or com.cmuxterm.app)")
-    parser.add_argument("--cli", required=True, help="the CLI bundled in that app (Contents/Resources/bin/cmux)")
+    parser.add_argument("--cli", required=True, help="the CLI bundled in that app (Contents/Resources/bin/shellx)")
     parser.add_argument("--out", required=True, help="JSON result file")
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--commit", default="unknown", help="source commit of the measured build")

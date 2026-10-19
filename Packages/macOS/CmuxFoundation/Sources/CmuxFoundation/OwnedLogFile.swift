@@ -8,7 +8,7 @@ public import Foundation
 /// regular file ``owner`` owns with no other hard link. New files are 0600.
 ///
 /// ```swift
-/// guard let handle = OwnedLogFile(path: "/tmp/cmux-bg.log").openForAppending() else { return }
+/// guard let handle = OwnedLogFile(path: "/tmp/shellx-bg.log").openForAppending() else { return }
 /// ```
 public struct OwnedLogFile: Sendable {
     /// The log file's path.

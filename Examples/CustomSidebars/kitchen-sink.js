@@ -1,6 +1,6 @@
 // kitchen-sink: every runtime feature on one scrolling panel. Use it as a
 // living demo and as a quick visual regression check for the JS lane.
-//   cp Examples/CustomSidebars/kitchen-sink.js ~/.config/cmux/sidebars/
+//   cp Examples/CustomSidebars/kitchen-sink.js ~/.config/shellx/sidebars/
 //   cmux right-sidebar set custom kitchen-sink    (or open it on the left)
 
 const [count, setCount] = signal(0);

@@ -72,7 +72,7 @@ struct LocalTmuxSessionRegistry {
         self.fileManager = fileManager
     }
 
-    /// The registry at `~/.cmux/<directoryName>`, or at the path in
+    /// The registry at `~/.shellx/<directoryName>`, or at the path in
     /// `overrideVariable` when set. local-zellij keeps its records in the
     /// same format under its own directory.
     static func live(
@@ -90,7 +90,7 @@ struct LocalTmuxSessionRegistry {
             )
         } else {
             root = fileManager.homeDirectoryForCurrentUser
-                .appendingPathComponent(".cmux", isDirectory: true)
+                .appendingPathComponent(".shellx", isDirectory: true)
                 .appendingPathComponent(directoryName, isDirectory: true)
         }
         return LocalTmuxSessionRegistry(rootURL: root, fileManager: fileManager)

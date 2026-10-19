@@ -81,7 +81,7 @@ public enum SettingsSectionID: String, CaseIterable, Identifiable, Sendable, Has
         case .globalHotkey: return String(localized: "settings.section.globalHotkey", defaultValue: "Global Hotkey")
         case .keyboardShortcuts: return String(localized: "settings.section.keyboardShortcuts", defaultValue: "Keyboard Shortcuts")
         case .workspaceColors: return String(localized: "settings.section.workspaceColors", defaultValue: "Workspace Colors")
-        case .settingsJSON: return "cmux.json"
+        case .settingsJSON: return "shellx.json"
         case .reset: return String(localized: "settings.section.reset", defaultValue: "Reset")
         }
     }

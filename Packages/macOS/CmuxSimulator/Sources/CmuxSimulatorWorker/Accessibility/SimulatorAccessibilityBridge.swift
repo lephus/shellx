@@ -26,7 +26,7 @@ final class SimulatorAccessibilityBridge: NSObject, @unchecked Sendable {
     static let maximumTextUTF8ByteCount = 512
 
     private let completionQueue = DispatchQueue(
-        label: "com.cmux.simulator.accessibility",
+        label: "pro.shellx.simulator.accessibility",
         qos: .userInitiated
     )
     let accessibilityGrid: SimulatorAccessibilityGrid

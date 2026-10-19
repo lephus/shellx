@@ -622,7 +622,7 @@ struct MachinesPanelView: View {
         }
         // Use the same app-bundled cmux executable that owns the selected team;
         // a login shell can otherwise resolve a different installation.
-        let cmuxExecutable = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/bin/cmux").path
+        let cmuxExecutable = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/bin/shellx").path
         let command = provider.addCommand(
             for: destination.organizationID,
             scope: destination.teamScope,

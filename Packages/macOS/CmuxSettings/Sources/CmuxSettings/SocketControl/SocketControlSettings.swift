@@ -1,5 +1,6 @@
 public import Darwin
 public import Foundation
+import ShellXBrand
 
 /// Pure resolution policy for the cmux control socket: where its path lives, which
 /// ``SocketControlMode`` is in effect, and how environment overrides apply.
@@ -20,9 +21,10 @@ public struct SocketControlSettings {
     public static let launchTagEnvKey = "CMUX_TAG"
     /// Base bundle identifier shared by all debug builds.
     public static let baseDebugBundleIdentifier = SocketPathMarkerFiles.defaultBaseDebugBundleIdentifier
-    private static let stableSocketFileName = "cmux.sock"
+    /// The stable control socket file name (`shellx.sock`).
+    public static let stableSocketFileName = "\(ShellXBrand.socketBaseName).sock"
     /// Legacy stable socket path used before the Application Support location.
-    public static let legacyStableDefaultSocketPath = "/tmp/cmux.sock"
+    public static let legacyStableDefaultSocketPath = "/tmp/\(ShellXBrand.socketBaseName).sock"
 
     /// The stable build's default socket path (within ``CmuxStateDirectory``, falling back to `/tmp`).
     public static var stableDefaultSocketPath: String {
@@ -351,16 +353,21 @@ public struct SocketControlSettings {
         }
     }
 
-    /// The per-user stable socket path (`cmux-<uid>.sock` in ``CmuxStateDirectory``, `/tmp` fallback).
+    /// The per-user stable socket file name (`shellx-<uid>.sock`).
+    public static func userScopedSocketFileName(currentUserID: uid_t = getuid()) -> String {
+        "\(ShellXBrand.socketBaseName)-\(currentUserID).sock"
+    }
+
+    /// The per-user stable socket path (`shellx-<uid>.sock` in ``CmuxStateDirectory``, `/tmp` fallback).
     public static func userScopedStableSocketPath(currentUserID: uid_t = getuid()) -> String {
         stableSocketDirectoryURL()?
-            .appendingPathComponent("cmux-\(currentUserID).sock", isDirectory: false)
-            .path ?? "/tmp/cmux-\(currentUserID).sock"
+            .appendingPathComponent(userScopedSocketFileName(currentUserID: currentUserID), isDirectory: false)
+            .path ?? legacyUserScopedStableSocketPath(currentUserID: currentUserID)
     }
 
     /// The legacy `/tmp` per-user stable socket path.
     public static func legacyUserScopedStableSocketPath(currentUserID: uid_t = getuid()) -> String {
-        "/tmp/cmux-\(currentUserID).sock"
+        "/tmp/" + userScopedSocketFileName(currentUserID: currentUserID)
     }
 
     /// The stable default socket path, falling back to the per-user path when the shared one is taken.
@@ -435,7 +442,7 @@ public struct SocketControlSettings {
 
     /// The directory holding the control socket and its marker files.
     ///
-    /// Resolves to ``CmuxStateDirectory`` (`~/.local/state/cmux`) rather than
+    /// Resolves to ``CmuxStateDirectory`` (`~/.local/state/shellx`) rather than
     /// Application Support: the separately-signed `cmux` CLI connects to this
     /// socket on every agent hook, and a different-identity process reaching into
     /// the app's Application Support data triggers the macOS Sequoia "access data

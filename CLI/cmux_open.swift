@@ -41,7 +41,7 @@ enum CMUXAgentTurnDiffBaselineFile {
                 .appendingPathComponent("agent-turn-diff-baselines.json", isDirectory: false)
                 .path
         }
-        return homeExpandedPath("~/.cmuxterm/agent-turn-diff-baselines.json", env: env)
+        return homeExpandedPath("~/.shellx/agent-turn-diff-baselines.json", env: env)
     }
 
     private static func normalized(_ value: String?) -> String? {
@@ -1085,7 +1085,7 @@ extension CMUXCLI {
 
     private func taggedDiffViewerExecutableURL(socketPath: String) -> URL? {
         let socketName = URL(fileURLWithPath: socketPath).lastPathComponent
-        let prefix = "cmux-debug-"
+        let prefix = "shellx-debug-"
         let suffix = ".sock"
         guard socketName.hasPrefix(prefix), socketName.hasSuffix(suffix) else {
             return nil
@@ -1107,7 +1107,7 @@ extension CMUXCLI {
         let candidate = URL(fileURLWithPath: homePath, isDirectory: true)
             .appendingPathComponent("Library/Developer/Xcode/DerivedData/cmux-\(tag)", isDirectory: true)
             .appendingPathComponent("Build/Products/Debug/ShellX DEV \(tag).app", isDirectory: true)
-            .appendingPathComponent("Contents/Resources/bin/cmux", isDirectory: false)
+            .appendingPathComponent("Contents/Resources/bin/shellx", isDirectory: false)
             .standardizedFileURL
 
         guard FileManager.default.isExecutableFile(atPath: candidate.path) else {

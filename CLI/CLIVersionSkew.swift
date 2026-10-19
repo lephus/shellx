@@ -146,7 +146,7 @@ enum CLIVersionSkew {
                 fix = String(
                     format: String(
                         localized: "cli.versionSkew.fix.otherProductNoPath",
-                        defaultValue: "This socket belongs to %@, which has its own CLI. Run the cmux CLI inside that app's bundle (Contents/Resources/bin/cmux).",
+                        defaultValue: "This socket belongs to %@, which has its own CLI. Run the cmux CLI inside that app's bundle (Contents/Resources/bin/shellx).",
                         bundle: bundle
                     ),
                     locale: .current,
@@ -162,7 +162,7 @@ enum CLIVersionSkew {
                     bundle: bundle
                 ),
                 locale: .current,
-                peerCLI ?? "Contents/Resources/bin/cmux"
+                peerCLI ?? "Contents/Resources/bin/shellx"
             )
         } else if order == .orderedDescending || (peer != nil && peer?.app == nil && peer?.version == nil) {
             // The app is older, or answers identify without `app` and

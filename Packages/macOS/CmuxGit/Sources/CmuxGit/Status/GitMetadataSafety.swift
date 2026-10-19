@@ -75,7 +75,7 @@ extension GitMetadataService {
     /// cooperative executor. The sidebar's process-wide probe limiter bounds
     /// callers; this queue only provides the correct blocking-I/O execution lane.
     nonisolated static let blockingStatusQueue = DispatchQueue(
-        label: "com.cmux.git-metadata-status",
+        label: "pro.shellx.git-metadata-status",
         qos: .utility,
         attributes: .concurrent
     )

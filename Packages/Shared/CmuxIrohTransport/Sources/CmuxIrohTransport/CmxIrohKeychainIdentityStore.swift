@@ -15,7 +15,7 @@ public actor CmxIrohKeychainIdentityStore: CmxIrohSecureIdentityStoring {
     ///   - legacyService: An older service whose item may be adopted only from
     ///     the same exact access group.
     public init(
-        service: String = "com.cmuxterm.iroh.endpoint-identity.v1",
+        service: String = "pro.shellx.desktop.iroh.endpoint-identity.v1",
         accessGroup: String? = nil,
         legacyService: String? = nil
     ) {

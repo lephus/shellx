@@ -41,7 +41,7 @@ enum BundledCLITestSupport {
         )
         while let item = enumerator?.nextObject() as? URL {
             guard item.lastPathComponent == "cmux",
-                  item.path.contains(".app/Contents/Resources/bin/cmux"),
+                  item.path.contains(".app/Contents/Resources/bin/shellx"),
                   fileManager.isExecutableFile(atPath: item.path) else { continue }
             return item
         }

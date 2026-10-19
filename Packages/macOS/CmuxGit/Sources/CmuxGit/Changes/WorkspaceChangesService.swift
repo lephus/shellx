@@ -26,7 +26,7 @@ public struct WorkspaceChangesService: Sendable {
     /// wall deadline; they run on this GCD queue so the Swift concurrency
     /// cooperative pool is never occupied by blocking waits.
     let blockingGitQueue = DispatchQueue(
-        label: "com.cmux.workspace-changes.git",
+        label: "pro.shellx.workspace-changes.git",
         qos: .utility,
         attributes: .concurrent
     )

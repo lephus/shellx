@@ -740,12 +740,12 @@ struct CodexHookInjectionStrippingTests {
     /// A cmux-wrapper-injected claude hook settings payload in joined
     /// `--settings=` form.
     private let cmuxClaudeHookSettingsMarker =
-        #"--settings={"preferredNotifChannel":"notifications_disabled","hooks":{"SessionStart":[{"matcher":"","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}\" hooks claude session-start","timeout":10}]}]}}"#
+        #"--settings={"preferredNotifChannel":"notifications_disabled","hooks":{"SessionStart":[{"matcher":"","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}\" hooks claude session-start","timeout":10}]}]}}"#
 
     /// The same cmux-wrapper-injected claude hook settings payload in split
     /// `--settings <json>` form.
     private let cmuxClaudeHookSettingsValue =
-        #"{"preferredNotifChannel":"notifications_disabled","hooks":{"SessionStart":[{"matcher":"","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}\" hooks claude session-start","timeout":10}]}]}}"#
+        #"{"preferredNotifChannel":"notifications_disabled","hooks":{"SessionStart":[{"matcher":"","hooks":[{"type":"command","command":"\"${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}\" hooks claude session-start","timeout":10}]}]}}"#
 
     /// User-owned settings may mention hook commands without proving that cmux's
     /// wrapper launched the executable.

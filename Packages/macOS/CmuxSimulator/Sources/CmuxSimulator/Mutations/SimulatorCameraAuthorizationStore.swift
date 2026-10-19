@@ -40,10 +40,10 @@ public struct SimulatorCameraAuthorizationStore: Sendable {
                 for: .applicationSupportDirectory,
                 in: .userDomainMask
             ).first?
-                .appendingPathComponent("com.cmux.simulator-ownership", isDirectory: true)
+                .appendingPathComponent("pro.shellx.simulator-ownership", isDirectory: true)
                 .appendingPathComponent("camera-authorizations", isDirectory: true)
             let legacyDirectory = legacyDirectory ?? fileManager.temporaryDirectory
-                .appendingPathComponent("com.cmux.simulator-ownership", isDirectory: true)
+                .appendingPathComponent("pro.shellx.simulator-ownership", isDirectory: true)
                 .appendingPathComponent("camera-authorizations", isDirectory: true)
             let pathsMatch = directory.map {
                 legacyDirectory.standardizedFileURL.path

@@ -9,7 +9,7 @@ import Foundation
 /// subprocess read loops and bounded file scans can stop early even though
 /// they run outside any Swift task.
 final class WorkspaceChangesCancellationSignal: @unchecked Sendable {
-    private static let threadKey = "com.cmux.workspace-changes.cancellation"
+    private static let threadKey = "pro.shellx.workspace-changes.cancellation"
     private let lock = NSLock()
     private let deadline: DispatchTime?
     private var cancelled = false

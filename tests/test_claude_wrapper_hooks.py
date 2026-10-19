@@ -22,7 +22,7 @@ from node_runtime import ensure_node_on_path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_WRAPPER = ROOT / "Resources" / "bin" / "cmux-claude-wrapper"
+SOURCE_WRAPPER = ROOT / "Resources" / "bin" / "shellx-claude-wrapper"
 CLIENT_POLICY = ROOT / "skills" / "cmux-cua" / "client-policy.sh"
 _RETAINED_SETTINGS_FIXTURES: list[Path] = []
 
@@ -47,16 +47,16 @@ def retain_settings_artifact_for_assertions(
     if index + 1 >= len(real_argv):
         return real_argv
     source = Path(real_argv[index + 1])
-    durable_root = home / ".cmuxterm" / "claude-settings"
+    durable_root = home / ".shellx" / "claude-settings"
     if not source.is_file() or source.parent != durable_root:
         return real_argv
     if original_directory_modes is not None:
         original_directory_modes["cmuxterm"] = source.parent.parent.stat().st_mode & 0o777
         original_directory_modes["claude-settings"] = source.parent.stat().st_mode & 0o777
-    fixture_root = Path(tempfile.mkdtemp(prefix="cmux-claude-wrapper-settings-fixture-"))
-    fixture_dir = fixture_root / ".cmuxterm" / "claude-settings"
+    fixture_root = Path(tempfile.mkdtemp(prefix="shellx-claude-wrapper-settings-fixture-"))
+    fixture_dir = fixture_root / ".shellx" / "claude-settings"
     fixture_dir.mkdir(parents=True)
-    fixture_root.joinpath(".cmuxterm").chmod(0o700)
+    fixture_root.joinpath(".shellx").chmod(0o700)
     fixture_dir.chmod(0o700)
     target = fixture_dir / source.name
     shutil.copy2(source, target)
@@ -288,7 +288,7 @@ def run_wrapper(
     # Root the sandbox under HOME: the wrapper trusts the installed Computer Use
     # client only when no ancestor is group- or world-writable, which rules out
     # a /tmp root.
-    with tempfile.TemporaryDirectory(prefix="cmux-claude-wrapper-test-", dir=str(Path.home())) as td:
+    with tempfile.TemporaryDirectory(prefix="shellx-claude-wrapper-test-", dir=str(Path.home())) as td:
         tmp = Path(td)
         wrapper_dir = tmp / "cmux.app" / "Contents" / "Resources" / "bin"
         real_dir = tmp / "real-bin"
@@ -297,7 +297,7 @@ def run_wrapper(
         real_dir.mkdir(parents=True, exist_ok=True)
         bundled_dir.mkdir(parents=True, exist_ok=True)
 
-        wrapper = wrapper_dir / "cmux-claude-wrapper"
+        wrapper = wrapper_dir / "shellx-claude-wrapper"
         install_wrapper_copy(wrapper)
 
         real_args_log = tmp / "real-args.log"
@@ -553,14 +553,14 @@ def run_wrapper_terminal_env_probe(
     restore_token: str | None = None,
     help_output: str = "",
 ) -> tuple[int, dict[str, str], list[str], str, set[str]]:
-    with tempfile.TemporaryDirectory(prefix="cmux-claude-wrapper-env-probe-") as td:
+    with tempfile.TemporaryDirectory(prefix="shellx-claude-wrapper-env-probe-") as td:
         tmp = Path(td)
         wrapper_dir = tmp / "wrapper-bin"
         real_dir = tmp / "real-bin"
         wrapper_dir.mkdir(parents=True, exist_ok=True)
         real_dir.mkdir(parents=True, exist_ok=True)
 
-        wrapper = wrapper_dir / "cmux-claude-wrapper"
+        wrapper = wrapper_dir / "shellx-claude-wrapper"
         install_wrapper_copy(wrapper)
 
         env_log = tmp / "real-env.log"
@@ -685,14 +685,14 @@ def run_wrapper_auth_env(
     in_cmux: bool = True,
     setup_env=None,
 ) -> tuple[int, dict[str, str], list[str], str]:
-    with tempfile.TemporaryDirectory(prefix="cmux-claude-wrapper-auth-env-") as td:
+    with tempfile.TemporaryDirectory(prefix="shellx-claude-wrapper-auth-env-") as td:
         tmp = Path(td)
         wrapper_dir = tmp / "wrapper-bin"
         real_dir = tmp / "real-bin"
         wrapper_dir.mkdir(parents=True, exist_ok=True)
         real_dir.mkdir(parents=True, exist_ok=True)
 
-        wrapper = wrapper_dir / "cmux-claude-wrapper"
+        wrapper = wrapper_dir / "shellx-claude-wrapper"
         install_wrapper_copy(wrapper)
 
         auth_env_log = tmp / "auth-env.log"
@@ -1453,7 +1453,7 @@ def test_live_socket_invalid_settings_warns_and_falls_back(failures: list[str]) 
 def test_live_socket_merges_settings_file_form(failures: list[str]) -> None:
     # --settings <path> reads JSON from disk (readFileSync/expand). Exercise that
     # loader branch end-to-end so path parsing/merging cannot silently regress.
-    with tempfile.TemporaryDirectory(prefix="cmux-claude-wrapper-settings-file-") as td:
+    with tempfile.TemporaryDirectory(prefix="shellx-claude-wrapper-settings-file-") as td:
         settings_path = Path(td) / "user-settings.json"
         settings_path.write_text('{"ultracode": true, "effortLevel": "max"}', encoding="utf-8")
         code, real_argv, _cmux_log, stderr, *_ = run_wrapper(
@@ -1533,7 +1533,7 @@ def test_multibyte_settings_argument_uses_byte_limit(failures: list[str]) -> Non
 
 
 def test_large_settings_file_is_merged_without_argv_growth(failures: list[str]) -> None:
-    with tempfile.TemporaryDirectory(prefix="cmux-claude-wrapper-large-settings-file-") as td:
+    with tempfile.TemporaryDirectory(prefix="shellx-claude-wrapper-large-settings-file-") as td:
         settings_path = Path(td) / "large-settings.json"
         large_value = "x" * 200_000
         settings_path.write_text(json.dumps({"largeUserValue": large_value}), encoding="utf-8")
@@ -1566,7 +1566,7 @@ def test_large_settings_file_is_merged_without_argv_growth(failures: list[str]) 
 
 def test_settings_artifact_survives_tmpdir_purge(failures: list[str]) -> None:
     """Claude's persisted --settings path must live outside the purged TMPDIR."""
-    with tempfile.TemporaryDirectory(prefix="cmux-claude-wrapper-settings-purge-") as td:
+    with tempfile.TemporaryDirectory(prefix="shellx-claude-wrapper-settings-purge-") as td:
         session_tmpdir = Path(td) / "session-tmp"
         session_tmpdir.mkdir()
         cases = (
@@ -1589,7 +1589,7 @@ def test_settings_artifact_survives_tmpdir_purge(failures: list[str]) -> None:
             expect(
                 settings_path.is_absolute()
                 and settings_path.parent.name == "claude-settings"
-                and settings_path.parent.parent.name == ".cmuxterm"
+                and settings_path.parent.parent.name == ".shellx"
                 and not str(settings_path).startswith(str(session_tmpdir) + os.sep),
                 f"{label} settings purge: path must be durable and outside TMPDIR, got {settings_path}",
                 failures,
@@ -1618,13 +1618,13 @@ def test_settings_artifact_survives_tmpdir_purge(failures: list[str]) -> None:
 
 
 def test_settings_cache_rejects_symlinked_directory(failures: list[str]) -> None:
-    with tempfile.TemporaryDirectory(prefix="cmux-claude-wrapper-settings-link-") as td:
+    with tempfile.TemporaryDirectory(prefix="shellx-claude-wrapper-settings-link-") as td:
         root = Path(td)
         home = root / "home"
         target = root / "target"
         home.mkdir()
         target.mkdir()
-        (home / ".cmuxterm").symlink_to(target, target_is_directory=True)
+        (home / ".shellx").symlink_to(target, target_is_directory=True)
 
         def setup(_tmp: Path, env: dict[str, str]) -> None:
             env["HOME"] = str(home)
@@ -1761,7 +1761,7 @@ def test_subcommand_discovery_cache_and_binary_identity(failures: list[str]) -> 
                 env["HOME"] = str(home)
                 env["FAKE_REAL_HELP_CALLS_LOG"] = str(calls)
                 real = tmp / "real-bin" / "claude"
-                wrapper = tmp / "cmux.app/Contents/Resources/bin/cmux-claude-wrapper"
+                wrapper = tmp / "cmux.app/Contents/Resources/bin/shellx-claude-wrapper"
                 env["CMUX_CUSTOM_CLAUDE_PATH"] = str(real)
                 if change == "symlink":
                     link = tmp / "claude-link"
@@ -1812,7 +1812,7 @@ def test_subcommand_cache_expires_for_unchanged_launchers(failures: list[str]) -
         home = tmp / "home"
         home.mkdir()
         env["HOME"] = str(home)
-        wrapper = tmp / "cmux.app/Contents/Resources/bin/cmux-claude-wrapper"
+        wrapper = tmp / "cmux.app/Contents/Resources/bin/shellx-claude-wrapper"
         # Perl's test-only preload replaces the clock imported by the wrapper;
         # alarms and filesystem timestamps retain their real behavior.
         (tmp / "CmuxTestClock.pm").write_text(
@@ -1863,7 +1863,7 @@ def test_subcommand_help_failure_falls_back_and_is_cached(failures: list[str]) -
                 home.mkdir()
                 env["HOME"] = str(home)
                 env["FAKE_REAL_HELP_CALLS_LOG"] = str(calls)
-                wrapper = tmp / "cmux.app/Contents/Resources/bin/cmux-claude-wrapper"
+                wrapper = tmp / "cmux.app/Contents/Resources/bin/shellx-claude-wrapper"
                 proc = subprocess.run([str(wrapper), "hello"], cwd=tmp, env=env,
                                       capture_output=True, text=True, timeout=15)
                 observed = read_lines(Path(env["FAKE_REAL_ARGS_LOG"]))
@@ -1926,7 +1926,7 @@ def test_subcommand_help_cancellation_cleans_up_children(failures: list[str]) ->
             home = tmp / "home"
             home.mkdir()
             env["HOME"] = str(home)
-            wrapper = tmp / "cmux.app/Contents/Resources/bin/cmux-claude-wrapper"
+            wrapper = tmp / "cmux.app/Contents/Resources/bin/shellx-claude-wrapper"
             pid_log = Path(env["FAKE_REAL_HELP_PIDS_LOG"])
             proc = subprocess.Popen([str(wrapper), "hello"], cwd=tmp, env=env,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -3520,9 +3520,9 @@ def test_live_socket_enforces_heap_cap_for_space_separated_flag(failures: list[s
 
 
 def test_live_socket_tmpdir_failure_keeps_node_options_injection(failures: list[str]) -> None:
-    # The restore preload lives in ~/.cmuxterm, not $TMPDIR (#12022), so an
+    # The restore preload lives in ~/.shellx, not $TMPDIR (#12022), so an
     # unusable TMPDIR no longer disables the NODE_OPTIONS injection.
-    with tempfile.TemporaryDirectory(prefix="cmux-claude-wrapper-bad-tmp-") as td:
+    with tempfile.TemporaryDirectory(prefix="shellx-claude-wrapper-bad-tmp-") as td:
         bad_tmpdir = Path(td) / "not-a-directory"
         bad_tmpdir.write_text("occupied", encoding="utf-8")
         code, real_argv, cmux_log, stderr, claudecode, node_options, runtime_node_options, child_node_options, _, _ = run_wrapper(
@@ -3538,8 +3538,8 @@ def test_live_socket_tmpdir_failure_keeps_node_options_injection(failures: list[
     require_flag, _, remaining_flags = node_options.partition(" ")
     expect(
         require_flag.startswith("--require=")
-        and require_flag.endswith("/.cmuxterm/cmux-claude-node-options/restore-node-options.cjs"),
-        f"tmpdir failure: expected restore preload under ~/.cmuxterm, got {node_options!r}",
+        and require_flag.endswith("/.shellx/cmux-claude-node-options/restore-node-options.cjs"),
+        f"tmpdir failure: expected restore preload under ~/.shellx, got {node_options!r}",
         failures,
     )
     expect(
@@ -3679,7 +3679,7 @@ def test_live_socket_native_claude_skips_node_options_injection(failures: list[s
 
     # The wrapper quotes the preload when $HOME has spaces (#14814); the
     # quoted flag is stripped whole, not split into fragments.
-    quoted = '--require="/Users/a b/.cmuxterm/cmux-claude-node-options/restore-node-options.cjs" --max-old-space-size=4096'
+    quoted = '--require="/Users/a b/.shellx/cmux-claude-node-options/restore-node-options.cjs" --max-old-space-size=4096'
     code, _, _, stderr, _, node_options, _, child_node_options, _, _ = run_wrapper(
         socket_state="live",
         argv=["hello"],
@@ -3739,7 +3739,7 @@ def test_live_socket_preserves_explicit_bypass_availability_flag(failures: list[
 def test_live_socket_stale_mktemp_literal_does_not_warn(failures: list[str]) -> None:
     def setup(tmp: Path, env: dict[str, str]) -> None:
         home = tmp / "home"
-        guard_dir = home / ".cmuxterm" / "cmux-claude-node-options"
+        guard_dir = home / ".shellx" / "cmux-claude-node-options"
         guard_dir.mkdir(parents=True)
         # Literal mktemp template names left behind by an older wrapper.
         (guard_dir / ".restore-node-options.cjs.XXXXXX").write_text("stale", encoding="utf-8")

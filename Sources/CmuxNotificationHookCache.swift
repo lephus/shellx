@@ -85,9 +85,9 @@ actor CmuxNotificationHookCache {
         var paths: [String] = []
         while true {
             let candidates = [
-                ((current as NSString).appendingPathComponent(".cmux") as NSString)
-                    .appendingPathComponent("cmux.json"),
-                (current as NSString).appendingPathComponent("cmux.json"),
+                ((current as NSString).appendingPathComponent(".shellx") as NSString)
+                    .appendingPathComponent("shellx.json"),
+                (current as NSString).appendingPathComponent("shellx.json"),
             ]
             if let candidate = candidates.first(where: { fileManager.fileExists(atPath: $0) }) {
                 paths.append(candidate)

@@ -208,7 +208,7 @@ extension CMUXCLI {
         }
         let home = FileManager.default.homeDirectoryForCurrentUser
         return home
-            .appendingPathComponent(".cmuxterm", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("agent-journal-dead-letter.jsonl", isDirectory: false)
     }
 

@@ -308,7 +308,7 @@ def --wrapped claude [...args: string] {
     } else if ($shim != "") and ($shim | path exists) {
         ^$shim ...$args
     } else {
-        let wrapper = (_cmux_wrapper_path "cmux-claude-wrapper")
+        let wrapper = (_cmux_wrapper_path "shellx-claude-wrapper")
         if ($wrapper != "") {
             ^$wrapper ...$args
         } else {

@@ -30,7 +30,7 @@ struct RemoteCodexWrapperProvisioningTests {
         process.waitUntilExit()
         #expect(process.terminationStatus == 0)
 
-        let installed = root.appendingPathComponent(".shellx/bin/cmux-codex-wrapper")
+        let installed = root.appendingPathComponent(".shellx/bin/shellx-codex-wrapper")
         #expect(try String(contentsOf: installed, encoding: .utf8) == wrapper + "\n")
         #expect(FileManager.default.isExecutableFile(atPath: installed.path))
 
@@ -87,6 +87,6 @@ struct RemoteCodexWrapperProvisioningTests {
         let bin = root.appendingPathComponent(".shellx/bin")
         let remaining = try FileManager.default.contentsOfDirectory(atPath: bin.path)
         #expect(!remaining.contains(where: { $0.hasPrefix(".codex-wrapper.tmp.") }))
-        #expect(!remaining.contains("cmux-codex-wrapper"))
+        #expect(!remaining.contains("shellx-codex-wrapper"))
     }
 }

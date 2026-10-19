@@ -2265,8 +2265,8 @@ struct ComputerUseUXTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
         for wrapperName in [
-            "cmux-codex-wrapper",
-            "cmux-claude-wrapper",
+            "shellx-codex-wrapper",
+            "shellx-claude-wrapper",
         ] {
             let wrapperURL = repositoryRoot
                 .appendingPathComponent("Resources/bin", isDirectory: true)
@@ -2472,7 +2472,7 @@ struct ComputerUseUXTests {
         let settingURL = root.appendingPathComponent("enabled")
         let logURL = root.appendingPathComponent("disabled-value")
         try FileManager.default.createDirectory(at: binDirectory, withIntermediateDirectories: true)
-        let wrapperURL = binDirectory.appendingPathComponent("cmux-claude-wrapper")
+        let wrapperURL = binDirectory.appendingPathComponent("shellx-claude-wrapper")
         try """
         #!/usr/bin/env bash
         printf '%s' "${CMUX_COMPUTER_USE_MCP_DISABLED:-missing}" > "$CMUX_TEST_LOG"

@@ -16,10 +16,10 @@ import Testing
         } else {
             repoRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         }
-        let wrapperURL = repoRoot.appendingPathComponent("Resources/bin/cmux-claude-wrapper", isDirectory: false)
+        let wrapperURL = repoRoot.appendingPathComponent("Resources/bin/shellx-claude-wrapper", isDirectory: false)
         #expect(
             fileManager.isExecutableFile(atPath: wrapperURL.path),
-            "Bundled cmux-claude-wrapper must exist and be executable for resume environment coverage"
+            "Bundled shellx-claude-wrapper must exist and be executable for resume environment coverage"
         )
         guard fileManager.isExecutableFile(atPath: wrapperURL.path) else { return }
 
@@ -90,7 +90,7 @@ import Testing
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
-        try runWithBoundedWait(process, shellDescription: "cmux-claude-wrapper --resume")
+        try runWithBoundedWait(process, shellDescription: "shellx-claude-wrapper --resume")
 
         let recorded = try String(contentsOf: recordURL, encoding: .utf8)
         #expect(recorded.contains("--settings"), Comment(rawValue: recorded))

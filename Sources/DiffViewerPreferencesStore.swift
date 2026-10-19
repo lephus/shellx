@@ -26,7 +26,7 @@ final class DiffViewerPreferencesStore: @unchecked Sendable {
         self.fileURL = fileURL
     }
 
-    /// `~/Library/Application Support/cmux/diff-viewer/preferences.json`, the
+    /// `~/Library/Application Support/ShellX/diff-viewer/preferences.json`, the
     /// path the CLI reads (`CMUX_DIFF_VIEWER_PREFS_PATH` overrides it there and
     /// here). Nil under automated tests so suites never touch the user's file.
     nonisolated static func defaultFileURL(
@@ -44,7 +44,7 @@ final class DiffViewerPreferencesStore: @unchecked Sendable {
         }
         guard let appSupportDirectory else { return nil }
         return appSupportDirectory
-            .appendingPathComponent("cmux", isDirectory: true)
+            .appendingPathComponent("ShellX", isDirectory: true)
             .appendingPathComponent("diff-viewer", isDirectory: true)
             .appendingPathComponent("preferences.json", isDirectory: false)
     }

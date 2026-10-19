@@ -24,7 +24,7 @@ final class TerminalSurfaceRemoteOutputLane: @unchecked Sendable {
 
     init(surfaceID: UUID, generation: UInt64) {
         queue = DispatchQueue(
-            label: "com.cmux.terminal-surface.remote-output.\(surfaceID.uuidString).\(generation)",
+            label: "pro.shellx.terminal-surface.remote-output.\(surfaceID.uuidString).\(generation)",
             qos: .userInitiated
         )
     }

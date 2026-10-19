@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Regression tests for cmux-codex-wrapper attaching cmux's bundled Computer Use
+Regression tests for shellx-codex-wrapper attaching cmux's bundled Computer Use
 MCP client to Codex sessions.
 """
 
@@ -17,8 +17,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_WRAPPER = ROOT / "Resources" / "bin" / "cmux-codex-wrapper"
-SOURCE_CLAUDE_WRAPPER = ROOT / "Resources" / "bin" / "cmux-claude-wrapper"
+SOURCE_WRAPPER = ROOT / "Resources" / "bin" / "shellx-codex-wrapper"
+SOURCE_CLAUDE_WRAPPER = ROOT / "Resources" / "bin" / "shellx-claude-wrapper"
 SOURCE_LINK_POLICY = ROOT / "skills" / "cmux-cua" / "link-policy.sh"
 SOURCE_CLIENT_POLICY = ROOT / "skills" / "cmux-cua" / "client-policy.sh"
 
@@ -510,7 +510,7 @@ def expect_scrubbed_mcp_env(
     if state_dir is not None:
         expect(
             json.loads(state_dir).endswith(
-                f"/Library/Application Support/cmux/cmux-cua/runtime/{state_scope}/state"
+                f"/Library/Application Support/ShellX/cmux-cua/runtime/{state_scope}/state"
             ),
             f"{context}: unexpected state dir {state_dir}",
             failures,
@@ -553,14 +553,14 @@ def run_wrapper(
     non_cmux: bool = False,
     dev_tag: str | None = None,
 ) -> tuple[int, list[str], str, dict[str, object]]:
-    with tempfile.TemporaryDirectory(prefix="cmux-codex-wrapper-test-", dir=str(Path.home())) as td:
+    with tempfile.TemporaryDirectory(prefix="shellx-codex-wrapper-test-", dir=str(Path.home())) as td:
         tmp = Path(td)
         wrapper_dir = tmp / "cmux.app" / "Contents" / "Resources" / "bin"
         real_dir = tmp / "real-bin"
         wrapper_dir.mkdir(parents=True)
         real_dir.mkdir(parents=True)
 
-        wrapper = wrapper_dir / "cmux-codex-wrapper"
+        wrapper = wrapper_dir / "shellx-codex-wrapper"
         shutil.copy2(SOURCE_WRAPPER, wrapper)
         wrapper.chmod(0o755)
         bundled_skill = wrapper_dir.parent / "cmux-cua"

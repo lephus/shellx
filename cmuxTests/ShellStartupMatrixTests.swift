@@ -344,7 +344,7 @@ struct ShellStartupMatrixTests {
         let install = (["cmux_shell_dir=\"\(shellDir.path)\""]
             + RemoteInteractiveShellBootstrapBuilder.claudeWrapperInstallLines)
             .joined(separator: "\n")
-        let wrapper = shellDir.appendingPathComponent("bin/cmux-claude-wrapper").path
+        let wrapper = shellDir.appendingPathComponent("bin/shellx-claude-wrapper").path
         let result = runProcess(
             executablePath: "/usr/bin/env",
             arguments: [

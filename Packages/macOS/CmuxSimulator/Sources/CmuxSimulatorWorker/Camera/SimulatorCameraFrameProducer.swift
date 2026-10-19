@@ -11,7 +11,7 @@ final class SimulatorCameraFrameProducer {
     private let sessionRunner: SimulatorCameraSessionRunner
     private let fileManager: FileManager
     private let captureQueue = DispatchQueue(
-        label: "com.cmux.simulator.camera.capture",
+        label: "pro.shellx.simulator.camera.capture",
         qos: .userInteractive
     )
     private var videoTask: Task<Void, Never>?

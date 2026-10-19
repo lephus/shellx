@@ -116,11 +116,11 @@ public final class RemoteDaemonRPCClient: @unchecked Sendable {
     /// launches `/usr/bin/ssh`.
     var transportExecutableOverride: String?
     let onUnexpectedTermination: (String) -> Void
-    let transportKeepaliveQueue = DispatchQueue(label: "com.cmux.remote-ssh.daemon-rpc.keepalive.\(UUID().uuidString)")
-    let ptyAttachCancellationTimerQueue = DispatchQueue(label: "com.cmux.remote-ssh.daemon-rpc.pty-attach-cancel-timeout.\(UUID().uuidString)")
-    let writeQueue = DispatchQueue(label: "com.cmux.remote-ssh.daemon-rpc.write.\(UUID().uuidString)")
-    let stateQueue = DispatchQueue(label: "com.cmux.remote-ssh.daemon-rpc.state.\(UUID().uuidString)")
-    let cliRequestQueue = DispatchQueue(label: "com.cmux.remote-ssh.daemon-rpc.cli.\(UUID().uuidString)", qos: .utility, attributes: .concurrent)
+    let transportKeepaliveQueue = DispatchQueue(label: "pro.shellx.remote-ssh.daemon-rpc.keepalive.\(UUID().uuidString)")
+    let ptyAttachCancellationTimerQueue = DispatchQueue(label: "pro.shellx.remote-ssh.daemon-rpc.pty-attach-cancel-timeout.\(UUID().uuidString)")
+    let writeQueue = DispatchQueue(label: "pro.shellx.remote-ssh.daemon-rpc.write.\(UUID().uuidString)")
+    let stateQueue = DispatchQueue(label: "pro.shellx.remote-ssh.daemon-rpc.state.\(UUID().uuidString)")
+    let cliRequestQueue = DispatchQueue(label: "pro.shellx.remote-ssh.daemon-rpc.cli.\(UUID().uuidString)", qos: .utility, attributes: .concurrent)
     let pendingCalls = RemoteDaemonPendingCallRegistry()
 
     var process: Process?

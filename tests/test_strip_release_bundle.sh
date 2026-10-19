@@ -17,7 +17,7 @@ mkdir -p \
 
 for path in \
   "$APP/Contents/MacOS/cmux" \
-  "$APP/Contents/Resources/bin/cmux" \
+  "$APP/Contents/Resources/bin/shellx" \
   "$APP/Contents/Resources/bin/cmux-tui" \
   "$APP/Contents/Resources/bin/cmux-diff-sidecar" \
   "$APP/Contents/Resources/bin/ghostty" \
@@ -42,7 +42,7 @@ printf '{}\n' > "$APP/Contents/Resources/bin/cmux-tui-ssh/manifest.json"
 cat > "$TMP_DIR/tools/file" <<'EOF'
 #!/usr/bin/env bash
 case "$1" in
-  *"/Contents/MacOS/cmux"|*"/Contents/Resources/bin/cmux"|*"/Contents/Resources/bin/cmux-tui"|*"/Contents/Resources/bin/cmux-diff-sidecar"|*"CmuxDockTilePlugin"|*"/Contents/MacOS/cmuxTunnel"|*"libcmux_"*|*"-apple-darwin")
+  *"/Contents/MacOS/cmux"|*"/Contents/Resources/bin/shellx"|*"/Contents/Resources/bin/cmux-tui"|*"/Contents/Resources/bin/cmux-diff-sidecar"|*"CmuxDockTilePlugin"|*"/Contents/MacOS/cmuxTunnel"|*"libcmux_"*|*"-apple-darwin")
     printf '%s: Mach-O universal binary\n' "$1"
     ;;
   *)
@@ -69,7 +69,7 @@ CMUX_STRIP_TOOL="$TMP_DIR/tools/strip" \
 expected="$TMP_DIR/expected.log"
 printf '%s\n' \
   "$APP/Contents/MacOS/cmux" \
-  "$APP/Contents/Resources/bin/cmux" \
+  "$APP/Contents/Resources/bin/shellx" \
   "$APP/Contents/Resources/bin/cmux-tui" \
   "$APP/Contents/Resources/bin/cmux-diff-sidecar" \
   "-S -x $APP/Contents/Resources/bin/cmux-tui-ssh/cmux-tui-aarch64-apple-darwin" \

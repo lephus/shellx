@@ -261,7 +261,7 @@ private func isCmuxCodexHookCommand(_ command: String, subcommand: String) -> Bo
             return true
         }
         if !command.contains("\\"),
-           command.contains("cmux-codex-hook"),
+           command.contains("shellx-codex-hook"),
            command.contains("hooks codex \(candidate)")
             || command.contains("hooks enqueue codex \(candidate)") {
             return true
@@ -295,7 +295,7 @@ private func cmuxCodexHookScriptFilename(from command: String) -> String? {
     }
     let directoryComponents = url.deletingLastPathComponent().pathComponents
     guard directoryComponents.count >= 2,
-          Array(directoryComponents.suffix(2)) == [".cmux", "hooks"]
+          Array(directoryComponents.suffix(2)) == [".shellx", "hooks"]
     else {
         return nil
     }
