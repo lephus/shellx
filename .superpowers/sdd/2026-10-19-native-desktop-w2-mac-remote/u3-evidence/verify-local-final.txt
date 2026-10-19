@@ -1,0 +1,34 @@
+RUN swift-syntax: Swift syntax (66 selected files)
+PASSED swift-syntax (0.14s)
+RUN xcstrings: XCStrings structure
+PASSED xcstrings (0.40s)
+RUN localization: Localization parity
+PASSED localization (3.94s)
+RUN localization-defaults: Swift defaultValue parity
+PASSED localization-defaults (4.18s)
+RUN project-tests: Project normalizer tests
+PASSED project-tests (3.03s; 16 tests executed, 0 skipped)
+RUN project: Xcode project normalization and version
+PASSED project (0.92s)
+RUN test-wiring-sync: Test-wiring sync tool
+PASSED test-wiring-sync (5.75s; 18 tests executed, 0 skipped)
+RUN wire-app-sources: App-source wiring tool
+PASSED wire-app-sources (0.42s; 13 tests executed, 0 skipped)
+RUN ui-lab: ui-lab harness directives
+PASSED ui-lab (0.09s; 4 tests executed, 0 skipped)
+RUN ui-fuzzer: UI fuzzer engine
+PASSED ui-fuzzer (0.40s; 22 tests executed, 0 skipped)
+RUN launch-policy: Generated Claude launch policy
+PASSED launch-policy (0.08s)
+RUN test-wiring: Swift test wiring and regression guard
+PASSED test-wiring (5.58s)
+RUN package-groups: Workspace Swift package groups
+PASSED package-groups (0.09s)
+RUN remote-tmux-waits-tests: Remote-tmux time-based wait lint tests
+PASSED remote-tmux-waits-tests (3.40s)
+RUN remote-tmux-waits: Remote-tmux time-based waits
+PASSED remote-tmux-waits (0.51s)
+RUN feature-flags: Feature flag policy
+PASSED feature-flags (5.93s)
+PASSED: 16/16 selected checks ran. Native compilation, app tests and app launch were not checked.
+Next for Swift changes: use the normal native build/test workflow in CONTRIBUTING.md.

@@ -1,0 +1,655 @@
+[0/1] Planning build
+Building for debugging...
+[0/4] Write sources
+[1/4] Write swift-version--58304C5D6DBC2206.txt
+error: emit-module command failed with exit code 1 (use -v to see invocation)
+[3/7] Emitting module ShellXRemoteUITests
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:22:18: error: cannot find 'ApprovalPromptLabels' in scope
+ 20 | }
+ 21 | 
+ 22 | private let vi = ApprovalPromptLabels(
+    |                  `- error: cannot find 'ApprovalPromptLabels' in scope
+ 23 |     title: "%@ muốn xem và điều khiển máy này",
+ 24 |     compare: "Chỉ chấp thuận nếu mã và vân tay khớp với màn hình máy kia.",
+[4/7] Compiling ShellXRemoteUITests ApprovalPromptModelTests.swift
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:22:18: error: cannot find 'ApprovalPromptLabels' in scope
+ 20 | }
+ 21 | 
+ 22 | private let vi = ApprovalPromptLabels(
+    |                  `- error: cannot find 'ApprovalPromptLabels' in scope
+ 23 |     title: "%@ muốn xem và điều khiển máy này",
+ 24 |     compare: "Chỉ chấp thuận nếu mã và vân tay khớp với màn hình máy kia.",
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:40:17: error: cannot find 'ApprovalPromptModel' in scope
+ 38 |                               firstSeen: t0.addingTimeInterval(30))
+ 39 |         // The service lists them newest first; the oldest still comes first.
+ 40 |         let m = ApprovalPromptModel(queue: [younger, older], now: t0.addingTimeInterval(60))
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+ 41 |         #expect(m.current?.id == "a")
+ 42 |         #expect(m.title == "Mac Studio wants to view and control this Mac")
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:58:21: error: cannot find 'ApprovalPromptModel' in scope
+ 56 |     @Test func fingerprintIsAlwaysShownWithTheCode() {
+ 57 |         for suspicious in [false, true] {
+ 58 |             let m = ApprovalPromptModel(queue: [request("a", suspicious: suspicious)], now: t0)
+    |                     `- error: cannot find 'ApprovalPromptModel' in scope
+ 59 |             #expect(!m.codeText.isEmpty)
+ 60 |             #expect(!m.fingerprintText.isEmpty)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:65:17: error: cannot find 'ApprovalPromptModel' in scope
+ 63 | 
+ 64 |     @Test func suspiciousRequestCannotBeApproved() {
+ 65 |         let m = ApprovalPromptModel(
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+ 66 |             queue: [request("a", fingerprint: "deadbeef01234567", suspicious: true)], now: t0
+ 67 |         )
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:79:21: error: cannot find 'ApprovalPromptModel' in scope
+ 77 |     @Test func expiredRequestsAreDropped() {
+ 78 |         let r = request("a", firstSeen: t0)
+ 79 |         let after = ApprovalPromptModel(queue: [r], now: t0.addingTimeInterval(301))
+    |                     `- error: cannot find 'ApprovalPromptModel' in scope
+ 80 |         #expect(after.current == nil)
+ 81 |         #expect(after.queueText == nil)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:90:17: error: cannot find 'ApprovalPromptModel' in scope
+ 88 | 
+ 89 |         // `now >= expiresAt` drops it: exactly 300 s is already expired, 299 s is not.
+ 90 |         #expect(ApprovalPromptModel(queue: [r], now: t0.addingTimeInterval(300)).current == nil)
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+ 91 |         #expect(ApprovalPromptModel(queue: [r], now: t0.addingTimeInterval(299)).current?.id == "a")
+ 92 |     }
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:91:17: error: cannot find 'ApprovalPromptModel' in scope
+ 89 |         // `now >= expiresAt` drops it: exactly 300 s is already expired, 299 s is not.
+ 90 |         #expect(ApprovalPromptModel(queue: [r], now: t0.addingTimeInterval(300)).current == nil)
+ 91 |         #expect(ApprovalPromptModel(queue: [r], now: t0.addingTimeInterval(299)).current?.id == "a")
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+ 92 |     }
+ 93 | 
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:95:17: error: cannot find 'ApprovalPromptModel' in scope
+ 93 | 
+ 94 |     @Test func emptyQueueShowsNothing() {
+ 95 |         let m = ApprovalPromptModel(queue: [], now: t0)
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+ 96 |         #expect(m.current == nil)
+ 97 |         #expect(m.queueText == nil)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:109:17: error: cannot find 'ApprovalPromptModel' in scope
+107 |         let now = t0.addingTimeInterval(30)
+108 |         // The queue label is "%lld / %lld" in the catalog's Vietnamese text.
+109 |         #expect(ApprovalPromptModel(queue: [a, b], now: now, labels: vi).queueText == "1 / 2")
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+110 |         #expect(ApprovalPromptModel(queue: [a, b, c], now: now, labels: vi).queueText == "1 / 3")
+111 |         // English reads "1 of 2".
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:110:17: error: cannot find 'ApprovalPromptModel' in scope
+108 |         // The queue label is "%lld / %lld" in the catalog's Vietnamese text.
+109 |         #expect(ApprovalPromptModel(queue: [a, b], now: now, labels: vi).queueText == "1 / 2")
+110 |         #expect(ApprovalPromptModel(queue: [a, b, c], now: now, labels: vi).queueText == "1 / 3")
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+111 |         // English reads "1 of 2".
+112 |         #expect(ApprovalPromptModel(queue: [a, b], now: now).queueText == "1 of 2")
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:112:17: error: cannot find 'ApprovalPromptModel' in scope
+110 |         #expect(ApprovalPromptModel(queue: [a, b, c], now: now, labels: vi).queueText == "1 / 3")
+111 |         // English reads "1 of 2".
+112 |         #expect(ApprovalPromptModel(queue: [a, b], now: now).queueText == "1 of 2")
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+113 |         // One pending request needs no counter.
+114 |         #expect(ApprovalPromptModel(queue: [a], now: now, labels: vi).queueText == nil)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:114:17: error: cannot find 'ApprovalPromptModel' in scope
+112 |         #expect(ApprovalPromptModel(queue: [a, b], now: now).queueText == "1 of 2")
+113 |         // One pending request needs no counter.
+114 |         #expect(ApprovalPromptModel(queue: [a], now: now, labels: vi).queueText == nil)
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+115 |         // An expired request is not pending.
+116 |         let later = t0.addingTimeInterval(305)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:117:17: error: cannot find 'ApprovalPromptModel' in scope
+115 |         // An expired request is not pending.
+116 |         let later = t0.addingTimeInterval(305)
+117 |         let m = ApprovalPromptModel(queue: [a, b, c], now: later, labels: vi)
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+118 |         #expect(m.current?.id == "b")
+119 |         #expect(m.queueText == "1 / 2")
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:125:17: error: cannot find 'ApprovalPromptModel' in scope
+123 |         let a = request("a", firstSeen: t0)
+124 |         let b = request("b", firstSeen: t0.addingTimeInterval(100))
+125 |         #expect(ApprovalPromptModel(queue: [b, a], now: t0.addingTimeInterval(299)).current?.id == "a")
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+126 |         #expect(ApprovalPromptModel(queue: [b, a], now: t0.addingTimeInterval(300)).current?.id == "b")
+127 |         #expect(ApprovalPromptModel(queue: [b, a], now: t0.addingTimeInterval(400)).current == nil)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:126:17: error: cannot find 'ApprovalPromptModel' in scope
+124 |         let b = request("b", firstSeen: t0.addingTimeInterval(100))
+125 |         #expect(ApprovalPromptModel(queue: [b, a], now: t0.addingTimeInterval(299)).current?.id == "a")
+126 |         #expect(ApprovalPromptModel(queue: [b, a], now: t0.addingTimeInterval(300)).current?.id == "b")
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+127 |         #expect(ApprovalPromptModel(queue: [b, a], now: t0.addingTimeInterval(400)).current == nil)
+128 |     }
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:127:17: error: cannot find 'ApprovalPromptModel' in scope
+125 |         #expect(ApprovalPromptModel(queue: [b, a], now: t0.addingTimeInterval(299)).current?.id == "a")
+126 |         #expect(ApprovalPromptModel(queue: [b, a], now: t0.addingTimeInterval(300)).current?.id == "b")
+127 |         #expect(ApprovalPromptModel(queue: [b, a], now: t0.addingTimeInterval(400)).current == nil)
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+128 |     }
+129 | 
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:133:17: error: cannot find 'ApprovalPromptModel' in scope
+131 |         let a = request("a")
+132 |         let b = request("b")
+133 |         #expect(ApprovalPromptModel(queue: [a, b], now: t0).current?.id == "a")
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+134 |         #expect(ApprovalPromptModel(queue: [b, a], now: t0).current?.id == "b")
+135 |     }
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:134:17: error: cannot find 'ApprovalPromptModel' in scope
+132 |         let b = request("b")
+133 |         #expect(ApprovalPromptModel(queue: [a, b], now: t0).current?.id == "a")
+134 |         #expect(ApprovalPromptModel(queue: [b, a], now: t0).current?.id == "b")
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+135 |     }
+136 | 
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:140:17: error: cannot find 'ApprovalPromptModel' in scope
+138 |         let a = request("a", firstSeen: t0)
+139 |         let b = request("b", firstSeen: t0.addingTimeInterval(50))
+140 |         let m = ApprovalPromptModel(queue: [b, a], now: t0.addingTimeInterval(10))
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+141 |         #expect(m.nextExpiry == t0.addingTimeInterval(300))
+142 |     }
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:145:17: error: cannot find 'ApprovalPromptModel' in scope
+143 | 
+144 |     @Test func fingerprintMismatchFromTheServiceIsShownAsTheSuspiciousTextAndBlocksApproval() {
+145 |         let m = ApprovalPromptModel(queue: [request("a")], now: t0, failureCode: "fingerprint_mismatch")
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+146 |         #expect(m.warning == "The fingerprint does not match what the server reports. Do not approve.")
+147 |         #expect(m.errorText == nil)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:153:17: error: cannot find 'ApprovalPromptModel' in scope
+151 | 
+152 |     @Test func suspiciousRequestWithAMismatchShowsTheWarningOnce() {
+153 |         let m = ApprovalPromptModel(queue: [request("a", suspicious: true)], now: t0, failureCode: "fingerprint_mismatch")
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+154 |         #expect(m.warning != nil)
+155 |         #expect(m.errorText == nil)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:160:19: error: cannot find 'ApprovalPromptModel' in scope
+158 | 
+159 |     @Test func otherFailuresShowInlineAndKeepTheRequestApprovable() {
+160 |         let net = ApprovalPromptModel(queue: [request("a")], now: t0, failureCode: "network")
+    |                   `- error: cannot find 'ApprovalPromptModel' in scope
+161 |         #expect(net.errorText == "Can't reach relay.shellx.pro")
+162 |         #expect(net.warning == nil)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:165:21: error: cannot find 'ApprovalPromptModel' in scope
+163 |         #expect(net.canApprove)
+164 | 
+165 |         let viNet = ApprovalPromptModel(queue: [request("a")], now: t0, labels: vi, failureCode: "network")
+    |                     `- error: cannot find 'ApprovalPromptModel' in scope
+166 |         #expect(viNet.errorText == "Không kết nối được relay.shellx.pro")
+167 | 
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:168:21: error: cannot find 'ApprovalPromptModel' in scope
+166 |         #expect(viNet.errorText == "Không kết nối được relay.shellx.pro")
+167 | 
+168 |         let other = ApprovalPromptModel(queue: [request("a")], now: t0, failureCode: "http_500")
+    |                     `- error: cannot find 'ApprovalPromptModel' in scope
+169 |         #expect(other.errorText == "http_500")
+170 |         #expect(other.canApprove)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:174:17: error: cannot find 'ApprovalPromptModel' in scope
+172 | 
+173 |     @Test func aFailureOnASuspiciousRequestKeepsItNotApprovable() {
+174 |         let m = ApprovalPromptModel(queue: [request("a", suspicious: true)], now: t0, failureCode: "network")
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+175 |         #expect(m.warning != nil)
+176 |         #expect(m.errorText == "Can't reach relay.shellx.pro")
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:181:17: error: cannot find 'ApprovalPromptModel' in scope
+179 | 
+180 |     @Test func busyDisablesBothButtons() {
+181 |         let m = ApprovalPromptModel(queue: [request("a")], now: t0, isBusy: true)
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+182 |         #expect(m.isBusy)
+183 |         #expect(!m.canApprove)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:189:17: error: cannot find 'ApprovalPromptModel' in scope
+187 | 
+188 |     @Test func vietnameseTextComesFromTheInjectedLabels() {
+189 |         let m = ApprovalPromptModel(
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+190 |             queue: [request("a", name: "Máy tính văn phòng", suspicious: true)], now: t0, labels: vi
+191 |         )
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:201:17: error: cannot find 'ApprovalPromptModel' in scope
+199 |     @Test func aVeryLongNameStaysOneTitleForTheViewToTruncate() {
+200 |         let name = String(repeating: "Máy tính văn phòng tầng 3 ", count: 6)
+201 |         let m = ApprovalPromptModel(queue: [request("a", name: name)], now: t0, labels: vi)
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+202 |         #expect(m.titleLineLimit == 1)
+203 |         #expect(m.title.hasPrefix("Máy tính văn phòng tầng 3 "))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:209:17: error: cannot find 'ApprovalPromptModel' in scope
+207 |     @Test func modelsWithTheSameInputsAreEqual() {
+208 |         let r = request("a")
+209 |         #expect(ApprovalPromptModel(queue: [r], now: t0) == ApprovalPromptModel(queue: [r], now: t0))
+    |                 `- error: cannot find 'ApprovalPromptModel' in scope
+210 |         #expect(
+211 |             ApprovalPromptModel(queue: [r], now: t0)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:209:61: error: cannot find 'ApprovalPromptModel' in scope
+207 |     @Test func modelsWithTheSameInputsAreEqual() {
+208 |         let r = request("a")
+209 |         #expect(ApprovalPromptModel(queue: [r], now: t0) == ApprovalPromptModel(queue: [r], now: t0))
+    |                                                             `- error: cannot find 'ApprovalPromptModel' in scope
+210 |         #expect(
+211 |             ApprovalPromptModel(queue: [r], now: t0)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:211:13: error: cannot find 'ApprovalPromptModel' in scope
+209 |         #expect(ApprovalPromptModel(queue: [r], now: t0) == ApprovalPromptModel(queue: [r], now: t0))
+210 |         #expect(
+211 |             ApprovalPromptModel(queue: [r], now: t0)
+    |             `- error: cannot find 'ApprovalPromptModel' in scope
+212 |                 != ApprovalPromptModel(queue: [r], now: t0, failureCode: "network")
+213 |         )
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptModelTests.swift:212:20: error: cannot find 'ApprovalPromptModel' in scope
+210 |         #expect(
+211 |             ApprovalPromptModel(queue: [r], now: t0)
+212 |                 != ApprovalPromptModel(queue: [r], now: t0, failureCode: "network")
+    |                    `- error: cannot find 'ApprovalPromptModel' in scope
+213 |         )
+214 |     }
+[5/7] Compiling ShellXRemoteUITests ApprovalPromptTrackerTests.swift
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:21:23: error: cannot find 'ApprovalPromptTracker' in scope
+ 19 | @Suite struct ApprovalPromptTrackerTests {
+ 20 |     @Test func approvingTheShownRequestStartsAndThenHidesItEvenIfTheServiceStillListsIt() {
+ 21 |         var tracker = ApprovalPromptTracker()
+    |                       `- error: cannot find 'ApprovalPromptTracker' in scope
+ 22 |         let queue = [request("a"), request("b", firstSeen: t0.addingTimeInterval(5))]
+ 23 |         let started = tracker.begin(.approve, requestID: "a", queue: queue, now: t0.addingTimeInterval(10))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:23:38: error: cannot infer contextual base in reference to member 'approve'
+ 21 |         var tracker = ApprovalPromptTracker()
+ 22 |         let queue = [request("a"), request("b", firstSeen: t0.addingTimeInterval(5))]
+ 23 |         let started = tracker.begin(.approve, requestID: "a", queue: queue, now: t0.addingTimeInterval(10))
+    |                                      `- error: cannot infer contextual base in reference to member 'approve'
+ 24 |         #expect(started)
+ 25 |         #expect(tracker.model(queue: queue, now: t0.addingTimeInterval(10)).isBusy)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:27:25: error: cannot infer contextual base in reference to member 'approve'
+ 25 |         #expect(tracker.model(queue: queue, now: t0.addingTimeInterval(10)).isBusy)
+ 26 | 
+ 27 |         tracker.finish(.approve, requestID: "a", failureCode: nil)
+    |                         `- error: cannot infer contextual base in reference to member 'approve'
+ 28 |         let model = tracker.model(queue: queue, now: t0.addingTimeInterval(11))
+ 29 |         #expect(!model.isBusy)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:27:63: error: 'nil' requires a contextual type
+ 25 |         #expect(tracker.model(queue: queue, now: t0.addingTimeInterval(10)).isBusy)
+ 26 | 
+ 27 |         tracker.finish(.approve, requestID: "a", failureCode: nil)
+    |                                                               `- error: 'nil' requires a contextual type
+ 28 |         let model = tracker.model(queue: queue, now: t0.addingTimeInterval(11))
+ 29 |         #expect(!model.isBusy)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:36:23: error: cannot find 'ApprovalPromptTracker' in scope
+ 34 | 
+ 35 |     @Test func suspiciousRequestIsNeverApprovedButCanBeDenied() {
+ 36 |         var tracker = ApprovalPromptTracker()
+    |                       `- error: cannot find 'ApprovalPromptTracker' in scope
+ 37 |         let queue = [request("a", suspicious: true)]
+ 38 |         #expect(!tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:38:33: error: cannot infer contextual base in reference to member 'approve'
+ 36 |         var tracker = ApprovalPromptTracker()
+ 37 |         let queue = [request("a", suspicious: true)]
+ 38 |         #expect(!tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+    |                                 `- error: cannot infer contextual base in reference to member 'approve'
+ 39 |         #expect(!tracker.model(queue: queue, now: t0).isBusy)
+ 40 |         #expect(tracker.begin(.deny, requestID: "a", queue: queue, now: t0))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:40:32: error: cannot infer contextual base in reference to member 'deny'
+ 38 |         #expect(!tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+ 39 |         #expect(!tracker.model(queue: queue, now: t0).isBusy)
+ 40 |         #expect(tracker.begin(.deny, requestID: "a", queue: queue, now: t0))
+    |                                `- error: cannot infer contextual base in reference to member 'deny'
+ 41 |     }
+ 42 | 
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:45:23: error: cannot find 'ApprovalPromptTracker' in scope
+ 43 |     @Test func aStaleButtonCannotActOnADifferentRequest() {
+ 44 |         // The person saw "a"; by the time the click lands "b" is on screen.
+ 45 |         var tracker = ApprovalPromptTracker()
+    |                       `- error: cannot find 'ApprovalPromptTracker' in scope
+ 46 |         let queue = [request("b", firstSeen: t0.addingTimeInterval(100))]
+ 47 |         #expect(!tracker.begin(.approve, requestID: "a", queue: queue, now: t0.addingTimeInterval(310)))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:47:33: error: cannot infer contextual base in reference to member 'approve'
+ 45 |         var tracker = ApprovalPromptTracker()
+ 46 |         let queue = [request("b", firstSeen: t0.addingTimeInterval(100))]
+ 47 |         #expect(!tracker.begin(.approve, requestID: "a", queue: queue, now: t0.addingTimeInterval(310)))
+    |                                 `- error: cannot infer contextual base in reference to member 'approve'
+ 48 |         #expect(!tracker.begin(.deny, requestID: "a", queue: queue, now: t0.addingTimeInterval(310)))
+ 49 |         #expect(!tracker.model(queue: queue, now: t0.addingTimeInterval(310)).isBusy)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:48:33: error: cannot infer contextual base in reference to member 'deny'
+ 46 |         let queue = [request("b", firstSeen: t0.addingTimeInterval(100))]
+ 47 |         #expect(!tracker.begin(.approve, requestID: "a", queue: queue, now: t0.addingTimeInterval(310)))
+ 48 |         #expect(!tracker.begin(.deny, requestID: "a", queue: queue, now: t0.addingTimeInterval(310)))
+    |                                 `- error: cannot infer contextual base in reference to member 'deny'
+ 49 |         #expect(!tracker.model(queue: queue, now: t0.addingTimeInterval(310)).isBusy)
+ 50 |     }
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:53:23: error: cannot find 'ApprovalPromptTracker' in scope
+ 51 | 
+ 52 |     @Test func aRequestThatIsNotTheOldestCannotBeActedOn() {
+ 53 |         var tracker = ApprovalPromptTracker()
+    |                       `- error: cannot find 'ApprovalPromptTracker' in scope
+ 54 |         let queue = [request("a"), request("b", firstSeen: t0.addingTimeInterval(5))]
+ 55 |         #expect(!tracker.begin(.approve, requestID: "b", queue: queue, now: t0.addingTimeInterval(10)))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:55:33: error: cannot infer contextual base in reference to member 'approve'
+ 53 |         var tracker = ApprovalPromptTracker()
+ 54 |         let queue = [request("a"), request("b", firstSeen: t0.addingTimeInterval(5))]
+ 55 |         #expect(!tracker.begin(.approve, requestID: "b", queue: queue, now: t0.addingTimeInterval(10)))
+    |                                 `- error: cannot infer contextual base in reference to member 'approve'
+ 56 |     }
+ 57 | 
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:59:23: error: cannot find 'ApprovalPromptTracker' in scope
+ 57 | 
+ 58 |     @Test func anExpiredRequestCannotBeApprovedOrDenied() {
+ 59 |         var tracker = ApprovalPromptTracker()
+    |                       `- error: cannot find 'ApprovalPromptTracker' in scope
+ 60 |         let queue = [request("a")]
+ 61 |         #expect(!tracker.begin(.approve, requestID: "a", queue: queue, now: t0.addingTimeInterval(300)))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:61:33: error: cannot infer contextual base in reference to member 'approve'
+ 59 |         var tracker = ApprovalPromptTracker()
+ 60 |         let queue = [request("a")]
+ 61 |         #expect(!tracker.begin(.approve, requestID: "a", queue: queue, now: t0.addingTimeInterval(300)))
+    |                                 `- error: cannot infer contextual base in reference to member 'approve'
+ 62 |         #expect(!tracker.begin(.deny, requestID: "a", queue: queue, now: t0.addingTimeInterval(301)))
+ 63 |     }
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:62:33: error: cannot infer contextual base in reference to member 'deny'
+ 60 |         let queue = [request("a")]
+ 61 |         #expect(!tracker.begin(.approve, requestID: "a", queue: queue, now: t0.addingTimeInterval(300)))
+ 62 |         #expect(!tracker.begin(.deny, requestID: "a", queue: queue, now: t0.addingTimeInterval(301)))
+    |                                 `- error: cannot infer contextual base in reference to member 'deny'
+ 63 |     }
+ 64 | 
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:66:23: error: cannot find 'ApprovalPromptTracker' in scope
+ 64 | 
+ 65 |     @Test func onlyOneDecisionIsInFlightAtATime() {
+ 66 |         var tracker = ApprovalPromptTracker()
+    |                       `- error: cannot find 'ApprovalPromptTracker' in scope
+ 67 |         let queue = [request("a")]
+ 68 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:68:32: error: cannot infer contextual base in reference to member 'approve'
+ 66 |         var tracker = ApprovalPromptTracker()
+ 67 |         let queue = [request("a")]
+ 68 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+    |                                `- error: cannot infer contextual base in reference to member 'approve'
+ 69 |         #expect(!tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+ 70 |         #expect(!tracker.begin(.deny, requestID: "a", queue: queue, now: t0))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:69:33: error: cannot infer contextual base in reference to member 'approve'
+ 67 |         let queue = [request("a")]
+ 68 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+ 69 |         #expect(!tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+    |                                 `- error: cannot infer contextual base in reference to member 'approve'
+ 70 |         #expect(!tracker.begin(.deny, requestID: "a", queue: queue, now: t0))
+ 71 |     }
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:70:33: error: cannot infer contextual base in reference to member 'deny'
+ 68 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+ 69 |         #expect(!tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+ 70 |         #expect(!tracker.begin(.deny, requestID: "a", queue: queue, now: t0))
+    |                                 `- error: cannot infer contextual base in reference to member 'deny'
+ 71 |     }
+ 72 | 
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:74:23: error: cannot find 'ApprovalPromptTracker' in scope
+ 72 | 
+ 73 |     @Test func aFailedApproveShowsInlineAndAllowsAnotherTry() {
+ 74 |         var tracker = ApprovalPromptTracker()
+    |                       `- error: cannot find 'ApprovalPromptTracker' in scope
+ 75 |         let queue = [request("a")]
+ 76 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:76:32: error: cannot infer contextual base in reference to member 'approve'
+ 74 |         var tracker = ApprovalPromptTracker()
+ 75 |         let queue = [request("a")]
+ 76 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+    |                                `- error: cannot infer contextual base in reference to member 'approve'
+ 77 |         tracker.finish(.approve, requestID: "a", failureCode: "network")
+ 78 | 
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:77:25: error: cannot infer contextual base in reference to member 'approve'
+ 75 |         let queue = [request("a")]
+ 76 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+ 77 |         tracker.finish(.approve, requestID: "a", failureCode: "network")
+    |                         `- error: cannot infer contextual base in reference to member 'approve'
+ 78 | 
+ 79 |         let model = tracker.model(queue: queue, now: t0)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:85:32: error: cannot infer contextual base in reference to member 'approve'
+ 83 |         #expect(model.canApprove)
+ 84 |         // A new attempt clears the old message while it runs.
+ 85 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+    |                                `- error: cannot infer contextual base in reference to member 'approve'
+ 86 |         #expect(tracker.model(queue: queue, now: t0).errorText == nil)
+ 87 |     }
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:90:23: error: cannot find 'ApprovalPromptTracker' in scope
+ 88 | 
+ 89 |     @Test func aFingerprintMismatchFromTheServiceBlocksApprovingThatRequest() {
+ 90 |         var tracker = ApprovalPromptTracker()
+    |                       `- error: cannot find 'ApprovalPromptTracker' in scope
+ 91 |         let queue = [request("a"), request("b", firstSeen: t0.addingTimeInterval(5))]
+ 92 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:92:32: error: cannot infer contextual base in reference to member 'approve'
+ 90 |         var tracker = ApprovalPromptTracker()
+ 91 |         let queue = [request("a"), request("b", firstSeen: t0.addingTimeInterval(5))]
+ 92 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+    |                                `- error: cannot infer contextual base in reference to member 'approve'
+ 93 |         tracker.finish(.approve, requestID: "a", failureCode: "fingerprint_mismatch")
+ 94 | 
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:93:25: error: cannot infer contextual base in reference to member 'approve'
+ 91 |         let queue = [request("a"), request("b", firstSeen: t0.addingTimeInterval(5))]
+ 92 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+ 93 |         tracker.finish(.approve, requestID: "a", failureCode: "fingerprint_mismatch")
+    |                         `- error: cannot infer contextual base in reference to member 'approve'
+ 94 | 
+ 95 |         let model = tracker.model(queue: queue, now: t0)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:98:33: error: cannot infer contextual base in reference to member 'approve'
+ 96 |         #expect(model.warning == "The fingerprint does not match what the server reports. Do not approve.")
+ 97 |         #expect(!model.canApprove)
+ 98 |         #expect(!tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+    |                                 `- error: cannot infer contextual base in reference to member 'approve'
+ 99 |         #expect(tracker.begin(.deny, requestID: "a", queue: queue, now: t0))
+100 |     }
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:99:32: error: cannot infer contextual base in reference to member 'deny'
+ 97 |         #expect(!model.canApprove)
+ 98 |         #expect(!tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+ 99 |         #expect(tracker.begin(.deny, requestID: "a", queue: queue, now: t0))
+    |                                `- error: cannot infer contextual base in reference to member 'deny'
+100 |     }
+101 | 
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:103:23: error: cannot find 'ApprovalPromptTracker' in scope
+101 | 
+102 |     @Test func aFailureBelongsToItsRequestOnly() {
+103 |         var tracker = ApprovalPromptTracker()
+    |                       `- error: cannot find 'ApprovalPromptTracker' in scope
+104 |         let a = request("a")
+105 |         let b = request("b", firstSeen: t0.addingTimeInterval(5))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:106:32: error: cannot infer contextual base in reference to member 'approve'
+104 |         let a = request("a")
+105 |         let b = request("b", firstSeen: t0.addingTimeInterval(5))
+106 |         #expect(tracker.begin(.approve, requestID: "a", queue: [a, b], now: t0))
+    |                                `- error: cannot infer contextual base in reference to member 'approve'
+107 |         tracker.finish(.approve, requestID: "a", failureCode: "network")
+108 |         // "a" is denied by someone else / gone; "b" is shown without a's error.
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:107:25: error: cannot infer contextual base in reference to member 'approve'
+105 |         let b = request("b", firstSeen: t0.addingTimeInterval(5))
+106 |         #expect(tracker.begin(.approve, requestID: "a", queue: [a, b], now: t0))
+107 |         tracker.finish(.approve, requestID: "a", failureCode: "network")
+    |                         `- error: cannot infer contextual base in reference to member 'approve'
+108 |         // "a" is denied by someone else / gone; "b" is shown without a's error.
+109 |         let model = tracker.model(queue: [b], now: t0)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:115:23: error: cannot find 'ApprovalPromptTracker' in scope
+113 | 
+114 |     @Test func decidedAndFailedRequestsAreForgottenOnceTheServiceDropsThem() {
+115 |         var tracker = ApprovalPromptTracker()
+    |                       `- error: cannot find 'ApprovalPromptTracker' in scope
+116 |         let a = request("a")
+117 |         #expect(tracker.begin(.deny, requestID: "a", queue: [a], now: t0))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:117:32: error: cannot infer contextual base in reference to member 'deny'
+115 |         var tracker = ApprovalPromptTracker()
+116 |         let a = request("a")
+117 |         #expect(tracker.begin(.deny, requestID: "a", queue: [a], now: t0))
+    |                                `- error: cannot infer contextual base in reference to member 'deny'
+118 |         tracker.finish(.deny, requestID: "a", failureCode: nil)
+119 |         #expect(tracker.model(queue: [a], now: t0).current == nil)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:118:25: error: cannot infer contextual base in reference to member 'deny'
+116 |         let a = request("a")
+117 |         #expect(tracker.begin(.deny, requestID: "a", queue: [a], now: t0))
+118 |         tracker.finish(.deny, requestID: "a", failureCode: nil)
+    |                         `- error: cannot infer contextual base in reference to member 'deny'
+119 |         #expect(tracker.model(queue: [a], now: t0).current == nil)
+120 | 
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:118:60: error: 'nil' requires a contextual type
+116 |         let a = request("a")
+117 |         #expect(tracker.begin(.deny, requestID: "a", queue: [a], now: t0))
+118 |         tracker.finish(.deny, requestID: "a", failureCode: nil)
+    |                                                            `- error: 'nil' requires a contextual type
+119 |         #expect(tracker.model(queue: [a], now: t0).current == nil)
+120 | 
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:127:23: error: cannot find 'ApprovalPromptTracker' in scope
+125 | 
+126 |     @Test func nothingStartsOnceStopped() {
+127 |         var tracker = ApprovalPromptTracker()
+    |                       `- error: cannot find 'ApprovalPromptTracker' in scope
+128 |         let queue = [request("a")]
+129 |         tracker.stop()
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:131:33: error: cannot infer contextual base in reference to member 'deny'
+129 |         tracker.stop()
+130 |         #expect(tracker.isStopped)
+131 |         #expect(!tracker.begin(.deny, requestID: "a", queue: queue, now: t0))
+    |                                 `- error: cannot infer contextual base in reference to member 'deny'
+132 |         #expect(!tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+133 |     }
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:132:33: error: cannot infer contextual base in reference to member 'approve'
+130 |         #expect(tracker.isStopped)
+131 |         #expect(!tracker.begin(.deny, requestID: "a", queue: queue, now: t0))
+132 |         #expect(!tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+    |                                 `- error: cannot infer contextual base in reference to member 'approve'
+133 |     }
+134 | 
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:136:23: error: cannot find 'ApprovalPromptTracker' in scope
+134 | 
+135 |     @Test func aResultAfterStopChangesNothingVisible() {
+136 |         var tracker = ApprovalPromptTracker()
+    |                       `- error: cannot find 'ApprovalPromptTracker' in scope
+137 |         let queue = [request("a")]
+138 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:138:32: error: cannot infer contextual base in reference to member 'approve'
+136 |         var tracker = ApprovalPromptTracker()
+137 |         let queue = [request("a")]
+138 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+    |                                `- error: cannot infer contextual base in reference to member 'approve'
+139 |         tracker.stop()
+140 |         tracker.finish(.approve, requestID: "a", failureCode: nil)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:140:25: error: cannot infer contextual base in reference to member 'approve'
+138 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+139 |         tracker.stop()
+140 |         tracker.finish(.approve, requestID: "a", failureCode: nil)
+    |                         `- error: cannot infer contextual base in reference to member 'approve'
+141 |         // Stopped: no decision is recorded that could hide a request later.
+142 |         #expect(tracker.model(queue: queue, now: t0).current?.id == "a")
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:140:63: error: 'nil' requires a contextual type
+138 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+139 |         tracker.stop()
+140 |         tracker.finish(.approve, requestID: "a", failureCode: nil)
+    |                                                               `- error: 'nil' requires a contextual type
+141 |         // Stopped: no decision is recorded that could hide a request later.
+142 |         #expect(tracker.model(queue: queue, now: t0).current?.id == "a")
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:146:23: error: cannot find 'ApprovalPromptTracker' in scope
+144 | 
+145 |     @Test func aFinishForAnotherRequestIsIgnored() {
+146 |         var tracker = ApprovalPromptTracker()
+    |                       `- error: cannot find 'ApprovalPromptTracker' in scope
+147 |         let queue = [request("a")]
+148 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:148:32: error: cannot infer contextual base in reference to member 'approve'
+146 |         var tracker = ApprovalPromptTracker()
+147 |         let queue = [request("a")]
+148 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+    |                                `- error: cannot infer contextual base in reference to member 'approve'
+149 |         tracker.finish(.approve, requestID: "zzz", failureCode: nil)
+150 |         #expect(tracker.model(queue: queue, now: t0).isBusy)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:149:25: error: cannot infer contextual base in reference to member 'approve'
+147 |         let queue = [request("a")]
+148 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+149 |         tracker.finish(.approve, requestID: "zzz", failureCode: nil)
+    |                         `- error: cannot infer contextual base in reference to member 'approve'
+150 |         #expect(tracker.model(queue: queue, now: t0).isBusy)
+151 |     }
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:149:65: error: 'nil' requires a contextual type
+147 |         let queue = [request("a")]
+148 |         #expect(tracker.begin(.approve, requestID: "a", queue: queue, now: t0))
+149 |         tracker.finish(.approve, requestID: "zzz", failureCode: nil)
+    |                                                                 `- error: 'nil' requires a contextual type
+150 |         #expect(tracker.model(queue: queue, now: t0).isBusy)
+151 |     }
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:154:23: error: cannot find 'ApprovalPromptTracker' in scope
+152 | 
+153 |     @Test func modelCarriesTheLabelsItIsGiven() {
+154 |         let tracker = ApprovalPromptTracker()
+    |                       `- error: cannot find 'ApprovalPromptTracker' in scope
+155 |         let labels = ApprovalPromptLabels(
+156 |             title: "%@ wants in", compare: "c", suspicious: "s", approve: "Yes", deny: "No",
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/ApprovalPromptTrackerTests.swift:155:22: error: cannot find 'ApprovalPromptLabels' in scope
+153 |     @Test func modelCarriesTheLabelsItIsGiven() {
+154 |         let tracker = ApprovalPromptTracker()
+155 |         let labels = ApprovalPromptLabels(
+    |                      `- error: cannot find 'ApprovalPromptLabels' in scope
+156 |             title: "%@ wants in", compare: "c", suspicious: "s", approve: "Yes", deny: "No",
+157 |             queue: "%lld/%lld", network: "n", codeLabel: "Code", fingerprintLabel: "FP"
+error: fatalError
+rc=1

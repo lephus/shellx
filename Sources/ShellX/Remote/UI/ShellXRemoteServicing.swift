@@ -96,9 +96,12 @@ final class ShellXRemoteUIModel: ObservableObject {
     let service: (any ShellXRemoteServicing)?
     @Published private(set) var snapshot: RemoteUISnapshot?
     private var changeCancellable: AnyCancellable?
+    /// The on-site approval prompt (U3). Exists only with a service.
+    private let approvalPrompt: ApprovalPromptController?
 
     init(service: (any ShellXRemoteServicing)?) {
         self.service = service
+        approvalPrompt = service.map { ApprovalPromptController(service: $0) }
         if let service {
             snapshot = RemoteUISnapshot(service: service)
         } else {
@@ -110,6 +113,9 @@ final class ShellXRemoteUIModel: ObservableObject {
             .sink { [weak self] _ in
                 MainActor.assumeIsolated { self?.refresh() }
             }
+        // ShellX: the approval panel follows `pendingApprovals` from here (U3);
+        // with no service (gate off) it is never created.
+        approvalPrompt?.start()
     }
 
     /// The sidebar shows the sign-in row: remote UI on and signed out.
