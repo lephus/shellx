@@ -51,6 +51,8 @@ public final class ShellXRemoteService: ObservableObject {
     var started = false
     var terminated = false
     var cmuxTuiAvailable = false
+    /// The launch sweep and cmux-tui check, run once and shared by `bootstrap` and `signIn`.
+    var preparation: Task<Bool, Never>?
     var configuration: Task<Void, any Error>?
     var bootTask: Task<Void, Never>?
     /// Stops of the last session; a new host start waits for them (they stop the bridge).
@@ -98,7 +100,7 @@ public final class ShellXRemoteService: ObservableObject {
     public func stopForTermination() {
         guard !terminated else { return }
         terminated = true
-        guard started || isSignedIn else { return }
+        guard started || isSignedIn || teardown != nil else { return }   // a sign-out's stops may still run
         generation += 1
         bootTask?.cancel()
         cancelAllTasks()
@@ -127,15 +129,21 @@ public final class ShellXRemoteService: ObservableObject {
 
     // MARK: - Account
 
-    /// `auth.login` (the password goes straight into the core's JSON), then starts the session.
+    /// `auth.login` (the password goes straight into the core's JSON), then starts the session. Signing in as
+    /// another account than the one `links.json` was saved under drops its link records and invite files.
     public func signIn(email: String, password: String) async throws {
         guard env.gateEnabled(), !terminated else {
             throw ShellXCoreError(code: "disabled", message: "remote machines are turned off")
         }
+        await prepareLocal()
+        guard !terminated else { return }
         try await ensureConfigured()
-        _ = try await call("auth.login", ["email": .string(email), "password": .string(password)], as: LoginReply.self)
+        let login = try await call("auth.login", ["email": .string(email), "password": .string(password)], as: LoginReply.self)
         guard !terminated else { return }
         if isSignedIn { await beginTeardown().value }   // another account: start over cleanly
+        await teardown?.value                           // a 401's stops: an old link may still save its record
+        await adoptAccount(login.user_id)
+        guard !terminated else { return }
         RemoteLog.service.info("signed in")
         startSession(list: nil)
     }
@@ -149,17 +157,34 @@ public final class ShellXRemoteService: ObservableObject {
         }
     }
 
+    /// `links.json` belongs to one account, whose `user_id` is kept in `links-owner` beside it (only `auth.login`
+    /// tells the user id, so a session restored at launch keeps the owner of its last sign-in). Signing in
+    /// as a different account, or with no owner on record (links saved before owners were kept), drops every
+    /// record and this Mac's invite files, so no link of another account is reconnected. Runs on the links
+    /// queue after the last session's links stopped. A failure is logged; the new account's links stay usable.
+    func adoptAccount(_ userID: String) async {
+        let store = env.store
+        let tickets = env.paths.coreStateDir.appendingPathComponent("tickets", isDirectory: true)
+        do {
+            try await Self.onLinkStore {
+                if (try? store.loadOwner()) != userID {
+                    let dropped = try store.removeAll()
+                    let invites = RemoteInviteSweep.sweep(ticketsDir: tickets, now: Date())
+                    if dropped + invites > 0 {
+                        RemoteLog.service.notice("new account: dropped \(dropped) link record(s), \(invites) invite file(s)")
+                    }
+                }
+                try store.saveOwner(userID)
+            }
+        } catch {
+            RemoteLog.service.error("link owner not updated: \(RemoteLog.code(error), privacy: .public)")
+        }
+    }
+
     // MARK: - Session
 
     func bootstrap() async {
-        let paths = env.paths, cmuxTui = env.cmuxTui
-        // Before anything else: invite files of an earlier run are stale.
-        cmuxTuiAvailable = (try? await Self.offMain { () -> Bool in
-            let removed = RemoteInviteSweep.sweep(ticketsDir: paths.coreStateDir.appendingPathComponent("tickets", isDirectory: true),
-                                                  now: Date())
-            if removed > 0 { RemoteLog.service.info("removed \(removed) stale invite file(s)") }
-            return FileManager.default.isExecutableFile(atPath: cmuxTui.path)
-        }) ?? false
+        await prepareLocal()
         guard !terminated else { return }
         do { try await ensureConfigured() } catch {
             let code = RemoteLog.code(error)
@@ -189,6 +214,27 @@ public final class ShellXRemoteService: ObservableObject {
             RemoteLog.service.error("machines.list failed at launch: \(code, privacy: .public)")
             startSession(list: nil, listImmediately: false)
         }
+    }
+
+    /// Before any session: invite files of an earlier run are stale (swept), and whether cmux-tui exists.
+    /// Runs once; a sign-in that finishes before the launch sweep waits for the same result.
+    func prepareLocal() async {
+        let task: Task<Bool, Never>
+        if let preparation {
+            task = preparation
+        } else {
+            let paths = env.paths, cmuxTui = env.cmuxTui
+            task = Task.detached {
+                (try? await Self.offMain { () -> Bool in
+                    let tickets = paths.coreStateDir.appendingPathComponent("tickets", isDirectory: true)
+                    let removed = RemoteInviteSweep.sweep(ticketsDir: tickets, now: Date())
+                    if removed > 0 { RemoteLog.service.info("removed \(removed) stale invite file(s)") }
+                    return FileManager.default.isExecutableFile(atPath: cmuxTui.path)
+                }) ?? false
+            }
+            preparation = task
+        }
+        cmuxTuiAvailable = await task.value
     }
 
     func ensureConfigured() async throws {
@@ -221,7 +267,10 @@ public final class ShellXRemoteService: ObservableObject {
     func runSession(_ gen: Int) async {
         // Links this Mac already holds; enrolled ones reconnect by themselves while their machine is online.
         // A grant that never enrolled cannot succeed now: its invite file was swept at launch, or dropped when
-        // the previous session stopped its link (R33). Such records are removed.
+        // the previous session stopped its link (R33). Such records are removed, but only once the last
+        // session's links stopped: one of them may still connect and save `enrolled = true` while stopping.
+        await teardown?.value
+        guard isCurrent(gen) else { return }
         let store = env.store
         let loaded: [RemoteLinkRecord]
         do {

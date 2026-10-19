@@ -570,3 +570,113 @@ private extension ServiceRig {
     #expect(rig.service.gate.isEmpty)
     #expect(!rig.launcher.runs.dropFirst(runs).contains { $0.args.starts(with: ["remote", "enroll"]) })
 }
+
+// MARK: - Final review fixes
+
+@MainActor @Test func failedEnrollApproveIsRetriedNotDenied() async throws {               // final review 1
+    let rig = ServiceRig()
+    #expect(await rig.withPending([FakeRemoteCore.pairing("p1", fingerprint: fpA)]))
+    rig.stub(["remote", "enroll", "create"], stdout: fixtureInviteURI(id: "inv1"))
+    try await rig.service.approve("p1")
+    rig.stubs.with { $0.insert(.init(key: ["remote", "enroll", "approve"], replies: [(Int32(1), Data()), (Int32(0), Data())]), at: 0) }
+    rig.stub(["remote", "enroll", "pending"], stdout: #"[{"invitation_id":"inv1"}]"#)
+    let approveArgs = RemoteCommandLine.enrollApprove(paths: rig.paths, invitationID: "inv1")
+    let denyArgs = RemoteCommandLine.enrollDeny(paths: rig.paths, invitationID: "inv1")
+    #expect(await until { rig.clock.deadlines.contains(rig.clock.now + 1) })
+    rig.clock.advance(by: 1)
+    #expect(await until { rig.launcher.runs.filter { $0.args == approveArgs }.count == 1 })   // exits 1
+    #expect(await until { rig.clock.deadlines.contains(rig.clock.now + 1) })
+    rig.clock.advance(by: 1)
+    #expect(await until { rig.launcher.runs.filter { $0.args == approveArgs }.count == 2 })   // tried again, exits 0
+    #expect(!rig.ran(denyArgs))
+    #expect(await until { rig.service.gate.isEmpty })                                         // single use once it went through
+}
+
+/// Signs in as `u_1` (no session at launch), adds a link record and an invite file, signs out, then signs in as `user`.
+@MainActor private func signInAgain(as user: String) async throws -> (ServiceRig, URL) {
+    let rig = ServiceRig(signedIn: false)
+    rig.service.startIfEnabled()
+    #expect(await until { rig.core.methods == ["config.set", "machines.list"] })
+    try await rig.service.signIn(email: "a@shellx.test", password: "pw")
+    #expect(await until { rig.service.hostState == rig.hostConnected })
+    try rig.seedRecord("m_1", enrolled: true)
+    let invite = rig.paths.coreStateDir.appendingPathComponent("tickets/invite-0123abcd.uri")
+    FileManager.default.createFile(atPath: invite.path, contents: Data("cmux://enroll/x".utf8), attributes: [.posixPermissions: 0o600])
+    await rig.service.signOut()
+    rig.core.userID.with { $0 = user }
+    try await rig.service.signIn(email: "b@shellx.test", password: "pw")
+    #expect(await until { rig.service.hostState == rig.hostConnected })
+    return (rig, invite)
+}
+
+@MainActor @Test func signingInAsAnotherAccountDropsTheOldLinks() async throws {          // final review 2
+    let (rig, invite) = try await signInAgain(as: "u_2")
+    #expect(try rig.store.load().isEmpty)
+    #expect(!FileManager.default.fileExists(atPath: invite.path))
+    await settle()
+    #expect(rig.connectIndex == nil)
+    #expect(await until { rig.service.machines.map(\.id) == ["m_1"] })
+    #expect(rig.service.machines.first?.access == RemoteMachine.Access.none)
+}
+
+@MainActor @Test func signingInAgainAsTheSameAccountKeepsTheLinks() async throws {         // final review 2
+    let (rig, _) = try await signInAgain(as: "u_1")
+    #expect(try rig.store.load().map(\.machineID) == ["m_1"])
+    #expect(await until { rig.connectIndex != nil })
+    #expect(await until { rig.service.machines.first?.access == .granted })
+}
+
+@MainActor @Test func signInBeforeTheLaunchSweepStillStartsTheHost() async throws {        // final review 3
+    let rig = ServiceRig(signedIn: false)
+    let tickets = rig.paths.coreStateDir.appendingPathComponent("tickets", isDirectory: true)
+    try FileManager.default.createDirectory(at: tickets, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+    let stale = tickets.appendingPathComponent("invite-stale.uri")
+    FileManager.default.createFile(atPath: stale.path, contents: Data("x".utf8), attributes: [.posixPermissions: 0o600])
+    // No launch sweep has run yet (startIfEnabled not called): sign-in must not conclude cmux-tui is missing.
+    try await rig.service.signIn(email: "dev@shellx.test", password: "pw")
+    #expect(await until { rig.service.hostState == rig.hostConnected })
+    #expect(!FileManager.default.fileExists(atPath: stale.path))
+}
+
+@MainActor @Test func newSessionSweepsRecordsOnlyAfterTheOldLinksStopped() async throws {  // final review 4
+    let rig = ServiceRig(signedIn: false)
+    rig.service.startIfEnabled()
+    #expect(await until { rig.core.methods == ["config.set", "machines.list"] })
+    try await rig.service.signIn(email: "dev@shellx.test", password: "pw")
+    #expect(await until { rig.service.hostState == rig.hostConnected })
+    rig.launcher.holdNextServerStop.with { $0 = true }
+    rig.service.beginTeardown()                                     // a 401: nobody awaits these stops
+    #expect(await until { rig.launcher.isHoldingRun })
+    try rig.seedRecord("m_1", enrolled: false)                      // a grant the stopping link is still enrolling
+    let signingIn = Task { @MainActor in try await rig.service.signIn(email: "dev@shellx.test", password: "pw") }
+    for _ in 0..<5 { await settle() }
+    #expect(try rig.store.load().count == 1)                        // not swept while the old links still stop
+    try rig.seedRecord("m_1", enrolled: true)                       // the old link connected meanwhile and saved it
+    rig.launcher.releaseHeldRun()
+    try await signingIn.value
+    #expect(await until { rig.service.hostState == rig.hostConnected })
+    #expect(try rig.store.load().map(\.enrolled) == [true])
+    #expect(await until { rig.connectIndex != nil })
+}
+
+@MainActor @Test func terminationJoinsATeardownEvenWithoutLaunch() async throws {           // final review 5
+    let rig = ServiceRig(signedIn: false)
+    try await rig.service.signIn(email: "dev@shellx.test", password: "pw")   // started stays false
+    #expect(await until { rig.service.hostState == rig.hostConnected })
+    let runs = rig.launcher.runs.count
+    rig.service.beginTeardown()
+    rig.service.stopForTermination()
+    #expect(rig.launcher.runs.dropFirst(runs).contains { $0.args == serverStopArgs(rig) })
+}
+
+@MainActor @Test func signInWithNoRecordedOwnerDropsTheLinks() async throws {              // final review 2
+    let rig = ServiceRig(signedIn: false)
+    try rig.seedRecord("m_1", enrolled: true)                       // saved before owners were kept: account unknown
+    rig.service.startIfEnabled()
+    #expect(await until { rig.core.methods == ["config.set", "machines.list"] })
+    try await rig.service.signIn(email: "dev@shellx.test", password: "pw")
+    #expect(await until { rig.service.hostState == rig.hostConnected })
+    #expect(try rig.store.load().isEmpty)
+    #expect(try rig.store.loadOwner() == "u_1")
+    #expect(rig.connectIndex == nil)
+}

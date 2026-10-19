@@ -18,6 +18,8 @@ final class FakeRemoteCore: ShellXCoreCalling, @unchecked Sendable {
     let coreStateDir: URL
     private let recorded = Locked<[Call]>([])
     let signedIn = Locked(true)
+    /// The account `auth.login` signs into.
+    let userID = Locked("u_1")
     /// `machines.list` items (shellx-core shape, incl. `is_this_machine`).
     let machines = Locked<[JSONValue]>([FakeRemoteCore.machine("m_self", "Phu's Mac (DEV t)", online: true, thisMachine: true),
                                         FakeRemoteCore.machine("m_1", "Mac mini", online: true)])
@@ -81,7 +83,7 @@ final class FakeRemoteCore: ShellXCoreCalling, @unchecked Sendable {
         case "auth.login":
             guard params["password"] == .string("pw") else { return Self.error("invalid_credentials") }
             signedIn.with { $0 = true }
-            return Self.ok(.object(["user_id": .string("u_1"), "device_id": .string("d_1"),
+            return Self.ok(.object(["user_id": .string(userID.get()), "device_id": .string("d_1"),
                                     "device_public_key_b64": .string("AAAA"), "fingerprint": .string(Self.ownFingerprint)]))
         case "auth.logout":
             signedIn.with { $0 = false }
