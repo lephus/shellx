@@ -12,6 +12,22 @@ Read this first on a new machine or in a new agent session. It replaces the lead
 
 ShellX is cmux (Manaflow, GPL-3.0) with ShellX changes, on `main` of `lephus/shellx`: the cmux tree with full history at the repo root, plus ShellX's `relay/` (API + relay, Node), `web/` (shellx.pro, Astro), `deploy/` (VPS, Docker + nginx-proxy). The Flutter apps (desktop + mobile 1.0.0) were deleted; they live at tag `flutter-final`. `lephus/shellx-pro` (the earlier mirror of cmux) is frozen: never code there. macOS = cmux app rebranded; Windows = GPUI app on `cmux-tui`; remote = cmux-tui remote protocol through a self-hosted `cmux-relay` ("relay2") with tickets minted by the ShellX API.
 
+## Update 2026-10-19 evening (richard's Mac): lanes merged into `main`
+
+The sprint resumed on another Mac and stopped again on the user's "làm xong, commit và push tất cả lên main; sau đó dừng".
+
+- `main` now holds `shellx/sprint` (L1 identity, L2 look, L3 sidebar, L6 Windows; checkpoint-1 merges, sprint head `577b086832`) and `shellx/l5-remote` (head `0abe36a511`), as `--no-ff` merges `a48fd2c30c` and `8618f29945`. All five lanes passed their final reviews; lane SDD state is under `docs/superpowers/sprint-state/<lane>/`.
+- **Not on `main`:** L4 `feat/relay-v2` (merging it deploys API v2 to production, gate G2 still waits on the user).
+- **Local checks on the merged `main`:** `scripts/verify-local.py --all` passed 15/15, all `tests/test_shellx_*.py` passed, and `swift test` on ShellXBrand passed 298 tests. Cargo was not run on this Mac.
+- **Still owed:**
+  - CI for the merged code. `shellx-mac` runs only on `shellx/**` pushes, so push `main` to a `shellx/*` branch to get a run.
+  - The checkpoint-1 Release build smoke test (a tagged `cp1` Release build of the pre-L6 sprint succeeded locally on Xcode 26.6, launch not done).
+  - The L1 `shellx-mac-unit` run 39233474076.
+  - The L5 `shellx-mac` run 39233991465.
+  - The K4 adapter `extension ShellXRemoteService: ShellXRemoteServicing {}` and the L3 Important items before flipping `ShellXFeatures.remoteMachines`.
+  - Task 14 GUI e2e / checkpoint 2.
+  - Ledger "Checkpoint 1" on `shellx/sprint` lists the rest.
+
 ## Sprint state at the stop
 
 The 12-hour sprint started 02:50 and was stopped by the user at 07:11. Every lane branch is pushed. Its SDD ledger (progress, task briefs, reports, rulings) is committed on the branch under `docs/superpowers/sprint-state/<lane>/`. Commits titled `wip(shellx): sprint paused …` hold an implementer's **unfinished, unreviewed** code: re-run that task's review loop before relying on them.
