@@ -151,6 +151,17 @@ class DeviceMirroringIsParked(unittest.TestCase):
         self.assertRegex(first_statement(
             "Sources/Mobile/Pairing/MobilePairingWindowController.swift", r"func show\(\) \{"), PARKED)
 
+    def test_parked_tab_bar_buttons_are_not_drawn(self):
+        tab_bar = strip_comments(body(
+            "Sources/Workspace.swift", r"static func surfaceTabBarBuiltInActionIsAvailable\([^{]*\{"))
+        self.assertRegex(
+            tab_bar, r"case \.cloudVM, \.newCloudWorkspace, \.newCloudMachine:\s*return CloudMachinesFeature\.isEnabled")
+        self.assertRegex(tab_bar, r"case \.mobileConnect:[^\n]*ShellXFeatures\.remoteMachines")
+        menu = strip_comments(body(
+            "Sources/AppDelegate+NewWorkspaceContextMenu.swift",
+            r"static func isBuiltInActionAvailableInNewWorkspaceMenu\([^{]*\{"))
+        self.assertRegex(menu, r"case \.mobileConnect:[^\n]*\n?[^\n]*ShellXFeatures\.remoteMachines")
+
     def test_machines_sidebar_mode_waits_for_remote_machines(self):
         text = body("Sources/RightSidebarMode+Availability.swift",
                     r"func isAvailable\(\s*feedEnabled: Bool,\s*machinesEnabled: Bool,[^{]*\{")
