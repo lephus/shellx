@@ -21,7 +21,7 @@ struct DevicesSidebarModeTests {
         return defaults
     }
 
-    @Test("Cloud off prevents discovery and hosting while the Cloud sidebar stays available")
+    @Test("Cloud off prevents discovery and hosting while the Cloud sidebar stays available", .enabled(if: ShellXSwitches.remoteMachines, "ShellX: device mirroring is parked until Wave 2"))
     func cloudOffDisablesDevices() {
         let defaults = makeDefaults()
         defaults.set(false, forKey: RightSidebarBetaFeatureSettings.cloudMachinesEnabledKey)
@@ -41,7 +41,7 @@ struct DevicesSidebarModeTests {
         #expect(!MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: .dev))
     }
 
-    @Test("The two device preferences remain independent within Cloud")
+    @Test("The two device preferences remain independent within Cloud", .enabled(if: ShellXSwitches.remoteMachines, "ShellX: device mirroring is parked until Wave 2"))
     func independentPreferencesWithinCloud() {
         let defaults = makeDefaults()
         let keys = DevicesCatalogSection()
@@ -69,6 +69,23 @@ struct DevicesSidebarModeTests {
         #expect(!MobileRemoteControlPolicy.allowsIncomingAccess(defaults: defaults, cloudEnabled: enabled))
     }
 
+    /// ShellX: discovery, hosting and the Machines tab stay off until Wave 2
+    /// flips `remoteMachines`, whatever the saved preferences and Cloud say.
+    @Test("ShellX parks device discovery, hosting and the Machines tab", .enabled(if: !ShellXSwitches.remoteMachines))
+    func devicesAreParkedInShellX() {
+        let defaults = makeDefaults()
+        let keys = DevicesCatalogSection()
+        defaults.set(true, forKey: keys.discoveryEnabled.userDefaultsKey)
+        defaults.set(true, forKey: keys.incomingAccessEnabled.userDefaultsKey)
+        let permissive = ManagedDevicePolicy(defaults: defaults, releaseDomainDefaults: nil) { _, _ in nil }
+        #expect(!DevicesFeature.isAvailable(defaults: defaults, policy: permissive, cloudEnabled: true))
+        #expect(!DevicesFeature.isEnabled(defaults: defaults, policy: permissive, cloudEnabled: true))
+        #expect(!DevicesFeature.isDiscoveryEnabled(defaults: defaults, cloudEnabled: true))
+        #expect(!MobileRemoteControlPolicy.allowsIncomingAccess(defaults: defaults, cloudEnabled: true))
+        #expect(!RightSidebarMode.machines.isAvailable(feedEnabled: true, machinesEnabled: true, devicesEnabled: true))
+        #expect(!RightSidebarMode.availableModes(defaults: defaults).contains(.machines))
+    }
+
     @Test("Device aliases open the same Cloud sidebar")
     func cliArgument() {
         #expect(RightSidebarMode.from(cliArgument: "devices") == .machines)
@@ -81,7 +98,7 @@ struct DevicesSidebarModeTests {
         #expect(RightSidebarMode.machines.canOpenAsPane)
     }
 
-    @Test("Cloud availability gates both machine sources")
+    @Test("Cloud availability gates both machine sources", .enabled(if: ShellXSwitches.remoteMachines, "ShellX: device mirroring is parked until Wave 2"))
     func availability() {
         #expect(RightSidebarMode.machines.isAvailable(feedEnabled: true, machinesEnabled: true, devicesEnabled: false))
         #expect(!RightSidebarMode.machines.isAvailable(feedEnabled: false, machinesEnabled: false, devicesEnabled: true))
@@ -112,7 +129,7 @@ struct DevicesSidebarModeTests {
         #expect(registry.takePendingReveal(windowID: first) == instance)
     }
 
-    @Test("Managed discovery policy overrides the discovery preference")
+    @Test("Managed discovery policy overrides the discovery preference", .enabled(if: ShellXSwitches.remoteMachines, "ShellX: device mirroring is parked until Wave 2"))
     func featureGate() {
         let defaults = makeDefaults()
         defaults.set(true, forKey: DevicesCatalogSection().discoveryEnabled.userDefaultsKey)
@@ -124,7 +141,7 @@ struct DevicesSidebarModeTests {
         #expect(DevicesFeature.isEnabled(defaults: defaults, policy: permissive, cloudEnabled: true))
     }
 
-    @Test("Hosting remains opt-in and separate from discovery")
+    @Test("Hosting remains opt-in and separate from discovery", .enabled(if: ShellXSwitches.remoteMachines, "ShellX: device mirroring is parked until Wave 2"))
     func hostListenerGate() {
         let defaults = makeDefaults()
         let keys = DevicesCatalogSection()

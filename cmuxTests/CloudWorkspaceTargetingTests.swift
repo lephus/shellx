@@ -179,37 +179,6 @@ struct CloudWorkspaceTargetingTests {
         #expect(fixture.requests.map(\.machineID) == ["b"])
     }
 
-    @Test("Command-Y dispatches the configured action to the last selected Cloud machine")
-    func actualShortcut() async throws {
-#if DEBUG
-        let previousStore = KeyboardShortcutSettings.installIsolatedTestFileStore(prefix: "cloud-workspace-target")
-        defer { KeyboardShortcutSettings.settingsFileStore = previousStore }
-        let fixture = CloudWorkspaceTargetingFixture()
-        defer { fixture.close() }
-        let manager = fixture.manager
-        let local = try #require(manager.selectedWorkspace)
-        let a = try fixture.workspace(machineID: "a")
-        manager.selectWorkspace(a)
-        manager.selectWorkspace(local)
-        fixture.pins.reconcile(machineIDs: ["b", "a"])
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 480), styleMask: [.titled], backing: .buffered, defer: false)
-        window.identifier = NSUserInterfaceItemIdentifier("cmux.main.\(fixture.windowID.uuidString)")
-        fixture.app.mainWindowContexts.values.first { $0.windowId == fixture.windowID }?.window = window
-        defer { window.orderOut(nil); withExtendedLifetime(window) {} }
-        KeyboardShortcutSettings.resetShortcut(for: .newCloudWorkspace)
-        fixture.app.debugResetShortcutRoutingStateForTesting()
-        let event = try #require(NSEvent.keyEvent(
-            with: .keyDown, location: .zero, modifierFlags: [.command], timestamp: 0,
-            windowNumber: window.windowNumber, context: nil, characters: "Y",
-            charactersIgnoringModifiers: "y", isARepeat: false, keyCode: 16
-        ))
-        #expect(fixture.app.debugHandleCustomShortcut(event: event))
-        await fixture.app.cloudWorkspaceOperationController?.waitForPendingOperations()
-        #expect(fixture.requests.map(\.machineID) == ["a"])
-        #expect(manager.tabs.count == 2)
-#endif
-    }
-
     @Test("A late creation preserves newer workspace navigation", arguments: [false, true])
     func completionFocus(navigate: Bool) async throws {
         let fixture = CloudWorkspaceTargetingFixture()
@@ -249,30 +218,6 @@ struct CloudWorkspaceTargetingTests {
         let created = try #require(createdID)
         #expect(manager.selectedTabId == (navigate ? other.id : created))
         #expect(manager.workspacesById[local.id] != nil)
-    }
-
-    /// Signed out with Cloud on, Cmd-Y introduces Cloud through the welcome
-    /// card (#19876) and still never falls back to a local workspace.
-    @Test("Signed-out Cloud access introduces Cloud without creating a workspace")
-    func unavailableAction() {
-        let seenKey = CloudWelcomeWindowController.seenVersionDefaultsKey
-        let previousSeen = UserDefaults.standard.object(forKey: seenKey)
-        UserDefaults.standard.removeObject(forKey: seenKey)
-        defer {
-            if let previousSeen { UserDefaults.standard.set(previousSeen, forKey: seenKey) }
-            else { UserDefaults.standard.removeObject(forKey: seenKey) }
-        }
-        let fixture = CloudWorkspaceTargetingFixture()
-        defer {
-            fixture.app.cloudWelcomeWindowController.dismiss()
-            fixture.close()
-        }
-        fixture.available = false
-        let ids = fixture.manager.tabs.map(\.id)
-        #expect(fixture.app.performNewCloudWorkspaceOnResolvedMachineAction(tabManager: fixture.manager))
-        #expect(NSApp.windows.contains { $0.identifier?.rawValue == "cmux.cloud.welcome" && $0.isVisible })
-        #expect(fixture.requests.isEmpty)
-        #expect(fixture.manager.tabs.map(\.id) == ids)
     }
 
 }

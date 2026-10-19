@@ -2537,8 +2537,6 @@ enum CmuxEmbeddedConfigSchema {
               "newTab",
               "newLocalWorkspace",
               "newBrowserWorkspace",
-              "newCloudWorkspace",
-              "newCloudMachine",
               "saveLayoutTemplate",
               "openFolder",
               "reopenPreviousSession",

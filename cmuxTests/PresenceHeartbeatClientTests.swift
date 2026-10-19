@@ -15,13 +15,17 @@ import Testing
 /// moment they change.
 @Suite struct PresenceHeartbeatClientTests {
     @MainActor
+    /// ShellX: presence and the phone host listener are parked behind
+    /// remoteMachines, so iPhone pairing alone announces nothing.
     @Test func iPhonePairingPublishesPresenceWithoutMacIncomingAccess() {
         let suiteName = "presence-iphone-only-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(true, forKey: MobileHostService.listeningEnabledDefaultsKey)
-        #expect(MobileHostService.isListeningEnabled(defaults: defaults))
-        #expect(PresenceSettings.isEnabled(defaults: defaults))
+        #expect(!MobileHostService.isListeningEnabled(defaults: defaults))
+        #expect(!PresenceSettings.isEnabled(defaults: defaults))
+        defaults.set(true, forKey: PresenceSettings.enabledKey)
+        #expect(!PresenceSettings.isEnabled(defaults: defaults))
         defaults.set(false, forKey: PresenceSettings.enabledKey)
         #expect(!PresenceSettings.isEnabled(defaults: defaults))
     }

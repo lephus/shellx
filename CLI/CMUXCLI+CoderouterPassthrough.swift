@@ -72,6 +72,22 @@ extension CMUXCLI {
         ))
     }
 
+    /// What every Cloud verb (`auth`, `login`, `vm`, `cloud`, `billing`, `vpn`,
+    /// `remotes`, `ai-accounts`, the hidden `vm-*` helpers) and every CodeRouter
+    /// verb ends with in ShellX, before the CLI looks for the app's socket: a
+    /// neutral message on stderr and exit 127 (``ShellXCloudGate``).
+    static func shellXUnavailable(_ service: ShellXCloudGate.Service) -> CLIError {
+        switch service {
+        case .codeRouter:
+            return coderouterNotAvailable()
+        case .cloud:
+            return coderouterUnavailable(localizedPassthroughString(
+                "shellx.cloud.unavailable",
+                defaultValue: "Cloud is not available in ShellX."
+            ))
+        }
+    }
+
     /// Every way of not running CodeRouter exits 127; the reason is on stderr.
     private static func coderouterUnavailable(_ message: String) -> CLIError {
         CLIError(message: message, exitCode: 127)

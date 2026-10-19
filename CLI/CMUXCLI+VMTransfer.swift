@@ -3,6 +3,7 @@ import CmuxSurfaceCatalogModel
 import CryptoKit
 import Darwin
 import Foundation
+import ShellXBrand
 
 /// Cloud file transfer. Push streams through OpenSSH/SFTP over the app's
 /// userspace WireGuard tunnel. Pull retains the existing exec transport.
@@ -1881,6 +1882,8 @@ extension CMUXCLI {
     }
 
     func runVMAgentCommand(rest: [String], client: SocketClient, jsonOutput: Bool) throws {
+        // ShellX: `cmux agent <provider>` would start an agent on a Cloud machine.
+        guard ShellXFeatures.cloud else { throw Self.shellXUnavailable(.cloud) }
         if CmuxTuiRemoteRouting.vmAgentRequestsHelp(rest) {
             print(Self.vmAgentUsage)
             return

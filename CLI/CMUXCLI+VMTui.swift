@@ -75,8 +75,7 @@ extension CMUXCLI {
         \(openFocusDefaultHelp)
 
         The client binary is found via CMUX_TUI_CLIENT, then ~/.cmux/bin/cmux, then
-        `cmux-tui` on PATH. Install one with:
-          curl -fsSL https://cmux.com/tui/install-static.sh | sh
+        `cmux-tui` on PATH.
         """
     }
 
@@ -333,8 +332,8 @@ extension CMUXCLI {
         if options.fullClient, clientPath == nil || clientProbe == nil {
             let searched = cmuxTuiClientCandidates().joined(separator: ", ")
             let template = CMUXDiffViewerLocalization.string(
-                "cli.vm.tui.clientMissingSearched",
-                defaultValue: "No cmux-tui client found (searched: %1$@). Install one with `curl -fsSL https://cmux.com/tui/install-static.sh | sh`, or point CMUX_TUI_CLIENT at a binary."
+                "cli.vm.tui.clientMissingNoInstaller",
+                defaultValue: "No cmux-tui client found (searched: %1$@). Point CMUX_TUI_CLIENT at a binary."
             )
             throw CLIError(message: String(format: template, searched))
         }

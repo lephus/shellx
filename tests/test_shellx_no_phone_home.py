@@ -55,7 +55,11 @@ FORBIDDEN_HOSTS = parse_forbidden_hosts()  # mirrors ShellXNetworkPolicy.forbidd
 HOST_ROOTS = ["Sources", "CLI", "Packages/macOS", "Packages/Shared", "Resources"]
 
 # Reasons shared by several allowlist entries.
-TASK5_GATED = "gated in Task 5 (hard-off Cloud, socket handlers + CLI)"
+TASK5_GATED = ("gated in Task 5 by ShellXFeatures.cloud == false: no menu, palette, footer or shortcut entry, "
+               "HostAccountFlow sign-in and billing refuse first, socket auth.*/vm.*/remotes.*/aiAccounts.* "
+               "and the CLI verbs are refused (tests/test_shellx_cloud_off.py)")
+TASK5_CODEROUTER = ("gated in Task 5 by ShellXFeatures.codeRouter == false: socket coderouter.* refused, "
+                    "no handoff service is created and mint() refuses first (tests/test_shellx_cloud_off.py)")
 TASK5_PARKED = ("parked behind ShellXFeatures.remoteMachines == false (Task 5); "
                 "Wave 2 swaps the transport before flipping it")
 NOT_A_HOST = "email domain comparison, not a network host"
@@ -65,8 +69,6 @@ NOT_A_HOST = "email domain comparison, not a network host"
 # what the host is for and which gate keeps it unreachable. Wave 2 removes
 # entries as it replaces the transports.
 CLOUD_ALLOWLIST = [
-    ("CLI/CMUXCLI+VMTui.swift",
-     "`cmux vm tui` install hint for cmux-tui (printed, never fetched); " + TASK5_GATED),
     ("Packages/Shared/CmuxAuthRuntime/Sources/CmuxAuthRuntime/Client/StackAuthClient.swift",
      "Stack Auth API base, used only by sign-in (palette, footer, `cmux auth login` -> auth.*); " + TASK5_GATED),
     ("Packages/Shared/CmuxAuthRuntime/Sources/CmuxAuthRuntime/Coordinator/AuthConfig.swift",
@@ -82,7 +84,7 @@ CLOUD_ALLOWLIST = [
      "learn-more links shown only in the Cloud machine UI; " + TASK5_GATED),
     ("Sources/Cloud/CodeRouterHandoffClient.swift",
      "CodeRouter handoff, needs a Stack Auth session (sign-in and the coderouter socket handlers); "
-     + TASK5_GATED),
+     + TASK5_CODEROUTER),
     ("Sources/Cloud/PresenceSettings.swift",
      "presence heartbeat service (opt-in with phone pairing); " + TASK5_PARKED),
     ("Sources/Mobile/MobileHostV2Installation.swift",

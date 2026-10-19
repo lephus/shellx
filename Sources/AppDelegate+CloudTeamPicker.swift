@@ -1,10 +1,14 @@
 import CmuxCloud
 import AppKit
 import CmuxCloud
+import ShellXBrand
 
 extension AppDelegate {
     @MainActor
     func handleCloudTeamPickerShortcut(_ event: NSEvent) -> Bool {
+        // ShellX: teams are a Manaflow Cloud service; the key passes through
+        // and no "Cloud unavailable" alert appears.
+        guard ShellXFeatures.cloud else { return false }
         guard matchConfiguredShortcut(event: event, action: .openTeamPicker) else { return false }
         _ = openCloudTeamPicker(
             preferredWindow: event.window ?? shortcutRoutingActiveWindow,
@@ -20,6 +24,7 @@ extension AppDelegate {
         preferredWindow: NSWindow? = nil,
         debugSource: String
     ) -> Bool {
+        guard ShellXFeatures.cloud else { return false }
         guard CloudMachinesFeature.isEnabled,
               RightSidebarMode.machines.isAvailable() else {
             let alert = NSAlert()

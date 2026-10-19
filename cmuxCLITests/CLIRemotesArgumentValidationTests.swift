@@ -46,16 +46,17 @@ struct CLIRemotesArgumentValidationTests {
     }
 }
 
-@Suite("VPN CLI argument validation", .serialized)
+/// ShellX: `cmux vpn` reaches Manaflow Cloud (`vm.tunnel_*`), so every
+/// invocation is refused before the CLI connects; argument validation never runs.
+@Suite("VPN CLI is refused in ShellX", .serialized)
 struct CLIVPNArgumentValidationTests {
-    @Test func rejectsTrailingArgumentsBeforeTunnelRequest() throws {
+    @Test func refusesEveryVPNVerbBeforeTheTunnelService() throws {
         let cases = [
             ["vpn", "up", "--typo"],
             ["vpn", "on", "extra"],
-            ["vpn", "down", "--typo"],
-            ["vpn", "off", "extra"],
-            ["vpn", "status", "--jsonn"],
-            ["vpn", "revoke", "--typo"],
+            ["vpn", "down"],
+            ["vpn", "status"],
+            ["vpn", "revoke"],
         ]
 
         for arguments in cases {
@@ -69,26 +70,16 @@ struct CLIVPNArgumentValidationTests {
                     "CMUX_SOCKET_PATH": fixture.path,
                     "CMUX_SOCKET_PASSWORD": "",
                     "CMUX_CLI_SENTRY_DISABLED": "1",
+                    "AppleLanguages": "(en)",
                     "PATH": ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin",
                 ],
                 timeout: 10
             )
 
             #expect(!result.timedOut)
-            #expect(result.status == 1, Comment(rawValue: result.stderr))
-            #expect(
-                result.stderr.contains("Error: Usage: cmux vpn <up|down|status|revoke>"),
-                Comment(rawValue: result.stderr)
-            )
-            let tunnelMethods = fixture.requestsSnapshot().compactMap { request in
-                (request["method"] as? String).flatMap { method in
-                    method.hasPrefix("vm.tunnel_") ? method : nil
-                }
-            }
-            #expect(
-                tunnelMethods.isEmpty,
-                "Invalid VPN arguments must be rejected before contacting the tunnel service"
-            )
+            #expect(result.status == 127, Comment(rawValue: result.stderr))
+            #expect(result.stderr.contains("Cloud is not available in ShellX."), Comment(rawValue: result.stderr))
+            #expect(fixture.requestsSnapshot().isEmpty, "vpn must not contact the app")
         }
     }
 }

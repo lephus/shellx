@@ -272,11 +272,9 @@ Change any of them with `sidebar.compactStatusIcons`, a map from state to an [SF
 
 Cmd+Ctrl+= and Cmd+Ctrl+- increase or decrease every terminal in the selected workspace by one point. Cmd+Ctrl+0 resets them to the current Ghostty font size. Hidden, hibernated, and Dock terminals change with visible terminals, and newly created terminals inherit the workspace size. Rebind them with `shortcuts.bindings.increaseWorkspaceTerminalFontSize`, `shortcuts.bindings.decreaseWorkspaceTerminalFontSize`, and `shortcuts.bindings.resetWorkspaceTerminalFontSize`.
 
-## New Cloud Workspace shortcut and the plus-button menu
+## The plus-button menu
 
-Cmd+Y creates a workspace on the machine that owns the most recently selected Cloud workspace, or the first usable machine in the right-hand Cloud sidebar. If no usable Cloud workspace or machine is available, it opens the New Cloud Machine flow. When a remembered selection is stale, the resolver uses the current right-hand Cloud sidebar order, including pins and manual reordering; an empty or still-loading fleet deterministically stays on the New Cloud Machine flow. Cmd+Shift+Y always opens the New Cloud Machine flow. Cmd+N always creates a local workspace on this Mac. Rebind or unbind these shortcuts from Settings > Keyboard Shortcuts or with `shortcuts.bindings.newCloudWorkspace` and `shortcuts.bindings.newCloudMachine`.
-
-When `ui.newWorkspace.contextMenu` is not set, the plus-button menu lists `cmux.newWorkspace` (Cmd+N, local), `cmux.newCloudWorkspace` (Cmd+Y), `cmux.newCloudMachine` (Cmd+Shift+Y), `cmux.newTerminal` (Cmd+T), and `cmux.newBrowser` (Cmd+Shift+L). Each row shows its current shortcut, so a rebind in Settings or `cmux.json` appears the next time the menu opens; unbound and chord shortcuts show no hint. Cloud rows appear only when Cloud Machines is enabled. A configured menu keeps your order and still shows hints for built-in rows and for actions with a `shortcut`.
+When `ui.newWorkspace.contextMenu` is not set, the plus-button menu lists `cmux.newWorkspace` (Cmd+N, local), `cmux.newTerminal` (Cmd+T), and `cmux.newBrowser` (Cmd+Shift+L). Each row shows its current shortcut, so a rebind in Settings or `cmux.json` appears the next time the menu opens; unbound and chord shortcuts show no hint. ShellX has no Cloud, so the Cloud rows (`cmux.newCloudWorkspace`, `cmux.newCloudMachine`) never appear and have no shortcut. A configured menu keeps your order and still shows hints for built-in rows and for actions with a `shortcut`.
 
 ## `terminal.textBoxSubmitActions`
 

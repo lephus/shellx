@@ -8,6 +8,7 @@ import CmuxSidebar
 import CmuxSidebarProviderKit
 import CmuxUpdater
 import CmuxWorkspaces
+import ShellXBrand
 import SwiftUI
 
 /// Footer debug controls and empty-area drop targets for the vertical tabs sidebar, extracted from `ContentView.swift`, which sits at its file-length budget.
@@ -90,18 +91,27 @@ enum SidebarFooterControl: CaseIterable, Equatable {
 }
 
 enum SidebarFooterPresentationPolicy {
+    /// ShellX: the account button, Cloud button and Pro badge lead to
+    /// Manaflow services (sign-in, Cloud, billing), which are hard-off.
+    static let cloudOnlyControls: [SidebarFooterControl] = [.account, .cloud, .upgrade]
+    /// ShellX: phone pairing is parked until Wave 2 flips `remoteMachines`.
+    static let parkedControls: [SidebarFooterControl] = [.mobileConnect]
+
     static func isVisible(
         _ control: SidebarFooterControl,
         presentationMode: WorkspacePresentationModeSettings.Mode
     ) -> Bool {
-        presentationMode != .minimal || control == .upgrade
+        if !ShellXFeatures.cloud, cloudOnlyControls.contains(control) { return false }
+        if !ShellXFeatures.remoteMachines, parkedControls.contains(control) { return false }
+        return presentationMode != .minimal || control == .upgrade
     }
 
     static func isUpgradeVisible(
         isProActive: Bool,
         isProStatusKnown: Bool = true
     ) -> Bool {
-        isProStatusKnown && !isProActive
+        guard ShellXFeatures.cloud else { return false }
+        return isProStatusKnown && !isProActive
     }
 }
 

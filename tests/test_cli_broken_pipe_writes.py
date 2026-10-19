@@ -83,19 +83,6 @@ class BrokenPipeWritesTests(unittest.TestCase):
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertEqual(closed.stderr, b"")
 
-    def test_vm_prompt_survives_closed_stderr(self) -> None:
-        with FakeUnixServer(self.responder("vm.cloud_prompt", {
-            "prompt": "test cloud prompt", "skill_path": "/test/skill.md",
-        })) as server:
-            args = ("--socket", server.path, "vm", "prompt")
-            normal = self.run_cli(*args)
-            self.assertEqual(normal.returncode, 0, normal.stderr)
-            self.assertEqual(normal.stdout, b"test cloud prompt\n")
-            self.assertEqual(normal.stderr, b"skill: /test/skill.md\n")
-            closed = self.run_cli(*args, closed="stderr")
-            self.assertEqual(closed.returncode, 0, closed.stdout)
-            self.assertEqual(closed.stdout, normal.stdout)
-
     def test_vault_warning_survives_closed_stderr(self) -> None:
         with FakeUnixServer(self.responder("vault.sessions", {
             "sessions": [], "errors": ["test unavailable session"],
@@ -116,28 +103,6 @@ class BrokenPipeWritesTests(unittest.TestCase):
         closed = self.run_cli(*args, closed="stderr")
         self.assertEqual(closed.returncode, normal.returncode)
         self.assertEqual(closed.stdout, normal.stdout)
-
-    def test_cloud_gate_preserves_pre_minted_config_when_disabled_or_unavailable(self) -> None:
-        for status in ({"enabled": False}, {}):
-            with self.subTest(status=status):
-                with FakeUnixServer(self.responder("vm.feature_status", status)) as server:
-                    self.env["CMUX_SOCKET_PATH"] = server.path
-                    config = Path(self.root.name) / "pty.json"
-                    config.write_text("invalid JSON: never dial a remote endpoint")
-                    result = self.run_cli("vm-pty-connect", "--config", str(config))
-                    self.assertNotEqual(result.returncode, 0)
-                    self.assertIn(b"Cloud Machines are temporarily unavailable", result.stderr)
-                    self.assertTrue(config.exists(), "Disabled Cloud must not consume attachment credentials")
-
-    def test_cloud_gate_allows_config_processing_when_enabled(self) -> None:
-        with FakeUnixServer(self.responder("vm.feature_status", {"enabled": True})) as server:
-            self.env["CMUX_SOCKET_PATH"] = server.path
-            config = Path(self.root.name) / "pty.json"
-            config.write_text("invalid JSON: never dial a remote endpoint")
-            result = self.run_cli("vm-pty-connect", "--config", str(config))
-            self.assertNotEqual(result.returncode, 0)
-            self.assertFalse(config.exists(), "Enabled Cloud must reach the config reader")
-            self.assertNotIn(b"Cloud Machines are temporarily unavailable", result.stderr)
 
     def test_socket_backed_stdout_does_not_signal(self) -> None:
         result = self.run_cli("--version", closed="stdout", socket_stream=True)
@@ -164,16 +129,18 @@ class BrokenPipeWritesTests(unittest.TestCase):
             self.assertTrue(reader.recv(4096).startswith(b"cmux "))
 
     def test_consumer_closes_during_large_stdout_write(self) -> None:
-        with FakeUnixServer(self.responder("vm.cloud_prompt", {"prompt": "x" * 262_144})) as server:
+        # ShellX refuses `vm prompt` (Cloud is off), so a local verb that
+        # prints its socket result carries the large write instead.
+        with FakeUnixServer(self.responder("system.capabilities", {"padding": "x" * 262_144})) as server:
             with subprocess.Popen(
-                [self.cli, "--socket", server.path, "vm", "prompt"],
+                [self.cli, "--socket", server.path, "capabilities"],
                 cwd=self.root.name, env=self.env, stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             ) as process:
                 try:
                     ready, _, _ = select.select([process.stdout], [], [], 15)
                     self.assertTrue(ready, "CLI did not start writing stdout")
-                    self.assertEqual(os.read(process.stdout.fileno(), 16), b"x" * 16)
+                    self.assertTrue(os.read(process.stdout.fileno(), 16).startswith(b"{"))
                     process.stdout.close()
                     process.wait(timeout=15)
                     self.assertEqual(process.returncode, 0, process.stderr.read())

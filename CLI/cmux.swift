@@ -6414,6 +6414,9 @@ struct CMUXCLI {
 
         let command = args[index]
         let rawCommandArgs = Array(args[(index + 1)...])
+        if let service = ShellXCloudGate.unavailableService(forCLICommand: command) {
+            throw Self.shellXUnavailable(service)
+        }
         if let supervisor = try OwnedProcessSupervisor(command: command, arguments: rawCommandArgs) {
             exit(try supervisor.run())
         }
