@@ -1943,7 +1943,7 @@ enum CmuxEmbeddedConfigSchema {
       "properties": {
         "matchTerminalBackground": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Use the terminal background instead of the sidebar tint."
         },
         "tintColor": {
