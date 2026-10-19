@@ -1,5 +1,6 @@
 import CMUXMobileCore
 import SwiftUI
+import ShellXIcons
 
 @MainActor
 struct IrohConnectionCheckCard: View {
@@ -34,7 +35,7 @@ struct IrohConnectionCheckCard: View {
             SettingsCardNote(String(
                 localized: "settings.networking.check.note",
                 defaultValue: """
-                cmux automatically uses direct internet, LAN, or any VPN route available to macOS, then \
+                ShellX automatically uses direct internet, LAN, or any VPN route available to macOS, then \
                 falls back to an allowed relay. Every route remains end-to-end encrypted.
                 """
             ))
@@ -60,7 +61,7 @@ struct IrohConnectionCheckCard: View {
                 searchAnchorID: "setting:networking:connectionCheck:\(stage.id)",
                 stageTitle(stage.kind)
             ) {
-                Label(stageStatus(stage.status), systemImage: stageSymbol(stage.status))
+                ShellXLabel(stageStatus(stage.status), icon: stageSymbol(stage.status))
                     .foregroundStyle(stageColor(stage.status))
             }
         }
@@ -78,9 +79,9 @@ struct IrohConnectionCheckCard: View {
                 )
             ) {
                 ShareLink(item: relayAllowlistText) {
-                    Label(
+                    ShellXLabel(
                         String(localized: "settings.networking.check.share", defaultValue: "Share…"),
-                        systemImage: "square.and.arrow.up"
+                        icon: "square.and.arrow.up"
                     )
                 }
                 .buttonStyle(.bordered)
@@ -98,9 +99,9 @@ struct IrohConnectionCheckCard: View {
             )
         ) {
             ShareLink(item: supportReportText(report)) {
-                Label(
+                ShellXLabel(
                     String(localized: "settings.networking.check.share", defaultValue: "Share…"),
-                    systemImage: "square.and.arrow.up"
+                    icon: "square.and.arrow.up"
                 )
             }
             .buttonStyle(.bordered)
@@ -120,7 +121,7 @@ struct IrohConnectionCheckCard: View {
     private var relayAllowlistText: String {
         let header = String(
             localized: "settings.networking.check.allowlist.header",
-            defaultValue: "Allow outbound HTTPS and WebSocket access to these cmux relay origins:"
+            defaultValue: "Allow outbound HTTPS and WebSocket access to these ShellX relay origins:"
         )
         return ([header] + safeRelayOrigins.map { "- \($0)" }).joined(separator: "\n")
     }
@@ -133,7 +134,7 @@ struct IrohConnectionCheckCard: View {
         var lines = [
             String(
                 localized: "settings.networking.check.report.header",
-                defaultValue: "cmux Connection Report"
+                defaultValue: "ShellX Connection Report"
             ),
             "\(String(localized: "settings.networking.check.path", defaultValue: "Active Route")): \(selectedPath(report.selectedPath))",
         ]
@@ -171,7 +172,7 @@ struct IrohConnectionCheckCard: View {
             String(
                 format: String(
                     localized: "settings.networking.check.path.managedRelay",
-                    defaultValue: "cmux Relay (%1$@, %2$@)"
+                    defaultValue: "ShellX Relay (%1$@, %2$@)"
                 ),
                 provider,
                 region
@@ -242,7 +243,7 @@ struct IrohConnectionCheckCard: View {
         case .retry:
             String(
                 localized: "settings.networking.check.action.retry",
-                defaultValue: "Retry. If this continues, share the safe report with cmux support."
+                defaultValue: "Retry. If this continues, share the safe report with ShellX support."
             )
         case .checkInternet:
             String(
@@ -252,20 +253,20 @@ struct IrohConnectionCheckCard: View {
         case .openMacApp:
             String(
                 localized: "settings.networking.check.action.mac",
-                defaultValue: "Keep cmux open and confirm both apps use the same account."
+                defaultValue: "Keep ShellX open and confirm both apps use the same account."
             )
         case .allowRelayTraffic:
             String(
                 localized: "settings.networking.check.action.relay",
                 defaultValue: """
                 Your network may block relay traffic. Ask IT to allow HTTPS and WebSocket access to your \
-                configured cmux relay domains, or add an approved custom relay.
+                configured ShellX relay domains, or add an approved custom relay.
                 """
             )
         case .refreshAccount:
             String(
                 localized: "settings.networking.check.action.account",
-                defaultValue: "Confirm you are signed in, then reopen cmux and run the check again."
+                defaultValue: "Confirm you are signed in, then reopen ShellX and run the check again."
             )
         case .reviewRelaySettings:
             String(
@@ -277,7 +278,7 @@ struct IrohConnectionCheckCard: View {
         case .updateOrRepair:
             String(
                 localized: "settings.networking.check.action.repair",
-                defaultValue: "Update cmux on both devices. If needed, pair them again."
+                defaultValue: "Update ShellX on both devices. If needed, pair them again."
             )
         }
     }

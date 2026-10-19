@@ -448,15 +448,15 @@ struct AuthEnvironmentTests {
         #expect(darkSnapshot.appearance == "dark")
         #expect(darkSnapshot.background == "#101010")
         #expect(darkSnapshot.foreground == "#F0F0F0")
-        #expect(darkSnapshot.accent == "#0091FF")
+        #expect(darkSnapshot.accent == "#60A5FA")
         #expect(lightSnapshot.appearance == "light")
         #expect(lightSnapshot.background == "#F0F0F0")
         #expect(lightSnapshot.foreground == "#101010")
-        #expect(lightSnapshot.accent == "#0088FF")
-        #expect(darkSnapshot.accentOnBackground == "#0091FF")
+        #expect(lightSnapshot.accent == "#60A5FA")
+        #expect(darkSnapshot.accentOnBackground == "#60A5FA")
         #expect(darkSnapshot.accentOnForeground != darkSnapshot.accent)
         #expect(lightSnapshot.accentOnBackground != lightSnapshot.accent)
-        #expect(lightSnapshot.accentOnForeground == "#0088FF")
+        #expect(lightSnapshot.accentOnForeground == "#60A5FA")
     }
 
     @MainActor

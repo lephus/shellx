@@ -1,6 +1,7 @@
 import CmuxSettingsUI
 import CmuxSettings
 import SwiftUI
+import ShellXIcons
 
 /// Cute pixel-art sleeping scene for Sleepy Mode. Renders from the live
 /// `SleepyModeSettingsStore` snapshot every frame, so theme / mascot / glow /
@@ -108,7 +109,7 @@ struct SleepyFaceView: View {
         let accent = SleepyPalette.colors(for: config)["O"] ?? .white
         let tint: Color = keepingAwake ? accent : Color(red: 0.95, green: 0.62, blue: 0.30)
         return HStack(spacing: 7) {
-            Image(systemName: keepingAwake ? "cup.and.saucer.fill" : "exclamationmark.triangle.fill")
+            ShellXIcon.image(keepingAwake ? "cup.and.saucer.fill" : "exclamationmark.triangle.fill")
             Text(keepingAwake
                 ? String(localized: "sleepyMode.keepAwake", defaultValue: "Mac staying awake")
                 : String(localized: "sleepyMode.keepAwake.failed", defaultValue: "Couldn't keep Mac awake — check Battery settings"))
@@ -130,7 +131,7 @@ struct SleepyFaceView: View {
                 Button {
                     SleepyModeController.shared.toggle()
                 } label: {
-                    Label(String(localized: "sleepyMode.button.exit", defaultValue: "Exit"), systemImage: "xmark")
+                    ShellXLabel(String(localized: "sleepyMode.button.exit", defaultValue: "Exit"), icon: "xmark")
                 }
                 .buttonStyle(SleepyPixelButtonStyle(tint: Color(red: 0.52, green: 0.30, blue: 0.40)))
 
@@ -140,7 +141,7 @@ struct SleepyFaceView: View {
                     let power = power
                     Task { await power.lockMacNow() }
                 } label: {
-                    Label(String(localized: "sleepyMode.button.lockMac", defaultValue: "Lock Mac"), systemImage: "lock.fill")
+                    ShellXLabel(String(localized: "sleepyMode.button.lockMac", defaultValue: "Lock Mac"), icon: "lock.fill")
                 }
                 .buttonStyle(SleepyPixelButtonStyle(tint: Color(red: 0.34, green: 0.30, blue: 0.60)))
 
@@ -148,7 +149,7 @@ struct SleepyFaceView: View {
                     let power = power
                     Task { await power.sleepDisplayNow() }
                 } label: {
-                    Label(String(localized: "sleepyMode.button.sleepDisplay", defaultValue: "Sleep Display"), systemImage: "moon.fill")
+                    ShellXLabel(String(localized: "sleepyMode.button.sleepDisplay", defaultValue: "Sleep Display"), icon: "moon.fill")
                 }
                 .buttonStyle(SleepyPixelButtonStyle(tint: Color(red: 0.28, green: 0.40, blue: 0.62)))
 
@@ -168,11 +169,11 @@ struct SleepyFaceView: View {
                         ui.isBusy = false
                     }
                 } label: {
-                    Label(
+                    ShellXLabel(
                         powerUIState.isOn
                             ? String(localized: "sleepyMode.button.lowPowerOn", defaultValue: "Low Power: On")
                             : String(localized: "sleepyMode.button.lowPowerOff", defaultValue: "Low Power: Off"),
-                        systemImage: powerUIState.isOn ? "leaf.fill" : "leaf"
+                        icon: powerUIState.isOn ? "leaf.fill" : "leaf"
                     )
                 }
                 .buttonStyle(SleepyPixelButtonStyle(tint: powerUIState.isOn ? Color(red: 0.24, green: 0.56, blue: 0.32) : Color(red: 0.30, green: 0.42, blue: 0.46)))

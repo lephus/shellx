@@ -13,13 +13,13 @@ extension CMUXCLI {
     /// Full help text for `cmux fork`, kept with the verb implementation.
     func forkSubcommandUsage() -> String {
         String(localized: "cli.fork.help", defaultValue: """
-        Usage: cmux fork [--surface <id|ref>] <kind> <checkpoint-id>
-               cmux fork <kind> <checkpoint-id> --surface <id|ref>
-               cmux fork --surface=<id|ref> <kind> <checkpoint-id>
-               cmux fork --surface [id|ref]
+        Usage: shellx fork [--surface <id|ref>] <kind> <checkpoint-id>
+               shellx fork <kind> <checkpoint-id> --surface <id|ref>
+               shellx fork --surface=<id|ref> <kind> <checkpoint-id>
+               shellx fork --surface [id|ref]
 
         Start a fork from the saved session on the selected surface.
-        With no id or ref, --surface uses the calling cmux surface.
+        With no id or ref, --surface uses the calling ShellX surface.
         """)
     }
 

@@ -254,8 +254,8 @@ struct CMUXCLIForkVerbRegressionTests {
             let fork = try runCLI(arguments: ["fork"] + form, environment: environment)
             #expect(restore.status != 0)
             #expect(fork.status != 0)
-            #expect(restore.stderr.contains("Usage: cmux restore"))
-            #expect(fork.stderr.contains("Usage: cmux fork"))
+            #expect(restore.stderr.contains("Usage: shellx restore"))
+            #expect(fork.stderr.contains("Usage: shellx fork"))
         }
     }
 

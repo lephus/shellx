@@ -454,24 +454,24 @@ enum UnsolicitedAuthCallbackApprovalPrompt {
         if request.replacesSignedInSession {
             return String(
                 localized: "account.callbackApproval.replace.title",
-                defaultValue: "Switch cmux to another account?"
+                defaultValue: "Switch ShellX to another account?"
             )
         }
         return String(
             localized: "account.callbackApproval.title",
-            defaultValue: "Sign in to cmux from a link?"
+            defaultValue: "Sign in to ShellX from a link?"
         )
     }
 
     private static func message(for request: UnsolicitedAuthCallbackApprovalRequest) -> String {
         let account = String(
             localized: "account.callbackApproval.message.unknown",
-            defaultValue: "A link is asking cmux to sign in to an account. Continue only if you just signed in to cmux in your browser."
+            defaultValue: "A link is asking ShellX to sign in to an account. Continue only if you just signed in to ShellX in your browser."
         )
         guard request.replacesSignedInSession else { return account }
         let warning = String(
             localized: "account.callbackApproval.replace.generic",
-            defaultValue: "You\u{2019}re already signed in. Continuing replaces that session, and new cmux activity will belong to the account in the link. If you didn\u{2019}t just choose this account yourself, click Don\u{2019}t Sign In."
+            defaultValue: "You\u{2019}re already signed in. Continuing replaces that session, and new ShellX activity will belong to the account in the link. If you didn\u{2019}t just choose this account yourself, click Don\u{2019}t Sign In."
         )
         return "\(account)\n\n\(warning)"
     }

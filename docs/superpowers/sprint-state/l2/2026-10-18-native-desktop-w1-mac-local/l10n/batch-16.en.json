@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Recipient: %@",
+"comment": ""
+},
+{
+"i": 1,
+"en": "summary.md preview:",
+"comment": ""
+},
+{
+"i": 2,
+"en": "The attachment preview will appear after the profiler writes the capture folder.",
+"comment": ""
+},
+{
+"i": 3,
+"en": "Review the attachment, add context, then send the email.",
+"comment": ""
+},
+{
+"i": 4,
+"en": "About %d seconds remaining",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Send a cmux profile",
+"comment": ""
+},
+{
+"i": 6,
+"en": "Recording CPU, SwiftUI, memory, and system traces in the background.",
+"comment": ""
+},
+{
+"i": 7,
+"en": "The bundled profiling script is missing.",
+"comment": ""
+},
+{
+"i": 8,
+"en": "Send Email",
+"comment": ""
+},
+{
+"i": 9,
+"en": "Sending...",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Packaging the profile and sending the email through Mail.",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Starting Instruments...",
+"comment": ""
+},
+{
+"i": 12,
+"en": "Unable to send the email.",
+"comment": ""
+},
+{
+"i": 13,
+"en": "Mail did not finish in time. Stopping the send helper so you can retry.",
+"comment": ""
+},
+{
+"i": 14,
+"en": "The Mail helper timed out and was stopped. You can try again.",
+"comment": ""
+},
+{
+"i": 15,
+"en": "The bundled profile submission helper is missing.",
+"comment": ""
+},
+{
+"i": 16,
+"en": "summary.md is not available yet.",
+"comment": ""
+},
+{
+"i": 17,
+"en": "Profiling cmux",
+"comment": ""
+},
+{
+"i": 18,
+"en": "Search All Windows...",
+"comment": ""
+},
+{
+"i": 19,
+"en": "Show cmux",
+"comment": ""
+},
+{
+"i": 20,
+"en": "Sleepy Mode Settings…",
+"comment": ""
+},
+{
+"i": 21,
+"en": "Start Profiling",
+"comment": ""
+},
+{
+"i": 22,
+"en": "1 unread notification",
+"comment": ""
+},
+{
+"i": 23,
+"en": "%lld unread notifications",
+"comment": ""
+},
+{
+"i": 24,
+"en": "Resume approval data is still loading. Retry the request.",
+"comment": ""
+},
+{
+"i": 25,
+"en": "Apply to all commands starting with “%@” in this folder",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Ask Each Time",
+"comment": ""
+},
+{
+"i": 27,
+"en": "Auto-Restore",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Keep Manual",
+"comment": ""
+},
+{
+"i": 29,
+"en": "A process wants cmux to keep this resume command for the current terminal:\n\nWorking directory: %@\n\n%@",
+"comment": ""
+},
+{
+"i": 30,
+"en": "Allow Resume Command?",
+"comment": ""
+},
+{
+"i": 31,
+"en": "Don’t ask again for this command",
+"comment": ""
+},
+{
+"i": 32,
+"en": "cmux is restoring a terminal with this resume command:\n\nWorking directory: %@\n\n%@",
+"comment": ""
+},
+{
+"i": 33,
+"en": "Run All",
+"comment": ""
+},
+{
+"i": 34,
+"en": "Skip All",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Run Resume Command?",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Untitled Tab",
+"comment": ""
+},
+{
+"i": 37,
+"en": "Amp",
+"comment": ""
+},
+{
+"i": 38,
+"en": "CodeBuddy",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Copilot",
+"comment": ""
+},
+{
+"i": 40,
+"en": "Cursor",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Factory",
+"comment": ""
+},
+{
+"i": 42,
+"en": "Gemini",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Qoder",
+"comment": ""
+},
+{
+"i": 44,
+"en": "Memory",
+"comment": ""
+},
+{
+"i": 45,
+"en": "Proc",
+"comment": ""
+},
+{
+"i": 46,
+"en": "Kill Process...",
+"comment": ""
+},
+{
+"i": 47,
+"en": "View Terminal",
+"comment": ""
+},
+{
+"i": 48,
+"en": "View Workspace",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Open a workspace, terminal, or browser surface to see it here.",
+"comment": ""
+},
+{
+"i": 50,
+"en": "No resource usage",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Unable to load resource usage",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Unable to kill process: %@",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Ask %@ (PID %lld) to terminate gracefully. cmux will force-kill it if it is still running after a short grace period.",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Ask %lld processes to terminate gracefully. cmux will force-kill remaining processes after a short grace period. PIDs: %@.",
+"comment": ""
+},
+{
+"i": 55,
+"en": "PID %lld",
+"comment": ""
+},
+{
+"i": 56,
+"en": "process group %lld",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Kill process?",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Kill processes?",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Loading resource usage",
+"comment": ""
+},
+{
+"i": 60,
+"en": "Pane %@",
+"comment": ""
+},
+{
+"i": 61,
+"en": "Surface %@",
+"comment": ""
+},
+{
+"i": 62,
+"en": "Unattributed",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Workspace %@",
+"comment": ""
+},
+{
+"i": 64,
+"en": "Unable to refresh Task Manager data.",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Refreshing",
+"comment": ""
+},
+{
+"i": 66,
+"en": "Focused",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Key window",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Process",
+"comment": ""
+},
+{
+"i": 69,
+"en": "Process %lld",
+"comment": ""
+},
+{
+"i": 70,
+"en": "Selected",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Shared x%lld",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Unknown tag",
+"comment": ""
+},
+{
+"i": 73,
+"en": "WebView",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Window %@",
+"comment": ""
+},
+{
+"i": 75,
+"en": "Child Process RSS",
+"comment": ""
+},
+{
+"i": 76,
+"en": "Coding Agents",
+"comment": ""
+},
+{
+"i": 77,
+"en": "Hierarchy",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Program Totals",
+"comment": ""
+},
+{
+"i": 79,
+"en": "Processes",
+"comment": ""
+},
+{
+"i": 80,
+"en": "App Footprint",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Child RSS",
+"comment": ""
+},
+{
+"i": 82,
+"en": "Updated",
+"comment": ""
+},
+{
+"i": 83,
+"en": "Task Manager",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Copy Text",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Agent shutdown needs attention",
+"comment": ""
+},
+{
+"i": 86,
+"en": "Finishing agent shutdown",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Last activity %@",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Resume",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Retry shutdown",
+"comment": ""
+},
+{
+"i": 90,
+"en": "Agent hibernated",
+"comment": ""
+},
+{
+"i": 91,
+"en": "Show",
+"comment": ""
+},
+{
+"i": 92,
+"en": "No previous session snapshot available",
+"comment": ""
+},
+{
+"i": 93,
+"en": "Clear (Control-L)",
+"comment": ""
+},
+{
+"i": 94,
+"en": "Copy IDs",
+"comment": ""
+},
+{
+"i": 95,
+"en": "Fork Conversation",
+"comment": ""
+},
+{
+"i": 96,
+"en": "Fork Conversation To",
+"comment": ""
+},
+{
+"i": 97,
+"en": "Look Up “%@”",
+"comment": ""
+},
+{
+"i": 98,
+"en": "Move Tab to New Workspace",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Reconnect Pane",
+"comment": ""
+},
+{
+"i": 100,
+"en": "Reset Terminal",
+"comment": ""
+},
+{
+"i": 101,
+"en": "Split Horizontally",
+"comment": ""
+},
+{
+"i": 102,
+"en": "Split Vertically",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Translate Selection",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Trigger Flash",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Add",
+"comment": ""
+},
+{
+"i": 106,
+"en": "Add Files",
+"comment": ""
+},
+{
+"i": 107,
+"en": "Add Images",
+"comment": ""
+},
+{
+"i": 108,
+"en": "Dismiss comments without sending",
+"comment": ""
+},
+{
+"i": 109,
+"en": "%d comments",
+"comment": ""
+},
+{
+"i": 110,
+"en": "1 comment",
+"comment": ""
+},
+{
+"i": 111,
+"en": "Show comments",
+"comment": ""
+},
+{
+"i": 112,
+"en": "Diff review comments are included when you submit",
+"comment": ""
+},
+{
+"i": 113,
+"en": "Open in Preview",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Open with Preview",
+"comment": ""
+},
+{
+"i": 115,
+"en": "Prompt or command",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Submit with %@",
+"comment": ""
+},
+{
+"i": 117,
+"en": "This terminal uses Text Entry until command launch is available. Shift-Tab is disabled while Text Entry is forced.",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Cancel Pending Launch",
+"comment": ""
+},
+{
+"i": 119,
+"en": "TextBox Submit Actions Docs",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Submit with %@. Press Shift-Tab to change.",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Toggle File Explorer",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Show or hide the file explorer",
+"comment": ""
+},
+{
+"i": 123,
+"en": "New Workspace Menu",
+"comment": ""
+},
+{
+"i": 124,
+"en": "New workspace options",
+"comment": ""
+},
+{
+"i": 125,
+"en": "New workspace",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Show notifications",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Toggle Sidebar",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Show or hide the sidebar",
+"comment": ""
+},
+{
+"i": 129,
+"en": "Split panes",
+"comment": ""
+},
+{
+"i": 130,
+"en": "UITest Action %lld",
+"comment": ""
+},
+{
+"i": 131,
+"en": "Update Available",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Update Available: %@",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Checking for Updates…",
+"comment": ""
+},
+{
+"i": 134,
+"en": "Configure automatic update preferences",
+"comment": ""
+},
+{
+"i": 135,
+"en": "Agent Invalidation (4010)",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Disk Image / Translocated (1003)",
+"comment": ""
+},
+{
+"i": 137,
+"en": "Download Failure (2001)",
+"comment": ""
+},
+{
+"i": 138,
+"en": "Generic Install Failure (4005)",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Install Didn’t Start (watchdog)",
+"comment": ""
+},
+{
+"i": 140,
+"en": "Install Failure / Auth (4005→4001)",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Installer Agent Failure (4005 + timeout)",
+"comment": ""
+},
+{
+"i": 142,
+"en": "No Internet",
+"comment": ""
+},
+{
+"i": 143,
+"en": "Signature Error (3001)",
+"comment": ""
+},
+{
+"i": 144,
+"en": "Updater Not Ready (readiness timeout)",
+"comment": ""
+},
+{
+"i": 145,
+"en": "Download and install the latest version",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Downloading: %@",
+"comment": ""
+},
+{
+"i": 147,
+"en": "Downloading…",
+"comment": ""
+},
+{
+"i": 148,
+"en": "Downloading the update package",
+"comment": ""
+},
+{
+"i": 149,
+"en": "App Location Issue",
+"comment": ""
+},
+{
+"i": 150,
+"en": "The network connection was lost while checking for updates. Try again.",
+"comment": ""
+},
+{
+"i": 151,
+"en": "Connection Lost",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Code",
+"comment": ""
+},
+{
+"i": 153,
+"en": "Debug",
+"comment": ""
+},
+{
+"i": 154,
+"en": "Domain",
+"comment": ""
+},
+{
+"i": 155,
+"en": "Failure",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Log",
+"comment": ""
+},
+{
+"i": 157,
+"en": "Recovery",
+"comment": ""
+},
+{
+"i": 158,
+"en": "cmux couldn’t start the update. Check your internet connection and try again.",
+"comment": ""
+},
+{
+"i": 159,
+"en": "Install attempt stalled without reaching download.",
+"comment": ""
+},
+{
+"i": 160,
+"en": "Update Didn’t Start",
+"comment": ""
+},
+{
+"i": 161,
+"en": "Couldn't Download Update",
+"comment": ""
+},
+{
+"i": 162,
+"en": "Download Latest Version",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Something went wrong while checking for updates. Try again, or check the update log for details.",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Update Failed",
+"comment": ""
+},
+{
+"i": 165,
+"en": "cmux couldn't download the update feed. Check your connection and try again.",
+"comment": ""
+},
+{
+"i": 166,
+"en": "Update Feed Error",
+"comment": ""
+},
+{
+"i": 167,
+"en": "The update feed could not be read. Please try again later.",
+"comment": ""
+},
+{
+"i": 168,
+"en": "The update feed is insecure. Please contact support.",
+"comment": ""
+},
+{
+"i": 169,
+"en": "Insecure Update Feed",
+"comment": ""
+},
+{
+"i": 170,
+"en": "Move cmux into Applications and relaunch to enable updates. If it’s already in Applications, restart your Mac and try again, or download the latest version below.",
+"comment": ""
+},
+{
+"i": 171,
+"en": "macOS didn’t start cmux’s updater helper in time. Security software can delay it. Retry once; if it still fails, restart your Mac or download and install the latest version below.",
+"comment": ""
+},
+{
+"i": 172,
+"en": "Couldn’t Start Updater",
+"comment": ""
+},
+{
+"i": 173,
+"en": "The update feed URL is invalid. Please contact support.",
+"comment": ""
+},
+{
+"i": 174,
+"en": "Invalid Update Feed",
+"comment": ""
+},
+{
+"i": 175,
+"en": "cmux can't reach the update server. Check your internet connection and try again.",
+"comment": ""
+},
+{
+"i": 176,
+"en": "No Internet Connection",
+"comment": ""
+},
+{
+"i": 177,
+"en": "Updater is still starting. Try again in a moment.",
+"comment": ""
+},
+{
+"i": 178,
+"en": "Move cmux into Applications and relaunch to enable updates.",
+"comment": ""
+},
+{
+"i": 179,
+"en": "Updater Permission Error",
+"comment": ""
+},
+{
+"i": 180,
+"en": "A secure connection to the update server couldn't be established. Try again later.",
+"comment": ""
+},
+{
+"i": 181,
+"en": "Secure Connection Failed",
+"comment": ""
+},
+{
+"i": 182,
+"en": "The update server can't be found. Check your connection or try again later.",
+"comment": ""
+},
+{
+"i": 183,
+"en": "Server Not Found",
+"comment": ""
+},
+{
+"i": 184,
+"en": "cmux couldn't connect to the update server. Check your connection or try again later.",
+"comment": ""
+},
+{
+"i": 185,
+"en": "Server Unreachable",
+"comment": ""
+},
+{
+"i": 186,
+"en": "The update's signature could not be verified. Please try again later.",
+"comment": ""
+},
+{
+"i": 187,
+"en": "Update Signature Error",
+"comment": ""
+},
+{
+"i": 188,
+"en": "The update server took too long to respond. Try again in a moment.",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Update Timed Out",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Updater Not Ready",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Preparing: %@",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Install Update and Relaunch",
+"comment": ""
+},
+{
+"i": 193,
+"en": "Installing…",
+"comment": ""
+},
+{
+"i": 194,
+"en": "Installing update and preparing to restart",
+"comment": ""
+},
+{
+"i": 195,
+"en": "You are running the latest version",
+"comment": ""
+},
+{
+"i": 196,
+"en": "No Updates Available",
+"comment": ""
+},
+{
+"i": 197,
+"en": "Enable Automatic Updates?",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Please wait while we check for available updates",
+"comment": ""
+},
+{
+"i": 199,
+"en": "cmux can automatically check for updates in the background.",
+"comment": ""
+},
+{
+"i": 200,
+"en": "Checking for updates…",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Details",
+"comment": ""
+},
+{
+"i": 202,
+"en": "Downloading Update",
+"comment": ""
+},
+{
+"i": 203,
+"en": "Enable automatic updates?",
+"comment": ""
+},
+{
+"i": 204,
+"en": "No Updates Found",
+"comment": ""
+},
+{
+"i": 205,
+"en": "You're already running the latest version.",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Preparing Update",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Released:",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Restart Required",
+"comment": ""
+},
+{
+"i": 209,
+"en": "The update is ready. Please restart the application to complete the installation.",
+"comment": ""
+},
+{
+"i": 210,
+"en": "Size:",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Version:",
+"comment": ""
+},
+{
+"i": 212,
+"en": "Preparing Update Check…",
+"comment": ""
+},
+{
+"i": 213,
+"en": "Waiting for the current update session to finish",
+"comment": ""
+},
+{
+"i": 214,
+"en": "Extracting and preparing the update",
+"comment": ""
+},
+{
+"i": 215,
+"en": "Restart to Complete Update",
+"comment": ""
+},
+{
+"i": 216,
+"en": "Starting Download…",
+"comment": ""
+},
+{
+"i": 217,
+"en": "Starting the update download",
+"comment": ""
+},
+{
+"i": 218,
+"en": "View GitHub Commit",
+"comment": ""
+},
+{
+"i": 219,
+"en": "View Release Notes",
+"comment": ""
+},
+{
+"i": 220,
+"en": "This workspace can't be closed right now.",
+"comment": ""
+},
+{
+"i": 221,
+"en": "Pinned workspaces can't be closed while pinned. Unpin the workspace first.",
+"comment": ""
+},
+{
+"i": 222,
+"en": "After current",
+"comment": ""
+},
+{
+"i": 223,
+"en": "End",
+"comment": ""
+},
+{
+"i": 224,
+"en": "Every checklist item is done.",
+"comment": ""
+},
+{
+"i": 225,
+"en": "Checklist complete",
+"comment": ""
+},
+{
+"i": 226,
+"en": "Group %lld",
+"comment": ""
+},
+{
+"i": 227,
+"en": "Collapse group",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Delete Group",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Edit Group Config…",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Mark All Workspaces in Group as Read",
+"comment": ""
+},
+{
+"i": 231,
+"en": "Mark All Workspaces in Group as Unread",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Mark Group as Read",
+"comment": ""
+},
+{
+"i": 233,
+"en": "Mark Group as Unread",
+"comment": ""
+},
+{
+"i": 234,
+"en": "Open Workspace Groups Docs",
+"comment": ""
+},
+{
+"i": 235,
+"en": "Pin Group",
+"comment": ""
+},
+{
+"i": 236,
+"en": "Rename Group…",
+"comment": ""
+},
+{
+"i": 237,
+"en": "Ungroup Workspaces",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Unpin Group",
+"comment": ""
+},
+{
+"i": 239,
+"en": "All requested children are ineligible because they are already group anchors; ungroup them first",
+"comment": ""
+},
+{
+"i": 240,
+"en": "close_workspaces must be a boolean",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Cannot delete every workspace in a window",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Could not close every workspace in the group",
+"comment": ""
+},
+{
+"i": 243,
+"en": "A pinned empty group can only be removed with Delete Group",
+"comment": ""
+},
+{
+"i": 244,
+"en": "The group anchor was not generated by cmux",
+"comment": ""
+},
+{
+"i": 245,
+"en": "The generated group anchor could not be removed",
+"comment": ""
+},
+{
+"i": 246,
+"en": "Generated-anchor cleanup requires an anchor-only group",
+"comment": ""
+},
+{
+"i": 247,
+"en": "external_id and idempotency_key must be strings",
+"comment": ""
+},
+{
+"i": 248,
+"en": "The group identity must not be empty",
+"comment": ""
+},
+{
+"i": 249,
+"en": "external_id and idempotency_key must match",
+"comment": ""
+},
+{
+"i": 250,
+"en": "Group has no workspaces to close",
+"comment": ""
+},
+{
+"i": 251,
+"en": "remove_generated_anchor must be a boolean",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Reference workspace must be a member of the target group",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Workspace is the anchor of another group; ungroup it first",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Expand group",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Focus the group’s anchor workspace",
+"comment": ""
+},
+{
+"i": 256,
+"en": "New workspace in group",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Pinned group",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Insert new group workspaces after the active workspace in that group.",
+"comment": ""
+},
+{
+"i": 259,
+"en": "End of group",
+"comment": ""
+},
+{
+"i": 260,
+"en": "Append new group workspaces after the last group member.",
+"comment": ""
+},
+{
+"i": 261,
+"en": "Top of group",
+"comment": ""
+},
+{
+"i": 262,
+"en": "Insert new group workspaces right after the group header.",
+"comment": ""
+},
+{
+"i": 263,
+"en": "New Workspace in Group",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Enter a new name for this group.",
+"comment": ""
+},
+{
+"i": 265,
+"en": "Group name",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Rename Group",
+"comment": ""
+},
+{
+"i": 267,
+"en": "%lld unread",
+"comment": ""
+},
+{
+"i": 268,
+"en": "No checklist items yet.",
+"comment": ""
+},
+{
+"i": 269,
+"en": "This workspace is no longer available.",
+"comment": ""
+},
+{
+"i": 270,
+"en": "notify --clear --surface requires workspace or window context; specify --workspace or --window",
+"comment": ""
+},
+{
+"i": 271,
+"en": "%1$d of 1 machine in use",
+"comment": ""
+},
+{
+"i": 272,
+"en": "%1$d machines in use",
+"comment": ""
+},
+{
+"i": 273,
+"en": "1 machine in use",
+"comment": ""
+},
+{
+"i": 274,
+"en": "%1$d of %#@count2@ in use",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Free plan: this machine stays reachable for %d days. Upgrade to keep it.",
+"comment": ""
+},
+{
+"i": 276,
+"en": "%d GB",
+"comment": ""
+},
+{
+"i": 277,
+"en": "%d MB",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Machine %1$@ was created, but opening it failed. Open it from the Machines list.\n\n%2$@",
+"comment": ""
+},
+{
+"i": 279,
+"en": "The machine could not be created.",
+"comment": ""
+},
+{
+"i": 280,
+"en": "cmux could not start the create command. Sign in and try again.",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Set Up Base",
+"comment": ""
+},
+{
+"i": 282,
+"en": "A cloud computer with devtools and coding agents preinstalled. Its home directory is reset when the machine is recreated.",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Base is your persistent cloud machine. Opening it later reuses this same machine; reset Base to start over.",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Optional label",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Machine size",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Choose the memory and disk profile for this machine.",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Required",
+"comment": ""
+},
+{
+"i": 288,
+"en": "RAM size",
+"comment": ""
+},
+{
+"i": 289,
+"en": "%1$d GB RAM · %2$d GB disk",
+"comment": ""
+},
+{
+"i": 290,
+"en": "RAM",
+"comment": ""
+},
+{
+"i": 291,
+"en": "%d GB RAM",
+"comment": ""
+},
+{
+"i": 292,
+"en": "%d GB disk included",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Memory. CPU scales with it.",
+"comment": ""
+},
+{
+"i": 294,
+"en": "Image",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Setting up Base…",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Creating…",
+"comment": ""
+},
+{
+"i": 297,
+"en": "fork [--surface <id|ref>] <kind> <checkpoint-id> | fork --surface [id|ref]",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Usage: cmux fork [--surface <id|ref>] <kind> <checkpoint-id>\n       cmux fork <kind> <checkpoint-id> --surface <id|ref>\n       cmux fork --surface=<id|ref> <kind> <checkpoint-id>\n       cmux fork --surface [id|ref]\n\nStart a fork from the saved session on the selected surface.",
+"comment": ""
+},
+{
+"i": 299,
+"en": "Usage: cmux fork --surface [id|ref]",
+"comment": ""
+}
+]

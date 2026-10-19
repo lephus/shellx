@@ -17,7 +17,7 @@ struct CmuxTaskManagerRow: Identifiable, Equatable {
         case codingAgentAggregate
         case childMemoryAggregate
 
-        var systemImage: String {
+        var icon: String {
             switch self {
             case .window: return "macwindow"
             case .workspace: return "rectangle.stack"

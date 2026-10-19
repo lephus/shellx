@@ -1478,7 +1478,7 @@ struct CmuxResolvedConfigAction: Identifiable, Sendable, Hashable {
         return CmuxResolvedConfigAction(
             id: builtIn.configID,
             title: metadata.title,
-            subtitle: String(localized: "command.cmuxConfig.builtInSubtitle", defaultValue: "cmux"),
+            subtitle: String(localized: "command.cmuxConfig.builtInSubtitle", defaultValue: "ShellX"),
             keywords: metadata.keywords,
             palette: true,
             shortcut: nil,

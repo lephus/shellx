@@ -2,6 +2,7 @@ import CmuxCloud
 import AppKit
 import CmuxAppKitSupportUI
 import SwiftUI
+import ShellXIcons
 
 /// Mounts the latest cloud pane creation failure above one workspace's content.
 struct CloudPaneCreationFailurePresentation: ViewModifier {
@@ -350,7 +351,7 @@ private struct CloudFailureCardBody: View {
             VStack(spacing: 8) {
                 if style == .dialog {
                     HStack {
-                        Image(systemName: "terminal")
+                        ShellXIcon.image("terminal")
                             .font(.system(size: 20, weight: .regular))
                             .foregroundStyle(.secondary)
                             .accessibilityHidden(true)
@@ -375,7 +376,7 @@ private struct CloudFailureCardBody: View {
         let onDismiss: () -> Void
         var body: some View {
             Button(action: onDismiss) {
-                Image(systemName: "xmark")
+                ShellXIcon.image("xmark")
                     .font(.system(size: 10, weight: .medium))
                     .frame(width: 20, height: 20)
                     .contentShape(Rectangle())

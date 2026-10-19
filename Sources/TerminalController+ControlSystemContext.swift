@@ -284,7 +284,7 @@ extension TerminalController: ControlSystemContext {
                     message: String(
                         format: String(
                             localized: "session.import.error.unknownChannel",
-                            defaultValue: "Unknown cmux channel \"%@\". Use stable, nightly, rc, staging, debug:<tag>, or a path to a session file."
+                            defaultValue: "Unknown ShellX channel \"%@\". Use stable, nightly, rc, staging, debug:<tag>, or a path to a session file."
                         ),
                         name
                     ),
@@ -352,7 +352,7 @@ extension TerminalController: ControlSystemContext {
                 code: "not_found",
                 message: String(
                     localized: "session.export.error.noSnapshot",
-                    defaultValue: "cmux has not saved a session yet. Try again in a few seconds."
+                    defaultValue: "ShellX has not saved a session yet. Try again in a few seconds."
                 ),
                 path: nil
             )
@@ -374,7 +374,7 @@ extension TerminalController: ControlSystemContext {
                 message: String(
                     format: String(
                         localized: "session.export.error.destinationIsLive",
-                        defaultValue: "%@ is this cmux's own session file. Choose another path."
+                        defaultValue: "%@ is this ShellX's own session file. Choose another path."
                     ),
                     url.path
                 ),
@@ -415,7 +415,7 @@ extension TerminalController: ControlSystemContext {
             return String(
                 format: String(
                     localized: "session.import.error.fileNotFound",
-                    defaultValue: "No saved cmux session at %@."
+                    defaultValue: "No saved ShellX session at %@."
                 ),
                 path
             )
@@ -428,7 +428,7 @@ extension TerminalController: ControlSystemContext {
             return String(
                 format: String(
                     localized: "session.import.error.notASnapshot",
-                    defaultValue: "%@ is not a cmux session snapshot."
+                    defaultValue: "%@ is not a ShellX session snapshot."
                 ),
                 path
             )
@@ -436,7 +436,7 @@ extension TerminalController: ControlSystemContext {
             return String(
                 format: String(
                     localized: "session.import.error.newerSchema",
-                    defaultValue: "%1$@ was saved by a newer cmux (session format %2$@, this cmux reads %3$@). Update cmux to import it."
+                    defaultValue: "%1$@ was saved by a newer ShellX (session format %2$@, this ShellX reads %3$@). Update ShellX to import it."
                 ),
                 path,
                 String(found),
@@ -446,7 +446,7 @@ extension TerminalController: ControlSystemContext {
             return String(
                 format: String(
                     localized: "session.import.error.olderSchema",
-                    defaultValue: "%1$@ uses an older session format (%2$@) that this cmux no longer reads (%3$@)."
+                    defaultValue: "%1$@ uses an older session format (%2$@) that this ShellX no longer reads (%3$@)."
                 ),
                 path,
                 String(found),
@@ -464,7 +464,7 @@ extension TerminalController: ControlSystemContext {
             return String(
                 format: String(
                     localized: "session.import.error.liveSnapshot",
-                    defaultValue: "%@ is the session this cmux is saving right now. Run cmux restore-session without --from to reopen the previous launch."
+                    defaultValue: "%@ is the session this ShellX is saving right now. Run shellx restore-session without --from to reopen the previous launch."
                 ),
                 path
             )

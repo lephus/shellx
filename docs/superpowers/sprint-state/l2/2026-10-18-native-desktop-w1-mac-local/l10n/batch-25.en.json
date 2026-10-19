@@ -1,0 +1,77 @@
+[
+{
+"i": 0,
+"en": "Leaves remote workspaces without an origin color until you enable it here.",
+"comment": ""
+},
+{
+"i": 1,
+"en": "Tints each remote workspace's sidebar row with a stable per-host color so servers are easy to tell apart. Your manual workspace color always wins.",
+"comment": ""
+},
+{
+"i": 2,
+"en": "Remote host names on duplicate titles",
+"comment": ""
+},
+{
+"i": 3,
+"en": "Leaves duplicate workspace titles as they are until you enable it here.",
+"comment": ""
+},
+{
+"i": 4,
+"en": "When workspaces share a title, shows each remote one's host after the title, leaving off the domain the hosts share.",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Preview: Cmd-J labels every clickable control in the window, and typing a label clicks it.",
+"comment": ""
+},
+{
+"i": 6,
+"en": "New Workspace on the remote host",
+"comment": ""
+},
+{
+"i": 7,
+"en": "New Workspace on the remote host new workspace remote tmux session host local workspace mirror beta unstable",
+"comment": ""
+},
+{
+"i": 8,
+"en": "New Workspace always opens a local workspace, even with a remote tmux workspace selected.",
+"comment": ""
+},
+{
+"i": 9,
+"en": "With a remote tmux workspace selected, New Workspace starts a tmux session on that workspace's host. New Local Workspace opens a local one.",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Your Max subscription is active. It includes everything in Pro.",
+"comment": ""
+},
+{
+"i": 11,
+"en": "cmux Max",
+"comment": ""
+},
+{
+"i": 12,
+"en": "Upgrade to Max…",
+"comment": ""
+},
+{
+"i": 13,
+"en": "Your Pro subscription is active. Manage it through your subscription provider.",
+"comment": ""
+},
+{
+"i": 14,
+"en": "Your Pro plan is active.",
+"comment": ""
+}
+]

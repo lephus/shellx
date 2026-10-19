@@ -222,7 +222,7 @@ extension CMUXCLI {
             stage = "codex.restore.binding-changed"
             message = String(
                 localized: "cli.restore.error.checkpointMismatch",
-                defaultValue: "restore: this command no longer matches the session. Run 'cmux restore --surface' to use the current record."
+                defaultValue: "restore: this command no longer matches the session. Run 'shellx restore --surface' to use the current record."
             )
         case .allowed:
             return

@@ -11,7 +11,7 @@ struct IrohNetworkingAttentionNote: View {
         } else if hasStaleRelayIDs {
             SettingsCardNote(String(
                 localized: "settings.networking.attention",
-                defaultValue: "Your saved relay choice needs attention. Direct Iroh remains available, but cmux will not substitute an unselected relay."
+                defaultValue: "Your saved relay choice needs attention. Direct Iroh remains available, but ShellX will not substitute an unselected relay."
             ))
         }
     }

@@ -62,8 +62,8 @@ extension CMUXCLI {
         workflowText("cli.workflow.guidance.choose", "Pick an example that fits the task and lists requirements you have."),
         workflowText("cli.workflow.guidance.recipe", "Open the recipe and copy only the needed top-level keys into .shellx/shellx.json or ~/.config/shellx/shellx.json. Add .shellx/dock.json when the example uses Dock."),
         workflowText("cli.workflow.guidance.adapt", "Replace sample paths, commands, URLs, tool names, and placements with values for this repository."),
-        workflowText("cli.workflow.guidance.validate", "Validate the JSON or JSONC, run cmux reload-config, and check the resulting entry point."),
-        workflowText("cli.workflow.guidance.save", "When the workspace looks right, save it with cmux layout save <name> --description \"<what this creates>\"."),
+        workflowText("cli.workflow.guidance.validate", "Validate the JSON or JSONC, run shellx reload-config, and check the resulting entry point."),
+        workflowText("cli.workflow.guidance.save", "When the workspace looks right, save it with shellx layout save <name> --description \"<what this creates>\"."),
     ]
 
     private static let workflowExamples: [WorkflowExample] = [
@@ -95,7 +95,7 @@ extension CMUXCLI {
                 "claude"
             ],
             instantiate: [
-                workflowText("cli.workflow.worktree-agents.instantiate.0", "Open the Worktree Agents recipe, merge its actions/ui/commands entries into cmux.json, adapt the worktree cwd and agent commands, then run cmux reload-config.")
+                workflowText("cli.workflow.worktree-agents.instantiate.0", "Open the Worktree Agents recipe, merge its actions/ui/commands entries into shellx.json, adapt the worktree cwd and agent commands, then run shellx reload-config.")
             ],
             adapt: [
                 workflowText("cli.workflow.worktree-agents.adapt.0", "change the worktree path"),
@@ -133,7 +133,7 @@ extension CMUXCLI {
                 workflowText("cli.workflow.full-stack-dev.requires.2", "optional lazygit")
             ],
             instantiate: [
-                workflowText("cli.workflow.full-stack-dev.instantiate.0", "Open the Full-Stack Dev recipe, merge the workspace command and optional Dock controls, replace the sample bun commands and preview URL, then run cmux reload-config.")
+                workflowText("cli.workflow.full-stack-dev.instantiate.0", "Open the Full-Stack Dev recipe, merge the workspace command and optional Dock controls, replace the sample bun commands and preview URL, then run shellx reload-config.")
             ],
             adapt: [
                 workflowText("cli.workflow.full-stack-dev.adapt.0", "use the repository's package manager and scripts"),
@@ -165,7 +165,7 @@ extension CMUXCLI {
                 workflowText("cli.workflow.ssh-devbox.requires.0", "a working ssh target or alias")
             ],
             instantiate: [
-                workflowText("cli.workflow.ssh-devbox.instantiate.0", "Open the SSH Devbox recipe, replace ssh devbox and the preview URL for the project, merge the command into cmux.json, then run cmux reload-config.")
+                workflowText("cli.workflow.ssh-devbox.instantiate.0", "Open the SSH Devbox recipe, replace ssh devbox and the preview URL for the project, merge the command into shellx.json, then run shellx reload-config.")
             ],
             adapt: [
                 workflowText("cli.workflow.ssh-devbox.adapt.0", "change the SSH host/command"),
@@ -197,7 +197,7 @@ extension CMUXCLI {
                 workflowText("cli.workflow.review-pr.requires.0", "gh for the sample terminal command")
             ],
             instantiate: [
-                workflowText("cli.workflow.review-pr.instantiate.0", "Open the Review PR recipe, point its command and URL at the repository's review flow, merge it into cmux.json, then run cmux reload-config.")
+                workflowText("cli.workflow.review-pr.instantiate.0", "Open the Review PR recipe, point its command and URL at the repository's review flow, merge it into shellx.json, then run shellx reload-config.")
             ],
             adapt: [
                 workflowText("cli.workflow.review-pr.adapt.0", "replace gh pr status with the team's review command"),
@@ -217,7 +217,7 @@ extension CMUXCLI {
             ],
             creates: [
                 workflowText("cli.workflow.docs-workspace.creates.0", "a docs-server terminal"),
-                workflowText("cli.workflow.docs-workspace.creates.1", "a cmux Markdown viewer terminal"),
+                workflowText("cli.workflow.docs-workspace.creates.1", "a ShellX Markdown viewer terminal"),
                 workflowText("cli.workflow.docs-workspace.creates.2", "a browser docs preview")
             ],
             configFiles: [".shellx/shellx.json", "~/.config/shellx/shellx.json"],
@@ -231,7 +231,7 @@ extension CMUXCLI {
                 workflowText("cli.workflow.docs-workspace.requires.0", "the project's docs-dev command")
             ],
             instantiate: [
-                workflowText("cli.workflow.docs-workspace.instantiate.0", "Open the Docs Workspace recipe, replace the docs command, Markdown path, and preview URL, merge it into cmux.json, then run cmux reload-config.")
+                workflowText("cli.workflow.docs-workspace.instantiate.0", "Open the Docs Workspace recipe, replace the docs command, Markdown path, and preview URL, merge it into shellx.json, then run shellx reload-config.")
             ],
             adapt: [
                 workflowText("cli.workflow.docs-workspace.adapt.0", "use the repository's docs command"),
@@ -265,7 +265,7 @@ extension CMUXCLI {
                 workflowText("cli.workflow.quick-agent-buttons.requires.0", "the agent binaries you keep in the recipe")
             ],
             instantiate: [
-                workflowText("cli.workflow.quick-agent-buttons.instantiate.0", "Open the Quick Agent Buttons recipe, keep the agent actions you use, merge actions/ui into cmux.json, then run cmux reload-config.")
+                workflowText("cli.workflow.quick-agent-buttons.instantiate.0", "Open the Quick Agent Buttons recipe, keep the agent actions you use, merge actions/ui into shellx.json, then run shellx reload-config.")
             ],
             adapt: [
                 workflowText("cli.workflow.quick-agent-buttons.adapt.0", "remove unused agents"),
@@ -480,7 +480,7 @@ extension CMUXCLI {
         }
 
         guard args.count == 1 else {
-            throw CLIError(message: "Usage: cmux docs [settings|shortcuts|api|browser|capture|agents|workflows|dock|managed-policies]")
+            throw CLIError(message: "Usage: shellx docs [settings|shortcuts|api|browser|capture|agents|workflows|dock|managed-policies]")
         }
 
         if topic == "list" || topic == "all" {
@@ -493,7 +493,7 @@ extension CMUXCLI {
         }
 
         guard let reference = docsReference(for: topic) else {
-            throw CLIError(message: "Unknown docs topic '\(topic)'. Run 'cmux docs' for topics.")
+            throw CLIError(message: "Unknown docs topic '\(topic)'. Run 'shellx docs' for topics.")
         }
 
         if wantsJSON {
@@ -505,17 +505,17 @@ extension CMUXCLI {
 
     func docsUsage() -> String {
         return """
-        Usage: cmux docs [settings|shortcuts|api|browser|capture|agents|workflows|dock|managed-policies]
+        Usage: shellx docs [settings|shortcuts|api|browser|capture|agents|workflows|dock|managed-policies]
 
-        Print the canonical docs URL, raw GitHub resources, and useful commands for a cmux topic.
-        This command does not require a running cmux app or socket.
+        Print the canonical docs URL, raw GitHub resources, and useful commands for a ShellX topic.
+        This command does not require a running ShellX app or socket.
 
         Agents:
-          Use `cmux docs settings` before editing ~/.config/shellx/shellx.json.
+          Use `shellx docs settings` before editing ~/.config/shellx/shellx.json.
           \(Self.workflowText("cli.workflow.guidance.discover", "Use `cmux docs workflows --json` to choose a shipped workflow example or discover the saved-layout lifecycle."))
-          Use `cmux docs dock` before creating or editing .shellx/dock.json.
-          Use `cmux docs capture` to screenshot or record a window for a pull request or a bug report.
-          Back up any existing cmux.json file to a timestamped .bak copy before editing so the user can revert.
+          Use `shellx docs dock` before creating or editing .shellx/dock.json.
+          Use `shellx docs capture` to screenshot or record a window for a pull request or a bug report.
+          Back up any existing shellx.json file to a timestamped .bak copy before editing so the user can revert.
           Fetch raw resources with the printed curl commands when you need the latest schema.
         """
     }
@@ -700,13 +700,13 @@ extension CMUXCLI {
         switch subcommand {
         case "path", "paths":
             guard args.count == 1 else {
-                throw CLIError(message: "Usage: cmux settings path")
+                throw CLIError(message: "Usage: shellx settings path")
             }
             printSettingsPaths(jsonOutput: wantsJSON)
             return
         case "docs", "documentation":
             guard args.count == 1 else {
-                throw CLIError(message: "Usage: cmux settings docs")
+                throw CLIError(message: "Usage: shellx settings docs")
             }
             if wantsJSON, let reference = docsReference(for: "settings") {
                 print(jsonString(docsPayload(reference)))
@@ -717,10 +717,10 @@ extension CMUXCLI {
         case "open":
             let targetRaw: String?
             if args.count > 2 {
-                throw CLIError(message: "Usage: cmux settings open [target]")
+                throw CLIError(message: "Usage: shellx settings open [target]")
             } else if let rawTarget = args.dropFirst().first {
                 guard let target = settingsTargetRawValue(for: rawTarget) else {
-                    throw CLIError(message: "Unknown settings target '\(rawTarget)'. Run 'cmux settings --help'.")
+                    throw CLIError(message: "Unknown settings target '\(rawTarget)'. Run 'shellx settings --help'.")
                 }
                 targetRaw = target
             } else {
@@ -735,10 +735,10 @@ extension CMUXCLI {
             return
         default:
             guard let targetRaw = settingsTargetRawValue(for: subcommand) else {
-                throw CLIError(message: "Unknown settings subcommand '\(subcommand)'. Run 'cmux settings --help'.")
+                throw CLIError(message: "Unknown settings subcommand '\(subcommand)'. Run 'shellx settings --help'.")
             }
             guard args.count == 1 else {
-                throw CLIError(message: "Usage: cmux settings [open [target]|path|docs|<target>]")
+                throw CLIError(message: "Usage: shellx settings [open [target]|path|docs|<target>]")
             }
             try openSettingsTarget(
                 targetRaw,
@@ -758,14 +758,14 @@ extension CMUXCLI {
 
     func settingsUsage() -> String {
         return """
-        Usage: cmux settings [open [target]|path|docs|<target>]
+        Usage: shellx settings [open [target]|path|docs|<target>]
 
-        Open cmux Settings, print cmux.json paths, or show settings documentation.
+        Open ShellX Settings, print shellx.json paths, or show settings documentation.
 
         Subcommands:
           open [target]       Open Settings, optionally to a target section.
-          path                Print cmux.json paths, docs URL, and schema URL.
-          docs                Print the same output as `cmux docs settings`.
+          path                Print shellx.json paths, docs URL, and schema URL.
+          docs                Print the same output as `shellx docs settings`.
 
         Targets:
           account, app, themes, terminal, networking, computers, devices, sidebar-appearance,
@@ -778,14 +778,14 @@ extension CMUXCLI {
           legacy config: \(Self.legacySettingsDisplayPath)
           legacy app support: \(Self.fallbackSettingsDisplayPath)
 
-        Related (not cmux-owned, but cmux reads it for terminal behavior):
+        Related (not ShellX-owned, but ShellX reads it for terminal behavior):
           \(Self.ghosttyConfigDisplayPath)
 
-        Before editing cmux.json:
-          Back up any existing cmux.json file to a timestamped .bak copy so the user can revert.
+        Before editing shellx.json:
+          Back up any existing shellx.json file to a timestamped .bak copy so the user can revert.
 
-        Reload after editing cmux.json or Ghostty config:
-          cmux reload-config   (reloads BOTH and refreshes terminals; no app restart needed)
+        Reload after editing shellx.json or Ghostty config:
+          shellx reload-config   (reloads BOTH and refreshes terminals; no app restart needed)
         """
     }
 

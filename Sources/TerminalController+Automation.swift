@@ -60,7 +60,7 @@ extension TerminalController {
         guard let automationEngine else {
             return .err(
                 code: "unavailable",
-                message: String(localized: "automation.error.engineUnavailable", defaultValue: "Automation is unavailable. Check ~/.shellx/automations.json, then run cmux automation reload."),
+                message: String(localized: "automation.error.engineUnavailable", defaultValue: "Automation is unavailable. Check ~/.shellx/automations.json, then run shellx automation reload."),
                 data: nil
             )
         }
@@ -79,7 +79,7 @@ extension TerminalController {
         guard let automationEngine else {
             return .err(
                 code: "unavailable",
-                message: String(localized: "automation.error.engineUnavailable", defaultValue: "Automation is unavailable. Check ~/.shellx/automations.json, then run cmux automation reload."),
+                message: String(localized: "automation.error.engineUnavailable", defaultValue: "Automation is unavailable. Check ~/.shellx/automations.json, then run shellx automation reload."),
                 data: nil
             )
         }
@@ -112,7 +112,7 @@ extension TerminalController {
         guard let automationEngine else {
             return .err(
                 code: "unavailable",
-                message: String(localized: "automation.error.engineUnavailable", defaultValue: "Automation is unavailable. Check ~/.shellx/automations.json, then run cmux automation reload."),
+                message: String(localized: "automation.error.engineUnavailable", defaultValue: "Automation is unavailable. Check ~/.shellx/automations.json, then run shellx automation reload."),
                 data: nil
             )
         }
@@ -138,7 +138,7 @@ extension TerminalController {
         guard let automationEngine else {
             return .err(
                 code: "unavailable",
-                message: String(localized: "automation.error.engineUnavailable", defaultValue: "Automation is unavailable. Check ~/.shellx/automations.json, then run cmux automation reload."),
+                message: String(localized: "automation.error.engineUnavailable", defaultValue: "Automation is unavailable. Check ~/.shellx/automations.json, then run shellx automation reload."),
                 data: nil
             )
         }
@@ -162,7 +162,7 @@ extension TerminalController {
         guard let automationEngine else {
             return .err(
                 code: "unavailable",
-                message: String(localized: "automation.error.engineUnavailable", defaultValue: "Automation is unavailable. Check ~/.shellx/automations.json, then run cmux automation reload."),
+                message: String(localized: "automation.error.engineUnavailable", defaultValue: "Automation is unavailable. Check ~/.shellx/automations.json, then run shellx automation reload."),
                 data: nil
             )
         }
@@ -175,7 +175,7 @@ extension TerminalController {
         guard let automationEngine else {
             return .err(
                 code: "unavailable",
-                message: String(localized: "automation.error.engineUnavailable", defaultValue: "Automation is unavailable. Check ~/.shellx/automations.json, then run cmux automation reload."),
+                message: String(localized: "automation.error.engineUnavailable", defaultValue: "Automation is unavailable. Check ~/.shellx/automations.json, then run shellx automation reload."),
                 data: nil
             )
         }

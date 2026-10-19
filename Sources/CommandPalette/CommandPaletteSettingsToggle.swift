@@ -249,7 +249,7 @@ enum CommandPaletteSettingsToggleCommands {
                 title: {
                     String(
                         localized: "settings.app.openSupportedFilesInCmux",
-                        defaultValue: "Open Supported Files in cmux"
+                        defaultValue: "Open Supported Files in ShellX"
                     )
                 },
                 sectionTitle: app,
@@ -284,7 +284,7 @@ enum CommandPaletteSettingsToggleCommands {
                 title: {
                     String(
                         localized: "settings.app.openMarkdownInCmuxViewer",
-                        defaultValue: "Open Markdown in cmux Viewer"
+                        defaultValue: "Open Markdown in ShellX Viewer"
                     )
                 },
                 sectionTitle: app,
@@ -750,7 +750,7 @@ enum CommandPaletteSettingsToggleCommands {
                 title: {
                     String(
                         localized: "settings.app.openSidebarPRLinks",
-                        defaultValue: "Open Sidebar PR Links in cmux Browser"
+                        defaultValue: "Open Sidebar PR Links in ShellX Browser"
                     )
                 },
                 sectionTitle: sidebar,
@@ -765,7 +765,7 @@ enum CommandPaletteSettingsToggleCommands {
                 title: {
                     String(
                         localized: "settings.app.openSidebarPortLinks",
-                        defaultValue: "Open Sidebar Port Links in cmux Browser"
+                        defaultValue: "Open Sidebar Port Links in ShellX Browser"
                     )
                 },
                 sectionTitle: sidebar,
@@ -968,7 +968,7 @@ enum CommandPaletteSettingsToggleCommands {
                 title: {
                     String(
                         localized: "settings.browser.openTerminalLinks",
-                        defaultValue: "Open Terminal Links in cmux Browser"
+                        defaultValue: "Open Terminal Links in ShellX Browser"
                     )
                 },
                 sectionTitle: browser,

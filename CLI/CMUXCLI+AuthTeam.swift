@@ -27,7 +27,7 @@ extension CMUXCLI {
             guard commandArgs.count == 2, !commandArgs[1].isEmpty else {
                 throw CLIError(message: String(
                     localized: "cli.auth.team.useUsage",
-                    defaultValue: "Usage: cmux auth team use <team-id>"
+                    defaultValue: "Usage: shellx auth team use <team-id>"
                 ))
             }
             let response = try client.sendV2(
@@ -49,7 +49,7 @@ extension CMUXCLI {
             guard !displayName.isEmpty else {
                 throw CLIError(message: String(
                     localized: "cli.auth.team.createUsage",
-                    defaultValue: "Usage: cmux auth team create <name>"
+                    defaultValue: "Usage: shellx auth team create <name>"
                 ))
             }
             let response = try client.sendV2(
@@ -82,7 +82,7 @@ extension CMUXCLI {
             guard !emails.isEmpty else {
                 throw CLIError(message: String(
                     localized: "cli.auth.team.inviteUsage",
-                    defaultValue: "Usage: cmux auth team invite <email>... [--role admin|member] [--team <team-id>]"
+                    defaultValue: "Usage: shellx auth team invite <email>... [--role admin|member] [--team <team-id>]"
                 ))
             }
             params["emails"] = emails
@@ -124,7 +124,7 @@ extension CMUXCLI {
             guard commandArgs.count >= 2, !commandArgs[1].isEmpty else {
                 throw CLIError(message: String(
                     localized: "cli.auth.team.revokeUsage",
-                    defaultValue: "Usage: cmux auth team revoke-invite <invitation-id|link-id> [--team <team-id>]"
+                    defaultValue: "Usage: shellx auth team revoke-invite <invitation-id|link-id> [--team <team-id>]"
                 ))
             }
             var params: [String: Any] = [:]
@@ -161,7 +161,7 @@ extension CMUXCLI {
             guard commandArgs.count >= 2, !commandArgs[1].isEmpty else {
                 throw CLIError(message: String(
                     localized: "cli.auth.team.acceptUsage",
-                    defaultValue: "Usage: cmux auth team accept|decline <invitation-id>"
+                    defaultValue: "Usage: shellx auth team accept|decline <invitation-id>"
                 ))
             }
             let method = commandArgs[0] == "accept" ? "auth.team.accept_invite" : "auth.team.decline_invite"
@@ -177,7 +177,7 @@ extension CMUXCLI {
             guard commandArgs.count >= 2, !commandArgs[1].isEmpty else {
                 throw CLIError(message: String(
                     localized: "cli.auth.team.removeUsage",
-                    defaultValue: "Usage: cmux auth team remove <user-id> [--team <team-id>]"
+                    defaultValue: "Usage: shellx auth team remove <user-id> [--team <team-id>]"
                 ))
             }
             var params: [String: Any] = ["user_id": commandArgs[1]]
@@ -191,7 +191,7 @@ extension CMUXCLI {
         default:
             throw CLIError(message: String(
                 localized: "cli.auth.team.usage",
-                defaultValue: "Usage: cmux auth team <list|use <team-id>|create <name>|members|invite <email>...|link|revoke-invite <id>|remove <user-id>|invitations|accept <id>|decline <id>>"
+                defaultValue: "Usage: shellx auth team <list|use <team-id>|create <name>|members|invite <email>...|link|revoke-invite <id>|remove <user-id>|invitations|accept <id>|decline <id>>"
             ))
         }
     }

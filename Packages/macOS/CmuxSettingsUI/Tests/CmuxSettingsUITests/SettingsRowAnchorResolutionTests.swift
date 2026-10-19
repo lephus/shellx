@@ -191,7 +191,6 @@ struct SettingsRowAnchorResolutionTests {
     /// (no single cmux.json path): pickers and action buttons. Each must
     /// match the corresponding curated entry id verbatim.
     static let explicitlyAnchoredEntryIDs: Set<String> = [
-        "setting:themes:appearance",
         "setting:themes:terminal-theme",
         "setting:app:app-icon",
         "setting:app:file-drops",

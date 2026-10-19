@@ -33,7 +33,7 @@ final class CloudVPNSetupModel {
 
     var unavailableMessage: String? {
         guard coordinator != nil, !isSupported else { return nil }
-        return String(localized: "cloud.vpn.setup.unavailable", defaultValue: "This copy of cmux does not include a signed VPN extension. Use a cmux release with Cloud VPN support. Cloud terminals, Ports, and Desktop remain available without the VPN.")
+        return String(localized: "cloud.vpn.setup.unavailable", defaultValue: "This copy of ShellX does not include a signed VPN extension. Use a ShellX release with Cloud VPN support. Cloud terminals, Ports, and Desktop remain available without the VPN.")
     }
 
     var statusTitle: String {

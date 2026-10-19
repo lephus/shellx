@@ -3,6 +3,7 @@ import CmuxSettings
 import Foundation
 import Testing
 @testable import CmuxSettingsUI
+import ShellXIcons
 
 @MainActor
 @Suite("Shortcut list search")
@@ -189,8 +190,8 @@ struct ShortcutListSearchTests {
     @Test func recorderShowsCustomPromptIconAndTintWhileArmed() {
         let button = RecorderHostButton(frame: .zero)
         defer { button.cancelRecordingIfActive() }
-        let resting = NSImage(systemSymbolName: "keyboard", accessibilityDescription: nil)
-        let recording = NSImage(systemSymbolName: "keyboard.badge.ellipsis", accessibilityDescription: nil)
+        let resting = ShellXIcon.nsImage("keyboard", accessibilityDescription: nil)
+        let recording = ShellXIcon.nsImage("keyboard.badge.ellipsis", accessibilityDescription: nil)
         button.placeholder = "Detect Shortcut"
         button.recordingPrompt = "Listening…"
         button.restingImage = resting

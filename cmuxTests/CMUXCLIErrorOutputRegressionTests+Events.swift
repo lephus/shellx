@@ -10,7 +10,7 @@ import Testing
         let serverResponse = "ERROR: Access denied - only processes started inside cmux can connect"
         let expectedMessage = String(
             localized: "cli.events.error.connectionDenied",
-            defaultValue: "Connection to cmux was denied. Run this command from a cmux terminal or review socket access in Settings > Automation."
+            defaultValue: "Connection to ShellX was denied. Run this command from a ShellX terminal or review socket access in Settings > Automation."
         )
         let responder = try UnixSocketResponder(path: socketPath, response: serverResponse)
         defer { responder.stop() }
@@ -46,7 +46,7 @@ import Testing
         let serverResponse = "ERROR: events.stream is unavailable"
         let expectedMessage = String(
             localized: "cli.events.error.server",
-            defaultValue: "cmux returned an error while starting the event stream. Check the command and try again."
+            defaultValue: "ShellX returned an error while starting the event stream. Check the command and try again."
         )
         let responder = try UnixSocketResponder(path: socketPath, response: serverResponse)
         defer { responder.stop() }
@@ -65,7 +65,7 @@ import Testing
             Comment(rawValue: result.diagnostics)
         )
         #expect(
-            !result.stderr.contains("Connection to cmux was denied"),
+            !result.stderr.contains("Connection to ShellX was denied"),
             Comment(rawValue: result.diagnostics)
         )
         #expect(

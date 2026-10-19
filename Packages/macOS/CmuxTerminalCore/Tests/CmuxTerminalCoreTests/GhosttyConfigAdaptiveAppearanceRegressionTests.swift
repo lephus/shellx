@@ -3,7 +3,9 @@ import Foundation
 import Testing
 @testable import CmuxTerminalCore
 
-/// Non-color settings must not opt an otherwise adaptive terminal out of Light mode.
+/// Non-color settings must not opt an otherwise untouched terminal out of the
+/// managed default palette. ShellX is dark-only: both appearances resolve the
+/// same managed theme (``GhosttyConfig/cmuxDefaultDarkThemeName``).
 @Suite struct GhosttyConfigAdaptiveAppearanceRegressionTests {
     @Test(arguments: [
         "font-size = 17",
@@ -19,8 +21,8 @@ import Testing
 
             #expect(dark.backgroundColor.hexString() == "#101112")
             #expect(dark.foregroundColor.hexString() == "#F0F1F2")
-            #expect(light.backgroundColor.hexString() == "#FAFBFC")
-            #expect(light.foregroundColor.hexString() == "#202122")
+            #expect(light.backgroundColor.hexString() == "#101112")
+            #expect(light.foregroundColor.hexString() == "#F0F1F2")
             if setting.hasPrefix("font-size") {
                 #expect(dark.fontSize == 17)
                 #expect(light.fontSize == 17)
@@ -34,8 +36,8 @@ import Testing
                 .appendingPathComponent("fonts.conf")
             try "font-size = 17\n".write(to: included, atomically: true, encoding: .utf8)
             let light = load(path, resources: resources, scheme: .light)
-            #expect(light.backgroundColor.hexString() == "#FAFBFC")
-            #expect(light.foregroundColor.hexString() == "#202122")
+            #expect(light.backgroundColor.hexString() == "#101112")
+            #expect(light.foregroundColor.hexString() == "#F0F1F2")
             #expect(light.fontSize == 17)
         }
     }
@@ -76,12 +78,13 @@ import Testing
         let themes = root.appendingPathComponent("themes")
         try FileManager.default.createDirectory(at: themes, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
-        for (name, contents) in [
-            (GhosttyConfig.cmuxDefaultLightThemeName, "background = #fafbfc\nforeground = #202122\n"),
-            (GhosttyConfig.cmuxDefaultDarkThemeName, "background = #101112\nforeground = #f0f1f2\n"),
-        ] {
-            try contents.write(to: themes.appendingPathComponent(name), atomically: true, encoding: .utf8)
-        }
+        // One managed theme serves both appearances (ShellX is dark-only).
+        #expect(GhosttyConfig.cmuxDefaultLightThemeName == GhosttyConfig.cmuxDefaultDarkThemeName)
+        try "background = #101112\nforeground = #f0f1f2\n".write(
+            to: themes.appendingPathComponent(GhosttyConfig.cmuxDefaultDarkThemeName),
+            atomically: true,
+            encoding: .utf8
+        )
         let path = root.appendingPathComponent("config.ghostty")
         let authoredTheme = root.appendingPathComponent("Deliberate Dark")
         try "background = #334455\nforeground = #ddeeff\n".write(

@@ -1,6 +1,7 @@
 import CmuxFoundation
 import CmuxSwiftRender
 import SwiftUI
+import ShellXIcons
 
 /// Renders the Swift interpreter's ``RenderNode`` IR as native SwiftUI.
 ///
@@ -83,9 +84,9 @@ struct RenderNodeView: View {
         case .text:
             Text(node.text ?? "")
         case .label:
-            Label(node.text ?? "", systemImage: node.systemName ?? "circle")
+            ShellXLabel(node.text ?? "", icon: node.systemName ?? "circle")
         case .image:
-            styledImage(Image(systemName: node.systemName ?? "questionmark.square.dashed"))
+            styledImage(ShellXIcon.image(node.systemName ?? "questionmark.square.dashed"))
         case .button:
             if node.children.isEmpty {
                 Button(node.text ?? "") {

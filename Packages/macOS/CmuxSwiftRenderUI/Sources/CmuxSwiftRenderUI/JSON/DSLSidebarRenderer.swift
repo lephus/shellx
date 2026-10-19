@@ -1,5 +1,6 @@
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// Renders a declarative JSON ``DSLNode`` tree as native SwiftUI.
 ///
@@ -36,7 +37,7 @@ struct DSLSidebarRenderer: View {
             }
             .reportTapTarget(node.action?.buttonAction)
         case .image:
-            Image(systemName: node.systemName ?? "questionmark.square.dashed")
+            ShellXIcon.image(node.systemName ?? "questionmark.square.dashed")
                 .modifier(OptionalDSLFont(spec: resolvedFontSpec))
         case .spacer:
             Spacer(minLength: node.size.map { CGFloat($0) })

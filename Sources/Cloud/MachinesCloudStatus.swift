@@ -1,5 +1,6 @@
 import CmuxCloud
 import SwiftUI
+import ShellXIcons
 
 /// Main's Cloud toolbar status, driven by values from the combined Cloud/Devices panel.
 /// Its row exists only while there is something to say; plan usage lives on the
@@ -48,7 +49,7 @@ struct MachinesCloudStatus: View {
             // (ownership, availability) is presented verbatim.
             let safeMessage = !error.isEmpty && error == treeHint ? error : treeErrorMessage
             HStack(alignment: .firstTextBaseline, spacing: 5) {
-                Image(systemName: "exclamationmark.triangle")
+                ShellXIcon.image("exclamationmark.triangle")
                     .font(.system(size: 10, weight: .semibold))
                 Text(safeMessage)
                     .cmuxFont(size: 11)

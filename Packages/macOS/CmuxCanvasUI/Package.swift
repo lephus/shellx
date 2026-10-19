@@ -16,6 +16,8 @@ let package = Package(
     dependencies: [
         .package(path: "../CmuxCanvas"),
         .package(path: "../CmuxFoundation"),
+        // coolicons behind ShellXIcon (spec §7.4); the CLI never links this package.
+        .package(path: "../../Shared/ShellXBrand"),
     ],
     targets: [
         .target(
@@ -23,6 +25,7 @@ let package = Package(
             dependencies: [
                 "CmuxCanvas",
                 "CmuxFoundation",
+                .product(name: "ShellXIcons", package: "ShellXBrand"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

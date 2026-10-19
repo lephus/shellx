@@ -252,7 +252,7 @@ final class MobilePairingModel {
                 state = .failed(
                     String(
                         localized: "mobile.pairing.error.teamUnavailable",
-                        defaultValue: "Could not load your cmux team. Check your internet connection, then try again."
+                        defaultValue: "Could not load your ShellX team. Check your internet connection, then try again."
                     )
                 )
                 observeTeamScopeRecovery(coordinator)
@@ -286,27 +286,27 @@ final class MobilePairingModel {
         case "com.cmux.app":
             return String(
                 localized: "mobile.pairing.target.appStore",
-                defaultValue: "cmux"
+                defaultValue: "ShellX"
             )
         case "dev.cmux.app.beta":
             return String(
                 localized: "mobile.pairing.target.beta",
-                defaultValue: "cmux BETA"
+                defaultValue: "ShellX BETA"
             )
         case "dev.cmux.app.internal":
             return String(
                 localized: "mobile.pairing.target.internal",
-                defaultValue: "cmux INTERNAL"
+                defaultValue: "ShellX INTERNAL"
             )
         case "dev.cmux.app.demo":
             return String(
                 localized: "mobile.pairing.target.demo",
-                defaultValue: "cmux DEMO"
+                defaultValue: "ShellX DEMO"
             )
         default:
             let format = String(
                 localized: "mobile.pairing.target.dev",
-                defaultValue: "cmux DEV %@"
+                defaultValue: "ShellX DEV %@"
             )
             let tag = bundleIdentifier.split(separator: ".").last ?? ""
             return String(format: format, locale: .current, String(tag))

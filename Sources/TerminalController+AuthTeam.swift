@@ -217,7 +217,7 @@ extension TerminalController {
                 code: "timeout",
                 message: String(
                     localized: "socket.authTeam.committedStatusTimedOut",
-                    defaultValue: "The team change was applied, but cmux did not report the updated status within 10 seconds. Run `cmux auth status` to confirm."
+                    defaultValue: "The team change was applied, but ShellX did not report the updated status within 10 seconds. Run `shellx auth status` to confirm."
                 ),
                 data: [
                     "retryable": false,

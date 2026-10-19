@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ShellXIcons
 
 struct FilePreviewPDFZoomChromeView: View {
     let chromeStyleVariant: FilePreviewPDFChromeStyleVariant
@@ -23,9 +24,9 @@ struct FilePreviewPDFZoomChromeView: View {
                     shareButton
                 }
             } label: {
-                Label(
+                ShellXLabel(
                     String(localized: "filePreview.pdf.zoomControls", defaultValue: "Zoom Controls"),
-                    systemImage: "magnifyingglass"
+                    icon: "magnifyingglass"
                 )
             }
             .controlSize(.regular)
@@ -136,7 +137,7 @@ struct FilePreviewPDFZoomChromeView: View {
             FilePreviewChromeIconButton(systemName: systemName, label: label, action: action)
         } else {
             Button(action: action) {
-                Image(systemName: systemName)
+                ShellXIcon.image(systemName)
                     .cmuxFont(size: 16, weight: .regular)
                     .frame(width: 38, height: 36)
                     .contentShape(Rectangle())

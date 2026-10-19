@@ -358,19 +358,19 @@ class TerminalController {
                 return String.localizedStringWithFormat(
                     String(
                         localized: "socket.terminal.notRunning.hibernated",
-                        defaultValue: "The terminal is hibernated: cmux suspended its idle agent to save memory. Wake it by showing it (this brings its window to the front), then retry: %@"
+                        defaultValue: "The terminal is hibernated: ShellX suspended its idle agent to save memory. Wake it by showing it (this brings its window to the front), then retry: %@"
                     ),
                     wakeCommand
                 )
             }
             return String(
                 localized: "socket.terminal.notRunning.hibernatedNoCommand",
-                defaultValue: "The terminal is hibernated: cmux suspended its idle agent to save memory. Show the terminal in cmux to wake it, then retry."
+                defaultValue: "The terminal is hibernated: ShellX suspended its idle agent to save memory. Show the terminal in ShellX to wake it, then retry."
             )
         case .awaitingRestore:
             return String(
                 localized: "socket.terminal.notRunning.awaitingRestore",
-                defaultValue: "cmux is still restoring the terminal after it reopened and is checking which agent session to resume. Retry in a few seconds."
+                defaultValue: "ShellX is still restoring the terminal after it reopened and is checking which agent session to resume. Retry in a few seconds."
             )
         case .starting:
             return String(
@@ -3719,7 +3719,7 @@ class TerminalController {
         guard let error else {
             return String(
                 localized: "cli.coderouter.handoff.notAuthenticated",
-                defaultValue: "CodeRouter handoff requires a signed-in cmux account. Run `cmux auth login`, then retry.",
+                defaultValue: "CodeRouter handoff requires a signed-in ShellX account. Run `shellx auth login`, then retry.",
                 bundle: .main
             )
         }
@@ -3727,31 +3727,31 @@ class TerminalController {
         case .notSignedIn:
             return String(
                 localized: "cli.coderouter.handoff.notAuthenticated",
-                defaultValue: "CodeRouter handoff requires a signed-in cmux account. Run `cmux auth login`, then retry.",
+                defaultValue: "CodeRouter handoff requires a signed-in ShellX account. Run `shellx auth login`, then retry.",
                 bundle: .main
             )
         case .sessionChanged:
             return String(
                 localized: "cli.coderouter.handoff.sessionChanged",
-                defaultValue: "The cmux account or team changed during the handoff. Try again.",
+                defaultValue: "The ShellX account or team changed during the handoff. Try again.",
                 bundle: .main
             )
         case .expiredLease:
             return String(
                 localized: "cli.coderouter.handoff.expired",
-                defaultValue: "The cmux handoff lease expired. Try again.",
+                defaultValue: "The ShellX handoff lease expired. Try again.",
                 bundle: .main
             )
         case .sessionUnavailable, .backendUnreachable:
             return String(
                 localized: "cli.coderouter.handoff.unavailable",
-                defaultValue: "The cmux service is not available. Check your connection and try again.",
+                defaultValue: "The ShellX service is not available. Check your connection and try again.",
                 bundle: .main
             )
         case .invalidTeam, .invalidResponse, .redirectedResponse, .httpStatus:
             return String(
                 localized: "cli.coderouter.handoff.failed",
-                defaultValue: "The cmux service rejected the CodeRouter handoff. Try again.",
+                defaultValue: "The ShellX service rejected the CodeRouter handoff. Try again.",
                 bundle: .main
             )
         }
@@ -4462,12 +4462,12 @@ class TerminalController {
                 if case .httpStatus = vmError {
                     message = String(
                         localized: "socket.cloudVM.sessionRejected",
-                        defaultValue: "The cmux Cloud service rejected this session. Run `cmux auth logout`, then `cmux auth login`, and retry."
+                        defaultValue: "The ShellX Cloud service rejected this session. Run `shellx auth logout`, then `shellx auth login`, and retry."
                     )
                 } else {
                     message = String(
                         localized: "socket.cloudVM.authRequired",
-                        defaultValue: "Cloud VM access requires sign-in. Run `cmux auth login`, then retry."
+                        defaultValue: "Cloud VM access requires sign-in. Run `shellx auth login`, then retry."
                     )
                 }
                 return v2Error(
@@ -4486,7 +4486,7 @@ class TerminalController {
                 let alternative = String(
                     format: String(
                         localized: "socket.cloudVM.transportUnsupported.useExec",
-                        defaultValue: "Use `cmux vm exec %1$@ -- <command>`; `cmux vm ssh %1$@` works where the provider offers SSH."
+                        defaultValue: "Use `shellx vm exec %1$@ -- <command>`; `shellx vm ssh %1$@` works where the provider offers SSH."
                     ),
                     machineID,
                     machineID
@@ -4494,7 +4494,7 @@ class TerminalController {
                 let message = String(
                     format: String(
                         localized: "socket.cloudVM.transportUnsupported",
-                        defaultValue: "%1$@ offers no `%2$@` transport (its provider has no cmux-tui daemon route), so cmux cannot attach a terminal to it. %3$@"
+                        defaultValue: "%1$@ offers no `%2$@` transport (its provider has no cmux-tui daemon route), so ShellX cannot attach a terminal to it. %3$@"
                     ),
                     machineID,
                     "cmux-remote",
@@ -4549,7 +4549,7 @@ class TerminalController {
     private nonisolated static func cloudVMSafeErrorMessage(_ error: Error) -> String {
         let fallback = String(
             localized: "socket.cloudVM.requestFailed",
-            defaultValue: "The Cloud VM request failed. Retry, or check the machine's status with `cmux vm ls`."
+            defaultValue: "The Cloud VM request failed. Retry, or check the machine's status with `shellx vm ls`."
         )
         if let catalogError = error as? SurfaceCatalogError {
             switch catalogError {
@@ -7015,12 +7015,12 @@ class TerminalController {
         case .drivenBySession:
             message = String(
                 localized: "cli.browser.error.replSessionTab",
-                defaultValue: "This tab belongs to a browser REPL session, which is driving it, so other clients cannot read or drive it. Use `cmux browser repl` to drive it."
+                defaultValue: "This tab belongs to a browser REPL session, which is driving it, so other clients cannot read or drive it. Use `shellx browser repl` to drive it."
             )
         case .holdsTypedSecrets:
             message = String(
                 localized: "cli.browser.error.replSecretTab",
-                defaultValue: "A browser REPL session typed a secret into this tab, so other clients cannot read or drive it until it closes. Use `cmux browser repl` to drive it."
+                defaultValue: "A browser REPL session typed a secret into this tab, so other clients cannot read or drive it until it closes. Use `shellx browser repl` to drive it."
             )
         }
         return message

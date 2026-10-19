@@ -130,21 +130,21 @@ enum CLIForwardingLaunchRouter {
     private static func localizedMissingBundledCLIError() -> String {
         String(
             localized: "cli.forwarding.error.missingBundledCLI",
-            defaultValue: "cmux could not run this command from the app bundle. Reinstall cmux or run the command from a standard cmux CLI installation."
+            defaultValue: "ShellX could not run this command from the app bundle. Reinstall ShellX or run the command from a standard ShellX CLI installation."
         )
     }
 
     private static func localizedArgumentAllocationError() -> String {
         String(
             localized: "cli.forwarding.error.allocateArguments",
-            defaultValue: "cmux could not start this command. Try again, or reinstall cmux if the problem continues."
+            defaultValue: "ShellX could not start this command. Try again, or reinstall ShellX if the problem continues."
         )
     }
 
     private static func localizedExecFailureError() -> String {
         String(
             localized: "cli.forwarding.error.execFailed",
-            defaultValue: "cmux could not start the command-line tool from the app bundle. Reinstall cmux or run the command from a standard cmux CLI installation."
+            defaultValue: "ShellX could not start the command-line tool from the app bundle. Reinstall ShellX or run the command from a standard ShellX CLI installation."
         )
     }
 
@@ -153,7 +153,7 @@ enum CLIForwardingLaunchRouter {
     private static func localizedForwardingLoopError() -> String {
         String(
             localized: "cli.forwarding.error.forwardingLoop",
-            defaultValue: "cmux could not hand this command to its bundled command-line tool because forwarding resolved back to the app itself. Reinstall cmux or run the command from a standard cmux CLI installation."
+            defaultValue: "ShellX could not hand this command to its bundled command-line tool because forwarding resolved back to the app itself. Reinstall ShellX or run the command from a standard ShellX CLI installation."
         )
     }
 

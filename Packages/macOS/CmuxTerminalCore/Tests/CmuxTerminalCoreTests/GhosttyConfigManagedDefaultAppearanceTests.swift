@@ -6,7 +6,7 @@ import Testing
 /// Regression coverage for https://github.com/manaflow-ai/cmux/issues/7161
 /// and https://github.com/manaflow-ai/cmux/issues/10199.
 ///
-/// cmux's managed default terminal theme ("Apple System Colors") applies only
+/// cmux's managed default terminal theme (ShellX: the "ShellX" theme) applies only
 /// when enabled and the user has no authored theme or terminal colors. Other
 /// settings keep that base; explicit appearance preserves Ghostty's colors.
 @Suite(.serialized) struct GhosttyConfigManagedDefaultAppearanceTests {
@@ -171,7 +171,7 @@ import Testing
 
     // MARK: Managed base + user override precedence
 
-    /// Writes sentinel "Apple System Colors" theme files into a themes root the
+    /// Writes sentinel managed-default theme files into a themes root the
     /// managed-default resolution finds via `GHOSTTY_RESOURCES_DIR`, keeping the
     /// resolved managed colors deterministic on machines with Ghostty installed.
     private func makeManagedThemesRoot(in dir: URL) throws -> URL {
@@ -238,7 +238,8 @@ import Testing
         }
     }
 
-    @Test func optedInManagedDefaultTracksAppearance() throws {
+    /// ShellX is dark-only: one managed theme serves both appearances.
+    @Test func optedInManagedDefaultIsTheSameForBothAppearances() throws {
         try withTempConfigDir { dir in
             let themesRoot = dir.appendingPathComponent("resources", isDirectory: true)
             let themesDir = themesRoot.appendingPathComponent("themes", isDirectory: true)
@@ -246,13 +247,7 @@ import Testing
                 at: themesDir,
                 withIntermediateDirectories: true
             )
-            try "background = #FAFBFC\nforeground = #101112\n".write(
-                to: themesDir.appendingPathComponent(
-                    GhosttyConfig.cmuxDefaultLightThemeName
-                ),
-                atomically: true,
-                encoding: .utf8
-            )
+            #expect(GhosttyConfig.cmuxDefaultLightThemeName == GhosttyConfig.cmuxDefaultDarkThemeName)
             try "background = #090A0B\nforeground = #F0F1F2\n".write(
                 to: themesDir.appendingPathComponent(
                     GhosttyConfig.cmuxDefaultDarkThemeName
@@ -279,12 +274,81 @@ import Testing
                 return config
             }
 
-            let light = load(.light)
-            let dark = load(.dark)
-            #expect(light.backgroundColor.hexString() == "#FAFBFC")
-            #expect(light.foregroundColor.hexString() == "#101112")
-            #expect(dark.backgroundColor.hexString() == "#090A0B")
-            #expect(dark.foregroundColor.hexString() == "#F0F1F2")
+            for scheme in [GhosttyConfig.ColorSchemePreference.light, .dark] {
+                let config = load(scheme)
+                #expect(config.backgroundColor.hexString() == "#090A0B")
+                #expect(config.foregroundColor.hexString() == "#F0F1F2")
+            }
+        }
+    }
+
+    // MARK: ShellX built-in default (spec §7.4)
+
+    /// Loads `userConfig` with the managed default on and no theme file named
+    /// like the managed theme anywhere, so the built-in ShellX palette is the
+    /// managed base.
+    private func loadWithBuiltInDefault(
+        userConfig: String,
+        scheme: GhosttyConfig.ColorSchemePreference = .dark,
+        body: (GhosttyConfig) throws -> Void
+    ) throws {
+        try withTempConfigDir { dir in
+            let emptyResources = dir.appendingPathComponent("resources", isDirectory: true)
+            try FileManager.default.createDirectory(
+                at: emptyResources.appendingPathComponent("themes", isDirectory: true),
+                withIntermediateDirectories: true
+            )
+            let file = dir.appendingPathComponent("config", isDirectory: false)
+            try userConfig.write(to: file, atomically: true, encoding: .utf8)
+            var config = GhosttyConfig()
+            config.loadResolvedUserConfig(
+                configPaths: [file.path],
+                preferredColorScheme: scheme,
+                adaptiveDefaultThemeEnabled: true,
+                environment: ["GHOSTTY_RESOURCES_DIR": emptyResources.path],
+                bundleResourceURL: nil
+            )
+            try body(config)
+        }
+    }
+
+    @Test func builtInManagedDefaultIsTheShellXTheme() throws {
+        for scheme in [GhosttyConfig.ColorSchemePreference.dark, .light] {
+            try loadWithBuiltInDefault(userConfig: "# no settings\n", scheme: scheme) { config in
+                #expect(config.backgroundColor.hexString() == "#0B0716")
+                #expect(config.foregroundColor.hexString() == "#CDC7E0")
+                #expect(config.cursorColor.hexString() == "#60A5FA")
+                #expect(config.cursorTextColor.hexString() == "#0B0716")
+                #expect(config.selectionBackground.hexString() == "#233356")
+                #expect(config.selectionForeground.hexString() == "#E6E2F2")
+                #expect(config.palette[1]?.hexString() == "#E88A8A")
+                #expect(config.palette[3]?.hexString() == "#E8C468")
+                #expect(config.palette[4]?.hexString() == "#60A5FA")
+                #expect(config.palette[15]?.hexString() == "#E6E2F2")
+            }
+        }
+    }
+
+    /// Review Focus 2: the user's Ghostty colors and themes always win; the
+    /// ShellX default applies only to an untouched config.
+    @Test func userGhosttyColorsWinOverTheShellXDefault() throws {
+        try loadWithBuiltInDefault(userConfig: "background = #ffffff\n") { config in
+            #expect(config.backgroundColor.hexString() == "#FFFFFF")
+            // The managed base is skipped entirely, so the rest stays Ghostty's.
+            #expect(config.palette[1]?.hexString() == "#CC6666")
+            #expect(config.foregroundColor.hexString() == "#FFFFFF")
+        }
+        try loadWithBuiltInDefault(userConfig: "cursor-color = #ff00ff\n") { config in
+            #expect(config.cursorColor.hexString() == "#FF00FF")
+            #expect(config.backgroundColor.hexString() == "#282C34")
+        }
+    }
+
+    @Test func nonColorSettingsKeepTheShellXDefault() throws {
+        try loadWithBuiltInDefault(userConfig: "font-size = 15\nfont-family = JetBrains Mono\n") { config in
+            #expect(config.backgroundColor.hexString() == "#0B0716")
+            #expect(config.cursorColor.hexString() == "#60A5FA")
+            #expect(config.fontSize == 15)
         }
     }
 

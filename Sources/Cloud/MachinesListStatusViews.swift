@@ -1,5 +1,6 @@
 import CmuxCloud
 import SwiftUI
+import ShellXIcons
 
 /// Symbol, copy and action for one ``MachineListStatus``. The compact notice,
 /// the empty state and the toolbar row all read it, so they never disagree.
@@ -79,7 +80,7 @@ struct MachineListStatusPresentation {
             title = String(localized: "machines.listUnavailable.title", defaultValue: "Can’t load the machine list")
             subtitle = String(
                 localized: "machines.listUnavailable.subtitle",
-                defaultValue: "Your machines are unchanged. cmux couldn’t load the list from the Cloud service and retries on its own."
+                defaultValue: "Your machines are unchanged. ShellX couldn’t load the list from the Cloud service and retries on its own."
             )
             action = .retry
             isFailure = true
@@ -98,14 +99,14 @@ struct MachineListStatusPresentation {
         case .failed(.requiresPro):
             // HTTP 402: the fix is an upgrade, not a retry and not a sign-in.
             symbolName = "sparkles"
-            title = String(localized: "machines.requiresPro.title", defaultValue: "Cloud machines need cmux Pro")
+            title = String(localized: "machines.requiresPro.title", defaultValue: "Cloud machines need ShellX Pro")
             subtitle = String(
                 localized: "machines.requiresPro.subtitle",
                 defaultValue: "This account’s plan doesn’t include Cloud machine access. Upgrade to create and reconnect machines."
             )
             action = .upgrade
             isFailure = true
-            staleTitle = String(localized: "machines.requiresPro.stale", defaultValue: "Cloud machines need cmux Pro — showing last known")
+            staleTitle = String(localized: "machines.requiresPro.stale", defaultValue: "Cloud machines need ShellX Pro — showing last known")
         }
     }
 }
@@ -119,7 +120,7 @@ struct MachinesListStatusNotice: View {
         let presentation = MachineListStatusPresentation(status)
         HStack(spacing: 6) {
             if let symbolName = presentation.symbolName {
-                Image(systemName: symbolName)
+                ShellXIcon.image(symbolName)
                     .font(.system(size: 11, weight: .semibold))
             } else {
                 ProgressView().controlSize(.mini)
@@ -152,7 +153,7 @@ struct MachinesListStatusEmptyState: View {
         let presentation = MachineListStatusPresentation(status)
         VStack(spacing: 10) {
             if let symbolName = presentation.symbolName {
-                Image(systemName: symbolName)
+                ShellXIcon.image(symbolName)
                     .font(.system(size: 26, weight: .light))
                     .foregroundColor(.secondary.opacity(0.55))
             } else {
@@ -215,7 +216,7 @@ struct MachinesListStatusToolbarRow: View {
         let failure = presentation.isFailure ? dismissalSignature : nil
         let row = HStack(spacing: 5) {
             if let symbolName = presentation.symbolName {
-                Image(systemName: symbolName)
+                ShellXIcon.image(symbolName)
                     .font(.system(size: 10, weight: .semibold))
             } else {
                 ProgressView().controlSize(.mini)

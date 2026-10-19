@@ -341,7 +341,7 @@ struct SSHConfiguredRemoteCommandHostTests {
             "The bootstrap installer hop must override a host-configured RemoteCommand; stderr: \(startupResult.stderr)"
         )
         #expect(
-            !startupResult.stderr.contains("[cmux] ssh exited with status"),
+            !startupResult.stderr.contains("[ShellX] ssh exited with status"),
             Comment(rawValue: startupResult.stderr)
         )
         #expect(startupResult.status == 0, Comment(rawValue: startupResult.stderr))

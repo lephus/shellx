@@ -11,7 +11,7 @@ struct AgentRestoreUnverifiableNotice: Sendable {
         AgentRestoreNoticeInput(
             message: String(
                 localized: "agentRestore.unverifiable.notice",
-                defaultValue: "cmux could not verify whether this agent session is already running, so it did not resume the session automatically. Run 'cmux restore --surface' to resume it here."
+                defaultValue: "ShellX could not verify whether this agent session is already running, so it did not resume the session automatically. Run 'shellx restore --surface' to resume it here."
             )
         ).startupInput(dialect: dialect)
     }

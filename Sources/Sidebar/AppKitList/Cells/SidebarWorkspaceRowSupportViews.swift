@@ -2,6 +2,7 @@ import AppKit
 import CmuxFoundation
 import CmuxSidebar
 import CmuxWorkspaces
+import ShellXBrand
 import SwiftUI
 
 /// Row-owned color helpers that preserve native semantic variants while
@@ -36,6 +37,16 @@ struct SidebarRowPalette {
         sidebarSelectedWorkspaceForegroundNSColor(on: selectedBackground, opacity: opacity)
     }
 
+    /// ShellX text tokens (spec §7.4) apply in a dark sidebar. A light
+    /// sidebar (a matched light terminal theme) keeps the semantic colors.
+    var usesShellXTextTokens: Bool { colorScheme == .dark }
+
+    /// Whether this active row sits on ShellX's default `raise` selection,
+    /// where status and metadata colors stay readable and need no flattening.
+    var usesShellXSelection: Bool {
+        model.isActive && sidebarIsShellXSelectionFill(selectedBackground)
+    }
+
     /// Resolves semantic colors against the row's concrete cmux scheme.
     func semantic(_ color: NSColor, opacity: CGFloat? = nil) -> NSColor {
         SidebarAppearanceColorResolver().resolvedColor(
@@ -45,15 +56,27 @@ struct SidebarRowPalette {
         )
     }
 
+    /// Session names: `text-hi` in a dark sidebar.
     var primaryText: NSColor {
-        model.isActive ? selectedForeground(1.0) : semantic(.labelColor)
+        if model.isActive { return selectedForeground(1.0) }
+        return usesShellXTextTokens ? ShellXPalette.textHi.nsColor : semantic(.labelColor)
     }
 
+    /// Metadata: `muted` in a dark sidebar (also on the `raise` selection),
+    /// raised to the contrast floor over a known backdrop.
     func secondary(
         _ selectedOpacity: CGFloat = 0.75,
         inactiveOpacity: CGFloat? = nil
     ) -> NSColor {
-        model.isActive
+        if usesShellXTextTokens, !model.isActive || usesShellXSelection {
+            return SidebarAppearanceColorResolver().readableSecondaryColor(
+                ShellXPalette.muted.nsColor,
+                for: colorScheme,
+                opacity: model.isActive ? nil : inactiveOpacity,
+                over: model.readabilityBackdropHex.flatMap { NSColor(hex: $0) }
+            )
+        }
+        return model.isActive
             ? selectedForeground(selectedOpacity)
             : SidebarAppearanceColorResolver().readableSecondaryColor(
                 .secondaryLabelColor,

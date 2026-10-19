@@ -91,7 +91,7 @@ extension TerminalController {
     nonisolated static var browserReplOtherUserMessage: String {
         String(
             localized: "cli.browser.repl.error.otherUser",
-            defaultValue: "The browser REPL accepts only clients that run as the same macOS user as cmux"
+            defaultValue: "The browser REPL accepts only clients that run as the same macOS user as ShellX"
         )
     }
 
@@ -227,14 +227,14 @@ extension TerminalController {
             let prefix = String(localized: "cli.browser.repl.error.workspaceNotFound", defaultValue: "Workspace not found")
             return .err(code: "not_found", message: "\(prefix): \(id.uuidString)", data: nil)
         case .explicitWorkspaceInvalid(let handle):
-            let prefix = String(localized: "cli.browser.repl.error.workspaceInvalid", defaultValue: "Not a workspace in this cmux instance")
+            let prefix = String(localized: "cli.browser.repl.error.workspaceInvalid", defaultValue: "Not a workspace in this ShellX instance")
             return .err(code: "not_found", message: "\(prefix): \(handle.debugDescription)", data: nil)
         case .noFocusedWorkspace:
             return browserReplNoWorkspaceError
         case .otherWorkspaceDenied(let requested, let caller):
             let prefix = String(
                 localized: "cli.browser.repl.error.otherWorkspaceDenied",
-                defaultValue: "A REPL call from a cmux terminal acts only on its own workspace's sessions; run it from a terminal of that workspace"
+                defaultValue: "A REPL call from a ShellX terminal acts only on its own workspace's sessions; run it from a terminal of that workspace"
             )
             return .err(
                 code: "denied",
@@ -246,7 +246,7 @@ extension TerminalController {
                 code: "denied",
                 message: String(
                     localized: "cli.browser.repl.error.allWorkspacesDenied",
-                    defaultValue: "--all-workspaces is refused in a cmux terminal: a REPL call from a cmux terminal acts only on its own workspace's sessions"
+                    defaultValue: "--all-workspaces is refused in a ShellX terminal: a REPL call from a ShellX terminal acts only on its own workspace's sessions"
                 ),
                 data: ["caller_workspace_id": caller.uuidString]
             )
@@ -255,7 +255,7 @@ extension TerminalController {
                 code: "denied",
                 message: String(
                     localized: "cli.browser.repl.error.callerUnresolved",
-                    defaultValue: "cmux could not trace this process to a cmux terminal or to outside cmux (its parent process chain is too deep or loops); run the REPL call from a shallower process"
+                    defaultValue: "ShellX could not trace this process to a ShellX terminal or to outside ShellX (its parent process chain is too deep or loops); run the REPL call from a shallower process"
                 ),
                 data: nil
             )
@@ -371,7 +371,7 @@ extension TerminalController {
         } catch BrowserReplSessionRegistry.Refusal.tooManySessions(let limit) {
             let prefix = String(
                 localized: "cli.browser.repl.error.tooManySessions",
-                defaultValue: "Too many browser REPL sessions are open; reset one with `cmux browser repl reset NAME` (`cmux browser repl list` lists this workspace's; from outside cmux, `cmux browser repl list --all-workspaces` lists every one)"
+                defaultValue: "Too many browser REPL sessions are open; reset one with `shellx browser repl reset NAME` (`shellx browser repl list` lists this workspace's; from outside ShellX, `shellx browser repl list --all-workspaces` lists every one)"
             )
             return .err(code: "unavailable", message: "\(prefix) (\(limit))", data: nil)
         } catch BrowserReplSessionRegistry.Refusal.tooManyPrivateSessions(let limit) {

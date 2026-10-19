@@ -6,6 +6,7 @@ import CMUXAgentLaunch
 import SQLite3
 import SwiftUI
 import UniformTypeIdentifiers
+import ShellXIcons
 
 @MainActor
 enum SessionEntryResumeCoordinator {
@@ -643,7 +644,7 @@ struct SessionIndexView: View {
         VStack(alignment: .leading, spacing: 2) {
             ForEach(searchErrors, id: \.self) { msg in
                 HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
+                    ShellXIcon.image("exclamationmark.triangle.fill")
                         .cmuxFont(size: 10)
                         .foregroundColor(.orange)
                     Text(msg)
@@ -1373,18 +1374,18 @@ struct SessionTranscriptPreviewView: View {
             loadingStatusRow
         case .missingFile:
             statusRow(
-                systemImage: "doc.badge.questionmark",
+                icon: "doc.badge.questionmark",
                 text: String(localized: "sessionIndex.preview.noFile", defaultValue: "No transcript file")
             )
         case .failed:
             statusRow(
-                systemImage: "exclamationmark.triangle.fill",
+                icon: "exclamationmark.triangle.fill",
                 text: String(localized: "sessionIndex.preview.error", defaultValue: "Couldn't load transcript")
             )
         case .loaded(let turns):
             if turns.isEmpty {
                 statusRow(
-                    systemImage: "text.bubble",
+                    icon: "text.bubble",
                     text: String(localized: "sessionIndex.preview.empty", defaultValue: "No previewable messages")
                 )
             } else {
@@ -1406,9 +1407,9 @@ struct SessionTranscriptPreviewView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private func statusRow(systemImage: String, text: String) -> some View {
+    private func statusRow(icon: String, text: String) -> some View {
         HStack(spacing: 8) {
-            CmuxSystemSymbolImage(magnified: systemImage, pointSize: 12, weight: .medium, tint: .secondary)
+            CmuxSystemSymbolImage(magnified: icon, pointSize: 12, weight: .medium, tint: .secondary)
             Text(text)
                 .cmuxFont(size: 12)
                 .foregroundColor(.secondary)

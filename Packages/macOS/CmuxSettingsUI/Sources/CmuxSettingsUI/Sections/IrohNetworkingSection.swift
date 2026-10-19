@@ -1,6 +1,7 @@
 import CMUXMobileCore
 import CmuxSettings
 import SwiftUI
+import ShellXIcons
 
 /// Iroh relay policy, custom relay, and private-path diagnostics.
 @MainActor
@@ -43,7 +44,7 @@ public struct IrohNetworkingSection: View {
                         irohNetworkingManagedByPolicy
                             ? String(
                                 localized: "managedPolicy.irohNetworking.disabled",
-                                defaultValue: "cmux relay networking is disabled by your organization."
+                                defaultValue: "ShellX relay networking is disabled by your organization."
                             )
                             : String(
                                 localized: "settings.mobile.managedByOrganization",
@@ -120,7 +121,7 @@ public struct IrohNetworkingSection: View {
                 Picker("", selection: preferenceBinding) {
                     Text(String(localized: "settings.networking.preference.automatic", defaultValue: "Automatic"))
                         .tag(PreferenceChoice.automatic)
-                    Text(String(localized: "settings.networking.preference.managed", defaultValue: "Selected cmux Relays"))
+                    Text(String(localized: "settings.networking.preference.managed", defaultValue: "Selected ShellX Relays"))
                         .tag(PreferenceChoice.managed)
                     Text(String(localized: "settings.networking.preference.custom", defaultValue: "Custom Relays"))
                         .tag(PreferenceChoice.custom)
@@ -149,7 +150,7 @@ public struct IrohNetworkingSection: View {
 
             SettingsCardNote(String(
                 localized: "settings.networking.relayPolicy.note",
-                defaultValue: "cmux downloads a signed relay catalog. Fleet additions, removals, and regional changes do not require an app update."
+                defaultValue: "ShellX downloads a signed relay catalog. Fleet additions, removals, and regional changes do not require an app update."
             ))
         }
     }
@@ -193,7 +194,7 @@ public struct IrohNetworkingSection: View {
                         Button(role: .destructive) {
                             pendingCustomRemovalID = relay.id
                         } label: {
-                            Image(systemName: "trash")
+                            ShellXIcon.image("trash")
                         }
                         .accessibilityLabel(String(localized: "settings.common.remove", defaultValue: "Remove"))
                     }
@@ -204,7 +205,7 @@ public struct IrohNetworkingSection: View {
 
             SettingsCardNote(String(
                 localized: "settings.networking.custom.note",
-                defaultValue: "Relay addresses sync with your account. Provider secrets stay only in each device's secure storage. Missing secrets never fall back to cmux relays."
+                defaultValue: "Relay addresses sync with your account. Provider secrets stay only in each device's secure storage. Missing secrets never fall back to ShellX relays."
             ))
         }
     }
@@ -240,7 +241,7 @@ public struct IrohNetworkingSection: View {
 
             SettingsCardNote(String(
                 localized: "settings.networking.private.note.short",
-                defaultValue: "The other Mac must run a current cmux build that advertises Iroh private-path support. Custom raw TCP routes are not accepted because they cannot prove the remote Mac. Iroh private paths stay encrypted and bound to its exact EndpointID."
+                defaultValue: "The other Mac must run a current ShellX build that advertises Iroh private-path support. Custom raw TCP routes are not accepted because they cannot prove the remote Mac. Iroh private paths stay encrypted and bound to its exact EndpointID."
             ))
         }
     }
@@ -266,7 +267,7 @@ public struct IrohNetworkingSection: View {
                 String(localized: "settings.networking.policy", defaultValue: "Relay Policy"),
                 subtitle: policyStatusText
             ) {
-                Image(systemName: policySymbol)
+                ShellXIcon.image(policySymbol)
                     .foregroundStyle(model.snapshot.policySource == .unavailable ? .orange : .secondary)
             }
             IrohDiagnosticsReportRows(
@@ -393,7 +394,7 @@ public struct IrohNetworkingSection: View {
     private var policyStatusText: String {
         switch model.snapshot.policySource {
         case .server:
-            String(localized: "settings.networking.policy.server", defaultValue: "Verified from cmux")
+            String(localized: "settings.networking.policy.server", defaultValue: "Verified from ShellX")
         case .cached:
             String(localized: "settings.networking.policy.cached", defaultValue: "Using the last verified catalog")
         case .unavailable:
@@ -464,12 +465,12 @@ private struct IrohDiagnosticsReportRows: View {
         ) {
             HStack(spacing: 6) {
                 ShareLink(item: exportText) {
-                    Label(
+                    ShellXLabel(
                         String(
                             localized: "settings.networking.diagnostics.share",
                             defaultValue: "Share…"
                         ),
-                        systemImage: "square.and.arrow.up"
+                        icon: "square.and.arrow.up"
                     )
                 }
                 .disabled(exportText.isEmpty || isMutating)
@@ -478,7 +479,7 @@ private struct IrohDiagnosticsReportRows: View {
                 Button(role: .destructive) {
                     showsClearConfirmation = true
                 } label: {
-                    Image(systemName: "trash")
+                    ShellXIcon.image("trash")
                 }
                 .disabled(report.events.isEmpty || isMutating)
                 .accessibilityLabel(String(

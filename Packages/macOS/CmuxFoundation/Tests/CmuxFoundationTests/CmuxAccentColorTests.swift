@@ -5,10 +5,13 @@ import Testing
 @testable import CmuxFoundation
 
 @Suite struct CmuxAccentColorTests {
-    @Test func cmuxModeUsesTheCmuxBlues() {
+    /// ShellX: the built-in accent is `ShellXPalette.primary` (#60a5fa) in
+    /// both schemes (spec §7.4).
+    @Test func cmuxModeUsesShellXPrimary() {
         let accent = CmuxAccentColor(mode: .cmux)
-        #expect(rgbBytes(accent.nsColor(isDark: false)) == [0, 136, 255])
-        #expect(rgbBytes(accent.nsColor(isDark: true)) == [0, 145, 255])
+        #expect(accent.nsColor(isDark: true).hexString() == "#60A5FA")
+        #expect(rgbBytes(accent.nsColor(isDark: false)) == [96, 165, 250])
+        #expect(rgbBytes(accent.nsColor(isDark: true)) == [96, 165, 250])
     }
 
     @Test func systemModeUsesTheResolvedControlAccent() throws {
@@ -52,12 +55,12 @@ import Testing
         #expect(rgbBytes(accent.nsColor(isDark: true)) == [255, 106, 0])
     }
 
-    @Test func customModeWithoutAValidColorFallsBackToCmuxBlue() {
+    @Test func customModeWithoutAValidColorFallsBackToShellXPrimary() {
         for hex in [nil, "", "not-a-color", "#FF6A00AA"] {
             let accent = CmuxAccentColor(mode: .custom, customHex: hex)
             #expect(accent.customHex == nil)
-            #expect(rgbBytes(accent.nsColor(isDark: false)) == [0, 136, 255])
-            #expect(rgbBytes(accent.nsColor(isDark: true)) == [0, 145, 255])
+            #expect(rgbBytes(accent.nsColor(isDark: false)) == [96, 165, 250])
+            #expect(rgbBytes(accent.nsColor(isDark: true)) == [96, 165, 250])
         }
     }
 
@@ -116,8 +119,8 @@ import Testing
         aqua.performAsCurrentDrawingAppearance {
             lightBytes = rgbBytes(accent.dynamicNSColor)
         }
-        #expect(darkBytes == [0, 145, 255])
-        #expect(lightBytes == [0, 136, 255])
+        #expect(darkBytes == [96, 165, 250])
+        #expect(lightBytes == [96, 165, 250])
     }
 
     @Test func builtInAgentStatusBlueResolvesToTheAccent() {

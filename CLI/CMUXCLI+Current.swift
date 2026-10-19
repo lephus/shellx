@@ -3,9 +3,9 @@ import Foundation
 /// One invocation's options and presentation; native owners capture all work facts.
 struct CurrentCommand {
     static let usage = String(localized: "cli.current.help", defaultValue: """
-            Usage: cmux current [--limit <1...200>] [--json]
+            Usage: shellx current [--limit <1...200>] [--json]
 
-            Read bounded current-work facts already known to cmux across local and Cloud surfaces.
+            Read bounded current-work facts already known to ShellX across local and Cloud surfaces.
             Does not refresh machines, read transcripts, or mutate work.
 
             Flags:
@@ -17,8 +17,8 @@ struct CurrentCommand {
             focus or filter this app-wide query; --id-format does not rewrite its identities.
 
             Examples:
-              cmux current
-              cmux current --json --limit 50
+              shellx current
+              shellx current --json --limit 50
             """)
 
     struct Options {

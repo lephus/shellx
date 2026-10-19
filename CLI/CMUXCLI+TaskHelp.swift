@@ -92,7 +92,7 @@ extension CMUXCLI {
     /// Text for `cmux help --help`.
     func helpCommandUsage() -> String {
         return """
-        \(String(localized: "cli.help.usage", defaultValue: "Usage: cmux help [topic]"))
+        \(String(localized: "cli.help.usage", defaultValue: "Usage: shellx help [topic]"))
 
         \(String(localized: "cli.help.description", defaultValue: "Show top-level CLI usage, or one task-focused command group."))
 
@@ -100,7 +100,7 @@ extension CMUXCLI {
         \(Self.taskHelpTopicSummary)
 
         \(String(localized: "cli.help.unknownTopic", defaultValue: "Unknown topics keep the top-level help behavior."))
-        \(String(localized: "cli.help.noSocket", defaultValue: "Also works without a running cmux app or socket."))
+        \(String(localized: "cli.help.noSocket", defaultValue: "Also works without a running ShellX app or socket."))
         """
     }
 
@@ -114,7 +114,7 @@ extension CMUXCLI {
         \(topic.title):
         \(commands)
 
-        \(String(localized: "cli.help.topic.commandUsage", defaultValue: "Run `cmux <command> --help` for command-specific usage."))
+        \(String(localized: "cli.help.topic.commandUsage", defaultValue: "Run `shellx <command> --help` for command-specific usage."))
         """
     }
 
@@ -169,7 +169,7 @@ extension CMUXCLI {
 
         \(String(localized: "cli.help.taskHelp.heading", defaultValue: "Task Help:"))
           cmux help <\(Self.taskHelpTopicNames)>
-          \(String(localized: "cli.help.taskHelp.description", defaultValue: "Show one command group without connecting to the cmux socket."))
+          \(String(localized: "cli.help.taskHelp.description", defaultValue: "Show one command group without connecting to the ShellX socket."))
 
         Commands:
         \(commandGroups)

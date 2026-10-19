@@ -1,5 +1,6 @@
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// Tiny stylized desktop+windows thumbnail used by ``ThemePickerRow``.
 ///
@@ -51,7 +52,7 @@ struct ThemeWindowThumbnail: View {
                 // Menu bar
                 VStack(spacing: 0) {
                     HStack {
-                        Image(systemName: "applelogo")
+                        ShellXIcon.image("applelogo")
                             .cmuxFont(size: max(height * 0.08, 6))
                             .foregroundColor(isDark ? .white : .black)
                             .opacity(0.8)

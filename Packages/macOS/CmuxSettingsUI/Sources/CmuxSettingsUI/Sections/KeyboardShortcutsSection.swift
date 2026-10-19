@@ -1,6 +1,7 @@
 import CmuxFoundation
 import CmuxSettings
 import SwiftUI
+import ShellXIcons
 
 /// **Keyboard Shortcuts** section — mirrors the legacy in-app
 /// section: one `SettingsCard` containing the base keymap picker,
@@ -134,12 +135,12 @@ public struct KeyboardShortcutsSection: View {
             configurationReview: .action,
             searchAnchorID: "setting:keyboardShortcuts:shortcut-chords",
             String(localized: "settings.shortcuts.chords", defaultValue: "Shortcut Chords"),
-            subtitle: String(localized: "settings.shortcuts.chords.subtitle", defaultValue: "Add tmux-style multi-step shortcuts in cmux.json, for example [\"ctrl+b\", \"c\"].")
+            subtitle: String(localized: "settings.shortcuts.chords.subtitle", defaultValue: "Add tmux-style multi-step shortcuts in shellx.json, for example [\"ctrl+b\", \"c\"].")
         ) {
             // ShellX has no chord docs page (cmux's is on cmux.com and nothing
             // under docs/ covers chords), so the "Chord docs" link is hidden.
             HStack(spacing: 8) {
-                Button(String(localized: "settings.app.settingsFile.openButton", defaultValue: "Open cmux.json")) {
+                Button(String(localized: "settings.app.settingsFile.openButton", defaultValue: "Open shellx.json")) {
                     hostActions.openConfigInExternalEditor()
                 }
                 .buttonStyle(.bordered)
@@ -160,9 +161,9 @@ public struct KeyboardShortcutsSection: View {
             Button {
                 Task { await model.resetAll() }
             } label: {
-                Label(
+                ShellXLabel(
                     String(localized: "settings.shortcuts.resetDefaults.button", defaultValue: "Reset Defaults"),
-                    systemImage: "arrow.counterclockwise"
+                    icon: "arrow.counterclockwise"
                 )
             }
             .buttonStyle(.bordered)

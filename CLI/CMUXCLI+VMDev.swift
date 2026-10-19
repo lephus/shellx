@@ -16,11 +16,11 @@ import Foundation
 extension CMUXCLI {
     static var vmDevUsage: String {
         """
-        Usage: cmux vm dev <machine> [<local-dir>] [--name <workspace>] [--layout <file>] [--command "<dev command>"] [--port <n>] [--remote <path>] [--sync|--no-sync] [--no-open] [--focus|--no-focus] [--dry-run] [--json]
+        Usage: shellx vm dev <machine> [<local-dir>] [--name <workspace>] [--layout <file>] [--command "<dev command>"] [--port <n>] [--remote <path>] [--sync|--no-sync] [--no-open] [--focus|--no-focus] [--dry-run] [--json]
 
         From a folder to a running dev layout on a cloud machine, in one command:
           1. route     confirm the machine (`vm.status`) and bind this folder to it, so
-                       `cmux vm run --sync` / `cmux vm agent --sync` from here land on the same machine
+                       `shellx vm run --sync` / `shellx vm agent --sync` from here land on the same machine
           2. sync      push the folder to <remote> (default work/<basename>; the `vm push` defaults
                        skip .git, node_modules, .venv, __pycache__, .DS_Store)
           3. detect    pick the dev command and port from the project (or take --command / --port)
@@ -28,7 +28,7 @@ extension CMUXCLI {
                        and build the layout in it: a `dev` pane running the command on the left,
                        a `shell` pane (focused) on the right with a browser tab on the port
           5. open      open that workspace here with the same geometry (unless --no-open) and mint
-                       the port's public URL (`cmux vm open <machine> <port>`)
+                       the port's public URL (`shellx vm open <machine> <port>`)
 
         Detection, first match wins (the command is typed into a login shell in <remote>):
           package.json     <pm> install && <pm> run dev   (pm: bun, pnpm, yarn, or npm by lockfile;
@@ -45,7 +45,7 @@ extension CMUXCLI {
           <local-dir>          The project folder (default: the current directory).
           --name <workspace>   Machine workspace to create or reuse (default: the folder's basename).
           --layout <file>      Use this layout document instead of the built-in dev layout (same format
-                               as `cmux vm layout apply`; validated here first, exit 2 when invalid).
+                               as `shellx vm layout apply`; validated here first, exit 2 when invalid).
           --command "<cmd>"    Run this instead of the detected dev command.
           --port <n>           The port the dev server listens on (browser tab + public URL).
           --remote <path>      Where the folder lives on the machine (default work/<basename>).
@@ -59,12 +59,12 @@ extension CMUXCLI {
                                 remote, synced, command, port, url, terminals: {dev, shell}, layout_applied, opened}
 
         Examples:
-          cmux vm dev brave-otter                      # this folder → brave-otter, layout opened here
-          cmux vm dev brave-otter ./web --name web     # a subfolder, workspace named web
-          cmux vm dev brave-otter --command "bun run dev --host" --port 5173
-          cmux vm dev brave-otter --dry-run --json     # what would happen, no socket traffic
-        Afterwards: `cmux vm terminal output <machine> <dev-terminal>` reads the server log;
-        `cmux vm terminal send <machine> <shell-terminal> 'bun test' --keys enter` runs a command.
+          shellx vm dev brave-otter                      # this folder → brave-otter, layout opened here
+          shellx vm dev brave-otter ./web --name web     # a subfolder, workspace named web
+          shellx vm dev brave-otter --command "bun run dev --host" --port 5173
+          shellx vm dev brave-otter --dry-run --json     # what would happen, no socket traffic
+        Afterwards: `shellx vm terminal output <machine> <dev-terminal>` reads the server log;
+        `shellx vm terminal send <machine> <shell-terminal> 'bun test' --keys enter` runs a command.
         """
     }
 

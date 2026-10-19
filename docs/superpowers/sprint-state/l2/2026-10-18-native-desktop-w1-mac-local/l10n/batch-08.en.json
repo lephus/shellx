@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Manual",
+"comment": ""
+},
+{
+"i": 1,
+"en": "auto",
+"comment": ""
+},
+{
+"i": 2,
+"en": "bypass",
+"comment": ""
+},
+{
+"i": 3,
+"en": "denied",
+"comment": ""
+},
+{
+"i": 4,
+"en": "ultraplan",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Plan file",
+"comment": ""
+},
+{
+"i": 6,
+"en": "Send feedback",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Ultraplan",
+"comment": ""
+},
+{
+"i": 8,
+"en": "Actionable",
+"comment": ""
+},
+{
+"i": 9,
+"en": "All Activity",
+"comment": ""
+},
+{
+"i": 10,
+"en": "All",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Load older activity",
+"comment": ""
+},
+{
+"i": 12,
+"en": "Loading older activity...",
+"comment": ""
+},
+{
+"i": 13,
+"en": "Exit plan",
+"comment": ""
+},
+{
+"i": 14,
+"en": "MESSAGE",
+"comment": ""
+},
+{
+"i": 15,
+"en": "PERMISSION",
+"comment": ""
+},
+{
+"i": 16,
+"en": "PLAN",
+"comment": ""
+},
+{
+"i": 17,
+"en": "PROMPT",
+"comment": ""
+},
+{
+"i": 18,
+"en": "Question",
+"comment": ""
+},
+{
+"i": 19,
+"en": "QUESTION",
+"comment": ""
+},
+{
+"i": 20,
+"en": "SESSION END",
+"comment": ""
+},
+{
+"i": 21,
+"en": "SESSION START",
+"comment": ""
+},
+{
+"i": 22,
+"en": "STOP",
+"comment": ""
+},
+{
+"i": 23,
+"en": "TODOS",
+"comment": ""
+},
+{
+"i": 24,
+"en": "TOOL RESULT",
+"comment": ""
+},
+{
+"i": 25,
+"en": "TOOL USE",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Compaction",
+"comment": ""
+},
+{
+"i": 27,
+"en": "Subagent",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Decision needed",
+"comment": ""
+},
+{
+"i": 29,
+"en": "Review and approve the plan",
+"comment": ""
+},
+{
+"i": 30,
+"en": "%@ plan ready",
+"comment": ""
+},
+{
+"i": 31,
+"en": "All tools",
+"comment": ""
+},
+{
+"i": 32,
+"en": "Allow Once",
+"comment": ""
+},
+{
+"i": 33,
+"en": "Always",
+"comment": ""
+},
+{
+"i": 34,
+"en": "%@ needs approval",
+"comment": ""
+},
+{
+"i": 35,
+"en": "%@ permission",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Agent is asking a question",
+"comment": ""
+},
+{
+"i": 37,
+"en": "%@ question",
+"comment": ""
+},
+{
+"i": 38,
+"en": "all tools",
+"comment": ""
+},
+{
+"i": 39,
+"en": "always",
+"comment": ""
+},
+{
+"i": 40,
+"en": "once",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Once",
+"comment": ""
+},
+{
+"i": 42,
+"en": "You: %@",
+"comment": ""
+},
+{
+"i": 43,
+"en": "You: %@ request from %@",
+"comment": ""
+},
+{
+"i": 44,
+"en": "feed.push event failed to decode",
+"comment": ""
+},
+{
+"i": 45,
+"en": "feed.push accepts either `event` or `events`, not both",
+"comment": ""
+},
+{
+"i": 46,
+"en": "feed.push requires an `event` object",
+"comment": ""
+},
+{
+"i": 47,
+"en": "Please answer all questions",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Multi-select",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Agent provided no options.",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Skip + plan immediately",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Submit",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Submit All Answers",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Type something…",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Expired",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Needs input",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Pending",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Claude finished — reply to continue",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Reply to Claude…",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Send to Claude",
+"comment": ""
+},
+{
+"i": 60,
+"en": "error",
+"comment": ""
+},
+{
+"i": 61,
+"en": "ok",
+"comment": ""
+},
+{
+"i": 62,
+"en": "session end",
+"comment": ""
+},
+{
+"i": 63,
+"en": "session start",
+"comment": ""
+},
+{
+"i": 64,
+"en": "stop",
+"comment": ""
+},
+{
+"i": 65,
+"en": "%lld lines",
+"comment": ""
+},
+{
+"i": 66,
+"en": "%lld chars",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Type several lines here...",
+"comment": ""
+},
+{
+"i": 68,
+"en": "AppKit",
+"comment": ""
+},
+{
+"i": 69,
+"en": "SwiftUI",
+"comment": ""
+},
+{
+"i": 70,
+"en": "Compare autosizing editors with identical input.",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Feed Text Editors",
+"comment": ""
+},
+{
+"i": 72,
+"en": "AppKit Direct, intrinsic",
+"comment": ""
+},
+{
+"i": 73,
+"en": "AppKit Direct, sizeThatFits",
+"comment": ""
+},
+{
+"i": 74,
+"en": "AppKit ScrollView, measured",
+"comment": ""
+},
+{
+"i": 75,
+"en": "AppKit ScrollView, sizeThatFits",
+"comment": ""
+},
+{
+"i": 76,
+"en": "SwiftUI Mirror TextEditor",
+"comment": ""
+},
+{
+"i": 77,
+"en": "SwiftUI TextField",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Feed Text Editor Lab",
+"comment": ""
+},
+{
+"i": 79,
+"en": "Collapse",
+"comment": ""
+},
+{
+"i": 80,
+"en": "... +%lld completed",
+"comment": ""
+},
+{
+"i": 81,
+"en": "%lld done",
+"comment": ""
+},
+{
+"i": 82,
+"en": "%lld in progress",
+"comment": ""
+},
+{
+"i": 83,
+"en": "%lld open",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Tasks",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Hold Shift to drop into editor",
+"comment": ""
+},
+{
+"i": 86,
+"en": "Hold Shift to drop into terminal",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Hold Shift to open as split",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Copy Path",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Copy Relative Path",
+"comment": ""
+},
+{
+"i": 90,
+"en": "Insert Path",
+"comment": ""
+},
+{
+"i": 91,
+"en": "Insert Relative Path",
+"comment": ""
+},
+{
+"i": 92,
+"en": "Open in Default Editor",
+"comment": ""
+},
+{
+"i": 93,
+"en": "Open in cmux",
+"comment": ""
+},
+{
+"i": 94,
+"en": "Reveal in Finder",
+"comment": ""
+},
+{
+"i": 95,
+"en": "No folder open",
+"comment": ""
+},
+{
+"i": 96,
+"en": "SSH command failed",
+"comment": ""
+},
+{
+"i": 97,
+"en": "File explorer is not available",
+"comment": ""
+},
+{
+"i": 98,
+"en": "Type to search",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Search failed: %@",
+"comment": ""
+},
+{
+"i": 100,
+"en": "First %d matches",
+"comment": ""
+},
+{
+"i": 101,
+"en": "%d matches",
+"comment": ""
+},
+{
+"i": 102,
+"en": "No matches",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Search files",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Configured ripgrep path is not executable: %@",
+"comment": ""
+},
+{
+"i": 105,
+"en": "rg exited with status %d",
+"comment": ""
+},
+{
+"i": 106,
+"en": "ripgrep (rg) is not installed or is not on PATH.",
+"comment": ""
+},
+{
+"i": 107,
+"en": "%d matches, searching",
+"comment": ""
+},
+{
+"i": 108,
+"en": "Local folders only",
+"comment": ""
+},
+{
+"i": 109,
+"en": "Unable to resolve SSH home: %@",
+"comment": ""
+},
+{
+"i": 110,
+"en": "Resolving remote home...",
+"comment": ""
+},
+{
+"i": 111,
+"en": "SSH files unavailable",
+"comment": ""
+},
+{
+"i": 112,
+"en": "SSH files unavailable: %@",
+"comment": ""
+},
+{
+"i": 113,
+"en": "Open Externally",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Open in %@",
+"comment": ""
+},
+{
+"i": 115,
+"en": "Open With",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Revert",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Share",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Bottom Split",
+"comment": ""
+},
+{
+"i": 119,
+"en": "Right-click Fork Conversation creates a split below the current pane.",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Left Split",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Right-click Fork Conversation creates a split to the left.",
+"comment": ""
+},
+{
+"i": 122,
+"en": "New Tab",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Right-click Fork Conversation creates a sibling tab in the current pane.",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Right-click Fork Conversation creates a new workspace.",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Right Split",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Right-click Fork Conversation creates a split to the right.",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Top Split",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Right-click Fork Conversation creates a split above the current pane.",
+"comment": ""
+},
+{
+"i": 129,
+"en": "vim",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Key table",
+"comment": ""
+},
+{
+"i": 131,
+"en": "key table",
+"comment": ""
+},
+{
+"i": 132,
+"en": "No open panels",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Title",
+"comment": ""
+},
+{
+"i": 134,
+"en": "Search all windows, panels, browser tabs...",
+"comment": ""
+},
+{
+"i": 135,
+"en": "Clear Closed",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Clear recently closed history",
+"comment": ""
+},
+{
+"i": 137,
+"en": "Closed %@",
+"comment": ""
+},
+{
+"i": 138,
+"en": "No history yet",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Focused %@",
+"comment": ""
+},
+{
+"i": 140,
+"en": "No matching history",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Search history",
+"comment": ""
+},
+{
+"i": 142,
+"en": "Copy Cloud Prompt",
+"comment": ""
+},
+{
+"i": 143,
+"en": "This build is missing the bundled cmux Cloud skill file.",
+"comment": ""
+},
+{
+"i": 144,
+"en": "Starting %@…",
+"comment": ""
+},
+{
+"i": 145,
+"en": "Open Cloud Agent",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Pi",
+"comment": ""
+},
+{
+"i": 147,
+"en": "Checking your cmux account…",
+"comment": ""
+},
+{
+"i": 148,
+"en": "Sign in to see and manage the machines in your cmux account.",
+"comment": ""
+},
+{
+"i": 149,
+"en": "Sign in to use Cloud Machines",
+"comment": ""
+},
+{
+"i": 150,
+"en": "Ready",
+"comment": ""
+},
+{
+"i": 151,
+"en": "Cloud VM access ended because cmux signed out.",
+"comment": ""
+},
+{
+"i": 152,
+"en": "This permanently deletes the machine and everything stored on it. This cannot be undone.",
+"comment": ""
+},
+{
+"i": 153,
+"en": "Delete machine “%@”?",
+"comment": ""
+},
+{
+"i": 154,
+"en": "New Machine",
+"comment": ""
+},
+{
+"i": 155,
+"en": "Your plan includes %d machines",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Your plan includes 1 machine",
+"comment": ""
+},
+{
+"i": 157,
+"en": "A machine is a persistent cloud computer. It keeps your files forever and costs nothing while it sleeps.",
+"comment": ""
+},
+{
+"i": 158,
+"en": "No machines yet",
+"comment": ""
+},
+{
+"i": 159,
+"en": "Reference: %@",
+"comment": ""
+},
+{
+"i": 160,
+"en": "Cloud VM publication response contained an invalid DNS instruction.",
+"comment": ""
+},
+{
+"i": 161,
+"en": "Cloud VM publication verification response was missing DNS instructions.",
+"comment": ""
+},
+{
+"i": 162,
+"en": "Cloud VM domain verification response was missing `domain`.",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Cloud VM domain response was missing required fields.",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Cloud VM domain list response was missing `domains`.",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Cloud VM publication response was missing required fields.",
+"comment": ""
+},
+{
+"i": 166,
+"en": "Cloud VM publication list response was missing `publications`.",
+"comment": ""
+},
+{
+"i": 167,
+"en": "Upgrade to cmux Pro at https://cmux.com/pricing?cmux_source=mac_vm_requires_pro_error&cmux_client=mac to create Cloud VMs.",
+"comment": ""
+},
+{
+"i": 168,
+"en": "Pause or delete a VM, or upgrade to Max.",
+"comment": ""
+},
+{
+"i": 169,
+"en": "Pause or delete a VM.",
+"comment": ""
+},
+{
+"i": 170,
+"en": "%1$lld of %2$lld vCPUs · %3$lld of %4$lld GB RAM in use",
+"comment": ""
+},
+{
+"i": 171,
+"en": "This size needs %1$lld GB RAM, but only %2$lld GB of your %3$lld GB pool is free. Pause or delete a VM, or upgrade to Max.",
+"comment": ""
+},
+{
+"i": 172,
+"en": "This size needs %1$lld GB RAM, but only %2$lld GB of your %3$lld GB pool is free. Pause or delete a VM.",
+"comment": ""
+},
+{
+"i": 173,
+"en": "This size needs %1$lld vCPUs, but only %2$lld of your %3$lld vCPUs are free. Pause or delete a VM, or upgrade to Max.",
+"comment": ""
+},
+{
+"i": 174,
+"en": "This size needs %1$lld vCPUs, but only %2$lld of your %3$lld vCPUs are free. Pause or delete a VM.",
+"comment": ""
+},
+{
+"i": 175,
+"en": "Upgrade to use more than %d machines",
+"comment": ""
+},
+{
+"i": 176,
+"en": "Subscribe to cmux Pro to create Cloud machines",
+"comment": ""
+},
+{
+"i": 177,
+"en": "Your plan includes unlimited machines",
+"comment": ""
+},
+{
+"i": 178,
+"en": "Upgrade to use more than 1 machine",
+"comment": ""
+},
+{
+"i": 179,
+"en": "%#@count1@d %#@count2@h",
+"comment": ""
+},
+{
+"i": 180,
+"en": "%#@count1@h %#@count2@m",
+"comment": ""
+},
+{
+"i": 181,
+"en": "%dm",
+"comment": ""
+},
+{
+"i": 182,
+"en": "Free cloud access expired · Upgrade to Pro",
+"comment": ""
+},
+{
+"i": 183,
+"en": "Free cloud access · expires in %@",
+"comment": ""
+},
+{
+"i": 184,
+"en": "Free cloud access · expires today, %@ left",
+"comment": ""
+},
+{
+"i": 185,
+"en": "Free plans keep a machine reachable for %d days after it is created. Upgrade to Pro to keep using it.",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Upgrade",
+"comment": ""
+},
+{
+"i": 187,
+"en": "Checkpoint",
+"comment": ""
+},
+{
+"i": 188,
+"en": "Copy IP Address",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Delete…",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Open Desktop",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Open Shell",
+"comment": ""
+},
+{
+"i": 192,
+"en": "%1$d of %#@count2@",
+"comment": ""
+},
+{
+"i": 193,
+"en": "%1$d machines",
+"comment": ""
+},
+{
+"i": 194,
+"en": "1 machine",
+"comment": ""
+},
+{
+"i": 195,
+"en": "%1$d of 1 machine",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Machines on your plan. Sleeping machines cost nothing.",
+"comment": ""
+},
+{
+"i": 197,
+"en": "Your plan includes %d machines. Upgrade to create more.",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Your plan includes 1 machine. Upgrade to create more.",
+"comment": ""
+},
+{
+"i": 199,
+"en": "Loading your Cloud machine plan…",
+"comment": ""
+},
+{
+"i": 200,
+"en": "Cloud plan details are still loading. Retry in a moment.",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Cloud Machines",
+"comment": ""
+},
+{
+"i": 202,
+"en": "My Devices",
+"comment": ""
+},
+{
+"i": 203,
+"en": "Checkpointing %@…",
+"comment": ""
+},
+{
+"i": 204,
+"en": "Creating a new machine…",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Forking %@…",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Working on %@…",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Opening %@’s desktop…",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Opening %@…",
+"comment": ""
+},
+{
+"i": 209,
+"en": "Checking %@…",
+"comment": ""
+},
+{
+"i": 210,
+"en": "Refresh Machines",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Upgrade to Reconnect…",
+"comment": ""
+},
+{
+"i": 212,
+"en": "The label is display-only. The machine keeps its name as its address.",
+"comment": ""
+},
+{
+"i": 213,
+"en": "Label",
+"comment": ""
+},
+{
+"i": 214,
+"en": "Delete Machine",
+"comment": ""
+},
+{
+"i": 215,
+"en": "1 day left",
+"comment": ""
+},
+{
+"i": 216,
+"en": "%d days left",
+"comment": ""
+},
+{
+"i": 217,
+"en": "Locked",
+"comment": ""
+},
+{
+"i": 218,
+"en": "Asleep · free while it sleeps",
+"comment": ""
+},
+{
+"i": 219,
+"en": "%1$@ · %2$@ tokens · %3$@",
+"comment": ""
+},
+{
+"i": 220,
+"en": "%dd",
+"comment": ""
+},
+{
+"i": 221,
+"en": "Token usage unavailable",
+"comment": "Shown in a cloud machine row when no token usage report is available."
+},
+{
+"i": 222,
+"en": "CPU",
+"comment": ""
+},
+{
+"i": 223,
+"en": "Disk",
+"comment": ""
+},
+{
+"i": 224,
+"en": "Mem",
+"comment": ""
+},
+{
+"i": 225,
+"en": "%@ GB",
+"comment": ""
+},
+{
+"i": 226,
+"en": "Cloud tree error",
+"comment": ""
+},
+{
+"i": 227,
+"en": "This account’s plan doesn’t include Cloud machine access. Upgrade to create and reconnect machines.",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Cloud machines need cmux Pro",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Upgrade to Pro",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Sign Out & Sign In Again",
+"comment": ""
+},
+{
+"i": 231,
+"en": "The Cloud service no longer accepts this Mac’s saved session. Sign out and sign back in to reconnect.",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Sign-in needs a refresh",
+"comment": ""
+},
+{
+"i": 233,
+"en": "Machine list unavailable — showing last known",
+"comment": ""
+},
+{
+"i": 234,
+"en": "Your machines are unchanged. cmux couldn’t load the list from the Cloud service and retries on its own.",
+"comment": ""
+},
+{
+"i": 235,
+"en": "Can’t load the machine list",
+"comment": ""
+},
+{
+"i": 236,
+"en": "Offline — showing last known",
+"comment": ""
+},
+{
+"i": 237,
+"en": "Cloud machines load when this Mac is back online.",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Waiting for network",
+"comment": ""
+},
+{
+"i": 239,
+"en": "Reconnecting to Cloud…",
+"comment": ""
+},
+{
+"i": 240,
+"en": "Copied as HTML",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Copied as Markdown",
+"comment": ""
+},
+{
+"i": 242,
+"en": "The file may have been moved or deleted.",
+"comment": ""
+},
+{
+"i": 243,
+"en": "File unavailable",
+"comment": ""
+},
+{
+"i": 244,
+"en": "Size",
+"comment": ""
+},
+{
+"i": 245,
+"en": "Reset to default",
+"comment": ""
+},
+{
+"i": 246,
+"en": "Set as default for new viewers",
+"comment": ""
+},
+{
+"i": 247,
+"en": "pt",
+"comment": ""
+},
+{
+"i": 248,
+"en": "Width",
+"comment": ""
+},
+{
+"i": 249,
+"en": "px",
+"comment": ""
+},
+{
+"i": 250,
+"en": "Show Preview",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Show TextEdit",
+"comment": ""
+},
+{
+"i": 252,
+"en": "TextEdit",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Toggle Markdown Mode",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Copy as HTML",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Copy as Markdown",
+"comment": ""
+},
+{
+"i": 256,
+"en": "Font Size",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Font",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Max Width",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Reset to built-in defaults",
+"comment": ""
+},
+{
+"i": 260,
+"en": "Remote image blocked",
+"comment": ""
+},
+{
+"i": 261,
+"en": "cmux will not contact this image URL until you load this image.",
+"comment": ""
+},
+{
+"i": 262,
+"en": "Copy image URL",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Only HTTPS remote images can be loaded in the viewer.",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Load this image",
+"comment": ""
+},
+{
+"i": 265,
+"en": "This remote image URL cannot be loaded in the viewer.",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Open image URL",
+"comment": ""
+},
+{
+"i": 267,
+"en": "Image URL: {url}",
+"comment": ""
+},
+{
+"i": 268,
+"en": "multiple owners",
+"comment": ""
+},
+{
+"i": 269,
+"en": "partially attributed",
+"comment": ""
+},
+{
+"i": 270,
+"en": "%@ app footprint + %@ child RSS",
+"comment": ""
+},
+{
+"i": 271,
+"en": "; top child group: %@ %@",
+"comment": ""
+},
+{
+"i": 272,
+"en": " from workspace %@",
+"comment": ""
+},
+{
+"i": 273,
+"en": "About cmux",
+"comment": ""
+},
+{
+"i": 274,
+"en": "Check for Updates…",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Ghostty Settings…",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Keep Mac Awake",
+"comment": ""
+},
+{
+"i": 277,
+"en": "Open cmux.json",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Reload Configuration",
+"comment": ""
+},
+{
+"i": 279,
+"en": "Settings…",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Current Window",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Close Other Tabs in Pane",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Command Palette…",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Go to Workspace…",
+"comment": ""
+},
+{
+"i": 284,
+"en": "New Workspace Group",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Open Folder",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Open in VS Code",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Open Folder in VS Code (Inline)",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Reopen Closed Browser Panel",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Restore Previous Launch",
+"comment": ""
+},
+{
+"i": 290,
+"en": "Find in Directory…",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Find",
+"comment": ""
+},
+{
+"i": 292,
+"en": "Agent Integrations",
+"comment": ""
+},
+{
+"i": 293,
+"en": "API Reference",
+"comment": ""
+},
+{
+"i": 294,
+"en": "Browser Automation",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Changelog",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Claude Code Teams",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Codex Teams",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Concepts",
+"comment": ""
+},
+{
+"i": 299,
+"en": "Custom Commands",
+"comment": ""
+}
+]

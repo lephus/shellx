@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ShellXIcons
 
 /// Sends a scene UI event (tap, move) back to the JS runtime.
 struct SceneEventSink {
@@ -120,7 +121,7 @@ private struct SceneNodeContent: View {
                 Text(node.string("text") ?? "")
             }
         case "image":
-            Image(systemName: node.string("systemName") ?? "questionmark.square.dashed")
+            ShellXIcon.image(node.string("systemName") ?? "questionmark.square.dashed")
         case "button":
             if node.children.isEmpty {
                 Button(node.string("text") ?? "", role: node.bool("destructive") ? .destructive : nil) {

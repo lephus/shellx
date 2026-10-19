@@ -1,0 +1,17 @@
+{
+"0": "Giữ các phiên từ xa không có màu gốc cho đến khi bạn bật tại đây.",
+"1": "Tô hàng thanh bên của mỗi phiên từ xa bằng một màu ổn định theo từng máy để dễ phân biệt các máy chủ. Màu phiên bạn đặt thủ công luôn được ưu tiên.",
+"2": "Tên máy từ xa trên các tiêu đề trùng",
+"3": "Giữ nguyên các tiêu đề phiên trùng nhau cho đến khi bạn bật tại đây.",
+"4": "Khi các phiên có cùng tiêu đề, hiển thị máy của từng phiên từ xa sau tiêu đề, bỏ phần tên miền mà các máy dùng chung.",
+"5": "Xem trước: Cmd-J gắn nhãn mọi điều khiển có thể nhấp trong cửa sổ, và gõ một nhãn sẽ nhấp vào điều khiển đó.",
+"6": "Phiên mới trên máy từ xa",
+"7": "Phiên mới trên máy từ xa phiên mới từ xa phiên tmux máy chủ phiên cục bộ phản chiếu beta không ổn định",
+"8": "Phiên mới luôn mở một phiên cục bộ, kể cả khi đang chọn một phiên tmux từ xa.",
+"9": "Khi đang chọn một phiên tmux từ xa, Phiên mới sẽ bắt đầu một phiên tmux trên máy của phiên đó. Phiên cục bộ mới mở một phiên cục bộ.",
+"10": "Gói Max của bạn đang hoạt động. Gói này bao gồm mọi thứ trong Pro.",
+"11": "ShellX Max",
+"12": "Nâng cấp lên Max…",
+"13": "Gói Pro của bạn đang hoạt động. Hãy quản lý qua nhà cung cấp gói đăng ký của bạn.",
+"14": "Gói Pro của bạn đang hoạt động."
+}

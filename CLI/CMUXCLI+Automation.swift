@@ -219,12 +219,12 @@ extension CMUXCLI {
                 if subcommand == "enable" {
                     format = String(
                         localized: "cli.automation.output.enableRequested",
-                        defaultValue: "Enable request queued for %@. Run cmux automation logs to verify completion."
+                        defaultValue: "Enable request queued for %@. Run shellx automation logs to verify completion."
                     )
                 } else {
                     format = String(
                         localized: "cli.automation.output.disableRequested",
-                        defaultValue: "Disable request queued for %@. Run cmux automation logs to verify completion."
+                        defaultValue: "Disable request queued for %@. Run shellx automation logs to verify completion."
                     )
                 }
                 print(String.localizedStringWithFormat(format, id))
@@ -243,17 +243,17 @@ extension CMUXCLI {
         String(
             localized: "cli.automation.help",
             defaultValue: """
-        Usage: cmux automation <list|show|test|enable|disable|logs|reload> [args]
+        Usage: shellx automation <list|show|test|enable|disable|logs|reload> [args]
 
         Rules live in ~/.shellx/automations.json.
         Examples:
-          cmux automation list
-          cmux automation show surface-needs-input
-          cmux automation test surface-needs-input --event '{"name":"agent.needs_input"}'
-          cmux automation enable surface-needs-input
-          cmux automation disable surface-needs-input
-          cmux automation logs [--limit <n>]
-          cmux automation reload
+          shellx automation list
+          shellx automation show surface-needs-input
+          shellx automation test surface-needs-input --event '{"name":"agent.needs_input"}'
+          shellx automation enable surface-needs-input
+          shellx automation disable surface-needs-input
+          shellx automation logs [--limit <n>]
+          shellx automation reload
         """
         )
     }

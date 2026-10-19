@@ -165,7 +165,7 @@ extension CMUXCLI {
 
     static var readSelectionHelp: String {
         String(localized: "cli.help.readSelection", defaultValue: """
-        Usage: cmux read-selection [flags]
+        Usage: shellx read-selection [flags]
 
         Read the active selection from any selectable surface. Plain output includes source context; --json returns the complete response.
 
@@ -175,14 +175,14 @@ extension CMUXCLI {
           --window <id|ref|index>      Window context for workspace/surface refs and indexes
 
         Example:
-          cmux read-selection --surface surface:2
-          cmux read-selection --surface surface:2 --json
+          shellx read-selection --surface surface:2
+          shellx read-selection --surface surface:2 --json
         """)
     }
 
     static var readScreenHelp: String {
         String(localized: "cli.help.readScreen", defaultValue: """
-        Usage: cmux read-screen [flags]
+        Usage: shellx read-screen [flags]
 
         Read terminal text from a surface as plain text.
 
@@ -195,9 +195,9 @@ extension CMUXCLI {
           --selection                  Read only the active selection; cannot be combined with --scrollback or --lines
 
         Example:
-          cmux read-screen
-          cmux read-screen --surface surface:2 --scrollback --lines 200
-          cmux read-screen --surface surface:2 --selection
+          shellx read-screen
+          shellx read-screen --surface surface:2 --scrollback --lines 200
+          shellx read-screen --surface surface:2 --selection
         """)
     }
 

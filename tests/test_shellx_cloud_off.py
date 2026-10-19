@@ -32,7 +32,7 @@ APP_SHORTCUTS = "Sources/KeyboardShortcutSettings.swift"
 SCHEMA = "Packages/macOS/CmuxFoundation/Sources/CmuxFoundation/ConfigValidation/CmuxConfigSchema.generated.swift"
 CLI_MAIN = "CLI/cmux.swift"
 CATALOG = "Resources/Localizable.xcstrings"
-LOCALES = ["en", "de", "fr", "ar", "es", "zh-Hant", "zh-Hans", "ko", "ja"]
+LOCALES = ["en", "de", "fr", "ar", "es", "zh-Hant", "zh-Hans", "ko", "ja", "vi"]
 
 CLOUD_OFF = r"guard ShellXFeatures\.cloud else"
 CODEROUTER_OFF = r"guard ShellXFeatures\.codeRouter else"

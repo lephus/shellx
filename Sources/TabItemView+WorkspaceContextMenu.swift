@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ShellXIcons
 
 /// Menu-open-deferred wrapper for a sidebar row's workspace context menu.
 /// `contextMenu(menuItems:)` evaluates its content closure during every row
@@ -88,9 +89,9 @@ extension TabItemView {
             let requestedMuted = !actions.currentNotificationsMuted(targetIds)
             actions.setNotificationsMuted(targetIds, requestedMuted)
         } label: {
-            Label(
+            ShellXLabel(
                 muteNotificationsLabel,
-                systemImage: context.allNotificationsMuted ? "bell" : "bell.slash"
+                icon: context.allNotificationsMuted ? "bell" : "bell.slash"
             )
         }
         .disabled(targetIds.isEmpty)
@@ -168,14 +169,14 @@ extension TabItemView {
                 Button {
                     applyTabColor(nil, targetIds: targetIds)
                 } label: {
-                    Label(String(localized: "contextMenu.clearColor", defaultValue: "Clear Color"), systemImage: "xmark.circle")
+                    ShellXLabel(String(localized: "contextMenu.clearColor", defaultValue: "Clear Color"), icon: "xmark.circle")
                 }
             }
 
             Button {
                 promptCustomColor(targetIds: targetIds)
             } label: {
-                Label(String(localized: "contextMenu.chooseCustomColor", defaultValue: "Choose Custom Color…"), systemImage: "paintpalette")
+                ShellXLabel(String(localized: "contextMenu.chooseCustomColor", defaultValue: "Choose Custom Color…"), icon: "paintpalette")
             }
 
             if !tabColorPalette.isEmpty {
@@ -191,7 +192,7 @@ extension TabItemView {
                     applyTabColor(entry.hex, targetIds: targetIds)
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "checkmark")
+                        ShellXIcon.image("checkmark")
                             .opacity(isSelected ? 1 : 0)
                             .frame(width: 12)
                         Image(nsImage: coloredCircleImage(color: tabColorSwatchColor(for: entry.hex)))

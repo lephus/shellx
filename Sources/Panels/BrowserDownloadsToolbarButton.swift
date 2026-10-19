@@ -1,6 +1,7 @@
 import AppKit
 import CmuxBrowser
 import SwiftUI
+import ShellXIcons
 
 /// Adapts a completed browser download to the app's existing file drop path.
 ///
@@ -74,7 +75,7 @@ struct BrowserDownloadsToolbarButton: View {
                         ProgressView()
                             .controlSize(.small)
                     } else {
-                        Image(systemName: "arrow.down.circle")
+                        ShellXIcon.image("arrow.down.circle")
                             .font(.system(size: iconPointSize, weight: .medium))
                             .foregroundStyle(Color.primary)
                     }
@@ -211,7 +212,7 @@ private struct BrowserDownloadRow: View {
                 Button {
                     onReveal(record)
                 } label: {
-                    Image(systemName: "magnifyingglass")
+                    ShellXIcon.image("magnifyingglass")
                 }
                 .buttonStyle(.borderless)
                 .help(String(localized: "browser.downloads.showInFinder", defaultValue: "Show in Finder"))
@@ -235,11 +236,11 @@ private struct BrowserDownloadRow: View {
         case .downloading:
             ProgressView().controlSize(.small)
         case .saved:
-            Image(systemName: "doc.fill")
+            ShellXIcon.image("doc.fill")
                 .foregroundStyle(.secondary)
                 .imageScale(.large)
         case .failed:
-            Image(systemName: "exclamationmark.triangle.fill")
+            ShellXIcon.image("exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
                 .imageScale(.large)
         }

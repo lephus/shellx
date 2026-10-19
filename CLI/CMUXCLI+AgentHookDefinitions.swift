@@ -601,7 +601,7 @@ extension CMUXCLI {
         }
         throw CLIError(message: String(
             localized: "cli.hooks.error.pinnedTargetMissing",
-            defaultValue: "cmux could not connect this hook installation to a running app. Open a cmux workspace and run this command again."
+            defaultValue: "ShellX could not connect this hook installation to a running app. Open a ShellX workspace and run this command again."
         ))
     }
 

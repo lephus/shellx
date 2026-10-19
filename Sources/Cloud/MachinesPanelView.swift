@@ -7,6 +7,7 @@ import CmuxSurfaceCatalogModel
 import Combine
 import OSLog
 import SwiftUI
+import ShellXIcons
 
 /// Right-sidebar Machines tab: the user's cloud machine fleet as a Finder-like
 /// tree (machine → Workspaces → terminals, Ports, Displays, Terminals). Matches the
@@ -215,7 +216,7 @@ struct MachinesPanelView: View {
         if includesCloud, let status = devBackend.status, !status.isReady {
             VStack(spacing: 12) {
                 if status.isFailure {
-                    Image(systemName: "exclamationmark.icloud")
+                    ShellXIcon.image("exclamationmark.icloud")
                 } else {
                     ProgressView().controlSize(.small)
                 }
@@ -331,7 +332,7 @@ struct MachinesPanelView: View {
                 .controlSize(.small)
             Text(String(
                 localized: "machines.auth.checking",
-                defaultValue: "Checking your cmux account…"
+                defaultValue: "Checking your ShellX account…"
             ))
             .cmuxFont(size: 13)
             .foregroundColor(.secondary)
@@ -348,7 +349,7 @@ struct MachinesPanelView: View {
         } else {
             VStack(spacing: 12) {
                 Spacer()
-                Image(systemName: "person.crop.circle.badge.plus")
+                ShellXIcon.image("person.crop.circle.badge.plus")
                     .font(.system(size: 28, weight: .light))
                     .foregroundColor(.secondary.opacity(0.7))
                 Text(String(
@@ -358,7 +359,7 @@ struct MachinesPanelView: View {
                 .cmuxFont(size: 13, weight: .semibold)
                 Text(String(
                     localized: "machines.auth.subtitle",
-                    defaultValue: "Sign in to see and manage the machines in your cmux account."
+                    defaultValue: "Sign in to see and manage the machines in your ShellX account."
                 ))
                 .cmuxFont(size: 12)
                 .foregroundColor(.secondary)
@@ -394,7 +395,7 @@ struct MachinesPanelView: View {
                 ),
                 idleSubtitle: String(
                     localized: "machines.auth.subtitle",
-                    defaultValue: "Sign in to see and manage the machines in your cmux account."
+                    defaultValue: "Sign in to see and manage the machines in your ShellX account."
                 )
             )
             .frame(maxWidth: 440)
@@ -687,12 +688,12 @@ struct MachinesPanelView: View {
         VStack(spacing: 10) {
             Spacer()
             if !includesCloud {
-                Image(systemName: "desktopcomputer")
+                ShellXIcon.image("desktopcomputer")
                     .font(.system(size: 30, weight: .light))
                     .foregroundStyle(.secondary)
                 Text(String(localized: "devices.empty.title", defaultValue: "No other devices yet"))
                     .font(.callout.weight(.medium))
-                Text(String(localized: "devices.empty.help", defaultValue: "Sign in to cmux on another Mac and make it discoverable in Settings › Devices."))
+                Text(String(localized: "devices.empty.help", defaultValue: "Sign in to ShellX on another Mac and make it discoverable in Settings › Devices."))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -707,7 +708,7 @@ struct MachinesPanelView: View {
             } else if isTeamChangePending {
                 teamScopeLoading
             } else if viewModel.hasLoadedOnce {
-                Image(systemName: "cloud")
+                ShellXIcon.image("cloud")
                     .font(.system(size: 30, weight: .light))
                     .foregroundColor(.secondary.opacity(0.55))
                 Text(String(localized: "machines.empty.title", defaultValue: "No machines yet"))
@@ -767,7 +768,7 @@ struct MachinesPanelView: View {
         guard let maxActiveVms = plan.maxActiveVms, maxActiveVms > 0 else {
             return String(
                 localized: "machines.empty.upgrade.none",
-                defaultValue: "Subscribe to cmux Pro to create Cloud machines"
+                defaultValue: "Subscribe to ShellX Pro to create Cloud machines"
             )
         }
         if plan.isSingleMachinePlan {

@@ -2,6 +2,7 @@ import CmuxFoundation
 import AppKit
 import CMUXProjectModel
 import SwiftUI
+import ShellXIcons
 
 /// Files tab inside ``ProjectPanelView``.
 ///
@@ -42,7 +43,7 @@ struct ProjectFilesTabView: View {
     @ViewBuilder
     private func filterBar(rowCount: Int) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
+            ShellXIcon.image("magnifyingglass")
                 .foregroundStyle(.secondary)
             TextField("Filter files (e.g. AppDelegate)", text: $panel.filesSearchText)
                 .textFieldStyle(.plain)
@@ -51,7 +52,7 @@ struct ProjectFilesTabView: View {
                 Button {
                     panel.filesSearchText = ""
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
+                    ShellXIcon.image("xmark.circle.fill")
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
@@ -207,7 +208,7 @@ struct ProjectFilesTabView: View {
             ProjectFilesDetailStrip(file: file, module: module)
         } else {
             ProjectEmptyDetailView(
-                systemImage: "doc.text.magnifyingglass",
+                icon: "doc.text.magnifyingglass",
                 title: "Select a file",
                 hint: "Pick any file in the tree to see its target memberships and on-disk path."
             )
@@ -262,11 +263,11 @@ private struct ProjectFilesGroupRow: View {
         let symbolFrame = max(1, 14 * scale)
         Button(action: onToggle) {
             HStack(spacing: 4) {
-                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                ShellXIcon.image(isExpanded ? "chevron.down" : "chevron.right")
                     .cmuxFont(size: 9, weight: .semibold)
                     .frame(width: chevronWidth)
                     .foregroundStyle(.secondary)
-                Image(systemName: glyph(for: group.style))
+                ShellXIcon.image(glyph(for: group.style))
                     .cmuxFont(size: 12)
                     .imageScale(.small)
                     .frame(width: symbolFrame, height: symbolFrame)
@@ -312,7 +313,7 @@ private struct ProjectFilesFileRow: View {
         Button(action: onSelect) {
             HStack(spacing: 4) {
                 Spacer().frame(width: spacerWidth)
-                Image(systemName: glyph(for: file.fileType))
+                ShellXIcon.image(glyph(for: file.fileType))
                     .cmuxFont(size: 12)
                     .imageScale(.small)
                     .frame(width: symbolFrame, height: symbolFrame)
@@ -381,7 +382,7 @@ private struct ProjectFilesDetailStrip: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Image(systemName: "doc.text")
+                ShellXIcon.image("doc.text")
                 Text(file.displayName)
                     .cmuxFont(size: 13, weight: .semibold)
                 Spacer()
@@ -426,7 +427,7 @@ private struct ProjectFilesDetailStrip: View {
     private func membershipRow(for membership: TargetMembership) -> some View {
         let target = module.target(for: membership.targetID)
         HStack(spacing: 6) {
-            Image(systemName: "checkmark.square")
+            ShellXIcon.image("checkmark.square")
                 .foregroundStyle(cmuxAccent.color)
             Text(target?.displayName ?? String(membership.targetID.rawValue.prefix(8)))
                 .cmuxFont(size: 12)

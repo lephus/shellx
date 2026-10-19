@@ -1,6 +1,7 @@
 import AppKit
 import CmuxSettings
 import SwiftUI
+import ShellXIcons
 
 /// **Custom Sidebars** section — renderer controls plus a small native
 /// onboarding surface for creating, installing, locating, and editing the
@@ -104,7 +105,7 @@ public struct CustomSidebarsSection: View {
         SettingsCardRow(
             configurationReview: .json("customSidebars.renderer"),
             String(localized: "settings.customSidebars.renderer", defaultValue: "Renderer"),
-            subtitle: String(localized: "settings.customSidebars.renderer.subtitle", defaultValue: "Isolated process protects cmux from a faulty sidebar but accepts clicks only. In-app also accepts hover, focus, and typing.")
+            subtitle: String(localized: "settings.customSidebars.renderer.subtitle", defaultValue: "Isolated process protects ShellX from a faulty sidebar but accepts clicks only. In-app also accepts hover, focus, and typing.")
         ) {
             Picker("", selection: Binding(get: { renderer.current }, set: { renderer.set($0) })) {
                 ForEach(CustomSidebarRendererMode.uiCases, id: \.self) { mode in
@@ -144,9 +145,9 @@ public struct CustomSidebarsSection: View {
                 Button {
                     galleryPresented = true
                 } label: {
-                    Label(
+                    ShellXLabel(
                         String(localized: "settings.customSidebars.browseTemplates", defaultValue: "Browse Templates…", bundle: .module),
-                        systemImage: "square.grid.2x2"
+                        icon: "square.grid.2x2"
                     )
                 }
                 .controlSize(.small)
@@ -246,7 +247,7 @@ public struct CustomSidebarsSection: View {
         case .templateUnavailable:
             operationMessage = String(
                 localized: "settings.customSidebars.templateUnavailable",
-                defaultValue: "Could not load the sidebar template. Reinstall cmux and try again."
+                defaultValue: "Could not load the sidebar template. Reinstall ShellX and try again."
             )
         case .writeFailed:
             operationMessage = String(
@@ -292,7 +293,7 @@ private struct CustomSidebarTemplateGallery: View {
 
             if previewingID != nil {
                 HStack {
-                    Label(String(localized: "settings.customSidebars.gallery.previewing", defaultValue: "Previewing in your sidebar", bundle: .module), systemImage: "eye")
+                    ShellXLabel(String(localized: "settings.customSidebars.gallery.previewing", defaultValue: "Previewing in your sidebar", bundle: .module), icon: "eye")
                     Spacer()
                     Button(String(localized: "settings.customSidebars.gallery.revert", defaultValue: "Revert", bundle: .module)) {
                         hostActions.revertCustomSidebarPreview()
@@ -399,7 +400,7 @@ private struct CustomSidebarTemplateGallery: View {
     private func operationMessage(for result: CustomSidebarOnboardingResult) -> String {
         switch result {
         case .templateUnavailable:
-            return String(localized: "settings.customSidebars.templateUnavailable", defaultValue: "Could not load the sidebar template. Reinstall cmux and try again.", bundle: .module)
+            return String(localized: "settings.customSidebars.templateUnavailable", defaultValue: "Could not load the sidebar template. Reinstall ShellX and try again.", bundle: .module)
         case .writeFailed:
             return String(localized: "settings.customSidebars.writeFailed", defaultValue: "Could not create the sidebar. Check folder permissions and free disk space, then try again.", bundle: .module)
         case .created:

@@ -278,11 +278,11 @@ extension RemoteTmuxController {
             message = removed
                 ? String(
                     localized: "dialog.remoteTmux.newSessionAttachFailed.removed.message",
-                    defaultValue: "The session was created, but cmux couldn't attach to it, so it was removed from the host."
+                    defaultValue: "The session was created, but ShellX couldn't attach to it, so it was removed from the host."
                 )
                 : String(
                     localized: "dialog.remoteTmux.newSessionAttachFailed.left.message",
-                    defaultValue: "The session was created, but cmux couldn't attach to it. It is still running on the host."
+                    defaultValue: "The session was created, but ShellX couldn't attach to it. It is still running on the host."
                 )
         }
         return (title, message)

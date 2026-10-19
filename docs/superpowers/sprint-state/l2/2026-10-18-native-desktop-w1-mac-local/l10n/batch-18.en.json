@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Use `cmux vm exec %1$@ -- <command>`; `cmux vm ssh %1$@` works where the provider offers SSH.",
+"comment": ""
+},
+{
+"i": 1,
+"en": "Destination not found: %@.",
+"comment": ""
+},
+{
+"i": 2,
+"en": "This machine is not connected: %@.",
+"comment": ""
+},
+{
+"i": 3,
+"en": "Nothing to open: %@.",
+"comment": ""
+},
+{
+"i": 4,
+"en": "%1$@ is unavailable: %2$@",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Unknown surface %@.",
+"comment": ""
+},
+{
+"i": 6,
+"en": "Unsupported: %@.",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Touch ID for sudo is not configured. Run cmux sudo setup-touch-id.",
+"comment": ""
+},
+{
+"i": 8,
+"en": "sudo request expired before approval",
+"comment": ""
+},
+{
+"i": 9,
+"en": "sudo request cancelled because the requesting process exited",
+"comment": ""
+},
+{
+"i": 10,
+"en": "approved sudo execution was interrupted before a result was written",
+"comment": ""
+},
+{
+"i": 11,
+"en": "approved sudo execution timed out; the process tree was terminated",
+"comment": ""
+},
+{
+"i": 12,
+"en": "sudo could not authenticate: Touch ID was cancelled or unavailable",
+"comment": ""
+},
+{
+"i": 13,
+"en": "the approved sudo script could not be staged safely",
+"comment": ""
+},
+{
+"i": 14,
+"en": "the independent sudo runner could not be launched",
+"comment": ""
+},
+{
+"i": 15,
+"en": "the approved sudo command could not be launched",
+"comment": ""
+},
+{
+"i": 16,
+"en": "sudo could not finish process cleanup; one or more processes survived",
+"comment": ""
+},
+{
+"i": 17,
+"en": "Usage: cmux sudo run [-r reason] [-t timeout] (-c 'command' | script.sh | -)\n       cmux sudo pending\n       cmux sudo setup-touch-id",
+"comment": ""
+},
+{
+"i": 18,
+"en": "(no reason given)",
+"comment": ""
+},
+{
+"i": 19,
+"en": "sudo: timeout must be a positive integer",
+"comment": ""
+},
+{
+"i": 20,
+"en": "sudo: timeout must not exceed 86400 seconds",
+"comment": ""
+},
+{
+"i": 21,
+"en": "sudo: nothing to run; pass -c 'command', a script file, or -",
+"comment": ""
+},
+{
+"i": 22,
+"en": "sudo: the script must be valid UTF-8",
+"comment": ""
+},
+{
+"i": 23,
+"en": "sudo: the script exceeds the 256 KiB limit",
+"comment": ""
+},
+{
+"i": 24,
+"en": "sudo: could not read the script from standard input",
+"comment": ""
+},
+{
+"i": 25,
+"en": "sudo: too many approval requests are pending; resolve one in cmux and retry",
+"comment": ""
+},
+{
+"i": 26,
+"en": "sudo: could not start Touch ID setup; reinstall cmux and retry",
+"comment": ""
+},
+{
+"i": 27,
+"en": "sudo: could not open cmux for approval; open cmux and retry",
+"comment": ""
+},
+{
+"i": 28,
+"en": "sudo: could not write the approval request",
+"comment": ""
+},
+{
+"i": 29,
+"en": "sudo: could not verify the requesting process; retry the command",
+"comment": ""
+},
+{
+"i": 30,
+"en": "sudo: could not monitor the approval result; retry the command",
+"comment": ""
+},
+{
+"i": 31,
+"en": "sudo: request denied",
+"comment": ""
+},
+{
+"i": 32,
+"en": "sudo: request failed",
+"comment": ""
+},
+{
+"i": 33,
+"en": "sudo: unknown flag: %@",
+"comment": ""
+},
+{
+"i": 34,
+"en": "sudo: unexpected argument: %@",
+"comment": ""
+},
+{
+"i": 35,
+"en": "sudo: script not found: %@",
+"comment": ""
+},
+{
+"i": 36,
+"en": "sudo: script is not a readable regular file: %@",
+"comment": ""
+},
+{
+"i": 37,
+"en": "sudo: request %@ queued; waiting up to %d seconds for approval in cmux…",
+"comment": ""
+},
+{
+"i": 38,
+"en": "sudo: request %@ queued; waiting up to 1 second for approval in cmux…",
+"comment": ""
+},
+{
+"i": 39,
+"en": "sudo: timed out waiting for approval (request %@ was not approved)",
+"comment": ""
+},
+{
+"i": 40,
+"en": "sudo: request %@ was approved, but execution did not complete before the timeout",
+"comment": ""
+},
+{
+"i": 41,
+"en": "sudo: could not start secure execution; retry from a cmux terminal",
+"comment": ""
+},
+{
+"i": 42,
+"en": "sudo: use the cmux CLI included with the cmux app, then retry",
+"comment": ""
+},
+{
+"i": 43,
+"en": "sudo run [-r reason] [-t timeout] (-c 'command' | script.sh | -)",
+"comment": ""
+},
+{
+"i": 44,
+"en": "sudo pending",
+"comment": ""
+},
+{
+"i": 45,
+"en": "sudo setup-touch-id",
+"comment": ""
+},
+{
+"i": 46,
+"en": "Administrator access requested",
+"comment": ""
+},
+{
+"i": 47,
+"en": "Review the entire script before approving. It will run with administrator privileges.",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Request ID",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Reason",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Requested by",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Working directory",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Queued",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Script to run as root",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Approve with Touch ID",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Waiting for approval",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Applying decision…",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Approved — starting the secure runner…",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Running with administrator privileges…",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Administrator request %@",
+"comment": ""
+},
+{
+"i": 60,
+"en": "%1$@ (PID %2$d)",
+"comment": ""
+},
+{
+"i": 61,
+"en": "The machine returned an invalid output page. Reconnect and retry.",
+"comment": ""
+},
+{
+"i": 62,
+"en": "The machine's output could not be read completely. Reconnect and retry.",
+"comment": ""
+},
+{
+"i": 63,
+"en": "The machine returned an invalid snapshot list. Reconnect and retry.",
+"comment": ""
+},
+{
+"i": 64,
+"en": "The machine input chunk is too large. Split it into smaller chunks and retry.",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Several machine workspaces have that name. Use a workspace ID or choose a unique name.",
+"comment": ""
+},
+{
+"i": 66,
+"en": "An image transfer is already in progress. Wait for it to finish or cancel it before pasting again.",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Select up to eight images at a time.",
+"comment": ""
+},
+{
+"i": 68,
+"en": "The Cloud terminal link is unavailable. Reconnect the terminal, then paste the image again.",
+"comment": ""
+},
+{
+"i": 69,
+"en": "This Cloud daemon cannot receive clipboard images. Update cmux-tui on the machine and reconnect the terminal.",
+"comment": ""
+},
+{
+"i": 70,
+"en": "The image exceeds the 20 MiB limit. Resize it and try again.",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Cloud image paste accepts PNG, JPEG, GIF, and WebP files. Copy a supported image and try again.",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Cloud temporary image storage is full. Wait ten minutes for previous images to expire, then try again.",
+"comment": ""
+},
+{
+"i": 73,
+"en": "The image could not be stored. Check the machine’s available disk space and copy the image again.",
+"comment": ""
+},
+{
+"i": 74,
+"en": "The image transfer timed out. Reconnect the Cloud terminal and try again.",
+"comment": ""
+},
+{
+"i": 75,
+"en": "The link closed before image paste was confirmed. Check the agent for an attachment before pasting again.",
+"comment": ""
+},
+{
+"i": 76,
+"en": "Paste this image directly into the Cloud terminal. Image attachments in the command buffer are not supported yet.",
+"comment": ""
+},
+{
+"i": 77,
+"en": "Image could not be pasted",
+"comment": ""
+},
+{
+"i": 78,
+"en": "The machine's file receiver ended without a result.",
+"comment": ""
+},
+{
+"i": 79,
+"en": "Cloud Diagnostics",
+"comment": ""
+},
+{
+"i": 80,
+"en": "Cloud Diagnostics…",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Copy Diagnostics",
+"comment": ""
+},
+{
+"i": 82,
+"en": "No Cloud activity recorded in this session.",
+"comment": ""
+},
+{
+"i": 83,
+"en": "Cloud activity and errors",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Cloud sends connection timing and error codes while you are signed in. Terminal content and credentials are excluded.",
+"comment": ""
+},
+{
+"i": 85,
+"en": "This operation did not complete. Check the machine state before you try it again.",
+"comment": ""
+},
+{
+"i": 86,
+"en": "Copy diagnostic reference",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Cloud could not verify your session. Sign in again.",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Cloud access was denied. Check your permissions.",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Your plan does not allow this Cloud operation.",
+"comment": ""
+},
+{
+"i": 90,
+"en": "Cloud received too many requests. Wait before you retry.",
+"comment": ""
+},
+{
+"i": 91,
+"en": "The Cloud connection did not complete. Check your connection and try again.",
+"comment": ""
+},
+{
+"i": 92,
+"en": "Another operation changed this machine. Refresh its state.",
+"comment": ""
+},
+{
+"i": 93,
+"en": "The Cloud resource is no longer available. Refresh the machine list.",
+"comment": ""
+},
+{
+"i": 94,
+"en": "This Cloud operation is not supported. Check for an update.",
+"comment": ""
+},
+{
+"i": 95,
+"en": "Operation cancelled",
+"comment": ""
+},
+{
+"i": 96,
+"en": "The Cloud operation failed. Copy the diagnostic reference if the problem continues.",
+"comment": ""
+},
+{
+"i": 97,
+"en": "Dismiss operation",
+"comment": ""
+},
+{
+"i": 98,
+"en": "Starting Cloud operation",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Checking your session",
+"comment": ""
+},
+{
+"i": 100,
+"en": "Waiting for Cloud service",
+"comment": ""
+},
+{
+"i": 101,
+"en": "Waiting to retry",
+"comment": ""
+},
+{
+"i": 102,
+"en": "Preparing machine",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Saving machine state",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Starting private connection",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Finding machine connection",
+"comment": ""
+},
+{
+"i": 106,
+"en": "Starting connection process",
+"comment": ""
+},
+{
+"i": 107,
+"en": "Connecting to machine",
+"comment": ""
+},
+{
+"i": 108,
+"en": "Loading machine state",
+"comment": ""
+},
+{
+"i": 109,
+"en": "Opening workspace",
+"comment": ""
+},
+{
+"i": 110,
+"en": "Waiting for terminal",
+"comment": ""
+},
+{
+"i": 111,
+"en": "Restoring connection",
+"comment": ""
+},
+{
+"i": 112,
+"en": "Transferring files",
+"comment": ""
+},
+{
+"i": 113,
+"en": "Preparing environment",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Opening port",
+"comment": ""
+},
+{
+"i": 115,
+"en": "Updating notifications",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Cleaning up",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Sending diagnostics",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Create machine",
+"comment": ""
+},
+{
+"i": 119,
+"en": "Open machine",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Refresh machines",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Rename machine",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Delete machine",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Pause machine",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Resume machine",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Save snapshot",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Copy machine",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Restore machine",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Resize machine",
+"comment": ""
+},
+{
+"i": 129,
+"en": "Run machine command",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Open port",
+"comment": ""
+},
+{
+"i": 131,
+"en": "Manage publication",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Prepare base",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Open workspace",
+"comment": ""
+},
+{
+"i": 134,
+"en": "Open terminal",
+"comment": ""
+},
+{
+"i": 135,
+"en": "Transfer files",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Prepare environment",
+"comment": ""
+},
+{
+"i": 137,
+"en": "Connect to machine",
+"comment": ""
+},
+{
+"i": 138,
+"en": "Update notifications",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Start agent",
+"comment": ""
+},
+{
+"i": 140,
+"en": "Cloud operation",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Cloud terminal could not start",
+"comment": ""
+},
+{
+"i": 142,
+"en": "The secure Cloud terminal endpoint is unavailable.",
+"comment": ""
+},
+{
+"i": 143,
+"en": "Cloud session disconnected",
+"comment": ""
+},
+{
+"i": 144,
+"en": "The terminal session is offline. Reconnect when you are ready.",
+"comment": ""
+},
+{
+"i": 145,
+"en": "Cloud session unavailable",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Automatic reconnect paused. Reconnect to try again.",
+"comment": ""
+},
+{
+"i": 147,
+"en": "The secure terminal endpoint is unavailable.",
+"comment": ""
+},
+{
+"i": 148,
+"en": "New Cloud Workspace",
+"comment": ""
+},
+{
+"i": 149,
+"en": "New Cloud Machine",
+"comment": ""
+},
+{
+"i": 150,
+"en": "Increasing %@ disk to %d GiB…",
+"comment": ""
+},
+{
+"i": 151,
+"en": "Resizing %@…",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Couldn't Resize Machine",
+"comment": ""
+},
+{
+"i": 153,
+"en": "Cloud VM Resized",
+"comment": ""
+},
+{
+"i": 154,
+"en": "vm resize: use CPU 1–32, memory 4–64 GiB in whole GiB, and disk 4–256 GiB in 4 GiB steps.",
+"comment": ""
+},
+{
+"i": 155,
+"en": "OK %@ cpu=%@ memory=%@ GiB disk=%@ GiB",
+"comment": ""
+},
+{
+"i": 156,
+"en": "vm.resize requires `id`. Run `cmux vm ls` to find one.",
+"comment": ""
+},
+{
+"i": 157,
+"en": "vm.resize requires a positive `storage_mb` value.",
+"comment": ""
+},
+{
+"i": 158,
+"en": "Usage:\n  cmux vm resize <id> [--cpu <vCPUs>] [--memory <GiB>] [--disk <GiB>]\n\nGrow an existing Cloud VM in place. Specify at least one resource:\nCPU: 1–32 vCPUs. Memory: 4–64 GiB in whole GiB. Disk: 4–256 GiB in 4 GiB steps.\nMemory and disk accept G, GB, or GiB suffixes. Shrinking is not supported.\nThe CLI checks your plan's limits before the request; the server enforces them again\nand returns the provider-confirmed resources.\nAdd --json for the structured result.",
+"comment": ""
+},
+{
+"i": 159,
+"en": "Grow an existing machine's CPU, memory, or disk; see `cmux vm resize --help`.",
+"comment": ""
+},
+{
+"i": 160,
+"en": "Increase to %d GiB",
+"comment": ""
+},
+{
+"i": 161,
+"en": "Increase to %d vCPUs",
+"comment": ""
+},
+{
+"i": 162,
+"en": "Increase CPU",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Increase Memory",
+"comment": ""
+},
+{
+"i": 164,
+"en": "…",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Stale",
+"comment": ""
+},
+{
+"i": 166,
+"en": "—",
+"comment": ""
+},
+{
+"i": 167,
+"en": "Asleep",
+"comment": ""
+},
+{
+"i": 168,
+"en": "Unavailable",
+"comment": ""
+},
+{
+"i": 169,
+"en": "Sampled %@",
+"comment": ""
+},
+{
+"i": 170,
+"en": "%d px",
+"comment": ""
+},
+{
+"i": 171,
+"en": "Pixels moved each time a pane-resize shortcut repeats.",
+"comment": ""
+},
+{
+"i": 172,
+"en": "Resize Pane Down",
+"comment": ""
+},
+{
+"i": 173,
+"en": "Pane Resize Step",
+"comment": ""
+},
+{
+"i": 174,
+"en": "pane resize split step pixels key repeat keybindings ctrl shift h j k l",
+"comment": ""
+},
+{
+"i": 175,
+"en": "Resize Pane Up",
+"comment": ""
+},
+{
+"i": 176,
+"en": "Resize Pane Left",
+"comment": ""
+},
+{
+"i": 177,
+"en": "Resize Pane Right",
+"comment": ""
+},
+{
+"i": 178,
+"en": "Enables the macOS Cloud Machines integration, including entry points, attachments, and background sync.",
+"comment": ""
+},
+{
+"i": 179,
+"en": "Cloud Machines are temporarily unavailable.",
+"comment": ""
+},
+{
+"i": 180,
+"en": "Max includes up to 5 Cloud VMs sharing 80 vCPUs and 160 GB RAM. It unlocks 24 GB / 12 vCPU and 32 GB / 16 vCPU sizes, and one VM can use up to 64 GB RAM / 32 vCPU.",
+"comment": ""
+},
+{
+"i": 181,
+"en": "$10",
+"comment": ""
+},
+{
+"i": 182,
+"en": "Get Max",
+"comment": ""
+},
+{
+"i": 183,
+"en": "40 included VM-hours each month; pauses at the limit",
+"comment": ""
+},
+{
+"i": 184,
+"en": "Go plan",
+"comment": ""
+},
+{
+"i": 185,
+"en": "Choose Go, Pro, or Max: cmux billing checkout --plan <go|pro|max>",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Larger machines need cmux Max. Upgrade at %@, or choose a smaller machine.",
+"comment": ""
+},
+{
+"i": 187,
+"en": "%1$@ machines need cmux %2$@.",
+"comment": ""
+},
+{
+"i": 188,
+"en": "Largest Cloud VM",
+"comment": ""
+},
+{
+"i": 189,
+"en": "%1$@ · Requires %2$@",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Shows and sells the $10/month Go personal Cloud VM plan.",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Unlimited workspaces and the iOS app",
+"comment": ""
+},
+{
+"i": 192,
+"en": "2 saved VMs",
+"comment": ""
+},
+{
+"i": 193,
+"en": "Up to 5 Cloud VMs sharing 80 vCPUs and 160 GB RAM; Max unlocks 24 GB / 12 vCPU, 32 GB / 16 vCPU, and up to 64 GB / 32 vCPU",
+"comment": ""
+},
+{
+"i": 194,
+"en": "No machine size is available for this plan. Close this dialog and reopen it to refresh your plan.",
+"comment": ""
+},
+{
+"i": 195,
+"en": "Get Go",
+"comment": ""
+},
+{
+"i": 196,
+"en": "64 GB RAM / 32 vCPU",
+"comment": ""
+},
+{
+"i": 197,
+"en": "20 vCPUs and 40 GB RAM, shared",
+"comment": ""
+},
+{
+"i": 198,
+"en": "20 vCPUs and 40 GB RAM per paid seat, shared across the team",
+"comment": ""
+},
+{
+"i": 199,
+"en": "80 vCPUs and 160 GB RAM, shared",
+"comment": ""
+},
+{
+"i": 200,
+"en": "Continue to checkout",
+"comment": ""
+},
+{
+"i": 201,
+"en": "1 active Cloud VM, 2 vCPU, 4 GiB RAM, 16 GiB disk",
+"comment": ""
+},
+{
+"i": 202,
+"en": "Max",
+"comment": ""
+},
+{
+"i": 203,
+"en": "$200",
+"comment": ""
+},
+{
+"i": 204,
+"en": "Go",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Larger machines need cmux Pro. Upgrade at %@, or choose a smaller machine.",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Upgrade to %@",
+"comment": ""
+},
+{
+"i": 207,
+"en": "16 GB RAM / 8 vCPU",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Retrying in %@s (attempt %@).",
+"comment": ""
+},
+{
+"i": 209,
+"en": "Retrying now (attempt %@).",
+"comment": ""
+},
+{
+"i": 210,
+"en": "a terminal on another Mac (from `cmux vm tree`)",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Targets (from `cmux vm tree`; <machine> is a cloud ID or another Mac's `device:<uuid>@<tag>`):",
+"comment": ""
+},
+{
+"i": 212,
+"en": "%dd ago",
+"comment": ""
+},
+{
+"i": 213,
+"en": "%dh ago",
+"comment": ""
+},
+{
+"i": 214,
+"en": "%dm ago",
+"comment": ""
+},
+{
+"i": 215,
+"en": "Offline · seen %@",
+"comment": ""
+},
+{
+"i": 216,
+"en": "Last seen %@",
+"comment": ""
+},
+{
+"i": 217,
+"en": "Discover other devices",
+"comment": ""
+},
+{
+"i": 218,
+"en": "No other devices yet",
+"comment": ""
+},
+{
+"i": 219,
+"en": "Make this Mac discoverable",
+"comment": ""
+},
+{
+"i": 220,
+"en": "The layout change could not be saved on the other Mac. Try again.",
+"comment": ""
+},
+{
+"i": 221,
+"en": "Manage My Devices",
+"comment": ""
+},
+{
+"i": 222,
+"en": "Disabled by your administrator.",
+"comment": ""
+},
+{
+"i": 223,
+"en": "Your layout and scrollback are preserved. Retry when the other Mac is available.",
+"comment": ""
+},
+{
+"i": 224,
+"en": "Mac disconnected",
+"comment": ""
+},
+{
+"i": 225,
+"en": "Workspace on %@",
+"comment": ""
+},
+{
+"i": 226,
+"en": "Usage: cmux auth <status|login|logout|team>\n\nstatus   Print whether the user is signed in (add `cmux --json` for JSON).\nlogin    Open the sign-in popup on the cmux web app and wait for it to finish.\nlogout   Clear the current session.\nteam     List teams or select one (`team list|use <team-id>|create <name>`).",
+"comment": ""
+},
+{
+"i": 227,
+"en": "Usage: cmux auth team create <name>",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Created and selected team: %@",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Selected team: %@",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Usage: cmux auth team <list|use <team-id>|create <name>|members|invite <email>...|link|revoke-invite <id>|remove <user-id>|invitations|accept <id>|decline <id>>",
+"comment": ""
+},
+{
+"i": 231,
+"en": "Usage: cmux auth team use <team-id>",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Usage: cmux auth <status|login|logout|team>",
+"comment": ""
+},
+{
+"i": 233,
+"en": "agent: %@",
+"comment": ""
+},
+{
+"i": 234,
+"en": "attention: %@",
+"comment": ""
+},
+{
+"i": 235,
+"en": "No current work observed",
+"comment": ""
+},
+{
+"i": 236,
+"en": "current: unexpected argument '%@'. Known flags: --limit <1...200> --json",
+"comment": ""
+},
+{
+"i": 237,
+"en": "current: --limit may only be supplied once",
+"comment": ""
+},
+{
+"i": 238,
+"en": "current: --limit requires an integer from 1 to 200",
+"comment": ""
+},
+{
+"i": 239,
+"en": "current: invalid response (missing items)",
+"comment": ""
+},
+{
+"i": 240,
+"en": "freshness: %@",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Usage: cmux current [--limit <1...200>] [--json]\n\nRead bounded current-work facts already known to cmux across local and Cloud surfaces.\nDoes not refresh machines, read transcripts, or mutate work.\n\nFlags:\n  --limit <1...200>  Maximum items (default: 100)\n  --json            Exact owner payload with identities, evidence and freshness\n\nText and JSON use the same snapshot. Unknown facts remain unknown; possible\nhuman obligations are observations, not permission to act. --window does not\nfocus or filter this app-wide query; --id-format does not rewrite its identities.\n\nExamples:\n  cmux current\n  cmux current --json --limit 50",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Limit reached; more work was observed. Use --limit (maximum 200).",
+"comment": ""
+},
+{
+"i": 243,
+"en": "possible human obligation: %@",
+"comment": ""
+},
+{
+"i": 244,
+"en": "Observed: %@; cached owner facts, no refresh",
+"comment": ""
+},
+{
+"i": 245,
+"en": "Owner %@: %@",
+"comment": ""
+},
+{
+"i": 246,
+"en": "PR: %@",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Show top-level CLI usage, or one task-focused command group.",
+"comment": ""
+},
+{
+"i": 248,
+"en": "Also works without a running cmux app or socket.",
+"comment": ""
+},
+{
+"i": 249,
+"en": "Show one command group without connecting to the cmux socket.",
+"comment": ""
+},
+{
+"i": 250,
+"en": "Task Help:",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Agents",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Run `cmux <command> --help` for command-specific usage.",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Customize",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Diagnostics / Advanced",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Navigate & Arrange",
+"comment": ""
+},
+{
+"i": 256,
+"en": "Start & Resume",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Topics:",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Unknown topics keep the top-level help behavior.",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Usage: cmux help [topic]",
+"comment": ""
+},
+{
+"i": 260,
+"en": "socket-status [--json]",
+"comment": ""
+},
+{
+"i": 261,
+"en": "Use --json for the profile source and socket-path observation. This command never connects to the automation socket.",
+"comment": ""
+},
+{
+"i": 262,
+"en": "Usage: cmux socket-status [--json]",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Socket control mode: %@%@. Live enforcement: not observed.",
+"comment": ""
+},
+{
+"i": 264,
+"en": "SSH attach stopped because the remote daemon version does not match this cmux client. Install a cmux release with its matching remote daemon, then reconnect the workspace. Do not substitute a daemon from an older release.",
+"comment": ""
+},
+{
+"i": 265,
+"en": "SSH attach stopped because terminal input could not be placed in raw forwarding mode. Reconnect the workspace to try again.",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Update cmux to connect to this Cloud page.",
+"comment": ""
+},
+{
+"i": 267,
+"en": "The Cloud connection ended. Reload to reconnect.",
+"comment": ""
+},
+{
+"i": 268,
+"en": "The Cloud terminal placement is unavailable. Refresh the machine, then retry.",
+"comment": ""
+},
+{
+"i": 269,
+"en": "The machine did not return the new terminal. Refresh the machine before trying again.",
+"comment": ""
+},
+{
+"i": 270,
+"en": "This machine has no available workspace. Refresh the machine and try again.",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Couldn’t open terminal",
+"comment": ""
+},
+{
+"i": 272,
+"en": "The machine’s current state could not be loaded. Reconnect and try again.",
+"comment": ""
+},
+{
+"i": 273,
+"en": "Resources",
+"comment": ""
+},
+{
+"i": 274,
+"en": "%@ vCPU · %@",
+"comment": ""
+},
+{
+"i": 275,
+"en": "%@ GB total · %@",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Usage",
+"comment": ""
+},
+{
+"i": 277,
+"en": "Open Team Picker",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Additional work is outside this snapshot.",
+"comment": ""
+},
+{
+"i": 279,
+"en": "No work in this snapshot matches your search.",
+"comment": ""
+},
+{
+"i": 280,
+"en": "May be out of date",
+"comment": ""
+},
+{
+"i": 281,
+"en": "No open local view · read only",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Find current work",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Current local and Cloud work",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Find Work",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Showing %lld of %lld items",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Relay connection to %1$@ failed: %2$@.",
+"comment": ""
+},
+{
+"i": 287,
+"en": "The relay connection timed out.",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Unable to connect. Check your network and try again.",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Machine badge gap",
+"comment": ""
+},
+{
+"i": 290,
+"en": "Browser URL and forwarded port rows",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Copy config",
+"comment": ""
+},
+{
+"i": 292,
+"en": "Detail gap",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Disclosure gap",
+"comment": ""
+},
+{
+"i": 294,
+"en": "Disclosure slot",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Displays and resource metrics",
+"comment": ""
+},
+{
+"i": 296,
+"en": "The fixture keeps every section expanded and uses names long enough to exercise truncation, nested rows, and the trailing edge.",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Icon gap",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Icon slot",
+"comment": ""
+},
+{
+"i": 299,
+"en": "Indent / level",
+"comment": ""
+}
+]

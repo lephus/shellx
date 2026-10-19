@@ -58,7 +58,7 @@ extension CMUXCLI {
         if availableThemes.isEmpty {
             return trimmed
         }
-        throw CLIError(message: "Unknown theme '\(trimmed)'. Run 'cmux themes' to list available themes.")
+        throw CLIError(message: "Unknown theme '\(trimmed)'. Run 'shellx themes' to list available themes.")
     }
 
     func themeConfigSearchURLs(targetBundleIdentifier: String) -> [URL] {

@@ -2,6 +2,7 @@ import AppKit
 import Testing
 
 @testable import CmuxAppKitSupportUI
+import ShellXIcons
 
 /// The hosted renderer must be able to draw an SF Symbol at an explicit
 /// configuration point size inside a larger natural-size slot, so hosted
@@ -41,7 +42,7 @@ import Testing
     @Test func explicitSymbolPointSizeMatchesAppKitConfiguredSymbolCoverage() throws {
         let systemName = "person.crop.circle"
         let pointSize: CGFloat = 14
-        let base = try #require(NSImage(systemSymbolName: systemName, accessibilityDescription: nil))
+        let base = try #require(ShellXIcon.nsImage(systemName, accessibilityDescription: nil))
         let configuration = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .regular)
         let configured = try #require(base.withSymbolConfiguration(configuration))
         let naturalSize = configured.size

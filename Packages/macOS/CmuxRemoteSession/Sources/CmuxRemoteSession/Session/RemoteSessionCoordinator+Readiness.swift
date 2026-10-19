@@ -105,7 +105,7 @@ extension RemoteSessionCoordinator {
             detail = String(
                 format: String(
                     localized: "remoteSession.parked.relayNotReady",
-                    defaultValue: "The cmux relay on %@ did not become ready (the host may not allow SSH remote port forwarding). Automatic reconnect paused; use Reconnect to try again."
+                    defaultValue: "The ShellX relay on %@ did not become ready (the host may not allow SSH remote port forwarding). Automatic reconnect paused; use Reconnect to try again."
                 ),
                 configuration.displayTarget
             )
@@ -113,7 +113,7 @@ extension RemoteSessionCoordinator {
             detail = String(
                 format: String(
                     localized: "remoteSession.parked.proxyNotReady",
-                    defaultValue: "The cmux proxy tunnel to %@ did not become ready. Automatic reconnect paused; use Reconnect to try again."
+                    defaultValue: "The ShellX proxy tunnel to %@ did not become ready. Automatic reconnect paused; use Reconnect to try again."
                 ),
                 configuration.displayTarget
             )

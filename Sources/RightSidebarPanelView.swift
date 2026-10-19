@@ -12,6 +12,7 @@ import CmuxSwiftRender
 import CmuxSwiftRenderUI
 import SwiftUI
 import UniformTypeIdentifiers
+import ShellXIcons
 
 private func rightSidebarDebugResponder(_ responder: NSResponder?) -> String {
     guard let responder else { return "nil" }
@@ -518,7 +519,7 @@ struct RightSidebarPanelView: View {
             }
         } else {
             VStack(spacing: 6) {
-                Image(systemName: "wand.and.stars")
+                ShellXIcon.image("wand.and.stars")
                     .font(.system(size: 20))
                     .foregroundStyle(.tertiary)
                 Text(String(
@@ -529,7 +530,7 @@ struct RightSidebarPanelView: View {
                 .foregroundStyle(.secondary)
                 Text(String(
                     localized: "rightSidebar.customSidebar.emptyHint",
-                    defaultValue: "Pick one with: cmux right-sidebar set custom <name>"
+                    defaultValue: "Pick one with: shellx right-sidebar set custom <name>"
                 ))
                 .font(.caption)
                 .foregroundStyle(.tertiary)

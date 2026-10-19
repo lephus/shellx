@@ -1,5 +1,6 @@
 import AppKit
 import CmuxBrowser
+import ShellXIcons
 
 /// Splits a composer deletion around authoritative context-token attachments.
 enum BrowserDesignModeTokenDeletion {
@@ -67,12 +68,12 @@ final class BrowserDesignModeTokenCell: NSTextAttachmentCell {
             .foregroundColor: tint,
         ]
         let configuration = NSImage.SymbolConfiguration(pointSize: 9, weight: .semibold)
-        let symbol = NSImage(
-            systemSymbolName: BrowserDesignModeTagSymbol.symbol(forTag: selection.tagName),
+        let symbol = ShellXIcon.nsImage(
+            BrowserDesignModeTagSymbol.symbol(forTag: selection.tagName),
             accessibilityDescription: selection.tagName
         )?.withSymbolConfiguration(configuration)
-        let removeSymbol = NSImage(
-            systemSymbolName: "xmark",
+        let removeSymbol = ShellXIcon.nsImage(
+            "xmark",
             accessibilityDescription: nil
         )?.withSymbolConfiguration(configuration)
         // Tint once; draw(withFrame:in:) runs on every text-view redraw.

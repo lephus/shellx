@@ -16,6 +16,7 @@ let package = Package(
     dependencies: [
         .package(path: "../CmuxFoundation"),
         .package(path: "../CmuxCore"),
+        // ShellX look tokens (sidebar tint default).
         .package(path: "../../Shared/ShellXBrand"),
     ],
     targets: [

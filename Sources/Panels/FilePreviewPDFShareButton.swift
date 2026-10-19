@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ShellXIcons
 
 /// AppKit-backed PDF share control that dispatches while handling mouse-down.
 struct FilePreviewPDFShareButton: NSViewRepresentable {
@@ -14,8 +15,8 @@ struct FilePreviewPDFShareButton: NSViewRepresentable {
         let button = FilePreviewPDFShareButtonControl()
         button.identifier = NSUserInterfaceItemIdentifier("FilePreviewPDFShareButton")
         button.title = ""
-        button.image = NSImage(
-            systemSymbolName: "square.and.arrow.up",
+        button.image = ShellXIcon.nsImage(
+            "square.and.arrow.up",
             accessibilityDescription: label
         )
         button.imagePosition = .imageOnly

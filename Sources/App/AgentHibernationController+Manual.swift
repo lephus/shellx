@@ -32,7 +32,7 @@ enum AgentHibernationManualRefusal: String, Sendable, Equatable {
         case .surfaceNotFound:
             String(localized: "agentHibernation.manual.surfaceNotFound", defaultValue: "No terminal matches that surface.")
         case .notRestorable:
-            String(localized: "agentHibernation.manual.notRestorable", defaultValue: "This terminal has no agent that cmux can resume the way it was started.")
+            String(localized: "agentHibernation.manual.notRestorable", defaultValue: "This terminal has no agent that ShellX can resume the way it was started.")
         case .alreadyHibernated:
             String(localized: "agentHibernation.manual.alreadyHibernated", defaultValue: "This agent is already hibernated.")
         case .notRunning:
@@ -42,7 +42,7 @@ enum AgentHibernationManualRefusal: String, Sendable, Equatable {
         case .agentBusy:
             String(localized: "agentHibernation.manual.agentBusy", defaultValue: "This agent is working or waiting for input.")
         case .lifecycleUnknown:
-            String(localized: "agentHibernation.manual.lifecycleUnknown", defaultValue: "cmux can't tell whether this agent is idle, so it was left running.")
+            String(localized: "agentHibernation.manual.lifecycleUnknown", defaultValue: "ShellX can't tell whether this agent is idle, so it was left running.")
         case .recentlyActive:
             String(localized: "agentHibernation.manual.recentlyActive", defaultValue: "This agent was active a moment ago. Try again in a few seconds.")
         case .unconfirmedInput:
@@ -73,7 +73,7 @@ enum AgentHibernationWakeRefusal: String, Sendable, Equatable {
         case .teardownInProgress:
             String(localized: "agentHibernation.wake.teardownInProgress", defaultValue: "This agent is still being hibernated. Try again in a moment.")
         case .resumeUnavailable:
-            String(localized: "agentHibernation.wake.resumeUnavailable", defaultValue: "cmux could not start this agent's resume command.")
+            String(localized: "agentHibernation.wake.resumeUnavailable", defaultValue: "ShellX could not start this agent's resume command.")
         }
     }
 }

@@ -406,20 +406,20 @@ extension CMUXCLI {
         guard sendTextWarrantsPasteHint(text) else { return }
         let hint = String(
             localized: "cli.send.hint.usePaste",
-            defaultValue: "hint: each newline was typed as Enter; for large multi-line text use cmux send --paste or cmux paste to deliver it as one paste"
+            defaultValue: "hint: each newline was typed as Enter; for large multi-line text use shellx send --paste or shellx paste to deliver it as one paste"
         )
         FileHandle.standardError.write(Data((hint + "\n").utf8))
     }
 
     static var sendHelp: String {
         String(localized: "cli.help.send", defaultValue: """
-        Usage: cmux send [flags] [--] <text>
+        Usage: shellx send [flags] [--] <text>
 
         Send text to a terminal surface as keystrokes. Escape sequences: \\n and \\r send Enter, \\t sends Tab.
 
-        For large text (for example over 4 KB, or several lines going to an agent), use --paste or cmux paste. Keystrokes press Enter at every newline, which can submit each line on its own.
+        For large text (for example over 4 KB, or several lines going to an agent), use --paste or shellx paste. Keystrokes press Enter at every newline, which can submit each line on its own.
 
-        With --paste, the text goes through the same paste path as cmux paste and Cmd+V, unchanged: escape sequences such as \\n are not interpreted, and control characters such as Esc and Ctrl-C are replaced with spaces. --paste must come before the text.
+        With --paste, the text goes through the same paste path as shellx paste and Cmd+V, unchanged: escape sequences such as \\n are not interpreted, and control characters such as Esc and Ctrl-C are replaced with spaces. --paste must come before the text.
 
         If an agent prompt in the target holds text someone is typing, or a question or permission dialog is open, nothing is sent and the command fails. --force sends anyway.
 
@@ -431,15 +431,15 @@ extension CMUXCLI {
           --force                      Send even over a draft or into an open dialog
 
         Example:
-          cmux send "echo hello"
-          cmux send --surface surface:2 "ls -la\\n"
-          cmux send --paste --surface surface:2 "$(cat notes.md)"
+          shellx send "echo hello"
+          shellx send --surface surface:2 "ls -la\\n"
+          shellx send --paste --surface surface:2 "$(cat notes.md)"
         """)
     }
 
     static var pasteHelp: String {
         String(localized: "cli.help.paste", defaultValue: """
-        Usage: cmux paste [flags] [--] [text | -]
+        Usage: shellx paste [flags] [--] [text | -]
 
         Paste text into a terminal surface through the same paste path as Cmd+V. If the running program has turned on bracketed paste, the text arrives as one paste and newlines stay inside it; otherwise each newline is sent as Enter. As with Cmd+V, control characters such as Esc, Backspace, Ctrl-C and Ctrl-U are replaced with spaces. Escape sequences such as \\n are not interpreted. With no text argument, or with - before --, the text is read from stdin. Text over 15 MiB after JSON escaping is rejected.
 
@@ -453,9 +453,9 @@ extension CMUXCLI {
           --force                      Send even over a draft or into an open dialog
 
         Example:
-          git diff | cmux paste --surface surface:2
-          cmux read-screen --surface surface:1 --lines 40 | cmux paste --surface surface:2
-          cmux paste --surface surface:2 --submit "Review this change"
+          git diff | shellx paste --surface surface:2
+          shellx read-screen --surface surface:1 --lines 40 | shellx paste --surface surface:2
+          shellx paste --surface surface:2 --submit "Review this change"
         """)
     }
 }

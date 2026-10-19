@@ -40,7 +40,7 @@ extension ContentView {
         return [
             CommandPaletteCommandContribution(
                 commandId: commandPaletteProWelcomeChecklistCommandId,
-                title: constant(String(localized: "command.pro.welcomeChecklist.title", defaultValue: "Welcome to cmux Pro")),
+                title: constant(String(localized: "command.pro.welcomeChecklist.title", defaultValue: "Welcome to ShellX Pro")),
                 subtitle: constant(String(localized: "command.auth.subtitle", defaultValue: "Account")),
                 keywords: ["pro", "welcome", "checklist", "onboarding", "cloud", "billing", "ios", "provider"]
             ),

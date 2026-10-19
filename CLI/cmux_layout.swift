@@ -3,7 +3,7 @@ import Foundation
 extension CMUXCLI {
     static func layoutHelpText() -> String {
         """
-        Usage: cmux layout <subcommand> [flags]
+        Usage: shellx layout <subcommand> [flags]
 
         Save, list, export, open, and delete named workspace layouts.
 
@@ -15,14 +15,14 @@ extension CMUXCLI {
           delete <name>
 
         \(Self.workflowText("cli.workflow.headings.starters", "Discover workflow starters:"))
-          cmux docs workflows
-          cmux docs workflows --json
+          shellx docs workflows
+          shellx docs workflows --json
 
         Examples:
-          cmux layout save dev --overwrite
-          cmux layout list
-          cmux layout get dev
-          cmux layout open dev --cwd ~/projects/myapp
+          shellx layout save dev --overwrite
+          shellx layout list
+          shellx layout get dev
+          shellx layout open dev --cwd ~/projects/myapp
         """
     }
 

@@ -273,7 +273,7 @@ extension CMUXCLI {
         let reconnectRecoveredNote = shellQuote(sshAutoReconnectRecoveredNoteFormat())
         let launchAcknowledgementTimeoutNote = shellQuote(String(
             localized: "cli.sshPtyAttach.launchAcknowledgementTimeoutRetry",
-            defaultValue: "[cmux] cmux did not acknowledge the SSH launch; retrying %s in %ss.",
+            defaultValue: "[ShellX] ShellX did not acknowledge the SSH launch; retrying %s in %ss.",
             bundle: CLIExecutableLocator.enclosingAppBundle() ?? .main
         ))
         let terminalExitPromptCommand = [

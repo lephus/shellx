@@ -5,6 +5,7 @@ import CmuxNotifications
 import AppKit
 import ExtensionFoundation
 import SwiftUI
+import ShellXIcons
 
 private struct CMUXSidebarExtensionGrant: Codable, Equatable {
     var manifestID: String
@@ -300,7 +301,7 @@ struct CMUXInstalledExtensionSidebarHostView: View {
                 .accessibilityIdentifier("CMUXExtensionSidebarEmptyState")
             } else {
                 VStack(spacing: 16) {
-                    Image(systemName: "puzzlepiece.extension")
+                    ShellXIcon.image("puzzlepiece.extension")
                         .cmuxFont(size: 26, weight: .regular)
                         .foregroundStyle(.secondary)
                         .frame(width: 60, height: 60)
@@ -379,7 +380,7 @@ struct CMUXInstalledExtensionSidebarHostView: View {
             isLoading = false
             errorText = String(
                 localized: "sidebar.extensions.error",
-                defaultValue: "CMUX could not load sidebar extensions."
+                defaultValue: "ShellX could not load sidebar extensions."
             )
         }
     }
@@ -400,7 +401,7 @@ struct CMUXInstalledExtensionSidebarHostView: View {
         }
         return String(
             localized: "sidebar.extensions.empty.detail",
-            defaultValue: "Install and enable a CMUX sidebar extension to show it here."
+            defaultValue: "Install and enable a ShellX sidebar extension to show it here."
         )
     }
 
@@ -408,7 +409,7 @@ struct CMUXInstalledExtensionSidebarHostView: View {
         if unapprovedExtensionCount > 0 {
             return String(
                 localized: "sidebar.extensions.unapproved.detail",
-                defaultValue: "An installed sidebar extension needs approval before CMUX can use it."
+                defaultValue: "An installed sidebar extension needs approval before ShellX can use it."
             )
         }
         return String(
@@ -437,13 +438,13 @@ struct CMUXInstalledExtensionSidebarHostView: View {
                     Button {
                         selectExtension(enabledIdentity)
                     } label: {
-                        Label(enabledIdentity.localizedName, systemImage: "puzzlepiece.extension")
+                        ShellXLabel(enabledIdentity.localizedName, icon: "puzzlepiece.extension")
                     }
                 }
             } label: {
-                Label(
+                ShellXLabel(
                     String(localized: "sidebar.extensions.choose.action", defaultValue: "Choose Extension"),
-                    systemImage: "puzzlepiece.extension"
+                    icon: "puzzlepiece.extension"
                 )
             }
             .menuStyle(.button)
@@ -453,9 +454,9 @@ struct CMUXInstalledExtensionSidebarHostView: View {
         Button {
             presentExtensionBrowser()
         } label: {
-            Label(
+            ShellXLabel(
                 String(localized: "sidebar.extensions.manage.short", defaultValue: "Manage"),
-                systemImage: "puzzlepiece.extension"
+                icon: "puzzlepiece.extension"
             )
         }
         .controlSize(.small)
@@ -463,9 +464,9 @@ struct CMUXInstalledExtensionSidebarHostView: View {
         Button {
             onUseDefaultSidebar()
         } label: {
-            Label(
+            ShellXLabel(
                 String(localized: "sidebar.extensions.useDefault.short", defaultValue: "Use Default"),
-                systemImage: "sidebar.left"
+                icon: "sidebar.left"
             )
         }
         .controlSize(.small)
@@ -479,9 +480,9 @@ struct CMUXInstalledExtensionSidebarHostView: View {
                 Button {
                     isShowingAccessReview = true
                 } label: {
-                    Label(
+                    ShellXLabel(
                         String(localized: "sidebar.extensions.access.statusLimited", defaultValue: "Limited"),
-                        systemImage: "lock"
+                        icon: "lock"
                     )
                 }
                 .buttonStyle(.bordered)
@@ -491,7 +492,7 @@ struct CMUXInstalledExtensionSidebarHostView: View {
             Button {
                 isShowingExtensionDetails = true
             } label: {
-                Image(systemName: "info.circle")
+                ShellXIcon.image("info.circle")
             }
             .buttonStyle(.plain)
             .controlSize(.small)
@@ -511,7 +512,7 @@ struct CMUXInstalledExtensionSidebarHostView: View {
     private func extensionDetailsPopover(activeIdentity: AppExtensionIdentity?) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Image(systemName: "puzzlepiece.extension")
+                ShellXIcon.image("puzzlepiece.extension")
                     .cmuxFont(size: 18, weight: .medium)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(activeIdentity?.localizedName ?? String(localized: "sidebar.provider.extensions.title", defaultValue: "Extension Sidebar"))
@@ -595,7 +596,7 @@ struct CMUXInstalledExtensionSidebarHostView: View {
 
     private func blockedExtensionView(reason: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Image(systemName: "exclamationmark.triangle")
+            ShellXIcon.image("exclamationmark.triangle")
                 .cmuxFont(size: 20, weight: .regular)
                 .foregroundStyle(.secondary)
             Text(String(localized: "sidebar.extensions.blocked.title", defaultValue: "Extension Blocked"))
@@ -627,9 +628,9 @@ struct CMUXInstalledExtensionSidebarHostView: View {
             xpcHost.invalidate()
             hostReloadToken &+= 1
         } label: {
-            Label(
+            ShellXLabel(
                 String(localized: "sidebar.extensions.retry", defaultValue: "Try Again"),
-                systemImage: "arrow.clockwise"
+                icon: "arrow.clockwise"
             )
         }
         .controlSize(.small)
@@ -637,9 +638,9 @@ struct CMUXInstalledExtensionSidebarHostView: View {
         Button {
             onUseDefaultSidebar()
         } label: {
-            Label(
+            ShellXLabel(
                 String(localized: "sidebar.extensions.useDefault.short", defaultValue: "Use Default"),
-                systemImage: "sidebar.left"
+                icon: "sidebar.left"
             )
         }
         .controlSize(.small)
@@ -647,9 +648,9 @@ struct CMUXInstalledExtensionSidebarHostView: View {
         Button {
             presentExtensionBrowser()
         } label: {
-            Label(
+            ShellXLabel(
                 String(localized: "sidebar.extensions.manage.short", defaultValue: "Manage"),
-                systemImage: "puzzlepiece.extension")
+                icon: "puzzlepiece.extension")
         }
         .controlSize(.small)
     }
@@ -672,15 +673,15 @@ struct CMUXInstalledExtensionSidebarHostView: View {
     private func blockedDetailText(reason: String) -> String {
         switch reason {
         case "connectionInterrupted":
-            return String(localized: "sidebar.extensions.blocked.detail.connectionInterrupted", defaultValue: "CMUX lost the extension connection. No workspace data or actions are being shared.")
+            return String(localized: "sidebar.extensions.blocked.detail.connectionInterrupted", defaultValue: "ShellX lost the extension connection. No workspace data or actions are being shared.")
         case "manifestTimedOut":
-            return String(localized: "sidebar.extensions.blocked.detail.manifestTimedOut", defaultValue: "CMUX did not receive this extension's configuration in time. No workspace data or actions are being shared.")
+            return String(localized: "sidebar.extensions.blocked.detail.manifestTimedOut", defaultValue: "ShellX did not receive this extension's configuration in time. No workspace data or actions are being shared.")
         case "missingManifest":
-            return String(localized: "sidebar.extensions.blocked.detail.missingManifest", defaultValue: "CMUX did not receive a sidebar extension configuration, so no workspace data or actions were shared.")
+            return String(localized: "sidebar.extensions.blocked.detail.missingManifest", defaultValue: "ShellX did not receive a sidebar extension configuration, so no workspace data or actions were shared.")
         case "invalidManifest":
-            return String(localized: "sidebar.extensions.blocked.detail.invalidManifest", defaultValue: "CMUX rejected this extension's configuration. No workspace data or actions were shared.")
+            return String(localized: "sidebar.extensions.blocked.detail.invalidManifest", defaultValue: "ShellX rejected this extension's configuration. No workspace data or actions were shared.")
         default:
-            return String(localized: "sidebar.extensions.blocked.detail.failedManifest", defaultValue: "CMUX could not load this extension's configuration. No workspace data or actions were shared.")
+            return String(localized: "sidebar.extensions.blocked.detail.failedManifest", defaultValue: "ShellX could not load this extension's configuration. No workspace data or actions were shared.")
         }
     }
 
@@ -721,7 +722,7 @@ struct CMUXInstalledExtensionSidebarHostView: View {
 
     private func permissionRow(title: String, detail: String, isGranted: Bool) -> some View {
         HStack(alignment: .top, spacing: 6) {
-            Image(systemName: isGranted ? "checkmark.circle.fill" : "circle")
+            ShellXIcon.image(isGranted ? "checkmark.circle.fill" : "circle")
                 .cmuxFont(size: 11, weight: .medium)
                 .foregroundStyle(isGranted ? .green : .secondary)
                 .padding(.top, 1)
@@ -750,25 +751,25 @@ struct CMUXInstalledExtensionSidebarHostView: View {
                     Button {
                         selectExtension(enabledIdentity)
                     } label: {
-                        Label(
+                        ShellXLabel(
                             enabledIdentity.localizedName,
-                            systemImage: enabledIdentity.bundleIdentifier == activeIdentity?.bundleIdentifier ? "checkmark" : "puzzlepiece.extension"
+                            icon: enabledIdentity.bundleIdentifier == activeIdentity?.bundleIdentifier ? "checkmark" : "puzzlepiece.extension"
                         )
                     }
                 }
             } label: {
-                Label(
+                ShellXLabel(
                     activeIdentity?.localizedName ?? String(localized: "sidebar.provider.extensions.title", defaultValue: "Extension Sidebar"),
-                    systemImage: "puzzlepiece.extension"
+                    icon: "puzzlepiece.extension"
                 )
                 .lineLimit(1)
             }
             .menuStyle(.button)
             .controlSize(.small)
         } else {
-            Label(
+            ShellXLabel(
                 activeIdentity?.localizedName ?? String(localized: "sidebar.provider.extensions.title", defaultValue: "Extension Sidebar"),
-                systemImage: "puzzlepiece.extension"
+                icon: "puzzlepiece.extension"
             )
             .cmuxFont(size: 12, weight: .semibold)
             .foregroundStyle(.secondary)
@@ -806,7 +807,7 @@ struct CMUXInstalledExtensionSidebarHostView: View {
             .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(pendingPermissionDescriptions(effectiveGrant: effectiveGrant), id: \.self) { description in
-                    Label(description, systemImage: "circle")
+                    ShellXLabel(description, icon: "circle")
                         .cmuxFont(size: 11)
                         .foregroundStyle(.secondary)
                         .labelStyle(.titleAndIcon)
@@ -853,7 +854,7 @@ struct CMUXInstalledExtensionSidebarHostView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
-                Image(systemName: "puzzlepiece.extension")
+                ShellXIcon.image("puzzlepiece.extension")
                     .cmuxFont(size: 22, weight: .medium)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(String.localizedStringWithFormat(
@@ -868,7 +869,7 @@ struct CMUXInstalledExtensionSidebarHostView: View {
                 }
             }
 
-            Text(String(localized: "sidebar.extensions.access.review.detail", defaultValue: "CMUX will only share the following data and actions if you allow this request."))
+            Text(String(localized: "sidebar.extensions.access.review.detail", defaultValue: "ShellX will only share the following data and actions if you allow this request."))
                 .cmuxFont(size: 12)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

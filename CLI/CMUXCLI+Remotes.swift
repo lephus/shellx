@@ -7,54 +7,54 @@ import Foundation
 // handled by the app's `RemotesClient` (the single registry-mutation path).
 extension CMUXCLI {
     static let aiAccountsUsage = """
-        Usage: cmux ai-accounts <list|upload|remove> [options]
+        Usage: shellx ai-accounts <list|upload|remove> [options]
 
         Upload local AI credentials to your team's subrouter tenant and manage
         the sanitized account records stored there.
 
-          cmux ai-accounts list [--team <id>] [--json]
+          shellx ai-accounts list [--team <id>] [--json]
               List uploaded AI accounts for the selected or specified team.
 
-          cmux ai-accounts upload <claude|codex|anthropic-key|openai-key> [--label <s>] [--key <s>] [--team <id>] [--validate] [--json]
+          shellx ai-accounts upload <claude|codex|anthropic-key|openai-key> [--label <s>] [--key <s>] [--team <id>] [--validate] [--json]
               Upload credentials. Claude and Codex OAuth files are read by the
-              cmux app. API-key providers read ANTHROPIC_API_KEY / OPENAI_API_KEY
+              ShellX app. API-key providers read ANTHROPIC_API_KEY / OPENAI_API_KEY
               from your shell environment; --key overrides but exposes the
               secret in shell history and process listings.
 
-          cmux ai-accounts remove <account-id> [--team <id>] [--json]
+          shellx ai-accounts remove <account-id> [--team <id>] [--json]
               Delete an uploaded AI account.
 
         Examples:
-          cmux ai-accounts list
-          cmux ai-accounts upload claude --label work
-          ANTHROPIC_API_KEY=... cmux ai-accounts upload anthropic-key
-          cmux ai-accounts remove acct_123
+          shellx ai-accounts list
+          shellx ai-accounts upload claude --label work
+          ANTHROPIC_API_KEY=... shellx ai-accounts upload anthropic-key
+          shellx ai-accounts remove acct_123
         """
 
     static let remotesUsage = """
-        Usage: cmux remotes <list|add|remove> [options]
+        Usage: shellx remotes <list|add|remove> [options]
 
-        Manage the remote Macs in your team's cmux device registry. Added remotes
+        Manage the remote Macs in your team's ShellX device registry. Added remotes
         appear in your iOS app's device list and the phone can attach to them.
 
-          cmux remotes list [--json]
+          shellx remotes list [--json]
               List your team's registered remotes (name, deviceId, routes, tag, last seen).
 
-          cmux remotes add <name> --route <host:port> [--route <host:port> ...] [--tag <tag>] [--json]
+          shellx remotes add <name> --route <host:port> [--route <host:port> ...] [--tag <tag>] [--json]
               Register or update a remote with one or more attach routes. Idempotent on
               <name>: re-adding the same name updates its routes. <host> must be a numeric
-              Tailscale IPv4/IPv6 peer or a *.ts.net MagicDNS name. cmux matches MagicDNS
+              Tailscale IPv4/IPv6 peer or a *.ts.net MagicDNS name. ShellX matches MagicDNS
               against the local authenticated Tailscale peer map and stores the peer's numeric
               address. Plain LAN IPs, other hostnames, and loopback are rejected.
 
-          cmux remotes remove <name-or-deviceId> [--json]
+          shellx remotes remove <name-or-deviceId> [--json]
               Remove a remote you registered from the device registry.
 
         Examples:
-          cmux remotes add my-studio --route 100.64.1.2:51001
-          cmux remotes add my-studio --route my-studio.tailnet.ts.net:51001 --tag stable
-          cmux remotes list --json
-          cmux remotes remove my-studio
+          shellx remotes add my-studio --route 100.64.1.2:51001
+          shellx remotes add my-studio --route my-studio.tailnet.ts.net:51001 --tag stable
+          shellx remotes list --json
+          shellx remotes remove my-studio
         """
 
     func runRemotesCommand(commandArgs: [String], client: SocketClient, jsonOutput: Bool) throws {

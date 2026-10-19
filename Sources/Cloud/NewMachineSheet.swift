@@ -1,6 +1,7 @@
 import CmuxCloud
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// How the New Machine sheet arranges its three settings. Release builds
 /// always use ``recommended``; DEBUG builds read ``defaultsKey`` each time the
@@ -317,7 +318,7 @@ struct NewMachineSheet: View {
                 model.keepsAgentsUpdated.toggle()
             } label: {
                 if model.keepsAgentsUpdated {
-                    Label(agentsTitle, systemImage: "checkmark")
+                    ShellXLabel(agentsTitle, icon: "checkmark")
                 } else {
                     Text(agentsTitle)
                 }
@@ -458,9 +459,9 @@ struct NewMachineSheet: View {
             .fixedSize()
             .accessibilityIdentifier("NewMachineSheet.size.loading")
         } else if model.hasNoAllowedMemoryOptions {
-            Label(
+            ShellXLabel(
                 String(localized: "machines.new.size.noneAllowed.short", defaultValue: "No size available"),
-                systemImage: "exclamationmark.triangle.fill"
+                icon: "exclamationmark.triangle.fill"
             )
             .cmuxFont(size: 12)
             .foregroundStyle(.orange)
@@ -485,7 +486,7 @@ struct NewMachineSheet: View {
                 }
                 ForEach(model.lockedMemoryOptions, id: \.self) { memoryMb in
                     if let size = model.sizeOption(memoryMb: memoryMb) {
-                        Label(model.lockedSizeMenuTitle(size), systemImage: "lock.fill")
+                        ShellXLabel(model.lockedSizeMenuTitle(size), icon: "lock.fill")
                             .tag(memoryMb)
                             .accessibilityIdentifier("NewMachineSheet.size.locked.\(memoryMb)")
                     }
@@ -507,7 +508,7 @@ struct NewMachineSheet: View {
                     if let size = model.sizeOption(memoryMb: memoryMb) {
                         Button { model.selectSize(memoryMb) } label: {
                             if memoryMb == model.memoryMb {
-                                Label(size.menuTitle, systemImage: "checkmark")
+                                ShellXLabel(size.menuTitle, icon: "checkmark")
                             } else {
                                 Text(size.menuTitle)
                             }
@@ -520,7 +521,7 @@ struct NewMachineSheet: View {
                 ForEach(model.lockedMemoryOptions, id: \.self) { memoryMb in
                     if let size = model.sizeOption(memoryMb: memoryMb) {
                         Button { model.selectSize(memoryMb) } label: {
-                            Label(model.lockedSizeMenuTitle(size), systemImage: "lock.fill")
+                            ShellXLabel(model.lockedSizeMenuTitle(size), icon: "lock.fill")
                         }
                         .disabled(model.upgradePlan(for: memoryMb) == nil)
                         .accessibilityIdentifier("NewMachineSheet.size.locked.\(memoryMb)")
@@ -553,9 +554,9 @@ struct NewMachineSheet: View {
                 .help(String(localized: "cloud.network.loading", defaultValue: "Loading network options…"))
                 .accessibilityIdentifier("NewMachineSheet.network")
         case .unavailable:
-            Label(
+            ShellXLabel(
                 CloudNetworkPolicyMode.full.title,
-                systemImage: "exclamationmark.triangle.fill"
+                icon: "exclamationmark.triangle.fill"
             )
             .cmuxFont(size: 12)
             .foregroundStyle(.secondary)
@@ -604,7 +605,7 @@ struct NewMachineSheet: View {
             allowlistExpanded.toggle()
         } label: {
             HStack(spacing: 4) {
-                Image(systemName: allowlistExpanded ? "chevron.down" : "chevron.right")
+                ShellXIcon.image(allowlistExpanded ? "chevron.down" : "chevron.right")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .frame(width: 10)
@@ -649,7 +650,7 @@ struct NewMachineSheet: View {
     @ViewBuilder
     private var agentsNetworkWarning: some View {
         if let note = model.agentUpdatesNetworkNote {
-            Image(systemName: "exclamationmark.triangle.fill")
+            ShellXIcon.image("exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
                 .help(note)
                 .accessibilityLabel(note)
@@ -669,7 +670,7 @@ struct NewMachineSheet: View {
                     .cmuxFont(size: 11)
                     .fixedSize(horizontal: false, vertical: true)
             } icon: {
-                Image(systemName: "exclamationmark.triangle.fill")
+                ShellXIcon.image("exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
             }
             .accessibilityElement(children: .combine)

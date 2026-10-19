@@ -429,7 +429,7 @@ extension CMUXCLI {
     private func piFeedAcknowledgmentError() -> CLIError {
         CLIError(message: String(
             localized: "cli.hooks.pi.error.feedIngestionNotAcknowledged",
-            defaultValue: "cmux did not receive acknowledgment for Pi feed ingestion"
+            defaultValue: "ShellX did not receive acknowledgment for Pi feed ingestion"
         ))
     }
 }

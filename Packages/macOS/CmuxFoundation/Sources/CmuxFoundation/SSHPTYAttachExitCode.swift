@@ -220,11 +220,11 @@ public enum SSHPTYAttachExitCode: Int32, Sendable {
     ) {
         let pluralFormat = String(
             localized: "cli.sshPtyAttach.noProgressRetryLimitReached.other",
-            defaultValue: "[cmux] remote PTY bridge made no progress after %s attempts; stopping retries."
+            defaultValue: "[ShellX] remote PTY bridge made no progress after %s attempts; stopping retries."
         ).remoteCommandShellQuoted
         let singularFormat = String(
             localized: "cli.sshPtyAttach.noProgressRetryLimitReached.one",
-            defaultValue: "[cmux] remote PTY bridge made no progress after %s attempt; stopping retries."
+            defaultValue: "[ShellX] remote PTY bridge made no progress after %s attempt; stopping retries."
         ).remoteCommandShellQuoted
         return (
             configurationLines: [

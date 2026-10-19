@@ -51,7 +51,7 @@ final class SettingsAutomationBehaviorUITests: SettingsUITestCase {
     private enum L {
         static let modePassword = "Password mode"
         static let modeOpenAccess = "Full open access"
-        static let modeCmuxOnly = "cmux processes only"
+        static let modeCmuxOnly = "ShellX processes only"
 
         static let passwordRowTitle = "Socket Password"
         static let passwordSubtitleUnset = "No password set. External clients will be blocked until one is configured."

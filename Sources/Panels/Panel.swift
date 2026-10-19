@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import AppKit
 import CmuxFoundation
+import ShellXBrand
 
 /// Type of panel content
 public enum PanelType: String, Codable, CaseIterable, Sendable {
@@ -134,10 +135,16 @@ public enum WorkspaceAttentionFlashReason: String, Equatable, Sendable {
 enum WorkspaceAttentionFlashAccent: Equatable, Sendable {
     case cmuxAccent
 
+    /// ShellX `primary-line` (spec §7.4): the accent at the `primaryLine`
+    /// alpha (0.45). With the default accent this is exactly
+    /// `ShellXPalette.primaryLine`; a user accent keeps its hue.
     func strokeColor(accent: CmuxAccentColor) -> NSColor {
         switch self {
         case .cmuxAccent:
-            return accent.dynamicNSColor
+            let alpha = CGFloat(ShellXPalette.primaryLine.alpha)
+            return NSColor(name: "shellXAttentionRing") { appearance in
+                accent.nsColor(for: appearance).withAlphaComponent(alpha)
+            }
         }
     }
 }
@@ -173,16 +180,18 @@ struct WorkspaceAttentionFlashDecision: Equatable, Sendable {
 }
 
 enum WorkspaceAttentionCoordinator {
+    // ShellX: no glows or colored shadows on UI (spec §7.4), so both rings
+    // are a flat 1 px `primary-line` stroke.
     static let notificationRingStyle = WorkspaceAttentionFlashPresentation(
         accent: .cmuxAccent,
-        glowOpacity: 0.35,
-        glowRadius: 3
+        glowOpacity: 0,
+        glowRadius: 0
     )
 
     static let flashRingStyle = WorkspaceAttentionFlashPresentation(
         accent: .cmuxAccent,
-        glowOpacity: 0.6,
-        glowRadius: 6
+        glowOpacity: 0,
+        glowRadius: 0
     )
 
     static func flashStyle(for reason: WorkspaceAttentionFlashReason) -> WorkspaceAttentionFlashPresentation {
@@ -221,7 +230,8 @@ enum FocusFlashCurve: Equatable {
 enum PanelOverlayRingMetrics {
     static let inset: CGFloat = 2
     static let cornerRadius: CGFloat = 6
-    static let lineWidth: CGFloat = .paneIndicatorStrokeWidth
+    /// ShellX: the attention and flash rings are 1 px (spec §7.4).
+    static let lineWidth: CGFloat = 1
 
     static func pathRect(in bounds: CGRect) -> CGRect {
         bounds.insetBy(dx: inset, dy: inset)

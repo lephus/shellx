@@ -106,9 +106,9 @@ public enum CloudNetworkPolicyMode: String, Codable, CaseIterable, Sendable {
         case .full:
             return String(localized: "cloud.network.mode.full.detail", defaultValue: "The machine can reach any public address.")
         case .allowlist:
-            return String(localized: "cloud.network.mode.allowlist.detail", defaultValue: "Only the domains and IP ranges you list, plus what cmux needs.")
+            return String(localized: "cloud.network.mode.allowlist.detail", defaultValue: "Only the domains and IP ranges you list, plus what ShellX needs.")
         case .none:
-            return String(localized: "cloud.network.mode.none.detail", defaultValue: "No outbound access except what cmux itself needs.")
+            return String(localized: "cloud.network.mode.none.detail", defaultValue: "No outbound access except what ShellX itself needs.")
         }
     }
 }

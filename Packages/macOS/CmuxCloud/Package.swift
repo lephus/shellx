@@ -25,7 +25,9 @@ let package = Package(
         .package(path: "../CmuxSettings"),
         .package(path: "../CmuxSurfaceCatalogModel"),
         .package(path: "../CmuxCloudResizeCore"),
-        .package(path: "../CmuxTerminal")
+        .package(path: "../CmuxTerminal"),
+        // coolicons behind ShellXIcon (spec §7.4); the CLI never links this package.
+        .package(path: "../../Shared/ShellXBrand")
     ],
     targets: [
         .target(
@@ -47,7 +49,8 @@ let package = Package(
                 "CmuxMobileHost",
                 "CmuxPhonePush",
                 "CmuxSettings",
-                "CmuxSurfaceCatalogModel"
+                "CmuxSurfaceCatalogModel",
+                .product(name: "ShellXIcons", package: "ShellXBrand")
             ],
             // The files moved out of the app target unchanged; keep its language mode.
             swiftSettings: [.swiftLanguageMode(.v5)]

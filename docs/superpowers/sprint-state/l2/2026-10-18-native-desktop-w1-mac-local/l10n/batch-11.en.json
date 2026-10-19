@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Warn Before Tab Close Button",
+"comment": ""
+},
+{
+"i": 1,
+"en": "Unavailable while tab close buttons are hidden.",
+"comment": ""
+},
+{
+"i": 2,
+"en": "Warn Before Quit",
+"comment": ""
+},
+{
+"i": 3,
+"en": "Watch Git Status in Sidebar",
+"comment": ""
+},
+{
+"i": 4,
+"en": "Update sidebar branch and PR metadata from repository file changes without polling git.",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Group New Workspace Placement",
+"comment": ""
+},
+{
+"i": 6,
+"en": "Inherit Workspace Working Directory",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Workspace Layouts",
+"comment": ""
+},
+{
+"i": 8,
+"en": "Customize…",
+"comment": ""
+},
+{
+"i": 9,
+"en": "Edit the saved layouts offered in the new-workspace menu.",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Wrap Workspace Titles in Sidebar",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Amp Integration",
+"comment": ""
+},
+{
+"i": 12,
+"en": "cmux installs and refreshes Amp hooks automatically in cmux terminals. They no-op outside cmux terminals. When disabled, the installed Amp plugin stays inactive without needing to be removed.",
+"comment": ""
+},
+{
+"i": 13,
+"en": "Naming Agent",
+"comment": ""
+},
+{
+"i": 14,
+"en": "%@ can't generate names yet, so cmux uses each session's own agent.",
+"comment": ""
+},
+{
+"i": 15,
+"en": "Other agents",
+"comment": ""
+},
+{
+"i": 16,
+"en": "Supported",
+"comment": ""
+},
+{
+"i": 17,
+"en": "%@ couldn't generate a name — it may be rate-limited, out of tokens, or signed out. Existing names are left unchanged.",
+"comment": ""
+},
+{
+"i": 18,
+"en": "%@ isn't installed, so naming used each session's own agent.",
+"comment": ""
+},
+{
+"i": 19,
+"en": "Claude Code Integration",
+"comment": ""
+},
+{
+"i": 20,
+"en": "Claude Binary Path",
+"comment": ""
+},
+{
+"i": 21,
+"en": "e.g. /usr/local/bin/claude",
+"comment": ""
+},
+{
+"i": 22,
+"en": "Custom path to the claude binary. Leave empty to use PATH.",
+"comment": ""
+},
+{
+"i": 23,
+"en": "When enabled, cmux wraps the claude command to inject session tracking and notification hooks. Disable if you prefer to manage Claude Code hooks yourself.",
+"comment": ""
+},
+{
+"i": 24,
+"en": "Codex Integration",
+"comment": ""
+},
+{
+"i": 25,
+"en": "When enabled, cmux wraps the codex command to inject session tracking and notification hooks. Disable if you prefer to manage Codex hooks yourself. cmux still tracks live Codex sessions it can observe even when this is off. To also track Codex launched through a custom launcher that bypasses the wrapper (e.g. a subrouter), run `cmux hooks setup --agent codex`, which installs hooks into ~/.codex/hooks.json.",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Cursor Integration",
+"comment": ""
+},
+{
+"i": 27,
+"en": "Hooks must be installed with `cmux hooks cursor install`. They no-op outside cmux terminals.",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Gemini CLI Integration",
+"comment": ""
+},
+{
+"i": 29,
+"en": "Hooks must be installed with `cmux hooks gemini install`. They no-op outside cmux terminals.",
+"comment": ""
+},
+{
+"i": 30,
+"en": "Kiro CLI Integration",
+"comment": ""
+},
+{
+"i": 31,
+"en": "Hooks must be installed with `cmux hooks kiro install`, then run Kiro with `kiro-cli chat --agent cmux` (or set it as your default agent). They no-op outside cmux terminals.",
+"comment": ""
+},
+{
+"i": 32,
+"en": "Kiro Notification Level",
+"comment": ""
+},
+{
+"i": 33,
+"en": "Minimal",
+"comment": ""
+},
+{
+"i": 34,
+"en": "Standard",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Controls how many Kiro tool events appear in Feed.",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Verbose",
+"comment": ""
+},
+{
+"i": 37,
+"en": "Enable Full Open Access",
+"comment": ""
+},
+{
+"i": 38,
+"en": "This disables ancestry and password checks and opens the socket to all local users. Only enable when you understand the risk.",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Enable full open access?",
+"comment": ""
+},
+{
+"i": 40,
+"en": "Warning: Full open access makes the control socket world-readable/writable on this Mac and disables auth checks. Use only for local debugging.",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Each workspace gets CMUX_PORT and CMUX_PORT_END env vars with a dedicated port range. New terminals inherit these values.",
+"comment": ""
+},
+{
+"i": 42,
+"en": "Port Base",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Starting port for CMUX_PORT env var.",
+"comment": ""
+},
+{
+"i": 44,
+"en": "Port Range Size",
+"comment": ""
+},
+{
+"i": 45,
+"en": "Number of ports per workspace.",
+"comment": ""
+},
+{
+"i": 46,
+"en": "Ripgrep Binary Path",
+"comment": ""
+},
+{
+"i": 47,
+"en": "e.g. /etc/profiles/per-user/you/bin/rg",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Custom path to the rg binary used by Find. Leave empty to use common install locations and PATH.",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Socket Control Mode",
+"comment": ""
+},
+{
+"i": 50,
+"en": "“Off” turns control off. “cmux processes only” accepts only processes started in cmux terminals. “Automation mode” also accepts other apps running as this Mac user. “Password mode” requires a password. “Full open access” accepts any local process without a password and is unsafe.",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Overrides: CMUX_SOCKET_ENABLE, CMUX_SOCKET_MODE, and CMUX_SOCKET_PATH (set CMUX_ALLOW_SOCKET_OVERRIDE=1 for stable/nightly builds).",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Socket Password",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Change",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Failed to clear password (%@).",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Password cleared.",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Enter a password first.",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Failed to save password (%@).",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Password saved.",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Set",
+"comment": ""
+},
+{
+"i": 60,
+"en": "Stored in Application Support.",
+"comment": ""
+},
+{
+"i": 61,
+"en": "No password set. External clients will be blocked until one is configured.",
+"comment": ""
+},
+{
+"i": 62,
+"en": "Suppress Subagent Notifications",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Uses process ancestry from hook processes. Disable if nested Codex or Claude sessions should trigger completion notifications.",
+"comment": ""
+},
+{
+"i": 64,
+"en": "Workspace Auto-Naming",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Claude Code Integration is off, so Claude sessions will not be auto-named. Other supported agents still name when their cmux hooks are installed.",
+"comment": ""
+},
+{
+"i": 66,
+"en": "When enabled, cmux summarizes supported agent sessions into short workspace and tab names using each agent's own binary, refreshed as the topic shifts. Manual renames always win and stop auto-naming for that workspace or tab. Uses your agent account for the short summarization calls.",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Custom Sidebars",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Extensions",
+"comment": ""
+},
+{
+"i": 69,
+"en": "Remote tmux",
+"comment": ""
+},
+{
+"i": 70,
+"en": "These features are experimental and may change or break. Enable them only when you are testing them.",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Workspace Todo Controls",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Checklist Style",
+"comment": ""
+},
+{
+"i": 73,
+"en": "Popover",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Behind Window",
+"comment": ""
+},
+{
+"i": 75,
+"en": "Within Window",
+"comment": ""
+},
+{
+"i": 76,
+"en": "Ask Where to Save Downloads",
+"comment": ""
+},
+{
+"i": 77,
+"en": "When off, browser downloads save directly to Downloads without a save panel.",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Custom Search Engine Name",
+"comment": ""
+},
+{
+"i": 79,
+"en": "Shown in browser address bar search suggestions.",
+"comment": ""
+},
+{
+"i": 80,
+"en": "Custom Search URL",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Use {query} or %s for the search terms. Without a placeholder, cmux appends q=.",
+"comment": ""
+},
+{
+"i": 82,
+"en": "Default Page Zoom",
+"comment": ""
+},
+{
+"i": 83,
+"en": "%lld%%",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Zoom applied to newly opened browser pages. Zoom In, Zoom Out, and Actual Size still adjust each page.",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Choose What to Import…",
+"comment": ""
+},
+{
+"i": 86,
+"en": "URLs to Always Open Externally",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Applies to browser-page link clicks, terminal link clicks, and intercepted `open https://...` calls. One rule per line. Plain text matches any URL substring; regex-shaped rules and `*`/`?` wildcards are supported (for example: example.com, *example.com*, .*example\\.com.*). Regex rules containing `*` or `?` must use the `re:` prefix; legacy `.*`/`.+` rules remain supported.",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Browser Memory Saver",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Memory Saver Delay",
+"comment": ""
+},
+{
+"i": 90,
+"en": "%#@count1@m %#@count2@s",
+"comment": ""
+},
+{
+"i": 91,
+"en": "%lld",
+"comment": ""
+},
+{
+"i": 92,
+"en": "%llds",
+"comment": ""
+},
+{
+"i": 93,
+"en": "How long a browser tab must stay hidden before cmux may free its page memory. Active downloads, popups, developer tools, fullscreen, and loading pages are skipped.",
+"comment": ""
+},
+{
+"i": 94,
+"en": "Browsing History",
+"comment": ""
+},
+{
+"i": 95,
+"en": "Clear History…",
+"comment": ""
+},
+{
+"i": 96,
+"en": "Clear History",
+"comment": ""
+},
+{
+"i": 97,
+"en": "This removes visited-page suggestions from the browser omnibar.",
+"comment": ""
+},
+{
+"i": 98,
+"en": "Clear browser history?",
+"comment": ""
+},
+{
+"i": 99,
+"en": "No saved pages yet.",
+"comment": ""
+},
+{
+"i": 100,
+"en": "Checking browsing history...",
+"comment": ""
+},
+{
+"i": 101,
+"en": "%lld saved pages appear in omnibar suggestions.",
+"comment": ""
+},
+{
+"i": 102,
+"en": "1 saved page appears in omnibar suggestions.",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Hosts to Open in Embedded Browser",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Applies to terminal link clicks and intercepted `open https://...` calls. Only these hosts open in cmux. Others open in your default browser. One host or wildcard per line (for example: example.com, *.internal.example). Leave empty to open all hosts in cmux.",
+"comment": ""
+},
+{
+"i": 105,
+"en": "HTTP Hosts Allowed in Embedded Browser",
+"comment": ""
+},
+{
+"i": 106,
+"en": "Controls which HTTP (non-HTTPS) hosts can open in cmux without a warning prompt. Defaults include localhost, *.localhost, 127.0.0.1, ::1, 0.0.0.0, and *.localtest.me. Remove entries to block them; reset to restore defaults.",
+"comment": ""
+},
+{
+"i": 107,
+"en": "One host or wildcard per line. Remove entries to block them.",
+"comment": ""
+},
+{
+"i": 108,
+"en": "Reset to Defaults",
+"comment": ""
+},
+{
+"i": 109,
+"en": "Embedded Browser URL Allowlist",
+"comment": ""
+},
+{
+"i": 110,
+"en": "Restricts embedded-browser navigation to matching hosts or URL patterns. A suggested localhost list is shown; saving it opts into the restriction. Remove entries to block them, or, when no managed policy applies, clear the list to allow all web origins. Invalid-only values fail closed. Internal cmux documents remain available.",
+"comment": ""
+},
+{
+"i": 111,
+"en": "One rule per line: localhost, *.localhost, example.com, https://git.example.com, or http://localhost:3000. Remove entries to block them.",
+"comment": ""
+},
+{
+"i": 112,
+"en": "One or more rules are invalid. Invalid-only values fail closed; use a host or HTTP(S) URL pattern.",
+"comment": ""
+},
+{
+"i": 113,
+"en": "browser.urlAllowlist URL allowlist localhost wildcard scheme port organization policy",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Choose…",
+"comment": ""
+},
+{
+"i": 115,
+"en": "Checking installed browsers...",
+"comment": ""
+},
+{
+"i": 116,
+"en": "The blank-tab import hint is hidden. Turn it back on here any time.",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Blank tabs are currently using Settings only mode from the debug window.",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Blank browser tabs can show this import suggestion. Hide or re-enable it here.",
+"comment": ""
+},
+{
+"i": 119,
+"en": "Shown until you import or dismiss it on a blank tab.",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Show import hint on blank browser tabs",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Intercept open http(s) in Terminal",
+"comment": ""
+},
+{
+"i": 122,
+"en": "When off, `open https://...` and `open http://...` always use your default browser.",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Open Terminal Links in cmux Browser",
+"comment": ""
+},
+{
+"i": 124,
+"en": "When off, links clicked in terminal output open in your default browser.",
+"comment": ""
+},
+{
+"i": 125,
+"en": "React Grab Version",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Pinned npm version of react-grab injected by the toolbar button (Cmd+Shift+G). Only versions with a known integrity hash are accepted.",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Default Search Engine",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Baidu",
+"comment": ""
+},
+{
+"i": 129,
+"en": "Bing",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Brave Search",
+"comment": ""
+},
+{
+"i": 131,
+"en": "DuckDuckGo",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Ecosia",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Exa",
+"comment": ""
+},
+{
+"i": 134,
+"en": "Google",
+"comment": ""
+},
+{
+"i": 135,
+"en": "Kagi",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Mojeek",
+"comment": ""
+},
+{
+"i": 137,
+"en": "Perplexity",
+"comment": ""
+},
+{
+"i": 138,
+"en": "Qwant",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Startpage",
+"comment": ""
+},
+{
+"i": 140,
+"en": "Used by the browser address bar when input is not a URL.",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Wikipedia",
+"comment": ""
+},
+{
+"i": 142,
+"en": "Yahoo",
+"comment": ""
+},
+{
+"i": 143,
+"en": "Yandex",
+"comment": ""
+},
+{
+"i": 144,
+"en": "Show Search Suggestions",
+"comment": ""
+},
+{
+"i": 145,
+"en": "Browser Theme",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Open Machines",
+"comment": ""
+},
+{
+"i": 147,
+"en": "Persistent cloud computers. Files survive forever; sleeping machines cost nothing.",
+"comment": ""
+},
+{
+"i": 148,
+"en": "Your machines",
+"comment": ""
+},
+{
+"i": 149,
+"en": "Manage…",
+"comment": ""
+},
+{
+"i": 150,
+"en": "%1$@ · %#@count2@, no limit",
+"comment": ""
+},
+{
+"i": 151,
+"en": "%1$@ · %2$d of %#@count3@",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Sign in to see your plan.",
+"comment": ""
+},
+{
+"i": 153,
+"en": "Remove",
+"comment": ""
+},
+{
+"i": 154,
+"en": "Open Active Config…",
+"comment": ""
+},
+{
+"i": 155,
+"en": "Open in Editor…",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Reveal Active Config in Finder",
+"comment": ""
+},
+{
+"i": 157,
+"en": "This is the cmux Ghostty config selected for this build. Edit it here, then Save to reload cmux.",
+"comment": ""
+},
+{
+"i": 158,
+"en": "This is a generated preview of the effective config. Edit the cmux tab to change what cmux reads.",
+"comment": ""
+},
+{
+"i": 159,
+"en": "This is a generated preview of the effective config. No base Ghostty config file was found, so only cmux overrides are shown.",
+"comment": ""
+},
+{
+"i": 160,
+"en": "Config Source",
+"comment": ""
+},
+{
+"i": 161,
+"en": "synced",
+"comment": ""
+},
+{
+"i": 162,
+"en": "Couldn't open the cmux config.",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Reload queued; too many requests are pending to confirm completion.",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Reloaded configuration from disk.",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Couldn't save the cmux config.",
+"comment": ""
+},
+{
+"i": 166,
+"en": "Saved to cmux config and reloaded.",
+"comment": ""
+},
+{
+"i": 167,
+"en": "Config",
+"comment": ""
+},
+{
+"i": 168,
+"en": "Show Custom Sidebars",
+"comment": ""
+},
+{
+"i": 169,
+"en": "Custom sidebars are SwiftUI-style files in ~/.config/cmux/sidebars. Pick one from the sidebar toggle button's right-click menu; edits hot-reload on save. Use the in-app renderer only for sidebars you trust.",
+"comment": ""
+},
+{
+"i": 170,
+"en": "Renderer",
+"comment": ""
+},
+{
+"i": 171,
+"en": "Couldn't save setting",
+"comment": ""
+},
+{
+"i": 172,
+"en": "%@ pt",
+"comment": ""
+},
+{
+"i": 173,
+"en": "Enable System-Wide Hotkey",
+"comment": ""
+},
+{
+"i": 174,
+"en": "Use Command, Option, or Control with another key. No extra macOS permission is required.",
+"comment": ""
+},
+{
+"i": 175,
+"en": "Show/Hide All Windows",
+"comment": ""
+},
+{
+"i": 176,
+"en": "Managed by your organization",
+"comment": ""
+},
+{
+"i": 177,
+"en": "Content Background",
+"comment": ""
+},
+{
+"i": 178,
+"en": "Full Screen UI",
+"comment": ""
+},
+{
+"i": 179,
+"en": "Header View",
+"comment": ""
+},
+{
+"i": 180,
+"en": "HUD Window",
+"comment": ""
+},
+{
+"i": 181,
+"en": "Liquid Glass (macOS 26+)",
+"comment": ""
+},
+{
+"i": 182,
+"en": "Menu",
+"comment": ""
+},
+{
+"i": 183,
+"en": "Sheet",
+"comment": ""
+},
+{
+"i": 184,
+"en": "Tool Tip",
+"comment": ""
+},
+{
+"i": 185,
+"en": "Under Window",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Window Background",
+"comment": ""
+},
+{
+"i": 187,
+"en": "Folder Access",
+"comment": ""
+},
+{
+"i": 188,
+"en": "One Level",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Entire Subtree",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Connected Devices",
+"comment": ""
+},
+{
+"i": 191,
+"en": "iOS devices currently attached to this Mac.",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Display Name",
+"comment": ""
+},
+{
+"i": 193,
+"en": "This Mac's name",
+"comment": ""
+},
+{
+"i": 194,
+"en": "Name the iOS app shows for this Mac when pairing. Empty uses this Mac's name.",
+"comment": ""
+},
+{
+"i": 195,
+"en": "Remote control from the iOS app is disabled by your organization.",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Open Pairing…",
+"comment": ""
+},
+{
+"i": 197,
+"en": "Sign in to cmux on your iPhone with the same account and it connects automatically. No QR code is needed.",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Forward Notifications to iPhone",
+"comment": ""
+},
+{
+"i": 199,
+"en": "Hide Notification Content",
+"comment": ""
+},
+{
+"i": 200,
+"en": "Sends a generic message instead of agent and terminal text.",
+"comment": ""
+},
+{
+"i": 201,
+"en": "When to Send",
+"comment": ""
+},
+{
+"i": 202,
+"en": "Only When Away",
+"comment": ""
+},
+{
+"i": 203,
+"en": "Always sends every local agent alert. Away mode waits until this Mac is locked, asleep, or idle.",
+"comment": ""
+},
+{
+"i": 204,
+"en": "Pairing Port",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Port %lld is in use. The pairing listener is still on %lld.",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Saved port %lld. It takes effect the next time iOS Pairing starts.",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Apply saves the port for the next pairing start. Current connections continue. To use the new port, turn iOS Pairing off and on. If the port is unavailable, cmux chooses an available port.",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Port %lld is saved for the next pairing start. Currently using port %lld.",
+"comment": ""
+},
+{
+"i": 209,
+"en": "Port %lld is in use. The pairing listener is on %lld instead.",
+"comment": ""
+},
+{
+"i": 210,
+"en": "Port must be between 1 and 65535.",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Pairing listener on port %lld.",
+"comment": ""
+},
+{
+"i": 212,
+"en": "Starting the pairing listener…",
+"comment": ""
+},
+{
+"i": 213,
+"en": "Preferred port for IROH connections, 1–65535.",
+"comment": ""
+},
+{
+"i": 214,
+"en": "Iroh",
+"comment": ""
+},
+{
+"i": 215,
+"en": "Loopback",
+"comment": ""
+},
+{
+"i": 216,
+"en": "Tailscale",
+"comment": ""
+},
+{
+"i": 217,
+"en": "WebSocket",
+"comment": ""
+},
+{
+"i": 218,
+"en": "No reachable addresses yet. Iroh routes need this Mac signed in to your cmux account; Tailscale routes need Tailscale running on this Mac.",
+"comment": ""
+},
+{
+"i": 219,
+"en": "Reachable at",
+"comment": ""
+},
+{
+"i": 220,
+"en": "Your saved relay choice needs attention. Direct Iroh remains available, but cmux will not substitute an unselected relay.",
+"comment": ""
+},
+{
+"i": 221,
+"en": "Confirm you are signed in, then reopen cmux and run the check again.",
+"comment": ""
+},
+{
+"i": 222,
+"en": "Connect this Mac to the internet, then run the check again.",
+"comment": ""
+},
+{
+"i": 223,
+"en": "Keep cmux open and confirm both apps use the same account.",
+"comment": ""
+},
+{
+"i": 224,
+"en": "Your network may block relay traffic. Ask IT to allow HTTPS and WebSocket access to your configured cmux relay domains, or add an approved custom relay.",
+"comment": ""
+},
+{
+"i": 225,
+"en": "Update cmux on both devices. If needed, pair them again.",
+"comment": ""
+},
+{
+"i": 226,
+"en": "Retry. If this continues, share the safe report with cmux support.",
+"comment": ""
+},
+{
+"i": 227,
+"en": "Choose Automatic relay selection, or fix the selected custom relay and its device secret.",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Allow outbound HTTPS and WebSocket access to these cmux relay origins:",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Mac Available",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Not Needed",
+"comment": ""
+},
+{
+"i": 231,
+"en": "cmux automatically uses direct internet, LAN, or any VPN route available to macOS, then falls back to an allowed relay. Every route remains end-to-end encrypted.",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Passed",
+"comment": ""
+},
+{
+"i": 233,
+"en": "Active Route",
+"comment": ""
+},
+{
+"i": 234,
+"en": "Custom Relay (%1$@)",
+"comment": ""
+},
+{
+"i": 235,
+"en": "Direct Peer-to-Peer",
+"comment": ""
+},
+{
+"i": 236,
+"en": "cmux Relay (%1$@, %2$@)",
+"comment": ""
+},
+{
+"i": 237,
+"en": "LAN or Private VPN",
+"comment": ""
+},
+{
+"i": 238,
+"en": "No Live Route",
+"comment": ""
+},
+{
+"i": 239,
+"en": "Relay Policy",
+"comment": ""
+},
+{
+"i": 240,
+"en": "Relay Reachability",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Suggested Action",
+"comment": ""
+},
+{
+"i": 242,
+"en": "cmux Connection Report",
+"comment": ""
+},
+{
+"i": 243,
+"en": "Run Check",
+"comment": ""
+},
+{
+"i": 244,
+"en": "Secure Session",
+"comment": ""
+},
+{
+"i": 245,
+"en": "Share…",
+"comment": ""
+},
+{
+"i": 246,
+"en": "IT Relay Allowlist",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Connection Report",
+"comment": ""
+},
+{
+"i": 248,
+"en": "Checks encrypted transport, relay policy, and relay reachability from this Mac.",
+"comment": ""
+},
+{
+"i": 249,
+"en": "Connection Check",
+"comment": ""
+},
+{
+"i": 250,
+"en": "Encrypted Transport",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Add Custom Relay",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Add…",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Authentication",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Device Secret",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Edit Custom Relay",
+"comment": ""
+},
+{
+"i": 256,
+"en": "Name",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Relay addresses sync with your account. Provider secrets stay only in each device's secure storage. Missing secrets never fall back to cmux relays.",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Region",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Remove this custom relay?",
+"comment": ""
+},
+{
+"i": 260,
+"en": "Relay Secret",
+"comment": ""
+},
+{
+"i": 261,
+"en": "New Secret (leave blank to keep current)",
+"comment": ""
+},
+{
+"i": 262,
+"en": "The secret stays in this device's secure storage and never syncs with your account.",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Use relays you operate or obtain from another provider.",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Custom Relays",
+"comment": ""
+},
+{
+"i": 265,
+"en": "Relay URL",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Relay-Only Verification",
+"comment": ""
+},
+{
+"i": 267,
+"en": "Debug builds only. Keeps authenticated Iroh sessions on relays so the relay path can be verified.",
+"comment": ""
+},
+{
+"i": 268,
+"en": "Clear Report",
+"comment": ""
+},
+{
+"i": 269,
+"en": "Clear this diagnostic report?",
+"comment": ""
+},
+{
+"i": 270,
+"en": "This permanently removes the connection timeline stored on this Mac.",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Recorded Events",
+"comment": ""
+},
+{
+"i": 272,
+"en": "Account Mismatch",
+"comment": ""
+},
+{
+"i": 273,
+"en": "Connection Admission Denied",
+"comment": ""
+},
+{
+"i": 274,
+"en": "Admission Lease Expired",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Admission Revalidation Failed",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Authorization Failed",
+"comment": ""
+},
+{
+"i": 277,
+"en": "Cancelled",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Connection Closed",
+"comment": ""
+},
+{
+"i": 279,
+"en": "Connection Refused",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Credentials Unavailable",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Name Resolution Failed",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Endpoint Unavailable",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Host Unreachable",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Endpoint Identity Mismatch",
+"comment": ""
+},
+{
+"i": 285,
+"en": "No Route Available",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Offline",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Permission Denied",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Relay Policy Unavailable",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Protocol Error",
+"comment": ""
+},
+{
+"i": 290,
+"en": "Connection Attempt Held",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Secure Channel Failed",
+"comment": ""
+},
+{
+"i": 292,
+"en": "Send Queue Overflow",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Replaced by a Newer Attempt",
+"comment": ""
+},
+{
+"i": 294,
+"en": "Timed Out",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Transport Idle Timeout",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Unsupported Route",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Last Failure",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Last Successful Connection",
+"comment": ""
+},
+{
+"i": 299,
+"en": "Not Recorded",
+"comment": ""
+}
+]

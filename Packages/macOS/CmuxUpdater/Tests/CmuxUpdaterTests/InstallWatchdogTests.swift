@@ -221,7 +221,7 @@ import Testing
         let error = NSError(
             domain: UpdateStateModel.updateErrorDomain,
             code: UpdateStateModel.installDidNotStartCode,
-            userInfo: [NSLocalizedDescriptionKey: "cmux couldn’t start the update. Check your internet connection and try again."]
+            userInfo: [NSLocalizedDescriptionKey: "ShellX couldn’t start the update. Check your internet connection and try again."]
         )
         let title = UpdateStateModel.userFacingErrorTitle(for: error)
         let message = UpdateStateModel.userFacingErrorMessage(for: error)

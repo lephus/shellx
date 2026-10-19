@@ -65,7 +65,7 @@ final class CloudPortAccessModel {
             if let coordinator, let blocker = CloudTunnelStatus(
                 backend: coordinator.backend, state: tunnelState, isPinned: false
             ).privateRouteBlocker { return blocker }
-            return String(localized: "cloud.portAccess.privateNetworkRequired", defaultValue: "This HTTPS service requires a private network connection. Run cmux vpn up, then reload.")
+            return String(localized: "cloud.portAccess.privateNetworkRequired", defaultValue: "This HTTPS service requires a private network connection. Run shellx vpn up, then reload.")
         case .closed: return String(localized: "cloud.ports.closed", defaultValue: "Closed")
         default: return nil
         }

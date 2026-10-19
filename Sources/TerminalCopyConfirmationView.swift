@@ -4,6 +4,7 @@ import CmuxSettings
 import CmuxTerminal
 import CmuxTerminalCore
 import SwiftUI
+import ShellXIcons
 
 @MainActor
 extension GhosttySurfaceScrollView {
@@ -141,7 +142,7 @@ private struct CopyConfirmationCapsule: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            Image(systemName: "doc.on.clipboard")
+            ShellXIcon.image("doc.on.clipboard")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(accent)
             Text(Self.title)

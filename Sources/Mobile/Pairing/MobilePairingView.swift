@@ -5,6 +5,7 @@ import CmuxAuthRuntime
 import CmuxMobileHost
 import Foundation
 import SwiftUI
+import ShellXIcons
 
 /// The macOS window for pairing an iPhone with this Mac.
 ///
@@ -99,12 +100,12 @@ struct MobilePairingView: View {
     private var getIPhoneAppBadge: some View {
         Link(destination: Self.iphoneAppURL) {
             HStack(spacing: 8) {
-                Image(systemName: "apple.logo")
+                ShellXIcon.image("apple.logo")
                     .cmuxFont(size: 20)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(String(
                         localized: "mobile.pairing.getApp.badge.caption",
-                        defaultValue: "Download cmux for"
+                        defaultValue: "Download ShellX for"
                     ))
                         .cmuxFont(.caption2)
                     Text(String(
@@ -126,7 +127,7 @@ struct MobilePairingView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(String(
             localized: "mobile.pairing.getApp.link",
-            defaultValue: "Get cmux for iPhone"
+            defaultValue: "Get ShellX for iPhone"
         ))
     }
 
@@ -173,7 +174,7 @@ struct MobilePairingView: View {
 
     private var pairingDisabledContent: some View {
         VStack(spacing: 12) {
-            Image(systemName: "iphone.slash")
+            ShellXIcon.image("iphone.slash")
                 .cmuxFont(size: 28)
                 .foregroundStyle(.secondary)
             Text(String(
@@ -183,7 +184,7 @@ struct MobilePairingView: View {
                 .cmuxFont(.headline)
             Text(String(
                 localized: "mobile.pairing.disabled.body",
-                defaultValue: "iOS pairing is off on this Mac. Open Settings and enable iOS pairing to discover this Mac from cmux on your iPhone."
+                defaultValue: "iOS pairing is off on this Mac. Open Settings and enable iOS pairing to discover this Mac from ShellX on your iPhone."
             ))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
@@ -203,7 +204,7 @@ struct MobilePairingView: View {
 
     private func failure(message: String) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
+            ShellXIcon.image("exclamationmark.triangle")
                 .cmuxFont(size: 28)
                 .foregroundStyle(.orange)
             Text(message)
@@ -246,12 +247,12 @@ struct MobilePairingView: View {
     private var irohReadyContent: some View {
         VStack(alignment: .center, spacing: 14) {
             getIPhoneAppBadge
-            Image(systemName: "checkmark.shield")
+            ShellXIcon.image("checkmark.shield")
                 .cmuxFont(size: 34)
                 .foregroundStyle(.green)
             Text(String(
                 localized: "mobile.pairing.irohInstruction",
-                defaultValue: "Install cmux on your iPhone and sign in with the same account. It connects automatically, with no code needed."
+                defaultValue: "Install ShellX on your iPhone and sign in with the same account. It connects automatically, with no code needed."
             ))
                 .cmuxFont(.callout)
                 .foregroundStyle(.secondary)
@@ -287,7 +288,7 @@ struct MobilePairingView: View {
 
         Text(String(
             localized: "mobile.pairing.scanInstruction",
-            defaultValue: "In cmux on your iPhone, sign in with the same account, choose Tailscale, then scan this code."
+            defaultValue: "In ShellX on your iPhone, sign in with the same account, choose Tailscale, then scan this code."
         ))
         .cmuxFont(.caption)
         .foregroundStyle(.secondary)
@@ -357,7 +358,7 @@ struct MobilePairingView: View {
             if reachableViaIroh {
                 Text(String(
                     localized: "mobile.pairing.irohInstruction",
-                    defaultValue: "Install cmux on your iPhone and sign in with the same account. It connects automatically — no code needed."
+                    defaultValue: "Install ShellX on your iPhone and sign in with the same account. It connects automatically — no code needed."
                 ))
                 .cmuxFont(.caption)
                 .foregroundStyle(.secondary)
@@ -378,7 +379,7 @@ struct MobilePairingView: View {
 
     @ViewBuilder
     private var tailscaleMissingBody: some View {
-        Image(systemName: "network.slash")
+        ShellXIcon.image("network.slash")
             .cmuxFont(size: 28)
             .foregroundStyle(.orange)
         Text(String(
@@ -412,7 +413,7 @@ struct MobilePairingView: View {
                 localized: "mobile.pairing.transport.iroh.detail",
                 defaultValue: """
                 iPhones signed in to your account find this Mac automatically over Iroh — \
-                end-to-end encrypted, direct when possible, through a cmux relay when not. No code needed.
+                end-to-end encrypted, direct when possible, through a ShellX relay when not. No code needed.
                 """
             )
         ) {

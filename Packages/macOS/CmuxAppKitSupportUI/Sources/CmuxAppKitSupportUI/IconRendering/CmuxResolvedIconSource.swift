@@ -5,7 +5,8 @@ public import UniformTypeIdentifiers
 /// Source image for a small cmux UI icon that must be resolved through AppKit.
 @MainActor
 public enum CmuxResolvedIconSource {
-    /// An SF Symbol resolved through `NSImage(systemSymbolName:accessibilityDescription:)`.
+    /// An SF Symbol name resolved through `ShellXIcon.nsImage(_:accessibilityDescription:)`:
+    /// its coolicon when mapped, else the SF Symbol of that name.
     case systemSymbol(name: String, accessibilityDescription: String?)
     /// An asset-catalog image resolved from a bundle.
     case asset(name: String, bundle: Bundle)

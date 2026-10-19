@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Usage:\n  cmux vm network <id>                                   Show the machine's outbound policy.\n  cmux vm network <id> set --mode <full|allowlist|none> [--dns <on|off>]\n  cmux vm network <id> set --policy <json>               Replace the whole policy.\n  cmux vm network <id> add-domain <domain>...\n  cmux vm network <id> remove-domain <domain>...\n  cmux vm network <id> add-range <cidr> [--port <n>] [--protocol <tcp|udp>] [--note <text>]\n  cmux vm network <id> remove-range <cidr> [--port <n>] [--protocol <tcp|udp>]\n  cmux vm network <id> preset <add|remove> <preset-id>...\n\nModes: full reaches any public address; allowlist reaches only the listed\ndomains and ranges; none reaches nothing. cmux's own hosts stay reachable\nin every mode. Domains are exact HTTPS host names (no wildcards). A range\nwith --port and no --protocol means TCP. Open DNS (--dns on) is itself an\noutbound channel. Changes apply live to a running machine, with no restart.\n`cmux vm network <id>` lists the preset ids. Add --json for the structured result.",
+"comment": ""
+},
+{
+"i": 1,
+"en": "vm new: use either --network or --network-policy, not both.",
+"comment": ""
+},
+{
+"i": 2,
+"en": "Show or change whether the machine keeps its coding agents up to date; see `cmux vm agent-updates --help`.",
+"comment": ""
+},
+{
+"i": 3,
+"en": "vCPUs follow --size: 4g 2, 8g 4, 16g 8, 24g 12, 32g 16, 64g 32.",
+"comment": ""
+},
+{
+"i": 4,
+"en": "Show or change the machine's outbound network policy; see `cmux vm network --help`.",
+"comment": ""
+},
+{
+"i": 5,
+"en": "latest keeps coding agents up to date; image (default) keeps the baked versions",
+"comment": ""
+},
+{
+"i": 6,
+"en": "Loading full text…",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Try again",
+"comment": ""
+},
+{
+"i": 8,
+"en": "Full text",
+"comment": ""
+},
+{
+"i": 9,
+"en": "Couldn’t load the full text from this Mac. Reconnect and try again.",
+"comment": ""
+},
+{
+"i": 10,
+"en": "See more",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Couldn't load the full message. Try again",
+"comment": ""
+},
+{
+"i": 12,
+"en": "What should change?",
+"comment": ""
+},
+{
+"i": 13,
+"en": "Your answer",
+"comment": ""
+},
+{
+"i": 14,
+"en": "Reply to agent…",
+"comment": ""
+},
+{
+"i": 15,
+"en": "Approve",
+"comment": ""
+},
+{
+"i": 16,
+"en": "Approve, auto-accept edits",
+"comment": ""
+},
+{
+"i": 17,
+"en": "Approve, bypass permissions",
+"comment": ""
+},
+{
+"i": 18,
+"en": "Approve (manual edits)",
+"comment": ""
+},
+{
+"i": 19,
+"en": "Approve as ultraplan",
+"comment": ""
+},
+{
+"i": 20,
+"en": "More approval modes",
+"comment": ""
+},
+{
+"i": 21,
+"en": "Allow All This Session",
+"comment": ""
+},
+{
+"i": 22,
+"en": "Bypass Permissions",
+"comment": ""
+},
+{
+"i": 23,
+"en": "More permission options",
+"comment": ""
+},
+{
+"i": 24,
+"en": "Select all that apply",
+"comment": ""
+},
+{
+"i": 25,
+"en": "Submit all answers",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Reply not sent.",
+"comment": ""
+},
+{
+"i": 27,
+"en": "Open Terminal",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Couldn’t confirm your reply was sent. Check the terminal before retrying.",
+"comment": ""
+},
+{
+"i": 29,
+"en": "Replied",
+"comment": ""
+},
+{
+"i": 30,
+"en": "Sending…",
+"comment": ""
+},
+{
+"i": 31,
+"en": "said",
+"comment": ""
+},
+{
+"i": 32,
+"en": "proposed a plan",
+"comment": ""
+},
+{
+"i": 33,
+"en": "asked a question",
+"comment": ""
+},
+{
+"i": 34,
+"en": "finished a turn",
+"comment": ""
+},
+{
+"i": 35,
+"en": "updated the plan checklist",
+"comment": ""
+},
+{
+"i": 36,
+"en": "a tool",
+"comment": ""
+},
+{
+"i": 37,
+"en": "sent an update",
+"comment": ""
+},
+{
+"i": 38,
+"en": "Allowed all",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Always allowed",
+"comment": ""
+},
+{
+"i": 40,
+"en": "Allowed once",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Permissions bypassed",
+"comment": ""
+},
+{
+"i": 42,
+"en": "Expired unanswered",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Plan approved",
+"comment": ""
+},
+{
+"i": 44,
+"en": "The event’s computer, workspace, or tab is no longer available.",
+"comment": ""
+},
+{
+"i": 45,
+"en": "Couldn’t open event",
+"comment": ""
+},
+{
+"i": 46,
+"en": "Run a coding agent in cmux on your Mac and its activity streams here.",
+"comment": ""
+},
+{
+"i": 47,
+"en": "No Agent Activity Yet",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Agent questions, permission requests, and plan approvals will appear here the moment they need you.",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Nothing Needs You",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Filter",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Showing the latest activity synced from your Macs.",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Feed is offline",
+"comment": ""
+},
+{
+"i": 53,
+"en": "The connected Mac's cmux predates the agent Feed. Update it to stream agent activity here.",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Update cmux on Your Mac",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Connect to a Mac to see its agent activity.",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Feed Unavailable",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Some paired Macs can’t stream agent activity yet.",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Update cmux on your Mac",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Drag in a direction to send arrow keys.",
+"comment": ""
+},
+{
+"i": 60,
+"en": "Arrow pad",
+"comment": ""
+},
+{
+"i": 61,
+"en": "Uploading AI account credentials is disabled by your organization.",
+"comment": ""
+},
+{
+"i": 62,
+"en": "cmux did not upload the file. Your organization's device policy disables file transfer through cmux.",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Change agent updates",
+"comment": ""
+},
+{
+"i": 64,
+"en": "Update network access",
+"comment": ""
+},
+{
+"i": 65,
+"en": "just now",
+"comment": ""
+},
+{
+"i": 66,
+"en": "Another account",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Not seen yet",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Agent updates need %@, which this network policy blocks. Allow it or updates will fail.",
+"comment": ""
+},
+{
+"i": 69,
+"en": "%@ is already in the list.",
+"comment": ""
+},
+{
+"i": 70,
+"en": "“%@” is not a host name.",
+"comment": ""
+},
+{
+"i": 71,
+"en": "The port must be a number from 1 to 65535.",
+"comment": ""
+},
+{
+"i": 72,
+"en": "“%@” is not an IPv4 or IPv6 range.",
+"comment": ""
+},
+{
+"i": 73,
+"en": "%@ is not in the list.",
+"comment": ""
+},
+{
+"i": 74,
+"en": "The note is too long.",
+"comment": ""
+},
+{
+"i": 75,
+"en": "The domain list is full.",
+"comment": ""
+},
+{
+"i": 76,
+"en": "The IP range list is full.",
+"comment": ""
+},
+{
+"i": 77,
+"en": "Unknown preset “%@”.",
+"comment": ""
+},
+{
+"i": 78,
+"en": "“%@”: wildcards are not supported yet. List each exact name.",
+"comment": ""
+},
+{
+"i": 79,
+"en": "Allowlist",
+"comment": ""
+},
+{
+"i": 80,
+"en": "Only the domains and IP ranges you list, plus what cmux needs.",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Full internet",
+"comment": ""
+},
+{
+"i": 82,
+"en": "The machine can reach any public address.",
+"comment": ""
+},
+{
+"i": 83,
+"en": "No internet",
+"comment": ""
+},
+{
+"i": 84,
+"en": "No outbound access except what cmux itself needs.",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Could not apply",
+"comment": ""
+},
+{
+"i": 86,
+"en": "Applying…",
+"comment": ""
+},
+{
+"i": 87,
+"en": "This machine's provider does not support outbound network rules.",
+"comment": ""
+},
+{
+"i": 88,
+"en": "DEV",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Nightly",
+"comment": ""
+},
+{
+"i": 90,
+"en": "RC",
+"comment": ""
+},
+{
+"i": 91,
+"en": "Staging",
+"comment": ""
+},
+{
+"i": 92,
+"en": "Presets: %1$@ · Domains: %2$@ · IP ranges: %3$@",
+"comment": ""
+},
+{
+"i": 93,
+"en": "Allow DNS lookups",
+"comment": ""
+},
+{
+"i": 94,
+"en": "Listed domains work without DNS. Open DNS lets tools resolve names for IP ranges, but DNS is also an outbound channel.",
+"comment": ""
+},
+{
+"i": 95,
+"en": "Domains (HTTPS)",
+"comment": ""
+},
+{
+"i": 96,
+"en": "e.g. api.example.com",
+"comment": ""
+},
+{
+"i": 97,
+"en": "Outbound access",
+"comment": ""
+},
+{
+"i": 98,
+"en": "Quick add",
+"comment": ""
+},
+{
+"i": 99,
+"en": "IP ranges",
+"comment": ""
+},
+{
+"i": 100,
+"en": "e.g. 203.0.113.0/24",
+"comment": ""
+},
+{
+"i": 101,
+"en": "Protocol",
+"comment": ""
+},
+{
+"i": 102,
+"en": "Always allowed so cmux keeps working: %@.",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Changes apply without restarting the machine.",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Loading the network policy…",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Network for %@",
+"comment": ""
+},
+{
+"i": 106,
+"en": "Network",
+"comment": ""
+},
+{
+"i": 107,
+"en": "When you connect, at most once a day, the machine updates Claude Code, Codex, OpenCode, Pi, and agent-browser from each tool's official GitHub release. A release installs only after it has been public for 3 days, and never as a downgrade.",
+"comment": ""
+},
+{
+"i": 108,
+"en": "How agents stay up to date",
+"comment": ""
+},
+{
+"i": 109,
+"en": "Each machine is its own microVM. You have root inside it. Model API keys stay at the network edge and never enter the machine. Outbound access follows the Network setting.",
+"comment": ""
+},
+{
+"i": 110,
+"en": "How machines are isolated",
+"comment": ""
+},
+{
+"i": 111,
+"en": "Learn more",
+"comment": ""
+},
+{
+"i": 112,
+"en": "Machine Details",
+"comment": ""
+},
+{
+"i": 113,
+"en": "No cloud machines yet",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Copy Device ID",
+"comment": ""
+},
+{
+"i": 115,
+"en": "Keep Agents Up to Date",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Network…",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Refresh Cloud Machines",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Connecting to your development backend…",
+"comment": ""
+},
+{
+"i": 119,
+"en": "The development backend took too long to start. Try again.",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Cannot reach the development backend. Check that Tailscale is connected, then try again.",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Cloud machine",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Loading network options…",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Network options could not be loaded. The machine gets full internet access; change it later with Network… in the machine menu.",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Keep coding agents up to date",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Agents pinned",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Agents auto-update",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Keep up to date",
+"comment": ""
+},
+{
+"i": 128,
+"en": "No size available",
+"comment": ""
+},
+{
+"i": 129,
+"en": "%@ requires `id`. Run `cmux vm ls` to find one.",
+"comment": ""
+},
+{
+"i": 130,
+"en": "vm.agent_updates_set `agent_updates` must be latest or image.",
+"comment": ""
+},
+{
+"i": 131,
+"en": "vm.network_update requires at least one edit.",
+"comment": ""
+},
+{
+"i": 132,
+"en": "vm.network_update received an edit it does not understand. Use `cmux vm network --help`.",
+"comment": ""
+},
+{
+"i": 133,
+"en": "vm.create `agent_updates` must be latest or image.",
+"comment": ""
+},
+{
+"i": 134,
+"en": "vm.create `network_policy` must be an object with a mode of full, allowlist, or none.",
+"comment": ""
+},
+{
+"i": 135,
+"en": "Sidebar extension",
+"comment": ""
+},
+{
+"i": 136,
+"en": "The other Mac could not complete this action. Check its connection and try again.",
+"comment": ""
+},
+{
+"i": 137,
+"en": "This Mac did not confirm it is signed into your account.",
+"comment": ""
+},
+{
+"i": 138,
+"en": "The Mac sent an unexpected reply. Update cmux on both Macs and try again.",
+"comment": ""
+},
+{
+"i": 139,
+"en": "This Mac is not connected right now.",
+"comment": ""
+},
+{
+"i": 140,
+"en": "Custom terminal options are not supported when creating a terminal on another Mac.",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Signed in as a different account",
+"comment": ""
+},
+{
+"i": 142,
+"en": "This terminal has no remote workspace.",
+"comment": ""
+},
+{
+"i": 143,
+"en": "Some terminal input was not sent because this Mac requires UTF-8 text.",
+"comment": ""
+},
+{
+"i": 144,
+"en": "Some terminal input was not sent because the connection could not keep up. Wait and try again.",
+"comment": ""
+},
+{
+"i": 145,
+"en": "Upgrade Plan",
+"comment": ""
+},
+{
+"i": 146,
+"en": "%.0f vCPU",
+"comment": ""
+},
+{
+"i": 147,
+"en": "Cannot close the last surface",
+"comment": ""
+},
+{
+"i": 148,
+"en": "Terminal surface not found",
+"comment": ""
+},
+{
+"i": 149,
+"en": "Warn Before Closing Active Agent Session",
+"comment": ""
+},
+{
+"i": 150,
+"en": "Closing an agent during a turn asks for confirmation.",
+"comment": ""
+},
+{
+"i": 151,
+"en": "%@ is still working. This will close the current tab.",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Answer",
+"comment": ""
+},
+{
+"i": 153,
+"en": "Choose an option or write an answer for each prompt.",
+"comment": ""
+},
+{
+"i": 154,
+"en": "Answer questions",
+"comment": ""
+},
+{
+"i": 155,
+"en": "Needs your input",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Choose one",
+"comment": ""
+},
+{
+"i": 157,
+"en": "%lld questions",
+"comment": ""
+},
+{
+"i": 158,
+"en": "Question %lld",
+"comment": ""
+},
+{
+"i": 159,
+"en": "Question %lld of %lld",
+"comment": ""
+},
+{
+"i": 160,
+"en": "%lld of %lld answered",
+"comment": ""
+},
+{
+"i": 161,
+"en": "%@ asked for credentials and cmux has nowhere to type them. Log in to the host, then try again.",
+"comment": ""
+},
+{
+"i": 162,
+"en": "Sign-in failed. Run the command above again to retry.",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Signed in. Reconnecting the mirror…",
+"comment": ""
+},
+{
+"i": 164,
+"en": "transport_port must be between 1 and 65535",
+"comment": ""
+},
+{
+"i": 165,
+"en": "transport_helper_path must be an absolute path without control or hidden characters",
+"comment": ""
+},
+{
+"i": 166,
+"en": "transport_helper_path is not supported by the selected transport",
+"comment": ""
+},
+{
+"i": 167,
+"en": "transport_helper_path cannot be used with a broker; the broker supplies the remote helper",
+"comment": ""
+},
+{
+"i": 168,
+"en": "transport is not one cmux knows; use ssh or et",
+"comment": ""
+},
+{
+"i": 169,
+"en": "transport_broker is not a usable name: %@",
+"comment": ""
+},
+{
+"i": 170,
+"en": "the '%@' transport does not use a broker; pass --transport et to connect through one",
+"comment": ""
+},
+{
+"i": 171,
+"en": "no broker named '%@' is declared under remoteTmux.brokers in cmux.json",
+"comment": ""
+},
+{
+"i": 172,
+"en": "broker '%@' is declared but cannot be used: %@",
+"comment": ""
+},
+{
+"i": 173,
+"en": "Restoring…",
+"comment": ""
+},
+{
+"i": 174,
+"en": "--transport-helper-path <path>  Absolute path to etterminal on the remote host (direct ET only). Omit to use ET's PATH lookup; a broker supplies its own helper path.",
+"comment": ""
+},
+{
+"i": 175,
+"en": "ssh-tmux: --transport-helper-path requires an absolute path",
+"comment": ""
+},
+{
+"i": 176,
+"en": "This host is already connected through a different route; detach it before changing the route.",
+"comment": ""
+},
+{
+"i": 177,
+"en": "This host is already connected with a different helper path; detach it before changing the helper path.",
+"comment": ""
+},
+{
+"i": 178,
+"en": "%1$@ is not supported by the app on %2$@. The CLI and the app come from different builds.",
+"comment": ""
+},
+{
+"i": 179,
+"en": "This CLI: %@",
+"comment": ""
+},
+{
+"i": 180,
+"en": "Connected app: %@",
+"comment": ""
+},
+{
+"i": 181,
+"en": "Fix: %@",
+"comment": ""
+},
+{
+"i": 182,
+"en": "This socket belongs to %1$@, which has its own CLI. Run %2$@, or put its directory first on PATH.",
+"comment": ""
+},
+{
+"i": 183,
+"en": "This socket belongs to %@, which has its own CLI. Run the cmux CLI inside that app's bundle (Contents/Resources/bin/cmux).",
+"comment": ""
+},
+{
+"i": 184,
+"en": "This CLI is older than the app. Run the app's CLI, %@, or remove the older cmux from PATH.",
+"comment": ""
+},
+{
+"i": 185,
+"en": "The running app is older than this CLI. Quit and reopen cmux to finish an installed update, or update it with cmux > Check for Updates.",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Could not read the app's version. Compare it in cmux > About cmux with this CLI, then relaunch or update the older one.",
+"comment": ""
+},
+{
+"i": 187,
+"en": "unknown (it does not answer system.identify)",
+"comment": ""
+},
+{
+"i": 188,
+"en": "%@, a build that does not report its version",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Computer Use is unavailable in this dev build. Install cmux NIGHTLY to use it.",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Usage:\n  cmux vm ls [--json]\n  cmux vm list [--json]\n\nList your Cloud VMs, their state, provider, image, and plan usage.",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Usage:\n  cmux vm new [--size <4g|8g|16g|24g|32g|64g>] [--agent-updates <latest|image>]\n              [--name <label>] [--provider <provider>] [--image <image-id>]\n              [--workspace <workspace-id>] [--network <full|allowlist|none>]\n              [--focus|--no-focus] [--detach|-d]\n\nCreate a Cloud VM. Pro supports sizes through 16g; 24g, 32g, and 64g require Max.\nThe server enforces plan limits and shared CPU and memory pools.\n`--detach` creates the machine without opening its workspace.",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Usage:\n  cmux vm ports <machine> [--json]\n\nShow listening TCP ports inside a Cloud VM.",
+"comment": ""
+},
+{
+"i": 193,
+"en": "Could not create a workspace on this Cloud VM. Wake the machine or retry `cmux vm workspace new`.",
+"comment": ""
+},
+{
+"i": 194,
+"en": "The Cloud connection client is unavailable in this build. Use a build with Cloud support or contact support.",
+"comment": ""
+},
+{
+"i": 195,
+"en": "Cloud service",
+"comment": ""
+},
+{
+"i": 196,
+"en": "The Cloud connection did not report a socket within the connect timeout.",
+"comment": ""
+},
+{
+"i": 197,
+"en": "The Cloud service returned an unversioned or malformed session snapshot for %@.",
+"comment": ""
+},
+{
+"i": 198,
+"en": "%@ has no remote workspace yet.",
+"comment": ""
+},
+{
+"i": 199,
+"en": "The Cloud service did not report the new terminal: %@",
+"comment": ""
+},
+{
+"i": 200,
+"en": "Cloud connection exited with status %@",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Cloud connection could not be started: %@",
+"comment": ""
+},
+{
+"i": 202,
+"en": "Cross-team My Devices",
+"comment": ""
+},
+{
+"i": 203,
+"en": "Finds and connects your Macs signed in to the same account even when they selected different teams.",
+"comment": ""
+},
+{
+"i": 204,
+"en": "The Cloud VM connection is unavailable. Wake the machine or retry the command.",
+"comment": ""
+},
+{
+"i": 205,
+"en": "This version of macOS cannot report whether the page handled this Edit shortcut, so the key was not sent and the command did not run.",
+"comment": ""
+},
+{
+"i": 206,
+"en": "A browser REPL session typed a secret into this tab, so other clients cannot read or drive it until it closes. Use `cmux browser repl` to drive it.",
+"comment": ""
+},
+{
+"i": 207,
+"en": "This tab belongs to a browser REPL session, which is driving it, so other clients cannot read or drive it. Use `cmux browser repl` to drive it.",
+"comment": ""
+},
+{
+"i": 208,
+"en": "cmux could not trace this process to a cmux terminal or to outside cmux (its parent process chain is too deep or loops); run the REPL call from a shallower process",
+"comment": ""
+},
+{
+"i": 209,
+"en": "--all-workspaces is refused in a cmux terminal: a REPL call from a cmux terminal acts only on its own workspace's sessions",
+"comment": ""
+},
+{
+"i": 210,
+"en": "A REPL call from a cmux terminal acts only on its own workspace's sessions; run it from a terminal of that workspace",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Not a workspace in this cmux instance",
+"comment": ""
+},
+{
+"i": 212,
+"en": "One-time code",
+"comment": ""
+},
+{
+"i": 213,
+"en": "Username or email",
+"comment": ""
+},
+{
+"i": 214,
+"en": "A REPL session owner token is 1 to 128 bytes",
+"comment": ""
+},
+{
+"i": 215,
+"en": "The working directory path is longer than 1024 bytes; cd to a shorter path and run the command again",
+"comment": ""
+},
+{
+"i": 216,
+"en": "--timeout must be 1 to 600000 milliseconds (10 minutes)",
+"comment": ""
+},
+{
+"i": 217,
+"en": "A REPL call's timeout is at most 600000 milliseconds (10 minutes)",
+"comment": ""
+},
+{
+"i": 218,
+"en": "That REPL session belongs to another client; name a session with --session to share one",
+"comment": ""
+},
+{
+"i": 219,
+"en": "The browser REPL accepts only clients that run as the same macOS user as cmux",
+"comment": ""
+},
+{
+"i": 220,
+"en": "A session name is 1 to 64 characters: letters, digits, '.', '_' and '-'",
+"comment": ""
+},
+{
+"i": 221,
+"en": "Too many private browser REPL sessions are open (runs without --session); only the client that started one can reset it, so quit REPL clients you no longer use or wait 30 minutes for idle ones to end, or pass --session NAME to use a named session",
+"comment": ""
+},
+{
+"i": 222,
+"en": "Too many browser REPL sessions are open; reset one with `cmux browser repl reset NAME` (`cmux browser repl list` lists this workspace's; from outside cmux, `cmux browser repl list --all-workspaces` lists every one)",
+"comment": ""
+},
+{
+"i": 223,
+"en": "vault fork takes --checkpoint <id> or --turn <n>, not both",
+"comment": ""
+},
+{
+"i": 224,
+"en": "Pass checkpoint or turn, not both.",
+"comment": ""
+},
+{
+"i": 225,
+"en": "Could not confirm your cmux sign-in. Try again in a moment.",
+"comment": ""
+},
+{
+"i": 226,
+"en": "See the machine’s desktop",
+"comment": ""
+},
+{
+"i": 227,
+"en": "Invite your team",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Create machines in seconds",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Work together on one machine",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Pause",
+"comment": ""
+},
+{
+"i": 231,
+"en": "Play",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Needs permission",
+"comment": ""
+},
+{
+"i": 233,
+"en": "Needs an answer",
+"comment": ""
+},
+{
+"i": 234,
+"en": "Needs sign-in",
+"comment": ""
+},
+{
+"i": 235,
+"en": "Listing tmux sessions on %@… (waits while the login is in progress; Ctrl-C to stop)",
+"comment": ""
+},
+{
+"i": 236,
+"en": "No tmux sessions found on %@.",
+"comment": ""
+},
+{
+"i": 237,
+"en": "NAME  WINDOWS  ATTACHED",
+"comment": ""
+},
+{
+"i": 238,
+"en": "cmux could not install the selected agent integration because its plugin directory is already in use.",
+"comment": ""
+},
+{
+"i": 239,
+"en": "cmux could not install the selected agent integration. Reinstall cmux or run the hook installation command again.",
+"comment": ""
+},
+{
+"i": 240,
+"en": "vm resize: this target needs %lld vCPUs and %lld GiB RAM, but only %lld vCPUs and %lld GiB are free in your plan pool. Pause or delete a VM, or choose a smaller size.",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Founder's Edition",
+"comment": ""
+},
+{
+"i": 242,
+"en": "vm resize: the %@ plan cannot resize %@ to %@; its maximum is %@. %@",
+"comment": ""
+},
+{
+"i": 243,
+"en": "Choose a smaller size.",
+"comment": ""
+},
+{
+"i": 244,
+"en": "Upgrade to cmux Pro to use this size.",
+"comment": ""
+},
+{
+"i": 245,
+"en": "Upgrade to cmux Max to use larger sizes.",
+"comment": ""
+},
+{
+"i": 246,
+"en": "vm resize: could not refresh plan limits before resizing; no changes were made.",
+"comment": ""
+},
+{
+"i": 247,
+"en": "vm resize: the server returned incomplete plan capacity data; retry after refreshing your Cloud machines.",
+"comment": ""
+},
+{
+"i": 248,
+"en": "vm resize: %@ is already %@; choose a larger size.",
+"comment": ""
+},
+{
+"i": 249,
+"en": "disk",
+"comment": ""
+},
+{
+"i": 250,
+"en": "memory",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Muse Code",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Show Cloud and Device Icons in Sidebar",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Display the cloud machine or device icon independently of Git branch and directory details.",
+"comment": ""
+},
+{
+"i": 254,
+"en": "CodeRouter Setup",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Could not open a local workspace for CodeRouter setup.",
+"comment": ""
+},
+{
+"i": 256,
+"en": "Account settings are still loading for this team. Try again in a moment.",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Select a local workspace before adding a coding agent account.",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Get started",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Start with the account you already use, then add another when you need more capacity or a backup.",
+"comment": ""
+},
+{
+"i": 260,
+"en": "Tip",
+"comment": ""
+},
+{
+"i": 261,
+"en": "Coderouter chooses a healthy team account for each request and moves sessions when another account reaches its limit.",
+"comment": ""
+},
+{
+"i": 262,
+"en": "Keep agents moving",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Add an account here once. Cloud machines in this team can use it without copying a provider key into every machine.",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Set up once",
+"comment": ""
+},
+{
+"i": 265,
+"en": "Why use coderouter?",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Agent Session",
+"comment": ""
+},
+{
+"i": 267,
+"en": "Claude",
+"comment": ""
+},
+{
+"i": 268,
+"en": "Jump to Last Prompt",
+"comment": ""
+},
+{
+"i": 269,
+"en": "Usage: cmux jump-to-last-prompt\n\nFocus the surface where you last submitted a prompt to a coding agent, switching workspace and window as needed. With --json, opened is false when there is none.\n\nFlags:\n  --json                Print JSON\n  --id-format <mode>    refs, uuids, or both",
+"comment": ""
+},
+{
+"i": 270,
+"en": "No prompt target",
+"comment": ""
+},
+{
+"i": 271,
+"en": "The SSH port forward ended before it was ready. Reload to reconnect.",
+"comment": ""
+},
+{
+"i": 272,
+"en": "HTTPS services on an SSH host can't open in the browser yet. Use http:// instead.",
+"comment": ""
+},
+{
+"i": 273,
+"en": "Focus Pane 1…9",
+"comment": ""
+},
+{
+"i": 274,
+"en": "Click by Hint",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Labels every clickable control in the window so typing a label clicks it.",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Focus Sidebar",
+"comment": ""
+},
+{
+"i": 277,
+"en": "No devices yet",
+"comment": ""
+},
+{
+"i": 278,
+"en": "%@ can’t open as a pane",
+"comment": ""
+},
+{
+"i": 279,
+"en": "SSH authentication failed. Automatic reconnect paused; use Reconnect to try again.",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Introducing",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Introducing cmux cloud",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Watch agents drive a real browser on the machine.",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Add teammates by email to your team’s machines.",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Close your laptop. Your agents keep working.",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Give every agent task its own machine, ready in seconds.",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Work on the same machine as your teammates, live.",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Already included in your plan.",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Cloud machines for your agents",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Show Cloud Welcome (F, New Badge)…",
+"comment": ""
+},
+{
+"i": 290,
+"en": "Show Cloud Welcome (F, On Clip)…",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Show Cloud Welcome (Headline)…",
+"comment": ""
+},
+{
+"i": 292,
+"en": "tmux new-session failed on the remote host. No workspace was created.",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Couldn't Create a tmux Session on %@",
+"comment": ""
+},
+{
+"i": 294,
+"en": "New Local Workspace",
+"comment": ""
+},
+{
+"i": 295,
+"en": "The session was created, but cmux couldn't attach to it. It is still running on the host.",
+"comment": ""
+},
+{
+"i": 296,
+"en": "The session was created, but cmux couldn't attach to it, so it was removed from the host.",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Couldn't Open the New tmux Session on %@",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Cloud browsers are unavailable on this machine. Refresh the machine and retry.",
+"comment": ""
+},
+{
+"i": 299,
+"en": "No pending dialog",
+"comment": ""
+}
+]

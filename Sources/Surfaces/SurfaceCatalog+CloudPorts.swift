@@ -20,7 +20,7 @@ extension SurfaceCatalog {
         String(
             format: String(
                 localized: "cloudTree.port.unsupported",
-                defaultValue: "%@’s provider cannot open machine ports as previews; reach the service from inside the machine with `cmux vm exec %@ -- …`."
+                defaultValue: "%@’s provider cannot open machine ports as previews; reach the service from inside the machine with `shellx vm exec %@ -- …`."
             ),
             machineID,
             machineID

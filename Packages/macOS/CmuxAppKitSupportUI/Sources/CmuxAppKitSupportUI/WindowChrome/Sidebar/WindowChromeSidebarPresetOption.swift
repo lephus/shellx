@@ -74,7 +74,8 @@ public enum WindowChromeSidebarPresetOption: String, CaseIterable, Identifiable,
     /// Tint hex selected by this preset.
     public var tintHex: String {
         switch self {
-        case .nativeSidebar: return "#000000"
+        // ShellX: the default preset paints the opaque `panel` token.
+        case .nativeSidebar: return WindowChromeSidebarTintDefaults.shellXPanelHex
         case .glassBehind: return "#000000"
         case .softBlur: return "#000000"
         case .popoverGlass: return "#000000"
@@ -86,7 +87,7 @@ public enum WindowChromeSidebarPresetOption: String, CaseIterable, Identifiable,
     /// Tint opacity selected by this preset.
     public var tintOpacity: Double {
         switch self {
-        case .nativeSidebar: return 0.18
+        case .nativeSidebar: return WindowChromeSidebarTintDefaults().opacity
         case .glassBehind: return 0.36
         case .softBlur: return 0.28
         case .popoverGlass: return 0.10

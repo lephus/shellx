@@ -1,6 +1,7 @@
 public import AppKit
 public import Foundation
 public import SwiftUI
+import ShellXBrand
 
 /// The one accent for cmux-drawn chrome: the color that means "this is the
 /// active or attention-worthy thing" (selected workspace, attention ring,
@@ -25,7 +26,7 @@ public struct CmuxAccentColor: Sendable, Hashable {
     public let mode: CmuxAccentColorMode
 
     /// Normalized `#RRGGBB` color drawn in ``CmuxAccentColorMode/custom``
-    /// mode. `nil` there falls back to cmux blue.
+    /// mode. `nil` there falls back to the built-in accent.
     public let customHex: String?
 
     public init(mode: CmuxAccentColorMode = .defaultValue) {
@@ -45,14 +46,11 @@ public struct CmuxAccentColor: Sendable, Hashable {
         )
     }
 
-    /// cmux's own blue for a light or dark appearance.
-    public static func cmuxBlue(isDark: Bool) -> NSColor {
-        NSColor(
-            srgbRed: 0,
-            green: (isDark ? 145.0 : 136.0) / 255.0,
-            blue: 1.0,
-            alpha: 1.0
-        )
+    /// The built-in accent ("ShellX Blue"): `ShellXPalette.primary`
+    /// (#60a5fa). ShellX is dark-only, so both schemes draw the same color;
+    /// `isDark` stays for call-site compatibility.
+    public static func cmuxBlue(isDark _: Bool) -> NSColor {
+        ShellXPalette.primary.nsColor
     }
 
     /// The accent for a light or dark appearance.

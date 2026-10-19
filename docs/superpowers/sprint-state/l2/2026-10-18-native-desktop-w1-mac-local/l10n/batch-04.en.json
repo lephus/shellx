@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Invalid Simulator application bundle identifier: %@",
+"comment": ""
+},
+{
+"i": 1,
+"en": "Simulator coordinates must be numbers from 0 through 1",
+"comment": ""
+},
+{
+"i": 2,
+"en": "simulator gesture requires a JSON touch object or array",
+"comment": ""
+},
+{
+"i": 3,
+"en": "simulator highlight requires on or off",
+"comment": ""
+},
+{
+"i": 4,
+"en": "Camera mirror mode must be auto, on, or off",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Invalid Simulator parameters",
+"comment": ""
+},
+{
+"i": 6,
+"en": "The Simulator permission action or service is invalid",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Invalid value '%@' for Simulator permission %@",
+"comment": ""
+},
+{
+"i": 8,
+"en": "Simulator tools action must be show, hide, or toggle",
+"comment": ""
+},
+{
+"i": 9,
+"en": "The Simulator interface option or value is invalid",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Invalid value '%@' for Simulator interface option %@",
+"comment": ""
+},
+{
+"i": 11,
+"en": "simulator input must be valid UTF-8",
+"comment": ""
+},
+{
+"i": 12,
+"en": "Simulator keyboard input is unavailable",
+"comment": ""
+},
+{
+"i": 13,
+"en": "simulator: %@ requires a value",
+"comment": ""
+},
+{
+"i": 14,
+"en": "No active cmux window",
+"comment": ""
+},
+{
+"i": 15,
+"en": "The selected Simulator is not streaming",
+"comment": ""
+},
+{
+"i": 16,
+"en": "The Simulator operation was cancelled",
+"comment": ""
+},
+{
+"i": 17,
+"en": "The Simulator operation failed",
+"comment": ""
+},
+{
+"i": 18,
+"en": "The Simulator operation did not complete before the deadline",
+"comment": ""
+},
+{
+"i": 19,
+"en": "This Simulator operation is unavailable",
+"comment": ""
+},
+{
+"i": 20,
+"en": "The Simulator pane closed before the operation started",
+"comment": ""
+},
+{
+"i": 21,
+"en": "The Simulator worker returned no permission status",
+"comment": ""
+},
+{
+"i": 22,
+"en": "Simulator control is unavailable in remote workspaces",
+"comment": ""
+},
+{
+"i": 23,
+"en": "No Simulator surface was found",
+"comment": ""
+},
+{
+"i": 24,
+"en": "simulator input requires a positional value, --stdin, or --file",
+"comment": ""
+},
+{
+"i": 25,
+"en": "simulator input sources are mutually exclusive",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Surface not found",
+"comment": ""
+},
+{
+"i": 27,
+"en": "The target surface is not a Simulator",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Text must not be empty",
+"comment": ""
+},
+{
+"i": 29,
+"en": "Text exceeds the %lld-byte UTF-8 limit",
+"comment": ""
+},
+{
+"i": 30,
+"en": "Too many Simulator operations are already running",
+"comment": ""
+},
+{
+"i": 31,
+"en": "Simulator input transmission is unavailable",
+"comment": ""
+},
+{
+"i": 32,
+"en": "simulator input accepts one quoted positional value",
+"comment": ""
+},
+{
+"i": 33,
+"en": "simulator %@ does not accept input",
+"comment": ""
+},
+{
+"i": 34,
+"en": "Unknown Simulator hardware button: %@",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Unknown Core Animation diagnostic: %@",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Unknown Simulator camera source: %@",
+"comment": ""
+},
+{
+"i": 37,
+"en": "simulator: unknown flag '%@'",
+"comment": ""
+},
+{
+"i": 38,
+"en": "Unknown Simulator orientation: %@",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Unknown or unsupported Simulator permission: %@",
+"comment": ""
+},
+{
+"i": 40,
+"en": "Unknown simulator subcommand: %@",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Unknown Simulator touch edge: %@",
+"comment": ""
+},
+{
+"i": 42,
+"en": "Unknown Simulator touch phase: %@",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Unknown Simulator interface option: %@",
+"comment": ""
+},
+{
+"i": 44,
+"en": "Text contains a character unsupported by Simulator input",
+"comment": ""
+},
+{
+"i": 45,
+"en": "No Web Inspector target is attached",
+"comment": ""
+},
+{
+"i": 46,
+"en": "The Web Inspector operation failed",
+"comment": ""
+},
+{
+"i": 47,
+"en": "The Web Inspector session could not be released",
+"comment": ""
+},
+{
+"i": 48,
+"en": "The Web Inspector target was not found",
+"comment": ""
+},
+{
+"i": 49,
+"en": "The Web Inspector operation did not complete before the deadline",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Native Web Inspector is unavailable",
+"comment": ""
+},
+{
+"i": 51,
+"en": "The Simulator worker stopped before completing the operation",
+"comment": ""
+},
+{
+"i": 52,
+"en": "The Simulator worker did not respond before the deadline",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Workspace not found",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Accessibility results reached the 500-element limit",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Set %@ to %@",
+"comment": ""
+},
+{
+"i": 56,
+"en": "No foreground application",
+"comment": ""
+},
+{
+"i": 57,
+"en": "No interface settings",
+"comment": ""
+},
+{
+"i": 58,
+"en": "No permission values",
+"comment": ""
+},
+{
+"i": 59,
+"en": "No Web Inspector targets",
+"comment": ""
+},
+{
+"i": 60,
+"en": "%@ %@ for %@",
+"comment": ""
+},
+{
+"i": 61,
+"en": "Permission results were truncated at 256 applications",
+"comment": ""
+},
+{
+"i": 62,
+"en": "Typed %lld characters",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Usage:\n  cmux simulator permissions list [bundle-id] [--surface <id|ref|index>]\n  cmux simulator permissions grant <permission> <bundle-id> [--value <value>] [--surface <id|ref|index>]\n  cmux simulator permissions revoke <permission> <bundle-id> [--surface <id|ref|index>]\n  cmux simulator permissions reset <permission|all> <bundle-id> [--surface <id|ref|index>]\n\nValues: photos limited; notifications critical; location always, inuse, or never.",
+"comment": ""
+},
+{
+"i": 64,
+"en": "Usage:\n  cmux simulator ui [status] [--surface <id|ref|index>]\n  cmux simulator ui [get] <option> [--surface <id|ref|index>]\n  cmux simulator ui [set] <option> <value> [--surface <id|ref|index>]\n\nOptions: appearance, liquid-glass, color-filter, text-size, reduce-motion, increase-contrast, show-borders, reduce-transparency, voiceover.",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Usage: cmux simulator <subcommand> [args] [--surface <id|ref|index>]\n\nSubcommands:\n  type [text] [--stdin|--file <path>]  Type text and wait for transmission completion\n  tap <x> <y> [x2 y2]                 Send a correlated one- or two-finger tap\n  gesture <json> [--stdin|--file]      Send 1...256 ordered normalized touch events\n  multitouch <json> [--stdin|--file]  Send ordered two-finger touch events\n  swipe <x1> <y1> <x2> <y2> [steps]  Send a sampled swipe\n  button <name>                       Press a Simulator hardware button\n  rotate <orientation>                Rotate to a logical orientation\n  ca <diagnostic> <on|off>             Toggle a Core Animation diagnostic\n  memory-warning                      Simulate a memory warning\n  event-log [limit]                   Print recent Simulator events\n  tools <show|hide|toggle>             Control the Simulator tools inspector\n  camera <configure|switch|mirror|status> ...\n  permissions <list|grant|revoke|reset> ...\n  ui [status|get|set] [option] [value]\n  targets                             Refresh and print Web Inspector targets\n  attach <target-id>                  Attach the native Web Inspector session\n  send [json] [--stdin|--file <path>] Send a raw JSON inspector command\n  highlight <on|off>                  Highlight the attached page\n  release                             Release the attached page\n\nEach command waits for its correlated Simulator-worker result. `send` prints the raw response carrying the same JSON request id.",
+"comment": ""
+},
+{
+"i": 66,
+"en": "Additional inspection commands:\n  accessibility                       Print the bounded native accessibility tree\n  foreground                          Print the foreground application",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Command timed out",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Refusing to choose socket: CMUX_SOCKET_PATH and CMUX_SOCKET differ. Use CMUX_SOCKET_PATH or unset CMUX_SOCKET.",
+"comment": ""
+},
+{
+"i": 69,
+"en": "No live cmux socket found. Tried:",
+"comment": ""
+},
+{
+"i": 70,
+"en": "Failed to write to socket",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Failed to write to socket (%1$@, errno %2$d)",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Invalid UTF-8 response",
+"comment": ""
+},
+{
+"i": 73,
+"en": "Not connected",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Socket response exceeded batch limit",
+"comment": ""
+},
+{
+"i": 75,
+"en": "Socket closed before complete reply",
+"comment": ""
+},
+{
+"i": 76,
+"en": "Socket read error",
+"comment": ""
+},
+{
+"i": 77,
+"en": "Unexpected extra batched socket response",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Workspace not closed",
+"comment": ""
+},
+{
+"i": 79,
+"en": "cmux: default socket %@ is unavailable; using %@.",
+"comment": ""
+},
+{
+"i": 80,
+"en": "ssh: mixed short-option cluster '%@' is not supported after the destination; use --ssh-option for SSH flags or -- for remote command arguments",
+"comment": ""
+},
+{
+"i": 81,
+"en": "[cmux] ssh exited with status %s; reconnecting (attempt %s/%s).",
+"comment": ""
+},
+{
+"i": 82,
+"en": "[cmux] SSH reconnected (attempt %s/%s).",
+"comment": ""
+},
+{
+"i": 83,
+"en": "[cmux] close this pane or press Ctrl-C to stop reconnecting.",
+"comment": ""
+},
+{
+"i": 84,
+"en": "[cmux] the SSH connection ended; the remote session may still be running.",
+"comment": ""
+},
+{
+"i": 85,
+"en": "[cmux] press Enter to close this pane. Press r then Enter to reconnect.",
+"comment": ""
+},
+{
+"i": 86,
+"en": "[cmux] ssh exited with status %s.",
+"comment": ""
+},
+{
+"i": 87,
+"en": "[cmux] Remote SSH advertised an unusable address; resolving the Mosh address through the SSH connection.",
+"comment": ""
+},
+{
+"i": 88,
+"en": "[cmux] Remote bootstrap install failed; continuing over SSH.",
+"comment": ""
+},
+{
+"i": 89,
+"en": "[cmux] Mosh is not installed locally; continuing over SSH.",
+"comment": ""
+},
+{
+"i": 90,
+"en": "[cmux] The local Mosh client lacks required SSH integration; continuing over SSH.",
+"comment": ""
+},
+{
+"i": 91,
+"en": "[cmux] Could not verify remote Mosh support; continuing over SSH.",
+"comment": ""
+},
+{
+"i": 92,
+"en": "[cmux] mosh-server is not installed on the remote host; continuing over SSH.",
+"comment": ""
+},
+{
+"i": 93,
+"en": "[cmux] SSH restore stopped because cmux could not register the connection lifecycle. Reopen this remote workspace to reconnect.",
+"comment": ""
+},
+{
+"i": 94,
+"en": "[cmux] press Enter to close this pane.",
+"comment": ""
+},
+{
+"i": 95,
+"en": "ssh: --transport must be followed by 'ssh' or 'mosh'",
+"comment": ""
+},
+{
+"i": 96,
+"en": "[cmux] remote PTY bridge closed; reattaching (attempt %s/%s).",
+"comment": ""
+},
+{
+"i": 97,
+"en": "[cmux] SSH disconnected (%s); retry %s in %ss; input discarded.",
+"comment": ""
+},
+{
+"i": 98,
+"en": "host unreachable",
+"comment": ""
+},
+{
+"i": 99,
+"en": "SSH authentication/control unavailable",
+"comment": ""
+},
+{
+"i": 100,
+"en": "remote service is starting",
+"comment": ""
+},
+{
+"i": 101,
+"en": "connection interrupted",
+"comment": ""
+},
+{
+"i": 102,
+"en": "remote service made no progress",
+"comment": ""
+},
+{
+"i": 103,
+"en": "SSH terminal input could not be reset; reconnecting.",
+"comment": ""
+},
+{
+"i": 104,
+"en": "SSH terminal input could not enter reconnect mode.",
+"comment": ""
+},
+{
+"i": 105,
+"en": "[cmux] remote PTY bridge closed; reattaching (attempt %s/%s). Input typed while disconnected is discarded.",
+"comment": ""
+},
+{
+"i": 106,
+"en": "[cmux] remote PTY reconnected (attempt %s/%s).",
+"comment": ""
+},
+{
+"i": 107,
+"en": "The SSH terminal connection ended; the remote session may still be running.",
+"comment": ""
+},
+{
+"i": 108,
+"en": "The SSH terminal connection ended while the remote session is still running; cmux is reconnecting.",
+"comment": ""
+},
+{
+"i": 109,
+"en": "ssh-pty-attach: bridge closed without receiving new output while the remote PTY session is still running",
+"comment": ""
+},
+{
+"i": 110,
+"en": "Internal SSH input flush does not accept arguments.",
+"comment": ""
+},
+{
+"i": 111,
+"en": "SSH terminal input could not be discarded safely.",
+"comment": ""
+},
+{
+"i": 112,
+"en": "[cmux] remote PTY bridge made no progress after %s attempt; stopping retries.",
+"comment": ""
+},
+{
+"i": 113,
+"en": "[cmux] remote PTY bridge made no progress after %s attempts; stopping retries.",
+"comment": ""
+},
+{
+"i": 114,
+"en": "The SSH terminal connection ended before the remote session state could be confirmed; preserving the remote session for reconnection.",
+"comment": ""
+},
+{
+"i": 115,
+"en": "[cmux] remote session was lost; starting a new shell.",
+"comment": ""
+},
+{
+"i": 116,
+"en": "SSH reattach stopped because queued terminal input could not be protected.",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Remote PTY session state is unavailable for one or more workspaces.",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Surface handle is blank",
+"comment": ""
+},
+{
+"i": 119,
+"en": "Surface index not found",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Invalid surface handle: %@ (expected UUID, ref like surface:1, or index)",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Surface ref not found: %@",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Usage: cmux surface ls [<machine>|local] [--refresh] [--json]\n       cmux surface open <resource> [--workspace <id|ref|index>] [--pane <id|ref>] [--left|--right|--up|--down|--tab] [--new] [--focus <true|false>]\n       cmux surface new-terminal --machine <id|local> [--cwd <dir>] [--name <name>] [--remote-workspace <ws_…>] [--workspace <id|ref|index>] [--no-open] [-- <command...>]\n       cmux surface resume set [flags] -- <argv...>\n       cmux surface resume set [flags] --shell <command>\n       cmux surface resume show [--json] [flags]\n       cmux surface resume get [--json] [flags]\n       cmux surface resume clear [flags]\n       cmux surface size|participants [--surface <id|ref|index>] [--json]\n       cmux surface size-policy <latest|smallest|largest|priority|fixed> [--cols <n> --rows <n>] [--surface <id|ref|index>]\n       cmux surface size-to-me|disconnect-others [--surface <id|ref|index>]\n       cmux surface size-counts <true|false|auto> [--participant <id>] [--surface <id|ref|index>]\n       cmux surface disconnect-participant <participant-id> [--surface <id|ref|index>]\n\nls / open / new-terminal: the surface catalog. Terminals, VNC screens and browsers\non This Mac and on every cloud machine are resources (`<machine>/<kind>/<key>`,\ne.g. local/terminal/<uuid>, vivid-newt/terminal/term_2f9c…, vivid-newt/display/display:1,\nvivid-newt/browser/port:3000); panes project them. `open` reuses the pane already\nshowing a resource unless --new; --pane with a side splits that pane on that side,\n--tab adds a tab to it. A local terminal moves to the destination (it is shown once).\n`new-terminal` creates a terminal on the machine (cloud: in its cmux-tui session).\n`cmux vm tree` prints the same catalog.\n\nresume: attach restart command metadata to a terminal surface.\nPublic CLI bindings are stored for inspection and manual restore.\n\nFlags:\n  --workspace <id|ref|index>   Workspace context (default: $CMUX_WORKSPACE_ID)\n  --surface <id|ref|index>     Surface context (default: $CMUX_SURFACE_ID)\n  --window <id|ref|index>      Window context for workspace and surface refs/indexes\n  --cwd <path>             Working directory for restore (default: $PWD)\n  --name <name>            Display name for the binding\n  --kind <kind>            Binding kind, for example agent or tmux\n  --checkpoint <id>        Provider checkpoint or session id\n  --checkpoint-id <id>     Same as --checkpoint and takes precedence\n  --source <source>        Binding source label\n\nExamples:\n  cmux surface resume set --kind tmux --shell \"tmux attach -t work\"\n  cmux surface resume set --kind opencode --checkpoint ses_123 -- opencode --session ses_123\n  cmux surface resume show --json",
+"comment": ""
+},
+{
+"i": 123,
+"en": "surface resume set: unknown flag '%1$@'. Known flags: %2$@. Use -- <argv...> for command arguments.",
+"comment": ""
+},
+{
+"i": 124,
+"en": "cmux tmux shim: no downstream tmux executable found",
+"comment": ""
+},
+{
+"i": 125,
+"en": "%@ must be launched from a cmux-managed terminal surface. Open a terminal surface in cmux and run this command there.",
+"comment": ""
+},
+{
+"i": 126,
+"en": "respawn-pane requires -k in cmux tmux compatibility mode",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Usage: cmux todo <subcommand> [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\nPer-workspace checklist shown in the sidebar and todo pane. Targets the\ncaller's workspace by default. Items are capped at 50 per workspace.\n\nNote for coding agents: this checklist belongs to the user. Do not add,\nedit, complete, remove, or replace items on your own initiative — only\nmanage it when the user explicitly asks you to. Use your own internal\ntask tracking for your plans.\n\nSubcommands:\n  add \"text\" [--state <pending|in-progress|completed>] [--origin <user|agent>]\n  list                    Print items (1-based indexes) and progress\n  check <index|id>        Mark an item completed\n  uncheck <index|id>      Mark an item pending\n  start <index|id>        Mark an item in-progress\n  edit <index|id> \"text\"  Rewrite an item's text\n  rm <index|id>           Remove an item\n  clear                   Remove every item\n  set ['<json>']          Atomically replace the whole checklist from a\n                          JSON array of {text, state?, id?, origin?}\n                          objects (inline argument, or piped on stdin).\n                          Items whose id matches an existing item keep\n                          their identity and origin; the rest are created\n                          and unnamed existing items are removed.\n  open                    Open (or focus) the workspace's todo pane\n\n<index> is the 1-based number printed by `cmux todo list`; <id> is the\nitem UUID from `cmux todo list --json`.\n\nExamples:\n  cmux todo add \"write regression test\"\n  cmux todo list\n  cmux todo check 1\n  cmux todo start 2 --workspace workspace:3\n  my-plan-tool --json | cmux todo set\n  cmux todo open\n\nSee also: cmux workspace status",
+"comment": ""
+},
+{
+"i": 128,
+"en": "top: invalid workspace handle '%@'",
+"comment": ""
+},
+{
+"i": 129,
+"en": "cmux top requires a running cmux build that supports process diagnostics",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Administrator privileges were required to modify /usr/local/bin.",
+"comment": ""
+},
+{
+"i": 131,
+"en": "No cmux CLI symlink was found at %@.",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Removed %@.",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Couldn't Uninstall cmux CLI",
+"comment": ""
+},
+{
+"i": 134,
+"en": "cmux CLI Uninstalled",
+"comment": ""
+},
+{
+"i": 135,
+"en": "%1$@ attaches only through its cmux-tui daemon. Run `cmux vm tui %1$@`; if that reports no client, install one with `curl -fsSL https://cmux.com/tui/install-static.sh | sh` or point CMUX_TUI_CLIENT at a binary.",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Created Cloud VM %@",
+"comment": ""
+},
+{
+"i": 137,
+"en": "%@: --command requires <text>",
+"comment": ""
+},
+{
+"i": 138,
+"en": "%@: --command can only be used with --type terminal",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Run this as the new terminal's initial command",
+"comment": ""
+},
+{
+"i": 140,
+"en": "%@ is ready",
+"comment": ""
+},
+{
+"i": 141,
+"en": "%@ has no desktop to show. New machines boot a screen; this one was created shell-only (`--base`).",
+"comment": ""
+},
+{
+"i": 142,
+"en": "%1$d machines on the %2$@ plan, no limit",
+"comment": ""
+},
+{
+"i": 143,
+"en": "%1$d of %#@count2@ on the %3$@ plan",
+"comment": ""
+},
+{
+"i": 144,
+"en": "%d machines",
+"comment": ""
+},
+{
+"i": 145,
+"en": "vm run: provisioned %1$@ but could not record it in the pool store, so later runs will not reuse it. Use `cmux vm run --machine %1$@` to keep using it or `cmux vm rm %1$@` to remove it.",
+"comment": ""
+},
+{
+"i": 146,
+"en": "No cloud machines. Try: cmux vm new",
+"comment": ""
+},
+{
+"i": 147,
+"en": "Your address on the network: %@",
+"comment": ""
+},
+{
+"i": 148,
+"en": "Tunnel is already up.",
+"comment": ""
+},
+{
+"i": 149,
+"en": "Bringing the tunnel up (sudo will prompt for your password)…",
+"comment": ""
+},
+{
+"i": 150,
+"en": "Tunnel is down.",
+"comment": ""
+},
+{
+"i": 151,
+"en": "Enrolled this Mac on your Cloud VM network.",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Tunnel is not up.",
+"comment": ""
+},
+{
+"i": 153,
+"en": "This Mac is unenrolled from your Cloud VM network.",
+"comment": ""
+},
+{
+"i": 154,
+"en": "Refreshed this Mac's tunnel keys.",
+"comment": ""
+},
+{
+"i": 155,
+"en": "Backend: %@",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Config: %@",
+"comment": ""
+},
+{
+"i": 157,
+"en": "Tunnel: down (enrolled; run `cmux vpn up`)",
+"comment": ""
+},
+{
+"i": 158,
+"en": "Interface: %@",
+"comment": ""
+},
+{
+"i": 159,
+"en": "Tunnel: not set up (run `cmux vpn up`)",
+"comment": ""
+},
+{
+"i": 160,
+"en": "Tunnel: up, but for a different enrollment (run `cmux vpn up` to switch it)",
+"comment": ""
+},
+{
+"i": 161,
+"en": "Tunnel: up",
+"comment": ""
+},
+{
+"i": 162,
+"en": "wg-quick is not installed. Install with: brew install wireguard-tools",
+"comment": ""
+},
+{
+"i": 163,
+"en": "The tunnel that is up was brought up for another enrollment (a different account, or older keys). Replacing it with this one (sudo will prompt for your password)…",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Tunnel is up.",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Could not switch the tunnel. Check the command output above, run `cmux vpn down`, then retry `cmux vpn up`.",
+"comment": ""
+},
+{
+"i": 166,
+"en": "(detached — no tab on the machine shows these)",
+"comment": ""
+},
+{
+"i": 167,
+"en": "%.0f GB disk",
+"comment": ""
+},
+{
+"i": 168,
+"en": "link %@",
+"comment": ""
+},
+{
+"i": 169,
+"en": "workspaces/",
+"comment": ""
+},
+{
+"i": 170,
+"en": "asleep — cmux vm open %@ wakes it",
+"comment": ""
+},
+{
+"i": 171,
+"en": "connecting…",
+"comment": ""
+},
+{
+"i": 172,
+"en": "⚠ %@",
+"comment": ""
+},
+{
+"i": 173,
+"en": "retry: cmux vm tree %@ --refresh",
+"comment": ""
+},
+{
+"i": 174,
+"en": "(none yet — cmux vm open %@ starts one)",
+"comment": ""
+},
+{
+"i": 175,
+"en": "(no terminals)",
+"comment": ""
+},
+{
+"i": 176,
+"en": "[agent %@]",
+"comment": ""
+},
+{
+"i": 177,
+"en": "This Mac",
+"comment": ""
+},
+{
+"i": 178,
+"en": "%#@count1@ · %#@count2@",
+"comment": ""
+},
+{
+"i": 179,
+"en": "%d terminals",
+"comment": ""
+},
+{
+"i": 180,
+"en": "%d browsers",
+"comment": ""
+},
+{
+"i": 181,
+"en": "terminals/",
+"comment": ""
+},
+{
+"i": 182,
+"en": "browsers/",
+"comment": ""
+},
+{
+"i": 183,
+"en": "(no terminals open)",
+"comment": ""
+},
+{
+"i": 184,
+"en": "(not in a workspace)",
+"comment": ""
+},
+{
+"i": 185,
+"en": "(open)",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Unknown surface '%@'. See: cmux surface ls --json",
+"comment": ""
+},
+{
+"i": 187,
+"en": "(open: %@)",
+"comment": ""
+},
+{
+"i": 188,
+"en": "desktop  (cmux vm open %@:desktop)",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Displays/",
+"comment": ""
+},
+{
+"i": 190,
+"en": "(+%d hidden)",
+"comment": ""
+},
+{
+"i": 191,
+"en": "↳ tab",
+"comment": ""
+},
+{
+"i": 192,
+"en": "ports/",
+"comment": ""
+},
+{
+"i": 193,
+"en": "Usage: cmux vm tree [<machine>|local] [--refresh] [--json]\n       cmux surface ls [<machine>|local] [--refresh] [--json]\n\nThe Finder-style view of every surface: This Mac first (its terminals grouped by\nworkspace, and its browsers), then each cloud machine — Workspaces, Ports, VNC\nDisplays (one row per screen), and a final Terminals section containing every\nmachine-owned terminal. Every line carries an address `cmux vm open` or\n`cmux surface open` accepts.\n\nOptions:\n  <machine>   Only this machine (`local` for This Mac).\n  --refresh   Re-read every provider (machine list, links, local panes) first.\n  --json      Print the catalog payload ({machines, resources, projections}).",
+"comment": ""
+},
+{
+"i": 194,
+"en": "%1$@ has multiple workspaces named '%2$@'. Use a workspace ID from cmux vm tree %1$@.",
+"comment": ""
+},
+{
+"i": 195,
+"en": "%1$@ has no workspace '%2$@'. See: cmux vm tree %1$@",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Workspace state for %1$@ is unavailable. Reconnect and retry.",
+"comment": ""
+},
+{
+"i": 197,
+"en": "%1$@ has no terminal '%2$@' in workspace '%3$@'. See: cmux vm tree %1$@",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Terminal '%2$@' on %1$@ has no unique tab in workspace '%3$@'. Use cmux vm tree %1$@ and choose an exact placement.",
+"comment": ""
+},
+{
+"i": 199,
+"en": "Terminal placement for %1$@ is unavailable. Reconnect and retry.",
+"comment": ""
+},
+{
+"i": 200,
+"en": "No pool machine is free for %@ — `cmux vm run` would provision a fresh one (add --provision to create it now).",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Started %1$@ on %2$@ — terminal %3$@ in workspace %4$@ (detached: it keeps running if the pane closes).",
+"comment": ""
+},
+{
+"i": 202,
+"en": "Reattach: cmux vm open %1$@/%2$@/%3$@",
+"comment": ""
+},
+{
+"i": 203,
+"en": "%1$d of 1 machine on the %2$@ plan",
+"comment": ""
+},
+{
+"i": 204,
+"en": "Free cloud access expires in %1$@ (%2$@) — upgrade to keep using it: %3$@",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Free cloud access has expired — upgrade to reconnect: %1$@",
+"comment": ""
+},
+{
+"i": 206,
+"en": "cmux vm pull: %1$d/%#@count2@",
+"comment": ""
+},
+{
+"i": 207,
+"en": "%d chunks",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Pulled %1$@:%2$@ to %3$@ (%4$@)",
+"comment": ""
+},
+{
+"i": 209,
+"en": "Skipped: %1$@ (pass --no-default-excludes to send everything)",
+"comment": ""
+},
+{
+"i": 210,
+"en": "cmux vm push: %1$d/%#@count2@",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Pushed %1$@ to %2$@:%3$@ (%4$@)",
+"comment": ""
+},
+{
+"i": 212,
+"en": "[cmux] connection lost — reconnecting (attempt %d)…",
+"comment": ""
+},
+{
+"i": 213,
+"en": "%@ label cleared",
+"comment": ""
+},
+{
+"i": 214,
+"en": "%1$@ is now labeled “%2$@”",
+"comment": ""
+},
+{
+"i": 215,
+"en": "Usage: cmux vm rename <id> <new-label>\n       cmux vm rename <id> --clear\n\nThe label is display-only; the machine id stays its address.\nFind an id:\n  cmux vm ls",
+"comment": ""
+},
+{
+"i": 216,
+"en": "cmux-tui exited with status %1$d. Re-run `cmux vm tui %2$@` to reconnect.",
+"comment": ""
+},
+{
+"i": 217,
+"en": "No cmux-tui client found (searched: %1$@). Install one with `curl -fsSL https://cmux.com/tui/install-static.sh | sh`, or point CMUX_TUI_CLIENT at a binary.",
+"comment": ""
+},
+{
+"i": 218,
+"en": "Connecting to %1$@ through cmux-tui…",
+"comment": ""
+},
+{
+"i": 219,
+"en": "The Cloud machine is still preparing remote access. Try again shortly.",
+"comment": ""
+},
+{
+"i": 220,
+"en": "private network trust",
+"comment": ""
+},
+{
+"i": 221,
+"en": "device already enrolled",
+"comment": ""
+},
+{
+"i": 222,
+"en": "Opened cmux-tui for %1$@ (%2$@)",
+"comment": ""
+},
+{
+"i": 223,
+"en": "cmux-tui protocol mismatch: client %1$@ speaks protocol %2$d, the machine daemon %3$@ speaks protocol %4$d. %5$@",
+"comment": ""
+},
+{
+"i": 224,
+"en": "Update cmux (its bundled cmux-tui client is older than the machine's daemon).",
+"comment": ""
+},
+{
+"i": 225,
+"en": "The machine's cmux-tui daemon is older than this client; reconnect once the machine has updated.",
+"comment": ""
+},
+{
+"i": 226,
+"en": "%1$@ is ready (%2$@) after %#@count3@s",
+"comment": ""
+},
+{
+"i": 227,
+"en": "%d",
+"comment": ""
+},
+{
+"i": 228,
+"en": "%@: --env-file requires <path>",
+"comment": ""
+},
+{
+"i": 229,
+"en": "%@: --env requires KEY=VALUE",
+"comment": ""
+},
+{
+"i": 230,
+"en": "%@: unknown flag '%@'. Known flags: --name <title>, --description <text>, --command <text>, --cwd <path>, --env KEY=VALUE, --env-file <path>, --layout <json>, --window <id|ref|index>, --focus <true|false>, --group <id|ref>, --group-placement <afterCurrent|top|end>, --group-reference <workspace>",
+"comment": ""
+},
+{
+"i": 231,
+"en": "No environment variables",
+"comment": ""
+},
+{
+"i": 232,
+"en": "%@: %@ entry '%@' has an empty key",
+"comment": ""
+},
+{
+"i": 233,
+"en": "%@: %@ entry '%@' must be in KEY=VALUE form",
+"comment": ""
+},
+{
+"i": 234,
+"en": "workspace env: unknown flag '%@'. Known flags: --workspace <id|ref|index>, --window <id|ref|index>, --mask",
+"comment": ""
+},
+{
+"i": 235,
+"en": "%@: could not read --env-file '%@': %@",
+"comment": ""
+},
+{
+"i": 236,
+"en": "Usage: cmux workspace status [set <lane|auto> | cycle] [--workspace <id|ref|index>] [--window <id|ref|index>] [--json]\n\nShow or pin a workspace's todo lifecycle status. Without arguments prints\nthe effective status, the inferred status, and the override, targeting the\ncaller's workspace by default.\n\nLanes are inferred from live signals (agent needs input > agent running >\nopen PR > all PRs merged/closed > dirty git tree > todo). `set <lane>`\npins a manual lane that auto-clears as soon as the inferred lane changes;\n`set auto` clears the pin immediately. `cycle` advances the manual override\none lane forward (todo → working → needs-attention → review → done → todo).\n\nNote for coding agents: manual status pins belong to the user; the lane\nalready tracks your activity automatically. Do not `set` or `cycle` the\nstatus unless the user explicitly asks you to.\n\nLanes: todo, working, needs-attention, review, done\n\nExamples:\n  cmux workspace status\n  cmux workspace status set review\n  cmux workspace status cycle\n  cmux workspace status set auto --workspace workspace:2",
+"comment": ""
+},
+{
+"i": 237,
+"en": "Usage: cmux workspace <subcommand> [flags]\n\nCanonical noun for workspace operations. Legacy verbs\n(new-workspace, list-workspaces, close-workspace,\nrename-workspace, select-workspace) keep working and print a\none-time deprecation hint pointing here.\n\nSubcommands:\n  list                    List workspaces in a window\n  create [flags]          Create a workspace (same flags as new-workspace)\n  env [workspace] [--mask]\n                          Print a workspace's configured environment\n                          variables (--mask redacts the values)\n  close <workspace>       Close a workspace\n  rename <workspace> --title <new>\n  select <workspace>      Make a workspace active\n  status [set <lane|auto>]\n                          Show or pin the workspace todo status\n  reconnect [workspace]   Reconnect a remote (SSH) workspace, including one\n                          whose automatic reconnect paused because the host\n                          was unreachable\n  disconnect [workspace]  Stop a remote (SSH) workspace's connection\n  loading <on|off> [--id <name>] Toggle the workspace loading spinner.\n  group <subcommand>      Workspace group operations (see cmux workspace-group --help)\nenv/reconnect/disconnect accept a positional handle or --workspace\n<id|ref|index>, defaulting to the caller's workspace, then the\nselected one (of --window's window when given).\nExamples:\n  cmux workspace list --json\n  cmux workspace create --name Build --cwd ~/projects/myapp\n  cmux workspace env workspace:3 --mask\n  cmux workspace close workspace:3\n  cmux workspace reconnect\n  cmux workspace disconnect --workspace workspace:3",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Mobile Pairing is unavailable",
+"comment": ""
+},
+{
+"i": 239,
+"en": "Omitting --from creates an anchor-only group without capturing live workspaces.",
+"comment": ""
+},
+{
+"i": 240,
+"en": "Use --remove-generated-anchor only for an anchor-only group whose anchor was created by cmux.",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Dissolve a group, preserving all members",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Delete the group AND close every member workspace. Explicitly destructive.",
+"comment": ""
+},
+{
+"i": 243,
+"en": "Pass --idempotency-key (or --external-id) to make retries and concurrent creates return one group.",
+"comment": ""
+},
+{
+"i": 244,
+"en": "Manage collapsible workspace groups in the sidebar. Each group is owned by an \"anchor\" workspace; the group header IS the anchor's sidebar representation. Closing the anchor closes only that workspace and promotes the group's next member to be the new anchor, so the group and its other members stay intact. When the anchor is the group's only workspace, the group is removed.",
+"comment": ""
+},
+{
+"i": 245,
+"en": "OK group deleted (closed %lld workspaces)",
+"comment": ""
+},
+{
+"i": 246,
+"en": "OK group dissolved (kept %lld workspaces)",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Usage: cmux workspace loading <on|off> [--id <name>] [--workspace <id>] [--window <id>] [--json]",
+"comment": ""
+},
+{
+"i": 248,
+"en": "%lld. %@ (%@): %@",
+"comment": ""
+},
+{
+"i": 249,
+"en": "SSH error (%@): %@",
+"comment": ""
+},
+{
+"i": 250,
+"en": "Close this tab and reopen the terminal from the Cloud sidebar.",
+"comment": ""
+},
+{
+"i": 251,
+"en": "The terminal view is unavailable. Reconnect to restore it.",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Cloud terminal unavailable",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Reconnect",
+"comment": ""
+},
+{
+"i": 254,
+"en": "browser",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Browsers",
+"comment": ""
+},
+{
+"i": 256,
+"en": "Displays",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Terminals",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Workspaces",
+"comment": ""
+},
+{
+"i": 259,
+"en": "1 browser",
+"comment": ""
+},
+{
+"i": 260,
+"en": "This Mac's tunnel to your Cloud VM network is down — run `cmux vpn up`.",
+"comment": ""
+},
+{
+"i": 261,
+"en": "This Mac's tunnel is up for a different enrollment — run `cmux vpn up` to switch it.",
+"comment": ""
+},
+{
+"i": 262,
+"en": "Workspace",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Close Terminal",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Copy Port",
+"comment": ""
+},
+{
+"i": 265,
+"en": "Copy Surface ID",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Copy Workspace ID",
+"comment": ""
+},
+{
+"i": 267,
+"en": "New Terminal",
+"comment": ""
+},
+{
+"i": 268,
+"en": "New Terminal Here",
+"comment": ""
+},
+{
+"i": 269,
+"en": "Couldn’t start a terminal on %@",
+"comment": ""
+},
+{
+"i": 270,
+"en": "Check that the machine is connected, then try Cmd+D or Cmd+T again.",
+"comment": ""
+},
+{
+"i": 271,
+"en": "The machine returned an unknown error.",
+"comment": ""
+},
+{
+"i": 272,
+"en": "%1$@ on %2$@",
+"comment": ""
+},
+{
+"i": 273,
+"en": "The pane does not identify a unique machine tab. Reopen it from the machine workspace.",
+"comment": ""
+},
+{
+"i": 274,
+"en": "Your local pane change was kept, but the machine layout could not be synchronized. Reopen the machine workspace to see its current layout.",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Couldn’t update the machine workspace",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Kill",
+"comment": ""
+},
+{
+"i": 277,
+"en": "The process ends on the machine, everywhere it is shown. Panes keep their scrollback.",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Kill terminal “%@”?",
+"comment": ""
+},
+{
+"i": 279,
+"en": "Close Workspace…",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Close workspace “%@”?",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Its terminal is killed with it.",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Its %d terminals are killed with it.",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Close",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Closing %@…",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Kill Terminal…",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Open Workspace",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Rename all views…",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Rename…",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Deleting %@…",
+"comment": ""
+},
+{
+"i": 290,
+"en": "Renaming %@…",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Cloud workspaces can only hold terminals and displays from their own Cloud machine. Browser tabs can move freely. Open a local workspace to move other splits there.",
+"comment": ""
+},
+{
+"i": 292,
+"en": "This terminal has more than one remote placement. Specify the remote tab.",
+"comment": ""
+},
+{
+"i": 293,
+"en": "This terminal is not open in a remote workspace.",
+"comment": ""
+},
+{
+"i": 294,
+"en": "Terminal rename changed %1$d of %#@count2@. Another change prevented a safe rollback. Refresh and retry.",
+"comment": ""
+},
+{
+"i": 295,
+"en": "%d remote tabs",
+"comment": ""
+},
+{
+"i": 296,
+"en": "The remote rename response was invalid. Refresh and retry.",
+"comment": ""
+},
+{
+"i": 297,
+"en": "The remote rename came from a different VM session. Refresh and retry.",
+"comment": ""
+},
+{
+"i": 298,
+"en": "The remote rename returned revision %2$llu after revision %1$llu. Refresh and retry.",
+"comment": ""
+},
+{
+"i": 299,
+"en": "A workspace name cannot be empty.",
+"comment": ""
+}
+]

@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ShellXIcons
 
 /// One line under the Machines control bar while the explicit Cloud VPN is
 /// starting, waiting for the user's extension approval, connected, or failed.
@@ -59,11 +60,11 @@ public struct MachinesTunnelBanner: View {
         case .starting, .stopping:
             ProgressView().controlSize(.mini)
         case .awaitingApproval:
-            Image(systemName: "lock.shield").font(.system(size: 10, weight: .semibold))
+            ShellXIcon.image("lock.shield").font(.system(size: 10, weight: .semibold))
         case .connected:
-            Image(systemName: "network").font(.system(size: 10, weight: .semibold))
+            ShellXIcon.image("network").font(.system(size: 10, weight: .semibold))
         case .failed:
-            Image(systemName: "exclamationmark.triangle").font(.system(size: 10, weight: .semibold))
+            ShellXIcon.image("exclamationmark.triangle").font(.system(size: 10, weight: .semibold))
         }
     }
 
@@ -77,7 +78,7 @@ public struct MachinesTunnelBanner: View {
     private var helpText: String {
         String(
             localized: "cloud.vpn.setup.howItWorks.body",
-            defaultValue: "Connect Safari, Chrome, and other apps to your Cloud machines. Each machine keeps its private IP address and original ports. Only traffic to your Cloud network uses this encrypted connection. cmux terminals, Ports, and Desktop work without it."
+            defaultValue: "Connect Safari, Chrome, and other apps to your Cloud machines. Each machine keeps its private IP address and original ports. Only traffic to your Cloud network uses this encrypted connection. ShellX terminals, Ports, and Desktop work without it."
         )
     }
 }

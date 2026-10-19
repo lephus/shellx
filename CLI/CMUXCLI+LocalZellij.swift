@@ -340,7 +340,7 @@ extension CMUXCLI {
     ) throws {
         guard let client else {
             throw CLIError(message: String.localizedStringWithFormat(
-                String(localized: "cli.localZellij.error.requiresApp", defaultValue: "local-zellij %@ requires a running cmux app; use --headless for a direct zellij client"),
+                String(localized: "cli.localZellij.error.requiresApp", defaultValue: "local-zellij %@ requires a running ShellX app; use --headless for a direct zellij client"),
                 invocation.action.rawValue
             ))
         }

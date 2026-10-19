@@ -1,6 +1,7 @@
 import CmuxFoundation
 import CMUXProjectModel
 import SwiftUI
+import ShellXIcons
 
 /// Targets tab inside ``ProjectPanelView``.
 ///
@@ -48,7 +49,7 @@ struct ProjectTargetsTabView: View {
         let isSelected = panel.selectedTargetID == target.id
         Button(action: { panel.selectedTargetID = target.id }) {
             HStack(alignment: .top, spacing: 8) {
-                Image(systemName: glyph(for: target.productType))
+                ShellXIcon.image(glyph(for: target.productType))
                     .foregroundStyle(cmuxAccent.color)
                     .frame(width: 16)
                 VStack(alignment: .leading, spacing: 2) {
@@ -103,7 +104,7 @@ struct ProjectTargetsTabView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 8) {
-                        Image(systemName: glyph(for: selected.target.productType))
+                        ShellXIcon.image(glyph(for: selected.target.productType))
                             .cmuxFont(size: 18)
                             .foregroundStyle(cmuxAccent.color)
                         VStack(alignment: .leading, spacing: 2) {
@@ -125,7 +126,7 @@ struct ProjectTargetsTabView: View {
             }
         } else {
             ProjectEmptyDetailView(
-                systemImage: "shippingbox",
+                icon: "shippingbox",
                 title: "Select a target",
                 hint: "Pick a target on the left to see its product type, dependencies, and configurations."
             )
@@ -164,7 +165,7 @@ struct ProjectTargetsTabView: View {
             ForEach(selected.target.dependencies, id: \.rawValue) { depID in
                 let label = module.target(for: depID)?.displayName ?? String(depID.rawValue.prefix(10))
                 HStack(spacing: 6) {
-                    Image(systemName: "link")
+                    ShellXIcon.image("link")
                         .foregroundStyle(.secondary)
                     Text(label)
                         .cmuxFont(size: 12)
@@ -193,9 +194,9 @@ struct ProjectTargetsTabView: View {
                     .cmuxFont(size: 12, weight: .semibold)
                     .foregroundStyle(.secondary)
                 HStack(spacing: 12) {
-                    Label("\(configCount) configurations", systemImage: "slider.horizontal.3")
+                    ShellXLabel("\(configCount) configurations", icon: "slider.horizontal.3")
                         .cmuxFont(size: 11)
-                    Label("\(totalKeys) target overrides", systemImage: "wrench.and.screwdriver")
+                    ShellXLabel("\(totalKeys) target overrides", icon: "wrench.and.screwdriver")
                         .cmuxFont(size: 11)
                 }
                 .foregroundStyle(.secondary)
@@ -203,7 +204,7 @@ struct ProjectTargetsTabView: View {
                     panel.selectedTargetID = selected.target.id
                     panel.activeTab = .buildSettings
                 } label: {
-                    Label("Open in Build Settings", systemImage: "arrow.right.circle")
+                    ShellXLabel("Open in Build Settings", icon: "arrow.right.circle")
                         .cmuxFont(size: 11, weight: .medium)
                 }
                 .buttonStyle(.plain)

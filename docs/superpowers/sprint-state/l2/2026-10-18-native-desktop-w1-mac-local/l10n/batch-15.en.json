@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Text contains a character that cannot be typed with a US keyboard (scalar %1$lld: U+%2$@)",
+"comment": ""
+},
+{
+"i": 1,
+"en": "The isolated worker could not attach the selected inspector target.",
+"comment": ""
+},
+{
+"i": 2,
+"en": "The selected Simulator did not negotiate native Web Inspector access.",
+"comment": ""
+},
+{
+"i": 3,
+"en": "The isolated worker rejected the raw inspector command.",
+"comment": ""
+},
+{
+"i": 4,
+"en": "The isolated worker could not update the page highlight.",
+"comment": ""
+},
+{
+"i": 5,
+"en": "A Web Inspector command with this id is already pending.",
+"comment": ""
+},
+{
+"i": 6,
+"en": "A Web Inspector command must contain a string or numeric id.",
+"comment": ""
+},
+{
+"i": 7,
+"en": "The Web Inspector response wait was cancelled.",
+"comment": ""
+},
+{
+"i": 8,
+"en": "The inspector response stream exceeded its bounded in-flight buffer.",
+"comment": ""
+},
+{
+"i": 9,
+"en": "The Web Inspector response did not arrive before the bounded deadline.",
+"comment": ""
+},
+{
+"i": 10,
+"en": "The Web Inspector session ended before the response arrived.",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Web Inspector is unavailable",
+"comment": ""
+},
+{
+"i": 12,
+"en": "The isolated worker could not attach to the selected Simulator.",
+"comment": ""
+},
+{
+"i": 13,
+"en": "The Simulator worker client is permanently stopped.",
+"comment": ""
+},
+{
+"i": 14,
+"en": "The Simulator worker accepted a command but disconnected before confirming its outcome.",
+"comment": ""
+},
+{
+"i": 15,
+"en": "The isolated Simulator worker could not accept a command: %@",
+"comment": ""
+},
+{
+"i": 16,
+"en": "The Simulator worker failed twice. Recover the pane before retrying.",
+"comment": ""
+},
+{
+"i": 17,
+"en": "The isolated Simulator worker failed twice: %@",
+"comment": ""
+},
+{
+"i": 18,
+"en": "The Simulator worker closed its event stream before replying.",
+"comment": ""
+},
+{
+"i": 19,
+"en": "The Simulator input queue is at capacity.",
+"comment": ""
+},
+{
+"i": 20,
+"en": "The Simulator changed while this tool operation was running.",
+"comment": ""
+},
+{
+"i": 21,
+"en": "The previous Simulator tool operation is still stopping.",
+"comment": ""
+},
+{
+"i": 22,
+"en": "The isolated Simulator tool queue is at capacity.",
+"comment": ""
+},
+{
+"i": 23,
+"en": "The Simulator tool operation exceeded its bounded deadline.",
+"comment": ""
+},
+{
+"i": 24,
+"en": "The Simulator worker has too many pending requests.",
+"comment": ""
+},
+{
+"i": 25,
+"en": "A Simulator worker request reused an active identifier.",
+"comment": ""
+},
+{
+"i": 26,
+"en": "The Simulator worker did not produce a response.",
+"comment": ""
+},
+{
+"i": 27,
+"en": "The Simulator worker did not reply before the bounded deadline.",
+"comment": ""
+},
+{
+"i": 28,
+"en": "The Simulator worker stopped before replying.",
+"comment": ""
+},
+{
+"i": 29,
+"en": "This feature has been disabled remotely.",
+"comment": ""
+},
+{
+"i": 30,
+"en": "Simulator is temporarily unavailable",
+"comment": ""
+},
+{
+"i": 31,
+"en": "Bundle Identifier",
+"comment": ""
+},
+{
+"i": 32,
+"en": "Destination Latitude",
+"comment": ""
+},
+{
+"i": 33,
+"en": "Destination Longitude",
+"comment": ""
+},
+{
+"i": 34,
+"en": "Latitude",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Longitude",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Privacy Service",
+"comment": ""
+},
+{
+"i": 37,
+"en": "Speed (m/s)",
+"comment": ""
+},
+{
+"i": 38,
+"en": "URL",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Simulator Screenshot.%@",
+"comment": ""
+},
+{
+"i": 40,
+"en": "Simulator Recording.mp4",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Custom Route",
+"comment": ""
+},
+{
+"i": 42,
+"en": "Cycle",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Drive",
+"comment": ""
+},
+{
+"i": 44,
+"en": "Run",
+"comment": "Simulated movement activity: running or jogging, not executing a command."
+},
+{
+"i": 45,
+"en": "Walk",
+"comment": ""
+},
+{
+"i": 46,
+"en": "Apple Park Loop",
+"comment": ""
+},
+{
+"i": 47,
+"en": "Cupertino • flat ring road",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Reservoir Loop",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Central Park • 2.5 km",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Golden Gate Crossing",
+"comment": ""
+},
+{
+"i": 51,
+"en": "San Francisco • bridge round-trip",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Mt. Tam Ridge",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Stinson Beach • Steep Ravine + Matt Davis loop",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Pacific Coast Hwy",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Pacifica • Devil's Slide round-trip",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Speed",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Trail",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Transport",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Output truncated at 2 MiB.",
+"comment": ""
+},
+{
+"i": 60,
+"en": "All Services",
+"comment": ""
+},
+{
+"i": 61,
+"en": "Calendars",
+"comment": ""
+},
+{
+"i": 62,
+"en": "Contacts",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Limited Contacts",
+"comment": ""
+},
+{
+"i": 64,
+"en": "Critical Notifications",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Face ID",
+"comment": ""
+},
+{
+"i": 66,
+"en": "Grant",
+"comment": ""
+},
+{
+"i": 67,
+"en": "HomeKit",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Location While Using",
+"comment": ""
+},
+{
+"i": 69,
+"en": "Location Always",
+"comment": ""
+},
+{
+"i": 70,
+"en": "Media Library",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Microphone",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Motion",
+"comment": ""
+},
+{
+"i": 73,
+"en": "Photos",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Add Photos",
+"comment": ""
+},
+{
+"i": 75,
+"en": "Limited Photos",
+"comment": ""
+},
+{
+"i": 76,
+"en": "Read Status",
+"comment": ""
+},
+{
+"i": 77,
+"en": "Reminders",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Revoke",
+"comment": ""
+},
+{
+"i": 79,
+"en": "Speech Recognition",
+"comment": ""
+},
+{
+"i": 80,
+"en": "App Tracking",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Simulator Connection Failed",
+"comment": ""
+},
+{
+"i": 82,
+"en": "Select a device to start",
+"comment": ""
+},
+{
+"i": 83,
+"en": "Device Unavailable",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Simulator Renderer Stopped",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Battery Level",
+"comment": ""
+},
+{
+"i": 86,
+"en": "Battery State",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Carrier",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Cellular Bars",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Cellular",
+"comment": ""
+},
+{
+"i": 90,
+"en": "Data Network",
+"comment": ""
+},
+{
+"i": 91,
+"en": "Time",
+"comment": ""
+},
+{
+"i": 92,
+"en": "Wi-Fi Bars",
+"comment": ""
+},
+{
+"i": 93,
+"en": "Text to type",
+"comment": ""
+},
+{
+"i": 94,
+"en": "Accessibility XXXL",
+"comment": ""
+},
+{
+"i": 95,
+"en": "Accessibility XXL",
+"comment": ""
+},
+{
+"i": 96,
+"en": "Accessibility XL",
+"comment": ""
+},
+{
+"i": 97,
+"en": "Accessibility Large",
+"comment": ""
+},
+{
+"i": 98,
+"en": "Accessibility Medium",
+"comment": ""
+},
+{
+"i": 99,
+"en": "XXX Large",
+"comment": ""
+},
+{
+"i": 100,
+"en": "XX Large",
+"comment": ""
+},
+{
+"i": 101,
+"en": "Extra Large",
+"comment": ""
+},
+{
+"i": 102,
+"en": "Extra Small",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Large",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Small",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Activity",
+"comment": ""
+},
+{
+"i": 106,
+"en": "Appearance and Status Bar",
+"comment": ""
+},
+{
+"i": 107,
+"en": "Camera (Experimental)",
+"comment": ""
+},
+{
+"i": 108,
+"en": "Device",
+"comment": ""
+},
+{
+"i": 109,
+"en": "Diagnostics",
+"comment": ""
+},
+{
+"i": 110,
+"en": "Hardware",
+"comment": ""
+},
+{
+"i": 111,
+"en": "Inspect",
+"comment": ""
+},
+{
+"i": 112,
+"en": "Notifications and Privacy",
+"comment": ""
+},
+{
+"i": 113,
+"en": "Text Input",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Simulator Tools",
+"comment": ""
+},
+{
+"i": 115,
+"en": "URL and Media",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Web Inspector",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Yes",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Choose Target",
+"comment": ""
+},
+{
+"i": 119,
+"en": "Clear Responses",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Highlight Page",
+"comment": ""
+},
+{
+"i": 121,
+"en": "In Use",
+"comment": ""
+},
+{
+"i": 122,
+"en": "No inspector responses",
+"comment": ""
+},
+{
+"i": 123,
+"en": "No inspectable pages",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Raw Web Inspector JSON Request",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Refresh Targets",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Release",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Responses",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Send JSON",
+"comment": ""
+},
+{
+"i": 129,
+"en": "Response truncated in this view",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Web Inspector is unavailable for this Simulator",
+"comment": ""
+},
+{
+"i": 131,
+"en": "Remove Highlight",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Energy",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Exit",
+"comment": ""
+},
+{
+"i": 134,
+"en": "Lock Mac",
+"comment": ""
+},
+{
+"i": 135,
+"en": "Low Power: Off",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Low Power: On",
+"comment": ""
+},
+{
+"i": 137,
+"en": "Sleep Display",
+"comment": ""
+},
+{
+"i": 138,
+"en": "Blush",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Nightcap",
+"comment": ""
+},
+{
+"i": 140,
+"en": "Eyes",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Face",
+"comment": ""
+},
+{
+"i": 142,
+"en": "Logo",
+"comment": ""
+},
+{
+"i": 143,
+"en": "Touch ID or password to unlock",
+"comment": ""
+},
+{
+"i": 144,
+"en": "Press any key to wake (click the characters to play)",
+"comment": ""
+},
+{
+"i": 145,
+"en": "High Power",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Low Power",
+"comment": ""
+},
+{
+"i": 147,
+"en": "Aurora",
+"comment": ""
+},
+{
+"i": 148,
+"en": "Black",
+"comment": ""
+},
+{
+"i": 149,
+"en": "Midnight",
+"comment": ""
+},
+{
+"i": 150,
+"en": "Ocean",
+"comment": ""
+},
+{
+"i": 151,
+"en": "Sunset",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Mac staying awake",
+"comment": ""
+},
+{
+"i": 153,
+"en": "Couldn't keep Mac awake — check Battery settings",
+"comment": ""
+},
+{
+"i": 154,
+"en": "Cat",
+"comment": ""
+},
+{
+"i": 155,
+"en": "cmux mascot",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Logo face",
+"comment": ""
+},
+{
+"i": 157,
+"en": "Clock & date",
+"comment": ""
+},
+{
+"i": 158,
+"en": "Background glow",
+"comment": ""
+},
+{
+"i": 159,
+"en": "Look",
+"comment": ""
+},
+{
+"i": 160,
+"en": "Mascot",
+"comment": ""
+},
+{
+"i": 161,
+"en": "Moon",
+"comment": ""
+},
+{
+"i": 162,
+"en": "Agent pets",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Walks one cute pet for every Claude, Codex, and OpenCode agent you have running.",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Preview full screen",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Shows the scene full screen without locking; any key or click exits.",
+"comment": ""
+},
+{
+"i": 166,
+"en": "Require Touch ID to exit",
+"comment": ""
+},
+{
+"i": 167,
+"en": "Casual screensaver. Any key or click wakes it.",
+"comment": ""
+},
+{
+"i": 168,
+"en": "Locks the Mac. Blocks Cmd-Tab, Cmd-Q, and force-quit until you authenticate.",
+"comment": ""
+},
+{
+"i": 169,
+"en": "Scene",
+"comment": ""
+},
+{
+"i": 170,
+"en": "About security",
+"comment": ""
+},
+{
+"i": 171,
+"en": "Sleepy Mode is a screensaver, not a lock — any key wakes it. For real security, use the “Lock Mac” button in the scene, which engages the actual macOS login lock.",
+"comment": ""
+},
+{
+"i": 172,
+"en": "Security",
+"comment": ""
+},
+{
+"i": 173,
+"en": "Stars",
+"comment": ""
+},
+{
+"i": 174,
+"en": "Start Sleepy Mode",
+"comment": ""
+},
+{
+"i": 175,
+"en": "Start Sleepy Mode now",
+"comment": ""
+},
+{
+"i": 176,
+"en": "Engages Sleepy Mode using the settings above.",
+"comment": ""
+},
+{
+"i": 177,
+"en": "Battery & Wi-Fi",
+"comment": ""
+},
+{
+"i": 178,
+"en": "Floating z z z",
+"comment": ""
+},
+{
+"i": 179,
+"en": "Blossom",
+"comment": ""
+},
+{
+"i": 180,
+"en": "Mint",
+"comment": ""
+},
+{
+"i": 181,
+"en": "Mono",
+"comment": ""
+},
+{
+"i": 182,
+"en": "Unlock cmux Sleepy Mode",
+"comment": ""
+},
+{
+"i": 183,
+"en": "Cloud VM access requires sign-in. Run `cmux auth login`, then retry.",
+"comment": ""
+},
+{
+"i": 184,
+"en": "vm.domain_verify requires `name` (a domain).",
+"comment": ""
+},
+{
+"i": 185,
+"en": "vm.publication_create requires `port` between 1 and 65535.",
+"comment": ""
+},
+{
+"i": 186,
+"en": "vm.publication_create requires `vmId`.",
+"comment": ""
+},
+{
+"i": 187,
+"en": "A publication id is required.",
+"comment": ""
+},
+{
+"i": 188,
+"en": "%@ requires `accessMode` to be personal, team, or public.",
+"comment": ""
+},
+{
+"i": 189,
+"en": "%@ accepts `teamId` only when `accessMode` is team.",
+"comment": ""
+},
+{
+"i": 190,
+"en": "%@ requires `teamId` when `accessMode` is team.",
+"comment": ""
+},
+{
+"i": 191,
+"en": "vm.port_open: invalid explicit target `%@`.",
+"comment": ""
+},
+{
+"i": 192,
+"en": "The cmux Cloud service rejected this session. Run `cmux auth logout`, then `cmux auth login`, and retry.",
+"comment": ""
+},
+{
+"i": 193,
+"en": "The remote name could not be changed. Refresh and try again.",
+"comment": ""
+},
+{
+"i": 194,
+"en": "The remote rename timed out after 120 seconds. Refresh and try again.",
+"comment": ""
+},
+{
+"i": 195,
+"en": "Access denied - only processes started inside cmux can connect",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Unable to verify client process",
+"comment": ""
+},
+{
+"i": 197,
+"en": "A repository path is required.",
+"comment": ""
+},
+{
+"i": 198,
+"en": "caller-only selectors require caller=true",
+"comment": ""
+},
+{
+"i": 199,
+"en": "Missing or invalid caller",
+"comment": ""
+},
+{
+"i": 200,
+"en": "caller clear cannot be combined with workspace_id, tab_id, or surface_id",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Missing or invalid preferred_workspace_id",
+"comment": ""
+},
+{
+"i": 202,
+"en": "Missing or invalid preferred_surface_id",
+"comment": ""
+},
+{
+"i": 203,
+"en": "surface_id requires workspace_id",
+"comment": ""
+},
+{
+"i": 204,
+"en": "Missing or invalid workspace_id",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Notifications are unavailable. Try again.",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Select exactly one of id or all_read",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Missing or invalid notification id",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Select exactly one of id, tab_id, or all",
+"comment": ""
+},
+{
+"i": 209,
+"en": "Notification not found",
+"comment": ""
+},
+{
+"i": 210,
+"en": "Missing or invalid surface_id",
+"comment": ""
+},
+{
+"i": 211,
+"en": "surface_id requires tab_id or workspace_id",
+"comment": ""
+},
+{
+"i": 212,
+"en": "Notification target not found",
+"comment": ""
+},
+{
+"i": 213,
+"en": "Invalid pane resize parameters",
+"comment": ""
+},
+{
+"i": 214,
+"en": "Pane resize metrics are not ready; wait for the pane to finish loading and retry.",
+"comment": ""
+},
+{
+"i": 215,
+"en": "The remote tmux pane is not ready to resize; wait for it to become available and retry.",
+"comment": ""
+},
+{
+"i": 216,
+"en": "remote tmux beta is disabled",
+"comment": ""
+},
+{
+"i": 217,
+"en": "host and session are required",
+"comment": ""
+},
+{
+"i": 218,
+"en": "host is required",
+"comment": ""
+},
+{
+"i": 219,
+"en": "session is required",
+"comment": ""
+},
+{
+"i": 220,
+"en": "Sidebar name must not be empty.",
+"comment": ""
+},
+{
+"i": 221,
+"en": "Failed to open custom sidebar pane.",
+"comment": ""
+},
+{
+"i": 222,
+"en": "Missing or invalid window_id",
+"comment": ""
+},
+{
+"i": 223,
+"en": "Open requires a sidebar name.",
+"comment": ""
+},
+{
+"i": 224,
+"en": "Unable to access the target workspace.",
+"comment": ""
+},
+{
+"i": 225,
+"en": "Select requires a sidebar name.",
+"comment": ""
+},
+{
+"i": 226,
+"en": "Only terminal surfaces can target a remote tmux pane; the terminal is created as a new tmux window after the pane's window.",
+"comment": ""
+},
+{
+"i": 227,
+"en": "agent_session_ended must be a boolean",
+"comment": ""
+},
+{
+"i": 228,
+"en": "launch_command.arguments must be a non-empty array of strings",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Missing or invalid restore claim",
+"comment": ""
+},
+{
+"i": 230,
+"en": "AppDelegate not available",
+"comment": ""
+},
+{
+"i": 231,
+"en": "Missing or invalid direction (left|right|up|down)",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Failed to move surface",
+"comment": ""
+},
+{
+"i": 233,
+"en": "Source pane not found",
+"comment": ""
+},
+{
+"i": 234,
+"en": "Failed to split pane",
+"comment": ""
+},
+{
+"i": 235,
+"en": "Surface not found in window",
+"comment": ""
+},
+{
+"i": 236,
+"en": "Surface not found in workspace",
+"comment": ""
+},
+{
+"i": 237,
+"en": "splitting off would leave the source pane empty",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Tab not found",
+"comment": ""
+},
+{
+"i": 239,
+"en": "The terminal can't accept more input right now. Wait a moment and retry, or reopen the terminal if it stays unavailable.",
+"comment": ""
+},
+{
+"i": 240,
+"en": "The terminal session has ended; reopen it or create a new terminal session.",
+"comment": ""
+},
+{
+"i": 241,
+"en": "The terminal surface is no longer available; reopen it or create a new terminal session.",
+"comment": ""
+},
+{
+"i": 242,
+"en": "The remote terminal must open a shell or a valid named tmux session.",
+"comment": ""
+},
+{
+"i": 243,
+"en": "The remote terminal transport must be SSH or Mosh.",
+"comment": ""
+},
+{
+"i": 244,
+"en": "Mosh terminal transport requires an SSH-managed workspace.",
+"comment": ""
+},
+{
+"i": 245,
+"en": "index must be an integer",
+"comment": ""
+},
+{
+"i": 246,
+"en": "Specify exactly one target: index, before_workspace_id, or after_workspace_id",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Duplicate workspace in order",
+"comment": ""
+},
+{
+"i": 248,
+"en": "Invalid workspace id or ref",
+"comment": ""
+},
+{
+"i": 249,
+"en": "Missing workspace_ids",
+"comment": ""
+},
+{
+"i": 250,
+"en": "Relay request authentication failed",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Relay selector is invalid",
+"comment": ""
+},
+{
+"i": 252,
+"en": "TabManager not available",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Relay owner workspace is not active",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Unsupported parameter `window`; use `window_id` with a window UUID or ref from `window.list`.",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Allow any local process and user to connect with no auth. Unsafe.",
+"comment": ""
+},
+{
+"i": 256,
+"en": "Full open access",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Allow external local automation clients from this macOS user (no ancestry check).",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Automation mode",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Only processes started inside cmux terminals can send commands.",
+"comment": ""
+},
+{
+"i": 260,
+"en": "cmux processes only",
+"comment": ""
+},
+{
+"i": 261,
+"en": "Unable to resolve socket password file path.",
+"comment": ""
+},
+{
+"i": 262,
+"en": "Disable the local control socket.",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Require socket authentication with a password stored in a local file.",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Password mode",
+"comment": ""
+},
+{
+"i": 265,
+"en": "No unread notifications",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Attachment: %@",
+"comment": ""
+},
+{
+"i": 267,
+"en": "%d profiling files will be zipped and attached.",
+"comment": ""
+},
+{
+"i": 268,
+"en": "Attachment will be ready after capture.",
+"comment": ""
+},
+{
+"i": 269,
+"en": "Recording CPU, SwiftUI, memory, and system traces for %d seconds each. Finalizing may take longer.",
+"comment": ""
+},
+{
+"i": 270,
+"en": "The profile archive is ready. cmux is opening the submission draft now.",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Capture complete",
+"comment": ""
+},
+{
+"i": 272,
+"en": "The email draft could not be opened.",
+"comment": ""
+},
+{
+"i": 273,
+"en": "The email draft is open.",
+"comment": ""
+},
+{
+"i": 274,
+"en": "The email could not be sent.",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Your email",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Email sent.",
+"comment": ""
+},
+{
+"i": 277,
+"en": "The capture did not finish. If a folder was created, it may contain partial logs.",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Profiling failed",
+"comment": ""
+},
+{
+"i": 279,
+"en": "Files: none yet",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Files:",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Files: unavailable",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Finalizing traces...",
+"comment": ""
+},
+{
+"i": 283,
+"en": "folder",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Enter a valid email address so we can follow up.",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Unable to start profiling.",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Anything else we should know?",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Open Email Draft",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Opening...",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Packaging the profile and opening an email draft.",
+"comment": ""
+},
+{
+"i": 290,
+"en": "Could not package the attachment.",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Attachment is ready to preview.",
+"comment": ""
+},
+{
+"i": 292,
+"en": "Packaging...",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Creating the zip attachment for preview.",
+"comment": ""
+},
+{
+"i": 294,
+"en": "macOS may ask for administrator permission because Instruments samples the running cmux process.",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Why macOS may ask for permission",
+"comment": ""
+},
+{
+"i": 296,
+"en": "The email includes a zip with traces, logs, summary.md, and system-info.txt.",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Preview Attachment",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Your email: %@",
+"comment": ""
+},
+{
+"i": 299,
+"en": "Attachment preview",
+"comment": ""
+}
+]

@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "An installed sidebar extension needs approval before CMUX can use it.",
+"comment": ""
+},
+{
+"i": 1,
+"en": "Use Workspace Sidebar",
+"comment": ""
+},
+{
+"i": 2,
+"en": "Use Default",
+"comment": ""
+},
+{
+"i": 3,
+"en": "Drag to open in Finder or another app",
+"comment": ""
+},
+{
+"i": 4,
+"en": "Discord",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Attach Images",
+"comment": ""
+},
+{
+"i": 6,
+"en": "Up to 10 images.",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Couldn't send feedback. Check your connection and try again.",
+"comment": ""
+},
+{
+"i": 8,
+"en": "Your Email",
+"comment": ""
+},
+{
+"i": 9,
+"en": "you@example.com",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Enter a message before sending.",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Feedback is unavailable right now. Email founders@manaflow.com instead.",
+"comment": ""
+},
+{
+"i": 12,
+"en": "Couldn't send feedback. Please try again.",
+"comment": ""
+},
+{
+"i": 13,
+"en": "Each image must be 4 MB or smaller.",
+"comment": ""
+},
+{
+"i": 14,
+"en": "Enter a valid email address.",
+"comment": ""
+},
+{
+"i": 15,
+"en": "One of the selected files could not be attached.",
+"comment": ""
+},
+{
+"i": 16,
+"en": "Message",
+"comment": ""
+},
+{
+"i": 17,
+"en": "Share feedback, feature requests, or issues.",
+"comment": ""
+},
+{
+"i": 18,
+"en": "Your message is too long.",
+"comment": ""
+},
+{
+"i": 19,
+"en": "You can also reach us at founders@manaflow.com.",
+"comment": ""
+},
+{
+"i": 20,
+"en": "Too many feedback attempts. Please try again later.",
+"comment": ""
+},
+{
+"i": 21,
+"en": "Thanks for the feedback.",
+"comment": ""
+},
+{
+"i": 22,
+"en": "Send Feedback",
+"comment": ""
+},
+{
+"i": 23,
+"en": "You can attach up to 10 images.",
+"comment": ""
+},
+{
+"i": 24,
+"en": "These images are too large to send together. Remove a few and try again.",
+"comment": ""
+},
+{
+"i": 25,
+"en": "Check your message and attachments, then try again.",
+"comment": ""
+},
+{
+"i": 26,
+"en": "GitHub Issues",
+"comment": ""
+},
+{
+"i": 27,
+"en": "Welcome to cmux!",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Playing audio",
+"comment": ""
+},
+{
+"i": 29,
+"en": "Camera in use",
+"comment": ""
+},
+{
+"i": 30,
+"en": "Microphone in use",
+"comment": ""
+},
+{
+"i": 31,
+"en": "High memory warning",
+"comment": ""
+},
+{
+"i": 32,
+"en": "A pane in this workspace is using a lot of memory",
+"comment": ""
+},
+{
+"i": 33,
+"en": "Show less details",
+"comment": ""
+},
+{
+"i": 34,
+"en": "Show more details",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Macintosh HD",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Notifications muted for this workspace",
+"comment": ""
+},
+{
+"i": 37,
+"en": "Pinned workspace. Closing requires confirmation.",
+"comment": ""
+},
+{
+"i": 38,
+"en": ":%lld",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Open localhost:%lld",
+"comment": ""
+},
+{
+"i": 40,
+"en": "Hide the Pro badge",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Default Workspaces",
+"comment": ""
+},
+{
+"i": 42,
+"en": "Custom sidebar",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Extension Sidebar",
+"comment": ""
+},
+{
+"i": 44,
+"en": "Open %1$@ #%2$lld",
+"comment": ""
+},
+{
+"i": 45,
+"en": "closed",
+"comment": ""
+},
+{
+"i": 46,
+"en": "merged",
+"comment": ""
+},
+{
+"i": 47,
+"en": "open",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Remote connected to %@",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Remote connecting to %@",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Remote disconnected from %@",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Remote error for %@",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Remote error for %@: %@",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Remote reconnecting to %@",
+"comment": ""
+},
+{
+"i": 54,
+"en": "SSH host %@ is unreachable. Automatic reconnect is paused — use Reconnect to retry.",
+"comment": ""
+},
+{
+"i": 55,
+"en": "remote host",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Reconnect to %@",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Remote • %@",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Remote workspace",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Auto — return to %@",
+"comment": ""
+},
+{
+"i": 60,
+"en": "Status: %@",
+"comment": ""
+},
+{
+"i": 61,
+"en": "Change workspace status",
+"comment": ""
+},
+{
+"i": 62,
+"en": "None (hide status)",
+"comment": ""
+},
+{
+"i": 63,
+"en": "In Review",
+"comment": ""
+},
+{
+"i": 64,
+"en": "Todo",
+"comment": ""
+},
+{
+"i": 65,
+"en": "%@ — inferred",
+"comment": ""
+},
+{
+"i": 66,
+"en": "%@ — set manually",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Working",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Pinned status clears when activity changes",
+"comment": ""
+},
+{
+"i": 69,
+"en": "No folder",
+"comment": ""
+},
+{
+"i": 70,
+"en": "Activate to focus this workspace. Drag to reorder, or use Move Up and Move Down actions.",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Rename workspace",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Accessibility elements: %lld",
+"comment": ""
+},
+{
+"i": 73,
+"en": "Live Element Overlay",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Page %1$lld of %2$lld",
+"comment": ""
+},
+{
+"i": 75,
+"en": "Previous",
+"comment": ""
+},
+{
+"i": 76,
+"en": "Accessibility roots: %lld",
+"comment": ""
+},
+{
+"i": 77,
+"en": "More elements exist beyond the bounded snapshot.",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Accessibility Tree",
+"comment": ""
+},
+{
+"i": 79,
+"en": "Add Media",
+"comment": ""
+},
+{
+"i": 80,
+"en": "App Switcher",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Apply Status Bar",
+"comment": ""
+},
+{
+"i": 82,
+"en": "Animated Placeholder",
+"comment": ""
+},
+{
+"i": 83,
+"en": "Capture Keyboard (Escape to Release)",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Capture Pointer and Keyboard (Escape to Release)",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Image or Video",
+"comment": ""
+},
+{
+"i": 86,
+"en": "Clear Highlight",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Clear Location",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Clear Status Bar",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Crown Down",
+"comment": ""
+},
+{
+"i": 90,
+"en": "Crown Up",
+"comment": ""
+},
+{
+"i": 91,
+"en": "Disable Camera",
+"comment": ""
+},
+{
+"i": 92,
+"en": "Foreground App",
+"comment": ""
+},
+{
+"i": 93,
+"en": "Home",
+"comment": ""
+},
+{
+"i": 94,
+"en": "Use Mac Camera",
+"comment": ""
+},
+{
+"i": 95,
+"en": "Install App or IPA",
+"comment": ""
+},
+{
+"i": 96,
+"en": "Software Keyboard",
+"comment": ""
+},
+{
+"i": 97,
+"en": "Launch",
+"comment": ""
+},
+{
+"i": 98,
+"en": "Lock",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Memory Warning",
+"comment": ""
+},
+{
+"i": 100,
+"en": "Open URL",
+"comment": ""
+},
+{
+"i": 101,
+"en": "Pause Route",
+"comment": ""
+},
+{
+"i": 102,
+"en": "Read",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Load Recent Logs",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Reload React Native",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Resume Route",
+"comment": ""
+},
+{
+"i": 106,
+"en": "Rotate Left",
+"comment": ""
+},
+{
+"i": 107,
+"en": "Rotate Right",
+"comment": ""
+},
+{
+"i": 108,
+"en": "Screenshot",
+"comment": ""
+},
+{
+"i": 109,
+"en": "Send Push Payload",
+"comment": ""
+},
+{
+"i": 110,
+"en": "Set Location",
+"comment": ""
+},
+{
+"i": 111,
+"en": "Shut Down Device",
+"comment": ""
+},
+{
+"i": 112,
+"en": "Side Button",
+"comment": ""
+},
+{
+"i": 113,
+"en": "Siri",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Stream Logs",
+"comment": ""
+},
+{
+"i": 115,
+"en": "Start Recording",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Start Route",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Stop Streaming",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Stop Recording",
+"comment": ""
+},
+{
+"i": 119,
+"en": "Stop Route",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Swipe Home",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Copy from Mac",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Terminate",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Terminate Renderer",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Type",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Write",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Accessibility Inspection",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Accessibility Highlight",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Simulator Action",
+"comment": ""
+},
+{
+"i": 129,
+"en": "Applications",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Camera",
+"comment": ""
+},
+{
+"i": 131,
+"en": "Camera Configuration",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Camera Mirror",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Camera Status",
+"comment": ""
+},
+{
+"i": 134,
+"en": "Capture",
+"comment": ""
+},
+{
+"i": 135,
+"en": "Clipboard",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Core Animation Diagnostic",
+"comment": ""
+},
+{
+"i": 137,
+"en": "Digital Crown",
+"comment": ""
+},
+{
+"i": 138,
+"en": "No recent activity",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Hardware Button",
+"comment": ""
+},
+{
+"i": 140,
+"en": "Appearance or Accessibility",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Appearance Status",
+"comment": ""
+},
+{
+"i": 142,
+"en": "Keyboard",
+"comment": ""
+},
+{
+"i": 143,
+"en": "Location",
+"comment": ""
+},
+{
+"i": 144,
+"en": "Logs",
+"comment": ""
+},
+{
+"i": 145,
+"en": "Media",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Privacy",
+"comment": ""
+},
+{
+"i": 147,
+"en": "Privacy Status",
+"comment": ""
+},
+{
+"i": 148,
+"en": "Push Notification",
+"comment": ""
+},
+{
+"i": 149,
+"en": "React Native Reload",
+"comment": ""
+},
+{
+"i": 150,
+"en": "Rotate",
+"comment": ""
+},
+{
+"i": 151,
+"en": "Status Bar",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Touch",
+"comment": ""
+},
+{
+"i": 153,
+"en": "Type Text",
+"comment": ""
+},
+{
+"i": 154,
+"en": "Web Inspector Attach",
+"comment": ""
+},
+{
+"i": 155,
+"en": "Web Inspector Command",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Web Inspector Highlight",
+"comment": ""
+},
+{
+"i": 157,
+"en": "Web Inspector Release",
+"comment": ""
+},
+{
+"i": 158,
+"en": "Web Inspector Targets",
+"comment": ""
+},
+{
+"i": 159,
+"en": "Button Shapes",
+"comment": ""
+},
+{
+"i": 160,
+"en": "Color Filter",
+"comment": ""
+},
+{
+"i": 161,
+"en": "Text Size",
+"comment": ""
+},
+{
+"i": 162,
+"en": "Differentiate Without Color",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Increase Contrast",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Invert Colors",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Liquid Glass",
+"comment": ""
+},
+{
+"i": 166,
+"en": "Reduce Motion",
+"comment": ""
+},
+{
+"i": 167,
+"en": "Reduce Transparency",
+"comment": ""
+},
+{
+"i": 168,
+"en": "Tinted",
+"comment": ""
+},
+{
+"i": 169,
+"en": "VoiceOver",
+"comment": ""
+},
+{
+"i": 170,
+"en": "Launch Arguments",
+"comment": ""
+},
+{
+"i": 171,
+"en": "Executable",
+"comment": ""
+},
+{
+"i": 172,
+"en": "Minimum OS",
+"comment": ""
+},
+{
+"i": 173,
+"en": "App Path",
+"comment": ""
+},
+{
+"i": 174,
+"en": "Process ID",
+"comment": ""
+},
+{
+"i": 175,
+"en": "React Native",
+"comment": ""
+},
+{
+"i": 176,
+"en": "Terminate Running App",
+"comment": ""
+},
+{
+"i": 177,
+"en": "Wait for Debugger",
+"comment": ""
+},
+{
+"i": 178,
+"en": "Critical Alerts",
+"comment": ""
+},
+{
+"i": 179,
+"en": "Not Determined",
+"comment": ""
+},
+{
+"i": 180,
+"en": "Charged",
+"comment": ""
+},
+{
+"i": 181,
+"en": "Charging",
+"comment": ""
+},
+{
+"i": 182,
+"en": "Discharging",
+"comment": ""
+},
+{
+"i": 183,
+"en": "Camera injection uses private Simulator interfaces and may stop working after an Xcode update.",
+"comment": ""
+},
+{
+"i": 184,
+"en": "Mac Camera",
+"comment": ""
+},
+{
+"i": 185,
+"en": "Injected Apps",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Mirror",
+"comment": ""
+},
+{
+"i": 187,
+"en": "Disabled",
+"comment": ""
+},
+{
+"i": 188,
+"en": "Not Supported",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Searching",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Clipboard text must be 1 MiB or smaller.",
+"comment": ""
+},
+{
+"i": 191,
+"en": "The Simulator clipboard is larger than 1 MiB.",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Blue-Yellow",
+"comment": ""
+},
+{
+"i": 193,
+"en": "Grayscale",
+"comment": ""
+},
+{
+"i": 194,
+"en": "Green-Red",
+"comment": ""
+},
+{
+"i": 195,
+"en": "Red-Green",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Xcode returned an unexpected installed-application list.",
+"comment": ""
+},
+{
+"i": 197,
+"en": "Xcode returned an unreadable installed-application list: %@",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Camera injection must run inside the isolated Simulator worker.",
+"comment": ""
+},
+{
+"i": 199,
+"en": "cmux could not create a private clipboard staging file.",
+"comment": ""
+},
+{
+"i": 200,
+"en": "This action requires correlated execution in the isolated Simulator worker.",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Xcode returned an unreadable Simulator device list: %@",
+"comment": ""
+},
+{
+"i": 202,
+"en": "The application environment key '%@' is invalid.",
+"comment": ""
+},
+{
+"i": 203,
+"en": "Simulator action failed",
+"comment": ""
+},
+{
+"i": 204,
+"en": "This live accessibility setting requires the contained in-Simulator helper.",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Latitude must be from -90 through 90 and longitude from -180 through 180.",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Location route update distance must be positive.",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Location route update interval must be positive.",
+"comment": ""
+},
+{
+"i": 208,
+"en": "A location route needs at least two distinct waypoints and a positive speed.",
+"comment": ""
+},
+{
+"i": 209,
+"en": "cmux has no paused location route for this device.",
+"comment": ""
+},
+{
+"i": 210,
+"en": "cmux has no running location route for this device.",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Another client replaced this device's location route.",
+"comment": ""
+},
+{
+"i": 212,
+"en": "The log interval must be positive.",
+"comment": ""
+},
+{
+"i": 213,
+"en": "Native input actions require the isolated Simulator worker.",
+"comment": ""
+},
+{
+"i": 214,
+"en": "Granting or revoking privacy access requires a bundle identifier.",
+"comment": ""
+},
+{
+"i": 215,
+"en": "The active Xcode does not expose %@ through simctl; cmux will not mutate private TCC or BulletinBoard stores in the host process.",
+"comment": ""
+},
+{
+"i": 216,
+"en": "The %1$@ value must be from %2$lld through %3$lld.",
+"comment": ""
+},
+{
+"i": 217,
+"en": "A status bar override needs at least one value.",
+"comment": ""
+},
+{
+"i": 218,
+"en": "5G",
+"comment": ""
+},
+{
+"i": 219,
+"en": "5G+",
+"comment": ""
+},
+{
+"i": 220,
+"en": "5G UC",
+"comment": ""
+},
+{
+"i": 221,
+"en": "5G UWB",
+"comment": ""
+},
+{
+"i": 222,
+"en": "4G",
+"comment": ""
+},
+{
+"i": 223,
+"en": "Hidden",
+"comment": ""
+},
+{
+"i": 224,
+"en": "LTE",
+"comment": ""
+},
+{
+"i": 225,
+"en": "LTE-A",
+"comment": ""
+},
+{
+"i": 226,
+"en": "LTE+",
+"comment": ""
+},
+{
+"i": 227,
+"en": "3G",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Wi-Fi",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Choose Device",
+"comment": ""
+},
+{
+"i": 230,
+"en": "No iPhone or iPad Simulators",
+"comment": ""
+},
+{
+"i": 231,
+"en": "Install an iOS runtime in Xcode, then refresh.",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Runtime",
+"comment": ""
+},
+{
+"i": 233,
+"en": "State",
+"comment": ""
+},
+{
+"i": 234,
+"en": "UDID",
+"comment": ""
+},
+{
+"i": 235,
+"en": "Booted",
+"comment": ""
+},
+{
+"i": 236,
+"en": "Booting",
+"comment": ""
+},
+{
+"i": 237,
+"en": "Shut Down",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Shutting Down",
+"comment": ""
+},
+{
+"i": 239,
+"en": "Color Blended Layers",
+"comment": ""
+},
+{
+"i": 240,
+"en": "Color Copied Images",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Color Misaligned Images",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Color Offscreen Rendering",
+"comment": ""
+},
+{
+"i": 243,
+"en": "Slow Animations",
+"comment": ""
+},
+{
+"i": 244,
+"en": "The active Xcode worker did not negotiate accessibility inspection.",
+"comment": ""
+},
+{
+"i": 245,
+"en": "Accessibility requires a live framebuffer.",
+"comment": ""
+},
+{
+"i": 246,
+"en": "The worker could not update the accessibility highlight overlay.",
+"comment": ""
+},
+{
+"i": 247,
+"en": "An accessibility snapshot is already at capacity.",
+"comment": ""
+},
+{
+"i": 248,
+"en": "The Simulator display changed during accessibility inspection.",
+"comment": ""
+},
+{
+"i": 249,
+"en": "Accessibility inspection is unavailable",
+"comment": ""
+},
+{
+"i": 250,
+"en": "The Simulator worker could not release camera and inspector ownership of the app.",
+"comment": ""
+},
+{
+"i": 251,
+"en": "The active Xcode worker did not negotiate an isolated camera adapter.",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Camera authorization readback rejected an invalid device or bundle identifier.",
+"comment": ""
+},
+{
+"i": 253,
+"en": "The saved Simulator camera authorization could not be restored.",
+"comment": ""
+},
+{
+"i": 254,
+"en": "The Simulator camera authorization has an unsupported value and was not changed.",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Camera cleanup is still running. Retry after it finishes.",
+"comment": ""
+},
+{
+"i": 256,
+"en": "The isolated worker could not configure the requested camera source and target.",
+"comment": ""
+},
+{
+"i": 257,
+"en": "The worker could not update camera mirroring.",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Another cmux Simulator pane already owns the camera feed for this device.",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Could not open the Simulator camera ownership lock.",
+"comment": ""
+},
+{
+"i": 260,
+"en": "A synthetic-camera source can only be switched while a camera session is active.",
+"comment": ""
+},
+{
+"i": 261,
+"en": "The isolated worker could not switch the active camera source.",
+"comment": ""
+},
+{
+"i": 262,
+"en": "The camera action is unavailable",
+"comment": ""
+},
+{
+"i": 263,
+"en": "The Simulator command was cancelled.",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Simulator subprocess output limits must be nonnegative.",
+"comment": ""
+},
+{
+"i": 265,
+"en": "The Simulator command timed out.",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Could not start the selected Simulator",
+"comment": ""
+},
+{
+"i": 267,
+"en": "Could not load Simulator devices",
+"comment": ""
+},
+{
+"i": 268,
+"en": "Simulator %1$@ changed to %2$@.",
+"comment": ""
+},
+{
+"i": 269,
+"en": "The Simulator became unavailable before the request was delivered.",
+"comment": ""
+},
+{
+"i": 270,
+"en": "A Simulator worker request reused an active correlation identifier.",
+"comment": ""
+},
+{
+"i": 271,
+"en": "The active Xcode worker did not negotiate foreground-app inspection.",
+"comment": ""
+},
+{
+"i": 272,
+"en": "A foreground-application read is already at capacity.",
+"comment": ""
+},
+{
+"i": 273,
+"en": "The Simulator changed during foreground-app inspection.",
+"comment": ""
+},
+{
+"i": 274,
+"en": "The previous foreground-application read is still unwinding.",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Simulator input is unavailable",
+"comment": ""
+},
+{
+"i": 276,
+"en": "The isolated worker could not complete the Simulator action.",
+"comment": ""
+},
+{
+"i": 277,
+"en": "The location action could not be completed",
+"comment": ""
+},
+{
+"i": 278,
+"en": "The Simulator did not confirm its requested orientation.",
+"comment": ""
+},
+{
+"i": 279,
+"en": "Simulator input exceeded its bounded host queue; held input was released and the worker stopped.",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Private permission changes require an installed application bundle identifier.",
+"comment": ""
+},
+{
+"i": 281,
+"en": "The active Xcode worker did not negotiate a safe adapter for %@.",
+"comment": ""
+},
+{
+"i": 282,
+"en": "The active Xcode worker did not negotiate permission readback.",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Reset All needs the active Xcode worker's isolated extended-permissions adapter.",
+"comment": ""
+},
+{
+"i": 284,
+"en": "The permission action is unavailable",
+"comment": ""
+},
+{
+"i": 285,
+"en": "The in-Simulator accessibility helper could not apply the requested setting.",
+"comment": ""
+},
+{
+"i": 286,
+"en": "The isolated worker could not update %@.",
+"comment": ""
+},
+{
+"i": 287,
+"en": "The Simulator protocol exceeded its bounded queue.",
+"comment": ""
+},
+{
+"i": 288,
+"en": "React Native could not be reloaded",
+"comment": ""
+},
+{
+"i": 289,
+"en": "The worker could not reload the foreground React Native application.",
+"comment": ""
+},
+{
+"i": 290,
+"en": "The Simulator renderer stopped",
+"comment": ""
+},
+{
+"i": 291,
+"en": "The Simulator renderer is unavailable",
+"comment": ""
+},
+{
+"i": 292,
+"en": "The saved Simulator is no longer available. Choose another device.",
+"comment": ""
+},
+{
+"i": 293,
+"en": "A Simulator event subscriber exceeded its bounded queue.",
+"comment": ""
+},
+{
+"i": 294,
+"en": "Simulator permissions are not available yet. Wait for the device to finish starting.",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Technical Details",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Enter text to type",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Text is too long to type",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Text is too long to type (maximum %lld UTF-8 bytes)",
+"comment": ""
+},
+{
+"i": 299,
+"en": "Text contains a character that cannot be typed with a US keyboard",
+"comment": ""
+}
+]

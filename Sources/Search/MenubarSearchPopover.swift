@@ -1,6 +1,7 @@
 import CmuxFoundation
 import AppKit
 import SwiftUI
+import ShellXIcons
 
 @MainActor
 final class MenubarSearchPopover: NSObject, NSPopoverDelegate {
@@ -191,7 +192,7 @@ private struct GlobalSearchPaletteView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
+                ShellXIcon.image("magnifyingglass")
                     .cmuxFont(size: 15, weight: .semibold)
                     .foregroundStyle(.secondary)
                 TextField(
@@ -292,7 +293,7 @@ private struct GlobalSearchResultRowView: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: row.systemImageName)
+                ShellXIcon.image(row.systemImageName)
                     .cmuxFont(size: 14, weight: .semibold)
                     .foregroundStyle(isSelected ? .primary : .secondary)
                     .frame(width: 22, height: 22)

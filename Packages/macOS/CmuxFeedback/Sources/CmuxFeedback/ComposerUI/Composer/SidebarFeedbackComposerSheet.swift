@@ -1,6 +1,7 @@
 import CmuxFoundation
 public import SwiftUI
 import AppKit
+import ShellXIcons
 
 /// Modal feedback composer presented from the sidebar help menu.
 ///
@@ -145,9 +146,9 @@ public struct SidebarFeedbackComposerSheet: View {
                     Button {
                         chooseAttachments()
                     } label: {
-                        Label(
+                        ShellXLabel(
                             String(localized: "sidebar.help.feedback.attachImages", defaultValue: "Attach Images", bundle: .module),
-                            systemImage: "paperclip"
+                            icon: "paperclip"
                         )
                     }
                     .accessibilityIdentifier("SidebarFeedbackAttachButton")
@@ -167,7 +168,7 @@ public struct SidebarFeedbackComposerSheet: View {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(attachments) { attachment in
                             HStack(spacing: 8) {
-                                Image(systemName: "photo")
+                                ShellXIcon.image("photo")
                                     .foregroundStyle(.secondary)
                                 Text(attachment.fileName)
                                     .cmuxFont(size: 12)

@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "The report stays on this Mac until you share it. It excludes terminal content, account and endpoint identities, network addresses, relay URLs, credentials, and raw errors.",
+"comment": ""
+},
+{
+"i": 1,
+"en": "Share a bounded, privacy-safe connection timeline with support.",
+"comment": ""
+},
+{
+"i": 2,
+"en": "This setting is not configurable with the current transport.",
+"comment": ""
+},
+{
+"i": 3,
+"en": "Never Use Relays",
+"comment": ""
+},
+{
+"i": 4,
+"en": "Requires a reachable direct, local-network, or private-network path. Applies on the next reconnect.",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Using the last verified catalog",
+"comment": ""
+},
+{
+"i": 6,
+"en": "Verified from cmux",
+"comment": ""
+},
+{
+"i": 7,
+"en": "No valid catalog available",
+"comment": ""
+},
+{
+"i": 8,
+"en": "Selected cmux Relays",
+"comment": ""
+},
+{
+"i": 9,
+"en": "Add Private Network",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Edit Private Network",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Enabled",
+"comment": ""
+},
+{
+"i": 12,
+"en": "Host or IP Address",
+"comment": ""
+},
+{
+"i": 13,
+"en": "Use this for Tailscale alternatives, a company VPN, or a private network you operate. Authentication still happens before cmux accepts the route.",
+"comment": ""
+},
+{
+"i": 14,
+"en": "The other Mac must run a current cmux build that advertises Iroh private-path support. Custom raw TCP routes are not accepted because they cannot prove the remote Mac. Iroh private paths stay encrypted and bound to its exact EndpointID.",
+"comment": ""
+},
+{
+"i": 15,
+"en": "Port",
+"comment": ""
+},
+{
+"i": 16,
+"en": "Remove this private network?",
+"comment": ""
+},
+{
+"i": 17,
+"en": "Iroh discovers usable LAN and VPN paths after authenticating the other device.",
+"comment": ""
+},
+{
+"i": 18,
+"en": "Tailscale Compatibility",
+"comment": ""
+},
+{
+"i": 19,
+"en": "Retained for released clients and networks where Iroh cannot connect.",
+"comment": ""
+},
+{
+"i": 20,
+"en": "Private Networks",
+"comment": ""
+},
+{
+"i": 21,
+"en": "Keeps Iroh connections to this Mac on cmux relays instead of direct or local-network paths. Applies on the next reconnect.",
+"comment": ""
+},
+{
+"i": 22,
+"en": "cmux downloads a signed relay catalog. Fleet additions, removals, and regional changes do not require an app update.",
+"comment": ""
+},
+{
+"i": 23,
+"en": "Relay Preference",
+"comment": ""
+},
+{
+"i": 24,
+"en": "Direct peer-to-peer stays enabled. This controls which relays Iroh may use when a direct path is unavailable.",
+"comment": ""
+},
+{
+"i": 25,
+"en": "Could Not Save Networking Settings",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Your previous networking configuration is still active. Check your account connection and relay values, then try again.",
+"comment": ""
+},
+{
+"i": 27,
+"en": "Iroh Status",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Iroh endpoint active",
+"comment": ""
+},
+{
+"i": 29,
+"en": "Direct-only until relay settings recover",
+"comment": ""
+},
+{
+"i": 30,
+"en": "Connected directly peer-to-peer",
+"comment": ""
+},
+{
+"i": 31,
+"en": "Connected through %@",
+"comment": ""
+},
+{
+"i": 32,
+"en": "Connected through a private network",
+"comment": ""
+},
+{
+"i": 33,
+"en": "Connected through %1$@, %2$@",
+"comment": ""
+},
+{
+"i": 34,
+"en": "Test",
+"comment": ""
+},
+{
+"i": 35,
+"en": "unreachable",
+"comment": ""
+},
+{
+"i": 36,
+"en": "test unavailable",
+"comment": ""
+},
+{
+"i": 37,
+"en": "reachable",
+"comment": ""
+},
+{
+"i": 38,
+"en": "Notify when an agent has been idle waiting for your input. Suppressed while background work is still running.",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Agent Waiting for Input",
+"comment": ""
+},
+{
+"i": 40,
+"en": "Notify when an agent is blocked waiting for your permission to run a tool.",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Agent Needs Permission",
+"comment": ""
+},
+{
+"i": 42,
+"en": "When idle",
+"comment": ""
+},
+{
+"i": 43,
+"en": "When to notify that an agent finished. When idle waits until background tasks and scheduled wakeups drain.",
+"comment": ""
+},
+{
+"i": 44,
+"en": "Agent Finished",
+"comment": ""
+},
+{
+"i": 45,
+"en": "Notification Command",
+"comment": ""
+},
+{
+"i": 46,
+"en": "say \"done\"",
+"comment": ""
+},
+{
+"i": 47,
+"en": "Run a shell command when a notification arrives. $CMUX_NOTIFICATION_TITLE, $CMUX_NOTIFICATION_SUBTITLE, $CMUX_NOTIFICATION_BODY are set.",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Desktop Notifications",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Send Test",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Deliver Quietly",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Denied",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Temporary",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Permission unknown",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Desktop notifications are enabled.",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Desktop notifications are disabled in System Settings.",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Desktop notifications are not enabled yet.",
+"comment": ""
+},
+{
+"i": 57,
+"en": "cmux test notification",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Briefly flash an outline when cmux highlights a pane.",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Pane Flash",
+"comment": ""
+},
+{
+"i": 60,
+"en": "Show a ring around panes with unread notifications.",
+"comment": ""
+},
+{
+"i": 61,
+"en": "Unread Pane Ring",
+"comment": ""
+},
+{
+"i": 62,
+"en": "Choose Custom File…",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Choose Notification Sound",
+"comment": ""
+},
+{
+"i": 64,
+"en": "Error / Stalled",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Choose a sound for each agent and alert type. Empty cells use the global notification sound.",
+"comment": ""
+},
+{
+"i": 66,
+"en": "That file is missing or cannot be decoded as audio.",
+"comment": ""
+},
+{
+"i": 67,
+"en": "The saved per-agent sound settings are invalid. Fix notifications.soundOverrides in cmux.json before editing.",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Needs Input",
+"comment": ""
+},
+{
+"i": 69,
+"en": "No registered agents found.",
+"comment": ""
+},
+{
+"i": 70,
+"en": "Override the sound for a specific agent and alert type.",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Per-Agent Notification Sounds",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Turn Done",
+"comment": ""
+},
+{
+"i": 73,
+"en": "Use Global Sound",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Basso",
+"comment": ""
+},
+{
+"i": 75,
+"en": "Blow",
+"comment": ""
+},
+{
+"i": 76,
+"en": "Bottle",
+"comment": ""
+},
+{
+"i": 77,
+"en": "Frog",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Funk",
+"comment": ""
+},
+{
+"i": 79,
+"en": "Glass",
+"comment": ""
+},
+{
+"i": 80,
+"en": "Hero",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Morse",
+"comment": ""
+},
+{
+"i": 82,
+"en": "Ping",
+"comment": ""
+},
+{
+"i": 83,
+"en": "Pop",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Purr",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Sosumi",
+"comment": ""
+},
+{
+"i": 86,
+"en": "Submarine",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Tink",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Custom File…",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Choose...",
+"comment": ""
+},
+{
+"i": 90,
+"en": "Choose",
+"comment": ""
+},
+{
+"i": 91,
+"en": "The file is missing or cannot be decoded as audio.",
+"comment": ""
+},
+{
+"i": 92,
+"en": "Custom Notification Sound Error",
+"comment": ""
+},
+{
+"i": 93,
+"en": "No file selected",
+"comment": ""
+},
+{
+"i": 94,
+"en": "Validating notification sound",
+"comment": ""
+},
+{
+"i": 95,
+"en": "Choose a custom audio file first.",
+"comment": ""
+},
+{
+"i": 96,
+"en": "File needs an extension: ",
+"comment": ""
+},
+{
+"i": 97,
+"en": "File not found: ",
+"comment": ""
+},
+{
+"i": 98,
+"en": "Could not prepare this file for notifications. Try WAV, AIFF, or CAF.",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Ready for notifications.",
+"comment": ""
+},
+{
+"i": 100,
+"en": "Prepared for notifications (converted to CAF).",
+"comment": ""
+},
+{
+"i": 101,
+"en": "Sound played when a notification arrives.",
+"comment": ""
+},
+{
+"i": 102,
+"en": "Notification Sound",
+"comment": ""
+},
+{
+"i": 103,
+"en": "HUD Glass",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Native Sidebar",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Popover Glass",
+"comment": ""
+},
+{
+"i": 106,
+"en": "Raycast Gray",
+"comment": ""
+},
+{
+"i": 107,
+"en": "Soft Blur",
+"comment": ""
+},
+{
+"i": 108,
+"en": "Reset All Settings",
+"comment": ""
+},
+{
+"i": 109,
+"en": "auth authentication login logout sign in sign out email user profile team",
+"comment": ""
+},
+{
+"i": 110,
+"en": "general preferences prefs behavior chrome dock menubar menu bar status notifications telemetry",
+"comment": ""
+},
+{
+"i": 111,
+"en": "api cli control socket mcp agents hooks ports",
+"comment": ""
+},
+{
+"i": 112,
+"en": "web webview address bar omnibar links urls embedded default browser",
+"comment": ""
+},
+{
+"i": 113,
+"en": "chrome safari firefox brave edge arc bookmarks history cookies profiles",
+"comment": ""
+},
+{
+"i": 114,
+"en": "cloud machines vm virtual machine persistent computer sandbox plan upgrade fleet freestyle",
+"comment": ""
+},
+{
+"i": 115,
+"en": "custom sidebars vibe code swift json interpreted renderer in-process remote worker isolated",
+"comment": ""
+},
+{
+"i": 116,
+"en": "system shortcut global keyboard show hide bring forward",
+"comment": ""
+},
+{
+"i": 117,
+"en": "keybinds key bindings hotkeys chords accelerators commands",
+"comment": ""
+},
+{
+"i": 118,
+"en": "ios iphone ipad mobile pairing local network permission sync",
+"comment": ""
+},
+{
+"i": 119,
+"en": "iroh relay relays server fleet provider region custom self hosted private network tailscale vpn direct peer",
+"comment": ""
+},
+{
+"i": 120,
+"en": "factory defaults restore clear preferences",
+"comment": ""
+},
+{
+"i": 121,
+"en": "configuration config file json jsonc dotfile ~/.config schema docs",
+"comment": ""
+},
+{
+"i": 122,
+"en": "sidebar left rail navigation details branches badges material terminal background",
+"comment": ""
+},
+{
+"i": 123,
+"en": "sleepy mode screensaver caffeinate keep awake do not sleep lock touch id battery wifi clock mascot theme glow pixel night",
+"comment": ""
+},
+{
+"i": 124,
+"en": "shell scrollback scrollbar scroll bar ghostty tty pty",
+"comment": ""
+},
+{
+"i": 125,
+"en": "textbox text box rich input prompt focus composer compose attachments",
+"comment": ""
+},
+{
+"i": 126,
+"en": "tab colors palette accent badge selected highlight",
+"comment": ""
+},
+{
+"i": 127,
+"en": "auth authentication login logout signin sign-in signout sign-out email user profile stack team",
+"comment": ""
+},
+{
+"i": 128,
+"en": "app.appIcon dock icon application icon app switcher alternate icon",
+"comment": ""
+},
+{
+"i": 129,
+"en": "app.accentColor accent color highlight tint blue purple system accent macOS accent cmux blue",
+"comment": ""
+},
+{
+"i": 130,
+"en": "app.appearance theme color scheme light mode dark mode system mode",
+"comment": ""
+},
+{
+"i": 131,
+"en": "canvas.paneGap canvas pane gap spacing freeform layout panes snapping tidy distribute align",
+"comment": ""
+},
+{
+"i": 132,
+"en": "canvas.snappingEnabled canvas snap snapping enabled edges drag resize align panes freeform layout",
+"comment": ""
+},
+{
+"i": 133,
+"en": "app.defaultTerminal default terminal ssh links command tool unix executable launch services handler",
+"comment": ""
+},
+{
+"i": 134,
+"en": "macos desktop notifications system settings permission alerts notify test",
+"comment": ""
+},
+{
+"i": 135,
+"en": "notifications.dockBadge badge dock unread count icon notifications red bubble",
+"comment": ""
+},
+{
+"i": 136,
+"en": "fileEditor.wordWrap file editor word wrap soft wrap reflow lines text horizontal scroll preview",
+"comment": ""
+},
+{
+"i": 137,
+"en": "app.focusPaneOnFirstClick click to focus focus follows mouse first click mouse activation",
+"comment": ""
+},
+{
+"i": 138,
+"en": "app.forkConversationDefaultDestination fork conversation right left top bottom split tab workspace default",
+"comment": ""
+},
+{
+"i": 139,
+"en": "sidebar.hideAllDetails compact sidebar hide details only title minimal left rail",
+"comment": ""
+},
+{
+"i": 140,
+"en": "app.hideTabCloseButton hide close tab x button terminal surface",
+"comment": ""
+},
+{
+"i": 141,
+"en": "app.keepWorkspaceOpenWhenClosingLastSurface close last pane surface keep tab workspace",
+"comment": ""
+},
+{
+"i": 142,
+"en": "app.language locale l10n localization translation japanese english ja en nihongo restart",
+"comment": ""
+},
+{
+"i": 143,
+"en": "sidebar.loadingSpinnerPosition loading spinner position left right leading trailing side workspace",
+"comment": ""
+},
+{
+"i": 144,
+"en": "markdown.fontFamily md markdown viewer font font-family family typeface system stack custom",
+"comment": ""
+},
+{
+"i": 145,
+"en": "markdown.fontSize md markdown viewer font size points zoom scale text bigger smaller larger default",
+"comment": ""
+},
+{
+"i": 146,
+"en": "markdown.maxWidth md markdown viewer max width column reading line length pixels px narrow wide",
+"comment": ""
+},
+{
+"i": 147,
+"en": "app.openMarkdownInCmuxViewer md markdown mdx viewer preview readme",
+"comment": ""
+},
+{
+"i": 148,
+"en": "app.menuBarOnly menubar menu bar dockless hide dock app switcher cmd-tab command-tab",
+"comment": ""
+},
+{
+"i": 149,
+"en": "app.minimalMode minimal layout simple chrome compact titlebar controls",
+"comment": ""
+},
+{
+"i": 150,
+"en": "app.newWorkspacePlacement new tab insert position order top bottom end",
+"comment": ""
+},
+{
+"i": 151,
+"en": "sidebar.notificationBadgePosition notification unread badge position left right leading trailing side workspace",
+"comment": ""
+},
+{
+"i": 152,
+"en": "notifications.command shell command hook script env environment variable variables done agent",
+"comment": ""
+},
+{
+"i": 153,
+"en": "notifications.sound notifications.customSoundFilePath sound audio alert chime beep custom file wav mp3 caf aiff",
+"comment": ""
+},
+{
+"i": 154,
+"en": "notifications.soundOverrides per-agent agent sound turn done needs input permission error stalled custom file",
+"comment": ""
+},
+{
+"i": 155,
+"en": "sidebar.openPortLinksInCmuxBrowser ports localhost links browser default external embedded",
+"comment": ""
+},
+{
+"i": 156,
+"en": "sidebar.openPullRequestLinksInCmuxBrowser pr links github browser default external embedded",
+"comment": ""
+},
+{
+"i": 157,
+"en": "app.commandPaletteSearchesAllSurfaces command palette search all surfaces cmd-p terminal browser markdown",
+"comment": ""
+},
+{
+"i": 158,
+"en": "notifications.paneFlash flash blink highlight pane notification pulse",
+"comment": ""
+},
+{
+"i": 159,
+"en": "app.preferredEditor editor open file code vscode visual studio zed sublime subl cursor",
+"comment": ""
+},
+{
+"i": 160,
+"en": "app.renameSelectsExistingName rename select all existing title command palette workspace name",
+"comment": ""
+},
+{
+"i": 161,
+"en": "app.reorderOnNotification notification reorder move workspace top unread sort",
+"comment": ""
+},
+{
+"i": 162,
+"en": "sidebar.showAgentActivity loading spinner active coding agent agents running activity",
+"comment": ""
+},
+{
+"i": 163,
+"en": "sidebar.showBranchDirectory git branch cwd path directory folder repo sidebar",
+"comment": ""
+},
+{
+"i": 164,
+"en": "sidebar.showLog log status latest message imperative",
+"comment": ""
+},
+{
+"i": 165,
+"en": "notifications.showInMenuBar menubar menu bar status item tray extra",
+"comment": ""
+},
+{
+"i": 166,
+"en": "sidebar.showCustomMetadata metadata meta report_meta status custom block",
+"comment": ""
+},
+{
+"i": 167,
+"en": "sidebar.showNotificationMessage latest message unread notification text sidebar",
+"comment": ""
+},
+{
+"i": 168,
+"en": "sidebar.showPorts localhost port listener dev server url",
+"comment": ""
+},
+{
+"i": 169,
+"en": "sidebar.showProgress progress bar percent status set_progress",
+"comment": ""
+},
+{
+"i": 170,
+"en": "sidebar.showPullRequests pr mr review github gitlab bitbucket pull request merge request",
+"comment": ""
+},
+{
+"i": 171,
+"en": "sidebar.showSSH remote host target ssh server",
+"comment": ""
+},
+{
+"i": 172,
+"en": "sidebar.showWorkspaceDescription workspace description notes markdown sidebar",
+"comment": ""
+},
+{
+"i": 173,
+"en": "sidebar.branchLayout git branch layout vertical inline cwd directory",
+"comment": ""
+},
+{
+"i": 174,
+"en": "app.openSupportedFilesInCmux cmd click file preview pdf image video audio quicklook quick look editor external",
+"comment": ""
+},
+{
+"i": 175,
+"en": "app.sendAnonymousTelemetry analytics crash reports sentry posthog usage anonymous privacy",
+"comment": ""
+},
+{
+"i": 176,
+"en": "ghostty config configuration terminal settings preview merged file reload macos-option-as-alt option as alt left option right option alt key meta",
+"comment": ""
+},
+{
+"i": 177,
+"en": "notifications.unreadPaneRing blue border unread ring notification pane outline",
+"comment": ""
+},
+{
+"i": 178,
+"en": "app.warnBeforeClosingTab close tab confirmation command-w cmd-w terminal surface",
+"comment": ""
+},
+{
+"i": 179,
+"en": "app.warnBeforeClosingTabXButton close tab x button confirmation terminal surface",
+"comment": ""
+},
+{
+"i": 180,
+"en": "app.warnBeforeQuit quit confirmation command-q cmd-q exit close app",
+"comment": ""
+},
+{
+"i": 181,
+"en": "sidebar.watchGitStatus git status branch watcher index lock",
+"comment": ""
+},
+{
+"i": 182,
+"en": "workspaceGroups.newWorkspacePlacement group new workspace command n cmd-n plus insert position after current top end",
+"comment": ""
+},
+{
+"i": 183,
+"en": "app.workspaceInheritWorkingDirectory workspace cwd directory inherit current focused ghostty working-directory",
+"comment": ""
+},
+{
+"i": 184,
+"en": "sidebar.wrapWorkspaceTitles workspace title wrap multiline pr pull request",
+"comment": ""
+},
+{
+"i": 185,
+"en": "automation.claudeCodeIntegration claude code hooks agent integration status notifications",
+"comment": ""
+},
+{
+"i": 186,
+"en": "automation.claudeBinaryPath claude binary executable path cli command custom",
+"comment": ""
+},
+{
+"i": 187,
+"en": "automation.cursorIntegration cursor ide agent hooks notifications",
+"comment": ""
+},
+{
+"i": 188,
+"en": "automation.geminiIntegration gemini cli google agent hooks notifications",
+"comment": ""
+},
+{
+"i": 189,
+"en": "automation.kiroIntegration kiro cli amazon q agent hooks notifications",
+"comment": ""
+},
+{
+"i": 190,
+"en": "automation.kiroNotificationLevel kiro cli notification verbosity minimal standard verbose tool events",
+"comment": ""
+},
+{
+"i": 191,
+"en": "automation.portBase cmux_port start first base env environment variable",
+"comment": ""
+},
+{
+"i": 192,
+"en": "automation.portRange cmux_port_end range size count env ports",
+"comment": ""
+},
+{
+"i": 193,
+"en": "automation.ripgrepBinaryPath ripgrep rg binary executable path search find nix custom",
+"comment": ""
+},
+{
+"i": 194,
+"en": "automation.socketControlMode api socket unix domain control server auth allow password disabled",
+"comment": ""
+},
+{
+"i": 195,
+"en": "automation.socketPassword auth token credential secret password access key",
+"comment": ""
+},
+{
+"i": 196,
+"en": "automation.suppressSubagentNotifications subagent nested child agent codex claude hooks notifications",
+"comment": ""
+},
+{
+"i": 197,
+"en": "automation.workspaceAutoNaming automation.autoNamingAgent ai auto naming auto-name auto name workspace tab workspaces tabs title titles rename workspace rename tab renaming generated summarize summary summarizer conversation agent picker naming agent",
+"comment": ""
+},
+{
+"i": 198,
+"en": "sidebar.beta.workspaceTodos.controls.enabled workspace todo todos task status checklist add item controls beta",
+"comment": ""
+},
+{
+"i": 199,
+"en": "sidebar.beta.workspaceTodos.checklistStyle workspace todo todos task status checklist popover inline presentation style beta",
+"comment": ""
+},
+{
+"i": 200,
+"en": "browser.askWhereToSaveDownloads downloads save panel folder attachments files pdf gmail",
+"comment": ""
+},
+{
+"i": 201,
+"en": "browser.enabled enable disable webview embedded browser tabs links",
+"comment": ""
+},
+{
+"i": 202,
+"en": "browser.urlsToAlwaysOpenExternally denylist blocklist regex rules external default browser",
+"comment": ""
+},
+{
+"i": 203,
+"en": "browser.discardHiddenWebViews memory hidden tabs webview discard unload reclaim",
+"comment": ""
+},
+{
+"i": 204,
+"en": "browser.hiddenWebViewDiscardDelaySeconds memory hidden tabs delay seconds discard unload",
+"comment": ""
+},
+{
+"i": 205,
+"en": "clear browser history visited pages suggestions omnibar",
+"comment": ""
+},
+{
+"i": 206,
+"en": "browser.hostsToOpenInEmbeddedBrowser allowlist whitelist host wildcard domain embedded browser",
+"comment": ""
+},
+{
+"i": 207,
+"en": "browser.insecureHttpHostsAllowedInEmbeddedBrowser insecure http allowlist localhost localtest non-https warning",
+"comment": ""
+},
+{
+"i": 208,
+"en": "browser.interceptTerminalOpenCommandInCmuxBrowser open command http https url terminal intercept",
+"comment": ""
+},
+{
+"i": 209,
+"en": "browser.reactGrabVersion react grab npm version toolbar cmd-shift-g inspect component",
+"comment": ""
+},
+{
+"i": 210,
+"en": "browser.defaultSearchEngine browser.customSearchEngineName browser.customSearchEngineURLTemplate omnibar address bar google duckduckgo bing kagi brave startpage perplexity exa yahoo ecosia qwant mojeek wikipedia github baidu yandex custom search provider",
+"comment": ""
+},
+{
+"i": 211,
+"en": "browser.showSearchSuggestions suggest autocomplete address bar search suggestions",
+"comment": ""
+},
+{
+"i": 212,
+"en": "browser.openTerminalLinksInCmuxBrowser click url terminal links open in browser href",
+"comment": ""
+},
+{
+"i": 213,
+"en": "browser.theme web page theme color scheme light dark system",
+"comment": ""
+},
+{
+"i": 214,
+"en": "chrome safari firefox brave edge arc bookmarks history cookies profiles migration",
+"comment": ""
+},
+{
+"i": 215,
+"en": "browser.showImportHintOnBlankTabs blank tab onboarding hint import prompt dismiss",
+"comment": ""
+},
+{
+"i": 216,
+"en": "global hotkey enable system wide show hide all windows",
+"comment": ""
+},
+{
+"i": 217,
+"en": "global hotkey shortcut recorder key command option control",
+"comment": ""
+},
+{
+"i": 218,
+"en": "tmux prefix ctrl-b control-b multi key sequence chord cmux json",
+"comment": ""
+},
+{
+"i": 219,
+"en": "hotkeys keybindings key bindings commands keyboard accelerators shortcuts cmux json",
+"comment": ""
+},
+{
+"i": 220,
+"en": "mobile ios iphone files folders directory subtree one level authorization security",
+"comment": ""
+},
+{
+"i": 221,
+"en": "mobile ios iphone pairing display name mac hostname device label",
+"comment": ""
+},
+{
+"i": 222,
+"en": "mobile ios iphone pairing port tcp listener firewall conflict bind",
+"comment": ""
+},
+{
+"i": 223,
+"en": "iroh custom relay self hosted server url secret credential device authentication",
+"comment": ""
+},
+{
+"i": 224,
+"en": "relay policy signed verified catalog cached server expiry sequence security",
+"comment": ""
+},
+{
+"i": 225,
+"en": "private network lan vpn direct peer path local address generic provider automatic",
+"comment": ""
+},
+{
+"i": 226,
+"en": "iroh relay preference automatic managed selected cmux fleet provider region account",
+"comment": ""
+},
+{
+"i": 227,
+"en": "iroh status diagnostics direct peer relay degraded active inactive refresh",
+"comment": ""
+},
+{
+"i": 228,
+"en": "tailscale tailnet private ip compatibility vpn legacy tcp automatic",
+"comment": ""
+},
+{
+"i": 229,
+"en": "factory reset restore defaults clear preferences",
+"comment": ""
+},
+{
+"i": 230,
+"en": "docs documentation schema reference cmux json keys configuration",
+"comment": ""
+},
+{
+"i": 231,
+"en": "open config file json jsonc config editor ~/.config cmux preferences",
+"comment": ""
+},
+{
+"i": 232,
+"en": "sidebarAppearance.darkModeTintColor dark color sidebar tint hex nighttime",
+"comment": ""
+},
+{
+"i": 233,
+"en": "sidebar-font-size sidebar font size text scale workspace title badge metadata shortcut hint",
+"comment": ""
+},
+{
+"i": 234,
+"en": "sidebarAppearance.lightModeTintColor light color sidebar tint hex daytime",
+"comment": ""
+},
+{
+"i": 235,
+"en": "sidebarAppearance.matchTerminalBackground transparent background material terminal background sync",
+"comment": ""
+},
+{
+"i": 236,
+"en": "restore default clear tint colors opacity",
+"comment": ""
+},
+{
+"i": 237,
+"en": "sidebar.rightMaxWidth dock right sidebar max width terminal reservation cap logs lazygit",
+"comment": ""
+},
+{
+"i": 238,
+"en": "sidebarAppearance.tintOpacity alpha transparency intensity blend",
+"comment": ""
+},
+{
+"i": 239,
+"en": "terminal.adaptiveDefaultTheme adaptive default theme appearance light dark palette Ghostty managed colors empty untouched config preserve settings",
+"comment": ""
+},
+{
+"i": 240,
+"en": "terminal.copyOnSelect copy on selection select clipboard mouse double click triple click iterm",
+"comment": ""
+},
+{
+"i": 241,
+"en": "terminal.showCopyConfirmation copy confirmation copied clipboard feedback indicator toast popup copy on selection select mouse",
+"comment": ""
+},
+{
+"i": 242,
+"en": "terminal.reflowHardWrapOnCopy reflow hard wrap copy soft wrap line breaks newlines paste",
+"comment": ""
+},
+{
+"i": 243,
+"en": "surface resume commands approvals command prefixes auto restore ask manual tmux hibernation sticky process",
+"comment": ""
+},
+{
+"i": 244,
+"en": "terminal.showScrollBar scrollback scrollbar scroll bar right edge alternate screen tui",
+"comment": ""
+},
+{
+"i": 245,
+"en": "terminal.sessionContentAlignment terminal agent chat left center right alignment position",
+"comment": ""
+},
+{
+"i": 246,
+"en": "terminal.sessionContentMaxWidth terminal agent chat max width readable line length points pt narrow wide",
+"comment": ""
+},
+{
+"i": 247,
+"en": "surface-tab-bar-font-size tab bar font size text scale terminal browser pane tab title",
+"comment": ""
+},
+{
+"i": 248,
+"en": "terminal.textBoxDefaultSubmitAction submit action shift tab claude codex opencode pi agent route provider icon new session",
+"comment": ""
+},
+{
+"i": 249,
+"en": "terminal.focusTextBoxOnNewTerminals focus textbox text box rich input prompt default new terminal workspace split tab",
+"comment": ""
+},
+{
+"i": 250,
+"en": "terminal.showTextBoxOnNewTerminals show textbox text box rich input prompt default new terminal workspace split tab",
+"comment": ""
+},
+{
+"i": 251,
+"en": "terminal.textBoxMaxLines textbox text box rich input prompt max height lines grow scroll",
+"comment": ""
+},
+{
+"i": 252,
+"en": "workspaceColors.notificationBadgeColor unread notification badge color dot count",
+"comment": ""
+},
+{
+"i": 253,
+"en": "workspaceColors.indicatorStyle tab indicator active workspace style color stripe dot",
+"comment": ""
+},
+{
+"i": 254,
+"en": "workspaceColors.colors workspace palette named colors custom color reset built-in",
+"comment": ""
+},
+{
+"i": 255,
+"en": "workspaceColors.selectionColor selected workspace color highlight background active tab",
+"comment": ""
+},
+{
+"i": 256,
+"en": "No Results",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Automation",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Beta Features",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Global Hotkey",
+"comment": ""
+},
+{
+"i": 260,
+"en": "Keyboard Shortcuts",
+"comment": ""
+},
+{
+"i": 261,
+"en": "Networking",
+"comment": ""
+},
+{
+"i": 262,
+"en": "TextBox",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Workspace Colors",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Open Docs",
+"comment": ""
+},
+{
+"i": 265,
+"en": "Documentation",
+"comment": ""
+},
+{
+"i": 266,
+"en": "View supported keys, file locations, schema, and reload behavior.",
+"comment": ""
+},
+{
+"i": 267,
+"en": "User config file",
+"comment": ""
+},
+{
+"i": 268,
+"en": "Edit cmux-owned app settings, shortcuts, automation, sidebar, notifications, and browser behavior.",
+"comment": ""
+},
+{
+"i": 269,
+"en": "Shortcut Chords",
+"comment": ""
+},
+{
+"i": 270,
+"en": "Chord docs",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Add tmux-style multi-step shortcuts in cmux.json, for example [\"ctrl+b\", \"c\"].",
+"comment": ""
+},
+{
+"i": 272,
+"en": "Managed in cmux.json",
+"comment": ""
+},
+{
+"i": 273,
+"en": "Click a shortcut value to record. Use X to unbind; it changes to restore after a clear.",
+"comment": ""
+},
+{
+"i": 274,
+"en": "Reset Default Shortcuts",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Reset Defaults",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Restore built-in shortcut values for shortcuts managed in app settings.",
+"comment": ""
+},
+{
+"i": 277,
+"en": "Show Shortcut Hints While Holding Modifier Keys",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Dock Max Width",
+"comment": ""
+},
+{
+"i": 279,
+"en": "Use custom Dock max width",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Right Sidebar Tabs",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Move %@ Down",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Move %@ Up",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Choose which tabs the right sidebar shows and their order. The ⌃1–⌃9 shortcuts follow the visible order.",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Sidebar Font Size",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Couldn't save sidebar font size. Please try again.",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Controls workspace titles, metadata, badges, and shortcut hints in the left sidebar.",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Match Terminal Background",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Use the same background color and transparency as the terminal.",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Reset Sidebar Tint",
+"comment": ""
+},
+{
+"i": 290,
+"en": "Restore default sidebar appearance.",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Dark Mode Tint",
+"comment": ""
+},
+{
+"i": 292,
+"en": "Dark tint",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Sidebar tint color when using dark appearance.",
+"comment": ""
+},
+{
+"i": 294,
+"en": "Light Mode Tint",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Light tint",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Sidebar tint color when using light appearance.",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Tint Opacity",
+"comment": ""
+},
+{
+"i": 298,
+"en": "How strongly the tint color shows over the sidebar material.",
+"comment": ""
+},
+{
+"i": 299,
+"en": "Follow Window",
+"comment": ""
+}
+]

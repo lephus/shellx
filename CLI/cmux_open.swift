@@ -811,7 +811,7 @@ extension CMUXCLI {
         let parsedArgs = try parseOpenArguments(commandArgs)
 
         guard !parsedArgs.targets.isEmpty else {
-            throw CLIError(message: "open requires at least one path or URL. Usage: cmux open <path-or-url>...")
+            throw CLIError(message: "open requires at least one path or URL. Usage: shellx open <path-or-url>...")
         }
 
         let explicitFocus: Bool?
@@ -915,7 +915,7 @@ extension CMUXCLI {
     ) throws {
         let parsedArgs = try parseDiffArguments(commandArgs)
         guard parsedArgs.inputs.count <= 1 else {
-            throw CLIError(message: "diff accepts at most one patch file. Usage: cmux diff [patch-file|-] [options]")
+            throw CLIError(message: "diff accepts at most one patch file. Usage: shellx diff [patch-file|-] [options]")
         }
         if parsedArgs.source != nil, !parsedArgs.inputs.isEmpty {
             throw CLIError(message: "diff accepts either a patch file or a git source, not both")
@@ -1286,7 +1286,7 @@ extension CMUXCLI {
                     continue
                 default:
                     if arg.hasPrefix("-") {
-                        throw CLIError(message: "open: unknown flag '\(arg)'. Usage: cmux open <path-or-url>... [--workspace <id|ref|index>] [--surface <id|ref|index>] [--pane <id|ref|index>] [--window <id|ref|index>] [--focus true|false] [--no-focus]")
+                        throw CLIError(message: "open: unknown flag '\(arg)'. Usage: shellx open <path-or-url>... [--workspace <id|ref|index>] [--surface <id|ref|index>] [--pane <id|ref|index>] [--window <id|ref|index>] [--focus true|false] [--no-focus]")
                     }
                 }
             }
@@ -1383,7 +1383,7 @@ extension CMUXCLI {
                     continue
                 default:
                     if arg.hasPrefix("-"), arg != "-" {
-                        throw CLIError(message: "diff: unknown flag '\(arg)'. Usage: cmux diff [patch-file|-] [--source <unstaged|staged|branch|last-turn>] [--workspace <id|ref|index>] [--surface <id|ref|index>] [--window <id|ref|index>] [--session <id>] [--cwd <path>] [--base <ref>] [--focus true|false] [--no-focus] [--title <text>] [--layout split|unified] [--font-size <points>]")
+                        throw CLIError(message: "diff: unknown flag '\(arg)'. Usage: shellx diff [patch-file|-] [--source <unstaged|staged|branch|last-turn>] [--workspace <id|ref|index>] [--surface <id|ref|index>] [--window <id|ref|index>] [--session <id>] [--cwd <path>] [--base <ref>] [--focus true|false] [--no-focus] [--title <text>] [--layout split|unified] [--font-size <points>]")
                     }
                 }
             }
@@ -1451,7 +1451,7 @@ extension CMUXCLI {
 
         guard let rawInput, rawInput != "-" else {
             guard isatty(STDIN_FILENO) == 0 else {
-                throw CLIError(message: "diff requires a patch file, piped stdin, or a git source. Usage: cmux diff <patch-file>|-|--unstaged|--staged|--branch|--last-turn")
+                throw CLIError(message: "diff requires a patch file, piped stdin, or a git source. Usage: shellx diff <patch-file>|-|--unstaged|--staged|--branch|--last-turn")
             }
             let data = FileHandle.standardInput.readDataToEndOfFile()
             return DiffInput(
@@ -7822,9 +7822,9 @@ extension CMUXCLI {
 
     func openSubcommandUsage() -> String {
         """
-        Usage: cmux open <path-or-url>... [options]
+        Usage: shellx open <path-or-url>... [options]
 
-        Open files, directories, or URLs in cmux.
+        Open files, directories, or URLs in ShellX.
         HTML files open in browser splits without focusing by default.
         Markdown files open in markdown preview tabs; other files open in file preview tabs.
         Multiple files open as tabs in the same target pane.
@@ -7839,19 +7839,19 @@ extension CMUXCLI {
                                        \(Self.openFocusDefaultHelp)
 
         Examples:
-          cmux open report.pdf
-          cmux open image-a.png image-b.jpg
-          cmux open ~/Downloads/movie.mov --pane pane:1
-          cmux open https://example.com
+          shellx open report.pdf
+          shellx open image-a.png image-b.jpg
+          shellx open ~/Downloads/movie.mov --pane pane:1
+          shellx open https://example.com
         """
     }
 
     func diffSubcommandUsage() -> String {
         """
-        Usage: cmux diff [patch-file|-] [options]
+        Usage: shellx diff [patch-file|-] [options]
 
-        Render a unified diff or patch in a cmux browser split.
-        With no patch file or source, cmux diff reads piped stdin.
+        Render a unified diff or patch in a ShellX browser split.
+        With no patch file or source, shellx diff reads piped stdin.
 
         Options:
           --source <name>              Diff source: unstaged, staged, branch, last-turn
@@ -7868,18 +7868,18 @@ extension CMUXCLI {
           --focus <true|false>         Focus the diff browser split (default: false)
           --no-focus                   Do not focus the opened diff browser split
           --title <text>               Set the diff viewer title to the provided text
-          --layout <split|unified>     Diff layout (default: your last choice in the viewer, then diffViewer.defaultLayout in cmux.json, then unified)
+          --layout <split|unified>     Diff layout (default: your last choice in the viewer, then diffViewer.defaultLayout in shellx.json, then unified)
           --font-size <points>         Set diff font size (default: 10)
 
         Examples:
-          cmux diff changes.patch
-          git diff | cmux diff
-          cmux diff --unstaged
-          cmux diff --staged
-          cmux diff --branch
-          cmux diff --branch --base upstream/main --repo ../repo
-          cmux diff --last-turn
-          cmux diff pr.patch --layout unified --font-size 15 --focus true
+          shellx diff changes.patch
+          git diff | shellx diff
+          shellx diff --unstaged
+          shellx diff --staged
+          shellx diff --branch
+          shellx diff --branch --base upstream/main --repo ../repo
+          shellx diff --last-turn
+          shellx diff pr.patch --layout unified --font-size 15 --focus true
         """
     }
 

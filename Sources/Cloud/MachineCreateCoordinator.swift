@@ -231,7 +231,7 @@ final class MachineCreateCoordinator {
             self.apply(self.lifecycle.finish(completion, from: attempt))
         })
         guard let handle else {
-            let failure = isRetry ? String(localized: "machines.new.error.launch", defaultValue: "cmux could not start the create command. Sign in and try again.") : nil
+            let failure = isRetry ? String(localized: "machines.new.error.launch", defaultValue: "ShellX could not start the create command. Sign in and try again.") : nil
             apply(lifecycle.refuse(attempt, retryFailure: failure))
             return false
         }

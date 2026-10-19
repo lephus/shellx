@@ -1,6 +1,7 @@
 import CmuxCloud
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// The machine menu's Network sheet: the shared editor over the stored
 /// policy, the provider's applied state beside the buttons, and Save.
@@ -52,7 +53,7 @@ struct CloudNetworkPolicySheet: View {
                 .compactMap { $0?.isEmpty == false ? $0 : nil }
                 .joined(separator: "\n")
             HStack(spacing: 4) {
-                Image(systemName: applied.state == .applied ? "checkmark.circle.fill"
+                ShellXIcon.image(applied.state == .applied ? "checkmark.circle.fill"
                     : applied.state == .pending ? "clock" : "exclamationmark.triangle.fill")
                     .foregroundStyle(applied.state == .failed ? Color.red : Color.secondary)
                 Text(applied.title)

@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import Observation
 import SwiftUI
+import ShellXIcons
 
 /// Visual variants for the Pro upgrade badge shown in the sidebar footer and
 /// the titlebar trailing controls. DEBUG exploration: the active variant is
@@ -202,7 +203,7 @@ struct ProBadgeContent: View {
             case .none:
                 EmptyView()
             case .symbol(let name):
-                Image(systemName: name)
+                ShellXIcon.image(name)
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(foreground)
             case .emoji(let emoji):
@@ -261,7 +262,7 @@ struct ProBadgeView: View {
     var actions = ProBadgeActions()
 
     private var helpTitle: String {
-        String(localized: "menu.help.upgradeToPro", defaultValue: "Upgrade to cmux Pro…")
+        String(localized: "menu.help.upgradeToPro", defaultValue: "Upgrade to ShellX Pro…")
     }
 
     private var dismissTitle: String {
@@ -296,7 +297,7 @@ struct ProBadgeView: View {
                         ProBadgeStyleStore.shared.isDismissed = true
                     }
                 } label: {
-                    Image(systemName: "xmark")
+                    ShellXIcon.image("xmark")
                         .font(.system(size: 8, weight: .bold))
                         .foregroundStyle(foreground)
                         .opacity(0.75)
@@ -374,7 +375,7 @@ private struct ProBadgeDebugView: View {
                         ProBadgeStyleStore.shared.current = style
                     } label: {
                         HStack(spacing: 10) {
-                            Image(systemName: current == style ? "largecircle.fill.circle" : "circle")
+                            ShellXIcon.image(current == style ? "largecircle.fill.circle" : "circle")
                                 .font(.system(size: 12))
                                 .foregroundStyle(current == style ? Color.accentColor : Color.secondary)
                             ProBadgeLabel(style: style)

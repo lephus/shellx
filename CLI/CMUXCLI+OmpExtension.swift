@@ -495,7 +495,7 @@ export default function cmuxOmpSessionExtension(api: ExtensionAPI) {
             throw CLIError(message: String.localizedStringWithFormat(
                 String(
                     localized: "cli.hooks.omp.error.notCmuxExtension",
-                    defaultValue: "%@ exists and is not a cmux extension; leaving it alone"
+                    defaultValue: "%@ exists and is not a ShellX extension; leaving it alone"
                 ),
                 extensionURL.path
             ))
@@ -534,7 +534,7 @@ export default function cmuxOmpSessionExtension(api: ExtensionAPI) {
             print(String.localizedStringWithFormat(
                 String(
                     localized: "cli.hooks.omp.noneFound",
-                    defaultValue: "No OMP cmux extension found at %@"
+                    defaultValue: "No OMP ShellX extension found at %@"
                 ),
                 extensionURL.path
             ))
@@ -545,7 +545,7 @@ export default function cmuxOmpSessionExtension(api: ExtensionAPI) {
             print(String.localizedStringWithFormat(
                 String(
                     localized: "cli.hooks.omp.refuseRemoveMissingMarker",
-                    defaultValue: "Refusing to remove %@: missing cmux marker"
+                    defaultValue: "Refusing to remove %@: missing ShellX marker"
                 ),
                 extensionURL.path
             ))
@@ -555,7 +555,7 @@ export default function cmuxOmpSessionExtension(api: ExtensionAPI) {
         print(String.localizedStringWithFormat(
             String(
                 localized: "cli.hooks.omp.removed",
-                defaultValue: "Removed OMP cmux extension from %@"
+                defaultValue: "Removed OMP ShellX extension from %@"
             ),
             extensionURL.path
         ))

@@ -23,7 +23,7 @@ struct SimulatorWebInspectorTargetPicker: View {
                     .disabled(target.isInUse)
                 }
             } label: {
-                SimulatorLocalizedLabel(simulatorStrings.chooseTarget, systemImage: "scope")
+                SimulatorLocalizedLabel(simulatorStrings.chooseTarget, icon: "scope")
             }
             .disabled(!isAvailable || targets.isEmpty)
             if case .attached = session {

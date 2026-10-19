@@ -16,7 +16,7 @@ struct SimulatorDeviceStage: View {
             backgroundColor
             if coordinator.devices.isEmpty, coordinator.failure == nil {
                 ContentUnavailableView {
-                    SimulatorLocalizedLabel(simulatorStrings.noDevices, systemImage: "iphone.slash")
+                    SimulatorLocalizedLabel(simulatorStrings.noDevices, icon: "iphone.slash")
                 } description: {
                     Text(simulatorStrings.noDevicesHelp)
                 } actions: {
@@ -117,7 +117,7 @@ struct SimulatorDeviceStage: View {
     @ViewBuilder
     private func failureView(_ failure: SimulatorFailure) -> some View {
         ContentUnavailableView {
-            SimulatorLocalizedLabel(simulatorStrings.failed, systemImage: "exclamationmark.triangle")
+            SimulatorLocalizedLabel(simulatorStrings.failed, icon: "exclamationmark.triangle")
         } description: {
             Text(simulatorStrings.failure(failure.code))
         } actions: {
@@ -137,13 +137,13 @@ struct SimulatorDeviceStage: View {
             }
         case .workerCrashed:
             ContentUnavailableView {
-                SimulatorLocalizedLabel(simulatorStrings.workerStopped, systemImage: "bolt.slash")
+                SimulatorLocalizedLabel(simulatorStrings.workerStopped, icon: "bolt.slash")
             } actions: {
                 SimulatorLocalizedButton(simulatorStrings.reconnect) { coordinator.recover() }
             }
         default:
             ContentUnavailableView {
-                SimulatorLocalizedLabel(simulatorStrings.selectToStart, systemImage: "iphone")
+                SimulatorLocalizedLabel(simulatorStrings.selectToStart, icon: "iphone")
             }
         }
     }

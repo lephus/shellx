@@ -134,7 +134,7 @@ public func defaultCloudVMAction(status: Int, errorCode: String, response: [Stri
     case "vm_requires_pro":
         return String(
             localized: "cloudVM.error.requiresPro.action",
-            defaultValue: "Upgrade to cmux Pro at https://cmux.com/pricing?cmux_source=mac_vm_requires_pro_error&cmux_client=mac to create Cloud VMs."
+            defaultValue: "Upgrade to ShellX Pro at https://cmux.com/pricing?cmux_source=mac_vm_requires_pro_error&cmux_client=mac to create Cloud VMs."
         )
     case "vm_memory_requires_plan":
         let details = response["details"] as? [String: Any]
@@ -144,12 +144,12 @@ public func defaultCloudVMAction(status: Int, errorCode: String, response: [Stri
         if plan == .pro {
             return String(format: String(
                 localized: "cloudVM.error.memoryRequiresPlan.proAction",
-                defaultValue: "Larger machines need cmux Pro. Upgrade at %@, or choose a smaller machine."
+                defaultValue: "Larger machines need ShellX Pro. Upgrade at %@, or choose a smaller machine."
             ), checkout.absoluteString)
         }
         return String(format: String(
             localized: "cloudVM.error.memoryRequiresPlan.action",
-            defaultValue: "Larger machines need cmux Max. Upgrade at %@, or choose a smaller machine."
+            defaultValue: "Larger machines need ShellX Max. Upgrade at %@, or choose a smaller machine."
         ), checkout.absoluteString)
     case "vm_resource_pool_exceeded":
         guard cloudVMResourcePoolUpgradePlanID(response) == CheckoutPlan.max.rawValue else {

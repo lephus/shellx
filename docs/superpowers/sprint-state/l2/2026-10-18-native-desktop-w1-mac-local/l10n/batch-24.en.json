@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Cloud access for this Mac sign-in was revoked. Sign out of cmux, then sign in again to reconnect this machine.",
+"comment": ""
+},
+{
+"i": 1,
+"en": "Sign in again to reconnect",
+"comment": ""
+},
+{
+"i": 2,
+"en": "An item with that name already exists.",
+"comment": ""
+},
+{
+"i": 3,
+"en": "You don't have permission to change this folder.",
+"comment": ""
+},
+{
+"i": 4,
+"en": "Enter a single file or folder name.",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Unable to update this file or folder.",
+"comment": ""
+},
+{
+"i": 6,
+"en": "New File",
+"comment": ""
+},
+{
+"i": 7,
+"en": "New Folder",
+"comment": ""
+},
+{
+"i": 8,
+"en": "This item and its contents will be deleted.",
+"comment": ""
+},
+{
+"i": 9,
+"en": "Duplicate",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Move to Trash",
+"comment": ""
+},
+{
+"i": 11,
+"en": "%@ copy",
+"comment": ""
+},
+{
+"i": 12,
+"en": "Delete the selected items?",
+"comment": ""
+},
+{
+"i": 13,
+"en": "These items and their contents will be deleted.",
+"comment": ""
+},
+{
+"i": 14,
+"en": "Delete “%@”?",
+"comment": ""
+},
+{
+"i": 15,
+"en": "Enter a name for this item.",
+"comment": ""
+},
+{
+"i": 16,
+"en": "File operation failed",
+"comment": ""
+},
+{
+"i": 17,
+"en": "CodeRouter handoff requires a signed-in cmux account. Run `cmux auth login`, then retry.",
+"comment": ""
+},
+{
+"i": 18,
+"en": "CodeRouter handoff requires a selected cmux team. Select a team in cmux, then retry.",
+"comment": ""
+},
+{
+"i": 19,
+"en": "The cmux account or team changed during the handoff. Try again.",
+"comment": ""
+},
+{
+"i": 20,
+"en": "The cmux handoff lease expired. Try again.",
+"comment": ""
+},
+{
+"i": 21,
+"en": "The cmux service is not available. Check your connection and try again.",
+"comment": ""
+},
+{
+"i": 22,
+"en": "The installed CodeRouter CLI does not support secure cmux handoff. Update CodeRouter and try again.",
+"comment": ""
+},
+{
+"i": 23,
+"en": "The cmux service rejected the CodeRouter handoff. Try again.",
+"comment": ""
+},
+{
+"i": 24,
+"en": "Copy Error Details",
+"comment": ""
+},
+{
+"i": 25,
+"en": "Error Details Copied",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Too many sign-in requests from this network. cmux retries automatically.",
+"comment": ""
+},
+{
+"i": 27,
+"en": "cmux retried automatically. Wait a minute, then try again. Your account and existing cmux workspaces are unchanged.",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Too many sign-in requests from this network",
+"comment": ""
+},
+{
+"i": 29,
+"en": "cmux retries automatically. Keep this pane open.",
+"comment": ""
+},
+{
+"i": 30,
+"en": "The Cloud machine did not answer the request before its deadline. The connection will be checked before retrying.",
+"comment": ""
+},
+{
+"i": 31,
+"en": "Cloud can be enabled through your team; machine access follows the team’s plan.",
+"comment": ""
+},
+{
+"i": 32,
+"en": "Included through your team’s plan.",
+"comment": ""
+},
+{
+"i": 33,
+"en": "restore: this session has no saved conversation to resume. Start the agent again in this terminal.",
+"comment": ""
+},
+{
+"i": 34,
+"en": "Your team's running machines are using all of the plan's Cloud capacity. Pause or delete a running machine, then try again.",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Every active machine your plan allows is in use. Pause or delete a running machine, then try again.",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Your team has no machine create credits left. Ask a team admin to add credits or upgrade the plan.",
+"comment": ""
+},
+{
+"i": 37,
+"en": "This size is larger than your plan includes. Choose a smaller size, or upgrade the plan.",
+"comment": ""
+},
+{
+"i": 38,
+"en": "Your account has no machine create credits left. Add Cloud VM create credits or upgrade your plan.",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Request recovery when supported. Running processes may be lost.",
+"comment": ""
+},
+{
+"i": 40,
+"en": "%1$@ restarted (status=%2$@)",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Restart Machine",
+"comment": ""
+},
+{
+"i": 42,
+"en": "Restart machine",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Codex was still updating its session locks, so cmux could not confirm this conversation is free. Retry 'cmux restore --surface'.",
+"comment": ""
+},
+{
+"i": 44,
+"en": "cmux could not read this conversation's Codex session lock, so it could not confirm the conversation is free. Retry 'cmux restore --surface'.",
+"comment": ""
+},
+{
+"i": 45,
+"en": "%1$@ · Go",
+"comment": ""
+},
+{
+"i": 46,
+"en": "%1$@ · Max",
+"comment": ""
+},
+{
+"i": 47,
+"en": "Upgrade to cmux Max",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Upgrade to cmux Max…",
+"comment": ""
+},
+{
+"i": 49,
+"en": "The browser could not turn on offline mode",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Timed out applying browser emulation",
+"comment": ""
+},
+{
+"i": 51,
+"en": "browser.geolocation.set needs latitude and longitude, or clear: true",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Latitude must be between -90 and 90, longitude between -180 and 180, and accuracy 0 or more",
+"comment": ""
+},
+{
+"i": 53,
+"en": "browser.offline.set needs enabled: true or false",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Allow SSH Machine to Write Clipboard",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Allows OSC 52 clipboard writes only from this SSH machine. The existing clipboard-read policy remains unchanged.",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Environment:",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Review Approval…",
+"comment": ""
+},
+{
+"i": 58,
+"en": "The resume proposal changed or could not be approved. No replacement command was registered. Review the current proposal and try again.",
+"comment": ""
+},
+{
+"i": 59,
+"en": "A program running within cmux would like to access the contents of other apps.",
+"comment": ""
+},
+{
+"i": 60,
+"en": "A program running within cmux would like to access data from other apps.",
+"comment": ""
+},
+{
+"i": 61,
+"en": "A program running within cmux would like to use AppleScript.",
+"comment": ""
+},
+{
+"i": 62,
+"en": "A program running within cmux would like to use Bluetooth to discover passkeys and security keys.",
+"comment": ""
+},
+{
+"i": 63,
+"en": "A program running within cmux would like to read and write your calendars.",
+"comment": ""
+},
+{
+"i": 64,
+"en": "A program running within cmux would like to add events to your calendars.",
+"comment": ""
+},
+{
+"i": 65,
+"en": "A program running within cmux would like to use your camera.",
+"comment": ""
+},
+{
+"i": 66,
+"en": "A program running within cmux would like to access files in your Desktop folder.",
+"comment": ""
+},
+{
+"i": 67,
+"en": "A program running within cmux would like to access files in your Documents folder.",
+"comment": ""
+},
+{
+"i": 68,
+"en": "A program running within cmux would like to access files in your Downloads folder.",
+"comment": ""
+},
+{
+"i": 69,
+"en": "A program running within cmux would like to access files managed by a file provider.",
+"comment": ""
+},
+{
+"i": 70,
+"en": "A program running within cmux would like to discover devices on your local network.",
+"comment": ""
+},
+{
+"i": 71,
+"en": "A program running within cmux would like to access your location.",
+"comment": ""
+},
+{
+"i": 72,
+"en": "A program running within cmux would like to use your microphone.",
+"comment": ""
+},
+{
+"i": 73,
+"en": "A program running within cmux would like to access motion data.",
+"comment": ""
+},
+{
+"i": 74,
+"en": "A program running within cmux would like to access files on a network volume.",
+"comment": ""
+},
+{
+"i": 75,
+"en": "A program running within cmux would like to read and write your reminders.",
+"comment": ""
+},
+{
+"i": 76,
+"en": "A program running within cmux would like to access files on a removable volume.",
+"comment": ""
+},
+{
+"i": 77,
+"en": "A program running within cmux would like to use speech recognition.",
+"comment": ""
+},
+{
+"i": 78,
+"en": "A program running within cmux would like to perform system administration tasks.",
+"comment": ""
+},
+{
+"i": 79,
+"en": "New $(PRODUCT_NAME) Workspace Here",
+"comment": ""
+},
+{
+"i": 80,
+"en": "New $(PRODUCT_NAME) Window Here",
+"comment": ""
+},
+{
+"i": 81,
+"en": "A program running within cmux would like to access your calendars.",
+"comment": ""
+},
+{
+"i": 82,
+"en": "A program running within cmux would like to access your reminders.",
+"comment": ""
+},
+{
+"i": 83,
+"en": "A program running within cmux would like to access your contacts.",
+"comment": ""
+},
+{
+"i": 84,
+"en": "A program running within cmux would like to access your photo library.",
+"comment": ""
+},
+{
+"i": 85,
+"en": "A program running within cmux would like to access your system's audio.",
+"comment": ""
+},
+{
+"i": 86,
+"en": "cmux installs a network extension so this Mac can reach your Cloud machines on their private network. It runs only while you use cmux Cloud.",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Pack nesting is too deep.",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Pack cycle ignored.",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Pack file does not exist.",
+"comment": ""
+},
+{
+"i": 90,
+"en": "Pack loading limit exceeded.",
+"comment": ""
+},
+{
+"i": 91,
+"en": "Pack file size could not be read.",
+"comment": ""
+},
+{
+"i": 92,
+"en": "cmux Cloud Tunnel",
+"comment": ""
+},
+{
+"i": 93,
+"en": "Duplicate diff viewer allowlist entry",
+"comment": ""
+},
+{
+"i": 94,
+"en": "Diff viewer allowlist is empty",
+"comment": ""
+},
+{
+"i": 95,
+"en": "Invalid diff viewer allowlist entry",
+"comment": ""
+},
+{
+"i": 96,
+"en": "Could not load the diff viewer. Try again.",
+"comment": ""
+},
+{
+"i": 97,
+"en": "Could not open the diff viewer. Try again.",
+"comment": ""
+},
+{
+"i": 98,
+"en": "The diff is too large to display. Try opening fewer files.",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Diff viewer file is not readable",
+"comment": ""
+},
+{
+"i": 100,
+"en": "Diff viewer trusted directory is unsafe",
+"comment": ""
+},
+{
+"i": 101,
+"en": "%@ must be an absolute path.",
+"comment": ""
+},
+{
+"i": 102,
+"en": "session.import requires exactly one of params.source or params.path.",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Session context is unavailable.",
+"comment": ""
+},
+{
+"i": 104,
+"en": "session.export requires params.path.",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Feedback is unavailable right now. Email founders@cmux.com instead.",
+"comment": ""
+},
+{
+"i": 106,
+"en": "You can also reach us at founders@cmux.com.",
+"comment": ""
+},
+{
+"i": 107,
+"en": "must contain at most %lld item(s)",
+"comment": ""
+},
+{
+"i": 108,
+"en": "must contain at least %lld item(s)",
+"comment": ""
+},
+{
+"i": 109,
+"en": "(+%lld more)",
+"comment": ""
+},
+{
+"i": 110,
+"en": "cmux config %@ found %lld error(s)",
+"comment": ""
+},
+{
+"i": 111,
+"en": "semantic validation failed",
+"comment": ""
+},
+{
+"i": 112,
+"en": "Validate JSONC syntax and cmux config semantics.",
+"comment": ""
+},
+{
+"i": 113,
+"en": "JSONC syntax and semantic validation passed",
+"comment": ""
+},
+{
+"i": 114,
+"en": "cmux config %@ --path requires a path",
+"comment": ""
+},
+{
+"i": 115,
+"en": "cmux config %@ --scope requires global or project",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Unknown config %@ argument '%@'. Use --path <path>.",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Unknown config %@ option '%@'",
+"comment": ""
+},
+{
+"i": 118,
+"en": "uses a disallowed value combination",
+"comment": ""
+},
+{
+"i": 119,
+"en": "matches multiple mutually exclusive forms",
+"comment": ""
+},
+{
+"i": 120,
+"en": "does not match any allowed form",
+"comment": ""
+},
+{
+"i": 121,
+"en": "must be > %@",
+"comment": ""
+},
+{
+"i": 122,
+"en": "must be < %@",
+"comment": ""
+},
+{
+"i": 123,
+"en": "must be <= %@",
+"comment": ""
+},
+{
+"i": 124,
+"en": "must be >= %@",
+"comment": ""
+},
+{
+"i": 125,
+"en": "must be a multiple of %@",
+"comment": ""
+},
+{
+"i": 126,
+"en": "must contain at most %lld key(s)",
+"comment": ""
+},
+{
+"i": 127,
+"en": "must contain at least %lld key(s)",
+"comment": ""
+},
+{
+"i": 128,
+"en": "is required",
+"comment": ""
+},
+{
+"i": 129,
+"en": "references an unknown schema definition '%@'",
+"comment": ""
+},
+{
+"i": 130,
+"en": "is only supported in the global cmux.json",
+"comment": ""
+},
+{
+"i": 131,
+"en": "must be an absolute URI",
+"comment": ""
+},
+{
+"i": 132,
+"en": "must contain at most %lld character(s)",
+"comment": ""
+},
+{
+"i": 133,
+"en": "must contain at least %lld character(s)",
+"comment": ""
+},
+{
+"i": 134,
+"en": "must match pattern %@",
+"comment": ""
+},
+{
+"i": 135,
+"en": "array",
+"comment": ""
+},
+{
+"i": 136,
+"en": "boolean",
+"comment": ""
+},
+{
+"i": 137,
+"en": "expected %@, got %@",
+"comment": ""
+},
+{
+"i": 138,
+"en": "integer",
+"comment": ""
+},
+{
+"i": 139,
+"en": "valid JSON value",
+"comment": ""
+},
+{
+"i": 140,
+"en": "null",
+"comment": ""
+},
+{
+"i": 141,
+"en": "number",
+"comment": ""
+},
+{
+"i": 142,
+"en": "object",
+"comment": ""
+},
+{
+"i": 143,
+"en": "string",
+"comment": ""
+},
+{
+"i": 144,
+"en": "unknown configuration key",
+"comment": ""
+},
+{
+"i": 145,
+"en": "must equal %@",
+"comment": ""
+},
+{
+"i": 146,
+"en": "must be one of %@",
+"comment": ""
+},
+{
+"i": 147,
+"en": "The input document exceeds the size limit.",
+"comment": ""
+},
+{
+"i": 148,
+"en": "The input document is unavailable.",
+"comment": ""
+},
+{
+"i": 149,
+"en": "%@ may only be supplied once.",
+"comment": ""
+},
+{
+"i": 150,
+"en": "The document could not be encoded.",
+"comment": ""
+},
+{
+"i": 151,
+"en": "This help command accepts no additional arguments.",
+"comment": ""
+},
+{
+"i": 152,
+"en": "The input document is invalid JSON.",
+"comment": ""
+},
+{
+"i": 153,
+"en": "The execution receipt does not match this request.",
+"comment": ""
+},
+{
+"i": 154,
+"en": "The execution request is invalid.",
+"comment": ""
+},
+{
+"i": 155,
+"en": "The workload receipt digest is invalid.",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Missing required option: %@",
+"comment": ""
+},
+{
+"i": 157,
+"en": "The input document must use canonical JSON.",
+"comment": ""
+},
+{
+"i": 158,
+"en": "The input document must be a JSON object.",
+"comment": ""
+},
+{
+"i": 159,
+"en": "%@ requires a value.",
+"comment": ""
+},
+{
+"i": 160,
+"en": "The input document must be a regular file.",
+"comment": ""
+},
+{
+"i": 161,
+"en": "The execution receipt request digest does not match.",
+"comment": ""
+},
+{
+"i": 162,
+"en": "The terminal result is missing workload evidence.",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Unknown option: %@",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Unknown execution subcommand: %@",
+"comment": ""
+},
+{
+"i": 165,
+"en": "glaeda <request|observe> [options]",
+"comment": ""
+},
+{
+"i": 166,
+"en": "Usage: cmux glaeda <request|observe> [options]\n\nExchange one semantic execution request with the execution service.\n\nSubcommands:\n  request\n    --request-ref <ref>        CMUX caller correlation reference\n    --work-ref <ref>           CMUX work correlation reference\n    --repository <owner/repo>  Canonical Git repository identity\n    --commit <40-hex>          Exact Git commit\n    --tree <40-hex>            Exact Git tree\n    [--reuse <prefer_valid_reuse|no_preference>]\n\n    Emits canonical execution-request JSON to stdout.\n    CMUX workspace, machine, shell command, and environment stay outside this request.\n\n  observe\n    --request <path>           Exact request document previously emitted\n    --receipt <path|->         Bounded execution receipt, or - for stdin\n\n    Validates request/result correlation and emits a bounded CMUX observation.\n    Terminal states require a workload-receipt digest.\n\nExamples:\n  cmux glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \\\n    --repository owner/repo --commit <commit> --tree <tree>\n  cmux glaeda observe --request request.json --receipt result.json",
+"comment": ""
+},
+{
+"i": 167,
+"en": "Swap With Session…",
+"comment": ""
+},
+{
+"i": 168,
+"en": "Terminal Pane",
+"comment": ""
+},
+{
+"i": 169,
+"en": "Swap Here",
+"comment": ""
+},
+{
+"i": 170,
+"en": "file is empty",
+"comment": ""
+},
+{
+"i": 171,
+"en": "file not found",
+"comment": ""
+},
+{
+"i": 172,
+"en": "custom %@",
+"comment": ""
+},
+{
+"i": 173,
+"en": "legacy app support",
+"comment": ""
+},
+{
+"i": 174,
+"en": "legacy config",
+"comment": ""
+},
+{
+"i": 175,
+"en": "primary",
+"comment": ""
+},
+{
+"i": 176,
+"en": "project",
+"comment": ""
+},
+{
+"i": 177,
+"en": "not found; cmux will use defaults until this file exists",
+"comment": ""
+},
+{
+"i": 178,
+"en": "path is a directory, expected a file",
+"comment": ""
+},
+{
+"i": 179,
+"en": "bytes",
+"comment": ""
+},
+{
+"i": 180,
+"en": "keys",
+"comment": ""
+},
+{
+"i": 181,
+"en": "path",
+"comment": ""
+},
+{
+"i": 182,
+"en": "Schema",
+"comment": ""
+},
+{
+"i": 183,
+"en": "ERROR",
+"comment": ""
+},
+{
+"i": 184,
+"en": "MISSING",
+"comment": ""
+},
+{
+"i": 185,
+"en": "top-level value must be a JSON object",
+"comment": ""
+},
+{
+"i": 186,
+"en": "unknown config parse error",
+"comment": ""
+},
+{
+"i": 187,
+"en": "'%@' isn't a cmux setting. Run `cmux docs settings` to list them.",
+"comment": ""
+},
+{
+"i": 188,
+"en": "'%@' isn't a setting. Edit that section of cmux.json directly.",
+"comment": ""
+},
+{
+"i": 189,
+"en": "'%@' isn't true or false, so it can't be toggled.",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Cycling '%@' needs at least one value.",
+"comment": ""
+},
+{
+"i": 191,
+"en": "No setting preset named '%@'. Add it under settingPresets in ~/.config/cmux/cmux.json.",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Setting preset '%@' must be an object of settings, for example {\"sidebar\": {\"showPorts\": false}}.",
+"comment": ""
+},
+{
+"i": 193,
+"en": "'%@' names a key that contains \".\", such as a workspaceGroups.byCwd path. Setting paths split on every \".\", so that key can't be changed this way. Edit it in cmux.json directly.",
+"comment": ""
+},
+{
+"i": 194,
+"en": "[cmux] SSH pane could not contact cmux to start the remote session after %s attempts; reconnect to try again.",
+"comment": ""
+},
+{
+"i": 195,
+"en": "cmux did not acknowledge the SSH launch",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Keep Local Sessions Alive",
+"comment": ""
+},
+{
+"i": 197,
+"en": "Named local-tmux sessions keep processes and scrollback alive across cmux quit, crashes, and updates. Ordinary terminals keep their current behavior.",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Start Persistent Session",
+"comment": ""
+},
+{
+"i": 199,
+"en": "Creates a named local-tmux session in the selected workspace directory and attaches it to cmux.",
+"comment": ""
+},
+{
+"i": 200,
+"en": "Session name",
+"comment": ""
+},
+{
+"i": 201,
+"en": "No live sessions",
+"comment": ""
+},
+{
+"i": 202,
+"en": "Managed",
+"comment": ""
+},
+{
+"i": 203,
+"en": "Unmanaged",
+"comment": ""
+},
+{
+"i": 204,
+"en": "Clients",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Open a workspace and try again.",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Could not update saved sessions. Try again.",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Session persistence is unavailable. Reinstall cmux and try again.",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Live: %lld",
+"comment": ""
+},
+{
+"i": 209,
+"en": "Clients: %lld",
+"comment": ""
+},
+{
+"i": 210,
+"en": "Automation Rules",
+"comment": ""
+},
+{
+"i": 211,
+"en": "%1$lld total • %2$lld enabled • %3$lld disabled",
+"comment": ""
+},
+{
+"i": 212,
+"en": "Edit Rules",
+"comment": ""
+},
+{
+"i": 213,
+"en": "No rules configured yet.",
+"comment": ""
+},
+{
+"i": 214,
+"en": "The automation rules file could not be loaded. Edit the JSON file and reload.",
+"comment": ""
+},
+{
+"i": 215,
+"en": "Loading rules…",
+"comment": ""
+},
+{
+"i": 216,
+"en": "No rules file yet.",
+"comment": ""
+},
+{
+"i": 217,
+"en": "Rules live in ~/.cmuxterm/automations.json. Edit the JSON directly, then reload the running engine. The cmux automation CLI remains available for test and log diagnostics.",
+"comment": ""
+},
+{
+"i": 218,
+"en": "Reload requested.",
+"comment": ""
+},
+{
+"i": 219,
+"en": "Automation engine unavailable.",
+"comment": ""
+},
+{
+"i": 220,
+"en": "General",
+"comment": ""
+},
+{
+"i": 221,
+"en": "Sidebar & Dock",
+"comment": ""
+},
+{
+"i": 222,
+"en": "Agents & Automation",
+"comment": ""
+},
+{
+"i": 223,
+"en": "Browser & Files",
+"comment": ""
+},
+{
+"i": 224,
+"en": "Remote & Devices",
+"comment": ""
+},
+{
+"i": 225,
+"en": "Keyboard & Advanced",
+"comment": ""
+},
+{
+"i": 226,
+"en": "Ghostty default colors",
+"comment": ""
+},
+{
+"i": 227,
+"en": "No themes match your search.",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Open in Terminal…",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Runs the searchable cmux themes picker in a new terminal tab.",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Light: %1$@ · Dark: %2$@",
+"comment": ""
+},
+{
+"i": 231,
+"en": "Search all themes",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Couldn't save the terminal theme. Please try again.",
+"comment": ""
+},
+{
+"i": 233,
+"en": "Current dark theme",
+"comment": ""
+},
+{
+"i": 234,
+"en": "Current light theme",
+"comment": ""
+},
+{
+"i": 235,
+"en": "Current light and dark theme",
+"comment": ""
+},
+{
+"i": 236,
+"en": "Open cmux NIGHTLY, built daily from the latest code. It installs next to this app and updates separately.",
+"comment": ""
+},
+{
+"i": 237,
+"en": "Nightly Build",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Open the stable cmux app. It installs next to this one if it is missing.",
+"comment": ""
+},
+{
+"i": 239,
+"en": "Stable Release",
+"comment": ""
+},
+{
+"i": 240,
+"en": "Dark Themes",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Light Themes",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Stop discovering other devices",
+"comment": ""
+},
+{
+"i": 243,
+"en": "Hide this Mac from My Devices",
+"comment": ""
+},
+{
+"i": 244,
+"en": "Browse Templates…",
+"comment": ""
+},
+{
+"i": 245,
+"en": "Start with a template",
+"comment": ""
+},
+{
+"i": 246,
+"en": "Installed %@",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Keep",
+"comment": ""
+},
+{
+"i": 248,
+"en": "Previewing in your sidebar",
+"comment": ""
+},
+{
+"i": 249,
+"en": "Try a curated sidebar before you install it.",
+"comment": ""
+},
+{
+"i": 250,
+"en": "Sidebar Templates",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Try",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Use",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Left sidebar",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Right panel",
+"comment": ""
+},
+{
+"i": 255,
+"en": "In terminals on another machine, typed characters appear right away when the connection is slow. They stay underlined until the remote host confirms them. Local terminals, password prompts and full-screen apps are excluded.",
+"comment": ""
+},
+{
+"i": 256,
+"en": "More themes match. Keep typing to narrow the list.",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Invite people",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Email addresses, comma separated",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Invite role",
+"comment": ""
+},
+{
+"i": 260,
+"en": "Send invites",
+"comment": ""
+},
+{
+"i": 261,
+"en": "Invitations sent.",
+"comment": ""
+},
+{
+"i": 262,
+"en": "Leave",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Invite link copied. It expires in 7 days.",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Copy invite link",
+"comment": ""
+},
+{
+"i": 265,
+"en": "%1$@ · expires %2$@",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Loading members…",
+"comment": ""
+},
+{
+"i": 267,
+"en": "Refresh members",
+"comment": ""
+},
+{
+"i": 268,
+"en": "Remove %@",
+"comment": ""
+},
+{
+"i": 269,
+"en": "Pending invitations",
+"comment": ""
+},
+{
+"i": 270,
+"en": "Invite links",
+"comment": ""
+},
+{
+"i": 271,
+"en": "People who share this team's Cloud machines.",
+"comment": ""
+},
+{
+"i": 272,
+"en": "Team members",
+"comment": ""
+},
+{
+"i": 273,
+"en": "%d uses",
+"comment": ""
+},
+{
+"i": 274,
+"en": "%1$d of %#@uses@",
+"comment": ""
+},
+{
+"i": 275,
+"en": "%1$@ · %2$d of %#@seats@ used",
+"comment": ""
+},
+{
+"i": 276,
+"en": "%1$@ · %#@members@",
+"comment": ""
+},
+{
+"i": 277,
+"en": "%d members",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Invite…",
+"comment": ""
+},
+{
+"i": 279,
+"en": "Members",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Ignore",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Invited by %1$@ · %2$@",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Join",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Invitations",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Use the terminal theme foreground for flashes; unread rings stay cmux blue.",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Use Theme Foreground",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Turning this off also fails messages that are waiting to be delivered. To turn messages off for one agent, run cmux agent messages off in its terminal.",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Agent messages are off. Sends fail and nothing is delivered.",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Agents can message each other with cmux agent message.",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Middle-Click Paste",
+"comment": ""
+},
+{
+"i": 290,
+"en": "Apps that use the mouse still get middle clicks.",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Workspace Description Color",
+"comment": ""
+},
+{
+"i": 292,
+"en": "Canonical Agent Scratch",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Opt in to organize new Claude, Codex, and OpenCode panel scratch files under ~/.local/state/cmux/agent-artifacts. Provider transcripts and existing files are not moved.",
+"comment": ""
+},
+{
+"i": 294,
+"en": "Native agent panels use the system temporary directory.",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Native agent panels use a cmux-owned scratch directory per session.",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Text color used for workspace descriptions. Default follows the current theme.",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Remote host colors remote host colors origin color tint per-host server workspace sidebar row tab beta unstable",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Remote host names on duplicate titles hostname server duplicate same title collision workspace sidebar row beta unstable",
+"comment": ""
+},
+{
+"i": 299,
+"en": "Remote host colors",
+"comment": ""
+}
+]

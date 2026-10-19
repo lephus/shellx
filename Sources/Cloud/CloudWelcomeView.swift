@@ -1,6 +1,7 @@
 import AppKit
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// What the welcome window's one prominent button does for this account.
 enum CloudWelcomeNextStep: Equatable {
@@ -157,7 +158,7 @@ struct CloudWelcomeView: View {
         .frame(width: launchCardWidth)
         .overlay(alignment: .topTrailing) {
             Button(action: onNotNow) {
-                Image(systemName: "xmark")
+                ShellXIcon.image("xmark")
                     .cmuxFont(size: 9, weight: .bold)
                     .foregroundStyle(.white.opacity(0.8))
                     .frame(width: 24, height: 24)
@@ -350,7 +351,7 @@ struct CloudWelcomeView: View {
     private var noteLines: [String] {
         let available = String(
             localized: "cloud.welcome.note.available",
-            defaultValue: "Cloud is available on cmux Pro and Max."
+            defaultValue: "Cloud is available on ShellX Pro and Max."
         )
         switch nextStep {
         case .enable:
@@ -371,9 +372,9 @@ private struct CloudWelcomeHeader: View {
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 6) {
-                Image(systemName: "cloud.fill")
+                ShellXIcon.image("cloud.fill")
                     .cmuxFont(size: 11, weight: .semibold)
-                Text(String(localized: "cloud.welcome.title.eyebrow", defaultValue: "cmux cloud"))
+                Text(String(localized: "cloud.welcome.title.eyebrow", defaultValue: "ShellX cloud"))
                     .cmuxFont(size: 12, weight: .semibold)
             }
             .foregroundStyle(Color.accentColor)
@@ -417,7 +418,7 @@ private struct CloudWelcomeReasonRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Image(systemName: symbol)
+            ShellXIcon.image(symbol)
                 .cmuxFont(size: 14)
                 .foregroundStyle(.secondary)
                 .frame(width: 20)

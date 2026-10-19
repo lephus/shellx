@@ -35,12 +35,12 @@ extension CMUXCLI {
         case .kindMismatch:
             return String(
                 localized: "cli.fork.error.kindMismatch",
-                defaultValue: "fork: this command no longer matches the session. Run 'cmux fork --surface' to use the current record."
+                defaultValue: "fork: this command no longer matches the session. Run 'shellx fork --surface' to use the current record."
             )
         case .checkpointMismatch:
             return String(
                 localized: "cli.fork.error.checkpointMismatch",
-                defaultValue: "fork: this command no longer matches the session. Run 'cmux fork --surface' to use the current record."
+                defaultValue: "fork: this command no longer matches the session. Run 'shellx fork --surface' to use the current record."
             )
         case .unsupportedMode:
             return String(
@@ -90,7 +90,7 @@ extension CMUXCLI {
         case .socketNotReady:
             return String(
                 localized: "cli.fork.error.socketNotReady",
-                defaultValue: "fork: cmux is still opening. Retry the visible fork command in a moment."
+                defaultValue: "fork: ShellX is still opening. Retry the visible fork command in a moment."
             )
         }
     }

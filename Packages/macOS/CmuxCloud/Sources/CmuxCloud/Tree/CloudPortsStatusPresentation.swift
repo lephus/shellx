@@ -63,7 +63,7 @@ public struct CloudPortsStatusPresentation: Equatable, Sendable {
         if isVPNGuidance {
             return String(
                 localized: "cloud.ports.vpnOff.explanation",
-                defaultValue: "Ports open in cmux without setup. To use private addresses in other apps, set up Cloud VPN."
+                defaultValue: "Ports open in ShellX without setup. To use private addresses in other apps, set up Cloud VPN."
             )
         }
         switch state {
@@ -74,30 +74,30 @@ public struct CloudPortsStatusPresentation: Equatable, Sendable {
         case .available:
             return Self.routeNote
         case .loopbackOnly:
-            return String(localized: "cloudTree.ports.loopback.detail", defaultValue: "These services open in cmux without Cloud VPN. They listen on the machine’s loopback address, so other apps cannot reach them through its private IP, even with VPN connected.")
+            return String(localized: "cloudTree.ports.loopback.detail", defaultValue: "These services open in ShellX without Cloud VPN. They listen on the machine’s loopback address, so other apps cannot reach them through its private IP, even with VPN connected.")
         case .empty(.noListeningService):
             return String(localized: "cloudTree.ports.empty.noService", defaultValue: "Start a web server on this machine, then refresh.")
         case .empty(.otherInterfaceOnly):
-            return String(localized: "cloudTree.ports.binding.detail", defaultValue: "cmux’s browser route connects to 127.0.0.1 on the machine. Bind the service to 127.0.0.1 or 0.0.0.0, then refresh. Turning on Cloud VPN does not change this route.")
+            return String(localized: "cloudTree.ports.binding.detail", defaultValue: "ShellX’s browser route connects to 127.0.0.1 on the machine. Bind the service to 127.0.0.1 or 0.0.0.0, then refresh. Turning on Cloud VPN does not change this route.")
         case .unavailable(.privateAddress):
-            return String(localized: "cloudTree.ports.privateAddress.detail", defaultValue: "cmux’s authenticated route needs this machine’s private address. Refresh to retrieve it. Turning on Cloud VPN does not assign a missing address.")
+            return String(localized: "cloudTree.ports.privateAddress.detail", defaultValue: "ShellX’s authenticated route needs this machine’s private address. Refresh to retrieve it. Turning on Cloud VPN does not assign a missing address.")
         case .unavailable(.machineAsleep):
-            return String(localized: "cloudTree.ports.asleep.detail", defaultValue: "Wake the machine to check its services. cmux’s in-app forwarding does not need Cloud VPN.")
+            return String(localized: "cloudTree.ports.asleep.detail", defaultValue: "Wake the machine to check its services. ShellX’s in-app forwarding does not need Cloud VPN.")
         case .unavailable(.link):
-            return String(localized: "cloudTree.ports.link.detail", defaultValue: "Port discovery could not connect to this machine. Existing cmux ports may still work. Refresh to reconnect; Cloud VPN is not required.")
+            return String(localized: "cloudTree.ports.link.detail", defaultValue: "Port discovery could not connect to this machine. Existing ShellX ports may still work. Refresh to reconnect; Cloud VPN is not required.")
         case .unavailable(.transport):
-            return String(localized: "cloudTree.ports.unavailable.detail", defaultValue: "The port scan failed; this does not mean no service is listening. Existing cmux ports may still work. Refresh to retry; Cloud VPN is not required.")
+            return String(localized: "cloudTree.ports.unavailable.detail", defaultValue: "The port scan failed; this does not mean no service is listening. Existing ShellX ports may still work. Refresh to retry; Cloud VPN is not required.")
         case .unavailable(.hub):
-            return String(localized: "cloudTree.ports.hub.detail", defaultValue: "This build cannot start cmux’s authenticated Cloud forward. Update cmux, then retry.")
+            return String(localized: "cloudTree.ports.hub.detail", defaultValue: "This build cannot start ShellX’s authenticated Cloud forward. Update ShellX, then retry.")
         case .stale:
-            return String(localized: "cloudTree.ports.stale.detail", defaultValue: "The last scan could not be refreshed. Listed services may have changed; refresh to check again. cmux forwarding does not need Cloud VPN.")
+            return String(localized: "cloudTree.ports.stale.detail", defaultValue: "The last scan could not be refreshed. Listed services may have changed; refresh to check again. ShellX forwarding does not need Cloud VPN.")
         case .unsupported:
             return String(localized: "cloudTree.ports.unsupported.detail", defaultValue: "This provider has no supported in-app port route. Open a shell to access the service inside the machine. Cloud VPN does not add provider support.")
         }
     }
 
     public static var routeNote: String {
-        String(localized: "cloudTree.ports.routeNote", defaultValue: "cmux forwards ports without Cloud VPN. Web browsers and other Mac apps need Cloud VPN to reach services bound to the machine’s private address.")
+        String(localized: "cloudTree.ports.routeNote", defaultValue: "ShellX forwards ports without Cloud VPN. Web browsers and other Mac apps need Cloud VPN to reach services bound to the machine’s private address.")
     }
 
     public var action: CloudPortsStatusAction {

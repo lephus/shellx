@@ -1,5 +1,6 @@
 import AppKit
 import CmuxSwiftRender
+import ShellXIcons
 
 /// Builds a native `NSMenu` from interpreted `.contextMenu` IR on demand.
 ///
@@ -94,7 +95,7 @@ struct RenderNodeContextMenuBuilder {
         let title = node.text?.isEmpty == false ? node.text! : renderNodePlainText(of: node.children)
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         if let symbol = renderNodeFirstSystemImage(of: node) {
-            item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+            item.image = ShellXIcon.nsImage(symbol, accessibilityDescription: nil)
         }
         applyRenderNodeKeyEquivalent(from: node, to: item)
         if let action = node.action, !disabled {

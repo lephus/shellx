@@ -133,7 +133,7 @@ final class CLIRestoreSessionTransferTests {
         )
 
         #expect(result.status != 0)
-        #expect(result.stderr.contains("was saved by a newer cmux"), Comment(rawValue: result.stderr))
+        #expect(result.stderr.contains("was saved by a newer ShellX"), Comment(rawValue: result.stderr))
     }
 
     @Test(arguments: [

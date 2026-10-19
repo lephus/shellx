@@ -1,6 +1,7 @@
 import CmuxCloud
 import AppKit
 import SwiftUI
+import ShellXIcons
 
 struct CloudOperationDetailsView: View {
     let operations: [CloudOperationSnapshot]
@@ -46,7 +47,7 @@ struct CloudOperationDetailsView: View {
                             }
                             ForEach(operation.steps) { step in
                                 HStack {
-                                    Image(systemName: step.outcome == nil ? "clock" : step.outcome == .success ? "checkmark" : "exclamationmark.triangle")
+                                    ShellXIcon.image(step.outcome == nil ? "clock" : step.outcome == .success ? "checkmark" : "exclamationmark.triangle")
                                         .foregroundStyle(step.outcome == .failure || step.outcome == .timeout ? Color.orange : Color.secondary)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(step.phase.label)

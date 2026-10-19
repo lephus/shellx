@@ -1,6 +1,7 @@
 import CmuxFoundation
 import CMUXProjectModel
 import SwiftUI
+import ShellXIcons
 
 /// Schemes tab inside ``ProjectPanelView``.
 ///
@@ -45,7 +46,7 @@ struct ProjectSchemesTabView: View {
         let isSelected = panel.selectedSchemeName == scheme.name
         Button(action: { panel.selectedSchemeName = scheme.name }) {
             HStack(spacing: 8) {
-                Image(systemName: "play.rectangle")
+                ShellXIcon.image("play.rectangle")
                     .foregroundStyle(cmuxAccent.color)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
@@ -90,7 +91,7 @@ struct ProjectSchemesTabView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 8) {
-                        Label(selected.scheme.name, systemImage: "play.rectangle.fill")
+                        ShellXLabel(selected.scheme.name, icon: "play.rectangle.fill")
                             .cmuxFont(size: 14, weight: .semibold)
                         Text(scopeBadgeText(isShared: selected.scheme.isShared))
                             .cmuxFont(size: 10, weight: .medium)
@@ -146,7 +147,7 @@ struct ProjectSchemesTabView: View {
             }
         } else {
             ProjectEmptyDetailView(
-                systemImage: "play.rectangle",
+                icon: "play.rectangle",
                 title: String(localized: "projectSchemes.empty.title", defaultValue: "Select a scheme"),
                 hint: String(localized: "projectSchemes.empty.hint", defaultValue: "Pick a scheme on the left to inspect its run / test / profile / archive targets and launch settings.")
             )

@@ -363,7 +363,7 @@ extension TerminalController {
             timeoutSeconds: 240,
             daemonUnavailableMessage: String(
                 localized: "socket.cloudVM.tuiDaemonUnavailable",
-                defaultValue: "Could not create a workspace on this Cloud VM. Wake the machine or retry `cmux vm workspace new`."
+                defaultValue: "Could not create a workspace on this Cloud VM. Wake the machine or retry `shellx vm workspace new`."
             )
         ) {
             let machine = SurfaceMachineID(rawValue: vmId)
@@ -788,7 +788,7 @@ extension TerminalController {
     /// command line, or a terminal's visible screen. The result names keys only.
     nonisolated func socketWorkerVMEnvSetResponse(id: Any?, params: [String: Any]) -> String {
         guard let vmId = Self.surfaceString(params["id"]), !vmId.isEmpty else {
-            return v2Error(id: id, code: "invalid_params", message: String(localized: "cli.vm.env.setRequiresIdRunCmuxVmLsTo", defaultValue: "vm.env_set requires `id`. Run `cmux vm ls` to find one."))
+            return v2Error(id: id, code: "invalid_params", message: String(localized: "cli.vm.env.setRequiresIdRunCmuxVmLsTo", defaultValue: "vm.env_set requires `id`. Run `shellx vm ls` to find one."))
         }
         guard let rawEntries = params["entries"] as? [[String: Any]], !rawEntries.isEmpty else {
             return v2Error(id: id, code: "invalid_params", message: String(localized: "cli.vm.env.setRequiresEntriesANonEmptyArrayOf", defaultValue: "vm.env_set requires `entries`: a non-empty array of {key, value}."))

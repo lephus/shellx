@@ -4,6 +4,7 @@ import CmuxFoundation
 import Foundation
 import SwiftUI
 import CmuxSettings
+import ShellXBrand
 
 enum SidebarMatchTerminalBackgroundSettings {
     static let userDefaultsKey = "sidebarMatchTerminalBackground"
@@ -355,8 +356,14 @@ func sidebarSelectedWorkspaceBackgroundNSColor(
        let parsed = NSColor(hex: hex) {
         return parsed
     }
-    if activeTabIndicatorStyle == .solidFill || !subtleSelection {
+    if activeTabIndicatorStyle == .solidFill {
         return accent.nsColor(for: colorScheme)
+    }
+    if !subtleSelection {
+        // ShellX (spec §7.4): the default selection is the flat `raise`
+        // block in a dark sidebar. A light sidebar (a matched light terminal
+        // theme) keeps the accent fill.
+        return colorScheme == .dark ? ShellXPalette.raise.nsColor : accent.nsColor(for: colorScheme)
     }
     let surface = NSColor(white: colorScheme == .dark ? 0.16 : 0.93, alpha: 1)
     let fill = CmuxSelectionFill.resolve(
@@ -374,11 +381,26 @@ func sidebarSelectedWorkspaceForegroundNSColor(opacity: CGFloat) -> NSColor {
     )
 }
 
+/// Whether `color` is ShellX's default selection fill (`ShellXPalette.raise`).
+func sidebarIsShellXSelectionFill(_ color: NSColor) -> Bool {
+    guard let candidate = color.usingColorSpace(.sRGB),
+          let raise = ShellXPalette.raise.nsColor.usingColorSpace(.sRGB) else { return false }
+    let tolerance: CGFloat = 0.5 / 255
+    return abs(candidate.redComponent - raise.redComponent) < tolerance
+        && abs(candidate.greenComponent - raise.greenComponent) < tolerance
+        && abs(candidate.blueComponent - raise.blueComponent) < tolerance
+        && abs(candidate.alphaComponent - raise.alphaComponent) < tolerance
+}
+
 func sidebarSelectedWorkspaceForegroundNSColor(
     on backgroundColor: NSColor,
     opacity: CGFloat
 ) -> NSColor {
     let clampedOpacity = max(0, min(opacity, 1))
+    // ShellX: names on the default `raise` selection draw in `text-hi`.
+    if sidebarIsShellXSelectionFill(backgroundColor) {
+        return ShellXPalette.textHi.nsColor.withAlphaComponent(clampedOpacity)
+    }
     let whiteContrast = cmuxContrastRatio(foreground: .white, background: backgroundColor)
     guard whiteContrast < 2.75 else {
         return NSColor.white.withAlphaComponent(clampedOpacity)

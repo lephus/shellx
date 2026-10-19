@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import ShellXIcons
 
 /// Adds the shared Finder reveal action when the browser is displaying a local file.
 struct BrowserLocalFileFinderMenu: View {
@@ -11,9 +12,9 @@ struct BrowserLocalFileFinderMenu: View {
             Button {
                 FileExternalOpenAction.revealInFinder(fileURL: fileURL)
             } label: {
-                Label(
+                ShellXLabel(
                     FileExternalOpenText.revealInFinder,
-                    systemImage: "folder"
+                    icon: "folder"
                 )
             }
             .accessibilityIdentifier("BrowserRevealLocalFileInFinder")

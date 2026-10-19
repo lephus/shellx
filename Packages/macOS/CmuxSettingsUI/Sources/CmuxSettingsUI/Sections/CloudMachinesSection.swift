@@ -1,6 +1,7 @@
 import AppKit
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// **Cloud Machines** settings: first-use activation, plan details, and
 /// optional system VPN setup. The activation control calls the host's shared
@@ -163,7 +164,7 @@ public struct CloudMachinesSection: View {
                 .accessibilityIdentifier("SettingsCloudEnableRetry")
             }
         case .unavailable:
-            Image(systemName: "lock.slash")
+            ShellXIcon.image("lock.slash")
                 .foregroundStyle(.secondary)
                 .accessibilityLabel(String(localized: "settings.cloudMachines.enable.unavailable", defaultValue: "Cloud unavailable"))
         }
@@ -213,7 +214,7 @@ public struct CloudMachinesSection: View {
         case .failed(.signInRequired):
             return String(
                 localized: "settings.cloudMachines.enable.signIn.subtitle",
-                defaultValue: "Sign in to your cmux account, then retry Cloud setup."
+                defaultValue: "Sign in to your ShellX account, then retry Cloud setup."
             )
         case .failed(.serviceUnavailable):
             return String(
@@ -340,7 +341,7 @@ public struct CloudMachinesSection: View {
         if activationState.isEnabled {
             return String(
                 localized: "cloud.vpn.setup.howItWorks.body",
-                defaultValue: "Connect Safari, Chrome, and other apps to your Cloud machines. Each machine keeps its private IP address and original ports. Only traffic to your Cloud network uses this encrypted connection. cmux terminals, Ports, and Desktop work without it."
+                defaultValue: "Connect Safari, Chrome, and other apps to your Cloud machines. Each machine keeps its private IP address and original ports. Only traffic to your Cloud network uses this encrypted connection. ShellX terminals, Ports, and Desktop work without it."
             )
         }
         return String(

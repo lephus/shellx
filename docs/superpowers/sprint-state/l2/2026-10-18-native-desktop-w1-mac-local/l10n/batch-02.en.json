@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Draw a capture area",
+"comment": ""
+},
+{
+"i": 1,
+"en": "Select elements",
+"comment": ""
+},
+{
+"i": 2,
+"en": "Design Mode",
+"comment": ""
+},
+{
+"i": 3,
+"en": "The username or password you entered is incorrect.",
+"comment": ""
+},
+{
+"i": 4,
+"en": "%@ requires a username and password.",
+"comment": ""
+},
+{
+"i": 5,
+"en": "%1$@ requires a username and password for \"%2$@\".",
+"comment": ""
+},
+{
+"i": 6,
+"en": "Password",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Authentication Required",
+"comment": ""
+},
+{
+"i": 8,
+"en": "this site",
+"comment": ""
+},
+{
+"i": 9,
+"en": "Username",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Certificate %d",
+"comment": ""
+},
+{
+"i": 11,
+"en": "%@ requires a client certificate.",
+"comment": ""
+},
+{
+"i": 12,
+"en": "Serial %@",
+"comment": ""
+},
+{
+"i": 13,
+"en": "Choose a Certificate",
+"comment": ""
+},
+{
+"i": 14,
+"en": "%@ (%@)",
+"comment": ""
+},
+{
+"i": 15,
+"en": "This site",
+"comment": ""
+},
+{
+"i": 16,
+"en": "This page says:",
+"comment": ""
+},
+{
+"i": 17,
+"en": "The page at %@ says:",
+"comment": ""
+},
+{
+"i": 18,
+"en": "download",
+"comment": ""
+},
+{
+"i": 19,
+"en": "Download failed",
+"comment": ""
+},
+{
+"i": 20,
+"en": "Download in progress",
+"comment": ""
+},
+{
+"i": 21,
+"en": "Downloading...",
+"comment": ""
+},
+{
+"i": 22,
+"en": "Clear",
+"comment": ""
+},
+{
+"i": 23,
+"en": "No recent downloads",
+"comment": ""
+},
+{
+"i": 24,
+"en": "Open",
+"comment": ""
+},
+{
+"i": 25,
+"en": "Show in Finder",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Downloads",
+"comment": ""
+},
+{
+"i": 27,
+"en": "Proceed Anyway (Unsafe)",
+"comment": ""
+},
+{
+"i": 28,
+"en": "The page could not be opened. Check the address and try again.",
+"comment": ""
+},
+{
+"i": 29,
+"en": "Can't open this page",
+"comment": ""
+},
+{
+"i": 30,
+"en": "The site refused to connect. Check that a server is running on this address.",
+"comment": ""
+},
+{
+"i": 31,
+"en": "%@ refused to connect. Check that a server is running on this address.",
+"comment": ""
+},
+{
+"i": 32,
+"en": "Can't reach this page",
+"comment": ""
+},
+{
+"i": 33,
+"en": "Check your network connection and try again.",
+"comment": ""
+},
+{
+"i": 34,
+"en": "Frame load interrupted",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Attempted URL",
+"comment": ""
+},
+{
+"i": 36,
+"en": "This URL is not allowed by your organization's embedded-browser policy.",
+"comment": ""
+},
+{
+"i": 37,
+"en": "This URL is not allowed by the embedded-browser URL policy.",
+"comment": ""
+},
+{
+"i": 38,
+"en": "Blocked by your organization's policy",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Blocked by the embedded-browser URL policy",
+"comment": ""
+},
+{
+"i": 40,
+"en": "%@ uses plain HTTP, so traffic can be read or modified on the network.\n\nOpen this URL in your default browser, or proceed in cmux.",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Connection isn't secure",
+"comment": ""
+},
+{
+"i": 42,
+"en": "The certificate for this site is invalid.",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Reload",
+"comment": ""
+},
+{
+"i": 44,
+"en": "Copy Link",
+"comment": ""
+},
+{
+"i": 45,
+"en": "cmux could not open this link. You can copy it and open it in another app.",
+"comment": ""
+},
+{
+"i": 46,
+"en": "Cannot Open Link",
+"comment": ""
+},
+{
+"i": 47,
+"en": "A web page in cmux wants to open a link in another app. You can stay in the browser instead.",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Open App",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Stay in Browser",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Open External App?",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Focus Mode",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Esc again to exit",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Enter Browser Focus Mode",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Exit Browser Focus Mode",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Enter Focus Mode",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Enter browser focus mode",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Exit browser focus mode",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Esc Esc",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Go Back",
+"comment": ""
+},
+{
+"i": 60,
+"en": "Go Forward",
+"comment": ""
+},
+{
+"i": 61,
+"en": "go to URL",
+"comment": ""
+},
+{
+"i": 62,
+"en": "Additional data (bookmarks, settings, extensions)",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Bookmarks, settings, and extensions are not available yet.",
+"comment": ""
+},
+{
+"i": 64,
+"en": "No importable browser matches '%@'",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Failed to create cmux browser profile '%@'",
+"comment": ""
+},
+{
+"i": 66,
+"en": "No cmux browser profile matches '%@'",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Browser import failed",
+"comment": ""
+},
+{
+"i": 68,
+"en": "No importable browsers found",
+"comment": ""
+},
+{
+"i": 69,
+"en": "No source profiles found for %@",
+"comment": ""
+},
+{
+"i": 70,
+"en": "No source profile matches '%@'",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Browser: %@",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Created cmux profiles: %@",
+"comment": ""
+},
+{
+"i": 73,
+"en": "Destination profile: %@",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Domain filter: %@",
+"comment": ""
+},
+{
+"i": 75,
+"en": "Imported cookies: %ld",
+"comment": ""
+},
+{
+"i": 76,
+"en": "Imported history entries: %ld",
+"comment": ""
+},
+{
+"i": 77,
+"en": "%@ -> %@",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Profile mappings:",
+"comment": ""
+},
+{
+"i": 79,
+"en": "Scope: %@",
+"comment": ""
+},
+{
+"i": 80,
+"en": "Skipped cookies: %ld",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Source profiles: %@",
+"comment": ""
+},
+{
+"i": 82,
+"en": "Browser data import complete",
+"comment": ""
+},
+{
+"i": 83,
+"en": "Warnings:",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Cookies (site sign-ins)",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Destination",
+"comment": ""
+},
+{
+"i": 86,
+"en": "Merge into one",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Separate profiles",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Import into",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Create \"%@\"",
+"comment": ""
+},
+{
+"i": 90,
+"en": "Imported data goes into the selected cmux profile.",
+"comment": ""
+},
+{
+"i": 91,
+"en": "All selected source profiles go into one cmux profile.",
+"comment": ""
+},
+{
+"i": 92,
+"en": "Missing cmux profiles are created on import.",
+"comment": ""
+},
+{
+"i": 93,
+"en": "Detected: %@.",
+"comment": ""
+},
+{
+"i": 94,
+"en": "Detected: %@, +1 more.",
+"comment": ""
+},
+{
+"i": 95,
+"en": "Detected: %@, %#@count2@.",
+"comment": ""
+},
+{
+"i": 96,
+"en": "+%ld more",
+"comment": ""
+},
+{
+"i": 97,
+"en": "No supported browsers detected.",
+"comment": ""
+},
+{
+"i": 98,
+"en": "Domains",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Optional domains, comma-separated",
+"comment": ""
+},
+{
+"i": 100,
+"en": "cmux could not create the destination profile \"%@\".",
+"comment": ""
+},
+{
+"i": 101,
+"en": "The selected cmux browser profile no longer exists. Pick a destination profile again.",
+"comment": ""
+},
+{
+"i": 102,
+"en": "Import could not start",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Hide Hint",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Import…",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Browser Settings",
+"comment": ""
+},
+{
+"i": 106,
+"en": "You can always find this in Settings > Browser.",
+"comment": ""
+},
+{
+"i": 107,
+"en": "Choose a browser to import bookmarks, history, and cookies. Already-imported entries are deduped automatically.",
+"comment": ""
+},
+{
+"i": 108,
+"en": "Import browser data",
+"comment": ""
+},
+{
+"i": 109,
+"en": "Import",
+"comment": ""
+},
+{
+"i": 110,
+"en": "History (visited pages)",
+"comment": ""
+},
+{
+"i": 111,
+"en": "Next",
+"comment": ""
+},
+{
+"i": 112,
+"en": "cmux could not find browser profiles to import from on this Mac.",
+"comment": ""
+},
+{
+"i": 113,
+"en": "Importing %@ from %@…",
+"comment": ""
+},
+{
+"i": 114,
+"en": "This can take a few seconds for large profiles.",
+"comment": ""
+},
+{
+"i": 115,
+"en": "Importing Browser Data",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Cookies + history",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Cookies only",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Everything",
+"comment": ""
+},
+{
+"i": 119,
+"en": "History only",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Browser",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Profile %ld",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Profiles",
+"comment": ""
+},
+{
+"i": 123,
+"en": "No source profiles detected for %@.",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Select one or more profiles.",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Start Import",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Step 3 of 3",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Step 1 of 3",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Step 2 of 3",
+"comment": ""
+},
+{
+"i": 129,
+"en": "Import Browser Data",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Select Cookies, History, or both before starting import.",
+"comment": ""
+},
+{
+"i": 131,
+"en": "Choose at least one source profile to import.",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Bookmarks, settings, and extensions import are not available yet. Imported cookies and history only.",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Failed reading %@ cookies at %@: %@",
+"comment": ""
+},
+{
+"i": 134,
+"en": "Failed reading %@ history at %@: %@",
+"comment": ""
+},
+{
+"i": 135,
+"en": "%@ cookie import is not implemented yet.",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Skipped %ld encrypted cookies that require Keychain decryption.",
+"comment": ""
+},
+{
+"i": 137,
+"en": "Failed reading Firefox cookies at %@: %@",
+"comment": ""
+},
+{
+"i": 138,
+"en": "Failed reading Firefox history at %@: %@",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Skipped %ld encrypted %@ cookies because %@ could not be unlocked from Keychain.",
+"comment": ""
+},
+{
+"i": 140,
+"en": "No browsing history was found for %@.",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Safari cookies are stored in Cookies.binarycookies and are not yet supported by this importer.",
+"comment": ""
+},
+{
+"i": 142,
+"en": "More Actions",
+"comment": ""
+},
+{
+"i": 143,
+"en": "New tab",
+"comment": ""
+},
+{
+"i": 144,
+"en": "Open in Default Browser",
+"comment": ""
+},
+{
+"i": 145,
+"en": "Download PDF",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Print PDF",
+"comment": ""
+},
+{
+"i": 147,
+"en": "Loading…",
+"comment": ""
+},
+{
+"i": 148,
+"en": "Proceed in cmux",
+"comment": ""
+},
+{
+"i": 149,
+"en": "Multiple cmux browser profiles match '%@': %@. Use a profile UUID.",
+"comment": ""
+},
+{
+"i": 150,
+"en": "Browser profiles cannot be used while the cmux browser is disabled",
+"comment": ""
+},
+{
+"i": 151,
+"en": "The default browser profile cannot be deleted",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Browser profile command failed",
+"comment": ""
+},
+{
+"i": 153,
+"en": "Browser profile must be a non-empty name or UUID",
+"comment": ""
+},
+{
+"i": 154,
+"en": "Missing browser profile name",
+"comment": ""
+},
+{
+"i": 155,
+"en": "Missing browser profile",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Specify only one browser profile selector",
+"comment": ""
+},
+{
+"i": 157,
+"en": "Failed to clear cmux browser profile '%@'",
+"comment": ""
+},
+{
+"i": 158,
+"en": "Failed to delete cmux browser profile '%@'",
+"comment": ""
+},
+{
+"i": 159,
+"en": "Cannot delete cmux browser profile '%@' while %#@count2@ using it",
+"comment": ""
+},
+{
+"i": 160,
+"en": "%d browser panels are",
+"comment": ""
+},
+{
+"i": 161,
+"en": "No cmux browser profile matches '%@'. Run 'cmux browser profiles' to list available profiles.",
+"comment": ""
+},
+{
+"i": 162,
+"en": "Failed to rename cmux browser profile to '%@'",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Browser profiles can only be used when creating a browser pane",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Browser profiles cannot be selected when creating a browser pane in a remote workspace",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Browser Profile: %@",
+"comment": ""
+},
+{
+"i": 166,
+"en": "Default",
+"comment": ""
+},
+{
+"i": 167,
+"en": "New Profile...",
+"comment": ""
+},
+{
+"i": 168,
+"en": "Create a separate browser profile for cookies, history, and local storage.",
+"comment": ""
+},
+{
+"i": 169,
+"en": "Profile name",
+"comment": ""
+},
+{
+"i": 170,
+"en": "New Browser Profile",
+"comment": ""
+},
+{
+"i": 171,
+"en": "Rename Current Profile...",
+"comment": ""
+},
+{
+"i": 172,
+"en": "Choose a new name for this browser profile.",
+"comment": ""
+},
+{
+"i": 173,
+"en": "Rename Browser Profile",
+"comment": ""
+},
+{
+"i": 174,
+"en": "Inject React Grab",
+"comment": ""
+},
+{
+"i": 175,
+"en": "Timed out waiting for the browser screenshot.",
+"comment": ""
+},
+{
+"i": 176,
+"en": "The page is too large to capture.",
+"comment": ""
+},
+{
+"i": 177,
+"en": "Another browser screenshot is already in progress.",
+"comment": ""
+},
+{
+"i": 178,
+"en": "No screenshot was returned.",
+"comment": ""
+},
+{
+"i": 179,
+"en": "The screenshot image could not be encoded.",
+"comment": ""
+},
+{
+"i": 180,
+"en": "The screenshot selection is empty or outside the browser view.",
+"comment": ""
+},
+{
+"i": 181,
+"en": "The screenshot could not be written to the clipboard.",
+"comment": ""
+},
+{
+"i": 182,
+"en": "The browser screenshot disagreed with rendered text at %1$@; %#@count2@ blank after %#@count3@.",
+"comment": ""
+},
+{
+"i": 183,
+"en": "%lld text probes were",
+"comment": ""
+},
+{
+"i": 184,
+"en": "%lld attempts",
+"comment": ""
+},
+{
+"i": 185,
+"en": "The page dimensions could not be read.",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Screenshot copied to clipboard",
+"comment": ""
+},
+{
+"i": 187,
+"en": "Screenshot Page to Clipboard",
+"comment": ""
+},
+{
+"i": 188,
+"en": "Click and drag to select. Esc cancels.",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Search",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Switch to tab",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Browser Theme: %@",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Toggle Developer Tools",
+"comment": ""
+},
+{
+"i": 193,
+"en": "Close or detach the browser inspector before changing the browser viewport",
+"comment": ""
+},
+{
+"i": 194,
+"en": "Viewport dimensions must be between 1 and 4096",
+"comment": ""
+},
+{
+"i": 195,
+"en": "Exit browser element fullscreen before changing the browser viewport",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Viewport and page zoom exceed browser render limits",
+"comment": ""
+},
+{
+"i": 197,
+"en": "browser.viewport.set requires integer width and height",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Command+scroll pans the canvas from anywhere",
+"comment": ""
+},
+{
+"i": 199,
+"en": "Click or drag to move the canvas viewport",
+"comment": ""
+},
+{
+"i": 200,
+"en": "Canvas minimap",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Close Pane",
+"comment": ""
+},
+{
+"i": 202,
+"en": "browser cookies <get|set|clear> [set: --http-only] [...]",
+"comment": ""
+},
+{
+"i": 203,
+"en": "cookies <get|set|clear> [--name <name>] [--value <value>] [--url <url>] [--domain <domain>] [--path <path>] [--expires <unix>] [--secure] [set: --http-only] [--all]",
+"comment": ""
+},
+{
+"i": 204,
+"en": "browser design-mode requires one of: enable, disable, toggle, status",
+"comment": ""
+},
+{
+"i": 205,
+"en": "browser design-mode enable|disable|toggle|status [--surface <id>]",
+"comment": ""
+},
+{
+"i": 206,
+"en": "mode must be one of: enable, disable, toggle",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Timed out updating browser design mode",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Browser design mode could not be updated",
+"comment": ""
+},
+{
+"i": 209,
+"en": "Browser evaluation result contains a circular reference",
+"comment": ""
+},
+{
+"i": 210,
+"en": "Invalid trusted diff viewer allowlist",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Missing or invalid trusted diff viewer allowlist",
+"comment": ""
+},
+{
+"i": 212,
+"en": "Invalid trusted diff viewer session",
+"comment": ""
+},
+{
+"i": 213,
+"en": "Missing trusted diff viewer session",
+"comment": ""
+},
+{
+"i": 214,
+"en": "Blocked by your organization's browser policy",
+"comment": ""
+},
+{
+"i": 215,
+"en": "Invalid browser download arguments: %@",
+"comment": ""
+},
+{
+"i": 216,
+"en": "browser download requires a surface handle",
+"comment": ""
+},
+{
+"i": 217,
+"en": "No recent downloads.",
+"comment": ""
+},
+{
+"i": 218,
+"en": "%1$lld. %2$@ %3$@\n   id: %4$@\n   path: %5$@\n   bytes: %6$@\n   path_exists: %7$@",
+"comment": ""
+},
+{
+"i": 219,
+"en": "Browser operation failed",
+"comment": ""
+},
+{
+"i": 220,
+"en": "browser cookies clear requires exactly one of --all or a cookie scope",
+"comment": ""
+},
+{
+"i": 221,
+"en": "browser cookies clear --expires must be an integer Unix timestamp",
+"comment": ""
+},
+{
+"i": 222,
+"en": "browser cookies clear received an invalid cookie filter",
+"comment": ""
+},
+{
+"i": 223,
+"en": "browser cookies clear --url requires a valid URL with a host",
+"comment": ""
+},
+{
+"i": 224,
+"en": "Browser controls are unavailable",
+"comment": ""
+},
+{
+"i": 225,
+"en": "browser viewport requires: <width> <height> | reset",
+"comment": ""
+},
+{
+"i": 226,
+"en": "browser viewport reset does not accept additional arguments",
+"comment": ""
+},
+{
+"i": 227,
+"en": "Named keys follow Playwright/W3C names. Space, Spacebar, and space emit DOM key \" \" with code \"Space\"; --key ' ' passes the raw DOM key.",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Emulate an exact 1...4096 CSS-pixel viewport inside the pane without resizing it",
+"comment": ""
+},
+{
+"i": 229,
+"en": "The page is aspect-fitted in the existing pane; reset restores native pane sizing",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Oversized viewport and page-zoom combinations return structured render-limit details",
+"comment": ""
+},
+{
+"i": 231,
+"en": "viewport <width> <height> | reset",
+"comment": ""
+},
+{
+"i": 232,
+"en": "--profile requires a non-empty profile name or UUID",
+"comment": ""
+},
+{
+"i": 233,
+"en": "--profile is only supported when browser open creates a new pane; omit the surface selector",
+"comment": ""
+},
+{
+"i": 234,
+"en": "[--profile <name|uuid>]",
+"comment": ""
+},
+{
+"i": 235,
+"en": "last used",
+"comment": ""
+},
+{
+"i": 236,
+"en": "type must be terminal, browser, or simulator",
+"comment": ""
+},
+{
+"i": 237,
+"en": "Usage: cmux canvas new-pane [--type terminal|browser|simulator]",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Invalid surface handle: %@",
+"comment": ""
+},
+{
+"i": 239,
+"en": "Surface not found: %@",
+"comment": ""
+},
+{
+"i": 240,
+"en": "Usage: cmux claude-teams [claude-args...]\n\nLaunch Claude Code with agent teams enabled.\n\nThis command:\n  - defaults Claude teammate mode to auto\n  - sets a tmux-like environment so Claude auto mode uses cmux splits\n  - sets CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1\n  - prepends a private tmux shim to PATH\n  - forwards all remaining arguments to claude\n\nThe tmux shim translates supported tmux window/pane commands into cmux\nworkspace and split operations in the current cmux session.\n\nExamples:\n  cmux claude-teams\n  cmux claude-teams --continue\n  cmux claude-teams --model sonnet",
+"comment": ""
+},
+{
+"i": 241,
+"en": "close-surface requires --workspace or --window with explicit --surface",
+"comment": ""
+},
+{
+"i": 242,
+"en": "id: %1$@\nverification: %2$@\ncertificate: %3$@",
+"comment": ""
+},
+{
+"i": 243,
+"en": "No custom Cloud VM domains. Start one with `cmux cloud domains verify <domain>`.",
+"comment": ""
+},
+{
+"i": 244,
+"en": "publications: none",
+"comment": ""
+},
+{
+"i": 245,
+"en": "publications: %@",
+"comment": ""
+},
+{
+"i": 246,
+"en": "id: %1$@\nvm: %2$@:%3$@\naccess: %4$@\nstate: %5$@\nrouting revision: %6$@\ndomain: %7$@",
+"comment": ""
+},
+{
+"i": 247,
+"en": "No ALIAS/ANAME/flattening record at your DNS provider? Publish www.%@ and redirect the apex to it.",
+"comment": ""
+},
+{
+"i": 248,
+"en": "certificate",
+"comment": ""
+},
+{
+"i": 249,
+"en": "Add these DNS records for %@:",
+"comment": ""
+},
+{
+"i": 250,
+"en": "ownership",
+"comment": ""
+},
+{
+"i": 251,
+"en": "routing",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Routing: the apex record serves %@ itself; the * record serves every subdomain.",
+"comment": ""
+},
+{
+"i": 253,
+"en": "No published Cloud VM domains.",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Publish VM ports on generated or custom domains.",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Access must be personal, team, or public.",
+"comment": ""
+},
+{
+"i": 256,
+"en": "The cmux app returned a domain response this CLI could not read.",
+"comment": ""
+},
+{
+"i": 257,
+"en": "The cmux app returned a publication response this CLI could not read.",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Removed publication %@.",
+"comment": ""
+},
+{
+"i": 259,
+"en": "%1$@ (team %2$@)",
+"comment": ""
+},
+{
+"i": 260,
+"en": "`--team` can only be used with team access.",
+"comment": ""
+},
+{
+"i": 261,
+"en": "Team access requires `--team <id>` when more than one team is available.",
+"comment": ""
+},
+{
+"i": 262,
+"en": "unknown",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Usage:\n  cmux cloud domains [list]\n  cmux cloud domains zones\n  cmux cloud domains verify <domain>\n  cmux cloud domains publish <vm> <port> [--domain <hostname>] [--access personal|team|public] [--team <id>] [--org-slug <slug>] [--yes]\n  cmux cloud domains access <hostname> <personal|team|public> [--team <id>] [--yes]\n  cmux cloud domains grant <hostname> <email> [--expires <ISO-date>]\n  cmux cloud domains ungrant <hostname> <email>\n  cmux cloud domains grants <hostname>\n  cmux cloud domains rm <hostname>\n\nVerify a domain you own first: `verify` prints the DNS records to add, then run it\nagain to complete. `publish --domain` then accepts that domain or any one-label child.\nGenerated names use <vm>--<organization>--<port>.cmux.sh and need no verification.\nAccess defaults to the owning team or personal owner. Email grants apply to one port only.\nPublic access requires confirmation; --yes confirms it for scripts. Add --json for JSON output.",
+"comment": ""
+},
+{
+"i": 264,
+"en": "verification: not required (cmux domain)",
+"comment": ""
+},
+{
+"i": 265,
+"en": "verification: %@",
+"comment": ""
+},
+{
+"i": 266,
+"en": "After updating DNS: cmux cloud domains verify %@",
+"comment": ""
+},
+{
+"i": 267,
+"en": "cloud VM",
+"comment": ""
+},
+{
+"i": 268,
+"en": "coderouter|cr [coderouter-args...]                 (aliases for the CodeRouter CLI; offers to install it when missing)",
+"comment": ""
+},
+{
+"i": 269,
+"en": "Install CodeRouter now? [y/N] ",
+"comment": ""
+},
+{
+"i": 270,
+"en": "CodeRouter was not installed. Install it later with:\n  %@",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Could not download the CodeRouter installer (curl exited with status %1$d). Retry, or install it with:\n  %2$@",
+"comment": ""
+},
+{
+"i": 272,
+"en": "The CodeRouter installer finished, but its command could not be found in %@. Check the installation and try again.",
+"comment": ""
+},
+{
+"i": 273,
+"en": "The CodeRouter installer exited with status %1$d. Retry, or install it with:\n  %2$@",
+"comment": ""
+},
+{
+"i": 274,
+"en": "Installing CodeRouter...",
+"comment": ""
+},
+{
+"i": 275,
+"en": "CodeRouter CLI is not installed. Install it, then retry:\n  %@",
+"comment": ""
+},
+{
+"i": 276,
+"en": "CodeRouter CLI is not installed. cmux can install it now by running the official installer:\n  %1$@\nThis downloads the checksum-verified CodeRouter binary into %2$@ and adds that directory to your shell PATH.",
+"comment": ""
+},
+{
+"i": 277,
+"en": "coderouter <status|machines|claude> [--team <id>] [--json]    (team model-plane settings; other verbs pass through)",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Could not start the required CLI. Check the installation and try again.",
+"comment": ""
+},
+{
+"i": 279,
+"en": "cmux codex-teams watcher skipped a Codex subagent: depth %1$lld exceeds the automatic pane limit %2$lld.",
+"comment": ""
+},
+{
+"i": 280,
+"en": "cmux codex-teams watcher could not create a pane for a resumed Codex subagent.",
+"comment": ""
+},
+{
+"i": 281,
+"en": "cmux codex-teams watcher could not create a pane for a resumed Codex subagent (error code: %@).",
+"comment": ""
+},
+{
+"i": 282,
+"en": "cmux codex-teams watcher could not attach a Codex subagent because its resumed thread was not ready.",
+"comment": ""
+},
+{
+"i": 283,
+"en": "cmux codex-teams watcher skipped a Codex subagent: thread status %@ is not attachable.",
+"comment": ""
+},
+{
+"i": 284,
+"en": "cmux comments requires a git repository: %@",
+"comment": ""
+},
+{
+"i": 285,
+"en": "--repo requires a path. For a path starting with a dash, pass it as ./-name",
+"comment": ""
+},
+{
+"i": 286,
+"en": "comments requires a subcommand. Try: list",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Unexpected argument '%@' for cmux comments list. Supported: --repo <path>, --all, --json",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Unknown comments subcommand '%@'. Try: list",
+"comment": ""
+},
+{
+"i": 289,
+"en": "    anchor: %@",
+"comment": ""
+},
+{
+"i": 290,
+"en": "No review comments. (repo: %@)",
+"comment": ""
+},
+{
+"i": 291,
+"en": "1 review comment (repo: %@)",
+"comment": ""
+},
+{
+"i": 292,
+"en": "%1$lld review comments (repo: %2$@)",
+"comment": ""
+},
+{
+"i": 293,
+"en": "consumed",
+"comment": ""
+},
+{
+"i": 294,
+"en": "pending",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Usage: cmux comments <subcommand> [options]\n\nReview comments saved from the diff viewer, stored per git repository.\n\nSubcommands:\n  list [--repo <path>] [--all] [--json]\n    List review comments for a repository (default: the git repository\n    containing the current directory). Lists pending comments only;\n    --all includes comments already delivered to an agent through a\n    TextBox submission.",
+"comment": ""
+},
+{
+"i": 296,
+"en": "(routed to remote tmux; the new pane arrives asynchronously)",
+"comment": ""
+},
+{
+"i": 297,
+"en": "(routed to remote tmux; the new window arrives asynchronously)",
+"comment": ""
+},
+{
+"i": 298,
+"en": "clear-notifications --surface requires a workspace or window context",
+"comment": ""
+},
+{
+"i": 299,
+"en": "dismiss-notification requires exactly one of --id or --all-read",
+"comment": ""
+}
+]

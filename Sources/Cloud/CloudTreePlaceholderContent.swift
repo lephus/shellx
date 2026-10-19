@@ -16,14 +16,14 @@ struct CloudTreePlaceholderContent: View {
                     ProgressView().controlSize(.mini)
                 case .error:
                     CmuxSystemSymbolImage(
-                        systemName: "exclamationmark.triangle",
+                        symbolName: "exclamationmark.triangle",
                         pointSize: max(style.iconSize, 9),
                         weight: .regular,
                         tint: Color(nsColor: .secondaryLabelColor)
                     )
                 case .createMachine:
                     CmuxSystemSymbolImage(
-                        systemName: "plus",
+                        symbolName: "plus",
                         pointSize: max(style.iconSize, 9),
                         weight: .medium,
                         tint: Color(nsColor: .secondaryLabelColor)
@@ -34,7 +34,7 @@ struct CloudTreePlaceholderContent: View {
                     Color.clear
                 case .dimmed:
                     CmuxSystemSymbolImage(
-                        systemName: "moon.zzz",
+                        symbolName: "moon.zzz",
                         pointSize: max(style.iconSize, 9),
                         weight: .regular,
                         tint: Color(nsColor: .tertiaryLabelColor)

@@ -1,6 +1,7 @@
 import CmuxFoundation
 import AppKit
 import SwiftUI
+import ShellXIcons
 
 private enum PDFPreviewChromeDebugAction {
     case zoomOut
@@ -169,7 +170,7 @@ private struct PDFPreviewChromeDebugView: View {
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                ShellXIcon.image(isSelected ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
                     .frame(width: 16)
 
@@ -329,7 +330,7 @@ final class PDFPreviewChromeDebugWindowController: ReleasingWindowController {
         item.label = action.title
         item.paletteLabel = action.title
         item.toolTip = action.title
-        item.image = NSImage(systemSymbolName: action.systemName, accessibilityDescription: action.title)
+        item.image = ShellXIcon.nsImage(action.systemName, accessibilityDescription: action.title)
         item.target = self
         item.action = selector
         item.isBordered = true

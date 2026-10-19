@@ -1,6 +1,7 @@
 import AppKit
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// The welcome window's hero: the Cloud tree as the right sidebar shows it
 /// mid-work (one machine open on its workspace and two terminals, Terminals
@@ -39,7 +40,7 @@ struct CloudWelcomeHero: View {
 
     private var header: some View {
         HStack(spacing: 6) {
-            Image(systemName: "cloud")
+            ShellXIcon.image("cloud")
                 .cmuxFont(size: 11)
             Text(String(localized: "cloudTree.group.cloudMachines", defaultValue: "Cloud Machines"))
                 .cmuxFont(size: 12)
@@ -58,12 +59,12 @@ struct CloudWelcomeHero: View {
         HStack(spacing: 6) {
             if isChild {
                 // A workspace row: disclosure chevron, then its folder.
-                Image(systemName: isOpen ? "chevron.down" : "chevron.right")
+                ShellXIcon.image(isOpen ? "chevron.down" : "chevron.right")
                     .cmuxFont(size: 9, weight: .semibold)
                     .foregroundStyle(.secondary)
                     .frame(width: 14)
             }
-            Image(systemName: symbol)
+            ShellXIcon.image(symbol)
                 .cmuxFont(size: isChild ? 11 : 9, weight: isChild ? .regular : .semibold)
                 .foregroundStyle(.secondary)
                 .frame(width: 14)
@@ -76,7 +77,7 @@ struct CloudWelcomeHero: View {
 
     private func leafRow(symbol: String, name: String, depth: Int) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: symbol)
+            ShellXIcon.image(symbol)
                 .cmuxFont(size: 11)
                 .foregroundStyle(.secondary)
                 .frame(width: 14)

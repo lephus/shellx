@@ -29,13 +29,13 @@ public enum CmuxSettingChangeError: LocalizedError, Sendable, Equatable {
         case .unknownPath(let path):
             return localization.format(
                 "config.settingChange.unknownPath",
-                defaultValue: "'%@' isn't a cmux setting. Run `cmux docs settings` to list them.",
+                defaultValue: "'%@' isn't a ShellX setting. Run `shellx docs settings` to list them.",
                 path
             )
         case .notASetting(let path):
             return localization.format(
                 "config.settingChange.notASetting",
-                defaultValue: "'%@' isn't a setting. Edit that section of cmux.json directly.",
+                defaultValue: "'%@' isn't a setting. Edit that section of shellx.json directly.",
                 path
             )
         case .notBoolean(let path):
@@ -65,7 +65,7 @@ public enum CmuxSettingChangeError: LocalizedError, Sendable, Equatable {
         case .keyContainsDot(let path):
             return localization.format(
                 "config.settingChange.keyContainsDot",
-                defaultValue: "'%@' names a key that contains \".\", such as a workspaceGroups.byCwd path. Setting paths split on every \".\", so that key can't be changed this way. Edit it in cmux.json directly.",
+                defaultValue: "'%@' names a key that contains \".\", such as a workspaceGroups.byCwd path. Setting paths split on every \".\", so that key can't be changed this way. Edit it in shellx.json directly.",
                 path
             )
         }

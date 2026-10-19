@@ -5,6 +5,7 @@ import CmuxSettings
 import CmuxSettingsUI
 import CmuxSidebarProviderKit
 import Foundation
+import ShellXIcons
 
 enum CmuxExtensionSidebarSelection {
     @MainActor
@@ -376,7 +377,7 @@ enum CmuxExtensionSidebarSelection {
             item.representedObject = descriptor.id
             item.target = CmuxExtensionSidebarMenuTarget.shared
             item.state = selectedProviderId == descriptor.id ? .on : .off
-            item.image = NSImage(systemSymbolName: descriptor.systemImageName, accessibilityDescription: nil)
+            item.image = ShellXIcon.nsImage(descriptor.systemImageName, accessibilityDescription: nil)
             menu.addItem(item)
         }
         if customSidebarsEnabled {

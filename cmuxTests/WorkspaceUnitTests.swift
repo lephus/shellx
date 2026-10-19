@@ -55,9 +55,10 @@ final class SidebarSelectedWorkspaceColorTests: XCTestCase {
             return
         }
 
-        XCTAssertEqual(color.redComponent, 0, accuracy: 0.001)
-        XCTAssertEqual(color.greenComponent, 136.0 / 255.0, accuracy: 0.001)
-        XCTAssertEqual(color.blueComponent, 1.0, accuracy: 0.001)
+        // ShellX primary #60a5fa.
+        XCTAssertEqual(color.redComponent, 0x60 / 255.0, accuracy: 0.001)
+        XCTAssertEqual(color.greenComponent, 0xA5 / 255.0, accuracy: 0.001)
+        XCTAssertEqual(color.blueComponent, 0xFA / 255.0, accuracy: 0.001)
         XCTAssertEqual(color.alphaComponent, 1.0, accuracy: 0.001)
     }
 
@@ -71,9 +72,10 @@ final class SidebarSelectedWorkspaceColorTests: XCTestCase {
             return
         }
 
-        XCTAssertEqual(color.redComponent, 0, accuracy: 0.001)
-        XCTAssertEqual(color.greenComponent, 145.0 / 255.0, accuracy: 0.001)
-        XCTAssertEqual(color.blueComponent, 1.0, accuracy: 0.001)
+        // ShellX primary #60a5fa.
+        XCTAssertEqual(color.redComponent, 0x60 / 255.0, accuracy: 0.001)
+        XCTAssertEqual(color.greenComponent, 0xA5 / 255.0, accuracy: 0.001)
+        XCTAssertEqual(color.blueComponent, 0xFA / 255.0, accuracy: 0.001)
         XCTAssertEqual(color.alphaComponent, 1.0, accuracy: 0.001)
     }
 
@@ -158,7 +160,11 @@ final class SidebarSelectedWorkspaceColorTests: XCTestCase {
                 colorScheme: scheme,
                 sidebarSelectionColorHex: nil
             )
-            XCTAssertEqual(solid.color?.hexString(), CmuxAccentColor().nsColor(for: scheme).hexString())
+            // ShellX: a dark sidebar selects with the flat `raise` token.
+            XCTAssertEqual(
+                solid.color?.hexString(),
+                scheme == .dark ? "#171128" : CmuxAccentColor().nsColor(for: scheme).hexString()
+            )
             XCTAssertEqual(solid.opacity, 1.0, accuracy: 0.001)
             XCTAssertNil(solid.edgeColor)
 
@@ -263,7 +269,9 @@ final class SidebarSelectedWorkspaceColorTests: XCTestCase {
         }
     }
 
-    func testSolidFillSelectedWorkspaceForegroundUsesNativeSelectionTextOnAccentBackground() {
+    /// ShellX primary (#60a5fa) is too light for white text (2.5:1), so the
+    /// readable foreground on the solid accent fill is black.
+    func testSolidFillSelectedWorkspaceForegroundIsReadableOnAccentBackground() {
         guard let color = sidebarSelectedWorkspaceForegroundNSColor(
             on: sidebarSelectedWorkspaceBackgroundNSColor(
                 for: .light,
@@ -276,9 +284,9 @@ final class SidebarSelectedWorkspaceColorTests: XCTestCase {
             return
         }
 
-        XCTAssertEqual(color.redComponent, 1.0, accuracy: 0.001)
-        XCTAssertEqual(color.greenComponent, 1.0, accuracy: 0.001)
-        XCTAssertEqual(color.blueComponent, 1.0, accuracy: 0.001)
+        XCTAssertEqual(color.redComponent, 0.0, accuracy: 0.001)
+        XCTAssertEqual(color.greenComponent, 0.0, accuracy: 0.001)
+        XCTAssertEqual(color.blueComponent, 0.0, accuracy: 0.001)
         XCTAssertEqual(color.alphaComponent, 0.65, accuracy: 0.001)
     }
 

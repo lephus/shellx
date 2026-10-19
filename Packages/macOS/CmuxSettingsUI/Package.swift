@@ -18,6 +18,8 @@ let package = Package(
         .package(path: "../../Shared/CMUXMobileCore"),
         .package(path: "../CmuxFoundation"),
         .package(path: "../CmuxSettings"),
+        // coolicons behind ShellXIcon (spec §7.4); the CLI never links this package.
+        .package(path: "../../Shared/ShellXBrand"),
     ],
     targets: [
         .target(
@@ -26,6 +28,7 @@ let package = Package(
                 "CMUXMobileCore",
                 .product(name: "CmuxFoundation", package: "CmuxFoundation"),
                 .product(name: "CmuxSettings", package: "CmuxSettings"),
+                .product(name: "ShellXIcons", package: "ShellXBrand"),
             ],
             resources: [
                 .process("Resources/Localizable.xcstrings"),
@@ -40,6 +43,7 @@ let package = Package(
                 "CmuxSettingsUI",
                 "CmuxSettings",
                 .product(name: "CmuxFoundation", package: "CmuxFoundation"),
+                .product(name: "ShellXIcons", package: "ShellXBrand"),
             ]
         ),
     ]

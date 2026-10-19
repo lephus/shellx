@@ -1,6 +1,7 @@
 import CmuxFoundation
 import CmuxSettings
 import SwiftUI
+import ShellXIcons
 
 /// **Mobile** section — Mac-side controls for pairing and syncing with
 /// cmux on iOS: the pairing-host toggle, the preferred listener port (with a
@@ -123,7 +124,7 @@ public struct MobileSection: View {
                     }
                     SettingsCardNote(String(
                         localized: "settings.mobile.port.note",
-                        defaultValue: "Apply saves the port for the next pairing start. Current connections continue. To use the new port, turn iOS Pairing off and on. If the port is unavailable, cmux chooses an available port."
+                        defaultValue: "Apply saves the port for the next pairing start. Current connections continue. To use the new port, turn iOS Pairing off and on. If the port is unavailable, ShellX chooses an available port."
                     ))
                 }
                 .disabled(remoteControlManagedByPolicy)
@@ -159,7 +160,7 @@ public struct MobileSection: View {
                 localized: "settings.mobile.phonePush.forwarding",
                 defaultValue: "Forward Notifications to iPhone"
             ),
-            subtitle: String(localized: "settings.mobile.phonePush.forwarding.subtitle", defaultValue: "Sends agent notifications from this Mac to cmux on iPhone and iPad.")
+            subtitle: String(localized: "settings.mobile.phonePush.forwarding.subtitle", defaultValue: "Sends agent notifications from this Mac to ShellX on iPhone and iPad.")
         ) {
             Toggle(
                 "",
@@ -251,7 +252,7 @@ public struct MobileSection: View {
             subtitle: String(
                 localized: "settings.mobile.pairDevice.subtitle",
                 defaultValue: """
-                Sign in to cmux on your iPhone with the same account and it \
+                Sign in to ShellX on your iPhone with the same account and it \
                 connects automatically. No QR code is needed.
                 """
             )
@@ -333,19 +334,19 @@ public struct MobileSection: View {
     private var boundPortStatusRow: some View {
         if !isDraftValid {
             statusCaption {
-                Label(
+                ShellXLabel(
                     String(localized: "settings.mobile.port.status.invalid", defaultValue: "Port must be between 1 and 65535."),
-                    systemImage: "exclamationmark.triangle.fill"
+                    icon: "exclamationmark.triangle.fill"
                 )
                 .foregroundStyle(.orange)
             }
         } else if iOSPairingHost.current, let current = status.current,
                   current.pendingPortChange, let bound = current.boundPort {
             statusCaption {
-                Label(
+                ShellXLabel(
                     String(localized: "settings.mobile.port.pending",
                         defaultValue: "Port \(current.configuredPort) is saved for the next pairing start. Currently using port \(bound)."),
-                    systemImage: "info.circle"
+                    icon: "info.circle"
                 )
                 .foregroundStyle(.secondary)
             }
@@ -353,20 +354,20 @@ public struct MobileSection: View {
             // Only while pairing is on — toggling off stops the listener, which
             // would make "still listening on …" wrong.
             statusCaption {
-                Label(
+                ShellXLabel(
                     String(
                         localized: "settings.mobile.port.apply.inUse",
                         defaultValue: "Port \(requested) is in use. The pairing listener is still on \(status.current?.boundPort ?? requested)."
                     ),
-                    systemImage: "exclamationmark.triangle.fill"
+                    icon: "exclamationmark.triangle.fill"
                 )
                 .foregroundStyle(.orange)
             }
         } else if case let .savedForLater(saved) = applyResult, status.current?.isRunning != true {
             statusCaption {
-                Label(
+                ShellXLabel(
                     String(localized: "settings.mobile.port.apply.saved", defaultValue: "Saved port \(saved). It takes effect the next time iOS Pairing starts."),
-                    systemImage: "checkmark.circle.fill"
+                    icon: "checkmark.circle.fill"
                 )
                 .foregroundStyle(.secondary)
             }
@@ -390,18 +391,18 @@ public struct MobileSection: View {
             Text(String(localized: "settings.mobile.port.status.starting", defaultValue: "Starting the pairing listener…"))
                 .foregroundStyle(.secondary)
         } else if snapshot.usesEphemeralFallback, let bound = snapshot.boundPort {
-            Label(
+            ShellXLabel(
                 String(
                     localized: "settings.mobile.port.status.fallback",
                     defaultValue: "Port \(snapshot.configuredPort) is in use. The pairing listener is on \(bound) instead."
                 ),
-                systemImage: "exclamationmark.triangle.fill"
+                icon: "exclamationmark.triangle.fill"
             )
             .foregroundStyle(.orange)
         } else if let bound = snapshot.boundPort {
-            Label(
+            ShellXLabel(
                 String(localized: "settings.mobile.port.status.ok", defaultValue: "Pairing listener on port \(bound)."),
-                systemImage: "checkmark.circle.fill"
+                icon: "checkmark.circle.fill"
             )
             .foregroundStyle(.secondary)
         }
@@ -524,7 +525,7 @@ public struct MobileSection: View {
             if snapshot.routes.isEmpty {
                 SettingsCardNote(String(
                     localized: "settings.mobile.routes.empty",
-                    defaultValue: "No reachable addresses yet. Iroh routes need this Mac signed in to your cmux account; Tailscale routes need Tailscale running on this Mac."
+                    defaultValue: "No reachable addresses yet. Iroh routes need this Mac signed in to your ShellX account; Tailscale routes need Tailscale running on this Mac."
                 ))
             } else {
                 VStack(alignment: .leading, spacing: 4) {

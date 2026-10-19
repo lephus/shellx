@@ -1,5 +1,6 @@
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// The one-time discovery hint that appears, with a soft scale+fade, after a
 /// user scrolls inside a pane: it teaches that Command+scroll pans the canvas
@@ -14,7 +15,7 @@ struct CanvasCommandScrollHint: View {
     var body: some View {
         HStack(spacing: 8) {
             textKeycap("⌘")
-            Image(systemName: "plus")
+            ShellXIcon.image("plus")
                 .cmuxFont(size: 9, weight: .bold)
                 .foregroundStyle(.secondary)
             symbolKeycap("arrow.up.and.down.and.arrow.left.and.right")
@@ -48,7 +49,7 @@ struct CanvasCommandScrollHint: View {
 
     private func symbolKeycap(_ systemName: String) -> some View {
         keycapContainer {
-            Image(systemName: systemName)
+            ShellXIcon.image(systemName)
                 .cmuxFont(size: 12, weight: .semibold)
         }
     }

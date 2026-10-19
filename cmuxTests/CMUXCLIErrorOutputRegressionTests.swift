@@ -1463,7 +1463,7 @@ import Testing
         #expect(!duplicateResult.timedOut, Comment(rawValue: duplicateResult.diagnostics))
         #expect(duplicateResult.status == 1, Comment(rawValue: duplicateResult.diagnostics))
         #expect(
-            duplicateResult.stderr.contains("Usage: cmux restore --surface [id|ref]"),
+            duplicateResult.stderr.contains("Usage: shellx restore --surface [id|ref]"),
             Comment(rawValue: duplicateResult.diagnostics)
         )
         #expect(duplicateResponder.receivedRequests.isEmpty)
@@ -1502,7 +1502,7 @@ import Testing
         XCTAssertEqual(result.status, 1, result.diagnostics)
         XCTAssertTrue(
             result.stderr.contains(
-                "restore: the current cmux surface could not be identified. "
+                "restore: the current ShellX surface could not be identified. "
                     + "Retry from this terminal or pass --surface <id|ref>."
             ),
             result.diagnostics
@@ -1558,7 +1558,7 @@ import Testing
             XCTAssertFalse(result.timedOut, result.diagnostics)
             XCTAssertEqual(result.status, 1, result.diagnostics)
             XCTAssertTrue(
-                result.stderr.contains("Run 'cmux restore --surface'"),
+                result.stderr.contains("Run 'shellx restore --surface'"),
                 result.diagnostics
             )
         }
@@ -1982,7 +1982,7 @@ import Testing
         #expect(!result.timedOut, Comment(rawValue: result.diagnostics))
         #expect(result.status != 0, Comment(rawValue: result.diagnostics))
         #expect(
-            result.stderr.contains("the current cmux surface could not be identified"),
+            result.stderr.contains("the current ShellX surface could not be identified"),
             Comment(rawValue: result.diagnostics)
         )
         let requests = try responder.receivedRequests.map { request in
@@ -2346,7 +2346,7 @@ import Testing
         #expect(!result.timedOut, Comment(rawValue: result.diagnostics))
         #expect(result.status != 0, Comment(rawValue: result.diagnostics))
         #expect(
-            result.stderr.contains("the current cmux surface could not be identified"),
+            result.stderr.contains("the current ShellX surface could not be identified"),
             Comment(rawValue: result.diagnostics)
         )
         let requests = try responder.receivedRequests.map { request in
@@ -2640,8 +2640,8 @@ import Testing
             (["shortcuts", "--invalid"], "shortcuts: unknown flag '--invalid'"),
             (["open"], "open requires at least one path or URL"),
             (["diff", "one.patch", "two.patch"], "diff accepts at most one patch file"),
-            (["restore", "codex", UUID().uuidString.lowercased()], "restore: cmux is still opening."),
-            (["fork", "pi", UUID().uuidString.lowercased()], "fork: cmux is still opening."),
+            (["restore", "codex", UUID().uuidString.lowercased()], "restore: ShellX is still opening."),
+            (["fork", "pi", UUID().uuidString.lowercased()], "fork: ShellX is still opening."),
             (["restore-session", "--invalid"], "restore-session: unknown flag '--invalid'"),
             (["feedback", "--invalid"], "feedback: unknown flag '--invalid'"),
         ]
@@ -2660,7 +2660,7 @@ import Testing
                 Comment(rawValue: result.diagnostics)
             )
             #expect(
-                !result.stderr.contains("No live cmux socket found"),
+                !result.stderr.contains("No live ShellX socket found"),
                 Comment(rawValue: result.diagnostics)
             )
         }
@@ -2760,7 +2760,7 @@ import Testing
         #expect(leakedResponder.receivedRequests.isEmpty, Comment(rawValue: result.diagnostics))
         #expect(!result.stdout.contains("PONG LEAKED"), Comment(rawValue: result.diagnostics))
         #expect(!result.stderr.contains(leakedSocketPath), Comment(rawValue: result.diagnostics))
-        #expect(result.stderr.contains("No live cmux socket found"), Comment(rawValue: result.diagnostics))
+        #expect(result.stderr.contains("No live ShellX socket found"), Comment(rawValue: result.diagnostics))
         #expect(result.stderr.contains(taggedSocketPath), Comment(rawValue: result.diagnostics))
     }
 
@@ -3301,7 +3301,7 @@ import Testing
         XCTAssertFalse(result.timedOut, result.diagnostics)
         XCTAssertEqual(result.status, 0, result.diagnostics)
         XCTAssertTrue(result.stdout.contains("Offline Theme"), result.diagnostics)
-        XCTAssertFalse(result.stderr.contains("No live cmux socket found"), result.diagnostics)
+        XCTAssertFalse(result.stderr.contains("No live ShellX socket found"), result.diagnostics)
     }
 
     @Test func testThemesSetReloadsRunningAppAfterEveryThemeWrite() async throws {

@@ -1,6 +1,7 @@
 import CmuxCloud
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// The Network sheet's editor: the mode menu with the security info button,
 /// and in Allowlist mode the lists themselves. The New Machine sheet lays
@@ -56,7 +57,7 @@ struct CloudNetworkModeMenu: View {
                     model.mode = mode
                 } label: {
                     if mode == model.mode {
-                        Label(mode.title, systemImage: "checkmark")
+                        ShellXLabel(mode.title, icon: "checkmark")
                     } else {
                         Text(mode.title)
                     }
@@ -236,7 +237,7 @@ private struct CloudNetworkEntryRow: View {
                 .truncationMode(.middle)
             Spacer(minLength: 0)
             Button(action: onRemove) {
-                Image(systemName: "minus.circle")
+                ShellXIcon.image("minus.circle")
             }
             .buttonStyle(.borderless)
             .help(String(localized: "cloud.network.remove", defaultValue: "Remove"))

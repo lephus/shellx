@@ -1,4 +1,5 @@
 import AppKit
+import ShellXIcons
 
 extension GhosttyNSView {
     func appendMoveCurrentSurfaceMoveMenuItems(to menu: NSMenu) {
@@ -17,8 +18,8 @@ extension GhosttyNSView {
             action: nil,
             keyEquivalent: ""
         )
-        moveItem.image = NSImage(
-            systemSymbolName: "rectangle.stack.badge.play",
+        moveItem.image = ShellXIcon.nsImage(
+            "rectangle.stack.badge.play",
             accessibilityDescription: nil
         )
         let submenu = NSMenu()
@@ -35,8 +36,8 @@ extension GhosttyNSView {
             )
             item.target = self
             item.representedObject = target.workspaceId
-            item.image = NSImage(
-                systemSymbolName: "rectangle.portrait.on.rectangle.portrait",
+            item.image = ShellXIcon.nsImage(
+                "rectangle.portrait.on.rectangle.portrait",
                 accessibilityDescription: nil
             )
             submenu.addItem(item)
@@ -52,8 +53,8 @@ extension GhosttyNSView {
             keyEquivalent: ""
         )
         item.target = self
-        item.image = NSImage(
-            systemSymbolName: "rectangle.portrait.and.arrow.right",
+        item.image = ShellXIcon.nsImage(
+            "rectangle.portrait.and.arrow.right",
             accessibilityDescription: nil
         )
     }

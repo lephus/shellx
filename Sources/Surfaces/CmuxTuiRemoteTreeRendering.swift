@@ -165,7 +165,7 @@ extension CmuxTuiRemoteRouting {
             lines.append("    " + String(localized: "cli.vm.tree.link.connecting", defaultValue: "connecting…"))
         case "asleep":
             lines.append("    " + String(
-                format: String(localized: "cli.vm.tree.link.asleep", defaultValue: "asleep — cmux vm open %@ wakes it"),
+                format: String(localized: "cli.vm.tree.link.asleep", defaultValue: "asleep — shellx vm open %@ wakes it"),
                 id
             ))
         case "error", "unavailable":
@@ -174,13 +174,13 @@ extension CmuxTuiRemoteRouting {
                 linkErrorDescription
             ))
             lines.append("    " + String(
-                format: String(localized: "cli.vm.tree.link.retry", defaultValue: "retry: cmux vm tree %@ --refresh"),
+                format: String(localized: "cli.vm.tree.link.retry", defaultValue: "retry: shellx vm tree %@ --refresh"),
                 id
             ))
         default:
             if workspaces.isEmpty {
                 lines.append("    " + String(
-                    format: String(localized: "cli.vm.tree.noWorkspaces", defaultValue: "(none yet — cmux vm open %@ starts one)"),
+                    format: String(localized: "cli.vm.tree.noWorkspaces", defaultValue: "(none yet — shellx vm open %@ starts one)"),
                     id
                 ))
             }

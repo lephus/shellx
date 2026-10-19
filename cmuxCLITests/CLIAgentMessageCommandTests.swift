@@ -118,7 +118,7 @@ struct CLIAgentMessageCommandTests {
         let run = try runCLI(arguments: ["agent", "message", "--help"])
 
         #expect(run.result.status == 0, Comment(rawValue: run.result.stderr + run.result.stdout))
-        #expect(run.result.stdout.contains("Usage: cmux agent message"))
+        #expect(run.result.stdout.contains("Usage: shellx agent message"))
         #expect(run.request("agent.message.send") == nil)
     }
 

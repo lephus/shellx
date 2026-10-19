@@ -1,6 +1,7 @@
 import SwiftUI
 import CmuxAppKitSupportUI
 import CmuxFeedback
+import ShellXIcons
 
 struct CloudVMLoadingPanelView: View {
     @ObservedObject var panel: CloudVMLoadingPanel
@@ -57,7 +58,7 @@ struct CloudVMLoadingPanelView: View {
                         CloudVMLoadingStatusView(elapsedSeconds: elapsedSeconds)
                     }
                 case .failed(let message, let failedElapsedSeconds):
-                        CmuxSystemSymbolImage(systemName: "exclamationmark.triangle.fill", pointSize: 18, tint: .orange)
+                        CmuxSystemSymbolImage(symbolName: "exclamationmark.triangle.fill", pointSize: 18, tint: .orange)
                         Text(String(localized: "panel.cloudVM.loading.failed.headline", defaultValue: "Base unavailable"))
                             .cmuxFont(size: 14, weight: .semibold)
                             .foregroundStyle(.primary)
@@ -70,9 +71,9 @@ struct CloudVMLoadingPanelView: View {
                             Button {
                                 _ = AppDelegate.shared?.performCloudVMAction(debugSource: "panel.cloudVM.retry")
                             } label: {
-                                Label(
+                                ShellXLabel(
                                     String(localized: "panel.cloudVM.loading.failed.retry", defaultValue: "Retry"),
-                                    systemImage: "arrow.clockwise"
+                                    icon: "arrow.clockwise"
                                 )
                                 .cmuxFont(size: 12, weight: .semibold)
                             }
@@ -82,9 +83,9 @@ struct CloudVMLoadingPanelView: View {
                             Button {
                                 FeedbackComposerBridge().openComposer()
                             } label: {
-                                Label(
+                                ShellXLabel(
                                     String(localized: "panel.cloudVM.loading.failed.feedback", defaultValue: "Send Feedback"),
-                                    systemImage: "bubble.left.and.text.bubble.right"
+                                    icon: "bubble.left.and.text.bubble.right"
                                 )
                                 .cmuxFont(size: 12, weight: .semibold)
                             }
@@ -164,7 +165,7 @@ private struct CloudVMLoadingStatusRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            CmuxSystemSymbolImage(systemName: icon, pointSize: 12, tint: isActive ? Color.secondary : Color(nsColor: .tertiaryLabelColor))
+            CmuxSystemSymbolImage(symbolName: icon, pointSize: 12, tint: isActive ? Color.secondary : Color(nsColor: .tertiaryLabelColor))
                 .frame(width: 14)
             Text(text)
                 .cmuxFont(size: 12)

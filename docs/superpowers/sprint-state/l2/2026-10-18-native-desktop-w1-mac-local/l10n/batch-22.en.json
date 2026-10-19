@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "browser.hiddenWebViewMemoryBudgetMB memory budget limit megabytes hidden tabs discard unload",
+"comment": ""
+},
+{
+"i": 1,
+"en": "Memory Saver Mode",
+"comment": ""
+},
+{
+"i": 2,
+"en": "Hidden Tab Memory Budget",
+"comment": ""
+},
+{
+"i": 3,
+"en": "Memory Budget",
+"comment": ""
+},
+{
+"i": 4,
+"en": "Memory Budget frees the tabs hidden longest once hidden tabs use more than the budget. Timer frees every tab hidden longer than the delay.",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Timer",
+"comment": ""
+},
+{
+"i": 6,
+"en": "How much memory hidden browser tabs may use before cmux frees the ones hidden longest.",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Keep Page Active While Hidden",
+"comment": ""
+},
+{
+"i": 8,
+"en": "Allow Page to Unload While Hidden",
+"comment": ""
+},
+{
+"i": 9,
+"en": "This page was unloaded to save memory.",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Restore Unloaded Pages Automatically",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Brings back an unloaded page as soon as its tab is shown. When off, the tab shows the page's last snapshot until you click Restore.",
+"comment": ""
+},
+{
+"i": 12,
+"en": "browser.autoRestoreUnloadedPages restore reload unloaded discarded hidden tabs placeholder",
+"comment": ""
+},
+{
+"i": 13,
+"en": "cmux pr: could not identify the caller workspace; run it inside a cmux terminal or pass --workspace <id|ref|index>",
+"comment": ""
+},
+{
+"i": 14,
+"en": "cmux pr requires a git repository in the current directory",
+"comment": ""
+},
+{
+"i": 15,
+"en": "cmux pr expects a pull-request URL or a positive pull-request number",
+"comment": ""
+},
+{
+"i": 16,
+"en": "cmux pr could not resolve the pull request; check authentication and try again",
+"comment": ""
+},
+{
+"i": 17,
+"en": "cmux pr received invalid pull-request information",
+"comment": ""
+},
+{
+"i": 18,
+"en": "cmux pr: the pull request does not belong to the detected repository",
+"comment": ""
+},
+{
+"i": 19,
+"en": "Usage: cmux pr <url|number> [--workspace <id|ref|index>] [--window <id|ref|index>]\n       cmux pr clear [--workspace <id|ref|index>] [--window <id|ref|index>]\n\nAttach or replace a pull-request link immediately. Requires a Git repository and account authentication.\nUses the repository associated with the current directory, including its configured upstream.\nTarget: explicit workspace, caller TTY, configured workspace, then a unique worktree match.\n--window restricts resolution; ambiguous targets fail without changing focus.\nThe manual link survives branch refreshes until replaced, cleared, or the session ends.\nThe existing watcher refreshes matching pull-request status. Clear removes only the manual link.\nSidebar visibility and click settings still apply.\n\nExample:\n  cmux pr 123\n  cmux pr clear",
+"comment": ""
+},
+{
+"i": 20,
+"en": "Workspace not found; run cmux list-workspaces and retry with --workspace.",
+"comment": ""
+},
+{
+"i": 21,
+"en": "Invalid PR handoff; use cmux pr --help.",
+"comment": ""
+},
+{
+"i": 22,
+"en": "pr <url|number> [flags] | pr clear [flags]",
+"comment": ""
+},
+{
+"i": 23,
+"en": "Installs and relaunches when %lld agents finish. Agents resume after the relaunch.",
+"comment": ""
+},
+{
+"i": 24,
+"en": "Relaunching will stop %lld running commands. Choose Install Now when you're ready.",
+"comment": ""
+},
+{
+"i": 25,
+"en": "by %@",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Usage: cmux new-window [--name <title>]\n\nCreate a new window.\n\nFlags:\n  --name <title>   Set the initial workspace and window title before the window appears.\n\nExamples:\n  cmux new-window\n  cmux new-window --name \"Build server\"",
+"comment": ""
+},
+{
+"i": 27,
+"en": "Usage: cmux new-window [--name <title>]. The name must not be empty.",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Sidebar '%@' already exists. Use --force to overwrite it.",
+"comment": ""
+},
+{
+"i": 29,
+"en": "Created %@ from %@.",
+"comment": ""
+},
+{
+"i": 30,
+"en": "Sidebar name must be kebab-case and must not contain a path.",
+"comment": ""
+},
+{
+"i": 31,
+"en": "sidebar new requires a kebab-case name",
+"comment": ""
+},
+{
+"i": 32,
+"en": "sidebar new requires --from <template>",
+"comment": ""
+},
+{
+"i": 33,
+"en": "Open it with: cmux sidebar open %@",
+"comment": ""
+},
+{
+"i": 34,
+"en": "sidebar new received unexpected argument '%@'",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Unknown sidebar template '%@'. Run cmux sidebar templates.",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Could not create the sidebar file.",
+"comment": ""
+},
+{
+"i": 37,
+"en": "sidebar templates does not accept positional arguments",
+"comment": ""
+},
+{
+"i": 38,
+"en": "New from Template…",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Unread workspaces first, with quick actions for triage.",
+"comment": ""
+},
+{
+"i": 40,
+"en": "Agents Board",
+"comment": ""
+},
+{
+"i": 41,
+"en": "A kanban-style board for agent workspaces.",
+"comment": ""
+},
+{
+"i": 42,
+"en": "Agents Cards",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Agent workspaces as compact status cards.",
+"comment": ""
+},
+{
+"i": 44,
+"en": "Agents Dense",
+"comment": ""
+},
+{
+"i": 45,
+"en": "A dense, information-first agent roster.",
+"comment": ""
+},
+{
+"i": 46,
+"en": "Agents Focus",
+"comment": ""
+},
+{
+"i": 47,
+"en": "A focused view of the active agent and its queue.",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Agents Timeline",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Agent activity arranged as a live timeline.",
+"comment": ""
+},
+{
+"i": 50,
+"en": "btop Agents",
+"comment": ""
+},
+{
+"i": 51,
+"en": "A terminal-inspired monitor for agent activity.",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Clock",
+"comment": ""
+},
+{
+"i": 53,
+"en": "A simple clock with workspace shortcuts.",
+"comment": ""
+},
+{
+"i": 54,
+"en": "A compact workspace list for narrow sidebars.",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Finder",
+"comment": ""
+},
+{
+"i": 56,
+"en": "A Finder-style workspace and tab browser.",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Focus",
+"comment": ""
+},
+{
+"i": 58,
+"en": "The selected workspace first, followed by what needs attention.",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Kitchen Sink",
+"comment": ""
+},
+{
+"i": 60,
+"en": "A tour of the custom sidebar runtime features.",
+"comment": ""
+},
+{
+"i": 61,
+"en": "Panel Info",
+"comment": ""
+},
+{
+"i": 62,
+"en": "A selected-workspace overview with ports and pull requests.",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Panel Sessions",
+"comment": ""
+},
+{
+"i": 64,
+"en": "Searchable sessions for this workspace or all workspaces.",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Panel Subagents",
+"comment": ""
+},
+{
+"i": 66,
+"en": "Coding-agent sessions grouped by workspace with live status.",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Panel Todo",
+"comment": ""
+},
+{
+"i": 68,
+"en": "An interactive scratch checklist for the current workspace.",
+"comment": ""
+},
+{
+"i": 69,
+"en": "Listening ports across the current workspaces.",
+"comment": ""
+},
+{
+"i": 70,
+"en": "Status Board",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Workspaces grouped by urgency, review, progress, and completion.",
+"comment": ""
+},
+{
+"i": 72,
+"en": "A straightforward live workspace list.",
+"comment": ""
+},
+{
+"i": 73,
+"en": "Created a temporary preview at %@ from %@.",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Remove it when finished: %@",
+"comment": ""
+},
+{
+"i": 75,
+"en": "Usage: cmux sidebar try <template>",
+"comment": ""
+},
+{
+"i": 76,
+"en": "Browse Sidebar Templates",
+"comment": ""
+},
+{
+"i": 77,
+"en": "Browse Sidebar Templates…",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Missing or invalid effects",
+"comment": ""
+},
+{
+"i": 79,
+"en": "--desktop must be true|false",
+"comment": ""
+},
+{
+"i": 80,
+"en": "Show Agent Usage in Sidebar",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Append the model and context window used to Claude Code and Codex status entries, plus an estimated API cost for Claude Code. The cost is an API list-price estimate, not your subscription bill.",
+"comment": ""
+},
+{
+"i": 82,
+"en": "sidebar.showAgentUsage agent usage model context window tokens percent cost price estimate spend claude codex",
+"comment": ""
+},
+{
+"i": 83,
+"en": "~%@",
+"comment": ""
+},
+{
+"i": 84,
+"en": "~%@+",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Cost is an API list-price estimate, not your subscription bill.",
+"comment": ""
+},
+{
+"i": 86,
+"en": "Double Blink",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Blink the pane flash twice instead of one short pulse.",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Flash While Typing",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Flash the pane when typing dismisses its notification.",
+"comment": ""
+},
+{
+"i": 90,
+"en": "notifications.paneFlashOnTyping pane flash typing terminal interaction notification pulse",
+"comment": ""
+},
+{
+"i": 91,
+"en": "notifications.paneFlashDoubleBlink pane flash double blink twice pulse",
+"comment": ""
+},
+{
+"i": 92,
+"en": "Switch Account…",
+"comment": ""
+},
+{
+"i": 93,
+"en": "Agent messages are turned off for all of cmux (agentMessages.enabled is false).",
+"comment": ""
+},
+{
+"i": 94,
+"en": "Its workspace has messages off, so it receives none.",
+"comment": ""
+},
+{
+"i": 95,
+"en": "Messages to %@ are off.",
+"comment": ""
+},
+{
+"i": 96,
+"en": "Messages to %@ are on.",
+"comment": ""
+},
+{
+"i": 97,
+"en": "Usage: cmux agent messages [on|off|status] [<target>] [--workspace] [--json]\n\nTurn agent messages off or on for one agent, or show whether it gets\nthem. Turning messages off for an agent refuses new messages to it and\nmarks the ones already queued for it as failed.\n\n<target> is resolved like cmux agent message: a workspace or surface id\nor ref, or a workspace title. Without one, the command applies to the\nsurface it runs in. --workspace applies to every surface in the\nworkspace instead.\n\nWithout --workspace, a workspace target means the one agent surface it\nresolves to now. That surface stays off even if a different surface\nbecomes the workspace's agent later.\n\nTo turn agent messages off everywhere, set agentMessages.enabled to\nfalse in ~/.config/cmux/cmux.json or turn off Settings > Automation >\nAgent Messages.\n\nExamples:\n  cmux agent messages off\n  cmux agent messages on workspace:3\n  cmux agent messages off --workspace cmux-remote-status",
+"comment": ""
+},
+{
+"i": 98,
+"en": "agent messages [on|off|status] [<target>] [--workspace]",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Agent Messages",
+"comment": ""
+},
+{
+"i": 100,
+"en": "Not delivered",
+"comment": ""
+},
+{
+"i": 101,
+"en": "Turn Off Agent Messages for This Tab",
+"comment": ""
+},
+{
+"i": 102,
+"en": "Turn On Agent Messages for This Tab",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Agent messages are turned off (agentMessages.enabled is false).",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Recipient %@ has messages disabled.",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Recipient workspace %@ has messages disabled.",
+"comment": ""
+},
+{
+"i": 106,
+"en": "Scope must be surface or workspace.",
+"comment": ""
+},
+{
+"i": 107,
+"en": "Give a target workspace or surface, or run this inside a cmux surface.",
+"comment": ""
+},
+{
+"i": 108,
+"en": "The setting was not changed: cmux could not save it to the message journal.",
+"comment": ""
+},
+{
+"i": 109,
+"en": "Folder, simulator, local browser creation, directory search, and diff commands are available after selecting a local workspace. Cloud VM commands may be unavailable here.",
+"comment": ""
+},
+{
+"i": 110,
+"en": "Some commands are local-only",
+"comment": ""
+},
+{
+"i": 111,
+"en": "cloud, workspace, availability, local, unavailable, actions",
+"comment": ""
+},
+{
+"i": 112,
+"en": "Cloud workspace",
+"comment": ""
+},
+{
+"i": 113,
+"en": "Show Cloud command availability",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Persistent cloud computers that open as regular cmux workspaces.",
+"comment": ""
+},
+{
+"i": 115,
+"en": "Cloud Machines require cmux Pro",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Setting up Cloud Machines…",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Sign in to your cmux account, then retry Cloud setup.",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Files and installed tools stay on the machine between sessions.",
+"comment": ""
+},
+{
+"i": 119,
+"en": "Cloud Machines are unavailable on this Mac right now.",
+"comment": ""
+},
+{
+"i": 120,
+"en": "The Cloud service could not be reached. Check your connection and retry.",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Pick up where you left off from any Mac you sign in on.",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Use Cloud Machines",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Checking your cmux plan…",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Cloud was not enabled. You can start setup again whenever you are ready.",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Agents and terminals keep running after you close your laptop.",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Enable Cloud",
+"comment": ""
+},
+{
+"i": 127,
+"en": "This account’s plan does not include Cloud machine access.",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Cloud setup is temporarily unavailable",
+"comment": ""
+},
+{
+"i": 129,
+"en": "cmux is preparing the shared Cloud connection. This can take a moment.",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Enabling Cloud",
+"comment": ""
+},
+{
+"i": 131,
+"en": "Prepare Cloud once to list and create persistent cloud computers.",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Preparing the shared Cloud connection…",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Your current plan does not include Cloud machine access.",
+"comment": ""
+},
+{
+"i": 134,
+"en": "Cloud setup could not finish. Check your connection and retry.",
+"comment": ""
+},
+{
+"i": 135,
+"en": "Cloud machines are ready to use.",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Cloud unavailable",
+"comment": ""
+},
+{
+"i": 137,
+"en": "Enable Cloud above to view your plan.",
+"comment": ""
+},
+{
+"i": 138,
+"en": "Enable Cloud above before setting up private IP access.",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Cloud Workspace",
+"comment": ""
+},
+{
+"i": 140,
+"en": "local-zellij working directory is not an accessible directory: %@",
+"comment": ""
+},
+{
+"i": 141,
+"en": "local-zellij session already exists; use attach or close it before supplying a new command",
+"comment": ""
+},
+{
+"i": 142,
+"en": "local-zellij session already exists with a different working directory; use attach or close it first",
+"comment": ""
+},
+{
+"i": 143,
+"en": "local-zellij could not list sessions; liveness is unknown.",
+"comment": ""
+},
+{
+"i": 144,
+"en": "local-zellij %@ requires a running cmux app; use --headless for a direct zellij client",
+"comment": ""
+},
+{
+"i": 145,
+"en": "local-zellij could not run zellij",
+"comment": ""
+},
+{
+"i": 146,
+"en": "local-zellij session %@ has exited; close it first",
+"comment": ""
+},
+{
+"i": 147,
+"en": "local-zellij session not found for id %@",
+"comment": ""
+},
+{
+"i": 148,
+"en": "local-zellij session not found: %@",
+"comment": ""
+},
+{
+"i": 149,
+"en": "local-zellij session is no longer running: %@",
+"comment": ""
+},
+{
+"i": 150,
+"en": "local-zellij state directory is too long for a Unix socket: %@",
+"comment": ""
+},
+{
+"i": 151,
+"en": "local-zellij could not start session %@",
+"comment": ""
+},
+{
+"i": 152,
+"en": "local-zellij state could not be accessed safely",
+"comment": ""
+},
+{
+"i": 153,
+"en": "local-zellij command timed out",
+"comment": ""
+},
+{
+"i": 154,
+"en": "local-zellij requires zellij. Install zellij or set CMUX_LOCAL_ZELLIJ_BIN to its path",
+"comment": ""
+},
+{
+"i": 155,
+"en": "local-zellij close failed",
+"comment": ""
+},
+{
+"i": 156,
+"en": "local-zellij interactive client exited with an error",
+"comment": ""
+},
+{
+"i": 157,
+"en": "local-zellij could not start an interactive client",
+"comment": ""
+},
+{
+"i": 158,
+"en": "No local zellij sessions",
+"comment": ""
+},
+{
+"i": 159,
+"en": "%@ [%@]",
+"comment": ""
+},
+{
+"i": 160,
+"en": "%@ [%@] socket=%@",
+"comment": ""
+},
+{
+"i": 161,
+"en": "exited",
+"comment": ""
+},
+{
+"i": 162,
+"en": "local-zellij could not verify the existing surface; no new client was created",
+"comment": ""
+},
+{
+"i": 163,
+"en": "local-zellij could not resolve %@ target %@",
+"comment": ""
+},
+{
+"i": 164,
+"en": "local-zellij could not create a workspace for %@",
+"comment": ""
+},
+{
+"i": 165,
+"en": "local-zellij workspace target was not found",
+"comment": ""
+},
+{
+"i": 166,
+"en": "local-zellij pane or surface targets require a workspace",
+"comment": ""
+},
+{
+"i": 167,
+"en": "OK session=%@ surface=%@ mode=local-zellij",
+"comment": ""
+},
+{
+"i": 168,
+"en": "local-zellij session names must start with a letter, number, or underscore, contain only letters, numbers, underscores, or dashes, and be short enough for a Unix socket path",
+"comment": ""
+},
+{
+"i": 169,
+"en": "local-zellij workspace, attachment, and --headless options are only valid with start or attach",
+"comment": ""
+},
+{
+"i": 170,
+"en": "local-zellij --detached is only valid with start",
+"comment": ""
+},
+{
+"i": 171,
+"en": "local-zellij: session name was supplied more than once",
+"comment": ""
+},
+{
+"i": 172,
+"en": "local-zellij: --focus must be true or false",
+"comment": ""
+},
+{
+"i": 173,
+"en": "local-zellij: --id must be a UUID",
+"comment": ""
+},
+{
+"i": 174,
+"en": "local-zellij list does not take a session selector",
+"comment": ""
+},
+{
+"i": 175,
+"en": "local-zellij --new-client is only valid with attach",
+"comment": ""
+},
+{
+"i": 176,
+"en": "local-zellij: %@ requires a value",
+"comment": ""
+},
+{
+"i": 177,
+"en": "local-zellij: use either a session name or --id, not both",
+"comment": ""
+},
+{
+"i": 178,
+"en": "local-zellij %@ requires a session name or --id\n%@",
+"comment": ""
+},
+{
+"i": 179,
+"en": "local-zellij --cwd and --command are only valid with start",
+"comment": ""
+},
+{
+"i": 180,
+"en": "local-zellij start requires a session name",
+"comment": ""
+},
+{
+"i": 181,
+"en": "local-zellij: unexpected argument '%@'",
+"comment": ""
+},
+{
+"i": 182,
+"en": "local-zellij: unknown flag '%@'\n%@",
+"comment": ""
+},
+{
+"i": 183,
+"en": "Unknown local-zellij subcommand '%@'.\n%@",
+"comment": ""
+},
+{
+"i": 184,
+"en": "Usage: cmux local-zellij <start|attach|list|status|close> [session] [options]\n\nOpt-in local zellij sessions survive cmux quit, crash, and app updates. Ordinary cmux terminals are unchanged.\n\nstart <name> [--cwd <path>] [--command <shell>] [--detached]\nattach <name|--id <uuid>> [--workspace <id|ref|index>] [--focus <true|false>] [--headless] [--new-client]\nlist [--json]\nstatus <name|--id <uuid>> [--json]\nclose <name|--id <uuid>>\n\nThe registry and zellij socket directory live under ~/.cmux/local-zellij with user-only permissions. `attach --headless` hands the terminal directly to zellij for a client outside the cmux GUI.",
+"comment": ""
+},
+{
+"i": 185,
+"en": "Reading Simulator subprocess output failed on %1$@: %2$@ (errno %3$@).",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Hidden characters",
+"comment": ""
+},
+{
+"i": 187,
+"en": "This request contains %ld invisible or text-direction characters. They are shown as ⟨U+XXXX⟩ markers. Deny it unless you expected them.",
+"comment": ""
+},
+{
+"i": 188,
+"en": "Don’t Sign In",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Switch Account",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Sign in to cmux from a link?",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Switch cmux to another account?",
+"comment": ""
+},
+{
+"i": 192,
+"en": "A link is asking cmux to sign in as %@. Continue only if you just signed in to cmux in your browser.",
+"comment": ""
+},
+{
+"i": 193,
+"en": "A link is asking cmux to sign in to an account. Continue only if you just signed in to cmux in your browser.",
+"comment": ""
+},
+{
+"i": 194,
+"en": "You’re signed in as %@. Continuing replaces that session, and new cmux activity will belong to the account in the link. If you didn’t just choose this account yourself, click Don’t Sign In.",
+"comment": ""
+},
+{
+"i": 195,
+"en": "You’re already signed in. Continuing replaces that session, and new cmux activity will belong to the account in the link. If you didn’t just choose this account yourself, click Don’t Sign In.",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Couldn’t open SSH terminal",
+"comment": ""
+},
+{
+"i": 197,
+"en": "Check the SSH connection, then retry this request.",
+"comment": ""
+},
+{
+"i": 198,
+"en": "The SSH connection could not be established.",
+"comment": ""
+},
+{
+"i": 199,
+"en": "Copied to clipboard",
+"comment": ""
+},
+{
+"i": 200,
+"en": "--agent requires a value. Usage: cmux hooks setup [agent] [--agent <name>] [--yes|-y]",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Unknown option %@. Usage: cmux hooks setup [agent] [--agent <name>] [--yes|-y]",
+"comment": ""
+},
+{
+"i": 202,
+"en": "--agent was given more than once with different values. Specify one agent.",
+"comment": ""
+},
+{
+"i": 203,
+"en": "Starting display…",
+"comment": ""
+},
+{
+"i": 204,
+"en": "There is no room to split this pane.",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Find shortcut by keys",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Press keys to see which shortcut uses them",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Detect Shortcut",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Listening…",
+"comment": ""
+},
+{
+"i": 209,
+"en": "No shortcuts match",
+"comment": ""
+},
+{
+"i": 210,
+"en": "Search shortcuts",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Show Link URLs on Hover",
+"comment": ""
+},
+{
+"i": 212,
+"en": "Shows a link's destination at the bottom of a browser pane while the pointer is over it or it has keyboard focus.",
+"comment": ""
+},
+{
+"i": 213,
+"en": "browser.showLinkHoverURL link hover url destination address status bar preview",
+"comment": ""
+},
+{
+"i": 214,
+"en": "Run Playwright-style JavaScript against this workspace's browser panes; see `browser repl guide`",
+"comment": ""
+},
+{
+"i": 215,
+"en": "Serve the REPL as an MCP server on stdio (tools: eval, snapshot, screenshot, tabs, reset; its own session unless --session names one)",
+"comment": ""
+},
+{
+"i": 216,
+"en": "REPL input is not valid UTF-8",
+"comment": ""
+},
+{
+"i": 217,
+"en": "REPL input is too large",
+"comment": ""
+},
+{
+"i": 218,
+"en": "A session name is required",
+"comment": ""
+},
+{
+"i": 219,
+"en": "--timeout must be a positive number of milliseconds",
+"comment": ""
+},
+{
+"i": 220,
+"en": "No code to evaluate",
+"comment": ""
+},
+{
+"i": 221,
+"en": "No workspace to bind the REPL session to",
+"comment": ""
+},
+{
+"i": 222,
+"en": "browser repl does not support this option",
+"comment": ""
+},
+{
+"i": 223,
+"en": "--max-output must be a number of characters, or 0 for no limit",
+"comment": ""
+},
+{
+"i": 224,
+"en": "Fill",
+"comment": ""
+},
+{
+"i": 225,
+"en": "This form is in a frame from %1$@, inside a page from %2$@.",
+"comment": ""
+},
+{
+"i": 226,
+"en": "An agent asked cmux to fill this sign-in form. cmux hides the exact text you type where it appears in what the agent reads back, but not altered copies of it (such as encoded or split text), and scripts on the page can read the filled fields.",
+"comment": ""
+},
+{
+"i": 227,
+"en": "Sign in to %@",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Enable Cloud Machines",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Show Cloud Welcome…",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Cloud is available on cmux Pro and Max.",
+"comment": ""
+},
+{
+"i": 231,
+"en": "Included in your plan.",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Set Up Cloud",
+"comment": ""
+},
+{
+"i": 233,
+"en": "Your work, wherever you go",
+"comment": ""
+},
+{
+"i": 234,
+"en": "New",
+"comment": ""
+},
+{
+"i": 235,
+"en": "cmux cloud",
+"comment": ""
+},
+{
+"i": 236,
+"en": "Opens on any Mac",
+"comment": ""
+},
+{
+"i": 237,
+"en": "Runs while you’re away",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Stays set up",
+"comment": ""
+},
+{
+"i": 239,
+"en": "Shared with your team",
+"comment": ""
+},
+{
+"i": 240,
+"en": "Invite teammates to the same machine and work together.",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Upgrade to use cmux cloud",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Use cmux cloud",
+"comment": ""
+},
+{
+"i": 243,
+"en": "%1$@: %2$@ requires a value",
+"comment": ""
+},
+{
+"i": 244,
+"en": "%1$@: unexpected argument %2$@",
+"comment": ""
+},
+{
+"i": 245,
+"en": "%1$@: unknown option %2$@",
+"comment": ""
+},
+{
+"i": 246,
+"en": "Show Menu",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Split Right (Option-click to Split Down)",
+"comment": ""
+},
+{
+"i": 248,
+"en": "Coderouter",
+"comment": ""
+},
+{
+"i": 249,
+"en": "New %@ Account",
+"comment": ""
+},
+{
+"i": 250,
+"en": "%lld%% left",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Remove Account…",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Remove “%@” from coderouter?",
+"comment": ""
+},
+{
+"i": 253,
+"en": "The team stops routing agents through this account. You can add it again later.",
+"comment": ""
+},
+{
+"i": 254,
+"en": "coderouter",
+"comment": ""
+},
+{
+"i": 255,
+"en": "What Is coderouter?",
+"comment": ""
+},
+{
+"i": 256,
+"en": "Add the Codex, Claude and OpenCode accounts you already have, and agents on your Cloud machines use them right away.",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Accounts belong to the team selected at the top of this panel.",
+"comment": ""
+},
+{
+"i": 258,
+"en": "In this sidebar",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Click New Codex, Claude or OpenCode Account and sign in in the terminal that opens. Each account shows how much of its limit is left; hover it and click × to remove it. When one account reaches its limit, sessions move to another.",
+"comment": ""
+},
+{
+"i": 260,
+"en": "From a terminal",
+"comment": ""
+},
+{
+"i": 261,
+"en": "Add an account. Also claude or opencode.",
+"comment": ""
+},
+{
+"i": 262,
+"en": "List every account and its usage.",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Run Codex through coderouter on this Mac.",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Remove from Workspace",
+"comment": ""
+},
+{
+"i": 265,
+"en": "Default image",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Size, network, and agent settings are inherited from the base machine.",
+"comment": ""
+},
+{
+"i": 267,
+"en": "Loading sizes…",
+"comment": ""
+},
+{
+"i": 268,
+"en": "Fork of %@",
+"comment": ""
+},
+{
+"i": 269,
+"en": "Forking…",
+"comment": ""
+},
+{
+"i": 270,
+"en": "Couldn't fork machine",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Brighten Colors in Dark Mode",
+"comment": ""
+},
+{
+"i": 272,
+"en": "Lighten workspace colors in dark mode so they stay readable on a dark sidebar. Turn off to show colors exactly as chosen. Applies to Solid Fill; the Left Rail indicator always uses a lightened rail.",
+"comment": ""
+},
+{
+"i": 273,
+"en": "Invalid --limit value: %@",
+"comment": ""
+},
+{
+"i": 274,
+"en": "Review id prefix '%@' is ambiguous.",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Unable to resolve the repository review ledger path.",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Invalid cmux review receipt: %@",
+"comment": ""
+},
+{
+"i": 277,
+"en": "Invalid cmux review receipt '%1$@': %2$@",
+"comment": ""
+},
+{
+"i": 278,
+"en": "No cmux review receipts found for this repository.",
+"comment": ""
+},
+{
+"i": 279,
+"en": "cmux review requires a git repository: %@",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Unable to read review ledger: %@",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Unable to read review receipt '%1$@': %2$@",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Review receipt not found: %@",
+"comment": ""
+},
+{
+"i": 283,
+"en": "review requires a subcommand. Try: list, show, findings",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Unexpected argument '%1$@' for cmux review %2$@",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Unknown review subcommand '%@'. Try: list, show, findings",
+"comment": ""
+},
+{
+"i": 286,
+"en": "No surfaced findings for this review.",
+"comment": ""
+},
+{
+"i": 287,
+"en": "No review receipts. (repo: %@)",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Usage: cmux review <subcommand> [options]\n\nRead local adversarial-review receipts stored in the repository's Git metadata.\nThis command does not require a running cmux app or socket.\n\nSubcommands:\n  list [--repo <path>]\n      List review runs newest first.\n  show [<id|latest>] [--repo <path>]\n      Show one review run (default: latest).\n  findings [<id|latest>] [--repo <path>] [--all]\n      Show findings for one review run. Refuted/suppressed findings are\n      hidden unless --all is supplied.\n\nAll subcommands support --json.",
+"comment": ""
+},
+{
+"i": 289,
+"en": "agent inbox [--surface <target>] [--state <state>] [--mark-read]",
+"comment": ""
+},
+{
+"i": 290,
+"en": "agent message <target> [--from <name>] <text|->",
+"comment": ""
+},
+{
+"i": 291,
+"en": "agent message --reply-to <id> [--from <name>] <text|->",
+"comment": ""
+},
+{
+"i": 292,
+"en": "%@: agent updates must be latest or image.",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Usage:\n  cmux vm agent-updates <id>                 Show the machine's setting.\n  cmux vm agent-updates <id> <latest|image>  Change it.\n\nlatest updates Claude Code, Codex, OpenCode, Pi, and agent-browser to each\ntool's newest GitHub release when you connect, at most once a day, checked\nagainst its sha256 digest. image keeps the versions the machine's image\nbaked (the default). Updates reach only GitHub, which every network mode\nallows. Add --json for the structured result.\nA new release installs only after it has been public for 3 days.",
+"comment": ""
+},
+{
+"i": 294,
+"en": "vm network: --dns takes on or off.",
+"comment": ""
+},
+{
+"i": 295,
+"en": "vm network: the mode must be full, allowlist, or none.",
+"comment": ""
+},
+{
+"i": 296,
+"en": "The network policy must be a JSON object with a mode, for example {\"mode\":\"none\"}.",
+"comment": ""
+},
+{
+"i": 297,
+"en": "vm network: --port must be a number from 1 to 65535.",
+"comment": ""
+},
+{
+"i": 298,
+"en": "vm network: --protocol takes tcp or udp.",
+"comment": ""
+},
+{
+"i": 299,
+"en": "(the lists below take effect only in allowlist mode)",
+"comment": ""
+}
+]

@@ -314,7 +314,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
                 Comment(rawValue: scenario.name)
             )
             if scenario.confirmsRunning {
-                let claimsAutomaticReconnect = result.stderr.contains("cmux is reconnecting")
+                let claimsAutomaticReconnect = result.stderr.contains("ShellX is reconnecting")
                 #expect(
                     claimsAutomaticReconnect == (scenario.wrapperRetry == "1"),
                     Comment(rawValue: "\(scenario.name): \(result.stderr)")

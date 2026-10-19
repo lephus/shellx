@@ -3,6 +3,7 @@ public import SwiftUI
 public import CmuxUpdater
 import AppKit
 @preconcurrency import Sparkle
+import ShellXIcons
 
 /// Popover view that displays detailed update information and actions.
 public struct UpdatePopoverView: View {
@@ -120,12 +121,12 @@ private struct UpdateReleaseNotesLink: View {
     var body: some View {
         Link(destination: notes.url) {
             HStack {
-                Image(systemName: "doc.text")
+                ShellXIcon.image("doc.text")
                     .cmuxFont(size: 11)
                 Text(notes.label)
                     .cmuxFont(size: 11, weight: .medium)
                 Spacer()
-                Image(systemName: "arrow.up.right")
+                ShellXIcon.image("arrow.up.right")
                     .cmuxFont(size: 10)
             }
             .foregroundColor(.primary)
@@ -222,7 +223,7 @@ private struct PermissionRequestView: View {
                 Text(String(localized: "update.popover.enableAutoUpdates", defaultValue: "Enable automatic updates?"))
                     .cmuxFont(size: 13, weight: .semibold)
 
-                Text(String(localized: "update.popover.autoUpdatesDescription", defaultValue: "cmux can automatically check for updates in the background."))
+                Text(String(localized: "update.popover.autoUpdatesDescription", defaultValue: "ShellX can automatically check for updates in the background."))
                     .cmuxFont(size: 11)
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

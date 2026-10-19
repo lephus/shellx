@@ -14,7 +14,7 @@ struct DeviceDiscoverabilityConfirmation {
         )
         alert.informativeText = String(
             localized: "devices.incoming.confirm.message",
-            defaultValue: "Other Macs signed in to your cmux account may discover this Mac and connect to its workspaces. Do you want to continue?"
+            defaultValue: "Other Macs signed in to your ShellX account may discover this Mac and connect to its workspaces. Do you want to continue?"
         )
         alert.addButton(withTitle: String(
             localized: "devices.incoming.confirm.enable", defaultValue: "Make Discoverable"

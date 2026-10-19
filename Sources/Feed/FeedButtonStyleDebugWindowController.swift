@@ -1,3 +1,4 @@
+import ShellXIcons
 #if DEBUG
 import AppKit
 import CmuxFoundation
@@ -974,7 +975,7 @@ private struct FeedButtonStyleDebugView: View {
             applyPalette(palette)
         } label: {
             HStack(spacing: 7) {
-                Image(systemName: palette == activePalette ? "checkmark.circle.fill" : "circle")
+                ShellXIcon.image(palette == activePalette ? "checkmark.circle.fill" : "circle")
                     .cmuxFont(size: 11, weight: .medium)
                 paletteSwatches(palette)
                 Text(palette.label)
@@ -1192,7 +1193,7 @@ private struct FeedButtonStyleDebugView: View {
             applyPreset(preset)
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: preset == activePreset ? "checkmark.circle.fill" : "circle")
+                ShellXIcon.image(preset == activePreset ? "checkmark.circle.fill" : "circle")
                     .cmuxFont(size: 11, weight: .medium)
                 Text(preset.label)
                     .cmuxFont(size: 11, weight: .medium)
@@ -1226,7 +1227,7 @@ private struct FeedButtonStyleDebugView: View {
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(FeedButton.Kind.allCases) { kind in
                     HStack(spacing: 8) {
-                        Image(systemName: selectedKind == kind ? "checkmark.circle.fill" : "circle")
+                        ShellXIcon.image(selectedKind == kind ? "checkmark.circle.fill" : "circle")
                             .foregroundStyle(selectedKind == kind ? Color.accentColor : Color.secondary)
                             .frame(width: 15)
                         Text(kind.debugLabel)

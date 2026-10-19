@@ -22,7 +22,7 @@ extension CMUXCLI {
     func workspaceLoadingUsage() -> String {
         String(
             localized: "cli.workspaceLoading.usage",
-            defaultValue: "Usage: cmux workspace loading <on|off> [--id <name>] [--workspace <id>] [--window <id>] [--json]"
+            defaultValue: "Usage: shellx workspace loading <on|off> [--id <name>] [--workspace <id>] [--window <id>] [--json]"
         )
     }
 

@@ -146,14 +146,14 @@ extension AppDelegate {
     static var actionsAndLaunchersMenuTitle: String {
         String(
             localized: "actions.discovery.menuTitle",
-            defaultValue: "Actions · cmux.json…"
+            defaultValue: "Actions · shellx.json…"
         )
     }
 
     private static var actionsAndLaunchersDialogTitle: String {
         String(
             localized: "actions.discovery.dialogTitle",
-            defaultValue: "Actions · cmux.json"
+            defaultValue: "Actions · shellx.json"
         )
     }
 
@@ -201,7 +201,7 @@ extension AppDelegate {
         // short and fully localized.
         alert.addButton(withTitle: String(
             localized: "menu.app.openCmuxSettingsFile",
-            defaultValue: "Open cmux.json"
+            defaultValue: "Open shellx.json"
         ))
         // ShellX has no custom-commands docs page (cmux's is on cmux.com and
         // nothing under docs/ covers actions), so there is no "Open Docs".
