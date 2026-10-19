@@ -57,3 +57,28 @@ public struct RemoteLinkStore: Sendable {
         if kept.count != records.count { try save(kept) }
     }
 }
+
+// Account ownership (internal: only the service's sign-in uses it).
+extension RemoteLinkStore {
+    /// `links-owner` next to `links.json`: the `auth.login` `user_id` the records were saved under.
+    var ownerFile: URL { file.deletingLastPathComponent().appendingPathComponent("links-owner") }
+
+    /// Nil when no owner was ever saved (records from before owners were kept, or none at all).
+    func loadOwner() throws -> String? {
+        try OwnerOnlyFile.read(ownerFile).map { String(decoding: $0, as: UTF8.self) }
+    }
+
+    func saveOwner(_ userID: String) throws {
+        try OwnerOnlyFile.ensurePrivateDirectory(ownerFile.deletingLastPathComponent())
+        try OwnerOnlyFile.write(Data(userID.utf8), to: ownerFile)
+    }
+
+    /// Drops every record; returns how many there were.
+    @discardableResult
+    func removeAll() throws -> Int {
+        Self.lock.lock(); defer { Self.lock.unlock() }
+        let records = (try? load()) ?? []   // an unreadable file is replaced too
+        try save([])
+        return records.count
+    }
+}

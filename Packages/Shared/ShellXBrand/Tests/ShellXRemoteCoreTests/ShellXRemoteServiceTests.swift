@@ -668,3 +668,15 @@ private extension ServiceRig {
     rig.service.stopForTermination()
     #expect(rig.launcher.runs.dropFirst(runs).contains { $0.args == serverStopArgs(rig) })
 }
+
+@MainActor @Test func signInWithNoRecordedOwnerDropsTheLinks() async throws {              // final review 2
+    let rig = ServiceRig(signedIn: false)
+    try rig.seedRecord("m_1", enrolled: true)                       // saved before owners were kept: account unknown
+    rig.service.startIfEnabled()
+    #expect(await until { rig.core.methods == ["config.set", "machines.list"] })
+    try await rig.service.signIn(email: "dev@shellx.test", password: "pw")
+    #expect(await until { rig.service.hostState == rig.hostConnected })
+    #expect(try rig.store.load().isEmpty)
+    #expect(try rig.store.loadOwner() == "u_1")
+    #expect(rig.connectIndex == nil)
+}

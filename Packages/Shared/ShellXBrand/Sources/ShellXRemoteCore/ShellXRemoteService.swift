@@ -129,7 +129,8 @@ public final class ShellXRemoteService: ObservableObject {
 
     // MARK: - Account
 
-    /// `auth.login` (the password goes straight into the core's JSON), then starts the session.
+    /// `auth.login` (the password goes straight into the core's JSON), then starts the session. Signing in as
+    /// another account than the one `links.json` was saved under drops its link records and invite files.
     public func signIn(email: String, password: String) async throws {
         guard env.gateEnabled(), !terminated else {
             throw ShellXCoreError(code: "disabled", message: "remote machines are turned off")
@@ -137,9 +138,12 @@ public final class ShellXRemoteService: ObservableObject {
         await prepareLocal()
         guard !terminated else { return }
         try await ensureConfigured()
-        _ = try await call("auth.login", ["email": .string(email), "password": .string(password)], as: LoginReply.self)
+        let login = try await call("auth.login", ["email": .string(email), "password": .string(password)], as: LoginReply.self)
         guard !terminated else { return }
         if isSignedIn { await beginTeardown().value }   // another account: start over cleanly
+        await teardown?.value                           // a 401's stops: an old link may still save its record
+        await adoptAccount(login.user_id)
+        guard !terminated else { return }
         RemoteLog.service.info("signed in")
         startSession(list: nil)
     }
@@ -150,6 +154,30 @@ public final class ShellXRemoteService: ObservableObject {
         guard configuration != nil else { return }
         do { _ = try await call("auth.logout", as: EmptyReply.self) } catch {
             RemoteLog.service.error("logout failed: \(RemoteLog.code(error), privacy: .public)")
+        }
+    }
+
+    /// `links.json` belongs to one account, whose `user_id` is kept in `links-owner` beside it (only `auth.login`
+    /// tells the user id, so a session restored at launch keeps the owner of its last sign-in). Signing in
+    /// as a different account, or with no owner on record (links saved before owners were kept), drops every
+    /// record and this Mac's invite files, so no link of another account is reconnected. Runs on the links
+    /// queue after the last session's links stopped. A failure is logged; the new account's links stay usable.
+    func adoptAccount(_ userID: String) async {
+        let store = env.store
+        let tickets = env.paths.coreStateDir.appendingPathComponent("tickets", isDirectory: true)
+        do {
+            try await Self.onLinkStore {
+                if (try? store.loadOwner()) != userID {
+                    let dropped = try store.removeAll()
+                    let invites = RemoteInviteSweep.sweep(ticketsDir: tickets, now: Date())
+                    if dropped + invites > 0 {
+                        RemoteLog.service.notice("new account: dropped \(dropped) link record(s), \(invites) invite file(s)")
+                    }
+                }
+                try store.saveOwner(userID)
+            }
+        } catch {
+            RemoteLog.service.error("link owner not updated: \(RemoteLog.code(error), privacy: .public)")
         }
     }
 
