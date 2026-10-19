@@ -77692,7 +77692,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "close-tab yêu cầu --workspace hoặc --window cùng với --surface tường minh"
+            "value": "close-surface yêu cầu --workspace hoặc --window cùng với --surface tường minh"
           }
         }
       }
