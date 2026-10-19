@@ -5227,7 +5227,7 @@ cmux restore-session --from ~/session.json   # reopen an exported file" tabindex
   </div></div>
 <p dir="auto">The imported session opens as additional windows next to the ones you have, like
 <code>cmux restore-session</code>; the other install's saved file is only read. Agent resume carries
-over because hook session mappings in <code>~/.shellx/</code> are shared by every install. Browser
+over because hook session mappings in <code>~/.cmuxterm/</code> are shared by every install. Browser
 cookies and logins are per install and do not move.</p>
 <p dir="auto"><code>--from &lt;channel&gt;</code> restores another install's own session file with the same trust as your
 own session, including automatic agent resume. <code>--from &lt;path&gt;</code> treats the file as untrusted:
@@ -5245,7 +5245,7 @@ environment variables from the file are dropped. A snapshot saved by a newer cmu
 session file, it keeps a copy next to it as <code>session-&lt;bundle id&gt;.schema-v&lt;N&gt;.json</code>.</p>
 <p dir="auto">Under the hood, cmux writes a versioned snapshot under
 <code>~/Library/Application Support/cmux/</code> and agent hooks write session mappings
-under <code>~/.shellx/</code>. On restore, cmux rebuilds the layout first, then runs the
+under <code>~/.cmuxterm/</code>. On restore, cmux rebuilds the layout first, then runs the
 supported agent's native resume command when automatic agent resume is enabled.</p>
 <p dir="auto">Read the full guide at <a href="https://cmux.com/docs/session-restore" rel="nofollow">https://cmux.com/docs/session-restore</a>.</p>
 <div class="markdown-heading" dir="auto"><h2 tabindex="-1" class="heading-element" dir="auto">FAQ</h2><a id="user-content-faq" class="anchor" aria-label="Permalink: FAQ" href="/manaflow-ai/cmux#faq"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path></path></svg></a></div>
