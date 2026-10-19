@@ -23,13 +23,15 @@ extension RequestAccessLabels {
 
 /// Follows one machine's outgoing pairing in the service and turns it into
 /// a `RequestAccessModel`. A retry asks the service for a new pairing, which
-/// then replaces the old one on screen.
+/// then replaces the old one on screen. Which pairing is followed, and what a
+/// dismissed sheet may no longer do, is decided by the package's
+/// `RequestAccessTracker`; this class only owns the Tasks.
 @MainActor
 final class RequestAccessSheetModel: ObservableObject {
     let machineID: RemoteMachine.ID
-    @Published private(set) var model: RequestAccessModel?
+    /// Nil before the service publishes the pairing and while a retry is in flight.
+    @Published private(set) var state: RequestAccessModel? = nil
     @Published private(set) var machineName: String
-    @Published private(set) var isRetrying = false
 
     /// Cancel: dismiss only; the pairing expires server-side.
     var onCancel: (() -> Void)?
@@ -37,16 +39,15 @@ final class RequestAccessSheetModel: ObservableObject {
     var onApproved: (() -> Void)?
 
     private let service: any ShellXRemoteServicing
-    private var expectedCode: String?
-    private var supersededPairingIDs: Set<OutgoingPairing.ID> = []
+    private var tracker: RequestAccessTracker
     private var changeCancellable: AnyCancellable?
+    private var retryTask: Task<Void, Never>?
     private var autoCloseTask: Task<Void, Never>?
-    private var autoClosePairingID: OutgoingPairing.ID?
 
     init(machineID: RemoteMachine.ID, expectedCode: String?, service: any ShellXRemoteServicing) {
         self.machineID = machineID
-        self.expectedCode = expectedCode
         self.service = service
+        tracker = RequestAccessTracker(machineID: machineID, expectedCode: expectedCode)
         machineName = service.machines.first { $0.id == machineID }?.name ?? machineID
         refresh()
         // `changePublisher` fires before the change lands; read on the next turn.
@@ -59,7 +60,7 @@ final class RequestAccessSheetModel: ObservableObject {
 
     /// The header's "waiting · code" was clicked while this sheet is up.
     func follow(expectedCode code: String?) {
-        if let code { expectedCode = code }
+        tracker.follow(expectedCode: code)
         refresh()
     }
 
@@ -69,37 +70,34 @@ final class RequestAccessSheetModel: ObservableObject {
     }
 
     func refresh() {
+        guard !tracker.isStopped else { return }
         let name = service.machines.first { $0.id == machineID }?.name ?? machineID
         if name != machineName { machineName = name }
-        let pairing = RequestAccessModel.currentPairing(
-            in: service.outgoing,
-            for: machineID,
-            expectedCode: expectedCode,
-            excluding: supersededPairingIDs
-        )
-        let next = pairing.map { RequestAccessModel(pairing: $0, machineName: name, labels: .localized) }
-        if next != model { model = next }
-        if let next, next.closesAutomatically { scheduleAutoClose(for: next.pairingID) }
+        let next = tracker.current(in: service.outgoing)
+            .map { RequestAccessModel(pairing: $0, machineName: name, labels: .localized) }
+        if next != state { state = next }
+        if let next, next.closesAutomatically, tracker.takeAutoClose(for: next.pairingID) {
+            scheduleAutoClose()
+        }
     }
 
+    /// "Try again": ask for a new pairing and follow it instead of the old one.
     func retry() {
-        guard !isRetrying, model?.primaryAction == .retry else { return }
-        let previous = model?.pairingID
-        if let previous { supersededPairingIDs.insert(previous) }
-        isRetrying = true
-        model = nil
+        guard tracker.beginRetry(from: state) else { return }
+        refresh()
         let service = service
         let machineID = machineID
-        Task { @MainActor in
+        retryTask = Task { @MainActor [weak self] in
+            let code: String?
             do {
-                let code = try await service.requestAccess(to: machineID)
-                self.expectedCode = code
+                code = try await service.requestAccess(to: machineID)
             } catch {
-                // Nothing new to show; let the old pairing back so "Try again" stays.
-                if let previous { self.supersededPairingIDs.remove(previous) }
-                NSSound.beep()
+                code = nil
+                if !Task.isCancelled { NSSound.beep() }
             }
-            self.isRetrying = false
+            guard !Task.isCancelled, let self else { return }
+            self.retryTask = nil
+            self.tracker.finishRetry(code: code)
             self.refresh()
         }
     }
@@ -109,20 +107,24 @@ final class RequestAccessSheetModel: ObservableObject {
         onCancel?()
     }
 
+    /// The sheet is gone: no Task or subscription outlives this call, and a
+    /// pending retry or auto-close can no longer open a session.
     func stop() {
+        tracker.stop()
+        retryTask?.cancel()
+        retryTask = nil
         autoCloseTask?.cancel()
         autoCloseTask = nil
         changeCancellable = nil
     }
 
-    private func scheduleAutoClose(for pairingID: OutgoingPairing.ID) {
-        guard autoClosePairingID != pairingID else { return }
-        autoClosePairingID = pairingID
+    private func scheduleAutoClose() {
         autoCloseTask?.cancel()
         let delay = UInt64(RequestAccessModel.autoCloseDelay * 1_000_000_000)
         autoCloseTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: delay)
-            guard !Task.isCancelled, let self else { return }
+            guard !Task.isCancelled, let self, !self.tracker.isStopped else { return }
+            self.autoCloseTask = nil
             self.stop()
             self.onApproved?()
         }
@@ -136,7 +138,7 @@ struct RequestAccessSheet: View {
     @ObservedObject var model: RequestAccessSheetModel
 
     var body: some View {
-        let state = model.model
+        let state = model.state
         VStack(alignment: .leading, spacing: 14) {
             Text(state?.title ?? model.pendingTitle)
                 .font(.system(size: 15, weight: .semibold))
@@ -175,7 +177,6 @@ struct RequestAccessSheet: View {
                         model.retry()
                     }
                     .buttonStyle(ShellXSheetButtonStyle(kind: .primary))
-                    .disabled(model.isRetrying)
                 }
             }
         }
@@ -241,41 +242,42 @@ final class RequestAccessSheetPresenter {
     private init() {}
 
     func present(machineID: RemoteMachine.ID, expectedCode: String?, service: any ShellXRemoteServicing) {
-        if let model, let window = sheet?.window {
-            if model.machineID == machineID {
-                model.follow(expectedCode: expectedCode)
+        if let current = model, let window = sheet?.window {
+            if current.machineID == machineID {
+                current.follow(expectedCode: expectedCode)
                 (hostWindow ?? window).makeKeyAndOrderFront(nil)
                 return
             }
             dismiss()
         }
-        let model = RequestAccessSheetModel(machineID: machineID, expectedCode: expectedCode, service: service)
-        model.onCancel = { [weak self] in self?.dismiss() }
-        model.onApproved = { [weak self] in
+        let newModel = RequestAccessSheetModel(machineID: machineID, expectedCode: expectedCode, service: service)
+        newModel.onCancel = { [weak self] in self?.dismiss() }
+        newModel.onApproved = { [weak self] in
             self?.dismiss()
             ShellXRemoteUIActions.openSession(on: machineID)
         }
-        let sheet = CloudSheetWindow(rootView: RequestAccessSheet(model: model))
-        let window = sheet.window
+        let newSheet = CloudSheetWindow(rootView: RequestAccessSheet(model: newModel))
+        let window = newSheet.window
         window.styleMask = [.titled]
-        window.title = model.pendingTitle
+        window.title = newModel.pendingTitle
         window.appearance = NSAppearance(named: .darkAqua)
         window.isReleasedWhenClosed = false
-        self.model = model
-        self.sheet = sheet
+        model = newModel
+        sheet = newSheet
 
         let host = NSApp.cmuxMainWindowForModalPresentation(preferring: NSApp.keyWindow)
         if let host, host.attachedSheet == nil {
             hostWindow = host
-            sheet.beginSheet(on: host)
+            newSheet.beginSheet(on: host)
         } else {
             hostWindow = nil
-            sheet.orderFrontFloating()
+            newSheet.orderFrontFloating()
         }
     }
 
     private func dismiss() {
         model?.stop()
+        model = nil
         guard let window = sheet?.window else { return }
         if let host = hostWindow, host.attachedSheet === window {
             host.endSheet(window)
@@ -283,6 +285,5 @@ final class RequestAccessSheetPresenter {
         window.orderOut(nil)
         sheet = nil
         hostWindow = nil
-        model = nil
     }
 }

@@ -10,16 +10,19 @@ import ShellXRemoteCore
 /// Air with a pending request (code 123456) and an online Mac Studio with
 /// no access yet, so every header state shows.
 /// Request access: each request is an `OutgoingPairing` from this Mac
-/// (fingerprint `ownFingerprint`) that is approved after `approvalDelay`.
-/// The MacBook Air's pending request expires `expiryDelay` after sign-in, so
-/// the sheet's "Try again" can be seen by reopening it from its header.
+/// (fingerprint `ownFingerprint`). The first request to a machine expires
+/// after `expiryDelay`, so the sheet shows "Expired" and "Try again"; every
+/// later one is approved after `approvalDelay`, which closes the sheet and
+/// opens the session. The MacBook Air's pending request stays waiting: click
+/// its "waiting" header to reopen the sheet on it. DEBUG only: nothing here
+/// approves a request on the real service's behalf.
 @MainActor
 final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing {
     static let requestCode = "123456"
     /// This Mac's fingerprint as the fixture reports it in outgoing pairings.
     static let ownFingerprint = "a1b2c3d4e5f60718"
     static let approvalDelay: UInt64 = 4_000_000_000
-    static let expiryDelay: UInt64 = 8_000_000_000
+    static let expiryDelay: UInt64 = 6_000_000_000
 
     @Published private(set) var machines: [RemoteMachine] = []
     @Published private(set) var pendingApprovals: [PairingRequest] = []
@@ -29,7 +32,7 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
     @Published private(set) var remoteWorkspaces: [UUID: RemoteMachine.ID] = [:]
 
     private let now: () -> Date
-    private var requestSerial = 0
+    private var requestCounts: [RemoteMachine.ID: Int] = [:]
 
     init(now: @escaping () -> Date = { Date() }) {
         self.now = now
@@ -61,8 +64,9 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
     }
 
     func requestAccess(to machineID: RemoteMachine.ID) async throws -> String {
-        requestSerial += 1
-        let pairingID = "p-\(machineID)-\(requestSerial)"
+        let count = (requestCounts[machineID] ?? 0) + 1
+        requestCounts[machineID] = count
+        let pairingID = "p-\(machineID)-\(count)"
         update(machineID) { $0.access = .requested(pairingID: pairingID, code: Self.requestCode) }
         // A new request replaces any earlier one to the same machine.
         outgoing.removeAll { $0.toMachineID == machineID }
@@ -70,9 +74,14 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
             id: pairingID, toMachineID: machineID, code: Self.requestCode,
             ownFingerprint: Self.ownFingerprint, status: .waiting, createdAt: now()
         ))
+        let expires = count == 1
         Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: Self.approvalDelay)
-            self?.finish(pairingID, as: .approved, access: .granted)
+            try? await Task.sleep(nanoseconds: expires ? Self.expiryDelay : Self.approvalDelay)
+            if expires {
+                self?.finish(pairingID, as: .expired, access: .none)
+            } else {
+                self?.finish(pairingID, as: .approved, access: .granted)
+            }
         }
         return Self.requestCode
     }
@@ -116,15 +125,12 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
             ownFingerprint: Self.ownFingerprint, status: .waiting, createdAt: now()
         )]
         isSignedIn = true
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: Self.expiryDelay)
-            self?.finish("p1", as: .expired, access: .none)
-        }
     }
 
     func signOut() async {
         machines = []
         outgoing = []
+        requestCounts = [:]
         remoteWorkspaces = [:]
         isSignedIn = false
     }

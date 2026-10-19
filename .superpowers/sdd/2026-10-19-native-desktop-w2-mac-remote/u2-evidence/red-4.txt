@@ -1,0 +1,142 @@
+[0/1] Planning build
+Building for debugging...
+[0/4] Write sources
+[1/4] Write swift-version--58304C5D6DBC2206.txt
+[3/6] Emitting module ShellXRemoteUITests
+[4/6] Compiling ShellXRemoteUITests RequestAccessTrackerTests.swift
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:22:23: error: cannot find 'RequestAccessTracker' in scope
+ 20 | @Suite struct RequestAccessTrackerTests {
+ 21 |     @Test func followsThePairingWithTheExpectedCode() {
+ 22 |         let tracker = RequestAccessTracker(machineID: "m1", expectedCode: "333333")
+    |                       `- error: cannot find 'RequestAccessTracker' in scope
+ 23 |         let outgoing = [op("old", "111111", 10, .expired), op("new", "333333", 20), op("other", "222222", 50, machine: "m2")]
+ 24 |         #expect(tracker.current(in: outgoing)?.id == "new")
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:30:23: error: cannot find 'RequestAccessTracker' in scope
+ 28 | 
+ 29 |     @Test func followCanSwitchToTheCodeTheHeaderShows() {
+ 30 |         var tracker = RequestAccessTracker(machineID: "m1", expectedCode: "111111")
+    |                       `- error: cannot find 'RequestAccessTracker' in scope
+ 31 |         let outgoing = [op("a", "111111", 10), op("b", "333333", 20)]
+ 32 |         #expect(tracker.current(in: outgoing)?.id == "a")
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:33:38: error: 'nil' requires a contextual type
+ 31 |         let outgoing = [op("a", "111111", 10), op("b", "333333", 20)]
+ 32 |         #expect(tracker.current(in: outgoing)?.id == "a")
+ 33 |         tracker.follow(expectedCode: nil)
+    |                                      `- error: 'nil' requires a contextual type
+ 34 |         #expect(tracker.current(in: outgoing)?.id == "a")
+ 35 |         tracker.follow(expectedCode: "333333")
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:40:23: error: cannot find 'RequestAccessTracker' in scope
+ 38 | 
+ 39 |     @Test func retryShowsNothingThenFollowsTheNewPairing() {
+ 40 |         var tracker = RequestAccessTracker(machineID: "m1", expectedCode: "111111")
+    |                       `- error: cannot find 'RequestAccessTracker' in scope
+ 41 |         let expired = op("p1", "111111", 10, .expired)
+ 42 |         let older = op("p0", "111111", 5, .expired)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:60:23: error: cannot find 'RequestAccessTracker' in scope
+ 58 |     @Test func retryWithTheSameCodeSkipsTheSupersededPairing() {
+ 59 |         // A service that reuses the code (the DEBUG fixture does).
+ 60 |         var tracker = RequestAccessTracker(machineID: "m1", expectedCode: "123456")
+    |                       `- error: cannot find 'RequestAccessTracker' in scope
+ 61 |         let expired = op("p1", "123456", 10, .expired)
+ 62 |         #expect(tracker.beginRetry(from: shown(expired)))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:70:23: error: cannot find 'RequestAccessTracker' in scope
+ 68 | 
+ 69 |     @Test func failedRetryBringsTheOldPairingBack() {
+ 70 |         var tracker = RequestAccessTracker(machineID: "m1", expectedCode: "111111")
+    |                       `- error: cannot find 'RequestAccessTracker' in scope
+ 71 |         let failed = op("p1", "111111", 10, .failed(code: "network"))
+ 72 |         #expect(tracker.beginRetry(from: shown(failed)))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:74:35: error: 'nil' requires a contextual type
+ 72 |         #expect(tracker.beginRetry(from: shown(failed)))
+ 73 |         #expect(tracker.current(in: [failed]) == nil)
+ 74 |         tracker.finishRetry(code: nil)
+    |                                   `- error: 'nil' requires a contextual type
+ 75 |         #expect(!tracker.isRetrying)
+ 76 |         #expect(tracker.current(in: [failed])?.id == "p1")
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:83:27: error: cannot find 'RequestAccessTracker' in scope
+ 81 |     @Test func retryIsOnlyOfferedForExpiredOrFailed() {
+ 82 |         for status in [OutgoingPairing.Status.waiting, .approved, .denied] {
+ 83 |             var tracker = RequestAccessTracker(machineID: "m1", expectedCode: "111111")
+    |                           `- error: cannot find 'RequestAccessTracker' in scope
+ 84 |             #expect(!tracker.beginRetry(from: shown(op("p1", "111111", 10, status))))
+ 85 |             #expect(!tracker.isRetrying)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:87:20: error: cannot find 'RequestAccessTracker' in scope
+ 85 |             #expect(!tracker.isRetrying)
+ 86 |         }
+ 87 |         var none = RequestAccessTracker(machineID: "m1", expectedCode: nil)
+    |                    `- error: cannot find 'RequestAccessTracker' in scope
+ 88 |         #expect(!none.beginRetry(from: nil))
+ 89 | 
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:87:72: error: 'nil' requires a contextual type
+ 85 |             #expect(!tracker.isRetrying)
+ 86 |         }
+ 87 |         var none = RequestAccessTracker(machineID: "m1", expectedCode: nil)
+    |                                                                        `- error: 'nil' requires a contextual type
+ 88 |         #expect(!none.beginRetry(from: nil))
+ 89 | 
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:88:40: error: 'nil' requires a contextual type
+ 86 |         }
+ 87 |         var none = RequestAccessTracker(machineID: "m1", expectedCode: nil)
+ 88 |         #expect(!none.beginRetry(from: nil))
+    |                                        `- error: 'nil' requires a contextual type
+ 89 | 
+ 90 |         for status in [OutgoingPairing.Status.expired, .failed(code: "rate_limited")] {
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:91:27: error: cannot find 'RequestAccessTracker' in scope
+ 89 | 
+ 90 |         for status in [OutgoingPairing.Status.expired, .failed(code: "rate_limited")] {
+ 91 |             var tracker = RequestAccessTracker(machineID: "m1", expectedCode: "111111")
+    |                           `- error: cannot find 'RequestAccessTracker' in scope
+ 92 |             #expect(tracker.beginRetry(from: shown(op("p1", "111111", 10, status))))
+ 93 |         }
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:97:23: error: cannot find 'RequestAccessTracker' in scope
+ 95 | 
+ 96 |     @Test func secondRetryWhileOneIsInFlightIsRefused() {
+ 97 |         var tracker = RequestAccessTracker(machineID: "m1", expectedCode: "111111")
+    |                       `- error: cannot find 'RequestAccessTracker' in scope
+ 98 |         let expired = shown(op("p1", "111111", 10, .expired))
+ 99 |         #expect(tracker.beginRetry(from: expired))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:104:23: error: cannot find 'RequestAccessTracker' in scope
+102 | 
+103 |     @Test func autoCloseFiresOncePerApprovedPairing() {
+104 |         var tracker = RequestAccessTracker(machineID: "m1", expectedCode: nil)
+    |                       `- error: cannot find 'RequestAccessTracker' in scope
+105 |         #expect(tracker.takeAutoClose(for: "p1"))
+106 |         #expect(!tracker.takeAutoClose(for: "p1"))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:104:75: error: 'nil' requires a contextual type
+102 | 
+103 |     @Test func autoCloseFiresOncePerApprovedPairing() {
+104 |         var tracker = RequestAccessTracker(machineID: "m1", expectedCode: nil)
+    |                                                                           `- error: 'nil' requires a contextual type
+105 |         #expect(tracker.takeAutoClose(for: "p1"))
+106 |         #expect(!tracker.takeAutoClose(for: "p1"))
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:111:23: error: cannot find 'RequestAccessTracker' in scope
+109 | 
+110 |     @Test func stoppedTrackerShowsNothingAndRefusesWork() {
+111 |         var tracker = RequestAccessTracker(machineID: "m1", expectedCode: "111111")
+    |                       `- error: cannot find 'RequestAccessTracker' in scope
+112 |         let expired = op("p1", "111111", 10, .expired)
+113 |         let approved = op("p2", "111111", 20, .approved)
+
+/Users/richard/Documents/helper/shellx-wt/l3-sidebar/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessTrackerTests.swift:126:23: error: cannot find 'RequestAccessTracker' in scope
+124 | 
+125 |     @Test func stoppingDuringARetryIgnoresItsResult() {
+126 |         var tracker = RequestAccessTracker(machineID: "m1", expectedCode: "111111")
+    |                       `- error: cannot find 'RequestAccessTracker' in scope
+127 |         let expired = op("p1", "111111", 10, .expired)
+128 |         #expect(tracker.beginRetry(from: shown(expired)))
+error: fatalError

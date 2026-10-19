@@ -59,23 +59,22 @@ public struct RequestAccessModel: Equatable, Sendable {
     public let primaryAction: Action?
     public let closesAutomatically: Bool
 
-    /// The pairing the sheet for `machineID` shows: the newest one to that
-    /// machine that was not retried, preferring the code `requestAccess`
-    /// returned so an older request never stands in for the new one.
+    /// The pairing the sheet for `machineID` shows. With an `expectedCode`
+    /// (what `requestAccess` returned) it is the newest pairing to that
+    /// machine with that code, and nothing until the service publishes it:
+    /// an older pairing's code must never stand in for the new request.
+    /// Without one it is the newest pairing to that machine. A pairing in
+    /// `superseded` (one the user retried) is never shown again.
     public static func currentPairing(
         in outgoing: [OutgoingPairing],
         for machineID: RemoteMachine.ID,
         expectedCode: String?,
         excluding superseded: Set<OutgoingPairing.ID>
     ) -> OutgoingPairing? {
-        let candidates = outgoing.filter { $0.toMachineID == machineID && !superseded.contains($0.id) }
-        func newest(_ list: [OutgoingPairing]) -> OutgoingPairing? {
-            list.max { $0.createdAt < $1.createdAt }
-        }
-        if let expectedCode, let match = newest(candidates.filter({ $0.code == expectedCode })) {
-            return match
-        }
-        return newest(candidates)
+        outgoing
+            .filter { $0.toMachineID == machineID && !superseded.contains($0.id) }
+            .filter { expectedCode == nil || $0.code == expectedCode }
+            .max { $0.createdAt < $1.createdAt }
     }
 
     public init(pairing: OutgoingPairing, machineName: String, labels: RequestAccessLabels = .english) {

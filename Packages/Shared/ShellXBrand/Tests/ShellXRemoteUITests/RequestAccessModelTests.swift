@@ -93,25 +93,39 @@ private let vi = RequestAccessLabels(
         #expect(waiting != RequestAccessModel(pairing: pairing(.approved), machineName: "A"))
         #expect(waiting.pairingID == "p1")
     }
+
     @Test func currentPairingIsTheNewestForTheMachineSkippingSuperseded() {
+        let outgoing = fixturePairings()
+        // Without an expected code the newest for the machine is shown.
+        #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: nil, excluding: [])?.id == "stray")
+        // The code `requestAccess` returned wins over a newer pairing with another code.
+        #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "333333", excluding: [])?.id == "new")
+        // A retried pairing is never shown again, even with the same code.
+        #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "111111", excluding: ["old"]) == nil)
+        #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: nil, excluding: ["old", "stray"])?.id == "new")
+        #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: nil, excluding: ["old", "new", "stray"]) == nil)
+        #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m3", expectedCode: nil, excluding: []) == nil)
+    }
+
+    @Test func aKnownCodeNeverFallsBackToAnotherPairing() {
+        // `requestAccess` returned 000000 but the service has not published
+        // that pairing yet: show nothing rather than a stale pairing's code.
+        let outgoing = fixturePairings()
+        #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "000000", excluding: []) == nil)
+        // A same-code pairing of another machine does not stand in either.
+        #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "222222", excluding: []) == nil)
+    }
+
+    private func fixturePairings() -> [OutgoingPairing] {
         func op(_ id: String, _ machine: String, _ code: String, _ t: TimeInterval, _ s: OutgoingPairing.Status = .waiting) -> OutgoingPairing {
             OutgoingPairing(id: id, toMachineID: machine, code: code, ownFingerprint: "a1b2c3d4e5f60718",
                             status: s, createdAt: Date(timeIntervalSince1970: t))
         }
-        let outgoing = [
+        return [
             op("old", "m1", "111111", 10, .expired),
             op("other", "m2", "222222", 50),
             op("new", "m1", "333333", 20),
             op("stray", "m1", "999999", 30),
         ]
-        // The code `requestAccess` returned wins over a newer pairing with another code.
-        #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "333333", excluding: [])?.id == "new")
-        // Without a matching code the newest for the machine is shown.
-        #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: nil, excluding: [])?.id == "stray")
-        #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "000000", excluding: [])?.id == "stray")
-        // A retried pairing is never shown again, even with the same code.
-        #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "111111", excluding: ["old", "stray"])?.id == "new")
-        #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: nil, excluding: ["old", "new", "stray"]) == nil)
-        #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m3", expectedCode: nil, excluding: []) == nil)
     }
 }

@@ -12,8 +12,9 @@ enum ShellXRemoteUIActions {
         Task { @MainActor in
             do {
                 let code = try await service.requestAccess(to: machineID)
-                // The sheet follows the machine's `OutgoingPairing` live; the
-                // header also switches to "waiting · 123 456".
+                // ShellX: present RequestAccessSheet (U2). The sheet follows the
+                // machine's `OutgoingPairing` live; the header also switches to
+                // "waiting · 123 456".
                 presentRequestAccess(to: machineID, expectedCode: code)
             } catch {
                 NSSound.beep()

@@ -1,0 +1,77 @@
+Building for debugging...
+[0/3] Write sources
+[1/3] Write swift-version--58304C5D6DBC2206.txt
+[3/5] Emitting module ShellXRemoteUITests
+[4/5] Compiling ShellXRemoteUITests RequestAccessModelTests.swift
+/Users/lehuuphu/Documents/myProjects/shellx-wt-l3/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessModelTests.swift:108:36: error: type 'RequestAccessModel' has no member 'currentPairing'
+106 |         ]
+107 |         // The code `requestAccess` returned wins over a newer pairing with another code.
+108 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "333333", excluding: [])?.id == "new")
+    |                                    `- error: type 'RequestAccessModel' has no member 'currentPairing'
+109 |         // Without a matching code the newest for the machine is shown.
+110 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: nil, excluding: [])?.id == "stray")
+
+/Users/lehuuphu/Documents/myProjects/shellx-wt-l3/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessModelTests.swift:110:36: error: type 'RequestAccessModel' has no member 'currentPairing'
+108 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "333333", excluding: [])?.id == "new")
+109 |         // Without a matching code the newest for the machine is shown.
+110 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: nil, excluding: [])?.id == "stray")
+    |                                    `- error: type 'RequestAccessModel' has no member 'currentPairing'
+111 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "000000", excluding: [])?.id == "stray")
+112 |         // A retried pairing is never shown again, even with the same code.
+
+/Users/lehuuphu/Documents/myProjects/shellx-wt-l3/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessModelTests.swift:110:90: error: 'nil' requires a contextual type
+108 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "333333", excluding: [])?.id == "new")
+109 |         // Without a matching code the newest for the machine is shown.
+110 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: nil, excluding: [])?.id == "stray")
+    |                                                                                          `- error: 'nil' requires a contextual type
+111 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "000000", excluding: [])?.id == "stray")
+112 |         // A retried pairing is never shown again, even with the same code.
+
+/Users/lehuuphu/Documents/myProjects/shellx-wt-l3/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessModelTests.swift:111:36: error: type 'RequestAccessModel' has no member 'currentPairing'
+109 |         // Without a matching code the newest for the machine is shown.
+110 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: nil, excluding: [])?.id == "stray")
+111 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "000000", excluding: [])?.id == "stray")
+    |                                    `- error: type 'RequestAccessModel' has no member 'currentPairing'
+112 |         // A retried pairing is never shown again, even with the same code.
+113 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "111111", excluding: ["old", "stray"])?.id == "new")
+
+/Users/lehuuphu/Documents/myProjects/shellx-wt-l3/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessModelTests.swift:113:36: error: type 'RequestAccessModel' has no member 'currentPairing'
+111 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "000000", excluding: [])?.id == "stray")
+112 |         // A retried pairing is never shown again, even with the same code.
+113 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "111111", excluding: ["old", "stray"])?.id == "new")
+    |                                    `- error: type 'RequestAccessModel' has no member 'currentPairing'
+114 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: nil, excluding: ["old", "new", "stray"]) == nil)
+115 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m3", expectedCode: nil, excluding: []) == nil)
+
+/Users/lehuuphu/Documents/myProjects/shellx-wt-l3/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessModelTests.swift:114:36: error: type 'RequestAccessModel' has no member 'currentPairing'
+112 |         // A retried pairing is never shown again, even with the same code.
+113 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "111111", excluding: ["old", "stray"])?.id == "new")
+114 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: nil, excluding: ["old", "new", "stray"]) == nil)
+    |                                    `- error: type 'RequestAccessModel' has no member 'currentPairing'
+115 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m3", expectedCode: nil, excluding: []) == nil)
+116 |     }
+
+/Users/lehuuphu/Documents/myProjects/shellx-wt-l3/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessModelTests.swift:114:90: error: 'nil' requires a contextual type
+112 |         // A retried pairing is never shown again, even with the same code.
+113 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "111111", excluding: ["old", "stray"])?.id == "new")
+114 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: nil, excluding: ["old", "new", "stray"]) == nil)
+    |                                                                                          `- error: 'nil' requires a contextual type
+115 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m3", expectedCode: nil, excluding: []) == nil)
+116 |     }
+
+/Users/lehuuphu/Documents/myProjects/shellx-wt-l3/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessModelTests.swift:115:36: error: type 'RequestAccessModel' has no member 'currentPairing'
+113 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "111111", excluding: ["old", "stray"])?.id == "new")
+114 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: nil, excluding: ["old", "new", "stray"]) == nil)
+115 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m3", expectedCode: nil, excluding: []) == nil)
+    |                                    `- error: type 'RequestAccessModel' has no member 'currentPairing'
+116 |     }
+117 | }
+
+/Users/lehuuphu/Documents/myProjects/shellx-wt-l3/Packages/Shared/ShellXBrand/Tests/ShellXRemoteUITests/RequestAccessModelTests.swift:115:90: error: 'nil' requires a contextual type
+113 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: "111111", excluding: ["old", "stray"])?.id == "new")
+114 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m1", expectedCode: nil, excluding: ["old", "new", "stray"]) == nil)
+115 |         #expect(RequestAccessModel.currentPairing(in: outgoing, for: "m3", expectedCode: nil, excluding: []) == nil)
+    |                                                                                          `- error: 'nil' requires a contextual type
+116 |     }
+117 | }
+error: fatalError

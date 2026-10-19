@@ -1,0 +1,60 @@
+Building for debugging...
+[0/4] Write sources
+[1/4] Write swift-version--58304C5D6DBC2206.txt
+[3/6] Emitting module ShellXRemoteUITests
+[4/6] Compiling ShellXRemoteUITests RequestAccessTrackerTests.swift
+[4/6] Write Objects.LinkFileList
+[5/6] Linking ShellXBrandPackageTests
+Build complete! (1.45s)
+Test Suite 'Selected tests' started at 2026-10-19 09:55:16.717.
+Test Suite 'ShellXBrandPackageTests.xctest' started at 2026-10-19 09:55:16.718.
+Test Suite 'ShellXBrandPackageTests.xctest' passed at 2026-10-19 09:55:16.718.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-10-19 09:55:16.718.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite RequestAccessModelTests started.
+◇ Suite RequestAccessTrackerTests started.
+◇ Test modelIsEquatableAcrossStatusChanges() started.
+◇ Test expiredOffersRetry() started.
+◇ Test retryShowsNothingThenFollowsTheNewPairing() started.
+◇ Test stoppingDuringARetryIgnoresItsResult() started.
+◇ Test failedRetryBringsTheOldPairingBack() started.
+◇ Test retryWithTheSameCodeSkipsTheSupersededPairing() started.
+◇ Test vietnameseTitleTruncatesNotWraps() started.
+◇ Test followCanSwitchToTheCodeTheHeaderShows() started.
+◇ Test followsThePairingWithTheExpectedCode() started.
+◇ Test retryIsOnlyOfferedForExpiredOrFailed() started.
+◇ Test failedOffersRetryWithReadableCode() started.
+◇ Test aKnownCodeNeverFallsBackToAnotherPairing() started.
+◇ Test secondRetryWhileOneIsInFlightIsRefused() started.
+◇ Test waitingShowsCodeFingerprintAndSpinner() started.
+◇ Test currentPairingIsTheNewestForTheMachineSkippingSuperseded() started.
+◇ Test autoCloseFiresOncePerApprovedPairing() started.
+◇ Test approvedClosesAutomatically() started.
+◇ Test stoppedTrackerShowsNothingAndRefusesWork() started.
+◇ Test deniedShowsErrorWithoutRetry() started.
+✔ Test followCanSwitchToTheCodeTheHeaderShows() passed after 0.001 seconds.
+✔ Test followsThePairingWithTheExpectedCode() passed after 0.001 seconds.
+✔ Test aKnownCodeNeverFallsBackToAnotherPairing() passed after 0.001 seconds.
+✔ Test retryWithTheSameCodeSkipsTheSupersededPairing() passed after 0.001 seconds.
+✔ Test currentPairingIsTheNewestForTheMachineSkippingSuperseded() passed after 0.001 seconds.
+✔ Test modelIsEquatableAcrossStatusChanges() passed after 0.001 seconds.
+✔ Test waitingShowsCodeFingerprintAndSpinner() passed after 0.001 seconds.
+✔ Test retryShowsNothingThenFollowsTheNewPairing() passed after 0.001 seconds.
+✔ Test stoppedTrackerShowsNothingAndRefusesWork() passed after 0.001 seconds.
+✔ Test secondRetryWhileOneIsInFlightIsRefused() passed after 0.001 seconds.
+✔ Test expiredOffersRetry() passed after 0.001 seconds.
+✔ Test vietnameseTitleTruncatesNotWraps() passed after 0.001 seconds.
+✔ Test failedRetryBringsTheOldPairingBack() passed after 0.001 seconds.
+✔ Test deniedShowsErrorWithoutRetry() passed after 0.001 seconds.
+✔ Test stoppingDuringARetryIgnoresItsResult() passed after 0.001 seconds.
+✔ Test approvedClosesAutomatically() passed after 0.001 seconds.
+✔ Test autoCloseFiresOncePerApprovedPairing() passed after 0.001 seconds.
+✔ Test failedOffersRetryWithReadableCode() passed after 0.001 seconds.
+✔ Test retryIsOnlyOfferedForExpiredOrFailed() passed after 0.001 seconds.
+✔ Suite RequestAccessModelTests passed after 0.001 seconds.
+✔ Suite RequestAccessTrackerTests passed after 0.001 seconds.
+✔ Test run with 19 tests in 2 suites passed after 0.001 seconds.
