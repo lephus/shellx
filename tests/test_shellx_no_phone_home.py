@@ -54,42 +54,86 @@ FORBIDDEN_HOSTS = parse_forbidden_hosts()  # mirrors ShellXNetworkPolicy.forbidd
 # not build; the SDK-import check below still covers it.
 HOST_ROOTS = ["Sources", "CLI", "Packages/macOS", "Packages/Shared", "Resources"]
 
-CLOUD_REASON = "unreachable: ShellXFeatures.remoteMachines == false / Cloud hard-off (Task 5)"
+# Reasons shared by several allowlist entries.
+TASK5_GATED = "gated in Task 5 (hard-off Cloud, socket handlers + CLI)"
+TASK5_PARKED = ("parked behind ShellXFeatures.remoteMachines == false (Task 5); "
+                "Wave 2 swaps the transport before flipping it")
+TASK3_KEYCHAIN = "keychain service name, renamed by Task 3 (coexistence); entry becomes stale at merge"
+NOT_A_HOST = "email domain comparison, not a network host"
 
-# Whole files whose code only runs for cmux Cloud, Stack Auth, iroh device
-# mirroring, the phone host, CodeRouter, cloud VMs or billing. Task 5 switches
-# all of that off; Wave 2 removes entries as it swaps the transports.
+# Whole files whose forbidden-host code runs only behind a Cloud, account,
+# billing or pairing entry point that Task 5 switches off. Each reason names
+# what the host is for and which gate keeps it unreachable. Wave 2 removes
+# entries as it replaces the transports.
 CLOUD_ALLOWLIST = [
-    ("CLI/CMUXCLI+CoderouterPassthrough.swift", CLOUD_REASON),
-    ("CLI/CMUXCLI+VMTui.swift", CLOUD_REASON),
-    ("Packages/Shared/CmuxAuthRuntime/Sources/CmuxAuthRuntime/Client/StackAuthClient.swift", CLOUD_REASON),
-    ("Packages/Shared/CmuxAuthRuntime/Sources/CmuxAuthRuntime/Coordinator/AuthConfig.swift", CLOUD_REASON),
-    ("Packages/Shared/CmuxIrohTransport/Package.resolved", CLOUD_REASON),
-    ("Packages/Shared/CmuxIrohTransport/Package.swift", CLOUD_REASON),
-    ("Packages/Shared/CmuxIrxTransport/Package.resolved", CLOUD_REASON),
-    ("Packages/Shared/CmuxIrxTransport/Package.swift", CLOUD_REASON),
-    ("Packages/macOS/CmuxCloud/Sources/CmuxCloud/Environment/AuthEnvironment.swift", CLOUD_REASON),
-    ("Packages/macOS/CmuxCloud/Sources/CmuxCloud/VMClient/VMClient.swift", CLOUD_REASON),
-    ("Packages/macOS/CmuxCloud/Sources/CmuxCloud/VMClient/VMTunnelManager.swift", CLOUD_REASON),
-    ("Packages/macOS/CmuxFeedback/Sources/CmuxFeedback/DogfoodSink/DogfoodFeedbackService.swift", CLOUD_REASON),
-    ("Packages/macOS/CmuxPhonePush/Sources/CmuxPhonePush/PhonePushCrypto.swift", CLOUD_REASON),
-    ("Packages/macOS/CmuxPhonePush/Sources/CmuxPhonePush/PhonePushSharedStateStorage.swift", CLOUD_REASON),
-    ("Resources/coderouter-cli.json", CLOUD_REASON),
-    ("Resources/en.lproj/cloud-agent-skill.md", CLOUD_REASON),
-    ("Sources/Cloud/CloudSecurityExplainer.swift", CLOUD_REASON),
-    ("Sources/Cloud/CodeRouterHandoffClient.swift", CLOUD_REASON),
-    ("Sources/Cloud/PresenceSettings.swift", CLOUD_REASON),
-    ("Sources/Mobile/MobileHostV2Installation.swift", CLOUD_REASON),
-    ("Sources/Mobile/Pairing/MobilePairingView.swift", CLOUD_REASON),
-    ("Sources/PricingPlansScreen.swift", CLOUD_REASON),
+    ("CLI/CMUXCLI+VMTui.swift",
+     "`cmux vm tui` install hint for cmux-tui (printed, never fetched); " + TASK5_GATED),
+    ("Packages/Shared/CmuxAuthRuntime/Sources/CmuxAuthRuntime/Client/StackAuthClient.swift",
+     "Stack Auth API base, used only by sign-in (palette, footer, `cmux auth login` -> auth.*); " + TASK5_GATED),
+    ("Packages/Shared/CmuxAuthRuntime/Sources/CmuxAuthRuntime/Coordinator/AuthConfig.swift",
+     "sign-in callback URL on cmux.com, used only by sign-in; " + TASK5_GATED),
+    ("Packages/macOS/CmuxCloud/Sources/CmuxCloud/Environment/AuthEnvironment.swift",
+     "cmux.com and Stack Auth endpoints for sign-in, Cloud and billing; " + TASK5_GATED),
+    ("Packages/macOS/CmuxCloud/Sources/CmuxCloud/VMClient/VMClient.swift",
+     "Cloud VM API pricing links in error text (Cloud UI, `cmux vm|cloud` -> vm.*); " + TASK5_GATED),
+    ("Resources/en.lproj/cloud-agent-skill.md",
+     "Cloud agent skill text naming cmux.com/pricing for the agent to report (never fetched); "
+     "opened from the Machines panel and socket vm.cloud_agent_open, " + TASK5_GATED),
+    ("Sources/Cloud/CloudSecurityExplainer.swift",
+     "learn-more links shown only in the Cloud machine UI; " + TASK5_GATED),
+    ("Sources/Cloud/CodeRouterHandoffClient.swift",
+     "CodeRouter handoff, needs a Stack Auth session (sign-in and the coderouter socket handlers); "
+     + TASK5_GATED),
+    ("Sources/Cloud/PresenceSettings.swift",
+     "presence heartbeat service (opt-in with phone pairing); " + TASK5_PARKED),
+    ("Sources/Mobile/MobileHostV2Installation.swift",
+     "phone-host v2 relay origins (opt-in pairing); MobileHostService listening " + TASK5_PARKED),
+    ("Sources/Mobile/Pairing/MobilePairingView.swift",
+     "link to cmux's iPhone app in the pairing view; device pairing " + TASK5_PARKED),
+    ("Sources/PricingPlansScreen.swift",
+     "Enterprise mailto in the Pro pricing screen; billing entry points are unreachable after Task 5, "
+     + TASK5_GATED),
 ]
 
-# Build-time inputs: SwiftPM fetches these while building, the app never does.
-# Re-hosting the binaries is release work (Wave 3).
+# Whole files that name a forbidden host without contacting it.
+NOT_A_HOST_ALLOWLIST = [
+    ("Packages/macOS/CmuxCloud/Sources/CmuxCloud/VMClient/VMTunnelManager.swift",
+     "host string comparison that labels a Cloud tunnel as cmux's, not a network request"),
+    ("Packages/macOS/CmuxFeedback/Sources/CmuxFeedback/DogfoodSink/DogfoodFeedbackService.swift", NOT_A_HOST),
+    ("Packages/macOS/CmuxPhonePush/Sources/CmuxPhonePush/PhonePushCrypto.swift", TASK3_KEYCHAIN),
+    ("Packages/macOS/CmuxPhonePush/Sources/CmuxPhonePush/PhonePushSharedStateStorage.swift", TASK3_KEYCHAIN),
+]
+
+# Build-time inputs: SwiftPM, Xcode or a dev script reads these while
+# building; the app never contacts the host. Re-hosting is release work (Wave 3).
+IROH_FFI_PIN = ("build-time: SwiftPM fetches the iroh-ffi package from github.com/manaflow-ai while "
+                "resolving packages; the app never contacts it")
 BUILD_TIME_ALLOWLIST = [
     ("Packages/Shared/CmuxTerminalClient/Package.swift",
      "build-time: SwiftPM downloads the prebuilt cmux-terminal-client xcframework; the app never contacts it"),
+    ("Packages/Shared/CmuxIrohTransport/Package.swift", IROH_FFI_PIN),
+    ("Packages/Shared/CmuxIrohTransport/Package.resolved", IROH_FFI_PIN),
+    ("Packages/Shared/CmuxIrxTransport/Package.swift", IROH_FFI_PIN),
+    ("Packages/Shared/CmuxIrxTransport/Package.resolved", IROH_FFI_PIN),
+    ("Resources/coderouter-cli.json",
+     "build-time manifest read only by scripts/install-coderouter-client.sh, which no ShellX build "
+     "runs (reload.sh skips it); not in any Xcode resources phase, never bundled"),
 ]
+
+# The Xcode project and the workspace pins live outside HOST_ROOTS. They may
+# name a forbidden host only through these exact literals.
+PROJECT_PIN_FILES = [
+    "cmux.xcodeproj/project.pbxproj",
+    "cmux.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+]
+BUILD_TIME_PROJECT_LITERALS = [
+    ("cmux.xcodeproj/project.pbxproj", '"https://github.com/manaflow-ai/iroh-ffi.git"',
+     "build-time: XCRemoteSwiftPackageReference Xcode resolves for CmuxIrohTransport; the app never contacts it"),
+    ("cmux.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+     '"https://github.com/manaflow-ai/iroh-ffi.git"', IROH_FFI_PIN),
+]
+
+ALL_FILE_ALLOWLISTS = CLOUD_ALLOWLIST + NOT_A_HOST_ALLOWLIST + BUILD_TIME_ALLOWLIST
 
 # Literals that name a forbidden host but never reach it. They are removed from
 # a line before the host scan; the rest of the line is still checked.
@@ -165,6 +209,17 @@ def reachable_offenders(hosts, roots, allow):
     return hits
 
 
+def is_comment_hit(hit):
+    """Whether the `"path:line"` from offenders() is a comment line."""
+    path, number = hit.rsplit(":", 1)
+    return is_comment(path, read(path).splitlines()[int(number) - 1])
+
+
+def code_lines(path):
+    """The lines of `path` that are not comments."""
+    return [line for line in read(path).splitlines() if not is_comment(path, line)]
+
+
 def catalogs():
     found = []
     for root in HOST_ROOTS:
@@ -200,17 +255,35 @@ class ShellXNoPhoneHomeTests(unittest.TestCase):
 
     def test_no_forbidden_hosts_in_reachable_code(self):
         self.assertTrue(FORBIDDEN_HOSTS, "ShellXNetworkPolicy.forbiddenHosts is missing")
-        hits = reachable_offenders(FORBIDDEN_HOSTS, HOST_ROOTS, CLOUD_ALLOWLIST + BUILD_TIME_ALLOWLIST)
+        hits = reachable_offenders(FORBIDDEN_HOSTS, HOST_ROOTS, ALL_FILE_ALLOWLISTS)
         for host in FORBIDDEN_HOSTS:
             self.assertEqual(hits[host], [], host)
 
-    def test_cloud_allowlist_entries_are_live(self):
+    def test_allowlist_entries_are_live_and_reasoned(self):
         pattern = "|".join(host_pattern(h) for h in EXPECTED_FORBIDDEN_HOSTS)
-        for path, reason in CLOUD_ALLOWLIST + BUILD_TIME_ALLOWLIST:
-            if (path, reason) in CLOUD_ALLOWLIST:
-                self.assertEqual(reason, CLOUD_REASON, path)
+        paths = [path for path, _reason in ALL_FILE_ALLOWLISTS]
+        self.assertEqual(len(paths), len(set(paths)), "a file is allowlisted twice")
+        for path, reason in ALL_FILE_ALLOWLISTS:
+            self.assertGreater(len(reason.split()), 4, f"allowlist reason too vague: {path}")
             self.assertTrue((ROOT / path).is_file(), f"stale allowlist entry: {path}")
             self.assertTrue(re.search(pattern, read(path)), f"allowlisted file no longer names a forbidden host: {path}")
+        for path, literal, reason in BUILD_TIME_PROJECT_LITERALS:
+            self.assertTrue(reason.startswith("build-time: "), path)
+            self.assertIn(literal, read(path), f"stale build-time literal in {path}")
+
+    def test_no_forbidden_hosts_in_xcode_project_or_workspace_pins(self):
+        # Outside HOST_ROOTS, so scanned here line by line: only the reasoned
+        # build-time literals may name a forbidden host.
+        regex = re.compile("|".join(host_pattern(h) for h in EXPECTED_FORBIDDEN_HOSTS))
+        hits = []
+        for path in PROJECT_PIN_FILES:
+            literals = [literal for pin_path, literal, _reason in BUILD_TIME_PROJECT_LITERALS if pin_path == path]
+            for number, line in enumerate(read(path).splitlines(), start=1):
+                for literal in literals:
+                    line = line.replace(literal, "")
+                if regex.search(line):
+                    hits.append(f"{path}:{number}")
+        self.assertEqual(hits, [])
 
     def test_catalog_strings_naming_forbidden_hosts_are_unused(self):
         # Catalog entries are copy, not code. Upstream keys that still name a
@@ -223,7 +296,7 @@ class ShellXNoPhoneHomeTests(unittest.TestCase):
                 if pattern.search(key) or pattern.search(json.dumps(entry, ensure_ascii=False)):
                     keys.add(key)
         self.assertTrue(keys)  # the upstream catalogs do carry such keys
-        allowed = {path for path, _reason in CLOUD_ALLOWLIST}
+        allowed = {path for path, _reason in CLOUD_ALLOWLIST + NOT_A_HOST_ALLOWLIST}
         literal = re.compile(r'"([^"\\\s]+)"')
         hits = []
         for root in ["Sources", "CLI", "Packages/macOS", "Packages/Shared"]:
@@ -275,6 +348,31 @@ class ShellXNoPhoneHomeTests(unittest.TestCase):
         self.assertSourceHas(commands, "helpResourceButton(.website)")
         self.assertSourceHas(commands, "helpResourceButton(.sourceCode)")
         self.assertSourceLacks(commands, "helpResourceButton(.discord)")
+
+    def test_coderouter_is_never_downloaded_or_run(self):
+        # CodeRouter is a Manaflow service no ShellX wave replaces, so its gate
+        # is a switch of its own, not remoteMachines (Wave 2 flips that one).
+        self.assertSourceMatches("Packages/Shared/ShellXBrand/Sources/ShellXBrand/ShellXFeatures.swift",
+                                 r"public static let codeRouter = false\b")
+        # `cmux cr` and the passthrough refuse before looking for any executable.
+        self.assertSourceMatches(
+            "CLI/cmux.swift",
+            r"func runCoderouterAlias\(\s*commandArgs: \[String\],\s*explicitSocketPath: String\?,[^{]*\{"
+            r"(?:\s*//[^\n]*)*\s*guard ShellXFeatures\.codeRouter,\s*"
+            r"let resolvedPath = resolveCoderouterExecutable\(environment: environment\) else \{\s*"
+            r"throw Self\.coderouterNotAvailable\(\)")
+        self.assertSourceLacks("CLI/cmux.swift", "bootstrapCoderouter")
+        passthrough = "\n".join(code_lines("CLI/CMUXCLI+CoderouterPassthrough.swift"))
+        for needle in ("remoteMachines", "curl", "install.sh", "bootstrapCoderouter", "readLine", "Process()"):
+            self.assertNotIn(needle, passthrough)
+        self.assertIn('defaultValue: "CodeRouter is not available in ShellX."', passthrough)
+        # No ShellX build downloads or bundles the CodeRouter binary.
+        hits = offenders(r"install-coderouter-client\.sh", roots=["scripts", ".github"],
+                         allow=[("scripts/install-coderouter-client.sh", "the script itself")])
+        self.assertEqual([hit for hit in hits if not is_comment_hit(hit)], [])
+        pbx = read("cmux.xcodeproj/project.pbxproj")
+        self.assertNotIn("coderouter-cli.json", pbx)
+        self.assertNotIn("bin/coderouter", pbx)
 
 
 if __name__ == "__main__":

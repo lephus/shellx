@@ -2137,7 +2137,9 @@ else
   fi
   "$PWD/scripts/install-cmux-tui-client.sh" "${cmux_tui_install_args[@]}"
 fi
-"$PWD/scripts/install-coderouter-client.sh" "$APP_PATH"
+# ShellX never bundles CodeRouter (a Manaflow service; the CLI refuses `cr`),
+# so it skips scripts/install-coderouter-client.sh, which downloads Manaflow's
+# binary from GitHub into Contents/Resources/bin.
 if command -v xattr >/dev/null 2>&1; then
   xattr -cr "$APP_PATH" || true
 fi

@@ -656125,6 +656125,65 @@
           }
         }
       }
+    },
+    "cli.coderouter.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CodeRouter is not available in ShellX."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CodeRouter ist in ShellX nicht verfügbar."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CodeRouter n'est pas disponible dans ShellX."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CodeRouter غير متاح في ShellX."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CodeRouter no está disponible en ShellX."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX 不提供 CodeRouter。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX 不提供 CodeRouter。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX에서는 CodeRouter를 사용할 수 없습니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX では CodeRouter を利用できません。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
