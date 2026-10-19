@@ -256,7 +256,7 @@ struct CLIPasteCommandTests {
         defer { try? FileManager.default.removeItem(at: root) }
         if let buffers {
             let storeURL = home
-                .appendingPathComponent(".cmuxterm", isDirectory: true)
+                .appendingPathComponent(".shellx", isDirectory: true)
                 .appendingPathComponent("tmux-compat-store.json", isDirectory: false)
             try FileManager.default.createDirectory(
                 at: storeURL.deletingLastPathComponent(),

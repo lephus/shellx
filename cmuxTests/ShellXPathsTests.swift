@@ -20,7 +20,7 @@ struct ShellXPathsTests {
         #expect(SocketControlSettings.stableSocketFileName.hasPrefix("shellx"))
         #expect(SocketControlSettings.stableDefaultSocketPath.hasSuffix("/.local/state/shellx/shellx.sock"))
         #expect(SocketControlSettings.legacyStableDefaultSocketPath == "/tmp/shellx.sock")
-        #expect(CmuxConfig.defaultGlobalConfigPath().hasSuffix("/.config/shellx/shellx.json"))
+        #expect(CmuxConfigStore.defaultGlobalConfigPath().hasSuffix("/.config/shellx/shellx.json"))
         #expect(CmuxSettingsFileStore.defaultPrimaryPath.hasSuffix("/.config/shellx/shellx.json"))
     }
 

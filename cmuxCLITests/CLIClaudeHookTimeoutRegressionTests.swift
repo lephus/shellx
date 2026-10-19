@@ -46,7 +46,7 @@ struct CLIClaudeHookTimeoutRegressionTests {
             isDirectory: true
         )
         let binDirectory = root.appendingPathComponent("bin", isDirectory: true)
-        let fakeCLI = binDirectory.appendingPathComponent("cmux")
+        let fakeCLI = binDirectory.appendingPathComponent("shellx")
         let fakeClaude = binDirectory.appendingPathComponent("claude")
         let capturedSettings = root.appendingPathComponent("settings.json")
         let socketPath = makeCodexHookSocketPath("claude-deadline")
@@ -89,13 +89,13 @@ struct CLIClaudeHookTimeoutRegressionTests {
         try expectDirectHook(
             hooks,
             event: "PreToolUse",
-            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks claude cron-create-guard"#,
+            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}" hooks claude cron-create-guard"#,
             timeout: 5
         )
         try expectDirectHook(
             hooks,
             event: "PermissionRequest",
-            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks feed --source claude"#,
+            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}" hooks feed --source claude"#,
             timeout: 125
         )
     }
@@ -110,7 +110,7 @@ struct CLIClaudeHookTimeoutRegressionTests {
             isDirectory: true
         )
         let binDirectory = root.appendingPathComponent("bin", isDirectory: true)
-        let fakeCLI = binDirectory.appendingPathComponent("cmux")
+        let fakeCLI = binDirectory.appendingPathComponent("shellx")
         let fakeClaude = binDirectory.appendingPathComponent("claude")
         let capturedSettings = root.appendingPathComponent("settings.json")
         let socketPath = makeCodexHookSocketPath("claude-queue")
@@ -168,19 +168,19 @@ struct CLIClaudeHookTimeoutRegressionTests {
         try expectDirectHook(
             hooks,
             event: "PreToolUse",
-            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks claude cron-create-guard"#,
+            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}" hooks claude cron-create-guard"#,
             timeout: 5
         )
         try expectDirectHook(
             hooks,
             event: "PermissionRequest",
-            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks feed --source claude"#,
+            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}" hooks feed --source claude"#,
             timeout: 125
         )
         try expectDirectHook(
             hooks,
             event: "Stop",
-            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks claude auto-name"#,
+            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}" hooks claude auto-name"#,
             timeout: 120,
             isAsync: true
         )
@@ -190,7 +190,7 @@ struct CLIClaudeHookTimeoutRegressionTests {
             try expectDirectHook(
                 hooks,
                 event: event,
-                command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks claude inbox-wait"#,
+                command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}" hooks claude inbox-wait"#,
                 timeout: 86_400,
                 isAsync: true,
                 isAsyncRewake: true
@@ -199,7 +199,7 @@ struct CLIClaudeHookTimeoutRegressionTests {
         try expectDirectHook(
             hooks,
             event: "UserPromptSubmit",
-            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks claude inbox-drain 2>/dev/null || echo '{}'"#,
+            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}" hooks claude inbox-drain 2>/dev/null || echo '{}'"#,
             timeout: 5
         )
 

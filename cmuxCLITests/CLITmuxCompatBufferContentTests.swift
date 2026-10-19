@@ -49,7 +49,7 @@ struct CLITmuxCompatBufferContentTests {
             .appendingPathComponent("cmux-tmux-buffer-content-\(UUID().uuidString)", isDirectory: true)
         let home = root.appendingPathComponent("home", isDirectory: true)
         let storeURL = home
-            .appendingPathComponent(".cmuxterm", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("tmux-compat-store.json", isDirectory: false)
         try FileManager.default.createDirectory(
             at: storeURL.deletingLastPathComponent(),

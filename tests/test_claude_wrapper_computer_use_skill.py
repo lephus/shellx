@@ -137,7 +137,7 @@ done
     listener.bind(str(socket_path))
     listener.listen(1)
     write_executable(
-        bundle_bin / "cmux",
+        bundle_bin / "shellx",
         """#!/bin/sh
 if [ "$1" = "--socket" ]; then
   shift 2

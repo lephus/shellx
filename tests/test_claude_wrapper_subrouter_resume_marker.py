@@ -117,12 +117,12 @@ exit 0
 """,
         )
         make_executable(
-            wrapper_dir / "cmux",
+            wrapper_dir / "shellx",
             """#!/usr/bin/env bash
 exit 0
 """,
         )
-        bundled_cli = bundled_dir / "cmux"
+        bundled_cli = bundled_dir / "shellx"
         make_executable(
             bundled_cli,
             """#!/usr/bin/env bash

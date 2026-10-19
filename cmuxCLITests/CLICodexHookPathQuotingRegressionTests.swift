@@ -42,7 +42,7 @@ struct CLICodexHookPathQuotingRegressionTests {
         ]
         for event in lifecycleEvents {
             let command = try injectedCodexHookCommand(eventName: event.eventName, output: emit.stdout)
-            #expect(command.contains("/.cmux/hooks/"))
+            #expect(command.contains("/.shellx/hooks/"))
             #expect(command.contains("-\(event.subcommand).sh"))
             let run = runCodexHookProcess(
                 executablePath: "/bin/sh",
@@ -69,15 +69,15 @@ struct CLICodexHookPathQuotingRegressionTests {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("cmux codex $hook 'home; \(UUID().uuidString)", isDirectory: true)
         let codexHome = root.appendingPathComponent(".codex", isDirectory: true)
-        let hooksDirectory = root.appendingPathComponent(".cmux/hooks", isDirectory: true)
+        let hooksDirectory = root.appendingPathComponent(".shellx/hooks", isDirectory: true)
         try FileManager.default.createDirectory(at: codexHome, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: hooksDirectory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let legacyScript = hooksDirectory.appendingPathComponent("cmux-codex-hook-persistent-stop.sh")
+        let legacyScript = hooksDirectory.appendingPathComponent("shellx-codex-hook-persistent-stop.sh")
         try makeCodexHookExecutableShellFile(at: legacyScript, lines: ["#!/bin/sh", "exit 0"])
         let userCommand = "/bin/true"
-        let outsideCommand = root.appendingPathComponent("cmux-codex-hook-persistent-stop.sh").path
+        let outsideCommand = root.appendingPathComponent("shellx-codex-hook-persistent-stop.sh").path
         let hooks: [String: Any] = [
             "hooks": [
                 "Stop": [["hooks": [

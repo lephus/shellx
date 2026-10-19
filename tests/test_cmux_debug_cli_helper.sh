@@ -7,7 +7,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TAG="Debug_Helper.Test"
 TAG_SLUG="debug-helper-test"
 TAG_BUNDLE_ID="debug.helper.test"
-SOCKET_PATH="/tmp/cmux-debug-${TAG_SLUG}.sock"
+SOCKET_PATH="/tmp/shellx-debug-${TAG_SLUG}.sock"
 TMP_DIR="$(mktemp -d)"
 SERVER_PID=""
 
@@ -22,7 +22,7 @@ trap cleanup EXIT
 
 FAKE_HOME="$TMP_DIR/home"
 FAKE_CLI_DIR="$FAKE_HOME/Library/Developer/Xcode/DerivedData/cmux-${TAG_SLUG}/Build/Products/Debug/ShellX DEV ${TAG_SLUG}.app/Contents/Resources/bin"
-FAKE_CLI="$FAKE_CLI_DIR/cmux"
+FAKE_CLI="$FAKE_CLI_DIR/shellx"
 mkdir -p "$FAKE_CLI_DIR"
 cat > "$FAKE_CLI" <<'EOF'
 #!/usr/bin/env bash
@@ -76,7 +76,7 @@ OUTPUT="$(
   CMUX_SOCKET_PATH="/tmp/main-cmux.sock" \
   CMUX_SOCKET_PASSWORD="main-secret" \
   CMUX_BUNDLE_ID="pro.shellx.desktop" \
-  CMUX_BUNDLED_CLI_PATH="/Applications/cmux.app/Contents/Resources/bin/shellx" \
+  CMUX_BUNDLED_CLI_PATH="/Applications/ShellX.app/Contents/Resources/bin/shellx" \
   CMUX_WORKSPACE_ID="main-workspace" \
   CMUX_TAB_ID="main-tab" \
   CMUX_SURFACE_ID="main-surface" \
@@ -121,9 +121,9 @@ reject_prefix "CMUX_DEBUG_LOG"
 # A build restored by publish-hq lives in the HQ Tag Opener cache, not DerivedData.
 CACHED_CLI_DIR="$FAKE_HOME/Library/Application Support/cmux/tag-app-cache/cmux-${TAG_SLUG}/ShellX DEV ${TAG_SLUG}.app/Contents/Resources/bin"
 mkdir -p "$CACHED_CLI_DIR"
-cp "$FAKE_CLI" "$CACHED_CLI_DIR/cmux"
+cp "$FAKE_CLI" "$CACHED_CLI_DIR/shellx"
 rm -rf "$FAKE_HOME/Library/Developer/Xcode/DerivedData"
 OUTPUT="$(HOME="$FAKE_HOME" CMUX_TAG="$TAG" "$ROOT_DIR/scripts/cmux-debug-cli.sh" env)"
-require_line "CMUX_BUNDLED_CLI_PATH=$CACHED_CLI_DIR/cmux"
+require_line "CMUX_BUNDLED_CLI_PATH=$CACHED_CLI_DIR/shellx"
 
 echo "PASS: cmux-debug-cli.sh routes through the tagged CLI/socket and scrubs ambient cmux env"

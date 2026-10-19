@@ -13,7 +13,7 @@ struct CLICodexHookTimeoutRegressionTests {
         try FileManager.default.createDirectory(at: codexHome, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let previousCommand = "cmux_cli=\"${CMUX_BUNDLED_CLI_PATH:-}\"; if [ -z \"$cmux_cli\" ] || [ ! -x \"$cmux_cli\" ]; then cmux_cli=\"$(command -v cmux 2>/dev/null || true)\"; fi; if [ -n \"$CMUX_SURFACE_ID\" ] && [ \"$CMUX_CODEX_HOOKS_DISABLED\" != \"1\" ] && [ -n \"$cmux_cli\" ]; then { if [ -n \"${CMUX_SOCKET_PATH:-}\" ]; then \"$cmux_cli\" --socket \"$CMUX_SOCKET_PATH\" hooks codex prompt-submit; else \"$cmux_cli\" hooks codex prompt-submit; fi; } || echo '{}'; else echo '{}'; fi"
+        let previousCommand = "cmux_cli=\"${CMUX_BUNDLED_CLI_PATH:-}\"; if [ -z \"$cmux_cli\" ] || [ ! -x \"$cmux_cli\" ]; then cmux_cli=\"$(command -v shellx 2>/dev/null || true)\"; fi; if [ -n \"$CMUX_SURFACE_ID\" ] && [ \"$CMUX_CODEX_HOOKS_DISABLED\" != \"1\" ] && [ -n \"$cmux_cli\" ]; then { if [ -n \"${CMUX_SOCKET_PATH:-}\" ]; then \"$cmux_cli\" --socket \"$CMUX_SOCKET_PATH\" hooks codex prompt-submit; else \"$cmux_cli\" hooks codex prompt-submit; fi; } || echo '{}'; else echo '{}'; fi"
         let legacyHookJSON: [String: Any] = [
             "hooks": [
                 "UserPromptSubmit": [
@@ -98,7 +98,7 @@ struct CLICodexHookTimeoutRegressionTests {
         let hooksURL = codexHome.appendingPathComponent("hooks.json", isDirectory: false)
         let configURL = codexHome.appendingPathComponent("config.toml", isDirectory: false)
         let hooksContent = #"""
-        {"custom":{"format":"must stay exact"},"hooks":{"Stop":[{"hooks":[{"type":"command","command":"cmux hooks codex stop","timeout":5},{"type":"command","command":"/usr/local/bin/user-stop","timeout":42}]}]}}
+        {"custom":{"format":"must stay exact"},"hooks":{"Stop":[{"hooks":[{"type":"command","command":"shellx hooks codex stop","timeout":5},{"type":"command","command":"/usr/local/bin/user-stop","timeout":42}]}]}}
         """#
         let configContent = """
         model = "gpt-5.5"
@@ -143,7 +143,7 @@ struct CLICodexHookTimeoutRegressionTests {
         #expect(Set(emittedEvents) == expectedInjectedEvents)
         #expect(emittedEvents.count == expectedInjectedEvents.count)
         let generatedHookDirectory = root
-            .appendingPathComponent(".cmux", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("hooks", isDirectory: true)
         for (event, subcommand) in [("SubagentStart", "subagent-start"), ("SubagentStop", "subagent-stop")] {
             let config = try #require(
@@ -482,7 +482,7 @@ struct CLICodexHookTimeoutRegressionTests {
         #expect(emit.stdout.contains("timeout=5000"))
 
         let hooksDirectory = root
-            .appendingPathComponent(".cmux", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("hooks", isDirectory: true)
         let generatedStopScript = try #require(
             FileManager.default
@@ -493,7 +493,7 @@ struct CLICodexHookTimeoutRegressionTests {
                 .first { $0.lastPathComponent.hasSuffix("-stop.sh") }
         )
         let legacyStopScript = hooksDirectory
-            .appendingPathComponent("cmux-codex-hook-stop.sh", isDirectory: false)
+            .appendingPathComponent("shellx-codex-hook-stop.sh", isDirectory: false)
         #expect(
             generatedStopScript != legacyStopScript,
             "A content-addressed path prevents an older cmux build from replacing this script"
@@ -514,14 +514,14 @@ struct CLICodexHookTimeoutRegressionTests {
             .appendingPathComponent("cmux-codex-stop-legacy-path-\(UUID().uuidString)", isDirectory: true)
         let codexHome = root.appendingPathComponent(".codex", isDirectory: true)
         let hooksDirectory = root
-            .appendingPathComponent(".cmux", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("hooks", isDirectory: true)
         try FileManager.default.createDirectory(at: codexHome, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: hooksDirectory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
         let legacyStopScript = hooksDirectory
-            .appendingPathComponent("cmux-codex-hook-stop.sh", isDirectory: false)
+            .appendingPathComponent("shellx-codex-hook-stop.sh", isDirectory: false)
         try makeCodexHookExecutableShellFile(at: legacyStopScript, lines: [
             "#!/bin/sh",
             "echo '{}'",
@@ -572,14 +572,14 @@ struct CLICodexHookTimeoutRegressionTests {
             .appendingPathComponent("cmux-codex-unrecognized-path-\(UUID().uuidString)", isDirectory: true)
         let codexHome = root.appendingPathComponent(".codex", isDirectory: true)
         let hooksDirectory = root
-            .appendingPathComponent(".cmux", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("hooks", isDirectory: true)
         try FileManager.default.createDirectory(at: codexHome, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: hooksDirectory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
         let userScript = hooksDirectory
-            .appendingPathComponent("cmux-codex-hook-unrecognized.sh", isDirectory: false)
+            .appendingPathComponent("shellx-codex-hook-unrecognized.sh", isDirectory: false)
         try makeCodexHookExecutableShellFile(at: userScript, lines: [
             "#!/bin/sh",
             "echo user-hook",

@@ -63,7 +63,7 @@ def run_wrapper(
         cmux_locale_log = tmp / "cmux-locale.log"
         system_open = tmp / "system-open"
         defaults = tmp / "defaults"
-        cmux = tmp / "cmux"
+        cmux = tmp / "shellx"  # the bundled CLI beside Resources/bin/open
 
         make_executable(
             system_open,
