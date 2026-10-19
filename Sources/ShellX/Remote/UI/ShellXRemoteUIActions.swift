@@ -22,6 +22,11 @@ enum ShellXRemoteUIActions {
         }
     }
 
+    /// A workspace closed: let the service forget it. No-op when the remote UI is off.
+    static func workspaceClosed(_ id: UUID) {
+        ShellXRemoteUIModel.shared.service?.forgetRemoteWorkspace(id)
+    }
+
     static func openSession(on machineID: RemoteMachine.ID) {
         guard let service = ShellXRemoteUIModel.shared.service else { return }
         Task { @MainActor in

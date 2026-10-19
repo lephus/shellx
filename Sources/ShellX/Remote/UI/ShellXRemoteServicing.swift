@@ -28,6 +28,8 @@ protocol ShellXRemoteServicing: AnyObject {
     /// Throws `ShellXCoreError` (`invalid_credentials`, `network`, …).
     func signIn(email: String, password: String) async throws
     func signOut() async
+    /// Called when a workspace closes so the service stops tracking it.
+    func forgetRemoteWorkspace(_ id: UUID)
 }
 
 extension ShellXRemoteServicing where Self: ObservableObject, Self.ObjectWillChangePublisher == ObservableObjectPublisher {

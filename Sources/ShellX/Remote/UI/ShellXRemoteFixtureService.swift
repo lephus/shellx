@@ -194,6 +194,11 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
         isSignedIn = true
     }
 
+    func forgetRemoteWorkspace(_ id: UUID) {
+        guard remoteWorkspaces[id] != nil else { return }
+        remoteWorkspaces[id] = nil
+    }
+
     func signOut() async {
         machines = []
         outgoing = []
