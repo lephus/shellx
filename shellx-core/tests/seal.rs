@@ -209,7 +209,9 @@ fn standard_alphabet_is_refused() {
     assert!(standard.contains('+') && !standard.contains('='), "{standard}");
     assert_ne!(standard, KAT_SEALED);
     assert_invalid(&requester, KAT_PAIRING_ID, &standard);
-    // '/' (standard 63) where URL-safe has '-' (62): off-alphabet, refused.
+    // Only an off-alphabet character test: '/' is not in the URL-safe alphabet at all (standard
+    // has it at 63, where URL-safe has '_'), so swapping it in for '-' must be refused. It does
+    // not check how '/' would decode.
     assert_invalid(&requester, KAT_PAIRING_ID, &KAT_SEALED.replace('-', "/"));
     // Control: the URL-safe original still opens.
     assert_eq!(&*open_invite(&requester, KAT_PAIRING_ID, KAT_SEALED).unwrap(), URI);

@@ -35,7 +35,12 @@ BUILD = (
 )
 NEEDS = {"SHELLX_E2E_BIN": ("cmux-tui", "cmux-relay"), "SHELLX_E2E_CORE_BIN": ("shellx-core-cli", "shellx-fake-api")}
 ENROLL_TEST = "test_enroll_via_sealed_invite_and_view"
-RECONNECT_BUDGET = 120  # seconds; see test_reconnect_after_relay_restart_with_2s_tickets
+# Seconds. A bounded upper limit for a probabilistic window, not a fix: with the register ticket
+# at 2 s the daemon is reachable ~1 s in every ~6-7 s after a relay restart and the viewer's own
+# jittered retry has to land in one (see test_reconnect_after_relay_restart_with_2s_tickets).
+# It does not make "relay rejected the authenticated operation" go away; that error ends the
+# client and is only handled by the harness restarting it (enrolled_connect_argv).
+RECONNECT_BUDGET = 120
 
 
 def missing_binaries() -> list[str]:

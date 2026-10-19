@@ -19,6 +19,26 @@ Rules this file keeps (lane L5 constraints):
   redacted. `logs()` returns every process log so the test can scan them.
 - The harness dir lives under a short /tmp root (macOS sun_path is 104
   bytes) and `close()` removes it with every ticket, invite and key in it.
+
+Where this harness deliberately differs from the ShellX app (all test-only; the
+app is Packages/Shared/ShellXBrand/Sources/ShellXRemoteCore: RemoteCommandLine,
+ShellXClientLinkSupervisor, ShellXTicketRefresher, ReconnectBackoff):
+(a) The invite spawn of `remote connect` passes a SECOND relay-route triple, the
+    invite route's origin, so that both route candidates read the refreshed
+    ticket file (see `relay_credential_args`). cmux keeps only scheme://host:port
+    of an invite route, and the invite's own static connect ticket would expire
+    during the 2 s-ticket stress test. The app passes one triple; ledger ruling
+    R32 accepted that (in production, with 120 s tickets, an expired invite
+    ticket costs one extra ~1 s backoff step). The enrolled restart argv has
+    exactly the app's single triple (`enrolled_connect_argv`).
+(b) The harness refresher is latency-aware: it starts the next mint early enough
+    that the file keeps REFRESH_MARGIN of life while the mint runs
+    (`refresh_delay`). The app's ShellXTicketRefresher is half-life with a 1 s
+    floor (TicketSchedule.nextRefresh); that is enough for its 120 s tickets and
+    cannot be used with the 2 s tickets this e2e runs.
+(c) The app mints a fresh ticket before every spawn (LinkStateMachine
+    mintTicket); the harness only relies on the refresher keeping the file
+    fresh and does not mint on each restart.
 """
 
 from __future__ import annotations
@@ -39,7 +59,7 @@ import threading
 import time
 import urllib.request
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
 HERE = Path(__file__).resolve().parent
 FAKE_APP = HERE / "fake_app.py"
@@ -53,6 +73,11 @@ RELAY_PATH = "/v1/relay"
 REFRESH_FLOOR = 0.1
 # Life a ticket file must keep beyond the next mint's expected latency.
 REFRESH_MARGIN = 0.5
+# How many of the latest mint latencies the refresher schedules by.
+LATENCY_WINDOW = 5
+# `remote connect --headless --json` prints one JSON object per line with this
+# `event` when connected and on every topology change.
+SNAPSHOT_EVENT = "connection-snapshot"
 
 TICKET_RE = re.compile(r"v2\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]*")
 INVITE_RE = re.compile(r"cmux://enroll/[A-Za-z0-9_=-]+")
@@ -97,19 +122,103 @@ def route_origin(route: str) -> str:
 
 
 def relay_credential_args(route: str, slot: str, ticket_file: str) -> list[str]:
-    """`remote connect` relay credentials for `route` and for its origin.
+    """`remote connect` relay credentials for an INVITE spawn: the full `route`
+    and, when it has a path, its origin (test-only, see the module docstring).
 
-    cmux keeps only `scheme://host:port` of an invite route
-    (identity.rs credential_free_route_hint), so an invite adds that origin as
-    a second route candidate carrying the invite's own static connect ticket
-    (remote_cli.rs start_connected: `relay_routes.entry(route).or_insert`). That
-    ticket was minted at pairing time; once it expires, a dial on that
-    candidate is refused (`invalid-ticket`) and cmux ends the client for good.
-    Naming the origin here too makes every candidate read the refreshed file."""
+    The second triple is for the invite spawn only. cmux keeps only
+    `scheme://host:port` of an invite route (identity.rs
+    credential_free_route_hint), so an invite adds that origin as a second route
+    candidate carrying the invite's own static connect ticket
+    (remote_cli.rs start_connected: `relay_routes.entry(route).or_insert`).
+    That ticket was minted at pairing time. Once it has expired, a dial on the
+    origin candidate gets `invalid-ticket` and cmux treats it as non-retryable
+    (provider/relay.rs `open` retries once, with the same static ticket;
+    `relay_rejection`: "relay rejected the authenticated operation"), so the
+    client ends for good. That needs both of these:
+    - a relay that, like the stock cmux-relay, does not reject at the HTTP
+      upgrade: it accepts the WebSocket and checks the ticket afterwards, in
+      the Allocate control message (cmux-relay relay.rs);
+    - the stale origin candidate being the one that is selected and opened.
+    Naming the origin here too makes every candidate read the refreshed file.
+
+    An enrolled restart has no invite, hence exactly one candidate (the
+    positional route): cmux refuses a relay credential route that is not a
+    candidate (remote_cli.rs start_connected, `relay_route_not_candidate`). It
+    must never get this second triple; see `enrolled_connect_argv`."""
     args = ["--relay-route", route, "--relay-slot", slot, "--relay-ticket-file", ticket_file]
     if route_origin(route) != route:
         args += ["--relay-route", route_origin(route), "--relay-slot", slot, "--relay-ticket-file", ticket_file]
     return args
+
+
+def _connect_flags(state_dir: str, local_socket: str, device_name: str) -> list[str]:
+    """The flags both spawns share, in the order of Swift RemoteCommandLine.connect."""
+    return ["--state-dir", state_dir, "--local-socket", local_socket, "--headless", "--json",
+            "--exit-with-parent", "--device-name", device_name]
+
+
+def invite_connect_argv(cmux_tui: str, route: str, slot: str, ticket_file: str, invite_file: str,
+                        state_dir: str, local_socket: str, device_name: str) -> list[str]:
+    """First spawn of the viewer's client: enrolls with the sealed invite. The
+    positional route comes first; then one `--relay-route` triple per route
+    candidate that needs the refreshed ticket file (the full route and its
+    origin, see `relay_credential_args`)."""
+    return [cmux_tui, "remote", "connect", route, *relay_credential_args(route, slot, ticket_file),
+            *_connect_flags(state_dir, local_socket, device_name), "--invite-file", invite_file]
+
+
+def enrolled_connect_argv(cmux_tui: str, route: str, slot: str, ticket_file: str, daemon_fingerprint: str,
+                          state_dir: str, local_socket: str, device_name: str) -> list[str]:
+    """Restart of an enrolled client, no invite: the same argv as Swift
+    RemoteCommandLine.connect (RemoteCommandLine.swift:37-45) with
+    `--daemon <fingerprint>`. The route stays positional and the single relay
+    credential is the shorthand `--relay-slot S --relay-ticket-file F` (no
+    `--relay-route`): cmux then has exactly one candidate, the positional route,
+    and the credential is keyed to it.
+
+    `--exit-with-parent` is kept as in the app: the client exits when the
+    harness process (its direct parent) exits, which is what the harness wants
+    (no client survives a killed or cancelled CI run); the harness itself stops
+    clients through `_stop`."""
+    return [cmux_tui, "remote", "connect", route, "--relay-slot", slot, "--relay-ticket-file", ticket_file,
+            *_connect_flags(state_dir, local_socket, device_name), "--daemon", daemon_fingerprint]
+
+
+def refresh_delay(left: float, latencies: Sequence[float]) -> float:
+    """Seconds to wait before the next mint of a ticket that has `left` seconds
+    of life: half the remaining life, or earlier so that the mint (as slow as
+    the slowest of `latencies`) finishes with REFRESH_MARGIN of life left in
+    the file; never less than REFRESH_FLOOR."""
+    slowest = max(latencies, default=0.0)
+    return max(REFRESH_FLOOR, min(left / 2, left - slowest - REFRESH_MARGIN))
+
+
+def next_latencies(recent: Sequence[float], latency: float, cold: bool) -> list[float]:
+    """The refresher's latency window after a mint. The first mint of a
+    refresher is cold (process start, page cache): when `cold` the window
+    restarts from the second mint, so one slow first mint does not keep the
+    refresher at REFRESH_FLOOR for the next LATENCY_WINDOW mints."""
+    window = [] if cold else list(recent)
+    return (window + [latency])[-LATENCY_WINDOW:]
+
+
+def is_snapshot_line(line: str) -> bool:
+    """True for the `{"event":"connection-snapshot",...}` line that `remote
+    connect --headless --json` prints once connected (remote_cli.rs
+    connect_with_flags); what ShellXClientLinkSupervisor.isSnapshotLine matches."""
+    if not line.startswith("{"):
+        return False
+    try:
+        value = json.loads(line)
+    except ValueError:
+        return False
+    return isinstance(value, dict) and value.get("event") == SNAPSHOT_EVENT
+
+
+def log_has_snapshot(text: str) -> bool:
+    """True if any complete line of a client log is a connection snapshot (a
+    half-written last line does not parse and counts on the next read)."""
+    return any(is_snapshot_line(line) for line in text.splitlines())
 
 
 def invitation_id(uri: str) -> str:
@@ -135,9 +244,29 @@ class CoreError(HarnessError):
         self.code = code
 
 
+class MintStats:
+    """What one ticket refresher saw: how many mints, the cold first latency and
+    the slowest mint, to attribute a CI failure to a slow API/CLI."""
+
+    def __init__(self, first_latency: float) -> None:
+        self.first = first_latency
+        self.maximum = first_latency
+        self.count = 1
+        self.failures = 0
+
+    def record(self, latency: float) -> None:
+        self.count += 1
+        self.maximum = max(self.maximum, latency)
+
+
 class Machine:
     """One ShellX install: its own shellx-core state dir (0700) and
-    SHELLX_CORE_CONFIG, cmux-tui state dirs and sockets."""
+    SHELLX_CORE_CONFIG, cmux-tui state dirs and sockets.
+
+    The refreshers and the two `remote connect` argvs differ from the app in
+    three test-only ways, listed in the module docstring (a second origin
+    relay-route triple on the invite spawn, a latency-aware refresher, no mint
+    before every spawn)."""
 
     def __init__(self, harness: "Harness", name: str) -> None:
         self.h = harness
@@ -168,10 +297,12 @@ class Machine:
         self.relay_url = ""
         self.invite_path: Optional[str] = None
         self.refreshers: dict[str, tuple[threading.Event, threading.Thread, str]] = {}
+        self.mint_stats: dict[str, MintStats] = {}
         self.daemon_runs = 0
         self.core_lock = threading.Lock()
         self.client_runs = 0
-        self.client_argv: list[str] = []
+        self.client_route = ""     # the full relay route of the viewer's client
+        self.client_ticket = ""    # the refreshed connect ticket file of the viewer's client
 
     # shellx-core ---------------------------------------------------------
     def core(self, method: str, **params) -> dict:
@@ -217,7 +348,8 @@ class Machine:
         fresh from a thread: the next mint starts at half the remaining life,
         or earlier so that it finishes (slowest of the last mints) with at
         least REFRESH_MARGIN of life left in the file; never sooner than
-        REFRESH_FLOOR.
+        REFRESH_FLOOR (`refresh_delay`). Test-only: the app's
+        ShellXTicketRefresher is half-life with a 1 s floor.
 
         With 2 s tickets whose expiry is a whole second, a fresh ticket has
         1-2 s left, and cmux treats an expired ticket as fatal (the relay's
@@ -226,7 +358,11 @@ class Machine:
         relay_rejection). Pure half-life scheduling, measured after the mint
         returns, left the file expired for most of a slow mint (seen at 0.6-7 s
         under load: the relay refused a connect ticket 0.4 s past its expiry
-        that the next mint replaced 1.3 s later)."""
+        that the next mint replaced 1.3 s later).
+
+        The first mint is cold, so the latency window restarts from the second
+        mint (`next_latencies`); the slowest mint is logged by
+        `note_mint_stats` (on stop and in `Harness.dump_logs`)."""
         if write_to in self.refreshers:
             return self.refreshers[write_to][2]
         params = {"permission": permission, "write_to": write_to}
@@ -236,13 +372,13 @@ class Machine:
         first = self.core("tickets.mint", **params)
         first_latency = time.monotonic() - started
         self.relay_url = first["relay_url"]
+        stats = self.mint_stats[write_to] = MintStats(first_latency)
         stop = threading.Event()
 
         def loop(expires_at: float, latency: float) -> None:
-            recent = [latency]
+            recent, cold = [latency], True
             while True:
-                left = expires_at - time.time()
-                if stop.wait(max(REFRESH_FLOOR, min(left / 2, left - max(recent) - REFRESH_MARGIN))):
+                if stop.wait(refresh_delay(expires_at - time.time(), recent)):
                     return
                 started = time.monotonic()
                 try:
@@ -250,7 +386,11 @@ class Machine:
                 except Exception as error:  # API briefly unreachable: retry in 1 s
                     self.h.note(f"refresher {self.name}/{write_to}: {type(error).__name__}")
                     expires_at = time.time() + 2
-                recent = (recent + [time.monotonic() - started])[-5:]
+                    stats.failures += 1
+                    continue
+                latency = time.monotonic() - started
+                stats.record(latency)
+                recent, cold = next_latencies(recent, latency, cold), False
 
         thread = threading.Thread(target=loop, args=(float(first["expires_at_unix"]), first_latency),
                                   name=f"tickets-{self.name}-{write_to}", daemon=True)
@@ -258,12 +398,20 @@ class Machine:
         self.refreshers[write_to] = (stop, thread, first["path"])
         return first["path"]
 
+    def note_mint_stats(self) -> None:
+        """One harness-log line per refresher: mints, failed mints, the cold
+        first latency and the slowest latency (all mints)."""
+        for write_to, stats in list(self.mint_stats.items()):
+            self.h.note(f"refresher {self.name}/{write_to}: mints={stats.count} failed={stats.failures} "
+                        f"first={stats.first:.2f} s max={stats.maximum:.2f} s")
+
     def stop_refreshers(self) -> None:
         for stop, _, _ in self.refreshers.values():
             stop.set()
         for _, thread, _ in self.refreshers.values():
             thread.join(timeout=70)
         self.refreshers.clear()
+        self.note_mint_stats()
 
 
 class Harness:
@@ -495,17 +643,15 @@ class Harness:
 
     def connect_viewer(self, viewer: Machine, host: Machine) -> None:
         """`cmux-tui remote connect` through the relay with the sealed invite and
-        a refreshed connect ticket. Returns once the host sees the pending
-        enrollment."""
+        a refreshed connect ticket (`invite_connect_argv`: the full route and,
+        test-only, its origin both read the refreshed file). Returns once the
+        host sees the pending enrollment."""
         if not viewer.invite_path:
             raise HarnessError("pair() first")
-        ticket = viewer.start_ticket_refresher("connect.ticket", "connect", target=host.machine_id)
-        route = relay_route(viewer.relay_url)
-        viewer.client_argv = [
-            str(self.bin / "cmux-tui"), "remote", "connect", route,
-            *relay_credential_args(route, host.slot, ticket), "--state-dir", str(viewer.cstate),
-            "--local-socket", str(viewer.client_sock), "--headless", "--device-name", viewer.session]
-        argv = [*viewer.client_argv[:4], "--invite-file", viewer.invite_path, *viewer.client_argv[4:]]
+        viewer.client_ticket = viewer.start_ticket_refresher("connect.ticket", "connect", target=host.machine_id)
+        viewer.client_route = relay_route(viewer.relay_url)
+        argv = invite_connect_argv(str(self.bin / "cmux-tui"), viewer.client_route, host.slot, viewer.client_ticket,
+                                   viewer.invite_path, str(viewer.cstate), str(viewer.client_sock), viewer.session)
         viewer.client_runs += 1
         proc = self._spawn(f"client-{viewer.name}-{viewer.client_runs}", argv, self.env(viewer))
         self.viewer = viewer
@@ -538,11 +684,18 @@ class Harness:
         refresher keeps fresh, on a 1, 2, 4, 8, 16, 30 s backoff that restarts
         at 1 s once a client has connected (LinkStateMachine: `attempt = 0` on
         `.connected`). Upstream ends the client when the daemon restarted and
-        lost its logical session, and on any relay rejection."""
+        lost its logical session, and on any relay rejection.
+
+        The restart argv is the app's (`enrolled_connect_argv`): one relay
+        credential, not the invite spawn's origin triple, because with no invite
+        cmux has a single route candidate and refuses a relay credential route
+        that is not one. "Connected" is the first `connection-snapshot` line on
+        the client's `--json` stdout, as in ShellXClientLinkSupervisor."""
         fingerprint = self.host_cli(host, "remote", "enroll", "status", "--json")["daemon_fingerprint"]
-        argv = [*viewer.client_argv[:4], "--daemon", fingerprint, *viewer.client_argv[4:]]
+        argv = enrolled_connect_argv(str(self.bin / "cmux-tui"), viewer.client_route, host.slot,
+                                     viewer.client_ticket, fingerprint, str(viewer.cstate),
+                                     str(viewer.client_sock), viewer.session)
         backoff = (1, 2, 4, 8, 16, 30)
-        ready_line = str(viewer.client_sock).encode()  # headless `remote connect` prints it once connected
 
         def loop() -> None:
             attempt = 0
@@ -552,7 +705,7 @@ class Harness:
                 proc = self._proc(name)
                 if seen_connected != viewer.client_runs:
                     try:
-                        if ready_line in (self.log_dir / f"{name}.log").read_bytes():
+                        if log_has_snapshot((self.log_dir / f"{name}.log").read_text(errors="replace")):
                             seen_connected = viewer.client_runs
                             self.note(f"client {viewer.name} connected")
                     except OSError:
@@ -658,6 +811,8 @@ class Harness:
     def dump_logs(self, stream, lines: int = 80) -> None:
         if not self.root.exists():
             return
+        for machine in list(self.machines.values()):
+            machine.note_mint_stats()
         for name, proc in list(self.procs.items()):
             print(f"----- process {name} pid={proc.pid} rc={proc.poll()}", file=stream)
         for path in sorted(self.root.rglob("*.log")):
