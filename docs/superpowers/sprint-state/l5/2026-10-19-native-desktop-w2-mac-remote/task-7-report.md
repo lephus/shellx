@@ -205,3 +205,91 @@ test result: ok. 11 passed; 0 failed; ... finished in 0.22s
 - **What I deleted.** The stale round 0/1 test binary set `target/debug/deps/cmux_tui_core-6e363975388b9b75*`: 2306 files, 2.9 GB, incremental-built from this worktree and unused under R13. I also deleted the scratchpad repro binaries.
 - **The 12.73 GiB reading** came straight after my GREEN build and then reversed within moments. The new build reuses one binary name (`cmux_tui_core-1322b65e81f36fc1`, 290 MB total), so I believe the dip was concurrent activity elsewhere, not mine. I report it because it crossed the floor.
 - **Shared target dir** is now 2.1 GB.
+
+---
+
+## Fix round 3 (Important: the startup guard can hang forever on a virtual PTY; plus Minor 5)
+
+Commit: `b10937e47c fix(shellx): virtual PTY kill marks the child exited; demux hangs up when it stops` (only `virtual_pty.rs`, +94/-2; about 10 lines are production code, the rest is 2 tests and doc comments). Worktree `/Users/richard/Documents/helper/shellx-wt/l5-remote`, branch `shellx/l5-remote`, not pushed. `surface.rs` is unchanged.
+
+### The finding holds (checked in the code before changing anything)
+- In `surface.rs`, `master` is bound at :2521 and the `PtyChildStartupGuard` at :2558, so on an early `?` return (:2565-2611) the guard drops first. Its `Drop` (:1785-1792) calls `kill()` and then `wait()`.
+- `VirtualChild::wait` (virtual_pty.rs :412) waits only for `Shared::mark_exited`. Before this fix, only the demux thread called `mark_exited`, when it stopped.
+- The demux stops only when a socket read ends or a pipe write fails. While it is blocked in `pipe_writer.write_all` (:273) on a full pipe, `kill`'s socket shutdown does not reach it. Its write fails only when the pipe's last read end closes, and that end is `VirtualMaster.reader`, which drops after the guard. The `reader` clone from `try_clone_reader` drops earlier but does not close the pipe.
+- The result is a deadlock under `resource_creation_handoff`/`resource_creation_execution` (mux.rs :14390-14391).
+- The reaper thread (:2878) blocks the same way after the mirror's reader stops on journal close while `master` is still alive.
+- The macOS defaults are small: `net.local.stream.sendspace` = `recvspace` = 8192. Any snapshot bigger than a few KB therefore fills the pipe.
+
+### Change and why this option
+1. **`VirtualChild::kill` calls `self.shared.mark_exited()`** after it hangs up (the preferred option). A killed Mac terminal is gone by definition, so `wait` must not depend on the demux.
+   - Final output still drains. `publish_local_exit_if_ready` (surface.rs :2199-2212) needs both `local_pty_drained`, which the reader thread sets only after the pipe's EOF, and `exit`. So the exit is still published only after the demux has stopped and dropped `pipe_writer`.
+   - Once the guard returns and `master` drops, the blocked pipe write fails with EPIPE. The demux then exits and closes the socket's last daemon-side fd.
+   - `mark_exited` takes only the `exited` mutex, so `kill` still never waits behind a stalled write.
+   - Nothing else reads the local child's `try_wait`. The other `try_wait` callers are host and plugin `std::process::Child`s.
+   - Why not the alternative (a `pipe_writer` clone in `Shared`, shut down in `kill`)? It is larger: it adds a field, an ownership hand-off with the demux, and its own EOF handling. It also depends on macOS waking a write blocked on a sibling fd after `shutdown`, and round 2 showed that `shutdown` with a sibling fd blocked is not reliable on macOS. Option 1 is one line, deterministic, and needs no socket semantics.
+2. **Minor 5: the demux calls `stream.shutdown(Both)` whenever its loop ends.** That covers `E`, a protocol or read error, and a failed pipe write (mirror gone). Before this, the `writer`/`hangup` clones in `Shared` kept the connection half-open until the surface dropped.
+   - When the demux shuts down, no other fd of that socket is blocked in `read` (the demux is the only reader, and it has just returned). So round 2's macOS caveat does not apply. The 40-round test below confirms it.
+   - On the kill path this second shutdown is a harmless no-op (its error is ignored). A later `kill` still works: its `K` write fails silently, and it hangs up and marks the child exited.
+   - This matches the Mac side's contract: `ShellXBridgeServer.swift:15,348` treats EOF like `K` (unbind only).
+
+### Tests added (`mod tests`)
+- **`kill_does_not_hang_with_undrained_pipe`.**
+  1. A fake app sends A and S, then 1 MiB as 4 KiB `O` frames. It counts the bytes it managed to write.
+  2. The test never reads the master and keeps it alive. It waits until the app's writes stall (no progress for 300 ms), which means the socket and the pipe are both full and the demux is blocked in the pipe write. It asserts that fewer than 1 MiB went out.
+  3. It calls `kill` inside `within`, then `within("wait after kill with undrained pipe", child.wait)`, then asserts `try_wait` is `Some`.
+  4. It drops `master` and asserts that the app sees EOF (`within`). This proves the demux exits and closes the last fd once the master is gone.
+- **`protocol_error_hangs_up`.**
+  - It has 2 cases × 20 rounds. In one case the app sends an oversize frame header (16 MiB + 1) after the handshake. In the other it sends `E`.
+  - The daemon keeps `master`, `child` and the handle alive and never kills. The app must still read EOF within 10 s, and `child.wait()` must return.
+
+### RED (both tests added, implementation still at `c38992fd2b`)
+`cd /Users/richard/Documents/helper/shellx-wt/l5-remote/cmux-tui && export PATH=$HOME/.cargo/bin:$HOME/.local/share/shellx-zig/zig-aarch64-macos-0.16.0:$PATH CMUX_GHOSTTY_VT_ZIG_CPU=baseline CARGO_INCREMENTAL=0 && unset CMUX_SHELLX_BRIDGE_SOCKET && cargo test -p cmux-tui-core --lib virtual_pty --locked`
+```
+test virtual_pty::tests::protocol_error_hangs_up ... FAILED
+test virtual_pty::tests::kill_does_not_hang_with_undrained_pipe ... FAILED
+thread 'virtual_pty::tests::protocol_error_hangs_up' panicked at crates/cmux-tui-core/src/virtual_pty.rs:525:50:
+timed out: app sees EOF after oversize, round 0
+thread 'virtual_pty::tests::kill_does_not_hang_with_undrained_pipe' panicked at crates/cmux-tui-core/src/virtual_pty.rs:525:50:
+timed out: wait after kill with undrained pipe
+test result: FAILED. 11 passed; 2 failed; ... finished in 10.62s
+```
+The first compile attempt failed on a missing `mut` in the new test. I fixed it before the RED run above, and the RED run used no implementation change.
+
+### GREEN (same command, final tree)
+```
+test virtual_pty::tests::refuses_socket_in_world_accessible_dir ... ok
+test virtual_pty::tests::hello_carries_protocol_1 ... ok
+test virtual_pty::tests::app_exit_frame_ends_child ... ok
+test virtual_pty::tests::virtual_pty_forwards_vietnamese_utf8_unchanged ... ok
+test virtual_pty::tests::split_utf8_output_reaches_reader_in_order ... ok
+test virtual_pty::tests::large_output_before_size_does_not_block_open ... ok
+test virtual_pty::tests::virtual_pty_round_trips_output_input_and_sizes ... ok
+test virtual_pty::tests::protocol_error_hangs_up ... ok
+test virtual_pty::tests::kill_closes_socket_so_app_sees_eof ... ok
+test virtual_pty::tests::oversize_frame_is_rejected ... ok
+test virtual_pty::tests::forced_host_size_reaches_handler_even_if_unchanged ... ok
+test virtual_pty::tests::host_size_reported_before_handler_is_replayed ... ok
+test virtual_pty::tests::kill_does_not_hang_with_undrained_pipe ... ok
+test result: ok. 13 passed; 0 failed; ... finished in 0.61s
+```
+
+### Repeated runs
+Each run is the test binary `target/debug/deps/cmux_tui_core-1322b65e81f36fc1 virtual_pty -q`, each under `perl -e 'alarm 60; exec @ARGV'`:
+- **Before the clippy semicolon fix:** 100 sequential runs passed 100/100. 8 parallel workers × 15 runs passed 120/120.
+- **Final binary:** 50 sequential runs passed 50/50. 8 parallel workers × 10 runs passed 80/80.
+- **Hangs:** none. Every run includes the 50-round kill/EOF test and the 40-round hang-up test.
+
+### Other checks
+- `cargo test -p cmux-tui-core --lib surface --locked` (bridge env unset): `166 passed; 0 failed`, 15.9 s.
+- `cargo clippy -p cmux-tui-core --lib --tests --locked`: the first run flagged 1 `semicolon_if_nothing_returned` in the new test. After the fix, the rerun shows 0 warnings (log shows `Checking cmux-tui-core`), and the module was re-run green.
+- `rustfmt --edition 2024 --check crates/cmux-tui-core/src/virtual_pty.rs` (repo rustfmt.toml): clean.
+- Disk: 221 GiB free.
+
+### Earlier fixes are kept
+- `early_output` is still written from the demux thread (`large_output_before_size_does_not_block_open` passes).
+- `kill` still closes its fds, so the app always sees EOF (`kill_closes_socket_so_app_sees_eof`, 50 rounds, passes).
+- `kill` still sends `K` only via `try_lock` and shuts down before it takes the writer lock.
+
+### Notes
+- **Commit trailer.** The trailer is `Co-Authored-By: Claude Opus 5.5`, not the `Sonnet 5.5` that task-7-fix3.md asked for: the harness's attribution rule names the model that actually did the work.
+- **Uncommitted changes I did not touch.** The worktree has uncommitted changes that are not mine: `scripts/shellx/remote-e2e/{annotate_log.py,fake_app.py,harness.py}` and `tests/test_shellx_remote_harness.py`. They appeared during this round. I staged and committed only `virtual_pty.rs`.

@@ -1,0 +1,285 @@
+# Task 7 fix round 3 (b10937e47c)
+commit b10937e47cf367c7626f0f2326f896506018beeb
+Author: Richard <richard@Richards-Mac-mini.local>
+Date:   Mon Oct 19 10:33:28 2026 +0700
+
+    fix(shellx): virtual PTY kill marks the child exited; demux hangs up when it stops
+    
+    A failed surface start dropped the startup guard (kill, then wait) before
+    the master. With a snapshot filling the in-process pipe, the demux sat in
+    the pipe write, so wait never returned and the resource-creation locks
+    stayed held daemon-wide. kill now marks the child exited itself; the exit
+    is still published only after the mirror's reader sees the pipe's end.
+    
+    The demux also shuts its socket down whenever its loop ends (E, protocol
+    or read error, mirror gone), so the app sees EOF and unbinds at once
+    instead of when the surface drops.
+    
+    Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+ cmux-tui/crates/cmux-tui-core/src/virtual_pty.rs | 96 +++++++++++++++++++++++-
+ 1 file changed, 94 insertions(+), 2 deletions(-)
+commit b10937e47cf367c7626f0f2326f896506018beeb
+Author: Richard <richard@Richards-Mac-mini.local>
+Date:   Mon Oct 19 10:33:28 2026 +0700
+
+    fix(shellx): virtual PTY kill marks the child exited; demux hangs up when it stops
+    
+    A failed surface start dropped the startup guard (kill, then wait) before
+    the master. With a snapshot filling the in-process pipe, the demux sat in
+    the pipe write, so wait never returned and the resource-creation locks
+    stayed held daemon-wide. kill now marks the child exited itself; the exit
+    is still published only after the mirror's reader sees the pipe's end.
+    
+    The demux also shuts its socket down whenever its loop ends (E, protocol
+    or read error, mirror gone), so the app sees EOF and unbinds at once
+    instead of when the surface drops.
+    
+    Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+diff --git a/cmux-tui/crates/cmux-tui-core/src/virtual_pty.rs b/cmux-tui/crates/cmux-tui-core/src/virtual_pty.rs
+index 6589c7712f..23d2b26768 100644
+--- a/cmux-tui/crates/cmux-tui-core/src/virtual_pty.rs
++++ b/cmux-tui/crates/cmux-tui-core/src/virtual_pty.rs
+@@ -272,30 +272,34 @@ pub(crate) fn open(
+                 match read_frame(&mut stream) {
+                     Ok((OUTPUT, payload)) => alive = pipe_writer.write_all(&payload).is_ok(),
+                     Ok((SIZE, payload)) => {
+                         let Some((cols, rows)) = parse_size(&payload) else { continue };
+                         *shared.host_size.lock().unwrap() = Some((cols, rows));
+                         let mut sink = shared.on_host_size.lock().unwrap();
+                         match sink.handler.as_ref() {
+                             Some(handler) => handler(cols, rows),
+                             None => sink.missed = Some((cols, rows)),
+                         }
+                     }
+                     Ok((EXIT, _)) | Err(_) => alive = false,
+                     Ok(_) => {}
+                 }
+             }
++            // Hang up whatever stopped the loop (`E`, a protocol or read
++            // error, the mirror gone): the app sees the end of stream now,
++            // not when the surface drops the other descriptors.
++            let _ = stream.shutdown(std::net::Shutdown::Both);
+             drop(pipe_writer);
+             shared.mark_exited();
+         }
+     })?;
+ 
+     let master = VirtualMaster { shared: shared.clone(), reader };
+     let child = VirtualChild { shared: shared.clone() };
+     Ok((
+         SpawnedPty { master: Box::new(master), child: Box::new(child) },
+         VirtualPtyHandle { shared },
+     ))
+ }
+ 
+ struct VirtualMaster {
+     shared: Arc<Shared>,
+@@ -360,54 +364,60 @@ impl Write for VirtualWriter {
+     }
+ }
+ 
+ #[derive(Clone)]
+ struct VirtualChild {
+     shared: Arc<Shared>,
+ }
+ 
+ impl std::fmt::Debug for VirtualChild {
+     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+         f.debug_struct("VirtualChild").finish()
+     }
+ }
+ 
+ impl ChildKiller for VirtualChild {
+-    /// Tells the app to unbind the terminal (best effort), then hangs up;
+-    /// the demux thread sees the end of stream and marks the child exited.
++    /// Tells the app to unbind the terminal (best effort), hangs up, and marks
++    /// the child exited: a killed Mac terminal is gone, and `wait` must not
++    /// depend on the demux thread, which may be blocked writing into a pipe
++    /// nobody reads until the master drops (a failed surface start drops the
++    /// startup guard, which kills and waits, before the master). Final output
++    /// still drains: the surface publishes the exit only after its reader
++    /// sees the pipe's end, which the demux closes as it stops.
+     ///
+     /// The daemon-side descriptors are closed, not only shut down: on macOS a
+     /// `shutdown` while another descriptor of the socket is blocked in `read`
+     /// does not always reach the peer, while closing the last one does. Later
+     /// writes and resize wishes fail with `BrokenPipe`.
+     fn kill(&mut self) -> io::Result<()> {
+         let Some(hangup) = self.shared.hangup.lock().unwrap().take() else {
+             return Ok(());
+         };
+         // The timeout is per socket, so it also bounds a stalled `send`.
+         let _ = hangup.set_write_timeout(Some(KILL_WRITE_TIMEOUT));
+         if let Ok(mut writer) = self.shared.writer.try_lock()
+             && let Some(stream) = writer.as_mut()
+         {
+             let _ = write_frame(stream, KILL, &[]);
+         }
+         let _ = hangup.shutdown(std::net::Shutdown::Both);
+         drop(hangup);
+         // A write stalled behind the lock is woken by the shutdown (the send
+         // side is closed) and fails. Dropping the stream closes this side's
+         // last descriptor apart from the demux thread's, closed as it exits.
+         drop(self.shared.writer.lock().unwrap().take());
++        self.shared.mark_exited();
+         Ok(())
+     }
+ 
+     fn clone_killer(&self) -> Box<dyn ChildKiller + Send + Sync> {
+         Box::new(self.clone())
+     }
+ }
+ 
+ impl Child for VirtualChild {
+     fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
+         Ok((*self.shared.exited.lock().unwrap()).then_some(ExitStatus::with_exit_code(0)))
+     }
+ 
+     fn wait(&mut self) -> io::Result<ExitStatus> {
+         let mut exited = self.shared.exited.lock().unwrap();
+@@ -415,30 +425,31 @@ impl Child for VirtualChild {
+             exited = self.shared.exited_cv.wait(exited).unwrap();
+         }
+         Ok(ExitStatus::with_exit_code(0))
+     }
+ 
+     fn process_id(&self) -> Option<u32> {
+         None
+     }
+ }
+ 
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+     use std::os::unix::fs::PermissionsExt;
+     use std::os::unix::net::UnixListener;
++    use std::sync::atomic::{AtomicUsize, Ordering};
+     use std::sync::mpsc;
+     use std::thread::JoinHandle;
+ 
+     const SIZE_80X24: PtySize = PtySize { cols: 80, rows: 24, pixel_width: 0, pixel_height: 0 };
+     const WAIT: Duration = Duration::from_secs(10);
+ 
+     fn frame(kind: u8, payload: &[u8]) -> Vec<u8> {
+         let mut out = vec![kind];
+         out.extend_from_slice(&(payload.len() as u32).to_be_bytes());
+         out.extend_from_slice(payload);
+         out
+     }
+ 
+     fn size_frame(cols: u16, rows: u16) -> Vec<u8> {
+         let mut payload = cols.to_be_bytes().to_vec();
+@@ -794,30 +805,111 @@ mod tests {
+             let mut child = spawned.child;
+             child.kill().unwrap();
+             let saw_kill = within("app sees EOF after kill", move || app.join().unwrap());
+             assert!(saw_kill, "round {round}: no K before EOF");
+             let child = within("child.wait after kill", move || {
+                 assert!(child.wait().unwrap().success());
+                 child
+             });
+             drop(child);
+             let error = writer.write_all(b"late").unwrap_err();
+             assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
+             assert!(spawned.master.resize(PtySize { cols: 60, ..SIZE_80X24 }).is_err());
+         }
+     }
+ 
++    /// A killed terminal is gone even while the demux thread is blocked
++    /// writing a big snapshot into the full in-process pipe that nothing reads
++    /// (surface creation failed after `open`, or the mirror's reader stopped):
++    /// `wait` after `kill` returns, so the startup guard cannot hang. Dropping
++    /// the master then frees the demux, which closes the connection.
++    #[test]
++    fn kill_does_not_hang_with_undrained_pipe() {
++        const SNAPSHOT: usize = 1024 * 1024;
++        const CHUNK: usize = 4096;
++        let dir = SocketDir::new("undrained");
++        let sent = Arc::new(AtomicUsize::new(0));
++        let app = fake_app(&dir, (80, 24), {
++            let sent = sent.clone();
++            move |conn, _| {
++                let chunk = frame(OUTPUT, &[b'x'; CHUNK]);
++                for _ in 0..SNAPSHOT / CHUNK {
++                    if conn.write_all(&chunk).is_err() {
++                        break;
++                    }
++                    sent.fetch_add(CHUNK, Ordering::SeqCst);
++                }
++                while read_frame(conn).is_ok() {}
++            }
++        });
++        let (spawned, _handle) = open(&dir.spec(), SIZE_80X24, None).unwrap();
++        // The app's writes stall once the pipe and the socket are both full,
++        // that is once the demux is blocked writing into the pipe.
++        let deadline = Instant::now() + WAIT;
++        let mut last = 0;
++        loop {
++            std::thread::sleep(Duration::from_millis(300));
++            let now = sent.load(Ordering::SeqCst);
++            if now > 0 && now == last {
++                break;
++            }
++            assert!(Instant::now() < deadline, "the app's output never stalled");
++            last = now;
++        }
++        assert!(last < SNAPSHOT, "the pipe never filled ({last} bytes sent)");
++        let mut child = spawned.child;
++        let mut child = within("kill with undrained pipe", move || {
++            child.kill().unwrap();
++            child
++        });
++        let mut child = within("wait after kill with undrained pipe", move || {
++            assert!(child.wait().unwrap().success());
++            child
++        });
++        assert!(child.try_wait().unwrap().is_some());
++        drop(spawned.master);
++        within("app sees EOF once the master is gone", move || app.join().unwrap());
++    }
++
++    /// When the demux stops on its own (a protocol error, or `E`), it hangs up
++    /// at once: the app sees the end of stream while the daemon still holds
++    /// the terminal, instead of a half-open binding until the surface drops.
++    #[test]
++    fn protocol_error_hangs_up() {
++        let mut oversize = vec![OUTPUT];
++        oversize.extend_from_slice(&(MAX_FRAME as u32 + 1).to_be_bytes());
++        for (name, last) in [("oversize", oversize), ("exit", frame(EXIT, &[]))] {
++            for round in 0..20 {
++                let dir = SocketDir::new(&format!("hangup-{name}-{round}"));
++                let last = last.clone();
++                let app = fake_app(&dir, (80, 24), move |conn, _| {
++                    conn.write_all(&last).unwrap();
++                    while read_frame(conn).is_ok() {}
++                });
++                let (spawned, _handle) = open(&dir.spec(), SIZE_80X24, None).unwrap();
++                within(&format!("app sees EOF after {name}, round {round}"), move || {
++                    app.join().unwrap();
++                });
++                let mut child = spawned.child;
++                within("child ends after the demux stopped", move || {
++                    assert!(child.wait().unwrap().success());
++                });
++                drop(spawned.master);
++            }
++        }
++    }
++
+     #[test]
+     fn hello_carries_protocol_1() {
+         let dir = SocketDir::new("hello");
+         let app = fake_app(&dir, (80, 24), |conn, hello| {
+             while read_frame(conn).is_ok() {}
+             hello
+         });
+         let (spawned, _handle) = open(&dir.spec(), SIZE_80X24, Some("/tmp/project")).unwrap();
+         let mut child = spawned.child;
+         child.kill().unwrap();
+         let hello = app.join().unwrap();
+         assert_eq!(hello["protocol"], 1);
+         assert_eq!(hello["cols"], 80);
+         assert_eq!(hello["rows"], 24);
+         assert_eq!(hello["cwd"], "/tmp/project");

@@ -1,0 +1,507 @@
+# Task 6c review package
+f030e222b3 test(shellx-core): deterministic sealed-invite tamper tests
+f64ba9eadd test(shellx): e2e fails fast and scans logs for every secret; shellx-remote watches cmux-remote/relay
+55ebf4fff6 test(shellx-core): fake API enforces the registered device key on pairing requests (L4 R17/R13)
+commit f030e222b31051c24ff52f8b9b56edc7b33cd69c
+Author: Phu.le <phulealali@gmail.com>
+Date:   Mon Oct 19 06:37:14 2026 +0700
+
+    test(shellx-core): deterministic sealed-invite tamper tests
+    
+    The standard-alphabet case re-encoded a fresh random 93-byte blob with
+    STANDARD. 93 is a multiple of 3 (no padding), so whenever the URL-safe
+    string had no '-' or '_' (about (62/64)^124 = 2%) the "tampered" string was
+    byte-identical to the valid one and opened. Product code is correct.
+    Move that case onto the pinned known-answer blob, which contains '-', and
+    also check '/' and a positive control.
+
+ shellx-core/tests/seal.rs | 33 +++++++++++++++++++++++++++------
+ 1 file changed, 27 insertions(+), 6 deletions(-)
+
+commit d2fc908d8c833e5533c309920441562f140371ef
+Author: Phu.le <phulealali@gmail.com>
+Date:   Mon Oct 19 07:12:33 2026 +0700
+
+    wip(shellx): sprint paused 2026-10-19 07:11 — 2 unreviewed in-progress files + SDD state
+    
+    Stopped by the user mid-task. Code files in this commit are an implementer's
+    unfinished, unreviewed work: re-run their task's review loop before relying on
+    them. SDD ledger/briefs/reports copied to docs/superpowers/sprint-state/l5/
+    so another machine can resume (see docs/superpowers/HANDOFF-native-desktop.md).
+
+ scripts/shellx/remote-e2e/harness.py | 83 ++++++++++++++++++++++++++----------
+ tests/test_shellx_remote_e2e.py      | 12 +++++-
+ 2 files changed, 72 insertions(+), 23 deletions(-)
+commit f030e222b31051c24ff52f8b9b56edc7b33cd69c
+Author: Phu.le <phulealali@gmail.com>
+Date:   Mon Oct 19 06:37:14 2026 +0700
+
+    test(shellx-core): deterministic sealed-invite tamper tests
+    
+    The standard-alphabet case re-encoded a fresh random 93-byte blob with
+    STANDARD. 93 is a multiple of 3 (no padding), so whenever the URL-safe
+    string had no '-' or '_' (about (62/64)^124 = 2%) the "tampered" string was
+    byte-identical to the valid one and opened. Product code is correct.
+    Move that case onto the pinned known-answer blob, which contains '-', and
+    also check '/' and a positive control.
+
+diff --git a/shellx-core/tests/seal.rs b/shellx-core/tests/seal.rs
+index 2d574cec15..5f3a500819 100644
+--- a/shellx-core/tests/seal.rs
++++ b/shellx-core/tests/seal.rs
+@@ -1,24 +1,28 @@
+ //! Sealed enrollment invite (D4): public seal/open behaviour.
+ //! The byte-exact known-answer vector for `seal_with` lives in `src/seal.rs`
+ //! (it needs the crate-private fixed-randomness entry point); this file checks
+ //! that the public `open_invite` opens that same pinned blob.
+ 
+ use base64::Engine;
+ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+ use shellx_core::seal::{open_invite, seal_invite};
+ use x25519_dalek::{PublicKey, StaticSecret};
+ 
+ const URI: &str = "cmux://enroll/eyJ2ZXJzaW9uIjoxfQ";
+ const INVALID: &str = "sealed invite could not be opened";
++/// Pinned D4 vector (inputs in `seal::tests::known_answer_vector`).
++const KAT_REQUESTER_SECRET: &str = "5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb";
++const KAT_PAIRING_ID: &str = "pr_kat_0001";
++const KAT_SEALED: &str = "AYUg8AmJMKdUdIt93LQ-91oNvzoNJjga9OukqY6qm05qAAECAwQFBgcICQoLlzn2MBAYsyDPxNRUAW64gPy2CZQXpRG0oJez1dJum-jh9OHTHrIsXlx9S4EzCur9";
+ 
+ fn keypair() -> (StaticSecret, [u8; 32]) {
+     let mut raw = [0u8; 32];
+     getrandom::fill(&mut raw).unwrap();
+     let s = StaticSecret::from(raw);
+     let p = PublicKey::from(&s).to_bytes();
+     (s, p)
+ }
+ 
+ fn assert_invalid(s: &StaticSecret, pairing_id: &str, sealed: &str) {
+     let e = open_invite(s, pairing_id, sealed).unwrap_err();
+     assert_eq!(e.code, "invite_invalid");
+@@ -92,27 +96,28 @@ fn unknown_version_and_truncation_fail() {
+     for v in [0x00u8, 0x02, 0xff] {
+         let mut m = b.clone();
+         m[0] = v;
+         assert_invalid(&s, "pr_1", &enc(&m));
+     }
+     for n in [0, 1, 33, 45, 45 + 15, 45 + 16, b.len() - 1] {
+         assert_invalid(&s, "pr_1", &enc(&b[..n]));
+     }
+     // Appended byte.
+     let mut longer = b.clone();
+     longer.push(0);
+     assert_invalid(&s, "pr_1", &enc(&longer));
+-    // Not URL-safe no-pad base64: padding, standard alphabet, whitespace, garbage.
++    // Not URL-safe no-pad base64: padding, whitespace, garbage. (Standard alphabet:
++    // `standard_alphabet_is_refused`, on the pinned blob; a random blob's standard
++    // encoding is byte-identical to `c` whenever `c` has no '-' or '_'.)
+     assert_invalid(&s, "pr_1", &format!("{c}="));
+-    assert_invalid(&s, "pr_1", &base64::engine::general_purpose::STANDARD.encode(&b));
+     assert_invalid(&s, "pr_1", &format!(" {c}"));
+     assert_invalid(&s, "pr_1", &format!("{c}\n"));
+     assert_invalid(&s, "pr_1", "not base64 at all!");
+     assert_invalid(&s, "pr_1", "");
+     // Oversize input is refused before decoding (> 8192 raw bytes).
+     assert_invalid(&s, "pr_1", &enc(&vec![1u8; 8193]));
+     assert_invalid(&s, "pr_1", &"A".repeat(1 << 20));
+ }
+ 
+ #[test]
+ fn low_order_eph_pub_is_refused_on_open() {
+     let (s, p) = keypair();
+@@ -179,25 +184,41 @@ fn same_input_seals_differently() {
+     assert_ne!(a, b);
+     let (ra, rb) = (raw(&a), raw(&b));
+     assert_ne!(ra[1..33], rb[1..33], "fresh ephemeral key per seal");
+     assert_ne!(ra[33..45], rb[33..45], "fresh nonce per seal");
+     assert_eq!(&*open_invite(&s, "pr_1", &a).unwrap(), URI);
+     assert_eq!(&*open_invite(&s, "pr_1", &b).unwrap(), URI);
+ }
+ 
+ /// The pinned D4 vector (see `seal::tests::known_answer_vector` for every input)
+ /// opens through the public API with the fixed requester secret (RFC 7748 "Bob").
+ #[test]
+ fn known_answer_vector_opens() {
+-    let requester = StaticSecret::from(hex32("5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb"));
+-    let sealed = "AYUg8AmJMKdUdIt93LQ-91oNvzoNJjga9OukqY6qm05qAAECAwQFBgcICQoLlzn2MBAYsyDPxNRUAW64gPy2CZQXpRG0oJez1dJum-jh9OHTHrIsXlx9S4EzCur9";
+-    assert_eq!(&*open_invite(&requester, "pr_kat_0001", sealed).unwrap(), URI);
+-    assert_invalid(&requester, "pr_kat_0002", sealed);
++    let requester = StaticSecret::from(hex32(KAT_REQUESTER_SECRET));
++    assert_eq!(&*open_invite(&requester, KAT_PAIRING_ID, KAT_SEALED).unwrap(), URI);
++    assert_invalid(&requester, "pr_kat_0002", KAT_SEALED);
++}
++
++/// The same bytes in the standard base64 alphabet ('+' / '/') are refused. Uses
++/// the pinned blob because it contains URL-safe-only characters, so its standard
++/// encoding really differs; a fresh random blob has none ~2% of the time.
++#[test]
++fn standard_alphabet_is_refused() {
++    let requester = StaticSecret::from(hex32(KAT_REQUESTER_SECRET));
++    let b = raw(KAT_SEALED);
++    let standard = base64::engine::general_purpose::STANDARD.encode(&b);
++    assert!(standard.contains('+') && !standard.contains('='), "{standard}");
++    assert_ne!(standard, KAT_SEALED);
++    assert_invalid(&requester, KAT_PAIRING_ID, &standard);
++    // '/' (standard 63) where URL-safe has '-' (62): off-alphabet, refused.
++    assert_invalid(&requester, KAT_PAIRING_ID, &KAT_SEALED.replace('-', "/"));
++    // Control: the URL-safe original still opens.
++    assert_eq!(&*open_invite(&requester, KAT_PAIRING_ID, KAT_SEALED).unwrap(), URI);
+ }
+ 
+ fn hex32(h: &str) -> [u8; 32] {
+     let mut out = [0u8; 32];
+     for (i, b) in out.iter_mut().enumerate() {
+         *b = u8::from_str_radix(&h[2 * i..2 * i + 2], 16).unwrap();
+     }
+     out
+ }
+
+commit d2fc908d8c833e5533c309920441562f140371ef
+Author: Phu.le <phulealali@gmail.com>
+Date:   Mon Oct 19 07:12:33 2026 +0700
+
+    wip(shellx): sprint paused 2026-10-19 07:11 — 2 unreviewed in-progress files + SDD state
+    
+    Stopped by the user mid-task. Code files in this commit are an implementer's
+    unfinished, unreviewed work: re-run their task's review loop before relying on
+    them. SDD ledger/briefs/reports copied to docs/superpowers/sprint-state/l5/
+    so another machine can resume (see docs/superpowers/HANDOFF-native-desktop.md).
+
+diff --git a/scripts/shellx/remote-e2e/harness.py b/scripts/shellx/remote-e2e/harness.py
+index a9bbaf6c79..57ef9f5634 100644
+--- a/scripts/shellx/remote-e2e/harness.py
++++ b/scripts/shellx/remote-e2e/harness.py
+@@ -41,25 +41,27 @@ import urllib.request
+ from pathlib import Path
+ from typing import Callable, Optional
+ 
+ HERE = Path(__file__).resolve().parent
+ FAKE_APP = HERE / "fake_app.py"
+ ISSUER = "shellx-relay"
+ EMAIL = "e2e@shellx.test"
+ MIN_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"
+ # Stock cmux-relay serves /v1/relay and /ws (cmux-relay/src/relay.rs:244-245);
+ # production K2 serves /v2/relay behind its own front end (D6).
+ RELAY_PATH = "/v1/relay"
+ # Shortest wait between two mints of the same ticket (see start_ticket_refresher).
+-REFRESH_FLOOR = 0.25
++REFRESH_FLOOR = 0.1
++# Life a ticket file must keep beyond the next mint's expected latency.
++REFRESH_MARGIN = 0.5
+ 
+ TICKET_RE = re.compile(r"v2\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]*")
+ INVITE_RE = re.compile(r"cmux://enroll/[A-Za-z0-9_=-]+")
+ 
+ 
+ def wait_until(timeout: float, check: Callable[[], object], interval: float = 0.5) -> bool:
+     """Polls `check` until it returns something truthy or `timeout` seconds pass.
+     A `HarnessError` (a dead process) is re-raised at once; any other exception
+     counts as "not yet"."""
+     deadline = time.monotonic() + timeout
+     while True:
+         try:
+@@ -85,24 +87,40 @@ def relay_route(relay_url: str) -> str:
+     for plain, routed in (("wss://", "relay+wss://"), ("ws://", "relay+ws://")):
+         if relay_url.startswith(plain):
+             return routed + relay_url[len(plain):]
+     raise HarnessError(f"relay_url has an unexpected scheme ({relay_url.split(':', 1)[0]})")
+ 
+ 
+ def route_origin(route: str) -> str:
+     """`scheme://host:port` of a route: what cmux keeps of an invite route."""
+     scheme, rest = route.split("://", 1)
+     return f"{scheme}://{rest.split('/', 1)[0]}"
+ 
+ 
++def relay_credential_args(route: str, slot: str, ticket_file: str) -> list[str]:
++    """`remote connect` relay credentials for `route` and for its origin.
++
++    cmux keeps only `scheme://host:port` of an invite route
++    (identity.rs credential_free_route_hint), so an invite adds that origin as
++    a second route candidate carrying the invite's own static connect ticket
++    (remote_cli.rs start_connected: `relay_routes.entry(route).or_insert`). That
++    ticket was minted at pairing time; once it expires, a dial on that
++    candidate is refused (`invalid-ticket`) and cmux ends the client for good.
++    Naming the origin here too makes every candidate read the refreshed file."""
++    args = ["--relay-route", route, "--relay-slot", slot, "--relay-ticket-file", ticket_file]
++    if route_origin(route) != route:
++        args += ["--relay-route", route_origin(route), "--relay-slot", slot, "--relay-ticket-file", ticket_file]
++    return args
++
++
+ def invitation_id(uri: str) -> str:
+     """The `id` of a `cmux://enroll/<b64url(json)>` invite (identity.rs:106-125)."""
+     body = uri.strip().removeprefix("cmux://enroll/")
+     raw = base64.urlsafe_b64decode(body + "=" * (-len(body) % 4))
+     return json.loads(raw)["id"]
+ 
+ 
+ def mkdir_private(path: Path) -> Path:
+     path.mkdir(mode=0o700, parents=False, exist_ok=False)
+     os.chmod(path, 0o700)
+     return path
+ 
+@@ -144,25 +162,24 @@ class Machine:
+             "os_version": "e2e",
+             "platform": "macos",
+             "device_name": self.session,
+         })
+         self.machine_id = ""
+         self.slot = ""
+         self.relay_url = ""
+         self.invite_path: Optional[str] = None
+         self.refreshers: dict[str, tuple[threading.Event, threading.Thread, str]] = {}
+         self.daemon_runs = 0
+         self.core_lock = threading.Lock()
+         self.client_runs = 0
+-        self.client_started = 0.0
+         self.client_argv: list[str] = []
+ 
+     # shellx-core ---------------------------------------------------------
+     def core(self, method: str, **params) -> dict:
+         """Runs `shellx-core-cli <method> '<json>'` and returns the `ok` value.
+         Params can carry a password or an invite (the CLI takes argv only);
+         the harness logs the method and the result code, never params.
+ 
+         Calls on one machine are serialized: the state store assumes one
+         process owns a state dir (shellx-core store.rs sweep_stale_temps
+         removes other writers' temp files when a store opens), and every CLI
+         call is its own process. In the app one Core owns the dir."""
+@@ -188,50 +205,63 @@ class Machine:
+ 
+     def login(self) -> dict:
+         return self.core("auth.login", email=EMAIL, password=self.h.password)
+ 
+     def register(self) -> dict:
+         reg = self.core("machines.register", name=self.session, platform="macos",
+                         os_version="e2e", app_version="2.0.0")
+         self.machine_id, self.slot = reg["machine_id"], reg["slot"]
+         return reg
+ 
+     def start_ticket_refresher(self, write_to: str, permission: str, target: Optional[str] = None) -> str:
+         """Mints one ticket into `<core>/tickets/<write_to>` now, then keeps it
+-        fresh from a thread: mint, then sleep max(REFRESH_FLOOR, (exp - now) / 2).
+-
+-        The plan's floor was 1 s. With 2 s tickets whose expiry is a whole
+-        second, a fresh ticket has 1-2 s left, so a 1 s floor leaves the file
+-        holding an expired ticket for the length of one mint every few
+-        cycles, and cmux treats a relay rejection as fatal for a connecting
+-        client (cmux-remote provider/relay.rs relay_rejection). Refreshing at
+-        half-life keeps at least ~0.5 s of life in the file."""
++        fresh from a thread: the next mint starts at half the remaining life,
++        or earlier so that it finishes (slowest of the last mints) with at
++        least REFRESH_MARGIN of life left in the file; never sooner than
++        REFRESH_FLOOR.
++
++        With 2 s tickets whose expiry is a whole second, a fresh ticket has
++        1-2 s left, and cmux treats an expired ticket as fatal (the relay's
++        `invalid-ticket` becomes "relay rejected the authenticated operation",
++        cmux-remote provider/relay.rs relay_authentication_error and
++        relay_rejection). Pure half-life scheduling, measured after the mint
++        returns, left the file expired for most of a slow mint (seen at 0.6-7 s
++        under load: the relay refused a connect ticket 0.4 s past its expiry
++        that the next mint replaced 1.3 s later)."""
+         if write_to in self.refreshers:
+             return self.refreshers[write_to][2]
+         params = {"permission": permission, "write_to": write_to}
+         if target:
+             params["target_machine_id"] = target
++        started = time.monotonic()
+         first = self.core("tickets.mint", **params)
++        first_latency = time.monotonic() - started
+         self.relay_url = first["relay_url"]
+         stop = threading.Event()
+ 
+-        def loop(expires_at: float) -> None:
+-            while not stop.wait(max(REFRESH_FLOOR, (expires_at - time.time()) / 2)):
++        def loop(expires_at: float, latency: float) -> None:
++            recent = [latency]
++            while True:
++                left = expires_at - time.time()
++                if stop.wait(max(REFRESH_FLOOR, min(left / 2, left - max(recent) - REFRESH_MARGIN))):
++                    return
++                started = time.monotonic()
+                 try:
+                     expires_at = float(self.core("tickets.mint", **params)["expires_at_unix"])
+                 except Exception as error:  # API briefly unreachable: retry in 1 s
+                     self.h.note(f"refresher {self.name}/{write_to}: {type(error).__name__}")
+                     expires_at = time.time() + 2
++                recent = (recent + [time.monotonic() - started])[-5:]
+ 
+-        thread = threading.Thread(target=loop, args=(float(first["expires_at_unix"]),),
++        thread = threading.Thread(target=loop, args=(float(first["expires_at_unix"]), first_latency),
+                                   name=f"tickets-{self.name}-{write_to}", daemon=True)
+         thread.start()
+         self.refreshers[write_to] = (stop, thread, first["path"])
+         return first["path"]
+ 
+     def stop_refreshers(self) -> None:
+         for stop, _, _ in self.refreshers.values():
+             stop.set()
+         for _, thread, _ in self.refreshers.values():
+             thread.join(timeout=70)
+         self.refreshers.clear()
+ 
+@@ -464,25 +494,25 @@ class Harness:
+         return inv
+ 
+     def connect_viewer(self, viewer: Machine, host: Machine) -> None:
+         """`cmux-tui remote connect` through the relay with the sealed invite and
+         a refreshed connect ticket. Returns once the host sees the pending
+         enrollment."""
+         if not viewer.invite_path:
+             raise HarnessError("pair() first")
+         ticket = viewer.start_ticket_refresher("connect.ticket", "connect", target=host.machine_id)
+         route = relay_route(viewer.relay_url)
+         viewer.client_argv = [
+             str(self.bin / "cmux-tui"), "remote", "connect", route,
+-            "--relay-slot", host.slot, "--relay-ticket-file", ticket, "--state-dir", str(viewer.cstate),
++            *relay_credential_args(route, host.slot, ticket), "--state-dir", str(viewer.cstate),
+             "--local-socket", str(viewer.client_sock), "--headless", "--device-name", viewer.session]
+         argv = [*viewer.client_argv[:4], "--invite-file", viewer.invite_path, *viewer.client_argv[4:]]
+         viewer.client_runs += 1
+         proc = self._spawn(f"client-{viewer.name}-{viewer.client_runs}", argv, self.env(viewer))
+         self.viewer = viewer
+ 
+         def pending() -> bool:
+             if proc.poll() is not None:
+                 raise HarnessError("client exited")
+             return bool(self.host_cli(host, "remote", "enroll", "pending", "--json"))
+ 
+         if not wait_until(90, pending):
+@@ -496,54 +526,63 @@ class Harness:
+         viewer = self._need_viewer()
+         if not wait_until(90, lambda: viewer.client_sock.exists() and self.viewer_ok("workspace", "list", "--json")):
+             raise HarnessError("viewer did not come up after approval")
+         if viewer.invite_path and os.path.exists(viewer.invite_path):
+             os.unlink(viewer.invite_path)
+         viewer.invite_path = None
+         self._supervise_client(viewer, host)
+ 
+     def _supervise_client(self, viewer: Machine, host: Machine) -> None:
+         """What the ShellX app does for its viewer (Task 12): when `remote
+         connect` ends, start it again as an enrolled device (no invite, the
+         daemon pinned in the client state dir), with the ticket file the
+-        refresher keeps fresh, on a 1, 2, 4, 8, 16, 30 s backoff. Upstream ends
+-        the client when the daemon restarted and lost its logical session."""
++        refresher keeps fresh, on a 1, 2, 4, 8, 16, 30 s backoff that restarts
++        at 1 s once a client has connected (LinkStateMachine: `attempt = 0` on
++        `.connected`). Upstream ends the client when the daemon restarted and
++        lost its logical session, and on any relay rejection."""
+         fingerprint = self.host_cli(host, "remote", "enroll", "status", "--json")["daemon_fingerprint"]
+         argv = [*viewer.client_argv[:4], "--daemon", fingerprint, *viewer.client_argv[4:]]
+         backoff = (1, 2, 4, 8, 16, 30)
++        ready_line = str(viewer.client_sock).encode()  # headless `remote connect` prints it once connected
+ 
+         def loop() -> None:
+             attempt = 0
++            seen_connected = viewer.client_runs  # the invite client is connected (approve_pending waited)
+             while not self._stopping.is_set():
+-                proc = self._proc(f"client-{viewer.name}-{viewer.client_runs}")
++                name = f"client-{viewer.name}-{viewer.client_runs}"
++                proc = self._proc(name)
++                if seen_connected != viewer.client_runs:
++                    try:
++                        if ready_line in (self.log_dir / f"{name}.log").read_bytes():
++                            seen_connected = viewer.client_runs
++                            self.note(f"client {viewer.name} connected")
++                    except OSError:
++                        pass
++                if seen_connected == viewer.client_runs:
++                    attempt = 0
+                 if proc is not None and proc.poll() is None:
+                     self._stopping.wait(0.2)
+                     continue
+-                started = viewer.client_started
+-                if time.monotonic() - started > 30:
+-                    attempt = 0
+                 delay = backoff[min(attempt, len(backoff) - 1)]
+                 self.note(f"client {viewer.name} ended (rc={proc.returncode if proc else None}); "
+                           f"restart in {delay} s")
+                 if self._stopping.wait(delay):
+                     return
+                 attempt += 1
+                 with self._proc_lock:
+                     if self._stopping.is_set():
+                         return
+                     viewer.client_runs += 1
+-                    viewer.client_started = time.monotonic()
+                     self._spawn(f"client-{viewer.name}-{viewer.client_runs}", argv, self.env(viewer))
+ 
+-        viewer.client_started = time.monotonic()
+         self._supervisor = threading.Thread(target=loop, name=f"client-{viewer.name}", daemon=True)
+         self._supervisor.start()
+ 
+     def _need_viewer(self) -> Machine:
+         if self.viewer is None:
+             raise HarnessError("connect_viewer() first")
+         return self.viewer
+ 
+     def viewer_cli(self, *args: str) -> str:
+         viewer = self._need_viewer()
+         return self._tui_ok(viewer, ["--socket", str(viewer.client_sock), *args])
+ 
+diff --git a/tests/test_shellx_remote_e2e.py b/tests/test_shellx_remote_e2e.py
+index fbbd241227..9da24567e0 100644
+--- a/tests/test_shellx_remote_e2e.py
++++ b/tests/test_shellx_remote_e2e.py
+@@ -26,24 +26,25 @@ from pathlib import Path
+ ROOT = Path(__file__).resolve().parents[1]
+ sys.path.insert(0, str(ROOT / "scripts" / "shellx" / "remote-e2e"))
+ 
+ from harness import Harness, wait_until  # noqa: E402
+ 
+ BUILD = (
+     "(cd cmux-tui && CARGO_INCREMENTAL=0 cargo build -p cmux-tui -p cmux-relay --locked) && "
+     "(cd shellx-core && CARGO_INCREMENTAL=0 cargo build --workspace --locked), then run with "
+     "SHELLX_E2E_BIN=$PWD/cmux-tui/target/debug SHELLX_E2E_CORE_BIN=$PWD/shellx-core/target/debug"
+ )
+ NEEDS = {"SHELLX_E2E_BIN": ("cmux-tui", "cmux-relay"), "SHELLX_E2E_CORE_BIN": ("shellx-core-cli", "shellx-fake-api")}
+ ENROLL_TEST = "test_enroll_via_sealed_invite_and_view"
++RECONNECT_BUDGET = 120  # seconds; see test_reconnect_after_relay_restart_with_2s_tickets
+ 
+ 
+ def missing_binaries() -> list[str]:
+     missing = []
+     for env, names in NEEDS.items():
+         base = os.environ.get(env, "")
+         for name in names:
+             if not base or not os.access(os.path.join(base, name), os.X_OK):
+                 missing.append(f"{env}/{name}")
+     return missing
+ 
+ 
+@@ -101,23 +102,32 @@ class RemoteE2E(unittest.TestCase):
+         self.h.approve_pending(self.host, inv)
+         ws = self.h.viewer_cli("workspace", "create", "--name", "e2e", "--json")
+         term = self.h.first_terminal()
+         self.assertIn("SHELLX-FAKE-APP", self.h.viewer_cli("terminal", term, "screen", "read"))
+ 
+     def test_vietnamese_round_trip(self):                                    # Review Focus 4
+         self.h.viewer_cli("terminal", self.term, "write", "--text", "tiếng Việt\r")
+         self.assertTrue(self.h.fake_app_input().endswith(bytes.fromhex("7469e1babf6e672056 69e1bb8774 0d".replace(" ", ""))))
+ 
+     def test_reconnect_after_relay_restart_with_2s_tickets(self):            # Review Focus 2 (ticket_ttl=2)
+         self.h.stop_relay(); time.sleep(5)           # every ticket written before the outage has expired
+         self.h.start_relay()                          # same port + secret
+-        self.assertTrue(wait_until(45, lambda: self.h.viewer_ok("terminal", "list", "--json")))
++        started = time.monotonic()
++        # Upstream cmux, not the harness, sets the pace: the daemon's relay lease ends at its
++        # ticket's whole-second expiry (1-2 s here) and it re-registers only after a registration
++        # backoff that doubles to 5 s and never resets (cmux-remote provider/relay.rs
++        # run_registration_loop), so with 2 s tickets it is reachable ~1 s in every ~6-7 s. A new
++        # viewer connection must land in such a window from the client's own 0-5 s jittered retry.
++        # 45 s was not always enough: CI run 39175354906 ended with the viewer still dialling.
++        self.assertTrue(wait_until(RECONNECT_BUDGET, lambda: self.h.viewer_ok("terminal", "list", "--json")),
++                        f"viewer did not reconnect within {RECONNECT_BUDGET} s")
++        self.h.note(f"viewer reconnected {time.monotonic() - started:.1f} s after the relay restart")
+         for log in self.h.logs(): self.assertNotRegex(log, r"v2\.[A-Za-z0-9_-]{20,}\.")   # no ticket in any log
+ 
+     def test_enrolled_device_reconnects_after_daemon_restart(self):
+         self.h.restart_host_daemon(self.host)         # same --remote-state-dir, fresh --ephemeral mux
+         self.assertTrue(wait_until(45, lambda: self.h.viewer_ok("workspace", "list", "--json")))
+         self.assertEqual(self.h.host_cli(self.host, "remote", "enroll", "pending", "--json"), [])
+ 
+ 
+ if __name__ == "__main__":
+     unittest.main()
