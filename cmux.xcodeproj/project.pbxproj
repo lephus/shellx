@@ -2945,6 +2945,7 @@
 		D7AB12048000000000000005 /* RemoteInteractiveShellBootstrapBuilder+WorkingDirectory.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7AB12048000000000000004 /* RemoteInteractiveShellBootstrapBuilder+WorkingDirectory.swift */; };
 		A5001643 /* RemoteInteractiveShellBootstrapBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001642 /* RemoteInteractiveShellBootstrapBuilder.swift */; };
 		B9000028A1B2C3D4E5F60719 /* RemoteInteractiveShellBootstrapBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001642 /* RemoteInteractiveShellBootstrapBuilder.swift */; };
+		59A0EF9FC63A4CA36EF3F83F /* RemoteLinkBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45F3355FE7BE8DE9DC2D13CA /* RemoteLinkBanner.swift */; };
 		D0C0D0C0D0C0D0C0D0C00003 /* RemoteLoopbackRuntimeBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0C0D0C0D0C0D0C0D0C00004 /* RemoteLoopbackRuntimeBridge.swift */; };
 		E30790000000000000000004 /* RemotePTYBridgeStrings+App.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30790000000000000000003 /* RemotePTYBridgeStrings+App.swift */; };
 		B11049000000000000000003 /* RemoteRelayTmuxCompatAuthorizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B11049000000000000000004 /* RemoteRelayTmuxCompatAuthorizationTests.swift */; };
@@ -7535,6 +7536,7 @@
 		835000000000000000000005 /* RemoteInitialCommandBootstrapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteInitialCommandBootstrapTests.swift; sourceTree = "<group>"; };
 		D7AB12048000000000000004 /* RemoteInteractiveShellBootstrapBuilder+WorkingDirectory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RemoteInteractiveShellBootstrapBuilder+WorkingDirectory.swift"; sourceTree = "<group>"; };
 		A5001642 /* RemoteInteractiveShellBootstrapBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteInteractiveShellBootstrapBuilder.swift; sourceTree = "<group>"; };
+		45F3355FE7BE8DE9DC2D13CA /* RemoteLinkBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/UI/RemoteLinkBanner.swift; sourceTree = "<group>"; };
 		D0C0D0C0D0C0D0C0D0C00004 /* RemoteLoopbackRuntimeBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteLoopbackRuntimeBridge.swift; sourceTree = "<group>"; };
 		E30790000000000000000003 /* RemotePTYBridgeStrings+App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RemotePTYBridgeStrings+App.swift"; sourceTree = "<group>"; };
 		B11049000000000000000004 /* RemoteRelayTmuxCompatAuthorizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteRelayTmuxCompatAuthorizationTests.swift; sourceTree = "<group>"; };
@@ -12419,6 +12421,7 @@
 				5E13C3000000000000000021 /* RequestAccessSheet.swift */,
 				E2D4C55521BBD77F79C0171A /* ApprovalPromptPanel.swift */,
 				F6F9F17AA1307DF7546262BA /* ApprovalPromptController.swift */,
+				45F3355FE7BE8DE9DC2D13CA /* RemoteLinkBanner.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -16371,6 +16374,7 @@
 				835000000000000000000001 /* RemoteInitialCommandBootstrap.swift in Sources */,
 				D7AB12048000000000000003 /* RemoteInteractiveShellBootstrapBuilder+WorkingDirectory.swift in Sources */,
 				A5001643 /* RemoteInteractiveShellBootstrapBuilder.swift in Sources */,
+				59A0EF9FC63A4CA36EF3F83F /* RemoteLinkBanner.swift in Sources */,
 				D0C0D0C0D0C0D0C0D0C00003 /* RemoteLoopbackRuntimeBridge.swift in Sources */,
 				E30790000000000000000004 /* RemotePTYBridgeStrings+App.swift in Sources */,
 				A5001640 /* RemoteRelayZshBootstrap.swift in Sources */,

@@ -22,6 +22,11 @@ import ShellXRemoteCore
 /// disabled and the core would refuse it with `fingerprint_mismatch`).
 /// Approve and Deny remove the request from `pendingApprovals`. DEBUG only:
 /// nothing here approves a request on the real service's behalf.
+/// Link banner (U4): opening a session tags the selected workspace as a
+/// remote workspace of that machine, then walks the machine's link through
+/// the banner states, one step per open: connecting, reconnecting (with a
+/// countdown, then it gives up and goes offline); connecting, failed;
+/// connecting, connected (no banner); and around again.
 @MainActor
 final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing {
     static let requestCode = "123456"
@@ -31,6 +36,8 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
     static let approveDelay: UInt64 = 400_000_000
     static let approvalDelay: UInt64 = 4_000_000_000
     static let expiryDelay: UInt64 = 6_000_000_000
+    /// How long the fixture's reconnecting banner counts down before it gives up.
+    static let reconnectCountdown: TimeInterval = 10
 
     @Published private(set) var machines: [RemoteMachine] = []
     @Published private(set) var pendingApprovals: [PairingRequest] = []
@@ -41,6 +48,7 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
 
     private let now: () -> Date
     private var requestCounts: [RemoteMachine.ID: Int] = [:]
+    private var openCounts: [RemoteMachine.ID: Int] = [:]
 
     init(now: @escaping () -> Date = { Date() }) {
         self.now = now
@@ -144,9 +152,30 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
         guard let machine = machines.first(where: { $0.id == machineID }), machine.online else {
             throw ShellXCoreError(code: "offline", message: "machine is offline")
         }
+        // ShellX: the selected workspace stands in for the remote session (banner, U4).
+        if let workspaceID = AppDelegate.shared?.tabManager?.selectedTabId {
+            remoteWorkspaces[workspaceID] = machineID
+        }
+        let step = openCounts[machineID, default: 0] % 3
+        openCounts[machineID] = step + 1
         update(machineID) { $0.link = .connecting }
         try? await Task.sleep(nanoseconds: 800_000_000)
-        update(machineID) { $0.link = .connected(localSocket: "/tmp/shellx-fixture.sock") }
+        switch step {
+        case 0:
+            let retryAt = now().addingTimeInterval(Self.reconnectCountdown)
+            let reconnecting = LinkState.reconnecting(attempt: 1, retryAt: retryAt)
+            update(machineID) { $0.link = reconnecting }
+            try? await Task.sleep(nanoseconds: UInt64(Self.reconnectCountdown * 1_000_000_000))
+            // Gives up unless the link changed meanwhile (sign-out).
+            let gaveUpAt = now()
+            update(machineID) { machine in
+                if machine.link == reconnecting { machine.link = .offline(lastSeen: gaveUpAt) }
+            }
+        case 1:
+            update(machineID) { $0.link = .failed(code: "network") }
+        default:
+            update(machineID) { $0.link = .connected(localSocket: "/tmp/shellx-fixture.sock") }
+        }
     }
 
     func signIn(email: String, password: String) async throws {
@@ -170,6 +199,7 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
         outgoing = []
         pendingApprovals = []
         requestCounts = [:]
+        openCounts = [:]
         remoteWorkspaces = [:]
         isSignedIn = false
     }

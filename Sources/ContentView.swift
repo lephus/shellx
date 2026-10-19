@@ -1846,6 +1846,9 @@ struct ContentView: View {
                             )
                         }
                     )
+                    // ShellX: offline/reconnecting banner above remote workspaces (W2 Task U4);
+                    // shows the workspace as it is while the remote UI is off.
+                    .shellXRemoteLinkBanner(workspaceID: tab.id, isSelected: isSelectedWorkspace)
                     .opacity(isSelectedWorkspace ? 1 : 0)
                     .allowsHitTesting(isSelectedWorkspace)
                     .accessibilityHidden(!isSelectedWorkspace)
