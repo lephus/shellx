@@ -12,11 +12,16 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../CmuxSudoBroker"),
+        // coolicons behind ShellXIcon (spec §7.4); the CLI never links this package.
+        .package(path: "../../Shared/ShellXBrand"),
     ],
     targets: [
         .target(
             name: "CmuxSudoBrokerUI",
-            dependencies: ["CmuxSudoBroker"],
+            dependencies: [
+                "CmuxSudoBroker",
+                .product(name: "ShellXIcons", package: "ShellXBrand"),
+            ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
                 .enableUpcomingFeature("ExistentialAny"),

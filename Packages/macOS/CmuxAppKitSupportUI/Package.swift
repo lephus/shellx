@@ -26,6 +26,7 @@ let package = Package(
                 "CmuxFoundation",
                 "CmuxWorkspaces",
                 .product(name: "ShellXBrand", package: "ShellXBrand"),
+                .product(name: "ShellXIcons", package: "ShellXBrand"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
@@ -35,7 +36,10 @@ let package = Package(
         ),
         .testTarget(
             name: "CmuxAppKitSupportUITests",
-            dependencies: ["CmuxAppKitSupportUI"],
+            dependencies: [
+                "CmuxAppKitSupportUI",
+                .product(name: "ShellXIcons", package: "ShellXBrand"),
+            ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
                 .enableUpcomingFeature("ExistentialAny"),

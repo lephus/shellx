@@ -3339,6 +3339,7 @@
 		96351C316291EC669B8DF2DC /* ShellXAboutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157337FA38DA052318228A89 /* ShellXAboutTests.swift */; };
 		5E11A00000000000000000A2 /* ShellXBrand in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000A1 /* ShellXBrand */; };
 		5E11A00000000000000000A3 /* ShellXBrand in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000A1 /* ShellXBrand */; };
+		5E11A00000000000000000B2 /* ShellXIcons in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000B1 /* ShellXIcons */; };
 		B2C68350F29BD5759B40BE98 /* ShellXThemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B157E03C649BE0CB191F7C8 /* ShellXThemeTests.swift */; };
 		1521D55DC63D5E5FC4955E31 /* ShortcutAndCommandPaletteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6083A7DAD962E287FC2FFE94 /* ShortcutAndCommandPaletteTests.swift */; };
 		76027A12C93B4538BF22C71E /* ShortcutBareStartRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB7F2E9143904957AAA70726 /* ShortcutBareStartRouting.swift */; };
@@ -9305,6 +9306,7 @@
 				A5001290 /* MarkdownUI in Frameworks */,
 				A5001270 /* PostHog in Frameworks */,
 				5E11A00000000000000000A2 /* ShellXBrand in Frameworks */,
+				5E11A00000000000000000B2 /* ShellXIcons in Frameworks */,
 				A5001230 /* Sparkle in Frameworks */,
 				F20F85FC5900550685FA33AD /* StackAuth in Frameworks */,
 			);
@@ -14093,6 +14095,7 @@
 				A13296000000000000000101 /* CmuxWorkspacePresence */,
 				A1329A000000000000000101 /* CmuxTerminalSizing */,
 				5E11A00000000000000000A1 /* ShellXBrand */,
+				5E11A00000000000000000B1 /* ShellXIcons */,
 				A1329B000000000000000101 /* CmuxTerminalSharing */,
 				A5001231 /* Sparkle */,
 				A5001271 /* PostHog */,
@@ -20549,6 +20552,7 @@
 		A13296000000000000000101 /* CmuxWorkspacePresence */ = {isa = XCSwiftPackageProductDependency; package = A13296000000000000000100 /* XCLocalSwiftPackageReference "CmuxWorkspacePresence" */; productName = CmuxWorkspacePresence; };
 		A1329A000000000000000101 /* CmuxTerminalSizing */ = {isa = XCSwiftPackageProductDependency; package = A1329A000000000000000100 /* XCLocalSwiftPackageReference "CmuxTerminalSizing" */; productName = CmuxTerminalSizing; };
 		5E11A00000000000000000A1 /* ShellXBrand */ = {isa = XCSwiftPackageProductDependency; package = 5E11A00000000000000000A0 /* XCLocalSwiftPackageReference "ShellXBrand" */; productName = ShellXBrand; };
+		5E11A00000000000000000B1 /* ShellXIcons */ = {isa = XCSwiftPackageProductDependency; package = 5E11A00000000000000000A0 /* XCLocalSwiftPackageReference "ShellXBrand" */; productName = ShellXIcons; };
 		A1329B000000000000000101 /* CmuxTerminalSharing */ = {isa = XCSwiftPackageProductDependency; package = A1329B000000000000000100 /* XCLocalSwiftPackageReference "CmuxTerminalSharing" */; productName = CmuxTerminalSharing; };
 		79E4513469FB44C7A3690415 /* CmuxCloudMachines */ = {isa = XCSwiftPackageProductDependency; package = 3915DFE5FE794CDF87D746C9 /* XCLocalSwiftPackageReference "CmuxCloudMachines" */; productName = CmuxCloudMachines; };
 		800100000000000000000202 /* CmuxHive */ = {

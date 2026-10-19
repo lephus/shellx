@@ -16,12 +16,15 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../CmuxFoundation"),
+        // coolicons behind ShellXIcon (spec §7.4); the CLI never links this package.
+        .package(path: "../../Shared/ShellXBrand"),
     ],
     targets: [
         .target(
             name: "CmuxFeedback",
             dependencies: [
                 "CmuxFoundation",
+                .product(name: "ShellXIcons", package: "ShellXBrand"),
             ],
             resources: [
                 // Folded from CmuxFeedbackUI: the composer's localized strings.

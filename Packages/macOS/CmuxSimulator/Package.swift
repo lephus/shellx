@@ -14,6 +14,8 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../CmuxFoundation"),
+        // coolicons for CmuxSimulatorUI only; the CLI links the CmuxSimulator product.
+        .package(path: "../../Shared/ShellXBrand"),
     ],
     targets: [
         .target(
@@ -52,6 +54,7 @@ let package = Package(
                 "CmuxSimulator",
                 "CmuxSimulatorSystem",
                 .product(name: "CmuxFoundation", package: "CmuxFoundation"),
+                .product(name: "ShellXIcons", package: "ShellXBrand"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
