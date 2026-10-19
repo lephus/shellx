@@ -39,9 +39,12 @@ ShellXClientLinkSupervisor, ShellXTicketRefresher, ReconnectBackoff):
 (c) The app mints a fresh ticket before every spawn (LinkStateMachine
     mintTicket); the harness only relies on the refresher keeping the file
     fresh and does not mint on each restart.
-The daemon side is the app's: every daemon spawn runs `server stop --force` for
-the session first, then `server start` with the app's argv (`server_stop_argv`,
-`server_start_argv`), and the enroll commands name the admin socket.
+The daemon argv is the app's (`server_stop_argv`, `server_start_argv`) and the
+enroll commands name the admin socket. The order around the register ticket
+differs, see (c): the app runs `server stop --force`, mints, then `server
+start`; the harness mints once, when it starts the host's ticket refresher
+before the first daemon, and runs `server stop --force` right before every
+`server start`.
 
 Run as a script, it serves a running ShellX app instead of fake_app.py (the
 live check of plan Task 11 Step 4):
@@ -51,8 +54,8 @@ live check of plan Task 11 Step 4):
 
 It starts relay, fake API, the host daemon on the app's bridge socket and a
 paired, connected viewer, prints the viewer CLI and the live-check commands
-(no secrets), and cleans up on Ctrl-C or SIGTERM. It needs no file in the repo
-other than this directory, so it runs from any working directory.
+(no secrets), and cleans up on Ctrl-C, SIGTERM or SIGHUP. It needs no file in
+the repo other than this directory, so it runs from any working directory.
 """
 
 from __future__ import annotations
@@ -104,8 +107,9 @@ INVITE_RE = re.compile(r"cmux://enroll/[A-Za-z0-9_=-]+")
 
 def wait_until(timeout: float, check: Callable[[], object], interval: float = 0.5) -> bool:
     """Polls `check` until it returns something truthy or `timeout` seconds pass.
-    A `HarnessError` (a dead process) is re-raised at once; any other exception
-    counts as "not yet"."""
+    A `HarnessError` (a dead process) is re-raised at once; any other Exception
+    counts as "not yet". A BaseException that is not an Exception (`Stopped`,
+    KeyboardInterrupt) always goes through."""
     deadline = time.monotonic() + timeout
     while True:
         try:
@@ -230,6 +234,11 @@ def server_stop_argv(cmux_tui: str, session: str, mux_socket: str) -> list[str]:
     return [cmux_tui, "server", "stop", "--session", session, "--socket", mux_socket, "--force"]
 
 
+def enroll_flags(session: str, state_dir: str, admin_socket: str) -> list[str]:
+    """What Swift RemoteCommandLine.enroll adds to every `remote enroll` call."""
+    return ["--session", session, "--state-dir", state_dir, "--admin-socket", admin_socket]
+
+
 def session_daemon_pids(ps_output: str, session: str, mux_socket: str) -> list[int]:
     """Pids of the live `cmux-tui server start --session <session> --socket
     <mux_socket>` processes in `ps -A -ww -o pid=,stat=,args=` output. The mux
@@ -329,24 +338,42 @@ class MintStats:
         self.maximum = max(self.maximum, latency)
 
 
+class MacEnv:
+    """HOME, TMPDIR and XDG_RUNTIME_DIR of one Mac user session, for two ShellX
+    installs on one Mac (Review Focus 1: the Release and a tagged debug build)."""
+
+    def __init__(self, root: Path) -> None:
+        self.dir = mkdir_private(root)
+        self.home = mkdir_private(self.dir / "home")
+        self.tmp = mkdir_private(self.dir / "tmp")
+        self.runtime_dir = mkdir_private(self.dir / "run")
+
+
 class Machine:
     """One ShellX install: its own shellx-core state dir (0700) and
-    SHELLX_CORE_CONFIG, cmux-tui state dirs and sockets.
+    SHELLX_CORE_CONFIG, cmux-tui state dirs and sockets. Its HOME, TMPDIR and
+    XDG_RUNTIME_DIR are its own unless `env` (a MacEnv shared with another
+    install on the same Mac) is given; every path the install names explicitly
+    (`paths()`) is its own either way.
 
     The refreshers and the two `remote connect` argvs differ from the app in
     three test-only ways, listed in the module docstring (a second origin
     relay-route triple on the invite spawn, a latency-aware refresher, no mint
     before every spawn)."""
 
-    def __init__(self, harness: "Harness", name: str) -> None:
+    def __init__(self, harness: "Harness", name: str, env: Optional[MacEnv] = None) -> None:
         self.h = harness
         self.name = name
         self.session = f"e2e-{name}"
         self.dir = mkdir_private(harness.root / name)
         self.core_dir = mkdir_private(self.dir / "core")
-        self.home = mkdir_private(self.dir / "home")
-        self.tmp = mkdir_private(self.dir / "tmp")
-        self.run_dir = mkdir_private(self.dir / "run")
+        self.run_dir = mkdir_private(self.dir / "run")   # this install's sockets
+        if env is None:
+            self.home = mkdir_private(self.dir / "home")
+            self.tmp = mkdir_private(self.dir / "tmp")
+            self.runtime_dir = self.run_dir
+        else:
+            self.home, self.tmp, self.runtime_dir = env.home, env.tmp, env.runtime_dir
         self.dstate = mkdir_private(self.dir / "d")  # daemon --remote-state-dir
         self.cstate = mkdir_private(self.dir / "c")  # client --state-dir
         self.bridge_dir = mkdir_private(self.dir / "b")
@@ -380,16 +407,20 @@ class Machine:
         self.last_stop_rc: Optional[int] = None  # `server stop` before the latest daemon spawn
 
     def paths(self) -> dict[str, Path]:
-        """Every file system path this machine uses (Review Focus 1: no two
-        machines may share one)."""
+        """Every file system path this install names explicitly (Review Focus 1:
+        no two installs may share one, even on one Mac)."""
         return {
             "dir": self.dir, "core_dir": self.core_dir, "tickets": self.core_dir / "tickets",
-            "home": self.home, "tmp": self.tmp, "run_dir": self.run_dir, "dstate": self.dstate,
+            "run_dir": self.run_dir, "dstate": self.dstate,
             "cstate": self.cstate, "bridge_dir": self.bridge_dir, "bridge_sock": self.bridge_sock,
             "mux_sock": self.mux_sock, "admin_sock": self.admin_sock, "link_sock": self.link_sock,
             "client_sock": self.client_sock, "app_input_log": self.app_input_log,
             "app_events_log": self.app_events_log,
         }
+
+    def env_dirs(self) -> dict[str, Path]:
+        """HOME, TMPDIR and XDG_RUNTIME_DIR: shared by installs on one Mac."""
+        return {"home": self.home, "tmp": self.tmp, "runtime_dir": self.runtime_dir}
 
     # shellx-core ---------------------------------------------------------
     def core(self, method: str, **params) -> dict:
@@ -533,7 +564,7 @@ class Harness:
     # plumbing ------------------------------------------------------------
     def env(self, machine: Optional[Machine] = None, extra: Optional[dict] = None) -> dict:
         home, tmp = (machine.home, machine.tmp) if machine else (self.home, self.tmp)
-        run_dir = machine.run_dir if machine else self.tmp
+        run_dir = machine.runtime_dir if machine else self.tmp
         env = {
             "HOME": str(home),
             "TMPDIR": f"{tmp}/",
@@ -644,8 +675,12 @@ class Harness:
         if not wait_until(30, lambda: proc.poll() is None and "listening" in log.read_text(), 0.2):
             raise HarnessError(f"fake API did not start (rc={proc.poll()})")
 
-    def machine(self, name: str) -> Machine:
-        machine = Machine(self, name)
+    def mac_env(self, name: str) -> MacEnv:
+        """A HOME, TMPDIR and XDG_RUNTIME_DIR for installs that share one Mac."""
+        return MacEnv(self.root / name)
+
+    def machine(self, name: str, env: Optional[MacEnv] = None) -> Machine:
+        machine = Machine(self, name, env)
         self.machines[name] = machine
         return machine
 
@@ -659,8 +694,7 @@ class Harness:
 
     @staticmethod
     def _enroll_flags(host: Machine) -> list[str]:
-        """What Swift RemoteCommandLine.enroll adds to every `remote enroll` call."""
-        return ["--session", host.session, "--state-dir", str(host.dstate), "--admin-socket", str(host.admin_sock)]
+        return enroll_flags(host.session, str(host.dstate), str(host.admin_sock))
 
     def start_fake_app(self, host: Machine) -> None:
         """fake_app.py on the host's bridge socket; its banner names the host
@@ -680,13 +714,15 @@ class Harness:
         host.app_external = True
 
     def start_host_daemon(self, host: Machine) -> None:
-        """The app's daemon spawn (ShellXDaemonSupervisor): `server stop --force`
-        for this session first (a daemon left by a crash or force quit, Review
-        Focus 5; status ignored, kept in `host.last_stop_rc`), then `cmux-tui
-        server start` with the app's argv (patched daemon, virtual PTY via
-        CMUX_SHELLX_BRIDGE_SOCKET) registered at the relay with a refreshed
-        register ticket. The fake app is started first unless the host serves
-        a real app. Returns once `remote enroll status` answers."""
+        """The app's daemon spawn (ShellXDaemonSupervisor), in this order: the
+        fake app (unless the host serves a real app); the register ticket
+        refresher (minted once, on the host's first daemon; the app mints after
+        the stop, before every start); `server stop --force` for this session
+        (a daemon left by a crash or force quit, Review Focus 5; status ignored,
+        kept in `host.last_stop_rc`); then `cmux-tui server start` with the
+        app's argv (patched daemon, virtual PTY via CMUX_SHELLX_BRIDGE_SOCKET)
+        registered at the relay with the refreshed ticket. Returns once
+        `remote enroll status` answers."""
         self.start_fake_app(host)
         ticket = host.start_ticket_refresher("register.ticket", "register")
         route = relay_route(host.relay_url)
@@ -746,7 +782,8 @@ class Harness:
     def session_daemon_pids(self, host: Machine) -> list[int]:
         """Live `cmux-tui server start --session <session>` processes on this
         host's mux socket (this harness only), from `ps`."""
-        out = subprocess.run(["ps", "-A", "-ww", "-o", "pid=,stat=,args="], capture_output=True, text=True,
+        out = subprocess.run(["ps", "-A", "-ww", "-o", "pid=,stat=,args="], env={"PATH": MIN_PATH, "LC_ALL": "C"},
+                             cwd=self.root, stdin=subprocess.DEVNULL, capture_output=True, text=True,
                              check=True, timeout=30).stdout
         return session_daemon_pids(out, host.session, str(host.mux_sock))
 
@@ -922,7 +959,18 @@ class Harness:
         return self._tui_ok(self._need_viewer(viewer), self.viewer_argv(viewer, *args))
 
     def viewer_ok(self, *args: str, viewer: Optional[Machine] = None) -> bool:
-        return self._tui(self._need_viewer(viewer), self.viewer_argv(viewer, *args), 20).returncode == 0
+        """True if the viewer CLI command exits 0 within 20 s (a timeout is False)."""
+        viewer = self._need_viewer(viewer)
+        try:
+            return self._tui(viewer, self.viewer_argv(viewer, *args), 20).returncode == 0
+        except subprocess.TimeoutExpired:
+            self.note(f"tui {viewer.name} --socket {' '.join(args[:2])} -> timeout")
+            return False
+
+    def process_log(self, name: str) -> str:
+        """The output of the harness process `name` (its log file), redacted."""
+        path = self.log_dir / f"{name}.log"
+        return self.redact(path.read_text(errors="replace")) if path.exists() else ""
 
     def first_terminal(self, viewer: Optional[Machine] = None) -> str:
         """Id of the first terminal the viewer sees (waits for one to appear)."""
@@ -1063,7 +1111,16 @@ def parse_cli(argv: Sequence[str], environ: Mapping[str, str]) -> argparse.Names
     args = parser.parse_args(list(argv))
     if not args.bin or not args.core_bin:
         parser.error("--bin and --core-bin (or SHELLX_E2E_BIN and SHELLX_E2E_CORE_BIN) are required")
+    args.app_bridge = os.path.abspath(os.path.expanduser(args.app_bridge))
     return args
+
+
+def missing_binaries(bin_dir: str, core_bin_dir: str) -> list[str]:
+    """The binaries `--app-bridge` needs that are not executable files."""
+    needed = [(bin_dir, "cmux-tui"), (bin_dir, "cmux-relay"),
+              (core_bin_dir, "shellx-core-cli"), (core_bin_dir, "shellx-fake-api")]
+    return [os.path.join(base, name) for base, name in needed
+            if not (os.path.isfile(os.path.join(base, name)) and os.access(os.path.join(base, name), os.X_OK))]
 
 
 def viewer_cli_prefix(cmux_tui: str, env: Mapping[str, str], client_socket: str) -> list[str]:
@@ -1088,8 +1145,13 @@ def live_check_lines(prefix: Sequence[str], terminal_id: str) -> list[str]:
     ]
 
 
-class Stopped(Exception):
-    """Ctrl-C or SIGTERM in `main`."""
+class Stopped(BaseException):
+    """Ctrl-C, SIGTERM or SIGHUP in `main`. A BaseException like
+    KeyboardInterrupt, so that `wait_until` (any Exception is "not yet") and
+    other `except Exception` let it through."""
+
+
+STOP_SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
 
 
 def _raise_stopped(*_) -> None:
@@ -1097,16 +1159,21 @@ def _raise_stopped(*_) -> None:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    """`--app-bridge`: exits 0 when stopped by Ctrl-C or SIGTERM once the viewer
-    is up, 130 when stopped before, 1 when the setup failed or the daemon
-    exited, 2 on a usage error. Every process and the harness dir are removed
-    in all cases."""
+    """`--app-bridge`: exits 0 when stopped by Ctrl-C, SIGTERM or SIGHUP once
+    the viewer is up, 130 when stopped before, 1 when the setup failed or the
+    daemon exited, 2 on a usage error, a missing binary or a bridge path that
+    is not a socket (nothing is started then). Every process and the harness
+    dir are removed in all cases."""
     args = parse_cli(sys.argv[1:] if argv is None else argv, os.environ)
-    bridge = Path(args.app_bridge).expanduser()
+    bridge = Path(args.app_bridge)
     if not is_socket(bridge):
         print(f"harness.py: {bridge} is not a socket (is the ShellX app running with the bridge on?)", file=sys.stderr)
         return 2
-    for sig in (signal.SIGINT, signal.SIGTERM):
+    missing = missing_binaries(args.bin, args.core_bin)
+    if missing:
+        print(f"harness.py: not executable: {', '.join(missing)}", file=sys.stderr)
+        return 2
+    for sig in STOP_SIGNALS:
         signal.signal(sig, _raise_stopped)
     h = Harness(args.bin, args.core_bin, ticket_ttl=args.ticket_ttl)
     ready = False
@@ -1143,7 +1210,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         h.dump_logs(sys.stderr)
         return 1
     finally:
-        for sig in (signal.SIGINT, signal.SIGTERM):
+        for sig in STOP_SIGNALS:
             signal.signal(sig, signal.SIG_IGN)   # cleanup is not interrupted
         h.close()
         print("harness.py: stopped and cleaned up", file=sys.stderr)

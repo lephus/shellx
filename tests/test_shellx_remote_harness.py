@@ -10,8 +10,18 @@ schedule, the "connected" line, and the CI annotation chunking.
 
 from __future__ import annotations
 
+import contextlib
+import io
+import os
 import re
+import shlex
+import signal
+import socket
+import stat
+import subprocess
 import sys
+import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -99,8 +109,8 @@ class EnrolledArgv(unittest.TestCase):
 
     def test_flags_follow_the_swift_source(self):
         source = (ROOT / "Packages/Shared/ShellXBrand/Sources/ShellXRemoteCore/RemoteCommandLine.swift").read_text()
-        body = source[source.index("public static func connect("):]
-        body = body[:body.index("/// Pane patience")]
+        start = source.index("public static func connect(")
+        body = source[start:source.index("\n\n", start)]          # the function, up to the next blank line
         swift_flags = re.findall(r'"(--[a-z-]+)"', body)
         harness_flags = [a for a in enrolled_argv() if a.startswith("--")]
         self.assertEqual([f for f in swift_flags if f != "--invite-file"], harness_flags)
@@ -109,13 +119,15 @@ class EnrolledArgv(unittest.TestCase):
 SWIFT = ROOT / "Packages/Shared/ShellXBrand/Sources/ShellXRemoteCore/RemoteCommandLine.swift"
 
 
-def swift_array(function: str) -> list[str]:
-    """The argv array literal a `RemoteCommandLine.<function>(...)` returns, element by element:
-    a string literal as its value, anything else (`paths.session`, `route`) as its Swift text."""
+def swift_array(function: str, index: int = 0) -> list[str]:
+    """The `index`th array literal in the body of `RemoteCommandLine.<function>(...)` (the body
+    runs to the next blank line), element by element: a string literal as its value, anything
+    else (`paths.session`, `route`) as its Swift text."""
     source = SWIFT.read_text()
-    body = source[source.index(f"public static func {function}("):]
+    start = source.index(f"static func {function}(")
+    body = source[start:source.index("\n\n", start)]
     body = body[body.index("{") + 1:]
-    literal = body[body.index("[") + 1:body.index("]")]
+    literal = re.findall(r"\[([^\[\]]*)\]", body)[index]
     return [item[1:-1] if item.startswith('"') else item
             for item in (part.strip() for part in literal.split(",")) if item]
 
@@ -133,6 +145,12 @@ class ServerArgv(unittest.TestCase):
             CMUX, "paths.session", "paths.muxSocket.path", "paths.daemonStateDir.path", "paths.adminSocket.path",
             "paths.linkSocket.path", "route", "slot", "ticketFile.path")
         self.assertEqual(argv, [CMUX, *swift_array("serverStart")])
+
+    def test_enroll_flags_are_the_swift_enroll_flags(self):
+        # RemoteCommandLine.enroll: ["remote", "enroll", action] + positional + [these] + extra + json.
+        self.assertEqual(swift_array("enroll", 0), ["remote", "enroll", "action"])
+        self.assertEqual(harness.enroll_flags("paths.session", "paths.daemonStateDir.path", "paths.adminSocket.path"),
+                         swift_array("enroll", 1))
 
     def test_stop_names_the_session_and_its_mux_socket_and_forces(self):
         argv = harness.server_stop_argv(CMUX, "e2e-host", "/h/run/mux.sock")
@@ -192,8 +210,23 @@ class MachinePaths(unittest.TestCase):
             others = [m for m in self.machines if m is not machine]
             for key, path in machine.paths().items():
                 for other in others:
-                    self.assertFalse(Path(path).is_relative_to(other.dir) if hasattr(Path, "is_relative_to")
-                                     else str(path).startswith(str(other.dir) + "/"), f"{machine.name}.{key}")
+                    self.assertFalse(Path(path).is_relative_to(other.dir), f"{machine.name}.{key}")
+
+    def test_separate_machines_have_separate_environments(self):
+        self.assertEqual(len({tuple(m.env_dirs().values()) for m in self.machines}), len(self.machines))
+
+    def test_two_instances_on_one_mac_share_the_environment_not_the_paths(self):
+        # Two ShellX builds on one Mac (Review Focus 1): one HOME, TMPDIR and XDG_RUNTIME_DIR,
+        # every explicit path their own.
+        mac = self.h.mac_env("mac")
+        one, two = self.h.machine("one", env=mac), self.h.machine("two", env=mac)
+        self.assertEqual(one.env_dirs(), two.env_dirs())
+        for key in ("HOME", "TMPDIR", "XDG_RUNTIME_DIR"):
+            self.assertEqual(self.h.env(one)[key], self.h.env(two)[key], key)
+        self.assertNotEqual(self.h.env(one)["HOME"], self.h.env(self.machines[0])["HOME"])
+        self.assertFalse({str(p) for p in one.paths().values()} & {str(p) for p in two.paths().values()})
+        for path in list(one.paths().values()) + list(two.paths().values()):
+            self.assertFalse(Path(path).is_relative_to(mac.dir), path)
 
     def test_every_socket_and_the_daemon_dirs_are_per_machine(self):
         names = {"bridge_sock", "mux_sock", "admin_sock", "link_sock", "client_sock", "dstate", "cstate", "core_dir"}
@@ -204,6 +237,42 @@ class MachinePaths(unittest.TestCase):
 
     def test_sessions_are_distinct(self):
         self.assertEqual(len({m.session for m in self.machines}), len(self.machines))
+
+    def test_a_viewer_cli_timeout_is_not_ok(self):
+        def timeout(*_args, **_kwargs):
+            raise subprocess.TimeoutExpired("cmux-tui", 20)
+        self.h.viewer = self.machines[2]
+        self.h._tui = timeout
+        self.assertFalse(self.h.viewer_ok("terminal", "list", "--json"))
+
+
+class StopSignal(unittest.TestCase):
+    """--app-bridge's Ctrl-C/SIGTERM/SIGHUP must stop setup too: `wait_until` treats any
+    Exception as "not yet", so the stop must not be one."""
+
+    def test_stopped_is_a_base_exception(self):
+        self.assertTrue(issubclass(harness.Stopped, BaseException))
+        self.assertFalse(issubclass(harness.Stopped, Exception))
+
+    def test_wait_until_lets_stopped_through(self):
+        def check():
+            raise harness.Stopped
+        started = time.monotonic()
+        with self.assertRaises(harness.Stopped):
+            harness.wait_until(30, check, 0.05)
+        self.assertLess(time.monotonic() - started, 5)
+
+    def test_a_stop_signal_during_wait_until_propagates(self):
+        self.assertEqual(set(harness.STOP_SIGNALS), {signal.SIGINT, signal.SIGTERM, signal.SIGHUP})
+        for sig in (signal.SIGTERM, signal.SIGHUP):
+            previous = signal.signal(sig, harness._raise_stopped)
+            try:
+                started = time.monotonic()
+                with self.assertRaises(harness.Stopped):
+                    harness.wait_until(30, lambda: os.kill(os.getpid(), sig) or False, 0.05)
+                self.assertLess(time.monotonic() - started, 5)
+            finally:
+                signal.signal(sig, previous)
 
 
 class AppBridgeCli(unittest.TestCase):
@@ -219,9 +288,48 @@ class AppBridgeCli(unittest.TestCase):
                                   "--ticket-ttl", "30"], self.ENV)
         self.assertEqual((args.bin, args.core_bin, args.ticket_ttl), ("/x/bin", "/x/core", 30))
 
+    def test_the_bridge_path_is_made_absolute(self):
+        args = harness.parse_cli(["--app-bridge", "sx-1/bridge.sock"], self.ENV)
+        self.assertEqual(args.app_bridge, os.path.join(os.getcwd(), "sx-1/bridge.sock"))
+        args = harness.parse_cli(["--app-bridge", "~/sx-1/bridge.sock"], self.ENV)
+        self.assertEqual(args.app_bridge, os.path.join(os.path.expanduser("~"), "sx-1/bridge.sock"))
+        self.assertTrue(os.path.isabs(args.app_bridge))
+
+    def test_missing_binaries_are_named(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tui = Path(tmp) / "cmux-tui"
+            tui.write_text("#!/bin/sh\n")
+            tui.chmod(0o755)
+            (Path(tmp) / "cmux-relay").write_text("not executable")
+            self.assertEqual(harness.missing_binaries(tmp, tmp),
+                             [f"{tmp}/cmux-relay", f"{tmp}/shellx-core-cli", f"{tmp}/shellx-fake-api"])
+
+    def test_main_refuses_missing_binaries_before_starting_anything(self):
+        sock_dir = tempfile.mkdtemp(prefix="sxt-", dir="/tmp")   # short: sun_path
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        created = []
+        original = harness.Harness
+        harness.Harness = lambda *args, **kwargs: created.append(args) or original(*args, **kwargs)
+        try:
+            server.bind(f"{sock_dir}/bridge.sock")
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                rc = harness.main(["--app-bridge", f"{sock_dir}/bridge.sock", "--bin", sock_dir, "--core-bin", sock_dir])
+            self.assertEqual(rc, 2)
+            self.assertIn("cmux-tui", err.getvalue())
+            self.assertIn("shellx-fake-api", err.getvalue())
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(harness.main(["--app-bridge", f"{sock_dir}/none.sock", "--bin", sock_dir,
+                                               "--core-bin", sock_dir]), 2)    # not a socket
+            self.assertEqual(created, [])                                       # nothing was started
+        finally:
+            harness.Harness = original
+            server.close()
+            for name in os.listdir(sock_dir):
+                os.unlink(os.path.join(sock_dir, name))
+            os.rmdir(sock_dir)
+
     def test_missing_bridge_or_bins_is_a_usage_error(self):
-        import contextlib
-        import io
         for argv, env in ((["--bin", "/b", "--core-bin", "/c"], {}), (["--app-bridge", "/b.sock"], {}),
                           (["--app-bridge", "/b.sock", "--bin", "/b"], {})):
             with self.assertRaises(SystemExit) as raised, contextlib.redirect_stderr(io.StringIO()):
@@ -229,7 +337,6 @@ class AppBridgeCli(unittest.TestCase):
             self.assertEqual(raised.exception.code, 2, argv)
 
     def test_live_check_commands(self):
-        import shlex
         env = {"HOME": "/tmp/sx-1/viewer/home", "PATH": harness.MIN_PATH, "LANG": "en_US.UTF-8"}
         prefix = harness.viewer_cli_prefix("/e/bin/cmux-tui", env, "/tmp/sx-1/viewer/run/client.sock")
         self.assertEqual(prefix, ["env", "-i", "HOME=/tmp/sx-1/viewer/home", f"PATH={harness.MIN_PATH}",
@@ -424,7 +531,6 @@ class AnnotateLog(unittest.TestCase):
             self.assertLess(len(command.encode()), 64 * 1024)
 
     def test_every_harness_dump_starts_with_the_marker(self):
-        import io
         h = harness.Harness("/nonexistent/bin", "/nonexistent/core")
         try:
             out = io.StringIO()
@@ -445,11 +551,6 @@ class AnnotateLog(unittest.TestCase):
         self.assertEqual(len(commands), 1)
 
     def test_main_prints_commands_and_survives_a_missing_log(self):
-        import contextlib
-        import io
-        import os
-        import tempfile
-
         out = io.StringIO()
         with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stdout(out):
             path = os.path.join(tmp, "e2e.log")
