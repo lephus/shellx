@@ -1,0 +1,42 @@
+[package]
+name = "shellx-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "shellx-desktop"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+async-channel = "2"
+cmux-pty = { path = "../../cmux-tui/crates/cmux-pty" }
+ghostty-vt = { path = "../../cmux-tui/crates/ghostty-vt" }
+shellx-core = { path = "../../shellx-core" }
+shellx-model = { path = "../shellx-model" }
+shellx-remote = { path = "../shellx-remote" }
+serde_json = { workspace = true }
+
+# GPUI from crates.io, pinned exactly. Default features are off so gpui does
+# not embed its own manifest resource (ours carries the icon + manifest);
+# the Windows backend (Direct3D 11 + DirectWrite) is not feature-gated.
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
+# GetTimeZoneInformation (local offset for "lần cuối HH:MM") and
+# SystemParametersInfoW(SPI_GETSCREENREADER) (screen-reader window title);
+# 0.61 is already in the tree through gpui's dependencies.
+windows-sys = { version = "0.61", features = [
+    "Win32_System_Time",
+    "Win32_UI_WindowsAndMessaging",
+] }
+gpui = { version = "=0.2.2", default-features = false }
+
+[build-dependencies]
+embed-resource = "3"
+
+[dev-dependencies]
+shellx-fake-api = { path = "../../shellx-core/fake-api" }
+tempfile = "3"

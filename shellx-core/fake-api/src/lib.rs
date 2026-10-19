@@ -24,7 +24,8 @@
 //! digits unique among the target's live pending requests, `requester_fingerprint`
 //! copied from the requester machine row, pending expires after 300 s (reported
 //! lazily as `expired`), a new (from, to) request supersedes the old pending one,
-//! `role=target` items carry `requester_x25519_b64` (standard base64, D2),
+//! items of both roles carry `requester_x25519_b64` (standard base64, D2/R13), a
+//! request whose key is not the requester machine's registered one is 400 (D1/R17),
 //! `sealed_invite_b64` is returned verbatim to the requester only once approved,
 //! approve is target-only, refuses plaintext `cmux://` and grants `connect`.
 
@@ -645,6 +646,11 @@ fn create_pairing(rec: &Recorded, st: &mut State) -> Reply {
     let Some(key) = b["requester_x25519_b64"].as_str().and_then(decode_any_b64).filter(|k| k.len() == 32) else {
         return Reply::error(400, "bad_request", "requester_x25519_b64 must be a 32-byte key");
     };
+    // D1, enforced as the real server does (relay/src/v2/pairings.ts:103): the
+    // key must be the requester machine's registered one.
+    if URL_SAFE_NO_PAD.decode(&st.machines[from].noise_public_key_b64).ok().as_deref() != Some(key.as_slice()) {
+        return Reply::error(400, "bad_request", "Malformed request body");
+    }
     let now = now_unix();
     // Supersede an older pending request with the same (from, to).
     for p in st.pairings.values_mut() {
@@ -713,9 +719,7 @@ fn list_pairings(rec: &Recorded, st: &State) -> Reply {
                 "code": p.code,
                 "status": status,
             });
-            if role == "target"
-                && let Some(k) = &p.requester_x25519
-            {
+            if let Some(k) = &p.requester_x25519 {
                 v["requester_x25519_b64"] = json!(STANDARD.encode(k));
             }
             if (role == "requester" || st.list_all_pairings)

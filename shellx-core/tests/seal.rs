@@ -10,6 +10,10 @@ use x25519_dalek::{PublicKey, StaticSecret};
 
 const URI: &str = "cmux://enroll/eyJ2ZXJzaW9uIjoxfQ";
 const INVALID: &str = "sealed invite could not be opened";
+/// Pinned D4 vector (inputs in `seal::tests::known_answer_vector`).
+const KAT_REQUESTER_SECRET: &str = "5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb";
+const KAT_PAIRING_ID: &str = "pr_kat_0001";
+const KAT_SEALED: &str = "AYUg8AmJMKdUdIt93LQ-91oNvzoNJjga9OukqY6qm05qAAECAwQFBgcICQoLlzn2MBAYsyDPxNRUAW64gPy2CZQXpRG0oJez1dJum-jh9OHTHrIsXlx9S4EzCur9";
 
 fn keypair() -> (StaticSecret, [u8; 32]) {
     let mut raw = [0u8; 32];
@@ -101,9 +105,10 @@ fn unknown_version_and_truncation_fail() {
     let mut longer = b.clone();
     longer.push(0);
     assert_invalid(&s, "pr_1", &enc(&longer));
-    // Not URL-safe no-pad base64: padding, standard alphabet, whitespace, garbage.
+    // Not URL-safe no-pad base64: padding, whitespace, garbage. (Standard alphabet:
+    // `standard_alphabet_is_refused`, on the pinned blob; a random blob's standard
+    // encoding is byte-identical to `c` whenever `c` has no '-' or '_'.)
     assert_invalid(&s, "pr_1", &format!("{c}="));
-    assert_invalid(&s, "pr_1", &base64::engine::general_purpose::STANDARD.encode(&b));
     assert_invalid(&s, "pr_1", &format!(" {c}"));
     assert_invalid(&s, "pr_1", &format!("{c}\n"));
     assert_invalid(&s, "pr_1", "not base64 at all!");
@@ -188,10 +193,26 @@ fn same_input_seals_differently() {
 /// opens through the public API with the fixed requester secret (RFC 7748 "Bob").
 #[test]
 fn known_answer_vector_opens() {
-    let requester = StaticSecret::from(hex32("5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb"));
-    let sealed = "AYUg8AmJMKdUdIt93LQ-91oNvzoNJjga9OukqY6qm05qAAECAwQFBgcICQoLlzn2MBAYsyDPxNRUAW64gPy2CZQXpRG0oJez1dJum-jh9OHTHrIsXlx9S4EzCur9";
-    assert_eq!(&*open_invite(&requester, "pr_kat_0001", sealed).unwrap(), URI);
-    assert_invalid(&requester, "pr_kat_0002", sealed);
+    let requester = StaticSecret::from(hex32(KAT_REQUESTER_SECRET));
+    assert_eq!(&*open_invite(&requester, KAT_PAIRING_ID, KAT_SEALED).unwrap(), URI);
+    assert_invalid(&requester, "pr_kat_0002", KAT_SEALED);
+}
+
+/// The same bytes in the standard base64 alphabet ('+' / '/') are refused. Uses
+/// the pinned blob because it contains URL-safe-only characters, so its standard
+/// encoding really differs; a fresh random blob has none ~2% of the time.
+#[test]
+fn standard_alphabet_is_refused() {
+    let requester = StaticSecret::from(hex32(KAT_REQUESTER_SECRET));
+    let b = raw(KAT_SEALED);
+    let standard = base64::engine::general_purpose::STANDARD.encode(&b);
+    assert!(standard.contains('+') && !standard.contains('='), "{standard}");
+    assert_ne!(standard, KAT_SEALED);
+    assert_invalid(&requester, KAT_PAIRING_ID, &standard);
+    // '/' (standard 63) where URL-safe has '-' (62): off-alphabet, refused.
+    assert_invalid(&requester, KAT_PAIRING_ID, &KAT_SEALED.replace('-', "/"));
+    // Control: the URL-safe original still opens.
+    assert_eq!(&*open_invite(&requester, KAT_PAIRING_ID, KAT_SEALED).unwrap(), URI);
 }
 
 fn hex32(h: &str) -> [u8; 32] {

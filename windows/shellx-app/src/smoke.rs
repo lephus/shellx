@@ -1,0 +1,642 @@
+//! `--smoke`: headless check of the same Session the window uses. Starts an
+//! interactive PowerShell on ConPTY, types a command through the same input
+//! path as the window (committed text + libghostty-vt-encoded Enter), waits
+//! for the computed result in the libghostty-vt grid, resizes, and exits.
+//! Exit code 0 = pass. No window is opened.
+//!
+//! Then the pane checks: a `Tabs` model with two splits and a second tab,
+//! one real shell per pane through `workspace::PaneHost` (the window's code
+//! path), closed in an order that walks PaneClosed (shell `exit`, then the
+//! Ctrl+Shift+W path) -> TabClosed -> Respawned. After every step the live
+//! shells must equal the model's panes, and every dropped pane's shell must
+//! have exited within 5 s.
+//!
+//! `--smoke-ui-assets` (also run first by `--smoke`): every icon the window
+//! loads is embedded and is an SVG, and every shell string exists in vi + en.
+
+use std::sync::mpsc;
+use std::time::{Duration, Instant};
+
+use anyhow::{Context as _, Result, bail, ensure};
+use shellx_model::layout::{Axis, PaneId};
+use shellx_model::tabs::{CloseOutcome, PaneTarget, Tabs};
+
+use crate::fonts;
+use crate::icons::{self, Icon};
+use crate::local_pty::{ExitProbe, LocalPty, default_shell, spawn_reader};
+use crate::shell_info::SHELL_STRINGS;
+use crate::term_core::{PtyLink, TermCore, rgb};
+use crate::workspace::{PaneHost, model_panes, spawn_local_pane};
+use shellx_model::palette::TERM_BG;
+use shellx_model::selection::to_crlf;
+use shellx_model::strings::{Lang, t};
+
+const TIMEOUT: Duration = Duration::from_secs(45);
+/// A dropped pane's shell must be gone within this.
+const EXIT_TIMEOUT: Duration = Duration::from_secs(5);
+
+struct Pump {
+    rx: mpsc::Receiver<Vec<u8>>,
+    closed: bool,
+}
+
+impl Pump {
+    /// Feed output until `done(lines)` holds or the deadline passes.
+    fn until(
+        &mut self,
+        session: &mut TermCore,
+        what: &str,
+        mut done: impl FnMut(&[String]) -> bool,
+    ) -> Result<Vec<String>> {
+        let deadline = Instant::now() + TIMEOUT;
+        loop {
+            let lines = session.text_lines()?;
+            if done(&lines) {
+                return Ok(lines);
+            }
+            if Instant::now() > deadline {
+                dump(&lines);
+                bail!("timed out waiting for {what}");
+            }
+            if self.closed {
+                std::thread::sleep(Duration::from_millis(100));
+                continue;
+            }
+            match self.rx.recv_timeout(Duration::from_millis(100)) {
+                Ok(bytes) => {
+                    session.feed(&bytes);
+                    while let Ok(more) = self.rx.try_recv() {
+                        session.feed(&more);
+                    }
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Disconnected) => self.closed = true,
+            }
+        }
+    }
+}
+
+fn dump(lines: &[String]) {
+    eprintln!("---- grid ----");
+    for line in lines.iter().filter(|l| !l.is_empty()) {
+        eprintln!("{line}");
+    }
+    eprintln!("--------------");
+}
+
+fn contains(lines: &[String], needle: &str) -> bool {
+    lines.iter().any(|line| line.contains(needle))
+}
+
+fn has_prompt(lines: &[String]) -> bool {
+    lines
+        .iter()
+        .any(|l| l.trim_end().ends_with('>') || l.contains("PS "))
+}
+
+/// `-NoProfile` keeps the runner's profile out of the results.
+fn smoke_shell_args(program: &str) -> Vec<&'static str> {
+    if program.to_ascii_lowercase().contains("powershell") || program.contains("pwsh") {
+        vec!["-NoProfile"]
+    } else {
+        Vec::new()
+    }
+}
+
+/// Cross-platform, no GPUI: the icon table and the shell strings.
+pub fn ui_assets() -> Result<()> {
+    for icon in Icon::ALL {
+        let Some(bytes) = icons::by_path(icon.path()) else {
+            bail!("{icon:?}: {} is not embedded", icon.path());
+        };
+        ensure!(
+            icons::looks_like_svg(bytes),
+            "{icon:?}: {} is not an SVG with a viewBox",
+            icon.path()
+        );
+    }
+    for lang in [Lang::Vi, Lang::En] {
+        for s in SHELL_STRINGS {
+            ensure!(!t(lang, *s).trim().is_empty(), "{s:?} is empty in {lang:?}");
+        }
+    }
+    println!(
+        "smoke-ui-assets: {} icons, {} strings x 2 languages",
+        Icon::ALL.len(),
+        SHELL_STRINGS.len()
+    );
+    println!("smoke-ui-assets: PASS");
+    Ok(())
+}
+
+/// Cross-platform, no GPUI: the window's paste, IME-commit and copy paths
+/// (`TermView` calls exactly these `TermCore` methods) over a recording
+/// link. Paste with mode 2004 on is ONE bracketed write with the embedded
+/// end marker stripped; an IME commit is ONE write of the composed UTF-8;
+/// copy reads the cells through libghostty (wide chars) with CRLF joins.
+pub fn input_paths() -> Result<()> {
+    #[derive(Default)]
+    struct Recorder(std::sync::Mutex<Vec<Vec<u8>>>);
+    impl PtyLink for Recorder {
+        fn write(&self, bytes: &[u8]) {
+            self.0.lock().unwrap().push(bytes.to_vec());
+        }
+        fn resize(&self, _: u16, _: u16, _: u32, _: u32) -> Result<()> {
+            Ok(())
+        }
+        fn is_closed(&self) -> bool {
+            false
+        }
+    }
+    let link = std::sync::Arc::new(Recorder::default());
+    let mut core = TermCore::new(link.clone(), 80, 24)?;
+    let writes = || link.0.lock().unwrap().clone();
+    core.feed(b"\x1b[?2004h");
+    ensure!(core.bracketed_paste(), "mode 2004 not set");
+    core.paste("echo a\x1b[201~b\n");
+    ensure!(
+        writes() == vec![b"\x1b[200~echo ab\r\x1b[201~".to_vec()],
+        "bracketed paste: {:?}",
+        writes()
+    );
+    core.send_text("ti\u{1ebf}ng Vi\u{1ec7}t");
+    let viet = [
+        0x74, 0x69, 0xe1, 0xba, 0xbf, 0x6e, 0x67, 0x20, 0x56, 0x69, 0xe1, 0xbb, 0x87, 0x74,
+    ];
+    ensure!(
+        writes().len() == 2 && writes()[1] == viet,
+        "IME commit: {:?}",
+        writes()
+    );
+    core.feed("ab\u{6f22}\u{5b57}c\r\nok".as_bytes());
+    let copied = core.selection_text((0, 0), (1, 1)).map(|t| to_crlf(&t));
+    ensure!(
+        copied.as_deref() == Some("ab\u{6f22}\u{5b57}c\r\nok"),
+        "copy: {copied:?}"
+    );
+    println!("smoke-input: bracketed paste, IME commit (one UTF-8 write), copy ok");
+    Ok(())
+}
+
+/// Cross-platform, no GPUI: shellx-core links and answers over a temp state
+/// dir. No network is touched (a logged-out core fails before any request).
+pub fn core_bridge() -> Result<()> {
+    use shellx_model::core_api::{CoreCall, CoreConfig, config_set, list_machines};
+    let dir = std::env::temp_dir().join(format!("shellx-smoke-core-{}", std::process::id()));
+    let bridge = crate::core_bridge::CoreBridge::new();
+    config_set(
+        &bridge,
+        &CoreConfig {
+            api_base: "https://relay.shellx.pro".into(),
+            state_dir: dir.to_string_lossy().into_owned(),
+            app_version: shellx_model::VERSION.into(),
+            os_version: crate::os_info::os_version(),
+            device_name: crate::os_info::device_name(),
+        },
+    )
+    .map_err(|e| anyhow::anyhow!("config.set: {e}"))?;
+    let result = list_machines(&bridge);
+    let _ = std::fs::remove_dir_all(&dir);
+    let err = match result {
+        Ok(_) => bail!("machines.list succeeded without a session"),
+        Err(e) => e,
+    };
+    ensure!(
+        err.code == "not_logged_in" || err.code == "unknown_method",
+        "machines.list: unexpected error {err}"
+    );
+    let unknown = bridge.call("no.such.method", serde_json::json!({}));
+    ensure!(
+        matches!(&unknown, Err(e) if e.code == "unknown_method"),
+        "unknown method did not map to unknown_method"
+    );
+    println!("smoke-core: config.set OK, machines.list -> {}", err.code);
+    Ok(())
+}
+
+/// Remote session against a fake Mac (Task 13a): enroll, mirror, one UTF-8
+/// write, input refused while reconnecting, reconnect with a fresh ticket.
+pub fn remote_session() -> Result<()> {
+    let summary = crate::remote_session::smoke()?;
+    println!("smoke-remote: {summary}");
+    Ok(())
+}
+
+/// The window's remote-tab path (Task 13b) against the fake Mac: open,
+/// split on the same session, one UTF-8 write, a terminal end closes only
+/// its pane, sign-out closes the session and the remote tabs.
+pub fn remote_tabs() -> Result<()> {
+    let summary = crate::remote_tabs::smoke()?;
+    println!("smoke-remote-tabs: {summary}");
+    Ok(())
+}
+
+/// Scripted pairing: pending, pending, approved saves the link; denied saves none.
+pub fn pairing_flow() -> Result<()> {
+    use serde_json::json;
+    use shellx_model::core_api::FakeCore;
+    use shellx_model::remote_state::PairState;
+    let dir = std::env::temp_dir().join(format!("shellx-smoke-pair-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let path = dir.join("links.json");
+    let drive = |core: &FakeCore| {
+        let clock = std::cell::Cell::new(0u64);
+        let mut svc = crate::pairing_service::PairingService::new(crate::links_store::LinksStore::new(path.clone()));
+        svc.run_blocking(core, "m1", "Mac", || clock.get(), |ms| clock.set(clock.get() + ms))
+    };
+    let core = FakeCore::new();
+    core.on("pair.request", Ok(json!({"pairing_id": "p1", "code": "123456", "fingerprint": "ab"})));
+    core.on("pair.poll", Ok(json!({"status": "denied"})));
+    ensure!(matches!(drive(&core), PairState::Denied) && !path.exists(), "denied must not save a link");
+    core.on_seq(
+        "pair.poll",
+        vec![
+            Ok(json!({"status": "pending"})),
+            Ok(json!({"status": "pending"})),
+            Ok(json!({"status": "approved", "invite_path": "i.uri", "relay_route": "r", "relay_slot": "s", "daemon_fingerprint": "d"})),
+        ],
+    );
+    ensure!(matches!(drive(&core), PairState::Approved { .. }), "pairing did not approve");
+    let links = crate::links_store::LinksStore::new(path.clone()).load()?;
+    let _ = std::fs::remove_dir_all(&dir);
+    ensure!(links.get("m1").is_some_and(|l| l.relay_slot == "s" && !l.enrolled), "link not saved");
+    println!("smoke-pairing: denied -> no link, approved -> link saved");
+    Ok(())
+}
+
+/// The account service's path (what the window runs off the UI thread):
+/// shellx-core configured on its first call (temp state dir), `AccountFlow`
+/// actions run through `run_account_action` in order. Start without a
+/// session -> LoggedOut (the sign-in card); a login against a closed local
+/// port -> Error with a readable message (the panel's error line).
+pub fn account_flow() -> Result<()> {
+    use std::collections::VecDeque;
+
+    use shellx_model::account::{AccountEvent, AccountFlow, AccountState};
+    use shellx_model::core_api::CoreConfig;
+    use shellx_model::strings::login_failed;
+
+    use crate::core_bridge::CoreBridge;
+    use crate::core_service::{ConfiguredCore, MachineFacts, run_account_action};
+
+    let dir = std::env::temp_dir().join(format!("shellx-smoke-account-{}", std::process::id()));
+    let facts = MachineFacts::this_pc();
+    let (cfg_dir, cfg_facts) = (dir.clone(), facts.clone());
+    let core = ConfiguredCore::new(Box::new(CoreBridge::new()), move || {
+        Ok(CoreConfig {
+            api_base: "http://127.0.0.1:9".into(),
+            state_dir: cfg_dir.to_string_lossy().into_owned(),
+            app_version: shellx_model::VERSION.into(),
+            os_version: cfg_facts.os_version.clone(),
+            device_name: cfg_facts.device_name.clone(),
+        })
+    });
+    let drive = |flow: &mut AccountFlow, event: AccountEvent| {
+        let mut queue: VecDeque<_> = flow.on(event, 0).into();
+        while let Some(action) = queue.pop_front() {
+            if let Some(result) = run_account_action(&core, &facts, action) {
+                queue.extend(flow.on(result, 0));
+            }
+        }
+    };
+    let mut flow = AccountFlow::new();
+    drive(&mut flow, AccountEvent::Started);
+    let started = flow.state().clone();
+    drive(
+        &mut flow,
+        AccountEvent::LoginSubmitted {
+            email: "smoke@shellx.invalid".into(),
+            password: "not-a-password".into(),
+        },
+    );
+    let after_login = flow.state().clone();
+    let _ = std::fs::remove_dir_all(&dir);
+    ensure!(
+        started == AccountState::LoggedOut,
+        "account start without a session: {started:?}, want LoggedOut"
+    );
+    let AccountState::Error(err) = after_login else {
+        bail!("login against a closed port: {after_login:?}, want Error");
+    };
+    ensure!(!err.code.is_empty(), "login error without a code");
+    println!(
+        "smoke-account: start -> LoggedOut (sign-in card); login offline -> {} ({})",
+        err.code,
+        login_failed(Lang::Vi, &err.message)
+    );
+    Ok(())
+}
+
+pub fn run() -> Result<()> {
+    ui_assets()?;
+    core_bridge()?;
+    account_flow()?;
+    pairing_flow()?;
+    remote_session()?;
+    remote_tabs()?;
+    input_paths()?;
+    let started = Instant::now();
+    let (program, args) = default_shell();
+    let mut full_args = args.clone();
+    full_args.extend(smoke_shell_args(&program));
+    let (link, reader) = LocalPty::spawn(&program, &full_args, 100, 30)?;
+    let mut session = TermCore::new(link.clone(), 100, 30)?;
+    let (tx, rx) = mpsc::channel();
+    spawn_reader(reader, move |bytes| tx.send(bytes).is_ok());
+    let mut pump = Pump { rx, closed: false };
+
+    // 0. Palette and embedded fonts.
+    ensure!(
+        session.frame()?.default_colors.0 == rgb(TERM_BG),
+        "default background is not TERM_BG"
+    );
+    let embedded = fonts::embedded();
+    ensure!(embedded.len() == 5, "expected 5 embedded fonts");
+    ensure!(
+        embedded.iter().all(|f| fonts::has_font_magic(f)),
+        "an embedded font lacks a TrueType/OpenType header"
+    );
+    println!("smoke: palette and fonts ok");
+
+    // 1. Key encoding through libghostty-vt (what the window sends).
+    ensure!(
+        session.encode_chord("enter").as_deref() == Some(b"\r".as_slice()),
+        "enter != CR"
+    );
+    ensure!(
+        session.encode_chord("ctrl+c").as_deref() == Some(b"\x03".as_slice()),
+        "ctrl+c"
+    );
+    ensure!(
+        session.encode_chord("backspace").as_deref() == Some(b"\x7f".as_slice()),
+        "bs"
+    );
+    ensure!(
+        session.encode_chord("up").is_some(),
+        "up arrow not encodable"
+    );
+    println!("smoke: key encoding ok");
+
+    // 2. Shell prompt reaches the grid.
+    pump.until(&mut session, "the PowerShell prompt", |lines| {
+        lines
+            .iter()
+            .any(|l| l.trim_end().ends_with('>') || l.contains("PS "))
+    })?;
+    println!("smoke: prompt after {:?}", started.elapsed());
+
+    // 3. Type a command the way the window does and read the result back.
+    //    The marker is computed by the shell, so finding it proves the
+    //    command ran (the typed text alone never contains it).
+    session.send_text("Write-Output ('shellx-ok-' + (6*7))");
+    ensure!(session.send_chord("enter"), "enter not sent");
+    pump.until(&mut session, "shellx-ok-42", |lines| {
+        contains(lines, "shellx-ok-42")
+    })?;
+    println!(
+        "smoke: echo ok (shellx-ok-42 in grid) after {:?}",
+        started.elapsed()
+    );
+
+    // 4. Vietnamese committed text round-trips through ConPTY into the grid
+    //    (what an IME commit sends). Informational: a miss is a warning.
+    session.send_text("Write-Output 'ti\u{1ebf}ng Vi\u{1ec7}t'");
+    session.send_chord("enter");
+    match pump.until(&mut session, "Vietnamese text", |lines| {
+        lines
+            .iter()
+            .filter(|l| l.contains("ti\u{1ebf}ng Vi\u{1ec7}t"))
+            .count()
+            >= 2
+    }) {
+        Ok(_) => println!("smoke: unicode ok (tiếng Việt echoed by the shell)"),
+        Err(e) => println!("smoke: WARN unicode round-trip: {e:#}"),
+    }
+
+    // 5. Resize VT grid + pseudoconsole, then confirm the shell sees it.
+    session.resize(120, 40, 8, 16)?;
+    ensure!(
+        session.vt_cols_rows() == (120, 40),
+        "VT grid did not resize"
+    );
+    session.send_text("Write-Output ('cols-' + $Host.UI.RawUI.WindowSize.Width)");
+    session.send_chord("enter");
+    match pump.until(&mut session, "cols-120", |lines| {
+        contains(lines, "cols-120")
+    }) {
+        Ok(_) => println!("smoke: resize ok (shell reports 120 columns)"),
+        Err(e) => println!("smoke: WARN resize not seen by shell: {e:#}"),
+    }
+
+    let lines = session.text_lines()?;
+    dump(&lines);
+    session.send_text("exit");
+    session.send_chord("enter");
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !link.is_closed() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    drop(session);
+    drop(link);
+
+    panes()?;
+    println!("smoke: PASS in {:?}", started.elapsed());
+    Ok(())
+}
+
+/// One pane's shell in the smoke: what `TermView` holds in the window.
+/// Field order matters: the link drops (killing the shell) before `rx`, so
+/// the reader thread keeps draining while the pseudoconsole closes.
+struct ShellPane {
+    core: TermCore,
+    link: std::sync::Arc<LocalPty>,
+    probe: ExitProbe,
+    rx: mpsc::Receiver<Vec<u8>>,
+}
+
+impl ShellPane {
+    fn spawn(_pane: PaneId, _target: &PaneTarget) -> Result<ShellPane> {
+        let (program, _) = default_shell();
+        let started = spawn_local_pane(80, 24, &smoke_shell_args(&program))?;
+        let (tx, rx) = mpsc::channel();
+        spawn_reader(started.reader, move |bytes| tx.send(bytes).is_ok());
+        Ok(ShellPane {
+            probe: started.link.exit_probe(),
+            core: started.core,
+            link: started.link,
+            rx,
+        })
+    }
+
+    /// Feed pending output (the grid answers ConPTY's startup queries).
+    fn pump(&mut self) {
+        while let Ok(bytes) = self.rx.try_recv() {
+            self.core.feed(&bytes);
+        }
+    }
+}
+
+type Host = PaneHost<ShellPane>;
+
+fn pump_all(host: &mut Host) {
+    for (_, pane) in host.iter_mut() {
+        pane.pump();
+    }
+}
+
+/// Pump every pane until `done(host)` holds or `TIMEOUT` passes.
+fn wait_for(host: &mut Host, what: &str, mut done: impl FnMut(&mut Host) -> bool) -> Result<()> {
+    let deadline = Instant::now() + TIMEOUT;
+    loop {
+        pump_all(host);
+        if done(host) {
+            return Ok(());
+        }
+        if Instant::now() > deadline {
+            bail!("timed out waiting for {what}");
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+fn wait_prompt(host: &mut Host, pane: PaneId) -> Result<()> {
+    wait_for(host, &format!("the prompt of {pane:?}"), |host| {
+        host.get_mut(pane)
+            .and_then(|p| p.core.text_lines().ok())
+            .is_some_and(|lines| has_prompt(&lines))
+    })
+}
+
+/// Reconcile the host with the model like the window does, check the live
+/// shells, then drop the removed panes and wait for their shells to exit.
+fn sync(host: &mut Host, tabs: &Tabs, step: &str) -> Result<(Vec<PaneId>, Vec<PaneId>)> {
+    let changed = host
+        .reconcile(tabs, ShellPane::spawn)
+        .with_context(|| format!("{step}: starting a pane shell"))?;
+    let removed_ids: Vec<PaneId> = changed.removed.iter().map(|(p, _)| *p).collect();
+    let probes: Vec<(PaneId, ExitProbe)> = changed
+        .removed
+        .iter()
+        .map(|(p, pane)| (*p, pane.probe.clone()))
+        .collect();
+    drop(changed.removed);
+    let deadline = Instant::now() + EXIT_TIMEOUT;
+    loop {
+        pump_all(host);
+        let alive: Vec<PaneId> = probes
+            .iter()
+            .filter(|(_, probe)| !probe.exited())
+            .map(|(p, _)| *p)
+            .collect();
+        if alive.is_empty() {
+            break;
+        }
+        ensure!(
+            Instant::now() < deadline,
+            "{step}: shells of dropped panes {alive:?} still running after {EXIT_TIMEOUT:?}"
+        );
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    ensure!(
+        host.ids() == model_panes(tabs),
+        "{step}: live shells {:?} != model panes {:?}",
+        host.ids(),
+        model_panes(tabs)
+    );
+    for pane in host.ids() {
+        let closed = host.get(pane).is_some_and(|p| p.link.is_closed());
+        ensure!(!closed, "{step}: the shell of {pane:?} is not running");
+    }
+    println!(
+        "smoke: panes {step}: live {:?}, added {:?}, removed {removed_ids:?} (exited)",
+        host.ids(),
+        changed.added
+    );
+    Ok((changed.added, removed_ids))
+}
+
+pub fn panes() -> Result<()> {
+    let started = Instant::now();
+    let mut host = Host::new();
+
+    // Tab 1: p1 | (p2 over p3); tab 2: p4. Four real shells.
+    let (mut tabs, p1) = Tabs::new();
+    let t1 = tabs.active().id;
+    let p2 = tabs.split_focused(Axis::Row, PaneTarget::Local);
+    let p3 = tabs.split_focused(Axis::Column, PaneTarget::Local);
+    let (t2, p4) = tabs.new_tab(PaneTarget::Local);
+    let (added, _) = sync(&mut host, &tabs, "open")?;
+    ensure!(added == vec![p1, p2, p3, p4], "open: added {added:?}");
+
+    // The shell in p2 exits by itself (`exit`): the window's poll sees
+    // is_closed() and closes the pane; its sibling p3 takes the space.
+    wait_prompt(&mut host, p2)?;
+    {
+        let pane = host.get_mut(p2).expect("p2 is live");
+        pane.core.send_text("exit");
+        ensure!(pane.core.send_chord("enter"), "enter not sent");
+    }
+    wait_for(&mut host, "p2's shell to exit", |host| {
+        host.get(p2).is_some_and(|p| p.link.is_closed())
+    })?;
+    let out = tabs.close_pane(p2);
+    ensure!(
+        out == CloseOutcome::PaneClosed { tab: t1, focus: p3 },
+        "exit p2: {out:?}"
+    );
+    let (_, removed) = sync(&mut host, &tabs, "shell exit -> PaneClosed")?;
+    ensure!(removed == vec![p2], "exit p2 removed {removed:?}");
+
+    // Ctrl+Shift+W on tab 1's focused pane (p3): focus moves to p1.
+    ensure!(tabs.select(t1), "select tab 1");
+    let focused = tabs.active().focused;
+    ensure!(focused == p3, "tab 1 focus is {focused:?}, expected p3");
+    let out = tabs.close_pane(focused);
+    ensure!(
+        out == CloseOutcome::PaneClosed { tab: t1, focus: p1 },
+        "close p3: {out:?}"
+    );
+    sync(&mut host, &tabs, "Ctrl+Shift+W -> PaneClosed")?;
+
+    // The last pane of tab 1 closes: the tab goes, tab 2 becomes active.
+    let out = tabs.close_pane(p1);
+    ensure!(
+        out == CloseOutcome::TabClosed {
+            closed: t1,
+            active: t2
+        },
+        "close p1: {out:?}"
+    );
+    sync(&mut host, &tabs, "last pane of a tab -> TabClosed")?;
+
+    // The last pane of the last tab closes: a fresh local tab appears.
+    let CloseOutcome::Respawned { pane: p5, .. } = tabs.close_pane(p4) else {
+        bail!("closing the last pane did not respawn");
+    };
+    let (added, removed) = sync(&mut host, &tabs, "last pane of last tab -> Respawned")?;
+    ensure!(
+        added == vec![p5] && removed == vec![p4],
+        "respawn: added {added:?}, removed {removed:?}"
+    );
+    wait_prompt(&mut host, p5)?;
+    println!("smoke: panes respawned shell {p5:?} shows a prompt");
+
+    // Window close: dropping the host ends every shell.
+    let probes: Vec<ExitProbe> = host
+        .ids()
+        .iter()
+        .filter_map(|p| host.get(*p))
+        .map(|p| p.probe.clone())
+        .collect();
+    drop(host);
+    let deadline = Instant::now() + EXIT_TIMEOUT;
+    while probes.iter().any(|probe| !probe.exited()) {
+        ensure!(
+            Instant::now() < deadline,
+            "shells still running after the host was dropped"
+        );
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    println!("smoke: panes ok in {:?}", started.elapsed());
+    Ok(())
+}

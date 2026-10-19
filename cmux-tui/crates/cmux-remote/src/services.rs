@@ -257,6 +257,8 @@ pub struct DaemonServices {
     mux_upload_budget: MuxUploadBudget,
 }
 
+// ShellX: Windows client path (terminal-host types are Unix-only)
+#[cfg(unix)]
 fn validate_renderer_host_hello(
     response: &Frame,
     request_id: u64,
