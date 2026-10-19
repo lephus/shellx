@@ -538,16 +538,20 @@ class Harness:
         self.core_bin = Path(core_bin_dir).resolve()
         self.ticket_ttl = ticket_ttl
         self.root = Path(os.path.realpath(tempfile.mkdtemp(prefix="sx-", dir="/tmp")))
-        os.chmod(self.root, 0o700)
-        self.log_dir = mkdir_private(self.root / "logs")
-        self.home = mkdir_private(self.root / "home")
-        self.tmp = mkdir_private(self.root / "tmp")
-        self.tui_config = self.root / "cmux-tui.json"
-        self.tui_config.write_text("{}\n")
+        try:   # a failure or a stop signal (Stopped) here must not leave the root behind
+            os.chmod(self.root, 0o700)
+            self.log_dir = mkdir_private(self.root / "logs")
+            self.home = mkdir_private(self.root / "home")
+            self.tmp = mkdir_private(self.root / "tmp")
+            self.tui_config = self.root / "cmux-tui.json"
+            self.tui_config.write_text("{}\n")
+            self.relay_port = free_port()
+            self.api_port = free_port()
+        except BaseException:
+            shutil.rmtree(self.root, ignore_errors=True)
+            raise
         self.secret = secrets.token_hex(32)  # 64 ASCII bytes, relay + fake API only, by env
         self.password = secrets.token_urlsafe(18)
-        self.relay_port = free_port()
-        self.api_port = free_port()
         self.api_base = f"http://127.0.0.1:{self.api_port}"
         self.user = pwd.getpwuid(os.getuid()).pw_name
         self.procs: dict[str, subprocess.Popen] = {}
@@ -602,7 +606,8 @@ class Harness:
         return proc
 
     def _stop(self, name: str, sig: int = signal.SIGTERM, grace: float = 10.0) -> None:
-        proc = self.procs.pop(name, None)
+        with self._proc_lock:   # supervisors spawn under it; the wait below is outside it
+            proc = self.procs.pop(name, None)
         if proc is None or proc.poll() is not None:
             return
         self._terminate(proc, sig, grace)
@@ -1175,9 +1180,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
     for sig in STOP_SIGNALS:
         signal.signal(sig, _raise_stopped)
-    h = Harness(args.bin, args.core_bin, ticket_ttl=args.ticket_ttl)
+    h: Optional[Harness] = None
     ready = False
     try:
+        # Built inside the try: a stop during construction still restores the
+        # signals (Harness removes its own partial root when __init__ fails).
+        h = Harness(args.bin, args.core_bin, ticket_ttl=args.ticket_ttl)
         h.start_relay()
         h.start_api()
         host, viewer = h.machine("host"), h.machine("viewer")
@@ -1206,13 +1214,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except Stopped:
         return 0 if ready else 130
     except HarnessError as error:
+        if h is None:
+            print(f"harness.py: {error}", file=sys.stderr)
+            return 1
         print(f"harness.py: {h.redact(str(error))}", file=sys.stderr)
         h.dump_logs(sys.stderr)
         return 1
     finally:
         for sig in STOP_SIGNALS:
             signal.signal(sig, signal.SIG_IGN)   # cleanup is not interrupted
-        h.close()
+        if h is not None:
+            h.close()
         print("harness.py: stopped and cleaned up", file=sys.stderr)
 
 

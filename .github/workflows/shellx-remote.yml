@@ -26,6 +26,13 @@ on:
       - "cmux-tui/crates/cmux-tui/src/**"
       - "cmux-tui/Cargo.lock"
       - "cmux-tui/rust-toolchain.toml"
+      # Anything else the e2e daemon/relay build depends on: the rest of
+      # cmux-tui (ghostty-vt-sys, cmux-pty, ...), the ghostty submodule pointer
+      # and the CI scripts that install zig and fetch the submodule.
+      - "cmux-tui/**"
+      - "ghostty"
+      - "scripts/install-zig-ci.sh"
+      - "scripts/ci/init-submodule.sh"
       - "scripts/shellx/remote-e2e/**"
       - "tests/test_shellx_remote*.py"
       - "Packages/Shared/ShellXBrand/**"

@@ -275,6 +275,72 @@ class StopSignal(unittest.TestCase):
                 signal.signal(sig, previous)
 
 
+class StopDuringConstruction(unittest.TestCase):
+    """A stop signal that lands while `Harness(...)` is being built still ends
+    `main` normally (130) and removes the temp root made so far."""
+
+    def test_stop_while_constructing_cleans_the_root_and_returns_130(self):
+        roots = []
+        real_mkdtemp, real_free_port = harness.tempfile.mkdtemp, harness.free_port
+        real_is_socket, real_missing = harness.is_socket, harness.missing_binaries
+
+        def mkdtemp(*args, **kwargs):
+            roots.append(real_mkdtemp(*args, **kwargs))
+            return roots[-1]
+
+        def stopped_port():
+            raise harness.Stopped
+
+        previous = {sig: signal.getsignal(sig) for sig in harness.STOP_SIGNALS}
+        harness.tempfile.mkdtemp, harness.free_port = mkdtemp, stopped_port
+        harness.is_socket, harness.missing_binaries = (lambda _path: True), (lambda *_: [])
+        try:
+            with contextlib.redirect_stderr(io.StringIO()):
+                rc = harness.main(["--app-bridge", "/tmp/sx-none/bridge.sock", "--bin", "/tmp", "--core-bin", "/tmp"])
+        finally:
+            harness.tempfile.mkdtemp, harness.free_port = real_mkdtemp, real_free_port
+            harness.is_socket, harness.missing_binaries = real_is_socket, real_missing
+            for sig, handler in previous.items():
+                signal.signal(sig, handler)
+        self.assertEqual(rc, 130)
+        self.assertEqual(len(roots), 1)
+        self.assertFalse(os.path.exists(roots[0]), "temp root left behind")
+
+
+class ProcTable(unittest.TestCase):
+    """`_stop` takes `_proc_lock` for the pop (supervisor threads spawn under
+    it), but not while it waits for the process to end."""
+
+    def test_stop_pops_under_the_lock_and_waits_outside_it(self):
+        h = harness.Harness.__new__(harness.Harness)
+        h._proc_lock = harness.threading.Lock()
+        seen = {}
+
+        class Table(dict):
+            def pop(inner, *args):
+                seen["pop_locked"] = h._proc_lock.locked()
+                return dict.pop(inner, *args)
+
+        proc = subprocess.Popen(["sleep", "30"], start_new_session=True)
+        h.procs = Table({"daemon-x": proc})
+        h.note = lambda _line: None
+        real_terminate = harness.Harness._terminate
+
+        def terminate(p, sig, grace):
+            seen["wait_locked"] = h._proc_lock.locked()
+            real_terminate(p, sig, grace)
+
+        h._terminate = terminate
+        try:
+            h._stop("daemon-x")
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
+        self.assertEqual(seen, {"pop_locked": True, "wait_locked": False})
+        self.assertNotIn("daemon-x", h.procs)
+
+
 class AppBridgeCli(unittest.TestCase):
     ENV = {"SHELLX_E2E_BIN": "/e/bin", "SHELLX_E2E_CORE_BIN": "/e/core"}
 
