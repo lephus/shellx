@@ -13,9 +13,11 @@ public enum CloudMachinesFeature: Sendable {
         return String(localized: "cloud.feature.disabled", defaultValue: "Cloud Machines are temporarily unavailable.")
     }
 
-    /// Whether Cloud can be discovered on this Mac.
+    /// Whether Cloud can be discovered on this Mac. ShellX: never. Cloud is a
+    /// Manaflow service (ShellXFeatures.cloud) and stays off for good; it does
+    /// not follow ShellXFeatures.remoteMachines.
     public nonisolated static func isAvailable(policy: ManagedDevicePolicy) -> Bool {
-        !policy.isEnforced(.disableCloud)
+        false
     }
 
     /// Whether Cloud work is enabled after local first-use activation.
@@ -23,7 +25,7 @@ public enum CloudMachinesFeature: Sendable {
         defaults: UserDefaults,
         policy: ManagedDevicePolicy
     ) -> Bool {
-        isAvailable(policy: policy) && localOptIn(defaults: defaults)
+        false
     }
 
     public nonisolated static func localOptIn(defaults: UserDefaults) -> Bool {

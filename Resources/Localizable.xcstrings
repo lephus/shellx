@@ -656184,6 +656184,124 @@
           }
         }
       }
+    },
+    "shellx.cloud.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cloud is not available in ShellX."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cloud ist in ShellX nicht verfügbar."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le Cloud n'est pas disponible dans ShellX."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "السحابة غير متاحة في ShellX."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La nube no está disponible en ShellX."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX 不提供 Cloud。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX 不提供 Cloud。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX에서는 Cloud를 사용할 수 없습니다."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX では Cloud を利用できません。"
+          }
+        }
+      }
+    },
+    "cli.vm.tui.clientMissingNoInstaller": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No cmux-tui client found (searched: %1$@). Point CMUX_TUI_CLIENT at a binary."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kein cmux-tui-Client gefunden (durchsucht: %1$@). Lege CMUX_TUI_CLIENT auf eine ausführbare Datei fest."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun client cmux-tui trouvé (emplacements recherchés : %1$@). Indiquez un binaire dans CMUX_TUI_CLIENT."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لم يتم العثور على عميل cmux-tui (تم البحث في: %1$@). عيّن CMUX_TUI_CLIENT إلى ملف تنفيذي."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se encontró ningún cliente cmux-tui (se buscó en: %1$@). Indica un binario en CMUX_TUI_CLIENT."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到 cmux-tui 用戶端（已搜尋：%1$@）。請將 CMUX_TUI_CLIENT 指向一個執行檔。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到 cmux-tui 客户端（已搜索：%1$@）。请将 CMUX_TUI_CLIENT 指向一个可执行文件。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux-tui 클라이언트를 찾을 수 없습니다(검색한 위치: %1$@). CMUX_TUI_CLIENT에 실행 파일을 지정하세요."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cmux-tui クライアントが見つかりません（検索したパス: %1$@）。CMUX_TUI_CLIENT にバイナリを指定してください。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

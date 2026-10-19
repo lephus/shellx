@@ -4,6 +4,7 @@ import AppKit
 import CMUXMobileCore
 import Bonsplit
 import Foundation
+import ShellXBrand
 import SwiftUI
 
 /// Shared entrypoint for every "Upgrade to cmux Pro" surface (sidebar badge,
@@ -41,6 +42,8 @@ enum ProUpgradePresenter {
     /// already on the top tier or its plan is not yet known.
     @MainActor
     static var currentUpgradeOffer: CmuxPlanTier? {
+        // ShellX: no upgrade offer anywhere (billing and Pro are Manaflow services).
+        guard ShellXFeatures.cloud else { return nil }
         guard let flow = AppDelegate.shared?.auth?.accountFlow else { return .pro }
         return flow.upgradeOffer
     }
@@ -58,6 +61,7 @@ enum ProUpgradePresenter {
         analytics: ProductAnalytics = .app,
         open: @MainActor (ProUpgradeSource) -> Void = { presentAppPricingWeb(source: $0) }
     ) {
+        guard ShellXFeatures.cloud else { return }
         analytics.track(.upgradeOpened(source, destination: .pricingPage))
         open(source)
     }
@@ -68,6 +72,7 @@ enum ProUpgradePresenter {
     /// entry is a no-op.
     @MainActor
     static func prefetch(source: ProUpgradeSource) {
+        guard ShellXFeatures.cloud else { return }
         guard BrowserAvailabilitySettings.isEnabled() else { return }
         // When an upgrade workspace already exists, present() refocuses it and
         // navigates its existing panel, so a prewarmed webview would go unused.
@@ -88,6 +93,7 @@ enum ProUpgradePresenter {
 
     @MainActor
     static func presentAppPricingWeb(source: ProUpgradeSource) {
+        guard ShellXFeatures.cloud else { return }
         let url = appPricingURLForCurrentAppearance(source: source)
         guard BrowserAvailabilitySettings.isEnabled() else {
             NSWorkspace.shared.open(url)
@@ -101,6 +107,7 @@ enum ProUpgradePresenter {
 
     @MainActor
     static func presentNativePricingPreview() {
+        guard ShellXFeatures.cloud else { return }
         NativePricingWindowController.shared.show()
     }
 
@@ -110,6 +117,7 @@ enum ProUpgradePresenter {
         plan: CheckoutPlan = .pro,
         analytics: ProductAnalytics = .app
     ) {
+        guard ShellXFeatures.cloud else { return }
         analytics.track(.upgradeOpened(source, plan: plan, destination: .checkout))
         NSWorkspace.shared.open(checkoutURL(source: source, plan: plan))
     }
@@ -126,6 +134,7 @@ enum ProUpgradePresenter {
 
     @MainActor
     static func presentBillingPortal() {
+        guard ShellXFeatures.cloud else { return }
         NSWorkspace.shared.open(AuthEnvironment.billingPortalURL)
     }
 
@@ -388,6 +397,7 @@ private final class NativePricingPlanStore: ObservableObject {
 enum NativePricingPlanRefresh {
     @MainActor
     static func refreshForProWelcomeChecklist() async {
+        guard ShellXFeatures.cloud else { return }
         await NativePricingPlanStore.refreshForProWelcomeChecklist()
     }
 }

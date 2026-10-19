@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import OSLog
+import ShellXBrand
 
 /// How a CodeRouter command is pinned to the selected team without relying on
 /// the CLI's shared, persisted active organization.
@@ -330,6 +331,10 @@ enum CoderouterCLIAccountReader {
     }
 
     @Sendable private static func runCLI(_ arguments: [String], environment: [String: String]) async throws -> Data {
+        // ShellX: never exec a CodeRouter, bundled, on PATH or in ~/.coderouter.
+        guard ShellXFeatures.codeRouter else {
+            throw accountError(String(localized: "cli.coderouter.unavailable", defaultValue: "CodeRouter is not available in ShellX."))
+        }
         guard let executable = resolvedExecutable(environment: environment) else {
             throw accountError("coderouter is not installed. Run cmux cr in a terminal to install it.")
         }

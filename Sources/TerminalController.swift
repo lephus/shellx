@@ -25,6 +25,7 @@ import CmuxAgentChat
 import Foundation
 import os
 import Bonsplit
+import ShellXBrand
 import WebKit
 import CmuxSidebar
 import CmuxWorkspaces
@@ -439,6 +440,25 @@ class TerminalController {
                 || explicitFocusParamAllowsFocus(commandKey: commandKey, params: params)
         }
         return focusIntentV1Commands.contains(commandKey)
+    }
+
+    /// ShellX: the encoded `not_available` error for a v2 method served by a
+    /// Manaflow service (sign-in, accounts, Cloud machines, billing, CodeRouter;
+    /// see ``ShellXCloudGate``), or `nil` for a local method. Every v2 entry asks
+    /// this before its focus check, so no handler for such a method ever runs.
+    nonisolated static func shellXUnavailableServiceResponse(method: String, id: Any?) -> String? {
+        guard let service = ShellXCloudGate.unavailableService(forSocketMethod: method) else { return nil }
+        let message: String
+        switch service {
+        case .cloud:
+            message = String(localized: "shellx.cloud.unavailable", defaultValue: "Cloud is not available in ShellX.")
+        case .codeRouter:
+            message = String(localized: "cli.coderouter.unavailable", defaultValue: "CodeRouter is not available in ShellX.")
+        }
+        guard let idValue = v2WireId(id) else {
+            return ControlResponseEncoder.encodeFailureResponse
+        }
+        return v2Encoder.error(id: idValue, code: "not_available", message: message, data: nil)
     }
 
     /// Returns the encoded error when task-local automation policy suppresses
@@ -1121,8 +1141,10 @@ class TerminalController {
     ) {
         self.authCoordinator = coordinator
         self.accountFlow = accountFlow
-        self.codeRouterHandoffService = codeRouterHandoffService
-            ?? CodeRouterHandoffClient(auth: coordinator)
+        // ShellX: CodeRouter is off for good, so no handoff service exists.
+        self.codeRouterHandoffService = ShellXFeatures.codeRouter
+            ? (codeRouterHandoffService ?? CodeRouterHandoffClient(auth: coordinator))
+            : nil
     }
 
     /// Injects the app-lifetime browser import coordinator before socket RPCs start.
@@ -3008,6 +3030,12 @@ class TerminalController {
             }
             let request = relayAuthorization.request
             let automationOrigin = CmuxAutomationInvocationContext.eventOrigin
+            if let refusal = Self.shellXUnavailableServiceResponse(
+                method: request.method,
+                id: request.id.map(\.foundationObject)
+            ) {
+                return refusal
+            }
             if let focusError = Self.focusSuppressionResponse(
                 method: request.method,
                 id: request.id.map(\.foundationObject),
@@ -3341,6 +3369,12 @@ class TerminalController {
     /// the calling thread; only the command body crosses to the main actor,
     /// via a single `v2MainSync` hop.
     private nonisolated func processParsedV2Command(_ request: ControlRequest) -> String {
+        if let refusal = Self.shellXUnavailableServiceResponse(
+            method: request.method,
+            id: request.id.map(\.foundationObject)
+        ) {
+            return refusal
+        }
         if let focusError = Self.focusSuppressionResponse(
             method: request.method,
             id: request.id.map(\.foundationObject),

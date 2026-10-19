@@ -2,6 +2,7 @@ import CmuxAuthRuntime
 import CmuxCloud
 import CmuxFoundation
 import Foundation
+import ShellXBrand
 
 /// The short-lived, one-use authority that cmux passes to CodeRouter.
 ///
@@ -157,6 +158,8 @@ actor CodeRouterHandoffClient {
     /// target a different team the signed-in user belongs to; normal callers
     /// pass nil and use AuthCoordinator.resolvedTeamID.
     func mint(teamID explicitTeamID: String? = nil) async throws -> CodeRouterHandoffLease {
+        // ShellX: CodeRouter is a Manaflow service; no lease is ever requested.
+        guard ShellXFeatures.codeRouter else { throw CodeRouterHandoffClientError.sessionUnavailable }
         let snapshot: AuthenticatedSessionSnapshot
         do {
             snapshot = try await auth.authenticatedSessionSnapshot()

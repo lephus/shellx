@@ -11,10 +11,8 @@ extension cmuxApp {
 
             Divider()
 
-            Button(String(localized: "cloud.diagnostics.menu", defaultValue: "Cloud Diagnostics…")) {
-                AppDelegate.shared?.showCloudDiagnostics()
-            }
-
+            // ShellX: no Cloud Diagnostics, upgrade or Pro entries (Cloud,
+            // billing and Pro are Manaflow services, hard-off).
             splitCommandButton(title: String(localized: "sidebar.help.sendFeedback", defaultValue: "Send Feedback"), shortcut: menuShortcut(for: .sendFeedback)) {
                 presentFeedbackFromHelpMenu()
             }
@@ -23,22 +21,7 @@ extension cmuxApp {
                 AppDelegate.shared?.checkForUpdates(nil)
             }
 
-            if let offer = ProUpgradePresenter.currentUpgradeOffer {
-                Button(ProUpgradePresenter.upgradeMenuTitle(for: offer)) {
-                    ProUpgradePresenter.present(source: .helpMenu)
-                }
-            }
             #if DEBUG
-            Button(String(localized: "menu.help.previewNativePricing", defaultValue: "Preview Native Pro Pricing…")) {
-                ProUpgradePresenter.presentNativePricingPreview()
-            }
-            Button(String(localized: "debug.menu.cloudSidebarSpacingLab", defaultValue: "Cloud Sidebar Spacing Lab…")) {
-                AppDelegate.shared?.debugWindowsCoordinator.cloudSidebarDebugLabController.show()
-            }
-            cloudWelcomeDebugMenuItems
-            Button(String(localized: "menu.help.showProWelcomeChecklist", defaultValue: "Show Pro Welcome Checklist…")) {
-                ProWelcomeChecklistPresenter.present()
-            }
             Button(String(localized: "menu.help.featureFlags", defaultValue: "Feature Flags…")) {
                 InternalFlagsPresenter.present()
             }

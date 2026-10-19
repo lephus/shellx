@@ -1,4 +1,5 @@
 import Foundation
+import ShellXBrand
 
 /// UserDefaults keys for the device presence heartbeat.
 ///
@@ -33,6 +34,9 @@ enum PresenceSettings {
     /// expects their phone to see the Mac online. Default (mobile off) => off, for
     /// privacy — the Mac announces nothing until the user opts into mobile.
     static func isEnabled(defaults: UserDefaults = .standard) -> Bool {
+        // ShellX: presence is parked behind `remoteMachines` (Wave 2 swaps
+        // the presence service for ShellX's own before flipping it).
+        guard ShellXFeatures.remoteMachines else { return false }
         guard MobileHostService.isListeningEnabled(defaults: defaults) else { return false }
         if defaults.object(forKey: enabledKey) != nil {
             return defaults.bool(forKey: enabledKey)

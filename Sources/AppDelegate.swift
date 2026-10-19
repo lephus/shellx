@@ -1593,6 +1593,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         _ url: URL,
         delivery: AuthCallbackDelivery = .external
     ) async -> Bool {
+        // ShellX: sign-in and billing are Manaflow services; a callback URL
+        // never completes a sign-in or refreshes a billing plan.
+        guard ShellXFeatures.cloud else { return false }
         let callbackRouter = auth?.callbackRouter ?? AuthCallbackRouter()
         guard callbackRouter.isAuthCallbackURL(url) else {
             AuthDebugLog().log("auth.callback rejected: URL is not an accepted callback")
@@ -8687,6 +8690,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         bringWindowForward: Bool = false,
         debugSource: String = "mobileConnect"
     ) -> Workspace? {
+        // ShellX: phone pairing is parked until Wave 2 flips `remoteMachines`.
+        guard ShellXFeatures.remoteMachines else { return nil }
         // Shared chokepoint for every pairing-window entry (Settings, palette,
         // menu): pairing is unavailable under a managed remote-control disable.
         guard MobileRemoteControlPolicy.isEnabled else {
@@ -11069,18 +11074,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             },
             onQuitApp: {
                 AppDelegate.requestApplicationTermination()
-            },
-            cloudMenuEntries: { [weak self] in
-                guard let self else { return [] }
-                return CloudMenuContent.entries(
-                    self.cloudMenuContext(),
-                    actions: self.cloudMenuActions(fromStatusItem: true),
-                    layout: .statusItem
-                )
-            },
-            onCloudMenuWillOpen: {
-                CloudMenuModel.shared.menuWillOpen()
             }
+            // ShellX: no Cloud section in the status item (Cloud is off).
         )
     }
 
@@ -15676,23 +15671,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 #endif
             performNewLocalWorkspaceAction(event: event, debugSource: "shortcut.ctrlOptCmdN")
             return true
-        }
-
-        if matchConfiguredShortcut(event: event, action: .newCloudWorkspace) {
-#if DEBUG
-            cmuxDebugLog("shortcut.action name=newCloudWorkspace \(debugShortcutRouteSnapshot(event: event))")
-#endif
-            return performNewCloudWorkspaceOnResolvedMachineAction(
-                preferredWindow: mainWindowForShortcutEvent(event),
-                debugSource: "shortcut.cmdY"
-            )
-        }
-
-        if matchConfiguredShortcut(event: event, action: .newCloudMachine) {
-#if DEBUG
-            cmuxDebugLog("shortcut.action name=newCloudMachine \(debugShortcutRouteSnapshot(event: event))")
-#endif
-            return performNewCloudMachineAction(event: event, debugSource: "shortcut.cmdShiftY")
         }
 
         // New Window: Cmd+Shift+N

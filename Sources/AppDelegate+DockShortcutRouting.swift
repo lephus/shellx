@@ -99,7 +99,7 @@ extension KeyboardShortcutSettings.Action {
         case .openSettings, .openTeamPicker, .reloadConfiguration,
              .showHideAllWindows, .globalSearch,
              .newWindow, .closeWindow, .toggleFullScreen, .quit,
-             .toggleSidebar, .focusSidebar, .showWindowHints, .newTab, .newLocalWorkspace, .newBrowserWorkspace, .newCloudWorkspace, .newCloudMachine,
+             .toggleSidebar, .focusSidebar, .showWindowHints, .newTab, .newLocalWorkspace, .newBrowserWorkspace,
              .saveLayoutTemplate, .openFolder,
              .reopenPreviousSession, .goToWorkspace,
              .commandPalette, .agentInbox, .sendFeedback,

@@ -929,15 +929,6 @@ struct cmuxApp: App {
                     }
                 }
 
-                if CloudMachinesFeature.isEnabled && AppDelegate.shared?.auth?.accountFlow.isAuthenticated == true {
-                    splitCommandButton(title: String(localized: "menu.file.newCloudWorkspace", defaultValue: "New Cloud Workspace"), shortcut: menuShortcut(for: .newCloudWorkspace)) {
-                        _ = AppDelegate.shared?.performNewCloudWorkspaceOnResolvedMachineAction(tabManager: activeTabManager, debugSource: "menu.newCloudWorkspace")
-                    }
-                    splitCommandButton(title: String(localized: "menu.file.newCloudMachine", defaultValue: "New Cloud Machine"), shortcut: menuShortcut(for: .newCloudMachine)) {
-                        _ = AppDelegate.shared?.performNewCloudMachineAction(tabManager: activeTabManager, debugSource: "menu.newCloudMachine")
-                    }
-                }
-
                 if CmuxFeatureFlags.shared.isSimulatorEnabled {
                     Button(String(localized: "menu.file.newSimulatorPane", defaultValue: "New Simulator Pane")) {
                         performNewSimulatorPaneFromMenu()
@@ -1103,7 +1094,7 @@ struct cmuxApp: App {
         }
         helpCommands
         historyCommands
-        cloudCommands
+        // ShellX: no Cloud menu (Cloud is a Manaflow service, hard-off).
         CommandGroup(after: .toolbar) {
             splitCommandButton(title: String(localized: "menu.view.toggleLeftSidebar", defaultValue: "Toggle Left Sidebar"), shortcut: menuShortcut(for: .toggleSidebar)) {
                 // The AppKit-hosted Settings window has no SwiftUI

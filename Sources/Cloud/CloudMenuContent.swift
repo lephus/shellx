@@ -189,13 +189,11 @@ enum CloudMenuContent {
             .action(CloudMenuAction(
                 id: "cloud.newWorkspace",
                 title: String(localized: "menu.file.newCloudWorkspace", defaultValue: "New Cloud Workspace"),
-                shortcut: .newCloudWorkspace,
                 perform: actions.newWorkspace
             )),
             .action(CloudMenuAction(
                 id: "cloud.newMachine",
                 title: String(localized: "cloudMenu.newMachine", defaultValue: "New Cloud Machine…"),
-                shortcut: .newCloudMachine,
                 perform: actions.newMachine
             )),
         ]

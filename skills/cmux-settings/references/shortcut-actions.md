@@ -44,8 +44,6 @@ Values for `shortcuts.bindings.<action>`:
 - `shortcuts.bindings.markWorkspaceDone`
 - `shortcuts.bindings.moveWorkspaceDown`
 - `shortcuts.bindings.moveWorkspaceUp`
-- `shortcuts.bindings.newCloudMachine`
-- `shortcuts.bindings.newCloudWorkspace`
 - `shortcuts.bindings.newWorkspaceGroup`
 - `shortcuts.bindings.renameWorkspace`
 - `shortcuts.bindings.reopenClosedBrowserPanel`

@@ -2,6 +2,7 @@ import CmuxCommandPalette
 import AppKit
 import CMUXMobileCore
 import Foundation
+import ShellXBrand
 
 extension ContentView {
     static let commandPaletteProUpgradeCommandId = "palette.pro.upgrade"
@@ -30,6 +31,8 @@ extension ContentView {
     }
 
     static func commandPaletteProCommandContributions() -> [CommandPaletteCommandContribution] {
+        // ShellX: no upgrade or Pro commands (billing is a Manaflow service).
+        guard ShellXFeatures.cloud else { return [] }
         func constant(_ value: String) -> (CommandPaletteContextSnapshot) -> String {
             { _ in value }
         }
@@ -54,6 +57,7 @@ extension ContentView {
     }
 
     func registerProCommandHandlers(_ registry: inout CommandPaletteHandlerRegistry) {
+        guard ShellXFeatures.cloud else { return }
         registry.register(commandId: Self.commandPaletteProUpgradeCommandId) {
 #if DEBUG
             cmuxDebugLog("palette.pro.upgrade.invoke")
