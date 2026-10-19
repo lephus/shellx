@@ -4,12 +4,12 @@ Việc của bạn trên một máy Windows 10 1809+ hoặc Windows 11. Đánh d
 
 ## Run id (điều phối viên cập nhật mục này)
 
-Run mới nhất lúc viết: **39205433045** (head `0f7d20ca36`, nhánh `shellx/l6-windows`; điều phối viên sẽ thay bằng run xanh mới hơn trong báo cáo cuối nếu có). Lấy run mới nhất bằng:
+Run mới nhất lúc viết: **39210284444** (head `c2087a601d`, nhánh `shellx/l6-windows`, cả 4 job xanh; commit sau đó chỉ sửa mục này; điều phối viên sẽ thay bằng run xanh mới hơn trong báo cáo cuối nếu có). Lấy run mới nhất bằng:
 `gh run list -R lephus/shellx --branch shellx/l6-windows --workflow shellx-windows.yml -L 1`
 
 ```
-gh run download 39205433045 -R lephus/shellx -n shellx-desktop
-gh run download 39205433045 -R lephus/shellx -n ShellX-Setup-2.0.0-sprint
+gh run download 39210284444 -R lephus/shellx -n shellx-desktop
+gh run download 39210284444 -R lephus/shellx -n ShellX-Setup-2.0.0-sprint
 ```
 
 Artifact chỉ giữ 14 ngày; hết hạn thì nhờ điều phối viên chạy lại workflow.
