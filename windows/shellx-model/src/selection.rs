@@ -589,7 +589,14 @@ mod tests {
         far.push_str("zz");
         assert_eq!(word_at(&far, m), (m, m));
         assert_eq!(word_at(&far, m - 1), (m - 1, m));
-        let r = ime_rect(c(0, m), (0.0, 0.0), 1.0, 1.0, &"x".repeat(70_000), 69_999..70_000);
+        let r = ime_rect(
+            c(0, m),
+            (0.0, 0.0),
+            1.0,
+            1.0,
+            &"x".repeat(70_000),
+            69_999..70_000,
+        );
         assert_eq!(r.x, f32::from(m));
     }
 }

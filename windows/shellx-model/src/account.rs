@@ -75,9 +75,7 @@ impl fmt::Debug for AccountEvent {
             AccountEvent::LoginResult(r) => f.debug_tuple("LoginResult").field(r).finish(),
             AccountEvent::Registered(r) => f.debug_tuple("Registered").field(r).finish(),
             AccountEvent::Tick(t) => f.debug_tuple("Tick").field(t).finish(),
-            AccountEvent::HeartbeatResult(r) => {
-                f.debug_tuple("HeartbeatResult").field(r).finish()
-            }
+            AccountEvent::HeartbeatResult(r) => f.debug_tuple("HeartbeatResult").field(r).finish(),
             AccountEvent::LogoutRequested => write!(f, "LogoutRequested"),
             AccountEvent::LogoutResult(r) => f.debug_tuple("LogoutResult").field(r).finish(),
             AccountEvent::LoggedOut => write!(f, "LoggedOut"),
@@ -163,6 +161,13 @@ impl AccountFlow {
     /// session). Cleared by the next login or logout attempt.
     pub fn notice(&self) -> Option<&CoreErr> {
         self.notice.as_ref()
+    }
+
+    /// Whether `LoginSubmitted` would start a login now. Not while a login
+    /// runs or this machine is being registered (`LoggingIn`): the flow
+    /// ignores the event then, and the panel keeps the typed password.
+    pub fn accepts_login(&self) -> bool {
+        self.state != AccountState::LoggingIn
     }
 
     /// The login call is running (the panel shows "signing in").
@@ -268,7 +273,7 @@ impl AccountFlow {
                 }
             }
             AccountEvent::LoginSubmitted { email, password } => {
-                if self.state == AccountState::LoggingIn {
+                if !self.accepts_login() {
                     return out;
                 }
                 self.state = AccountState::LoggingIn;
@@ -744,7 +749,10 @@ mod tests {
             f.on(AccountEvent::HeartbeatResult(Err(net())), 2_000)
                 .is_empty()
         );
-        assert!(f.on(AccountEvent::HeartbeatResult(Ok(())), 2_001).is_empty());
+        assert!(
+            f.on(AccountEvent::HeartbeatResult(Ok(())), 2_001)
+                .is_empty()
+        );
         // a revoked machine that failed to show up after its one register
         // may register again once a heartbeat says it is gone
         let mut g = AccountFlow::new();
@@ -893,6 +901,40 @@ mod tests {
             2_001,
         );
         assert_eq!(g.state(), &AccountState::LoggedOut);
+    }
+
+    #[test]
+    fn login_accepted_only_outside_logging_in() {
+        let submit = || AccountEvent::LoginSubmitted {
+            email: "a".into(),
+            password: "b".into(),
+        };
+        // register phase (LoggingIn, no login call): ignored, so the panel
+        // must keep the typed password
+        let mut f = AccountFlow::new();
+        f.on(AccountEvent::Started, 0);
+        f.on(AccountEvent::ListResult(Ok(vec![])), 1);
+        assert_eq!(f.state(), &AccountState::LoggingIn);
+        assert!(!f.accepts_login());
+        assert!(f.on(submit(), 2).is_empty());
+        // signed out: accepted
+        let mut g = AccountFlow::new();
+        g.on(AccountEvent::Started, 0);
+        g.on(
+            AccountEvent::ListResult(Err(CoreErr::new("not_logged_in", ""))),
+            1,
+        );
+        assert!(g.accepts_login());
+        assert!(matches!(
+            g.on(submit(), 2)[..],
+            [AccountAction::CallLogin { .. }]
+        ));
+        // while that login runs: not accepted
+        assert!(!g.accepts_login());
+        assert!(g.on(submit(), 3).is_empty());
+        // after a failed login: accepted again
+        g.on(AccountEvent::LoginResult(Err(net())), 4);
+        assert!(g.accepts_login());
     }
 
     #[test]

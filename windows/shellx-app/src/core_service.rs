@@ -142,9 +142,9 @@ pub fn run_account_action(
         ))),
         // A lost session shows on the next list (not_logged_in); a removed
         // machine (machine_not_found) lets the flow register it again.
-        AccountAction::CallHeartbeat => Some(AccountEvent::HeartbeatResult(
-            heartbeat(core).map(|_| ()),
-        )),
+        AccountAction::CallHeartbeat => {
+            Some(AccountEvent::HeartbeatResult(heartbeat(core).map(|_| ())))
+        }
         AccountAction::CallLogout => Some(AccountEvent::LogoutResult(logout(core))),
         AccountAction::ScheduleTick { .. } => None,
     }

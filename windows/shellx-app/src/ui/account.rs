@@ -126,6 +126,12 @@ impl AccountService {
         self.flow.login_in_flight()
     }
 
+    /// A submit now would start a login (not while one runs or this machine
+    /// is being registered).
+    pub fn accepts_login(&self) -> bool {
+        self.flow.accepts_login()
+    }
+
     /// A failed logout (the session stays); the settings panel shows it.
     pub fn notice(&self) -> Option<&CoreErr> {
         self.flow.notice()

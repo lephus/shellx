@@ -11,12 +11,14 @@
 //! register failure) show as one muted line; local terminals keep working and
 //! the account service retries by itself.
 //!
-//! The password field is cleared as soon as the login is submitted: the
-//! password then lives only in the login call.
+//! The password field is cleared (its buffer zeroed) as soon as a login is
+//! accepted, and when the panel closes: the password then lives only in the
+//! login call. A submit the account flow would ignore (this machine is being
+//! registered) keeps the typed password and starts nothing.
 
 use gpui::{
-    ClickEvent, Context, Div, Entity, EventEmitter, Focusable, IntoElement, Render, Subscription,
-    Window, div, prelude::*, px,
+    App, ClickEvent, Context, Div, Entity, EventEmitter, FocusHandle, Focusable, IntoElement,
+    Render, Subscription, Window, div, prelude::*, px,
 };
 use shellx_model::account::AccountState;
 use shellx_model::palette;
@@ -78,6 +80,7 @@ impl LoginPanel {
                 if logged_in && (this.open || this.submitted) {
                     // Signed in: the panel goes away and the keyboard goes
                     // back to the terminal.
+                    this.password.update(cx, |f, cx| f.clear(cx));
                     this.open = false;
                     this.submitted = false;
                     cx.emit(LoginPanelEvent::Closed);
@@ -129,14 +132,36 @@ impl LoginPanel {
         cx.notify();
     }
 
-    fn close(&mut self, cx: &mut Context<Self>) {
-        self.open = false;
-        cx.emit(LoginPanelEvent::Closed);
+    /// The panel (Email, Mật khẩu) is shown; a field holds the keyboard.
+    pub fn is_open(&self) -> bool {
+        self.open
+    }
+
+    /// The field the keyboard belongs to while the panel is open: Email
+    /// while it is empty, else Mật khẩu.
+    pub fn focus_target(&self, cx: &App) -> FocusHandle {
+        let target = if self.email.read(cx).text().trim().is_empty() {
+            &self.email
+        } else {
+            &self.password
+        };
+        target.read(cx).focus_handle(cx)
+    }
+
+    /// Esc / Cancel, and the sidebar hiding: the typed password is wiped.
+    pub fn close(&mut self, cx: &mut Context<Self>) {
+        self.password.update(cx, |f, cx| f.clear(cx));
+        if self.open {
+            self.open = false;
+            cx.emit(LoginPanelEvent::Closed);
+        }
         cx.notify();
     }
 
     fn submit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.account.read(cx).login_in_flight() {
+        // Ignored by the flow (a login runs, or this machine is being
+        // registered): keep the password, start nothing.
+        if !self.account.read(cx).accepts_login() {
             return;
         }
         let email = self.email.read(cx).text().trim().to_string();

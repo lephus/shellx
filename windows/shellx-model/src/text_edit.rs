@@ -16,7 +16,13 @@ use crate::selection::char_cells;
 /// What the masked field draws per char.
 pub const MASK_CHAR: char = '•';
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+/// Bytes a masked field reserves up front, so a typed password normally
+/// never reallocates (a reallocation leaves the old copy in freed memory).
+const MASKED_RESERVE: usize = 128;
+
+/// `Debug` is written by hand: a masked field prints `***` and its length,
+/// never its content or preedit.
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct TextEdit {
     content: String,
     selected: Range<usize>,
@@ -39,6 +45,37 @@ fn clean(text: &str) -> String {
         .collect()
 }
 
+impl std::fmt::Debug for TextEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut d = f.debug_struct("TextEdit");
+        if self.masked {
+            d.field(
+                "content",
+                &format_args!("*** ({} bytes)", self.content.len()),
+            );
+        } else {
+            d.field("content", &self.content);
+        }
+        d.field("selected", &self.selected)
+            .field("reversed", &self.reversed)
+            .field("marked", &self.marked)
+            .field("masked", &self.masked)
+            .finish()
+    }
+}
+
+/// Overwrites the string's bytes with zeros, then empties it; the
+/// allocation is kept (and reused), so the old text does not linger in
+/// freed memory.
+fn wipe(s: &mut String) {
+    let mut bytes = std::mem::take(s).into_bytes();
+    bytes.fill(0);
+    // Keep the zeroing from being optimized away as a dead store.
+    std::hint::black_box(&mut bytes);
+    bytes.clear();
+    *s = String::from_utf8(bytes).unwrap_or_default();
+}
+
 fn is_attached(c: char) -> bool {
     !c.is_control() && char_cells(c) == 0
 }
@@ -46,9 +83,19 @@ fn is_attached(c: char) -> bool {
 impl TextEdit {
     pub fn new(masked: bool) -> TextEdit {
         TextEdit {
+            content: if masked {
+                String::with_capacity(MASKED_RESERVE)
+            } else {
+                String::new()
+            },
             masked,
             ..TextEdit::default()
         }
+    }
+
+    /// Bytes allocated for the content.
+    pub fn capacity(&self) -> usize {
+        self.content.capacity()
     }
 
     pub fn text(&self) -> &str {
@@ -83,10 +130,14 @@ impl TextEdit {
         }
     }
 
-    /// Clears everything (after a submit the password field is emptied).
+    /// Clears everything (after a submit, and when the sign-in panel
+    /// closes, the password field is emptied). The content is zeroed in
+    /// place first.
     pub fn clear(&mut self) {
-        let masked = self.masked;
-        *self = TextEdit::new(masked);
+        wipe(&mut self.content);
+        self.selected = 0..0;
+        self.reversed = false;
+        self.marked = None;
     }
 
     pub fn set_text(&mut self, text: &str) {
@@ -539,5 +590,35 @@ mod tests {
         assert_eq!(p.display_text(), "ab");
         t.clear();
         assert!(t.is_empty() && t.masked());
+    }
+
+    #[test]
+    fn masked_debug_shows_no_typed_char() {
+        let mut t = TextEdit::new(true);
+        // chars that never occur in the struct's own Debug skeleton
+        t.insert("QJ#~");
+        t.replace_and_mark_text_in_range(None, "ế", None);
+        let dbg = format!("{t:?}");
+        for c in "QJ#~ế".chars() {
+            assert!(!dbg.contains(c), "{c:?} in {dbg}");
+        }
+        assert!(dbg.contains("***"), "{dbg}");
+        // the plain field still shows its text
+        assert!(format!("{:?}", typed("ab")).contains("\"ab\""));
+    }
+
+    #[test]
+    fn clear_wipes_and_keeps_the_buffer() {
+        let mut t = TextEdit::new(true);
+        t.insert("secret-password");
+        let cap = t.capacity();
+        t.clear();
+        assert!(t.is_empty() && t.masked());
+        assert_eq!(t.selected_range(), 0..0);
+        // the same allocation is reused (it was zeroed, not freed with the
+        // password in it)
+        assert_eq!(t.capacity(), cap);
+        t.insert("x");
+        assert_eq!(t.text(), "x");
     }
 }
