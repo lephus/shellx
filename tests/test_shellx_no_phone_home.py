@@ -194,7 +194,7 @@ class ShellXNoPhoneHomeTests(unittest.TestCase):
         manifests = offenders(r"sentry-cocoa|posthog-ios|getsentry|PostHog/posthog", roots=["Packages"], allow=[])
         manifests = [h for h in manifests if Path(h.rsplit(":", 1)[0]).name in ("Package.swift", "Package.resolved")]
         self.assertEqual(manifests, [])
-        imports = (r"^\s*(?:@\w+\s+)*(?:public |internal |package |private |fileprivate )?import\s+"
+        imports = (r"^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:public |internal |package |private |fileprivate )?import\s+"
                    r"(?:(?:struct|class|enum|protocol|func|var|let|typealias)\s+)?(Sentry|PostHog)\b")
         self.assertEqual(offenders(imports, roots=["Sources", "CLI", "Packages"], allow=[]), [])
 
