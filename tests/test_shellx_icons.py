@@ -17,6 +17,8 @@
 Usage (from the repo root):
     python3 tests/test_shellx_icons.py
 """
+from __future__ import annotations
+
 import json
 import re
 import sys
@@ -87,6 +89,8 @@ DYNAMIC_CALL_SITES = [
 # the CLI does not link.
 CLI_REACHABLE_ICON_PACKAGES = {
     "Packages/Shared/ShellXBrand": "defines the ShellXIcons product next to ShellXBrand; the CLI links ShellXBrand only",
+    "Packages/macOS/CmuxSimulator": "ShellXIcons is a dependency of CmuxSimulatorUI only; the CLI links the "
+                                    "CmuxSimulator product (targets CmuxSimulator, CmuxSimulatorSystem)",
 }
 
 
@@ -140,25 +144,125 @@ def target_product_dependencies(pbx: str, target: str) -> list[str]:
     raise AssertionError(f"target {target} not in {PBXPROJ}")
 
 
+def pbx_object_fields(pbx: str) -> dict[str, dict[str, str]]:
+    """{object id: {field: value}} for every pbxproj object, single-line
+    (`= {isa = ...; a = b; };`) or multi-line."""
+    objects = {}
+    for m in re.finditer(r"^\t\t(\w+) /\*[^\n]*?\*/ = \{", pbx, re.M):
+        depth, i = 0, m.end() - 1
+        while True:
+            depth += {"{": 1, "}": -1}.get(pbx[i], 0)
+            if depth == 0:
+                break
+            i += 1
+        body = re.sub(r"/\*.*?\*/", "", pbx[m.end():i])
+        objects[m.group(1)] = {
+            key: value.strip().strip('"') for key, value in re.findall(r"(\w+) = ([^;{}()]*);", body)
+        }
+    return objects
+
+
 def product_package_paths(pbx: str) -> dict[str, str]:
-    """{product name: local package path} for XCSwiftPackageProductDependency."""
-    packages = dict(re.findall(
-        r"(\w+) /\* XCLocalSwiftPackageReference \"[^\"]*\" \*/ = \{isa = XCLocalSwiftPackageReference; "
-        r"relativePath = \"?([^\";]+)\"?;", pbx))
+    """{product name: local package path} for each XCSwiftPackageProductDependency."""
+    objects = pbx_object_fields(pbx)
     products = {}
-    for ref, name in re.findall(
-            r"isa = XCSwiftPackageProductDependency; package = (\w+) /\*[^*]*\*/; productName = \"?([^\";]+)\"?;", pbx):
-        if ref in packages:
-            products[name] = packages[ref]
+    for fields in objects.values():
+        if fields.get("isa") == "XCSwiftPackageProductDependency":
+            package = objects.get(fields.get("package", ""), {})
+            if package.get("isa") == "XCLocalSwiftPackageReference":
+                products[fields["productName"]] = package["relativePath"]
     return products
 
 
-def local_package_deps(package: str) -> set[str]:
-    manifest = ROOT / package / "Package.swift"
-    deps = set()
-    for rel in re.findall(r'\.package\(\s*(?:name:\s*"[^"]*",\s*)?path:\s*"([^"]+)"', manifest.read_text(encoding="utf-8")):
-        deps.add((ROOT / package / rel).resolve().relative_to(ROOT).as_posix())
-    return deps
+class Manifest:
+    """The parts of a Package.swift the CLI-linkage check needs: package
+    name, local path dependencies, products and each target's dependencies."""
+
+    def __init__(self, package: str):
+        sys.path.insert(0, str(ROOT / "scripts/shellx"))
+        import icon_codemod  # noqa: E402
+
+        self.package = package
+        text = (ROOT / package / "Package.swift").read_text(encoding="utf-8")
+        masked = icon_codemod.mask(text)
+
+        def call_args(open_idx: int) -> tuple[int, int, dict]:
+            close = icon_codemod.matching_paren(masked, open_idx)
+            return open_idx, close, icon_codemod.top_level_label_spans(masked, open_idx, close)
+
+        def label_strings(spans: dict, label: str, close: int) -> list[str]:
+            if label not in spans:
+                return []
+            start = spans[label][1]
+            later = sorted(s for s, _ in spans.values() if s > start)
+            end = later[0] if later else close
+            return [text[start + m.start(1):start + m.end(1)] for m in re.finditer(r'"(_*)"', masked[start:end])]
+
+        name = re.search(r"\bPackage\(", masked)
+        _, close, spans = call_args(name.end() - 1)
+        self.name = label_strings(spans, "name", close)[0]
+        self.path_deps: dict[str, str] = {}
+        for m in re.finditer(r"\.package\(", masked):
+            _, close, spans = call_args(m.end() - 1)
+            for rel in label_strings(spans, "path", close):
+                path = (ROOT / package / rel).resolve().relative_to(ROOT).as_posix()
+                self.path_deps[Path(rel).name] = path
+                for named in label_strings(spans, "name", close):
+                    self.path_deps[named] = path
+        self.products: dict[str, list[str]] = {}
+        for m in re.finditer(r"\.(?:library|executable)\(", masked):
+            _, close, spans = call_args(m.end() - 1)
+            self.products[label_strings(spans, "name", close)[0]] = label_strings(spans, "targets", close)
+        self.targets: dict[str, list[tuple[str, str | None]]] = {}
+        for m in re.finditer(r"\.(?:target|executableTarget|testTarget|binaryTarget|systemLibrary)\(", masked):
+            _, close, spans = call_args(m.end() - 1)
+            target = label_strings(spans, "name", close)[0]
+            deps: list[tuple[str, str | None]] = []
+            if "dependencies" in spans:
+                start = spans["dependencies"][1]
+                later = sorted(s for s, _ in spans.values() if s > start)
+                block = masked[start:(later[0] if later else close)]
+                for d in re.finditer(r'\.product\(\s*name:\s*"(_*)",\s*package:\s*"(_*)"', block):
+                    deps.append((text[start + d.start(1):start + d.end(1)], text[start + d.start(2):start + d.end(2)]))
+                # Blank the .product(...) calls (same length, so offsets hold).
+                plain = re.sub(r"\.product\([^)]*\)", lambda p: " " * len(p.group()), block)
+                deps += [(text[start + d.start(1):start + d.end(1)], None)
+                         for d in re.finditer(r'"(_*)"', plain)]
+            self.targets[target] = deps
+
+
+def cli_reachable_targets(pbx: str) -> set[tuple[str, str]]:
+    """(package, target) pairs the cmux-cli target links: the targets of its
+    package products and, recursively, their target and product dependencies."""
+    manifests: dict[str, Manifest] = {}
+
+    def manifest(package: str) -> Manifest:
+        if package not in manifests:
+            manifests[package] = Manifest(package)
+        return manifests[package]
+
+    def product_targets(package: str, product: str) -> list[tuple[str, str]]:
+        return [(package, target) for target in manifest(package).products.get(product, [])]
+
+    paths = product_package_paths(pbx)
+    todo = [pair for product in target_product_dependencies(pbx, "cmux-cli") if product in paths
+            for pair in product_targets(paths[product], product)]
+    seen: set[tuple[str, str]] = set()
+    while todo:
+        package, target = todo.pop()
+        if (package, target) in seen:
+            continue
+        seen.add((package, target))
+        m = manifest(package)
+        for name, owner in m.targets.get(target, []):
+            if owner is None and name in m.targets:
+                todo.append((package, name))
+                continue
+            candidates = [m.path_deps[owner]] if owner in m.path_deps else (
+                list(m.path_deps.values()) if owner is None else [])
+            for dep in candidates:
+                todo += product_targets(dep, name)
+    return seen
 
 
 class ShellXIconsGuard(unittest.TestCase):
@@ -274,33 +378,41 @@ class ShellXIconsGuard(unittest.TestCase):
             parts = path.split("/")
             if parts[0] == "Sources" or path.startswith("Packages/Shared/ShellXBrand/"):
                 continue
-            package, kind, target = "/".join(parts[:3]), parts[3], parts[4]
-            manifest = read(f"{package}/Package.swift")
-            self.assertIn('"ShellXIcons"', manifest, f"{path}: {package}/Package.swift lacks the ShellXIcons product")
-            block = re.search(
-                rf'\.(?:target|testTarget|executableTarget)\(\s*name:\s*"{re.escape(target)}"(.*?)\n\s*\),?\n',
-                manifest, re.S)
-            self.assertIsNotNone(block, f"{path}: target {target} not found in {package}/Package.swift")
-            self.assertIn('"ShellXIcons"', block.group(1), f"{path}: target {target} does not depend on ShellXIcons")
+            package, target = "/".join(parts[:3]), parts[4]
+            manifest = Manifest(package)
+            self.assertIn(target, manifest.targets, f"{path}: target {target} not found in {package}/Package.swift")
+            self.assertIn(("ShellXIcons", "ShellXBrand"), manifest.targets[target],
+                          f"{path}: target {target} does not depend on the ShellXIcons product")
+            self.assertEqual(Path(ROOT / manifest.path_deps["ShellXBrand"]), ROOT / "Packages/Shared/ShellXBrand")
 
     def test_cli_never_links_shellxicons(self):
+        """The shellx CLI must not carry the icon resource bundle: no CLI
+        product is ShellXIcons, and no target the CLI links (through any
+        chain of local package targets and products) depends on it."""
         pbx = pbx_objects()
         cli_products = target_product_dependencies(pbx, "cmux-cli")
         self.assertIn("ShellXBrand", cli_products)
         self.assertNotIn("ShellXIcons", cli_products)
         paths = product_package_paths(pbx)
-        reachable, todo = set(), [paths[p] for p in cli_products if p in paths]
-        while todo:
-            package = todo.pop()
-            if package in reachable:
-                continue
-            reachable.add(package)
-            todo += sorted(local_package_deps(package))
+        unresolved = sorted(p for p in cli_products if p not in paths)
+        self.assertEqual(unresolved, [], "every CLI package product must resolve to a local package")
+        reachable = cli_reachable_targets(pbx)
+        self.assertIn(("Packages/Shared/ShellXBrand", "ShellXBrand"), reachable)
+        self.assertIn(("Packages/macOS/CmuxSimulator", "CmuxSimulator"), reachable)
+        self.assertNotIn(("Packages/macOS/CmuxSimulator", "CmuxSimulatorUI"), reachable)
+        self.assertGreater(len(reachable), 15)
         offending = sorted(
-            p for p in reachable
-            if "ShellXIcons" in read(f"{p}/Package.swift") and p not in CLI_REACHABLE_ICON_PACKAGES
+            f"{package}:{target}"
+            for package, target in reachable
+            if target == "ShellXIcons"
+            or any(name == "ShellXIcons" for name, _ in Manifest(package).targets.get(target, []))
         )
-        self.assertEqual(offending, [], "packages the CLI links (directly or not) must not use ShellXIcons")
+        self.assertEqual(offending, [], "targets the CLI links (directly or not) must not use ShellXIcons")
+        # The packages the CLI reaches that also hold ShellXIcons users keep
+        # them in targets the CLI does not link (e.g. CmuxSimulatorUI).
+        packages = {package for package, _ in reachable}
+        icon_packages = sorted(p for p in packages if "ShellXIcons" in read(f"{p}/Package.swift"))
+        self.assertEqual(icon_packages, sorted(CLI_REACHABLE_ICON_PACKAGES), icon_packages)
 
 
 if __name__ == "__main__":
