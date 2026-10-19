@@ -15,7 +15,7 @@ import Foundation
 enum CLIVersionSkew {
     /// What the connected app says about itself in `system.identify`.
     struct Peer: Equatable {
-        /// `app` from `system.identify` (`cmux`, `cmux-next`); nil from apps
+        /// `app` from `system.identify` (`shellx`, `cmux`, `cmux-next`); nil from apps
         /// that predate the field.
         var app: String?
         var version: String?
@@ -48,7 +48,8 @@ enum CLIVersionSkew {
     }
 
     /// The product name this CLI belongs to, as `system.identify` reports it.
-    static let cliProduct = "cmux"
+    /// ShellX's own product name, so a socket answered by cmux reads as another product.
+    static let cliProduct = "shellx"
 
     /// The user-facing explanation, or nil when the original error already
     /// says enough: the app is the same build as this CLI, lists the method,
