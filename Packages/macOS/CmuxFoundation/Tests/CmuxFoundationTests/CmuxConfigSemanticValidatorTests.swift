@@ -282,7 +282,7 @@ struct CmuxConfigSemanticValidatorTests {
             ["app": ["appearance": "system"]],
             scope: .project
         )
-        #expect(contains(globalOnly, path: "$.app", message: "global cmux.json"))
+        #expect(contains(globalOnly, path: "$.app", message: "global shellx.json"))
 
         let hooks = try issues(
             ["notifications": ["hooksMode": "replace", "hooks": []]],
@@ -298,7 +298,7 @@ struct CmuxConfigSemanticValidatorTests {
             contains(
                 workspacePlacement,
                 path: "$.workspaceGroups.newWorkspacePlacement",
-                message: "global cmux.json"
+                message: "global shellx.json"
             )
         )
     }
