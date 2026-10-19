@@ -163,7 +163,7 @@ extension ShellXRemoteService {
     }
 
     /// D9 second layer: approve only invitation ids the gate issued for an approved pairing (once, ≤ 300 s);
-    /// deny every other pending enrollment.
+    /// deny every other pending enrollment. Ticks never overlap, so an id is never approved twice at once.
     func enrollTick() async {
         let pending: (status: Int32, stdout: Data)
         do { pending = try await run(RemoteCommandLine.enrollPending(paths: env.paths)) } catch {
@@ -179,12 +179,16 @@ extension ShellXRemoteService {
                 RemoteLog.service.error("pending enrollment with an unusable invitation id (\(invitation.utf8.count) bytes) left alone")
                 continue
             }
-            switch gate.decide(pendingInvitationID: invitation, now: env.clock.now) {
+            switch gate.check(pendingInvitationID: invitation, now: env.clock.now) {
             case .approve(let pairingID):
+                // Used up only once the daemon admitted it; a timeout or failed run is tried again next tick
+                // (the gate still drops it after its 300 s).
                 let result = try? await run(RemoteCommandLine.enrollApprove(paths: env.paths, invitationID: invitation))
+                let status = result?.status ?? -1
+                if status == 0 { gate.consume(invitationID: invitation) }
                 RemoteLog.service.info("""
                     enrollment \(invitation, privacy: .public) for \(pairingID, privacy: .public) approved, \
-                    exit \(result?.status ?? -1)
+                    exit \(status)
                     """)
             case .deny:
                 let result = try? await run(RemoteCommandLine.enrollDeny(paths: env.paths, invitationID: invitation))

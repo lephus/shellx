@@ -332,3 +332,14 @@ private func runWrapper(maxFailures: Int, resetAfter: Int, clientBody: String) t
     let c = RemoteCommandLine.attachShellCommand(clientPath: "/c", socketPath: "/s", terminalID: "t")
     #expect(c.contains("-ge 45")); #expect(c.contains("sleep 2")); #expect(c.contains("-ge 10 ]"))
 }
+
+@Test func gateCheckKeepsInvitationUntilConsumed() {
+    var g = ApprovalGate(); g.expect(invitationID: "a", pairingID: "p", now: t0)
+    #expect(g.check(pendingInvitationID: "a", now: t0 + 1) == .approve(pairingID: "p"))
+    #expect(g.check(pendingInvitationID: "a", now: t0 + 2) == .approve(pairingID: "p"))   // approve failed: try again
+    #expect(g.check(pendingInvitationID: "a", now: t0 + 301) == .deny)                     // never past 300 s
+    #expect(g.check(pendingInvitationID: "x", now: t0 + 1) == .deny)
+    g.consume(invitationID: "a")
+    #expect(g.check(pendingInvitationID: "a", now: t0 + 3) == .deny)
+    #expect(g.isEmpty)
+}
