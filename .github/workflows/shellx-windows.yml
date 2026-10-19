@@ -16,6 +16,9 @@ on:
       - cmux-tui/Cargo.toml
       - .github/workflows/shellx-windows.yml
       - .github/actions/setup-cmux-tui-rust/**
+      - scripts/ci/init-submodule.sh
+      - scripts/ghostty-zig-version.sh
+      - ghostty
 
 permissions: {}
 
@@ -213,6 +216,16 @@ jobs:
         run: |
           unset CMUX_GHOSTTY_SRC
           cargo test --release --locked -p shellx-remote --target "$TARGET"
+
+      # The app's unit tests (remote session/link, pairing, links store, core
+      # service, TermCore) on Windows too, not only on the Mac.
+      - name: Test shellx-app
+        working-directory: windows
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          unset CMUX_GHOSTTY_SRC
+          cargo test --release --locked -p shellx-app --bin shellx-desktop --target "$TARGET"
 
       - name: Stage artifact
         id: stage

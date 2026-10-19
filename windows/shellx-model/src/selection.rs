@@ -75,11 +75,11 @@ impl Selection {
     pub fn spans(&self, cols: u16) -> Vec<(u16, u16, u16)> {
         let (s, e) = self.ordered();
         if s.row == e.row {
-            return vec![(s.row, s.col, (e.col + 1).min(cols))];
+            return vec![(s.row, s.col, e.col.saturating_add(1).min(cols))];
         }
         let mut v = vec![(s.row, s.col, cols)];
         v.extend((s.row + 1..e.row).map(|r| (r, 0, cols)));
-        v.push((e.row, 0, (e.col + 1).min(cols)));
+        v.push((e.row, 0, e.col.saturating_add(1).min(cols)));
         v
     }
 }
@@ -234,9 +234,9 @@ fn cells_before_and_in(text: &str, range_utf16: &Range<usize>) -> (u16, u16) {
     for c in text.chars() {
         let w = char_cells(c);
         if at < range_utf16.start {
-            before += w;
+            before = before.saturating_add(w);
         } else if at < range_utf16.end {
-            inside += w;
+            inside = inside.saturating_add(w);
         }
         at += c.len_utf16();
     }
@@ -315,12 +315,13 @@ fn is_sep(c: char) -> bool {
 }
 
 /// `start..end` (exclusive) of the run of non-separator chars around `col`;
-/// on a separator (or past the line) `(col, col + 1)`.
+/// on a separator (or past the line) `(col, col + 1)`. Columns saturate at
+/// `u16::MAX` (a line longer than 65535 chars is clamped, never wrapped).
 pub fn word_at(line: &str, col: u16) -> (u16, u16) {
     let chars: Vec<char> = line.chars().collect();
     let c = usize::from(col);
     if c >= chars.len() || is_sep(chars[c]) {
-        return (col, col + 1);
+        return (col, col.saturating_add(1));
     }
     let mut s = c;
     while s > 0 && !is_sep(chars[s - 1]) {
@@ -330,7 +331,8 @@ pub fn word_at(line: &str, col: u16) -> (u16, u16) {
     while e < chars.len() && !is_sep(chars[e]) {
         e += 1;
     }
-    (s as u16, e as u16)
+    let clamp = |i: usize| u16::try_from(i).unwrap_or(u16::MAX);
+    (clamp(s), clamp(e))
 }
 
 #[cfg(test)]
@@ -568,5 +570,26 @@ mod tests {
         let mut s = Selection::new(c(0, 6));
         s.extend(c(0, 9));
         assert_eq!(selected_text(&s, &lines(&[line]), 10), "Việt");
+    }
+
+    #[test]
+    fn max_column_and_long_lines_never_overflow() {
+        let m = u16::MAX;
+        let s = Selection::new(c(0, m));
+        assert_eq!(s.spans(m), vec![(0, m, m)]);
+        let mut s = Selection::new(c(0, 3));
+        s.extend(c(1, m));
+        assert_eq!(s.spans(m), vec![(0, 3, m), (1, 0, m)]);
+        // Past the line at the last column: (col, col + 1) saturates.
+        assert_eq!(word_at("ab", m), (m, m));
+        // A word longer than 65535 chars clamps instead of wrapping.
+        let long = "x".repeat(70_000);
+        assert_eq!(word_at(&long, 10), (0, m));
+        let mut far = "y ".repeat(33_000);
+        far.push_str("zz");
+        assert_eq!(word_at(&far, m), (m, m));
+        assert_eq!(word_at(&far, m - 1), (m - 1, m));
+        let r = ime_rect(c(0, m), (0.0, 0.0), 1.0, 1.0, &"x".repeat(70_000), 69_999..70_000);
+        assert_eq!(r.x, f32::from(m));
     }
 }
