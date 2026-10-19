@@ -51,6 +51,8 @@ public final class ShellXRemoteService: ObservableObject {
     var started = false
     var terminated = false
     var cmuxTuiAvailable = false
+    /// The launch sweep and cmux-tui check, run once and shared by `bootstrap` and `signIn`.
+    var preparation: Task<Bool, Never>?
     var configuration: Task<Void, any Error>?
     var bootTask: Task<Void, Never>?
     /// Stops of the last session; a new host start waits for them (they stop the bridge).
@@ -132,6 +134,8 @@ public final class ShellXRemoteService: ObservableObject {
         guard env.gateEnabled(), !terminated else {
             throw ShellXCoreError(code: "disabled", message: "remote machines are turned off")
         }
+        await prepareLocal()
+        guard !terminated else { return }
         try await ensureConfigured()
         _ = try await call("auth.login", ["email": .string(email), "password": .string(password)], as: LoginReply.self)
         guard !terminated else { return }
@@ -152,14 +156,7 @@ public final class ShellXRemoteService: ObservableObject {
     // MARK: - Session
 
     func bootstrap() async {
-        let paths = env.paths, cmuxTui = env.cmuxTui
-        // Before anything else: invite files of an earlier run are stale.
-        cmuxTuiAvailable = (try? await Self.offMain { () -> Bool in
-            let removed = RemoteInviteSweep.sweep(ticketsDir: paths.coreStateDir.appendingPathComponent("tickets", isDirectory: true),
-                                                  now: Date())
-            if removed > 0 { RemoteLog.service.info("removed \(removed) stale invite file(s)") }
-            return FileManager.default.isExecutableFile(atPath: cmuxTui.path)
-        }) ?? false
+        await prepareLocal()
         guard !terminated else { return }
         do { try await ensureConfigured() } catch {
             let code = RemoteLog.code(error)
@@ -189,6 +186,27 @@ public final class ShellXRemoteService: ObservableObject {
             RemoteLog.service.error("machines.list failed at launch: \(code, privacy: .public)")
             startSession(list: nil, listImmediately: false)
         }
+    }
+
+    /// Before any session: invite files of an earlier run are stale (swept), and whether cmux-tui exists.
+    /// Runs once; a sign-in that finishes before the launch sweep waits for the same result.
+    func prepareLocal() async {
+        let task: Task<Bool, Never>
+        if let preparation {
+            task = preparation
+        } else {
+            let paths = env.paths, cmuxTui = env.cmuxTui
+            task = Task.detached {
+                (try? await Self.offMain { () -> Bool in
+                    let tickets = paths.coreStateDir.appendingPathComponent("tickets", isDirectory: true)
+                    let removed = RemoteInviteSweep.sweep(ticketsDir: tickets, now: Date())
+                    if removed > 0 { RemoteLog.service.info("removed \(removed) stale invite file(s)") }
+                    return FileManager.default.isExecutableFile(atPath: cmuxTui.path)
+                }) ?? false
+            }
+            preparation = task
+        }
+        cmuxTuiAvailable = await task.value
     }
 
     func ensureConfigured() async throws {
