@@ -4,6 +4,7 @@ import CmuxFoundation
 import CmuxAppKitSupportUI
 import CmuxSettings
 import CmuxSettingsUI
+import ShellXBrand
 import SwiftUI
 import WebKit
 import AppKit
@@ -5325,46 +5326,6 @@ struct OmnibarSuggestionsView: View {
         }
     }
 
-    private var popupOverlayGradientColors: [Color] {
-        switch colorScheme {
-        case .light:
-            return [
-                Color.white.opacity(0.55),
-                Color.white.opacity(0.2),
-            ]
-        case .dark:
-            return [
-                Color.black.opacity(0.26),
-                Color.black.opacity(0.14),
-            ]
-        @unknown default:
-            return [
-                Color.white.opacity(0.55),
-                Color.white.opacity(0.2),
-            ]
-        }
-    }
-
-    private var popupBorderGradientColors: [Color] {
-        switch colorScheme {
-        case .light:
-            return [
-                Color.white.opacity(0.65),
-                Color.black.opacity(0.12),
-            ]
-        case .dark:
-            return [
-                Color.white.opacity(0.22),
-                Color.white.opacity(0.06),
-            ]
-        @unknown default:
-            return [
-                Color.white.opacity(0.65),
-                Color.black.opacity(0.12),
-            ]
-        }
-    }
-
     private var popupShadowColor: Color {
         switch colorScheme {
         case .light:
@@ -5475,30 +5436,14 @@ struct OmnibarSuggestionsView: View {
                     .allowsHitTesting(false)
             }
         }
+        // ShellX popover (spec §7.4): flat `raise` fill, 1 px `border`, no gradients.
         .background(
             RoundedRectangle(cornerRadius: popupCornerRadius, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: popupCornerRadius, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: popupOverlayGradientColors,
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                )
+                .fill(ShellXPalette.raise.color)
         )
         .overlay(
             RoundedRectangle(cornerRadius: popupCornerRadius, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        colors: popupBorderGradientColors,
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1
-                )
+                .stroke(ShellXPalette.border.color, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: popupCornerRadius, style: .continuous))
         .shadow(color: popupShadowColor, radius: 20, y: 10)

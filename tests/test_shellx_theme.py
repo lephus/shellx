@@ -6,7 +6,8 @@
   it through ATSApplicationFontsPath.
 - The app is dark-only: the Light/Dark/System picker is hidden and live
   appearance applies land on the forced ShellX appearance.
-- Buttons and inputs carry no gradients outside the allowlist (content fades,
+- The sidebar defaults to the opaque panel tint (match terminal background off).
+- Buttons, inputs and popovers carry no gradients outside the allowlist (content fades,
   debug-only styles, decorative art).
 
 Usage (from the repo root):
@@ -39,7 +40,6 @@ GRADIENT_ALLOW = [
     ("Sources/ProBadgeStyle.swift", "logo gradient (logo is the spec's one exception)"),
     ("Sources/Cloud/CloudWelcomeMedia.swift", "cloud welcome artwork (cloud UI hidden in ShellX)"),
     ("Sources/App/ComputerUseCursorOverlayController.swift", "agent cursor overlay art"),
-    ("Sources/Panels/BrowserPanelView.swift", "omnibar suggestion popover chrome (follow-up)"),
     ("Packages/macOS/CmuxSettingsUI/Sources/CmuxSettingsUI/Rows/ThemeWindowThumbnail.swift", "wallpaper art in the hidden appearance picker"),
     ("Packages/macOS/CmuxComputerUse/Sources/CmuxComputerUse/AgentCursorPointerView.swift", "agent cursor art"),
     ("Packages/macOS/CmuxSwiftRender/Sources/CmuxSwiftRender/SwiftViewInterpreter.swift", "user-authored view interpreter"),
@@ -102,6 +102,25 @@ class ShellXThemeGuardTests(unittest.TestCase):
         self.assertIn("AppearanceSettings.enforceShellXDarkOnly()", app)
         launch = app.index("AppearanceSettings.enforceShellXDarkOnly()")
         self.assertLess(launch, app.index("let startupAppearance = AppearanceSettings.resolvedMode()"))
+
+    def test_sidebar_defaults_to_the_panel_tint(self):
+        catalog = read("Packages/macOS/CmuxSettings/Sources/CmuxSettings/Keys/SidebarAppearanceCatalogSection.swift")
+        match = re.search(r'id: "sidebarAppearance\.matchTerminalBackground",\s*defaultValue: (\w+)', catalog)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.group(1), "false")
+        tint = read("Packages/macOS/CmuxAppKitSupportUI/Sources/CmuxAppKitSupportUI/WindowChrome/Sidebar/WindowChromeSidebarTintDefaults.swift")
+        self.assertIn("public static let matchesTerminalBackground = false", tint)
+        self.assertIn("ShellXPalette.panel.hexString.uppercased()", tint)
+        self.assertIn("opacity: Double = 1.0", tint)
+        schema = read("Packages/macOS/CmuxFoundation/Sources/CmuxFoundation/ConfigValidation/CmuxConfigSchema.generated.swift")
+        self.assertRegex(schema, r'"matchTerminalBackground": \{\s*"type": "boolean",\s*"default": false')
+        self.assertRegex(schema, r'"tintColor": \{\s*"\$ref": "#/\$defs/colorHex",\s*"default": "#100B1D"')
+
+    def test_omnibar_popover_is_flat(self):
+        browser = read("Sources/Panels/BrowserPanelView.swift")
+        self.assertNotRegex(browser, GRADIENT_PATTERN)
+        self.assertIn(".fill(ShellXPalette.raise.color)", browser)
+        self.assertIn(".stroke(ShellXPalette.border.color, lineWidth: 1)", browser)
 
     def test_no_gradients_on_buttons_or_rows(self):
         hits = offenders(GRADIENT_PATTERN, ["Sources", "Packages/macOS"], GRADIENT_ALLOW)

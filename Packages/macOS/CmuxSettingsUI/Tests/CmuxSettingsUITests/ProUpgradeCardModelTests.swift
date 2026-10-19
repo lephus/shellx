@@ -50,7 +50,7 @@ import Testing
     @Test func maxIsOfferedNoUpgrade() {
         let managed = ProUpgradeCardModel(tier: .max, isProActive: true, canManageBilling: true, isSignedIn: true)
         #expect(managed.actions == [.manageBilling])
-        #expect(managed.title == String(localized: "settings.account.max.title", defaultValue: "cmux Max"))
+        #expect(managed.title == String(localized: "settings.account.max.title", defaultValue: "ShellX Max"))
 
         let external = ProUpgradeCardModel(tier: .max, isProActive: true, canManageBilling: false, isSignedIn: true)
         #expect(external.actions.isEmpty)

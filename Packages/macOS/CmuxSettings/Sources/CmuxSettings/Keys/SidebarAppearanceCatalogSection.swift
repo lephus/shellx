@@ -3,9 +3,11 @@ import ShellXBrand
 
 /// Settings under the dotted-id prefix `sidebarAppearance.*`.
 public struct SidebarAppearanceCatalogSection: SettingCatalogSection {
+    /// ShellX: off by default, so the sidebar draws the opaque `panel` token
+    /// (spec §7.4) instead of the terminal background. A stored choice wins.
     public let matchTerminalBackground = DefaultsKey<Bool>(
         id: "sidebarAppearance.matchTerminalBackground",
-        defaultValue: true,
+        defaultValue: false,
         userDefaultsKey: "sidebarMatchTerminalBackground"
     )
 
