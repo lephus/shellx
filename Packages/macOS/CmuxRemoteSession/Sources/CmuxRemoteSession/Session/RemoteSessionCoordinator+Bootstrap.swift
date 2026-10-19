@@ -3,7 +3,7 @@ internal import CmuxFoundation
 internal import CryptoKit
 public import Foundation
 
-// cmuxd-remote bootstrap: probe the remote platform and existing install,
+// shellx-remote bootstrap: probe the remote platform and existing install,
 // acquire a binary (explicit override, verified manifest download, or the
 // dev-only local `go build` fallback), upload + install it atomically, and
 // perform the stdio `hello` handshake. Faithful lift: probe/upload/install
@@ -169,7 +169,7 @@ extension RemoteSessionCoordinator {
           armv7l|ARMV7L|armv7|ARMV7) cmux_go_arch=arm ;;
           *) exit 71 ;;
         esac
-        cmux_remote_path="$HOME/.cmux/bin/cmuxd-remote/\(scriptVersion)/${cmux_go_os}-${cmux_go_arch}/cmuxd-remote"
+        cmux_remote_path="$HOME/.shellx/bin/shellx-remote/\(scriptVersion)/${cmux_go_os}-${cmux_go_arch}/shellx-remote"
         if [ -x "$cmux_remote_path" ] && [ -s "$cmux_remote_path" ]; then
           printf '%syes\\n' '\(Self.remotePlatformProbeExistsMarker)'
           cmux_remote_size="$(wc -c < "$cmux_remote_path" 2>/dev/null || printf '0')"
@@ -269,12 +269,31 @@ extension RemoteSessionCoordinator {
         )
     }
 
-    static func allowLocalDaemonBuildFallback(environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
-        environment["CMUX_REMOTE_DAEMON_ALLOW_LOCAL_BUILD"] == "1"
+    /// True in Debug builds only. The dev fallback below (a local
+    /// `CMUX_REMOTE_DAEMON_BINARY` or `go build`, enabled with
+    /// `CMUX_REMOTE_DAEMON_ALLOW_LOCAL_BUILD=1`) is compiled out of Release
+    /// builds, which only upload the manifest-pinned, SHA-256-verified helper.
+    static let isDebugBuild: Bool = {
+        #if DEBUG
+        true
+        #else
+        false
+        #endif
+    }()
+
+    static func allowLocalDaemonBuildFallback(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        isDebugBuild: Bool = RemoteSessionCoordinator.isDebugBuild
+    ) -> Bool {
+        guard isDebugBuild else { return false }
+        return environment["CMUX_REMOTE_DAEMON_ALLOW_LOCAL_BUILD"] == "1"
     }
 
-    static func explicitRemoteDaemonBinaryURL(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL? {
-        guard allowLocalDaemonBuildFallback(environment: environment) else { return nil }
+    static func explicitRemoteDaemonBinaryURL(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        isDebugBuild: Bool = RemoteSessionCoordinator.isDebugBuild
+    ) -> URL? {
+        guard allowLocalDaemonBuildFallback(environment: environment, isDebugBuild: isDebugBuild) else { return nil }
         guard let path = environment["CMUX_REMOTE_DAEMON_BINARY"]?.trimmingCharacters(in: .whitespacesAndNewlines),
               !path.isEmpty else {
             return nil
@@ -284,10 +303,10 @@ extension RemoteSessionCoordinator {
 
     static func versionedRemoteDaemonBuildURL(goOS: String, goArch: String, version: String) -> URL {
         URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-            .appendingPathComponent("cmux-remote-daemon-build", isDirectory: true)
+            .appendingPathComponent("shellx-remote-build", isDirectory: true)
             .appendingPathComponent(version, isDirectory: true)
             .appendingPathComponent("\(goOS)-\(goArch)", isDirectory: true)
-            .appendingPathComponent("cmuxd-remote", isDirectory: false)
+            .appendingPathComponent("shellx-remote", isDirectory: false)
     }
 
     func buildLocalDaemonBinary(goOS: String, goArch: String, version: String) throws -> URL {
@@ -312,13 +331,13 @@ extension RemoteSessionCoordinator {
 
         guard Self.allowLocalDaemonBuildFallback() else {
             throw NSError(domain: "cmux.remote.daemon", code: 20, userInfo: [
-                NSLocalizedDescriptionKey: "this build does not include a verified cmuxd-remote manifest for \(goOS)-\(goArch). Use a release/nightly build, or set CMUX_REMOTE_DAEMON_ALLOW_LOCAL_BUILD=1 for a dev-only fallback.",
+                NSLocalizedDescriptionKey: "this build does not include a verified shellx-remote manifest for \(goOS)-\(goArch). Use a release build, or set CMUX_REMOTE_DAEMON_ALLOW_LOCAL_BUILD=1 in a Debug build for a dev-only fallback.",
             ])
         }
 
         guard let repoRoot = findRepoRoot() else {
             throw NSError(domain: "cmux.remote.daemon", code: 20, userInfo: [
-                NSLocalizedDescriptionKey: "cannot locate cmux repo root for dev-only cmuxd-remote build fallback",
+                NSLocalizedDescriptionKey: "cannot locate the repo root for the dev-only shellx-remote build fallback",
             ])
         }
         let daemonRoot = repoRoot.appendingPathComponent("daemon/remote", isDirectory: true)
@@ -330,7 +349,7 @@ extension RemoteSessionCoordinator {
         }
         guard let goBinary = Self.which("go") else {
             throw NSError(domain: "cmux.remote.daemon", code: 22, userInfo: [
-                NSLocalizedDescriptionKey: "go is required for the dev-only cmuxd-remote build fallback",
+                NSLocalizedDescriptionKey: "go is required for the dev-only shellx-remote build fallback",
             ])
         }
 
@@ -353,7 +372,7 @@ extension RemoteSessionCoordinator {
         guard result.status == 0 else {
             let detail = Self.bestErrorLine(stderr: result.stderr, stdout: result.stdout) ?? "go build failed with status \(result.status)"
             throw NSError(domain: "cmux.remote.daemon", code: 23, userInfo: [
-                NSLocalizedDescriptionKey: "failed to build cmuxd-remote: \(detail)",
+                NSLocalizedDescriptionKey: "failed to build shellx-remote: \(detail)",
             ])
         }
         guard FileManager.default.isExecutableFile(atPath: output.path),
@@ -417,7 +436,7 @@ extension RemoteSessionCoordinator {
         let version = (resultObject["version"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
         let capabilities = (resultObject["capabilities"] as? [String]) ?? []
         return DaemonHello(
-            name: (name?.isEmpty == false ? name! : "cmuxd-remote"),
+            name: (name?.isEmpty == false ? name! : "shellx-remote"),
             version: (version?.isEmpty == false ? version! : "dev"),
             capabilities: capabilities,
             remotePath: remotePath
@@ -514,7 +533,7 @@ extension RemoteSessionCoordinator {
     }
 
     static func remoteDaemonPath(version: String, goOS: String, goArch: String) -> String {
-        ".cmux/bin/cmuxd-remote/\(version)/\(goOS)-\(goArch)/cmuxd-remote"
+        ".shellx/bin/shellx-remote/\(version)/\(goOS)-\(goArch)/shellx-remote"
     }
 
     static func remoteDaemonInstallLocation(

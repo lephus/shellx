@@ -9,7 +9,7 @@ import Foundation
 /// why they were moved off the main-actor dispatch path. Running the whole
 /// action on one serial queue keeps every command in its authored order, so a
 /// later command can't finish before an earlier browser navigate/click/wait.
-private let cmuxSidebarWorkerQueue = DispatchQueue(label: "com.cmux.sidebar-action-worker")
+private let cmuxSidebarWorkerQueue = DispatchQueue(label: "pro.shellx.sidebar-action-worker")
 
 /// Select-burst coalescing lives in ``SidebarSelectCoalescer``
 /// (CmuxSwiftRenderUI), where its FIFO/newest-wins semantics are unit-tested.

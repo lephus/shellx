@@ -444,7 +444,7 @@ struct CmuxTopSnapshotScopeTests {
 
         let scope = try #require(CmuxTopProcessSnapshot.cmuxScope(
             arguments: [
-                "/Applications/cmux.app/Contents/Resources/bin/cmux",
+                "/Applications/ShellX.app/Contents/Resources/bin/shellx",
                 "hooks",
                 "codex",
                 "monitor",
@@ -464,7 +464,7 @@ struct CmuxTopSnapshotScopeTests {
 
         let scope = CmuxTopProcessSnapshot.cmuxScope(
             arguments: [
-                "/Applications/cmux.app/Contents/Resources/bin/cmux",
+                "/Applications/ShellX.app/Contents/Resources/bin/shellx",
                 "other",
                 "/tmp/hooks",
                 "/tmp/codex",
@@ -502,7 +502,7 @@ struct CmuxTopSnapshotScopeTests {
         let monitorPID = 4242
         let bytes = kernProcArgs(
             arguments: [
-                "/Applications/cmux.app/Contents/Resources/bin/cmux",
+                "/Applications/ShellX.app/Contents/Resources/bin/shellx",
                 "hooks",
                 "codex",
                 "monitor",
@@ -524,8 +524,8 @@ struct CmuxTopSnapshotScopeTests {
                 CmuxTopProcessInfo(
                     pid: monitorPID,
                     parentPID: 1,
-                    name: "cmux",
-                    path: "/Applications/cmux.app/Contents/Resources/bin/cmux",
+                    name: "shellx",
+                    path: "/Applications/ShellX.app/Contents/Resources/bin/shellx",
                     ttyDevice: nil,
                     cmuxWorkspaceID: scope.workspaceID,
                     cmuxSurfaceID: scope.surfaceID,

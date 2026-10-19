@@ -31,16 +31,15 @@ import CoreServices
 import CoreGraphics
 import UserNotifications
 import CMUXMobileCore
-import Sentry
 import WebKit
 import Combine
 import ObjectiveC.runtime
 import Darwin
 import CmuxFoundation
-import CmuxSentryReporting
 import CmuxSidebar
 import CmuxGit
 import os
+import ShellXBrand
 
 private nonisolated let sudoApprovalLogger = Logger(
     subsystem: "com.cmuxterm.app",
@@ -48,7 +47,8 @@ private nonisolated let sudoApprovalLogger = Logger(
 )
 
 private enum CmuxThemeNotifications {
-    static let reloadConfig = Notification.Name("com.cmuxterm.themes.reload-config")
+    // Distributed: the ShellX CLI posts it, so the name must not be cmux's.
+    static let reloadConfig = Notification.Name("\(ShellXBrand.bundleID).themes.reload-config")
 }
 
 struct WorkspaceGroupNewWorkspaceTarget {
@@ -613,18 +613,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     let accentColorObserver = CmuxAccentColorObserver()
     /// The resolved cmux accent for chrome drawing.
     var accentColor: CmuxAccentColor { accentColorObserver.current }
-    private static let reloadConfigurationMenuItemIdentifier = NSUserInterfaceItemIdentifier("com.cmux.reloadConfiguration")
+    private static let reloadConfigurationMenuItemIdentifier = NSUserInterfaceItemIdentifier("pro.shellx.reloadConfiguration")
     private static let cachedIsRunningUnderXCTest = MacSentryStartupPolicy.isRunningUnderXCTest(
         environment: ProcessInfo.processInfo.environment
     )
     private var isRunningUnderXCTestCached: Bool {
         Self.cachedIsRunningUnderXCTest
     }
-    /// Bridges the Mac host's transport diagnostic ring into Sentry
-    /// (breadcrumbs, structured logs, throttled failure events with the ring
-    /// export attached). Created after `SentrySDK.start`; delivery no-ops when
-    /// the SDK is off.
-    private var transportSentryReporter: TransportSentryReporter?
     private let cmuxThemePreviewReloadScheduler = MainActorDeferredActionScheduler()
     private let connectivityInvalidationSubscriberCoordinator = ConnectivityInvalidationSubscriberCoordinator()
     let workspacePresenceController = WorkspacePresenceController()
@@ -1508,7 +1503,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                in: .userDomainMask
            ).first,
            let runnerExecutableURL = Bundle.main.resourceURL?
-               .appendingPathComponent("bin/cmux", isDirectory: false),
+               .appendingPathComponent("bin/shellx", isDirectory: false),
            fileManager.isExecutableFile(atPath: runnerExecutableURL.path) {
             let broker = SudoBroker(
                 paths: SudoBrokerPaths(
@@ -1530,7 +1525,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             in: .userDomainMask
         ).first?
             .appendingPathComponent("Logs", isDirectory: true)
-            .appendingPathComponent("cmux", isDirectory: true)
+            .appendingPathComponent("ShellX", isDirectory: true)
             .appendingPathComponent("hangs", isDirectory: true)
         let captureStore = hangDirectory.map {
             MainThreadHangCaptureStore(
@@ -1598,6 +1593,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         _ url: URL,
         delivery: AuthCallbackDelivery = .external
     ) async -> Bool {
+        // ShellX: sign-in and billing are Manaflow services; a callback URL
+        // never completes a sign-in or refreshes a billing plan.
+        guard ShellXFeatures.cloud else { return false }
         let callbackRouter = auth?.callbackRouter ?? AuthCallbackRouter()
         guard callbackRouter.isAuthCallbackURL(url) else {
             AuthDebugLog().log("auth.callback rejected: URL is not an accepted callback")
@@ -1685,6 +1683,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // An older ShellX (the Flutter app) shares our bundle id. Ask before
+        // anything else runs; this returns only once it has quit.
+        if !isRunningUnderXCTest(ProcessInfo.processInfo.environment) {
+            resolveOlderShellXBeforeLaunch()
+        }
         // Start the one browser-availability watcher before any gated view or
         // menu mounts: it is lazy, and its consumers only observe its
         // notification, so nothing else would bring it up (#10866).
@@ -1842,91 +1845,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
 #endif
 
-        if sentryStartupPolicy.shouldStart {
-            // Pre-warm locale before Sentry to avoid a startup data race.
-            // Locale initialization (os.locale.ensureLocale / NSLocale._preferredLanguages)
-            // on the main thread can race with Sentry's background init thread
-            // calling posix.getenv, causing a SIGSEGV ~134ms after launch.
-            // Forcing locale access here before SentrySDK.start eliminates the race.
-            // Related to: #836
-            _ = Locale.current
-            _ = NSLocale.preferredLanguages
-
-            StartupBreadcrumbLog.append("appDelegate.didFinish.sentry.begin")
-            SentrySDK.start { options in
-                options.dsn = "https://ecba1ec90ecaee02a102fba931b6d2b3@o4507547940749312.ingest.us.sentry.io/4510796264636416"
-                #if DEBUG
-                options.environment = "development"
-                options.debug = true
-                #else
-                options.environment = "production"
-                options.debug = false
-                #endif
-                options.sendDefaultPii = false
-
-                // Performance tracing is disabled. The auto-instrumented root
-                // `SentryTransaction.trace` serializes its `data` / `tags` /
-                // `description` into the payload *after* `beforeSend` runs, and
-                // the root tracer is not reachable through the public Sentry API,
-                // so those fields cannot be scrubbed. Disabling transactions
-                // removes that un-scrubbable egress path while keeping crash,
-                // error, and app-hang reporting (which are independent of the
-                // trace sample rate). cmux does not consume these performance
-                // traces today.
-                options.tracesSampleRate = 0.0
-                // Keep app-hang tracking enabled, but avoid reporting short main-thread stalls
-                // as hangs in normal user interaction flows.
-                options.appHangTimeoutInterval = 8.0
-                // Attach stack traces to all events
-                options.attachStacktrace = true
-                // Avoid recursively capturing failed requests from Sentry's own ingestion endpoint.
-                options.enableCaptureFailedRequests = false
-                // Report Objective-C exceptions that reach NSApplication's
-                // reportException: hook with their reason and throw stack. The
-                // matching executor-corruption path reaches this hook before
-                // AppKit terminates the process. Some macOS 26+ drawing paths
-                // call the class-level _crashOnException: method directly and
-                // remain outside Sentry Cocoa 9.3.0's hook; a future SDK upgrade
-                // can cover those paths too.
-                options.enableUncaughtNSExceptionReporting = true
-                // Structured logs power the transport diagnostics bridge
-                // (TransportSentryReporter on the host diagnostic ring below).
-                options.enableLogs = true
-                // Redact file paths, emails, and secrets from every outgoing
-                // event, breadcrumb, structured log, and (belt-and-suspenders,
-                // if tracing is ever re-enabled) child performance span before
-                // it leaves the device.
-                let scrubber = SentryEventScrubber()
-                options.beforeSend = { event in scrubber.scrub(event) }
-                options.beforeBreadcrumb = { breadcrumb in scrubber.scrub(breadcrumb) }
-                options.beforeSendSpan = { span in scrubber.scrub(span) }
-                options.beforeSendLog = { log in scrubber.scrub(log) }
-            }
-            // Bridge the Mac host's transport diagnostic ring into Sentry:
-            // every retained event becomes a breadcrumb + budget-limited log
-            // line, and gated failures become events carrying the ring export.
-            // The tap delivers on the ring's drain task, off the main thread.
-            let transportReporter = TransportSentryReporter(
-                role: .macHost,
-                exportRing: { await MobileHostDiagnostics.log.export() }
-            )
-            transportSentryReporter = transportReporter
-            MobileHostDiagnostics.log.setEventTap { event in
-                transportReporter.ingest(event)
-            }
-            StartupBreadcrumbLog.append("appDelegate.didFinish.sentry.complete")
-        }
-
-        if telemetryEnabled && !isRunningUnderXCTest {
-            StartupBreadcrumbLog.append("appDelegate.didFinish.posthog.begin")
-            PostHogAnalytics.shared.startIfNeeded()
-            StartupBreadcrumbLog.append("appDelegate.didFinish.posthog.complete")
-        }
+        // ShellX starts no crash reporter (Sentry) and no analytics SDK
+        // (PostHog), and fetches no remote feature flags: flags resolve from
+        // their local defaults. Product analytics stays a disabled no-op.
         startProductAnalytics()
-        // `DisableTelemetry` (MDM) also stops the remote feature-flag fetch: it
-        // carries the same anonymous install id, and flags then use their
-        // built-in defaults.
-        if !isRunningUnderXCTest, !ManagedDevicePolicy().isEnforced(.disableTelemetry) {
+        if CmuxFeatureFlags.remoteConfigFetchEnabled, !isRunningUnderXCTest, !ManagedDevicePolicy().isEnforced(.disableTelemetry) {
             CmuxFeatureFlags.shared.start()
         }
 
@@ -2837,7 +2760,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
         }
         // Best-effort one-time migration: a value previously stored in the
-        // legacy ~/.config/cmux/dev-window-display file moves into the shared
+        // legacy ~/.config/shellx/dev-window-display file moves into the shared
         // cmux.json (app.devWindowDisplay) so an existing dev-display default
         // keeps working. No-op when already set or the legacy file is absent.
         Task { await DevWindowDisplayDefault.migrateLegacyFileIfNeeded(runtime: settingsRuntime) }
@@ -7265,7 +7188,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
 #endif
         guard let workspace = tabManager?.selectedWorkspace,
-              let cliURL = Bundle.main.resourceURL?.appendingPathComponent("bin/cmux"),
+              let cliURL = Bundle.main.resourceURL?.appendingPathComponent("bin/shellx"),
               FileManager.default.isExecutableFile(atPath: cliURL.path) else {
             return false
         }
@@ -7879,7 +7802,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             }
             if let name {
                 guard CmuxExtensionSidebarSelection.customSidebarFileURL(forName: name) != nil else {
-                    return .failure(String(localized: "rightSidebar.remote.error.customSidebarNotFound", defaultValue: "ERROR: No custom sidebar named '\(name)' in ~/.config/cmux/sidebars"))
+                    return .failure(String(localized: "rightSidebar.remote.error.customSidebarNotFound", defaultValue: "ERROR: No custom sidebar named '\(name)' in ~/.config/shellx/sidebars"))
                 }
                 state.selectCustomSidebar(name: name)
             }
@@ -8772,6 +8695,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         bringWindowForward: Bool = false,
         debugSource: String = "mobileConnect"
     ) -> Workspace? {
+        // ShellX: phone pairing is parked until Wave 2 flips `remoteMachines`.
+        guard ShellXFeatures.remoteMachines else { return nil }
         // Shared chokepoint for every pairing-window entry (Settings, palette,
         // menu): pairing is unavailable under a managed remote-control disable.
         guard MobileRemoteControlPolicy.isEnabled else {
@@ -11154,18 +11079,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             },
             onQuitApp: {
                 AppDelegate.requestApplicationTermination()
-            },
-            cloudMenuEntries: { [weak self] in
-                guard let self else { return [] }
-                return CloudMenuContent.entries(
-                    self.cloudMenuContext(),
-                    actions: self.cloudMenuActions(fromStatusItem: true),
-                    layout: .statusItem
-                )
-            },
-            onCloudMenuWillOpen: {
-                CloudMenuModel.shared.menuWillOpen()
             }
+            // ShellX: no Cloud section in the status item (Cloud is off).
         )
     }
 
@@ -12487,10 +12402,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         )
     }
 
-    @objc func triggerSentryTestCrash(_ sender: Any?) {
-        guard SentrySDK.isEnabled else { return }
-        SentrySDK.crash()
-    }
+    /// ShellX has no crash reporter, so the debug "test crash" item does nothing.
+    @objc func triggerSentryTestCrash(_ sender: Any?) {}
 #endif
 
 #if DEBUG
@@ -14310,7 +14223,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             "windowRouteFailure": "",
         ], at: path)
 
-        guard let cliURL = Bundle.main.resourceURL?.appendingPathComponent("bin/cmux"),
+        guard let cliURL = Bundle.main.resourceURL?.appendingPathComponent("bin/shellx"),
               FileManager.default.isExecutableFile(atPath: cliURL.path) else {
             writeMultiWindowNotificationTestData([
                 "windowRouteStatus": "0",
@@ -15763,23 +15676,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 #endif
             performNewLocalWorkspaceAction(event: event, debugSource: "shortcut.ctrlOptCmdN")
             return true
-        }
-
-        if matchConfiguredShortcut(event: event, action: .newCloudWorkspace) {
-#if DEBUG
-            cmuxDebugLog("shortcut.action name=newCloudWorkspace \(debugShortcutRouteSnapshot(event: event))")
-#endif
-            return performNewCloudWorkspaceOnResolvedMachineAction(
-                preferredWindow: mainWindowForShortcutEvent(event),
-                debugSource: "shortcut.cmdY"
-            )
-        }
-
-        if matchConfiguredShortcut(event: event, action: .newCloudMachine) {
-#if DEBUG
-            cmuxDebugLog("shortcut.action name=newCloudMachine \(debugShortcutRouteSnapshot(event: event))")
-#endif
-            return performNewCloudMachineAction(event: event, debugSource: "shortcut.cmdShiftY")
         }
 
         // New Window: Cmd+Shift+N
@@ -18675,8 +18571,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             ) else { continue }
             switch SingleInstanceConflictPolicy(environment: environment).action(
                 currentBundleURL: Bundle.main.bundleURL,
-                existingBundleURL: app.bundleURL
+                existingBundleURL: app.bundleURL,
+                existingKind: Self.singleInstanceKind(of: app)
             ) {
+            case .askToQuitOlderShellX:
+                // Never quit it without the user's click; exits on Cancel.
+                promptToQuitOlderShellX(app)
             case .yieldToExisting:
                 // Another bundle sharing this id (a local Release build, a
                 // tool-launched copy) must not kill the user's running app.
@@ -18721,6 +18621,92 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 "quitRequestedPids": quitRequestedPids.joined(separator: ",")
             ]
         )
+    }
+
+    /// Shows the "older ShellX is running" prompt for every non-native app
+    /// that shares our bundle id (the Flutter ShellX at /Applications/ShellX.app).
+    private func resolveOlderShellXBeforeLaunch() {
+        guard let bundleId = Bundle.main.bundleIdentifier else { return }
+        let currentPid = ProcessInfo.processInfo.processIdentifier
+        for app in NSRunningApplication.runningApplications(withBundleIdentifier: bundleId) {
+            guard app.processIdentifier != currentPid, !app.isTerminated else { continue }
+            guard Self.isDuplicateApplicationExecutable(
+                app.executableURL,
+                mainExecutableURL: Self.bundleExecutableURL(of: app)
+            ) else { continue }
+            guard Self.singleInstanceKind(of: app) == .olderShellX else { continue }
+            promptToQuitOlderShellX(app)
+        }
+    }
+
+    /// Asks the user to quit the older ShellX `app`. Cancel exits this launch
+    /// (as a silent yield did before); Quit asks the app to terminate, waits
+    /// the graceful timeout and continues. If it refuses, says so and exits.
+    /// The older app is never force-terminated.
+    private func promptToQuitOlderShellX(_ app: NSRunningApplication) {
+        let path = app.bundleURL?.path ?? String(app.processIdentifier)
+        StartupBreadcrumbLog.append(
+            "singleInstance.olderShellX.prompt",
+            fields: ["existingPid": String(app.processIdentifier), "existingBundlePath": path]
+        )
+        NSApp.activate()
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(
+            localized: "singleInstance.olderShellX.title",
+            defaultValue: "An older ShellX is running"
+        )
+        alert.informativeText = String.localizedStringWithFormat(
+            String(
+                localized: "singleInstance.olderShellX.message",
+                defaultValue: "The previous ShellX app (at %@) is open. Quit it to use the new ShellX."
+            ),
+            path
+        )
+        alert.addButton(withTitle: String(
+            localized: "singleInstance.olderShellX.quit",
+            defaultValue: "Quit it and open ShellX"
+        ))
+        alert.addButton(withTitle: String(localized: "common.cancel", defaultValue: "Cancel"))
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            StartupBreadcrumbLog.append("singleInstance.olderShellX.cancel")
+            // _exit: skip atexit handlers, as the yield path does.
+            _exit(0)
+        }
+        _ = app.terminate()
+        let deadline = Date().addingTimeInterval(SingleInstanceConflictPolicy.gracefulTerminationTimeout)
+        while !app.isTerminated, Date() < deadline {
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.1))
+        }
+        guard app.isTerminated else {
+            StartupBreadcrumbLog.append("singleInstance.olderShellX.quitRefused")
+            let failure = NSAlert()
+            failure.alertStyle = .critical
+            failure.messageText = String(
+                localized: "singleInstance.olderShellX.quitFailed.title",
+                defaultValue: "The older ShellX didn't quit"
+            )
+            failure.informativeText = String.localizedStringWithFormat(
+                String(
+                    localized: "singleInstance.olderShellX.quitFailed.message",
+                    defaultValue: "Quit the app at %@ yourself, then open ShellX again."
+                ),
+                path
+            )
+            failure.addButton(withTitle: String(localized: "common.ok", defaultValue: "OK"))
+            failure.runModal()
+            _exit(0)
+        }
+        StartupBreadcrumbLog.append("singleInstance.olderShellX.quit")
+    }
+
+    /// Whether `app` is a native ShellX or another app sharing our bundle id.
+    nonisolated private static func singleInstanceKind(
+        of app: NSRunningApplication
+    ) -> SingleInstanceConflictPolicy.ExistingInstanceKind {
+        SingleInstanceConflictPolicy.classifyExistingBundle(at: app.bundleURL) { path in
+            FileManager.default.fileExists(atPath: path)
+        }
     }
 
     /// The main executable of the bundle `app` was registered with, if any.
@@ -18769,16 +18755,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             ) else {
                 return
             }
-            // Leave same-bundle launches to the incoming process. It yields to
-            // this instance by default and can replace it only with the
-            // explicit reload override.
-            if let launchedBundleURL = app.bundleURL,
-               SingleInstanceConflictPolicy.isSameBundle(launchedBundleURL, Bundle.main.bundleURL) {
+            switch SingleInstanceConflictPolicy.duplicateLaunchAction(
+                launchedBundleURL: app.bundleURL,
+                currentBundleURL: Bundle.main.bundleURL,
+                launchedKind: Self.singleInstanceKind(of: app)
+            ) {
+            case .ignoreSameBundle:
+                // Leave same-bundle launches to the incoming process. It yields to
+                // this instance by default and can replace it only with the
+                // explicit reload override.
                 StartupBreadcrumbLog.append(
                     "singleInstance.observe.sameBundleLaunch",
                     fields: ["duplicatePid": String(app.processIdentifier)]
                 )
                 return
+            case .leaveOlderShellXRunning:
+                // The older (Flutter) ShellX the user just opened, or a bundle
+                // LaunchServices did not identify, keeps running; it used to be
+                // force-terminated here without a word.
+                StartupBreadcrumbLog.append(
+                    "singleInstance.observe.olderShellXLaunch",
+                    fields: [
+                        "launchedPid": String(app.processIdentifier),
+                        "launchedBundlePath": app.bundleURL?.path ?? "nil"
+                    ]
+                )
+                return
+            case .terminateDuplicate:
+                break
             }
 
             StartupBreadcrumbLog.append(

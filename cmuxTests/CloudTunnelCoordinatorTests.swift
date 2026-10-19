@@ -16,7 +16,7 @@ import Testing
 /// side is a fake that records calls and emits link status on demand.
 @Suite(.timeLimit(.minutes(2)))
 struct CloudTunnelCoordinatorTests {
-    private static let extensionID = "com.cmuxterm.app.tests.tunnel"
+    private static let extensionID = "pro.shellx.desktop.tests.tunnel"
     private static let networkExtension = CloudTunnelBackend.networkExtension(extensionBundleIdentifier: extensionID)
     private static let use = CloudPrivateNetworkUse(machineID: "vm-1", purpose: .attach)
 

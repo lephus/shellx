@@ -2,11 +2,9 @@
 
 import PackageDescription
 
-// `CmuxMobileCrashReporting` is the iOS crash telemetry leaf package. It owns
-// the Sentry startup options for mobile, including watchdog termination,
-// app-hang, and MetricKit diagnostics. It depends on the telemetry consent seam
-// in `CMUXMobileCore`, making crash reporting and analytics sibling consumers
-// of the same opt-out contract.
+// `CmuxMobileCrashReporting` is the iOS crash telemetry leaf package. ShellX
+// links no Sentry SDK (no phone-home), so it keeps the composition root's
+// entry points as no-ops that only purge a stale crash cache.
 let package = Package(
     name: "CmuxMobileCrashReporting",
     platforms: [
@@ -21,20 +19,12 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../../Shared/CMUXMobileCore"),
-        .package(path: "../../Shared/CmuxSentryTelemetry"),
-        .package(
-            url: "https://github.com/getsentry/sentry-cocoa.git",
-            .upToNextMajor(from: "9.3.0")
-        ),
     ],
     targets: [
         .target(
             name: "CmuxMobileCrashReporting",
             dependencies: [
                 "CMUXMobileCore",
-                .product(name: "CmuxSentryScrubbing", package: "CmuxSentryTelemetry"),
-                .product(name: "CmuxSentryReporting", package: "CmuxSentryTelemetry"),
-                .product(name: "Sentry", package: "sentry-cocoa"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

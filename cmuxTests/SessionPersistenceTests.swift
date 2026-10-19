@@ -2337,7 +2337,7 @@ final class SocketListenerAcceptPolicyTests: XCTestCase {
         defer { try? fileManager.removeItem(at: sandbox) }
 
         let recordURL = sandbox.appendingPathComponent("record.txt", isDirectory: false)
-        let wrapperURL = sandbox.appendingPathComponent("cmux-claude-wrapper", isDirectory: false)
+        let wrapperURL = sandbox.appendingPathComponent("shellx-claude-wrapper", isDirectory: false)
         let shimURL = shimDir.appendingPathComponent("claude", isDirectory: false)
         let realClaudeURL = realBinDir.appendingPathComponent("claude", isDirectory: false)
 
@@ -2346,7 +2346,7 @@ final class SocketListenerAcceptPolicyTests: XCTestCase {
             try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
         }
 
-        // Stand-in for cmux-claude-wrapper: re-inject the hook --settings on --resume
+        // Stand-in for shellx-claude-wrapper: re-inject the hook --settings on --resume
         // (as the real wrapper does), then record the final invocation.
         try writeExecutable(wrapperURL, """
         #!/usr/bin/env bash
@@ -2733,7 +2733,7 @@ final class SocketListenerAcceptPolicyTests: XCTestCase {
     }
 
     /// Builds the hermetic wrapper/shim/real-claude sandbox shared by the non-POSIX
-    /// restore-launcher regression tests: a recording stand-in for `cmux-claude-wrapper`
+    /// restore-launcher regression tests: a recording stand-in for `shellx-claude-wrapper`
     /// (re-injects the hook `--settings` on `--resume`, as the real wrapper does), the
     /// per-surface shim that `CMUX_CLAUDE_WRAPPER_SHIM` points at, and a hook-less "real"
     /// claude that records when the wrapper was bypassed.
@@ -2749,7 +2749,7 @@ final class SocketListenerAcceptPolicyTests: XCTestCase {
         }
 
         let recordURL = sandbox.appendingPathComponent("record.txt", isDirectory: false)
-        let wrapperURL = sandbox.appendingPathComponent("cmux-claude-wrapper", isDirectory: false)
+        let wrapperURL = sandbox.appendingPathComponent("shellx-claude-wrapper", isDirectory: false)
         let shimURL = shimDir.appendingPathComponent("claude", isDirectory: false)
         let realClaudeURL = realBinDir.appendingPathComponent("claude", isDirectory: false)
 

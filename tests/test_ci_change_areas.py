@@ -3152,7 +3152,7 @@ def test_ci_workflow_edits_to_a_mac_lane_caller_still_select_it() -> None:
 def test_mac_standalone_lane_inputs_still_select_their_lanes_beside_routing_edits() -> None:
     real = CI_WORKFLOW.read_text(encoding="utf-8")
     edited = edit_job(real, "changes")
-    wrapper = route_ci_workflow_edit(edited, ("Resources/bin/cmux-claude-wrapper",))
+    wrapper = route_ci_workflow_edit(edited, ("Resources/bin/shellx-claude-wrapper",))
     assert wrapper["claude_wrapper"] == "true", wrapper
     daemon = route_ci_workflow_edit(edited, (".github/workflows/remote-daemon.yml",))
     assert daemon["remote_daemon"] == "true", daemon
@@ -7148,9 +7148,9 @@ def test_trusted_router_reads_new_guard_tests_from_the_pr_head() -> None:
 
 
 def test_claude_wrapper_inputs_use_standalone_lane_without_native_compile() -> None:
-    for paths in (["Resources/bin/cmux-claude-wrapper"],
+    for paths in (["Resources/bin/shellx-claude-wrapper"],
                   ["tests/test_claude_wrapper_hooks.py"],
-                  ["Resources/bin/cmux-claude-wrapper", "tests/test_claude_wrapper_hooks.py"]):
+                  ["Resources/bin/shellx-claude-wrapper", "tests/test_claude_wrapper_hooks.py"]):
         areas = module.classify_files(paths)
         assert not areas.macos and not areas.cli and not areas.release_build and not areas.swift_packages, (paths, areas)
         assert module.classify_files([*paths, "Sources/AppDelegate.swift"]).macos
@@ -7161,7 +7161,7 @@ def test_claude_wrapper_scope_executes_workflow_shell() -> None:
     workflow = yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))
     script = next(step["run"] for step in workflow["jobs"]["changes"]["steps"] if step.get("id") == "standalone")
     for paths, expected in (
-        (["Resources/bin/cmux-claude-wrapper"], "true"),
+        (["Resources/bin/shellx-claude-wrapper"], "true"),
         (["tests/test_claude_wrapper_hooks.py"], "true"),
         (["tests/node_runtime.py"], "true"),
         (["scripts/ci/run_python_test_lane.py"], "true"),
@@ -7172,7 +7172,7 @@ def test_claude_wrapper_scope_executes_workflow_shell() -> None:
         (["tests/test-execution.toml"], "false"),
         (["tests/test-execution.toml", "tests/test_claude_wrapper_hooks.py"], "true"),
         ([".github/workflows/ci.yml"], "true"),
-        (["Resources/bin/cmux-claude-wrapper", "Sources/AppDelegate.swift"], "true"),
+        (["Resources/bin/shellx-claude-wrapper", "Sources/AppDelegate.swift"], "true"),
         (["Sources/AppDelegate.swift"], "false"),
         (["docs/example.md"], "false"),
         ([], "false"),

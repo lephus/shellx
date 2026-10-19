@@ -58,7 +58,7 @@ strip_executable() {
 }
 
 strip_executable "$APP_PATH/Contents/MacOS/cmux"
-strip_executable "$APP_PATH/Contents/Resources/bin/cmux"
+strip_executable "$APP_PATH/Contents/Resources/bin/shellx"
 strip_executable "$APP_PATH/Contents/Resources/bin/cmux-tui"
 strip_executable "$APP_PATH/Contents/Resources/bin/cmux-diff-sidecar"
 

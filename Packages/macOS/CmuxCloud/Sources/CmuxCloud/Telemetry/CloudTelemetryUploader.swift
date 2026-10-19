@@ -71,7 +71,7 @@ public actor CloudTelemetryUploader: CloudTelemetrySending {
         self.session = session
         self.batchDelay = batchDelay
         self.queueURL = queueURL ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(Bundle.main.bundleIdentifier ?? "com.cmuxterm.app")
+            .appendingPathComponent(Bundle.main.bundleIdentifier ?? "pro.shellx.desktop")
             .appendingPathComponent("cloud-diagnostics.json")
     }
 

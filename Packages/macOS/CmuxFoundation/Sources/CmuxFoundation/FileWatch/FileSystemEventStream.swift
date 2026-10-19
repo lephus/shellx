@@ -26,7 +26,7 @@ struct FileSystemEventBatch: Sendable {
 /// calls and callbacks execute on that queue.
 final class FileSystemEventStream: @unchecked Sendable {
     private static let queue = DispatchQueue(
-        label: "com.cmux.recursive-path-watcher", qos: .utility
+        label: "pro.shellx.recursive-path-watcher", qos: .utility
     )
 
     /// The C trampoline `FSEventStreamCreate` requires.

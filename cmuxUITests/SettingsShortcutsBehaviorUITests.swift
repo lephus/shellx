@@ -15,7 +15,7 @@ import XCTest
 /// - `SettingsGlobalHotkeyNote` — static permissions note.
 ///
 /// Keyboard Shortcuts section:
-/// - `SettingsKeyboardShortcutsChordDocsLink` — external chord docs URL.
+/// - (`SettingsKeyboardShortcutsChordDocsLink` is hidden in ShellX: no chord docs page.)
 /// - `SettingsKeyboardShortcutsOpenSettingsFileButton` — open cmux.json.
 /// - `SettingsKeyboardShortcutsResetDefaultsButton` — reset all bindings.
 /// - per-action `ShortcutRecorderView` + `ShortcutRecorderClearRestoreButton`.
@@ -327,11 +327,9 @@ final class SettingsShortcutsBehaviorUITests: SettingsUITestCase {
 //   the cmux UI surface to assert against. Not e2e-testable from XCUITest;
 //   the host action itself can be unit-tested against a fake SettingsHostActions.
 
-// TIER 3 (not e2e): SettingsKeyboardShortcutsChordDocsLink ("Chord docs") —
-//   A SwiftUI Link to https://cmux.com/docs/keyboard-shortcuts#shortcut-chords.
-//   Clicking it opens the default web browser to an external URL; there is no
-//   in-app observable effect, so it is not e2e-testable. The destination URL
-//   correctness is better covered by a unit assertion on the section, not a UI test.
+// Not in ShellX: SettingsKeyboardShortcutsChordDocsLink ("Chord docs") — ShellX
+//   has no chord docs page, so the section hides the link
+//   (tests/test_shellx_no_phone_home.py checks it stays hidden).
 
 // TIER 3 (not e2e): SettingsGlobalHotkeyNote / ShortcutRecordingHint —
 //   Static informational text only. They render fixed copy and have no

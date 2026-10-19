@@ -1,4 +1,4 @@
-// cmux-feed-plugin-marker v1
+// shellx-feed-plugin-marker v1
 // Bridges OpenCode's plugin event bus to the cmux socket's feed.* verbs.
 // Installed by `cmux hooks setup` or `cmux hooks opencode install`.
 // DO NOT EDIT MANUALLY - cmux upgrades this file in place.
@@ -8,7 +8,7 @@ import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
 
-const DEFAULT_SOCKET = `${os.homedir()}/.config/cmux/cmux.sock`;
+const DEFAULT_SOCKET = `${os.homedir()}/.local/state/shellx/shellx.sock`;
 const REPLY_TIMEOUT_MS = 120_000;
 const MAX_PLAN_BYTES = 128 * 1024;
 
@@ -1105,16 +1105,16 @@ const createCMUXFeed = async (ctx, options = {}) => {
 
 export const CMUXFeed = createCMUXFeed;
 
-const CMUX_FEED_SERVER_SCOPES_KEY = Symbol.for("cmux.feed.server.scopes");
+const CMUX_FEED_SERVER_SCOPES_KEY = Symbol.for("shellx.feed.server.scopes");
 
 const isTUIProcessServerContext = (ctx) =>
   Boolean(ctx && typeof ctx === "object" && ctx.client && ctx.serverUrl && ctx.directory);
 
 export default {
-  id: "cmux.feed",
+  id: "shellx.feed",
   async server(ctx) {
     if (!isTUIProcessServerContext(ctx)) return {};
-    // cmux-feed.js and plugins/cmux/index.js both load this source, and every
+    // shellx-feed.js and plugins/shellx/index.js both load this source, and every
     // loader in one plugin scope receives the same ctx. OpenCode keeps one
     // scope per directory, and disposes a scope's hooks when it tears it down.
     const scopes = globalThis[CMUX_FEED_SERVER_SCOPES_KEY] ||= new WeakSet();

@@ -21,6 +21,7 @@ struct Harness {
             clock: clock,
             defaults: defaults,
             isDevLikeBundle: false,
+            hasUpdateSigningKey: true,
             updaterFactory: { _, _ in updater }
         )
     }

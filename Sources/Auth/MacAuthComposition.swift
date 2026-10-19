@@ -253,7 +253,7 @@ struct MacAuthComposition {
             in: .userDomainMask
         ).first ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
         return support
-            .appendingPathComponent("cmux", isDirectory: true)
+            .appendingPathComponent("ShellX", isDirectory: true)
             .appendingPathComponent(bundleIdentifier ?? "cmux", isDirectory: true)
     }
 
@@ -415,7 +415,7 @@ final class MacAuthTeamScopeRecoveryTriggers {
         pathMonitor.pathUpdateHandler = { path in
             continuation.yield(path.status == .satisfied)
         }
-        pathMonitor.start(queue: DispatchQueue(label: "com.cmux.auth.team-scope-path"))
+        pathMonitor.start(queue: DispatchQueue(label: "pro.shellx.auth.team-scope-path"))
         tasks.append(Task { @MainActor [weak self] in
             var wasSatisfied = false
             for await satisfied in pathSatisfied {

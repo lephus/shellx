@@ -223,7 +223,7 @@ struct TerminalStartupRestoreFailureTests {
         let recorder = AgentChatResumeIntentRecorder { _ in }
         let source = Workspace(
             workingDirectory: workingDirectory,
-            initialTerminalInput: " cmux restore codex \(sessionID)\n",
+            initialTerminalInput: " shellx restore codex \(sessionID)\n",
             initialTerminalStartupRestoreAgent: agent,
             agentSessionAutoResumeDefaults: defaults.store,
             agentChatResumeIntentRecorder: recorder

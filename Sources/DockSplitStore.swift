@@ -35,8 +35,8 @@ final class DockSplitStore: BonsplitDelegate, FilePreviewTabMetadataHost {
     @ObservationIgnored var ownedPaneIds: Set<UUID> = []
 
     /// Which Dock this store backs: `.workspace` (per-workspace, seeded from the
-    /// project `.cmux/dock.json`) or `.global` (a per-window Dock seeded from
-    /// the global `~/.config/cmux/dock.json`, owner id == window id). Drives
+    /// project `.shellx/dock.json`) or `.global` (a per-window Dock seeded from
+    /// the global `~/.config/shellx/dock.json`, owner id == window id). Drives
     /// config resolution and how cross-container moves resolve a reference window.
     let scope: DockScope
 

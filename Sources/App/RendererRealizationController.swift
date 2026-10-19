@@ -40,7 +40,7 @@ final class RendererRealizationController {
     private let visibilityCoalescingWindow: TimeInterval
     private let onEvaluationCompleted: () -> Void
     private let safetyTimerEnabled: Bool
-    private let timerQueue = DispatchQueue(label: "com.cmux.renderer-realization", qos: .utility)
+    private let timerQueue = DispatchQueue(label: "pro.shellx.renderer-realization", qos: .utility)
     private let systemMemoryPressureRetryPasses = 2
     private var timer: DispatchSourceTimer?
     private var reclaimDeadlineTask: Task<Void, Never>?

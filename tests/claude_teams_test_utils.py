@@ -69,7 +69,7 @@ def resolve_cmux_cli() -> str:
     if explicit and os.path.exists(explicit) and os.access(explicit, os.X_OK):
         return explicit
 
-    recorded_path = Path("/tmp/cmux-last-cli-path")
+    recorded_path = Path("/tmp/shellx-last-cli-path")
     if recorded_path.exists():
         candidate = recorded_path.read_text(encoding="utf-8").strip()
         if candidate and os.path.exists(candidate) and os.access(candidate, os.X_OK):
@@ -247,7 +247,7 @@ def install_pi_extension(config_dir: Path, cli_path: str | None = None) -> Path:
             f"exit={install.returncode} stdout={install.stdout!r} stderr={install.stderr!r}"
         )
 
-    extension_path = config_dir / "extensions" / "cmux-session.ts"
+    extension_path = config_dir / "extensions" / "shellx-session.ts"
     if not extension_path.exists():
         raise RuntimeError(f"expected extension at {extension_path}")
     override = os.environ.get("CMUX_TEST_PI_EXTENSION_OVERRIDE")

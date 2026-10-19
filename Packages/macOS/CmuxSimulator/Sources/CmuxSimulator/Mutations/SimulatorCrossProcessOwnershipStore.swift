@@ -8,7 +8,7 @@ struct SimulatorCrossProcessOwnershipStore: Sendable {
 
     init(directory: URL? = nil) {
         self.directory = directory ?? FileManager().temporaryDirectory
-            .appendingPathComponent("com.cmux.simulator-ownership", isDirectory: true)
+            .appendingPathComponent("pro.shellx.simulator-ownership", isDirectory: true)
     }
 
     func claim(namespace: String, components: [String]) throws -> UUID {

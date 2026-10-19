@@ -165,7 +165,7 @@ extension CMUXCLI {
           Before editing, back up any existing cmux.json file to a timestamped .bak copy.
           Use printed curl commands to fetch the latest docs/schema; prefer Ghostty config for terminal behavior Ghostty already supports.
           Ghostty config lives at ~/.config/ghostty/config (terminal transparency, blur, font, theme, keybinds, etc.).
-          `cmux reload-config` reloads BOTH Ghostty config and ~/.config/cmux/cmux.json, then refreshes terminals in place. No app restart needed.
+          `cmux reload-config` reloads BOTH Ghostty config and ~/.config/shellx/shellx.json, then refreshes terminals in place. No app restart needed.
 
         \(String(localized: "cli.help.taskHelp.heading", defaultValue: "Task Help:"))
           cmux help <\(Self.taskHelpTopicNames)>
@@ -180,7 +180,7 @@ extension CMUXCLI {
           CMUX_TAB_ID         Optional alias used by `tab-action`/`rename-tab` as default --tab.
           CMUX_SURFACE_ID     Auto-set in cmux terminals. Used as default --surface.
           CMUX_SOCKET_PATH    Override the Unix socket path. Without this, the CLI defaults
-                              to ~/.local/state/cmux/cmux.sock and auto-discovers tagged/debug sockets.
+                              to ~/.local/state/shellx/shellx.sock and auto-discovers tagged/debug sockets.
         """
     }
 

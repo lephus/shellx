@@ -201,7 +201,27 @@ private actor CodeRouterHandoffGate {
 struct CodeRouterHandoffClientTests {
     private let baseURL = URL(string: "http://127.0.0.1:39123")!
 
-    @Test
+    /// ShellX: CodeRouter is a Manaflow service, so `mint()` refuses before it
+    /// reads the session or sends any request.
+    @Test(.enabled(if: !ShellXSwitches.codeRouter))
+    func mintRefusesBeforeAnyRequestInShellX() async throws {
+        let probe = CodeRouterHandoffRequestProbe()
+        let handler: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in
+            await probe.record(request)
+            throw URLError(.badServerResponse)
+        }
+        let client = CodeRouterHandoffClient(
+            auth: CodeRouterHandoffTestAuth(),
+            baseURL: baseURL,
+            requestHandler: handler
+        )
+        await #expect(throws: CodeRouterHandoffClientError.sessionUnavailable) {
+            _ = try await client.mint()
+        }
+        #expect(await probe.request == nil)
+    }
+
+    @Test(.enabled(if: ShellXSwitches.codeRouter, "ShellX: CodeRouter is off; mint() refuses first"))
     func mintsLeaseWithNativeHeadersAndNoCookies() async throws {
         let auth = CodeRouterHandoffTestAuth()
         let probe = CodeRouterHandoffRequestProbe()
@@ -252,7 +272,7 @@ struct CodeRouterHandoffClientTests {
         // app-host tests cannot import the CLI, so that bound is not checked here.
     }
 
-    @Test
+    @Test(.enabled(if: ShellXSwitches.codeRouter, "ShellX: CodeRouter is off; mint() refuses first"))
     func rejectsAccountOrTeamChangeBeforeReturningLease() async throws {
         let auth = CodeRouterHandoffTestAuth()
         let gate = CodeRouterHandoffGate()
@@ -283,7 +303,7 @@ struct CodeRouterHandoffClientTests {
         }
     }
 
-    @Test
+    @Test(.enabled(if: ShellXSwitches.codeRouter, "ShellX: CodeRouter is off; mint() refuses first"))
     func rejectsAccountChangeBeforeReturningLease() async throws {
         let auth = CodeRouterHandoffTestAuth()
         let gate = CodeRouterHandoffGate()
@@ -313,7 +333,7 @@ struct CodeRouterHandoffClientTests {
         }
     }
 
-    @Test
+    @Test(.enabled(if: ShellXSwitches.codeRouter, "ShellX: CodeRouter is off; mint() refuses first"))
     func rejectsExpiredAndReplayedResponsesWithoutEchoingBody() async throws {
         let auth = CodeRouterHandoffTestAuth()
         let secretLease = "crh_" + String(repeating: "D", count: 43)
@@ -333,7 +353,7 @@ struct CodeRouterHandoffClientTests {
         }
     }
 
-    @Test
+    @Test(.enabled(if: ShellXSwitches.codeRouter, "ShellX: CodeRouter is off; mint() refuses first"))
     func rejectsExpiredAndOversizedSuccessBodies() async throws {
         let auth = CodeRouterHandoffTestAuth()
         let expiredHandler: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in
@@ -375,7 +395,7 @@ struct CodeRouterHandoffClientTests {
         }
     }
 
-    @Test
+    @Test(.enabled(if: ShellXSwitches.codeRouter, "ShellX: CodeRouter is off; mint() refuses first"))
     func rejectsUntrustedHostAndInvalidLeaseSyntax() async throws {
         let auth = CodeRouterHandoffTestAuth()
         let handler: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { _ in
@@ -397,7 +417,7 @@ struct CodeRouterHandoffClientTests {
         #expect(!CodeRouterHandoffClient.isValidLeaseSyntax("crh_" + String(repeating: "!", count: 43)))
     }
 
-    @Test
+    @Test(.enabled(if: ShellXSwitches.codeRouter, "ShellX: CodeRouter is off; mint() refuses first"))
     func rejectsRedirectedMintResponse() async throws {
         let auth = CodeRouterHandoffTestAuth()
         let handler: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in
@@ -418,7 +438,7 @@ struct CodeRouterHandoffClientTests {
         }
     }
 
-    @Test
+    @Test(.enabled(if: ShellXSwitches.codeRouter, "ShellX: CodeRouter is off; mint() refuses first"))
     func rejectsTeamMismatchForExplicitTeamRequest() async throws {
         let auth = CodeRouterHandoffTestAuth()
         let handler: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in

@@ -12,7 +12,7 @@ import Foundation
 /// lock domain.
 struct JSONConfigWriteLock: Sendable {
     private static let waitQueue = DispatchQueue(
-        label: "com.cmux.settings.json-write-lock",
+        label: "pro.shellx.settings.json-write-lock",
         qos: .userInitiated,
         attributes: .concurrent
     )

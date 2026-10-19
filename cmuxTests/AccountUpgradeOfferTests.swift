@@ -23,46 +23,12 @@ struct AccountUpgradeOfferTests {
         ))
     }
 
-    @Test(arguments: [
-        (CmuxPlanTier.free, Optional(CmuxPlanTier.pro)),
-        (CmuxPlanTier.go, Optional(CmuxPlanTier.pro)),
-        (CmuxPlanTier.pro, Optional(CmuxPlanTier.max)),
-        (CmuxPlanTier.max, nil),
-    ])
-    func paletteCommandFollowsTheTier(tier: CmuxPlanTier, expected: CmuxPlanTier?) throws {
-        let command = try #require(ContentView.commandPaletteProCommandContributions().first {
-            $0.commandId == ContentView.commandPaletteProUpgradeCommandId
-        })
-        var context = CommandPaletteContextSnapshot()
-        let offer = CmuxPlanTier.upgradeOffer(isSignedIn: true, knownTier: tier)
-        context.setString(
-            CommandPaletteContextKeys.accountUpgradeOffer,
-            ContentView.commandPaletteUpgradeOfferValue(offer)
-        )
-        #expect(command.when(context) == (expected != nil))
-        if let expected {
-            #expect(command.title(context) == ProUpgradePresenter.upgradeCommandTitle(for: expected))
-        }
-    }
-
-    @Test func paletteHidesTheUpgradeWhileThePlanIsUnknown() throws {
-        let command = try #require(ContentView.commandPaletteProCommandContributions().first {
-            $0.commandId == ContentView.commandPaletteProUpgradeCommandId
-        })
-        var context = CommandPaletteContextSnapshot()
-        context.setString(
-            CommandPaletteContextKeys.accountUpgradeOffer,
-            ContentView.commandPaletteUpgradeOfferValue(CmuxPlanTier.upgradeOffer(isSignedIn: true, knownTier: nil))
-        )
-        #expect(!command.when(context))
-    }
-
-    @Test func footerBadgeIsHiddenForProAndMax() {
+    /// ShellX: billing and Pro are Manaflow services, so no tier shows the
+    /// footer upgrade badge and the palette offers no upgrade command.
+    @Test func footerBadgeAndPaletteNeverOfferAnUpgrade() {
         for tier in CmuxPlanTier.allCases {
-            #expect(
-                SidebarFooterPresentationPolicy.isUpgradeVisible(isProActive: tier.includesPro) == !tier.includesPro,
-                "\(tier)"
-            )
+            #expect(!SidebarFooterPresentationPolicy.isUpgradeVisible(isProActive: tier.includesPro), "\(tier)")
         }
+        #expect(ContentView.commandPaletteProCommandContributions().isEmpty)
     }
 }

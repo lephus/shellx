@@ -778,7 +778,7 @@ final class RemoteTmuxControlConnection {
         proc.standardError = errPipe
         let stdinWriter = RemoteTmuxControlPipeWriter(
             handle: inPipe.fileHandleForWriting,
-            label: "com.cmux.remote-tmux.stdin.\(UUID().uuidString)",
+            label: "pro.shellx.remote-tmux.stdin.\(UUID().uuidString)",
             maxPendingBytes: Self.maxPendingStdinBytes,
             onFailure: { [weak self] in
                 self?.handleStdinWriteFailure()
@@ -786,7 +786,7 @@ final class RemoteTmuxControlConnection {
         )
 
         let stdoutPipeReader = RemoteTmuxProcessOutputReader(
-            label: "com.cmux.remote-tmux.stdout.\(UUID().uuidString)",
+            label: "pro.shellx.remote-tmux.stdout.\(UUID().uuidString)",
             maxPendingChunks: Self.maxPendingStdoutChunks,
             maxPendingBytes: Self.maxPendingStdoutBytes,
             onOverflow: { [weak self] in
@@ -796,7 +796,7 @@ final class RemoteTmuxControlConnection {
         let reader = outPipe.fileHandleForReading
         stdoutPipeReader.attach(to: reader)
         let stderrPipeReader = RemoteTmuxProcessOutputReader(
-            label: "com.cmux.remote-tmux.stderr.\(UUID().uuidString)",
+            label: "pro.shellx.remote-tmux.stderr.\(UUID().uuidString)",
             maxPendingChunks: Self.maxPendingStderrChunks,
             maxPendingBytes: Self.maxPendingStderrBytes,
             onOverflow: { [weak self] in

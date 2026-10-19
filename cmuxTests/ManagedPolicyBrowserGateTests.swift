@@ -256,6 +256,20 @@ struct ManagedPolicyBrowserGateTests {
         }
     }
 
+    /// ShellX parks Cloud for good and phone pairing until Wave 2, so the
+    /// tab bar must not draw buttons whose actions refuse.
+    @Test
+    func surfaceTabBarParkedButtonsFollowTheirActionGates() {
+        for action in [CmuxSurfaceTabBarBuiltInAction.cloudVM, .newCloudWorkspace, .newCloudMachine] {
+            #expect(!Workspace.surfaceTabBarBuiltInActionIsAvailable(action))
+            #expect(!AppDelegate.isBuiltInActionAvailableInNewWorkspaceMenu(action, isAuthenticated: true))
+        }
+        if !ShellXSwitches.remoteMachines {
+            #expect(!Workspace.surfaceTabBarBuiltInActionIsAvailable(.mobileConnect))
+            #expect(!AppDelegate.isBuiltInActionAvailableInNewWorkspaceMenu(.mobileConnect))
+        }
+    }
+
     /// The availability gate is watched by one owner (#10866).
     ///
     /// Each consumer used to subscribe to all three underlying signals, which

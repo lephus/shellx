@@ -17,7 +17,7 @@ public struct SettingsJSONSection: View {
 
     public var body: some View {
         Group {
-            SettingsSectionHeader(String(localized: "settings.section.settingsJSON", defaultValue: "cmux.json"), section: .settingsJSON)
+            SettingsSectionHeader(String(localized: "settings.section.settingsJSON", defaultValue: "shellx.json"), section: .settingsJSON)
                 .accessibilityIdentifier("SettingsJSONSection")
             SettingsCard {
                 userConfigFileRow
@@ -65,7 +65,7 @@ public struct SettingsJSONSection: View {
         ) {
             Link(
                 String(localized: "settings.settingsJSON.docsButton", defaultValue: "Open Docs"),
-                destination: URL(string: "https://cmux.com/docs/configuration#cmux-json")!
+                destination: URL(string: "https://github.com/lephus/shellx/blob/main/docs/configuration.md")!
             )
             .cmuxFont(.caption)
             .accessibilityIdentifier("SettingsJSONDocsLink")

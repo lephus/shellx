@@ -10,7 +10,7 @@ re-declare the user's handlers: a copied user handler is discovered twice and
 runs twice (https://github.com/manaflow-ai/cmux/issues/12081).
 
 The argv-level tests run against the built cmux CLI. The live test also runs
-the real ``codex`` binary through ``Resources/bin/cmux-codex-wrapper`` against
+the real ``codex`` binary through ``Resources/bin/shellx-codex-wrapper`` against
 a hermetic local model provider and is skipped when no real codex is installed.
 """
 
@@ -40,7 +40,7 @@ from claude_teams_test_utils import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_WRAPPER = ROOT / "Resources" / "bin" / "cmux-codex-wrapper"
+SOURCE_WRAPPER = ROOT / "Resources" / "bin" / "shellx-codex-wrapper"
 ACTIVATION_PREFIX = ["--enable", "hooks", "--dangerously-bypass-hook-trust"]
 # The events named in issue 12081. The CLI's own baseline (an empty hooks.json)
 # defines the complete injected set, which newer schemas extend.

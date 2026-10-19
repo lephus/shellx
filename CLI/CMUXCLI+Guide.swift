@@ -77,11 +77,11 @@ extension CMUXCLI {
         agent-browser --help
         ```
 
-        [cmux browser](https://cmux.com/docs/browser-automation) · [agent-browser docs](https://agent-browser.dev/) · [agent-browser commands](https://agent-browser.dev/commands)
+        [cmux browser](https://github.com/lephus/shellx/blob/main/skills/cmux-browser/SKILL.md) · [agent-browser docs](https://agent-browser.dev/) · [agent-browser commands](https://agent-browser.dev/commands)
 
         \(CMUXDiffViewerLocalization.string("cli.guide.overview.computer", defaultValue: "## Use app windows\n\nUse computer-use tools for native apps or visual controls. cmux provides these tools to Claude Code and Codex sessions launched in cmux. Complete setup in Settings > Computer Use. Read the `cmux-cua` skill for your agent's methods: inspect app or window state, click or type, then inspect again."))
 
-        [cmux-cua](https://github.com/manaflow-ai/cmux/blob/main/skills/cmux-cua/SKILL.md#using-the-tools-agent-facing)
+        [cmux-cua](https://github.com/lephus/shellx/blob/main/skills/cmux-cua/SKILL.md#using-the-tools-agent-facing)
 
         \(CMUXDiffViewerLocalization.string("cli.guide.overview.cloud", defaultValue: "## Use Cloud\n\nUse cmux Cloud when work needs a remote machine. List machines before choosing one. Use `exec` for a short command, `agent` for a coding agent, and `push` or `pull` for files. The default Cloud devbox includes Chrome and `cua-driver`; the Cloud guide explains how to verify and use them. Use the Cloud guide for desktop, browser, port, and machine lifecycle methods."))
 
@@ -152,7 +152,7 @@ extension CMUXCLI {
         cmux cloud desktop <machine>
         ```
 
-        [agent-browser docs](https://agent-browser.dev/) · [agent-browser commands](https://agent-browser.dev/commands) · [cua-driver docs](https://cua.ai/docs/cua-driver) · [cmux cloud agent](https://github.com/manaflow-ai/cmux/blob/main/skills/cmux-cloud-vm/references/agent-workflows.md)
+        [agent-browser docs](https://agent-browser.dev/) · [agent-browser commands](https://agent-browser.dev/commands) · [cua-driver docs](https://cua.ai/docs/cua-driver) · [cmux cloud agent](https://github.com/lephus/shellx/blob/main/skills/cmux-cloud-vm/references/agent-workflows.md)
 
         \(CMUXDiffViewerLocalization.string("cli.guide.cloud.share", defaultValue: "## Observe, open, share, and clean up\n\nUse `tree`, `terminal read`, and `terminal wait` to observe live work and check its real output. Use `open` for a machine's terminal, desktop, or web port when there is something useful to show. Private web URLs need the Cloud network connection; read `vpn` help. Use `domains` to publish a web port with explicit access rules. Use snapshots and forks to keep or copy machine state. Delete forks and scratch machines you created. Never remove or reset a machine you did not create."))
 
@@ -162,7 +162,7 @@ extension CMUXCLI {
         \(CMUXDiffViewerLocalization.string("cli.guide.cloud.more", defaultValue: "## Find exact methods\n\nRead command help for flags and examples. The full Cloud reference covers machine lifecycle, workspaces, terminals, and transfers. Use `cmux guide` for local workspace, browser, and computer-use methods."))
 
         `cmux cloud --help` · `cmux cloud <command> --help` · `cmux guide`
-        [cmux cloud](https://github.com/manaflow-ai/cmux/blob/main/skills/cmux-cloud-vm/references/commands.md)
+        [cmux cloud](https://github.com/lephus/shellx/blob/main/skills/cmux-cloud-vm/references/commands.md)
         """
     }
 }

@@ -55,8 +55,8 @@ def main() -> int:
                     "plugins": [
                         "oh-my-opencode",
                         ["existing-plugin", {"enabled": True}],
-                        "cmux-session",
-                        "./plugins/cmux-session.js",
+                        "shellx-session",
+                        "./plugins/shellx-session.js",
                     ]
                 }
             ),
@@ -80,20 +80,20 @@ def main() -> int:
             print(f"stderr={install.stderr.strip()}")
             return 1
 
-        plugin_path = config_dir / "plugins" / "cmux-session.js"
+        plugin_path = config_dir / "plugins" / "shellx-session.js"
         if not plugin_path.exists():
             print(f"FAIL: expected plugin at {plugin_path}")
             return 1
-        feed_plugin_path = config_dir / "plugins" / "cmux-feed.js"
+        feed_plugin_path = config_dir / "plugins" / "shellx-feed.js"
         if not feed_plugin_path.exists():
             print(f"FAIL: expected feed plugin at {feed_plugin_path}")
             return 1
-        if "cmux-feed-plugin-marker" not in feed_plugin_path.read_text(encoding="utf-8"):
+        if "shellx-feed-plugin-marker" not in feed_plugin_path.read_text(encoding="utf-8"):
             print(f"FAIL: expected cmux feed marker in {feed_plugin_path}")
             return 1
-        tui_directory = config_dir / "plugins" / "cmux"
-        ownership_marker = tui_directory / ".cmux-owned"
-        if not ownership_marker.exists() or "cmux-opencode-tui-plugin-ownership-marker" not in ownership_marker.read_text(encoding="utf-8"):
+        tui_directory = config_dir / "plugins" / "shellx"
+        ownership_marker = tui_directory / ".shellx-owned"
+        if not ownership_marker.exists() or "shellx-opencode-tui-plugin-ownership-marker" not in ownership_marker.read_text(encoding="utf-8"):
             print(f"FAIL: expected cmux TUI ownership marker at {ownership_marker}")
             return 1
 
@@ -110,12 +110,12 @@ def main() -> int:
             entry
             for entry in plugins
             if (entry if isinstance(entry, str) else entry[0] if isinstance(entry, list) and entry else "")
-            == "cmux-session"
+            == "shellx-session"
         ]
         if stale:
             print(f"FAIL: expected stale cmux plugin registrations removed, got {plugins!r}")
             return 1
-        if "./plugins/cmux" not in plugins:
+        if "./plugins/shellx" not in plugins:
             print(f"FAIL: expected local cmux session plugin registration, got {plugins!r}")
             return 1
         if "oh-my-opencode" not in plugins or ["existing-plugin", {"enabled": True}] not in plugins:
@@ -451,8 +451,8 @@ await v1Hooks.event({ event: { type: "session.deleted", properties: { info: { id
             print(f"stderr={project_install.stderr.strip()}")
             return 1
         project_plugin_dir = project_dir / ".opencode" / "plugins"
-        project_feed = project_plugin_dir / "cmux-feed.js"
-        project_tui = project_plugin_dir / "cmux"
+        project_feed = project_plugin_dir / "shellx-feed.js"
+        project_tui = project_plugin_dir / "shellx"
         if not project_feed.exists() or not project_tui.exists():
             print("FAIL: project-local install did not create the Feed and TUI bridge")
             return 1
@@ -496,8 +496,8 @@ await v1Hooks.event({ event: { type: "session.deleted", properties: { info: { id
             print("FAIL: project-local foreign-file install failed")
             return 1
         project_foreign_plugins = project_foreign_dir / ".opencode" / "plugins"
-        project_foreign_feed = project_foreign_plugins / "cmux-feed.js"
-        project_foreign_tui = project_foreign_plugins / "cmux"
+        project_foreign_feed = project_foreign_plugins / "shellx-feed.js"
+        project_foreign_tui = project_foreign_plugins / "shellx"
         project_foreign_feed.write_text("// user-owned project plugin\n", encoding="utf-8")
         project_foreign_uninstall = subprocess.run(
             [cli_path, "hooks", "opencode", "uninstall", "--project"],
@@ -532,8 +532,8 @@ await v1Hooks.event({ event: { type: "session.deleted", properties: { info: { id
         if orphan_install.returncode != 0:
             print("FAIL: orphan-case OpenCode plugin install failed")
             return 1
-        orphan_session = orphan_root / "plugins" / "cmux-session.js"
-        orphan_tui = orphan_root / "plugins" / "cmux"
+        orphan_session = orphan_root / "plugins" / "shellx-session.js"
+        orphan_tui = orphan_root / "plugins" / "shellx"
         orphan_session.unlink()
         orphan_uninstall = subprocess.run(
             [cli_path, "hooks", "opencode", "uninstall", "--yes"],
@@ -567,8 +567,8 @@ await v1Hooks.event({ event: { type: "session.deleted", properties: { info: { id
         if foreign_install.returncode != 0:
             print("FAIL: foreign-file OpenCode plugin install failed")
             return 1
-        foreign_session = foreign_root / "plugins" / "cmux-session.js"
-        foreign_tui = foreign_root / "plugins" / "cmux"
+        foreign_session = foreign_root / "plugins" / "shellx-session.js"
+        foreign_tui = foreign_root / "plugins" / "shellx"
         foreign_session.write_text("// user-owned plugin\n", encoding="utf-8")
         foreign_uninstall = subprocess.run(
             [cli_path, "hooks", "opencode", "uninstall", "--yes"],
@@ -583,7 +583,7 @@ await v1Hooks.event({ event: { type: "session.deleted", properties: { info: { id
             foreign_uninstall.returncode != 0
             or foreign_session.read_text(encoding="utf-8") != "// user-owned plugin\n"
             or foreign_tui.exists()
-            or "./plugins/cmux" in foreign_config.get("plugin", [])
+            or "./plugins/shellx" in foreign_config.get("plugin", [])
         ):
             print("FAIL: uninstall removed or retained the wrong files for an unmarked legacy plugin")
             return 1
@@ -591,10 +591,10 @@ await v1Hooks.event({ event: { type: "session.deleted", properties: { info: { id
         # Never follow a user symlink while validating or overwriting the
         # shared TUI package directory.
         symlink_root = root / "symlink-config"
-        symlink_directory = symlink_root / "plugins" / "cmux"
+        symlink_directory = symlink_root / "plugins" / "shellx"
         symlink_directory.mkdir(parents=True)
         symlink_target = root / "symlink-target.js"
-        symlink_target.write_text("// cmux-opencode-tui-plugin-server-marker v2\n", encoding="utf-8")
+        symlink_target.write_text("// shellx-opencode-tui-plugin-server-marker v2\n", encoding="utf-8")
         (symlink_directory / "index.js").symlink_to(symlink_target)
         symlink_env = env.copy()
         symlink_env["OPENCODE_CONFIG_DIR"] = str(symlink_root)

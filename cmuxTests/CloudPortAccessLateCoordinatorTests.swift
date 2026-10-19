@@ -19,7 +19,7 @@ struct CloudPortAccessLateCoordinatorTests {
 
     private static func makeCoordinator() -> CloudTunnelCoordinator {
         CloudTunnelCoordinator(
-            backend: .networkExtension(extensionBundleIdentifier: "com.cmuxterm.app.tests.portaccess"),
+            backend: .networkExtension(extensionBundleIdentifier: "pro.shellx.desktop.tests.portaccess"),
             controller: FakeTunnelController(),
             enroller: FakeTunnelEnroller(),
             consumers: FakeTunnelConsumers()
@@ -117,7 +117,7 @@ struct CloudPortAccessLateCoordinatorTests {
         let controller = FakeTunnelController()
         controller.holdInstallForApproval = true
         let coordinator = CloudTunnelCoordinator(
-            backend: .networkExtension(extensionBundleIdentifier: "com.cmuxterm.app.tests.browser"),
+            backend: .networkExtension(extensionBundleIdentifier: "pro.shellx.desktop.tests.browser"),
             controller: controller,
             enroller: FakeTunnelEnroller(),
             consumers: FakeTunnelConsumers()

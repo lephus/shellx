@@ -15,8 +15,11 @@ import Security
 public struct ComputerUseHelperTrust: Sendable {
     /// The helper's bundle identifier, the key of its TCC rows.
     public static let bundleIdentifier = "com.cmuxterm.cua"
-    /// The Developer ID team that signs release helpers.
-    public static let teamIdentifier = "7WLXT3NR37"
+    /// The Developer ID team that signs release helpers: ShellX's (`ShellXBrand.teamID`; this
+    /// package does not link ShellXBrand). ShellX builds no helper of its own (see
+    /// scripts/build-app-bundled-resources.sh), and an installed cmux's helper is signed by
+    /// cmux's team, so no helper passes and Computer Use stays unavailable in ShellX.
+    public static let teamIdentifier = "W4RF3W4VTZ"
     /// The code requirement every usable helper satisfies: the release
     /// helper's designated requirement. The two certificate fields are the
     /// Developer ID intermediate and leaf markers, so an Apple Development or

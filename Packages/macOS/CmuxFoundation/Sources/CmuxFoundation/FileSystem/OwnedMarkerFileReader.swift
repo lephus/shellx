@@ -4,13 +4,13 @@ public import Foundation
 /// Reads a small text marker file only when it is a regular file owned by the
 /// expected user.
 ///
-/// Scripts leave markers such as `/tmp/cmux-last-debug-log-path` in the shared
+/// Scripts leave markers such as `/tmp/shellx-last-debug-log-path` in the shared
 /// `/tmp` directory. Another local user could create that path first and point
 /// cmux at a file of their choosing, so a marker is trusted only when this user
 /// owns it and it is not a symbolic link.
 ///
 /// ```swift
-/// let logPath = OwnedMarkerFileReader().trimmedContents(atPath: "/tmp/cmux-last-debug-log-path")
+/// let logPath = OwnedMarkerFileReader().trimmedContents(atPath: "/tmp/shellx-last-debug-log-path")
 /// ```
 public struct OwnedMarkerFileReader: Sendable, Equatable {
     /// The user ID that must own the marker.

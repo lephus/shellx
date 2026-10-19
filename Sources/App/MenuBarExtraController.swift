@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import CmuxFoundation
 import Foundation
+import ShellXBrand
 
 @MainActor
 final class MenuBarExtraController: NSObject, NSMenuDelegate {
@@ -577,7 +578,7 @@ enum MenuBarBuildHintFormatter {
     ) -> String? {
         guard isDebugBuild else { return nil }
         let normalized = appName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let prefix = "cmux DEV"
+        let prefix = "\(ShellXBrand.appName) DEV"
         guard normalized.hasPrefix(prefix) else { return "Build: DEV" }
 
         let suffix = String(normalized.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)

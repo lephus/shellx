@@ -252,7 +252,7 @@ struct AgentSessionAutoResumeSwiftTests {
             let sessionID = "644498fd-8501-4d8e-a2dc-7496ca299d28"
             let friendlyTitle = "phase-zero-approval-handoff"
             let resumeCommand =
-                "'/Applications/cmux.app/Contents/Resources/bin/cmux-claude-wrapper' " +
+                "'/Applications/ShellX.app/Contents/Resources/bin/shellx-claude-wrapper' " +
                 "'--dangerously-skip-permissions' '--resume' '\(sessionID)'"
             let source = Workspace()
             let sourcePanelID = try #require(source.focusedPanelId)

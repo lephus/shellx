@@ -44,22 +44,22 @@ import Testing
     }
 
     @Test func classifiesDebugAndStagingBundlesAsDevLike() {
-        #expect(UpdateController.isDevLikeBundleIdentifier("com.cmuxterm.app.debug"))
-        #expect(UpdateController.isDevLikeBundleIdentifier("com.cmuxterm.app.debug.my-tag"))
-        #expect(UpdateController.isDevLikeBundleIdentifier("com.cmuxterm.app.staging"))
-        #expect(UpdateController.isDevLikeBundleIdentifier("com.cmuxterm.app.staging.my-tag"))
+        #expect(UpdateController.isDevLikeBundleIdentifier("pro.shellx.desktop.debug"))
+        #expect(UpdateController.isDevLikeBundleIdentifier("pro.shellx.desktop.debug.my-tag"))
+        #expect(UpdateController.isDevLikeBundleIdentifier("pro.shellx.desktop.staging"))
+        #expect(UpdateController.isDevLikeBundleIdentifier("pro.shellx.desktop.staging.my-tag"))
     }
 
     @Test func doesNotClassifyPublicOrNightlyOrNilAsDevLike() {
-        #expect(!UpdateController.isDevLikeBundleIdentifier("com.cmuxterm.app"))
-        #expect(!UpdateController.isDevLikeBundleIdentifier("com.cmuxterm.app.nightly"))
+        #expect(!UpdateController.isDevLikeBundleIdentifier("pro.shellx.desktop"))
+        #expect(!UpdateController.isDevLikeBundleIdentifier("pro.shellx.desktop.nightly"))
         // RC is on the public release train: it must keep auto-update on.
-        #expect(!UpdateController.isDevLikeBundleIdentifier("com.cmuxterm.app.rc"))
-        #expect(!UpdateController.isDevLikeBundleIdentifier("com.cmuxterm.app.rc.candidate1"))
+        #expect(!UpdateController.isDevLikeBundleIdentifier("pro.shellx.desktop.rc"))
+        #expect(!UpdateController.isDevLikeBundleIdentifier("pro.shellx.desktop.rc.candidate1"))
         #expect(!UpdateController.isDevLikeBundleIdentifier(nil))
         // A look-alike that is neither the exact base id nor a dotted suffix must not match.
-        #expect(!UpdateController.isDevLikeBundleIdentifier("com.cmuxterm.app.debugger"))
-        #expect(!UpdateController.isDevLikeBundleIdentifier("com.cmuxterm.app.stagingx"))
+        #expect(!UpdateController.isDevLikeBundleIdentifier("pro.shellx.desktop.debugger"))
+        #expect(!UpdateController.isDevLikeBundleIdentifier("pro.shellx.desktop.stagingx"))
     }
 
     /// A manual "Check for Updates" on a DEV/staging build must not query the public appcast or
@@ -138,7 +138,8 @@ import Testing
             clock: SystemUpdateClock(),
             hostBundle: .main,
             defaults: defaults,
-            isDevLikeBundle: false
+            isDevLikeBundle: false,
+            hasUpdateSigningKey: true
         )
         #expect(defaults.bool(forKey: UpdateSettings.automaticChecksKey) == true)
     }

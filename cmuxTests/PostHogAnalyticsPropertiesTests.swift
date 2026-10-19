@@ -68,62 +68,24 @@ struct PostHogAnalyticsPropertiesTests {
     }
 
     @MainActor
-    @Test("feature flag control plane uses a stable anonymous rollout identity and targeting context")
+    @Test("ShellX builds no feature-flag control-plane request with telemetry consent, so no rollout identity leaves the Mac")
     func featureFlagControlPlaneRespectsTelemetryConsent() throws {
         let suiteName = "cmux.feature.flags.identity.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
-        let identityKey = "cmux.flags.releaseControlDistinctID"
 
-        let firstRequest = try #require(CmuxFeatureFlags.postHogControlPlaneRequest(
-            telemetryEnabled: true,
-            defaults: defaults
-        ))
-        let secondRequest = try #require(CmuxFeatureFlags.postHogControlPlaneRequest(
-            telemetryEnabled: true,
-            defaults: defaults
-        ))
-        let firstBody = try #require(firstRequest.httpBody)
-        let secondBody = try #require(secondRequest.httpBody)
-        let firstPayload = try #require(
-            JSONSerialization.jsonObject(with: firstBody) as? [String: Any]
-        )
-        let secondPayload = try #require(
-            JSONSerialization.jsonObject(with: secondBody) as? [String: Any]
-        )
-        let distinctID = try #require(firstPayload["distinctId"] as? String)
-        let prefix = "cmux-desktop-release-control-"
-        let context = try #require(firstPayload["context"] as? [String: Any])
-        let personProperties = try #require(context["personProperties"] as? [String: Any])
-
-        #expect(firstRequest.url?.host == "cmux.com")
-        #expect(distinctID.hasPrefix(prefix))
-        #expect(UUID(uuidString: String(distinctID.dropFirst(prefix.count))) != nil)
-        #expect(secondPayload["distinctId"] as? String == distinctID)
-        #expect(personProperties["$os"] as? String == "macOS")
-        #expect((personProperties["cmux_architecture"] as? String)?.isEmpty == false)
-        #expect(firstPayload["$anon_distinct_id"] == nil)
-        #expect(firstPayload["person_properties"] == nil)
+        #expect(CmuxFeatureFlags.remoteConfigFetchEnabled == false)
+        #expect(CmuxFeatureFlags.postHogControlPlaneRequest(telemetryEnabled: true, defaults: defaults) == nil)
     }
 
     @MainActor
-    @Test("feature flag control plane sends no persistent identity after telemetry opt-out")
+    @Test("ShellX builds no feature-flag control-plane request after telemetry opt-out and stores no identity")
     func featureFlagControlPlaneHonorsTelemetryOptOut() throws {
         let suiteName = "cmux.feature.flags.optout.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let request = try #require(CmuxFeatureFlags.postHogControlPlaneRequest(
-            telemetryEnabled: false,
-            defaults: defaults
-        ))
-        let body = try #require(request.httpBody)
-        let payload = try #require(
-            JSONSerialization.jsonObject(with: body) as? [String: Any]
-        )
-
-        #expect(payload["distinctId"] as? String == "cmux-desktop-release-control")
-        #expect((payload["context"] as? [String: Any])?.isEmpty == true)
+        #expect(CmuxFeatureFlags.postHogControlPlaneRequest(telemetryEnabled: false, defaults: defaults) == nil)
         #expect(defaults.object(forKey: "cmux.flags.releaseControlDistinctID") == nil)
     }
 
@@ -718,7 +680,7 @@ struct PostHogAnalyticsPropertiesTests {
             mechanismType: "mach",
             appVersion: "0.64.22",
             appBuild: "6422",
-            appNamespace: "com.cmuxterm.app"
+            appNamespace: "pro.shellx.desktop"
         )
         let properties = PostHogAnalytics.crashExceptionProperties(
             reported: reported,
@@ -740,7 +702,7 @@ struct PostHogAnalyticsPropertiesTests {
         // The crashed build and the reporting launch are identified separately.
         #expect(properties["crash_app_version"] as? String == "0.64.22")
         #expect(properties["crash_app_build"] as? String == "6422")
-        #expect(properties["crash_app_namespace"] as? String == "com.cmuxterm.app")
+        #expect(properties["crash_app_namespace"] as? String == "pro.shellx.desktop")
         #expect(properties["app_version"] as? String == "0.64.23")
         #expect(properties["app_build"] as? String == "6423")
         #expect((properties["channel"] as? String)?.isEmpty == false)
@@ -790,7 +752,7 @@ struct PostHogAnalyticsPropertiesTests {
             mechanismType: "signal",
             appVersion: "0.64.22",
             appBuild: "6422",
-            appNamespace: "com.cmuxterm.app"
+            appNamespace: "pro.shellx.desktop"
         )
         let properties = PostHogAnalytics.crashExceptionProperties(reported: reported, infoDictionary: [:])
         let entry = try #require((properties["$exception_list"] as? [[String: Any]])?.first)
@@ -820,7 +782,7 @@ struct PostHogAnalyticsPropertiesTests {
                 "app": [
                     "app_version": "0.64.22",
                     "app_build": "6422",
-                    "app_identifier": "com.cmuxterm.app",
+                    "app_identifier": "pro.shellx.desktop",
                 ],
             ],
         ]
@@ -839,7 +801,7 @@ struct PostHogAnalyticsPropertiesTests {
         #expect(reported.mechanismType == "mach")
         #expect(reported.appVersion == "0.64.22")
         #expect(reported.appBuild == "6422")
-        #expect(reported.appNamespace == "com.cmuxterm.app")
+        #expect(reported.appNamespace == "pro.shellx.desktop")
     }
 
     @Test
@@ -927,7 +889,7 @@ struct PostHogAnalyticsPropertiesTests {
             "started_at": Date(timeIntervalSince1970: 900),
             "app_version": "0.64.22",
             "app_build": "6422",
-            "app_namespace": "com.cmuxterm.app",
+            "app_namespace": "pro.shellx.desktop",
         ], forKey: "posthog.previousLaunchIdentity")
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).ghosttycrash")
         defer { try? FileManager.default.removeItem(at: url) }
@@ -959,7 +921,7 @@ struct PostHogAnalyticsPropertiesTests {
         let properties = capturedQueue.sync { captured }
         #expect(properties["crash_app_version"] as? String == (olderArtifact ? nil : "0.64.22"))
         #expect(properties["crash_app_build"] as? String == (olderArtifact ? nil : "6422"))
-        #expect(properties["crash_app_namespace"] as? String == (olderArtifact ? nil : "com.cmuxterm.app"))
+        #expect(properties["crash_app_namespace"] as? String == (olderArtifact ? nil : "pro.shellx.desktop"))
         #expect(properties["$exception_fingerprint"] as? String == "cmux-mac-crash:UnknownCrash")
     }
 

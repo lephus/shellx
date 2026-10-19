@@ -32,7 +32,7 @@ extension CMUXCLI {
                FileManager.default.isExecutableFile(atPath: bundled) {
                 return bundled
             }
-            return "cmux"
+            return "shellx"
         }()
         let payloadURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(
@@ -143,7 +143,7 @@ extension CMUXCLI {
                FileManager.default.isExecutableFile(atPath: bundled) {
                 return bundled
             }
-            return "cmux"
+            return "shellx"
         }()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
@@ -214,7 +214,7 @@ extension CMUXCLI {
         // Shell-safe paths remain bare for those runtimes; paths that need shell
         // quoting are rendered as one argument for Codex's `/bin/sh -lc` runner.
         // The scripts are env-driven and identical across invocations, so they
-        // are written once into a cmux-owned dir (~/.cmux/hooks), not the user's
+        // are written once into a cmux-owned dir (~/.shellx/hooks), not the user's
         // ~/.codex. Any write failure falls back to the inline snippet.
         let hooksDir = eventsToInject.isEmpty ? nil : Self.codexHookScriptsDirectory()
         var args: [String] = ["--enable", "hooks", "--dangerously-bypass-hook-trust"]
@@ -271,7 +271,7 @@ extension CMUXCLI {
     }
 
     /// The cmux-owned directory holding the generated codex hook scripts.
-    /// `~/.cmux/hooks` (NOT the user's `~/.codex`), created on demand. Returns
+    /// `~/.shellx/hooks` (NOT the user's `~/.codex`), created on demand. Returns
     /// nil if it cannot be created, so the caller falls back to inline commands.
     static func codexHookScriptsDirectory() -> URL? {
         let dir = codexHookScriptsURL()
@@ -286,7 +286,7 @@ extension CMUXCLI {
     /// The hook-script directory path without creating it.
     static func codexHookScriptsURL() -> URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".cmux", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("hooks", isDirectory: true)
     }
 
@@ -374,7 +374,7 @@ extension CMUXCLI {
         for def: AgentHookDef
     ) -> String {
         codexSynchronousAgentHookShellCommand(
-            "cmux hooks codex \(companion.cmuxSubcommand)",
+            "shellx hooks codex \(companion.cmuxSubcommand)",
             for: def,
             failOpen: true
         )
@@ -384,13 +384,13 @@ extension CMUXCLI {
         event: CodexHookInjectionEvent,
         for def: AgentHookDef
     ) -> String {
-        let command = "cmux hooks codex \(event.cmuxSubcommand)"
+        let command = "shellx hooks codex \(event.cmuxSubcommand)"
         if event.delivery == .queued {
             return queuedAgentHookShellCommand(
                 agent: def.name,
                 subcommand: event.cmuxSubcommand,
                 disableEnvironmentVariable: def.disableEnvVar,
-                identityMarker: "cmux-codex-hook"
+                identityMarker: "shellx-codex-hook"
             )
         }
         return codexSynchronousAgentHookShellCommand(command, for: def)
@@ -471,17 +471,17 @@ extension CMUXCLI {
     }
 
     static func codexFireAndForgetAgentHookShellCommand(_ command: String, for def: AgentHookDef) -> String {
-        let routedArguments = command.hasPrefix("cmux ") ? String(command.dropFirst("cmux ".count)) : command
+        let routedArguments = command.hasPrefix("shellx ") ? String(command.dropFirst("shellx ".count)) : command
         let runner = "payload=\"$1\"; shift; \"$@\" <\"$payload\" >/dev/null 2>&1 & child=\"$!\"; ( timer=; trap \"kill \\$timer 2>/dev/null || true; wait \\$timer 2>/dev/null || true; exit 0\" HUP INT TERM; sleep 30 & timer=\"$!\"; wait \"$timer\" 2>/dev/null || true; timer=; kill \"$child\" 2>/dev/null || true ) & watchdog=\"$!\"; wait \"$child\" 2>/dev/null || true; kill \"$watchdog\" 2>/dev/null || true; wait \"$watchdog\" 2>/dev/null || true; rm -f \"$payload\""
         let noOp = stdinDrainingHookNoOpShellCommand
         return [
             "cmux_cli=\"${CMUX_BUNDLED_CLI_PATH:-}\"",
-            "if [ -z \"$cmux_cli\" ] || [ ! -x \"$cmux_cli\" ]; then cmux_cli=\"$(command -v cmux 2>/dev/null || true)\"; fi",
+            "if [ -z \"$cmux_cli\" ] || [ ! -x \"$cmux_cli\" ]; then cmux_cli=\"$(command -v shellx 2>/dev/null || true)\"; fi",
             "agent_pid=\"${CMUX_CODEX_PID:-${PPID:-}}\"",
             // The hook shell's immediate parent is the callback owner. Do not
             // reuse an inherited observation from an outer Codex process.
             "hook_pid=\"${PPID:-}\"",
-            "if [ -n \"$CMUX_SURFACE_ID\" ] && [ \"$\(def.disableEnvVar)\" != \"1\" ] && [ -n \"$cmux_cli\" ]; then payload=\"$(mktemp \"${TMPDIR:-/tmp}/cmux-codex-hook.XXXXXX\" 2>/dev/null || mktemp -t cmux-codex-hook 2>/dev/null)\" || { \(noOp); exit 0; }; cat >\"$payload\" || true; if [ -n \"${CMUX_SOCKET_PATH:-}\" ]; then CMUX_CODEX_PID=\"$agent_pid\" CMUX_CODEX_HOOK_PID=\"$hook_pid\" nohup sh -c '\(runner)' cmux-codex-hook \"$payload\" \"$cmux_cli\" --socket \"$CMUX_SOCKET_PATH\" \(routedArguments) >/dev/null 2>&1 & else CMUX_CODEX_PID=\"$agent_pid\" CMUX_CODEX_HOOK_PID=\"$hook_pid\" nohup sh -c '\(runner)' cmux-codex-hook \"$payload\" \"$cmux_cli\" \(routedArguments) >/dev/null 2>&1 & fi; echo '{}'; else \(noOp); fi",
+            "if [ -n \"$CMUX_SURFACE_ID\" ] && [ \"$\(def.disableEnvVar)\" != \"1\" ] && [ -n \"$cmux_cli\" ]; then payload=\"$(mktemp \"${TMPDIR:-/tmp}/shellx-codex-hook.XXXXXX\" 2>/dev/null || mktemp -t shellx-codex-hook 2>/dev/null)\" || { \(noOp); exit 0; }; cat >\"$payload\" || true; if [ -n \"${CMUX_SOCKET_PATH:-}\" ]; then CMUX_CODEX_PID=\"$agent_pid\" CMUX_CODEX_HOOK_PID=\"$hook_pid\" nohup sh -c '\(runner)' shellx-codex-hook \"$payload\" \"$cmux_cli\" --socket \"$CMUX_SOCKET_PATH\" \(routedArguments) >/dev/null 2>&1 & else CMUX_CODEX_PID=\"$agent_pid\" CMUX_CODEX_HOOK_PID=\"$hook_pid\" nohup sh -c '\(runner)' shellx-codex-hook \"$payload\" \"$cmux_cli\" \(routedArguments) >/dev/null 2>&1 & fi; echo '{}'; else \(noOp); fi",
         ].joined(separator: "; ")
     }
 }

@@ -1,6 +1,7 @@
 import CmuxCloud
 import CmuxSettings
 import Foundation
+import ShellXBrand
 
 /// Shared policy for discovering the account's other Macs. Incoming discovery
 /// is controlled independently by `MobileRemoteControlPolicy`.
@@ -36,9 +37,12 @@ enum DevicesFeature {
         policy: ManagedDevicePolicy? = nil,
         cloudEnabled: Bool? = nil
     ) -> Bool {
+        // ShellX: discovering the account's other Macs is parked until Wave 2
+        // ships ShellX's own relay and flips `remoteMachines`; it no longer
+        // follows Cloud (a Manaflow service), so `cloudEnabled` is ignored.
+        guard ShellXFeatures.remoteMachines else { return false }
         let policy = policy ?? ManagedDevicePolicy(defaults: defaults)
         return !policy.isEnforced(.disableCloud)
-            && (cloudEnabled ?? CloudMachinesFeature.isEnabled(defaults: defaults, policy: policy))
     }
 
     nonisolated static func isDiscoveryEnabled(defaults: UserDefaults = .standard, cloudEnabled: Bool? = nil) -> Bool {

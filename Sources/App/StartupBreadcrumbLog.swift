@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import os
+import ShellXBrand
 
 enum StartupBreadcrumbLog {
     private static let maxFieldLength = 240
@@ -101,12 +102,11 @@ enum StartupBreadcrumbLog {
             return true
         }
         let bundleIdentifier = Bundle.main.bundleIdentifier ?? ""
-        return bundleIdentifier == "com.cmuxterm.app.nightly"
-            || bundleIdentifier.hasPrefix("com.cmuxterm.app.nightly.")
-            || bundleIdentifier == "com.cmuxterm.app.rc"
-            || bundleIdentifier.hasPrefix("com.cmuxterm.app.rc.")
-            || bundleIdentifier == "com.cmuxterm.app.debug"
-            || bundleIdentifier.hasPrefix("com.cmuxterm.app.debug.")
+        return ["nightly", "rc", "debug"].contains { channel in
+            let channelBundleIdentifier = "\(ShellXBrand.bundleID).\(channel)"
+            return bundleIdentifier == channelBundleIdentifier
+                || bundleIdentifier.hasPrefix("\(channelBundleIdentifier).")
+        }
     }
 
     private static var logURL: URL {

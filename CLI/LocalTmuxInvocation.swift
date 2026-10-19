@@ -246,7 +246,7 @@ struct LocalTmuxInvocation {
     close <name|--id <uuid>>
     cleanup [--prune]
 
-    The registry and tmux server socket live under ~/.cmux/local-tmux with
+    The registry and tmux server socket live under ~/.shellx/local-tmux with
     user-only permissions. `attach --headless` hands the terminal directly to
     tmux for a client outside the cmux GUI.
     """)

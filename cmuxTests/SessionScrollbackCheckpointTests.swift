@@ -426,9 +426,9 @@ struct SessionScrollbackCheckpointStoreTests {
 
     @Test func checkpointDirectorySitsNextToPrimarySnapshot() {
         let store = SessionScrollbackCheckpointStore(
-            primarySnapshotURL: URL(fileURLWithPath: "/tmp/cmux/session-com.cmuxterm.app.json")
+            primarySnapshotURL: URL(fileURLWithPath: "/tmp/cmux/session-pro.shellx.desktop.json")
         )
-        #expect(store.directoryURL.path == "/tmp/cmux/session-com.cmuxterm.app-scrollback")
+        #expect(store.directoryURL.path == "/tmp/cmux/session-pro.shellx.desktop-scrollback")
     }
 
     @Test func writesTruncatesRemovesAndPrunes() throws {

@@ -7,6 +7,7 @@ import CmuxSettingsUI
 import CmuxSurfaceCatalogModel
 import Foundation
 import Observation
+import ShellXBrand
 
 @MainActor
 final class HiveComputersService {
@@ -215,7 +216,7 @@ final class HiveComputersService {
             let directory = try FileManager.default.url(
                 for: .applicationSupportDirectory, in: .userDomainMask,
                 appropriateFor: nil, create: true
-            ).appendingPathComponent(Bundle.main.bundleIdentifier ?? "com.cmuxterm.app", isDirectory: true)
+            ).appendingPathComponent(Bundle.main.bundleIdentifier ?? ShellXBrand.bundleID, isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let runtime = HiveSyncRuntime(
                 allowsLoopback: allowsLoopback,

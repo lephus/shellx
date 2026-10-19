@@ -166,7 +166,7 @@ struct SudoIntegrityBindingTests {
             now: now
         )
 
-        #expect(checker.calls.map(\.resourcePath) == ["Resources/bin/cmux"])
+        #expect(checker.calls.map(\.resourcePath) == ["Resources/bin/shellx"])
         #expect(spawner.commands.isEmpty)
         #expect(fixture.store.authoritativeResult(id: request.id)?.errorCode == .processLaunchFailed)
     }
@@ -203,7 +203,7 @@ struct SudoIntegrityBindingTests {
         #expect(afterSudo[0] == "/bin/sh")
         #expect(afterSudo[1] == "-c")
         #expect(afterSudo[3] == SudoHelperStagingCommand.argumentZero)
-        #expect(afterSudo[4] == "/Applications/cmux.app/Contents/Resources/bin/cmux")
+        #expect(afterSudo[4] == "/Applications/cmux.app/Contents/Resources/bin/shellx")
         #expect(afterSudo[5] == String(repeating: "5a", count: 32))
         #expect(afterSudo[7] == policy.executorRequirement.text)
         #expect(afterSudo[10] == SudoPrivilegedExecutor.hiddenCommand)
@@ -299,7 +299,7 @@ struct SudoIntegrityBindingTests {
         let helperBytes = try Data(contentsOf: URL(fileURLWithPath: "/usr/bin/true"))
         let source = try staging.writeSource(helperBytes)
         let foreignTeam = try #require(
-            SudoCodeSigningRequirement.developerID(teamIdentifier: "7WLXT3NR37")
+            SudoCodeSigningRequirement.developerID(teamIdentifier: "W4RF3W4VTZ")
         )
 
         let refused = try staging.run(
@@ -345,7 +345,7 @@ struct SudoIntegrityBindingTests {
         ) == nil)
         #expect(SudoBundledHelperPolicy.developerID(
             appBundleURL: bundle,
-            teamIdentifier: "7WLXT3NR37\" or anchor apple generic"
+            teamIdentifier: "W4RF3W4VTZ\" or anchor apple generic"
         ) == nil)
     }
 

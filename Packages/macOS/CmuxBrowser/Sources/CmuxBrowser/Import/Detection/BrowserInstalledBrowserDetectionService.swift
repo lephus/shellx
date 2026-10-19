@@ -5,7 +5,7 @@ public actor BrowserInstalledBrowserDetectionService {
     private let scan: @Sendable () -> [InstalledBrowserCandidate]
     // Foundation/Launch Services discovery has no asynchronous API. This serial
     // I/O lane prevents a blocked scan from occupying the UI or cooperative pool.
-    private let queue = DispatchQueue(label: "com.cmux.browser-discovery", qos: .utility)
+    private let queue = DispatchQueue(label: "pro.shellx.browser-discovery", qos: .utility)
     private var inFlight: Task<[InstalledBrowserCandidate], Never>?
 
     /// Creates a discovery owner.

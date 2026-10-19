@@ -88,7 +88,7 @@ cmux_attach__bundle_seg() {
 
 # The tagged macOS Debug app's bundle id (the iOS pairing host lives on the Mac).
 cmux_attach_mac_bundle_id() {
-  printf 'com.cmuxterm.app.debug.%s' "$(cmux_attach__bundle_seg "$1")"
+  printf 'pro.shellx.desktop.debug.%s' "$(cmux_attach__bundle_seg "$1")"
 }
 
 # Unsigned Simulator apps have no application-identifier entitlement, so iOS
@@ -159,12 +159,12 @@ cmux_attach_remove_stale_socket() {
 
 # The locally-built tagged macOS Debug .app bundle path (cloud/local reloads both
 # download/install here). Both the DerivedData dir AND the .app basename use the
-# sanitized slug, matching reload.sh (`APP_NAME="cmux DEV ${TAG_SLUG}"`); the raw
+# sanitized slug, matching reload.sh (`APP_NAME="ShellX DEV ${TAG_SLUG}"`); the raw
 # tag would miss for any tag whose slug differs (e.g. "Fix Foo" -> "fix-foo").
 cmux_attach_mac_app_path() {
   local slug
   slug="$(cmux_attach__slug "$1")"
-  printf '%s/Library/Developer/Xcode/DerivedData/cmux-%s/Build/Products/Debug/cmux DEV %s.app' \
+  printf '%s/Library/Developer/Xcode/DerivedData/cmux-%s/Build/Products/Debug/ShellX DEV %s.app' \
     "$HOME" "$slug" "$slug"
 }
 

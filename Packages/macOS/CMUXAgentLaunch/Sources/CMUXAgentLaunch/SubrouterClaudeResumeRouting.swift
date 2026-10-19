@@ -16,7 +16,7 @@ import Foundation
 /// same way, through two exact-match markers that must agree:
 ///
 /// - ``environmentKey``, exported by `sr` into the Claude child it launches.
-/// - ``launchBoundEnvironmentKey``, exported by `cmux-claude-wrapper` only when
+/// - ``launchBoundEnvironmentKey``, exported by `shellx-claude-wrapper` only when
 ///   the argv it received carried Subrouter's private `--settings` file. The
 ///   wrapper is the one process that still sees that file: its settings merge
 ///   drops user `--settings` before the argv is captured for restore.
@@ -32,7 +32,7 @@ public struct SubrouterClaudeResumeRouting: Sendable, Equatable {
     public static let launchBoundEnvironmentKey = "CMUX_AGENT_LAUNCH_SUBROUTER_CLAUDE_RESUME_COMMAND"
 
     /// The account a routed launch was pinned to, exported by
-    /// `cmux-claude-wrapper` from the routing headers in the launcher's
+    /// `shellx-claude-wrapper` from the routing headers in the launcher's
     /// private `--settings` file. It is the launcher's resolved choice, so it
     /// survives however the launcher was invoked or what it appended to the
     /// arguments it forwarded.

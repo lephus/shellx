@@ -9,8 +9,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WRAPPER = ROOT / "Resources/bin/cmux-pi-wrapper"
-MARKER = "cmux-pi-session-extension-marker v4"
+WRAPPER = ROOT / "Resources/bin/shellx-pi-wrapper"
+MARKER = "shellx-pi-session-extension-marker v4"
 
 
 def executable(path: Path, text: str) -> None:
@@ -49,13 +49,13 @@ def run_case(
     )
     agent_dir = root / "pi-agent"
     if managed_global:
-        extension = agent_dir / "extensions/cmux-session.ts"
+        extension = agent_dir / "extensions/shellx-session.ts"
         extension.parent.mkdir(parents=True)
         extension.write_text(f"// {MARKER}\n", encoding="utf-8")
     if stale_cached_extension:
-        cached = root / "tmp/cmux-pi-extensions/surface-test/cmux-session.ts"
+        cached = root / "tmp/cmux-pi-extensions/surface-test/shellx-session.ts"
         cached.parent.mkdir(parents=True)
-        cached.write_text("// cmux-pi-session-extension-marker v3\n", encoding="utf-8")
+        cached.write_text("// shellx-pi-session-extension-marker v3\n", encoding="utf-8")
 
     environment = {
         "PATH": f"{bin_dir}:/usr/bin:/bin",
@@ -70,13 +70,13 @@ def run_case(
     subprocess.run([str(WRAPPER), *args], env=environment, check=True)
     return {
         "args": log.read_text(encoding="utf-8").splitlines(),
-        "extension_exists": (root / "tmp/cmux-pi-extensions/surface-test/cmux-session.ts").exists(),
-        "global_exists": (agent_dir / "extensions/cmux-session.ts").exists(),
+        "extension_exists": (root / "tmp/cmux-pi-extensions/surface-test/shellx-session.ts").exists(),
+        "global_exists": (agent_dir / "extensions/shellx-session.ts").exists(),
     }
 
 
 def main() -> int:
-    with tempfile.TemporaryDirectory(prefix="cmux-pi-wrapper-glob-") as directory:
+    with tempfile.TemporaryDirectory(prefix="shellx-pi-wrapper-glob-") as directory:
         root = Path(directory)
         (root / "bin1").mkdir()
         literal_path = run_case(root, bin_name="bin[1]")
@@ -99,7 +99,7 @@ def main() -> int:
         ("-v",),
     )
     for args in passthrough_args:
-        with tempfile.TemporaryDirectory(prefix="cmux-pi-wrapper-command-") as directory:
+        with tempfile.TemporaryDirectory(prefix="shellx-pi-wrapper-command-") as directory:
             result = run_case(Path(directory), args=args)
             if result["args"] != list(args) or result["extension_exists"]:
                 raise AssertionError(f"Pi subcommand was changed by extension injection: {result}")
@@ -112,45 +112,45 @@ def main() -> int:
         ("--", "--no-extensions"),
     )
     for args in interactive_args:
-        with tempfile.TemporaryDirectory(prefix="cmux-pi-wrapper-prompt-") as directory:
+        with tempfile.TemporaryDirectory(prefix="shellx-pi-wrapper-prompt-") as directory:
             root = Path(directory)
             prompted = run_case(root, args=args)
-            expected = ["-e", str(root / "tmp/cmux-pi-extensions/surface-test/cmux-session.ts"), *args]
+            expected = ["-e", str(root / "tmp/cmux-pi-extensions/surface-test/shellx-session.ts"), *args]
             if prompted["args"] != expected or not prompted["extension_exists"]:
                 raise AssertionError(f"Pi interactive invocation lost extension injection: {prompted}")
 
-    with tempfile.TemporaryDirectory(prefix="cmux-pi-wrapper-") as directory:
+    with tempfile.TemporaryDirectory(prefix="shellx-pi-wrapper-") as directory:
         root = Path(directory)
         injected = run_case(root)
         if "-e" not in injected["args"] or not injected["extension_exists"]:
             raise AssertionError(f"missing bundled Pi extension injection: {injected}")
 
-    with tempfile.TemporaryDirectory(prefix="cmux-pi-wrapper-global-") as directory:
+    with tempfile.TemporaryDirectory(prefix="shellx-pi-wrapper-global-") as directory:
         root = Path(directory)
         managed = run_case(root, managed_global=True)
         if "-e" in managed["args"]:
             raise AssertionError(f"managed global Pi extension loaded twice: {managed}")
 
-    with tempfile.TemporaryDirectory(prefix="cmux-pi-wrapper-refresh-") as directory:
+    with tempfile.TemporaryDirectory(prefix="shellx-pi-wrapper-refresh-") as directory:
         root = Path(directory)
         refreshed = run_case(root, stale_cached_extension=True)
-        cached = root / "tmp/cmux-pi-extensions/surface-test/cmux-session.ts"
+        cached = root / "tmp/cmux-pi-extensions/surface-test/shellx-session.ts"
         if "-e" not in refreshed["args"] or cached.read_text(encoding="utf-8").strip() != f"// {MARKER}":
             raise AssertionError(f"stale bundled Pi extension was not refreshed: {refreshed}")
 
-    with tempfile.TemporaryDirectory(prefix="cmux-pi-wrapper-disabled-") as directory:
+    with tempfile.TemporaryDirectory(prefix="shellx-pi-wrapper-disabled-") as directory:
         root = Path(directory)
         disabled = run_case(root, disabled=True)
         if "-e" in disabled["args"] or disabled["extension_exists"]:
             raise AssertionError(f"Pi hooks disabled still injected extension: {disabled}")
 
-    with tempfile.TemporaryDirectory(prefix="cmux-pi-wrapper-no-extensions-") as directory:
+    with tempfile.TemporaryDirectory(prefix="shellx-pi-wrapper-no-extensions-") as directory:
         root = Path(directory)
         opted_out = run_case(root, args=("--print", "hello", "--no-extensions"))
         if opted_out["args"] != ["--print", "hello", "--no-extensions"] or opted_out["extension_exists"]:
             raise AssertionError(f"Pi --no-extensions was overridden by cmux injection: {opted_out}")
 
-    with tempfile.TemporaryDirectory(prefix="cmux-pi-wrapper-missing-") as directory:
+    with tempfile.TemporaryDirectory(prefix="shellx-pi-wrapper-missing-") as directory:
         root = Path(directory)
         shim_dir = root / "shim-bin"
         shim_dir.mkdir()

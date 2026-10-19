@@ -477,12 +477,12 @@ while [ "$attempt" -le "$max_attempts" ]; do
     exit 1
   fi
 
-  if grep -Fq 'path = "/tmp/cmux-debug.sock"' "$log_path"; then
+  if grep -Fq 'path = "/tmp/shellx-debug.sock"' "$log_path"; then
     echo "FAIL: app-host used default debug socket instead of an XCTest-scoped socket" >&2
     exit 1
   fi
 
-  if grep -Fq 'SocketControlServer: Listening on /tmp/cmux-debug.sock' "$log_path"; then
+  if grep -Fq 'SocketControlServer: Listening on /tmp/shellx-debug.sock' "$log_path"; then
     echo "FAIL: app-host listener used default debug socket instead of an XCTest-scoped socket" >&2
     exit 1
   fi
@@ -558,7 +558,7 @@ while [ "$attempt" -le "$max_attempts" ]; do
         while IFS= read -r -d '' app_stdout; do
           if [ ! -r "$app_stdout" ]; then
             invalid_listener_evidence=1
-          elif grep -Eq 'SocketControlServer: Listening on /tmp/cmux-debug\.sock|path = "/tmp/cmux-debug\.sock"' "$app_stdout"; then
+          elif grep -Eq 'SocketControlServer: Listening on /tmp/shellx-debug\.sock|path = "/tmp/shellx-debug\.sock"' "$app_stdout"; then
             echo "FAIL: xcresult app listener used default debug socket instead of an XCTest-scoped socket" >&2
             invalid_listener_evidence=1
           elif grep -Eq 'SocketControlServer: Listening on |message = "socket.listener.start"' "$app_stdout"; then

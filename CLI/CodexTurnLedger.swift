@@ -54,7 +54,7 @@ final class CodexTurnLedger {
                     .path
             }
             ?? URL(
-                fileURLWithPath: Self.homeExpandedPath("~/.cmuxterm", environment: environment),
+                fileURLWithPath: Self.homeExpandedPath("~/.shellx", environment: environment),
                 isDirectory: true
             )
                 .appendingPathComponent(Self.defaultFilename, isDirectory: false)

@@ -106,8 +106,8 @@ class SocketEvidenceTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
 
     def test_default_socket_in_app_stdout_is_rejected(self):
-        for marker in ('SocketControlServer: Listening on /tmp/cmux-debug.sock\n',
-                       'message = "socket.listener.start"; path = "/tmp/cmux-debug.sock"\n'):
+        for marker in ('SocketControlServer: Listening on /tmp/shellx-debug.sock\n',
+                       'message = "socket.listener.start"; path = "/tmp/shellx-debug.sock"\n'):
             with self.subTest(marker=marker):
                 result = self.run_wrapper({"diagnostics": {APP_STDOUT: LISTENER + marker}})
                 self.assertEqual(result.returncode, 1, result.stdout)

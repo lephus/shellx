@@ -146,13 +146,13 @@ struct CloudActivationPolicyTests {
                 home: home,
                 interfaceName: "cmux-t",
                 purpose: .browser,
-                bundleIdentifier: "com.cmuxterm.app.tests"
+                bundleIdentifier: "pro.shellx.desktop.tests"
             )
             terminal = VMTunnelManager(
                 home: home,
                 interfaceName: "cmux-t",
                 purpose: .terminal,
-                bundleIdentifier: "com.cmuxterm.app.tests"
+                bundleIdentifier: "pro.shellx.desktop.tests"
             )
             policy = CloudActivationPolicy.live(
                 defaults: defaults,
@@ -300,7 +300,8 @@ struct CloudActivationPolicyTests {
         #expect(!CloudMachinesFeature.isEnabled(defaults: defaults, policy: unmanaged))
 
         defaults.set(true, forKey: RightSidebarBetaFeatureSettings.cloudMachinesEnabledKey)
-        #expect(CloudMachinesFeature.isEnabled(defaults: defaults, policy: unmanaged))
+        // ShellX: Cloud is hard-off; the local activation does not enable it.
+        #expect(!CloudMachinesFeature.isEnabled(defaults: defaults, policy: unmanaged))
         #expect(!CloudMachinesFeature.isEnabled(defaults: defaults, policy: managedOff))
 
         defaults.set(false, forKey: RightSidebarBetaFeatureSettings.cloudMachinesEnabledKey)

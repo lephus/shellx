@@ -55,7 +55,7 @@ struct SettingsRowAnchorResolutionTests {
         "app.preferredEditor",
         "app.renameSelectsExistingName",
         "app.reorderOnNotification",
-        "app.sendAnonymousTelemetry",
+        // "app.sendAnonymousTelemetry": hidden in ShellX (no telemetry).
         "app.warnBeforeClosingAgentSession",
         "app.warnBeforeClosingTab",
         "app.warnBeforeClosingTabXButton",

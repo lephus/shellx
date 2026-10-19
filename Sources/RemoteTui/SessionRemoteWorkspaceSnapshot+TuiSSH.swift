@@ -3,7 +3,7 @@ import CmuxFoundation
 import Foundation
 
 extension SessionRemoteWorkspaceSnapshot {
-    /// Restore the carrier descriptor without reviving a cmuxd-remote launch script.
+    /// Restore the carrier descriptor without reviving a shellx-remote launch script.
     func tuiSSHConfiguration(agentSocketPath: String?) -> WorkspaceRemoteConfiguration? {
         guard sshSessionOwner == "cmux-tui", isPersistentSSHCarrierShape else { return nil }
         var configuration = carrierConfiguration(agentSocketPath: agentSocketPath)

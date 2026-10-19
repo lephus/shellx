@@ -104,10 +104,11 @@ cmux_cua_skill_name_is() {
 
 cmux_cua_skill_target_is_managed() {
     # A resource suffix, app name, or dangling path alone is not ownership
-    # proof. A link is managed only when its existing bundle has cmux's bundle
-    # identifier, lives in a known cmux install/build root, and is owned by
+    # proof. A link is managed only when its existing bundle has ShellX's bundle
+    # identifier, lives in a known ShellX install/build root, and is owned by
     # root or the current user. Removed bundles have no verifiable owner or
-    # identity and are deliberately preserved for manual review.
+    # identity and are deliberately preserved for manual review. Links into a
+    # cmux bundle (com.cmuxterm.*) belong to cmux and are never touched.
     local target="$1"
     local resource_name
     case "$target" in
@@ -125,10 +126,10 @@ cmux_cua_skill_target_is_managed() {
     [[ "$app_owner" == "0" || "$app_owner" == "$(/usr/bin/id -u)" ]] || return 1
 
     case "$app_bundle" in
-        /Applications/cmux*.app|/Applications/Utilities/cmux*.app|\
-        "$home/Applications"/cmux*.app|\
-        "$home/Library/Developer/Xcode/DerivedData"/cmux-*/Build/Products/*/cmux*.app|\
-        /tmp/cmux-*/Build/Products/*/cmux*.app)
+        /Applications/ShellX*.app|/Applications/Utilities/ShellX*.app|\
+        "$home/Applications"/ShellX*.app|\
+        "$home/Library/Developer/Xcode/DerivedData"/cmux-*/Build/Products/*/ShellX*.app|\
+        /tmp/shellx-*/Build/Products/*/ShellX*.app)
             ;;
         *)
             return 1
@@ -139,7 +140,7 @@ cmux_cua_skill_target_is_managed() {
     if [[ -f "$info_plist" && -x /usr/libexec/PlistBuddy ]]; then
         local bundle_id
         bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info_plist" 2>/dev/null)" || return 1
-        [[ "$bundle_id" == com.cmuxterm.* ]]
+        [[ "$bundle_id" == pro.shellx.desktop || "$bundle_id" == pro.shellx.desktop.* ]]
         return $?
     fi
     return 1

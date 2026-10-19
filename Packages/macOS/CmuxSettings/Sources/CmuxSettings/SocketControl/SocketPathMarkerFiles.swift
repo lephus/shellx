@@ -1,18 +1,20 @@
 public import Foundation
+import ShellXBrand
 
 public enum SocketPathMarkerFiles {
-    /// The stable release bundle identifier used for machine-wide discovery.
-    public static let stableBundleIdentifier = "com.cmuxterm.app"
+    /// The stable release bundle identifier used for machine-wide discovery
+    /// (`ShellXBrand.bundleID`; this package does not link ShellXBrand).
+    public static let stableBundleIdentifier = "pro.shellx.desktop"
     public static let stableMarkerFileName = "last-socket-path"
-    public static let stableTmpPath = "/tmp/cmux-last-socket-path"
-    public static let nightlyBundleIdentifier = "com.cmuxterm.app.nightly"
-    public static let rcBundleIdentifier = "com.cmuxterm.app.rc"
-    public static let stagingBundleIdentifier = "com.cmuxterm.app.staging"
-    public static let defaultBaseDebugBundleIdentifier = "com.cmuxterm.app.debug"
-    public static let defaultDebugSocketPath = "/tmp/cmux-debug.sock"
-    public static let defaultNightlySocketPath = "/tmp/cmux-nightly.sock"
-    public static let defaultRCSocketPath = "/tmp/cmux-rc.sock"
-    public static let defaultStagingSocketPath = "/tmp/cmux-staging.sock"
+    public static let stableTmpPath = "/tmp/\(ShellXBrand.socketBaseName)-last-socket-path"
+    public static let nightlyBundleIdentifier = "pro.shellx.desktop.nightly"
+    public static let rcBundleIdentifier = "pro.shellx.desktop.rc"
+    public static let stagingBundleIdentifier = "pro.shellx.desktop.staging"
+    public static let defaultBaseDebugBundleIdentifier = "pro.shellx.desktop.debug"
+    public static let defaultDebugSocketPath = "/tmp/\(ShellXBrand.socketBaseName)-debug.sock"
+    public static let defaultNightlySocketPath = "/tmp/\(ShellXBrand.socketBaseName)-nightly.sock"
+    public static let defaultRCSocketPath = "/tmp/\(ShellXBrand.socketBaseName)-rc.sock"
+    public static let defaultStagingSocketPath = "/tmp/\(ShellXBrand.socketBaseName)-staging.sock"
 
     public static func markerFileURL(
         fileName: String = stableMarkerFileName,
@@ -103,22 +105,22 @@ public enum SocketPathMarkerFiles {
             return isDebugBuild ? debugSocketPath : stableSocketPath
         case .nightly(let slug):
             if let slug {
-                return "/tmp/cmux-nightly-\(slug).sock"
+                return "/tmp/\(ShellXBrand.socketBaseName)-nightly-\(slug).sock"
             }
             return nightlySocketPath
         case .rc(let slug):
             if let slug {
-                return "/tmp/cmux-rc-\(slug).sock"
+                return "/tmp/\(ShellXBrand.socketBaseName)-rc-\(slug).sock"
             }
             return rcSocketPath
         case .staging(let slug):
             if let slug {
-                return "/tmp/cmux-staging-\(slug).sock"
+                return "/tmp/\(ShellXBrand.socketBaseName)-staging-\(slug).sock"
             }
             return stagingSocketPath
         case .dev(let slug):
             if let slug {
-                return "/tmp/cmux-debug-\(slug).sock"
+                return "/tmp/\(ShellXBrand.socketBaseName)-debug-\(slug).sock"
             }
             return debugSocketPath
         }

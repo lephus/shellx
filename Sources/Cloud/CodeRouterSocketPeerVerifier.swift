@@ -2,6 +2,7 @@ import CmuxControlSocket
 import Darwin
 import Foundation
 import Security
+import ShellXBrand
 
 @_silgen_name("csops_audittoken")
 private func cmuxCodeSigningOperationsForAuditToken(
@@ -20,13 +21,13 @@ struct CodeRouterSocketPeerVerifier: Sendable {
 
     private static let signingRequirement: String = {
 #if DEBUG
-        return #"anchor apple generic and identifier "com.cmuxterm.coderouter" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists and certificate leaf[subject.OU] = "7WLXT3NR37""#
+        return #"anchor apple generic and identifier "com.cmuxterm.coderouter" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists and certificate leaf[subject.OU] = "\#(ShellXBrand.teamID)""#
 #else
-        return #"anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and identifier "com.cmuxterm.coderouter" and certificate leaf[subject.OU] = "7WLXT3NR37""#
+        return #"anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and identifier "com.cmuxterm.coderouter" and certificate leaf[subject.OU] = "\#(ShellXBrand.teamID)""#
 #endif
     }()
     private static let taggedDevelopmentSigningRequirement =
-        #"anchor apple generic and identifier "com.cmuxterm.coderouter" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists and certificate leaf[subject.OU] = "7WLXT3NR37""#
+        #"anchor apple generic and identifier "com.cmuxterm.coderouter" and certificate leaf[field.1.2.840.113635.100.6.1.12] exists and certificate leaf[subject.OU] = "\#(ShellXBrand.teamID)""#
     private static let validFlag: UInt32 = 0x0000_0001
     private static let hardFlag: UInt32 = 0x0000_0100
     private static let killFlag: UInt32 = 0x0000_0200
@@ -159,7 +160,7 @@ struct CodeRouterSocketPeerVerifier: Sendable {
 #if DEBUG
         return false
 #else
-        guard Bundle.main.bundleIdentifier?.hasPrefix("com.cmuxterm.app.debug.") == true else {
+        guard Bundle.main.bundleIdentifier?.hasPrefix("\(ShellXBrand.bundleID).debug.") == true else {
             return false
         }
         var requirement: SecRequirement?

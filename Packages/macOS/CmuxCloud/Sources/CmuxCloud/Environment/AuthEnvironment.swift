@@ -110,20 +110,21 @@ public enum AuthEnvironment: Sendable {
             return overridden
         }
         if isDebugBuild {
-            // Untagged Debug builds register cmux-dev:// so they can coexist
+            // Untagged Debug builds register shellx-dev:// so they can coexist
             // with the installed stable app. Tagged Debug builds use
-            // cmux-dev-<tag>://.
+            // shellx-dev-<tag>://. (The schemes match CMUX_AUTH_CALLBACK_SCHEME
+            // in the project and scripts/reload.sh; ShellX never answers cmux's.)
             if let tag = environment["CMUX_TAG"]?
                 .trimmingCharacters(in: .whitespacesAndNewlines),
                !tag.isEmpty,
                let schemeTag = sanitizedCallbackSchemeTag(tag) {
-                return "cmux-dev-\(schemeTag)"
+                return "shellx-dev-\(schemeTag)"
             }
-            return "cmux-dev"
+            return "shellx-dev"
         }
-        if bundleIdentifier == "com.cmuxterm.app.nightly" { return "cmux-nightly" }
-        if bundleIdentifier == "com.cmuxterm.app.rc" { return "cmux-rc" }
-        return "cmux"
+        if bundleIdentifier == "pro.shellx.desktop.nightly" { return "shellx-nightly" }
+        if bundleIdentifier == "pro.shellx.desktop.rc" { return "shellx-rc" }
+        return "shellx"
     }
 
     static func sanitizedCallbackSchemeTag(_ rawTag: String) -> String? {
@@ -539,7 +540,7 @@ public enum AuthEnvironment: Sendable {
         var paths: [String] = []
         if let tag = ProcessInfo.processInfo.environment["CMUX_TAG"],
            tag.range(of: #"^[A-Za-z0-9._-]+\z"#, options: .regularExpression) != nil {
-            paths.append((home as NSString).appendingPathComponent(".config/cmux/dev-profiles/\(tag).env"))
+            paths.append((home as NSString).appendingPathComponent(".config/shellx/dev-profiles/\(tag).env"))
         }
         paths.append((home as NSString).appendingPathComponent(".cmux-dev.env"))
         return paths

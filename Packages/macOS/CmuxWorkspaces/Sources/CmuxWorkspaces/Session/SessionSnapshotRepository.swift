@@ -8,7 +8,7 @@ internal import CMUXDebugLog
 /// Faithful lift of the legacy `SessionPersistenceStore` namespace enum from
 /// `Sources/SessionPersistence.swift`: JSON encode/decode (sorted keys),
 /// atomic writes with identical-content skip, the primary/`-previous` backup
-/// pair under `Application Support/cmux/`, and the unusable-primary recovery
+/// pair under `Application Support/ShellX/`, and the unusable-primary recovery
 /// path are unchanged. The legacy per-call `bundleIdentifier`/
 /// `appSupportDirectory`/`FileManager` defaulted parameters became
 /// constructor-injected state (they were constant per process), and the
@@ -41,7 +41,7 @@ public struct SessionSnapshotRepository<SnapshotValue: SessionSnapshotRepresenti
     ///     snapshots with any other version are unusable.
     ///   - bundleIdentifier: The bundle identifier used to derive the
     ///     snapshot file name (pass `Bundle.main.bundleIdentifier` at the
-    ///     composition root). Falls back to `com.cmuxterm.app` when nil or
+    ///     composition root). Falls back to `pro.shellx.desktop` when nil or
     ///     blank.
     ///   - appSupportDirectory: Overrides the discovered user Application
     ///     Support directory (tests pass a temporary directory).
@@ -550,7 +550,7 @@ public struct SessionSnapshotRepository<SnapshotValue: SessionSnapshotRepresenti
             .sorted { $0.archivedAt > $1.archivedAt }
     }
 
-    /// `Application Support/cmux/session-history/`, shared by every bundle;
+    /// `Application Support/ShellX/session-history/`, shared by every bundle;
     /// file names carry the bundle identifier.
     public func historyDirectoryURL() -> URL? {
         cmuxAppSupportDirectoryURL()?.appendingPathComponent("session-history", isDirectory: true)

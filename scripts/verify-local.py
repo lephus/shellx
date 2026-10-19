@@ -69,7 +69,7 @@ CHECK_INPUTS = {
         "scripts/claude-launch-environment-policy.json",
         "Packages/macOS/CMUXAgentLaunch/Sources/CMUXAgentLaunch/ClaudeSessionEnvironmentPolicy+Generated.swift",
         "agent-chat/adapters/claude-environment-policy.generated.ts",
-        "Resources/bin/cmux-claude-wrapper"),
+        "Resources/bin/shellx-claude-wrapper"),
     "test-wiring": ("scripts/lint-pbxproj-test-wiring.sh", "cmuxTests/*",
                     "cmux.xcodeproj/project.pbxproj"),
     "package-groups": ("Packages/*", "cmux.xcworkspace/contents.xcworkspacedata"),

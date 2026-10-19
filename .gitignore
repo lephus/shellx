@@ -91,3 +91,6 @@ build/
 
 # Release builds (published to downloads, never committed)
 release/out/
+
+# ShellX build output (scripts/shellx/build_remote_daemon.sh -> dist/shellx-remote/<version>/), never committed
+/dist/

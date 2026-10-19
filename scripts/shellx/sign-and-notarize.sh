@@ -24,7 +24,6 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 IDENTITY="${SHELLX_SIGNING_IDENTITY:-Developer ID Application: Phu Le huu (W4RF3W4VTZ)}"
 NOTARY_PROFILE="${SHELLX_NOTARY_PROFILE:-shellx-notary}"
-BUNDLE_ID="pro.shellx.desktop"
 PRODUCT_NAME="ShellX"
 ENTITLEMENTS="$REPO_ROOT/shellx.release.entitlements"
 
@@ -37,7 +36,7 @@ build_app() {
   local derived="${1:-$REPO_ROOT/build-shellx}"
   cd "$REPO_ROOT"
   "$REPO_ROOT/scripts/ensure-ghosttykit.sh" >&2
-  # No Go toolchain is needed: the tunnel extension is dropped at signing time,
+  # No Go toolchain is needed: the app no longer embeds the tunnel extension,
   # so its wireguard-go archive may be the stub (Release otherwise requires Go).
   # SWIFT_OPTIMIZATION_LEVEL=-Onone: with Xcode 26.2 (Swift 6.2.3) an -O build dies
   # in the SIL linker ("SILFunction type mismatch for ghostty_surface_clear_selection"):
@@ -52,9 +51,6 @@ build_app() {
     -configuration Release \
     -destination 'platform=macOS' \
     -derivedDataPath "$derived" \
-    PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
-    INFOPLIST_KEY_CFBundleName="$PRODUCT_NAME" \
-    INFOPLIST_KEY_CFBundleDisplayName="$PRODUCT_NAME" \
     SWIFT_OPTIMIZATION_LEVEL=-Onone \
     ENABLE_DEBUG_DYLIB=NO \
     ARCHS=arm64 \
@@ -62,15 +58,10 @@ build_app() {
     CODE_SIGNING_ALLOWED=NO \
     CODE_SIGN_ENTITLEMENTS= \
     build >&2
-  # PRODUCT_NAME is a project-wide override, so setting it also renames every
-  # Swift package product and collides ("Multiple commands produce ShellX.bundle").
-  # The executable stays "cmux" until W1 renames the app target in the project;
-  # only the bundle directory and display names are ShellX here.
-  # The Cloud tunnel system extension is embedded by the build; the signing step
-  # removes it because shellx.release.entitlements does not request the tunnel.
+  # The app target itself is named ShellX (bundle id pro.shellx.desktop, Release
+  # PRODUCT_NAME ShellX), so the build produces ShellX.app directly. The Cloud
+  # tunnel system extension is no longer embedded in the app.
   local products="$derived/Build/Products/Release"
-  rm -rf "$products/$PRODUCT_NAME.app"
-  mv "$products/cmux.app" "$products/$PRODUCT_NAME.app"
   echo "$products/$PRODUCT_NAME.app"
 }
 

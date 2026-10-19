@@ -15,19 +15,19 @@ struct MobileHostIdentityTests {
     @Test func appInstanceTagDistinguishesReleaseChannelsAndTaggedDevBuilds() {
         #expect(MobileHostIdentity.instanceTag(
             environment: [:],
-            bundleIdentifier: "com.cmuxterm.app"
+            bundleIdentifier: "pro.shellx.desktop"
         ) == "default")
         #expect(MobileHostIdentity.instanceTag(
             environment: [:],
-            bundleIdentifier: "com.cmuxterm.app.nightly"
+            bundleIdentifier: "pro.shellx.desktop.nightly"
         ) == "nightly")
         #expect(MobileHostIdentity.instanceTag(
             environment: [:],
-            bundleIdentifier: "com.cmuxterm.app.staging"
+            bundleIdentifier: "pro.shellx.desktop.staging"
         ) == "staging")
         #expect(MobileHostIdentity.instanceTag(
             environment: ["CMUX_TAG": "future-one"],
-            bundleIdentifier: "com.cmuxterm.app.debug.future-one"
+            bundleIdentifier: "pro.shellx.desktop.debug.future-one"
         ) == "future-one")
     }
 
@@ -118,11 +118,11 @@ struct MobileHostIdentityTests {
     @Test func taggedBuildIdentityUsesBundleScopeWithoutLaunchMetadata() {
         #expect(MobileHostIdentity.instanceTag(
             environment: [:],
-            bundleIdentifier: "com.cmuxterm.app.debug.future-one"
+            bundleIdentifier: "pro.shellx.desktop.debug.future-one"
         ) == "future-one")
         #expect(MobileHostIdentity.instanceTag(
             environment: [:],
-            bundleIdentifier: "com.cmuxterm.app.debug.future-two"
+            bundleIdentifier: "pro.shellx.desktop.debug.future-two"
         ) == "future-two")
     }
 
@@ -484,7 +484,7 @@ struct MobileHostIdentityTests {
             defaults: taggedDefaults,
             sharedIDURL: sharedIDURL,
             stableDefaults: stableDefaults,
-            bundleIdentifier: "com.cmuxterm.app.debug.mpick"
+            bundleIdentifier: "pro.shellx.desktop.debug.mpick"
         ) == stableID.lowercased())
         #expect(taggedDefaults.string(forKey: "mobileHost.deviceID") == stableID.lowercased())
         #expect(try String(contentsOf: sharedIDURL, encoding: .utf8) == stableID.lowercased())

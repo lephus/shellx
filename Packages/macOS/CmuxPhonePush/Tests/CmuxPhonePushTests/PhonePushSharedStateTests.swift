@@ -210,11 +210,11 @@ struct PhonePushSharedStateTests {
 
     @Test("the keychain group needs a resolved team prefix")
     func keychainAccessGroupResolution() {
-        #expect(PhonePushKeychainStateStorage.accessGroup(from: "7WLXT3NR37.dev.cmux.app.internal")
-            == "7WLXT3NR37.dev.cmux.app.internal")
+        #expect(PhonePushKeychainStateStorage.accessGroup(from: "W4RF3W4VTZ.dev.cmux.app.internal")
+            == "W4RF3W4VTZ.dev.cmux.app.internal")
         #expect(PhonePushKeychainStateStorage.accessGroup(from: "$(AppIdentifierPrefix)dev.cmux.app") == nil)
         #expect(PhonePushKeychainStateStorage.accessGroup(from: ".dev.cmux.app.internal") == nil)
-        #expect(PhonePushKeychainStateStorage.accessGroup(from: "7WLXT3NR37.") == nil)
+        #expect(PhonePushKeychainStateStorage.accessGroup(from: "W4RF3W4VTZ.") == nil)
         #expect(PhonePushKeychainStateStorage.accessGroup(from: nil) == nil)
     }
 }

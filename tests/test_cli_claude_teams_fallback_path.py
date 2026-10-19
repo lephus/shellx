@@ -50,7 +50,7 @@ def main() -> int:
             Path(__file__).resolve().parents[1]
             / "Resources"
             / "bin"
-            / "cmux-claude-wrapper"
+            / "shellx-claude-wrapper"
         )
         shutil.copyfile(wrapper_source, live_managed_bin / "claude")
         (live_managed_bin / "claude").chmod(0o755)

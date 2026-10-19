@@ -239,7 +239,7 @@ struct GhosttyTerminalStartupEnvironmentTests {
         for directory in [home, temporary, wrappers, userBin] {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         }
-        let wrapper = wrappers.appendingPathComponent("cmux-claude-wrapper")
+        let wrapper = wrappers.appendingPathComponent("shellx-claude-wrapper")
         let realClaude = userBin.appendingPathComponent("claude")
         try "#!/bin/sh\nprintf 'wrapped:%s\\n' \"$*\"\n".write(
             to: wrapper, atomically: true, encoding: .utf8
@@ -291,7 +291,7 @@ struct GhosttyTerminalStartupEnvironmentTests {
         try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let wrapperURL = bundleBin.appendingPathComponent("cmux-claude-wrapper", isDirectory: false)
+        let wrapperURL = bundleBin.appendingPathComponent("shellx-claude-wrapper", isDirectory: false)
         try """
         #!/usr/bin/env bash
         set -euo pipefail
@@ -302,13 +302,13 @@ struct GhosttyTerminalStartupEnvironmentTests {
         } > "$CMUX_TEST_LOG"
         """.write(to: wrapperURL, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: wrapperURL.path)
-        let hermesWrapperURL = bundleBin.appendingPathComponent("cmux-hermes-agent-wrapper", isDirectory: false)
+        let hermesWrapperURL = bundleBin.appendingPathComponent("shellx-hermes-agent-wrapper", isDirectory: false)
         try "#!/usr/bin/env bash\nexit 0\n".write(to: hermesWrapperURL, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o700],
             ofItemAtPath: hermesWrapperURL.path
         )
-        let ampWrapperURL = bundleBin.appendingPathComponent("cmux-amp-wrapper", isDirectory: false)
+        let ampWrapperURL = bundleBin.appendingPathComponent("shellx-amp-wrapper", isDirectory: false)
         try "#!/usr/bin/env bash\nexit 0\n".write(to: ampWrapperURL, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o700],
@@ -384,13 +384,13 @@ struct GhosttyTerminalStartupEnvironmentTests {
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
         }
 
-        let staleWrapperURL = oldBundleBin.appendingPathComponent("cmux-claude-wrapper", isDirectory: false)
+        let staleWrapperURL = oldBundleBin.appendingPathComponent("shellx-claude-wrapper", isDirectory: false)
         try writeExecutable(staleWrapperURL, """
         #!/usr/bin/env bash
         printf 'stale %s\\n' "$*" > "$CMUX_TEST_LOG"
         """)
 
-        let currentWrapperURL = currentBundleBin.appendingPathComponent("cmux-claude-wrapper", isDirectory: false)
+        let currentWrapperURL = currentBundleBin.appendingPathComponent("shellx-claude-wrapper", isDirectory: false)
         try writeExecutable(currentWrapperURL, """
         #!/usr/bin/env bash
         printf 'current %s\\n' "$*" > "$CMUX_TEST_LOG"
@@ -451,7 +451,7 @@ struct GhosttyTerminalStartupEnvironmentTests {
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
         }
 
-        let wrapperURL = bundleBin.appendingPathComponent("cmux-claude-wrapper", isDirectory: false)
+        let wrapperURL = bundleBin.appendingPathComponent("shellx-claude-wrapper", isDirectory: false)
         try writeExecutable(wrapperURL, """
         #!/usr/bin/env bash
         printf 'stale-wrapper %s\\n' "$*" > "$CMUX_TEST_LOG"

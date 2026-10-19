@@ -4,7 +4,9 @@ import CmuxAppKitSupportUI
 import CmuxCommandPalette
 import CmuxCore
 import CmuxFeedback
+import ShellXBrand
 import CmuxFoundation
+import CmuxTestSupport
 import CmuxAgentJournal
 import CmuxNotifications
 import CmuxPanes
@@ -7899,7 +7901,7 @@ struct ContentView: View {
             CommandPaletteCommandContribution(
                 commandId: "palette.openCmuxSettingsFile",
                 title: constant(String(localized: "settings.settingsJSON.openFile", defaultValue: "Open cmux.json")),
-                subtitle: constant(String(localized: "command.cmuxConfig.subtitle", defaultValue: "cmux.json")),
+                subtitle: constant(String(localized: "command.cmuxConfig.subtitle", defaultValue: "shellx.json")),
                 keywords: ["open", "cmux", "json", "config", "configuration", "settings", "file", "editor", "dotfile"]
             )
         )
@@ -8804,7 +8806,7 @@ struct ContentView: View {
             )
         )
 
-        let cmuxConfigDefaultSubtitle = String(localized: "command.cmuxConfig.subtitle", defaultValue: "cmux.json")
+        let cmuxConfigDefaultSubtitle = String(localized: "command.cmuxConfig.subtitle", defaultValue: "shellx.json")
         for issue in cmuxConfigStore.configurationIssues {
             contributions.append(
                 CommandPaletteCommandContribution(
@@ -10276,9 +10278,16 @@ struct ContentView: View {
     }
 
     private func presentFeedbackComposer() {
-        DispatchQueue.main.async {
-            isFeedbackComposerPresented = true
+#if DEBUG
+        // UI tests record the mail draft instead of opening the mail app.
+        if UITestCaptureSink().appendLineIfConfigured(
+            envKey: "CMUX_UI_TEST_CAPTURE_OPEN_URL_PATH",
+            line: FeedbackComposerSettings.submissionURL.absoluteString
+        ) {
+            return
         }
+#endif
+        FeedbackComposerBridge.openMailDraft()
     }
 
     static func shouldHandleCommandPaletteRequest(
@@ -15810,11 +15819,13 @@ private enum SidebarHelpMenuAction {
 }
 
 private struct SidebarHelpMenuButton: View {
-    private let docsURL = URL(string: "https://cmux.com/docs")
-    private let changelogURL = URL(string: "https://cmux.com/docs/changelog")
-    private let githubURL = URL(string: "https://github.com/manaflow-ai/cmux")
-    private let githubIssuesURL = URL(string: "https://github.com/manaflow-ai/cmux/issues")
-    private let discordURL = URL(string: "https://discord.gg/xsgFEVrWCZ")
+    // ShellX: the website stands in for docs; links with no ShellX page
+    // (changelog, cmux's Discord) are nil, which hides their rows.
+    private let docsURL: URL? = ShellXBrand.websiteURL
+    private let changelogURL: URL? = nil
+    private let githubURL: URL? = ShellXBrand.sourceCodeURL
+    private let githubIssuesURL: URL? = ShellXBrand.sourceCodeURL.appendingPathComponent("issues")
+    private let discordURL: URL? = nil
     private let helpTitle = String(localized: "sidebar.help.button", defaultValue: "Help")
     private let buttonSize = SidebarFooterButtonMetrics.buttonSize
 #if DEBUG

@@ -2106,7 +2106,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: hookURL)) as? [String: Any])
         XCTAssertNil(json["hooks"])
 
-        let cmuxGroup = try XCTUnwrap(json["cmux"] as? [String: Any])
+        let cmuxGroup = try XCTUnwrap(json["shellx"] as? [String: Any])
         let allCommands = cmuxGroup.values
             .compactMap { $0 as? [[String: Any]] }
             .flatMap { entries in
@@ -2202,7 +2202,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
             .appendingPathComponent("config", isDirectory: true)
             .appendingPathComponent("hooks.json", isDirectory: false)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: hookURL)) as? [String: Any])
-        let cmuxGroup = try XCTUnwrap(json["cmux"] as? [String: Any])
+        let cmuxGroup = try XCTUnwrap(json["shellx"] as? [String: Any])
         let commands = cmuxGroup.values
             .compactMap { $0 as? [[String: Any]] }
             .flatMap { entries in entries.compactMap { $0["command"] as? String } }
@@ -2281,7 +2281,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
             .appendingPathComponent("config", isDirectory: true)
             .appendingPathComponent("hooks.json", isDirectory: false)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: hookURL)) as? [String: Any])
-        let cmuxGroup = try XCTUnwrap(json["cmux"] as? [String: Any])
+        let cmuxGroup = try XCTUnwrap(json["shellx"] as? [String: Any])
         let sessionStart = try XCTUnwrap(cmuxGroup["SessionStart"] as? [[String: Any]])
         let command = try XCTUnwrap(sessionStart.first?["command"] as? String)
 

@@ -75,8 +75,7 @@ extension CMUXCLI {
         \(openFocusDefaultHelp)
 
         The client binary is found via CMUX_TUI_CLIENT, then ~/.cmux/bin/cmux, then
-        `cmux-tui` on PATH. Install one with:
-          curl -fsSL https://cmux.com/tui/install-static.sh | sh
+        `cmux-tui` on PATH.
         """
     }
 
@@ -86,13 +85,13 @@ extension CMUXCLI {
     /// interactive `cmux-tui` the person uses so machines never share identity.
     static func vmTuiClientStateDir() -> URL {
         URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
-            .appendingPathComponent(".cmuxterm", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("cmux-tui-client", isDirectory: true)
     }
 
     static func vmTuiDevicesStoreURL() -> URL {
         URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
-            .appendingPathComponent(".cmuxterm", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("vm-tui-devices.json", isDirectory: false)
     }
 
@@ -333,8 +332,8 @@ extension CMUXCLI {
         if options.fullClient, clientPath == nil || clientProbe == nil {
             let searched = cmuxTuiClientCandidates().joined(separator: ", ")
             let template = CMUXDiffViewerLocalization.string(
-                "cli.vm.tui.clientMissingSearched",
-                defaultValue: "No cmux-tui client found (searched: %1$@). Install one with `curl -fsSL https://cmux.com/tui/install-static.sh | sh`, or point CMUX_TUI_CLIENT at a binary."
+                "cli.vm.tui.clientMissingNoInstaller",
+                defaultValue: "No cmux-tui client found (searched: %1$@). Point CMUX_TUI_CLIENT at a binary."
             )
             throw CLIError(message: String(format: template, searched))
         }
@@ -380,7 +379,7 @@ extension CMUXCLI {
                 .appendingPathComponent("cmux-vm-tui-\(UUID().uuidString.lowercased()).json")
             try JSONEncoder().encode(config).write(to: configURL, options: .atomic)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: configURL.path)
-            let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "cmux")
+            let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "shellx")
             initialCommand = "\(shellQuote(executablePath)) vm-tui-connect --config \(shellQuote(configURL.path))"
         } else {
             initialCommand = Self.vmPlainTerminalPlaceholderCommand

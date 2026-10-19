@@ -13,7 +13,7 @@ import Testing
 /// exactly while macOS waits for the extension approval.
 @Suite
 struct CloudTunnelBannerTests {
-    private static let extensionID = "com.cmuxterm.app.tests.tunnel"
+    private static let extensionID = "pro.shellx.desktop.tests.tunnel"
     private let networkExtension = CloudTunnelBackend.networkExtension(extensionBundleIdentifier: CloudTunnelBannerTests.extensionID)
 
     @Test("off, and builds without the extension, show no banner")

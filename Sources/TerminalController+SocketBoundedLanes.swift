@@ -193,7 +193,7 @@ extension TerminalController {
     /// cooperative-pool thread. This is the sanctioned legacy blocking
     /// boundary, not general async work.
     private nonisolated static let socketBlockingWorkerQueue = DispatchQueue(
-        label: "com.cmux.socket.blocking-worker",
+        label: "pro.shellx.socket.blocking-worker",
         qos: .userInitiated,
         attributes: .concurrent
     )

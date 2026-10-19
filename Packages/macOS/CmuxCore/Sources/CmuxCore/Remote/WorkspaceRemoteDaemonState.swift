@@ -1,4 +1,4 @@
-/// Lifecycle state of the cmuxd-remote daemon backing a remote workspace.
+/// Lifecycle state of the shellx-remote daemon backing a remote workspace.
 ///
 /// Raw values are wire/persisted strings (status payloads): do not rename
 /// cases.

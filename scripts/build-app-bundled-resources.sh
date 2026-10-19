@@ -30,6 +30,12 @@ CMUX_CUA_HELPER_APP="${DEST}/../Library/cmux Computer Use.app"
 CMUX_CUA_HELPER_OWNER_MARKER="${CMUX_CUA_HELPER_APP}/Contents/Resources/.cmux-cua-managed-helper"
 CMUX_CUA_HELPER_EXEC="${CMUX_CUA_HELPER_APP}/Contents/MacOS/cmux-cua"
 INFO_PLIST="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+# ShellX does not build or ship the cmux Computer Use helper. Its TCC identity
+# (com.cmuxterm.cua) belongs to cmux, so a ShellX copy would take over cmux's
+# Accessibility and Screen Recording rows, and ComputerUseHelperTrust pins the
+# ShellX team, so no cmux helper is trusted either. CMUX_CUA_HELPER_BUILD=1
+# restores the upstream helper build (tests/test_build_app_bundled_resources.sh).
+CMUX_CUA_HELPER_BUILD="${CMUX_CUA_HELPER_BUILD:-0}"
 
 run_git() (
   unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE
@@ -198,6 +204,7 @@ fingerprint="$({
   printf 'zig-required=%s\n' "${ZIG_REQUIRED:-}"
   fingerprint_toolchain
   printf 'helper-display=%s\n' "${CMUX_CUA_HELPER_DISPLAY_NAME:-}"
+  printf 'cua-helper-build=%s\n' "$CMUX_CUA_HELPER_BUILD"
   printf 'bundle-id=%s\n' "${PRODUCT_BUNDLE_IDENTIFIER:-}"
   hash_git_worktree "${SRCROOT}/ghostty"
   hash_swiftpm_resource_bundles "$DEST"
@@ -224,11 +231,15 @@ fingerprint="$({
 output_fingerprint_value="$(output_fingerprint)"
 
 helper_output_ok=true
-if [ ! -d "$CMUX_CUA_HELPER_APP" ] ||
-  [ ! -f "$CMUX_CUA_HELPER_APP/Contents/Info.plist" ] ||
-  [ ! -f "$CMUX_CUA_HELPER_OWNER_MARKER" ] ||
-  [ ! -x "$CMUX_CUA_HELPER_EXEC" ] ||
-  [ -e "$LEGACY_CMUX_CUA_CLIENT" ]; then
+if [ "$CMUX_CUA_HELPER_BUILD" = 1 ]; then
+  if [ ! -d "$CMUX_CUA_HELPER_APP" ] ||
+    [ ! -f "$CMUX_CUA_HELPER_APP/Contents/Info.plist" ] ||
+    [ ! -f "$CMUX_CUA_HELPER_OWNER_MARKER" ] ||
+    [ ! -x "$CMUX_CUA_HELPER_EXEC" ] ||
+    [ -e "$LEGACY_CMUX_CUA_CLIENT" ]; then
+    helper_output_ok=false
+  fi
+elif [ -e "$CMUX_CUA_HELPER_APP" ] || [ -e "$LEGACY_CMUX_CUA_CLIENT" ]; then
   helper_output_ok=false
 fi
 if [ -f "$STAMP" ] && [ -x "$GHOSTTY_HELPER_DEST" ] \
@@ -316,16 +327,21 @@ if [ ! -x "$GHOSTTY_HELPER_DEST" ]; then
   echo "error: Ghostty CLI helper was not created at $GHOSTTY_HELPER_DEST" >&2
   exit 1
 fi
-if [ ! -x "$BUILD_CMUX_CUA" ]; then
-  echo "error: missing cmux-cua build script at $BUILD_CMUX_CUA" >&2
-  exit 1
-fi
-# The standalone build output is scratch; only the helper bundle ships.
-"$BUILD_CMUX_CUA" --output "${DERIVED_FILE_DIR}/cmux-cua/cmux-cua" \
-  --helper-app "$CMUX_CUA_HELPER_APP" --archs "${ARCHS:-}"
-if [ ! -x "$CMUX_CUA_HELPER_EXEC" ]; then
-  echo "error: cmux-cua was not created at $CMUX_CUA_HELPER_EXEC" >&2
-  exit 1
+if [ "$CMUX_CUA_HELPER_BUILD" = 1 ]; then
+  if [ ! -x "$BUILD_CMUX_CUA" ]; then
+    echo "error: missing cmux-cua build script at $BUILD_CMUX_CUA" >&2
+    exit 1
+  fi
+  # The standalone build output is scratch; only the helper bundle ships.
+  "$BUILD_CMUX_CUA" --output "${DERIVED_FILE_DIR}/cmux-cua/cmux-cua" \
+    --helper-app "$CMUX_CUA_HELPER_APP" --archs "${ARCHS:-}"
+  if [ ! -x "$CMUX_CUA_HELPER_EXEC" ]; then
+    echo "error: cmux-cua was not created at $CMUX_CUA_HELPER_EXEC" >&2
+    exit 1
+  fi
+else
+  # Drop a helper an earlier (upstream) build left in this product.
+  rm -rf "$CMUX_CUA_HELPER_APP"
 fi
 update_commit
 

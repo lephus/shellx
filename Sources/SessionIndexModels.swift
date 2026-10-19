@@ -375,7 +375,7 @@ struct SessionEntry: Identifiable, Hashable, Sendable {
             // command runs in a shell where the integration's PATH shim is not
             // active (e.g. the `$SHELL -lic` restore launcher). Without this the
             // bare `codex resume <id>` resolves to the real codex binary,
-            // bypassing cmux-codex-wrapper, so no SessionStart fires and the iOS
+            // bypassing shellx-codex-wrapper, so no SessionStart fires and the iOS
             // GUI stays read-only. Mirror of the claude case: the token is
             // POSIX-only and this command is typed into / copy-pasted into the
             // user's own shell (fish/csh included), so the rendered command is

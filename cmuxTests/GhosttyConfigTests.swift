@@ -275,7 +275,7 @@ final class GhosttyConfigTests: XCTestCase {
 
         XCTAssertTrue(
             paths.contains(
-                "\(NSHomeDirectory())/Library/Application Support/com.cmuxterm.app/themes/Zag Light"
+                "\(NSHomeDirectory())/Library/Application Support/pro.shellx.desktop/themes/Zag Light"
             )
         )
     }
@@ -290,7 +290,7 @@ final class GhosttyConfigTests: XCTestCase {
 
         XCTAssertTrue(
             paths.contains(
-                "\(fixedHome)/Library/Application Support/com.cmuxterm.app/themes/Zag Light"
+                "\(fixedHome)/Library/Application Support/pro.shellx.desktop/themes/Zag Light"
             )
         )
     }
@@ -303,7 +303,7 @@ final class GhosttyConfigTests: XCTestCase {
         defer { try? fileManager.removeItem(at: root) }
 
         let themesDirectory = root
-            .appendingPathComponent("Library/Application Support/com.cmuxterm.app/themes", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/pro.shellx.desktop/themes", isDirectory: true)
         try fileManager.createDirectory(at: themesDirectory, withIntermediateDirectories: true)
         try "background = #ffffff\nforeground = #1f2328\n".write(
             to: themesDirectory.appendingPathComponent("Zag Light", isDirectory: false),
@@ -2791,8 +2791,8 @@ final class WorkspaceRemoteSSHCleanupTests: XCTestCase {
     func testOrphanedCMUXRemoteSSHPIDsMatchesOnlyParentOneRelayAndDaemonTransports() {
         let psOutput = """
           101 1 /usr/bin/ssh -N -T -S none -o ControlPath=/tmp/cmux-ssh-501-56080-%C -R 127.0.0.1:56080:127.0.0.1:64048 cmux-macmini
-          102 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .cmux/bin/cmuxd-remote/0.63.1/darwin-arm64/cmuxd-remote serve --stdio'
-          107 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .cmux/bin/cmuxd-remote/0.63.1/darwin-arm64/cmuxd-remote 'serve' '--stdio' '--persistent' '--slot' 'ssh-test''
+          102 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .shellx/bin/shellx-remote/0.63.1/darwin-arm64/shellx-remote serve --stdio'
+          107 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .shellx/bin/shellx-remote/0.63.1/darwin-arm64/shellx-remote 'serve' '--stdio' '--persistent' '--slot' 'ssh-test''
           103 999 /usr/bin/ssh -N -T -S none -R 127.0.0.1:56081:127.0.0.1:64049 cmux-macmini
           104 1 /usr/bin/ssh -tt cmux-macmini
           105 1 /usr/bin/ssh -N -T -S none -R 127.0.0.1:56082:127.0.0.1:64050 other-host
@@ -2812,9 +2812,9 @@ final class WorkspaceRemoteSSHCleanupTests: XCTestCase {
         let psOutput = """
           201 1 /usr/bin/ssh -N -T -S none -R 127.0.0.1:56080:127.0.0.1:64048 cmux-macmini
           202 1 /usr/bin/ssh -N -T -S none -R 127.0.0.1:56081:127.0.0.1:64049 cmux-macmini
-          203 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .cmux/bin/cmuxd-remote/0.63.1/darwin-arm64/cmuxd-remote serve --stdio'
-          204 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .cmux/bin/cmuxd-remote/0.63.1/darwin-arm64/cmuxd-remote 'serve' '--stdio' '--persistent' '--slot' 'ssh-test''
-          205 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .cmux/bin/cmuxd-remote/0.63.1/darwin-arm64/cmuxd-remote 'serve' '--stdio' '--persistent' '--slot' 'ssh-other''
+          203 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .shellx/bin/shellx-remote/0.63.1/darwin-arm64/shellx-remote serve --stdio'
+          204 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .shellx/bin/shellx-remote/0.63.1/darwin-arm64/shellx-remote 'serve' '--stdio' '--persistent' '--slot' 'ssh-test''
+          205 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .shellx/bin/shellx-remote/0.63.1/darwin-arm64/shellx-remote 'serve' '--stdio' '--persistent' '--slot' 'ssh-other''
         """
 
         XCTAssertEqual(
@@ -2839,8 +2839,8 @@ final class WorkspaceRemoteSSHCleanupTests: XCTestCase {
 
     func testOrphanedCMUXRemoteSSHPIDsMatchesBackslashEscapedPersistentDaemonSlot() {
         let psOutput = """
-          211 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec '\''.cmux/bin/cmuxd-remote/0.63.1/darwin-arm64/cmuxd-remote'\'' '\''serve'\'' '\''--stdio'\'' '\''--persistent'\'' '\''--slot'\'' '\''ssh-test'\'''
-          212 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec '\''.cmux/bin/cmuxd-remote/0.63.1/darwin-arm64/cmuxd-remote'\'' '\''serve'\'' '\''--stdio'\'' '\''--persistent'\'' '\''--slot'\'' '\''ssh-other'\'''
+          211 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec '\''.shellx/bin/shellx-remote/0.63.1/darwin-arm64/shellx-remote'\'' '\''serve'\'' '\''--stdio'\'' '\''--persistent'\'' '\''--slot'\'' '\''ssh-test'\'''
+          212 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec '\''.shellx/bin/shellx-remote/0.63.1/darwin-arm64/shellx-remote'\'' '\''serve'\'' '\''--stdio'\'' '\''--persistent'\'' '\''--slot'\'' '\''ssh-other'\'''
         """
 
         XCTAssertEqual(
@@ -2856,8 +2856,8 @@ final class WorkspaceRemoteSSHCleanupTests: XCTestCase {
 
     func testOrphanedCMUXRemoteSSHPIDsMatchesEqualsQuotedPersistentDaemonSlot() {
         let psOutput = """
-          221 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .cmux/bin/cmuxd-remote serve --stdio --persistent --slot='ssh-test''
-          222 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .cmux/bin/cmuxd-remote serve --stdio --persistent --slot="ssh-other"'
+          221 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .shellx/bin/shellx-remote serve --stdio --persistent --slot='ssh-test''
+          222 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .shellx/bin/shellx-remote serve --stdio --persistent --slot="ssh-other"'
         """
 
         XCTAssertEqual(
@@ -2874,10 +2874,10 @@ final class WorkspaceRemoteSSHCleanupTests: XCTestCase {
     func testOrphanedCMUXRemoteSSHPIDsWithSlotAndNoRelayKeepsGenericCleanup() {
         let psOutput = """
           301 1 /usr/bin/ssh -N -T -S none -R 127.0.0.1:56080:127.0.0.1:64048 cmux-macmini
-          302 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .cmux/bin/cmuxd-remote/0.63.1/darwin-arm64/cmuxd-remote serve --stdio'
-          303 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .cmux/bin/cmuxd-remote/0.63.1/darwin-arm64/cmuxd-remote 'serve' '--stdio' '--persistent' '--slot' 'ssh-test''
-          304 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .cmux/bin/cmuxd-remote/0.63.1/darwin-arm64/cmuxd-remote 'serve' '--stdio' '--persistent' '--slot' 'ssh-other''
-          305 1 /usr/bin/ssh -T -S none -o RequestTTY=no other-host sh -c 'exec .cmux/bin/cmuxd-remote/0.63.1/darwin-arm64/cmuxd-remote serve --stdio'
+          302 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .shellx/bin/shellx-remote/0.63.1/darwin-arm64/shellx-remote serve --stdio'
+          303 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .shellx/bin/shellx-remote/0.63.1/darwin-arm64/shellx-remote 'serve' '--stdio' '--persistent' '--slot' 'ssh-test''
+          304 1 /usr/bin/ssh -T -S none -o RequestTTY=no cmux-macmini sh -c 'exec .shellx/bin/shellx-remote/0.63.1/darwin-arm64/shellx-remote 'serve' '--stdio' '--persistent' '--slot' 'ssh-other''
+          305 1 /usr/bin/ssh -T -S none -o RequestTTY=no other-host sh -c 'exec .shellx/bin/shellx-remote/0.63.1/darwin-arm64/shellx-remote serve --stdio'
         """
 
         XCTAssertEqual(
@@ -4517,7 +4517,7 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
         defer { try? fileManager.removeItem(at: root) }
 
         try writeExecutableScript(
-            at: binDir.appendingPathComponent("cmux", isDirectory: false),
+            at: binDir.appendingPathComponent("shellx", isDirectory: false),
             contents: """
             #!/bin/sh
             printf '%s\\n' "$*" >> "\(logPath.path)"
@@ -4562,7 +4562,7 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
         defer { try? fileManager.removeItem(at: root) }
 
         try writeExecutableScript(
-            at: binDir.appendingPathComponent("cmux", isDirectory: false),
+            at: binDir.appendingPathComponent("shellx", isDirectory: false),
             contents: """
             #!/bin/sh
             printf '%s\\n' "$*" >> "\(logPath.path)"
@@ -4609,7 +4609,7 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
         defer { try? fileManager.removeItem(at: root) }
 
         try writeExecutableScript(
-            at: binDir.appendingPathComponent("cmux", isDirectory: false),
+            at: binDir.appendingPathComponent("shellx", isDirectory: false),
             contents: """
             #!/bin/sh
             printf '%s\\n' "$*" >> "\(logPath.path)"
@@ -4660,7 +4660,7 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
         defer { try? fileManager.removeItem(at: root) }
 
         try writeExecutableScript(
-            at: binDir.appendingPathComponent("cmux", isDirectory: false),
+            at: binDir.appendingPathComponent("shellx", isDirectory: false),
             contents: """
             #!/bin/sh
             printf '%s\\n' "$*" >> "\(logPath.path)"
@@ -4704,7 +4704,7 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
         defer { try? fileManager.removeItem(at: root) }
 
         try writeExecutableScript(
-            at: binDir.appendingPathComponent("cmux", isDirectory: false),
+            at: binDir.appendingPathComponent("shellx", isDirectory: false),
             contents: """
             #!/bin/sh
             printf '%s\\n' "$*" >> "\(logPath.path)"
@@ -4758,7 +4758,7 @@ final class ZshShellIntegrationHandoffTests: XCTestCase {
         defer { try? fileManager.removeItem(at: root) }
 
         try writeExecutableScript(
-            at: binDir.appendingPathComponent("cmux", isDirectory: false),
+            at: binDir.appendingPathComponent("shellx", isDirectory: false),
             contents: """
             #!/bin/sh
             printf '%s\\n' "$*" >> "\(logPath.path)"

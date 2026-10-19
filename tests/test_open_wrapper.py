@@ -63,7 +63,7 @@ def run_wrapper(
         cmux_locale_log = tmp / "cmux-locale.log"
         system_open = tmp / "system-open"
         defaults = tmp / "defaults"
-        cmux = tmp / "cmux"
+        cmux = tmp / "shellx"  # the bundled CLI beside Resources/bin/open
 
         make_executable(
             system_open,
@@ -155,7 +155,7 @@ exit 0
 
         env = os.environ.copy()
         env["CMUX_SOCKET_PATH"] = "/tmp/cmux-open-wrapper-test.sock"
-        env["CMUX_BUNDLE_ID"] = "com.cmuxterm.app.debug.test"
+        env["CMUX_BUNDLE_ID"] = "pro.shellx.desktop.debug.test"
         env["CMUX_OPEN_WRAPPER_SYSTEM_OPEN"] = str(system_open)
         env["CMUX_OPEN_WRAPPER_DEFAULTS"] = str(defaults)
         env["FAKE_OPEN_LOG"] = str(open_log)

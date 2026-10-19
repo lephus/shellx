@@ -103,7 +103,7 @@ mkdir -p "node_modules/$package"
             timeout=20,
         )
 
-        shadow_config_json = root / ".cmuxterm" / "omo-config" / "opencode.json"
+        shadow_config_json = root / ".shellx" / "omo-config" / "opencode.json"
         try:
             shadow_config = json.loads(shadow_config_json.read_text(encoding="utf-8"))
         except Exception as exc:
@@ -112,7 +112,7 @@ mkdir -p "node_modules/$package"
 
         # The file references must survive byte for byte: OpenCode does not
         # resolve an escaped "{file:.\/AGENTS.md}".
-        shadow_omo_json = root / ".cmuxterm" / "omo-config" / "oh-my-openagent.json"
+        shadow_omo_json = root / ".shellx" / "omo-config" / "oh-my-openagent.json"
         for written in (shadow_config_json, shadow_omo_json):
             try:
                 raw = written.read_text(encoding="utf-8")
@@ -159,7 +159,7 @@ mkdir -p "node_modules/$package"
             return 1
         opencode_log_content = opencode_log.read_text(encoding="utf-8")
         opencode_config_dir = opencode_log_content.strip()
-        expected_config_dir = str(root / ".cmuxterm" / "omo-config")
+        expected_config_dir = str(root / ".shellx" / "omo-config")
         if opencode_config_dir != expected_config_dir:
             print(
                 "FAIL: fake opencode received wrong OPENCODE_CONFIG_DIR; "
@@ -167,7 +167,7 @@ mkdir -p "node_modules/$package"
             )
             return 1
 
-        package_json = root / ".cmuxterm" / "omo-config" / "package.json"
+        package_json = root / ".shellx" / "omo-config" / "package.json"
         try:
             package_manifest = json.loads(package_json.read_text(encoding="utf-8"))
         except Exception as exc:

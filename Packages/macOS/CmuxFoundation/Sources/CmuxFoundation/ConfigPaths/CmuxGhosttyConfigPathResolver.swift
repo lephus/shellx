@@ -10,9 +10,9 @@ public import Foundation
 /// bundle-id→URL transforms have no natural receiver type; modernization into
 /// an instantiated, dependency-injected resolver is deferred to the engine lift.
 public struct CmuxGhosttyConfigPathResolver {
-    /// The bundle identifier of the released cmux app, used as the canonical
-    /// config location and the fallback for dev/nightly/rc/staging channels.
-    public static let releaseBundleIdentifier = "com.cmuxterm.app"
+    /// The bundle identifier of the released ShellX app (`ShellXBrand.bundleID`), used as the
+    /// canonical config location and the fallback for dev/nightly/rc/staging channels.
+    public static let releaseBundleIdentifier = "pro.shellx.desktop"
     private static let releaseFallbackChannelSuffixes = ["debug", "nightly", "rc", "staging"]
 
     public init() {}

@@ -203,10 +203,8 @@ extension AppDelegate {
             localized: "menu.app.openCmuxSettingsFile",
             defaultValue: "Open cmux.json"
         ))
-        alert.addButton(withTitle: String(
-            localized: "settings.settingsJSON.docsButton",
-            defaultValue: "Open Docs"
-        ))
+        // ShellX has no custom-commands docs page (cmux's is on cmux.com and
+        // nothing under docs/ covers actions), so there is no "Open Docs".
         alert.addButton(withTitle: String(
             localized: "common.ok",
             defaultValue: "OK"
@@ -271,9 +269,6 @@ extension AppDelegate {
             // Reuse the existing in-cmux config editor path used by Settings'
             // workspace-layout customization.
             openWorkspaceLayoutsCustomization()
-        case .alertSecondButtonReturn:
-            guard let url = URL(string: "https://cmux.com/docs/custom-commands") else { return }
-            NSWorkspace.shared.open(url)
         default:
             break
         }

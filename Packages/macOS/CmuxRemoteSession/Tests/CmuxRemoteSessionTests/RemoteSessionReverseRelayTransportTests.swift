@@ -23,8 +23,8 @@ struct RemoteSessionReverseRelayTransportTests {
 
         coordinator.queue.sync {
             coordinator.daemonReady = true
-            coordinator.daemonRemotePath = "/tmp/cmuxd-remote"
-            coordinator.startReverseRelayLocked(remotePath: "/tmp/cmuxd-remote")
+            coordinator.daemonRemotePath = "/tmp/shellx-remote"
+            coordinator.startReverseRelayLocked(remotePath: "/tmp/shellx-remote")
         }
 
         let forwardRequest = try #require(runner.requests.first(where: {
@@ -68,11 +68,11 @@ struct RemoteSessionReverseRelayTransportTests {
 
         coordinator.queue.sync {
             coordinator.daemonReady = true
-            coordinator.daemonRemotePath = "/tmp/cmuxd-remote"
+            coordinator.daemonRemotePath = "/tmp/shellx-remote"
             coordinator.reverseRelayControlMasterForwardSpec =
                 "127.0.0.1:\(fixture.identity.relayPort):127.0.0.1:55001"
             coordinator.reverseRelayReady = true
-            coordinator.startReverseRelayLocked(remotePath: "/tmp/cmuxd-remote")
+            coordinator.startReverseRelayLocked(remotePath: "/tmp/shellx-remote")
         }
 
         #expect(coordinator.queue.sync { coordinator.reverseRelayReady })
@@ -178,8 +178,8 @@ struct RemoteSessionReverseRelayTransportTests {
         var launches = launcher.launches.makeAsyncIterator()
         coordinator.queue.sync {
             coordinator.daemonReady = true
-            coordinator.daemonRemotePath = "/tmp/cmuxd-remote"
-            coordinator.startReverseRelayLocked(remotePath: "/tmp/cmuxd-remote")
+            coordinator.daemonRemotePath = "/tmp/shellx-remote"
+            coordinator.startReverseRelayLocked(remotePath: "/tmp/shellx-remote")
         }
 
         let launch = try #require(await launches.next())
@@ -209,8 +209,8 @@ struct RemoteSessionReverseRelayTransportTests {
         var launches = launcher.launches.makeAsyncIterator()
         coordinator.queue.sync {
             coordinator.daemonReady = true
-            coordinator.daemonRemotePath = "/tmp/cmuxd-remote"
-            coordinator.startReverseRelayLocked(remotePath: "/tmp/cmuxd-remote")
+            coordinator.daemonRemotePath = "/tmp/shellx-remote"
+            coordinator.startReverseRelayLocked(remotePath: "/tmp/shellx-remote")
         }
 
         let launch = try #require(await launches.next())
@@ -241,8 +241,8 @@ struct RemoteSessionReverseRelayTransportTests {
 
         coordinator.queue.sync {
             coordinator.daemonReady = true
-            coordinator.daemonRemotePath = "/tmp/cmuxd-remote"
-            coordinator.startReverseRelayLocked(remotePath: "/tmp/cmuxd-remote")
+            coordinator.daemonRemotePath = "/tmp/shellx-remote"
+            coordinator.startReverseRelayLocked(remotePath: "/tmp/shellx-remote")
         }
 
         #expect(!runner.requests.contains(where: { $0.arguments.first == "-G" }))
@@ -380,8 +380,8 @@ struct RemoteSessionReverseRelayTransportTests {
         var statuses = host.daemonStatuses.makeAsyncIterator()
         coordinator.queue.sync {
             coordinator.daemonReady = true
-            coordinator.daemonRemotePath = "/tmp/cmuxd-remote"
-            coordinator.startReverseRelayLocked(remotePath: "/tmp/cmuxd-remote")
+            coordinator.daemonRemotePath = "/tmp/shellx-remote"
+            coordinator.startReverseRelayLocked(remotePath: "/tmp/shellx-remote")
         }
         _ = try #require(await launches.next())
         launcher.emitTermination(detail: rawFailure)
@@ -421,8 +421,8 @@ struct RemoteSessionReverseRelayTransportTests {
         var statuses = host.daemonStatuses.makeAsyncIterator()
         coordinator.queue.sync {
             coordinator.daemonReady = true
-            coordinator.daemonRemotePath = "/tmp/cmuxd-remote"
-            coordinator.startReverseRelayLocked(remotePath: "/tmp/cmuxd-remote")
+            coordinator.daemonRemotePath = "/tmp/shellx-remote"
+            coordinator.startReverseRelayLocked(remotePath: "/tmp/shellx-remote")
         }
         _ = try #require(await launches.next())
         launcher.emitTermination(
@@ -483,8 +483,8 @@ struct RemoteSessionReverseRelayTransportTests {
             coordinator.proxyConnectionDesired = true
             coordinator.armReadinessDeadlineLocked()
             coordinator.daemonReady = true
-            coordinator.daemonRemotePath = "/tmp/cmuxd-remote"
-            coordinator.startReverseRelayLocked(remotePath: "/tmp/cmuxd-remote")
+            coordinator.daemonRemotePath = "/tmp/shellx-remote"
+            coordinator.startReverseRelayLocked(remotePath: "/tmp/shellx-remote")
         }
         _ = try #require(await launches.next())
         launcher.emitTermination(detail: diagnostic)
@@ -536,8 +536,8 @@ struct RemoteSessionReverseRelayTransportTests {
         var launches = launcher.launches.makeAsyncIterator()
         coordinator.queue.sync {
             coordinator.daemonReady = true
-            coordinator.daemonRemotePath = "/tmp/cmuxd-remote"
-            coordinator.startReverseRelayLocked(remotePath: "/tmp/cmuxd-remote")
+            coordinator.daemonRemotePath = "/tmp/shellx-remote"
+            coordinator.startReverseRelayLocked(remotePath: "/tmp/shellx-remote")
         }
         let launch = try #require(await launches.next())
         #expect(launch.arguments.starts(with: ["-N", "-T", "-S", "none"]))

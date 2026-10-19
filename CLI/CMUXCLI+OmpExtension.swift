@@ -1,10 +1,10 @@
 import Foundation
 
 extension CMUXCLI {
-    private static let ompExtensionMarker = "cmux-omp-session-extension-marker"
-    private static let ompExtensionFilename = "cmux-omp-session.ts"
+    private static let ompExtensionMarker = "shellx-omp-session-extension-marker"
+    private static let ompExtensionFilename = "shellx-omp-session.ts"
     private static let ompExtensionSource = #"""
-// cmux-omp-session-extension-marker v4
+// shellx-omp-session-extension-marker v4
 // Bridges OMP session lifecycle events into cmux's restorable session store.
 // Installed by `cmux hooks omp install` or `cmux hooks setup`.
 // DO NOT EDIT MANUALLY. cmux upgrades this file in place.
@@ -172,7 +172,7 @@ function hookInvocation(subcommand: string, ctx: ExtensionContext, extra: Record
     event: eventName(subcommand),
     ...extra,
   };
-  const cmux = process.env.CMUX_OMP_CMUX_BIN || "cmux";
+  const cmux = process.env.CMUX_OMP_CMUX_BIN || "shellx";
   return {
     cmux,
     cwd,

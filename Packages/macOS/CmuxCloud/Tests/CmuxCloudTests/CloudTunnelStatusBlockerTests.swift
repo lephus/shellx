@@ -7,7 +7,7 @@ import Testing
 /// as something blocking the user; only an in-flight `cmux vpn up` is.
 @Suite
 struct CloudTunnelStatusBlockerTests {
-    private let backend = CloudTunnelBackend.networkExtension(extensionBundleIdentifier: "com.cmuxterm.app.tests.tunnel")
+    private let backend = CloudTunnelBackend.networkExtension(extensionBundleIdentifier: "pro.shellx.desktop.tests.tunnel")
 
     @Test("an off tunnel blocks nothing and shows no copy")
     func offIsNotABlocker() {

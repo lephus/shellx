@@ -1,7 +1,7 @@
 public import Foundation
 public import CmuxCore
 
-/// Synchronous JSON-RPC client for a cmuxd-remote daemon over one of three
+/// Synchronous JSON-RPC client for a shellx-remote daemon over one of three
 /// transports: `ssh ... <remotePath> serve --stdio` (newline-delimited JSON on
 /// stdio), an SSH local forward to the baked VM daemon socket, or a brokered
 /// WebSocket endpoint (faithful lift of the app target's
@@ -116,11 +116,11 @@ public final class RemoteDaemonRPCClient: @unchecked Sendable {
     /// launches `/usr/bin/ssh`.
     var transportExecutableOverride: String?
     let onUnexpectedTermination: (String) -> Void
-    let transportKeepaliveQueue = DispatchQueue(label: "com.cmux.remote-ssh.daemon-rpc.keepalive.\(UUID().uuidString)")
-    let ptyAttachCancellationTimerQueue = DispatchQueue(label: "com.cmux.remote-ssh.daemon-rpc.pty-attach-cancel-timeout.\(UUID().uuidString)")
-    let writeQueue = DispatchQueue(label: "com.cmux.remote-ssh.daemon-rpc.write.\(UUID().uuidString)")
-    let stateQueue = DispatchQueue(label: "com.cmux.remote-ssh.daemon-rpc.state.\(UUID().uuidString)")
-    let cliRequestQueue = DispatchQueue(label: "com.cmux.remote-ssh.daemon-rpc.cli.\(UUID().uuidString)", qos: .utility, attributes: .concurrent)
+    let transportKeepaliveQueue = DispatchQueue(label: "pro.shellx.remote-ssh.daemon-rpc.keepalive.\(UUID().uuidString)")
+    let ptyAttachCancellationTimerQueue = DispatchQueue(label: "pro.shellx.remote-ssh.daemon-rpc.pty-attach-cancel-timeout.\(UUID().uuidString)")
+    let writeQueue = DispatchQueue(label: "pro.shellx.remote-ssh.daemon-rpc.write.\(UUID().uuidString)")
+    let stateQueue = DispatchQueue(label: "pro.shellx.remote-ssh.daemon-rpc.state.\(UUID().uuidString)")
+    let cliRequestQueue = DispatchQueue(label: "pro.shellx.remote-ssh.daemon-rpc.cli.\(UUID().uuidString)", qos: .utility, attributes: .concurrent)
     let pendingCalls = RemoteDaemonPendingCallRegistry()
 
     var process: Process?
@@ -156,7 +156,7 @@ public final class RemoteDaemonRPCClient: @unchecked Sendable {
     ///
     /// - Parameters:
     ///   - configuration: The remote connection this daemon serves.
-    ///   - remotePath: Remote path of the cmuxd-remote binary (stdio
+    ///   - remotePath: Remote path of the shellx-remote binary (stdio
     ///     transport only).
     ///   - strings: App-bundle-resolved user-facing error strings (the
     ///     package never localizes).

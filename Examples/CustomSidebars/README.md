@@ -30,7 +30,7 @@ The curated previews are also shown in the [custom-sidebar guide](../../docs/cus
 | Panel Todo | ![Panel Todo](../../Packages/macOS/CmuxSettingsUI/Sources/CmuxSettingsUI/Resources/CustomSidebarTemplatePreviews/panel-todo-light.png) | ![Panel Todo dark](../../Packages/macOS/CmuxSettingsUI/Sources/CmuxSettingsUI/Resources/CustomSidebarTemplatePreviews/panel-todo-dark.png) |
 
 You can also copy any source file from this directory into
-`~/.config/cmux/sidebars/`. Enable **Settings -> Beta features -> Custom sidebars**
+`~/.config/shellx/sidebars/`. Enable **Settings -> Beta features -> Custom sidebars**
 then pick it from the sidebar toggle button's right-click menu. The manifest lists
 the bundled templates' display name, description, and intended placement. The other
 examples remain available here as authoring references.
@@ -48,7 +48,7 @@ examples remain available here as authoring references.
   a tiny progress meter, unread count and PR number. The header graphs busy
   workspaces over twelve minutes. Click a row to select it, drag to reorder,
   and use BUSY to hide quiet workspaces. Install with
-  `cp Examples/CustomSidebars/btop-agents.js ~/.config/cmux/sidebars/` and
+  `cp Examples/CustomSidebars/btop-agents.js ~/.config/shellx/sidebars/` and
   `cmux sidebar select btop-agents`.
 
 See `docs/custom-sidebars.md` for the full authoring contract.

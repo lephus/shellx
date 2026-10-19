@@ -1,6 +1,6 @@
 extension CMUXCLI {
     static let piExtensionSourcePart1 = #"""
-// cmux-pi-session-extension-marker v4
+// shellx-pi-session-extension-marker v4
 // Bridges Pi session lifecycle, tool telemetry, notifications, and resume bindings into cmux.
 // Installed by `cmux hooks pi install` or `cmux hooks setup`.
 // DO NOT EDIT MANUALLY. cmux upgrades this file in place.
@@ -541,7 +541,7 @@ async function warn(
 }
 
 function cmuxExecutable(): string {
-  return process.env.CMUX_PI_CMUX_BIN || "cmux";
+  return process.env.CMUX_PI_CMUX_BIN || "shellx";
 }
 """#
 }

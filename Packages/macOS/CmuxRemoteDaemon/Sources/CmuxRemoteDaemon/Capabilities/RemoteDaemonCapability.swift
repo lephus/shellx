@@ -1,4 +1,4 @@
-/// Capabilities cmux requires from a cmuxd-remote daemon, as advertised in the
+/// Capabilities cmux requires from a shellx-remote daemon, as advertised in the
 /// daemon's `hello` response.
 ///
 /// Raw values are the wire capability strings; do not rename them.

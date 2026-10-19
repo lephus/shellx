@@ -3,7 +3,7 @@ import CmuxCore
 import Foundation
 
 extension Workspace {
-    /// Managed SSH entrypoints without a cmuxd-remote relay converge here, including saved
+    /// Managed SSH entrypoints without a shellx-remote relay converge here, including saved
     /// workspace descriptors. See `WorkspaceRemoteConfiguration.routesThroughSSHTui`.
     func configureSSHTuiConnection(_ configuration: WorkspaceRemoteConfiguration, autoConnect: Bool) -> Bool {
         AppDelegate.shared?.sshTuiWorkspaceCoordinator.disconnect(workspace: self)
@@ -100,7 +100,7 @@ extension Workspace {
 }
 
 extension WorkspaceRemoteConfiguration {
-    /// cmux-tui owns managed SSH connections, which carry no cmuxd-remote channel
+    /// cmux-tui owns managed SSH connections, which carry no shellx-remote channel
     /// (`workspace.ssh.open` and restored descriptors leave the relay unset). A
     /// configuration that arrives with a relay or daemon endpoint was bootstrapped
     /// by the legacy `workspace.remote.configure` flow, which the CLI still uses

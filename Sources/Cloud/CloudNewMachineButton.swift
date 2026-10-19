@@ -20,9 +20,10 @@ struct CloudNewMachineButton: View {
         String(localized: "cloudTree.action.newCloudMachine", defaultValue: "New Cloud Machine")
     }
 
+    /// ShellX: New Cloud Machine has no shortcut (Cloud is off).
     private var shortcut: StoredShortcut {
         _ = shortcutObserver.revision
-        return KeyboardShortcutSettings.shortcut(for: .newCloudMachine)
+        return .unbound
     }
 
     var body: some View {
@@ -64,7 +65,7 @@ struct CloudNewMachineButton: View {
         .padding(.horizontal, RightSidebarChromeMetrics.barHorizontalPadding)
         .padding(.top, 6)
         .padding(.bottom, 2)
-        .help(KeyboardShortcutSettings.Action.newCloudMachine.tooltip(title))
+        .help(title)
         .accessibilityLabel(title)
         .accessibilityIdentifier("CloudNewMachineButton")
         .background(

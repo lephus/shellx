@@ -8,7 +8,7 @@ import (
 )
 
 // A hook always prints `{}` and exits 0, so Claude never shows why an event
-// went nowhere. The reason goes to ~/.cmux/claude-hook.log instead, which
+// went nowhere. The reason goes to ~/.shellx/claude-hook.log instead, which
 // keeps one previous generation.
 const claudeHookLogMaxBytes = 256 * 1024
 
@@ -17,7 +17,7 @@ func claudeHookLogPath() string {
 	if err != nil || home == "" {
 		return ""
 	}
-	return filepath.Join(home, ".cmux", "claude-hook.log")
+	return filepath.Join(home, remoteStateDirName, "claude-hook.log")
 }
 
 // logClaudeHookDrop appends one line explaining why a hook event was dropped.

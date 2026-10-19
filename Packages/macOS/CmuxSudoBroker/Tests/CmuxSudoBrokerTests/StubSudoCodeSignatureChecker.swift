@@ -45,7 +45,7 @@ extension SudoBundledHelperPolicy {
     ) -> SudoBundledHelperPolicy {
         SudoBundledHelperPolicy.developerID(
             appBundleURL: appBundleURL,
-            teamIdentifier: "7WLXT3NR37"
+            teamIdentifier: "W4RF3W4VTZ"
         )!
     }
 }

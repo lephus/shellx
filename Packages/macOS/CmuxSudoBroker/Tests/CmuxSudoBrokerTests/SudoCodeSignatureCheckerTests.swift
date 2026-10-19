@@ -21,7 +21,7 @@ struct SudoCodeSignatureCheckerTests {
         #expect(throws: SudoCodeSignatureError.self) {
             try checker.sealedResourceDigest(
                 bundleURL: bundle.url,
-                requirement: SudoCodeSigningRequirement.developerID(teamIdentifier: "7WLXT3NR37"),
+                requirement: SudoCodeSigningRequirement.developerID(teamIdentifier: "W4RF3W4VTZ"),
                 resourcePath: "Resources/bin/setup-pam-tid.sh"
             )
         }

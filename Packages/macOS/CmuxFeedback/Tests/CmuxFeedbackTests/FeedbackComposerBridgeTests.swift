@@ -38,12 +38,13 @@ struct FeedbackComposerBridgeTests {
     }
 
     @Test func endpointHonorsEnvironmentOverride() {
-        // The override is read from the process environment; with no override set
-        // the resolved endpoint falls back to the production default.
+        // The override is read from the process environment. ShellX has no
+        // default endpoint, so without an override nothing resolves.
         let settings = FeedbackComposerSettings()
         if ProcessInfo.processInfo.environment[settings.endpointEnvironmentKey] == nil {
-            #expect(settings.endpointURL()?.absoluteString == settings.defaultEndpoint)
+            #expect(settings.endpointURL() == nil)
         }
+        #expect(settings.endpointURL(environment: [settings.endpointEnvironmentKey: "https://feedback.invalid/upload"])?.host == "feedback.invalid")
     }
 
     @Test func composerRequestedNotificationNameMatchesAppContract() {

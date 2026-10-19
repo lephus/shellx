@@ -60,11 +60,11 @@ struct CloudTunnelBackendSelectorTests {
         let backend = selector(
             capabilities: ["packet-tunnel-provider-systemextension"],
             canInstall: true,
-            bundled: "com.cmuxterm.app.tunnel"
+            bundled: "pro.shellx.desktop.tunnel"
         ).select()
-        #expect(backend == .networkExtension(extensionBundleIdentifier: "com.cmuxterm.app.tunnel"))
+        #expect(backend == .networkExtension(extensionBundleIdentifier: "pro.shellx.desktop.tunnel"))
         #expect(backend.isNetworkExtension)
-        #expect(backend.extensionBundleIdentifier == "com.cmuxterm.app.tunnel")
+        #expect(backend.extensionBundleIdentifier == "pro.shellx.desktop.tunnel")
         #expect(backend.wireName == "network-extension")
     }
 
@@ -81,11 +81,11 @@ struct CloudTunnelBackendSelectorTests {
             isDirectory: true
         )
         try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
-        let plist: [String: Any] = ["CFBundleIdentifier": "com.cmuxterm.app.debug.tunnel", "CFBundlePackageType": "SYSX"]
+        let plist: [String: Any] = ["CFBundleIdentifier": "pro.shellx.desktop.debug.tunnel", "CFBundlePackageType": "SYSX"]
         let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
         try data.write(to: contents.appendingPathComponent("Info.plist"))
 
-        #expect(CloudTunnelBackendSelector.bundledSystemExtensionIdentifier(in: app) == "com.cmuxterm.app.debug.tunnel")
+        #expect(CloudTunnelBackendSelector.bundledSystemExtensionIdentifier(in: app) == "pro.shellx.desktop.debug.tunnel")
     }
 
     @Test("a stripped bundle (folder present, no extension) reports nothing")

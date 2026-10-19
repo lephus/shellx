@@ -21,7 +21,7 @@ struct KimiCodeHookConfigTests {
         let installed = KimiCodeHookConfig.installing(events: events, in: "")
 
         #expect(installed == """
-        # cmux-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f begin
+        # shellx-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f begin
         [[hooks]]
         event = "SessionStart"
         command = "cmux hooks kimi session-start"
@@ -32,7 +32,7 @@ struct KimiCodeHookConfigTests {
         command = "cmux hooks feed --source kimi --event PreToolUse"
         timeout = 120
 
-        # cmux-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f end
+        # shellx-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f end
 
         """)
     }
@@ -54,13 +54,13 @@ struct KimiCodeHookConfigTests {
         model = "kimi-k2"
         telemetry = false
 
-        # cmux-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f begin
+        # shellx-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f begin
         [[hooks]]
         event = "Stop"
         command = "cmux hooks kimi stop"
         timeout = 10
 
-        # cmux-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f end
+        # shellx-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f end
 
         """)
     }
@@ -89,7 +89,7 @@ struct KimiCodeHookConfigTests {
             in: stale
         )
 
-        #expect(reinstalled.components(separatedBy: "# cmux-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f begin").count == 2)
+        #expect(reinstalled.components(separatedBy: "# shellx-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f begin").count == 2)
         #expect(reinstalled.contains("timeout = 20"))
         #expect(!reinstalled.contains("timeout = 10"))
     }
@@ -150,7 +150,7 @@ struct KimiCodeHookConfigTests {
     func uninstallRemovesOrphanedBeginMarkerWithoutDroppingFollowingTOML() {
         let existing = """
         model = "kimi-k2"
-        # cmux-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f begin
+        # shellx-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f begin
         telemetry = false
 
         """
@@ -165,8 +165,8 @@ struct KimiCodeHookConfigTests {
     @Test("Uninstall removes consecutive orphaned begin markers without dropping following TOML")
     func uninstallRemovesConsecutiveOrphanedBeginMarkersWithoutDroppingFollowingTOML() {
         let existing = """
-        # cmux-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f begin
-        # cmux-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f begin
+        # shellx-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f begin
+        # shellx-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f begin
         model = "kimi-k2"
 
         """
@@ -207,7 +207,7 @@ struct KimiCodeHookConfigTests {
             KimiCodeHookConfig.Event(name: "Stop", command: "cmux hooks kimi stop", timeout: 20),
         ]
         let refreshed = KimiCodeHookConfig.installing(events: eventsV2, in: crlfInstalled)
-        #expect(refreshed.components(separatedBy: "# cmux-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f begin").count == 2)
+        #expect(refreshed.components(separatedBy: "# shellx-kimi-hooks-7c3a9f12-4e8b-4d2a-9f15-6b8c0d1e2a3f begin").count == 2)
         #expect(refreshed.contains("timeout = 20"))
         #expect(!refreshed.contains("timeout = 10"))
 

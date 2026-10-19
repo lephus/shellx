@@ -4,6 +4,7 @@ import CryptoKit
 import Darwin
 import Foundation
 import Security
+import ShellXBrand
 
 struct AuthorizedSocketCommand: Sendable, Equatable {
     let command: String
@@ -59,7 +60,7 @@ extension TerminalController {
         bundleIdentifier: String? = Bundle.main.bundleIdentifier
     ) -> SocketClientCapabilityAuthority {
         let audience = bundleIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines)
-            .nonEmpty ?? "com.cmuxterm.app"
+            .nonEmpty ?? ShellXBrand.bundleID
         let store = SocketClientCapabilitySecretStore(
             service: "\(audience).socket-client-capability"
         )

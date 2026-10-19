@@ -25,6 +25,7 @@ import CmuxAgentChat
 import Foundation
 import os
 import Bonsplit
+import ShellXBrand
 import WebKit
 import CmuxSidebar
 import CmuxWorkspaces
@@ -264,7 +265,7 @@ class TerminalController {
     /// tool such as Instruments records signposts, so
     /// `socketMainHopSignpostingActive` genuinely gates all per-hop work.
     private nonisolated static let socketMainHopSignposter = OSSignposter(
-        subsystem: "com.cmux.socket",
+        subsystem: "pro.shellx.socket",
         category: .dynamicTracing
     )
     /// True while a tool (e.g. Instruments' os_signpost instrument) is
@@ -343,7 +344,7 @@ class TerminalController {
     }
     /// The command that shows, and so wakes, a hibernated terminal.
     nonisolated static func terminalWakeCommand(workspaceID: UUID, surfaceID: UUID) -> String {
-        "cmux focus-panel --workspace \(workspaceID.uuidString) --panel \(surfaceID.uuidString)"
+        "shellx focus-panel --workspace \(workspaceID.uuidString) --panel \(surfaceID.uuidString)"
     }
 
     /// Explains why a terminal has no running runtime and how to get one.
@@ -439,6 +440,25 @@ class TerminalController {
                 || explicitFocusParamAllowsFocus(commandKey: commandKey, params: params)
         }
         return focusIntentV1Commands.contains(commandKey)
+    }
+
+    /// ShellX: the encoded `not_available` error for a v2 method served by a
+    /// Manaflow service (sign-in, accounts, Cloud machines, billing, CodeRouter;
+    /// see ``ShellXCloudGate``), or `nil` for a local method. Every v2 entry asks
+    /// this before its focus check, so no handler for such a method ever runs.
+    nonisolated static func shellXUnavailableServiceResponse(method: String, id: Any?) -> String? {
+        guard let service = ShellXCloudGate.unavailableService(forSocketMethod: method) else { return nil }
+        let message: String
+        switch service {
+        case .cloud:
+            message = String(localized: "shellx.cloud.unavailable", defaultValue: "Cloud is not available in ShellX.")
+        case .codeRouter:
+            message = String(localized: "cli.coderouter.unavailable", defaultValue: "CodeRouter is not available in ShellX.")
+        }
+        guard let idValue = v2WireId(id) else {
+            return ControlResponseEncoder.encodeFailureResponse
+        }
+        return v2Encoder.error(id: idValue, code: "not_available", message: message, data: nil)
     }
 
     /// Returns the encoded error when task-local automation policy suppresses
@@ -639,12 +659,12 @@ class TerminalController {
         )[0]
         let simulatorDurableRecoveryDirectory = simulatorApplicationSupportDirectory
             .appendingPathComponent(
-                "com.cmux.simulator-ownership",
+                "pro.shellx.simulator-ownership",
                 isDirectory: true
             )
         let simulatorOwnershipDirectory = simulatorOwnershipFileManager.temporaryDirectory
             .appendingPathComponent(
-                "com.cmux.simulator-ownership",
+                "pro.shellx.simulator-ownership",
                 isDirectory: true
             )
         self.simulatorLocationOwnershipScope = SimulatorLocationOwnershipScope(
@@ -1121,8 +1141,10 @@ class TerminalController {
     ) {
         self.authCoordinator = coordinator
         self.accountFlow = accountFlow
-        self.codeRouterHandoffService = codeRouterHandoffService
-            ?? CodeRouterHandoffClient(auth: coordinator)
+        // ShellX: CodeRouter is off for good, so no handoff service exists.
+        self.codeRouterHandoffService = ShellXFeatures.codeRouter
+            ? (codeRouterHandoffService ?? CodeRouterHandoffClient(auth: coordinator))
+            : nil
     }
 
     /// Injects the app-lifetime browser import coordinator before socket RPCs start.
@@ -3008,6 +3030,12 @@ class TerminalController {
             }
             let request = relayAuthorization.request
             let automationOrigin = CmuxAutomationInvocationContext.eventOrigin
+            if let refusal = Self.shellXUnavailableServiceResponse(
+                method: request.method,
+                id: request.id.map(\.foundationObject)
+            ) {
+                return refusal
+            }
             if let focusError = Self.focusSuppressionResponse(
                 method: request.method,
                 id: request.id.map(\.foundationObject),
@@ -3341,6 +3369,12 @@ class TerminalController {
     /// the calling thread; only the command body crosses to the main actor,
     /// via a single `v2MainSync` hop.
     private nonisolated func processParsedV2Command(_ request: ControlRequest) -> String {
+        if let refusal = Self.shellXUnavailableServiceResponse(
+            method: request.method,
+            id: request.id.map(\.foundationObject)
+        ) {
+            return refusal
+        }
         if let focusError = Self.focusSuppressionResponse(
             method: request.method,
             id: request.id.map(\.foundationObject),
@@ -3800,7 +3834,7 @@ class TerminalController {
         result["app_bundle_path"] = Bundle.main.bundleURL.path
         // Lets a CLI from another build explain an unknown method
         // (`CLIVersionSkew`): product, version, and build of this process.
-        result["app"] = "cmux"
+        result["app"] = "shellx"
         if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
             result["version"] = version
         }
@@ -3812,7 +3846,7 @@ class TerminalController {
         }
         if let cliPath = Bundle.main.resourceURL?
             .appendingPathComponent("bin", isDirectory: true)
-            .appendingPathComponent("cmux", isDirectory: false)
+            .appendingPathComponent("shellx", isDirectory: false)
             .path {
             result["app_cli_path"] = cliPath
         }
@@ -10838,7 +10872,7 @@ class TerminalController {
             semaphore.signal()
         }
 
-        let watcherQueue = DispatchQueue(label: "com.cmux.browser.download.wait.file")
+        let watcherQueue = DispatchQueue(label: "pro.shellx.browser.download.wait.file")
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
             eventMask: [.write, .extend, .attrib, .link, .rename],
@@ -13014,7 +13048,7 @@ class TerminalController {
         case "tabtransfer", "tab-transfer", "com.splittabbar.tabtransfer":
             return DragOverlayRoutingPolicy.bonsplitTabTransferType
         case "sidebarreorder", "sidebar-reorder", "sidebar_tab_reorder",
-            "com.cmux.sidebar-tab-reorder":
+            "pro.shellx.sidebar-tab-reorder":
             return DragOverlayRoutingPolicy.sidebarTabReorderType
         default:
             // Allow explicit UTI strings for ad-hoc debug probes.

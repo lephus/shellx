@@ -158,7 +158,7 @@ func resolveClaudeHookDelivery(base claudeHookDelivery, fromUserSettings bool, h
 			delivery.callerTTY = func(string) string { return clientTTY }
 		} else {
 			// Outside tmux the surface IDs and relay must come from the same
-			// environment; ~/.cmux/socket_addr may name another workspace's
+			// environment; ~/.shellx/socket_addr may name another workspace's
 			// relay.
 			delivery.socketPath = strings.TrimSpace(base.getenv("CMUX_SOCKET_PATH"))
 			delivery.refreshAddr = nil
@@ -344,7 +344,7 @@ func claudeWrapperShouldInject(args []string, socketPath string, refreshAddr fun
 func claudeWrapperCmuxBinary() string {
 	candidates := []string{os.Getenv("CMUX_BUNDLED_CLI_PATH")}
 	if home, err := os.UserHomeDir(); err == nil {
-		candidates = append(candidates, filepath.Join(home, ".cmux", "bin", "cmux"))
+		candidates = append(candidates, filepath.Join(home, remoteStateDirName, "bin", remoteCLIName))
 	}
 	for _, candidate := range candidates {
 		if candidate == "" {
@@ -357,7 +357,7 @@ func claudeWrapperCmuxBinary() string {
 	if executable, err := os.Executable(); err == nil {
 		return executable
 	}
-	return "cmux"
+	return remoteCLIName
 }
 
 // findRealClaude resolves `claude` from PATH, skipping cmux shim directories
@@ -379,7 +379,7 @@ func findRealClaude(pathEnv string, cmuxBin string) string {
 		if err != nil || info.IsDir() || info.Mode()&0o111 == 0 {
 			continue
 		}
-		if resolved, err := filepath.EvalSymlinks(candidate); err == nil && filepath.Base(resolved) == "cmux-claude-wrapper" {
+		if resolved, err := filepath.EvalSymlinks(candidate); err == nil && filepath.Base(resolved) == "shellx-claude-wrapper" {
 			continue
 		}
 		return candidate
@@ -390,7 +390,7 @@ func findRealClaude(pathEnv string, cmuxBin string) string {
 // claudeSettingsCacheDir is the private directory for merged settings files.
 func claudeSettingsCacheDir() string {
 	if home, err := os.UserHomeDir(); err == nil {
-		return filepath.Join(home, ".cmux", "claude-settings")
+		return filepath.Join(home, remoteStateDirName, "claude-settings")
 	}
 	return filepath.Join(os.TempDir(), fmt.Sprintf("cmux-claude-settings-%d", os.Getuid()))
 }

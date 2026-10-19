@@ -45,7 +45,7 @@ public struct CustomSidebarsSection: View {
                 SettingsCardNote(
                     String(
                         localized: "settings.customSidebars.note",
-                        defaultValue: "Custom sidebars are SwiftUI-style files in ~/.config/cmux/sidebars. Pick one from the sidebar toggle button's right-click menu; edits hot-reload on save. Use the in-app renderer only for sidebars you trust."
+                        defaultValue: "Custom sidebars are SwiftUI-style files in ~/.config/shellx/sidebars. Pick one from the sidebar toggle button's right-click menu; edits hot-reload on save. Use the in-app renderer only for sidebars you trust."
                     )
                 )
             }
@@ -90,7 +90,7 @@ public struct CustomSidebarsSection: View {
             configurationReview: .settingsOnly,
             searchAnchorID: "setting:customSidebars:enabled",
             String(localized: "settings.customSidebars.enabled", defaultValue: "Show Custom Sidebars"),
-            subtitle: String(localized: "settings.customSidebars.enabled.subtitle", defaultValue: "Adds sidebars from ~/.config/cmux/sidebars to the sidebar picker.")
+            subtitle: String(localized: "settings.customSidebars.enabled.subtitle", defaultValue: "Adds sidebars from ~/.config/shellx/sidebars to the sidebar picker.")
         ) {
             Toggle("", isOn: Binding(get: { enabled.current }, set: { enabled.set($0) }))
                 .labelsHidden()
@@ -176,7 +176,7 @@ public struct CustomSidebarsSection: View {
             ) {
                 Link(
                     String(localized: "settings.settingsJSON.docsButton", defaultValue: "Open Docs"),
-                    destination: URL(string: "https://cmux.com/docs/custom-sidebars")!
+                    destination: URL(string: "https://github.com/lephus/shellx/blob/main/docs/custom-sidebars.md")!
                 )
                 .cmuxFont(.caption)
                 .accessibilityIdentifier("SettingsCustomSidebarsDocsLink")

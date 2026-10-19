@@ -329,7 +329,7 @@ func runWebSocketPTYServer(ctx context.Context, cfg wsPTYServerConfig, stderr io
 		_ = server.Shutdown(shutdownCtx)
 	}()
 
-	_, _ = fmt.Fprintf(stderr, "cmuxd-remote ws listening on %s\n", listener.Addr().String())
+	_, _ = fmt.Fprintf(stderr, remoteHelperName+" ws listening on %s\n", listener.Addr().String())
 	err = server.Serve(listener)
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
@@ -1333,7 +1333,7 @@ func (h *wsPTYHub) startSession(sessionKey wsPTYSessionKey, sessionID string, co
 	} else if len(trimmedCommand) > 120*1024 {
 		// Startup script exceeds Linux's MAX_ARG_STRLEN (~128KB). Write to a
 		// temp file and exec /bin/sh <file> to avoid E2BIG from execve.
-		f, err := os.CreateTemp("", "cmuxd-startup-*.sh")
+		f, err := os.CreateTemp("", remoteHelperName+"-startup-*.sh")
 		if err != nil {
 			return nil, fmt.Errorf("could not create startup script temp file: %w", err)
 		}
@@ -1404,7 +1404,7 @@ func persistentPTYCommand(command *exec.Cmd) (*exec.Cmd, error) {
 		return nil, fmt.Errorf("resolve persistent PTY exec helper: %w", err)
 	}
 	// A persistent PTY outlives every relay attachment. Enter the command
-	// through cmuxd-remote's exec helper so SIGHUP is blocked before exec and
+	// through shellx-remote's exec helper so SIGHUP is blocked before exec and
 	// inherited by every shell, foreground job, and background job in the PTY
 	// session. Unlike SIG_IGN, the mask survives programs resetting their own
 	// signal dispositions.

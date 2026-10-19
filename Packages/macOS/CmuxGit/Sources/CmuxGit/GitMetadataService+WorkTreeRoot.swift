@@ -3,7 +3,7 @@ import Foundation
 
 extension GitMetadataService {
     /// Serializes work-tree-root walks so a hung mount parks at most one thread.
-    private static let workTreeRootRunner = BoundedBlockingRunner(label: "com.cmux.git-work-tree-root")
+    private static let workTreeRootRunner = BoundedBlockingRunner(label: "pro.shellx.git-work-tree-root")
 
     /// Returns the root of the work tree that contains `directory`, found by
     /// walking up for the nearest `.git` directory or `gitdir:` pointer file,

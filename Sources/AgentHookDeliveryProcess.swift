@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import OSLog
+import ShellXBrand
 
 nonisolated private let agentHookDeliveryProcessLogger = Logger(
     subsystem: "com.cmuxterm.app",
@@ -24,7 +25,7 @@ struct AgentHookDeliveryProcess: Sendable {
 
     init(
         executableURLProvider: @escaping @Sendable () -> URL? = {
-            Bundle.main.resourceURL?.appendingPathComponent("bin/cmux", isDirectory: false)
+            Bundle.main.resourceURL?.appendingPathComponent("bin/shellx", isDirectory: false)
         },
         processTimeout: Duration = .seconds(15),
         deliveryTimeout: Duration = .seconds(16),
@@ -243,7 +244,7 @@ struct AgentHookDeliveryProcess: Sendable {
         let appScope = Self.safePathComponent(
             ambientEnvironment["CMUX_BUNDLE_ID"]
                 ?? Bundle.main.bundleIdentifier
-                ?? "com.cmuxterm.app"
+                ?? ShellXBrand.bundleID
         )
         let routeScope = Self.safePathComponent(
             event.environment["CMUX_WORKSPACE_ID"]
@@ -251,7 +252,7 @@ struct AgentHookDeliveryProcess: Sendable {
                 ?? "unrouted"
         )
         return URL(fileURLWithPath: homePath, isDirectory: true)
-            .appendingPathComponent(".cmuxterm", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("relay-hook-state", isDirectory: true)
             .appendingPathComponent(appScope, isDirectory: true)
             .appendingPathComponent(routeScope, isDirectory: true)

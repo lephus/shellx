@@ -25,7 +25,7 @@ public actor CmxIrohCustomRelayCredentialStore {
     /// Creates an account-scoped custom relay credential repository.
     public init(
         secureStore: any CmxIrohSecureCredentialStoring = CmxIrohKeychainCredentialStore(
-            service: "com.cmuxterm.iroh.custom-relay-credentials.v1"
+            service: "pro.shellx.desktop.iroh.custom-relay-credentials.v1"
         )
     ) {
         self.secureStore = secureStore

@@ -2,7 +2,6 @@ import CMUXMobileCore
 import CmuxSettings
 import Foundation
 import Observation
-import PostHog
 import os
 
 /// PostHog-backed runtime feature flags for the macOS app (PostHog project
@@ -58,6 +57,11 @@ final class CmuxFeatureFlags {
     private static let releaseControlDistinctIDPrefix =
         releaseControlProductWideDistinctID + "-"
     private nonisolated static let maximumPostHogControlPlaneResponseBytes = 1_048_576
+    /// ShellX never fetches remote flag values (no phone-home): there is no
+    /// ShellX client-config endpoint, so every flag resolves from its local
+    /// override or default. Wave 2 may point this at ShellX's own relay.
+    nonisolated static var remoteConfigFetchEnabled: Bool { false }
+    nonisolated private static let remoteConfigURL: URL? = nil
     private nonisolated static let releaseControlRetryAfterGate = CmxRetryAfterGate()
 
     // FLAG(key: sidebar-appkit-list-experiment, owner: lawrencecchen,
@@ -455,7 +459,7 @@ final class CmuxFeatureFlags {
         defaults: UserDefaults = .standard,
         overrideCapability: CmuxFeatureFlagOverrideCapability = .init(),
         telemetryEnabled: Bool = TelemetrySettings.enabledForCurrentLaunch,
-        remoteFlagValueProvider: @escaping (String) -> Any? = { PostHogSDK.shared.getFeatureFlag($0) },
+        remoteFlagValueProvider: @escaping (String) -> Any? = { _ in nil },
         remoteFlagLoader: (@Sendable () async -> [String: Bool]?)? = nil,
         publishesOffMainSnapshot: Bool = false,
         pinsFlagsToLocalValues: Bool = CmuxFeatureFlags.pinsFlagsToLocalValuesForCurrentLaunch
@@ -631,7 +635,7 @@ final class CmuxFeatureFlags {
         distinctID: String,
         personProperties: [String: String]
     ) -> URLRequest? {
-        guard let url = URL(string: "https://cmux.com/api/client-config") else { return nil }
+        guard Self.remoteConfigFetchEnabled, let url = Self.remoteConfigURL else { return nil }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 10
@@ -646,10 +650,13 @@ final class CmuxFeatureFlags {
         return request
     }
 
-    nonisolated private static func loadPostHogControlPlaneFlags(
+    /// The default remote loader. Internal so ShellX's no-phone-home test can
+    /// show it returns without building a request.
+    nonisolated static func loadPostHogControlPlaneFlags(
         distinctID: String,
         personProperties: [String: String]
     ) async -> [String: Bool]? {
+        guard Self.remoteConfigFetchEnabled else { return nil }
         guard (try? await releaseControlRetryAfterGate.wait()) != nil else { return nil }
         guard let request = postHogControlPlaneRequest(
             distinctID: distinctID,

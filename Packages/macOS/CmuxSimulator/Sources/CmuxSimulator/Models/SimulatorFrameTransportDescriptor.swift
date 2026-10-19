@@ -38,6 +38,6 @@ extension SimulatorFrameTransportDescriptor {
     /// Process-safe Darwin notification name for this random frame ring.
     package var framePublicationNotificationName: String? {
         guard simulatorFrameSharedMemoryNameIsValid(sharedMemoryName) else { return nil }
-        return "com.cmux.simulator.frame." + sharedMemoryName.dropFirst()
+        return "pro.shellx.simulator.frame." + sharedMemoryName.dropFirst()
     }
 }

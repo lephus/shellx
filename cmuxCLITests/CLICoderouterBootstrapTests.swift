@@ -2,35 +2,33 @@ import Darwin
 import Foundation
 import Testing
 
-/// `cmux cr` on a machine that has no CodeRouter CLI
-/// (https://github.com/manaflow-ai/cmux/issues/12139).
+/// ShellX never downloads, installs or runs CodeRouter (a Manaflow service):
+/// `cmux cr` and the `cmux coderouter` passthrough print a neutral message and
+/// exit 127 whether or not a CodeRouter CLI is installed.
 ///
 /// Every test isolates HOME and PATH so the developer's own CodeRouter install,
-/// `~/.coderouter`, and `~/.cmux` never take part, and none of them reaches the
-/// network: the interactive bootstrap runs a local stand-in for install.sh
-/// through the Debug-only `CMUX_CODEROUTER_INSTALLER_SCRIPT` seam. The stand-in
-/// honors the real installer's contract (a `coderouter` executable in
-/// `$HOME/.coderouter/bin`) so the re-resolve and exec after installing are the
-/// production code path.
-@Suite("CodeRouter CLI bootstrap")
+/// `~/.coderouter`, and `~/.cmux` never take part. The fake installs below would
+/// record their arguments if anything exec'd them.
+@Suite("CodeRouter is not available in ShellX")
 struct CLICoderouterBootstrapTests {
-    static let installCommand = "curl -fsSL https://cmux.com/coderouter/install.sh | sh"
-    static let confirmPrompt = "Install CodeRouter now? [y/N]"
+    static let notAvailable = "CodeRouter is not available in ShellX."
 
     enum InstallRoot: CustomStringConvertible {
+        case path
         case installerDefault
         case explicitCoderouterInstall
 
         var description: String {
             switch self {
+            case .path: return "PATH"
             case .installerDefault: return "~/.coderouter"
             case .explicitCoderouterInstall: return "$CODEROUTER_INSTALL"
             }
         }
     }
 
-    @Test("non-interactive: prints the exact install command, exits 127, touches nothing")
-    func nonInteractiveMissingBinaryPrintsInstallCommand() throws {
+    @Test("non-interactive: neutral message, exit 127, no install command, touches nothing")
+    func nonInteractiveIsRefused() throws {
         let fixture = try Fixture()
         defer { fixture.cleanUp() }
 
@@ -45,9 +43,8 @@ struct CLICoderouterBootstrapTests {
         #expect(!result.timedOut, Comment(rawValue: result.stderr))
         #expect(result.status == 127, Comment(rawValue: result.stderr))
         #expect(result.stdout.isEmpty)
-        #expect(result.stderr.contains(Self.installCommand), Comment(rawValue: result.stderr))
-        // No terminal to answer on, so no question is asked.
-        #expect(!result.stderr.contains("[y/N]"), Comment(rawValue: result.stderr))
+        #expect(result.stderr.contains(Self.notAvailable), Comment(rawValue: result.stderr))
+        Self.expectNoInstallOffer(result.stderr)
         #expect(!result.stderr.contains(fixture.root.path))
         #expect(!result.stderr.contains(fixture.socketPath))
         #expect(!result.stderr.contains("missing-capability"))
@@ -55,119 +52,92 @@ struct CLICoderouterBootstrapTests {
         #expect(!fixture.fileManager.fileExists(atPath: fixture.installerDefaultRoot.path))
     }
 
-    @Test(
-        "an install the shell PATH does not know yet is still exec'd, with no prompt",
-        arguments: [InstallRoot.installerDefault, InstallRoot.explicitCoderouterInstall]
-    )
-    func installerLocationIsResolvedWithoutPATH(installRoot: InstallRoot) throws {
+    @Test("terminal: no offer and no prompt even with `y` typed, exit 127")
+    func terminalIsRefusedWithoutPrompt() throws {
         let fixture = try Fixture()
         defer { fixture.cleanUp() }
-        let root: URL
+
+        let result = try fixture.runCLIUnderPTY(arguments: ["cr", "--version"], input: "y\n")
+
+        #expect(!result.timedOut, Comment(rawValue: result.transcript))
+        #expect(result.status == 127, Comment(rawValue: result.transcript))
+        #expect(result.transcript.contains(Self.notAvailable), Comment(rawValue: result.transcript))
+        Self.expectNoInstallOffer(result.transcript)
+        #expect(!fixture.fileManager.fileExists(atPath: fixture.installerDefaultRoot.path))
+    }
+
+    @Test(
+        "an installed CodeRouter is never exec'd",
+        arguments: [InstallRoot.path, InstallRoot.installerDefault, InstallRoot.explicitCoderouterInstall]
+    )
+    func installedCoderouterIsNeverRun(installRoot: InstallRoot) throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let binary: URL
         var extraEnvironment: [String: String] = [:]
         switch installRoot {
+        case .path:
+            let directory = fixture.root.appendingPathComponent("path-bin", isDirectory: true)
+            binary = directory.appendingPathComponent("coderouter", isDirectory: false)
+            extraEnvironment["PATH"] = directory.path
         case .installerDefault:
-            root = fixture.installerDefaultRoot
+            binary = fixture.installerDefaultRoot.appendingPathComponent("bin/coderouter", isDirectory: false)
         case .explicitCoderouterInstall:
-            root = fixture.root.appendingPathComponent("custom-install-root", isDirectory: true)
+            let root = fixture.root.appendingPathComponent("custom-install-root", isDirectory: true)
+            binary = root.appendingPathComponent("bin/coderouter", isDirectory: false)
             extraEnvironment["CODEROUTER_INSTALL"] = root.path
         }
         try fixture.writeExecutable(
             """
             #!/bin/sh
             printf '<%s>\\n' "$@" > "$HOME/coderouter-args"
-            printf 'installed coderouter\\n'
+            printf 'installed coderouter ran\\n'
             exit 41
             """,
-            at: root.appendingPathComponent("bin/coderouter", isDirectory: false)
+            at: binary
         )
 
         let result = fixture.runCLI(arguments: ["cr", "login", "--device-auth"], extraEnvironment: extraEnvironment)
 
         #expect(!result.timedOut, Comment(rawValue: result.stderr))
-        #expect(result.status == 41, Comment(rawValue: result.stderr))
-        #expect(result.stdout == "installed coderouter\n")
-        #expect(result.stderr.isEmpty, Comment(rawValue: result.stderr))
-        #expect(try fixture.readHomeFile("coderouter-args") == "<login>\n<--device-auth>\n")
+        #expect(result.status == 127, Comment(rawValue: result.stderr))
+        #expect(result.stdout.isEmpty, Comment(rawValue: result.stdout))
+        #expect(result.stderr.contains(Self.notAvailable), Comment(rawValue: result.stderr))
+        #expect(!fixture.homeFileExists("coderouter-args"))
     }
 
-#if DEBUG
-    @Test("terminal: offers the documented installer once, runs it after y, then execs the install")
-    func terminalOfferInstallsAndExecs() throws {
+    @Test("`cmux coderouter` verbs cmux does not own are refused the same way")
+    func coderouterPassthroughIsRefused() throws {
         let fixture = try Fixture()
         defer { fixture.cleanUp() }
-        let installerScript = try fixture.writeFakeInstaller()
-
-        let result = try fixture.runCLIUnderPTY(
-            arguments: ["cr", "--version"],
-            input: "y\n",
-            extraEnvironment: ["CMUX_CODEROUTER_INSTALLER_SCRIPT": installerScript.path]
-        )
-
-        #expect(!result.timedOut, Comment(rawValue: result.transcript))
-        #expect(result.transcript.contains(Self.installCommand), Comment(rawValue: result.transcript))
-        #expect(result.transcript.contains(Self.confirmPrompt), Comment(rawValue: result.transcript))
-        #expect(fixture.installerRan, Comment(rawValue: result.transcript))
-        #expect(result.transcript.contains("fake installer done"), Comment(rawValue: result.transcript))
-        // The installed binary receives the original arguments and its exit status is ours.
-        #expect(try fixture.readHomeFile("coderouter-args") == "<--version>\n")
-        #expect(result.transcript.contains("installed coderouter ran"), Comment(rawValue: result.transcript))
-        #expect(result.status == 41, Comment(rawValue: result.transcript))
-    }
-#endif
-
-    @Test("terminal: declining installs nothing, prints the install command, exits 127")
-    func terminalDeclineKeepsMachineUntouched() throws {
-        let fixture = try Fixture()
-        defer { fixture.cleanUp() }
-        let installerScript = try fixture.writeFakeInstaller()
-
-        let result = try fixture.runCLIUnderPTY(
-            arguments: ["cr", "--version"],
-            input: "n\n",
-            extraEnvironment: ["CMUX_CODEROUTER_INSTALLER_SCRIPT": installerScript.path]
-        )
-
-        #expect(!result.timedOut, Comment(rawValue: result.transcript))
-        #expect(result.status == 127, Comment(rawValue: result.transcript))
-        #expect(result.transcript.contains(Self.confirmPrompt), Comment(rawValue: result.transcript))
-        #expect(result.transcript.contains(Self.installCommand), Comment(rawValue: result.transcript))
-        #expect(!fixture.installerRan, Comment(rawValue: result.transcript))
-        #expect(!fixture.fileManager.fileExists(atPath: fixture.installerDefaultRoot.path))
-    }
-
-    @Test("an existing install is exec'd unchanged and the installer never runs")
-    func existingInstallNeverRunsTheInstaller() throws {
-        let fixture = try Fixture()
-        defer { fixture.cleanUp() }
-        let installerScript = try fixture.writeFakeInstaller()
         let pathDirectory = fixture.root.appendingPathComponent("path-bin", isDirectory: true)
         try fixture.writeExecutable(
             """
             #!/bin/sh
             printf '<%s>\\n' "$@" > "$HOME/coderouter-args"
-            printf 'path coderouter\\n'
             exit 41
             """,
             at: pathDirectory.appendingPathComponent("coderouter", isDirectory: false)
         )
 
-        // A terminal with `y` already typed: were cmux to ask, it would install.
-        let result = try fixture.runCLIUnderPTY(
-            arguments: ["cr", "--version"],
-            input: "y\n",
-            extraEnvironment: [
-                "PATH": pathDirectory.path,
-                "CMUX_CODEROUTER_INSTALLER_SCRIPT": installerScript.path,
-            ]
+        let result = fixture.runCLI(
+            arguments: ["coderouter", "login"],
+            extraEnvironment: ["PATH": pathDirectory.path]
         )
 
-        #expect(!result.timedOut, Comment(rawValue: result.transcript))
-        #expect(result.status == 41, Comment(rawValue: result.transcript))
-        #expect(result.transcript.contains("path coderouter"), Comment(rawValue: result.transcript))
-        #expect(!result.transcript.contains(Self.confirmPrompt), Comment(rawValue: result.transcript))
-        #expect(try fixture.readHomeFile("coderouter-args") == "<--version>\n")
-        #expect(!fixture.installerRan, Comment(rawValue: result.transcript))
-        #expect(!fixture.fileManager.fileExists(atPath: fixture.installerDefaultRoot.path))
+        #expect(!result.timedOut, Comment(rawValue: result.stderr))
+        #expect(result.status == 127, Comment(rawValue: result.stderr))
+        #expect(result.stderr.contains(Self.notAvailable), Comment(rawValue: result.stderr))
+        #expect(!fixture.homeFileExists("coderouter-args"))
+    }
+
+    /// Nothing points the user at an installer: no cmux.com URL, no curl
+    /// command, no install question.
+    static func expectNoInstallOffer(_ output: String) {
+        #expect(!output.contains("[y/N]"), Comment(rawValue: output))
+        #expect(!output.contains("curl"), Comment(rawValue: output))
+        #expect(!output.contains("install.sh"), Comment(rawValue: output))
+        #expect(!output.contains("cmux.com"), Comment(rawValue: output))
     }
 
     // MARK: - Fixture
@@ -223,21 +193,17 @@ struct CLICoderouterBootstrapTests {
             socketPath = "/tmp/cli-crb-\(shortID).sock"
         }
 
-        /// Where install.sh puts the binary when `CODEROUTER_INSTALL` is unset.
+        /// Where CodeRouter's installer puts the binary when `CODEROUTER_INSTALL` is unset.
         var installerDefaultRoot: URL {
             home.appendingPathComponent(".coderouter", isDirectory: true)
-        }
-
-        var installerRan: Bool {
-            fileManager.fileExists(atPath: home.appendingPathComponent("installer-ran", isDirectory: false).path)
         }
 
         func cleanUp() {
             try? fileManager.removeItem(at: root)
         }
 
-        func readHomeFile(_ name: String) throws -> String {
-            try String(contentsOf: home.appendingPathComponent(name, isDirectory: false), encoding: .utf8)
+        func homeFileExists(_ name: String) -> Bool {
+            fileManager.fileExists(atPath: home.appendingPathComponent(name, isDirectory: false).path)
         }
 
         /// The CLI's environment: the test host's, minus every cmux control value,
@@ -264,31 +230,6 @@ struct CLICoderouterBootstrapTests {
             try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try contents.write(to: url, atomically: true, encoding: .utf8)
             try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
-        }
-
-        /// A stand-in for install.sh that records that it ran and installs a fake
-        /// `coderouter` where the real installer puts it. PATH is empty, so every
-        /// tool is addressed absolutely.
-        func writeFakeInstaller() throws -> URL {
-            let url = root.appendingPathComponent("fake-install.sh", isDirectory: false)
-            try writeExecutable(
-                """
-                #!/bin/sh
-                set -eu
-                /usr/bin/touch "$HOME/installer-ran"
-                /bin/mkdir -p "$HOME/.coderouter/bin"
-                /bin/cat > "$HOME/.coderouter/bin/coderouter" <<'CODEROUTER'
-                #!/bin/sh
-                printf '<%s>\\n' "$@" > "$HOME/coderouter-args"
-                printf 'installed coderouter ran\\n'
-                exit 41
-                CODEROUTER
-                /bin/chmod 755 "$HOME/.coderouter/bin/coderouter"
-                printf 'fake installer done\\n'
-                """,
-                at: url
-            )
-            return url
         }
 
         /// Runs the CLI with piped stdio and stdin at /dev/null: the non-interactive case.

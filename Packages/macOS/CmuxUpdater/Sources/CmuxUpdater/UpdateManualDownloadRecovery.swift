@@ -47,17 +47,17 @@ public struct UpdateManualDownloadRecovery: Sendable {
 
     /// The direct stable DMG URL for `architecture` in the latest release.
     public static func stableDownloadURLString(for architecture: UpdateHostArchitecture) -> String {
-        "https://github.com/manaflow-ai/cmux/releases/latest/download/cmux-macos-\(architecture.rawValue).dmg"
+        "https://github.com/lephus/shellx/releases/latest/download/cmux-macos-\(architecture.rawValue).dmg"
     }
 
     /// The direct nightly DMG URL for `architecture`.
     public static func nightlyDownloadURLString(for architecture: UpdateHostArchitecture) -> String {
-        "https://github.com/manaflow-ai/cmux/releases/download/nightly/cmux-nightly-macos-\(architecture.rawValue).dmg"
+        "https://github.com/lephus/shellx/releases/download/nightly/cmux-nightly-macos-\(architecture.rawValue).dmg"
     }
 
     /// The direct RC DMG URL for `architecture`.
     public static func rcDownloadURLString(for architecture: UpdateHostArchitecture) -> String {
-        "https://github.com/manaflow-ai/cmux/releases/download/rc/cmux-rc-macos-\(architecture.rawValue).dmg"
+        "https://github.com/lephus/shellx/releases/download/rc/cmux-rc-macos-\(architecture.rawValue).dmg"
     }
 
     /// Returns a direct download URL when manually downloading is a sensible recovery for

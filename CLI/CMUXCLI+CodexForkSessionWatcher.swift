@@ -47,7 +47,7 @@ struct CodexForkSessionWatcher {
         let stateRoot = environment["CMUX_AGENT_HOOK_STATE_DIR"]
             .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
             ?? URL(fileURLWithPath: environment["HOME"] ?? NSHomeDirectory(), isDirectory: true)
-                .appendingPathComponent(".cmuxterm", isDirectory: true).path
+                .appendingPathComponent(".shellx", isDirectory: true).path
         claimsDirectory = URL(fileURLWithPath: stateRoot, isDirectory: true)
             .appendingPathComponent("codex-fork-claims", isDirectory: true)
     }
@@ -390,7 +390,7 @@ extension CMUXCLI {
         environment: [String: String],
         client: SocketClient
     ) -> Bool {
-        let executable = CommandLine.arguments.first ?? "cmux"
+        let executable = CommandLine.arguments.first ?? "shellx"
         let process = Process()
         if executable.hasPrefix("/") {
             process.executableURL = URL(fileURLWithPath: executable)

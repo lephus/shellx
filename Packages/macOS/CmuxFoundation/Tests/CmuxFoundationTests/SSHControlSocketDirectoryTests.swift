@@ -14,7 +14,7 @@ struct SSHControlSocketDirectoryTests {
 
         let directory = try #require(SSHControlSocketDirectory.prepare(home: home.path, userID: userID))
 
-        #expect(directory == home.resolvedPath + "/.cmux/ssh")
+        #expect(directory == home.resolvedPath + "/.shellx/ssh")
         var info = stat()
         try #require(lstat(directory, &info) == 0)
         #expect(info.st_mode & 0o777 == 0o700)
@@ -32,10 +32,10 @@ struct SSHControlSocketDirectoryTests {
     }
 
     @Test("A directory other users can write to is refused", arguments: [
-        (".cmux", mode_t(0o777)),
-        (".cmux", mode_t(0o775)),
-        (".cmux/ssh", mode_t(0o777)),
-        (".cmux/ssh", mode_t(0o720)),
+        (".shellx", mode_t(0o777)),
+        (".shellx", mode_t(0o775)),
+        (".shellx/ssh", mode_t(0o777)),
+        (".shellx/ssh", mode_t(0o720)),
     ])
     func refusesWritableDirectory(component: String, mode: mode_t) throws {
         let home = try TemporaryHome()
@@ -50,8 +50,8 @@ struct SSHControlSocketDirectoryTests {
     func refusesLinkToSharedTemporaryDirectory() throws {
         let home = try TemporaryHome()
         defer { home.remove() }
-        try #require(mkdir(home.path + "/.cmux", 0o700) == 0)
-        try #require(symlink("/tmp", home.path + "/.cmux/ssh") == 0)
+        try #require(mkdir(home.path + "/.shellx", 0o700) == 0)
+        try #require(symlink("/tmp", home.path + "/.shellx/ssh") == 0)
 
         #expect(SSHControlSocketDirectory.prepare(home: home.path, userID: userID) == nil)
     }

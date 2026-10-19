@@ -1,6 +1,7 @@
 import CmuxCloud
 import AppKit
 import Foundation
+import ShellXBrand
 
 extension RightSidebarMode {
     static func from(cliArgument rawValue: String) -> RightSidebarMode? {
@@ -104,7 +105,9 @@ extension RightSidebarMode {
         case .dock:
             return true
         case .machines:
-            return machinesEnabled
+            // ShellX: the Machines tab (Cloud machines and the account's other
+            // Macs) is parked until Wave 2 flips `remoteMachines`.
+            return ShellXFeatures.remoteMachines && machinesEnabled
         case .customSidebar:
             // Available once the custom-sidebars beta is on AND a right-side
             // sidebar has been picked (right_sidebar set custom <name>); the

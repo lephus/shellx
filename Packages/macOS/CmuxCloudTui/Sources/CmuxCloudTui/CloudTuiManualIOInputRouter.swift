@@ -30,7 +30,7 @@ public final class CloudTuiManualIOInputRouter: @unchecked Sendable {
 
     public init(
         surfaceID: UInt64,
-        queue: DispatchQueue = DispatchQueue(label: "com.cmux.cloud-manual-io-input", qos: .userInitiated),
+        queue: DispatchQueue = DispatchQueue(label: "pro.shellx.cloud-manual-io-input", qos: .userInitiated),
         commandBuilder: CloudTuiManualIOCommand = CloudTuiManualIOCommand()
     ) {
         self.surfaceID = surfaceID

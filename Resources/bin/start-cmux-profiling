@@ -424,19 +424,19 @@ system_info_value() {
 channel_for_bundle() {
   local bundle_id="$1"
   case "$bundle_id" in
-    com.cmuxterm.app)
+    pro.shellx.desktop)
       printf 'stable'
       ;;
-    com.cmuxterm.app.nightly|com.cmuxterm.app.nightly.*)
+    pro.shellx.desktop.nightly|pro.shellx.desktop.nightly.*)
       printf 'nightly'
       ;;
-    com.cmuxterm.app.rc|com.cmuxterm.app.rc.*)
+    pro.shellx.desktop.rc|pro.shellx.desktop.rc.*)
       printf 'rc'
       ;;
-    com.cmuxterm.app.staging|com.cmuxterm.app.staging.*)
+    pro.shellx.desktop.staging|pro.shellx.desktop.staging.*)
       printf 'staging'
       ;;
-    com.cmuxterm.app.debug|com.cmuxterm.app.debug.*)
+    pro.shellx.desktop.debug|pro.shellx.desktop.debug.*)
       printf 'dev'
       ;;
     *)

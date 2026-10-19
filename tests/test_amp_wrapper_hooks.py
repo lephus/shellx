@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_WRAPPER = ROOT / "Resources" / "bin" / "cmux-amp-wrapper"
+SOURCE_WRAPPER = ROOT / "Resources" / "bin" / "shellx-amp-wrapper"
 
 
 @dataclass
@@ -74,7 +74,7 @@ def run_wrapper(
     amp_available: bool = True,
     workspace_only: bool = False,
 ) -> WrapperResult:
-    with tempfile.TemporaryDirectory(prefix="cmux-amp-wrapper-test-") as td:
+    with tempfile.TemporaryDirectory(prefix="shellx-amp-wrapper-test-") as td:
         tmp = Path(td)
         wrapper_dir = tmp / "wrapper-bin"
         shim_dir = tmp / "cmux-cli-shims" / "surface-test"
@@ -84,7 +84,7 @@ def run_wrapper(
         for directory in (wrapper_dir, shim_dir, real_dir, custom_dir, bundled_dir):
             directory.mkdir(parents=True)
 
-        wrapper = wrapper_dir / "cmux-amp-wrapper"
+        wrapper = wrapper_dir / "shellx-amp-wrapper"
         shutil.copy2(SOURCE_WRAPPER, wrapper)
         wrapper.chmod(0o755)
         shim = shim_dir / "amp"

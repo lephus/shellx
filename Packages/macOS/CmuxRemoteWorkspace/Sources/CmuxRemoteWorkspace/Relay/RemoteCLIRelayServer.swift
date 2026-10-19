@@ -56,7 +56,7 @@ public final class RemoteCLIRelayServer: @unchecked Sendable {
     private let commandRewriter: any RemoteRelayCommandRewriting
     private let clock: any RemoteProxyRetryClock
     private let localSocketPeerCheck: UnixSocketPeerCheck
-    private let queue = DispatchQueue(label: "com.cmux.remote-ssh.cli-relay.\(UUID().uuidString)", qos: .utility)
+    private let queue = DispatchQueue(label: "pro.shellx.remote-ssh.cli-relay.\(UUID().uuidString)", qos: .utility)
 
     private var listener: NWListener?
     private var sessions: [UUID: Session] = [:]

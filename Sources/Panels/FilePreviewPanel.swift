@@ -7,6 +7,7 @@ import PDFKit
 import Quartz
 import SwiftUI
 import UniformTypeIdentifiers
+import ShellXBrand
 
 enum FilePreviewInteraction {
     static let zoomStep: CGFloat = 1.25
@@ -90,7 +91,9 @@ struct FileExternalOpenApplicationResolver: Sendable {
         if Bundle.main.bundleIdentifier?.lowercased() == bundleIdentifier {
             return false
         }
-        return !bundleIdentifier.hasPrefix("dev.cmux.")
+        return !bundleIdentifier.hasPrefix("\(ShellXBrand.bundleID.lowercased()).")
+            && bundleIdentifier != ShellXBrand.bundleID.lowercased()
+            && !bundleIdentifier.hasPrefix("dev.cmux.")
             && !bundleIdentifier.hasPrefix("com.cmuxterm.")
     }
 }

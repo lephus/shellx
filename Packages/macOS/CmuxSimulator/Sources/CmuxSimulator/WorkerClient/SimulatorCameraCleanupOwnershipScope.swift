@@ -9,7 +9,7 @@ public struct SimulatorCameraCleanupOwnershipScope: Sendable {
     public init(fileManager: FileManager = FileManager(), makeUUID: () -> UUID = UUID.init) {
         let ownershipStore = SimulatorCrossProcessOwnershipStore(
             directory: fileManager.temporaryDirectory.appendingPathComponent(
-                "com.cmux.simulator-camera-cleanup-\(makeUUID().uuidString)",
+                "pro.shellx.simulator-camera-cleanup-\(makeUUID().uuidString)",
                 isDirectory: true
             )
         )

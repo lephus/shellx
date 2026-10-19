@@ -2,15 +2,10 @@ import CmuxSettings
 import Foundation
 
 enum TelemetrySettings {
-    // Launch-frozen telemetry enablement: read once at process start so settings
-    // changes apply on next restart. The persisted key, default, and read logic
-    // live in `CmuxSettings` (`AppCatalogSection().sendAnonymousTelemetry`) as the
-    // single source of truth; this anchor only freezes that read for the lifetime
-    // of the launch.
-    static let enabledForCurrentLaunch = resolveEnabled(
-        userOptIn: AppCatalogSection().sendAnonymousTelemetry.value(in: .standard),
-        policy: ManagedDevicePolicy()
-    )
+    // ShellX sends no telemetry (no Sentry, no PostHog, no third party), so
+    // telemetry is off for every launch whatever `sendAnonymousTelemetry`
+    // holds; Settings hides that row.
+    static let enabledForCurrentLaunch = false
 
     /// `DisableTelemetry` (MDM) wins over the user opt-in. Frozen for the
     /// launch like the opt-in itself, so a profile pushed mid-session applies

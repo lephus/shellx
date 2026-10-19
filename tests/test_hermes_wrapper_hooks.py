@@ -17,8 +17,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_WRAPPER = ROOT / "Resources" / "bin" / "cmux-hermes-agent-wrapper"
-SOURCE_TUI_PYTHON_WRAPPER = ROOT / "Resources" / "bin" / "cmux-hermes-python-wrapper"
+SOURCE_WRAPPER = ROOT / "Resources" / "bin" / "shellx-hermes-agent-wrapper"
+SOURCE_TUI_PYTHON_WRAPPER = ROOT / "Resources" / "bin" / "shellx-hermes-python-wrapper"
 SOURCE_TUI_SITECUSTOMIZE = ROOT / "Resources" / "bin" / "cmux-hermes-sitecustomize.py"
 SESSION_ID = "01JZ123456789ABCDEFGHJKMNP"
 # How long the wrapper may wait for its hook installer in launch-path checks.
@@ -195,7 +195,7 @@ def run_wrapper(
                 encoding="utf-8",
             )
 
-        wrapper = wrapper_dir / "cmux-hermes-agent-wrapper"
+        wrapper = wrapper_dir / "shellx-hermes-agent-wrapper"
         shutil.copy2(SOURCE_WRAPPER, wrapper)
         wrapper.chmod(0o755)
         if SOURCE_TUI_PYTHON_WRAPPER.is_file():
@@ -227,7 +227,7 @@ def run_wrapper(
         if installer_blocks:
             os.mkfifo(installer_gate)
 
-        stale_tui_python = tmp / "retired-build" / "cmux-hermes-python-wrapper"
+        stale_tui_python = tmp / "retired-build" / "shellx-hermes-python-wrapper"
         if stale_tui_python_wrapper:
             stale_tui_python.parent.mkdir(parents=True)
             make_executable(
@@ -346,7 +346,7 @@ fi
 if [[ "${FAKE_SAMPLE_TUI_WATCHER_CPU:-0}" == "1" ]]; then
   watcher_pid=""
   for _ in {1..100}; do
-    watcher_pid="$(/usr/bin/pgrep -P "$$" -f 'cmux-hermes-agent-wrapper' | /usr/bin/head -n 1 || true)"
+    watcher_pid="$(/usr/bin/pgrep -P "$$" -f 'shellx-hermes-agent-wrapper' | /usr/bin/head -n 1 || true)"
     [[ -n "$watcher_pid" ]] && break
     sleep 0.01
   done

@@ -106,7 +106,7 @@ private final class EffectLog: @unchecked Sendable {
 @Suite("Devices: account directory client", .timeLimit(.minutes(1)))
 struct AccountMacDirectoryClientTests {
     static let key = String(repeating: "a", count: 64)
-    static let identity = V2Identity(appNamespace: "com.cmuxterm.app", buildTag: "default", deviceID: "self",
+    static let identity = V2Identity(appNamespace: "pro.shellx.desktop", buildTag: "default", deviceID: "self",
         environment: "production", projectID: "project", teamID: "A", userID: "user")
     static let device = V2DeviceDescriptor(endpointID: key, identity: identity, identityGeneration: 1,
         metadata: V2DeviceMetadata(appVersion: "1", capabilities: ["irx-v2", "cmux.mac-host.v1"],
@@ -167,7 +167,7 @@ struct AccountMacDirectoryClientTests {
 
     private static func mac(_ device: String, team: String, endpoint: Character) -> String {
         let key = String(repeating: endpoint, count: 64)
-        return #"{"deviceRecordId":"\#(team)-\#(device)","revision":1,"revoked":false,"descriptor":{"endpointId":"\#(key)","identityGeneration":1,"identity":{"appNamespace":"com.cmuxterm.app","buildTag":"default","deviceId":"\#(device)","environment":"production","projectId":"project","teamId":"\#(team)","userId":"user"},"metadata":{"appVersion":"1","capabilities":["irx-v2","cmux.mac-devices.v1","cmux.mac-host.v1"],"displayName":"\#(device)","pairingEnabled":false,"platform":"mac","relayURLs":["https://relay.example"]}}}"#
+        return #"{"deviceRecordId":"\#(team)-\#(device)","revision":1,"revoked":false,"descriptor":{"endpointId":"\#(key)","identityGeneration":1,"identity":{"appNamespace":"pro.shellx.desktop","buildTag":"default","deviceId":"\#(device)","environment":"production","projectId":"project","teamId":"\#(team)","userId":"user"},"metadata":{"appVersion":"1","capabilities":["irx-v2","cmux.mac-devices.v1","cmux.mac-host.v1"],"displayName":"\#(device)","pairingEnabled":false,"platform":"mac","relayURLs":["https://relay.example"]}}}"#
     }
 
     private static func error(_ requestID: String, code: String) -> String {

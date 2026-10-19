@@ -94,7 +94,7 @@ def test_bash_shim_refresh_is_silent_and_refreshes_under_noclobber() -> None:
 
     with tempfile.TemporaryDirectory(prefix="cmux-9356-") as td:
         tmp = Path(td)
-        (tmp / "home" / ".cmuxterm").mkdir(parents=True)
+        (tmp / "home" / ".shellx").mkdir(parents=True)
         proc = _run_driver(tmp)
         debug = (
             f"\nexit={proc.returncode}"
@@ -112,7 +112,7 @@ def test_bash_shim_refresh_is_silent_and_refreshes_under_noclobber() -> None:
             + debug
         )
 
-        shim_path = tmp / "home" / ".cmuxterm" / "cmux-cli-shims" / "issue-9356-shim" / "claude"
+        shim_path = tmp / "home" / ".shellx" / "cmux-cli-shims" / "issue-9356-shim" / "claude"
         assert shim_path.exists(), f"shim was not created at {shim_path}" + debug
         assert os.access(shim_path, os.X_OK), (
             f"shim is not executable: {shim_path}" + debug

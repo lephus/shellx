@@ -564,7 +564,7 @@ if (projectionCount !== 1) {
     probe_bin.mkdir()
     probe_pi = probe_bin / "pi"
     probe_pi.symlink_to(package_cli)
-    inspectable_extension = root / "hot-path-cmux-session.ts"
+    inspectable_extension = root / "hot-path-shellx-session.ts"
     inspectable_extension.write_text(
         extension_path.read_text(encoding="utf-8")
         + "\nexport { normalizedLaunchArgv, supportsAgentSettled };\n",
@@ -808,7 +808,7 @@ touch "$CMUX_TEST_PI_PANEL_ONLY_MARKER"
 exit 91
 """,
     )
-    inspectable_extension = root / "panel-only-cmux-session.ts"
+    inspectable_extension = root / "panel-only-shellx-session.ts"
     inspectable_extension.write_text(
         extension_path.read_text(encoding="utf-8")
         + "\nexport { sendHook };\n",
@@ -1364,7 +1364,7 @@ await handlers.get("agent_end")({
 
 def check_feed_ack_rehomes_cached_target(bun: str, root: Path, extension_path: Path) -> int:
     live_workspace = "00000000-0000-0000-0000-000000008679"
-    inspectable_extension = root / "feed-rehome-cmux-session.ts"
+    inspectable_extension = root / "feed-rehome-shellx-session.ts"
     inspectable_extension.write_text(
         extension_path.read_text(encoding="utf-8")
         + "\nexport { PiCmuxCommandDispatcher, surfaceTargetsFor };\n",
@@ -1565,7 +1565,7 @@ while not release_path.exists():
 print("{}")
 """,
     )
-    inspectable_extension = root / "feed-failure-overflow-cmux-session.ts"
+    inspectable_extension = root / "feed-failure-overflow-shellx-session.ts"
     inspectable_extension.write_text(
         extension_path.read_text(encoding="utf-8")
         + "\nexport { PiCmuxCommandDispatcher };\n",
@@ -2028,7 +2028,7 @@ def check_nonterminal_timeout_marks_dropped_completion(
     root: Path,
     extension_path: Path,
 ) -> int:
-    inspectable_extension = root / "inspectable-cmux-session.ts"
+    inspectable_extension = root / "inspectable-shellx-session.ts"
     inspectable_extension.write_text(
         extension_path.read_text(encoding="utf-8")
         + "\nexport { PiCmuxCommandDispatcher };\n",
@@ -3022,7 +3022,7 @@ def check_timeout_configuration_and_failure_telemetry(
     if "CMUX_PI_HOOK_TIMEOUT_MS" not in extension_text:
         print("FAIL: generated Pi extension does not expose CMUX_PI_HOOK_TIMEOUT_MS")
         return 1
-    if "publishPiWorkspaceMetadata" in extension_text and "cmux-pi-session-extension-marker v4" not in extension_text:
+    if "publishPiWorkspaceMetadata" in extension_text and "shellx-pi-session-extension-marker v4" not in extension_text:
         print("FAIL: generated Pi extension did not advance its regeneration marker to v4")
         return 1
     forbidden_console_calls = [
@@ -3037,7 +3037,7 @@ def check_timeout_configuration_and_failure_telemetry(
         )
         return 1
 
-    inspectable_extension = root / "timeout-telemetry-cmux-session.ts"
+    inspectable_extension = root / "timeout-telemetry-shellx-session.ts"
     inspectable_extension.write_text(
         extension_text
         + "\nexport { PiCmuxCommandDispatcher, piHookTimeoutMilliseconds, piCommandTimeoutMilliseconds, commandFailureReason, piHookName, createPiLifecycleQueue };\n",
@@ -3270,7 +3270,7 @@ def check_diagnostic_log_safety_and_routing(
     extension_path: Path,
 ) -> int:
     extension_text = extension_path.read_text(encoding="utf-8")
-    inspectable_extension = root / "diagnostic-log-cmux-session.ts"
+    inspectable_extension = root / "diagnostic-log-shellx-session.ts"
     inspectable_extension.write_text(
         extension_text
         + "\nexport { PiCmuxCommandDispatcher, appendPiHookDiagnostic, piHookDiagnosticPath, runPiHookDiagnosticWrite, warn };\n",

@@ -82,7 +82,7 @@ struct SurfaceMachineIDDeviceEncodingTests {
     func machineInfoJSONRoundTrip() throws {
         let presence = SurfaceDevicePresence(
             state: .offline, lastSeenAt: Date(timeIntervalSince1970: 1_700_000_000), tag: "default",
-            bundleID: "com.cmuxterm.app", accountTrust: .sameAccount
+            bundleID: "pro.shellx.desktop", accountTrust: .sameAccount
         )
         let info = machineInfo(.device(studio), linkState: .offline, presence: presence)
         let data = try JSONEncoder().encode(info)
@@ -98,7 +98,7 @@ struct SurfaceMachineIDDeviceEncodingTests {
     func socketPayload() {
         let presence = SurfaceDevicePresence(
             state: .offline, lastSeenAt: Date(timeIntervalSince1970: 1_700_000_000), tag: "default",
-            bundleID: "com.cmuxterm.app", accountTrust: .sameAccount
+            bundleID: "pro.shellx.desktop", accountTrust: .sameAccount
         )
         let device = TerminalController.surfaceMachinePayload(machineInfo(.device(studio), linkState: .offline, presence: presence))
         #expect(device["kind"] as? String == "device")
@@ -108,7 +108,7 @@ struct SurfaceMachineIDDeviceEncodingTests {
         #expect(devicePresence?["state"] as? String == "offline")
         #expect(devicePresence?["account_trust"] as? String == "sameAccount")
         #expect(devicePresence?["tag"] as? String == "default")
-        #expect(devicePresence?["bundle_id"] as? String == "com.cmuxterm.app")
+        #expect(devicePresence?["bundle_id"] as? String == "pro.shellx.desktop")
         #expect((devicePresence?["last_seen_at"] as? NSNumber)?.doubleValue == 1_700_000_000)
 
         let cloud = TerminalController.surfaceMachinePayload(machineInfo(.cloud("brave-otter"), linkState: .connected, presence: nil))
@@ -159,9 +159,9 @@ struct SurfaceMachineIDDeviceEncodingTests {
         func presence(tag: String, bundleID: String?) -> SurfaceDevicePresence {
             SurfaceDevicePresence(state: .online, lastSeenAt: nil, tag: tag, bundleID: bundleID, accountTrust: .sameAccount)
         }
-        #expect(presence(tag: "default", bundleID: "com.cmuxterm.app").buildLabel == nil)
-        #expect(presence(tag: "default", bundleID: "com.cmuxterm.app.nightly").buildLabel == "Nightly")
-        #expect(presence(tag: "default", bundleID: "com.cmuxterm.app.rc").buildLabel == "RC")
+        #expect(presence(tag: "default", bundleID: "pro.shellx.desktop").buildLabel == nil)
+        #expect(presence(tag: "default", bundleID: "pro.shellx.desktop.nightly").buildLabel == "Nightly")
+        #expect(presence(tag: "default", bundleID: "pro.shellx.desktop.rc").buildLabel == "RC")
         #expect(presence(tag: "issue-8001", bundleID: "dev.cmux.issue-8001").buildLabel == "DEV \u{00B7} issue-8001")
         #expect(presence(tag: "issue-8001", bundleID: nil).buildLabel == "issue-8001")
     }

@@ -245,7 +245,7 @@ extension CMUXCLI {
             defaultValue: """
         Usage: cmux automation <list|show|test|enable|disable|logs|reload> [args]
 
-        Rules live in ~/.cmuxterm/automations.json.
+        Rules live in ~/.shellx/automations.json.
         Examples:
           cmux automation list
           cmux automation show surface-needs-input

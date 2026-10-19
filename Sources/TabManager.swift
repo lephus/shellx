@@ -7437,7 +7437,7 @@ enum WelcomeBannerDelivery: Equatable {
     /// Typed fallback. The leading space keeps it out of history only for zsh
     /// with HIST_IGNORE_SPACE, bash with HISTCONTROL=ignorespace or ignoreboth,
     /// and fish; other shells may still record it (best effort).
-    static let typedCommandText = " cmux welcome\n"
+    static let typedCommandText = " shellx welcome\n"
     private static let tokenDirectoryName = "cmux-welcome-banner"
     private static let integratedShellNames: Set<String> = ["zsh", "bash", "fish", "nu"]
 

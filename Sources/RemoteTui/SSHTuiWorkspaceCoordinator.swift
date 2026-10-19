@@ -271,7 +271,7 @@ final class SSHTuiWorkspaceCoordinator {
             && Self.configurationForAttach(configuration).restoredSSHSession == nil
         let preparedConfiguration = Self.configurationForAttach(configuration)
         if preparedConfiguration.restoredSSHSession == nil, configuration.restoredSSHSession != nil {
-            // A workspace saved by the retired cmuxd-remote path can still be
+            // A workspace saved by the retired shellx-remote path can still be
             // opened as a normal cmux-tui SSH workspace. Do not turn that stale
             // descriptor into an "unsupported" Cloud error; it describes a
             // PTY that no longer has a supported owner, so start a fresh

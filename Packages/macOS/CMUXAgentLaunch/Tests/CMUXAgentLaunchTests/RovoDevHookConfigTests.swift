@@ -25,7 +25,7 @@ struct RovoDevHookConfigTests {
 
         let installed = RovoDevHookConfig.installing(events: Self.events, in: existing)
 
-        #expect(installed.contains("# cmux hooks rovodev begin"))
+        #expect(installed.contains("# shellx hooks rovodev begin"))
         #expect(installed.contains("eventHooks:"))
         #expect(installed.contains("  events:"))
         #expect(installed.contains("    - name: on_complete"))
@@ -48,7 +48,7 @@ struct RovoDevHookConfigTests {
         let reinstalled = RovoDevHookConfig.installing(events: Self.events, in: installed)
 
         #expect(reinstalled == installed)
-        #expect(installed.contains("    # cmux hooks rovodev begin"))
+        #expect(installed.contains("    # shellx hooks rovodev begin"))
         #expect(installed.contains("    - name: user_hook"))
         #expect(installed.contains("        - command: \"echo user\""))
         #expect(installed.contains("    - name: on_tool_permission"))
@@ -65,7 +65,7 @@ struct RovoDevHookConfigTests {
 
         let installed = RovoDevHookConfig.installing(events: Self.events, in: existing)
 
-        #expect(installed.contains("eventHooks:\n  # cmux hooks rovodev begin\n  events:"))
+        #expect(installed.contains("eventHooks:\n  # shellx hooks rovodev begin\n  events:"))
         #expect(installed.contains("  enabled: true"))
         #expect(RovoDevHookConfig.uninstalling(from: installed) == existing)
     }
@@ -89,7 +89,7 @@ struct RovoDevHookConfigTests {
         let existing = """
         eventHooks:
           events:
-            # cmux hooks rovodev begin
+            # shellx hooks rovodev begin
             - name: on_complete
               commands:
                 - command: "cmux hooks rovodev stop"
@@ -121,7 +121,7 @@ struct RovoDevHookConfigTests {
         ]
         let installed = RovoDevHookConfig.installing(events: events, in: existing)
 
-        #expect(installed.contains("eventHooks:\n  # cmux hooks rovodev begin\n  events:"))
+        #expect(installed.contains("eventHooks:\n  # shellx hooks rovodev begin\n  events:"))
         #expect(installed.contains("    events:\n      - name: user_hook"))
         #expect(RovoDevHookConfig.uninstalling(from: installed) == existing)
     }
@@ -131,7 +131,7 @@ struct RovoDevHookConfigTests {
         let existing = """
         eventHooks:
           events:
-            # cmux hooks rovodev begin
+            # shellx hooks rovodev begin
         sessions:
           persistenceDir: /tmp/rovo
 

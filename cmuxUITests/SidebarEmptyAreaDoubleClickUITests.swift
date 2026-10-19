@@ -15,7 +15,7 @@ import XCTest
 /// Unwiring either call site turns both of them red.
 /// https://github.com/manaflow-ai/cmux/issues/10043
 final class SidebarEmptyAreaDoubleClickUITests: XCTestCase {
-    private let appDefaultsDomain = "com.cmuxterm.app.debug"
+    private let appDefaultsDomain = "pro.shellx.desktop.debug"
     private let appKitSidebarListOverrideKey =
         "cmux.flags.override.sidebar-appkit-list-experiment"
     private let workspaceRowLabelMarker = ", workspace "

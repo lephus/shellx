@@ -45,7 +45,7 @@ func captureStdout(t *testing.T, fn func()) string {
 
 func makeShortUnixSocketPath(t *testing.T) string {
 	t.Helper()
-	dir, err := os.MkdirTemp("/tmp", "cmuxd-")
+	dir, err := os.MkdirTemp("/tmp", "shellx-remote-")
 	if err != nil {
 		t.Fatalf("mkdtemp: %v", err)
 	}
@@ -442,7 +442,7 @@ func TestCLIPingOverAuthenticatedTCPWithRelayFile(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("CMUX_RELAY_ID", "")
 	t.Setenv("CMUX_RELAY_TOKEN", "")
-	relayDir := filepath.Join(home, ".cmux", "relay")
+	relayDir := filepath.Join(home, ".shellx", "relay")
 	if err := os.MkdirAll(relayDir, 0o700); err != nil {
 		t.Fatalf("mkdir relay dir: %v", err)
 	}
@@ -600,7 +600,7 @@ func TestCLIUnknownCommand(t *testing.T) {
 
 func TestCLINoSocket(t *testing.T) {
 	// Without CMUX_SOCKET_PATH set, should fail. An isolated HOME keeps the
-	// ~/.cmux/socket_addr fallback from reaching a live relay on a dev host.
+	// ~/.shellx/socket_addr fallback from reaching a live relay on a dev host.
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("CMUX_SOCKET_PATH", "")
 	os.Unsetenv("CMUX_SOCKET_PATH")
@@ -668,18 +668,15 @@ func TestCLIV2FlagMapping(t *testing.T) {
 }
 
 func TestBusyboxArgv0Detection(t *testing.T) {
-	// Verify that when argv[0] base is "cmux", we enter CLI mode
-	base := filepath.Base("cmux")
-	if base != "cmux" {
-		t.Fatalf("expected base 'cmux', got %q", base)
+	// Verify that when argv[0] base is "shellx", we enter CLI mode
+	if !shouldRunCLIForInvocation("shellx", nil) {
+		t.Fatalf("argv[0] 'shellx' should enter CLI mode")
 	}
-	base2 := filepath.Base("/home/user/.cmux/bin/cmux")
-	if base2 != "cmux" {
-		t.Fatalf("expected base 'cmux', got %q", base2)
+	if !shouldRunCLIForInvocation("/home/user/.shellx/bin/shellx", []string{"ping"}) {
+		t.Fatalf("argv[0] '/home/user/.shellx/bin/shellx' should enter CLI mode")
 	}
-	base3 := filepath.Base("cmuxd-remote")
-	if base3 == "cmux" {
-		t.Fatalf("cmuxd-remote should not match cmux")
+	if shouldRunCLIForInvocation("shellx-remote", []string{"serve", "--stdio"}) {
+		t.Fatalf("shellx-remote serve should not enter CLI mode")
 	}
 }
 

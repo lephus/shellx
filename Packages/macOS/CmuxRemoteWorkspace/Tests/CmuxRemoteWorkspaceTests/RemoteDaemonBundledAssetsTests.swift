@@ -13,7 +13,7 @@ struct RemoteDaemonBundledAssetsTests {
         let data = try JSONSerialization.data(withJSONObject: [
             "goOS": os,
             "goArch": arch,
-            "assetName": "cmuxd-remote-\(os)-\(arch)-12301",
+            "assetName": "shellx-remote-\(os)-\(arch)-12301",
             "downloadURL": "http://127.0.0.1:1/unpublished",
             "sha256": checksum ?? "e180eb2dc2a6aba2143c10755a5ec12d5bb9a6e14bfec2326d4b6d1933e4c0b4"
         ])

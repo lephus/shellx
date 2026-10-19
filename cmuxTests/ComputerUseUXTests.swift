@@ -1724,7 +1724,7 @@ struct ComputerUseUXTests {
             socketRootDirectoryURL: URL(fileURLWithPath: "/tmp"),
             userIdentifier: 501,
             environment: [:],
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "pro.shellx.desktop",
             authenticationToken: "production-token"
         )
         let staging = ComputerUseRuntimePaths(
@@ -1732,12 +1732,12 @@ struct ComputerUseUXTests {
             socketRootDirectoryURL: URL(fileURLWithPath: "/tmp"),
             userIdentifier: 501,
             environment: [:],
-            bundleIdentifier: "com.cmuxterm.app.staging",
+            bundleIdentifier: "pro.shellx.desktop.staging",
             authenticationToken: "staging-token"
         )
 
-        #expect(production.scope == "com.cmuxterm.app")
-        #expect(staging.scope == "com.cmuxterm.app.staging")
+        #expect(production.scope == "pro.shellx.desktop")
+        #expect(staging.scope == "pro.shellx.desktop.staging")
         #expect(production.daemonSocketURL != staging.daemonSocketURL)
         #expect(production.installedHelperAppURL != staging.installedHelperAppURL)
     }
@@ -2265,8 +2265,8 @@ struct ComputerUseUXTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
         for wrapperName in [
-            "cmux-codex-wrapper",
-            "cmux-claude-wrapper",
+            "shellx-codex-wrapper",
+            "shellx-claude-wrapper",
         ] {
             let wrapperURL = repositoryRoot
                 .appendingPathComponent("Resources/bin", isDirectory: true)
@@ -2472,7 +2472,7 @@ struct ComputerUseUXTests {
         let settingURL = root.appendingPathComponent("enabled")
         let logURL = root.appendingPathComponent("disabled-value")
         try FileManager.default.createDirectory(at: binDirectory, withIntermediateDirectories: true)
-        let wrapperURL = binDirectory.appendingPathComponent("cmux-claude-wrapper")
+        let wrapperURL = binDirectory.appendingPathComponent("shellx-claude-wrapper")
         try """
         #!/usr/bin/env bash
         printf '%s' "${CMUX_COMPUTER_USE_MCP_DISABLED:-missing}" > "$CMUX_TEST_LOG"

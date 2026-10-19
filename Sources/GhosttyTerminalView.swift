@@ -626,7 +626,7 @@ class GhosttyApp {
             return baseURL.deletingLastPathComponent().appendingPathComponent(bgName)
         }
 
-        return URL(fileURLWithPath: "/tmp/cmux-bg.log")
+        return URL(fileURLWithPath: "/tmp/shellx-bg.log")
     }
 
     let backgroundLogEnabled = {
@@ -740,7 +740,7 @@ class GhosttyApp {
     }
 
     #if DEBUG
-    private static let initLogPath = "/tmp/cmux-ghostty-init.log"
+    private static let initLogPath = "/tmp/shellx-ghostty-init.log"
 
     private static func initLog(_ message: String) {
         let timestamp = ISO8601DateFormatter().string(from: Date())
@@ -3754,7 +3754,7 @@ class GhosttyApp {
     func logBackground(_ message: String) {
         // Skip all work (timing capture, string formatting, and disk I/O) unless
         // background logging is explicitly enabled via env/defaults. Without this
-        // guard, direct callers wrote to /tmp/cmux-bg.log on every theme/OSC color
+        // guard, direct callers wrote to /tmp/shellx-bg.log on every theme/OSC color
         // event even in normal runs.
         guard backgroundLogEnabled else { return }
         // The writer captures cheap timing values here and performs all string
@@ -3873,7 +3873,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         NSPasteboard.PasteboardType(UTType.heif.identifier)
     ])
     private static let tabTransferPasteboardType = NSPasteboard.PasteboardType("com.splittabbar.tabtransfer")
-    private static let sidebarTabReorderPasteboardType = NSPasteboard.PasteboardType("com.cmux.sidebar-tab-reorder")
+    private static let sidebarTabReorderPasteboardType = NSPasteboard.PasteboardType("pro.shellx.sidebar-tab-reorder")
 
     /// Resolves internal drag identity through the live registries. AppKit
     /// drag callbacks arrive on the main thread, while this view predates the
@@ -10715,7 +10715,7 @@ final class GhosttySurfaceScrollView: NSView {
     private var lastDragGeometryLogSignature: String?
     private var dragLayoutLogSequence: UInt64 = 0
     private static let tabTransferPasteboardType = NSPasteboard.PasteboardType("com.splittabbar.tabtransfer")
-    private static let sidebarTabReorderPasteboardType = NSPasteboard.PasteboardType("com.cmux.sidebar-tab-reorder")
+    private static let sidebarTabReorderPasteboardType = NSPasteboard.PasteboardType("pro.shellx.sidebar-tab-reorder")
     private static var flashCounts: [UUID: Int] = [:]
     private static var drawCounts: [UUID: Int] = [:]
     private static var lastDrawTimes: [UUID: CFTimeInterval] = [:]

@@ -119,7 +119,8 @@ extension CmuxTopProcessSnapshot {
         let executableName = URL(fileURLWithPath: arguments[0])
             .lastPathComponent
             .lowercased()
-        guard executableName == "cmux" else { return false }
+        // The bundled CLI is `Resources/bin/shellx` (ShellXBrand.cliName).
+        guard executableName == "shellx" else { return false }
         let subcommands = arguments
             .dropFirst()
             .prefix(normalizedPath.count)

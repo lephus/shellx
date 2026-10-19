@@ -228,7 +228,7 @@ func TestResolveClaudeHookDeliveryFollowsTmuxClientWithoutEnvironment(t *testing
 		4102: cmuxClientEnvironment("63518", "22222222-2222-4222-8222-222222222222"),
 	})
 	base := claudeHookDelivery{
-		socketPath:  "127.0.0.1:62357", // ~/.cmux/socket_addr names another workspace's relay
+		socketPath:  "127.0.0.1:62357", // ~/.shellx/socket_addr names another workspace's relay
 		refreshAddr: func() string { return "127.0.0.1:62357" },
 		getenv:      paneEnv,
 		callerTTY:   func(string) string { return "/dev/pts/1" },
@@ -319,7 +319,7 @@ func TestResolveClaudeHookDeliveryNeverUsesPaneEnvironmentInTmux(t *testing.T) {
 }
 
 // TestResolveClaudeHookDeliveryIgnoresSocketAddrOutsideTmux keeps surface IDs
-// and relay from one environment: ~/.cmux/socket_addr may be another
+// and relay from one environment: ~/.shellx/socket_addr may be another
 // workspace's relay.
 func TestResolveClaudeHookDeliveryIgnoresSocketAddrOutsideTmux(t *testing.T) {
 	values := map[string]string{
@@ -419,7 +419,7 @@ func TestClaudeHookRelaySharesOneTimeBudget(t *testing.T) {
 	if elapsed := run(); elapsed > claudeHookTimeBudget+700*time.Millisecond {
 		t.Fatalf("hung tmux: hook took %v, want at most about one %v budget", elapsed, claudeHookTimeBudget)
 	}
-	if log, _ := os.ReadFile(filepath.Join(home, ".cmux", "claude-hook.log")); !strings.Contains(string(log), "tmux display-message failed") {
+	if log, _ := os.ReadFile(filepath.Join(home, ".shellx", "claude-hook.log")); !strings.Contains(string(log), "tmux display-message failed") {
 		t.Fatalf("hung tmux was not logged: %q", log)
 	}
 	// A silent relay holds the hook for the rest of the same budget.
@@ -428,7 +428,7 @@ func TestClaudeHookRelaySharesOneTimeBudget(t *testing.T) {
 	if elapsed := run(); elapsed < claudeHookTimeBudget || elapsed > claudeHookTimeBudget+700*time.Millisecond {
 		t.Fatalf("silent relay: hook took %v, want about one %v budget", elapsed, claudeHookTimeBudget)
 	}
-	if log, _ := os.ReadFile(filepath.Join(home, ".cmux", "claude-hook.log")); !strings.Contains(string(log), "stop: relay "+listener.Addr().String()+" did not accept the event") {
+	if log, _ := os.ReadFile(filepath.Join(home, ".shellx", "claude-hook.log")); !strings.Contains(string(log), "stop: relay "+listener.Addr().String()+" did not accept the event") {
 		t.Fatalf("silent relay was not logged: %q", log)
 	}
 	if claudeHookDeclaredTimeout*time.Second-previousBudget < time.Second {
@@ -451,7 +451,7 @@ func TestClaudeHookLiveRelayFollowsPersistentSlot(t *testing.T) {
 	write("53000.slot", "ssh-slot-b\n")
 	write("53000.auth", `{"relay_id":"r","relay_token":"00"}`)
 	tree := fakeClaudeProcessTree{
-		10: {1, []string{"cmuxd-remote", "serve", "--persistent-server", "--slot", "ssh-slot-a", "--persistent-lease-port", "51000"}},
+		10: {1, []string{"shellx-remote", "serve", "--persistent-server", "--slot", "ssh-slot-a", "--persistent-lease-port", "51000"}},
 		11: {10, []string{"tmux", "attach-session", "-t", "=s"}},
 	}
 	if got := claudeHookLiveRelay("127.0.0.1:51000", 11, tree, relayDir); got != "127.0.0.1:52000" {

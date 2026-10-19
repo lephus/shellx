@@ -1,6 +1,7 @@
 import CmuxAgentJournal
 import CmuxSettings
 import Foundation
+import ShellXBrand
 
 /// Owns the app's agent message store and publishes its receipts on the
 /// event bus (`cmux events --category agent`).
@@ -115,14 +116,14 @@ enum AgentMessageCenter {
             return nil
         }
         let bundleID = bundleIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolvedBundleID = bundleID?.isEmpty == false ? bundleID! : "com.cmuxterm.app"
+        let resolvedBundleID = bundleID?.isEmpty == false ? bundleID! : ShellXBrand.bundleID
         let safeBundleID = resolvedBundleID.replacingOccurrences(
             of: "[^A-Za-z0-9._-]",
             with: "_",
             options: .regularExpression
         )
         return appSupport
-            .appendingPathComponent("cmux", isDirectory: true)
+            .appendingPathComponent("ShellX", isDirectory: true)
             .appendingPathComponent("agent-messages-\(safeBundleID).jsonl", isDirectory: false)
     }
 

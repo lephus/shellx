@@ -5,15 +5,24 @@ import Testing
     @Test func missingInfoFeedURLUsesFallback() {
         let resolver = UpdateFeedResolver(hostArchitecture: .arm64)
         let resolution = resolver.resolve(infoFeedURL: nil)
-        #expect(resolution.url == "https://github.com/manaflow-ai/cmux/releases/latest/download/appcast-arm64.xml")
+        #expect(resolution.url == "https://download.shellx.pro/desktop/appcast.xml")
         #expect(resolution.usedFallback)
         #expect(!resolution.isNightly)
+    }
+
+    /// ShellX's own feed (Resources/Info.plist `SUFeedURL`) is a fork stable feed: used as is.
+    @Test func shellXInfoFeedURLIsUsedAsIs() {
+        let resolver = UpdateFeedResolver(hostArchitecture: .arm64)
+        let resolution = resolver.resolve(infoFeedURL: "https://download.shellx.pro/desktop/appcast.xml")
+        #expect(resolution.url == "https://download.shellx.pro/desktop/appcast.xml")
+        #expect(resolution.channel == .stable)
+        #expect(!resolution.usedFallback)
     }
 
     @Test func emptyInfoFeedURLUsesFallback() {
         let resolver = UpdateFeedResolver(hostArchitecture: .x86_64)
         let resolution = resolver.resolve(infoFeedURL: "")
-        #expect(resolution.url == "https://github.com/manaflow-ai/cmux/releases/latest/download/appcast-x86_64.xml")
+        #expect(resolution.url == "https://download.shellx.pro/desktop/appcast.xml")
         #expect(resolution.usedFallback)
     }
 

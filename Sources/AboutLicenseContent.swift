@@ -1,4 +1,5 @@
 import Foundation
+import ShellXBrand
 
 struct AboutLicenseContent {
     let bundle: Bundle
@@ -6,7 +7,7 @@ struct AboutLicenseContent {
 
     init(
         bundle: Bundle,
-        repositoryURL: URL = URL(string: "https://github.com/manaflow-ai/cmux")!
+        repositoryURL: URL = ShellXBrand.sourceCodeURL
     ) {
         self.bundle = bundle
         self.repositoryURL = repositoryURL
@@ -71,7 +72,7 @@ struct AboutLicenseContent {
         bundleIdentifier: String?,
         commit: String?
     ) -> URL {
-        if bundleIdentifier == "com.cmuxterm.app", let version = normalized(version) {
+        if bundleIdentifier == ShellXBrand.bundleID, let version = normalized(version) {
             return repositoryURL
                 .appendingPathComponent("tree", isDirectory: true)
                 .appendingPathComponent("v\(version)")

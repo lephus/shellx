@@ -2,7 +2,7 @@ internal import CmuxFoundation
 internal import CryptoKit
 internal import Foundation
 
-// Installs cmuxd-remote through the same SSH exec channel used by bootstrap.
+// Installs shellx-remote through the same SSH exec channel used by bootstrap.
 // No SFTP subsystem or remote scp executable is required: the local binary is
 // streamed to `cat`, then the existing chmod-and-rename step publishes it
 // atomically at the versioned destination.
@@ -303,11 +303,11 @@ extension RemoteSessionCoordinator {
             data = try Data(contentsOf: localBinary, options: [.mappedIfSafe])
         } catch {
             throw Self.remoteDaemonIntegrityFailure(
-                detail: "could not read local cmuxd-remote: \(error.localizedDescription)"
+                detail: "could not read local shellx-remote: \(error.localizedDescription)"
             )
         }
         guard !data.isEmpty else {
-            throw Self.remoteDaemonIntegrityFailure(detail: "local cmuxd-remote is empty")
+            throw Self.remoteDaemonIntegrityFailure(detail: "local shellx-remote is empty")
         }
         let digest = SHA256.hash(data: data)
             .map { String(format: "%02x", $0) }

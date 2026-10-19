@@ -30,8 +30,8 @@ struct RemotePlatformProbeScriptTests {
         let home = root.appendingPathComponent("home", isDirectory: true)
         let bin = root.appendingPathComponent("bin", isDirectory: true)
         let daemonURL = home
-            .appendingPathComponent(".cmux/bin/cmuxd-remote/test-version/linux-amd64", isDirectory: true)
-            .appendingPathComponent("cmuxd-remote", isDirectory: false)
+            .appendingPathComponent(".shellx/bin/shellx-remote/test-version/linux-amd64", isDirectory: true)
+            .appendingPathComponent("shellx-remote", isDirectory: false)
         try fileManager.createDirectory(at: daemonURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try fileManager.createDirectory(at: bin, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: root) }
@@ -123,8 +123,8 @@ struct RemotePlatformProbeScriptTests {
         let home = root.appendingPathComponent("home", isDirectory: true)
         let bin = root.appendingPathComponent("bin", isDirectory: true)
         let daemonURL = home
-            .appendingPathComponent(".cmux/bin/cmuxd-remote/test-version/linux-amd64", isDirectory: true)
-            .appendingPathComponent("cmuxd-remote", isDirectory: false)
+            .appendingPathComponent(".shellx/bin/shellx-remote/test-version/linux-amd64", isDirectory: true)
+            .appendingPathComponent("shellx-remote", isDirectory: false)
         try fileManager.createDirectory(at: daemonURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try fileManager.createDirectory(at: bin, withIntermediateDirectories: true)
         try Data().write(to: daemonURL)
@@ -174,8 +174,8 @@ struct RemotePlatformProbeScriptTests {
             isDirectory: true
         )
         let home = root.appendingPathComponent("home", isDirectory: true)
-        let remotePath = home.appendingPathComponent(".cmux/bin/cmuxd-remote/test/linux-amd64/cmuxd-remote")
-        let logURL = home.appendingPathComponent(".cmux/daemon/test/repair-slot/daemon.log")
+        let remotePath = home.appendingPathComponent(".shellx/bin/shellx-remote/test/linux-amd64/shellx-remote")
+        let logURL = home.appendingPathComponent(".shellx/daemon/test/repair-slot/daemon.log")
         try fileManager.createDirectory(at: remotePath.deletingLastPathComponent(), withIntermediateDirectories: true)
         try fileManager.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("abc".utf8).write(to: remotePath)
@@ -215,8 +215,8 @@ struct RemotePlatformProbeScriptTests {
         let home = root.appendingPathComponent("home", isDirectory: true)
         let bin = root.appendingPathComponent("bin", isDirectory: true)
         let daemonURL = home
-            .appendingPathComponent(".cmux/bin/cmuxd-remote/dev/linux-amd64", isDirectory: true)
-            .appendingPathComponent("cmuxd-remote", isDirectory: false)
+            .appendingPathComponent(".shellx/bin/shellx-remote/dev/linux-amd64", isDirectory: true)
+            .appendingPathComponent("shellx-remote", isDirectory: false)
         try fileManager.createDirectory(at: daemonURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try fileManager.createDirectory(at: bin, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: root) }

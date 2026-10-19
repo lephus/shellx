@@ -49,11 +49,11 @@ public struct MobileTaskAttachmentStore {
     /// Default cache root under a user's home directory.
     ///
     /// - Parameter homeDirectory: Home directory that owns the cache.
-    /// - Returns: `~/.cache/cmux/task-attachments`.
+    /// - Returns: `~/.cache/shellx/task-attachments`.
     public static func defaultRootURL(homeDirectory: URL) -> URL {
         homeDirectory
             .appendingPathComponent(".cache", isDirectory: true)
-            .appendingPathComponent("cmux", isDirectory: true)
+            .appendingPathComponent("shellx", isDirectory: true)
             .appendingPathComponent("task-attachments", isDirectory: true)
     }
 
