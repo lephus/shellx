@@ -50,7 +50,9 @@ MIN_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"
 # production K2 serves /v2/relay behind its own front end (D6).
 RELAY_PATH = "/v1/relay"
 # Shortest wait between two mints of the same ticket (see start_ticket_refresher).
-REFRESH_FLOOR = 0.25
+REFRESH_FLOOR = 0.1
+# Life a ticket file must keep beyond the next mint's expected latency.
+REFRESH_MARGIN = 0.5
 
 TICKET_RE = re.compile(r"v2\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]*")
 INVITE_RE = re.compile(r"cmux://enroll/[A-Za-z0-9_=-]+")
@@ -92,6 +94,22 @@ def route_origin(route: str) -> str:
     """`scheme://host:port` of a route: what cmux keeps of an invite route."""
     scheme, rest = route.split("://", 1)
     return f"{scheme}://{rest.split('/', 1)[0]}"
+
+
+def relay_credential_args(route: str, slot: str, ticket_file: str) -> list[str]:
+    """`remote connect` relay credentials for `route` and for its origin.
+
+    cmux keeps only `scheme://host:port` of an invite route
+    (identity.rs credential_free_route_hint), so an invite adds that origin as
+    a second route candidate carrying the invite's own static connect ticket
+    (remote_cli.rs start_connected: `relay_routes.entry(route).or_insert`). That
+    ticket was minted at pairing time; once it expires, a dial on that
+    candidate is refused (`invalid-ticket`) and cmux ends the client for good.
+    Naming the origin here too makes every candidate read the refreshed file."""
+    args = ["--relay-route", route, "--relay-slot", slot, "--relay-ticket-file", ticket_file]
+    if route_origin(route) != route:
+        args += ["--relay-route", route_origin(route), "--relay-slot", slot, "--relay-ticket-file", ticket_file]
+    return args
 
 
 def invitation_id(uri: str) -> str:
@@ -153,7 +171,6 @@ class Machine:
         self.daemon_runs = 0
         self.core_lock = threading.Lock()
         self.client_runs = 0
-        self.client_started = 0.0
         self.client_argv: list[str] = []
 
     # shellx-core ---------------------------------------------------------
@@ -197,32 +214,45 @@ class Machine:
 
     def start_ticket_refresher(self, write_to: str, permission: str, target: Optional[str] = None) -> str:
         """Mints one ticket into `<core>/tickets/<write_to>` now, then keeps it
-        fresh from a thread: mint, then sleep max(REFRESH_FLOOR, (exp - now) / 2).
+        fresh from a thread: the next mint starts at half the remaining life,
+        or earlier so that it finishes (slowest of the last mints) with at
+        least REFRESH_MARGIN of life left in the file; never sooner than
+        REFRESH_FLOOR.
 
-        The plan's floor was 1 s. With 2 s tickets whose expiry is a whole
-        second, a fresh ticket has 1-2 s left, so a 1 s floor leaves the file
-        holding an expired ticket for the length of one mint every few
-        cycles, and cmux treats a relay rejection as fatal for a connecting
-        client (cmux-remote provider/relay.rs relay_rejection). Refreshing at
-        half-life keeps at least ~0.5 s of life in the file."""
+        With 2 s tickets whose expiry is a whole second, a fresh ticket has
+        1-2 s left, and cmux treats an expired ticket as fatal (the relay's
+        `invalid-ticket` becomes "relay rejected the authenticated operation",
+        cmux-remote provider/relay.rs relay_authentication_error and
+        relay_rejection). Pure half-life scheduling, measured after the mint
+        returns, left the file expired for most of a slow mint (seen at 0.6-7 s
+        under load: the relay refused a connect ticket 0.4 s past its expiry
+        that the next mint replaced 1.3 s later)."""
         if write_to in self.refreshers:
             return self.refreshers[write_to][2]
         params = {"permission": permission, "write_to": write_to}
         if target:
             params["target_machine_id"] = target
+        started = time.monotonic()
         first = self.core("tickets.mint", **params)
+        first_latency = time.monotonic() - started
         self.relay_url = first["relay_url"]
         stop = threading.Event()
 
-        def loop(expires_at: float) -> None:
-            while not stop.wait(max(REFRESH_FLOOR, (expires_at - time.time()) / 2)):
+        def loop(expires_at: float, latency: float) -> None:
+            recent = [latency]
+            while True:
+                left = expires_at - time.time()
+                if stop.wait(max(REFRESH_FLOOR, min(left / 2, left - max(recent) - REFRESH_MARGIN))):
+                    return
+                started = time.monotonic()
                 try:
                     expires_at = float(self.core("tickets.mint", **params)["expires_at_unix"])
                 except Exception as error:  # API briefly unreachable: retry in 1 s
                     self.h.note(f"refresher {self.name}/{write_to}: {type(error).__name__}")
                     expires_at = time.time() + 2
+                recent = (recent + [time.monotonic() - started])[-5:]
 
-        thread = threading.Thread(target=loop, args=(float(first["expires_at_unix"]),),
+        thread = threading.Thread(target=loop, args=(float(first["expires_at_unix"]), first_latency),
                                   name=f"tickets-{self.name}-{write_to}", daemon=True)
         thread.start()
         self.refreshers[write_to] = (stop, thread, first["path"])
@@ -473,7 +503,7 @@ class Harness:
         route = relay_route(viewer.relay_url)
         viewer.client_argv = [
             str(self.bin / "cmux-tui"), "remote", "connect", route,
-            "--relay-slot", host.slot, "--relay-ticket-file", ticket, "--state-dir", str(viewer.cstate),
+            *relay_credential_args(route, host.slot, ticket), "--state-dir", str(viewer.cstate),
             "--local-socket", str(viewer.client_sock), "--headless", "--device-name", viewer.session]
         argv = [*viewer.client_argv[:4], "--invite-file", viewer.invite_path, *viewer.client_argv[4:]]
         viewer.client_runs += 1
@@ -505,22 +535,33 @@ class Harness:
         """What the ShellX app does for its viewer (Task 12): when `remote
         connect` ends, start it again as an enrolled device (no invite, the
         daemon pinned in the client state dir), with the ticket file the
-        refresher keeps fresh, on a 1, 2, 4, 8, 16, 30 s backoff. Upstream ends
-        the client when the daemon restarted and lost its logical session."""
+        refresher keeps fresh, on a 1, 2, 4, 8, 16, 30 s backoff that restarts
+        at 1 s once a client has connected (LinkStateMachine: `attempt = 0` on
+        `.connected`). Upstream ends the client when the daemon restarted and
+        lost its logical session, and on any relay rejection."""
         fingerprint = self.host_cli(host, "remote", "enroll", "status", "--json")["daemon_fingerprint"]
         argv = [*viewer.client_argv[:4], "--daemon", fingerprint, *viewer.client_argv[4:]]
         backoff = (1, 2, 4, 8, 16, 30)
+        ready_line = str(viewer.client_sock).encode()  # headless `remote connect` prints it once connected
 
         def loop() -> None:
             attempt = 0
+            seen_connected = viewer.client_runs  # the invite client is connected (approve_pending waited)
             while not self._stopping.is_set():
-                proc = self._proc(f"client-{viewer.name}-{viewer.client_runs}")
+                name = f"client-{viewer.name}-{viewer.client_runs}"
+                proc = self._proc(name)
+                if seen_connected != viewer.client_runs:
+                    try:
+                        if ready_line in (self.log_dir / f"{name}.log").read_bytes():
+                            seen_connected = viewer.client_runs
+                            self.note(f"client {viewer.name} connected")
+                    except OSError:
+                        pass
+                if seen_connected == viewer.client_runs:
+                    attempt = 0
                 if proc is not None and proc.poll() is None:
                     self._stopping.wait(0.2)
                     continue
-                started = viewer.client_started
-                if time.monotonic() - started > 30:
-                    attempt = 0
                 delay = backoff[min(attempt, len(backoff) - 1)]
                 self.note(f"client {viewer.name} ended (rc={proc.returncode if proc else None}); "
                           f"restart in {delay} s")
@@ -531,10 +572,8 @@ class Harness:
                     if self._stopping.is_set():
                         return
                     viewer.client_runs += 1
-                    viewer.client_started = time.monotonic()
                     self._spawn(f"client-{viewer.name}-{viewer.client_runs}", argv, self.env(viewer))
 
-        viewer.client_started = time.monotonic()
         self._supervisor = threading.Thread(target=loop, name=f"client-{viewer.name}", daemon=True)
         self._supervisor.start()
 

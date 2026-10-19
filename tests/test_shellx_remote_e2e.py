@@ -35,6 +35,7 @@ BUILD = (
 )
 NEEDS = {"SHELLX_E2E_BIN": ("cmux-tui", "cmux-relay"), "SHELLX_E2E_CORE_BIN": ("shellx-core-cli", "shellx-fake-api")}
 ENROLL_TEST = "test_enroll_via_sealed_invite_and_view"
+RECONNECT_BUDGET = 120  # seconds; see test_reconnect_after_relay_restart_with_2s_tickets
 
 
 def missing_binaries() -> list[str]:
@@ -110,7 +111,16 @@ class RemoteE2E(unittest.TestCase):
     def test_reconnect_after_relay_restart_with_2s_tickets(self):            # Review Focus 2 (ticket_ttl=2)
         self.h.stop_relay(); time.sleep(5)           # every ticket written before the outage has expired
         self.h.start_relay()                          # same port + secret
-        self.assertTrue(wait_until(45, lambda: self.h.viewer_ok("terminal", "list", "--json")))
+        started = time.monotonic()
+        # Upstream cmux, not the harness, sets the pace: the daemon's relay lease ends at its
+        # ticket's whole-second expiry (1-2 s here) and it re-registers only after a registration
+        # backoff that doubles to 5 s and never resets (cmux-remote provider/relay.rs
+        # run_registration_loop), so with 2 s tickets it is reachable ~1 s in every ~6-7 s. A new
+        # viewer connection must land in such a window from the client's own 0-5 s jittered retry.
+        # 45 s was not always enough: CI run 39175354906 ended with the viewer still dialling.
+        self.assertTrue(wait_until(RECONNECT_BUDGET, lambda: self.h.viewer_ok("terminal", "list", "--json")),
+                        f"viewer did not reconnect within {RECONNECT_BUDGET} s")
+        self.h.note(f"viewer reconnected {time.monotonic() - started:.1f} s after the relay restart")
         for log in self.h.logs(): self.assertNotRegex(log, r"v2\.[A-Za-z0-9_-]{20,}\.")   # no ticket in any log
 
     def test_enrolled_device_reconnects_after_daemon_restart(self):
