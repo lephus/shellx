@@ -14,4 +14,8 @@ public enum ShellXFeatures {
     /// `remoteMachines`; Wave 2's own relay never brings it back.
     /// ``ShellXCloudGate`` refuses its CLI verbs and socket methods.
     public static let cloud = false
+
+    /// Upstream cmux device mirroring (DevicesFeature, MobileHostService, PresenceSettings) stays off:
+    /// ShellX remote uses its own transport (W2 plan Task 13).
+    public static let upstreamDeviceMirroring = false
 }

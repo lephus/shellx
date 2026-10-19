@@ -1721,6 +1721,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         CmuxTuiSurfaceProviderRegistry.shared.start(catalog: .shared)
         let env = ProcessInfo.processInfo.environment
+        ShellXRemoteService.shared.startIfEnabled() // ShellX: remote machines (W2 Task 13); gate off returns at once
         let telemetryEnabled = TelemetrySettings.enabledForCurrentLaunch
         let sentryStartupPolicy = MacSentryStartupPolicy(
             environment: env,
@@ -2489,6 +2490,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         WebViewInspectorTeardown.closeAllInspectors(in: NSApp.windows)
     }
     func applicationWillTerminate(_ notification: Notification) {
+        ShellXRemoteService.shared.stopForTermination() // ShellX: stops links, daemon and bridge (bounded, < 2 s)
         cloudWorkspaceOperationController?.cancelAll()
         StartupBreadcrumbLog.append("appDelegate.willTerminate.begin")
         agentChatTranscriptService.shutdown()

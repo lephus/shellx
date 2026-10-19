@@ -214,3 +214,27 @@ fn state_dir_change_reopens_the_store() {
         std::fs::read(dir_b.join("device.key")).unwrap()
     );
 }
+
+#[test]
+fn concurrent_first_use_creates_one_device_key() {
+    for _ in 0..5 {
+        let dir = support::state_dir();
+        StateStore::open(&dir).unwrap();
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(16));
+        let keys: Vec<[u8; 32]> = (0..16)
+            .map(|_| {
+                let (dir, barrier) = (dir.to_path_buf(), barrier.clone());
+                std::thread::spawn(move || {
+                    let store = StateStore::open(&dir).unwrap();
+                    barrier.wait();
+                    shellx_core::auth::device_public(&store).unwrap()
+                })
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .map(|h| h.join().unwrap())
+            .collect();
+        let stored = shellx_core::auth::device_public(&StateStore::open(&dir).unwrap()).unwrap();
+        assert!(keys.iter().all(|k| *k == stored), "every first caller sees the one stored key");
+    }
+}

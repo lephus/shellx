@@ -1,0 +1,11 @@
+### Task 6c (ad hoc, not in the plan): flake fixes found by CI run 39175354906 and local loops
+
+Two flakes, both test-side (product code believed correct):
+
+1. `shellx-core/tests/seal.rs` `unknown_version_and_truncation_fail`: the "standard alphabet" tamper case re-encoded a fresh random 93-byte blob with STANDARD base64; when the URL-safe string had no '-'/'_' (~2%) the "tampered" string equalled the valid one and opened. Fix = commit f030e222b3 (pinned known-answer blob containing '-', also '/', plus a positive control). Was committed but never reviewed.
+
+2. `tests/test_shellx_remote_e2e.py::test_reconnect_after_relay_restart_with_2s_tickets` (Review Focus 2, ticket_ttl = 2): CI run 39175354906 first attempt failed ("relay rejected the authenticated operation"). Fix = commit d2fc908d8c, titled `wip(shellx): sprint paused`: UNREVIEWED work by an implementer stopped mid-task. It changes `scripts/shellx/remote-e2e/harness.py` (ticket-refresher scheduling by measured mint latency + REFRESH_MARGIN, `relay_credential_args` naming the invite route's origin as a second --relay-route with the same ticket file, client-restart backoff reset once the client printed its local socket) and `tests/test_shellx_remote_e2e.py` (RECONNECT_BUDGET 120 s).
+
+Acceptance: the e2e stays a faithful model of what the ShellX app does (Task 12 `ShellXClientLinkSupervisor` + `RemoteCommandLine.connect` + `ShellXTicketRefresher`), is deterministic enough for CI, and asserts what Review Focus 2 asks (viewer returns after relay outage with expired 2 s tickets; no ticket in any log).
+
+Named risk to check: the harness now passes the origin route (scheme://host:port, no path) as a second relay candidate because cmux keeps only that part of an invite route (identity.rs credential_free_route_hint; remote_cli.rs start_connected `relay_routes.entry(route).or_insert`). If that is real, the Swift side (`Packages/Shared/ShellXBrand/Sources/ShellXRemoteCore/RemoteCommandLine.swift` `connect(...)` and the client supervisor) has the same exposure: the invite's static connect ticket (120 s in production) would be dialled on the pathless candidate after it expired. State clearly whether the Swift side needs the same second --relay-route/--relay-slot/--relay-ticket-file triple.

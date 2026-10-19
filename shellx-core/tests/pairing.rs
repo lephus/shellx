@@ -132,7 +132,9 @@ fn approve_seals_and_requester_opens() {
     let pid = p.request();
     assert_eq!(p.a.call("pair.poll", json!({"pairing_id": pid})).unwrap(), json!({"status": "pending"}));
     p.show();
-    let out = p.b.call("pair.approve", json!({"pairing_id": pid, "invite_uri": uri()})).unwrap();
+    // Built once: uri() embeds a wall-clock expiry, so two calls can straddle a second.
+    let invite = uri();
+    let out = p.b.call("pair.approve", json!({"pairing_id": pid, "invite_uri": invite})).unwrap();
     assert_eq!(out, json!({}));
     let poll = p.a.call("pair.poll", json!({"pairing_id": pid, "write_invite_to": "invite-b.uri"})).unwrap();
     assert_eq!(poll["status"], "approved");
@@ -144,7 +146,7 @@ fn approve_seals_and_requester_opens() {
     assert_eq!(path, p.a_dir.join("tickets").join("invite-b.uri"));
     #[cfg(unix)]
     assert_eq!(support::mode(&path), 0o600);
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), uri());
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), invite);
     // The secret and the relay ticket never appear in the response.
     let s = poll.to_string();
     assert!(!s.contains(SECRET_B64) && !s.contains(TICKET) && !s.contains("cmux://"));
@@ -154,7 +156,7 @@ fn approve_seals_and_requester_opens() {
     let post = requests_to(&p.fake, &format!("/v2/pairings/{pid}/approve"));
     assert_eq!(post.len(), 1);
     assert_eq!(post[0].body["sealed_invite_b64"], json!(stored));
-    assert!(!post[0].body.to_string().contains(&uri()));
+    assert!(!post[0].body.to_string().contains(&invite));
     // Approval grants connect from requester to target (not the reverse).
     assert!(p.fake.has_grant(&p.a_id, &p.b_id) && !p.fake.has_grant(&p.b_id, &p.a_id));
     p.a.call("tickets.mint", json!({"permission": "connect", "target_machine_id": p.b_id})).unwrap();
@@ -165,9 +167,10 @@ fn poll_returns_invite_uri_when_not_written() {
     let p = pair();
     let pid = p.request();
     p.show();
-    p.b.call("pair.approve", json!({"pairing_id": pid, "invite_uri": uri()})).unwrap();
+    let invite = uri();
+    p.b.call("pair.approve", json!({"pairing_id": pid, "invite_uri": invite})).unwrap();
     let poll = p.a.call("pair.poll", json!({"pairing_id": pid})).unwrap();
-    assert_eq!(poll["invite_uri"], json!(uri()));
+    assert_eq!(poll["invite_uri"], json!(invite));
     assert!(poll.get("invite_path").is_none());
     assert_eq!(poll["relay_slot"], "slotB");
     assert!(std::fs::read_dir(p.a_dir.join("tickets")).unwrap().next().is_none());
@@ -415,4 +418,24 @@ fn requester_list_items_carry_the_requester_key() {
     let shown = base64::engine::general_purpose::STANDARD.decode(item["requester_x25519_b64"].as_str().expect("key present")).unwrap();
     let own = URL_SAFE_NO_PAD.decode(p.a_login["device_public_key_b64"].as_str().unwrap()).unwrap();
     assert_eq!(shown, own, "{item}");
+}
+
+#[test]
+fn login_and_logout_forget_the_shown_fingerprints() {
+    let p = pair();
+    let pid = p.request();
+    p.show();
+    // Re-login (same account, machine kept) forgets what was shown.
+    p.b.call("auth.login", json!({"email": "a@b.c", "password": "pw"})).unwrap();
+    let e = p.b.call("pair.approve", json!({"pairing_id": pid, "invite_uri": uri()})).unwrap_err();
+    assert_eq!(e.code, "fingerprint_mismatch");
+    // So does logout (then sign back in and re-register the same machine).
+    p.show();
+    p.b.call("auth.logout", json!({})).unwrap();
+    p.b.call("auth.login", json!({"email": "a@b.c", "password": "pw"})).unwrap();
+    let reg = json!({"name": "Mac B", "platform": "macos", "os_version": "15", "app_version": "2.0.0"});
+    p.b.call("machines.register", reg).unwrap();
+    let e = p.b.call("pair.approve", json!({"pairing_id": pid, "invite_uri": uri()})).unwrap_err();
+    assert_eq!(e.code, "fingerprint_mismatch");
+    assert_eq!(p.approve_posts(), 0);
 }

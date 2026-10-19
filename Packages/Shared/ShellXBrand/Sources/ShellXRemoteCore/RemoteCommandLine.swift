@@ -32,12 +32,27 @@ public enum RemoteCommandLine {
                                                    "--relay-ticket-file", ticketFile.path, "--ttl", String(ttlSeconds)], json: false)
     }
 
+    /// `daemonFingerprint` pins the daemon already known in the client state dir (`--daemon`,
+    /// `cmux-tui/src/remote_cli.rs` `parse_connect_flags`); used for enrolled restarts without an invite.
     public static func connect(paths: RemotePaths, machine: RemoteMachine.ID, route: String, slot: String,
-                               ticketFile: URL, inviteFile: URL?, deviceName: String) -> [String] {
+                               ticketFile: URL, inviteFile: URL?, deviceName: String,
+                               daemonFingerprint: String? = nil) -> [String] {
         ["remote", "connect", route, "--relay-slot", slot, "--relay-ticket-file", ticketFile.path,
          "--state-dir", paths.clientStateDir.path, "--local-socket", paths.clientSocket(for: machine).path,
          "--headless", "--json", "--exit-with-parent", "--device-name", deviceName]
             + (inviteFile.map { ["--invite-file", $0.path] } ?? [])
+            + (daemonFingerprint.map { ["--daemon", $0] } ?? [])
+    }
+
+    /// `cmux-tui --socket <client socket> terminal list --json`: the remote session's terminals as a JSON array
+    /// of public terminal snapshots (`{"id", "tab_id", "title", …}`, `cmux-tui-core/src/resource_api.rs`).
+    public static func terminalList(clientSocket: URL) -> [String] {
+        ["--socket", clientSocket.path, "terminal", "list", "--json"]
+    }
+
+    /// `workspace create --name <name>` (`cli/command.rs` `parse_workspace`); starts with one terminal.
+    public static func workspaceCreate(clientSocket: URL, name: String) -> [String] {
+        ["--socket", clientSocket.path, "workspace", "create", "--name", name, "--json"]
     }
 
     /// Pane patience: give up after this many consecutive failed attaches (about 90 s at 2 s sleeps),

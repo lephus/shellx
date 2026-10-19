@@ -259,6 +259,14 @@ impl FakeApi {
         }
     }
 
+    /// Overwrite a machine's stored `noise_public_key_b64` verbatim (e.g. padded
+    /// standard base64 as the L4 server may hold it, or garbage). Test hook.
+    pub fn set_machine_key_b64(&self, machine_id: &str, key_b64: &str) {
+        if let Some(m) = self.shared.lock().machines.get_mut(machine_id) {
+            m.noise_public_key_b64 = key_b64.to_string();
+        }
+    }
+
     /// Allow `from_machine` to mint connect tickets for `target_machine` (what an
     /// approved pairing will do). Test hook; empty by default.
     pub fn grant_connect(&self, from_machine: &str, target_machine: &str) {
@@ -637,7 +645,7 @@ fn create_pairing(rec: &Recorded, st: &mut State) -> Reply {
         Some(m) if m.user_id == who.user_id => return Reply::error(403, "forbidden", "Not your machine"),
         _ => return Reply::error(404, "machine_not_found", "Machine not found"),
     }
-    if !st.machines.get(to).is_some_and(|m| m.user_id == who.user_id) {
+    if st.machines.get(to).is_none_or(|m| m.user_id != who.user_id) {
         return Reply::error(404, "machine_not_found", "Machine not found");
     }
     if from == to {
@@ -706,7 +714,7 @@ fn list_pairings(rec: &Recorded, st: &State) -> Reply {
             st.list_all_pairings || if role == "target" { p.to_machine_id == own } else { p.from_machine_id == own }
         })
         .collect();
-    items.sort_by(|a, b| b.1.seq.cmp(&a.1.seq));
+    items.sort_by_key(|(_, p)| std::cmp::Reverse(p.seq));
     let pairings: Vec<Value> = items
         .into_iter()
         .map(|(id, p)| {

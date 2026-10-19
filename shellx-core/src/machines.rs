@@ -9,6 +9,7 @@ use crate::config::Config;
 use crate::envelope::CoreError;
 use crate::fingerprint::fingerprint;
 use crate::http::{self, Method};
+use crate::pairing::{decode_key, pairing_id_ok};
 use crate::store::StateStore;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -88,14 +89,10 @@ pub fn list(agent: &ureq::Agent, cfg: &Config, store: &StateStore) -> Result<Val
         .machines
         .into_iter()
         .map(|m| {
-            // Prefer the fingerprint of the key the server holds (D1); fall back to its field.
-            let from_key = m
-                .noise_public_key_b64
-                .as_deref()
-                .and_then(|k| URL_SAFE_NO_PAD.decode(k).ok())
-                .and_then(|raw| <[u8; 32]>::try_from(raw).ok())
-                .map(|raw| fingerprint(&raw));
-            let fp = from_key.or(m.fingerprint).unwrap_or_default();
+            // D1: the fingerprint is computed here from the key the server holds (any
+            // base64 alphabet). The server's own `fingerprint` field is never shown:
+            // no decodable 32-byte key → `null` (Swift `MachineItem.fingerprint: String?`).
+            let fp = m.noise_public_key_b64.as_deref().and_then(decode_key).map(|raw| fingerprint(&raw));
             json!({
                 "is_this_machine": own.as_deref() == Some(m.machine_id.as_str()),
                 "machine_id": m.machine_id,
@@ -112,6 +109,9 @@ pub fn list(agent: &ureq::Agent, cfg: &Config, store: &StateStore) -> Result<Val
 
 pub fn heartbeat(agent: &ureq::Agent, cfg: &Config, store: &StateStore) -> Result<Value, CoreError> {
     let m = require_machine(store)?;
+    if !pairing_id_ok(&m.machine_id) {
+        return Err(CoreError::new("io", format!("{MACHINE_FILE}: machine_id is not path-safe")));
+    }
     let path = format!("/v2/machines/{}/heartbeat", m.machine_id);
     let tok = token(store)?;
     let reply = http::send(agent, cfg, Some(&tok), Method::Post, &path, None, None)?;

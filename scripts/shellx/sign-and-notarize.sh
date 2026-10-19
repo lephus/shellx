@@ -74,6 +74,11 @@ sign_and_notarize() {
   app="$(cd "$app" && pwd)"
   cd "$REPO_ROOT"
 
+  # Bundle the cmux-tui built from this fork; a failed build stops here instead of
+  # leaving CMUX_TUI_CLIENT_LOCAL empty (the installer would then download one).
+  local tui; tui="$(scripts/shellx/build-cmux-tui.sh --release --arch universal)"
+  CMUX_TUI_CLIENT_LOCAL="$tui" scripts/install-cmux-tui-client.sh "$app"
+
   echo "==> signing $app"
   "$REPO_ROOT/scripts/sign-cmux-bundle.sh" "$app" "$ENTITLEMENTS" "$IDENTITY"
 

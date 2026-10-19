@@ -56,19 +56,25 @@ pub fn load_session(store: &StateStore) -> Result<Option<SessionFile>, CoreError
 }
 
 /// The device X25519 secret, generated and stored on first use.
+///
+/// Creation is create-if-absent (`StateStore::create_secret`) followed by a
+/// re-read, so concurrent first callers (threads, other `Core`s, other
+/// processes on the same state dir) all end up with the one stored key.
 pub fn device_secret(store: &StateStore) -> Result<StaticSecret, CoreError> {
-    if let Some(bytes) = store.read_secret(DEVICE_KEY_FILE)? {
-        let mut raw: [u8; 32] = bytes[..].try_into().map_err(|_| {
-            CoreError::new("io", format!("{DEVICE_KEY_FILE}: expected 32 bytes, found {}", bytes.len()))
-        })?;
-        let secret = StaticSecret::from(raw);
-        raw.zeroize();
-        return Ok(secret);
+    if store.read_secret(DEVICE_KEY_FILE)?.is_none() {
+        let mut raw = Zeroizing::new([0u8; 32]);
+        getrandom::fill(&mut raw[..]).map_err(|_| CoreError::new("crypto", "random source unavailable"))?;
+        store.create_secret(DEVICE_KEY_FILE, &raw[..])?;
     }
-    let mut raw = Zeroizing::new([0u8; 32]);
-    getrandom::fill(&mut raw[..]).map_err(|_| CoreError::new("crypto", "random source unavailable"))?;
-    store.write_secret(DEVICE_KEY_FILE, &raw[..])?;
-    Ok(StaticSecret::from(*raw))
+    let bytes = store
+        .read_secret(DEVICE_KEY_FILE)?
+        .ok_or_else(|| CoreError::new("io", format!("{DEVICE_KEY_FILE}: missing right after creation")))?;
+    let mut raw: [u8; 32] = bytes[..]
+        .try_into()
+        .map_err(|_| CoreError::new("io", format!("{DEVICE_KEY_FILE}: expected 32 bytes, found {}", bytes.len())))?;
+    let secret = StaticSecret::from(raw);
+    raw.zeroize();
+    Ok(secret)
 }
 
 pub fn device_public(store: &StateStore) -> Result<[u8; 32], CoreError> {

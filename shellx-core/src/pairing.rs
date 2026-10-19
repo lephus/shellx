@@ -18,7 +18,7 @@
 //!   the person was shown: the `fingerprint` param when given (it wins), else the
 //!   one this `Core` returned for that `pairing_id` in its most recent
 //!   `pair.pending` (an in-memory map, replaced by every successful
-//!   `pair.pending`, cleared by `config.set`). Neither → `fingerprint_mismatch`.
+//!   `pair.pending`, cleared by `config.set`, `auth.login` and `auth.logout`). Neither → `fingerprint_mismatch`.
 //! * The invite URI is a secret (it carries the enrollment PSK and a relay
 //!   ticket): it is never logged, never put in an error, and returned by
 //!   `pair.poll` only when `write_invite_to` is absent. With `write_invite_to` it
@@ -163,14 +163,15 @@ fn parse_invite(uri: &str) -> Option<InviteSummary> {
 
 /// A 32-byte public key in standard or URL-safe base64, padded or not (K1 `*_b64`;
 /// L4 returns `requester_x25519_b64` in standard base64).
-fn decode_key(b64: &str) -> Option<[u8; 32]> {
+pub(crate) fn decode_key(b64: &str) -> Option<[u8; 32]> {
     [&URL_SAFE_NO_PAD, &URL_SAFE, &STANDARD, &STANDARD_NO_PAD]
         .iter()
         .find_map(|e| e.decode(b64).ok())
         .and_then(|raw| <[u8; 32]>::try_from(raw).ok())
 }
 
-fn pairing_id_ok(id: &str) -> bool {
+/// Path-safe server id (`[A-Za-z0-9_-]{1,128}`): safe to put in a URL path.
+pub(crate) fn pairing_id_ok(id: &str) -> bool {
     (1..=PAIRING_ID_MAX).contains(&id.len()) && id.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
 }
 

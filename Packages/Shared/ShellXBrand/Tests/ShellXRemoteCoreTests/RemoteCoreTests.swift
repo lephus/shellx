@@ -206,6 +206,46 @@ private let route = "relay+wss://relay.shellx.pro/v2/relay"
                 "--headless", "--json", "--exit-with-parent", "--device-name", "Mac"]
     #expect(RemoteCommandLine.connect(paths: P, machine: "m_1", route: route, slot: "sl", ticketFile: ticket, inviteFile: nil, deviceName: "Mac") == base)
     #expect(RemoteCommandLine.connect(paths: P, machine: "m_1", route: route, slot: "sl", ticketFile: ticket, inviteFile: URL(fileURLWithPath: "/t/i"), deviceName: "Mac") == base + ["--invite-file", "/t/i"])
+    #expect(RemoteCommandLine.connect(paths: P, machine: "m_1", route: route, slot: "sl", ticketFile: ticket, inviteFile: nil,
+                                      deviceName: "Mac", daemonFingerprint: "a1b2c3d4e5f60718") == base + ["--daemon", "a1b2c3d4e5f60718"])
+}
+
+@Test func remoteSessionCliArgv() {                         // cmux-tui cli/command.rs parse_terminal / parse_workspace
+    let sock = URL(fileURLWithPath: "/tmp/sx-1/c-2.sock")
+    #expect(RemoteCommandLine.terminalList(clientSocket: sock) == ["--socket", "/tmp/sx-1/c-2.sock", "terminal", "list", "--json"])
+    #expect(RemoteCommandLine.workspaceCreate(clientSocket: sock, name: "ShellX")
+            == ["--socket", "/tmp/sx-1/c-2.sock", "workspace", "create", "--name", "ShellX", "--json"])
+}
+
+@Test func machineNameMarksDevBuilds() {
+    #expect(ShellXRemoteDevice.machineName(base: "Phu's Mac", bundleID: "pro.shellx.desktop") == "Phu's Mac")
+    #expect(ShellXRemoteDevice.machineName(base: "Phu's Mac", bundleID: "pro.shellx.desktop.debug.l5") == "Phu's Mac (DEV l5)")
+    #expect(ShellXRemoteDevice.machineName(base: "Phu's Mac", bundleID: "pro.shellx.desktop.debug.") == "Phu's Mac (DEV)")
+}
+
+@Test func linkStoreRemovesARecord() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("sx-store-" + UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let store = RemoteLinkStore(file: dir.appendingPathComponent("links.json"))
+    try store.remove(machineID: "m_0")                               // nothing stored yet
+    for id in ["m_1", "m_2"] {
+        try store.upsert(RemoteLinkRecord(machineID: id, route: route, slot: "s", daemonFingerprint: "f", enrolled: false))
+    }
+    try store.remove(machineID: "m_1")
+    #expect(try store.load().map(\.machineID) == ["m_2"])
+}
+
+@Test func gateRevokesAndPrunes() {
+    var g = ApprovalGate()
+    #expect(g.isEmpty)
+    g.expect(invitationID: "a", pairingID: "p", now: t0); g.expect(invitationID: "b", pairingID: "q", now: t0 + 100)
+    g.revoke(invitationID: "a")
+    #expect(g.decide(pendingInvitationID: "a", now: t0 + 1) == .deny)
+    g.pruneExpired(now: t0 + 401)
+    #expect(g.isEmpty)
+    g.expect(invitationID: "c", pairingID: "r", now: t0)
+    g.pruneExpired(now: t0 + 300)
+    #expect(!g.isEmpty)
 }
 
 @Test func attachWrapperQuotesAndLoops() {
@@ -291,4 +331,15 @@ private func runWrapper(maxFailures: Int, resetAfter: Int, clientBody: String) t
 @Test func attachWrapperProductionDefaults() {
     let c = RemoteCommandLine.attachShellCommand(clientPath: "/c", socketPath: "/s", terminalID: "t")
     #expect(c.contains("-ge 45")); #expect(c.contains("sleep 2")); #expect(c.contains("-ge 10 ]"))
+}
+
+@Test func gateCheckKeepsInvitationUntilConsumed() {
+    var g = ApprovalGate(); g.expect(invitationID: "a", pairingID: "p", now: t0)
+    #expect(g.check(pendingInvitationID: "a", now: t0 + 1) == .approve(pairingID: "p"))
+    #expect(g.check(pendingInvitationID: "a", now: t0 + 2) == .approve(pairingID: "p"))   // approve failed: try again
+    #expect(g.check(pendingInvitationID: "a", now: t0 + 301) == .deny)                     // never past 300 s
+    #expect(g.check(pendingInvitationID: "x", now: t0 + 1) == .deny)
+    g.consume(invitationID: "a")
+    #expect(g.check(pendingInvitationID: "a", now: t0 + 3) == .deny)
+    #expect(g.isEmpty)
 }

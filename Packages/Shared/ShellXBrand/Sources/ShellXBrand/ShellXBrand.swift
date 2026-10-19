@@ -18,4 +18,6 @@ public enum ShellXBrand {
     public static let sourceCodeURL = URL(string: "https://github.com/lephus/shellx")!
     public static let contactEmail = "phule9225@gmail.com"
     public static let updateFeedURL = URL(string: "https://download.shellx.pro/desktop/appcast.xml")!
+    /// ShellX API and relay (K1). DEBUG builds may override it with `SHELLX_API_BASE` (app side only).
+    public static let apiBaseURL = URL(string: "https://relay.shellx.pro")!
 }

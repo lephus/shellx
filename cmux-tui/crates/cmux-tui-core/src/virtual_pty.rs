@@ -18,6 +18,11 @@
 //! grid did not change (the app's forced echo after a remote resize). `E` or
 //! end of stream ends the child.
 //!
+//! Unknown type bytes: this side ignores them, but the app's Swift
+//! `BridgeFrameDecoder` (`ShellXRemoteCore/BridgeFrame.swift`) throws
+//! `unknownType` and drops the connection. A new daemon -> app type therefore
+//! needs the Swift decoder updated (and shipped) before the daemon sends it.
+//!
 //! Enabled when the daemon runs with `CMUX_SHELLX_BRIDGE_SOCKET=<path>`: every
 //! default-shell terminal it creates becomes a Mac terminal. The socket's
 //! directory must be a real directory owned by this user with no group or
@@ -38,6 +43,12 @@ pub(crate) const BRIDGE_SOCKET_ENV: &str = "CMUX_SHELLX_BRIDGE_SOCKET";
 const PROTOCOL: u32 = 1;
 /// Largest payload either side may send in one frame.
 const MAX_FRAME: usize = 16 * 1024 * 1024;
+/// Output the app may send during the handshake (before its `S`) that `open`
+/// holds in memory. Matches the app's own 64 MiB pending cap
+/// (`ShellXBridgeServer.maxPendingBytes`); past it `open` fails, as the app
+/// drops a daemon that falls that far behind. Failing is the conservative
+/// choice: dropping bytes would leave the mirror showing a corrupt screen.
+const MAX_HANDSHAKE_OUTPUT: usize = 64 * 1024 * 1024;
 /// How long `kill` may spend sending its best-effort `K` frame.
 const KILL_WRITE_TIMEOUT: Duration = Duration::from_millis(500);
 
@@ -205,6 +216,15 @@ fn check_socket_dir(socket: &Path) -> anyhow::Result<()> {
 
 /// Connects to the app, binds (or creates) one Mac terminal and returns a
 /// master/child pair the surface code uses exactly like a real PTY.
+///
+/// Blocking: this runs synchronously on the thread creating the surface
+/// (`Surface::spawn*` from `Mux::spawn_surface_with`) and can wait up to
+/// 10 s for the app's `A` plus up to 2 s for its `S`. No mux-wide lock is
+/// held there (`state`, `workspace_registry` and the cell-pixel lock are
+/// taken and released around the spawn), but the per-workspace lifecycle
+/// mutex is: `create_terminal_in_workspace` and `apply_layout` keep it across
+/// the spawn, so other creates/layouts/closes of the *same* workspace wait,
+/// and a layout with several default-shell leaves opens them one after another.
 pub(crate) fn open(
     spec: &VirtualPtySpec,
     size: PtySize,
@@ -237,7 +257,14 @@ pub(crate) fn open(
     while host_size.is_none() && Instant::now() < deadline {
         match read_frame(&mut stream) {
             Ok((SIZE, payload)) => host_size = parse_size(&payload),
-            Ok((OUTPUT, payload)) => early_output.extend_from_slice(&payload),
+            Ok((OUTPUT, payload)) => {
+                if early_output.len() + payload.len() > MAX_HANDSHAKE_OUTPUT {
+                    anyhow::bail!(
+                        "shellx bridge: handshake output exceeds {MAX_HANDSHAKE_OUTPUT} bytes before the size report"
+                    );
+                }
+                early_output.extend_from_slice(&payload);
+            }
             Ok((EXIT, _)) => anyhow::bail!("shellx bridge: app ended the terminal during setup"),
             Ok(_) => {}
             Err(error)
@@ -284,6 +311,10 @@ pub(crate) fn open(
                     Ok(_) => {}
                 }
             }
+            // Hang up whatever stopped the loop (`E`, a protocol or read
+            // error, the mirror gone): the app sees the end of stream now,
+            // not when the surface drops the other descriptors.
+            let _ = stream.shutdown(std::net::Shutdown::Both);
             drop(pipe_writer);
             shared.mark_exited();
         }
@@ -372,8 +403,13 @@ impl std::fmt::Debug for VirtualChild {
 }
 
 impl ChildKiller for VirtualChild {
-    /// Tells the app to unbind the terminal (best effort), then hangs up;
-    /// the demux thread sees the end of stream and marks the child exited.
+    /// Tells the app to unbind the terminal (best effort), hangs up, and marks
+    /// the child exited: a killed Mac terminal is gone, and `wait` must not
+    /// depend on the demux thread, which may be blocked writing into a pipe
+    /// nobody reads until the master drops (a failed surface start drops the
+    /// startup guard, which kills and waits, before the master). Final output
+    /// still drains: the surface publishes the exit only after its reader
+    /// sees the pipe's end, which the demux closes as it stops.
     ///
     /// The daemon-side descriptors are closed, not only shut down: on macOS a
     /// `shutdown` while another descriptor of the socket is blocked in `read`
@@ -396,6 +432,7 @@ impl ChildKiller for VirtualChild {
         // side is closed) and fails. Dropping the stream closes this side's
         // last descriptor apart from the demux thread's, closed as it exits.
         drop(self.shared.writer.lock().unwrap().take());
+        self.shared.mark_exited();
         Ok(())
     }
 
@@ -427,6 +464,7 @@ mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
     use std::os::unix::net::UnixListener;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::mpsc;
     use std::thread::JoinHandle;
 
@@ -660,6 +698,45 @@ mod tests {
         app.join().unwrap();
     }
 
+    /// Output held during the handshake is capped at 64 MiB (the app's own
+    /// pending cap): an app that floods it without a size report fails the
+    /// open instead of growing daemon memory without bound.
+    #[test]
+    fn handshake_output_over_cap_fails_open() {
+        let dir = SocketDir::new("early-cap");
+        let listener = UnixListener::bind(dir.socket()).unwrap();
+        let app = std::thread::spawn(move || {
+            let (mut conn, _) = listener.accept().unwrap();
+            let (kind, _) = read_frame(&mut conn).unwrap();
+            assert_eq!(kind, HELLO);
+            conn.write_all(&frame(ACK, br#"{"surface_id":"x","mode":"attach"}"#)).unwrap();
+            let chunk = vec![b'x'; MAX_FRAME];
+            let header = |len: usize| {
+                let mut h = vec![OUTPUT];
+                h.extend_from_slice(&(len as u32).to_be_bytes());
+                h
+            };
+            // Exactly the cap, then one byte more; the daemon may hang up mid-way.
+            for _ in 0..4 {
+                if conn.write_all(&header(MAX_FRAME)).is_err() || conn.write_all(&chunk).is_err() {
+                    return;
+                }
+            }
+            let _ = conn.write_all(&frame(OUTPUT, b"!"));
+            let _ = conn.write_all(&size_frame(80, 24));
+            while read_frame(&mut conn).is_ok() {}
+        });
+        let socket = dir.socket();
+        let result = within("open with flooding app", move || {
+            open(&VirtualPtySpec { socket }, SIZE_80X24, None)
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        });
+        let error = result.expect_err("handshake output over the cap was accepted");
+        assert!(error.contains("handshake output"), "{error}");
+        app.join().unwrap();
+    }
+
     /// The Mac re-sends its grid after every remote resize even when it did
     /// not change (the forced echo); each report must reach the mirror.
     #[test]
@@ -803,6 +880,87 @@ mod tests {
             let error = writer.write_all(b"late").unwrap_err();
             assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
             assert!(spawned.master.resize(PtySize { cols: 60, ..SIZE_80X24 }).is_err());
+        }
+    }
+
+    /// A killed terminal is gone even while the demux thread is blocked
+    /// writing a big snapshot into the full in-process pipe that nothing reads
+    /// (surface creation failed after `open`, or the mirror's reader stopped):
+    /// `wait` after `kill` returns, so the startup guard cannot hang. Dropping
+    /// the master then frees the demux, which closes the connection.
+    #[test]
+    fn kill_does_not_hang_with_undrained_pipe() {
+        const SNAPSHOT: usize = 1024 * 1024;
+        const CHUNK: usize = 4096;
+        let dir = SocketDir::new("undrained");
+        let sent = Arc::new(AtomicUsize::new(0));
+        let app = fake_app(&dir, (80, 24), {
+            let sent = sent.clone();
+            move |conn, _| {
+                let chunk = frame(OUTPUT, &[b'x'; CHUNK]);
+                for _ in 0..SNAPSHOT / CHUNK {
+                    if conn.write_all(&chunk).is_err() {
+                        break;
+                    }
+                    sent.fetch_add(CHUNK, Ordering::SeqCst);
+                }
+                while read_frame(conn).is_ok() {}
+            }
+        });
+        let (spawned, _handle) = open(&dir.spec(), SIZE_80X24, None).unwrap();
+        // The app's writes stall once the pipe and the socket are both full,
+        // that is once the demux is blocked writing into the pipe.
+        let deadline = Instant::now() + WAIT;
+        let mut last = 0;
+        loop {
+            std::thread::sleep(Duration::from_millis(300));
+            let now = sent.load(Ordering::SeqCst);
+            if now > 0 && now == last {
+                break;
+            }
+            assert!(Instant::now() < deadline, "the app's output never stalled");
+            last = now;
+        }
+        assert!(last < SNAPSHOT, "the pipe never filled ({last} bytes sent)");
+        let mut child = spawned.child;
+        let mut child = within("kill with undrained pipe", move || {
+            child.kill().unwrap();
+            child
+        });
+        let mut child = within("wait after kill with undrained pipe", move || {
+            assert!(child.wait().unwrap().success());
+            child
+        });
+        assert!(child.try_wait().unwrap().is_some());
+        drop(spawned.master);
+        within("app sees EOF once the master is gone", move || app.join().unwrap());
+    }
+
+    /// When the demux stops on its own (a protocol error, or `E`), it hangs up
+    /// at once: the app sees the end of stream while the daemon still holds
+    /// the terminal, instead of a half-open binding until the surface drops.
+    #[test]
+    fn protocol_error_hangs_up() {
+        let mut oversize = vec![OUTPUT];
+        oversize.extend_from_slice(&(MAX_FRAME as u32 + 1).to_be_bytes());
+        for (name, last) in [("oversize", oversize), ("exit", frame(EXIT, &[]))] {
+            for round in 0..20 {
+                let dir = SocketDir::new(&format!("hangup-{name}-{round}"));
+                let last = last.clone();
+                let app = fake_app(&dir, (80, 24), move |conn, _| {
+                    conn.write_all(&last).unwrap();
+                    while read_frame(conn).is_ok() {}
+                });
+                let (spawned, _handle) = open(&dir.spec(), SIZE_80X24, None).unwrap();
+                within(&format!("app sees EOF after {name}, round {round}"), move || {
+                    app.join().unwrap();
+                });
+                let mut child = spawned.child;
+                within("child ends after the demux stopped", move || {
+                    assert!(child.wait().unwrap().success());
+                });
+                drop(spawned.master);
+            }
         }
     }
 

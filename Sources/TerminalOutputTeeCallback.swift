@@ -12,6 +12,7 @@ let cmuxTerminalOutputTeeCallback: @convention(c) (
         let buffer = UnsafeBufferPointer(start: rebound, count: count)
         TerminalScrollbackCheckpointActivity.recordOutput(context.scrollbackCheckpointFlags)
         MobileTerminalByteTee.shared.append(surfaceID: context.surfaceID, bytes: buffer)
+        ShellXBridgeTee.consume(surfaceID: context.surfaceID, buffer: buffer) // ShellX:
         TerminalPredictionCenter.shared.consumeOutput(
             surfaceID: context.surfaceID,
             bytes: buffer
