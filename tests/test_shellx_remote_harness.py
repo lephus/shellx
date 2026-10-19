@@ -206,6 +206,43 @@ class MachinePaths(unittest.TestCase):
         self.assertEqual(len({m.session for m in self.machines}), len(self.machines))
 
 
+class AppBridgeCli(unittest.TestCase):
+    ENV = {"SHELLX_E2E_BIN": "/e/bin", "SHELLX_E2E_CORE_BIN": "/e/core"}
+
+    def test_bins_from_the_environment(self):
+        args = harness.parse_cli(["--app-bridge", "/t/sx-1/bridge.sock"], self.ENV)
+        self.assertEqual((args.app_bridge, args.bin, args.core_bin), ("/t/sx-1/bridge.sock", "/e/bin", "/e/core"))
+        self.assertEqual(args.ticket_ttl, 120)                     # production ticket lifetime
+
+    def test_flags_win_over_the_environment(self):
+        args = harness.parse_cli(["--app-bridge", "/b.sock", "--bin", "/x/bin", "--core-bin", "/x/core",
+                                  "--ticket-ttl", "30"], self.ENV)
+        self.assertEqual((args.bin, args.core_bin, args.ticket_ttl), ("/x/bin", "/x/core", 30))
+
+    def test_missing_bridge_or_bins_is_a_usage_error(self):
+        import contextlib
+        import io
+        for argv, env in ((["--bin", "/b", "--core-bin", "/c"], {}), (["--app-bridge", "/b.sock"], {}),
+                          (["--app-bridge", "/b.sock", "--bin", "/b"], {})):
+            with self.assertRaises(SystemExit) as raised, contextlib.redirect_stderr(io.StringIO()):
+                harness.parse_cli(argv, env)
+            self.assertEqual(raised.exception.code, 2, argv)
+
+    def test_live_check_commands(self):
+        import shlex
+        env = {"HOME": "/tmp/sx-1/viewer/home", "PATH": harness.MIN_PATH, "LANG": "en_US.UTF-8"}
+        prefix = harness.viewer_cli_prefix("/e/bin/cmux-tui", env, "/tmp/sx-1/viewer/run/client.sock")
+        self.assertEqual(prefix, ["env", "-i", "HOME=/tmp/sx-1/viewer/home", f"PATH={harness.MIN_PATH}",
+                                  "LANG=en_US.UTF-8", "/e/bin/cmux-tui", "--socket", "/tmp/sx-1/viewer/run/client.sock"])
+        lines = harness.live_check_lines(prefix, "t-42")
+        export = next(line for line in lines if line.startswith("export SHELLX_VIEWER_CLI="))
+        self.assertEqual(shlex.split(shlex.split(export.split("=", 1)[1])[0]), prefix)
+        cli = shlex.join(prefix)
+        self.assertIn(f"{cli} terminal t-42 screen read", lines)
+        self.assertIn(f"{cli} terminal t-42 write --text $'echo $((6*7))\\r'", lines)
+        self.assertFalse(any(harness.TICKET_RE.search(line) or harness.INVITE_RE.search(line) for line in lines))
+
+
 class RefreshSchedule(unittest.TestCase):
     def test_half_life_when_mints_are_fast(self):
         self.assertAlmostEqual(harness.refresh_delay(2.0, [0.1]), 1.0)

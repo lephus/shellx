@@ -42,16 +42,29 @@ ShellXClientLinkSupervisor, ShellXTicketRefresher, ReconnectBackoff):
 The daemon side is the app's: every daemon spawn runs `server stop --force` for
 the session first, then `server start` with the app's argv (`server_stop_argv`,
 `server_start_argv`), and the enroll commands name the admin socket.
+
+Run as a script, it serves a running ShellX app instead of fake_app.py (the
+live check of plan Task 11 Step 4):
+
+    python3 scripts/shellx/remote-e2e/harness.py --app-bridge "$TMPDIR/sx-<hash8>/bridge.sock" \
+        --bin <cmux-tui target dir> --core-bin <shellx-core target dir>
+
+It starts relay, fake API, the host daemon on the app's bridge socket and a
+paired, connected viewer, prints the viewer CLI and the live-check commands
+(no secrets), and cleans up on Ctrl-C or SIGTERM. It needs no file in the repo
+other than this directory, so it runs from any working directory.
 """
 
 from __future__ import annotations
 
+import argparse
 import base64
 import json
 import os
 import pwd
 import re
 import secrets
+import shlex
 import shutil
 import signal
 import socket
@@ -63,7 +76,7 @@ import threading
 import time
 import urllib.request
 from pathlib import Path
-from typing import Callable, Optional, Sequence
+from typing import Callable, Mapping, Optional, Sequence
 
 HERE = Path(__file__).resolve().parent
 FAKE_APP = HERE / "fake_app.py"
@@ -1029,3 +1042,112 @@ def terminal_ids(listing) -> list[str]:
                 ids.append(str(ident))
     return ids
 
+
+# --app-bridge: serve a running ShellX app (plan Task 11 Step 4 live check) -----
+
+def parse_cli(argv: Sequence[str], environ: Mapping[str, str]) -> argparse.Namespace:
+    """`--app-bridge SOCKET [--bin DIR] [--core-bin DIR] [--ticket-ttl S]`;
+    the binary dirs default to SHELLX_E2E_BIN and SHELLX_E2E_CORE_BIN."""
+    parser = argparse.ArgumentParser(
+        prog="harness.py",
+        description="Relay, fake ShellX API, host daemon on a running ShellX app's bridge socket, and a "
+                    "paired viewer; prints the viewer CLI. Ctrl-C or SIGTERM stops everything.")
+    parser.add_argument("--app-bridge", required=True, metavar="SOCKET",
+                        help="the app's bridge socket, $TMPDIR/sx-<hash8>/bridge.sock")
+    parser.add_argument("--bin", default=environ.get("SHELLX_E2E_BIN"), metavar="DIR",
+                        help="dir with cmux-tui and cmux-relay (default: $SHELLX_E2E_BIN)")
+    parser.add_argument("--core-bin", default=environ.get("SHELLX_E2E_CORE_BIN"), metavar="DIR",
+                        help="dir with shellx-core-cli and shellx-fake-api (default: $SHELLX_E2E_CORE_BIN)")
+    parser.add_argument("--ticket-ttl", type=int, default=120, metavar="SECONDS",
+                        help="relay ticket lifetime (default: 120, the production value)")
+    args = parser.parse_args(list(argv))
+    if not args.bin or not args.core_bin:
+        parser.error("--bin and --core-bin (or SHELLX_E2E_BIN and SHELLX_E2E_CORE_BIN) are required")
+    return args
+
+
+def viewer_cli_prefix(cmux_tui: str, env: Mapping[str, str], client_socket: str) -> list[str]:
+    """The viewer CLI exactly as the harness runs it: its clean environment
+    (`env -i`, paths and names only, no secret) and its local socket."""
+    return ["env", "-i", *[f"{key}={value}" for key, value in env.items()], cmux_tui, "--socket", client_socket]
+
+
+def live_check_lines(prefix: Sequence[str], terminal_id: str) -> list[str]:
+    """What `--app-bridge` prints: the viewer CLI as SHELLX_VIEWER_CLI and the
+    commands of the live check, ready to paste in bash or zsh."""
+    cli = shlex.join(prefix)
+    term = shlex.quote(terminal_id)
+    return [
+        "Viewer CLI (bash: $SHELLX_VIEWER_CLI ...; zsh: ${=SHELLX_VIEWER_CLI} ...):",
+        f"export SHELLX_VIEWER_CLI={shlex.quote(cli)}",
+        "Live check: the screen shows the focused ShellX terminal, then 42 is printed in the Mac pane:",
+        f"{cli} terminal {term} screen read",
+        f"{cli} terminal {term} write --text $'echo $((6*7))\\r'",
+        f"{cli} terminal {term} screen read",
+        "Ctrl-C (or SIGTERM) stops relay, API, daemon and viewer and removes the harness dir.",
+    ]
+
+
+class Stopped(Exception):
+    """Ctrl-C or SIGTERM in `main`."""
+
+
+def _raise_stopped(*_) -> None:
+    raise Stopped
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    """`--app-bridge`: exits 0 when stopped by Ctrl-C or SIGTERM once the viewer
+    is up, 130 when stopped before, 1 when the setup failed or the daemon
+    exited, 2 on a usage error. Every process and the harness dir are removed
+    in all cases."""
+    args = parse_cli(sys.argv[1:] if argv is None else argv, os.environ)
+    bridge = Path(args.app_bridge).expanduser()
+    if not is_socket(bridge):
+        print(f"harness.py: {bridge} is not a socket (is the ShellX app running with the bridge on?)", file=sys.stderr)
+        return 2
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, _raise_stopped)
+    h = Harness(args.bin, args.core_bin, ticket_ttl=args.ticket_ttl)
+    ready = False
+    try:
+        h.start_relay()
+        h.start_api()
+        host, viewer = h.machine("host"), h.machine("viewer")
+        h.use_app_bridge(host, bridge)
+        for machine in (host, viewer):
+            machine.login()
+            machine.register()
+        h.start_host_daemon(host)
+        invitation = h.pair(viewer, host)
+        h.connect_viewer(viewer, host)
+        h.approve_pending(host, invitation)
+        h.viewer_cli("workspace", "create", "--name", "shellx-live", "--json")
+        term = h.first_terminal()
+        print(f"Harness dir {h.root} (removed on exit); daemon session {host.session} on {bridge}")
+        for line in live_check_lines(viewer_cli_prefix(str(h.bin / "cmux-tui"), h.env(viewer),
+                                                       str(viewer.client_sock)), term):
+            print(line)
+        sys.stdout.flush()
+        ready = True
+        daemon = h.daemon_proc(host)
+        while daemon.poll() is None:
+            time.sleep(0.5)
+        print(f"harness.py: the host daemon exited (rc={daemon.returncode})", file=sys.stderr)
+        h.dump_logs(sys.stderr)
+        return 1
+    except Stopped:
+        return 0 if ready else 130
+    except HarnessError as error:
+        print(f"harness.py: {h.redact(str(error))}", file=sys.stderr)
+        h.dump_logs(sys.stderr)
+        return 1
+    finally:
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            signal.signal(sig, signal.SIG_IGN)   # cleanup is not interrupted
+        h.close()
+        print("harness.py: stopped and cleaned up", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
