@@ -22,7 +22,7 @@ public enum ShellXCloudGate {
     public static let cloudCLICommands = [
         "auth", "login", "logout", "billing", "vm", "cloud", "vpn",
         "remotes", "remote", "ai-accounts",
-        "vm-pty-attach", "vm-tui-connect", "vm-ssh-attach",
+        "vm-pty-attach", "vm-pty-connect", "vm-tui-connect", "vm-ssh-attach",
     ]
     /// Top-level CLI verbs that run or configure CodeRouter.
     public static let codeRouterCLICommands = ["coderouter", "cr"]

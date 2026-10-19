@@ -325,6 +325,13 @@ class CLIVerbsAreRefused(unittest.TestCase):
                 self.assertIn(label, refused, f"CLI verb {label!r} reaches Cloud without the ShellX gate")
         self.assertGreaterEqual(checked, 5, "parsed too few Cloud CLI cases")
 
+    def test_pre_dispatch_cloud_verbs_are_refused(self):
+        """Verbs handled by `if command == "..."` before the dispatch switch."""
+        refused = set(swift_string_list(GATE, "cloudCLICommands"))
+        for verb in re.findall(r'if command == "([^"]+)" \{ try run(?:VM|Cloud)\w*\(', read(CLI_MAIN)):
+            self.assertIn(verb, refused, verb)
+        self.assertIn("vm-pty-connect", refused)
+
     def test_vm_agent_alias_refuses_first(self):
         self.assertRegex(first_statement("CLI/CMUXCLI+VMTransfer.swift", r"func runVMAgentCommand\([^{]*\{"),
                          CLOUD_OFF + r" \{ throw Self\.shellXUnavailable\(\.cloud\) \}")

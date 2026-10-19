@@ -43,7 +43,7 @@ import Testing
         for command in [
             "auth", "login", "logout", "billing", "vm", "cloud", "vpn",
             "remotes", "remote", "ai-accounts",
-            "vm-pty-attach", "vm-tui-connect", "vm-ssh-attach", "VM",
+            "vm-pty-attach", "vm-pty-connect", "vm-tui-connect", "vm-ssh-attach", "VM",
         ] {
             #expect(ShellXCloudGate.unavailableService(forCLICommand: command) == .cloud, "\(command)")
         }
