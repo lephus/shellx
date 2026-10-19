@@ -63,7 +63,7 @@ extension CMUXCLI {
                 guard Self.pullRequestWindowIDsEqual(caller?["window_id"] as? String, windowID) else {
                     throw CLIError(message: CMUXDiffViewerLocalization.string(
                         "cli.pr.error.workspaceMissing",
-                        defaultValue: "Workspace not found; run cmux list-workspaces and retry with --workspace."
+                        defaultValue: "Workspace not found; run shellx list-workspaces and retry with --workspace."
                     ))
                 }
             }
@@ -142,7 +142,7 @@ extension CMUXCLI {
     private func pullRequestAmbiguousWorkspaceError() -> CLIError {
         CLIError(message: CMUXDiffViewerLocalization.string(
             "cli.pr.error.ambiguousWorkspace",
-            defaultValue: "cmux pr: could not identify the caller workspace; run it inside a cmux terminal or pass --workspace <id|ref|index>"
+            defaultValue: "shellx pr: could not identify the caller workspace; run it inside a ShellX terminal or pass --workspace <id|ref|index>"
         ))
     }
 
@@ -273,7 +273,7 @@ extension CMUXCLI {
         guard !result.timedOut, result.exitStatus == 0, result.executionError == nil, !root.isEmpty else {
             throw CLIError(message: CMUXDiffViewerLocalization.string(
                 "cli.pr.error.notRepository",
-                defaultValue: "cmux pr requires a git repository in the current directory"
+                defaultValue: "shellx pr requires a git repository in the current directory"
             ))
         }
         return URL(fileURLWithPath: root).standardizedFileURL.resolvingSymlinksInPath().path
@@ -285,7 +285,7 @@ extension CMUXCLI {
         guard inputURL != nil || (Int(numberToken).map { $0 > 0 } == true && numberToken.allSatisfy(\.isNumber)) else {
             throw CLIError(message: CMUXDiffViewerLocalization.string(
                 "cli.pr.error.invalidSelector",
-                defaultValue: "cmux pr expects a pull-request URL or a positive pull-request number"
+                defaultValue: "shellx pr expects a pull-request URL or a positive pull-request number"
             ))
         }
         let root = try await pullRequestRepositoryRoot()
@@ -304,7 +304,7 @@ extension CMUXCLI {
         if !allowedRepositories.contains(requestedRepository.lowercased()) {
             throw CLIError(message: CMUXDiffViewerLocalization.string(
                 "cli.pr.error.repositoryMismatch",
-                defaultValue: "cmux pr: the pull request does not belong to the detected repository"
+                defaultValue: "shellx pr: the pull request does not belong to the detected repository"
             ))
         }
         guard let requestedNumber = inputURL?.number ?? Int(numberToken) else {
@@ -343,7 +343,7 @@ extension CMUXCLI {
         guard !result.timedOut, result.exitStatus == 0, result.executionError == nil else {
             throw CLIError(message: CMUXDiffViewerLocalization.string(
                 "cli.pr.error.lookupFailed",
-                defaultValue: "cmux pr could not resolve the pull request; check authentication and try again"
+                defaultValue: "shellx pr could not resolve the pull request; check authentication and try again"
             ))
         }
         guard let data = result.stdout?.data(using: .utf8),
@@ -356,15 +356,15 @@ extension CMUXCLI {
     private func pullRequestMalformedMetadataError() -> CLIError {
         CLIError(message: CMUXDiffViewerLocalization.string(
             "cli.pr.error.lookupMalformed",
-            defaultValue: "cmux pr received invalid pull-request information"
+            defaultValue: "shellx pr received invalid pull-request information"
         ))
     }
 
     static let pullRequestUsage = CMUXDiffViewerLocalization.string(
         "cli.pr.usage",
         defaultValue: """
-        Usage: cmux pr <url|number> [--workspace <id|ref|index>] [--window <id|ref|index>]
-               cmux pr clear [--workspace <id|ref|index>] [--window <id|ref|index>]
+        Usage: shellx pr <url|number> [--workspace <id|ref|index>] [--window <id|ref|index>]
+               shellx pr clear [--workspace <id|ref|index>] [--window <id|ref|index>]
 
         Attach or replace a pull-request link immediately. Requires a Git repository and account authentication.
         Uses the repository associated with the current directory, including its configured upstream.
@@ -375,8 +375,8 @@ extension CMUXCLI {
         Sidebar visibility and click settings still apply.
 
         Example:
-          cmux pr 123
-          cmux pr clear
+          shellx pr 123
+          shellx pr clear
         """
     )
 }

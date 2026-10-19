@@ -54,7 +54,7 @@ struct RemoteBootstrapStagingCommandBuilderTests {
         #expect(preparation.status == 0)
         #expect(preparation.stderr.isEmpty)
 
-        let stagedURL = remoteHome.appendingPathComponent(".cmux/relay/52261.bootstrap.sh")
+        let stagedURL = remoteHome.appendingPathComponent(".shellx/relay/52261.bootstrap.sh")
         let staged = String(decoding: try Data(contentsOf: stagedURL), as: UTF8.self)
         #expect(staged.contains(
             "workspace=workspace-123 surface=surface-456 lifecycle=lifecycle-789 attempt=attempt-012"
@@ -95,7 +95,7 @@ struct RemoteBootstrapStagingCommandBuilderTests {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("cmux-bootstrap-argv-\(UUID().uuidString)", isDirectory: true)
         let remoteHome = directory.appendingPathComponent("remote-home", isDirectory: true)
-        let relayDirectory = remoteHome.appendingPathComponent(".cmux/relay", isDirectory: true)
+        let relayDirectory = remoteHome.appendingPathComponent(".shellx/relay", isDirectory: true)
         try FileManager.default.createDirectory(at: relayDirectory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
 
@@ -171,7 +171,7 @@ struct RemoteBootstrapStagingCommandBuilderTests {
         #expect(preparation.status == 0)
         #expect(preparation.stderr.isEmpty)
         #expect(FileManager.default.fileExists(
-            atPath: remoteHome.appendingPathComponent(".cmux/relay/52262.bootstrap.sh").path
+            atPath: remoteHome.appendingPathComponent(".shellx/relay/52262.bootstrap.sh").path
         ))
 
         let execution = try run(
@@ -223,7 +223,7 @@ struct RemoteBootstrapStagingCommandBuilderTests {
         #expect(preparation.status == 23)
         #expect(preparation.stderr.contains("remote installer stderr"))
         #expect(!FileManager.default.fileExists(
-            atPath: directory.appendingPathComponent("remote-home/.cmux/relay/52263.bootstrap.sh").path
+            atPath: directory.appendingPathComponent("remote-home/.shellx/relay/52263.bootstrap.sh").path
         ))
     }
 

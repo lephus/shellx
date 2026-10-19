@@ -61,7 +61,7 @@ struct NotificationSoundOverridesView: View {
             if isPersistedValueMalformed {
                 Text(String(
                     localized: "settings.notifications.soundOverrides.invalidConfiguration",
-                    defaultValue: "The saved per-agent sound settings are invalid. Fix notifications.soundOverrides in cmux.json before editing."
+                    defaultValue: "The saved per-agent sound settings are invalid. Fix notifications.soundOverrides in shellx.json before editing."
                 ))
                 .font(.caption)
                 .foregroundStyle(.red)

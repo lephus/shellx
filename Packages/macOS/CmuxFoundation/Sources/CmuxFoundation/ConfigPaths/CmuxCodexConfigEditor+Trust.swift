@@ -1,8 +1,8 @@
 extension CmuxCodexConfigEditor {
     static let cmuxCodexHookTrustBegin =
-        "# cmux-codex-hook-trust-f5cc24da-7a09-4b20-a756-89e7786f6738 begin"
+        "# shellx-codex-hook-trust-f5cc24da-7a09-4b20-a756-89e7786f6738 begin"
     static let cmuxCodexHookTrustEnd =
-        "# cmux-codex-hook-trust-f5cc24da-7a09-4b20-a756-89e7786f6738 end"
+        "# shellx-codex-hook-trust-f5cc24da-7a09-4b20-a756-89e7786f6738 end"
 
     enum HookTrustBlockRemovalResult {
         case notFound

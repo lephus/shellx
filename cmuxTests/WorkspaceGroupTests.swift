@@ -210,6 +210,8 @@ struct WorkspaceGroupTests {
                 break
             case .workspace(let workspaceId):
                 visibleWorkspaceIds.append(workspaceId)
+            case .machineHeader: // ShellX: machine section headers (W1 Task 10)
+                break
             }
         }
 

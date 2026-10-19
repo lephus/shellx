@@ -60,7 +60,7 @@ extension CMUXCLI {
             detail: detail,
             message: String(
                 localized: "cli.restore.error.socketNotReady",
-                defaultValue: "restore: cmux is still opening. Retry the visible restore command in a moment."
+                defaultValue: "restore: ShellX is still opening. Retry the visible restore command in a moment."
             )
         )
     }
@@ -133,29 +133,29 @@ extension CMUXCLI {
         case (.restore, .surfaceUsage):
             return CLIError(message: String(
                 localized: "cli.restore.usage.surface",
-                defaultValue: "Usage: cmux restore --surface [id|ref]"
+                defaultValue: "Usage: shellx restore --surface [id|ref]"
             ))
         case (.restore, .positionalUsage):
             return CLIError(message: String(
                 localized: "cli.restore.usage.positional",
                 defaultValue: """
-                Usage: cmux restore [--surface <id|ref>] <kind> <checkpoint-id>
-                       cmux restore <kind> <checkpoint-id> --surface <id|ref>
-                       cmux restore --surface=<id|ref> <kind> <checkpoint-id>
+                Usage: shellx restore [--surface <id|ref>] <kind> <checkpoint-id>
+                       shellx restore <kind> <checkpoint-id> --surface <id|ref>
+                       shellx restore --surface=<id|ref> <kind> <checkpoint-id>
                 """
             ))
         case (.fork, .surfaceUsage):
             return CLIError(message: String(
                 localized: "cli.fork.usage.surface",
-                defaultValue: "Usage: cmux fork --surface [id|ref]"
+                defaultValue: "Usage: shellx fork --surface [id|ref]"
             ))
         case (.fork, .positionalUsage):
             return CLIError(message: String(
                 localized: "cli.fork.usage.positional",
                 defaultValue: """
-                Usage: cmux fork [--surface <id|ref>] <kind> <checkpoint-id>
-                       cmux fork <kind> <checkpoint-id> --surface <id|ref>
-                       cmux fork --surface=<id|ref> <kind> <checkpoint-id>
+                Usage: shellx fork [--surface <id|ref>] <kind> <checkpoint-id>
+                       shellx fork <kind> <checkpoint-id> --surface <id|ref>
+                       shellx fork --surface=<id|ref> <kind> <checkpoint-id>
                 """
             ))
         case (.restore, .surfaceNotFound):
@@ -171,12 +171,12 @@ extension CMUXCLI {
         case (.restore, .currentSurfaceUnknown):
             return CLIError(message: String(
                 localized: "cli.restore.error.currentSurfaceUnknown",
-                defaultValue: "restore: the current cmux surface could not be identified. Retry from this terminal or pass --surface <id|ref>."
+                defaultValue: "restore: the current ShellX surface could not be identified. Retry from this terminal or pass --surface <id|ref>."
             ))
         case (.fork, .currentSurfaceUnknown):
             return CLIError(message: String(
                 localized: "cli.fork.error.currentSurfaceUnknown",
-                defaultValue: "fork: the current cmux surface could not be identified. Retry from this terminal or pass --surface <id|ref>."
+                defaultValue: "fork: the current ShellX surface could not be identified. Retry from this terminal or pass --surface <id|ref>."
             ))
         case (.restore, .malformedRecord):
             return CLIError(message: String(

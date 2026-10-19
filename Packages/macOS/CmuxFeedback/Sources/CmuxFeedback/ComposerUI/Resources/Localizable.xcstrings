@@ -64,6 +64,12 @@
             "state": "translated",
             "value": "附加"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đính kèm"
+          }
         }
       }
     },
@@ -128,6 +134,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "附加图片"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đính kèm ảnh"
           }
         }
       }
@@ -194,6 +206,12 @@
             "state": "translated",
             "value": "附加图片"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đính kèm ảnh"
+          }
         }
       }
     },
@@ -258,6 +276,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "最多 10 张图片。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tối đa 10 ảnh."
           }
         }
       }
@@ -324,6 +348,12 @@
             "state": "translated",
             "value": "إلغاء"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hủy"
+          }
         }
       }
     },
@@ -388,6 +418,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法发送反馈。请检查您的网络连接并重试。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể gửi góp ý. Hãy kiểm tra kết nối và thử lại."
           }
         }
       }
@@ -454,6 +490,12 @@
             "state": "translated",
             "value": "完毕"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xong"
+          }
         }
       }
     },
@@ -519,6 +561,12 @@
             "state": "translated",
             "value": "您的电子邮箱"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Email của bạn"
+          }
         }
       }
     },
@@ -580,6 +628,12 @@
           }
         },
         "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "you@example.com"
+          }
+        },
+        "vi": {
           "stringUnit": {
             "state": "translated",
             "value": "you@example.com"
@@ -649,6 +703,12 @@
             "state": "translated",
             "value": "发送前请输入内容。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hãy nhập tin nhắn trước khi gửi."
+          }
         }
       }
     },
@@ -713,6 +773,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "反馈服务目前不可用。请发送邮件至 founders@cmux.com 联系我们。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiện không thể gửi góp ý. Hãy gửi email tới founders@cmux.com."
           }
         }
       }
@@ -779,6 +845,12 @@
             "state": "translated",
             "value": "无法发送反馈。请重试。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể gửi góp ý. Vui lòng thử lại."
+          }
         }
       }
     },
@@ -843,6 +915,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "请输入有效的电子邮箱地址。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hãy nhập địa chỉ email hợp lệ."
           }
         }
       }
@@ -909,6 +987,12 @@
             "state": "translated",
             "value": "选中的某个文件无法附加。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể đính kèm một trong các tệp đã chọn."
+          }
         }
       }
     },
@@ -973,6 +1057,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Message"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tin nhắn"
           }
         }
       }
@@ -1039,6 +1129,12 @@
             "state": "translated",
             "value": "分享反馈、功能需求或遇到的问题。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chia sẻ góp ý, yêu cầu tính năng hoặc sự cố."
+          }
         }
       }
     },
@@ -1103,6 +1199,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "您的反馈内容过长。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tin nhắn của bạn quá dài."
           }
         }
       }
@@ -1169,6 +1271,12 @@
             "state": "translated",
             "value": "您也可以通过 founders@cmux.com 联系我们。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bạn cũng có thể liên hệ chúng tôi tại founders@cmux.com."
+          }
         }
       }
     },
@@ -1233,6 +1341,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "反馈尝试过于频繁。请稍后再试。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quá nhiều lần gửi góp ý. Vui lòng thử lại sau."
           }
         }
       }
@@ -1299,6 +1413,12 @@
             "state": "translated",
             "value": "移除"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xóa"
+          }
         }
       }
     },
@@ -1363,6 +1483,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "发送"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi"
           }
         }
       }
@@ -1429,6 +1555,12 @@
             "state": "translated",
             "value": "您也可以通过 founders@cmux.com 联系我们。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bạn cũng có thể liên hệ chúng tôi tại founders@cmux.com."
+          }
         }
       }
     },
@@ -1493,6 +1625,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "感谢您的反馈。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cảm ơn bạn đã góp ý."
           }
         }
       }
@@ -1559,6 +1697,12 @@
             "state": "translated",
             "value": "发送反馈"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi góp ý"
+          }
         }
       }
     },
@@ -1623,6 +1767,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "您最多只能附加 10 张图片。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bạn có thể đính kèm tối đa 10 ảnh."
           }
         }
       }
@@ -1689,6 +1839,12 @@
             "state": "translated",
             "value": "这些图片过大，无法一同发送。请移除部分图片后重试。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các ảnh này quá lớn để gửi cùng lúc. Hãy bỏ bớt vài ảnh và thử lại."
+          }
         }
       }
     },
@@ -1753,6 +1909,225 @@
           "stringUnit": {
             "state": "translated",
             "value": "请检查您的反馈内容和附件，然后重试。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hãy kiểm tra tin nhắn và tệp đính kèm rồi thử lại."
+          }
+        }
+      }
+    },
+    "shellx.feedback.successBody": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can also reach us at %@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ でもお問い合わせいただけます。"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ви також можете написати нам на %@."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@(으)로도 연락하실 수 있습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sie können uns auch unter %@ erreichen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vous pouvez également nous écrire à %@."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يمكنك أيضًا التواصل معنا عبر %@."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "También puedes escribirnos a %@."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你也可以透過 %@ 聯絡我們。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你也可以通过 %@ 联系我们。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bạn cũng có thể liên hệ với chúng tôi qua %@."
+          }
+        }
+      }
+    },
+    "shellx.feedback.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A human will read this! You can also reach us at %@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "担当者が必ず読みます！%@ でもお問い合わせいただけます。"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Це прочитає людина! Ви також можете написати нам на %@."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "사람이 직접 읽습니다! %@(으)로도 연락하실 수 있습니다."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das liest ein Mensch! Sie können uns auch unter %@ erreichen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un humain lira ce message ! Vous pouvez également nous écrire à %@."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "سيقرأ شخص حقيقي هذه الرسالة! يمكنك أيضًا التواصل معنا عبر %@."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¡Una persona leerá esto! También puedes escribirnos a %@."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "會有真人閱讀！你也可以透過 %@ 聯絡我們。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会有真人阅读！你也可以通过 %@ 联系我们。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sẽ có người đọc góp ý này! Bạn cũng có thể liên hệ với chúng tôi qua %@."
+          }
+        }
+      }
+    },
+    "shellx.feedback.endpointError": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feedback is unavailable right now. Email %@ instead."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在フィードバックを送信できません。代わりに %@ までメールしてください。"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Відгуки зараз недоступні. Напишіть на %@."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "현재 피드백을 사용할 수 없습니다. 대신 %@(으)로 이메일을 보내주세요."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feedback ist zurzeit nicht verfügbar. Senden Sie stattdessen eine E-Mail an %@."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les retours ne sont pas disponibles pour le moment. Envoyez plutôt un e-mail à %@."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الملاحظات غير متوفرة الآن. يرجى مراسلة %@ عبر البريد الإلكتروني بدلاً من ذلك."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los comentarios no están disponibles en este momento. Envía un correo a %@ en su lugar."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目前無法使用意見反應功能。請改為傳送電子郵件至 %@。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目前无法使用反馈功能。请改为发送电子邮件至 %@。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiện chưa gửi được góp ý. Hãy gửi email tới %@."
           }
         }
       }

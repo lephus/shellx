@@ -254,7 +254,7 @@ public struct MoshTerminalCommandBuilder: Sendable {
     private func terminalLifecycleRegistrationShellLines() -> [String] {
         [
             "cmux_mosh_lifecycle_cli=\"${CMUX_BUNDLED_CLI_PATH:-}\"",
-            "if [ -z \"$cmux_mosh_lifecycle_cli\" ] || [ ! -x \"$cmux_mosh_lifecycle_cli\" ]; then cmux_mosh_lifecycle_cli=\"$(command -v cmux 2>/dev/null || true)\"; fi",
+            "if [ -z \"$cmux_mosh_lifecycle_cli\" ] || [ ! -x \"$cmux_mosh_lifecycle_cli\" ]; then cmux_mosh_lifecycle_cli=\"$(command -v shellx 2>/dev/null || true)\"; fi",
             "if [ -z \"$cmux_mosh_lifecycle_cli\" ] || [ -z \"${CMUX_SOCKET_PATH:-}\" ] || [ -z \"${CMUX_WORKSPACE_ID:-}\" ] || [ -z \"${CMUX_SURFACE_ID:-}\" ] || [ -z \"${CMUX_TERMINAL_LIFECYCLE_ID:-}\" ]; then cmux_mosh_fallback; fi",
             "cmux_mosh_lifecycle_rpc() { cmux_mosh_lifecycle_method=\"$1\"; cmux_mosh_lifecycle_payload=\"$2\"; cmux_mosh_lifecycle_retry=0; while ! CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC=2 \"$cmux_mosh_lifecycle_cli\" --socket \"$CMUX_SOCKET_PATH\" rpc \"$cmux_mosh_lifecycle_method\" \"$cmux_mosh_lifecycle_payload\" >/dev/null 2>&1; do cmux_mosh_lifecycle_retry=$((cmux_mosh_lifecycle_retry + 1)); if [ \"$cmux_mosh_lifecycle_retry\" -ge 4 ]; then return 1; fi; /bin/sleep 0.1; done; }",
             "cmux_mosh_launch_payload=\"{\\\"workspace_id\\\":\\\"$CMUX_WORKSPACE_ID\\\",\\\"surface_id\\\":\\\"$CMUX_SURFACE_ID\\\",\\\"terminal_lifecycle_id\\\":\\\"$CMUX_TERMINAL_LIFECYCLE_ID\\\",\\\"attempt_id\\\":\\\"$CMUX_SSH_ATTEMPT_ID\\\"}\"",

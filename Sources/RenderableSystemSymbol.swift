@@ -2,6 +2,7 @@ import AppKit
 import CmuxAppKitSupportUI
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// Returns whether a rasterized icon contains a visible alpha pixel.
 @MainActor
@@ -27,7 +28,7 @@ enum RenderableSystemSymbol {
     private static var renderabilityCache = RenderabilityCache(
         limit: renderabilityCacheLimit,
         negativeRetryInterval: negativeRenderabilityRetryInterval,
-        resolve: { NSImage(systemSymbolName: $0, accessibilityDescription: nil) != nil }
+        resolve: { ShellXIcon.nsImage($0, accessibilityDescription: nil) != nil }
     )
     @MainActor
     private static var appKitImageCache: [AppKitImageCacheKey: NSImage] = [:]
@@ -271,7 +272,7 @@ enum RenderableSystemSymbol {
         if !renderabilityCache.isRenderable(systemName) {
             return nil
         }
-        guard let baseImage = NSImage(systemSymbolName: systemName, accessibilityDescription: nil) else {
+        guard let baseImage = ShellXIcon.nsImage(systemName, accessibilityDescription: nil) else {
             renderabilityCache.cacheRenderability(false, for: systemName)
             return nil
         }
@@ -302,7 +303,7 @@ enum RenderableSystemSymbol {
 
     /// Draws a symbol into an owned bitmap before handing it to AppKit views.
     ///
-    /// `NSImage(systemSymbolName:)` stores a lazy symbol representation. If
+    /// A symbol `NSImage` (SF or coolicon) stores a lazy symbol representation. If
     /// that representation reaches an `NSImageView` while AppKit is solving
     /// window constraints, the first provider lookup can block the main
     /// thread for several seconds. A bitmap representation makes all later
@@ -423,7 +424,8 @@ enum RenderableSystemSymbol {
 struct CmuxSystemSymbolImage: View {
     @Environment(\.cmuxGlobalFontMagnificationPercent) private var globalFontPercent
 
-    let systemName: String
+    /// An SF Symbol name; ``ShellXIcon`` draws its coolicon when mapped.
+    let symbolName: String
     let pointSize: CGFloat
     var weight: Font.Weight?
     let tint: Color
@@ -431,14 +433,14 @@ struct CmuxSystemSymbolImage: View {
     var appliesGlobalFontMagnification = false
 
     init(
-        systemName: String,
+        symbolName: String,
         pointSize: CGFloat,
         weight: Font.Weight? = nil,
         tint: Color,
         alignment: Alignment = .center,
         appliesGlobalFontMagnification: Bool = false
     ) {
-        self.systemName = systemName
+        self.symbolName = symbolName
         self.pointSize = pointSize
         self.weight = weight
         self.tint = tint
@@ -447,14 +449,14 @@ struct CmuxSystemSymbolImage: View {
     }
 
     init(
-        magnified systemName: String,
+        magnified symbolName: String,
         pointSize: CGFloat,
         weight: Font.Weight? = nil,
         tint: Color,
         alignment: Alignment = .center
     ) {
         self.init(
-            systemName: systemName,
+            symbolName: symbolName,
             pointSize: pointSize,
             weight: weight,
             tint: tint,
@@ -481,12 +483,12 @@ struct CmuxSystemSymbolImage: View {
         // The AppKit-hosted renderer owns every symbol draw. The materialized
         // image only supplies the configured symbol's natural layout size.
         if let image = RenderableSystemSymbol.configuredAppKitImage(
-            systemName: systemName,
+            systemName: symbolName,
             pointSize: rasterSize,
             weight: weight
         ) {
             CmuxHostedSystemSymbolImage(
-                systemName: systemName,
+                systemName: symbolName,
                 pointSize: rasterSize,
                 imageSize: image.size,
                 weight: RenderableSystemSymbol.nsFontWeight(for: weight),
@@ -494,11 +496,11 @@ struct CmuxSystemSymbolImage: View {
                 slotSize: rasterSize,
                 alignment: alignment
             )
-        } else if RenderableSystemSymbol.isRenderable(systemName) {
+        } else if RenderableSystemSymbol.isRenderable(symbolName) {
             // A transient blank materialization gets the same AppKit lifecycle
             // owner and forced-appearance retry through the hosted renderer.
             CmuxHostedSystemSymbolImage(
-                systemName: systemName,
+                systemName: symbolName,
                 pointSize: rasterSize,
                 imageSize: NSSize(width: rasterSize, height: rasterSize),
                 weight: RenderableSystemSymbol.nsFontWeight(for: weight),

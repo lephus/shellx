@@ -179,7 +179,7 @@ func TestTmuxWaitForSignalPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if filepath.Dir(path) != filepath.Join(os.Getenv("HOME"), ".cmux", "wait-for") {
+	if filepath.Dir(path) != filepath.Join(os.Getenv("HOME"), ".shellx", "wait-for") {
 		t.Errorf("unexpected path prefix: %s", path)
 	}
 	if !strings.HasSuffix(path, ".sig") {

@@ -7,7 +7,7 @@ extension CMUXCLI {
     /// Validates `cmux vpn` arguments without touching the socket, so bad input
     /// fails with usage before the CLI connects or authenticates.
     static func validatedVPNSubcommand(_ commandArgs: [String]) throws -> String {
-        let usage = CLIError(message: "Usage: cmux vpn <up|down|status|revoke>")
+        let usage = CLIError(message: "Usage: shellx vpn <up|down|status|revoke>")
         guard commandArgs.count <= 1 else { throw usage }
         let subcommand = commandArgs.first?.lowercased() ?? "status"
         guard ["up", "on", "down", "off", "status", "revoke"].contains(subcommand) else {
@@ -28,7 +28,7 @@ extension CMUXCLI {
         case "revoke":
             try runVPNRevoke(client: client, jsonOutput: jsonOutput)
         default:
-            throw CLIError(message: "Usage: cmux vpn <up|down|status|revoke>")
+            throw CLIError(message: "Usage: shellx vpn <up|down|status|revoke>")
         }
     }
 

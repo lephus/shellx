@@ -1,3 +1,5 @@
+import ShellXBrand
+
 /// A flavor of the cmux app, used to derive per-flavor socket and marker file paths.
 ///
 /// Stable, nightly, rc, staging, and dev builds each run side by side with isolated control
@@ -51,24 +53,24 @@ public enum SocketPathVariant: Equatable, Sendable {
             return SocketPathMarkerFiles.stableTmpPath
         case .nightly(let slug):
             if let slug = Self.sanitizedSlug(slug) {
-                return "/tmp/cmux-nightly-\(slug)-last-socket-path"
+                return "/tmp/\(ShellXBrand.socketBaseName)-nightly-\(slug)-last-socket-path"
             }
-            return "/tmp/cmux-nightly-last-socket-path"
+            return "/tmp/\(ShellXBrand.socketBaseName)-nightly-last-socket-path"
         case .rc(let slug):
             if let slug = Self.sanitizedSlug(slug) {
-                return "/tmp/cmux-rc-\(slug)-last-socket-path"
+                return "/tmp/\(ShellXBrand.socketBaseName)-rc-\(slug)-last-socket-path"
             }
-            return "/tmp/cmux-rc-last-socket-path"
+            return "/tmp/\(ShellXBrand.socketBaseName)-rc-last-socket-path"
         case .staging(let slug):
             if let slug = Self.sanitizedSlug(slug) {
-                return "/tmp/cmux-staging-\(slug)-last-socket-path"
+                return "/tmp/\(ShellXBrand.socketBaseName)-staging-\(slug)-last-socket-path"
             }
-            return "/tmp/cmux-staging-last-socket-path"
+            return "/tmp/\(ShellXBrand.socketBaseName)-staging-last-socket-path"
         case .dev(let slug):
             if let slug = Self.sanitizedSlug(slug) {
-                return "/tmp/cmux-dev-\(slug)-last-socket-path"
+                return "/tmp/\(ShellXBrand.socketBaseName)-dev-\(slug)-last-socket-path"
             }
-            return "/tmp/cmux-dev-last-socket-path"
+            return "/tmp/\(ShellXBrand.socketBaseName)-dev-last-socket-path"
         }
     }
 

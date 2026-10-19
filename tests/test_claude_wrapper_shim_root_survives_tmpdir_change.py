@@ -72,7 +72,7 @@ def main() -> int:
         root = Path(td)
         managed_root = root / "app installed" / "cmux-cli-shims" / SURFACE_ID
         changed_tmpdir = root / "profile tmp"
-        wrapper = root / "cmux-claude-wrapper"
+        wrapper = root / "shellx-claude-wrapper"
         managed_root.mkdir(parents=True)
         changed_tmpdir.mkdir()
         make_executable(wrapper)

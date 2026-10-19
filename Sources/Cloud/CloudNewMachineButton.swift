@@ -2,6 +2,7 @@ import CmuxFoundation
 import CmuxSettings
 import CmuxSettingsUI
 import SwiftUI
+import ShellXIcons
 
 /// The Cloud panel's full-width New Cloud Machine button, between the team
 /// header and the machine list. It runs the same action as Cmd-Shift-Y, so the list
@@ -20,9 +21,10 @@ struct CloudNewMachineButton: View {
         String(localized: "cloudTree.action.newCloudMachine", defaultValue: "New Cloud Machine")
     }
 
+    /// ShellX: New Cloud Machine has no shortcut (Cloud is off).
     private var shortcut: StoredShortcut {
         _ = shortcutObserver.revision
-        return KeyboardShortcutSettings.shortcut(for: .newCloudMachine)
+        return .unbound
     }
 
     var body: some View {
@@ -35,7 +37,7 @@ struct CloudNewMachineButton: View {
         )
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: "plus")
+                ShellXIcon.image("plus")
                     .font(.system(size: 11, weight: .semibold))
                 Text(title)
                     .cmuxFont(size: 12, weight: .medium)
@@ -64,7 +66,7 @@ struct CloudNewMachineButton: View {
         .padding(.horizontal, RightSidebarChromeMetrics.barHorizontalPadding)
         .padding(.top, 6)
         .padding(.bottom, 2)
-        .help(KeyboardShortcutSettings.Action.newCloudMachine.tooltip(title))
+        .help(title)
         .accessibilityLabel(title)
         .accessibilityIdentifier("CloudNewMachineButton")
         .background(

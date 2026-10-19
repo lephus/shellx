@@ -141,7 +141,7 @@ extension AppDelegate {
                 .appendingPathComponent("agent-turn-diff-baselines.json", isDirectory: false)
         }
         return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".cmuxterm", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("agent-turn-diff-baselines.json", isDirectory: false)
     }
 

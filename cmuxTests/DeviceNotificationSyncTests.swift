@@ -135,7 +135,7 @@ struct DeviceNotificationSyncTests {
             memoryMb: nil, diskMb: nil, linkState: .connected, linkError: nil,
             cpuPercent: nil, memoryUsedMb: nil, diskUsedMb: nil, remoteWorkspaces: [workspace],
             presence: SurfaceDevicePresence(state: .online, lastSeenAt: nil, tag: instance.tag,
-                bundleID: "com.cmuxterm.app", accountTrust: .sameAccount)
+                bundleID: "pro.shellx.desktop", accountTrust: .sameAccount)
         )], resources: [resource], projections: [])
         let nodes = CloudTreeNodeBuilder.nodes(machines: [], snapshot: snapshot, localWorkspaces: [],
             unreadTerminalIDs: [machine.rawValue: [terminal]], includeLocalMachine: false, source: .devices)

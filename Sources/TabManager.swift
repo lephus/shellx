@@ -2624,6 +2624,7 @@ class TabManager: ObservableObject {
         // manager may close its own live workspaces; stale or foreign objects must
         // never tear down terminals or publish a second close.
         guard tabs.contains(where: { $0.id == workspace.id }) else { return }
+        if ShellXRemoteUIGate.isEnabled { ShellXRemoteUIActions.workspaceClosed(workspace.id) } // ShellX: stop tracking a closed remote workspace
         MachineCreateCoordinator.shared.cancelOperations(forPresentationWorkspace: workspace.id)
         panelTitleUpdateCoalescer.flushNow()
         sentryBreadcrumb("workspace.close", data: ["tabCount": tabs.count - 1])
@@ -7437,7 +7438,7 @@ enum WelcomeBannerDelivery: Equatable {
     /// Typed fallback. The leading space keeps it out of history only for zsh
     /// with HIST_IGNORE_SPACE, bash with HISTCONTROL=ignorespace or ignoreboth,
     /// and fish; other shells may still record it (best effort).
-    static let typedCommandText = " cmux welcome\n"
+    static let typedCommandText = " shellx welcome\n"
     private static let tokenDirectoryName = "cmux-welcome-banner"
     private static let integratedShellNames: Set<String> = ["zsh", "bash", "fish", "nu"]
 

@@ -107,7 +107,7 @@ func startPersistentDaemonWithVerifierAndLogForTest(
 	stderr io.Writer,
 ) (string, func()) {
 	t.Helper()
-	socketDir, err := os.MkdirTemp("/tmp", "cmuxd-remote-test-*")
+	socketDir, err := os.MkdirTemp("/tmp", "shellx-remote-test-*")
 	if err != nil {
 		t.Fatalf("create short socket dir: %v", err)
 	}
@@ -311,7 +311,7 @@ func TestWrapperBinaryDispatchesIntoCLI(t *testing.T) {
 	}
 
 	sockPath := startMockSocket(t, "PONG")
-	wrapperPath := filepath.Join(t.TempDir(), "cmuxd-remote-current")
+	wrapperPath := filepath.Join(t.TempDir(), "shellx-remote-current")
 	if err := os.Symlink(os.Args[0], wrapperPath); err != nil {
 		t.Fatalf("symlink wrapper path: %v", err)
 	}
@@ -716,7 +716,7 @@ func TestPersistentDaemonSocketDirFallsBackFromUnsafeSymlink(t *testing.T) {
 	if err := os.MkdirAll(unsafeTarget, 0o755); err != nil {
 		t.Fatalf("create unsafe target: %v", err)
 	}
-	unsafeChild := filepath.Join(socketParent, fmt.Sprintf("cmuxd-remote-%d", os.Getuid()))
+	unsafeChild := filepath.Join(socketParent, fmt.Sprintf("shellx-remote-%d", os.Getuid()))
 	if err := os.Symlink(unsafeTarget, unsafeChild); err != nil {
 		t.Fatalf("create unsafe socket child symlink: %v", err)
 	}
@@ -772,7 +772,7 @@ func TestPersistentDaemonSocketDirReplacesInvalidStoredFallback(t *testing.T) {
 	if err := os.MkdirAll(unsafeTarget, 0o755); err != nil {
 		t.Fatalf("create unsafe target: %v", err)
 	}
-	unsafeChild := filepath.Join(socketParent, fmt.Sprintf("cmuxd-remote-%d", os.Getuid()))
+	unsafeChild := filepath.Join(socketParent, fmt.Sprintf("shellx-remote-%d", os.Getuid()))
 	if err := os.Symlink(unsafeTarget, unsafeChild); err != nil {
 		t.Fatalf("create unsafe socket child symlink: %v", err)
 	}
@@ -820,7 +820,7 @@ func TestPersistentDaemonSocketDirReusesStoredFallback(t *testing.T) {
 	if err := os.MkdirAll(socketParent, 0o755); err != nil {
 		t.Fatalf("create socket parent: %v", err)
 	}
-	unsafeChild := filepath.Join(socketParent, fmt.Sprintf("cmuxd-remote-%d", os.Getuid()))
+	unsafeChild := filepath.Join(socketParent, fmt.Sprintf("shellx-remote-%d", os.Getuid()))
 	if err := os.WriteFile(unsafeChild, []byte("not a directory"), 0o600); err != nil {
 		t.Fatalf("create unsafe socket child file: %v", err)
 	}
@@ -1942,7 +1942,7 @@ func TestPersistentDaemonPTYReattachSurvivesClientDisconnect(t *testing.T) {
 }
 
 func TestPersistentDaemonReadySignalAllowsImmediateDial(t *testing.T) {
-	socketDir, err := os.MkdirTemp("/tmp", "cmuxd-remote-ready-*")
+	socketDir, err := os.MkdirTemp("/tmp", "shellx-remote-ready-*")
 	if err != nil {
 		t.Fatalf("create short socket dir: %v", err)
 	}
@@ -2002,7 +2002,7 @@ func TestPersistentDaemonReadySignalAllowsImmediateDial(t *testing.T) {
 }
 
 func TestPersistentDaemonServerExitsAfterEmptySlotIdleTimeout(t *testing.T) {
-	socketDir, err := os.MkdirTemp("/tmp", "cmuxd-remote-idle-*")
+	socketDir, err := os.MkdirTemp("/tmp", "shellx-remote-idle-*")
 	if err != nil {
 		t.Fatalf("create short socket dir: %v", err)
 	}

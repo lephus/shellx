@@ -1,9 +1,9 @@
-/// Validates the identity fields for a tagged Debug cmux server.
+/// Validates the identity fields for a tagged Debug ShellX server.
 public struct CodeRouterDebugServerIdentityPolicy {
     /// Creates a Debug server identity policy.
     public init() {}
 
-    /// Tests whether the signing fields match the expected tagged cmux build.
+    /// Tests whether the signing fields match the expected tagged ShellX build.
     ///
     /// - Parameters:
     ///   - identifier: The connected server's code-signing identifier.
@@ -16,12 +16,13 @@ public struct CodeRouterDebugServerIdentityPolicy {
         teamIdentifier: String?,
         expectedBundleIdentifier: String?
     ) -> Bool {
-        let taggedPrefix = "com.cmuxterm.app.debug."
+        // `ShellXBrand.bundleID` / `.teamID` (this package does not link ShellXBrand).
+        let taggedPrefix = "pro.shellx.desktop.debug."
         guard let expectedBundleIdentifier,
               expectedBundleIdentifier.hasPrefix(taggedPrefix),
               expectedBundleIdentifier.count > taggedPrefix.count,
               identifier == expectedBundleIdentifier,
-              teamIdentifier == "7WLXT3NR37" else {
+              teamIdentifier == "W4RF3W4VTZ" else {
             return false
         }
         return true

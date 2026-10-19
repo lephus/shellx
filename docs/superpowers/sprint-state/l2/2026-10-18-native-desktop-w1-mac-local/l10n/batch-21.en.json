@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Counts toward size",
+"comment": ""
+},
+{
+"i": 1,
+"en": "[cmux] cmux did not acknowledge the SSH launch; retrying %s in %ss.",
+"comment": ""
+},
+{
+"i": 2,
+"en": "Cloud machines need cmux Pro — showing last known",
+"comment": ""
+},
+{
+"i": 3,
+"en": "Sign-in needs a refresh — showing last known",
+"comment": ""
+},
+{
+"i": 4,
+"en": "A program in this terminal wants to read your clipboard. Allow it only if you trust the program.",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Allow Clipboard Access?",
+"comment": ""
+},
+{
+"i": 6,
+"en": "Remote host",
+"comment": ""
+},
+{
+"i": 7,
+"en": "cmux did not respond within 10 seconds after the command started, so its result is unknown. Check the effect before retrying.",
+"comment": ""
+},
+{
+"i": 8,
+"en": "cmux did not respond within 10 seconds, so the command was not run. Retry in a moment.",
+"comment": ""
+},
+{
+"i": 9,
+"en": "cmux is handling too many control-socket requests right now, so this one was not run. Retry in a moment.",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Request was cancelled",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Request failed before returning a result",
+"comment": ""
+},
+{
+"i": 12,
+"en": "cmux could not identify the new fork session. Start the fork again from the parent pane.",
+"comment": ""
+},
+{
+"i": 13,
+"en": "cmux could not safely detach the parent session, so the fork was not started. Retry the fork from the parent pane.",
+"comment": ""
+},
+{
+"i": 14,
+"en": "Fork unavailable",
+"comment": ""
+},
+{
+"i": 15,
+"en": "Agent fork",
+"comment": ""
+},
+{
+"i": 16,
+"en": "The team change was applied, but cmux did not report the updated status within 10 seconds. Run `cmux auth status` to confirm.",
+"comment": ""
+},
+{
+"i": 17,
+"en": "iOS Browser Reaches Other Hosts",
+"comment": ""
+},
+{
+"i": 18,
+"en": "The iOS browser can load LAN, VPN, and internet hosts through this Mac. Link-local and cloud metadata addresses never go through this Mac; the phone loads them itself.",
+"comment": ""
+},
+{
+"i": 19,
+"en": "The iOS browser reaches only this Mac's localhost through this Mac. Other sites load over the phone's own network.",
+"comment": ""
+},
+{
+"i": 20,
+"en": "mobile ios iphone browser on iphone tunnel proxy localhost lan vpn internet hosts network security",
+"comment": ""
+},
+{
+"i": 21,
+"en": "set-input-files requires --selector <css> and either --file <path> (repeatable) or --clear",
+"comment": ""
+},
+{
+"i": 22,
+"en": "set-input-files --selector <css> (--file <path> ... | --clear) [--snapshot-after]\n    Select local files (up to 128 files, 32 MiB total) or clear the selection. Directory uploads are unsupported.",
+"comment": ""
+},
+{
+"i": 23,
+"en": "The selector must match a file input without directory selection",
+"comment": ""
+},
+{
+"i": 24,
+"en": "This file input does not allow multiple files",
+"comment": ""
+},
+{
+"i": 25,
+"en": "File upload preparation was cancelled",
+"comment": ""
+},
+{
+"i": 26,
+"en": "set-input-files requires a selector and a files array of absolute paths",
+"comment": ""
+},
+{
+"i": 27,
+"en": "Select at most 128 files using absolute paths",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Timed out preparing files for upload",
+"comment": ""
+},
+{
+"i": 29,
+"en": "The combined upload must be no larger than 32 MiB",
+"comment": ""
+},
+{
+"i": 30,
+"en": "Every upload path must be a readable regular file",
+"comment": ""
+},
+{
+"i": 31,
+"en": "%1$d/%2$d",
+"comment": ""
+},
+{
+"i": 32,
+"en": "Ports open in cmux without setup. To use private addresses in other apps, set up Cloud VPN.",
+"comment": ""
+},
+{
+"i": 33,
+"en": "Optional: Cloud VPN",
+"comment": ""
+},
+{
+"i": 34,
+"en": "Each machine has its own private IP. Two machines may both expose port 3000, for example 10.40.0.10:3000 and 10.40.0.11:3000. Right-click a Cloud port and choose Copy Private Address URL after connecting. These addresses are private, not public share links.",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Connect Cloud VPN",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Optional private IP access for other apps",
+"comment": ""
+},
+{
+"i": 37,
+"en": "Needs attention",
+"comment": ""
+},
+{
+"i": 38,
+"en": "Cloud VPN setup is unavailable",
+"comment": ""
+},
+{
+"i": 39,
+"en": "The VPN software is included in cmux. You do not need another app. macOS may require your password or Touch ID during approval.",
+"comment": ""
+},
+{
+"i": 40,
+"en": "Private network status",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Cloud VPN",
+"comment": ""
+},
+{
+"i": 42,
+"en": "This copy of cmux does not include a signed VPN extension. Use a cmux release with Cloud VPN support. Cloud terminals, Ports, and Desktop remain available without the VPN.",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Wake Machine",
+"comment": ""
+},
+{
+"i": 44,
+"en": "Wake the machine to check its services. cmux’s in-app forwarding does not need Cloud VPN.",
+"comment": ""
+},
+{
+"i": 45,
+"en": "Listening services",
+"comment": ""
+},
+{
+"i": 46,
+"en": "cmux’s browser route connects to 127.0.0.1 on the machine. Bind the service to 127.0.0.1 or 0.0.0.0, then refresh. Turning on Cloud VPN does not change this route.",
+"comment": ""
+},
+{
+"i": 47,
+"en": "Services use another interface",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Start a web server on this machine, then refresh.",
+"comment": ""
+},
+{
+"i": 49,
+"en": "This build cannot start cmux’s authenticated Cloud forward. Update cmux, then retry.",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Port discovery could not connect to this machine. Existing cmux ports may still work. Refresh to reconnect; Cloud VPN is not required.",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Cloud link unavailable",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Checking services through cmux’s authenticated Cloud link. No system VPN is needed.",
+"comment": ""
+},
+{
+"i": 53,
+"en": "These services open in cmux without Cloud VPN. They listen on the machine’s loopback address, so other apps cannot reach them through its private IP, even with VPN connected.",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Loopback services available",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Ports not checked yet",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Private address unavailable",
+"comment": ""
+},
+{
+"i": 57,
+"en": "cmux’s authenticated route needs this machine’s private address. Refresh to retrieve it. Turning on Cloud VPN does not assign a missing address.",
+"comment": ""
+},
+{
+"i": 58,
+"en": "cmux forwards ports without Cloud VPN. Web browsers and other Mac apps need Cloud VPN to reach services bound to the machine’s private address.",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Set Up VPN…",
+"comment": ""
+},
+{
+"i": 60,
+"en": "Port list may be out of date",
+"comment": ""
+},
+{
+"i": 61,
+"en": "The last scan could not be refreshed. Listed services may have changed; refresh to check again. cmux forwarding does not need Cloud VPN.",
+"comment": ""
+},
+{
+"i": 62,
+"en": "The port scan failed; this does not mean no service is listening. Existing cmux ports may still work. Refresh to retry; Cloud VPN is not required.",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Ports are not supported by this provider.",
+"comment": ""
+},
+{
+"i": 64,
+"en": "This provider has no supported in-app port route. Open a shell to access the service inside the machine. Cloud VPN does not add provider support.",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Open in cmux. No VPN setup needed.",
+"comment": ""
+},
+{
+"i": 66,
+"en": "Port %@",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Offline — its workspaces return when it does",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Use Cloud machines from any app",
+"comment": ""
+},
+{
+"i": 69,
+"en": "Optional access to each VM's private address and original ports, such as 10.40.0.10:3000.",
+"comment": ""
+},
+{
+"i": 70,
+"en": "Off. Your Cloud panes continue to work through cmux's built-in route.",
+"comment": ""
+},
+{
+"i": 71,
+"en": "First-time setup",
+"comment": ""
+},
+{
+"i": 72,
+"en": "1. Click Connect Cloud VPN. When macOS asks, allow the cmux network extension in System Settings.",
+"comment": ""
+},
+{
+"i": 73,
+"en": "Open General > Login Items & Extensions > Network Extensions, then enable cmux.",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Open Privacy & Security and allow the cmux extension.",
+"comment": ""
+},
+{
+"i": 75,
+"en": "2. Allow cmux to add a VPN configuration named cmux Cloud. This is a separate macOS permission.",
+"comment": ""
+},
+{
+"i": 76,
+"en": "3. Return to this pane. The connection continues automatically after approval. Disconnect here when finished. Quitting cmux or signing out also disconnects it.",
+"comment": ""
+},
+{
+"i": 77,
+"en": "Private addresses",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Make Discoverable",
+"comment": ""
+},
+{
+"i": 79,
+"en": "Other Macs signed in to your cmux account may discover this Mac and connect to its workspaces. Do you want to continue?",
+"comment": ""
+},
+{
+"i": 80,
+"en": "Make this Mac discoverable?",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Create Team",
+"comment": ""
+},
+{
+"i": 82,
+"en": "Create Team…",
+"comment": ""
+},
+{
+"i": 83,
+"en": "Switching teams…",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Creating team…",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Another team change is in progress. Try again when it finishes.",
+"comment": ""
+},
+{
+"i": 86,
+"en": "The new team becomes your active team.",
+"comment": ""
+},
+{
+"i": 87,
+"en": "theme themes color scheme colors palette ghostty light dark mode accent",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Themes",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Terminal Theme",
+"comment": ""
+},
+{
+"i": 90,
+"en": "Diff Viewer: Next Hunk",
+"comment": ""
+},
+{
+"i": 91,
+"en": "Diff Viewer: Previous Hunk",
+"comment": ""
+},
+{
+"i": 92,
+"en": "Free access",
+"comment": ""
+},
+{
+"i": 93,
+"en": "Open Cloud Dashboard",
+"comment": ""
+},
+{
+"i": 94,
+"en": "More Cloud",
+"comment": ""
+},
+{
+"i": 95,
+"en": "Your Cloud session expired",
+"comment": ""
+},
+{
+"i": 96,
+"en": "Could not reach cmux Cloud",
+"comment": ""
+},
+{
+"i": 97,
+"en": "Show Machines Sidebar",
+"comment": ""
+},
+{
+"i": 98,
+"en": "Signed In",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Cloud Machines · Loading…",
+"comment": ""
+},
+{
+"i": 100,
+"en": "Show All Machines…",
+"comment": ""
+},
+{
+"i": 101,
+"en": "Sign In to cmux Cloud…",
+"comment": ""
+},
+{
+"i": 102,
+"en": "Sign In Again…",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Signing In…",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Upgrade to Pro…",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Open Link in cmux Browser",
+"comment": ""
+},
+{
+"i": 106,
+"en": "restore: this session was started with '%1$@ claude proxy', but '%1$@' is not on PATH in this shell. Add it to PATH, then retry.",
+"comment": ""
+},
+{
+"i": 107,
+"en": "Command Moves by Word",
+"comment": ""
+},
+{
+"i": 108,
+"en": "Command arrow and delete keys move and delete by word, like Option. Control Left and Right Arrow move to the start and end of the line.",
+"comment": ""
+},
+{
+"i": 109,
+"en": "Command arrow and delete keys move and delete by line, as in macOS text fields.",
+"comment": ""
+},
+{
+"i": 110,
+"en": "Text Editing Gestures in Full-Screen Apps",
+"comment": ""
+},
+{
+"i": 111,
+"en": "Gestures also apply while a full-screen app such as vim, less, or tmux is running, so they keep working at a shell inside tmux, screen, or zellij.",
+"comment": ""
+},
+{
+"i": 112,
+"en": "Copy Working Directory",
+"comment": ""
+},
+{
+"i": 113,
+"en": "Copy Project Root",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Copy Visible Screen",
+"comment": ""
+},
+{
+"i": 115,
+"en": "Diff Viewer: Toggle Viewed",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Viewed",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Mark as viewed",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Mark as not viewed",
+"comment": ""
+},
+{
+"i": 119,
+"en": "Changed since viewed",
+"comment": ""
+},
+{
+"i": 120,
+"en": "{viewed} of {total} files viewed",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Filter files",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Added",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Modified",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Renamed",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Hide viewed files",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Show viewed files",
+"comment": ""
+},
+{
+"i": 127,
+"en": "No files match the filter.",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Generated file",
+"comment": ""
+},
+{
+"i": 129,
+"en": "Large diff",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Load diff",
+"comment": ""
+},
+{
+"i": 131,
+"en": "Clear filter",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Surface has a running process; retry with --force",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Failed to close surface",
+"comment": ""
+},
+{
+"i": 134,
+"en": "Surface has a running process; retry with force=true",
+"comment": ""
+},
+{
+"i": 135,
+"en": "One or more surfaces have a running process; retry with force=true",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Workspace has a running process; retry with --force",
+"comment": ""
+},
+{
+"i": 137,
+"en": "One or more workspaces or Dock surfaces have a running process; retry with --force",
+"comment": ""
+},
+{
+"i": 138,
+"en": "Running subagents",
+"comment": ""
+},
+{
+"i": 139,
+"en": "You no longer have access to this machine.",
+"comment": ""
+},
+{
+"i": 140,
+"en": "Cloud machine unavailable",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Sign in to cmux to reconnect this terminal.",
+"comment": ""
+},
+{
+"i": 142,
+"en": "Cloud session ended",
+"comment": ""
+},
+{
+"i": 143,
+"en": "This action edits your cmux.json:\n\n%@",
+"comment": ""
+},
+{
+"i": 144,
+"en": "Change Setting?",
+"comment": ""
+},
+{
+"i": 145,
+"en": "cmux couldn't read or save ~/.config/cmux/cmux.json. Check it for a syntax error, then try again.",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Couldn't Change Setting",
+"comment": ""
+},
+{
+"i": 147,
+"en": "Predictive Local Echo",
+"comment": ""
+},
+{
+"i": 148,
+"en": "terminal.predictiveLocalEcho predictive local echo typing latency lag ssh remote speculative mosh round trip underline",
+"comment": ""
+},
+{
+"i": 149,
+"en": "vm run: create returned no machine id",
+"comment": ""
+},
+{
+"i": 150,
+"en": "Paste as One Line",
+"comment": ""
+},
+{
+"i": 151,
+"en": "Action type: %@",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Shortcut: %@",
+"comment": ""
+},
+{
+"i": 153,
+"en": "Actions · cmux.json…",
+"comment": ""
+},
+{
+"i": 154,
+"en": "Actions · cmux.json",
+"comment": ""
+},
+{
+"i": 155,
+"en": "No configured actions.",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Hide command",
+"comment": ""
+},
+{
+"i": 157,
+"en": "%@ didn't resume after waking.",
+"comment": ""
+},
+{
+"i": 158,
+"en": "Show command",
+"comment": ""
+},
+{
+"i": 159,
+"en": "%@ didn't resume",
+"comment": ""
+},
+{
+"i": 160,
+"en": "It did not start within 90 seconds.",
+"comment": ""
+},
+{
+"i": 161,
+"en": "Its resume command exited.",
+"comment": ""
+},
+{
+"i": 162,
+"en": "%ld agents didn't resume",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Agent didn't resume",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Usage: cmux record [start] [flags]\n       cmux record stop|status [--id <id>]\n       cmux record note [--id <id>] <text>\n       cmux record list\n\nRecord a cmux window to an mp4 or gif, for a pull request or a bug\nreport. Only cmux's own windows can be recorded, and no Screen\nRecording permission is involved.\n\nFlags for start:\n  --format mp4|gif       Output format (default: mp4)\n  --gif                  Shorthand for --format gif\n  --fps <1-30>           Frames per second (default: 12 for mp4, 8 for gif)\n  --max-seconds <n>      Stop by itself after n seconds, 0.5-120 (default: 15)\n  --scale <0.1-1>        Scale the output (default: 1 for mp4, 0.5 for gif)\n  --max-width <64-4096>  Cap the output width, keeping the aspect ratio\n  --region <x,y,w,h>     Record part of the window, in window points\n  --out <path>           Write here instead of a temporary directory\n  --label <text>         Name the file\n  --no-captions          Do not draw `record note` captions into the clip\n  --window <id|ref|index>  Window to record (default: the frontmost one)\n\nOutput: `<id> <state> <frames> <path>`, or the full response with --json.\n\nA recording stops itself at --max-seconds, so a clip is never left\nrunning by an agent that goes away. One recording at a time.\n\nExample:\n  cmux record start --gif --max-seconds 8 --label sidebar-drag\n  cmux record note \"dragging the workspace\"\n  cmux record stop",
+"comment": ""
+},
+{
+"i": 165,
+"en": "record start: --gif conflicts with --format",
+"comment": ""
+},
+{
+"i": 166,
+"en": "record note: text is required",
+"comment": ""
+},
+{
+"i": 167,
+"en": "record %@: unexpected arguments: %@",
+"comment": ""
+},
+{
+"i": 168,
+"en": "record: unknown subcommand '%@' (start, stop, status, note, list)",
+"comment": ""
+},
+{
+"i": 169,
+"en": "record [start] [--format mp4|gif] [--gif] [--fps <n>] [--max-seconds <n>] [--scale <n>] [--max-width <n>] [--region <x,y,w,h>] [--out <path>] [--label <text>] [--no-captions] [--window <id|ref|index>] | record stop|status [--id <id>] | record note [--id <id>] <text> | record list",
+"comment": ""
+},
+{
+"i": 170,
+"en": "Usage: cmux shot [flags]\n\nScreenshot a cmux window, or a region of one, to a png or a jpeg. Only\ncmux's own windows can be captured, and no Screen Recording permission\nis involved, so this works on a release build and inside CI.\n\nFlags:\n  --format png|jpg       Output format (default: png)\n  --jpg                  Shorthand for --format jpg\n  --scale <0.1-1>        Scale the output (default: 1)\n  --max-width <64-8192>  Cap the output width, keeping the aspect ratio\n  --quality <0.1-1>      JPEG quality (default: 0.8, ignored for png)\n  --region <x,y,w,h>     Capture part of the window, in window points\n  --out <path>           Write here instead of a temporary directory\n  --label <text>         Name the file\n  --caption <text>       Draw a caption into the image\n  --window <id|ref|index>  Window to capture (default: the frontmost one)\n\nOutput: `<width>x<height> <bytes> <path>`, or the full response with --json.\n\nA region is the same rectangle `cmux record --region` films, so a\ndetail spotted in a clip can be shot with the same four numbers.\n\nExample:\n  cmux shot --label settings-sheet\n  cmux shot --region 0,0,420,900 --out ~/sidebar.png",
+"comment": ""
+},
+{
+"i": 171,
+"en": "shot: --jpg conflicts with --format",
+"comment": ""
+},
+{
+"i": 172,
+"en": "shot: unexpected arguments: %@",
+"comment": ""
+},
+{
+"i": 173,
+"en": "shot [--format png|jpg] [--jpg] [--scale <n>] [--max-width <n>] [--quality <n>] [--region <x,y,w,h>] [--out <path>] [--label <text>] [--caption <text>] [--window <id|ref|index>]",
+"comment": ""
+},
+{
+"i": 174,
+"en": "Auto-resumed ×%lld",
+"comment": ""
+},
+{
+"i": 175,
+"en": "Auto-Resume Agents After Errors",
+"comment": ""
+},
+{
+"i": 176,
+"en": "Send “continue” when an agent's turn ends on a retryable error such as model capacity or a dropped connection.",
+"comment": ""
+},
+{
+"i": 177,
+"en": "automation.agentAutoResume auto resume continue retry capacity overloaded agent error",
+"comment": ""
+},
+{
+"i": 178,
+"en": "Conversation Sidebar",
+"comment": ""
+},
+{
+"i": 179,
+"en": "Hides Conversations while preserving existing agent sessions.",
+"comment": ""
+},
+{
+"i": 180,
+"en": "Shows Conversations in the left sidebar picker.",
+"comment": ""
+},
+{
+"i": 181,
+"en": "Coding-agent sessions",
+"comment": ""
+},
+{
+"i": 182,
+"en": "Conversations",
+"comment": ""
+},
+{
+"i": 183,
+"en": "Multi-provider conversation sidebar",
+"comment": ""
+},
+{
+"i": 184,
+"en": "Enables the opt-in sidebar for conversations from multiple coding-agent providers.",
+"comment": ""
+},
+{
+"i": 185,
+"en": "This machine is asleep. Wake it to connect.",
+"comment": ""
+},
+{
+"i": 186,
+"en": "cmux cannot reach the Cloud service for this machine right now.",
+"comment": ""
+},
+{
+"i": 187,
+"en": "Clearing %@…",
+"comment": ""
+},
+{
+"i": 188,
+"en": "This tab is not open in a remote workspace.",
+"comment": ""
+},
+{
+"i": 189,
+"en": "The current state for tab %@ is unavailable. Refresh and retry before renaming.",
+"comment": ""
+},
+{
+"i": 190,
+"en": "%1$@: %2$@ is waiting on a question or dialog, so nothing was sent. Retry once it is answered, or pass --force to send anyway.",
+"comment": ""
+},
+{
+"i": 191,
+"en": "%1$@: the agent prompt in %2$@ holds text someone is typing, so nothing was sent. Retry when the prompt is clear, or pass --force to send anyway.",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Upgrade for more",
+"comment": ""
+},
+{
+"i": 193,
+"en": "Adds Dock to the right sidebar for custom terminal controls.",
+"comment": ""
+},
+{
+"i": 194,
+"en": "No agent activity seen on that surface yet. The message waits until an agent there picks it up.",
+"comment": ""
+},
+{
+"i": 195,
+"en": "Queued message %@ for %@ (%@).",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Usage: cmux agent inbox [--surface <target>] [--state queued|delivered|read|failed] [--limit <n>] [--mark-read] [--json]\n\nList agent messages, newest first. Without --surface, lists messages for\nevery surface. --mark-read marks the listed messages read.",
+"comment": ""
+},
+{
+"i": 197,
+"en": "Usage: cmux agent message <target> [--from <name>] [--thread <id>] [--json] [--] <text|->\n       cmux agent message --reply-to <message-id> [--from <name>] [--json] [--] <text|->\n\nSend a message to the agent running in another workspace or surface. cmux\ndelivers it through that agent's hooks, never by typing into its terminal,\nso it cannot land in a half-typed prompt. An idle Claude Code session wakes\nup to read it; a busy one reads it at its next step.\n\n<target> is a workspace or surface id or ref (workspace:2, surface:5), or a\nworkspace title (exact, then a unique prefix). Use - to read the text from\nstdin. --from defaults to the sending workspace's title.\n\nExamples:\n  cmux agent message cmux-remote-status \"The relay fix is on main, rebase when free.\"\n  cmux agent message --reply-to 3f2a... \"Done, PR is #123.\"",
+"comment": ""
+},
+{
+"i": 198,
+"en": "The message is too long. The limit is 32 KiB.",
+"comment": ""
+},
+{
+"i": 199,
+"en": "The message contains control characters. Only text, newlines and tabs are allowed.",
+"comment": ""
+},
+{
+"i": 200,
+"en": "The message is empty.",
+"comment": ""
+},
+{
+"i": 201,
+"en": "The sender name must be one line of at most 64 characters.",
+"comment": ""
+},
+{
+"i": 202,
+"en": "State must be queued, delivered, read or failed.",
+"comment": ""
+},
+{
+"i": 203,
+"en": "A surface_id UUID is required.",
+"comment": ""
+},
+{
+"i": 204,
+"en": "Give a target workspace or surface, or a message id to reply to.",
+"comment": ""
+},
+{
+"i": 205,
+"en": "That message has no sender surface to reply to.",
+"comment": ""
+},
+{
+"i": 206,
+"en": "The message was not sent: cmux could not save it to the message journal.",
+"comment": ""
+},
+{
+"i": 207,
+"en": "No workspace or surface matches that target.",
+"comment": ""
+},
+{
+"i": 208,
+"en": "No message with id %@.",
+"comment": ""
+},
+{
+"i": 209,
+"en": "This agent is working or waiting for input.",
+"comment": ""
+},
+{
+"i": 210,
+"en": "This agent is already hibernated.",
+"comment": ""
+},
+{
+"i": 211,
+"en": "cmux can't tell whether this agent is idle, so it was left running.",
+"comment": ""
+},
+{
+"i": 212,
+"en": "This terminal has no agent that cmux can resume the way it was started.",
+"comment": ""
+},
+{
+"i": 213,
+"en": "This terminal is not running, so there is nothing to hibernate.",
+"comment": ""
+},
+{
+"i": 214,
+"en": "This terminal is running other work, such as background jobs, that hibernation would stop.",
+"comment": ""
+},
+{
+"i": 215,
+"en": "This agent was active a moment ago. Try again in a few seconds.",
+"comment": ""
+},
+{
+"i": 216,
+"en": "No terminal matches that surface.",
+"comment": ""
+},
+{
+"i": 217,
+"en": "This agent is already being hibernated.",
+"comment": ""
+},
+{
+"i": 218,
+"en": "The agent changed or its session could not be protected, so it was left running. Try again later.",
+"comment": ""
+},
+{
+"i": 219,
+"en": "This agent has typed input it has not received yet.",
+"comment": ""
+},
+{
+"i": 220,
+"en": "This agent is on screen. Switch away from it first.",
+"comment": ""
+},
+{
+"i": 221,
+"en": "This agent is not hibernated.",
+"comment": ""
+},
+{
+"i": 222,
+"en": "cmux could not start this agent's resume command.",
+"comment": ""
+},
+{
+"i": 223,
+"en": "This agent is still being hibernated. Try again in a moment.",
+"comment": ""
+},
+{
+"i": 224,
+"en": "OK hibernated %@",
+"comment": ""
+},
+{
+"i": 225,
+"en": "Usage: cmux agent-hibernation <on|off> [--json]\n       cmux agent-hibernation <hibernate|wake> <surface> [--workspace <id|ref|index>] [--json]",
+"comment": ""
+},
+{
+"i": 226,
+"en": "OK woke %@",
+"comment": ""
+},
+{
+"i": 227,
+"en": "TextBox is a beta feature. Its defaults and behavior may change while it is being tested.",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Could not invite %1$@: %2$@",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Usage: cmux auth team invite <email>... [--role admin|member] [--team <team-id>]",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Invited %@",
+"comment": ""
+},
+{
+"i": 231,
+"en": "  pending  %1$@  %2$@  %3$@",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Usage: cmux auth team remove <user-id> [--team <team-id>]",
+"comment": ""
+},
+{
+"i": 233,
+"en": "Removed.",
+"comment": ""
+},
+{
+"i": 234,
+"en": "Usage: cmux auth team revoke-invite <invitation-id|link-id> [--team <team-id>]",
+"comment": ""
+},
+{
+"i": 235,
+"en": "Revoked.",
+"comment": ""
+},
+{
+"i": 236,
+"en": "Only team admins can do that.",
+"comment": ""
+},
+{
+"i": 237,
+"en": "Enter at least one email address.",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Link expiry must be 1, 7 or 30 days and max uses at least 1.",
+"comment": ""
+},
+{
+"i": 239,
+"en": "That invitation no longer exists.",
+"comment": ""
+},
+{
+"i": 240,
+"en": "A team must keep at least one admin.",
+"comment": ""
+},
+{
+"i": 241,
+"en": "That person is not a member of this team.",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Select a team first.",
+"comment": ""
+},
+{
+"i": 243,
+"en": "cmux Cloud is unreachable. Check your connection and try again.",
+"comment": ""
+},
+{
+"i": 244,
+"en": "Too many invitations. Wait a minute and try again.",
+"comment": ""
+},
+{
+"i": 245,
+"en": "This plan includes 3 members. Remove someone or upgrade to Team to invite more.",
+"comment": ""
+},
+{
+"i": 246,
+"en": "Invite people…",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Members…",
+"comment": ""
+},
+{
+"i": 248,
+"en": "Invite Team Members",
+"comment": ""
+},
+{
+"i": 249,
+"en": "An invitation id or link id is required.",
+"comment": ""
+},
+{
+"i": 250,
+"en": "A user id is required.",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Invite People",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Invite",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Invite More",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Invite link copied. Anyone with it joins as a member for 7 days.",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Manage members…",
+"comment": ""
+},
+{
+"i": 256,
+"en": "Could not invite: %@",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Admin",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Join as",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Member",
+"comment": ""
+},
+{
+"i": 260,
+"en": "Send Invite",
+"comment": ""
+},
+{
+"i": 261,
+"en": "The other invitations were sent.",
+"comment": ""
+},
+{
+"i": 262,
+"en": "%1$d of %#@seats@ open on this plan.",
+"comment": ""
+},
+{
+"i": 263,
+"en": "%d seats",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Copy link",
+"comment": ""
+},
+{
+"i": 265,
+"en": "Email, comma separated",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Invite to %@",
+"comment": ""
+},
+{
+"i": 267,
+"en": "Only team admins can invite.",
+"comment": ""
+},
+{
+"i": 268,
+"en": "Members share this team's Cloud machines. Your Mac stays private.",
+"comment": ""
+},
+{
+"i": 269,
+"en": "No seats left on this plan. Upgrade to Team to invite more.",
+"comment": ""
+},
+{
+"i": 270,
+"en": "Sent to %@",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Usage: cmux auth team accept|decline <invitation-id>",
+"comment": ""
+},
+{
+"i": 272,
+"en": "Declined.",
+"comment": ""
+},
+{
+"i": 273,
+"en": "%1$@  %2$@ (%3$@) invited by %4$@",
+"comment": ""
+},
+{
+"i": 274,
+"en": "Joined.",
+"comment": ""
+},
+{
+"i": 275,
+"en": "No pending invitations.",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Join from the team menu in the Cloud panel or Settings › Account.",
+"comment": ""
+},
+{
+"i": 277,
+"en": "A teammate",
+"comment": ""
+},
+{
+"i": 278,
+"en": "cmux Cloud team",
+"comment": ""
+},
+{
+"i": 279,
+"en": "%1$@ invited you to %2$@",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Invited to",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Join %@",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Unselected Fill Opacity",
+"comment": ""
+},
+{
+"i": 283,
+"en": "How strongly a workspace color fills rows that are not selected. The maximum shows the full color. Applies to Solid Fill.",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Show Agent Inbox",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Close Agent Inbox",
+"comment": ""
+},
+{
+"i": 286,
+"en": "No agent activity",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Plan approval",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Choose an answer",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Reply to this agent",
+"comment": ""
+},
+{
+"i": 290,
+"en": "Search agents, workspaces, and messages",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Choose an item to inspect its exchange.",
+"comment": ""
+},
+{
+"i": 292,
+"en": "Select an agent update",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Delivered",
+"comment": ""
+},
+{
+"i": 294,
+"en": "Agent Inbox",
+"comment": ""
+},
+{
+"i": 295,
+"en": "you",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Shows a keyboard-summoned inbox for agent messages, pending Feed decisions, and finished turns.",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Agent Inbox quick view",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Couldn’t send reply. Try again.",
+"comment": ""
+},
+{
+"i": 299,
+"en": "browser.hiddenWebViewDiscardMode memory saver budget timer hidden tabs discard unload",
+"comment": ""
+}
+]

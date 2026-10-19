@@ -1,5 +1,6 @@
 import AppKit
 import CmuxSidebar
+import ShellXBrand
 import Testing
 @testable import cmux_DEV
 
@@ -156,7 +157,8 @@ struct SidebarCompactAgentStatusTests {
             #expect(glyph.kind == .running)
             #expect(glyph.pulses)
             #expect(glyph.symbolName == "circle.fill")
-            #expect(glyph.color(isActive: false, selected: .white, secondary: .gray) == .gray)
+            // ShellX: running is the soft yellow `running` token.
+            #expect(glyph.color(isActive: false, selected: .white, secondary: .gray) == ShellXPalette.running.nsColor)
         }
     }
 
@@ -168,14 +170,16 @@ struct SidebarCompactAgentStatusTests {
         #expect(!glyph.pulses)
     }
 
-    /// cmux does not fetch a pull request's checks or mergeability, so merge
-    /// state is the only thing that colors the glyph.
+    /// cmux does not fetch a pull request's checks or mergeability. ShellX
+    /// draws every pull request state in `muted` (spec §7.4: settled states
+    /// carry no status color); the symbol still tells merged from open.
     @Test
     func pullRequestColorsFollowMergeStateAlone() {
+        let muted = ShellXPalette.muted.nsColor
         let cases: [(SidebarPullRequestStatus, NSColor, String)] = [
-            (.open, .gray, "cmux.pullrequest"),
-            (.merged, .systemPurple, "cmux.merge"),
-            (.closed, .gray, "cmux.pullrequest"),
+            (.open, muted, "cmux.pullrequest"),
+            (.merged, muted, "cmux.merge"),
+            (.closed, muted, "cmux.pullrequest"),
         ]
         for (status, color, symbol) in cases {
             let glyph = Glyph.resolve(.init(
@@ -268,7 +272,7 @@ struct SidebarCompactAgentStatusTests {
         ))
         #expect(closed.symbolName == "flame.fill")
         #expect(closed.badgeSymbolName == nil)
-        #expect(closed.color(isActive: false, selected: .white, secondary: .gray) == .gray)
+        #expect(closed.color(isActive: false, selected: .white, secondary: .gray) == ShellXPalette.muted.nsColor)
 
         let idle = Glyph.resolve(.init(lifecycleStates: [.idle], iconOverrides: icons))
         #expect(idle.symbolName == "checkmark.circle")
@@ -300,7 +304,7 @@ struct SidebarCompactAgentStatusTests {
             let unseen = glyph.applyingUnread(2, latestNotificationText: "Finished")
             #expect(unseen.kind == .unseen)
             #expect(unseen.tooltip.hasPrefix("Finished"))
-            #expect(unseen.color(isActive: false, selected: .white, secondary: .gray) == .systemBlue)
+            #expect(unseen.color(isActive: false, selected: .white, secondary: .gray) == ShellXPalette.done.nsColor)
             #expect(glyph.applyingUnread(0, latestNotificationText: "Finished") == glyph)
         }
         for input in [
@@ -641,8 +645,8 @@ struct SidebarCompactAgentStatusTests {
         let open = try #require(factory.makeSnapshot().compactStatusGlyph)
         #expect(open.kind == .pullRequest(.open))
         // No checks or mergeability data reaches the sidebar, so an open pull
-        // request draws secondary gray whatever its CI says.
-        #expect(open.color(isActive: false, selected: .white, secondary: .gray) == .gray)
+        // request draws ShellX `muted` whatever its CI says.
+        #expect(open.color(isActive: false, selected: .white, secondary: .gray) == ShellXPalette.muted.nsColor)
         #expect(open.badgeSymbolName == nil)
         #expect(open.tooltip.contains("cmux #42"))
 

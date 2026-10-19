@@ -473,23 +473,23 @@ public final class DebugEventLog: @unchecked Sendable {
 
         if let tag = env["CMUX_TAG"]?.trimmingCharacters(in: .whitespacesAndNewlines),
            !tag.isEmpty {
-            return "/tmp/cmux-debug-\(sanitizePathToken(tag)).log"
+            return "/tmp/shellx-debug-\(sanitizePathToken(tag)).log"
         }
 
         if let socketPath = env["CMUX_SOCKET_PATH"]?.trimmingCharacters(in: .whitespacesAndNewlines),
            !socketPath.isEmpty {
             let socketBase = URL(fileURLWithPath: socketPath).deletingPathExtension().lastPathComponent
-            if socketBase.hasPrefix("cmux-debug-") {
+            if socketBase.hasPrefix("shellx-debug-") {
                 return "/tmp/\(socketBase).log"
             }
         }
 
         if let bundleId = Bundle.main.bundleIdentifier,
-           bundleId != "com.cmuxterm.app.debug" {
-            return "/tmp/cmux-debug-\(sanitizePathToken(bundleId)).log"
+           bundleId != "pro.shellx.desktop.debug" {
+            return "/tmp/shellx-debug-\(sanitizePathToken(bundleId)).log"
         }
 
-        return "/tmp/cmux-debug.log"
+        return "/tmp/shellx-debug.log"
     }
 }
 

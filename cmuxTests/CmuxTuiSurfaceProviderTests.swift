@@ -1240,7 +1240,7 @@ import Testing
             ["--socket", "/k.sock", "--json", "--expected-revision", "9", "tab", "tab_1", "rename", "--name", "db shell"])
     }
 
-    @Test func vmTuiConnectPassesReceiptSession() throws {
+    @Test(.enabled(if: ShellXSwitches.cloud, "ShellX refuses vm-tui-connect (Cloud is off)")) func vmTuiConnectPassesReceiptSession() throws {
         let harness = CMUXCLIErrorOutputRegressionTests()
         let cliPath = try harness.bundledCLIPath()
         // The pane helper enters through the CLI's app-socket connection gate.

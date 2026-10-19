@@ -24,13 +24,15 @@ import verification_receipt as receipt
 
 # These are the production checks from CI's static-preflight job. Keep command
 # ownership in the existing scripts; local and CI use this one recipe list.
+# ShellX: "config-schema" (scripts/generate-cmux-config-schema.py --check) is
+# not run: its source, web/data/cmux.schema.json, was in cmux's BUSL web/ and
+# is not in this repo. CmuxConfigSchema.generated.swift stays as merged.
 CHECKS = (
     ("xcstrings", "static_analysis", "XCStrings structure", ["python3", "scripts/lint-xcstrings.py"]),
     ("localization", "static_analysis", "Localization parity", ["python3", "scripts/localization_catalog.py", "check"]),
     ("localization-defaults", "static_analysis", "Swift defaultValue parity", ["python3", "scripts/localization_defaults.py"]),
     ("project-tests", "tests", "Project normalizer tests", ["python3", "tests/test_normalize_pbxproj.py"]),
     ("project", "static_analysis", "Xcode project normalization and version", ["bash", "scripts/check-pbxproj.sh"]),
-    ("config-schema", "static_analysis", "Embedded cmux.json schema", ["python3", "scripts/generate-cmux-config-schema.py", "--check"]),
     ("test-wiring-sync", "tests", "Test-wiring sync tool", ["python3", "tests/test_sync_test_wiring.py"]),
     ("wire-app-sources", "tests", "App-source wiring tool", ["python3", "tests/test_wire_app_sources.py"]),
     ("ui-lab", "tests", "ui-lab harness directives", ["python3", "tests/test_ui_lab.py"]),
@@ -58,8 +60,6 @@ CHECK_INPUTS = {
     "project": ("scripts/normalize-pbxproj.py", "scripts/check-pbxproj-group-membership.py",
                 "cmux.xcodeproj/project.pbxproj",
                 ".xcode-version"),
-    "config-schema": ("web/data/cmux.schema.json",
-                      "Packages/macOS/CmuxFoundation/Sources/CmuxFoundation/ConfigValidation/CmuxConfigSchema.generated.swift"),
     "test-wiring-sync": ("scripts/sync-test-wiring", "scripts/sync_test_wiring.py", "scripts/lint-pbxproj-test-wiring.sh",
                          "scripts/normalize-pbxproj.py", "tests/fixtures/pbxproj-test-wiring/*"),
     "wire-app-sources": ("scripts/wire-app-sources.py", "cmux.xcodeproj/project.pbxproj", "Sources/**/*.swift"),
@@ -69,7 +69,7 @@ CHECK_INPUTS = {
         "scripts/claude-launch-environment-policy.json",
         "Packages/macOS/CMUXAgentLaunch/Sources/CMUXAgentLaunch/ClaudeSessionEnvironmentPolicy+Generated.swift",
         "agent-chat/adapters/claude-environment-policy.generated.ts",
-        "Resources/bin/cmux-claude-wrapper"),
+        "Resources/bin/shellx-claude-wrapper"),
     "test-wiring": ("scripts/lint-pbxproj-test-wiring.sh", "cmuxTests/*",
                     "cmux.xcodeproj/project.pbxproj"),
     "package-groups": ("Packages/*", "cmux.xcworkspace/contents.xcworkspacedata"),

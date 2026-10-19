@@ -194,8 +194,8 @@ struct CLIPasteCommandTests {
         let hinted = try runCLI(arguments: ["send", "--surface", Self.targetSurfaceRef, "--", large])
         #expect(hinted.result.status == 0, Comment(rawValue: hinted.result.stderr + hinted.result.stdout))
         #expect(hinted.requests.last?["method"] as? String == "surface.send_text")
-        #expect(hinted.result.stderr.contains("cmux send --paste"), Comment(rawValue: hinted.result.stderr))
-        #expect(hinted.result.stdout.contains("cmux send --paste") == false)
+        #expect(hinted.result.stderr.contains("shellx send --paste"), Comment(rawValue: hinted.result.stderr))
+        #expect(hinted.result.stdout.contains("shellx send --paste") == false)
 
         // The hint goes to stderr only: stdout matches a send without it.
         let small = try runCLI(arguments: ["send", "--surface", Self.targetSurfaceRef, "--", "echo hi\n"])
@@ -231,7 +231,7 @@ struct CLIPasteCommandTests {
             #expect(run.result.status == 0, Comment(rawValue: run.result.stderr + run.result.stdout))
             #expect(run.requests.last?["method"] as? String == "surface.send_text")
             #expect(
-                run.result.stderr.contains("cmux send --paste") == expectsHint,
+                run.result.stderr.contains("shellx send --paste") == expectsHint,
                 Comment(rawValue: "\(text.utf8.count) bytes: \(run.result.stderr)")
             )
         }
@@ -256,7 +256,7 @@ struct CLIPasteCommandTests {
         defer { try? FileManager.default.removeItem(at: root) }
         if let buffers {
             let storeURL = home
-                .appendingPathComponent(".cmuxterm", isDirectory: true)
+                .appendingPathComponent(".shellx", isDirectory: true)
                 .appendingPathComponent("tmux-compat-store.json", isDirectory: false)
             try FileManager.default.createDirectory(
                 at: storeURL.deletingLastPathComponent(),

@@ -8,43 +8,25 @@ import Testing
 @testable import cmux
 #endif
 
-/// Auth command visibility and the Cloud team's existing customizable command.
+/// ShellX: accounts are a Manaflow service (Stack Auth, cmux.com), so the
+/// palette offers no Sign In, Sign Out or team command in any auth state.
+/// The team picker keeps its shortcut mapping for the code that still exists.
 @MainActor
 struct CommandPaletteAuthCommandTests {
-    @Test func signedOutContextShowsSignInCommandOnly() {
-        var context = CommandPaletteContextSnapshot()
-        context.setBool(CommandPaletteContextKeys.authSignedIn, false)
-        context.setBool(CommandPaletteContextKeys.authWorking, false)
-        #expect(visibleAuthCommandIDs(context) == [ContentView.commandPaletteAuthSignInCommandId])
-    }
-
-    @Test func signedInContextShowsSignOutAndTeamPicker() {
-        var context = CommandPaletteContextSnapshot()
-        context.setBool(CommandPaletteContextKeys.authSignedIn, true)
-        context.setBool(CommandPaletteContextKeys.authWorking, false)
-        #expect(visibleAuthCommandIDs(context) == [
-            ContentView.commandPaletteAuthSignOutCommandId,
-            ContentView.commandPaletteAuthTeamPickerCommandId,
-            ContentView.commandPaletteAuthTeamMembersCommandId
-        ])
-    }
-
-    @Test(arguments: [false, true])
-    func workingAuthContextHidesAccountCommands(signedIn: Bool) {
+    @Test(arguments: [false, true], [false, true])
+    func noAccountCommandInAnyAuthState(signedIn: Bool, working: Bool) {
         var context = CommandPaletteContextSnapshot()
         context.setBool(CommandPaletteContextKeys.authSignedIn, signedIn)
-        context.setBool(CommandPaletteContextKeys.authWorking, true)
+        context.setBool(CommandPaletteContextKeys.authWorking, working)
         #expect(visibleAuthCommandIDs(context).isEmpty)
+        #expect(ContentView.commandPaletteAuthCommandContributions().isEmpty)
     }
 
-    @Test func teamPickerIsACloudCommandUsingTheCustomizableShortcut() throws {
-        let command = try #require(ContentView.commandPaletteAuthCommandContributions().first {
-            $0.commandId == ContentView.commandPaletteAuthTeamPickerCommandId
-        })
-        #expect(command.subtitle(CommandPaletteContextSnapshot()) == String(
-            localized: "command.cloudVM.subtitle", defaultValue: "Cloud"
-        ))
-        #expect(ContentView.commandPaletteShortcutAction(forCommandID: command.commandId) == .openTeamPicker)
+    @Test func teamPickerCommandStillMapsToItsShortcut() {
+        #expect(
+            ContentView.commandPaletteShortcutAction(forCommandID: ContentView.commandPaletteAuthTeamPickerCommandId)
+                == .openTeamPicker
+        )
     }
 
     private func visibleAuthCommandIDs(_ context: CommandPaletteContextSnapshot) -> [String] {

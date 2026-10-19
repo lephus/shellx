@@ -173,15 +173,15 @@ extension Workspace {
         let encodedTarget = Data(target.utf8).base64EncodedString()
         let endedLineFormat = String(
             localized: "remote.disconnectBanner.sessionEnded",
-            defaultValue: "[cmux] remote session disconnected: %s"
+            defaultValue: "[ShellX] remote session disconnected: %s"
         )
         let reconnectLine = String(
             localized: "remote.disconnectBanner.reconnectHint",
-            defaultValue: "[cmux] Press Enter to reconnect. This terminal will stay disconnected until then."
+            defaultValue: "[ShellX] Press Enter to reconnect. This terminal will stay disconnected until then."
         )
         let reconnectUnavailableLine = String(
             localized: "remote.disconnectBanner.reconnectUnavailableHint",
-            defaultValue: "[cmux] Reconnect this workspace from the sidebar or by running the original cmux remote command again."
+            defaultValue: "[ShellX] Reconnect this workspace from the sidebar or by running the original ShellX remote command again."
         )
         let encodedEndedFormat = Data(endedLineFormat.utf8).base64EncodedString()
         let encodedReconnectLine = Data(reconnectLine.utf8).base64EncodedString()
@@ -222,7 +222,7 @@ extension Workspace {
           IFS= read -r _ || exit 0
           cmux_reconnect_cli="${CMUX_BUNDLED_CLI_PATH:-}"
           if [ -z "$cmux_reconnect_cli" ] || [ ! -x "$cmux_reconnect_cli" ]; then
-            cmux_reconnect_cli="$(command -v cmux 2>/dev/null || true)"
+            cmux_reconnect_cli="$(command -v shellx 2>/dev/null || true)"
           fi
           cmux_reconnect_socket="${CMUX_SOCKET_PATH:-${CMUX_SOCKET:-}}"
           if [ -n "$cmux_reconnect_cli" ] && [ -n "$cmux_reconnect_socket" ] && [ -n "${CMUX_WORKSPACE_ID:-}" ]; then

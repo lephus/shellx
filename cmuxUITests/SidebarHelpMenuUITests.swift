@@ -17,6 +17,42 @@ private func sidebarHelpPollUntil(
     }
 }
 
+/// Where the app records the mail drafts it would open (DEBUG-only
+/// `CMUX_UI_TEST_CAPTURE_OPEN_URL_PATH` seam), so no mail app launches.
+private func feedbackMailCapturePath() -> String {
+    FileManager.default.temporaryDirectory
+        .appendingPathComponent("shellx-ui-test-feedback-mail-\(UUID().uuidString).log")
+        .path
+}
+
+private func capturedFeedbackMailDrafts(_ path: String) -> [String] {
+    ((try? String(contentsOfFile: path, encoding: .utf8)) ?? "")
+        .split(separator: "\n")
+        .map(String.init)
+        .filter { $0.hasPrefix("mailto:") }
+}
+
+/// ShellX takes feedback by mail: Send Feedback opens one mail draft to
+/// ShellX and never presents the upload composer sheet.
+private func assertFeedbackOpensMailDraft(
+    app: XCUIApplication,
+    capturePath: String,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    XCTAssertTrue(
+        sidebarHelpPollUntil(timeout: 3.0) { !capturedFeedbackMailDrafts(capturePath).isEmpty },
+        "Send Feedback opened no mail draft",
+        file: file,
+        line: line
+    )
+    let drafts = capturedFeedbackMailDrafts(capturePath)
+    XCTAssertEqual(drafts.count, 1, drafts.joined(separator: ", "), file: file, line: line)
+    XCTAssertFalse(drafts.joined().contains("cmux"), drafts.joined(separator: ", "), file: file, line: line)
+    XCTAssertFalse(app.textFields["SidebarFeedbackEmailField"].exists, file: file, line: line)
+    XCTAssertFalse(app.buttons["SidebarFeedbackSendButton"].exists, file: file, line: line)
+}
+
 final class SidebarHelpMenuUITests: XCTestCase {
     override func setUp() {
         super.setUp()
@@ -53,9 +89,12 @@ final class SidebarHelpMenuUITests: XCTestCase {
         XCTAssertEqual(updatePill.label, "Update Available: 9.9.9")
     }
 
-    func testHelpMenuSendFeedbackOpensComposerSheet() {
+    func testHelpMenuSendFeedbackOpensMailDraft() {
+        let capturePath = feedbackMailCapturePath()
+        defer { try? FileManager.default.removeItem(atPath: capturePath) }
         let app = XCUIApplication.cmuxTestApplication()
         app.launchEnvironment["CMUX_UI_TEST_MODE"] = "1"
+        app.launchEnvironment["CMUX_UI_TEST_CAPTURE_OPEN_URL_PATH"] = capturePath
         launchAndActivate(app)
 
         XCTAssertTrue(waitForWindowCount(atLeast: 1, app: app, timeout: 6.0))
@@ -74,53 +113,7 @@ final class SidebarHelpMenuUITests: XCTestCase {
         )
         sendFeedbackItem.click()
 
-        XCTAssertTrue(app.staticTexts["Send Feedback"].waitForExistence(timeout: 3.0))
-        XCTAssertTrue(
-            firstExistingElement(
-                candidates: [
-                    app.textFields["SidebarFeedbackEmailField"],
-                    app.textFields["Your Email"],
-                ],
-                timeout: 2.0
-            ) != nil
-        )
-        XCTAssertTrue(
-            firstExistingElement(
-                candidates: [
-                    app.buttons["SidebarFeedbackAttachButton"],
-                    app.buttons["Attach Images"],
-                ],
-                timeout: 2.0
-            ) != nil
-        )
-        XCTAssertTrue(
-            firstExistingElement(
-                candidates: [
-                    app.buttons["SidebarFeedbackSendButton"],
-                    app.buttons["Send"],
-                ],
-                timeout: 2.0
-            ) != nil
-        )
-        XCTAssertTrue(
-            app.staticTexts[
-                "You can also reach us at founders@cmux.com."
-            ].waitForExistence(timeout: 2.0)
-        )
-
-        let messageEditor = requireElement(
-            candidates: [
-                app.textViews["SidebarFeedbackMessageEditor"],
-                app.scrollViews["SidebarFeedbackMessageEditor"],
-                app.otherElements["SidebarFeedbackMessageEditor"],
-                app.textViews["Message"],
-            ],
-            timeout: 2.0,
-            description: "feedback message editor"
-        )
-        messageEditor.click()
-        app.typeText("hello")
-        XCTAssertTrue(app.staticTexts["5/4000"].waitForExistence(timeout: 2.0))
+        assertFeedbackOpensMailDraft(app: app, capturePath: capturePath)
     }
 
     func testHelpMenuSettingsOpensDismissesAndReopensWithShortcut() {
@@ -316,16 +309,33 @@ final class SidebarHelpMenuUITests: XCTestCase {
 }
 
 final class FeedbackComposerShortcutUITests: XCTestCase {
+    private var capturePath = ""
+
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
+        capturePath = feedbackMailCapturePath()
     }
 
-    func testCmdOptionFOpensFeedbackComposer() {
+    override func tearDown() {
+        try? FileManager.default.removeItem(atPath: capturePath)
+        super.tearDown()
+    }
+
+    private func launchApp(showSettings: Bool = false) -> XCUIApplication {
         let app = XCUIApplication.cmuxTestApplication()
         app.launchEnvironment["CMUX_UI_TEST_MODE"] = "1"
+        app.launchEnvironment["CMUX_UI_TEST_CAPTURE_OPEN_URL_PATH"] = capturePath
+        if showSettings {
+            app.launchEnvironment["CMUX_UI_TEST_SHOW_SETTINGS"] = "1"
+        }
         app.launch()
         app.activate()
+        return app
+    }
+
+    func testCmdOptionFOpensFeedbackMailDraft() {
+        let app = launchApp()
 
         XCTAssertTrue(
             sidebarHelpPollUntil(timeout: 6.0) {
@@ -335,18 +345,11 @@ final class FeedbackComposerShortcutUITests: XCTestCase {
 
         app.typeKey("f", modifierFlags: [.command, .option])
 
-        XCTAssertTrue(app.staticTexts["Send Feedback"].waitForExistence(timeout: 3.0))
-        XCTAssertTrue(
-            app.textFields["SidebarFeedbackEmailField"].waitForExistence(timeout: 2.0)
-                || app.textFields["Your Email"].waitForExistence(timeout: 2.0)
-        )
+        assertFeedbackOpensMailDraft(app: app, capturePath: capturePath)
     }
 
     func testCmdOptionFWorksWithHiddenSidebar() {
-        let app = XCUIApplication.cmuxTestApplication()
-        app.launchEnvironment["CMUX_UI_TEST_MODE"] = "1"
-        app.launch()
-        app.activate()
+        let app = launchApp()
 
         XCTAssertTrue(
             sidebarHelpPollUntil(timeout: 6.0) {
@@ -364,15 +367,11 @@ final class FeedbackComposerShortcutUITests: XCTestCase {
 
         app.typeKey("f", modifierFlags: [.command, .option])
 
-        XCTAssertTrue(app.staticTexts["Send Feedback"].waitForExistence(timeout: 3.0))
+        assertFeedbackOpensMailDraft(app: app, capturePath: capturePath)
     }
 
     func testCmdOptionFWorksFromSettingsWindow() {
-        let app = XCUIApplication.cmuxTestApplication()
-        app.launchEnvironment["CMUX_UI_TEST_MODE"] = "1"
-        app.launchEnvironment["CMUX_UI_TEST_SHOW_SETTINGS"] = "1"
-        app.launch()
-        app.activate()
+        let app = launchApp(showSettings: true)
 
         XCTAssertTrue(
             sidebarHelpPollUntil(timeout: 6.0) {
@@ -382,17 +381,13 @@ final class FeedbackComposerShortcutUITests: XCTestCase {
 
         app.typeKey("f", modifierFlags: [.command, .option])
 
-        XCTAssertTrue(app.staticTexts["Send Feedback"].waitForExistence(timeout: 3.0))
-        XCTAssertTrue(
-            app.textFields["SidebarFeedbackEmailField"].waitForExistence(timeout: 2.0)
-                || app.textFields["Your Email"].waitForExistence(timeout: 2.0)
-        )
+        assertFeedbackOpensMailDraft(app: app, capturePath: capturePath)
     }
 }
 
 final class CommandPaletteAllSurfacesUITests: XCTestCase {
     private var socketPath = ""
-    private let debugDefaultsDomain = "com.cmuxterm.app.debug"
+    private let debugDefaultsDomain = "pro.shellx.desktop.debug"
     private let hiddenSurfaceToken = "cmux-command-palette-hidden-surface"
     private let visibleSurfaceToken = "cmux-command-palette-visible-surface"
     private let noMatchWorkspaceQuery = "cmux-command-palette-no-match"

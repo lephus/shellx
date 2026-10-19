@@ -21,7 +21,7 @@ struct CloudFeatureFlagTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         let flags = CmuxFeatureFlags(
             defaults: defaults,
-            overrideCapability: .init(bundleIdentifier: "com.cmuxterm.app", isDebugBuild: false),
+            overrideCapability: .init(bundleIdentifier: "pro.shellx.desktop", isDebugBuild: false),
             remoteFlagValueProvider: { _ in nil }
         )
         flags.applyLoadedFlags()
@@ -46,8 +46,9 @@ struct CloudFeatureFlagTests {
         #expect(!requestedKeys.contains(definition.key))
         let policy = ManagedDevicePolicy(defaults: defaults, releaseDomainDefaults: nil, forcedObject: { _, _ in nil })
         defaults.set(true, forKey: RightSidebarBetaFeatureSettings.cloudMachinesEnabledKey)
-        #expect(CloudMachinesFeature.isAvailable(policy: policy))
-        #expect(CloudMachinesFeature.isEnabled(defaults: defaults, policy: policy))
+        // ShellX: Cloud is hard-off, whatever the local opt-in says.
+        #expect(!CloudMachinesFeature.isAvailable(policy: policy))
+        #expect(!CloudMachinesFeature.isEnabled(defaults: defaults, policy: policy))
     }
 
     @Test("Retired rollout values are neither requested nor exposed in flag controls", arguments: [false, true])
@@ -63,7 +64,7 @@ struct CloudFeatureFlagTests {
         var requestedKeys: [String] = []
         let flags = CmuxFeatureFlags(
             defaults: defaults,
-            overrideCapability: .init(bundleIdentifier: "com.cmuxterm.app", isDebugBuild: false),
+            overrideCapability: .init(bundleIdentifier: "pro.shellx.desktop", isDebugBuild: false),
             remoteFlagValueProvider: { key in
                 requestedKeys.append(key)
                 return remoteValue
@@ -76,10 +77,11 @@ struct CloudFeatureFlagTests {
             #expect(!CmuxFeatureFlags.allFlags.contains { $0.key == key })
         }
         let policy = ManagedDevicePolicy(defaults: defaults, releaseDomainDefaults: nil, forcedObject: { _, _ in nil })
-        #expect(CloudMachinesFeature.isAvailable(policy: policy))
+        // ShellX: Cloud is hard-off; the activation marker does not turn it on.
+        #expect(!CloudMachinesFeature.isAvailable(policy: policy))
         #expect(!CloudMachinesFeature.isEnabled(defaults: defaults, policy: policy))
         defaults.set(true, forKey: CloudActivationCoordinator.activationKey)
-        #expect(CloudMachinesFeature.isEnabled(defaults: defaults, policy: policy))
+        #expect(!CloudMachinesFeature.isEnabled(defaults: defaults, policy: policy))
         let managedOff = ManagedDevicePolicy(defaults: defaults, releaseDomainDefaults: nil) { _, key in
             key == ManagedDevicePolicyKey.disableCloud.rawValue ? true : nil
         }
@@ -113,15 +115,11 @@ struct CloudFeatureFlagTests {
         }
     }
 
-    @Test("Upgrade and welcome palette commands are available before any flags load")
+    /// ShellX: billing and Pro are Manaflow services, so the palette offers no
+    /// upgrade or welcome command at all.
+    @Test("ShellX contributes no upgrade or welcome palette command")
     func upgradeCommandsDoNotNeedRolloutContext() {
-        let context = CommandPaletteContextSnapshot()
-        let commands = ContentView.commandPaletteProCommandContributions()
-        #expect(commands.count == 2)
-        for command in commands {
-            #expect(command.when(context))
-            #expect(command.enablement(context))
-        }
+        #expect(ContentView.commandPaletteProCommandContributions().isEmpty)
     }
 
     @Test("A cancelled keyed operation cannot erase its replacement after re-enable")
@@ -191,7 +189,8 @@ struct CloudFeatureFlagTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set(false, forKey: CloudActivationCoordinator.activationKey)
         let policy = ManagedDevicePolicy(defaults: defaults, releaseDomainDefaults: nil, forcedObject: { _, _ in nil })
-        #expect(CloudMachinesFeature.isAvailable(policy: policy))
+        // ShellX: the Cloud tab is never available (Cloud is hard-off).
+        #expect(!CloudMachinesFeature.isAvailable(policy: policy))
         #expect(!CloudMachinesFeature.isEnabled(defaults: defaults, policy: policy))
     }
 

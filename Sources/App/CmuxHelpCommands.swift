@@ -6,15 +6,13 @@ extension cmuxApp {
     @CommandsBuilder
     var helpCommands: some Commands {
         CommandGroup(replacing: .help) {
-            primaryDocsHelpMenuItems
-            secondaryDocsHelpMenuItems
+            helpResourceButton(.website)
+            helpResourceButton(.sourceCode)
 
             Divider()
 
-            Button(String(localized: "cloud.diagnostics.menu", defaultValue: "Cloud Diagnostics…")) {
-                AppDelegate.shared?.showCloudDiagnostics()
-            }
-
+            // ShellX: no Cloud Diagnostics, upgrade or Pro entries (Cloud,
+            // billing and Pro are Manaflow services, hard-off).
             splitCommandButton(title: String(localized: "sidebar.help.sendFeedback", defaultValue: "Send Feedback"), shortcut: menuShortcut(for: .sendFeedback)) {
                 presentFeedbackFromHelpMenu()
             }
@@ -23,26 +21,7 @@ extension cmuxApp {
                 AppDelegate.shared?.checkForUpdates(nil)
             }
 
-            Divider()
-
-            helpResourceButton(.githubIssues)
-            helpResourceButton(.discord)
-            if let offer = ProUpgradePresenter.currentUpgradeOffer {
-                Button(ProUpgradePresenter.upgradeMenuTitle(for: offer)) {
-                    ProUpgradePresenter.present(source: .helpMenu)
-                }
-            }
             #if DEBUG
-            Button(String(localized: "menu.help.previewNativePricing", defaultValue: "Preview Native Pro Pricing…")) {
-                ProUpgradePresenter.presentNativePricingPreview()
-            }
-            Button(String(localized: "debug.menu.cloudSidebarSpacingLab", defaultValue: "Cloud Sidebar Spacing Lab…")) {
-                AppDelegate.shared?.debugWindowsCoordinator.cloudSidebarDebugLabController.show()
-            }
-            cloudWelcomeDebugMenuItems
-            Button(String(localized: "menu.help.showProWelcomeChecklist", defaultValue: "Show Pro Welcome Checklist…")) {
-                ProWelcomeChecklistPresenter.present()
-            }
             Button(String(localized: "menu.help.featureFlags", defaultValue: "Feature Flags…")) {
                 InternalFlagsPresenter.present()
             }
@@ -61,36 +40,6 @@ extension cmuxApp {
             Button(String(localized: "menu.help.keyboardShortcutsSettings", defaultValue: "Keyboard Shortcuts Settings…")) {
                 openKeyboardShortcutsFromHelpMenu()
             }
-        }
-    }
-
-    @ViewBuilder
-    private var primaryDocsHelpMenuItems: some View {
-        helpResourceButton(.gettingStarted)
-        helpResourceButton(.concepts)
-        helpResourceButton(.configuration)
-        helpResourceButton(.customCommands)
-        helpResourceButton(.dock)
-        helpResourceButton(.keyboardShortcuts)
-        helpResourceButton(.apiReference)
-        helpResourceButton(.browserAutomation)
-    }
-
-    @ViewBuilder
-    private var secondaryDocsHelpMenuItems: some View {
-        helpResourceButton(.notifications)
-        helpResourceButton(.ssh)
-        helpResourceButton(.skills)
-        agentIntegrationsHelpMenu
-        helpResourceButton(.changelog)
-    }
-
-    private var agentIntegrationsHelpMenu: some View {
-        Menu(String(localized: "menu.help.agentIntegrations", defaultValue: "Agent Integrations")) {
-            helpResourceButton(.claudeCodeTeams)
-            helpResourceButton(.ohMyOpenCode)
-            helpResourceButton(.ohMyCodex)
-            helpResourceButton(.ohMyClaudeCode)
         }
     }
 

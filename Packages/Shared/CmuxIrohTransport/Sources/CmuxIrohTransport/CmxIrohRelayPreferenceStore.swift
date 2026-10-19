@@ -15,7 +15,7 @@ public actor CmxIrohRelayPreferenceStore {
     /// Creates an isolated preference cache.
     public init(
         secureStore: any CmxIrohSecureCredentialStoring = CmxIrohKeychainCredentialStore(
-            service: "com.cmuxterm.iroh.relay-preference.v1"
+            service: "pro.shellx.desktop.iroh.relay-preference.v1"
         )
     ) {
         self.secureStore = secureStore

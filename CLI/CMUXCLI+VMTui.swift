@@ -62,10 +62,10 @@ extension CMUXCLI {
 
     static var vmTuiUsage: String {
         """
-        Usage: cmux vm tui <id> [--window <id|ref|index>] [--focus|--no-focus]
+        Usage: shellx vm tui <id> [--window <id|ref|index>] [--focus|--no-focus]
 
         Open the FULL cmux-tui client for a machine (its own workspaces, panes and
-        tabs) in a pane. `cmux vm shell <id>` and every other open give you a plain
+        tabs) in a pane. `shellx vm shell <id>` and every other open give you a plain
         terminal on the machine instead; use this when you want the client itself.
         The pane runs the local cmux-tui client against the machine's daemon over
         the owner's private network; the network is the admission, so no device
@@ -75,8 +75,7 @@ extension CMUXCLI {
         \(openFocusDefaultHelp)
 
         The client binary is found via CMUX_TUI_CLIENT, then ~/.cmux/bin/cmux, then
-        `cmux-tui` on PATH. Install one with:
-          curl -fsSL https://cmux.com/tui/install-static.sh | sh
+        `cmux-tui` on PATH.
         """
     }
 
@@ -86,13 +85,13 @@ extension CMUXCLI {
     /// interactive `cmux-tui` the person uses so machines never share identity.
     static func vmTuiClientStateDir() -> URL {
         URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
-            .appendingPathComponent(".cmuxterm", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("cmux-tui-client", isDirectory: true)
     }
 
     static func vmTuiDevicesStoreURL() -> URL {
         URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
-            .appendingPathComponent(".cmuxterm", isDirectory: true)
+            .appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("vm-tui-devices.json", isDirectory: false)
     }
 
@@ -213,7 +212,7 @@ extension CMUXCLI {
         let daemonCommit = (daemon["commit"] as? String).map { String($0.prefix(10)) } ?? "?"
         let clientCommit = client.buildIdentity.map { String($0.prefix(10)) } ?? "?"
         let stale = clientProtocol < daemonProtocol
-            ? CMUXDiffViewerLocalization.string("cli.vm.tui.staleClient", defaultValue: "Update cmux (its bundled cmux-tui client is older than the machine's daemon).")
+            ? CMUXDiffViewerLocalization.string("cli.vm.tui.staleClient", defaultValue: "Update ShellX (its bundled cmux-tui client is older than the machine's daemon).")
             : CMUXDiffViewerLocalization.string("cli.vm.tui.staleDaemon", defaultValue: "The machine's cmux-tui daemon is older than this client; reconnect once the machine has updated.")
         let template = CMUXDiffViewerLocalization.string(
             "cli.vm.tui.protocolMismatch",
@@ -333,8 +332,8 @@ extension CMUXCLI {
         if options.fullClient, clientPath == nil || clientProbe == nil {
             let searched = cmuxTuiClientCandidates().joined(separator: ", ")
             let template = CMUXDiffViewerLocalization.string(
-                "cli.vm.tui.clientMissingSearched",
-                defaultValue: "No cmux-tui client found (searched: %1$@). Install one with `curl -fsSL https://cmux.com/tui/install-static.sh | sh`, or point CMUX_TUI_CLIENT at a binary."
+                "cli.vm.tui.clientMissingNoInstaller",
+                defaultValue: "No cmux-tui client found (searched: %1$@). Point CMUX_TUI_CLIENT at a binary."
             )
             throw CLIError(message: String(format: template, searched))
         }
@@ -380,7 +379,7 @@ extension CMUXCLI {
                 .appendingPathComponent("cmux-vm-tui-\(UUID().uuidString.lowercased()).json")
             try JSONEncoder().encode(config).write(to: configURL, options: .atomic)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: configURL.path)
-            let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "cmux")
+            let executablePath = resolvedExecutableURL()?.path ?? (args.first ?? "shellx")
             initialCommand = "\(shellQuote(executablePath)) vm-tui-connect --config \(shellQuote(configURL.path))"
         } else {
             initialCommand = Self.vmPlainTerminalPlaceholderCommand
@@ -576,7 +575,7 @@ extension CMUXCLI {
     func runVMTuiConnect(commandArgs: [String], client: SocketClient) throws {
         let (configPath, _) = parseOption(commandArgs, name: "--config")
         guard let configPath, !configPath.isEmpty else {
-            throw CLIError(message: "Usage: cmux vm-tui-connect --config <file>")
+            throw CLIError(message: "Usage: shellx vm-tui-connect --config <file>")
         }
         let configURL = URL(fileURLWithPath: configPath)
         let config = try JSONDecoder().decode(VMTuiConnectConfig.self, from: Data(contentsOf: configURL))
@@ -638,12 +637,12 @@ extension CMUXCLI {
             preconditionFailure("resolved terminal placement cannot produce an error")
         case .notFound:
             return CLIError(message: String(
-                format: String(localized: "cli.vm.open.terminalNotFound", defaultValue: "%1$@ has no terminal '%2$@' in workspace '%3$@'. See: cmux vm tree %1$@"),
+                format: String(localized: "cli.vm.open.terminalNotFound", defaultValue: "%1$@ has no terminal '%2$@' in workspace '%3$@'. See: shellx vm tree %1$@"),
                 machine, selector, workspace
             ))
         case .ambiguous:
             return CLIError(message: String(
-                format: String(localized: "cli.vm.open.terminalAmbiguous", defaultValue: "Terminal '%2$@' on %1$@ has no unique tab in workspace '%3$@'. Use cmux vm tree %1$@ and choose an exact placement."),
+                format: String(localized: "cli.vm.open.terminalAmbiguous", defaultValue: "Terminal '%2$@' on %1$@ has no unique tab in workspace '%3$@'. Use shellx vm tree %1$@ and choose an exact placement."),
                 machine, selector, workspace
             ))
         case .unavailable:
@@ -664,12 +663,12 @@ extension CMUXCLI {
             preconditionFailure("resolved workspace cannot produce an error")
         case .notFound:
             return CLIError(message: String(
-                format: String(localized: "cli.vm.open.workspaceNotFound", defaultValue: "%1$@ has no workspace '%2$@'. See: cmux vm tree %1$@"),
+                format: String(localized: "cli.vm.open.workspaceNotFound", defaultValue: "%1$@ has no workspace '%2$@'. See: shellx vm tree %1$@"),
                 machine, selector
             ))
         case .ambiguous:
             return CLIError(message: String(
-                format: String(localized: "cli.vm.open.workspaceAmbiguous", defaultValue: "%1$@ has multiple workspaces named '%2$@'. Use a workspace ID from cmux vm tree %1$@."),
+                format: String(localized: "cli.vm.open.workspaceAmbiguous", defaultValue: "%1$@ has multiple workspaces named '%2$@'. Use a workspace ID from shellx vm tree %1$@."),
                 machine, selector
             ))
         case .unavailable:
@@ -808,14 +807,14 @@ extension CMUXCLI {
         CMUXDiffViewerLocalization.string(
             "cli.vm.tree.usage",
             defaultValue: """
-        Usage: cmux vm tree [<machine>|local] [--refresh] [--json]
-               cmux surface ls [<machine>|local] [--refresh] [--json]
+        Usage: shellx vm tree [<machine>|local] [--refresh] [--json]
+               shellx surface ls [<machine>|local] [--refresh] [--json]
 
         The Finder-style view of every surface: This Mac first (its terminals grouped by
         workspace, and its browsers), then each cloud machine — Workspaces, Ports, VNC
         Displays (one row per screen), and a final Terminals section containing every
-        machine-owned terminal. Every line carries an address `cmux vm open` or
-        `cmux surface open` accepts.
+        machine-owned terminal. Every line carries an address `shellx vm open` or
+        `shellx surface open` accepts.
 
         Options:
           <machine>   Only this machine (`local` for This Mac).
@@ -827,23 +826,23 @@ extension CMUXCLI {
 
     static var surfaceUsage: String {
         """
-        Usage: cmux surface ls [<machine>|local] [--refresh] [--json]
-               cmux surface open <resource> [--workspace <id|ref|index>] [--pane <id|ref>]
+        Usage: shellx surface ls [<machine>|local] [--refresh] [--json]
+               shellx surface open <resource> [--workspace <id|ref|index>] [--pane <id|ref>]
                                  [--left|--right|--up|--down|--tab] [--new] [--focus|--no-focus] [--json]
-               cmux surface new-terminal --machine <id|local> [--cwd <dir>] [--name <name>]
+               shellx surface new-terminal --machine <id|local> [--cwd <dir>] [--name <name>]
                                  [--remote-workspace <ws_…>] [--workspace <id|ref|index>] [--no-open]
                                  [--focus|--no-focus] [--json] [-- <command...>]
-               cmux surface resume …   (restart metadata; see `cmux surface resume --help`)
-               cmux surface size [--surface <id|ref>] [--json]
-               cmux surface size-policy <latest|smallest|largest|priority|fixed> [--cols N --rows N] [--surface <id|ref>]
-               cmux surface size-to-me [--surface <id|ref>]
-               cmux surface size-counts <true|false|auto> [--participant <id>] [--surface <id|ref>]
-               cmux surface participants [--surface <id|ref>] [--json]
-               cmux surface disconnect-participant <participant-id> [--surface <id|ref>]
-               cmux surface disconnect-others [--surface <id|ref>]
+               shellx surface resume …   (restart metadata; see `shellx surface resume --help`)
+               shellx surface size [--surface <id|ref>] [--json]
+               shellx surface size-policy <latest|smallest|largest|priority|fixed> [--cols N --rows N] [--surface <id|ref>]
+               shellx surface size-to-me [--surface <id|ref>]
+               shellx surface size-counts <true|false|auto> [--participant <id>] [--surface <id|ref>]
+               shellx surface participants [--surface <id|ref>] [--json]
+               shellx surface disconnect-participant <participant-id> [--surface <id|ref>]
+               shellx surface disconnect-others [--surface <id|ref>]
 
         Surfaces are terminals, VNC displays and browsers on This Mac or on a cloud machine;
-        panes project them. `surface ls` is the catalog (same as `cmux vm tree`, including
+        panes project them. `surface ls` is the catalog (same as `shellx vm tree`, including
         This Mac). A resource id reads <machine>/<kind>/<key>, e.g. local/terminal/<uuid>,
         vivid-newt/terminal/term_2f9c…, vivid-newt/display/display:1, vivid-newt/browser/port:3000.
 
@@ -863,15 +862,15 @@ extension CMUXCLI {
 
     static var vmOpenUsage: String {
         """
-        Usage: cmux vm open <target> [--workspace <id|ref|index>] [--focus [<true|false>] | --no-focus] [--print]
-               cmux vm open <id> <port> [--print]
+        Usage: shellx vm open <target> [--workspace <id|ref|index>] [--focus [<true|false>] | --no-focus] [--print]
+               shellx vm open <id> <port> [--print]
 
-        \(CMUXDiffViewerLocalization.string("cli.vm.open.deviceTargets", defaultValue: "Targets (from `cmux vm tree`; <machine> is a cloud ID or another Mac's `device:<uuid>@<tag>`):"))
-          <machine>                      the machine's shell (same as `cmux vm shell <machine>`)
+        \(CMUXDiffViewerLocalization.string("cli.vm.open.deviceTargets", defaultValue: "Targets (from `shellx vm tree`; <machine> is a cloud ID or another Mac's `device:<uuid>@<tag>`):"))
+          <machine>                      the machine's shell (same as `shellx vm shell <machine>`)
           <machine>/<workspace>          a cmux-tui workspace on it (`ws_…` id or unique name; ambiguous names fail)
           <machine>/<workspace>/<term>   one terminal (`term_…`) — reuses the pane that
                                          already shows it instead of opening a second one
-          <machine>/<workspace>/<term>/<tab>  one tab of that terminal (`tab_…` from `cmux vm tree`)
+          <machine>/<workspace>/<term>/<tab>  one tab of that terminal (`tab_…` from `shellx vm tree`)
           <machine>:desktop              the machine's noVNC screen as a browser pane
           <machine>:port/<n>             a private tokened URL for an HTTP port, as a browser pane
           <machine> <port>               same as <machine>:port/<port>
@@ -885,13 +884,13 @@ extension CMUXCLI {
           --print            Ports only: print the URL, do not open a pane.
 
         Examples:
-          cmux vm open vivid-newt
-          cmux vm open vivid-newt/main
-          cmux vm open vivid-newt/main/term_2f9c…
-          cmux vm open vivid-newt/main/term_2f9c…/tab_a
-          cmux vm open vivid-newt:desktop
-          cmux vm open vivid-newt:port/3000 --print
-          cmux vm open device:1f0c…@nightly/main/6C27…   \(CMUXDiffViewerLocalization.string("cli.vm.open.deviceExample", defaultValue: "a terminal on another Mac (from `cmux vm tree`)"))
+          shellx vm open vivid-newt
+          shellx vm open vivid-newt/main
+          shellx vm open vivid-newt/main/term_2f9c…
+          shellx vm open vivid-newt/main/term_2f9c…/tab_a
+          shellx vm open vivid-newt:desktop
+          shellx vm open vivid-newt:port/3000 --print
+          shellx vm open device:1f0c…@nightly/main/6C27…   \(CMUXDiffViewerLocalization.string("cli.vm.open.deviceExample", defaultValue: "a terminal on another Mac (from `shellx vm tree`)"))
         """
     }
 
@@ -1452,7 +1451,7 @@ extension CMUXCLI {
         let machines = (response["machines"] as? [[String: Any]]) ?? []
         let resources = (response["resources"] as? [[String: Any]]) ?? []
         guard !machines.isEmpty else {
-            print(String(localized: "cli.vm.tree.empty", defaultValue: "No cloud machines. Try: cmux vm new"))
+            print(String(localized: "cli.vm.tree.empty", defaultValue: "No cloud machines. Try: shellx vm new"))
             return
         }
         // Local terminals group by the workspace that shows them; titles come from the
@@ -1720,7 +1719,7 @@ extension CMUXCLI {
                 response = try client.sendV2(method: "surface.project", params: params, responseTimeout: 180)
             } catch let error as CLIError where error.message.contains("Unknown surface") {
                 throw CLIError(message: String(
-                    format: String(localized: "cli.surface.open.unknownResource", defaultValue: "Unknown surface '%@'. See: cmux surface ls --json"),
+                    format: String(localized: "cli.surface.open.unknownResource", defaultValue: "Unknown surface '%@'. See: shellx surface ls --json"),
                     resource
                 ))
             }

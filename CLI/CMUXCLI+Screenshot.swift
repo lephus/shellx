@@ -3,10 +3,10 @@ import Foundation
 extension CMUXCLI {
     static var shotHelp: String {
         String(localized: "cli.help.shot", defaultValue: """
-        Usage: cmux shot [flags]
+        Usage: shellx shot [flags]
 
-        Screenshot a cmux window, or a region of one, to a png or a jpeg. Only
-        cmux's own windows can be captured, and no Screen Recording permission
+        Screenshot a ShellX window, or a region of one, to a png or a jpeg. Only
+        ShellX's own windows can be captured, and no Screen Recording permission
         is involved, so this works on a release build and inside CI.
 
         Flags:
@@ -23,12 +23,12 @@ extension CMUXCLI {
 
         Output: `<width>x<height> <bytes> <path>`, or the full response with --json.
 
-        A region is the same rectangle `cmux record --region` films, so a
+        A region is the same rectangle `shellx record --region` films, so a
         detail spotted in a clip can be shot with the same four numbers.
 
         Example:
-          cmux shot --label settings-sheet
-          cmux shot --region 0,0,420,900 --out ~/sidebar.png
+          shellx shot --label settings-sheet
+          shellx shot --region 0,0,420,900 --out ~/sidebar.png
         """)
     }
 

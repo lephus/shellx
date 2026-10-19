@@ -30,7 +30,7 @@ struct SessionSnapshotStartupRecoveryTests {
     private func makeRepository(root: URL) -> SessionSnapshotRepository<RecoverySnapshotFixture> {
         SessionSnapshotRepository(
             schemaVersion: schemaVersion,
-            bundleIdentifier: "com.cmuxterm.app.nightly",
+            bundleIdentifier: "pro.shellx.desktop.nightly",
             appSupportDirectory: root
         )
     }
@@ -73,7 +73,7 @@ struct SessionSnapshotStartupRecoveryTests {
         let historyDirectory = try #require(repository.historyDirectoryURL())
         try writeRaw(
             "{\"version\":1,\"workspaces\":42}",
-            to: historyDirectory.appendingPathComponent("session-com.cmuxterm.app.nightly-3000000-w9-p9.json")
+            to: historyDirectory.appendingPathComponent("session-pro.shellx.desktop.nightly-3000000-w9-p9.json")
         )
         try writeRaw("{\"version\":1,\"workspaces\":\"not-a-list\"}", to: try #require(repository.defaultSnapshotFileURL()))
         try writeRaw("corrupt", to: try #require(repository.manualRestoreSnapshotFileURL()))

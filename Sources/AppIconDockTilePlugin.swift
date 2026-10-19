@@ -1,7 +1,9 @@
 import AppKit
 import CoreServices
 
-private let cmuxAppIconDidChangeNotification = Notification.Name("com.cmuxterm.appIconDidChange")
+// Distributed, posted by the app (`AppIconSettings.dockTileIconDidChangeNotification`). The plugin
+// target does not link ShellXBrand, so the ShellX bundle id is spelled out.
+private let cmuxAppIconDidChangeNotification = Notification.Name("pro.shellx.desktop.appIconDidChange")
 private let cmuxAppIconModeKey = "appIconMode"
 
 private enum DockTileAppIconMode: String {

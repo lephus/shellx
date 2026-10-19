@@ -6,9 +6,9 @@
 #
 # Example:
 #   scripts/sign-cmux-bundle.sh \
-#     "build-universal/Build/Products/Release/cmux NIGHTLY.app" \
-#     cmux.nightly.entitlements \
-#     "Developer ID Application: Manaflow, Inc. (7WLXT3NR37)"
+#     "build-shellx/Build/Products/Release/ShellX.app" \
+#     shellx.release.entitlements \
+#     "Developer ID Application: Phu Le huu (W4RF3W4VTZ)"
 #
 # Optional env:
 #   CMUX_HELPER_ENTITLEMENTS  (default: cmux-helper.entitlements)
@@ -224,7 +224,8 @@ if [[ "${CMUX_SIGN_SKIP_NUCLEO_FFI:-}" != 1 ]]; then
 fi
 # The sidecar must carry exactly the slices the app does: universal for stable
 # and the transitional nightly, one architecture for thinned nightlies.
-SIDECAR_CHECK=(--archs "$(lipo -archs "$APP_PATH/Contents/MacOS/cmux")" --require-signed)
+APP_EXECUTABLE="$APP_PATH/Contents/MacOS/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP_PATH/Contents/Info.plist")"
+SIDECAR_CHECK=(--archs "$(lipo -archs "$APP_EXECUTABLE")" --require-signed)
 if "$SIGNING_KEYCHAIN_TOOL" is-present; then
   # Run no bundle code while the signing identity is usable. The workflow
   # repeats this check with the handshake after it deletes the keychain.

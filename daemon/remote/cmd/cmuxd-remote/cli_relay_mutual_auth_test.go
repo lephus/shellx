@@ -89,7 +89,7 @@ func TestCLIRefusesTCPRelayWithoutCredentials(t *testing.T) {
 	// receive the CLI's requests.
 	addr, lines := startImpostorRelay(t, "", false)
 	home := t.TempDir()
-	if err := os.MkdirAll(home+"/.cmux/relay", 0o700); err != nil {
+	if err := os.MkdirAll(home+"/.shellx/relay", 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("HOME", home)

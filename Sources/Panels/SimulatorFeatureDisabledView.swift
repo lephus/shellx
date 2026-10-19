@@ -1,4 +1,5 @@
 import SwiftUI
+import ShellXIcons
 
 struct SimulatorFeatureDisabledView: View {
     let panel: SimulatorPanel
@@ -6,7 +7,7 @@ struct SimulatorFeatureDisabledView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Image(systemName: "iphone.slash")
+            ShellXIcon.image("iphone.slash")
                 .font(.system(size: 32))
                 .foregroundStyle(.secondary)
             Text(String(

@@ -55,7 +55,7 @@ struct SettingsRowAnchorResolutionTests {
         "app.preferredEditor",
         "app.renameSelectsExistingName",
         "app.reorderOnNotification",
-        "app.sendAnonymousTelemetry",
+        // "app.sendAnonymousTelemetry": hidden in ShellX (no telemetry).
         "app.warnBeforeClosingAgentSession",
         "app.warnBeforeClosingTab",
         "app.warnBeforeClosingTabXButton",
@@ -191,7 +191,6 @@ struct SettingsRowAnchorResolutionTests {
     /// (no single cmux.json path): pickers and action buttons. Each must
     /// match the corresponding curated entry id verbatim.
     static let explicitlyAnchoredEntryIDs: Set<String> = [
-        "setting:themes:appearance",
         "setting:themes:terminal-theme",
         "setting:app:app-icon",
         "setting:app:file-drops",

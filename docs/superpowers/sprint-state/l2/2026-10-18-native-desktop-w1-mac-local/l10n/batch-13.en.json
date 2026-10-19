@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Adapt Default Theme to Appearance",
+"comment": ""
+},
+{
+"i": 1,
+"en": "Resume Agent Sessions on Reopen",
+"comment": ""
+},
+{
+"i": 2,
+"en": "Agent Hibernation",
+"comment": ""
+},
+{
+"i": 3,
+"en": "Hibernate After Idle Seconds",
+"comment": ""
+},
+{
+"i": 4,
+"en": "A terminal must have no output and report an idle agent lifecycle for this long before it can be hibernated.",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Max Live Agent Terminals",
+"comment": ""
+},
+{
+"i": 6,
+"en": "Visible terminals stay live. Extra idle background agent terminals hibernate oldest first.",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Copy on Selection",
+"comment": ""
+},
+{
+"i": 8,
+"en": "Show Copy Confirmation",
+"comment": ""
+},
+{
+"i": 9,
+"en": "Briefly shows “Copied to clipboard” at the bottom of a terminal when selecting text copies it.",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Reflow Hard-Wrapped Text on Copy",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Runaway Memory Guardrail",
+"comment": ""
+},
+{
+"i": 12,
+"en": "Memory Warning Threshold (GB)",
+"comment": ""
+},
+{
+"i": 13,
+"en": "A pane is flagged once its combined process-tree memory crosses this many gigabytes.",
+"comment": ""
+},
+{
+"i": 14,
+"en": "Reclaim Offscreen Terminal Memory",
+"comment": ""
+},
+{
+"i": 15,
+"en": "Reclaim After Idle Seconds",
+"comment": ""
+},
+{
+"i": 16,
+"en": "An off-screen terminal must stay off-screen this long before its renderer memory is reclaimed.",
+"comment": ""
+},
+{
+"i": 17,
+"en": "Max Warm Renderers",
+"comment": ""
+},
+{
+"i": 18,
+"en": "The most recently visible terminals keep their renderer ready so switching stays instant. Extra off-screen renderers are reclaimed oldest first.",
+"comment": ""
+},
+{
+"i": 19,
+"en": "Resume Commands",
+"comment": ""
+},
+{
+"i": 20,
+"en": "Prefix: %@, cwd: %@",
+"comment": ""
+},
+{
+"i": 21,
+"en": "Could not delete the resume command approval.",
+"comment": ""
+},
+{
+"i": 22,
+"en": "Resume command approval deleted.",
+"comment": ""
+},
+{
+"i": 23,
+"en": "No custom resume commands have been approved.",
+"comment": ""
+},
+{
+"i": 24,
+"en": "env: %@",
+"comment": ""
+},
+{
+"i": 25,
+"en": "Enter a valid shell-style command prefix.",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Signature does not match. Delete this approval and approve the command again.",
+"comment": ""
+},
+{
+"i": 27,
+"en": "Ask",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Command prefix",
+"comment": ""
+},
+{
+"i": 29,
+"en": "Prefix: %@",
+"comment": ""
+},
+{
+"i": 30,
+"en": "Unknown source",
+"comment": ""
+},
+{
+"i": 31,
+"en": "Review signed command prefixes that can restore non-agent terminal surfaces.",
+"comment": ""
+},
+{
+"i": 32,
+"en": "Could not update the resume command approval.",
+"comment": ""
+},
+{
+"i": 33,
+"en": "Resume command approval updated.",
+"comment": ""
+},
+{
+"i": 34,
+"en": "Show Terminal Scroll Bar",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Scroll Speed",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Multiplier applied to terminal scroll wheel and trackpad deltas. Higher scrolls faster.",
+"comment": ""
+},
+{
+"i": 37,
+"en": "%.2f×",
+"comment": ""
+},
+{
+"i": 38,
+"en": "Session Content Alignment",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Center",
+"comment": ""
+},
+{
+"i": 40,
+"en": "Places width-capped content within the pane.",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Session Content Width",
+"comment": ""
+},
+{
+"i": 42,
+"en": "Limit session content width",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Tab Bar Font Size",
+"comment": ""
+},
+{
+"i": 44,
+"en": "Couldn't save tab bar font size. Please try again.",
+"comment": ""
+},
+{
+"i": 45,
+"en": "Controls the font size of the terminal and browser tab titles at the top of each pane.",
+"comment": ""
+},
+{
+"i": 46,
+"en": "TextBox Max Lines",
+"comment": ""
+},
+{
+"i": 47,
+"en": "Limits how tall the rich terminal input can grow before it scrolls.",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Text Editing Gestures",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Default Submit Action",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Used for new terminal sessions. Active Claude, Codex, OpenCode, and Pi sessions always submit as text entry.",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Focus TextBox on New Terminals",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Show TextBox on New Terminals",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Claude Dangerous",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Codex --yolo",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Text Entry",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Settings",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Settings could not load. Please restart cmux and report this issue.",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Base: %@",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Custom Colors",
+"comment": ""
+},
+{
+"i": 60,
+"en": "Named palette entry.",
+"comment": ""
+},
+{
+"i": 61,
+"en": "Edit cmux.json to add or remove named colors. \"Choose Custom Color...\" still adds local Custom N entries.",
+"comment": ""
+},
+{
+"i": 62,
+"en": "No palette entries. Add colors in cmux.json or use \"Choose Custom Color...\" from a workspace context menu.",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Workspace Color Indicator",
+"comment": ""
+},
+{
+"i": 64,
+"en": "Custom colors: none yet. Use \"Choose Custom Color...\" from a workspace context menu.",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Notification Badge",
+"comment": ""
+},
+{
+"i": 66,
+"en": "Color of the unread notification badge on workspace tabs.",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Customize the workspace color palette used by Sidebar > Workspace Color. \"Choose Custom Color...\" entries are persisted below.",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Color of the attention ring and pane flash when a pane needs input.",
+"comment": ""
+},
+{
+"i": 69,
+"en": "Reset Palette",
+"comment": ""
+},
+{
+"i": 70,
+"en": "Restore built-in defaults and clear all custom colors.",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Restore the built-in palette and remove extra named colors.",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Selection Highlight",
+"comment": ""
+},
+{
+"i": 73,
+"en": "Background color of the selected workspace in the sidebar.",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Canvas: Align Bottom Edges",
+"comment": ""
+},
+{
+"i": 75,
+"en": "Canvas: Align Left Edges",
+"comment": ""
+},
+{
+"i": 76,
+"en": "Canvas: Align Right Edges",
+"comment": ""
+},
+{
+"i": 77,
+"en": "Canvas: Align Top Edges",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Canvas: Distribute Horizontally",
+"comment": ""
+},
+{
+"i": 79,
+"en": "Canvas: Distribute Vertically",
+"comment": ""
+},
+{
+"i": 80,
+"en": "Canvas: Equalize Heights",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Canvas: Equalize Widths",
+"comment": ""
+},
+{
+"i": 82,
+"en": "Canvas: Toggle Overview",
+"comment": ""
+},
+{
+"i": 83,
+"en": "Canvas: Reveal Focused Pane",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Canvas: Tidy Panes",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Canvas: Zoom In",
+"comment": ""
+},
+{
+"i": 86,
+"en": "Canvas: Zoom Out",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Canvas: Actual Size",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Command Palette: Next",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Command Palette: Previous",
+"comment": ""
+},
+{
+"i": 90,
+"en": "Cycle TextBox Submit Action",
+"comment": ""
+},
+{
+"i": 91,
+"en": "Cycle Workspace Status",
+"comment": ""
+},
+{
+"i": 92,
+"en": "Decrease Font Size for Workspace Terminals",
+"comment": ""
+},
+{
+"i": 93,
+"en": "Diff Viewer: Next File",
+"comment": ""
+},
+{
+"i": 94,
+"en": "Diff Viewer: Open File Search",
+"comment": ""
+},
+{
+"i": 95,
+"en": "Diff Viewer: Previous File",
+"comment": ""
+},
+{
+"i": 96,
+"en": "Viewers: Scroll Down",
+"comment": ""
+},
+{
+"i": 97,
+"en": "Viewers: Scroll Down (Emacs)",
+"comment": ""
+},
+{
+"i": 98,
+"en": "Viewers: Scroll Half Page Down",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Viewers: Scroll Half Page Up",
+"comment": ""
+},
+{
+"i": 100,
+"en": "Viewers: Scroll to Bottom",
+"comment": ""
+},
+{
+"i": 101,
+"en": "Viewers: Scroll to Top",
+"comment": ""
+},
+{
+"i": 102,
+"en": "Viewers: Scroll Up",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Viewers: Scroll Up (Emacs)",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Edit Workspace Description",
+"comment": ""
+},
+{
+"i": 105,
+"en": "File Explorer: Open Selection",
+"comment": ""
+},
+{
+"i": 106,
+"en": "File Explorer: Open Selection (Finder Alias)",
+"comment": ""
+},
+{
+"i": 107,
+"en": "Clear All Notifications",
+"comment": ""
+},
+{
+"i": 108,
+"en": "Focus Next Pane",
+"comment": ""
+},
+{
+"i": 109,
+"en": "Focus Pane Down",
+"comment": ""
+},
+{
+"i": 110,
+"en": "Focus Pane Left",
+"comment": ""
+},
+{
+"i": 111,
+"en": "Focus Pane Right",
+"comment": ""
+},
+{
+"i": 112,
+"en": "Focus Pane Up",
+"comment": ""
+},
+{
+"i": 113,
+"en": "Focus Previous Pane",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Global Search",
+"comment": ""
+},
+{
+"i": 115,
+"en": "Group Selected Workspaces",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Increase Font Size for Workspace Terminals",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Brightness Down",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Brightness Up",
+"comment": ""
+},
+{
+"i": 119,
+"en": "Mute",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Next Track",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Play/Pause",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Previous Track",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Volume Down",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Volume Up",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Space",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Mark All Notifications Read",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Markdown Viewer: Zoom In",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Markdown Viewer: Zoom Out",
+"comment": ""
+},
+{
+"i": 129,
+"en": "Markdown Viewer: Actual Size",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Reorder Surface Left",
+"comment": ""
+},
+{
+"i": 131,
+"en": "Reorder Surface Right",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Move Surface to Next Pane",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Move Surface to Pane Below",
+"comment": ""
+},
+{
+"i": 134,
+"en": "Move Surface to Pane on Left",
+"comment": ""
+},
+{
+"i": 135,
+"en": "Move Surface to Pane on Right",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Move Surface to Pane Above",
+"comment": ""
+},
+{
+"i": 137,
+"en": "Move Surface to Previous Pane",
+"comment": ""
+},
+{
+"i": 138,
+"en": "Move Workspace Down",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Move Workspace Up",
+"comment": ""
+},
+{
+"i": 140,
+"en": "New Surface",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Next Workspace in Group",
+"comment": ""
+},
+{
+"i": 142,
+"en": "Open Browser",
+"comment": ""
+},
+{
+"i": 143,
+"en": "Press shortcut…",
+"comment": ""
+},
+{
+"i": 144,
+"en": "Previous Workspace in Group",
+"comment": ""
+},
+{
+"i": 145,
+"en": "Unbind",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Unbind shortcut",
+"comment": ""
+},
+{
+"i": 147,
+"en": "Shortcuts must include ⌘ ⌥ ⌃ or ⇧",
+"comment": ""
+},
+{
+"i": 148,
+"en": "This shortcut conflicts with %@ (%@).",
+"comment": ""
+},
+{
+"i": 149,
+"en": "This shortcut conflicts with %@ (%@). Swap shortcuts?",
+"comment": ""
+},
+{
+"i": 150,
+"en": "Use a digit from 1 through 9.",
+"comment": ""
+},
+{
+"i": 151,
+"en": "This keystroke is reserved by macOS.",
+"comment": ""
+},
+{
+"i": 152,
+"en": "System-wide hotkeys must include Command, Option, or Control.",
+"comment": ""
+},
+{
+"i": 153,
+"en": "%@ …",
+"comment": ""
+},
+{
+"i": 154,
+"en": "Restore",
+"comment": ""
+},
+{
+"i": 155,
+"en": "Restore previous shortcut",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Swap",
+"comment": ""
+},
+{
+"i": 157,
+"en": "Undo",
+"comment": ""
+},
+{
+"i": 158,
+"en": "Reset Workspace Color",
+"comment": ""
+},
+{
+"i": 159,
+"en": "Reset Font Size for Workspace Terminals",
+"comment": ""
+},
+{
+"i": 160,
+"en": "Save File Preview",
+"comment": ""
+},
+{
+"i": 161,
+"en": "Select Surface 1…9",
+"comment": ""
+},
+{
+"i": 162,
+"en": "Select Workspace 1…9",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Workspace Color: Amber",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Workspace Color: Aqua",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Workspace Color: Blue",
+"comment": ""
+},
+{
+"i": 166,
+"en": "Workspace Color: Crimson",
+"comment": ""
+},
+{
+"i": 167,
+"en": "Workspace Color: Green",
+"comment": ""
+},
+{
+"i": 168,
+"en": "Workspace Color: Olive",
+"comment": ""
+},
+{
+"i": 169,
+"en": "Workspace Color: Orange",
+"comment": ""
+},
+{
+"i": 170,
+"en": "Workspace Color: Red",
+"comment": ""
+},
+{
+"i": 171,
+"en": "Workspace Color: Teal",
+"comment": ""
+},
+{
+"i": 172,
+"en": "Show Browser JavaScript Console",
+"comment": ""
+},
+{
+"i": 173,
+"en": "Simulator: Home",
+"comment": ""
+},
+{
+"i": 174,
+"en": "Simulator: Rotate Left",
+"comment": ""
+},
+{
+"i": 175,
+"en": "Simulator: Rotate Right",
+"comment": ""
+},
+{
+"i": 176,
+"en": "Simulator: Toggle Appearance",
+"comment": ""
+},
+{
+"i": 177,
+"en": "Simulator: Toggle Software Keyboard",
+"comment": ""
+},
+{
+"i": 178,
+"en": "Show Sidebar Dock",
+"comment": ""
+},
+{
+"i": 179,
+"en": "Show Sidebar Feed",
+"comment": ""
+},
+{
+"i": 180,
+"en": "Show Sidebar Files",
+"comment": ""
+},
+{
+"i": 181,
+"en": "Show Sidebar Find",
+"comment": ""
+},
+{
+"i": 182,
+"en": "Show Sidebar Cloud",
+"comment": ""
+},
+{
+"i": 183,
+"en": "Show Sidebar Vault",
+"comment": ""
+},
+{
+"i": 184,
+"en": "Toggle Browser Design Mode",
+"comment": ""
+},
+{
+"i": 185,
+"en": "Toggle Browser Developer Tools",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Toggle Checklist Item Complete",
+"comment": ""
+},
+{
+"i": 187,
+"en": "Toggle Focused Workspace’s Group Collapse",
+"comment": ""
+},
+{
+"i": 188,
+"en": "Toggle Terminal Copy Mode",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Only while a browser pane is focused",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Only while a browser pane or text file preview is focused",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Only while a text file preview is focused",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Only while a markdown preview is focused",
+"comment": ""
+},
+{
+"i": 193,
+"en": "When: %@",
+"comment": ""
+},
+{
+"i": 194,
+"en": "Only while the right sidebar is focused",
+"comment": ""
+},
+{
+"i": 195,
+"en": "Only while a Simulator is focused",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Only while a terminal pane is focused",
+"comment": ""
+},
+{
+"i": 197,
+"en": "Show all shortcuts",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Browser & Find",
+"comment": ""
+},
+{
+"i": 199,
+"en": "Navigation",
+"comment": ""
+},
+{
+"i": 200,
+"en": "Other",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Panes",
+"comment": ""
+},
+{
+"i": 202,
+"en": "Unassigned",
+"comment": ""
+},
+{
+"i": 203,
+"en": "Left Rail",
+"comment": ""
+},
+{
+"i": 204,
+"en": "Solid Fill",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Loading (%lld active tasks)",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Loading (1 active task)",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Close group",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Add item",
+"comment": ""
+},
+{
+"i": 209,
+"en": "New checklist item",
+"comment": ""
+},
+{
+"i": 210,
+"en": "Attach Images…",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Attach",
+"comment": ""
+},
+{
+"i": 212,
+"en": "No images attached. Attach images.",
+"comment": ""
+},
+{
+"i": 213,
+"en": "1 image attached",
+"comment": ""
+},
+{
+"i": 214,
+"en": "%lld images attached",
+"comment": ""
+},
+{
+"i": 215,
+"en": "Manage images",
+"comment": ""
+},
+{
+"i": 216,
+"en": "Mark as completed",
+"comment": ""
+},
+{
+"i": 217,
+"en": "Hide checklist items",
+"comment": ""
+},
+{
+"i": 218,
+"en": "Item text",
+"comment": ""
+},
+{
+"i": 219,
+"en": "Show checklist items",
+"comment": ""
+},
+{
+"i": 220,
+"en": "Mark In Progress",
+"comment": ""
+},
+{
+"i": 221,
+"en": "… %lld more",
+"comment": ""
+},
+{
+"i": 222,
+"en": "Open as Pane",
+"comment": ""
+},
+{
+"i": 223,
+"en": "Show checklist",
+"comment": ""
+},
+{
+"i": 224,
+"en": "Remove Attachment",
+"comment": ""
+},
+{
+"i": 225,
+"en": "Remove item",
+"comment": ""
+},
+{
+"i": 226,
+"en": "Mark as pending",
+"comment": ""
+},
+{
+"i": 227,
+"en": "Cloud workspace on %@",
+"comment": "Tooltip and workspace-row accessibility label for a Cloud-bound workspace. The placeholder is the authoritative machine identifier."
+},
+{
+"i": 228,
+"en": "Sidebar error",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Sidebar file is empty or missing.",
+"comment": ""
+},
+{
+"i": 230,
+"en": "No supported SwiftUI view found.",
+"comment": ""
+},
+{
+"i": 231,
+"en": "Failed to decode sidebar JSON.",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Sidebar file is missing.",
+"comment": ""
+},
+{
+"i": 233,
+"en": "Invalid JSON at %@",
+"comment": ""
+},
+{
+"i": 234,
+"en": "Missing key '%@' at %@",
+"comment": ""
+},
+{
+"i": 235,
+"en": "Missing value at %@",
+"comment": ""
+},
+{
+"i": 236,
+"en": "Failed to read sidebar file.",
+"comment": ""
+},
+{
+"i": 237,
+"en": "root",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Type mismatch at %@",
+"comment": ""
+},
+{
+"i": 239,
+"en": "Create worktree",
+"comment": ""
+},
+{
+"i": 240,
+"en": "Workspace tools",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Notes",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Open window",
+"comment": ""
+},
+{
+"i": 243,
+"en": "Toggle section",
+"comment": ""
+},
+{
+"i": 244,
+"en": "%@ is using metadata-only access until you grant its requested data and actions.",
+"comment": ""
+},
+{
+"i": 245,
+"en": "Grant Requested Access",
+"comment": ""
+},
+{
+"i": 246,
+"en": "Keep Limited",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Limited",
+"comment": ""
+},
+{
+"i": 248,
+"en": "This extension has limited access.",
+"comment": ""
+},
+{
+"i": 249,
+"en": "Limited extension access",
+"comment": ""
+},
+{
+"i": 250,
+"en": "Workspace could not be closed",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Remote tmux window requested",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Extension action is not granted",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Extension connection is no longer active",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Surface could not be created",
+"comment": ""
+},
+{
+"i": 255,
+"en": "URL could not be opened",
+"comment": ""
+},
+{
+"i": 256,
+"en": "Close workspaces",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Create workspaces with paths",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Open URLs",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Select workspaces",
+"comment": ""
+},
+{
+"i": 260,
+"en": "CMUX lost the extension connection. No workspace data or actions are being shared.",
+"comment": ""
+},
+{
+"i": 261,
+"en": "CMUX could not load this extension's configuration. No workspace data or actions were shared.",
+"comment": ""
+},
+{
+"i": 262,
+"en": "CMUX rejected this extension's configuration. No workspace data or actions were shared.",
+"comment": ""
+},
+{
+"i": 263,
+"en": "CMUX did not receive this extension's configuration in time. No workspace data or actions are being shared.",
+"comment": ""
+},
+{
+"i": 264,
+"en": "CMUX did not receive a sidebar extension configuration, so no workspace data or actions were shared.",
+"comment": ""
+},
+{
+"i": 265,
+"en": "Blocked, connection interrupted",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Blocked, configuration unavailable",
+"comment": ""
+},
+{
+"i": 267,
+"en": "Blocked, invalid configuration",
+"comment": ""
+},
+{
+"i": 268,
+"en": "Blocked, configuration timed out",
+"comment": ""
+},
+{
+"i": 269,
+"en": "Blocked, missing configuration",
+"comment": ""
+},
+{
+"i": 270,
+"en": "Extension Blocked",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Open larger",
+"comment": ""
+},
+{
+"i": 272,
+"en": "Sidebar Extensions",
+"comment": ""
+},
+{
+"i": 273,
+"en": "Choose Extension",
+"comment": ""
+},
+{
+"i": 274,
+"en": "Choose which enabled extension should replace the sidebar.",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Choose a sidebar extension",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Bundle",
+"comment": ""
+},
+{
+"i": 277,
+"en": "Show extension details",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Secure extension connection",
+"comment": ""
+},
+{
+"i": 279,
+"en": "Waiting for an enabled extension",
+"comment": ""
+},
+{
+"i": 280,
+"en": "A sidebar extension is installed but disabled.",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Install and enable a CMUX sidebar extension to show it here.",
+"comment": ""
+},
+{
+"i": 282,
+"en": "No sidebar extension enabled",
+"comment": ""
+},
+{
+"i": 283,
+"en": "CMUX could not load sidebar extensions.",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Loading sidebar extensions",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Manage Sidebar Extensions...",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Manage",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Close workspaces from the extension",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Create workspaces for specific local folders",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Read listening ports for each workspace",
+"comment": ""
+},
+{
+"i": 290,
+"en": "Read latest workspace notifications",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Open links from the extension",
+"comment": ""
+},
+{
+"i": 292,
+"en": "Read pull request links associated with workspaces",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Select a workspace when you click in the extension",
+"comment": ""
+},
+{
+"i": 294,
+"en": "Read workspace names, branches, unread counts, and selection",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Read local workspace and project paths",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Network ports",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Pull requests",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Workspace metadata",
+"comment": ""
+},
+{
+"i": 299,
+"en": "Workspace paths",
+"comment": ""
+}
+]

@@ -368,7 +368,7 @@ enum SurfaceBrowserPlaceholder {
             )
             : String(
                 localized: "cloudTree.pane.unsupportedHint",
-                defaultValue: "This provider cannot open port previews. Do not retry; use `cmux vm exec` inside the machine or choose another machine."
+                defaultValue: "This provider cannot open port previews. Do not retry; use `shellx vm exec` inside the machine or choose another machine."
             )
         return page(title: title, detail: "\(error)\n\(hint)", spinner: false)
     }

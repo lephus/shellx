@@ -16,7 +16,7 @@ extension CMUXCLI {
         ).matches(version) else {
             throw CLIError(message: String(
                 localized: "cli.sshPtyAttach.incompatibleDaemon",
-                defaultValue: "SSH attach stopped because the remote daemon version does not match this cmux client. Install a cmux release with its matching remote daemon, then reconnect the workspace. Do not substitute a daemon from an older release.",
+                defaultValue: "SSH attach stopped because the remote daemon version does not match this ShellX client. Install a ShellX release with its matching remote daemon, then reconnect the workspace. Do not substitute a daemon from an older release.",
                 bundle: CLIExecutableLocator.enclosingAppBundle() ?? .main
             ))
         }

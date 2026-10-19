@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Close Workspaces Below",
+"comment": ""
+},
+{
+"i": 1,
+"en": "Copy Error",
+"comment": ""
+},
+{
+"i": 2,
+"en": "Copy Errors",
+"comment": ""
+},
+{
+"i": 3,
+"en": "Copy SSH Error",
+"comment": ""
+},
+{
+"i": 4,
+"en": "Copy Workspace IDs",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Copy Workspace Links",
+"comment": ""
+},
+{
+"i": 6,
+"en": "Disconnect Workspace",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Disconnect Workspaces",
+"comment": ""
+},
+{
+"i": 8,
+"en": "Mute Workspace Notifications",
+"comment": ""
+},
+{
+"i": 9,
+"en": "Mute Notifications for Selected Workspaces",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Unmute Workspace Notifications",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Unmute Notifications for Selected Workspaces",
+"comment": ""
+},
+{
+"i": 12,
+"en": "Mark Workspace as Read",
+"comment": ""
+},
+{
+"i": 13,
+"en": "Mark Workspace as Unread",
+"comment": ""
+},
+{
+"i": 14,
+"en": "Mark Workspaces as Done",
+"comment": ""
+},
+{
+"i": 15,
+"en": "Mark Workspaces as Read",
+"comment": ""
+},
+{
+"i": 16,
+"en": "Mark Workspaces as Unread",
+"comment": ""
+},
+{
+"i": 17,
+"en": "Move Down",
+"comment": ""
+},
+{
+"i": 18,
+"en": "Move to Top",
+"comment": ""
+},
+{
+"i": 19,
+"en": "Move Up",
+"comment": ""
+},
+{
+"i": 20,
+"en": "Move Workspace to Window",
+"comment": ""
+},
+{
+"i": 21,
+"en": "Move Workspaces to Window",
+"comment": ""
+},
+{
+"i": 22,
+"en": "No Notifications",
+"comment": ""
+},
+{
+"i": 23,
+"en": "Pin Workspaces",
+"comment": ""
+},
+{
+"i": 24,
+"en": "Reconnect Workspace",
+"comment": ""
+},
+{
+"i": 25,
+"en": "Reconnect Workspaces",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Remove Custom Workspace Name",
+"comment": ""
+},
+{
+"i": 27,
+"en": "Unpin Workspaces",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Workspace Color",
+"comment": ""
+},
+{
+"i": 29,
+"en": "Move to Group",
+"comment": ""
+},
+{
+"i": 30,
+"en": "New Empty Workspace Group",
+"comment": ""
+},
+{
+"i": 31,
+"en": "New Group from Selection",
+"comment": ""
+},
+{
+"i": 32,
+"en": "New Group from Workspace",
+"comment": ""
+},
+{
+"i": 33,
+"en": "Remove from Group",
+"comment": ""
+},
+{
+"i": 34,
+"en": "Workspace Settings",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Hide Terminal Scroll Bar",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Auto — %@",
+"comment": ""
+},
+{
+"i": 37,
+"en": "ERROR: Terminal session is out of date; restart the shell and try again",
+"comment": ""
+},
+{
+"i": 38,
+"en": "Terminal session is out of date; restart the shell and try again",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Diagnostic file saved. Click to reveal it in Finder.",
+"comment": ""
+},
+{
+"i": 40,
+"en": "Diagnostic file saved",
+"comment": ""
+},
+{
+"i": 41,
+"en": "cmux crashed during your last session",
+"comment": ""
+},
+{
+"i": 42,
+"en": "In-app (full input)",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Isolated process",
+"comment": ""
+},
+{
+"i": 44,
+"en": "Reset About",
+"comment": ""
+},
+{
+"i": 45,
+"en": "About Titlebar Debug",
+"comment": ""
+},
+{
+"i": 46,
+"en": "Action Lane Border",
+"comment": ""
+},
+{
+"i": 47,
+"en": "Action Lane Geometry",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Content fade",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Copy Config",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Fine tune",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Bonsplit Tab Bar",
+"comment": ""
+},
+{
+"i": 52,
+"en": "%@ px",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Reset",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Separator fade frame",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Solid bg extra",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Bonsplit Tab Bar Debug",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Padding",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Preview",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Browser Profile Popover",
+"comment": ""
+},
+{
+"i": 60,
+"en": "Horizontal",
+"comment": ""
+},
+{
+"i": 61,
+"en": "Vertical",
+"comment": ""
+},
+{
+"i": 62,
+"en": "Changes apply live to the browser profile popover.",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Tune the profile popover padding live while comparing it against the browser toolbar menu.",
+"comment": ""
+},
+{
+"i": 64,
+"en": "Controls the red debug-build label below the sidebar footer.",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Show Dev Build Banner",
+"comment": ""
+},
+{
+"i": 66,
+"en": "THIS IS A DEV BUILD",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Clear (system default)",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Current: %@",
+"comment": ""
+},
+{
+"i": 69,
+"en": "Current: (system default)",
+"comment": ""
+},
+{
+"i": 70,
+"en": "New DEBUG cmux windows open on the selected display. Shared across all tagged dev builds; applied at window creation.",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Refresh displays",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Dev Window Display",
+"comment": ""
+},
+{
+"i": 73,
+"en": "About Titlebar Debug…",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Bonsplit Tab Bar Debug…",
+"comment": ""
+},
+{
+"i": 75,
+"en": "Browser Profile Popover Debug…",
+"comment": ""
+},
+{
+"i": 76,
+"en": "Browser Toolbar Button Spacing",
+"comment": ""
+},
+{
+"i": 77,
+"en": "Dev Window Display…",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Feed Button Style Debug…",
+"comment": ""
+},
+{
+"i": 79,
+"en": "Feed Text Editor Lab…",
+"comment": ""
+},
+{
+"i": 80,
+"en": "Iroh Transport",
+"comment": ""
+},
+{
+"i": 81,
+"en": "No Relay (Direct Only)",
+"comment": ""
+},
+{
+"i": 82,
+"en": "Relay Only",
+"comment": ""
+},
+{
+"i": 83,
+"en": "Open Agent GUI (React)",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Open Agent GUI (Solid)",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Open Stress Workspaces and Load All Terminals",
+"comment": ""
+},
+{
+"i": 86,
+"en": "PDF Preview Chrome Debug…",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Show Canvas Scroll Hint",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Footer Icon Balance Lab…",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Startup Appearance Debug…",
+"comment": ""
+},
+{
+"i": 90,
+"en": "Tab Bar Backdrop Lab…",
+"comment": ""
+},
+{
+"i": 91,
+"en": "Titlebar Layout Debug...",
+"comment": ""
+},
+{
+"i": 92,
+"en": "Tune each icon live, compare sharp and squint previews, then use the cards to explore Help weights.",
+"comment": ""
+},
+{
+"i": 93,
+"en": "Help icon",
+"comment": ""
+},
+{
+"i": 94,
+"en": "Help",
+"comment": ""
+},
+{
+"i": 95,
+"en": "Hover intensity",
+"comment": ""
+},
+{
+"i": 96,
+"en": "Hover preview",
+"comment": ""
+},
+{
+"i": 97,
+"en": "Icon sizes",
+"comment": ""
+},
+{
+"i": 98,
+"en": "Optical balance",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Profile display",
+"comment": ""
+},
+{
+"i": 100,
+"en": "Icon",
+"comment": ""
+},
+{
+"i": 101,
+"en": "Picture",
+"comment": ""
+},
+{
+"i": 102,
+"en": "Profile icon",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Profile",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Cell guides show geometric alignment; the squint preview compares optical weight.",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Reset Selection",
+"comment": ""
+},
+{
+"i": 106,
+"en": "Sharp",
+"comment": ""
+},
+{
+"i": 107,
+"en": "Show 22 pt cell guides",
+"comment": ""
+},
+{
+"i": 108,
+"en": "Squint",
+"comment": ""
+},
+{
+"i": 109,
+"en": "Squint radius",
+"comment": ""
+},
+{
+"i": 110,
+"en": "Footer Icon Balance Lab",
+"comment": ""
+},
+{
+"i": 111,
+"en": "Medium",
+"comment": ""
+},
+{
+"i": 112,
+"en": "Regular",
+"comment": ""
+},
+{
+"i": 113,
+"en": "Semibold",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Appearance",
+"comment": ""
+},
+{
+"i": 115,
+"en": "Appearance:",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Config:",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Applied",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Reloads the running app through Ghostty config update, matching startup theme resolution without editing config files.",
+"comment": ""
+},
+{
+"i": 119,
+"en": "Apply Preview",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Copy Selected Config",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Force Dark",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Force Light",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Stored App Setting",
+"comment": ""
+},
+{
+"i": 124,
+"en": "No user Ghostty settings, so cmux applies its managed default colors.",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Fresh Install",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Loads your actual Ghostty and cmux config files.",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Real User Config",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Simulates a user with direct terminal color settings and no theme.",
+"comment": ""
+},
+{
+"i": 129,
+"en": "User Explicit Colors",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Simulates a user with one Ghostty theme applied in both appearances.",
+"comment": ""
+},
+{
+"i": 131,
+"en": "User Single Theme",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Simulates a user with an explicit light/dark Ghostty theme.",
+"comment": ""
+},
+{
+"i": 133,
+"en": "User Light/Dark Theme",
+"comment": ""
+},
+{
+"i": 134,
+"en": "Loads real user config files.",
+"comment": ""
+},
+{
+"i": 135,
+"en": "Restore Real Startup",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Selected Config",
+"comment": ""
+},
+{
+"i": 137,
+"en": "Startup config",
+"comment": ""
+},
+{
+"i": 138,
+"en": "Startup Appearance Debug",
+"comment": ""
+},
+{
+"i": 139,
+"en": "End opacity",
+"comment": ""
+},
+{
+"i": 140,
+"en": "Candidate fade",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Lead opacity",
+"comment": ""
+},
+{
+"i": 142,
+"en": "Ramp start",
+"comment": ""
+},
+{
+"i": 143,
+"en": "Candidate softness",
+"comment": ""
+},
+{
+"i": 144,
+"en": "Solid width",
+"comment": ""
+},
+{
+"i": 145,
+"en": "L",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Mask tabs",
+"comment": ""
+},
+{
+"i": 147,
+"en": "Surface opacity",
+"comment": ""
+},
+{
+"i": 148,
+"en": "R",
+"comment": ""
+},
+{
+"i": 149,
+"en": "Live Bonsplit tab bars with overflow tabs under the split buttons. The window background is transparent.",
+"comment": ""
+},
+{
+"i": 150,
+"en": "agent-browser logs",
+"comment": ""
+},
+{
+"i": 151,
+"en": "split button backdrop check",
+"comment": ""
+},
+{
+"i": 152,
+"en": "tabs hidden below controls",
+"comment": ""
+},
+{
+"i": 153,
+"en": "right edge overflow sample",
+"comment": ""
+},
+{
+"i": 154,
+"en": "cmux terminal transparency",
+"comment": ""
+},
+{
+"i": 155,
+"en": "underlay tab text visible here",
+"comment": ""
+},
+{
+"i": 156,
+"en": "drag / resize / compare the transparent edges",
+"comment": ""
+},
+{
+"i": 157,
+"en": "tab titles intentionally overflow under the split buttons",
+"comment": ""
+},
+{
+"i": 158,
+"en": "lawrence in ~/cmux",
+"comment": ""
+},
+{
+"i": 159,
+"en": "Tab Bar Backdrop Lab",
+"comment": ""
+},
+{
+"i": 160,
+"en": "workspace@lab:~",
+"comment": ""
+},
+{
+"i": 161,
+"en": "Candidate",
+"comment": ""
+},
+{
+"i": 162,
+"en": "Translucent chrome with tab occlusion.",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Low contrast",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Lower-opacity solid region.",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Soft end",
+"comment": ""
+},
+{
+"i": 166,
+"en": "Same mask with lighter button fill.",
+"comment": ""
+},
+{
+"i": 167,
+"en": "Tight edge",
+"comment": ""
+},
+{
+"i": 168,
+"en": "More coverage at the fade start.",
+"comment": ""
+},
+{
+"i": 169,
+"en": "Wide fade",
+"comment": ""
+},
+{
+"i": 170,
+"en": "Same model with a softer edge.",
+"comment": ""
+},
+{
+"i": 171,
+"en": "4 Control background",
+"comment": ""
+},
+{
+"i": 172,
+"en": "Uses AppKit controlBackgroundColor.",
+"comment": ""
+},
+{
+"i": 173,
+"en": "7 No backdrop",
+"comment": ""
+},
+{
+"i": 174,
+"en": "Control sample. Tabs remain visible below the buttons.",
+"comment": ""
+},
+{
+"i": 175,
+"en": "2 Raw bar opaque",
+"comment": ""
+},
+{
+"i": 176,
+"en": "Uses the tab chrome color at full opacity.",
+"comment": ""
+},
+{
+"i": 177,
+"en": "1 Raw pane opaque",
+"comment": ""
+},
+{
+"i": 178,
+"en": "Forces the pane fill to full opacity.",
+"comment": ""
+},
+{
+"i": 179,
+"en": "5 Opaque bar composite",
+"comment": ""
+},
+{
+"i": 180,
+"en": "Composites tab chrome over the window background.",
+"comment": ""
+},
+{
+"i": 181,
+"en": "0 Opaque pane composite",
+"comment": ""
+},
+{
+"i": 182,
+"en": "Old candidate. Covers too hard.",
+"comment": ""
+},
+{
+"i": 183,
+"en": "6 Translucent chrome",
+"comment": ""
+},
+{
+"i": 184,
+"en": "Shows the bleed-through problem.",
+"comment": ""
+},
+{
+"i": 185,
+"en": "No fade",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Hard translucent edge for contrast.",
+"comment": ""
+},
+{
+"i": 187,
+"en": "3 Window background",
+"comment": ""
+},
+{
+"i": 188,
+"en": "Uses AppKit windowBackgroundColor.",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Sample width",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Actions",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Leading",
+"comment": "Leading horizontal edge in the interface's text direction; not an absolute left coordinate."
+},
+{
+"i": 192,
+"en": "Minimum Width",
+"comment": ""
+},
+{
+"i": 193,
+"en": "Sidebar",
+"comment": ""
+},
+{
+"i": 194,
+"en": "Style",
+"comment": ""
+},
+{
+"i": 195,
+"en": "Tab Bar Inset",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Titlebar Layout Debug",
+"comment": ""
+},
+{
+"i": 197,
+"en": "Titlebar Controls",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Titlebar Inset",
+"comment": ""
+},
+{
+"i": 199,
+"en": "Top",
+"comment": ""
+},
+{
+"i": 200,
+"en": "Traffic Light Insets",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Browser Profile Popover Debug",
+"comment": ""
+},
+{
+"i": 202,
+"en": "macOS could not update every default terminal handler.",
+"comment": ""
+},
+{
+"i": 203,
+"en": "Mode",
+"comment": ""
+},
+{
+"i": 204,
+"en": "Open Related File",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Restore Defaults",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Section",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Amount",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Enable",
+"comment": ""
+},
+{
+"i": 209,
+"en": "Couldn't upload the dropped item because it isn't a local file. Drop a file from Finder, then try again.",
+"comment": ""
+},
+{
+"i": 210,
+"en": "File transfer timed out. Check the remote host and network connection, then try again.",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Couldn't upload the file to the remote session. Check that the remote host is reachable, then try again.",
+"comment": ""
+},
+{
+"i": 212,
+"en": "Don’t ask again",
+"comment": ""
+},
+{
+"i": 213,
+"en": "Closing this workspace will remove the group “%@”.",
+"comment": ""
+},
+{
+"i": 214,
+"en": "Closing this workspace will ungroup “%1$@” and release %#@count2@.",
+"comment": ""
+},
+{
+"i": 215,
+"en": "%lld other workspaces",
+"comment": ""
+},
+{
+"i": 216,
+"en": "Closing this workspace will ungroup “%@” and release 1 other workspace.",
+"comment": ""
+},
+{
+"i": 217,
+"en": "Close this workspace?",
+"comment": ""
+},
+{
+"i": 218,
+"en": "This will close the last tab and close the window.",
+"comment": ""
+},
+{
+"i": 219,
+"en": "This will close the last tab and close its workspace.",
+"comment": ""
+},
+{
+"i": 220,
+"en": "This will close 1 tab in this pane:\n%@",
+"comment": ""
+},
+{
+"i": 221,
+"en": "This will close %1$lld tabs in this pane:\n%2$@",
+"comment": ""
+},
+{
+"i": 222,
+"en": "Close other tabs?",
+"comment": ""
+},
+{
+"i": 223,
+"en": "Close pane?",
+"comment": ""
+},
+{
+"i": 224,
+"en": "This workspace is pinned. Closing it will close the workspace and all of its panels.",
+"comment": ""
+},
+{
+"i": 225,
+"en": "Close pinned workspace?",
+"comment": ""
+},
+{
+"i": 226,
+"en": "This will close the current tab.",
+"comment": ""
+},
+{
+"i": 227,
+"en": "This will close \"%@\".",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Close tab?",
+"comment": ""
+},
+{
+"i": 229,
+"en": "This will close the current window and all of its workspaces.",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Close window?",
+"comment": ""
+},
+{
+"i": 231,
+"en": "This will close the workspace and all of its panels.",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Close workspace?",
+"comment": ""
+},
+{
+"i": 233,
+"en": "This will close %1$lld workspaces and all of their panels:\n%2$@",
+"comment": ""
+},
+{
+"i": 234,
+"en": "Close workspaces?",
+"comment": ""
+},
+{
+"i": 235,
+"en": "This will close the current window, its %1$lld workspaces, and all of their panels:\n%2$@",
+"comment": ""
+},
+{
+"i": 236,
+"en": "This project action comes from:\n\n%@\n\nIt will run:\n\n%@",
+"comment": ""
+},
+{
+"i": 237,
+"en": "Run Once",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Run Project Action?",
+"comment": ""
+},
+{
+"i": 239,
+"en": "Trust and Run",
+"comment": ""
+},
+{
+"i": 240,
+"en": "A workspace with this name already exists. Close it and create a new one?",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Recreate",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Workspace Already Exists",
+"comment": ""
+},
+{
+"i": 243,
+"en": "cwd: %@",
+"comment": ""
+},
+{
+"i": 244,
+"en": "cwd %1$@: %2$@",
+"comment": ""
+},
+{
+"i": 245,
+"en": "url: %@",
+"comment": ""
+},
+{
+"i": 246,
+"en": "Could Not Set Default Terminal",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Delete",
+"comment": ""
+},
+{
+"i": 248,
+"en": "Delete the group “%@” and close its workspace?",
+"comment": ""
+},
+{
+"i": 249,
+"en": "Delete the group “%1$@” and close its %#@count2@?",
+"comment": ""
+},
+{
+"i": 250,
+"en": "%lld workspaces",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Delete the group “%@” and close its 2 workspaces?",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Delete this group?",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Couldn't Delete Workspace Layout",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Removes “%1$@” from %2$@. Workspaces it already created stay open.",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Delete Workspace Layout?",
+"comment": ""
+},
+{
+"i": 256,
+"en": "Don't warn again for Cmd+Q",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Notifications are disabled for cmux. Enable them in System Settings to see alerts.",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Enable Notifications for cmux",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Couldn't Update Default",
+"comment": ""
+},
+{
+"i": 260,
+"en": "This will close all windows and workspaces.",
+"comment": ""
+},
+{
+"i": 261,
+"en": "Quit",
+"comment": ""
+},
+{
+"i": 262,
+"en": "Quit cmux?",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Enter a custom name for this tab.",
+"comment": ""
+},
+{
+"i": 264,
+"en": "One or more captured commands are longer than %lld UTF-8 bytes and cannot be replayed reliably from a saved layout. Shorten them before saving.",
+"comment": ""
+},
+{
+"i": 265,
+"en": "Command Too Long to Save",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Commands that will be saved and re-run:",
+"comment": ""
+},
+{
+"i": 267,
+"en": "Environment variables whose values will be saved:",
+"comment": ""
+},
+{
+"i": 268,
+"en": "Couldn't Save Workspace Layout",
+"comment": ""
+},
+{
+"i": 269,
+"en": "Couldn't capture the workspace layout. Try again.",
+"comment": ""
+},
+{
+"i": 270,
+"en": "Use as default for new workspaces",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Saves this workspace as a reusable layout in %@. It appears in the new-workspace menu and the Command Palette.",
+"comment": ""
+},
+{
+"i": 272,
+"en": "Layout name",
+"comment": ""
+},
+{
+"i": 273,
+"en": "Save",
+"comment": ""
+},
+{
+"i": 274,
+"en": "%lld panels have no layout representation (previews, viewers, …) and will be left out.",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Save Workspace Layout",
+"comment": ""
+},
+{
+"i": 276,
+"en": "URLs that will be saved:",
+"comment": ""
+},
+{
+"i": 277,
+"en": "Enter a name before saving the layout.",
+"comment": ""
+},
+{
+"i": 278,
+"en": "The saved layouts file could not be read. Check it and try again.",
+"comment": ""
+},
+{
+"i": 279,
+"en": "A layout with that name already exists.",
+"comment": ""
+},
+{
+"i": 280,
+"en": "That saved layout could not be found.",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Layout Not Saved",
+"comment": ""
+},
+{
+"i": 282,
+"en": "The saved layout request could not be completed. Try again.",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Replace",
+"comment": ""
+},
+{
+"i": 284,
+"en": "A layout named “%@” already exists. Replace it?",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Replace Saved Layout?",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Enter a name for this workspace layout.",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Save Layout as Template",
+"comment": ""
+},
+{
+"i": 288,
+"en": "cmux stayed open because it could not restore a Simulator app’s camera state. Quit again to retry cleanup.",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Couldn’t Finish Simulator Cleanup",
+"comment": ""
+},
+{
+"i": 290,
+"en": "cmux SSH Link Blocked",
+"comment": ""
+},
+{
+"i": 291,
+"en": "No",
+"comment": ""
+},
+{
+"i": 292,
+"en": "I trust this SSH target and want cmux to connect.",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Command preview:",
+"comment": ""
+},
+{
+"i": 294,
+"en": "The link included conflicting SSH target fields.",
+"comment": ""
+},
+{
+"i": 295,
+"en": "The link included both title and name. Use only one workspace title field.",
+"comment": ""
+},
+{
+"i": 296,
+"en": "The SSH host or user contains unsupported or hidden characters, so cmux refused to use it.",
+"comment": ""
+},
+{
+"i": 297,
+"en": "The SSH host or user cannot start with a dash.",
+"comment": ""
+},
+{
+"i": 298,
+"en": "The SSH target is too long. The maximum length is %lld characters.",
+"comment": ""
+},
+{
+"i": 299,
+"en": "The SSH link repeated a parameter: %@",
+"comment": ""
+}
+]

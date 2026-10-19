@@ -111,6 +111,12 @@ extension TerminalController {
         }
         let authorizedRequest = relayAuthorization.request
         let automationOrigin = CmuxAutomationInvocationContext.eventOrigin
+        if let refusal = Self.shellXUnavailableServiceResponse(
+            method: authorizedRequest.method,
+            id: authorizedRequest.id.map(\.foundationObject)
+        ) {
+            return refusal
+        }
         if let focusError = Self.focusSuppressionResponse(
             method: authorizedRequest.method,
             id: authorizedRequest.id.map(\.foundationObject),
@@ -135,7 +141,7 @@ extension TerminalController {
                 code: ControlOverloadResponder.errorCode,
                 message: String(
                     localized: "socket.overloaded.message",
-                    defaultValue: "cmux is handling too many control-socket requests right now, so this one was not run. Retry in a moment."
+                    defaultValue: "ShellX is handling too many control-socket requests right now, so this one was not run. Retry in a moment."
                 )
             )
         }
@@ -550,6 +556,12 @@ extension TerminalController {
     private nonisolated func processParsedV2CommandAsync(
         _ request: ControlRequest
     ) async throws -> String {
+        if let refusal = Self.shellXUnavailableServiceResponse(
+            method: request.method,
+            id: request.id.map(\.foundationObject)
+        ) {
+            return refusal
+        }
         if let focusError = Self.focusSuppressionResponse(
             method: request.method,
             id: request.id.map(\.foundationObject),

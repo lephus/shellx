@@ -26,7 +26,7 @@ set -euo pipefail
 # and extension always agree on the point id.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SIDEBAR_POINT_NAME="cmux.sidebar"
+SIDEBAR_POINT_NAME="sidebar"
 
 TAG=""
 EXAMPLE="both"

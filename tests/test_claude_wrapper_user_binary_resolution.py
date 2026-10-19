@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WRAPPER = ROOT / "Resources" / "bin" / "cmux-claude-wrapper"
+WRAPPER = ROOT / "Resources" / "bin" / "shellx-claude-wrapper"
 SHELL_INTEGRATION_DIR = ROOT / "Resources" / "shell-integration"
 
 
@@ -39,7 +39,7 @@ def run_wrapper(argv: list[str], env: dict[str, str]) -> subprocess.CompletedPro
 
 
 def test_wrapper_skips_cmux_shims_and_bundled_claude(failures: list[str]) -> None:
-    with tempfile.TemporaryDirectory(prefix="cmux-claude-wrapper-resolution-") as td:
+    with tempfile.TemporaryDirectory(prefix="shellx-claude-wrapper-resolution-") as td:
         root = Path(td)
         bundle_bin = root / "cmux.app" / "Contents" / "Resources" / "bin"
         shim_bin = root / "shim-bin"
@@ -47,7 +47,7 @@ def test_wrapper_skips_cmux_shims_and_bundled_claude(failures: list[str]) -> Non
         for directory in (bundle_bin, shim_bin, real_bin):
             directory.mkdir(parents=True, exist_ok=True)
 
-        wrapper = bundle_bin / "cmux-claude-wrapper"
+        wrapper = bundle_bin / "shellx-claude-wrapper"
         wrapper.write_bytes(WRAPPER.read_bytes())
         wrapper.chmod(0o755)
 
@@ -87,7 +87,7 @@ exec "{wrapper}" "$@"
 
 
 def test_wrapper_skips_inherited_cmux_cli_shim_roots(failures: list[str]) -> None:
-    with tempfile.TemporaryDirectory(prefix="cmux-claude-wrapper-inherited-shim-") as td:
+    with tempfile.TemporaryDirectory(prefix="shellx-claude-wrapper-inherited-shim-") as td:
         root = Path(td)
         wrapper_bin = root / "wrapper-bin"
         current_shim_root = root / "tmp" / "cmux-cli-shims" / "current-surface"
@@ -96,7 +96,7 @@ def test_wrapper_skips_inherited_cmux_cli_shim_roots(failures: list[str]) -> Non
         for directory in (wrapper_bin, current_shim_root, inherited_shim_root, real_bin):
             directory.mkdir(parents=True, exist_ok=True)
 
-        wrapper = wrapper_bin / "cmux-claude-wrapper"
+        wrapper = wrapper_bin / "shellx-claude-wrapper"
         wrapper.write_bytes(WRAPPER.read_bytes())
         wrapper.chmod(0o755)
 
@@ -135,7 +135,7 @@ echo real-claude "$@"
 
 
 def test_wrapper_preserves_claude_teams_tmux_shim_for_custom_path(failures: list[str]) -> None:
-    with tempfile.TemporaryDirectory(prefix="cmux-claude-wrapper-teams-path-") as td:
+    with tempfile.TemporaryDirectory(prefix="shellx-claude-wrapper-teams-path-") as td:
         root = Path(td)
         wrapper_bin = root / "wrapper-bin"
         shim_root = root / "tmp" / "cmux-cli-shims" / "surface"
@@ -144,7 +144,7 @@ def test_wrapper_preserves_claude_teams_tmux_shim_for_custom_path(failures: list
         for directory in (wrapper_bin, shim_root, real_bin, logs):
             directory.mkdir(parents=True, exist_ok=True)
 
-        wrapper = wrapper_bin / "cmux-claude-wrapper"
+        wrapper = wrapper_bin / "shellx-claude-wrapper"
         wrapper.write_bytes(WRAPPER.read_bytes())
         wrapper.chmod(0o755)
 
@@ -243,7 +243,7 @@ def test_shell_integration_preserves_empty_path_components(failures: list[str]) 
         surface_id = "surface-path-test"
         home = root / "home"
         home.mkdir()
-        shim_root = home / ".cmuxterm" / "cmux-cli-shims" / surface_id
+        shim_root = home / ".shellx" / "cmux-cli-shims" / surface_id
         bundled_bin = SHELL_INTEGRATION_DIR.parent / "bin"
         expected_paths = {
             "bash": f"{bundled_bin}:{shim_root}::{first}::{last}:",

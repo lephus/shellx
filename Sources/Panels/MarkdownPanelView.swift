@@ -2,6 +2,7 @@ import AppKit
 import CmuxFoundation
 import SwiftUI
 import WebKit
+import ShellXIcons
 
 /// SwiftUI view that renders a MarkdownPanel's content in a WKWebView using
 /// marked.js + github-markdown-css + highlight.js.
@@ -187,7 +188,7 @@ struct MarkdownPanelView: View {
 
     private var fileUnavailableView: some View {
         VStack(spacing: 12) {
-            Image(systemName: "doc.questionmark")
+            ShellXIcon.image("doc.questionmark")
                 .cmuxFont(size: 40)
                 .foregroundColor(.secondary)
             Text(String(localized: "markdown.fileUnavailable.title", defaultValue: "File unavailable"))
@@ -311,21 +312,21 @@ private struct MarkdownPanelToolbar: View {
 
             toolbarButton(
                 title: String(localized: "markdown.toolbar.copyMarkdown", defaultValue: "Copy as Markdown"),
-                systemImage: "doc.on.doc",
+                icon: "doc.on.doc",
                 action: onCopyMarkdown
             )
             toolbarButton(
                 title: String(localized: "markdown.toolbar.copyHTML", defaultValue: "Copy as HTML"),
-                systemImage: "chevron.left.forwardslash.chevron.right",
+                icon: "chevron.left.forwardslash.chevron.right",
                 action: onCopyHTML
             )
         }
         .animation(.easeOut(duration: 0.15), value: confirmation)
     }
 
-    private func toolbarButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+    private func toolbarButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
         PanelHeaderIconButton(
-            systemName: systemImage,
+            systemName: icon,
             label: title,
             action: action
         )

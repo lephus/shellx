@@ -159,9 +159,9 @@ extension CMUXCLI {
                     ((resource == .memory && requested <= 16 * 1_024) ||
                      (resource == .vcpus && requested <= 8) ||
                      (resource == .disk && requested <= 128 * 1_024)) {
-            upgrade = String(localized: "cli.vm.resize.upgradePro", defaultValue: "Upgrade to cmux Pro to use this size.")
+            upgrade = String(localized: "cli.vm.resize.upgradePro", defaultValue: "Upgrade to ShellX Pro to use this size.")
         } else {
-            upgrade = String(localized: "cli.vm.resize.upgradeMax", defaultValue: "Upgrade to cmux Max to use larger sizes.")
+            upgrade = String(localized: "cli.vm.resize.upgradeMax", defaultValue: "Upgrade to ShellX Max to use larger sizes.")
         }
         let message = String(
             format: String(
@@ -219,7 +219,7 @@ extension CMUXCLI {
     static var vmResizeUsage: String {
         String(localized: "cli.vm.resize.usage", defaultValue: """
         Usage:
-          cmux vm resize <id> [--cpu <vCPUs>] [--memory <GiB>] [--disk <GiB>]
+          shellx vm resize <id> [--cpu <vCPUs>] [--memory <GiB>] [--disk <GiB>]
 
         Grow an existing Cloud VM in place. Specify at least one resource:
         CPU: 1–32 vCPUs. Memory: 4–64 GiB in whole GiB. Disk: 4–256 GiB in 4 GiB steps.
@@ -352,7 +352,7 @@ extension CMUXCLI {
     static var vmNewUsage: String {
         String(localized: "cli.vm.new.usage", defaultValue: """
         Usage:
-          cmux vm new [--size <4g|8g|16g|24g|32g|64g>] [--agent-updates <latest|image>]
+          shellx vm new [--size <4g|8g|16g|24g|32g|64g>] [--agent-updates <latest|image>]
                       [--name <label>] [--provider <provider>] [--image <image-id>]
                       [--workspace <workspace-id>] [--network <full|allowlist|none>]
                       [--focus|--no-focus] [--detach|-d]
@@ -366,8 +366,8 @@ extension CMUXCLI {
     static var vmListUsage: String {
         String(localized: "cli.vm.list.usage", defaultValue: """
         Usage:
-          cmux vm ls [--json]
-          cmux vm list [--json]
+          shellx vm ls [--json]
+          shellx vm list [--json]
 
         List your Cloud VMs, their state, provider, image, and plan usage.
         """)
@@ -376,7 +376,7 @@ extension CMUXCLI {
     static var vmPortsUsage: String {
         String(localized: "cli.vm.ports.usage", defaultValue: """
         Usage:
-          cmux vm ports <machine> [--json]
+          shellx vm ports <machine> [--json]
 
         Show listening TCP ports inside a Cloud VM.
         """)

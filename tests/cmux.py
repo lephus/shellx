@@ -52,11 +52,11 @@ class cmuxError(Exception):
 _STATE_DIR = os.path.expanduser("~/.local/state/cmux")
 _STABLE_SOCKET_PATH = os.path.join(_STATE_DIR, "cmux.sock")
 _LEGACY_STABLE_SOCKET_PATH = "/tmp/cmux.sock"
-_STABLE_BUNDLE_ID = "com.cmuxterm.app"
-_NIGHTLY_BUNDLE_ID = "com.cmuxterm.app.nightly"
-_RC_BUNDLE_ID = "com.cmuxterm.app.rc"
-_STAGING_BUNDLE_ID = "com.cmuxterm.app.staging"
-_DEFAULT_DEBUG_BUNDLE_ID = "com.cmuxterm.app.debug"
+_STABLE_BUNDLE_ID = "pro.shellx.desktop"
+_NIGHTLY_BUNDLE_ID = "pro.shellx.desktop.nightly"
+_RC_BUNDLE_ID = "pro.shellx.desktop.rc"
+_STAGING_BUNDLE_ID = "pro.shellx.desktop.staging"
+_DEFAULT_DEBUG_BUNDLE_ID = "pro.shellx.desktop.debug"
 
 
 def _sanitize_marker_slug(raw: str) -> Optional[str]:

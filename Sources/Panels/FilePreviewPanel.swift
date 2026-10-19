@@ -7,6 +7,8 @@ import PDFKit
 import Quartz
 import SwiftUI
 import UniformTypeIdentifiers
+import ShellXBrand
+import ShellXIcons
 
 enum FilePreviewInteraction {
     static let zoomStep: CGFloat = 1.25
@@ -90,7 +92,9 @@ struct FileExternalOpenApplicationResolver: Sendable {
         if Bundle.main.bundleIdentifier?.lowercased() == bundleIdentifier {
             return false
         }
-        return !bundleIdentifier.hasPrefix("dev.cmux.")
+        return !bundleIdentifier.hasPrefix("\(ShellXBrand.bundleID.lowercased()).")
+            && bundleIdentifier != ShellXBrand.bundleID.lowercased()
+            && !bundleIdentifier.hasPrefix("dev.cmux.")
             && !bundleIdentifier.hasPrefix("com.cmuxterm.")
     }
 }
@@ -282,7 +286,7 @@ struct FileExternalOpenMenu: View {
         case .header:
             PanelHeaderIconGlyph(systemName: "square.and.arrow.up")
         case .chrome:
-            Image(systemName: "square.and.arrow.up")
+            ShellXIcon.image("square.and.arrow.up")
                 .cmuxFont(size: 16, weight: .semibold)
                 .foregroundStyle(.secondary)
                 .frame(width: style.buttonSize.width, height: style.buttonSize.height)
@@ -1858,7 +1862,7 @@ struct FilePreviewPanelView: View {
 
     private var fileUnavailableView: some View {
         VStack(spacing: 12) {
-            Image(systemName: "doc.questionmark")
+            ShellXIcon.image("doc.questionmark")
                 .cmuxFont(size: 40)
                 .foregroundStyle(.secondary)
             Text(String(localized: "filePreview.fileUnavailable.title", defaultValue: "File unavailable"))
@@ -2012,9 +2016,9 @@ private struct FilePreviewPDFSidebarChromeView: View {
             ControlGroup {
                 sidebarMenu
             } label: {
-                Label(
+                ShellXLabel(
                     String(localized: "filePreview.pdf.sidebarOptions", defaultValue: "Sidebar Options"),
-                    systemImage: "sidebar.left"
+                    icon: "sidebar.left"
                 )
             }
             .controlSize(.regular)
@@ -2035,9 +2039,9 @@ private struct FilePreviewPDFSidebarChromeView: View {
             sidebarMenuItems
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: "sidebar.left")
+                ShellXIcon.image("sidebar.left")
                     .cmuxFont(size: 17, weight: .regular)
-                Image(systemName: "chevron.down")
+                ShellXIcon.image("chevron.down")
                     .cmuxFont(size: 10, weight: .semibold)
                     .foregroundStyle(.secondary)
             }
@@ -2098,7 +2102,7 @@ private struct FilePreviewPDFSidebarChromeView: View {
         Button(action: action) {
             HStack {
                 if isSelected {
-                    Image(systemName: "checkmark")
+                    ShellXIcon.image("checkmark")
                 }
                 Text(title)
             }
@@ -2115,7 +2119,7 @@ struct FilePreviewChromeIconButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemName)
+            ShellXIcon.image(systemName)
                 .cmuxFont(size: 16, weight: .semibold)
                 .frame(width: 42, height: 40)
         }
@@ -2134,8 +2138,8 @@ private struct FilePreviewChromeSidebarMenuLabel: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "sidebar.left")
-            Image(systemName: "chevron.down")
+            ShellXIcon.image("sidebar.left")
+            ShellXIcon.image("chevron.down")
                 .cmuxFont(size: 11, weight: .semibold)
         }
         .cmuxFont(size: 16, weight: .semibold)

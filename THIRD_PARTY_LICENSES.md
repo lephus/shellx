@@ -16,6 +16,19 @@ license text is in `Assets.xcassets/AgentIcons/LOBE-LICENSE.txt`.
 
 ---
 
+## coolicons (app icons)
+
+- **License:** Creative Commons Attribution 4.0 International (CC BY 4.0), https://creativecommons.org/licenses/by/4.0/
+- **Credit:** coolicons by Kryston Schwarze
+- **Source:** https://github.com/krystonschwarze/coolicons (v4.1)
+
+All 442 icons are bundled as SF Symbols custom-symbol templates in
+`Packages/Shared/ShellXBrand/Sources/ShellXIcons/Resources/Coolicons.xcassets`
+(strokes expanded to filled outlines, otherwise unchanged; see the `NOTICE`
+next to the catalog and `scripts/shellx/import_coolicons.py`).
+
+---
+
 ## Primer Octicons (selected diff viewer icons)
 
 - **License:** MIT License

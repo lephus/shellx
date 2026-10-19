@@ -1,6 +1,7 @@
 import CmuxFoundation
 import CmuxSettingsUI
 import SwiftUI
+import ShellXIcons
 
 /// Shows the active team in the Cloud header and pulls its team menu down from
 /// the trigger's leading edge.
@@ -134,13 +135,13 @@ struct CloudTeamPickerRow: View {
 
     private func chipLabel(teamName: String, isEnabled: Bool, isHighlighted: Bool) -> some View {
         HStack(spacing: 5) {
-            Image(systemName: "person.2")
+            ShellXIcon.image("person.2")
                 .font(.system(size: 10, weight: .semibold))
             Text(teamName)
                 .cmuxFont(size: 11, weight: .medium)
                 .lineLimit(1)
                 .layoutPriority(1)
-            Image(systemName: "chevron.down")
+            ShellXIcon.image("chevron.down")
                 .font(.system(size: 9, weight: .semibold))
         }
         // Same grey and hover rule as the tab bar's mode labels above.

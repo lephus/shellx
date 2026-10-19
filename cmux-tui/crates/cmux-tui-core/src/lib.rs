@@ -50,6 +50,9 @@ pub mod sizing_policy;
 mod stream_interrupt;
 mod surface;
 mod terminal_metadata;
+// ShellX: Mac-owned terminals (virtual PTY), see the module header.
+#[cfg(unix)]
+mod virtual_pty;
 mod workspace_registry;
 
 pub mod layout;

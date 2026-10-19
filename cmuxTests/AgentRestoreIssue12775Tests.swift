@@ -54,7 +54,7 @@ struct AgentRestoreIssue12775Tests {
             workingDirectory: "/tmp"
         )
         let workspace = Workspace(
-            initialTerminalInput: " cmux restore claude \(sessionID)\n",
+            initialTerminalInput: " shellx restore claude \(sessionID)\n",
             initialTerminalStartupRestoreAgent: agent,
             initialTerminalStartupRestoreCommitOwner: .tabManagerTopology,
             agentSessionAutoResumeDefaults: defaults

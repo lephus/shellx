@@ -13,7 +13,7 @@ import Testing
 /// exactly while macOS waits for the extension approval.
 @Suite
 struct CloudTunnelBannerTests {
-    private static let extensionID = "com.cmuxterm.app.tests.tunnel"
+    private static let extensionID = "pro.shellx.desktop.tests.tunnel"
     private let networkExtension = CloudTunnelBackend.networkExtension(extensionBundleIdentifier: CloudTunnelBannerTests.extensionID)
 
     @Test("off, and builds without the extension, show no banner")
@@ -49,9 +49,9 @@ struct CloudTunnelBannerTests {
         let failed = try #require(CloudTunnelBanner(status: CloudTunnelStatus(backend: networkExtension, state: .failed("no route"), isPinned: false)))
         #expect(failed.kind == .failed && failed.text.contains("no route"))
         let pinned = try #require(CloudTunnelBanner(status: CloudTunnelStatus(backend: networkExtension, state: .up, isPinned: true)))
-        #expect(pinned.kind == .connected && pinned.text.contains("cmux vpn down"))
+        #expect(pinned.kind == .connected && pinned.text.contains("shellx vpn down"))
         let unpinned = try #require(CloudTunnelBanner(status: CloudTunnelStatus(backend: networkExtension, state: .up, isPinned: false)))
-        #expect(unpinned.kind == .connected && !unpinned.text.contains("cmux vpn down"))
+        #expect(unpinned.kind == .connected && !unpinned.text.contains("shellx vpn down"))
     }
 
     @Test("the settings link lands on Login Items & Extensions on macOS 15 and Privacy & Security before")

@@ -1,20 +1,22 @@
 import CmuxFoundation
 import AppKit
 import SwiftUI
+import ShellXBrand
+import ShellXIcons
 
 struct DockEmptyView: View {
     @State private var isPromptPopoverPresented = false
 
     var body: some View {
         VStack(spacing: 10) {
-            Image(systemName: "dock.rectangle")
+            ShellXIcon.image("dock.rectangle")
                 .cmuxFont(size: 24)
                 .foregroundStyle(.secondary)
             Text(String(localized: "dock.empty.title", defaultValue: "No Dock Controls"))
                 .cmuxFont(size: 13, weight: .semibold)
             Text(String(
                 localized: "dock.empty.subtitle",
-                defaultValue: "Add controls to .cmux/dock.json."
+                defaultValue: "Add controls to .shellx/dock.json."
             ))
             .cmuxFont(size: 12)
             .foregroundStyle(.secondary)
@@ -23,9 +25,9 @@ struct DockEmptyView: View {
                     Button {
                         copyAgentPrompt()
                     } label: {
-                        Label(
+                        ShellXLabel(
                             String(localized: "dock.empty.copyPrompt", defaultValue: "Copy Agent Prompt"),
-                            systemImage: "doc.on.doc"
+                            icon: "doc.on.doc"
                         )
                     }
                     .buttonStyle(.bordered)
@@ -35,7 +37,7 @@ struct DockEmptyView: View {
                     Button {
                         isPromptPopoverPresented.toggle()
                     } label: {
-                        Image(systemName: "info.circle")
+                        ShellXIcon.image("info.circle")
                     }
                     .buttonStyle(.borderless)
                     .controlSize(.small)
@@ -49,9 +51,9 @@ struct DockEmptyView: View {
                 Button {
                     openDockDocs()
                 } label: {
-                    Label(
+                    ShellXLabel(
                         String(localized: "dock.empty.openDocs", defaultValue: "Docs"),
-                        systemImage: "questionmark.circle"
+                        icon: "questionmark.circle"
                     )
                 }
                 .buttonStyle(.bordered)
@@ -88,27 +90,27 @@ struct DockEmptyView: View {
     }
 
     private func openDockDocs() {
-        guard let url = URL(string: "https://cmux.com/docs/dock") else { return }
+        guard let url = URL(string: ShellXBrand.sourceCodeURL.absoluteString + "/blob/main/docs/dock.md") else { return }
         NSWorkspace.shared.open(url)
     }
 
     private var agentPrompt: String {
         String(
-            localized: "dock.empty.agentPrompt",
+            localized: "shellx.dock.empty.agentPrompt",
             defaultValue: """
-            Set up cmux Dock controls for the current context.
+            Set up ShellX Dock controls for the current context.
 
             First, learn the feature before editing:
-            1. Run `cmux docs dock` if the cmux CLI is available. If it is not, read https://cmux.com/docs/dock.
+            1. Run `shellx docs dock` if the ShellX CLI is available. If it is not, read https://github.com/lephus/shellx/blob/main/docs/dock.md.
             2. Inspect the repository or current directory to understand the project type, scripts, package manager, dev servers, logs, task runners, test commands, and any existing TUI tools.
             3. If the desired Dock is ambiguous, ask the user what they want monitored or controlled before writing files.
 
-            Dock is cmux's right-sidebar terminal and browser control area. A Dock config is JSON with a top-level `controls` array. Terminal controls run commands in Ghostty-backed sections using the user's login shell; browser controls embed URLs. Controls are useful for project dashboards, git/status views, dev server or build status, test watchers, log tails, queues, local services, or fixed web dashboards.
+            Dock is ShellX's right-sidebar terminal and browser control area. A Dock config is JSON with a top-level `controls` array. Terminal controls run commands in Ghostty-backed sections using the user's login shell; browser controls embed URLs. Controls are useful for project dashboards, git/status views, dev server or build status, test watchers, log tails, queues, local services, or fixed web dashboards.
 
             Choose where to write the config:
-            - In a repository or project directory, create or edit `.cmux/dock.json` so teammates can share it.
-            - For a personal default outside a repo, create or edit `~/.config/cmux/dock.json`.
-            - If both exist, project `.cmux/dock.json` is more specific for that project. Nested project configs apply to that directory tree; use the nearest relevant project config instead of writing unrelated controls globally.
+            - In a repository or project directory, create or edit `.shellx/dock.json` so teammates can share it.
+            - For a personal default outside a repo, create or edit `~/.config/shellx/dock.json`.
+            - If both exist, project `.shellx/dock.json` is more specific for that project. Nested project configs apply to that directory tree; use the nearest relevant project config instead of writing unrelated controls globally.
             - If there is no repo and no clear project root, use the global config only after confirming the user wants a personal Dock.
 
             Schema:
@@ -136,7 +138,7 @@ struct DockEmptyView: View {
             - Keep ids stable, lowercase, and unique.
             - `type` is optional: `terminal` is the default, or use `browser`.
             - Terminal controls require `command`; browser controls require `url`.
-            - Browser controls default to `chrome: true`. Set `chrome: false` to hide browser chrome, including the address bar and toolbar; Focus Address Bar then does nothing for that pane, while `cmux browser goto` and `cmux browser reload` remain available.
+            - Browser controls default to `chrome: true`. Set `chrome: false` to hide browser chrome, including the address bar and toolbar; Focus Address Bar then does nothing for that pane, while `shellx browser goto` and `shellx browser reload` remain available.
             - Use `cwd` for subdirectories; relative paths resolve from the config base.
             - Use `height` only when a control needs a fixed amount of vertical space.
             - Use `env` only for non-secret values needed by one control.

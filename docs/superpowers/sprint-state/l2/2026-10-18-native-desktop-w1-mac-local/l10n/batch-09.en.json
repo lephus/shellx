@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Feature Flags…",
+"comment": ""
+},
+{
+"i": 1,
+"en": "Getting Started",
+"comment": ""
+},
+{
+"i": 2,
+"en": "Keyboard Shortcuts Settings…",
+"comment": ""
+},
+{
+"i": 3,
+"en": "oh-my-claudecode",
+"comment": ""
+},
+{
+"i": 4,
+"en": "oh-my-codex",
+"comment": ""
+},
+{
+"i": 5,
+"en": "oh-my-opencode",
+"comment": ""
+},
+{
+"i": 6,
+"en": "Preview Native Pro Pricing…",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Show Pro Welcome Checklist…",
+"comment": ""
+},
+{
+"i": 8,
+"en": "SSH",
+"comment": ""
+},
+{
+"i": 9,
+"en": "Upgrade to cmux Pro…",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Focus Back",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Focus Forward",
+"comment": ""
+},
+{
+"i": 12,
+"en": "Focus History",
+"comment": ""
+},
+{
+"i": 13,
+"en": "%1$@ - %2$@",
+"comment": ""
+},
+{
+"i": 14,
+"en": "%1$@, %2$@",
+"comment": ""
+},
+{
+"i": 15,
+"en": "No Back History",
+"comment": ""
+},
+{
+"i": 16,
+"en": "No Forward History",
+"comment": ""
+},
+{
+"i": 17,
+"en": "No Focus History",
+"comment": ""
+},
+{
+"i": 18,
+"en": "Recently Closed",
+"comment": ""
+},
+{
+"i": 19,
+"en": "Clear All",
+"comment": ""
+},
+{
+"i": 20,
+"en": "No Recently Closed Items",
+"comment": ""
+},
+{
+"i": 21,
+"en": "%1$@ (%2$@)",
+"comment": ""
+},
+{
+"i": 22,
+"en": "Tabs, workspaces, and windows",
+"comment": ""
+},
+{
+"i": 23,
+"en": "1 workspace",
+"comment": ""
+},
+{
+"i": 24,
+"en": "%d workspaces",
+"comment": ""
+},
+{
+"i": 25,
+"en": "Recently Focused",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Most recent focus targets",
+"comment": ""
+},
+{
+"i": 27,
+"en": "Reopen Last Closed",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Reopen Closed Workspace",
+"comment": ""
+},
+{
+"i": 29,
+"en": "Show Full Back History",
+"comment": ""
+},
+{
+"i": 30,
+"en": "Show Full Forward History",
+"comment": ""
+},
+{
+"i": 31,
+"en": "Show Full History",
+"comment": ""
+},
+{
+"i": 32,
+"en": "Untitled Workspace",
+"comment": ""
+},
+{
+"i": 33,
+"en": "None (Blank Terminal)",
+"comment": ""
+},
+{
+"i": 34,
+"en": "Default for New Workspace",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Delete “%@”",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Delete Workspace Layout",
+"comment": ""
+},
+{
+"i": 37,
+"en": "Layouts",
+"comment": ""
+},
+{
+"i": 38,
+"en": "Manage Layouts",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Save Workspace as Layout…",
+"comment": ""
+},
+{
+"i": 40,
+"en": "Mark All Read",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Open Current Directory in Android Studio",
+"comment": ""
+},
+{
+"i": 42,
+"en": "Open Current Directory in Antigravity",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Open Current Directory in Cursor",
+"comment": ""
+},
+{
+"i": 44,
+"en": "Open Current Directory in Devin",
+"comment": ""
+},
+{
+"i": 45,
+"en": "Open Current Directory in Finder",
+"comment": ""
+},
+{
+"i": 46,
+"en": "Open Current Directory in Ghostty",
+"comment": ""
+},
+{
+"i": 47,
+"en": "Open Current Directory in iTerm2",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Open Current Directory in IntelliJ IDEA",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Open Current Directory in Terminal",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Open Current Directory in Tower",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Open Current Directory in VS Code (Inline)",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Open Current Directory in VS Code",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Open Current Directory in Warp",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Open Current Directory in Windsurf",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Open Current Directory in Xcode",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Open Current Directory in Zed",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Preferences…",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Quit cmux",
+"comment": ""
+},
+{
+"i": 59,
+"en": "New Workspace from Template",
+"comment": ""
+},
+{
+"i": 60,
+"en": "Copy Focus Logs",
+"comment": ""
+},
+{
+"i": 61,
+"en": "Copy Update Logs",
+"comment": ""
+},
+{
+"i": 62,
+"en": "Canvas Overview",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Tidy Canvas",
+"comment": ""
+},
+{
+"i": 64,
+"en": "Toggle Right Sidebar Focus",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Hard Refresh",
+"comment": ""
+},
+{
+"i": 66,
+"en": "Import Browser Data…",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Next Surface",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Previous Surface",
+"comment": ""
+},
+{
+"i": 69,
+"en": "Toggle Canvas Layout",
+"comment": ""
+},
+{
+"i": 70,
+"en": "Toggle Design Mode",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Toggle React Grab",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Toggle Right Sidebar",
+"comment": ""
+},
+{
+"i": 73,
+"en": "Workspace %lld",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Task Manager...",
+"comment": ""
+},
+{
+"i": 75,
+"en": "The file contains invalid or damaged media data.",
+"comment": ""
+},
+{
+"i": 76,
+"en": "That file is no longer available on the Mac.",
+"comment": ""
+},
+{
+"i": 77,
+"en": "That file was not referenced by this conversation.",
+"comment": ""
+},
+{
+"i": 78,
+"en": "cmux couldn't tell which session this gallery belongs to.",
+"comment": ""
+},
+{
+"i": 79,
+"en": "The gallery cursor is invalid.",
+"comment": ""
+},
+{
+"i": 80,
+"en": "cmux couldn't tell which session or file was requested.",
+"comment": ""
+},
+{
+"i": 81,
+"en": "The file path is invalid.",
+"comment": ""
+},
+{
+"i": 82,
+"en": "Artifact transfer requires an authenticated session.",
+"comment": ""
+},
+{
+"i": 83,
+"en": "That path is not a folder.",
+"comment": ""
+},
+{
+"i": 84,
+"en": "That path is not a regular file.",
+"comment": ""
+},
+{
+"i": 85,
+"en": "cmux does not have permission to read that file.",
+"comment": ""
+},
+{
+"i": 86,
+"en": "The Mac could not create a preview for that file.",
+"comment": ""
+},
+{
+"i": 87,
+"en": "The Mac found that file but could not read it.",
+"comment": ""
+},
+{
+"i": 88,
+"en": "That agent session is no longer available.",
+"comment": ""
+},
+{
+"i": 89,
+"en": "That session exists, but its file history could not be read.",
+"comment": ""
+},
+{
+"i": 90,
+"en": "Artifact transfer is temporarily unavailable.",
+"comment": ""
+},
+{
+"i": 91,
+"en": "This file type cannot be previewed.",
+"comment": ""
+},
+{
+"i": 92,
+"en": "Answer key was not accepted",
+"comment": ""
+},
+{
+"i": 93,
+"en": "Interrupt key was not accepted",
+"comment": ""
+},
+{
+"i": 94,
+"en": "Agent chat transcript service is not configured",
+"comment": ""
+},
+{
+"i": 95,
+"en": "The agent's terminal moved. Open it once on your Mac (or send the agent any prompt there), then retry.",
+"comment": ""
+},
+{
+"i": 96,
+"en": "The Mac can't find a transcript file for this conversation. If the agent just started in a project folder, send it a prompt and tap Retry. If it's running in your home directory, it doesn't keep a transcript, so use the Terminal tab to interact.",
+"comment": ""
+},
+{
+"i": 97,
+"en": "That file is not currently shown in this panel.",
+"comment": ""
+},
+{
+"i": 98,
+"en": "cmux couldn't complete the panel file request.",
+"comment": ""
+},
+{
+"i": 99,
+"en": "cmux couldn't tell which panel or file was requested.",
+"comment": ""
+},
+{
+"i": 100,
+"en": "cmux doesn't recognize that panel file request.",
+"comment": ""
+},
+{
+"i": 101,
+"en": "That file panel is no longer available.",
+"comment": ""
+},
+{
+"i": 102,
+"en": "The workspace, path, or revision is missing or invalid",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Missing or invalid path",
+"comment": ""
+},
+{
+"i": 104,
+"en": "The workspace identifier is missing or invalid",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Workspace changes are not enabled on this Mac",
+"comment": ""
+},
+{
+"i": 106,
+"en": "A selected workspace identifier is invalid",
+"comment": ""
+},
+{
+"i": 107,
+"en": "Workspace directory is not a Git repository",
+"comment": ""
+},
+{
+"i": 108,
+"en": "Path is not in the workspace changes",
+"comment": ""
+},
+{
+"i": 109,
+"en": "Path must stay inside the repository",
+"comment": ""
+},
+{
+"i": 110,
+"en": "Failed to read workspace diff",
+"comment": ""
+},
+{
+"i": 111,
+"en": "Between 1 and 64 workspaces can be requested at once",
+"comment": ""
+},
+{
+"i": 112,
+"en": "Workspace or effective directory not found",
+"comment": ""
+},
+{
+"i": 113,
+"en": "Tailscale pairing code. Keep Tailscale connected on both devices. Both devices must be connected to the same Tailscale network.",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Your terminal workspaces are now syncing to your iPhone. You can close this window.",
+"comment": ""
+},
+{
+"i": 115,
+"en": "iPhone connected",
+"comment": ""
+},
+{
+"i": 116,
+"en": "iOS pairing is off on this Mac. Open Settings and enable iOS pairing to discover this Mac from cmux on your iPhone.",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Enable iOS pairing",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Could not start the pairing listener on this Mac.",
+"comment": ""
+},
+{
+"i": 119,
+"en": "  team:     not loaded",
+"comment": ""
+},
+{
+"i": 120,
+"en": "  team:     not loaded (retrying)",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Could not load your cmux team. Check your internet connection, then try again.",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Could not generate a pairing code. Try again.",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Get cmux for iPhone",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Install cmux on your iPhone and sign in with the same account. It connects automatically — no code needed.",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Sync your terminal workspaces to your iPhone.",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Connection",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Download cmux for",
+"comment": ""
+},
+{
+"i": 128,
+"en": "iPhone",
+"comment": ""
+},
+{
+"i": 129,
+"en": "Pair your iPhone",
+"comment": ""
+},
+{
+"i": 130,
+"en": "In cmux on your iPhone, sign in with the same account, choose Tailscale, then scan this code.",
+"comment": ""
+},
+{
+"i": 131,
+"en": "Signed in as %@",
+"comment": ""
+},
+{
+"i": 132,
+"en": "iPhones signed in to your account find this Mac automatically over Iroh — end-to-end encrypted, direct when possible, through a cmux relay when not. No code needed.",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Connected",
+"comment": ""
+},
+{
+"i": 134,
+"en": "Not detected",
+"comment": ""
+},
+{
+"i": 135,
+"en": "Not registered",
+"comment": ""
+},
+{
+"i": 136,
+"en": "This code pairs over Tailscale instead. Both devices must be connected to the same Tailscale network.",
+"comment": ""
+},
+{
+"i": 137,
+"en": "Copy IP",
+"comment": ""
+},
+{
+"i": 138,
+"en": "Can't scan? Enter this Mac's numeric Tailscale IP and port:",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Preparing a pairing code…",
+"comment": ""
+},
+{
+"i": 140,
+"en": "Pairing QR code",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Pairing code unavailable. Tap Refresh Code.",
+"comment": ""
+},
+{
+"i": 142,
+"en": "Refresh Code",
+"comment": ""
+},
+{
+"i": 143,
+"en": "Get Tailscale",
+"comment": ""
+},
+{
+"i": 144,
+"en": "Tailscale is not connected on this Mac. Install it on both devices and connect both to the same Tailscale network.",
+"comment": ""
+},
+{
+"i": 145,
+"en": "cmux BETA",
+"comment": ""
+},
+{
+"i": 146,
+"en": "cmux DEMO",
+"comment": ""
+},
+{
+"i": 147,
+"en": "cmux DEV %@",
+"comment": ""
+},
+{
+"i": 148,
+"en": "cmux INTERNAL",
+"comment": ""
+},
+{
+"i": 149,
+"en": "Open with",
+"comment": ""
+},
+{
+"i": 150,
+"en": "Waiting for your iPhone…",
+"comment": ""
+},
+{
+"i": 151,
+"en": "Mobile Pairing",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Task Composer is disabled on this Mac",
+"comment": ""
+},
+{
+"i": 153,
+"en": "That file is not currently shown in this terminal.",
+"comment": ""
+},
+{
+"i": 154,
+"en": "cmux couldn't tell which terminal or file was requested.",
+"comment": ""
+},
+{
+"i": 155,
+"en": "That terminal is no longer available.",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Compact",
+"comment": ""
+},
+{
+"i": 157,
+"en": "Expanded",
+"comment": ""
+},
+{
+"i": 158,
+"en": "cmux couldn't reach %@. Start the server with cmux-chat or configure agentChat.startCommand in cmux.json.",
+"comment": ""
+},
+{
+"i": 159,
+"en": "cmux couldn't reach %@. Start it with: %@",
+"comment": ""
+},
+{
+"i": 160,
+"en": "Opened Agent Chat",
+"comment": ""
+},
+{
+"i": 161,
+"en": "Could not start Agent Chat",
+"comment": ""
+},
+{
+"i": 162,
+"en": "Agent chat server isn't running",
+"comment": ""
+},
+{
+"i": 163,
+"en": "cmux used default notification behavior because '%@' failed.",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Notification Hook Failed",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Dismiss",
+"comment": ""
+},
+{
+"i": 166,
+"en": "Desktop notifications will appear here for quick review.",
+"comment": ""
+},
+{
+"i": 167,
+"en": "Desktop notifications will appear here.",
+"comment": ""
+},
+{
+"i": 168,
+"en": "No notifications yet",
+"comment": ""
+},
+{
+"i": 169,
+"en": "Hide content (send a generic message instead of the terminal text)",
+"comment": ""
+},
+{
+"i": 170,
+"en": "When to send",
+"comment": ""
+},
+{
+"i": 171,
+"en": "Only when away from this Mac",
+"comment": ""
+},
+{
+"i": 172,
+"en": "Away means the screen is locked or asleep, the screensaver is running, or there has been no keyboard or mouse input for %lld minutes.",
+"comment": ""
+},
+{
+"i": 173,
+"en": "Send local agent notifications to cmux on your iPhone. Enabled by default; turn this off to stop this Mac from forwarding them.",
+"comment": ""
+},
+{
+"i": 174,
+"en": "Forward notifications to my iPhone",
+"comment": ""
+},
+{
+"i": 175,
+"en": "Jump to Latest",
+"comment": ""
+},
+{
+"i": 176,
+"en": "Mark as Read",
+"comment": ""
+},
+{
+"i": 177,
+"en": "Mark as Unread",
+"comment": ""
+},
+{
+"i": 178,
+"en": "Resize notifications",
+"comment": ""
+},
+{
+"i": 179,
+"en": "Drag to resize the notifications popover",
+"comment": ""
+},
+{
+"i": 180,
+"en": "Clear notification",
+"comment": ""
+},
+{
+"i": 181,
+"en": "%1$@ — %2$@",
+"comment": ""
+},
+{
+"i": 182,
+"en": "%1$@ — %2$@ (running %3$@)",
+"comment": ""
+},
+{
+"i": 183,
+"en": "Kill Pane Process",
+"comment": ""
+},
+{
+"i": 184,
+"en": "%1$@ in %2$@",
+"comment": ""
+},
+{
+"i": 185,
+"en": "A pane is using a lot of memory",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Kill Process",
+"comment": ""
+},
+{
+"i": 187,
+"en": "This sends SIGTERM then SIGKILL to high-memory process groups in the pane. Other process groups are left alone.",
+"comment": ""
+},
+{
+"i": 188,
+"en": "Kill this pane's runaway process?",
+"comment": ""
+},
+{
+"i": 189,
+"en": "%ds elapsed",
+"comment": ""
+},
+{
+"i": 190,
+"en": "cmux could not open a passwordless terminal session. Try opening the Cloud VM again.",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Waited %ds before stopping.",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Cloud VM could not be opened.",
+"comment": ""
+},
+{
+"i": 193,
+"en": "Cloud VM unavailable",
+"comment": ""
+},
+{
+"i": 194,
+"en": "Cloud VM command could not be launched.",
+"comment": ""
+},
+{
+"i": 195,
+"en": "The local cmux web server is offline. Start it and retry Open Cloud VM.",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Cloud VM attach command was empty.",
+"comment": ""
+},
+{
+"i": 197,
+"en": "The Cloud VM service could not create a VM yet. Retry keeps using this pinned Cloud VM slot, and once a VM exists cmux will always reattach to that same VM.",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Opening Cloud VM",
+"comment": ""
+},
+{
+"i": 199,
+"en": "Creating or reattaching to your persistent Cloud VM.",
+"comment": ""
+},
+{
+"i": 200,
+"en": "Waiting for a secure terminal endpoint",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Requesting your persistent VM",
+"comment": ""
+},
+{
+"i": 202,
+"en": "Starting or resuming the VM",
+"comment": ""
+},
+{
+"i": 203,
+"en": "Still waiting; retrying in the background",
+"comment": ""
+},
+{
+"i": 204,
+"en": "Terminal will open automatically when ready",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Pinned workspace created",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Contact sales",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Self-host agent execution, air-gapped",
+"comment": ""
+},
+{
+"i": 208,
+"en": "SSO / SAML, audit logs",
+"comment": ""
+},
+{
+"i": 209,
+"en": "SOC 2",
+"comment": ""
+},
+{
+"i": 210,
+"en": "Enterprise",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Self-hosting and compliance.",
+"comment": ""
+},
+{
+"i": 212,
+"en": "Custom",
+"comment": ""
+},
+{
+"i": 213,
+"en": "One click with your cmux account. Cancel anytime.",
+"comment": ""
+},
+{
+"i": 214,
+"en": "Download for Mac",
+"comment": ""
+},
+{
+"i": 215,
+"en": "Native macOS terminal built on Ghostty, open source",
+"comment": ""
+},
+{
+"i": 216,
+"en": "Unlimited local terminals and agents",
+"comment": ""
+},
+{
+"i": 217,
+"en": "5 active Cloud VMs, 20 VM creates",
+"comment": ""
+},
+{
+"i": 218,
+"en": "Community support",
+"comment": ""
+},
+{
+"i": 219,
+"en": "Free",
+"comment": ""
+},
+{
+"i": 220,
+"en": "The full terminal, forever.",
+"comment": ""
+},
+{
+"i": 221,
+"en": "Centralized admin and shared team rules",
+"comment": ""
+},
+{
+"i": 222,
+"en": "Local CLI agents with your own keys",
+"comment": ""
+},
+{
+"i": 223,
+"en": "Unified billing and seat management",
+"comment": ""
+},
+{
+"i": 224,
+"en": "Cloud agents on Cloud VMs",
+"comment": ""
+},
+{
+"i": 225,
+"en": "Committed usage",
+"comment": ""
+},
+{
+"i": 226,
+"en": "Not included",
+"comment": ""
+},
+{
+"i": 227,
+"en": "Included",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Concurrent Cloud VMs",
+"comment": ""
+},
+{
+"i": 229,
+"en": "1",
+"comment": ""
+},
+{
+"i": 230,
+"en": "5",
+"comment": ""
+},
+{
+"i": 231,
+"en": "5 per paid seat",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Model gateway: routing and usage analytics",
+"comment": ""
+},
+{
+"i": 233,
+"en": "iOS app",
+"comment": ""
+},
+{
+"i": 234,
+"en": "Self-hosted and air-gapped execution",
+"comment": ""
+},
+{
+"i": 235,
+"en": "SSO and SAML sign-in",
+"comment": ""
+},
+{
+"i": 236,
+"en": "Support",
+"comment": ""
+},
+{
+"i": 237,
+"en": "Community",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Dedicated",
+"comment": ""
+},
+{
+"i": 239,
+"en": "Email",
+"comment": ""
+},
+{
+"i": 240,
+"en": "Priority",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Native macOS terminal, open source",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Compare plans",
+"comment": ""
+},
+{
+"i": 243,
+"en": "Usage-based",
+"comment": ""
+},
+{
+"i": 244,
+"en": "Vertical tabs, splits, notifications, socket API",
+"comment": ""
+},
+{
+"i": 245,
+"en": "Current plan",
+"comment": ""
+},
+{
+"i": 246,
+"en": "Audit logs and dedicated support",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Self-hosted model gateway",
+"comment": ""
+},
+{
+"i": 248,
+"en": "Self-hosted Cloud execution and networking",
+"comment": ""
+},
+{
+"i": 249,
+"en": "SOC 2 and an SLA",
+"comment": ""
+},
+{
+"i": 250,
+"en": "cmux Pro",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Claude Code, Codex, Gemini, and local CLI agents",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Community support on Discord and GitHub",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Native Ghostty-based terminal",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Local session history",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Vertical tabs, split panes, browser panels, and notifications",
+"comment": ""
+},
+{
+"i": 256,
+"en": "$0",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Included compute",
+"comment": ""
+},
+{
+"i": 258,
+"en": "20 hrs/mo",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Extra usage",
+"comment": ""
+},
+{
+"i": 260,
+"en": "metered",
+"comment": ""
+},
+{
+"i": 261,
+"en": "Default VM",
+"comment": ""
+},
+{
+"i": 262,
+"en": "4 vCPU / 16 GB",
+"comment": ""
+},
+{
+"i": 263,
+"en": "/month",
+"comment": ""
+},
+{
+"i": 264,
+"en": "/user/month",
+"comment": ""
+},
+{
+"i": 265,
+"en": "Pro",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Team",
+"comment": ""
+},
+{
+"i": 267,
+"en": "Unlimited workspaces",
+"comment": ""
+},
+{
+"i": 268,
+"en": "Up to 5 Cloud VMs sharing 20 vCPUs and 40 GB RAM; one VM can use up to 16 GB RAM / 8 vCPU. The 24 GB / 12 vCPU and 32 GB / 16 vCPU sizes require Max.",
+"comment": ""
+},
+{
+"i": 269,
+"en": "cmux iOS app and email support",
+"comment": ""
+},
+{
+"i": 270,
+"en": "Cloud agents on isolated Cloud VMs",
+"comment": ""
+},
+{
+"i": 271,
+"en": "$50",
+"comment": ""
+},
+{
+"i": 272,
+"en": "Get Pro",
+"comment": ""
+},
+{
+"i": 273,
+"en": "Signed in",
+"comment": ""
+},
+{
+"i": 274,
+"en": "Signed out",
+"comment": ""
+},
+{
+"i": 275,
+"en": "$0.80",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Heavy builds and parallel agents",
+"comment": ""
+},
+{
+"i": 277,
+"en": "$0.40",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Standard development",
+"comment": ""
+},
+{
+"i": 279,
+"en": "$0.20",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Light agents and quick tasks",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Pro includes up to 5 Cloud VMs sharing 20 vCPUs and 40 GB RAM. One VM can use up to 16 GB RAM / 8 vCPU; the 24 GB / 12 vCPU and 32 GB / 16 vCPU sizes require Max. Team adds the same pool for each paid seat, shared across the team. Your VMs draw from one pool. Run one large VM or five small ones. Paused VMs do not use the pool. There is no metering or overage billing.",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Per active hour",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Best for",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Cloud VM resources",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Billing is not configured for this environment.",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Checking your current plan…",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Billing status unavailable",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Get Teams",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Unified billing for the whole team",
+"comment": ""
+},
+{
+"i": 290,
+"en": "Up to 5 Cloud VMs per paid seat, sharing 20 vCPUs and 40 GB RAM per paid seat across the team",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Team-wide model gateway analytics",
+"comment": ""
+},
+{
+"i": 292,
+"en": "Centralized seat management",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Priority email support",
+"comment": ""
+},
+{
+"i": 294,
+"en": "$60",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Pricing",
+"comment": ""
+},
+{
+"i": 296,
+"en": "cmux Upgrade",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Everything in Free",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Cloud dev boxes: 10 active, unlimited creates",
+"comment": ""
+},
+{
+"i": 299,
+"en": "20 compute-hours/mo on a 4 vCPU / 16 GB VM",
+"comment": ""
+}
+]

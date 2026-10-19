@@ -2,6 +2,7 @@ import CmuxFoundation
 import AppKit
 import SwiftUI
 import CmuxTerminalCore
+import ShellXBrand
 
 enum AppearanceMode: String, CaseIterable, Identifiable {
     case system
@@ -63,11 +64,16 @@ enum AppearanceSettings {
 
     private static func defaultLiveEnvironment() -> LiveApplyEnvironment {
         LiveApplyEnvironment(
-            setApplicationAppearance: { appearance in
-                NSApplication.shared.appearance = appearance
+            // ShellX is dark-only (spec §7.4): every live apply lands on the
+            // forced appearance, whatever mode a caller resolved.
+            setApplicationAppearance: { _ in
+                NSApplication.shared.appearance = ShellXAppearance.forcedAppearance
             },
-            synchronizeTerminalThemeWithAppearance: { appearance, source in
-                GhosttyApp.shared.synchronizeThemeWithAppearance(appearance, source: source)
+            synchronizeTerminalThemeWithAppearance: { _, source in
+                GhosttyApp.shared.synchronizeThemeWithAppearance(
+                    ShellXAppearance.forcedAppearance,
+                    source: source
+                )
             },
             systemAppearance: {
                 AppearanceSettings.systemNSAppearance()
@@ -90,6 +96,20 @@ enum AppearanceSettings {
             return defaultMode
         }
         return mode == .auto ? .system : mode
+    }
+
+    /// ShellX is dark-only (spec §7.4). Pins the stored appearance mode to
+    /// ``ShellXAppearance/forcedModeRawValue`` so the terminal theme side,
+    /// SwiftUI color schemes and chrome all resolve dark, even when an old
+    /// default or a hand-edited settings file stored Light or System.
+    /// Returns whether it changed the stored value.
+    @discardableResult
+    static func enforceShellXDarkOnly(defaults: UserDefaults = .standard) -> Bool {
+        guard defaults.string(forKey: appearanceModeKey) != ShellXAppearance.forcedModeRawValue else {
+            return false
+        }
+        defaults.set(ShellXAppearance.forcedModeRawValue, forKey: appearanceModeKey)
+        return true
     }
 
     @discardableResult
@@ -294,9 +314,12 @@ final class AppearanceSettingsUserDefaultsObserver {
                 currentRawValue: {
                     defaults.string(forKey: AppearanceSettings.appearanceModeKey)
                 },
-                applyStoredMode: { rawValue, source in
-                    AppearanceSettings.applyStoredMode(
-                        rawValue: rawValue,
+                applyStoredMode: { _, source in
+                    // ShellX is dark-only: a stored Light/System value is
+                    // pinned back to dark before it is applied.
+                    AppearanceSettings.enforceShellXDarkOnly(defaults: defaults)
+                    return AppearanceSettings.applyStoredMode(
+                        rawValue: ShellXAppearance.forcedModeRawValue,
                         defaults: defaults,
                         source: source
                     )

@@ -7,33 +7,33 @@ extension CMUXCLI {
         CmuxGlaedaExecutionLocalization().string(
             "glaeda.cli.usage",
             defaultValue: """
-            Usage: cmux glaeda <request|observe> [options]
+            Usage: shellx glaeda <request|observe> [options]
 
             Exchange one semantic execution request with the execution service.
 
             Subcommands:
               request
-                --request-ref <ref>        CMUX caller correlation reference
-                --work-ref <ref>           CMUX work correlation reference
+                --request-ref <ref>        ShellX caller correlation reference
+                --work-ref <ref>           ShellX work correlation reference
                 --repository <owner/repo>  Canonical Git repository identity
                 --commit <40-hex>          Exact Git commit
                 --tree <40-hex>            Exact Git tree
                 [--reuse <prefer_valid_reuse|no_preference>]
 
                 Emits canonical execution-request JSON to stdout.
-                CMUX workspace, machine, shell command, and environment stay outside this request.
+                ShellX workspace, machine, shell command, and environment stay outside this request.
 
               observe
                 --request <path>           Exact request document previously emitted
                 --receipt <path|->         Bounded execution receipt, or - for stdin
 
-                Validates request/result correlation and emits a bounded CMUX observation.
+                Validates request/result correlation and emits a bounded ShellX observation.
                 Terminal states require a workload-receipt digest.
 
             Examples:
-              cmux glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \
+              shellx glaeda request --request-ref cmux:exec:42 --work-ref cmux:work:42 \
                 --repository owner/repo --commit <commit> --tree <tree>
-              cmux glaeda observe --request request.json --receipt result.json
+              shellx glaeda observe --request request.json --receipt result.json
             """
         )
     }

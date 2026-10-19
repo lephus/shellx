@@ -1,6 +1,7 @@
 import AppKit
 import CmuxProductAnalytics
 import CmuxSettings
+import ShellXBrand
 import SwiftUI
 
 /// Whether a Cloud creation action (New Cloud Workspace, New Cloud Machine)
@@ -97,6 +98,8 @@ final class CloudWelcomeWindowController: NSObject, NSWindowDelegate {
         isRunningUnderXCTest: Bool = false,
         isUITestMode: Bool = false
     ) -> Bool {
+        // ShellX: the Cloud announcement never shows (Cloud is hard-off).
+        guard ShellXFeatures.cloud else { return false }
         guard !isDebugBuild, !isRunningUnderXCTest, !isUITestMode else { return false }
         return campaignAppVersions.contains(appVersion)
             && !hasSeenWelcome(in: defaults)
@@ -258,7 +261,7 @@ final class CloudWelcomeWindowController: NSObject, NSWindowDelegate {
         showsNewBadge: Bool,
         footerHasNotNow: Bool
     ) -> NSWindow {
-        let shortcut = KeyboardShortcutSettings.shortcut(for: .newCloudMachine)
+        let shortcut = StoredShortcut.unbound  // ShellX: no New Cloud Machine shortcut
         let rootView = CloudWelcomeAccountView(
             accountFlow: AppDelegate.shared?.auth?.accountFlow,
             resolveStep: nextStep,
@@ -288,7 +291,7 @@ final class CloudWelcomeWindowController: NSObject, NSWindowDelegate {
             defer: false
         )
         window.identifier = NSUserInterfaceItemIdentifier("cmux.cloud.welcome")
-        window.title = String(localized: "cloud.welcome.title.eyebrow", defaultValue: "cmux cloud")
+        window.title = String(localized: "cloud.welcome.title.eyebrow", defaultValue: "ShellX cloud")
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true

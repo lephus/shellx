@@ -2,7 +2,7 @@ import Foundation
 
 /// Diff viewer layout resolution and the globally persisted viewer display
 /// preferences the app writes through its `viewerPrefs` bridge
-/// (`~/Library/Application Support/cmux/diff-viewer/preferences.json`).
+/// (`~/Library/Application Support/ShellX/diff-viewer/preferences.json`).
 ///
 /// The CLI reads that file when generating a viewer page so new diff panels
 /// open with the last-used layout and options-menu toggles (#5284). The app's
@@ -69,7 +69,7 @@ extension CMUXCLI {
             return nil
         }
         return appSupport
-            .appendingPathComponent("cmux", isDirectory: true)
+            .appendingPathComponent("ShellX", isDirectory: true)
             .appendingPathComponent("diff-viewer", isDirectory: true)
             .appendingPathComponent("preferences.json", isDirectory: false)
     }

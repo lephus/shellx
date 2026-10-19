@@ -1,4 +1,4 @@
-// cmux-opencode-tui-plugin-marker v2
+// shellx-opencode-tui-plugin-marker v2
 // OpenCode V2 bridge loaded inside each TUI process.
 // The server entry is inert; this module owns the TUI's cmux identity.
 
@@ -190,7 +190,7 @@ function launchEnvironment(cwdValue, baseEnvironment = process.env) {
 /** Admit session restore without blocking the shared OpenCode service. */
 export function dispatchSessionHook(eventName, payload, spawnImpl = spawn, baseEnvironment = process.env) {
   if (baseEnvironment.CMUX_OPENCODE_HOOKS_DISABLED === "1" || !baseEnvironment.CMUX_SURFACE_ID) return false;
-  const cmux = baseEnvironment.CMUX_OPENCODE_CMUX_BIN || "cmux";
+  const cmux = baseEnvironment.CMUX_OPENCODE_CMUX_BIN || "shellx";
   try {
     const child = spawnImpl(cmux, ["hooks", "enqueue", "opencode", eventName], {
       env: launchEnvironment(payload.cwd, baseEnvironment),
@@ -393,7 +393,7 @@ export async function createCMUXTUIBridge(ctx, options = {}) {
 }
 
 export default {
-  id: "cmux.tui",
+  id: "shellx.tui",
   async tui(ctx) { return createCMUXTUIBridge(ctx); },
   // Compatibility alias for older V2 snapshots that called setup().
   async setup(ctx) { return createCMUXTUIBridge(ctx); },

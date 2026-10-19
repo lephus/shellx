@@ -1,5 +1,6 @@
 public import SwiftUI
 public import CmuxUpdater
+import ShellXIcons
 
 /// A badge view that displays the current state of an update operation (icon, progress ring,
 /// or loading spinner) for the update pill.
@@ -22,7 +23,7 @@ public struct UpdateBadge: View {
     private var badgeContent: some View {
         if model.showsDetectedBackgroundUpdate {
             if let iconName = model.iconName {
-                Image(systemName: iconName)
+                ShellXIcon.image(iconName)
             }
         } else {
             switch model.effectiveState {
@@ -31,7 +32,7 @@ public struct UpdateBadge: View {
                     let progress = min(1, max(0, Double(download.progress) / Double(expectedLength)))
                     ProgressRingView(progress: progress)
                 } else {
-                    Image(systemName: "arrow.down.circle")
+                    ShellXIcon.image("arrow.down.circle")
                 }
 
             case .extracting(let extracting):
@@ -42,7 +43,7 @@ public struct UpdateBadge: View {
 
             default:
                 if let iconName = model.iconName {
-                    Image(systemName: iconName)
+                    ShellXIcon.image(iconName)
                 }
             }
         }

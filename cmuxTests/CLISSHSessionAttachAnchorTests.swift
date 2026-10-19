@@ -258,7 +258,7 @@ struct CLISSHSessionAttachAnchorTests {
                         ok: false,
                         error: [
                             "code": "unavailable",
-                            "message": "ssh-session-attach: persisted SSH PTY session state is unavailable. Run 'cmux ssh-session-list --all-workspaces' and retry.",
+                            "message": "ssh-session-attach: persisted SSH PTY session state is unavailable. Run 'shellx ssh-session-list --all-workspaces' and retry.",
                         ]
                     )
                 }

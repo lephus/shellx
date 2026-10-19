@@ -1017,7 +1017,7 @@ enum SurfaceResumeApprovalStore {
     private static let secretFileName = ".surface-resume-approval-secret"
     private static let settingsTerminalSectionKey = "terminal"
     private static let settingsRecordsKey = "resumeCommands"
-    private static let keychainService = "com.cmuxterm.app.surface-resume-approvals"
+    private static let keychainService = "pro.shellx.desktop.surface-resume-approvals"
     private static let keychainAccount = "hmac-secret-v1"
     private static let signingSecretCache = SurfaceResumeApprovalSigningSecretCache(
         loader: {
@@ -1361,7 +1361,7 @@ enum SurfaceResumeApprovalStore {
     }
 
     private static func storesRecordsInCmuxSettings(_ fileURL: URL) -> Bool {
-        fileURL.lastPathComponent == "cmux.json"
+        fileURL.lastPathComponent == "shellx.json"
     }
 
     private static func legacyURL(forCmuxSettingsURL fileURL: URL) -> URL {

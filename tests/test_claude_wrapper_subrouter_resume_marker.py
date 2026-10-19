@@ -36,7 +36,7 @@ from node_runtime import ensure_node_on_path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_WRAPPER = ROOT / "Resources" / "bin" / "cmux-claude-wrapper"
+SOURCE_WRAPPER = ROOT / "Resources" / "bin" / "shellx-claude-wrapper"
 MARKER_KEY = "SUBROUTER_CLAUDE_RESUME_COMMAND"
 BOUND_KEY = "CMUX_AGENT_LAUNCH_SUBROUTER_CLAUDE_RESUME_COMMAND"
 ACCOUNT_KEY = "CMUX_AGENT_LAUNCH_ROUTED_CLAUDE_ACCOUNT"
@@ -93,7 +93,7 @@ def run_wrapper(
         for directory in (wrapper_dir, real_dir, bundled_dir, home, tmpdir):
             directory.mkdir(parents=True, exist_ok=True)
 
-        wrapper = wrapper_dir / "cmux-claude-wrapper"
+        wrapper = wrapper_dir / "shellx-claude-wrapper"
         shutil.copy2(SOURCE_WRAPPER, wrapper)
         wrapper.chmod(0o755)
 
@@ -117,12 +117,12 @@ exit 0
 """,
         )
         make_executable(
-            wrapper_dir / "cmux",
+            wrapper_dir / "shellx",
             """#!/usr/bin/env bash
 exit 0
 """,
         )
-        bundled_cli = bundled_dir / "cmux"
+        bundled_cli = bundled_dir / "shellx"
         make_executable(
             bundled_cli,
             """#!/usr/bin/env bash

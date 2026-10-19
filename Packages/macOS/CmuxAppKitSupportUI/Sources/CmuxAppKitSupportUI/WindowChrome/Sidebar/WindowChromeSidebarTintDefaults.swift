@@ -1,4 +1,8 @@
-/// Legacy default sidebar tint values.
+import ShellXBrand
+
+/// Default sidebar tint values. ShellX: the opaque `panel` token
+/// (`ShellXPalette.panel`, #100b1d). The sidebar does not match the terminal
+/// background by default, so this is what a fresh install draws (spec §7.4).
 public struct WindowChromeSidebarTintDefaults: Sendable {
     /// Default tint hex value.
     public let hex: String
@@ -8,13 +12,17 @@ public struct WindowChromeSidebarTintDefaults: Sendable {
 
     /// Whether the sidebar uses the terminal background instead of the tint
     /// when the user has not chosen. Mirrors the
-    /// `sidebarAppearance.matchTerminalBackground` catalog default.
-    public static let matchesTerminalBackground = true
+    /// `sidebarAppearance.matchTerminalBackground` catalog default. ShellX:
+    /// `false`, so the `panel` tint shows out of the box.
+    public static let matchesTerminalBackground = false
+
+    /// `ShellXPalette.panel` as an uppercase `#RRGGBB` string.
+    public static let shellXPanelHex = ShellXPalette.panel.hexString.uppercased()
 
     /// Creates sidebar tint defaults.
     public init(
-        hex: String = "#000000",
-        opacity: Double = 0.18
+        hex: String = WindowChromeSidebarTintDefaults.shellXPanelHex,
+        opacity: Double = 1.0
     ) {
         self.hex = hex
         self.opacity = opacity

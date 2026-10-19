@@ -10,6 +10,7 @@ import CmuxSettings
 import CmuxTerminalCore
 import CryptoKit
 import Foundation
+import ShellXBrand
 @preconcurrency import Network
 import OSLog
 import StackAuth
@@ -757,6 +758,9 @@ final class MobileHostService {
         defaults: UserDefaults,
         buildFlavor: BuildFlavor
     ) -> Bool {
+        // ShellX: the phone host listener is parked until Wave 2 swaps its
+        // relay and auth for ShellX's own and flips `remoteMachines`.
+        guard ShellXFeatures.remoteMachines else { return false }
         guard !ManagedDevicePolicy(defaults: defaults).isIncomingDeviceAccessDisabled else { return false }
         // The current iOS choice takes precedence over the historical key;
         // incoming Mac access remains an independent opt-in.

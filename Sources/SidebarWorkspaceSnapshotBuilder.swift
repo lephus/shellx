@@ -95,6 +95,9 @@ struct SidebarWorkspaceSnapshotBuilder {
         /// The single leading status glyph when `sidebar.compactAgentStatus`
         /// is on (agent status entries then leave `metadataEntries`).
         var compactStatusGlyph: SidebarCompactStatusGlyph? = nil
+        /// ShellX: the agent state behind the row's status pill, resolved
+        /// whether or not `sidebar.compactAgentStatus` is on (W1 Task 10).
+        var statusPillGlyphKind: SidebarCompactStatusGlyph.Kind? = nil
 
         var remoteWorkspaceBadgeLabel: String? { deviceWorkspaceLabel ?? cloudWorkspaceLabel }
         var remoteWorkspaceBadgeSymbol: String { deviceWorkspaceLabel == nil ? "cloud" : "desktopcomputer" }

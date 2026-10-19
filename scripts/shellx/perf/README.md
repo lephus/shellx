@@ -12,7 +12,7 @@ with no other heavy apps open, and with the same harness commit.
 # 1. Measure (5 runs, medians). The app must be a tagged build (reload.sh --tag).
 python3 scripts/shellx/perf/perf_mac.py \
   --app "<DerivedData>/Build/Products/Release/cmux DEV perf-base.app" \
-  --cli "<same app>/Contents/Resources/bin/cmux" \
+  --cli "<same app>/Contents/Resources/bin/shellx" \
   --runs 5 --commit d0b2cd7e --keystroke-ms <typometer median> \
   --out /tmp/perf-cmux-d0b2cd7e.json
 

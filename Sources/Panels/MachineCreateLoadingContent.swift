@@ -1,5 +1,6 @@
 import CmuxCloud
 import SwiftUI
+import ShellXIcons
 
 /// A truthful reservation surface using the same operation and actions as the machine row.
 struct MachineCreateLoadingContent: View {
@@ -13,7 +14,7 @@ struct MachineCreateLoadingContent: View {
                 ProgressView()
                     .controlSize(.large)
             } else {
-                Image(systemName: "exclamationmark.triangle.fill")
+                ShellXIcon.image("exclamationmark.triangle.fill")
                     .font(.system(size: 26, weight: .medium))
                     .foregroundStyle(.orange)
             }

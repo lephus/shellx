@@ -16,7 +16,7 @@ extension RemoteDaemonUploadTests {
         try fileManager.createDirectory(at: remoteDirectory, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: root) }
 
-        let localBinary = root.appendingPathComponent("cmuxd-remote", isDirectory: false)
+        let localBinary = root.appendingPathComponent("shellx-remote", isDirectory: false)
         let payload = Data(repeating: 0x5A, count: 128 * 1024)
         try payload.write(to: localBinary)
 
@@ -37,8 +37,8 @@ extension RemoteDaemonUploadTests {
         let coordinator = makeCoordinator(runner: runner)
         defer { coordinator.stop() }
         let location = RemoteDaemonInstallLocation(
-            relativePath: "remote/cmuxd-remote",
-            absolutePath: remoteDirectory.appendingPathComponent("cmuxd-remote").path
+            relativePath: "remote/shellx-remote",
+            absolutePath: remoteDirectory.appendingPathComponent("shellx-remote").path
         )
 
         try coordinator.queue.sync {
@@ -80,7 +80,7 @@ extension RemoteDaemonUploadTests {
         let markerPath = "\(temporaryFile.path).pid"
         #expect(fileManager.fileExists(atPath: markerPath))
 
-        let finalURL = remoteDirectory.appendingPathComponent("cmuxd-remote")
+        let finalURL = remoteDirectory.appendingPathComponent("shellx-remote")
         let hash = SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
         let finalize = RemoteSessionCoordinator.remoteDaemonFinalizeScript(
             remoteTempPath: temporaryFile.path,
@@ -103,8 +103,8 @@ extension RemoteDaemonUploadTests {
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: root) }
 
-        let tempURL = root.appendingPathComponent("cmuxd-remote.tmp", isDirectory: false)
-        let finalURL = root.appendingPathComponent("cmuxd-remote", isDirectory: false)
+        let tempURL = root.appendingPathComponent("shellx-remote.tmp", isDirectory: false)
+        let finalURL = root.appendingPathComponent("shellx-remote", isDirectory: false)
         let payload = Data("healthy remote daemon".utf8)
         try payload.write(to: tempURL)
         let hash = SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
@@ -137,8 +137,8 @@ extension RemoteDaemonUploadTests {
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: root) }
 
-        let smallBinary = root.appendingPathComponent("small-cmuxd-remote", isDirectory: false)
-        let largeBinary = root.appendingPathComponent("large-cmuxd-remote", isDirectory: false)
+        let smallBinary = root.appendingPathComponent("small-shellx-remote", isDirectory: false)
+        let largeBinary = root.appendingPathComponent("large-shellx-remote", isDirectory: false)
         try Data(repeating: 0x41, count: 64 * 1024).write(to: smallBinary)
         try Data(repeating: 0x42, count: 6 * 1024 * 1024).write(to: largeBinary)
 
@@ -197,8 +197,8 @@ extension RemoteDaemonUploadTests {
         )
         defer { coordinator.stop() }
         let location = RemoteDaemonInstallLocation(
-            relativePath: ".cmux/bin/cmuxd-remote/test/linux-amd64/cmuxd-remote",
-            absolutePath: "/home/test/.cmux/bin/cmuxd-remote/test/linux-amd64/cmuxd-remote"
+            relativePath: ".shellx/bin/shellx-remote/test/linux-amd64/shellx-remote",
+            absolutePath: "/home/test/.shellx/bin/shellx-remote/test/linux-amd64/shellx-remote"
         )
         let remotePath = location.absolutePath
 
@@ -247,7 +247,7 @@ extension RemoteDaemonUploadTests {
 
         let remotePath = root
             .appendingPathComponent("remote path's", isDirectory: true)
-            .appendingPathComponent("cmuxd-remote", isDirectory: false)
+            .appendingPathComponent("shellx-remote", isDirectory: false)
             .path
         let temporaryPath = "\(remotePath).tmp-stale"
         let pidPath = "\(temporaryPath).pid"
@@ -330,7 +330,7 @@ extension RemoteDaemonUploadTests {
         )
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: root) }
-        let remotePath = root.appendingPathComponent("quoted path's/cmuxd-remote").path
+        let remotePath = root.appendingPathComponent("quoted path's/shellx-remote").path
         try fileManager.createDirectory(
             at: URL(fileURLWithPath: remotePath).deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -365,7 +365,7 @@ extension RemoteDaemonUploadTests {
         try fileManager.createDirectory(at: bin, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: root) }
 
-        let remotePath = root.appendingPathComponent("cmuxd-remote").path
+        let remotePath = root.appendingPathComponent("shellx-remote").path
         let temporaryPath = "\(remotePath).tmp-live"
         let markerPath = "\(temporaryPath).pid"
         try Data("active".utf8).write(to: URL(fileURLWithPath: temporaryPath))
@@ -406,7 +406,7 @@ extension RemoteDaemonUploadTests {
 
         let remotePath = root
             .appendingPathComponent("remote path's", isDirectory: true)
-            .appendingPathComponent("cmuxd-remote", isDirectory: false)
+            .appendingPathComponent("shellx-remote", isDirectory: false)
             .path
         let remoteDirectory = URL(fileURLWithPath: remotePath).deletingLastPathComponent()
         try fileManager.createDirectory(at: remoteDirectory, withIntermediateDirectories: true)
@@ -500,8 +500,8 @@ extension RemoteDaemonUploadTests {
         let coordinator = makeCoordinator(runner: runner, sshOptions: sshOptions)
         defer { coordinator.stop() }
         let location = RemoteDaemonInstallLocation(
-            relativePath: ".cmux/bin/cmuxd-remote/test/linux-amd64/cmuxd-remote",
-            absolutePath: "/home/test/.cmux/bin/cmuxd-remote/test/linux-amd64/cmuxd-remote"
+            relativePath: ".shellx/bin/shellx-remote/test/linux-amd64/shellx-remote",
+            absolutePath: "/home/test/.shellx/bin/shellx-remote/test/linux-amd64/shellx-remote"
         )
         try coordinator.queue.sync {
             try coordinator.uploadRemoteDaemonBinaryLocked(

@@ -14,7 +14,7 @@ struct AgentMessagesSettingsCard: View {
                 configurationReview: .json("agentMessages.enabled"),
                 String(localized: "settings.automation.agentMessages", defaultValue: "Agent Messages", bundle: .module),
                 subtitle: isEnabled
-                    ? String(localized: "settings.automation.agentMessages.subtitleOn", defaultValue: "Agents can message each other with cmux agent message.", bundle: .module)
+                    ? String(localized: "settings.automation.agentMessages.subtitleOn", defaultValue: "Agents can message each other with ShellX agent message.", bundle: .module)
                     : String(localized: "settings.automation.agentMessages.subtitleOff", defaultValue: "Agent messages are off. Sends fail and nothing is delivered.", bundle: .module)
             ) {
                 Toggle("", isOn: Binding(get: { isEnabled }, set: setEnabled))
@@ -25,7 +25,7 @@ struct AgentMessagesSettingsCard: View {
             SettingsCardDivider()
             SettingsCardNote(String(
                 localized: "settings.automation.agentMessages.note",
-                defaultValue: "Turning this off also fails messages that are waiting to be delivered. To turn messages off for one agent, run cmux agent messages off in its terminal.",
+                defaultValue: "Turning this off also fails messages that are waiting to be delivered. To turn messages off for one agent, run shellx agent messages off in its terminal.",
                 bundle: .module
             ))
         }

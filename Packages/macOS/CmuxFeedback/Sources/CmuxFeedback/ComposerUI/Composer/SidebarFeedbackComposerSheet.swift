@@ -1,6 +1,7 @@
 import CmuxFoundation
 public import SwiftUI
 import AppKit
+import ShellXIcons
 
 /// Modal feedback composer presented from the sidebar help menu.
 ///
@@ -64,9 +65,12 @@ public struct SidebarFeedbackComposerSheet: View {
                 .cmuxFont(.headline)
             Text(
                 String(
-                    localized: "sidebar.help.feedback.successBody",
-                    defaultValue: "You can also reach us at founders@cmux.com.",
-                    bundle: .module
+                    format: String(
+                        localized: "shellx.feedback.successBody",
+                        defaultValue: "You can also reach us at %@.",
+                        bundle: .module
+                    ),
+                    Self.settings.foundersEmail
                 )
             )
             .cmuxFont(size: 12)
@@ -87,9 +91,12 @@ public struct SidebarFeedbackComposerSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             Text(
                 String(
-                    localized: "sidebar.help.feedback.note",
-                    defaultValue: "A human will read this! You can also reach us at founders@cmux.com.",
-                    bundle: .module
+                    format: String(
+                        localized: "shellx.feedback.note",
+                        defaultValue: "A human will read this! You can also reach us at %@.",
+                        bundle: .module
+                    ),
+                    Self.settings.foundersEmail
                 )
             )
             .cmuxFont(size: 12)
@@ -139,9 +146,9 @@ public struct SidebarFeedbackComposerSheet: View {
                     Button {
                         chooseAttachments()
                     } label: {
-                        Label(
+                        ShellXLabel(
                             String(localized: "sidebar.help.feedback.attachImages", defaultValue: "Attach Images", bundle: .module),
-                            systemImage: "paperclip"
+                            icon: "paperclip"
                         )
                     }
                     .accessibilityIdentifier("SidebarFeedbackAttachButton")
@@ -161,7 +168,7 @@ public struct SidebarFeedbackComposerSheet: View {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(attachments) { attachment in
                             HStack(spacing: 8) {
-                                Image(systemName: "photo")
+                                ShellXIcon.image("photo")
                                     .foregroundStyle(.secondary)
                                 Text(attachment.fileName)
                                     .cmuxFont(size: 12)
@@ -339,6 +346,17 @@ public struct SidebarFeedbackComposerSheet: View {
         return NSPredicate(format: "SELF MATCHES %@", pattern).evaluate(with: email)
     }
 
+    private static var endpointErrorMessage: String {
+        String(
+            format: String(
+                localized: "shellx.feedback.endpointError",
+                defaultValue: "Feedback is unavailable right now. Email %@ instead.",
+                bundle: .module
+            ),
+            settings.foundersEmail
+        )
+    }
+
     private func userFacingErrorMessage(for error: any Error) -> String {
         guard let submissionError = error as? FeedbackComposerSubmissionError else {
             return String(
@@ -350,11 +368,7 @@ public struct SidebarFeedbackComposerSheet: View {
 
         switch submissionError {
         case .invalidEndpoint:
-            return String(
-                localized: "sidebar.help.feedback.endpointError",
-                defaultValue: "Feedback is unavailable right now. Email founders@cmux.com instead.",
-                bundle: .module
-            )
+            return Self.endpointErrorMessage
         case .invalidResponse:
             return String(
                 localized: "sidebar.help.feedback.genericError",
@@ -401,11 +415,7 @@ public struct SidebarFeedbackComposerSheet: View {
                     bundle: .module
                 )
             case 500...599:
-                return String(
-                    localized: "sidebar.help.feedback.endpointError",
-                    defaultValue: "Feedback is unavailable right now. Email founders@cmux.com instead.",
-                    bundle: .module
-                )
+                return Self.endpointErrorMessage
             default:
                 return String(
                     localized: "sidebar.help.feedback.genericError",

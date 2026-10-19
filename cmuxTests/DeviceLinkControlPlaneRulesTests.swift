@@ -32,7 +32,7 @@ struct DeviceLinkControlPlaneRulesTests {
     @Test("Only a named admission rule enables Mac links", arguments: [true, false])
     func controlPlaneRules(advertised: Bool) throws {
         func record(deviceID: String, endpoint: String) -> V2DeviceRecord {
-            let identity = V2Identity(appNamespace: "com.cmuxterm.app.nightly", buildTag: "nightly",
+            let identity = V2Identity(appNamespace: "pro.shellx.desktop.nightly", buildTag: "nightly",
                 deviceID: deviceID, environment: "production", projectID: "project",
                 teamID: "work-team", userID: "my-account")
             let metadata = V2DeviceMetadata(appVersion: "0.64.25-nightly.1", capabilities: ["irx-v2", "cmux.mac-devices.v1", "cmux.mac-host.v1"],

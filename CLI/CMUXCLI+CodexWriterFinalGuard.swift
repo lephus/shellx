@@ -49,7 +49,7 @@ extension CMUXCLI {
                 detail: "session=\(sessionID)",
                 message: String(
                     localized: "agentRestore.writerLock.changing",
-                    defaultValue: "Codex was still updating its session locks, so cmux could not confirm this conversation is free. Retry 'cmux restore --surface'."
+                    defaultValue: "Codex was still updating its session locks, so ShellX could not confirm this conversation is free. Retry 'shellx restore --surface'."
                 )
             )
         case .unavailable:
@@ -58,7 +58,7 @@ extension CMUXCLI {
                 detail: "session=\(sessionID)",
                 message: String(
                     localized: "agentRestore.writerLock.unreadable",
-                    defaultValue: "cmux could not read this conversation's Codex session lock, so it could not confirm the conversation is free. Retry 'cmux restore --surface'."
+                    defaultValue: "ShellX could not read this conversation's Codex session lock, so it could not confirm the conversation is free. Retry 'shellx restore --surface'."
                 )
             )
         }

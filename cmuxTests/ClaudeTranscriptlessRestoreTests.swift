@@ -211,7 +211,7 @@ struct ClaudeTranscriptlessRestoreTests {
         let binding = try #require(result.terminal?.resumeBinding)
         #expect(binding.kind == "claude")
         let input = try #require(result.input)
-        #expect(input == " cmux restore claude \(binding.checkpointId ?? "")\n", Comment(rawValue: input))
+        #expect(input == " shellx restore claude \(binding.checkpointId ?? "")\n", Comment(rawValue: input))
     }
 
     @Test("A first prompt sent after the index loaded keeps the Claude binding")
@@ -223,7 +223,7 @@ struct ClaudeTranscriptlessRestoreTests {
 
         let binding = try #require(result.terminal?.resumeBinding)
         #expect(binding.kind == "claude")
-        #expect(result.input == " cmux restore claude \(binding.checkpointId ?? "")\n")
+        #expect(result.input == " shellx restore claude \(binding.checkpointId ?? "")\n")
     }
 
     @Test("A cached index marked incomplete still drops a transcript-less Claude session")

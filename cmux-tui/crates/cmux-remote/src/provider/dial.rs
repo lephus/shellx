@@ -18,7 +18,14 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::net::{TcpStream, UnixStream};
+use tokio::net::TcpStream;
+#[cfg(unix)]
+use tokio::net::UnixStream;
+// ShellX: Windows client path: tokio has no AF_UNIX off Unix; the hub dial fails at runtime.
+#[cfg(not(unix))]
+struct UnixStream;
+#[cfg(not(unix))]
+impl UnixStream { async fn connect(_: &Path) -> std::io::Result<TcpStream> { Err(std::io::ErrorKind::Unsupported.into()) } }
 
 use crate::link::LinkError;
 use crate::provider::socks;

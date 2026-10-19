@@ -75,52 +75,6 @@ struct UpgradeAnalyticsTests {
         #expect(sink.named("cmux_upgrade_badge_dismissed").compactMap { $0["source"] } == [AnalyticsValue.string("mac_sidebar_badge")])
     }
 
-    @Test("the welcome card's Upgrade records shown, click, close and the checkout source",
-          arguments: [CloudWelcomeTrigger.launchAnnouncement, .newCloudWorkspace, .newCloudMachine])
-    func welcomeUpgrade(trigger: CloudWelcomeTrigger) async throws {
-        let (analytics, sink, ledgerSuite) = TestAnalytics.make()
-        defer { TestAnalytics.remove(ledgerSuite) }
-        let suite = "UpgradeAnalyticsTests.welcome.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
-        var performed: [CloudWelcomeNextStep] = []
-        let controller = CloudWelcomeWindowController(
-            defaults: defaults,
-            nextStep: { .upgrade },
-            performNextStep: { step, _ in
-                performed.append(step)
-                // What the real `.upgrade` step does, minus opening pricing.
-                ProUpgradePresenter.present(source: .cloudWelcome, analytics: analytics, open: { _ in })
-            },
-            analytics: analytics,
-            now: { TestAnalytics.fixedNow }
-        )
-        defer { controller.dismiss() }
-        controller.present(over: nil, trigger: trigger)
-        controller.handleNext(.upgrade)
-        await analytics.drain()
-
-        #expect(performed == [.upgrade])
-        let shown = try #require(sink.named("cmux_cloud_welcome_shown").first)
-        #expect(shown["trigger"] == .string(trigger.rawValue))
-        #expect(shown["next_step"] == .string("upgrade"))
-        #expect(sink.named("cmux_upgrade_prompt_shown").compactMap { $0["source"] } == [AnalyticsValue.string("mac_cloud_welcome")])
-        let click = try #require(sink.named("cmux_cloud_welcome_button_clicked").first)
-        #expect(click["button"] == .string("upgrade"))
-        #expect(click["trigger"] == .string(trigger.rawValue))
-        let closed = sink.named("cmux_cloud_welcome_closed")
-        #expect(closed.count == 1)
-        #expect(closed.first?["outcome"] == .string("upgrade"))
-        #expect(sink.named("cmux_upgrade_entrypoint_opened").compactMap { $0["source"] } == [AnalyticsValue.string("mac_cloud_welcome")])
-        let order = sink.events.map(\.name).filter { $0.hasPrefix("cmux_cloud_welcome") || $0 == "cmux_upgrade_entrypoint_opened" }
-        #expect(order == [
-            "cmux_cloud_welcome_shown",
-            "cmux_cloud_welcome_button_clicked",
-            "cmux_cloud_welcome_closed",
-            "cmux_upgrade_entrypoint_opened",
-        ])
-    }
-
     @Test("Enable, Not Now and a plain window close each end the card once")
     func welcomeOtherOutcomes() async throws {
         for (step, act, button, outcome) in [

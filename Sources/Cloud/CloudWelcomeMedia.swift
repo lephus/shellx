@@ -4,6 +4,7 @@ import CmuxFoundation
 import ImageIO
 import Observation
 import SwiftUI
+import ShellXIcons
 
 /// One feature in the welcome's media slider: a short looping clip, a title
 /// and one line. The clip is `<id>.mp4` (or `.mov`, `.gif`) in the app's
@@ -283,11 +284,11 @@ struct CloudWelcomeMediaCarousel: View {
     private var introducingText: String {
         posterHeadline == nil
             ? String(localized: "cloud.welcome.introducing", defaultValue: "Introducing")
-            : String(localized: "cloud.welcome.introducingCloud", defaultValue: "Introducing cmux cloud")
+            : String(localized: "cloud.welcome.introducingCloud", defaultValue: "Introducing ShellX cloud")
     }
 
     private var titleText: String {
-        posterHeadline ?? String(localized: "cloud.welcome.title.eyebrow", defaultValue: "cmux cloud")
+        posterHeadline ?? String(localized: "cloud.welcome.title.eyebrow", defaultValue: "ShellX cloud")
     }
 
     // MARK: Feature list
@@ -317,7 +318,7 @@ struct CloudWelcomeMediaCarousel: View {
         let ink = Color.primary.opacity(isCurrent ? 1 : (isHovered ? 0.62 : 0.42))
         return Button(action: action) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Image(systemName: slide.symbol)
+                ShellXIcon.image(slide.symbol)
                     .cmuxFont(size: 13)
                     .foregroundStyle(ink)
                     .frame(width: 18)
@@ -436,7 +437,7 @@ struct CloudWelcomeMediaCarousel: View {
 
     private func controlButton(symbol: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol)
+            ShellXIcon.image(symbol)
                 .cmuxFont(size: 11, weight: .bold)
                 .foregroundStyle(.white)
                 .frame(width: 28, height: 28)
@@ -462,7 +463,7 @@ struct CloudWelcomeMediaCarousel: View {
     /// is obvious in the lab and harmless if one ever ships without it.
     private func placeholder(_ slide: CloudWelcomeSlide) -> some View {
         VStack(spacing: 10) {
-            Image(systemName: slide.symbol)
+            ShellXIcon.image(slide.symbol)
                 .cmuxFont(size: 34, weight: .light)
                 .foregroundStyle(Color.accentColor)
             Text(slide.title)

@@ -122,6 +122,12 @@
             "state": "translated",
             "value": "Зберігати локальні сеанси"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giữ phiên cục bộ luôn chạy"
+          }
         }
       }
     },
@@ -130,121 +136,127 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Named local-tmux sessions keep processes and scrollback alive across cmux quit, crashes, and updates. Ordinary terminals keep their current behavior."
+            "value": "Named local-tmux sessions keep processes and scrollback alive across ShellX quit, crashes, and updates. Ordinary terminals keep their current behavior."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Benannte local-tmux-Sitzungen halten Prozesse und Scrollback über das Beenden, Abstürze und Updates von cmux hinweg am Leben. Normale Terminals behalten ihr aktuelles Verhalten."
+            "value": "Benannte local-tmux-Sitzungen halten Prozesse und Scrollback über das Beenden, Abstürze und Updates von ShellX hinweg am Leben. Normale Terminals behalten ihr aktuelles Verhalten."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les sessions local-tmux nommées conservent les processus et l’historique lors de la fermeture, des plantages et des mises à jour de cmux. Les terminaux ordinaires conservent leur comportement actuel."
+            "value": "Les sessions local-tmux nommées conservent les processus et l’historique lors de la fermeture, des plantages et des mises à jour de ShellX. Les terminaux ordinaires conservent leur comportement actuel."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las sesiones local-tmux con nombre mantienen los procesos y el historial al salir de cmux, tras fallos y durante actualizaciones. Los terminales normales conservan su comportamiento actual."
+            "value": "Las sesiones local-tmux con nombre mantienen los procesos y el historial al salir de ShellX, tras fallos y durante actualizaciones. Los terminales normales conservan su comportamiento actual."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le sessioni local-tmux con nome mantengono processi e cronologia attivi dopo chiusure, arresti anomali e aggiornamenti di cmux. I terminali normali mantengono il comportamento attuale."
+            "value": "Le sessioni local-tmux con nome mantengono processi e cronologia attivi dopo chiusure, arresti anomali e aggiornamenti di ShellX. I terminali normali mantengono il comportamento attuale."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "名前付き local-tmux セッションは、cmux の終了、クラッシュ、更新後もプロセスとスクロールバックを維持します。通常のターミナルの動作は変わりません。"
+            "value": "名前付き local-tmux セッションは、ShellX の終了、クラッシュ、更新後もプロセスとスクロールバックを維持します。通常のターミナルの動作は変わりません。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "이름이 지정된 local-tmux 세션은 cmux 종료, 충돌 및 업데이트 후에도 프로세스와 스크롤백을 유지합니다. 일반 터미널의 현재 동작은 그대로 유지됩니다."
+            "value": "이름이 지정된 local-tmux 세션은 ShellX 종료, 충돌 및 업데이트 후에도 프로세스와 스크롤백을 유지합니다. 일반 터미널의 현재 동작은 그대로 유지됩니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "命名的 local-tmux 会话可在 cmux 退出、崩溃和更新后继续保留进程与回滚内容。普通终端保持现有行为。"
+            "value": "命名的 local-tmux 会话可在 ShellX 退出、崩溃和更新后继续保留进程与回滚内容。普通终端保持现有行为。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "具名 local-tmux 工作階段可在 cmux 結束、當機與更新後繼續保留程序及捲動記錄。一般終端機維持目前行為。"
+            "value": "具名 local-tmux 工作階段可在 ShellX 結束、當機與更新後繼續保留程序及捲動記錄。一般終端機維持目前行為。"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "تحافظ جلسات local-tmux المسماة على العمليات وسجل التمرير بعد إنهاء cmux أو تعطله أو تحديثه. وتبقى المحطات العادية على سلوكها الحالي."
+            "value": "تحافظ جلسات local-tmux المسماة على العمليات وسجل التمرير بعد إنهاء ShellX أو تعطله أو تحديثه. وتبقى المحطات العادية على سلوكها الحالي."
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Imenovane local-tmux sesije čuvaju procese i historiju pomjeranja nakon izlaska iz cmux-a, rušenja i ažuriranja. Obični terminali zadržavaju trenutno ponašanje."
+            "value": "Imenovane local-tmux sesije čuvaju procese i historiju pomjeranja nakon izlaska iz ShellX-a, rušenja i ažuriranja. Obični terminali zadržavaju trenutno ponašanje."
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Navngivne local-tmux-sessioner holder processer og scrollback i live på tværs af afslutning, nedbrud og opdateringer af cmux. Almindelige terminaler beholder deres nuværende adfærd."
+            "value": "Navngivne local-tmux-sessioner holder processer og scrollback i live på tværs af afslutning, nedbrud og opdateringer af ShellX. Almindelige terminaler beholder deres nuværende adfærd."
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "សម័យ local-tmux ដែលមានឈ្មោះរក្សាដំណើរការ និងប្រវត្តិរំកិលឱ្យនៅសល់បន្ទាប់ពីបិទ cmux គាំង ឬធ្វើបច្ចុប្បន្នភាព។ ស្ថានីយធម្មតារក្សាឥរិយាបថបច្ចុប្បន្ន។"
+            "value": "សម័យ local-tmux ដែលមានឈ្មោះរក្សាដំណើរការ និងប្រវត្តិរំកិលឱ្យនៅសល់បន្ទាប់ពីបិទ ShellX គាំង ឬធ្វើបច្ចុប្បន្នភាព។ ស្ថានីយធម្មតារក្សាឥរិយាបថបច្ចុប្បន្ន។"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Navngitte local-tmux-økter holder prosesser og tilbakerulling i live gjennom avslutning, krasj og oppdateringer av cmux. Vanlige terminaler beholder dagens oppførsel."
+            "value": "Navngitte local-tmux-økter holder prosesser og tilbakerulling i live gjennom avslutning, krasj og oppdateringer av ShellX. Vanlige terminaler beholder dagens oppførsel."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nazwane sesje local-tmux zachowują procesy i historię przewijania po zamknięciu, awarii i aktualizacji cmux. Zwykłe terminale zachowują dotychczasowe działanie."
+            "value": "Nazwane sesje local-tmux zachowują procesy i historię przewijania po zamknięciu, awarii i aktualizacji ShellX. Zwykłe terminale zachowują dotychczasowe działanie."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sessões local-tmux nomeadas mantêm processos e histórico de rolagem após o encerramento, falhas e atualizações do cmux. Terminais comuns mantêm o comportamento atual."
+            "value": "Sessões local-tmux nomeadas mantêm processos e histórico de rolagem após o encerramento, falhas e atualizações do ShellX. Terminais comuns mantêm o comportamento atual."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Именованные сеансы local-tmux сохраняют процессы и историю прокрутки после выхода, сбоев и обновлений cmux. Обычные терминалы сохраняют текущее поведение."
+            "value": "Именованные сеансы local-tmux сохраняют процессы и историю прокрутки после выхода, сбоев и обновлений ShellX. Обычные терминалы сохраняют текущее поведение."
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "เซสชัน local-tmux ที่ตั้งชื่อจะเก็บโปรเซสและประวัติการเลื่อนไว้เมื่อออกจาก cmux เกิดข้อขัดข้อง หรืออัปเดต เทอร์มินัลทั่วไปยังคงทำงานแบบเดิม"
+            "value": "เซสชัน local-tmux ที่ตั้งชื่อจะเก็บโปรเซสและประวัติการเลื่อนไว้เมื่อออกจาก ShellX เกิดข้อขัดข้อง หรืออัปเดต เทอร์มินัลทั่วไปยังคงทำงานแบบเดิม"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Adlandırılmış local-tmux oturumları cmux kapanışları, çökmeleri ve güncellemeleri boyunca süreçleri ve geri kaydırma geçmişini korur. Normal terminaller mevcut davranışlarını sürdürür."
+            "value": "Adlandırılmış local-tmux oturumları ShellX kapanışları, çökmeleri ve güncellemeleri boyunca süreçleri ve geri kaydırma geçmişini korur. Normal terminaller mevcut davranışlarını sürdürür."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Іменовані сеанси local-tmux зберігають процеси й історію прокручування після виходу, збоїв та оновлень cmux. Звичайні термінали зберігають поточну поведінку."
+            "value": "Іменовані сеанси local-tmux зберігають процеси й історію прокручування після виходу, збоїв та оновлень ShellX. Звичайні термінали зберігають поточну поведінку."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các phiên local-tmux có tên giữ tiến trình và scrollback tồn tại qua các lần thoát, sự cố và cập nhật ShellX. Terminal thông thường giữ nguyên hành vi hiện tại."
           }
         }
       }
@@ -370,6 +382,12 @@
             "state": "translated",
             "value": "Оновити"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Làm mới"
+          }
         }
       }
     },
@@ -493,6 +511,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Докладніше"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chi tiết"
           }
         }
       }
@@ -618,6 +642,12 @@
             "state": "translated",
             "value": "Запустити постійний сеанс"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bắt đầu phiên bền vững"
+          }
         }
       }
     },
@@ -626,121 +656,127 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Creates a named local-tmux session in the selected workspace directory and attaches it to cmux."
+            "value": "Creates a named local-tmux session in the selected workspace directory and attaches it to ShellX."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Erstellt im Verzeichnis des ausgewählten Arbeitsbereichs eine benannte local-tmux-Sitzung und verbindet sie mit cmux."
+            "value": "Erstellt im Verzeichnis des ausgewählten Arbeitsbereichs eine benannte local-tmux-Sitzung und verbindet sie mit ShellX."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Crée une session local-tmux nommée dans le dossier de l’espace de travail sélectionné et l’attache à cmux."
+            "value": "Crée une session local-tmux nommée dans le dossier de l’espace de travail sélectionné et l’attache à ShellX."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Crea una sesión local-tmux con nombre en el directorio del espacio de trabajo seleccionado y la adjunta a cmux."
+            "value": "Crea una sesión local-tmux con nombre en el directorio del espacio de trabajo seleccionado y la adjunta a ShellX."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Crea una sessione local-tmux con nome nella directory dell’area di lavoro selezionata e la collega a cmux."
+            "value": "Crea una sessione local-tmux con nome nella directory dell’area di lavoro selezionata e la collega a ShellX."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "選択中のワークスペースのディレクトリに名前付き local-tmux セッションを作成し、cmux に接続します。"
+            "value": "選択中のワークスペースのディレクトリに名前付き local-tmux セッションを作成し、ShellX に接続します。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "선택한 작업 공간 디렉터리에 이름이 지정된 local-tmux 세션을 만들고 cmux에 연결합니다."
+            "value": "선택한 작업 공간 디렉터리에 이름이 지정된 local-tmux 세션을 만들고 ShellX에 연결합니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在所选工作区目录中创建命名的 local-tmux 会话并将其附加到 cmux。"
+            "value": "在所选工作区目录中创建命名的 local-tmux 会话并将其附加到 ShellX。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "在所選工作區目錄中建立具名 local-tmux 工作階段，並將其附加至 cmux。"
+            "value": "在所選工作區目錄中建立具名 local-tmux 工作階段，並將其附加至 ShellX。"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "ينشئ جلسة local-tmux مسماة في مجلد مساحة العمل المحددة ويربطها بـ cmux."
+            "value": "ينشئ جلسة local-tmux مسماة في مجلد مساحة العمل المحددة ويربطها بـ ShellX."
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kreira imenovanu local-tmux sesiju u direktoriju odabranog radnog prostora i povezuje je s cmux-om."
+            "value": "Kreira imenovanu local-tmux sesiju u direktoriju odabranog radnog prostora i povezuje je s ShellX-om."
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Opretter en navngiven local-tmux-session i den valgte arbejdsområdemappe og knytter den til cmux."
+            "value": "Opretter en navngiven local-tmux-session i den valgte arbejdsområdemappe og knytter den til ShellX."
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "បង្កើតសម័យ local-tmux ដែលមានឈ្មោះក្នុងថតកន្លែងធ្វើការដែលបានជ្រើស ហើយភ្ជាប់វាទៅ cmux។"
+            "value": "បង្កើតសម័យ local-tmux ដែលមានឈ្មោះក្នុងថតកន្លែងធ្វើការដែលបានជ្រើស ហើយភ្ជាប់វាទៅ ShellX។"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Oppretter en navngitt local-tmux-økt i mappen til det valgte arbeidsområdet og kobler den til cmux."
+            "value": "Oppretter en navngitt local-tmux-økt i mappen til det valgte arbeidsområdet og kobler den til ShellX."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tworzy nazwaną sesję local-tmux w katalogu wybranego obszaru roboczego i dołącza ją do cmux."
+            "value": "Tworzy nazwaną sesję local-tmux w katalogu wybranego obszaru roboczego i dołącza ją do ShellX."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cria uma sessão local-tmux nomeada no diretório do espaço de trabalho selecionado e a anexa ao cmux."
+            "value": "Cria uma sessão local-tmux nomeada no diretório do espaço de trabalho selecionado e a anexa ao ShellX."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Создаёт именованный сеанс local-tmux в каталоге выбранной рабочей области и подключает его к cmux."
+            "value": "Создаёт именованный сеанс local-tmux в каталоге выбранной рабочей области и подключает его к ShellX."
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "สร้างเซสชัน local-tmux ที่ตั้งชื่อในไดเรกทอรีเวิร์กสเปซที่เลือกและแนบเข้ากับ cmux"
+            "value": "สร้างเซสชัน local-tmux ที่ตั้งชื่อในไดเรกทอรีเวิร์กสเปซที่เลือกและแนบเข้ากับ ShellX"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Seçili çalışma alanı dizininde adlandırılmış bir local-tmux oturumu oluşturur ve cmux'a bağlar."
+            "value": "Seçili çalışma alanı dizininde adlandırılmış bir local-tmux oturumu oluşturur ve ShellX'a bağlar."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Створює іменований сеанс local-tmux у каталозі вибраного робочого простору та підключає його до cmux."
+            "value": "Створює іменований сеанс local-tmux у каталозі вибраного робочого простору та підключає його до ShellX."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tạo một phiên local-tmux có tên trong thư mục của phiên đã chọn và gắn nó vào ShellX."
           }
         }
       }
@@ -866,6 +902,12 @@
             "state": "translated",
             "value": "Назва сеансу"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tên phiên"
+          }
         }
       }
     },
@@ -989,6 +1031,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Запустити"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bắt đầu"
           }
         }
       }
@@ -1114,6 +1162,12 @@
             "state": "translated",
             "value": "Стан"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trạng thái"
+          }
         }
       }
     },
@@ -1237,6 +1291,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Підключити"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đính kèm"
           }
         }
       }
@@ -1362,6 +1422,12 @@
             "state": "translated",
             "value": "Застарілий"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cũ"
+          }
         }
       }
     },
@@ -1485,6 +1551,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Перевірка…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang kiểm tra…"
           }
         }
       }
@@ -1610,6 +1682,12 @@
             "state": "translated",
             "value": "Немає активних сеансів"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không có phiên nào đang chạy"
+          }
         }
       }
     },
@@ -1733,6 +1811,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Активні"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang chạy"
           }
         }
       }
@@ -1858,6 +1942,12 @@
             "state": "translated",
             "value": "Керований"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Được quản lý"
+          }
         }
       }
     },
@@ -1981,6 +2071,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Некерований"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không được quản lý"
           }
         }
       }
@@ -2106,6 +2202,12 @@
             "state": "translated",
             "value": "Клієнти"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Client"
+          }
         }
       }
     },
@@ -2229,6 +2331,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Відкрийте робочу область і спробуйте ще раз."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hãy mở một phiên rồi thử lại."
           }
         }
       }
@@ -2354,6 +2462,12 @@
             "state": "translated",
             "value": "Не вдалося оновити збережені сеанси. Спробуйте ще раз."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể cập nhật các phiên đã lưu. Hãy thử lại."
+          }
         }
       }
     },
@@ -2362,121 +2476,127 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Session persistence is unavailable. Reinstall cmux and try again."
+            "value": "Session persistence is unavailable. Reinstall ShellX and try again."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sitzungen können nicht dauerhaft gespeichert werden. Installiere cmux neu und versuche es erneut."
+            "value": "Sitzungen können nicht dauerhaft gespeichert werden. Installiere ShellX neu und versuche es erneut."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "La persistance des sessions est indisponible. Réinstallez cmux et réessayez."
+            "value": "La persistance des sessions est indisponible. Réinstallez ShellX et réessayez."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La persistencia de sesiones no está disponible. Reinstala cmux e inténtalo de nuevo."
+            "value": "La persistencia de sesiones no está disponible. Reinstala ShellX e inténtalo de nuevo."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "La persistenza delle sessioni non è disponibile. Reinstalla cmux e riprova."
+            "value": "La persistenza delle sessioni non è disponibile. Reinstalla ShellX e riprova."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "セッションの永続化を利用できません。cmux を再インストールして、もう一度お試しください。"
+            "value": "セッションの永続化を利用できません。ShellX を再インストールして、もう一度お試しください。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "세션 유지를 사용할 수 없습니다. cmux를 다시 설치하고 다시 시도하세요."
+            "value": "세션 유지를 사용할 수 없습니다. ShellX를 다시 설치하고 다시 시도하세요."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "会话持久化不可用。请重新安装 cmux，然后重试。"
+            "value": "会话持久化不可用。请重新安装 ShellX，然后重试。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "工作階段持續保存功能無法使用。請重新安裝 cmux，然後重試。"
+            "value": "工作階段持續保存功能無法使用。請重新安裝 ShellX，然後重試。"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "الاحتفاظ بالجلسات غير متاح. أعد تثبيت cmux وحاول مرة أخرى."
+            "value": "الاحتفاظ بالجلسات غير متاح. أعد تثبيت ShellX وحاول مرة أخرى."
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Trajno čuvanje sesija nije dostupno. Ponovo instalirajte cmux i pokušajte ponovo."
+            "value": "Trajno čuvanje sesija nije dostupno. Ponovo instalirajte ShellX i pokušajte ponovo."
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bevaring af sessioner er ikke tilgængelig. Geninstaller cmux, og prøv igen."
+            "value": "Bevaring af sessioner er ikke tilgængelig. Geninstaller ShellX, og prøv igen."
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "មិនអាចប្រើមុខងាររក្សាទុកសម័យបានទេ។ ដំឡើង cmux ឡើងវិញ ហើយព្យាយាមម្តងទៀត។"
+            "value": "មិនអាចប្រើមុខងាររក្សាទុកសម័យបានទេ។ ដំឡើង ShellX ឡើងវិញ ហើយព្យាយាមម្តងទៀត។"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lagring av vedvarende økter er utilgjengelig. Installer cmux på nytt og prøv igjen."
+            "value": "Lagring av vedvarende økter er utilgjengelig. Installer ShellX på nytt og prøv igjen."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Zachowywanie sesji jest niedostępne. Zainstaluj ponownie cmux i spróbuj jeszcze raz."
+            "value": "Zachowywanie sesji jest niedostępne. Zainstaluj ponownie ShellX i spróbuj jeszcze raz."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "A persistência de sessões está indisponível. Reinstale o cmux e tente novamente."
+            "value": "A persistência de sessões está indisponível. Reinstale o ShellX e tente novamente."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Сохранение сеансов недоступно. Переустановите cmux и повторите попытку."
+            "value": "Сохранение сеансов недоступно. Переустановите ShellX и повторите попытку."
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "ไม่สามารถใช้การเก็บรักษาเซสชันได้ โปรดติดตั้ง cmux ใหม่แล้วลองอีกครั้ง"
+            "value": "ไม่สามารถใช้การเก็บรักษาเซสชันได้ โปรดติดตั้ง ShellX ใหม่แล้วลองอีกครั้ง"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Oturum kalıcılığı kullanılamıyor. cmux uygulamasını yeniden yükleyip tekrar deneyin."
+            "value": "Oturum kalıcılığı kullanılamıyor. ShellX uygulamasını yeniden yükleyip tekrar deneyin."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Збереження сеансів недоступне. Перевстановіть cmux і спробуйте ще раз."
+            "value": "Збереження сеансів недоступне. Перевстановіть ShellX і спробуйте ще раз."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tính năng lưu giữ phiên không khả dụng. Hãy cài đặt lại ShellX rồi thử lại."
           }
         }
       }
@@ -2602,6 +2722,12 @@
             "state": "translated",
             "value": "Не вдалося оновити збережені сеанси. Спробуйте ще раз."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể cập nhật các phiên đã lưu. Hãy thử lại."
+          }
         }
       }
     },
@@ -2725,6 +2851,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Активні: %lld"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang chạy: %lld"
           }
         }
       }
@@ -2850,6 +2982,12 @@
             "state": "translated",
             "value": "Клієнти: %lld"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Client: %lld"
+          }
         }
       }
     },
@@ -2973,6 +3111,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "自動化規則"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quy tắc tự động hóa"
           }
         }
       }
@@ -3098,6 +3242,12 @@
             "state": "translated",
             "value": "共 %1$lld 條 • 已啟用 %2$lld 條 • 已停用 %3$lld 條"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld tổng • %2$lld đã bật • %3$lld đã tắt"
+          }
         }
       }
     },
@@ -3221,6 +3371,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編輯規則"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sửa quy tắc"
           }
         }
       }
@@ -3346,6 +3502,12 @@
             "state": "translated",
             "value": "尚未設定規則。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa cấu hình quy tắc nào."
+          }
         }
       }
     },
@@ -3469,6 +3631,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "無法載入自動化規則檔案。請編輯 JSON 檔案後重新載入。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể tải tệp quy tắc tự động hóa. Hãy sửa tệp JSON rồi tải lại."
           }
         }
       }
@@ -3594,6 +3762,12 @@
             "state": "translated",
             "value": "正在載入規則…"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang tải quy tắc…"
+          }
         }
       }
     },
@@ -3718,6 +3892,12 @@
             "state": "translated",
             "value": "尚無規則檔案。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa có tệp quy tắc."
+          }
         }
       }
     },
@@ -3726,121 +3906,127 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "توجد القواعد في ~/.cmuxterm/automations.json. حرّر ملف JSON مباشرة، ثم أعد تحميل المحرك قيد التشغيل. تظل واجهة سطر الأوامر `cmux automation` متاحة للاختبار وتشخيص السجلات."
+            "value": "توجد القواعد في ~/.shellx/automations.json. حرّر ملف JSON مباشرة، ثم أعد تحميل المحرك قيد التشغيل. تظل واجهة سطر الأوامر `shellx automation` متاحة للاختبار وتشخيص السجلات."
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pravila se nalaze u ~/.cmuxterm/automations.json. Uredite JSON direktno, zatim ponovo učitajte pokrenuti mehanizam. CLI `cmux automation` ostaje dostupan za testiranje i dijagnostiku zapisa."
+            "value": "Pravila se nalaze u ~/.shellx/automations.json. Uredite JSON direktno, zatim ponovo učitajte pokrenuti mehanizam. CLI `shellx automation` ostaje dostupan za testiranje i dijagnostiku zapisa."
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Regler findes i ~/.cmuxterm/automations.json. Rediger JSON-filen direkte, og genindlæs derefter den kørende motor. CLI'en `cmux automation` er fortsat tilgængelig til test og logdiagnostik."
+            "value": "Regler findes i ~/.shellx/automations.json. Rediger JSON-filen direkte, og genindlæs derefter den kørende motor. CLI'en `shellx automation` er fortsat tilgængelig til test og logdiagnostik."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Regeln befinden sich in ~/.cmuxterm/automations.json. Bearbeite die JSON-Datei direkt und lade anschließend die laufende Engine neu. Die CLI `cmux automation` bleibt für Tests und Logdiagnosen verfügbar."
+            "value": "Regeln befinden sich in ~/.shellx/automations.json. Bearbeite die JSON-Datei direkt und lade anschließend die laufende Engine neu. Die CLI `shellx automation` bleibt für Tests und Logdiagnosen verfügbar."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rules live in ~/.cmuxterm/automations.json. Edit the JSON directly, then reload the running engine. The cmux automation CLI remains available for test and log diagnostics."
+            "value": "Rules live in ~/.shellx/automations.json. Edit the JSON directly, then reload the running engine. The ShellX automation CLI remains available for test and log diagnostics."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Las reglas se guardan en ~/.cmuxterm/automations.json. Edita el JSON directamente y después recarga el motor en ejecución. La CLI `cmux automation` sigue disponible para pruebas y diagnóstico de registros."
+            "value": "Las reglas se guardan en ~/.shellx/automations.json. Edita el JSON directamente y después recarga el motor en ejecución. La CLI `shellx automation` sigue disponible para pruebas y diagnóstico de registros."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les règles se trouvent dans ~/.cmuxterm/automations.json. Modifiez directement le fichier JSON, puis rechargez le moteur en cours d’exécution. La CLI `cmux automation` reste disponible pour les tests et le diagnostic des journaux."
+            "value": "Les règles se trouvent dans ~/.shellx/automations.json. Modifiez directement le fichier JSON, puis rechargez le moteur en cours d’exécution. La CLI `shellx automation` reste disponible pour les tests et le diagnostic des journaux."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le regole si trovano in ~/.cmuxterm/automations.json. Modifica direttamente il JSON, quindi ricarica il motore in esecuzione. La CLI `cmux automation` resta disponibile per test e diagnostica dei log."
+            "value": "Le regole si trovano in ~/.shellx/automations.json. Modifica direttamente il JSON, quindi ricarica il motore in esecuzione. La CLI `shellx automation` resta disponibile per test e diagnostica dei log."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "ルールは ~/.cmuxterm/automations.json にあります。JSON を直接編集してから、実行中のエンジンを再読み込みしてください。テストやログ診断には引き続き `cmux automation` CLI を使用できます。"
+            "value": "ルールは ~/.shellx/automations.json にあります。JSON を直接編集してから、実行中のエンジンを再読み込みしてください。テストやログ診断には引き続き `shellx automation` CLI を使用できます。"
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "ច្បាប់ស្ថិតនៅក្នុង ~/.cmuxterm/automations.json។ កែសម្រួល JSON ដោយផ្ទាល់ រួចផ្ទុកម៉ាស៊ីនដែលកំពុងដំណើរការឡើងវិញ។ CLI `cmux automation` នៅតែអាចប្រើសម្រាប់ការសាកល្បង និងវិនិច្ឆ័យកំណត់ហេតុ។"
+            "value": "ច្បាប់ស្ថិតនៅក្នុង ~/.shellx/automations.json។ កែសម្រួល JSON ដោយផ្ទាល់ រួចផ្ទុកម៉ាស៊ីនដែលកំពុងដំណើរការឡើងវិញ។ CLI `shellx automation` នៅតែអាចប្រើសម្រាប់ការសាកល្បង និងវិនិច្ឆ័យកំណត់ហេតុ។"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "규칙은 ~/.cmuxterm/automations.json에 있습니다. JSON을 직접 편집한 다음 실행 중인 엔진을 다시 로드하세요. 테스트와 로그 진단에는 `cmux automation` CLI를 계속 사용할 수 있습니다."
+            "value": "규칙은 ~/.shellx/automations.json에 있습니다. JSON을 직접 편집한 다음 실행 중인 엔진을 다시 로드하세요. 테스트와 로그 진단에는 `shellx automation` CLI를 계속 사용할 수 있습니다."
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reglene ligger i ~/.cmuxterm/automations.json. Rediger JSON-filen direkte, og last deretter inn den kjørende motoren på nytt. CLI-en `cmux automation` er fortsatt tilgjengelig for testing og loggdiagnostikk."
+            "value": "Reglene ligger i ~/.shellx/automations.json. Rediger JSON-filen direkte, og last deretter inn den kjørende motoren på nytt. CLI-en `shellx automation` er fortsatt tilgjengelig for testing og loggdiagnostikk."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reguły znajdują się w ~/.cmuxterm/automations.json. Edytuj JSON bezpośrednio, a następnie przeładuj działający silnik. Interfejs CLI `cmux automation` pozostaje dostępny do testów i diagnostyki logów."
+            "value": "Reguły znajdują się w ~/.shellx/automations.json. Edytuj JSON bezpośrednio, a następnie przeładuj działający silnik. Interfejs CLI `shellx automation` pozostaje dostępny do testów i diagnostyki logów."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "As regras ficam em ~/.cmuxterm/automations.json. Edite o JSON diretamente e depois recarregue o mecanismo em execução. A CLI `cmux automation` continua disponível para testes e diagnóstico de logs."
+            "value": "As regras ficam em ~/.shellx/automations.json. Edite o JSON diretamente e depois recarregue o mecanismo em execução. A CLI `shellx automation` continua disponível para testes e diagnóstico de logs."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Правила находятся в ~/.cmuxterm/automations.json. Отредактируйте JSON напрямую, затем перезагрузите работающий движок. CLI `cmux automation` по-прежнему доступен для тестирования и диагностики журналов."
+            "value": "Правила находятся в ~/.shellx/automations.json. Отредактируйте JSON напрямую, затем перезагрузите работающий движок. CLI `shellx automation` по-прежнему доступен для тестирования и диагностики журналов."
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "กฎอยู่ที่ ~/.cmuxterm/automations.json แก้ไข JSON โดยตรง แล้วโหลดเอนจินที่กำลังทำงานใหม่ CLI `cmux automation` ยังใช้สำหรับทดสอบและวินิจฉัยบันทึกได้"
+            "value": "กฎอยู่ที่ ~/.shellx/automations.json แก้ไข JSON โดยตรง แล้วโหลดเอนจินที่กำลังทำงานใหม่ CLI `shellx automation` ยังใช้สำหรับทดสอบและวินิจฉัยบันทึกได้"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kurallar ~/.cmuxterm/automations.json içinde bulunur. JSON'u doğrudan düzenleyin, ardından çalışan motoru yeniden yükleyin. `cmux automation` CLI'si test ve günlük tanılama için kullanılmaya devam eder."
+            "value": "Kurallar ~/.shellx/automations.json içinde bulunur. JSON'u doğrudan düzenleyin, ardından çalışan motoru yeniden yükleyin. `shellx automation` CLI'si test ve günlük tanılama için kullanılmaya devam eder."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Правила містяться в ~/.cmuxterm/automations.json. Відредагуйте JSON безпосередньо, а потім перезавантажте запущений рушій. CLI `cmux automation` залишається доступним для тестування та діагностики журналів."
+            "value": "Правила містяться в ~/.shellx/automations.json. Відредагуйте JSON безпосередньо, а потім перезавантажте запущений рушій. CLI `shellx automation` залишається доступним для тестування та діагностики журналів."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "规则位于 ~/.cmuxterm/automations.json。直接编辑 JSON，然后重新加载正在运行的引擎。`cmux automation` CLI 仍可用于测试和日志诊断。"
+            "value": "规则位于 ~/.shellx/automations.json。直接编辑 JSON，然后重新加载正在运行的引擎。`shellx automation` CLI 仍可用于测试和日志诊断。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "規則位於 ~/.cmuxterm/automations.json。直接編輯 JSON，然後重新載入正在執行的引擎。`cmux automation` CLI 仍可用於測試與記錄診斷。"
+            "value": "規則位於 ~/.shellx/automations.json。直接編輯 JSON，然後重新載入正在執行的引擎。`shellx automation` CLI 仍可用於測試與記錄診斷。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quy tắc nằm trong ~/.shellx/automations.json. Hãy sửa trực tiếp tệp JSON, rồi tải lại engine đang chạy. CLI tự động hóa shellx vẫn dùng được để kiểm thử và chẩn đoán log."
           }
         }
       }
@@ -3966,6 +4152,12 @@
             "state": "translated",
             "value": "重新載入"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tải lại"
+          }
         }
       }
     },
@@ -4089,6 +4281,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "已要求重新載入。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã yêu cầu tải lại."
           }
         }
       }
@@ -4214,6 +4412,12 @@
             "state": "translated",
             "value": "自動化引擎無法使用。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engine tự động hóa không khả dụng."
+          }
         }
       }
     },
@@ -4271,6 +4475,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "一般"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chung"
           }
         }
       }
@@ -4330,6 +4540,12 @@
             "state": "translated",
             "value": "工作區"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên"
+          }
         }
       }
     },
@@ -4387,6 +4603,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "側邊欄與 Dock"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thanh bên & Dock"
           }
         }
       }
@@ -4446,6 +4668,12 @@
             "state": "translated",
             "value": "代理程式與自動化"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent & Tự động hóa"
+          }
         }
       }
     },
@@ -4503,6 +4731,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "瀏覽器與檔案"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trình duyệt & Tệp"
           }
         }
       }
@@ -4562,6 +4796,12 @@
             "state": "translated",
             "value": "遠端與裝置"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Từ xa & Thiết bị"
+          }
         }
       }
     },
@@ -4619,6 +4859,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "鍵盤與進階"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bàn phím & Nâng cao"
           }
         }
       }
@@ -4745,6 +4991,12 @@
             "state": "translated",
             "value": "Ghostty 預設顏色"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Màu mặc định của Ghostty"
+          }
         }
       }
     },
@@ -4869,6 +5121,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "沒有符合搜尋的主題。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không có theme nào khớp với tìm kiếm của bạn."
           }
         }
       }
@@ -4995,6 +5253,12 @@
             "state": "translated",
             "value": "在終端機中開啟…"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở trong terminal…"
+          }
         }
       }
     },
@@ -5004,121 +5268,127 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Esegue il selettore di temi cmux con ricerca in una nuova scheda del terminale."
+            "value": "Esegue il selettore di temi ShellX con ricerca in una nuova scheda del terminale."
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pokreće pretraživi birač tema cmux u novoj kartici terminala."
+            "value": "Pokreće pretraživi birač tema ShellX u novoj kartici terminala."
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kører den søgbare cmux-temavælger i en ny terminalfane."
+            "value": "Kører den søgbare ShellX-temavælger i en ny terminalfane."
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "ដំណើរការកម្មវិធីជ្រើសស្បែក cmux ដែលអាចស្វែងរកបាន ក្នុងផ្ទាំងទែមីណាល់ថ្មី។"
+            "value": "ដំណើរការកម្មវិធីជ្រើសស្បែក ShellX ដែលអាចស្វែងរកបាន ក្នុងផ្ទាំងទែមីណាល់ថ្មី។"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kjører den søkbare cmux-temavelgeren i en ny terminalfane."
+            "value": "Kjører den søkbare ShellX-temavelgeren i en ny terminalfane."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uruchamia wyszukiwarkę motywów cmux w nowej karcie terminala."
+            "value": "Uruchamia wyszukiwarkę motywów ShellX w nowej karcie terminala."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Executa o seletor de temas do cmux com busca em uma nova aba do terminal."
+            "value": "Executa o seletor de temas do ShellX com busca em uma nova aba do terminal."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Запускает окно выбора тем cmux с поиском в новой вкладке терминала."
+            "value": "Запускает окно выбора тем ShellX с поиском в новой вкладке терминала."
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "เรียกใช้ตัวเลือกธีม cmux ที่ค้นหาได้ในแท็บเทอร์มินัลใหม่"
+            "value": "เรียกใช้ตัวเลือกธีม ShellX ที่ค้นหาได้ในแท็บเทอร์มินัลใหม่"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aranabilir cmux tema seçicisini yeni bir terminal sekmesinde çalıştırır."
+            "value": "Aranabilir ShellX tema seçicisini yeni bir terminal sekmesinde çalıştırır."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Запускає вибір тем cmux із пошуком у новій вкладці термінала."
+            "value": "Запускає вибір тем ShellX із пошуком у новій вкладці термінала."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Runs the searchable cmux themes picker in a new terminal tab."
+            "value": "Runs the searchable ShellX themes picker in a new terminal tab."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يشغّل منتقي سمات cmux القابل للبحث في علامة تبويب طرفية جديدة."
+            "value": "يشغّل منتقي سمات ShellX القابل للبحث في علامة تبويب طرفية جديدة."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Startet die durchsuchbare cmux-Themes-Auswahl in einem neuen Terminal-Tab."
+            "value": "Startet die durchsuchbare ShellX-Themes-Auswahl in einem neuen Terminal-Tab."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ejecuta el selector de temas de cmux con búsqueda en una nueva pestaña de terminal."
+            "value": "Ejecuta el selector de temas de ShellX con búsqueda en una nueva pestaña de terminal."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lance le sélecteur de thèmes cmux avec recherche dans un nouvel onglet de terminal."
+            "value": "Lance le sélecteur de thèmes ShellX avec recherche dans un nouvel onglet de terminal."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "検索できる cmux テーマピッカーを新しいターミナルタブで実行します。"
+            "value": "検索できる ShellX テーマピッカーを新しいターミナルタブで実行します。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "새 터미널 탭에서 검색 가능한 cmux 테마 선택기를 실행합니다."
+            "value": "새 터미널 탭에서 검색 가능한 ShellX 테마 선택기를 실행합니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在新的终端标签页中运行可搜索的 cmux 主题选择器。"
+            "value": "在新的终端标签页中运行可搜索的 ShellX 主题选择器。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "在新的終端機分頁中執行可搜尋的 cmux 主題選擇器。"
+            "value": "在新的終端機分頁中執行可搜尋的 ShellX 主題選擇器。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chạy bộ chọn theme ShellX có thể tìm kiếm trong một tab terminal mới."
           }
         }
       }
@@ -5245,6 +5515,12 @@
             "state": "translated",
             "value": "淺色：%1$@ · 深色：%2$@"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sáng: %1$@ · Tối: %2$@"
+          }
         }
       }
     },
@@ -5369,6 +5645,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "還原"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoàn nguyên"
           }
         }
       }
@@ -5495,6 +5777,12 @@
             "state": "translated",
             "value": "搜尋所有主題"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tìm tất cả theme"
+          }
         }
       }
     },
@@ -5619,6 +5907,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "外觀"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giao diện"
           }
         }
       }
@@ -5745,6 +6039,12 @@
             "state": "translated",
             "value": "無法儲存終端機主題。請再試一次。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể lưu theme terminal. Vui lòng thử lại."
+          }
         }
       }
     },
@@ -5869,6 +6169,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Current dark theme"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theme tối hiện tại"
           }
         }
       }
@@ -5995,6 +6301,12 @@
             "state": "translated",
             "value": "Current light theme"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theme sáng hiện tại"
+          }
         }
       }
     },
@@ -6120,6 +6432,12 @@
             "state": "translated",
             "value": "Current light and dark theme"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theme sáng và tối hiện tại"
+          }
         }
       }
     },
@@ -6179,6 +6497,12 @@
             "state": "translated",
             "value": "切換至 Nightly"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chuyển sang Nightly"
+          }
         }
       }
     },
@@ -6188,55 +6512,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open cmux NIGHTLY, built daily from the latest code. It installs next to this app and updates separately."
+            "value": "Open ShellX NIGHTLY, built daily from the latest code. It installs next to this app and updates separately."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "افتح cmux NIGHTLY، المبني يوميًا من أحدث شيفرة. يُثبَّت بجانب هذا التطبيق ويُحدَّث بشكل منفصل."
+            "value": "افتح ShellX NIGHTLY، المبني يوميًا من أحدث شيفرة. يُثبَّت بجانب هذا التطبيق ويُحدَّث بشكل منفصل."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux NIGHTLY öffnen, täglich aus dem neuesten Code gebaut. Es wird neben dieser App installiert und separat aktualisiert."
+            "value": "ShellX NIGHTLY öffnen, täglich aus dem neuesten Code gebaut. Es wird neben dieser App installiert und separat aktualisiert."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abre cmux NIGHTLY, compilado a diario con el código más reciente. Se instala junto a esta app y se actualiza por separado."
+            "value": "Abre ShellX NIGHTLY, compilado a diario con el código más reciente. Se instala junto a esta app y se actualiza por separado."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ouvrir cmux NIGHTLY, compilé chaque jour à partir du code le plus récent. Il s’installe à côté de cette app et se met à jour séparément."
+            "value": "Ouvrir ShellX NIGHTLY, compilé chaque jour à partir du code le plus récent. Il s’installe à côté de cette app et se met à jour séparément."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "最新のコードから毎日ビルドされる cmux NIGHTLY を開きます。このアプリと並べてインストールされ、別々にアップデートされます。"
+            "value": "最新のコードから毎日ビルドされる ShellX NIGHTLY を開きます。このアプリと並べてインストールされ、別々にアップデートされます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "최신 코드로 매일 빌드되는 cmux NIGHTLY를 엽니다. 이 앱과 나란히 설치되며 별도로 업데이트됩니다."
+            "value": "최신 코드로 매일 빌드되는 ShellX NIGHTLY를 엽니다. 이 앱과 나란히 설치되며 별도로 업데이트됩니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开 cmux NIGHTLY，每天基于最新代码构建。它会安装在此应用旁边，并单独更新。"
+            "value": "打开 ShellX NIGHTLY，每天基于最新代码构建。它会安装在此应用旁边，并单独更新。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "開啟 cmux NIGHTLY，每天以最新程式碼建置。它會安裝在此 App 旁邊，並獨立更新。"
+            "value": "開啟 ShellX NIGHTLY，每天以最新程式碼建置。它會安裝在此 App 旁邊，並獨立更新。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở ShellX NIGHTLY, được build hằng ngày từ mã mới nhất. Bản này được cài cạnh ứng dụng này và cập nhật riêng."
           }
         }
       }
@@ -6297,6 +6627,12 @@
             "state": "translated",
             "value": "Nightly 版本"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bản Nightly"
+          }
         }
       }
     },
@@ -6356,6 +6692,12 @@
             "state": "translated",
             "value": "切換至穩定版"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chuyển sang Stable"
+          }
         }
       }
     },
@@ -6365,55 +6707,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open the stable cmux app. It installs next to this one if it is missing."
+            "value": "Open the stable ShellX app. It installs next to this one if it is missing."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "افتح تطبيق cmux المستقر. إذا لم يكن مثبتًا، فسيُثبَّت بجانب هذا التطبيق."
+            "value": "افتح تطبيق ShellX المستقر. إذا لم يكن مثبتًا، فسيُثبَّت بجانب هذا التطبيق."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Die stabile cmux-App öffnen. Fehlt sie, wird sie neben dieser installiert."
+            "value": "Die stabile ShellX-App öffnen. Fehlt sie, wird sie neben dieser installiert."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abre la app estable de cmux. Si no está, se instala junto a esta."
+            "value": "Abre la app estable de ShellX. Si no está, se instala junto a esta."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ouvrir l’app cmux stable. Si elle est absente, elle s’installe à côté de celle-ci."
+            "value": "Ouvrir l’app ShellX stable. Si elle est absente, elle s’installe à côté de celle-ci."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "安定版の cmux アプリを開きます。見つからない場合は、このアプリと並べてインストールされます。"
+            "value": "安定版の ShellX アプリを開きます。見つからない場合は、このアプリと並べてインストールされます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "안정 버전 cmux 앱을 엽니다. 설치되어 있지 않으면 이 앱 옆에 설치됩니다."
+            "value": "안정 버전 ShellX 앱을 엽니다. 설치되어 있지 않으면 이 앱 옆에 설치됩니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开稳定版 cmux 应用。如果尚未安装，会安装在此应用旁边。"
+            "value": "打开稳定版 ShellX 应用。如果尚未安装，会安装在此应用旁边。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "開啟穩定版 cmux App。若尚未安裝，會安裝在此 App 旁邊。"
+            "value": "開啟穩定版 ShellX App。若尚未安裝，會安裝在此 App 旁邊。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở ứng dụng ShellX ổn định. Nếu chưa có, nó sẽ được cài cạnh ứng dụng này."
           }
         }
       }
@@ -6474,6 +6822,12 @@
             "state": "translated",
             "value": "穩定版"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bản ổn định"
+          }
         }
       }
     },
@@ -6533,6 +6887,12 @@
             "state": "translated",
             "value": "深色主題"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theme tối"
+          }
         }
       }
     },
@@ -6591,6 +6951,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "淺色主題"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theme sáng"
           }
         }
       }
@@ -6717,6 +7083,12 @@
             "state": "translated",
             "value": "Інтеграція Pi"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tích hợp Pi"
+          }
         }
       }
     },
@@ -6726,121 +7098,127 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "When enabled, cmux wraps the pi command and loads its bundled session extension without changing your Pi configuration. Disable if you prefer to manage Pi hooks yourself."
+            "value": "When enabled, ShellX wraps the pi command and loads its bundled session extension without changing your Pi configuration. Disable if you prefer to manage Pi hooks yourself."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "عند التفعيل، يغلّف cmux أمر pi ويحمّل امتداد الجلسة المضمّن دون تغيير إعدادات Pi. عطّل هذا الخيار إذا كنت تفضّل إدارة خطافات Pi بنفسك."
+            "value": "عند التفعيل، يغلّف ShellX أمر pi ويحمّل امتداد الجلسة المضمّن دون تغيير إعدادات Pi. عطّل هذا الخيار إذا كنت تفضّل إدارة خطافات Pi بنفسك."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wenn aktiviert, umhüllt cmux den pi-Befehl und lädt seine gebündelte Sitzungserweiterung, ohne deine Pi-Konfiguration zu ändern. Deaktiviere dies, wenn du die Pi-Hooks selbst verwalten möchtest."
+            "value": "Wenn aktiviert, umhüllt ShellX den pi-Befehl und lädt seine gebündelte Sitzungserweiterung, ohne deine Pi-Konfiguration zu ändern. Deaktiviere dies, wenn du die Pi-Hooks selbst verwalten möchtest."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cuando está activado, cmux envuelve el comando pi y carga su extensión de sesión integrada sin cambiar tu configuración de Pi. Desactívalo si prefieres gestionar tú mismo los hooks de Pi."
+            "value": "Cuando está activado, ShellX envuelve el comando pi y carga su extensión de sesión integrada sin cambiar tu configuración de Pi. Desactívalo si prefieres gestionar tú mismo los hooks de Pi."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lorsque cette option est activée, cmux encapsule la commande pi et charge son extension de session intégrée sans modifier votre configuration Pi. Désactivez-la si vous préférez gérer les hooks Pi vous-même."
+            "value": "Lorsque cette option est activée, ShellX encapsule la commande pi et charge son extension de session intégrée sans modifier votre configuration Pi. Désactivez-la si vous préférez gérer les hooks Pi vous-même."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "有効にすると、cmuxはpiコマンドをラップし、Piの設定を変更せずにバンドルされたセッション拡張機能を読み込みます。Piのフックを自分で管理する場合は無効にしてください。"
+            "value": "有効にすると、ShellXはpiコマンドをラップし、Piの設定を変更せずにバンドルされたセッション拡張機能を読み込みます。Piのフックを自分で管理する場合は無効にしてください。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "활성화하면 cmux가 pi 명령을 래핑하고 Pi 설정을 변경하지 않고 번들 세션 확장을 로드합니다. Pi 훅을 직접 관리하려면 비활성화하세요."
+            "value": "활성화하면 ShellX가 pi 명령을 래핑하고 Pi 설정을 변경하지 않고 번들 세션 확장을 로드합니다. Pi 훅을 직접 관리하려면 비활성화하세요."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "启用后，cmux 会包装 pi 命令并加载内置会话扩展，不会更改你的 Pi 配置。如果你希望自行管理 Pi 钩子，请禁用此选项。"
+            "value": "启用后，ShellX 会包装 pi 命令并加载内置会话扩展，不会更改你的 Pi 配置。如果你希望自行管理 Pi 钩子，请禁用此选项。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "啟用後，cmux 會包裝 pi 指令並載入內建工作階段擴充功能，不會變更你的 Pi 設定。若偏好自行管理 Pi 掛鉤，請停用此選項。"
+            "value": "啟用後，ShellX 會包裝 pi 指令並載入內建工作階段擴充功能，不會變更你的 Pi 設定。若偏好自行管理 Pi 掛鉤，請停用此選項。"
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kada je omogućeno, cmux obavija naredbu pi i učitava ugrađeno proširenje sesije bez mijenjanja vaše Pi konfiguracije. Onemogućite ako želite sami upravljati Pi kukama."
+            "value": "Kada je omogućeno, ShellX obavija naredbu pi i učitava ugrađeno proširenje sesije bez mijenjanja vaše Pi konfiguracije. Onemogućite ako želite sami upravljati Pi kukama."
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Når funktionen er aktiveret, indpakker cmux pi-kommandoen og indlæser den medfølgende sessionsudvidelse uden at ændre din Pi-konfiguration. Deaktiver den, hvis du selv vil administrere Pi-hooks."
+            "value": "Når funktionen er aktiveret, indpakker ShellX pi-kommandoen og indlæser den medfølgende sessionsudvidelse uden at ændre din Pi-konfiguration. Deaktiver den, hvis du selv vil administrere Pi-hooks."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quando è abilitata, cmux avvolge il comando pi e carica l'estensione di sessione inclusa senza modificare la configurazione di Pi. Disabilitala se preferisci gestire autonomamente gli hook di Pi."
+            "value": "Quando è abilitata, ShellX avvolge il comando pi e carica l'estensione di sessione inclusa senza modificare la configurazione di Pi. Disabilitala se preferisci gestire autonomamente gli hook di Pi."
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "នៅពេលបើកដំណើរការ cmux នឹងរុំពាក្យបញ្ជា pi ហើយផ្ទុកផ្នែកបន្ថែមសម័យដែលភ្ជាប់មកជាមួយ ដោយមិនផ្លាស់ប្តូរការកំណត់ Pi របស់អ្នក។ បិទវា ប្រសិនបើអ្នកចង់គ្រប់គ្រង hooks របស់ Pi ដោយខ្លួនឯង។"
+            "value": "នៅពេលបើកដំណើរការ ShellX នឹងរុំពាក្យបញ្ជា pi ហើយផ្ទុកផ្នែកបន្ថែមសម័យដែលភ្ជាប់មកជាមួយ ដោយមិនផ្លាស់ប្តូរការកំណត់ Pi របស់អ្នក។ បិទវា ប្រសិនបើអ្នកចង់គ្រប់គ្រង hooks របស់ Pi ដោយខ្លួនឯង។"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Når dette er aktivert, pakker cmux inn pi-kommandoen og laster den medfølgende øktutvidelsen uten å endre Pi-konfigurasjonen din. Deaktiver hvis du vil administrere Pi-hookene selv."
+            "value": "Når dette er aktivert, pakker ShellX inn pi-kommandoen og laster den medfølgende øktutvidelsen uten å endre Pi-konfigurasjonen din. Deaktiver hvis du vil administrere Pi-hookene selv."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Po włączeniu cmux opakuje polecenie pi i załaduje dołączone rozszerzenie sesji bez zmieniania konfiguracji Pi. Wyłącz tę opcję, jeśli wolisz samodzielnie zarządzać hookami Pi."
+            "value": "Po włączeniu ShellX opakuje polecenie pi i załaduje dołączone rozszerzenie sesji bez zmieniania konfiguracji Pi. Wyłącz tę opcję, jeśli wolisz samodzielnie zarządzać hookami Pi."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quando ativado, o cmux envolve o comando pi e carrega a extensão de sessão incluída sem alterar sua configuração do Pi. Desative se preferir gerenciar os hooks do Pi por conta própria."
+            "value": "Quando ativado, o ShellX envolve o comando pi e carrega a extensão de sessão incluída sem alterar sua configuração do Pi. Desative se preferir gerenciar os hooks do Pi por conta própria."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "При включении cmux оборачивает команду pi и загружает встроенное расширение сеанса, не изменяя конфигурацию Pi. Отключите этот параметр, если предпочитаете управлять хуками Pi самостоятельно."
+            "value": "При включении ShellX оборачивает команду pi и загружает встроенное расширение сеанса, не изменяя конфигурацию Pi. Отключите этот параметр, если предпочитаете управлять хуками Pi самостоятельно."
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "เมื่อเปิดใช้งาน cmux จะครอบคำสั่ง pi และโหลดส่วนขยายเซสชันที่มาพร้อมกับโปรแกรมโดยไม่เปลี่ยนการตั้งค่า Pi ของคุณ ปิดใช้งานหากต้องการจัดการ hooks ของ Pi เอง"
+            "value": "เมื่อเปิดใช้งาน ShellX จะครอบคำสั่ง pi และโหลดส่วนขยายเซสชันที่มาพร้อมกับโปรแกรมโดยไม่เปลี่ยนการตั้งค่า Pi ของคุณ ปิดใช้งานหากต้องการจัดการ hooks ของ Pi เอง"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Etkinleştirildiğinde cmux, Pi yapılandırmanızı değiştirmeden pi komutunu sarar ve birlikte gelen oturum uzantısını yükler. Pi kancalarını kendiniz yönetmeyi tercih ediyorsanız devre dışı bırakın."
+            "value": "Etkinleştirildiğinde ShellX, Pi yapılandırmanızı değiştirmeden pi komutunu sarar ve birlikte gelen oturum uzantısını yükler. Pi kancalarını kendiniz yönetmeyi tercih ediyorsanız devre dışı bırakın."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Якщо ввімкнено, cmux обгортає команду pi й завантажує вбудоване розширення сеансу, не змінюючи конфігурацію Pi. Вимкніть цей параметр, якщо хочете самостійно керувати хуками Pi."
+            "value": "Якщо ввімкнено, ShellX обгортає команду pi й завантажує вбудоване розширення сеансу, не змінюючи конфігурацію Pi. Вимкніть цей параметр, якщо хочете самостійно керувати хуками Pi."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Khi bật, ShellX bao bọc lệnh pi và tải tiện ích mở rộng phiên đi kèm mà không thay đổi cấu hình Pi của bạn. Hãy tắt nếu bạn muốn tự quản lý các hook của Pi."
           }
         }
       }
@@ -6851,121 +7229,127 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi runs without cmux integration."
+            "value": "Pi runs without ShellX integration."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يعمل Pi بدون تكامل cmux."
+            "value": "يعمل Pi بدون تكامل ShellX."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi läuft ohne cmux-Integration."
+            "value": "Pi läuft ohne ShellX-Integration."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi se ejecuta sin integración con cmux."
+            "value": "Pi se ejecuta sin integración con ShellX."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi s’exécute sans intégration cmux."
+            "value": "Pi s’exécute sans intégration ShellX."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Piはcmux連携なしで実行されます。"
+            "value": "PiはShellX連携なしで実行されます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi가 cmux 연동 없이 실행됩니다."
+            "value": "Pi가 ShellX 연동 없이 실행됩니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi 在没有 cmux 集成的情况下运行。"
+            "value": "Pi 在没有 ShellX 集成的情况下运行。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi 會在不使用 cmux 整合的情況下執行。"
+            "value": "Pi 會在不使用 ShellX 整合的情況下執行。"
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi radi bez cmux integracije."
+            "value": "Pi radi bez ShellX integracije."
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi kører uden cmux-integration."
+            "value": "Pi kører uden ShellX-integration."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi viene eseguito senza l'integrazione con cmux."
+            "value": "Pi viene eseguito senza l'integrazione con ShellX."
           }
         },
         "km": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi ដំណើរការដោយគ្មានការរួមបញ្ចូល cmux។"
+            "value": "Pi ដំណើរការដោយគ្មានការរួមបញ្ចូល ShellX។"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi kjører uten cmux-integrasjon."
+            "value": "Pi kjører uten ShellX-integrasjon."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi działa bez integracji z cmux."
+            "value": "Pi działa bez integracji z ShellX."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O Pi é executado sem a integração com o cmux."
+            "value": "O Pi é executado sem a integração com o ShellX."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi работает без интеграции с cmux."
+            "value": "Pi работает без интеграции с ShellX."
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi ทำงานโดยไม่มีการผสานรวมกับ cmux"
+            "value": "Pi ทำงานโดยไม่มีการผสานรวมกับ ShellX"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi, cmux entegrasyonu olmadan çalışır."
+            "value": "Pi, ShellX entegrasyonu olmadan çalışır."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pi працює без інтеграції з cmux."
+            "value": "Pi працює без інтеграції з ShellX."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pi chạy mà không có tích hợp ShellX."
           }
         }
       }
@@ -7092,6 +7476,12 @@
             "state": "translated",
             "value": "Бічна панель показує стан сеансу Pi та сповіщення."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thanh bên hiện trạng thái phiên và thông báo của Pi."
+          }
         }
       }
     },
@@ -7150,6 +7540,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "停止尋找其他裝置"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ngừng khám phá các thiết bị khác"
           }
         }
       }
@@ -7210,6 +7606,12 @@
             "state": "translated",
             "value": "從「我的裝置」隱藏此 Mac"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ẩn Mac này khỏi Thiết bị của tôi"
+          }
         }
       }
     },
@@ -7268,6 +7670,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "從範本新增…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mới từ mẫu…"
           }
         }
       }
@@ -7328,6 +7736,12 @@
             "state": "translated",
             "value": "アクティビティ"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoạt động"
+          }
         }
       }
     },
@@ -7386,6 +7800,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các phiên chưa đọc lên trước, kèm thao tác nhanh để phân loại."
           }
         }
       }
@@ -7446,6 +7866,12 @@
             "state": "translated",
             "value": "エージェントボード"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bảng agent"
+          }
         }
       }
     },
@@ -7504,6 +7930,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bảng kiểu kanban cho các phiên agent."
           }
         }
       }
@@ -7564,6 +7996,12 @@
             "state": "translated",
             "value": "エージェントカード"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thẻ agent"
+          }
         }
       }
     },
@@ -7622,6 +8060,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các phiên agent dạng thẻ trạng thái gọn."
           }
         }
       }
@@ -7682,6 +8126,12 @@
             "state": "translated",
             "value": "エージェント密集"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent dày đặc"
+          }
         }
       }
     },
@@ -7740,6 +8190,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Danh sách agent dày đặc, ưu tiên thông tin."
           }
         }
       }
@@ -7800,6 +8256,12 @@
             "state": "translated",
             "value": "エージェントフォーカス"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tập trung agent"
+          }
         }
       }
     },
@@ -7858,6 +8320,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Góc nhìn tập trung vào agent đang hoạt động và hàng đợi của nó."
           }
         }
       }
@@ -7918,6 +8386,12 @@
             "state": "translated",
             "value": "エージェントタイムライン"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dòng thời gian agent"
+          }
         }
       }
     },
@@ -7976,6 +8450,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoạt động của agent sắp xếp thành dòng thời gian trực tiếp."
           }
         }
       }
@@ -8036,6 +8516,12 @@
             "state": "translated",
             "value": "btopエージェント"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "btop Agents"
+          }
         }
       }
     },
@@ -8094,6 +8580,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trình giám sát kiểu terminal cho hoạt động của agent."
           }
         }
       }
@@ -8154,6 +8646,12 @@
             "state": "translated",
             "value": "時計"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đồng hồ"
+          }
         }
       }
     },
@@ -8212,6 +8710,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đồng hồ đơn giản kèm phím tắt đến các phiên."
           }
         }
       }
@@ -8272,6 +8776,12 @@
             "state": "translated",
             "value": "コンパクト"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thu gọn"
+          }
         }
       }
     },
@@ -8330,6 +8840,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Danh sách phiên gọn cho thanh bên hẹp."
           }
         }
       }
@@ -8390,6 +8906,12 @@
             "state": "translated",
             "value": "Finder サイドバー"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finder"
+          }
         }
       }
     },
@@ -8448,6 +8970,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trình duyệt phiên và tab kiểu Finder."
           }
         }
       }
@@ -8508,6 +9036,12 @@
             "state": "translated",
             "value": "フォーカス"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tập trung"
+          }
         }
       }
     },
@@ -8566,6 +9100,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên đang chọn lên trước, theo sau là những gì cần chú ý."
           }
         }
       }
@@ -8626,6 +9166,12 @@
             "state": "translated",
             "value": "全部入り"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kitchen Sink"
+          }
         }
       }
     },
@@ -8684,6 +9230,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tham quan các tính năng runtime thanh bên tùy chỉnh."
           }
         }
       }
@@ -8744,6 +9296,12 @@
             "state": "translated",
             "value": "パネル情報"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Panel Info"
+          }
         }
       }
     },
@@ -8802,6 +9360,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tổng quan phiên đang chọn kèm port và pull request."
           }
         }
       }
@@ -8862,6 +9426,12 @@
             "state": "translated",
             "value": "パネルセッション"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Panel Sessions"
+          }
         }
       }
     },
@@ -8920,6 +9490,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các phiên có thể tìm kiếm cho phiên này hoặc tất cả phiên."
           }
         }
       }
@@ -8980,6 +9556,12 @@
             "state": "translated",
             "value": "パネルサブエージェント"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Panel Subagents"
+          }
         }
       }
     },
@@ -9038,6 +9620,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các phiên agent lập trình nhóm theo phiên, kèm trạng thái trực tiếp."
           }
         }
       }
@@ -9098,6 +9686,12 @@
             "state": "translated",
             "value": "パネルToDo"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Panel Todo"
+          }
         }
       }
     },
@@ -9156,6 +9750,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Danh sách việc nháp tương tác cho phiên hiện tại."
           }
         }
       }
@@ -9216,6 +9816,12 @@
             "state": "translated",
             "value": "ポート"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cổng"
+          }
         }
       }
     },
@@ -9274,6 +9880,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các port đang lắng nghe trên các phiên hiện tại."
           }
         }
       }
@@ -9334,6 +9946,12 @@
             "state": "translated",
             "value": "ステータスボード"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bảng trạng thái"
+          }
         }
       }
     },
@@ -9392,6 +10010,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các phiên nhóm theo độ khẩn cấp, xem xét, tiến độ và hoàn tất."
           }
         }
       }
@@ -9452,6 +10076,12 @@
             "state": "translated",
             "value": "ワークスペース"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên"
+          }
         }
       }
     },
@@ -9510,6 +10140,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Danh sách phiên trực tiếp đơn giản."
           }
         }
       }
@@ -9570,6 +10206,12 @@
             "state": "translated",
             "value": "瀏覽範本…"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duyệt mẫu…"
+          }
         }
       }
     },
@@ -9628,6 +10270,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "從範本開始"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bắt đầu với một mẫu"
           }
         }
       }
@@ -9688,6 +10336,12 @@
             "state": "translated",
             "value": "已安裝 %@"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã cài %@"
+          }
         }
       }
     },
@@ -9746,6 +10400,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "保留"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giữ lại"
           }
         }
       }
@@ -9806,6 +10466,12 @@
             "state": "translated",
             "value": "正在側邊欄中預覽"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang xem trước trong thanh bên của bạn"
+          }
         }
       }
     },
@@ -9864,6 +10530,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "還原"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoàn nguyên"
           }
         }
       }
@@ -9924,6 +10596,12 @@
             "state": "translated",
             "value": "安裝前先試用精選側邊欄。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dùng thử một thanh bên được tuyển chọn trước khi cài."
+          }
         }
       }
     },
@@ -9982,6 +10660,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "側邊欄範本"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mẫu thanh bên"
           }
         }
       }
@@ -10042,6 +10726,12 @@
             "state": "translated",
             "value": "試用"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dùng thử"
+          }
         }
       }
     },
@@ -10100,6 +10790,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "使用"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dùng"
           }
         }
       }
@@ -10160,6 +10856,12 @@
             "state": "translated",
             "value": "左側邊欄"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thanh bên trái"
+          }
         }
       }
     },
@@ -10218,6 +10920,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "右側面板"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bảng bên phải"
           }
         }
       }
@@ -10278,6 +10986,12 @@
             "state": "translated",
             "value": "預測性本機回顯"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dự đoán local echo"
+          }
         }
       }
     },
@@ -10336,6 +11050,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "在其他機器上的終端機中，連線較慢時輸入的字元會立即顯示並加上底線，直到遠端主機確認為止。本機終端機、密碼提示和全螢幕 App 不適用此功能。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trong terminal trên máy khác, ký tự bạn gõ hiện ngay khi kết nối chậm. Chúng được gạch chân cho đến khi máy từ xa xác nhận. Terminal cục bộ, lời nhắc mật khẩu và ứng dụng toàn màn hình bị loại trừ."
           }
         }
       }
@@ -10462,6 +11182,12 @@
             "state": "translated",
             "value": "還有更多相符的主題。繼續輸入以縮小清單範圍。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Còn nhiều theme khớp nữa. Hãy gõ tiếp để thu hẹp danh sách."
+          }
         }
       }
     },
@@ -10520,6 +11246,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "邀請成員"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mời mọi người"
           }
         }
       }
@@ -10580,6 +11312,12 @@
             "state": "translated",
             "value": "無法邀請：%@"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể mời: %@"
+          }
         }
       }
     },
@@ -10638,6 +11376,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "電子郵件地址，以逗號分隔"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Địa chỉ email, cách nhau bằng dấu phẩy"
           }
         }
       }
@@ -10698,6 +11442,12 @@
             "state": "translated",
             "value": "邀請角色"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vai trò được mời"
+          }
         }
       }
     },
@@ -10756,6 +11506,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "傳送邀請"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi lời mời"
           }
         }
       }
@@ -10816,6 +11572,12 @@
             "state": "translated",
             "value": "邀請已送出。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã gửi lời mời."
+          }
         }
       }
     },
@@ -10874,6 +11636,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "離開"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rời đi"
           }
         }
       }
@@ -10934,6 +11702,12 @@
             "state": "translated",
             "value": "已複製邀請連結，7 天後失效。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã sao chép liên kết mời. Liên kết hết hạn sau 7 ngày."
+          }
         }
       }
     },
@@ -10992,6 +11766,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "複製邀請連結"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sao chép liên kết mời"
           }
         }
       }
@@ -11052,6 +11832,12 @@
             "state": "translated",
             "value": "%1$@ · 到期日 %2$@"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · hết hạn %2$@"
+          }
         }
       }
     },
@@ -11110,6 +11896,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在載入成員…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang tải thành viên…"
           }
         }
       }
@@ -11170,6 +11962,12 @@
             "state": "translated",
             "value": "重新整理成員"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Làm mới thành viên"
+          }
         }
       }
     },
@@ -11228,6 +12026,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "移除 %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xóa %@"
           }
         }
       }
@@ -11288,6 +12092,12 @@
             "state": "translated",
             "value": "撤銷"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thu hồi"
+          }
         }
       }
     },
@@ -11346,6 +12156,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "管理員"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quản trị viên"
           }
         }
       }
@@ -11406,6 +12222,12 @@
             "state": "translated",
             "value": "成員"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thành viên"
+          }
         }
       }
     },
@@ -11464,6 +12286,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "待處理的邀請"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lời mời đang chờ"
           }
         }
       }
@@ -11524,6 +12352,12 @@
             "state": "translated",
             "value": "邀請連結"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Liên kết mời"
+          }
         }
       }
     },
@@ -11582,6 +12416,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "共用此團隊 Cloud 機器的成員。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Những người dùng chung các máy Cloud của nhóm này."
           }
         }
       }
@@ -11642,6 +12482,12 @@
             "state": "translated",
             "value": "團隊成員"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thành viên nhóm"
+          }
         }
       }
     },
@@ -11701,6 +12547,12 @@
             "state": "translated",
             "value": "你"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bạn"
+          }
         }
       }
     },
@@ -11759,6 +12611,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "無法更新團隊。請再試一次。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể cập nhật nhóm. Hãy thử lại."
           }
         }
       }
@@ -11935,6 +12793,18 @@
                 "stringUnit": {
                   "state": "translated",
                   "value": "%d 回使用"
+                }
+              }
+            }
+          }
+        },
+        "vi": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%d lượt dùng"
                 }
               }
             }
@@ -12202,6 +13072,28 @@
                     "stringUnit": {
                       "state": "translated",
                       "value": "%d 回"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$d trên %#@uses@"
+          },
+          "substitutions": {
+            "uses": {
+              "argNum": 2,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%d lượt dùng"
                     }
                   }
                 }
@@ -12477,6 +13369,28 @@
               }
             }
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · đã dùng %2$d trên %#@seats@"
+          },
+          "substitutions": {
+            "seats": {
+              "argNum": 3,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%d chỗ"
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -12746,6 +13660,28 @@
               }
             }
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · %#@members@"
+          },
+          "substitutions": {
+            "members": {
+              "argNum": 2,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%d thành viên"
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -12804,6 +13740,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "取消"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hủy"
           }
         }
       }
@@ -12864,6 +13806,12 @@
             "state": "translated",
             "value": "傳送"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi"
+          }
         }
       }
     },
@@ -12922,6 +13870,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "邀請…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mời…"
           }
         }
       }
@@ -12982,6 +13936,12 @@
             "state": "translated",
             "value": "複製連結"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sao chép liên kết"
+          }
         }
       }
     },
@@ -13040,6 +14000,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "成員"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thành viên"
           }
         }
       }
@@ -13100,6 +14066,12 @@
             "state": "translated",
             "value": "移除"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gỡ"
+          }
         }
       }
     },
@@ -13158,6 +14130,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "忽略"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bỏ qua"
           }
         }
       }
@@ -13218,6 +14196,12 @@
             "state": "translated",
             "value": "由 %1$@ 邀請 · %2$@"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Được mời bởi %1$@ · %2$@"
+          }
         }
       }
     },
@@ -13276,6 +14260,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "加入"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tham gia"
           }
         }
       }
@@ -13336,6 +14326,12 @@
             "state": "translated",
             "value": "邀請"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lời mời"
+          }
         }
       }
     },
@@ -13345,55 +14341,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Use the terminal theme foreground for flashes; unread rings stay cmux blue."
+            "value": "Use the terminal theme foreground for flashes; unread rings stay ShellX blue."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Verwende die Vordergrundfarbe des Terminaldesigns für Blitze; ungelesene Ringe bleiben cmux-blau."
+            "value": "Verwende die Vordergrundfarbe des Terminaldesigns für Blitze; ungelesene Ringe bleiben ShellX-blau."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Utiliser le premier plan du thème du terminal pour les flashs ; les anneaux non lus restent bleus cmux."
+            "value": "Utiliser le premier plan du thème du terminal pour les flashs ; les anneaux non lus restent bleus ShellX."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "استخدم مقدمة سمة الطرفية للومضات؛ تبقى حلقات عدم القراءة باللون الأزرق لـ cmux."
+            "value": "استخدم مقدمة سمة الطرفية للومضات؛ تبقى حلقات عدم القراءة باللون الأزرق لـ ShellX."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Usa el primer plano del tema de la terminal para los destellos; los anillos no leídos siguen siendo azules de cmux."
+            "value": "Usa el primer plano del tema de la terminal para los destellos; los anillos no leídos siguen siendo azules de ShellX."
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用終端主題前景色顯示閃爍；未讀環維持 cmux 藍色。"
+            "value": "使用終端主題前景色顯示閃爍；未讀環維持 ShellX 藍色。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用终端主题前景色显示闪烁；未读环保持 cmux 蓝色。"
+            "value": "使用终端主题前景色显示闪烁；未读环保持 ShellX 蓝色。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "플래시에 터미널 테마 전경색을 사용하며 읽지 않은 링은 cmux 파란색으로 유지합니다."
+            "value": "플래시에 터미널 테마 전경색을 사용하며 읽지 않은 링은 ShellX 파란색으로 유지합니다."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "フラッシュにターミナルテーマの前景色を使い、未読リングは cmux ブルーのままにします。"
+            "value": "フラッシュにターミナルテーマの前景色を使い、未読リングは ShellX ブルーのままにします。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dùng màu chữ của theme terminal cho hiệu ứng nhấp nháy; vòng chưa đọc vẫn giữ màu xanh ShellX."
           }
         }
       }
@@ -13454,6 +14456,12 @@
             "state": "translated",
             "value": "テーマの前景色を使う"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dùng màu chữ của theme"
+          }
         }
       }
     },
@@ -13513,6 +14521,12 @@
             "state": "translated",
             "value": "代理訊息"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tin nhắn agent"
+          }
         }
       }
     },
@@ -13522,55 +14536,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Turning this off also fails messages that are waiting to be delivered. To turn messages off for one agent, run cmux agent messages off in its terminal."
+            "value": "Turning this off also fails messages that are waiting to be delivered. To turn messages off for one agent, run shellx agent messages off in its terminal."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يؤدي إيقاف هذا الخيار أيضًا إلى إفشال الرسائل التي تنتظر التسليم. لإيقاف الرسائل لوكيل واحد، شغّل cmux agent messages off في طرفيته."
+            "value": "يؤدي إيقاف هذا الخيار أيضًا إلى إفشال الرسائل التي تنتظر التسليم. لإيقاف الرسائل لوكيل واحد، شغّل shellx agent messages off في طرفيته."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Beim Ausschalten schlagen auch Nachrichten fehl, die noch auf Zustellung warten. Um Nachrichten nur für einen Agenten auszuschalten, führe cmux agent messages off in seinem Terminal aus."
+            "value": "Beim Ausschalten schlagen auch Nachrichten fehl, die noch auf Zustellung warten. Um Nachrichten nur für einen Agenten auszuschalten, führe shellx agent messages off in seinem Terminal aus."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Al desactivarlo también fallan los mensajes que esperan entrega. Para desactivar los mensajes de un solo agente, ejecuta cmux agent messages off en su terminal."
+            "value": "Al desactivarlo también fallan los mensajes que esperan entrega. Para desactivar los mensajes de un solo agente, ejecuta shellx agent messages off en su terminal."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "La désactivation fait aussi échouer les messages en attente de remise. Pour désactiver les messages d'un seul agent, exécutez cmux agent messages off dans son terminal."
+            "value": "La désactivation fait aussi échouer les messages en attente de remise. Pour désactiver les messages d'un seul agent, exécutez shellx agent messages off dans son terminal."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "オフにすると、配信待ちのメッセージも失敗になります。1 つのエージェントだけメッセージをオフにするには、そのターミナルで cmux agent messages off を実行してください。"
+            "value": "オフにすると、配信待ちのメッセージも失敗になります。1 つのエージェントだけメッセージをオフにするには、そのターミナルで shellx agent messages off を実行してください。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "끄면 전달을 기다리는 메시지도 실패 처리됩니다. 에이전트 하나만 메시지를 끄려면 해당 터미널에서 cmux agent messages off를 실행하세요."
+            "value": "끄면 전달을 기다리는 메시지도 실패 처리됩니다. 에이전트 하나만 메시지를 끄려면 해당 터미널에서 shellx agent messages off를 실행하세요."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "关闭后，等待投递的消息也会标记为失败。若只想关闭某个代理的消息，请在它的终端中运行 cmux agent messages off。"
+            "value": "关闭后，等待投递的消息也会标记为失败。若只想关闭某个代理的消息，请在它的终端中运行 shellx agent messages off。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "關閉後，等待遞送的訊息也會標為失敗。若只要關閉某個代理的訊息，請在它的終端機中執行 cmux agent messages off。"
+            "value": "關閉後，等待遞送的訊息也會標為失敗。若只要關閉某個代理的訊息，請在它的終端機中執行 shellx agent messages off。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tắt tùy chọn này cũng làm các tin nhắn đang chờ gửi bị lỗi. Để tắt tin nhắn cho một agent, hãy chạy shellx agent messages off trong terminal của nó."
           }
         }
       }
@@ -13631,6 +14651,12 @@
             "state": "translated",
             "value": "代理訊息已關閉。傳送會失敗，也不會遞送任何訊息。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tin nhắn agent đang tắt. Việc gửi sẽ lỗi và không có gì được chuyển đi."
+          }
         }
       }
     },
@@ -13640,55 +14666,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Agents can message each other with cmux agent message."
+            "value": "Agents can message each other with ShellX agent message."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يمكن للوكلاء مراسلة بعضهم باستخدام cmux agent message."
+            "value": "يمكن للوكلاء مراسلة بعضهم باستخدام ShellX agent message."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Agenten können sich mit cmux agent message gegenseitig Nachrichten senden."
+            "value": "Agenten können sich mit ShellX agent message gegenseitig Nachrichten senden."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Los agentes pueden enviarse mensajes con cmux agent message."
+            "value": "Los agentes pueden enviarse mensajes con ShellX agent message."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les agents peuvent s’envoyer des messages avec cmux agent message."
+            "value": "Les agents peuvent s’envoyer des messages avec ShellX agent message."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "エージェント同士が cmux agent message でメッセージを送り合えます。"
+            "value": "エージェント同士が ShellX agent message でメッセージを送り合えます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "에이전트끼리 cmux agent message로 메시지를 보낼 수 있습니다."
+            "value": "에이전트끼리 ShellX agent message로 메시지를 보낼 수 있습니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "代理可以使用 cmux agent message 互相发送消息。"
+            "value": "代理可以使用 ShellX agent message 互相发送消息。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "代理可以使用 cmux agent message 互相傳送訊息。"
+            "value": "代理可以使用 ShellX agent message 互相傳送訊息。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các agent có thể nhắn cho nhau bằng shellx agent message."
           }
         }
       }
@@ -13749,6 +14781,12 @@
             "state": "translated",
             "value": "中鍵點按貼上"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dán bằng nút giữa chuột"
+          }
         }
       }
     },
@@ -13807,6 +14845,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "使用滑鼠的 App 仍會收到中鍵點按。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các ứng dụng dùng chuột vẫn nhận được nhấp chuột giữa."
           }
         }
       }
@@ -13867,6 +14911,12 @@
             "state": "translated",
             "value": "工作區描述顏色"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Màu mô tả phiên"
+          }
         }
       }
     },
@@ -13926,6 +14976,12 @@
             "state": "translated",
             "value": "統一代理程式暫存目錄"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scratch agent chuẩn tắc"
+          }
         }
       }
     },
@@ -13935,55 +14991,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Opt in to organize new Claude, Codex, and OpenCode panel scratch files under ~/.local/state/cmux/agent-artifacts. Provider transcripts and existing files are not moved."
+            "value": "Opt in to organize new Claude, Codex, and OpenCode panel scratch files under ~/.local/state/shellx/agent-artifacts. Provider transcripts and existing files are not moved."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "فعّل هذا الخيار لتنظيم الملفات المؤقتة الجديدة للوحات Claude وCodex وOpenCode ضمن ~/.local/state/cmux/agent-artifacts. لا يتم نقل نصوص جلسات الموفّرين والملفات الموجودة."
+            "value": "فعّل هذا الخيار لتنظيم الملفات المؤقتة الجديدة للوحات Claude وCodex وOpenCode ضمن ~/.local/state/shellx/agent-artifacts. لا يتم نقل نصوص جلسات الموفّرين والملفات الموجودة."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aktivieren, um neue Scratch-Dateien der Claude-, Codex- und OpenCode-Panels unter ~/.local/state/cmux/agent-artifacts abzulegen. Anbieter-Transkripte und vorhandene Dateien werden nicht verschoben."
+            "value": "Aktivieren, um neue Scratch-Dateien der Claude-, Codex- und OpenCode-Panels unter ~/.local/state/shellx/agent-artifacts abzulegen. Anbieter-Transkripte und vorhandene Dateien werden nicht verschoben."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Actívalo para organizar los nuevos archivos temporales de los paneles de Claude, Codex y OpenCode en ~/.local/state/cmux/agent-artifacts. Las transcripciones de los proveedores y los archivos existentes no se mueven."
+            "value": "Actívalo para organizar los nuevos archivos temporales de los paneles de Claude, Codex y OpenCode en ~/.local/state/shellx/agent-artifacts. Las transcripciones de los proveedores y los archivos existentes no se mueven."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Activez cette option pour ranger les nouveaux fichiers de travail des panneaux Claude, Codex et OpenCode dans ~/.local/state/cmux/agent-artifacts. Les transcriptions des fournisseurs et les fichiers existants ne sont pas déplacés."
+            "value": "Activez cette option pour ranger les nouveaux fichiers de travail des panneaux Claude, Codex et OpenCode dans ~/.local/state/shellx/agent-artifacts. Les transcriptions des fournisseurs et les fichiers existants ne sont pas déplacés."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "オンにすると、新しい Claude、Codex、OpenCode パネルのスクラッチファイルを ~/.local/state/cmux/agent-artifacts にまとめます。プロバイダのトランスクリプトや既存のファイルは移動されません。"
+            "value": "オンにすると、新しい Claude、Codex、OpenCode パネルのスクラッチファイルを ~/.local/state/shellx/agent-artifacts にまとめます。プロバイダのトランスクリプトや既存のファイルは移動されません。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "켜면 새 Claude, Codex, OpenCode 패널 스크래치 파일을 ~/.local/state/cmux/agent-artifacts 아래에 정리합니다. 제공자 대화 기록과 기존 파일은 이동되지 않습니다."
+            "value": "켜면 새 Claude, Codex, OpenCode 패널 스크래치 파일을 ~/.local/state/shellx/agent-artifacts 아래에 정리합니다. 제공자 대화 기록과 기존 파일은 이동되지 않습니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "启用后，新的 Claude、Codex 和 OpenCode 面板临时文件将统一存放在 ~/.local/state/cmux/agent-artifacts 下。提供方的对话记录和现有文件不会被移动。"
+            "value": "启用后，新的 Claude、Codex 和 OpenCode 面板临时文件将统一存放在 ~/.local/state/shellx/agent-artifacts 下。提供方的对话记录和现有文件不会被移动。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "啟用後，新的 Claude、Codex 和 OpenCode 面板暫存檔案將統一存放在 ~/.local/state/cmux/agent-artifacts 下。提供者的對話紀錄和現有檔案不會被移動。"
+            "value": "啟用後，新的 Claude、Codex 和 OpenCode 面板暫存檔案將統一存放在 ~/.local/state/shellx/agent-artifacts 下。提供者的對話紀錄和現有檔案不會被移動。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chọn bật để sắp xếp các tệp scratch mới của bảng Claude, Codex và OpenCode trong ~/.local/state/shellx/agent-artifacts. Bản ghi của nhà cung cấp và các tệp hiện có không bị di chuyển."
           }
         }
       }
@@ -14044,6 +15106,12 @@
             "state": "translated",
             "value": "原生代理程式面板使用系統暫存目錄。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các bảng agent gốc dùng thư mục tạm của hệ thống."
+          }
         }
       }
     },
@@ -14053,55 +15121,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Native agent panels use a cmux-owned scratch directory per session."
+            "value": "Native agent panels use a ShellX-owned scratch directory per session."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "تستخدم لوحات الوكلاء الأصلية دليلًا مؤقتًا خاصًا بـ cmux لكل جلسة."
+            "value": "تستخدم لوحات الوكلاء الأصلية دليلًا مؤقتًا خاصًا بـ ShellX لكل جلسة."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Native Agent-Panels verwenden pro Sitzung ein eigenes Scratch-Verzeichnis von cmux."
+            "value": "Native Agent-Panels verwenden pro Sitzung ein eigenes Scratch-Verzeichnis von ShellX."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Los paneles nativos de agentes usan un directorio temporal propio de cmux por sesión."
+            "value": "Los paneles nativos de agentes usan un directorio temporal propio de ShellX por sesión."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Les panneaux d’agent natifs utilisent un répertoire de travail géré par cmux pour chaque session."
+            "value": "Les panneaux d’agent natifs utilisent un répertoire de travail géré par ShellX pour chaque session."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "ネイティブエージェントパネルはセッションごとに cmux 管理のスクラッチディレクトリを使用します。"
+            "value": "ネイティブエージェントパネルはセッションごとに ShellX 管理のスクラッチディレクトリを使用します。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "네이티브 에이전트 패널이 세션마다 cmux 소유의 스크래치 디렉터리를 사용합니다."
+            "value": "네이티브 에이전트 패널이 세션마다 ShellX 소유의 스크래치 디렉터리를 사용합니다."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "原生代理面板为每个会话使用由 cmux 管理的临时目录。"
+            "value": "原生代理面板为每个会话使用由 ShellX 管理的临时目录。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "原生代理程式面板為每個工作階段使用由 cmux 管理的暫存目錄。"
+            "value": "原生代理程式面板為每個工作階段使用由 ShellX 管理的暫存目錄。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các bảng agent gốc dùng một thư mục scratch riêng của ShellX cho mỗi phiên."
           }
         }
       }
@@ -14162,6 +15236,12 @@
             "state": "translated",
             "value": "重置"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đặt lại"
+          }
         }
       }
     },
@@ -14220,6 +15300,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "工作區描述使用的文字顏色。預設跟隨目前主題。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Màu chữ dùng cho mô tả phiên. Mặc định theo theme hiện tại."
           }
         }
       }
@@ -14280,6 +15366,12 @@
             "state": "translated",
             "value": "원격 호스트 색상 출처 색 색조 호스트별 서버 작업 공간 사이드바 행 탭 베타 불안정"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Màu máy từ xa màu máy từ xa màu gốc sắc thái từng máy chủ server phiên thanh bên hàng tab beta không ổn định"
+          }
         }
       }
     },
@@ -14338,6 +15430,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "중복 제목의 원격 호스트 이름 호스트명 서버 중복 같은 제목 충돌 작업 공간 사이드바 행 베타 불안정"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tên máy từ xa trên tiêu đề trùng hostname máy chủ server trùng cùng tiêu đề xung đột phiên thanh bên hàng beta không ổn định"
           }
         }
       }
@@ -14398,6 +15496,12 @@
             "state": "translated",
             "value": "遠端主機顏色"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Màu máy từ xa"
+          }
         }
       }
     },
@@ -14456,6 +15560,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "在此處啟用之前，遠端工作區不會顯示來源顏色。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giữ các phiên từ xa không có màu gốc cho đến khi bạn bật tại đây."
           }
         }
       }
@@ -14516,6 +15626,12 @@
             "state": "translated",
             "value": "為每個遠端工作區的側邊欄列加上依主機固定的顏色，方便區分伺服器。你手動設定的工作區顏色一律優先。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tô hàng thanh bên của mỗi phiên từ xa bằng một màu ổn định theo từng máy để dễ phân biệt các máy chủ. Màu phiên bạn đặt thủ công luôn được ưu tiên."
+          }
         }
       }
     },
@@ -14574,6 +15690,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "在重複標題中顯示遠端主機名稱"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tên máy từ xa trên các tiêu đề trùng"
           }
         }
       }
@@ -14634,6 +15756,12 @@
             "state": "translated",
             "value": "在此處啟用之前，重複的工作區標題維持不變。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giữ nguyên các tiêu đề phiên trùng nhau cho đến khi bạn bật tại đây."
+          }
         }
       }
     },
@@ -14692,6 +15820,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "當多個工作區標題相同時，在每個遠端工作區的標題後顯示主機名稱，並省略這些主機共用的網域。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Khi các phiên có cùng tiêu đề, hiển thị máy của từng phiên từ xa sau tiêu đề, bỏ phần tên miền mà các máy dùng chung."
           }
         }
       }
@@ -14752,6 +15886,12 @@
             "state": "translated",
             "value": "依提示點按"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nhấp theo gợi ý"
+          }
         }
       }
     },
@@ -14810,6 +15950,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "預覽：Cmd-J 會為視窗中每個可點按的控制項加上標籤，輸入標籤即可點按。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xem trước: Cmd-J gắn nhãn mọi điều khiển có thể nhấp trong cửa sổ, và gõ một nhãn sẽ nhấp vào điều khiển đó."
           }
         }
       }
@@ -14936,6 +16082,12 @@
             "state": "translated",
             "value": "Новий робочий простір на віддаленому хості"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên mới trên máy từ xa"
+          }
         }
       }
     },
@@ -15060,6 +16212,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Новий робочий простір віддалений хост новий сеанс tmux локальний робочий простір дзеркало бета нестабільно"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên mới trên máy từ xa phiên mới từ xa phiên tmux máy chủ phiên cục bộ phản chiếu beta không ổn định"
           }
         }
       }
@@ -15186,6 +16344,12 @@
             "state": "translated",
             "value": "Новий робочий простір завжди відкриває локальний робочий простір, навіть коли вибрано віддалений простір tmux."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên mới luôn mở một phiên cục bộ, kể cả khi đang chọn một phiên tmux từ xa."
+          }
         }
       }
     },
@@ -15311,6 +16475,12 @@
             "state": "translated",
             "value": "Коли вибрано віддалений простір tmux, новий робочий простір запускає сеанс tmux на його хості. Новий локальний робочий простір відкриває локальний."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Khi đang chọn một phiên tmux từ xa, Phiên mới sẽ bắt đầu một phiên tmux trên máy của phiên đó. Phiên cục bộ mới mở một phiên cục bộ."
+          }
         }
       }
     },
@@ -15370,6 +16540,12 @@
             "state": "translated",
             "value": "你的 Max 訂閱已啟用，包含 Pro 的所有功能。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gói Max của bạn đang hoạt động. Gói này bao gồm mọi thứ trong Pro."
+          }
         }
       }
     },
@@ -15379,55 +16555,61 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "cmux Max"
+            "value": "ShellX Max"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX Max"
           }
         }
       }
@@ -15487,6 +16669,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "升級至 Max…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nâng cấp lên Max…"
           }
         }
       }
@@ -15613,6 +16801,12 @@
             "state": "translated",
             "value": "你的 Pro 訂閱已啟用。請透過訂閱服務供應商管理。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gói Pro của bạn đang hoạt động. Hãy quản lý qua nhà cung cấp gói đăng ký của bạn."
+          }
         }
       }
     },
@@ -15737,6 +16931,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "你的 Pro 方案已啟用。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gói Pro của bạn đang hoạt động."
           }
         }
       }

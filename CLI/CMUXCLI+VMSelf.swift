@@ -7,10 +7,10 @@ import Foundation
 /// integrations the machine can use. Nothing runs on the machine to answer.
 extension CMUXCLI {
     static let vmSelfUsage = """
-        Usage: cmux vm self <machine> [<path>] [--json]
+        Usage: shellx vm self <machine> [<path>] [--json]
 
         Who a machine is, as the platform sees it — the same reflection a process inside
-        it reads with `cmux self`, fetched through your signed-in session (no shell is
+        it reads with `shellx self`, fetched through your signed-in session (no shell is
         started on the machine, and a sleeping machine stays asleep).
 
           <path>   owner | machine | peers | integrations (any reflection path).
@@ -18,9 +18,9 @@ extension CMUXCLI {
           --json   Print the raw reflection body.
 
         Examples:
-          cmux vm self brave-otter
-          cmux vm self brave-otter peers
-          cmux vm self brave-otter integrations --json
+          shellx vm self brave-otter
+          shellx vm self brave-otter peers
+          shellx vm self brave-otter integrations --json
         """
 
     func runVMSelfCommand(rest: [String], client: SocketClient, jsonOutput: Bool) throws {

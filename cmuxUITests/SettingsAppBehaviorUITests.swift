@@ -87,11 +87,12 @@ import XCTest
 ///     out-of-process effects (launch an editor, play a sound, run a shell
 ///     command); not in-app observable.
 ///
-/// TIER 3 (not e2e): cross-app/external/no in-app UI effect.
-///   - Send anonymous telemetry (sendAnonymousTelemetry): gates a network
-///     analytics pipeline read only at next launch; no UI effect to assert
-///     and nothing should hit the network from a test. Verify via the
-///     telemetry client's unit tests instead.
+/// Not in ShellX:
+///   - Send anonymous telemetry (sendAnonymousTelemetry): ShellX sends no
+///     telemetry, so the App section hides this row
+///     (`AppSection.showsTelemetrySetting == false`) and no test here may
+///     expect it. `ShellXNoPhoneHomeTests` and
+///     tests/test_shellx_no_phone_home.py cover telemetry being off.
 final class SettingsAppBehaviorUITests: SettingsUITestCase {
     func testMobilePairingSettingsLightAndDarkCaptures() throws {
         for appearance in ["light", "dark"] {

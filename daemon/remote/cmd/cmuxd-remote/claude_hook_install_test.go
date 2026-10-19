@@ -56,7 +56,7 @@ func TestClaudeHookInstallKeepsUserSettingsAndIsIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("CMUX_BUNDLED_CLI_PATH", bundled)
-	cli := filepath.Join(home, ".cmux", "bin", "cmux")
+	cli := filepath.Join(home, ".shellx", "bin", "shellx")
 	if err := os.MkdirAll(filepath.Dir(cli), 0o755); err != nil {
 		t.Fatal(err)
 	}

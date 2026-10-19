@@ -1,6 +1,7 @@
 import CmuxFoundation
 import CmuxSettings
 import SwiftUI
+import ShellXIcons
 
 /// **Beta Features** section — a warning note followed by the experimental
 /// toggles. Each toggle gates an unstable feature that is off by default.
@@ -182,7 +183,7 @@ public struct BetaFeaturesSection: View {
             configurationReview: .settingsOnly,
             searchAnchorID: "setting:betaFeatures:extensions",
             String(localized: "settings.betaFeatures.extensions", defaultValue: "Extensions"),
-            subtitle: String(localized: "settings.betaFeatures.extensions.subtitle", defaultValue: "Adds the extensions button and lets cmux install and run sidebar extensions.")
+            subtitle: String(localized: "settings.betaFeatures.extensions.subtitle", defaultValue: "Adds the extensions button and lets ShellX install and run sidebar extensions.")
         ) {
             Toggle("", isOn: Binding(get: { extensions.current }, set: { extensions.set($0) }))
                 .labelsHidden()
@@ -199,7 +200,7 @@ public struct BetaFeaturesSection: View {
             String(localized: "settings.betaFeatures.customSidebars", defaultValue: "Custom Sidebars"),
             subtitle: customSidebarsManagedByPolicy
                 ? String(localized: "settings.managedByOrganization", defaultValue: "Managed by your organization")
-                : String(localized: "settings.betaFeatures.customSidebars.subtitle", defaultValue: "Adds sidebars from ~/.config/cmux/sidebars to the sidebar picker.")
+                : String(localized: "settings.betaFeatures.customSidebars.subtitle", defaultValue: "Adds sidebars from ~/.config/shellx/sidebars to the sidebar picker.")
         ) {
             Toggle("", isOn: Binding(get: { customSidebars.current && !customSidebarsManagedByPolicy }, set: { customSidebars.set($0) }))
                 .labelsHidden()
@@ -215,7 +216,7 @@ public struct BetaFeaturesSection: View {
             configurationReview: .settingsOnly,
             searchAnchorID: "setting:betaFeatures:remoteTmux",
             String(localized: "settings.betaFeatures.remoteTmux", defaultValue: "Remote tmux"),
-            subtitle: String(localized: "settings.betaFeatures.remoteTmux.subtitle", defaultValue: "Shows tmux sessions on remote hosts as workspaces in the sidebar. The sessions keep running after cmux quits.")
+            subtitle: String(localized: "settings.betaFeatures.remoteTmux.subtitle", defaultValue: "Shows tmux sessions on remote hosts as workspaces in the sidebar. The sessions keep running after ShellX quits.")
         ) {
             Toggle("", isOn: Binding(get: { remoteTmux.current }, set: { remoteTmux.set($0) }))
                 .labelsHidden()
@@ -289,7 +290,7 @@ private struct BetaFeaturesWarningNote: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
+            ShellXIcon.image("exclamationmark.triangle.fill")
                 .cmuxFont(size: 12, weight: .semibold)
                 .foregroundStyle(.yellow)
                 .accessibilityHidden(true)

@@ -7,7 +7,7 @@ internal import CMUXDebugLog
 #endif
 
 /// Per-workspace remote-session lifecycle coordinator: owns the SSH/SCP
-/// orchestration, cmuxd-remote bootstrap and install, the reverse CLI relay,
+/// orchestration, shellx-remote bootstrap and install, the reverse CLI relay,
 /// the persistent-PTY bridge entry points, remote port scanning, and the
 /// reconnect/suspend policy for one configured remote workspace.
 ///
@@ -48,7 +48,7 @@ internal import CMUXDebugLog
 public final class RemoteSessionCoordinator: @unchecked Sendable {
     // MARK: - Collaborators (immutable after init)
 
-    let queue = DispatchQueue(label: "com.cmux.remote-ssh.\(UUID().uuidString)", qos: .utility)
+    let queue = DispatchQueue(label: "pro.shellx.remote-ssh.\(UUID().uuidString)", qos: .utility)
     let queueKey = DispatchSpecificKey<Void>()
     /// One-way publish seam to the owning workspace model (the app adapter
     /// binds the controller ID and owns the main-queue hop).
@@ -171,7 +171,7 @@ public final class RemoteSessionCoordinator: @unchecked Sendable {
     ///     per remote transport), injected from the app hub.
     ///   - connectionBroker: Process-wide native SSH ownership and per-host
     ///     connection-attempt broker.
-    ///   - manifestRepository: cmuxd-remote manifest/binary-cache repository.
+    ///   - manifestRepository: shellx-remote manifest/binary-cache repository.
     ///   - processRunner: Blocking subprocess seam (ssh/scp/dev go build).
     ///   - reverseRelayLauncher: Standalone SSH reverse-relay launch seam.
     ///   - reachabilityProbe: SSH endpoint reachability seam for the

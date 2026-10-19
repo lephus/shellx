@@ -922,51 +922,6 @@ struct CommandPaletteCloudAvailabilityTests {
         )
     }
 
-    /// Server-advertised VM capabilities hide only the operations the selected machine cannot honor.
-    @MainActor
-    @Test("server capabilities gate Cloud VM operations")
-    func cloudVMCapabilitiesGateOperations() {
-        let key = BetaFeaturesCatalogSection().cloudMachines.userDefaultsKey
-        let defaults = UserDefaults.standard
-        let original = defaults.object(forKey: key)
-        defaults.set(true, forKey: key)
-        defer {
-            if let original { defaults.set(original, forKey: key) }
-            else { defaults.removeObject(forKey: key) }
-        }
-        let contributions = ContentView.commandPaletteCloudCommandContributions(isAuthenticated: true)
-        var context = CommandPaletteContextSnapshot()
-        context.setBool(CommandPaletteContextKeys.workspaceIsCloud, true)
-        context.setBool(CommandPaletteContextKeys.cloudVMCapabilitiesKnown, true)
-        context.setBool(CommandPaletteContextKeys.cloudVMSupportsFork, false)
-        context.setBool(CommandPaletteContextKeys.cloudVMSupportsSnapshot, false)
-        context.setBool(CommandPaletteContextKeys.cloudVMSupportsRestore, false)
-        context.setBool(CommandPaletteContextKeys.cloudVMSupportsPorts, false)
-        context.setBool(CommandPaletteContextKeys.cloudVMSupportsExec, false)
-
-        let hidden = Set(
-            contributions.filter { !$0.when(context) }.map(\.commandId)
-        )
-        #expect(hidden.contains(ContentView.commandPaletteCloudForkCommandId))
-        #expect(hidden.contains(ContentView.commandPaletteCloudSnapshotCommandId))
-        #expect(hidden.contains(ContentView.commandPaletteCloudRestoreCommandId))
-        #expect(hidden.contains(ContentView.commandPaletteCloudPromoteTemplateCommandId))
-        #expect(hidden.contains(ContentView.commandPaletteCloudPortsCommandId))
-        #expect(hidden.contains(ContentView.commandPaletteCloudToolsCommandId))
-        #expect(!hidden.contains(ContentView.commandPaletteCloudHandoffCommandId))
-        #expect(
-            contributions.first { $0.commandId == ContentView.commandPaletteCloudStatusCommandId }?.when(context) == true
-        )
-
-        context.setBool(CommandPaletteContextKeys.cloudVMSupportsExec, true)
-        context.setBool(CommandPaletteContextKeys.cloudVMSupportsPorts, true)
-        let executionSupportedHidden = Set(
-            contributions.filter { !$0.when(context) }.map(\.commandId)
-        )
-        #expect(!executionSupportedHidden.contains(ContentView.commandPaletteCloudPortsCommandId))
-        #expect(!executionSupportedHidden.contains(ContentView.commandPaletteCloudToolsCommandId))
-    }
-
     /// The Cloud contribution catalog remains complete when capabilities are
     /// unknown, and feature and authentication gates still remove it.
     @MainActor
@@ -981,11 +936,9 @@ struct CommandPaletteCloudAvailabilityTests {
             else { defaults.removeObject(forKey: key) }
         }
 
-        let commandIds = Set(ContentView.commandPaletteCloudCommandContributions(isAuthenticated: true).map(\.commandId))
-        #expect(commandIds.contains(ContentView.commandPaletteCloudForkCommandId))
-        #expect(commandIds.contains(ContentView.commandPaletteCloudRestoreCommandId))
-        #expect(commandIds.contains(ContentView.commandPaletteCloudPortsCommandId))
-        #expect(commandIds.contains(ContentView.commandPaletteCloudToolsCommandId))
+        // ShellX: Cloud is hard-off, so even an enabled, signed-in context
+        // contributes no Cloud command.
+        #expect(ContentView.commandPaletteCloudCommandContributions(isAuthenticated: true).isEmpty)
         #expect(ContentView.commandPaletteCloudCommandContributions(isAuthenticated: false).isEmpty)
 
         defaults.set(false, forKey: key)
@@ -2114,28 +2067,28 @@ final class QuitWarningSettingsTests: XCTestCase {
 final class BuildFlavorTests: XCTestCase {
     func testDetectsDevFromBundleName() {
         XCTAssertEqual(
-            BuildFlavor.detect(bundleName: "cmux DEV noqdlg", bundleIdentifier: "com.cmuxterm.app"),
+            BuildFlavor.detect(bundleName: "cmux DEV noqdlg", bundleIdentifier: "pro.shellx.desktop"),
             .dev
         )
     }
 
     func testDetectsDevBeforeTagTextCanLookNightly() {
         XCTAssertEqual(
-            BuildFlavor.detect(bundleName: "cmux DEV nightly", bundleIdentifier: "com.cmuxterm.app"),
+            BuildFlavor.detect(bundleName: "cmux DEV nightly", bundleIdentifier: "pro.shellx.desktop"),
             .dev
         )
     }
 
     func testDetectsNightlyFromBundleIdentifier() {
         XCTAssertEqual(
-            BuildFlavor.detect(bundleName: "cmux", bundleIdentifier: "com.cmuxterm.app.nightly"),
+            BuildFlavor.detect(bundleName: "cmux", bundleIdentifier: "pro.shellx.desktop.nightly"),
             .nightly
         )
     }
 
     func testDetectsStableByDefault() {
         XCTAssertEqual(
-            BuildFlavor.detect(bundleName: "cmux", bundleIdentifier: "com.cmuxterm.app"),
+            BuildFlavor.detect(bundleName: "cmux", bundleIdentifier: "pro.shellx.desktop"),
             .stable
         )
     }

@@ -3,6 +3,7 @@ import AppKit
 import Bonsplit
 import CMUXAgentLaunch
 import SwiftUI
+import ShellXIcons
 #if DEBUG
 private func feedDebugResponderSummary(_ responder: NSResponder?) -> String {
     guard let responder else { return "nil" }
@@ -132,7 +133,7 @@ private struct FeedSecondaryFilterButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 3) {
-                Image(systemName: filter.symbolName)
+                ShellXIcon.image(filter.symbolName)
                     .symbolRenderingMode(.monochrome)
                     .cmuxFont(
                         size: RightSidebarChromeControlStyle.secondaryIconSize,
@@ -1076,7 +1077,7 @@ struct FeedItemRow: View, Equatable {
     /// agent and age on the right.
     private var chipHeader: some View {
         HStack(alignment: .center, spacing: 8) {
-            Image(systemName: snapshot.kind.symbolName)
+            ShellXIcon.image(snapshot.kind.symbolName)
                 .cmuxFont(size: 12, weight: .medium)
                 .foregroundColor(kindTint)
                 .frame(width: 14, height: 14)
@@ -1504,7 +1505,7 @@ private struct PermissionActionArea: View {
 
     private var toolLabel: some View {
         HStack(spacing: 5) {
-            Image(systemName: "exclamationmark.triangle.fill")
+            ShellXIcon.image("exclamationmark.triangle.fill")
                 .cmuxFont(size: 10, weight: .medium)
                 .foregroundColor(.orange)
             Text(toolName)
@@ -1686,13 +1687,13 @@ struct FeedButton: View {
     private var labelContent: some View {
         HStack(spacing: iconSpacing) {
             if let leadingIcon {
-                Image(systemName: leadingIcon)
+                ShellXIcon.image(leadingIcon)
                     .cmuxFont(size: iconSize, weight: .semibold)
             }
             Text(label)
                 .cmuxFont(size: labelSize, weight: .semibold)
             if let trailingIcon {
-                Image(systemName: trailingIcon)
+                ShellXIcon.image(trailingIcon)
                     .cmuxFont(size: iconSize, weight: .semibold)
             }
         }
@@ -1701,11 +1702,11 @@ struct FeedButton: View {
     private var standardLabelContent: some View {
         HStack(spacing: 4) {
             if let leadingIcon {
-                Image(systemName: leadingIcon)
+                ShellXIcon.image(leadingIcon)
             }
             Text(label)
             if let trailingIcon {
-                Image(systemName: trailingIcon)
+                ShellXIcon.image(trailingIcon)
             }
         }
         .cmuxFont(size: labelSize, weight: .semibold)
@@ -2376,7 +2377,7 @@ private struct ExitPlanAllowedPromptsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
-                Image(systemName: "checklist")
+                ShellXIcon.image("checklist")
                     .cmuxFont(size: 10, weight: .medium)
                     .foregroundColor(Color.purple.opacity(0.85))
                 Text(String(localized: "feed.exitplan.allowedPrompts", defaultValue: "Allowed prompts"))
@@ -2419,7 +2420,7 @@ private struct ExitPlanPlanFileView: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Image(systemName: "doc.text")
+            ShellXIcon.image("doc.text")
                 .cmuxFont(size: 10, weight: .medium)
                 .foregroundColor(.secondary)
             Text(String(localized: "feed.exitplan.planFile", defaultValue: "Plan file"))
@@ -2780,7 +2781,7 @@ private struct QuestionActionArea: View {
                     }
                 }
                 Spacer()
-                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                ShellXIcon.image(selected ? "checkmark.circle.fill" : "circle")
                     .cmuxFont(size: 12, weight: .medium)
                     .foregroundColor(selected ? Color(red: 0.24, green: 0.48, blue: 0.88) : .secondary.opacity(0.45))
             }
@@ -2828,7 +2829,7 @@ private struct QuestionActionArea: View {
                 },
                 onBlur: onBlurRow
             )
-            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+            ShellXIcon.image(selected ? "checkmark.circle.fill" : "circle")
                 .cmuxFont(size: 12, weight: .medium)
                 .foregroundColor(selected ? Color(red: 0.24, green: 0.48, blue: 0.88) : .secondary.opacity(0.45))
                 .padding(.leading, 8)
@@ -2868,7 +2869,7 @@ private struct QuestionActionArea: View {
             }
             if question.multiSelect {
                 HStack(spacing: 3) {
-                    Image(systemName: "checklist")
+                    ShellXIcon.image("checklist")
                         .cmuxFont(size: 8, weight: .medium)
                     Text(String(localized: "feed.question.multiSelect", defaultValue: "Multi-select"))
                         .cmuxFont(size: 9, weight: .semibold)
@@ -3691,7 +3692,7 @@ private struct StopActionArea: View {
         let _ = globalFontPercent
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 5) {
-                Image(systemName: "checkmark.circle")
+                ShellXIcon.image("checkmark.circle")
                     .cmuxFont(size: 10)
                     .foregroundColor(.secondary)
                 Text(String(localized: "feed.stop.label", defaultValue: "Claude finished — reply to continue"))
@@ -3876,7 +3877,7 @@ private struct TodoListBody: View {
     @ViewBuilder
     private func row(_ todo: WorkstreamTaskTodo) -> some View {
         HStack(alignment: .top, spacing: 6) {
-            Image(systemName: symbol(for: todo.state))
+            ShellXIcon.image(symbol(for: todo.state))
                 .cmuxFont(size: 11, weight: .medium)
                 .foregroundColor(color(for: todo.state))
                 .frame(width: 14, height: 14)

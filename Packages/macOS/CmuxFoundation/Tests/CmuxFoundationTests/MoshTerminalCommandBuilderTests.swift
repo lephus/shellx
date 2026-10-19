@@ -113,7 +113,7 @@ struct MoshTerminalCommandBuilderTests {
             #expect(result.stderr.isEmpty)
             #expect(FileManager.default.fileExists(atPath: directory.appendingPathComponent("mosh.args").path))
             #expect(FileManager.default.fileExists(
-                atPath: remoteHome.appendingPathComponent(".cmux/relay/52263.bootstrap.sh").path
+                atPath: remoteHome.appendingPathComponent(".shellx/relay/52263.bootstrap.sh").path
             ))
         }
     }

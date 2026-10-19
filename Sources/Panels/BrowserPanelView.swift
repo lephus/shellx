@@ -4,9 +4,11 @@ import CmuxFoundation
 import CmuxAppKitSupportUI
 import CmuxSettings
 import CmuxSettingsUI
+import ShellXBrand
 import SwiftUI
 import WebKit
 import AppKit
+import ShellXIcons
 
 let browserOmnibarTextFieldIdentifier = NSUserInterfaceItemIdentifier("cmux.browserOmnibarTextField")
 
@@ -1269,7 +1271,7 @@ struct BrowserPanelView: View {
                 #endif
                 panel.goBack()
             }) {
-                CmuxSystemSymbolImage(systemName: "chevron.left", pointSize: chromeMetrics.navigationIconFontSize, weight: .medium, tint: .primary)
+                CmuxSystemSymbolImage(symbolName: "chevron.left", pointSize: chromeMetrics.navigationIconFontSize, weight: .medium, tint: .primary)
                     .frame(width: addressBarButtonHitSize, height: addressBarButtonHitSize, alignment: .center)
                     .contentShape(Rectangle())
             }
@@ -1285,7 +1287,7 @@ struct BrowserPanelView: View {
                 #endif
                 panel.goForward()
             }) {
-                CmuxSystemSymbolImage(systemName: "chevron.right", pointSize: chromeMetrics.navigationIconFontSize, weight: .medium, tint: .primary)
+                CmuxSystemSymbolImage(symbolName: "chevron.right", pointSize: chromeMetrics.navigationIconFontSize, weight: .medium, tint: .primary)
                     .frame(width: addressBarButtonHitSize, height: addressBarButtonHitSize, alignment: .center)
                     .contentShape(Rectangle())
             }
@@ -1296,7 +1298,7 @@ struct BrowserPanelView: View {
             .accessibilityLabel(String(localized: "browser.goForward", defaultValue: "Go Forward"))
 
             Button(action: handleReloadOrStopButtonAction) {
-                CmuxSystemSymbolImage(systemName: panel.isLoading ? "xmark" : "arrow.clockwise", pointSize: chromeMetrics.navigationIconFontSize, weight: .medium, tint: .primary)
+                CmuxSystemSymbolImage(symbolName: panel.isLoading ? "xmark" : "arrow.clockwise", pointSize: chromeMetrics.navigationIconFontSize, weight: .medium, tint: .primary)
                     .frame(width: addressBarButtonHitSize, height: addressBarButtonHitSize, alignment: .center)
                     .contentShape(Rectangle())
             }
@@ -1356,9 +1358,9 @@ struct BrowserPanelView: View {
                 .fixedSize()
                 .allowsHitTesting(false)
                 .accessibilityRepresentation {
-                    Label(
+                    ShellXLabel(
                         String(localized: "browser.screenshotPage.copied", defaultValue: "Copied"),
-                        systemImage: "checkmark"
+                        icon: "checkmark"
                     )
                 }
                 .accessibilityIdentifier("BrowserScreenshotPageCopied")
@@ -1390,7 +1392,7 @@ struct BrowserPanelView: View {
             HStack(spacing: 5) {
                 if let activeToolbarModeIconName {
                     CmuxSystemSymbolImage(
-                        systemName: activeToolbarModeIconName,
+                        symbolName: activeToolbarModeIconName,
                         pointSize: devToolsButtonIconSize,
                         weight: .medium,
                         tint: activeToolbarModeColor
@@ -1519,7 +1521,7 @@ struct BrowserPanelView: View {
         Button(action: {
             openDevTools()
         }) {
-            CmuxSystemSymbolImage(systemName: devToolsIconOption.rawValue, pointSize: devToolsButtonIconSize, weight: .medium, tint: devToolsColorOption.color(accent: cmuxAccent))
+            CmuxSystemSymbolImage(symbolName: devToolsIconOption.rawValue, pointSize: devToolsButtonIconSize, weight: .medium, tint: devToolsColorOption.color(accent: cmuxAccent))
                 .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
         }
         .buttonStyle(OmnibarAddressButtonStyle())
@@ -1533,7 +1535,7 @@ struct BrowserPanelView: View {
         Button(action: {
             isBrowserProfileMenuPresented.toggle()
         }) {
-            CmuxSystemSymbolImage(systemName: "person.crop.circle", pointSize: devToolsButtonIconSize, weight: .medium, tint: devToolsColorOption.color(accent: cmuxAccent))
+            CmuxSystemSymbolImage(symbolName: "person.crop.circle", pointSize: devToolsButtonIconSize, weight: .medium, tint: devToolsColorOption.color(accent: cmuxAccent))
                 .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
         }
         .buttonStyle(OmnibarAddressButtonStyle())
@@ -1562,25 +1564,25 @@ struct BrowserPanelView: View {
     private var browserOverflowMenu: some View {
         Menu {
             Button(action: handleBrowserFocusModeButtonAction) {
-                Label(
+                ShellXLabel(
                     String(localized: "browser.focusMode.active", defaultValue: "Focus Mode"),
-                    systemImage: "keyboard"
+                    icon: "keyboard"
                 )
             }
             .disabled(!panel.canToggleBrowserFocusMode)
             .accessibilityIdentifier("BrowserOverflowFocusModeButton")
             Button(action: handleScreenshotPageButtonAction) {
-                Label(
+                ShellXLabel(
                     String(localized: "browser.contextMenu.screenshotPage", defaultValue: "Screenshot Page"),
-                    systemImage: "camera"
+                    icon: "camera"
                 )
             }
             .disabled(!panel.shouldRenderWebView || screenshotPageCaptureInProgress)
             .accessibilityIdentifier("BrowserScreenshotPageButton")
             Button(action: handleScreenshotSectionButtonAction) {
-                Label(
+                ShellXLabel(
                     String(localized: "browser.contextMenu.screenshotSection", defaultValue: "Screenshot Section"),
-                    systemImage: "viewfinder"
+                    icon: "viewfinder"
                 )
             }
             .disabled(!panel.shouldRenderWebView)
@@ -1594,7 +1596,7 @@ struct BrowserPanelView: View {
                 )
                 .accessibilityIdentifier("BrowserOverflowDesignModeButton")
                 Button(action: openDevTools) {
-                    Label(developerToolsButtonHelp, systemImage: devToolsIconOption.rawValue)
+                    ShellXLabel(developerToolsButtonHelp, icon: devToolsIconOption.rawValue)
                 }
                 .accessibilityIdentifier("BrowserToggleDevToolsButton")
             }
@@ -1623,7 +1625,7 @@ struct BrowserPanelView: View {
         Button(action: {
             isBrowserThemeMenuPresented.toggle()
         }) {
-            CmuxSystemSymbolImage(systemName: browserThemeMode.iconName, pointSize: devToolsButtonIconSize, weight: .medium, tint: browserThemeModeIconColor)
+            CmuxSystemSymbolImage(symbolName: browserThemeMode.iconName, pointSize: devToolsButtonIconSize, weight: .medium, tint: browserThemeModeIconColor)
                 .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
         }
         .buttonStyle(OmnibarAddressButtonStyle())
@@ -1651,7 +1653,7 @@ struct BrowserPanelView: View {
             isBrowserImportHintPopoverPresented.toggle()
         }) {
             HStack(spacing: 4) {
-                CmuxSystemSymbolImage(systemName: "square.and.arrow.down.on.square", pointSize: 10, weight: .medium, tint: devToolsColorOption.color(accent: cmuxAccent))
+                CmuxSystemSymbolImage(symbolName: "square.and.arrow.down.on.square", pointSize: 10, weight: .medium, tint: devToolsColorOption.color(accent: cmuxAccent))
                 Text(String(localized: "browser.import.hint.toolbar", defaultValue: "Import"))
                     .cmuxFont(size: 11, weight: .medium)
                     .lineLimit(1)
@@ -1680,7 +1682,7 @@ struct BrowserPanelView: View {
                         applyBrowserProfileSelection(profile.id)
                     } label: {
                         HStack(spacing: 8) {
-                            CmuxSystemSymbolImage(systemName: profile.id == panel.profileID ? "checkmark" : "circle", pointSize: 10, weight: .semibold, tint: .primary)
+                            CmuxSystemSymbolImage(symbolName: profile.id == panel.profileID ? "checkmark" : "circle", pointSize: 10, weight: .semibold, tint: .primary)
                                 .opacity(profile.id == panel.profileID ? 1.0 : 0.0)
                                 .frame(width: 12, alignment: .center)
                             Text(profile.displayName)
@@ -1742,7 +1744,7 @@ struct BrowserPanelView: View {
                     isBrowserThemeMenuPresented = false
                 } label: {
                     HStack(spacing: 8) {
-                        CmuxSystemSymbolImage(systemName: mode == browserThemeMode ? "checkmark" : "circle", pointSize: 10, weight: .semibold, tint: .primary)
+                        CmuxSystemSymbolImage(symbolName: mode == browserThemeMode ? "checkmark" : "circle", pointSize: 10, weight: .semibold, tint: .primary)
                             .opacity(mode == browserThemeMode ? 1.0 : 0.0)
                             .frame(width: 12, alignment: .center)
                         Text(mode.displayName)
@@ -1774,7 +1776,7 @@ struct BrowserPanelView: View {
 
         return HStack(spacing: 4) {
             if showSecureBadge {
-                CmuxSystemSymbolImage(systemName: "lock.fill", pointSize: chromeMetrics.secureBadgeFontSize, tint: .secondary)
+                CmuxSystemSymbolImage(symbolName: "lock.fill", pointSize: chromeMetrics.secureBadgeFontSize, tint: .secondary)
             }
 
             OmnibarTextFieldRepresentable(
@@ -5325,46 +5327,6 @@ struct OmnibarSuggestionsView: View {
         }
     }
 
-    private var popupOverlayGradientColors: [Color] {
-        switch colorScheme {
-        case .light:
-            return [
-                Color.white.opacity(0.55),
-                Color.white.opacity(0.2),
-            ]
-        case .dark:
-            return [
-                Color.black.opacity(0.26),
-                Color.black.opacity(0.14),
-            ]
-        @unknown default:
-            return [
-                Color.white.opacity(0.55),
-                Color.white.opacity(0.2),
-            ]
-        }
-    }
-
-    private var popupBorderGradientColors: [Color] {
-        switch colorScheme {
-        case .light:
-            return [
-                Color.white.opacity(0.65),
-                Color.black.opacity(0.12),
-            ]
-        case .dark:
-            return [
-                Color.white.opacity(0.22),
-                Color.white.opacity(0.06),
-            ]
-        @unknown default:
-            return [
-                Color.white.opacity(0.65),
-                Color.black.opacity(0.12),
-            ]
-        }
-    }
-
     private var popupShadowColor: Color {
         switch colorScheme {
         case .light:
@@ -5475,30 +5437,14 @@ struct OmnibarSuggestionsView: View {
                     .allowsHitTesting(false)
             }
         }
+        // ShellX popover (spec §7.4): flat `raise` fill, 1 px `border`, no gradients.
         .background(
             RoundedRectangle(cornerRadius: popupCornerRadius, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: popupCornerRadius, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: popupOverlayGradientColors,
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                )
+                .fill(ShellXPalette.raise.color)
         )
         .overlay(
             RoundedRectangle(cornerRadius: popupCornerRadius, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        colors: popupBorderGradientColors,
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1
-                )
+                .stroke(ShellXPalette.border.color, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: popupCornerRadius, style: .continuous))
         .shadow(color: popupShadowColor, radius: 20, y: 10)

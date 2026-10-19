@@ -1,4 +1,5 @@
 import SwiftUI
+import ShellXIcons
 
 /// Compatibility controls for localized resources across the package's supported Xcode versions.
 struct SimulatorLocalizedButton: View {
@@ -25,18 +26,18 @@ struct SimulatorLocalizedButton: View {
 
 struct SimulatorLocalizedLabel: View {
     let title: LocalizedStringResource
-    let systemImage: String
+    let icon: String
 
-    init(_ title: LocalizedStringResource, systemImage: String) {
+    init(_ title: LocalizedStringResource, icon: String) {
         self.title = title
-        self.systemImage = systemImage
+        self.icon = icon
     }
 
     var body: some View {
         Label {
             Text(title)
         } icon: {
-            Image(systemName: systemImage)
+            ShellXIcon.image(icon)
         }
     }
 }

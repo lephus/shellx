@@ -14,7 +14,7 @@ from test_claude_wrapper_hooks import generated_claude_hook_settings
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WRAPPER = ROOT / "Resources" / "bin" / "cmux-claude-wrapper"
+WRAPPER = ROOT / "Resources" / "bin" / "shellx-claude-wrapper"
 GENERATED_HOOK_SETTINGS = generated_claude_hook_settings()
 
 
@@ -443,7 +443,7 @@ exec claude "$@"
 """,
         )
         write_executable(
-            cmux_shim_dir / "cmux",
+            cmux_shim_dir / "shellx",
             """#!/usr/bin/env bash
 if [[ "${1:-}" == "--socket" ]]; then
   shift 2
@@ -801,7 +801,7 @@ def test_interactive_finite_shim_chain_does_not_duplicate_hooks(failures: list[s
         install_wrapper_copy(cmux_shim)
 
         write_executable(
-            cmux_shim_dir / "cmux",
+            cmux_shim_dir / "shellx",
             """#!/usr/bin/env bash
 if [[ "${1:-}" == "--socket" ]]; then
   shift 2
@@ -899,7 +899,7 @@ def test_interactive_spawning_shim_chain_refreshes_claude_pid(failures: list[str
         install_wrapper_copy(cmux_shim)
 
         write_executable(
-            cmux_shim_dir / "cmux",
+            cmux_shim_dir / "shellx",
             """#!/usr/bin/env bash
 if [[ "${1:-}" == "--socket" ]]; then
   shift 2
@@ -1063,7 +1063,7 @@ def test_custom_path_reentry_converges_to_one_settings_block(failures: list[str]
         cmux_shim = cmux_shim_dir / "claude"
         install_wrapper_copy(cmux_shim)
 
-        cmux_bin = cmux_shim_dir / "cmux"
+        cmux_bin = cmux_shim_dir / "shellx"
         write_executable(
             cmux_bin,
             """#!/usr/bin/env bash

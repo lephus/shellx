@@ -3,16 +3,16 @@
 #
 # Each `./scripts/reload.sh --tag <tag>` produces:
 #   ~/Library/Developer/Xcode/DerivedData/cmux-<tag>/      (multi-GB)
-#   /tmp/cmux-<tag>/                                       (build scratch)
-#   /tmp/cmux-debug-<tag>.sock                             (control socket)
-#   /tmp/cmux-debug-<tag>.log                              (debug log)
-#   /tmp/cmux-reload-<tag>.log                             (build log)
-#   ~/Library/Application Support/cmux/cmuxd-dev-<tag>.sock (cmuxd socket)
+#   /tmp/shellx-<tag>                                      (link to the DerivedData)
+#   /tmp/shellx-debug-<tag>.sock                           (control socket)
+#   /tmp/shellx-debug-<tag>.log                            (debug log)
+#   /tmp/shellx-reload-<tag>.log                           (build log)
+#   ~/Library/Application Support/ShellX/cmuxd-dev-<tag>.sock (cmuxd socket)
 #
 # This script removes those artifacts for tags that are safe to clean.
 # Safety rules (always on):
-#   - Skip any tag whose `cmux DEV <tag>` app is currently running.
-#   - Skip the tag pointed at by /tmp/cmux-last-cli-path (most recent reload).
+#   - Skip any tag whose `ShellX DEV <tag>` app is currently running.
+#   - Skip the tag pointed at by /tmp/shellx-last-cli-path (most recent reload).
 # A worktree merely existing on the same name is not treated as a
 # protection. Use --keep TAG when you want to preserve a build whose
 # worktree you still have around, or --older-than DAYS to skip anything
@@ -34,8 +34,8 @@
 set -euo pipefail
 
 DERIVED_DATA_ROOT="$HOME/Library/Developer/Xcode/DerivedData"
-APP_SUPPORT_DIR="$HOME/Library/Application Support/cmux"
-LAST_CLI_PATH_FILE="/tmp/cmux-last-cli-path"
+APP_SUPPORT_DIR="$HOME/Library/Application Support/ShellX"
+LAST_CLI_PATH_FILE="/tmp/shellx-last-cli-path"
 
 apply=0
 older_than_days=0
@@ -82,11 +82,10 @@ artifact_paths_for_tag() {
     local tag="$1"
     printf '%s\n' \
         "$DERIVED_DATA_ROOT/cmux-${tag}" \
-        "/tmp/cmux-${tag}" \
-        "/tmp/cmux-${tag}.tar" \
-        "/tmp/cmux-debug-${tag}.sock" \
-        "/tmp/cmux-debug-${tag}.log" \
-        "/tmp/cmux-reload-${tag}.log" \
+        "/tmp/shellx-${tag}" \
+        "/tmp/shellx-debug-${tag}.sock" \
+        "/tmp/shellx-debug-${tag}.log" \
+        "/tmp/shellx-reload-${tag}.log" \
         "$APP_SUPPORT_DIR/cmuxd-dev-${tag}.sock"
 }
 
@@ -132,14 +131,14 @@ if [[ -r "$LAST_CLI_PATH_FILE" ]]; then
     fi
 fi
 
-# Running cmux DEV processes by tag (the app name embeds the tag).
+# Running ShellX DEV processes by tag (the app name embeds the tag).
 running_tags=()
 while IFS= read -r line; do
-    # Match "cmux DEV <tag>" (with or without .app suffix).
-    if [[ "$line" =~ cmux\ DEV\ ([A-Za-z0-9._-]+) ]]; then
+    # Match "ShellX DEV <tag>" (with or without .app suffix).
+    if [[ "$line" =~ ShellX\ DEV\ ([A-Za-z0-9._-]+) ]]; then
         running_tags+=("${BASH_REMATCH[1]}")
     fi
-done < <(pgrep -fl "cmux DEV " 2>/dev/null || true)
+done < <(pgrep -fl "ShellX DEV " 2>/dev/null || true)
 
 # ---- planning ---------------------------------------------------------------
 

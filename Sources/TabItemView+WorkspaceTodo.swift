@@ -2,6 +2,7 @@ import AppKit
 import CmuxCommandPalette
 import CmuxWorkspaces
 import SwiftUI
+import ShellXIcons
 
 // MARK: - Context menu section
 
@@ -69,7 +70,7 @@ extension TabItemView {
     ) -> some View {
         Button(action: action) {
             if isSelected {
-                Label(title, systemImage: "checkmark")
+                ShellXLabel(title, icon: "checkmark")
             } else {
                 Text(title)
             }

@@ -182,9 +182,9 @@ import Testing
         #expect(snapshot.resolvedColorScheme == terminalScheme)
     }
 
-    /// A user who never chose keeps the sidebar and titlebar on the terminal
-    /// background, so a light terminal theme never sits beside dark chrome.
-    @Test func sidebarMatchesTerminalBackgroundUntilTheUserOptsOut() throws {
+    /// ShellX (spec §7.4): a user who never chose gets the opaque `panel`
+    /// sidebar; matching the terminal background is an opt-in.
+    @Test func sidebarDrawsPanelUntilTheUserOptsIntoMatching() throws {
         let suiteName = "cmux.tests.match-terminal-default"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
@@ -198,6 +198,11 @@ import Testing
             )
         )
 
+        // ShellX: the sidebar draws the `panel` tint unless the user opts in.
+        #expect(!resolver.currentFromUserDefaults(defaults: defaults).unifySurfaceBackdrops)
+        #expect(!WindowChromeSidebarTintDefaults.matchesTerminalBackground)
+
+        defaults.set(true, forKey: "sidebarMatchTerminalBackground")
         #expect(resolver.currentFromUserDefaults(defaults: defaults).unifySurfaceBackdrops)
 
         defaults.set(false, forKey: "sidebarMatchTerminalBackground")

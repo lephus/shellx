@@ -42,10 +42,10 @@ or permissions are not a reason to begin setup automatically.
   and stop; do not silently switch providers.
 - `ComputerUseRuntimeService` is the only helper lifecycle owner. It installs
   the nested helper under the tag-scoped
-  `~/Library/Application Support/cmux/cmux-cua/helper/<scope>/` directory
+  `~/Library/Application Support/ShellX/cmux-cua/helper/<scope>/` directory
   and launches that explicit app URL through LaunchServices.
 - The native daemon uses the tag-scoped
-  `/tmp/cmux-cua-<uid>/<scope>/cmux-cua.sock`; the Codex compatibility daemon uses
+  `/tmp/shellx-cua-<uid>/<scope>/cmux-cua.sock`; the Codex compatibility daemon uses
   `cmux-cua-codex.sock` beside it. Both fit Darwin's Unix-socket path limit and share
   the tag-scoped cmux Application Support state directory.
 - Neither wrapper installs global skills or adds skill directories by default.
@@ -265,7 +265,7 @@ the cursor naturally; presentation mode never promotes it to an always-on-top
 layer.
 
 The active target and session ordering come from cmux-cua's per-session state
-files under `~/Library/Application Support/cmux/cmux-cua/runtime/<scope>/state/`.
+files under `~/Library/Application Support/ShellX/cmux-cua/runtime/<scope>/state/`.
 
 The item hides when there is no live or recent session. Toggle visibility in
 Settings → cmux Computer Use.

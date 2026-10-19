@@ -1,6 +1,7 @@
 import CMUXMobileCore
 import CmuxIrohTransport
 import SwiftUI
+import ShellXIcons
 
 #if DEBUG
 struct IrohAndAgentSessionDebugMenuButtons: View {
@@ -63,7 +64,7 @@ struct IrohTransportDebugMenuButtons: View {
             }
         } label: {
             if transportMode == mode {
-                Label(title, systemImage: "checkmark")
+                ShellXLabel(title, icon: "checkmark")
             } else {
                 Text(title)
             }

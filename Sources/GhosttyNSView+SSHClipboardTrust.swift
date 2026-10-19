@@ -1,6 +1,7 @@
 import CmuxSSHClipboardTrust
 import AppKit
 import CmuxSurfaceCatalogModel
+import ShellXIcons
 
 extension GhosttyNSView {
     /// Adds the explicit, per-machine permission for an SSH cmux-tui mirror.
@@ -24,7 +25,7 @@ extension GhosttyNSView {
             localized: "terminalContextMenu.allowSSHClipboardWrites.tooltip",
             defaultValue: "Allows OSC 52 clipboard writes from this SSH machine. Clipboard reads remain blocked."
         )
-        item.image = NSImage(systemSymbolName: "checkmark.shield", accessibilityDescription: nil)
+        item.image = ShellXIcon.nsImage("checkmark.shield", accessibilityDescription: nil)
         return true
     }
 

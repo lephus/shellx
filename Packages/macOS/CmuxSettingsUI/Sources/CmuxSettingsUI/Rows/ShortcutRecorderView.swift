@@ -169,7 +169,7 @@ public final class RecorderHostButton: NSButton {
     /// hotkey being rebound in Settings is captured instead of firing.
     // `nonisolated` so the nonisolated `deinit` teardown path can post it.
     public nonisolated static let activeRecordingDidChangeNotification = Notification.Name(
-        "com.cmux.settingsUI.recorderActiveRecordingDidChange"
+        "pro.shellx.settingsUI.recorderActiveRecordingDidChange"
     )
 
     public var placeholder: String = ""

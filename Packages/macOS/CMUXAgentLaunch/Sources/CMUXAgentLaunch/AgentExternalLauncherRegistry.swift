@@ -92,8 +92,8 @@ public struct AgentExternalLauncherRegistry: Equatable, Sendable {
         var paths: [String] = []
         let home = (homeDirectory as NSString).standardizingPath
         paths.append(
-            ((home as NSString).appendingPathComponent(".config/cmux") as NSString)
-                .appendingPathComponent("cmux.json")
+            ((home as NSString).appendingPathComponent(".config/shellx") as NSString)
+                .appendingPathComponent("shellx.json")
         )
         if let workingDirectory = workingDirectory?.trimmingCharacters(in: .whitespacesAndNewlines),
            !workingDirectory.isEmpty,
@@ -143,9 +143,9 @@ public struct AgentExternalLauncherRegistry: Equatable, Sendable {
         var current = (start as NSString).standardizingPath
         while true {
             let candidates = [
-                ((current as NSString).appendingPathComponent(".cmux") as NSString)
-                    .appendingPathComponent("cmux.json"),
-                (current as NSString).appendingPathComponent("cmux.json"),
+                ((current as NSString).appendingPathComponent(".shellx") as NSString)
+                    .appendingPathComponent("shellx.json"),
+                (current as NSString).appendingPathComponent("shellx.json"),
             ]
             for candidate in candidates where fileManager.fileExists(atPath: candidate) {
                 return candidate

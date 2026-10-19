@@ -24,7 +24,7 @@ extension CMUXCLI {
             print(configUsage())
         case "get":
             guard args.count == 2 else {
-                throw CLIError(message: "Usage: cmux config get <setting.path|sidebar-font-size|surface-tab-bar-font-size>")
+                throw CLIError(message: "Usage: shellx config get <setting.path|sidebar-font-size|surface-tab-bar-font-size>")
             }
             if let key = canonicalFontSizeKey(args[1]) {
                 try runConfigGetFontSize(forKey: key, jsonOutput: wantsJSON)
@@ -33,7 +33,7 @@ extension CMUXCLI {
             }
         case "set":
             guard args.count == 3 else {
-                throw CLIError(message: "Usage: cmux config set <setting.path> <value>")
+                throw CLIError(message: "Usage: shellx config set <setting.path> <value>")
             }
             if let key = canonicalFontSizeKey(args[1]) {
                 try runConfigSetFontSize(
@@ -51,17 +51,17 @@ extension CMUXCLI {
             }
         case "unset":
             guard args.count == 2 else {
-                throw CLIError(message: "Usage: cmux config unset <setting.path>")
+                throw CLIError(message: "Usage: shellx config unset <setting.path>")
             }
             try runConfigSettingChange(.unset(path: args[1]), jsonOutput: wantsJSON)
         case "toggle":
             guard args.count == 2 else {
-                throw CLIError(message: "Usage: cmux config toggle <setting.path>")
+                throw CLIError(message: "Usage: shellx config toggle <setting.path>")
             }
             try runConfigSettingChange(.toggle(path: args[1]), jsonOutput: wantsJSON)
         case "cycle":
             guard args.count >= 3 else {
-                throw CLIError(message: "Usage: cmux config cycle <setting.path> <value> [value...]")
+                throw CLIError(message: "Usage: shellx config cycle <setting.path> <value> [value...]")
             }
             try runConfigSettingChange(
                 .cycle(path: args[1], values: args.dropFirst(2).map { CmuxSettingValue(commandLineArgument: $0) }),
@@ -69,7 +69,7 @@ extension CMUXCLI {
             )
         case "preset":
             guard args.count == 2 else {
-                throw CLIError(message: "Usage: cmux config preset <name>")
+                throw CLIError(message: "Usage: shellx config preset <name>")
             }
             try runConfigSettingChange(.preset(name: args[1]), jsonOutput: wantsJSON)
         case CmuxGhosttyConfigSettingEditor.sidebarFontSizeKey, CmuxGhosttyConfigSettingEditor.surfaceTabBarFontSizeKey:
@@ -84,16 +84,16 @@ extension CMUXCLI {
                     jsonOutput: wantsJSON
                 )
             } else {
-                throw CLIError(message: "Usage: cmux config \(subcommand) [points]")
+                throw CLIError(message: "Usage: shellx config \(subcommand) [points]")
             }
         case "path", "paths":
             guard args.count == 1 else {
-                throw CLIError(message: "Usage: cmux config path")
+                throw CLIError(message: "Usage: shellx config path")
             }
             printSettingsPaths(jsonOutput: wantsJSON)
         case "docs", "documentation":
             guard args.count == 1 else {
-                throw CLIError(message: "Usage: cmux config docs")
+                throw CLIError(message: "Usage: shellx config docs")
             }
             try runDocsCommand(commandArgs: ["settings"], jsonOutput: wantsJSON)
         case "doctor", "check", "validate":
@@ -107,7 +107,7 @@ extension CMUXCLI {
                 throw CLIError(
                     message: CmuxConfigValidationLocalization().format(
                         "config.validation.cli.errorCount",
-                        defaultValue: "cmux config %@ found %lld error(s)",
+                        defaultValue: "shellx config %@ found %lld error(s)",
                         subcommand,
                         Int64(report.errorCount)
                     )
@@ -115,7 +115,7 @@ extension CMUXCLI {
             }
         case "reload":
             guard args.count == 1 else {
-                throw CLIError(message: "Usage: cmux config reload")
+                throw CLIError(message: "Usage: shellx config reload")
             }
             guard let socketPath else {
                 throw CLIError(message: "cmux config reload requires a socket-backed cmux command path")
@@ -132,7 +132,7 @@ extension CMUXCLI {
             }
             print(response)
         default:
-            throw CLIError(message: "Unknown config subcommand '\(subcommand)'. Run 'cmux config --help'.")
+            throw CLIError(message: "Unknown config subcommand '\(subcommand)'. Run 'shellx config --help'.")
         }
     }
 
@@ -159,55 +159,55 @@ extension CMUXCLI {
     func configUsage() -> String {
         let validationHelp = CmuxConfigValidationLocalization().string(
             "config.validation.cli.help",
-            defaultValue: "Validate JSONC syntax and cmux config semantics."
+            defaultValue: "Validate JSONC syntax and ShellX config semantics."
         )
         return """
-        Usage: cmux config <doctor|check|validate|path|paths|docs|documentation|reload|get|set|unset|toggle|cycle|preset|sidebar-font-size|surface-tab-bar-font-size>
+        Usage: shellx config <doctor|check|validate|path|paths|docs|documentation|reload|get|set|unset|toggle|cycle|preset|sidebar-font-size|surface-tab-bar-font-size>
 
-        Inspect and change cmux.json settings, print configuration references, update selected Ghostty config keys, or reload the running app.
+        Inspect and change shellx.json settings, print configuration references, update selected Ghostty config keys, or reload the running app.
 
         Subcommands:
           doctor|check|validate [--path <path>] [--scope <global|project>]
                                                    \(validationHelp)
-          path|paths                              Print cmux.json paths, docs URL, and schema URL.
-          docs|documentation                      Print the same output as `cmux docs settings`.
-          reload                                  Reload Ghostty config + cmux.json and refresh terminals (alias for `cmux reload-config`).
-          get <setting.path>                      Print a setting: its cmux.json value, else the value set in Settings, else the default.
-          set <setting.path> <value>              Write a setting to ~/.config/cmux/cmux.json. <value> is JSON (true, 1.4, "dark", [...]);
+          path|paths                              Print shellx.json paths, docs URL, and schema URL.
+          docs|documentation                      Print the same output as `shellx docs settings`.
+          reload                                  Reload Ghostty config + shellx.json and refresh terminals (alias for `shellx reload-config`).
+          get <setting.path>                      Print a setting: its shellx.json value, else the value set in Settings, else the default.
+          set <setting.path> <value>              Write a setting to ~/.config/shellx/shellx.json. <value> is JSON (true, 1.4, "dark", [...]);
                                                   other text is stored as a string. Comments and other keys are kept.
-          unset <setting.path>                    Remove a setting from cmux.json, so the value set in Settings (or the default) applies.
-          toggle <setting.path>                   Flip a true/false setting, starting from the value cmux is using.
+          unset <setting.path>                    Remove a setting from shellx.json, so the value set in Settings (or the default) applies.
+          toggle <setting.path>                   Flip a true/false setting, starting from the value ShellX is using.
           cycle <setting.path> <value> [value...] Move a setting to the value after its current one, wrapping around.
-          preset <name>                           Apply the settings stored at settingPresets.<name> in cmux.json.
+          preset <name>                           Apply the settings stored at settingPresets.<name> in shellx.json.
           get <key>                               Print sidebar-font-size or surface-tab-bar-font-size.
-          set <key> <points>                      Set sidebar-font-size (10-20 pt) or surface-tab-bar-font-size (8-24 pt), then reload if cmux is running.
+          set <key> <points>                      Set sidebar-font-size (10-20 pt) or surface-tab-bar-font-size (8-24 pt), then reload if ShellX is running.
           sidebar-font-size [points]              Get or set the left sidebar text size.
           surface-tab-bar-font-size [points]      Get or set the workspace tab bar text size.
 
-        Setting changes are validated against the cmux.json schema before anything is written. A running
-        cmux applies them automatically; no reload is needed.
+        Setting changes are validated against the shellx.json schema before anything is written. A running
+        ShellX applies them automatically; no reload is needed.
 
         Config files:
           \(Self.primarySettingsDisplayPath)
           legacy config: \(Self.legacySettingsDisplayPath)
           legacy app support: \(Self.fallbackSettingsDisplayPath)
 
-        Related (not cmux-owned, but cmux reads it for terminal behavior):
+        Related (not ShellX-owned, but ShellX reads it for terminal behavior):
           \(Self.ghosttyConfigDisplayPath)
 
         Examples:
-          cmux config get terminal.scrollSpeed
-          cmux config set terminal.scrollSpeed 1.4
-          cmux config toggle fileEditor.wordWrap
-          cmux config cycle terminal.scrollSpeed 1.0 1.4 1.8
-          cmux config preset sidebar.quiet
-          cmux config doctor
-          cmux config doctor --path .cmux/cmux.json
-          cmux config set sidebar-font-size 14
-          cmux config sidebar-font-size 12.5
-          cmux config set surface-tab-bar-font-size 13
-          cmux config surface-tab-bar-font-size 11
-          cmux config reload
+          shellx config get terminal.scrollSpeed
+          shellx config set terminal.scrollSpeed 1.4
+          shellx config toggle fileEditor.wordWrap
+          shellx config cycle terminal.scrollSpeed 1.0 1.4 1.8
+          shellx config preset sidebar.quiet
+          shellx config doctor
+          shellx config doctor --path .shellx/shellx.json
+          shellx config set sidebar-font-size 14
+          shellx config sidebar-font-size 12.5
+          shellx config set surface-tab-bar-font-size 13
+          shellx config surface-tab-bar-font-size 11
+          shellx config reload
         """
     }
 
@@ -309,7 +309,7 @@ extension CMUXCLI {
 
         let source: String
         if reading.configured != nil {
-            source = "cmux.json"
+            source = "shellx.json"
         } else if reading.live != nil {
             source = "settings"
         } else {

@@ -287,7 +287,7 @@ func createTmuxShimDir(dirName string, tmuxScript string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(home, ".cmuxterm", dirName)
+	dir := filepath.Join(home, remoteStateDirName, dirName)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", err
 	}
@@ -351,7 +351,7 @@ func ensureClaudeNodeOptionsRestoreModule() (string, error) {
 	// The preload must outlive the Claude session: every Node child loads it
 	// via NODE_OPTIONS, and the OS purges temp directories under long-lived
 	// sessions (https://github.com/manaflow-ai/cmux/issues/12022). Keep it in
-	// ~/.cmuxterm like the macOS wrapper, private and never through a symlink.
+	// ~/.shellx (never cmux's state directory), private and never through a symlink.
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -359,7 +359,7 @@ func ensureClaudeNodeOptionsRestoreModule() (string, error) {
 	if !filepath.IsAbs(home) {
 		return "", fmt.Errorf("home directory %q is not absolute", home)
 	}
-	dir := filepath.Join(home, ".cmuxterm", "cmux-claude-node-options")
+	dir := filepath.Join(home, remoteStateDirName, "cmux-claude-node-options")
 	restoreModulePath := filepath.Join(dir, "restore-node-options.cjs")
 	for _, path := range []string{dir, restoreModulePath} {
 		if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
@@ -443,7 +443,7 @@ func configureAgentEnvironment(cfg agentConfig) {
 	// Find our own executable path for the shim to call back
 	selfPath, _ := os.Executable()
 	if selfPath == "" {
-		selfPath = "cmux"
+		selfPath = remoteCLIName
 	}
 	os.Setenv(cfg.cmuxBinEnvVar, selfPath)
 
@@ -533,7 +533,7 @@ func omoUserConfigDir() string {
 
 func omoShadowConfigDir() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".cmuxterm", "omo-config")
+	return filepath.Join(home, remoteStateDirName, "omo-config")
 }
 
 // omoEnsurePlugin creates a shadow config directory that layers the

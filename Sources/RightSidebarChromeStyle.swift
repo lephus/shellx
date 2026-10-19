@@ -27,7 +27,7 @@ enum HeaderChromeIconStyle {
 
     static func symbol(_ systemName: String) -> some View {
         CmuxSystemSymbolImage(
-            systemName: systemName,
+            symbolName: systemName,
             pointSize: RightSidebarChromeMetrics.headerIconSize,
             weight: weight,
             tint: foregroundColor
@@ -413,7 +413,7 @@ struct ModeBarButton: View {
         Button(action: action) {
             HStack(spacing: Self.contentSpacing) {
                 CmuxSystemSymbolImage(
-                    systemName: item.symbolName,
+                    symbolName: item.symbolName,
                     pointSize: RightSidebarChromeControlStyle.modeIconSize,
                     weight: RightSidebarChromeControlStyle.iconWeight,
                     tint: RightSidebarChromeControlStyle.pillForegroundColor(isSelected: isSelected, isHovered: isHovered),

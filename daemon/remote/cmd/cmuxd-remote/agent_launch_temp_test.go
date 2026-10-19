@@ -16,7 +16,7 @@ func TestEnsureClaudeNodeOptionsRestoreModuleLivesInPrivateHomeDirectory(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join(home, ".cmuxterm", "cmux-claude-node-options", "restore-node-options.cjs")
+	want := filepath.Join(home, ".shellx", "cmux-claude-node-options", "restore-node-options.cjs")
 	if path != want {
 		t.Fatalf("restore module path = %q, want %q", path, want)
 	}
@@ -58,10 +58,10 @@ func TestEnsureClaudeNodeOptionsRestoreModuleRefusesSymlinkedDirectory(t *testin
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	target := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(home, ".cmuxterm"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(home, ".shellx"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(target, filepath.Join(home, ".cmuxterm", "cmux-claude-node-options")); err != nil {
+	if err := os.Symlink(target, filepath.Join(home, ".shellx", "cmux-claude-node-options")); err != nil {
 		t.Fatal(err)
 	}
 	if path, err := ensureClaudeNodeOptionsRestoreModule(); err == nil {

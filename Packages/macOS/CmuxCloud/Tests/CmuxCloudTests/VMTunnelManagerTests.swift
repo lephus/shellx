@@ -192,12 +192,12 @@ struct VMTunnelManagerTests {
         let productionURL = URL(string: "https://cmux.com")!
         let nightly = VMTunnelManager(
             home: home,
-            bundleIdentifier: "com.cmuxterm.app.nightly",
+            bundleIdentifier: "pro.shellx.desktop.nightly",
             apiBaseURL: productionURL
         )
         let dev = VMTunnelManager(
             home: home,
-            bundleIdentifier: "com.cmuxterm.app.debug.all.agents",
+            bundleIdentifier: "pro.shellx.desktop.debug.all.agents",
             apiBaseURL: productionURL
         )
 
@@ -216,7 +216,7 @@ struct VMTunnelManagerTests {
 
         let devRestart = VMTunnelManager(
             home: home,
-            bundleIdentifier: "com.cmuxterm.app.debug.all.agents",
+            bundleIdentifier: "pro.shellx.desktop.debug.all.agents",
             apiBaseURL: URL(string: "http://localhost:9170")!
         )
         #expect(devRestart.interfaceName == dev.interfaceName)
@@ -230,12 +230,12 @@ struct VMTunnelManagerTests {
         let productionURL = URL(string: "https://cmux.com")!
         let stable = VMTunnelManager(
             home: home,
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "pro.shellx.desktop",
             apiBaseURL: productionURL
         )
         let nightly = VMTunnelManager(
             home: home,
-            bundleIdentifier: "com.cmuxterm.app.nightly",
+            bundleIdentifier: "pro.shellx.desktop.nightly",
             apiBaseURL: productionURL
         )
 
@@ -255,13 +255,13 @@ struct VMTunnelManagerTests {
         let productionURL = URL(string: "https://cmux.com")!
         let rc = VMTunnelManager(
             home: home,
-            bundleIdentifier: "com.cmuxterm.app.rc",
+            bundleIdentifier: "pro.shellx.desktop.rc",
             apiBaseURL: productionURL
         )
 
         let nightlyManager = VMTunnelManager(
             home: home,
-            bundleIdentifier: "com.cmuxterm.app.nightly",
+            bundleIdentifier: "pro.shellx.desktop.nightly",
             apiBaseURL: productionURL
         )
         // RC is a non-legacy channel like nightly: same credential file shape,
@@ -276,15 +276,15 @@ struct VMTunnelManagerTests {
         #expect(rc.privateKeyURL.lastPathComponent != "private.key")
 
         let taggedRC = VMTunnelManager.interfaceName(
-            bundleIdentifier: "com.cmuxterm.app.rc.candidate1",
+            bundleIdentifier: "pro.shellx.desktop.rc.candidate1",
             apiBaseURL: productionURL
         )
         let stable = VMTunnelManager.interfaceName(
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "pro.shellx.desktop",
             apiBaseURL: productionURL
         )
         let nightly = VMTunnelManager.interfaceName(
-            bundleIdentifier: "com.cmuxterm.app.nightly",
+            bundleIdentifier: "pro.shellx.desktop.nightly",
             apiBaseURL: productionURL
         )
         #expect(taggedRC != rc.interfaceName)
@@ -300,19 +300,19 @@ struct VMTunnelManagerTests {
         let productionURL = URL(string: "https://cmux.com")!
         let localURL = URL(string: "http://localhost:9170")!
         let taggedDev = VMTunnelManager.interfaceName(
-            bundleIdentifier: "com.cmuxterm.app.debug.all.agents",
+            bundleIdentifier: "pro.shellx.desktop.debug.all.agents",
             apiBaseURL: productionURL
         )
         let sameTaggedDevOnLocalAPI = VMTunnelManager.interfaceName(
-            bundleIdentifier: "com.cmuxterm.app.debug.all.agents",
+            bundleIdentifier: "pro.shellx.desktop.debug.all.agents",
             apiBaseURL: localURL
         )
         let anotherTaggedDev = VMTunnelManager.interfaceName(
-            bundleIdentifier: "com.cmuxterm.app.debug.cloud-notify",
+            bundleIdentifier: "pro.shellx.desktop.debug.cloud-notify",
             apiBaseURL: localURL
         )
         let nightly = VMTunnelManager.interfaceName(
-            bundleIdentifier: "com.cmuxterm.app.nightly",
+            bundleIdentifier: "pro.shellx.desktop.nightly",
             apiBaseURL: productionURL
         )
 
@@ -329,12 +329,12 @@ struct VMTunnelManagerTests {
     func baseDebugBundleUsesItsLaunchTag() {
         let productionURL = URL(string: "https://cmux.com")!
         let first = VMTunnelManager.interfaceName(
-            bundleIdentifier: "com.cmuxterm.app.debug",
+            bundleIdentifier: "pro.shellx.desktop.debug",
             environment: ["CMUX_TAG": "all-agents"],
             apiBaseURL: productionURL
         )
         let second = VMTunnelManager.interfaceName(
-            bundleIdentifier: "com.cmuxterm.app.debug",
+            bundleIdentifier: "pro.shellx.desktop.debug",
             environment: ["CMUX_TAG": "cloud-notify"],
             apiBaseURL: productionURL
         )
@@ -392,14 +392,14 @@ struct VMTunnelManagerTests {
         let browser = VMTunnelManager(
             home: home,
             purpose: .browser,
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "pro.shellx.desktop",
             environment: [:],
             apiBaseURL: productionURL
         )
         let terminal = VMTunnelManager(
             home: home,
             purpose: .terminal,
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "pro.shellx.desktop",
             environment: [:],
             apiBaseURL: productionURL
         )

@@ -827,7 +827,7 @@ extension WorkspaceContentView {
         if !found {
             let ts = ISO8601DateFormatter().string(from: Date())
             let line = "[\(ts)] PANEL NOT FOUND for tabId=\(tab.id) ws=\(workspace.id) panelCount=\(workspace.panels.count)\n"
-            let logPath = "/tmp/cmux-panel-debug.log"
+            let logPath = "/tmp/shellx-panel-debug.log"
             guard let handle = OwnedLogFile(path: logPath).openForAppending() else { return }
             defer { try? handle.close() }
             try? handle.write(contentsOf: Data(line.utf8))
@@ -923,7 +923,7 @@ struct EmptyPanelView: View {
     @ViewBuilder
     private func emptyPaneActionButton(
         title: String,
-        systemImage: String,
+        icon: String,
         shortcut: StoredShortcut,
         action: @escaping () -> Void
     ) -> some View {
@@ -934,7 +934,7 @@ struct EmptyPanelView: View {
                     // on-accent text color, so bake that semantic color rather
                     // than a literal white.
                     CmuxSystemSymbolImage(
-                        systemName: systemImage,
+                        symbolName: icon,
                         pointSize: 13,
                         tint: Color(nsColor: .alternateSelectedControlTextColor)
                     )
@@ -963,7 +963,7 @@ struct EmptyPanelView: View {
             HStack(spacing: 12) {
                 emptyPaneActionButton(
                     title: String(localized: "emptyPanel.action.terminal", defaultValue: "Terminal"),
-                    systemImage: "terminal.fill",
+                    icon: "terminal.fill",
                     shortcut: newSurfaceShortcut,
                     action: createTerminal
                 )
@@ -971,7 +971,7 @@ struct EmptyPanelView: View {
                 if BrowserAvailabilitySettings.offersBrowserAffordance(isEnabled: browserAvailable) {
                     emptyPaneActionButton(
                         title: String(localized: "emptyPanel.action.browser", defaultValue: "Browser"),
-                        systemImage: "globe",
+                        icon: "globe",
                         shortcut: openBrowserShortcut,
                         action: createBrowser
                     )

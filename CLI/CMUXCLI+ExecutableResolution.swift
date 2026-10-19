@@ -6,7 +6,7 @@ extension CMUXCLI {
     func managedTerminalRequiredMessage(displayName: String) -> String {
         let format = String(
             localized: "cli.tmux-compat.error.managedTerminalRequired",
-            defaultValue: "%@ must be launched from a cmux-managed terminal surface. Open a terminal surface in cmux and run this command there."
+            defaultValue: "%@ must be launched from a ShellX-managed terminal surface. Open a terminal surface in ShellX and run this command there."
         )
         return String(format: format, displayName)
     }
@@ -62,7 +62,7 @@ extension CMUXCLI {
         if let home = environment["HOME"], home.hasPrefix("/") {
             shimRoots.append(
                 URL(fileURLWithPath: home, isDirectory: true)
-                    .appendingPathComponent(".cmuxterm/cmux-cli-shims", isDirectory: true)
+                    .appendingPathComponent(".shellx/cmux-cli-shims", isDirectory: true)
                     .standardizedFileURL.path
             )
         }
@@ -71,7 +71,7 @@ extension CMUXCLI {
                 .appendingPathComponent("cmux-cli-shims", isDirectory: true)
                 .standardizedFileURL
                 .path,
-            "/tmp/cmux-cli-shims",
+            "/tmp/shellx-cli-shims",
         ])
         for shimRoot in shimRoots {
             let shimRoot = shimRoot.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -414,7 +414,8 @@ extension CMUXCLI {
         guard components.count >= 4 else { return nil }
         for index in components.indices {
             guard components[index].hasSuffix(".app"),
-                  components[index].lowercased().contains("cmux"),
+                  components[index].lowercased().contains("cmux")
+                    || components[index].lowercased().contains("shellx"),
                   components.indices.contains(index + 3),
                   components[index + 1] == "Contents",
                   components[index + 2] == "Resources",

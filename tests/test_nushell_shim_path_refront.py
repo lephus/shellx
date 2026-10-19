@@ -3,14 +3,14 @@
 Regression coverage for nushell wrapper-shim shadowing.
 
 cmux routes ``claude`` through a per-surface shim in ``$TMPDIR/cmux-cli-shims/
-<surface-id>/`` so ``cmux-claude-wrapper`` can inject session tracking and
+<surface-id>/`` so ``shellx-claude-wrapper`` can inject session tracking and
 notification hooks. The shim directory is prepended to ``PATH`` when the
 terminal spawns, but a nushell user's ``env.nu`` typically re-prepends their
 own directories (``~/.local/bin`` and friends) on top of the inherited
 ``PATH``, shadowing the shim. zsh/bash/fish recover via cmux shell
 integration that re-fronts the shim after user config runs; nushell had no
 integration at all, so the wrapper never ran, sessions were never captured
-into ``~/.cmuxterm/claude-hook-sessions.json``, and Claude session resume
+into ``~/.shellx/claude-hook-sessions.json``, and Claude session resume
 never worked.
 
 This test drives the *actual* bundled nushell bootstrap

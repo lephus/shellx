@@ -4,12 +4,13 @@ import Combine
 import Darwin
 import Foundation
 import CmuxFoundation
+import ShellXIcons
 
 /// Owns the dedicated computer-use status item and renders value-only session snapshots.
 @MainActor
 final class ComputerUseMenuBarController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
-    private let menu = NSMenu(title: String(localized: "computerUse.menu.title", defaultValue: "cmux Computer Use"))
+    private let menu = NSMenu(title: String(localized: "computerUse.menu.title", defaultValue: "ShellX Computer Use"))
     private let snapshotStore: ComputerUseMenuBarSnapshotStore
     private let isRunningInBackground: (String, String) -> Bool
     private let onContinueInBackground:
@@ -147,7 +148,7 @@ final class ComputerUseMenuBarController: NSObject, NSMenuDelegate {
         )
         let viewTitle = String(
             localized: "computerUse.menu.focusTarget",
-            defaultValue: "Focus cmux Computer Use"
+            defaultValue: "Focus ShellX Computer Use"
         )
         let viewItem = NSMenuItem(
             title: viewTitle,
@@ -155,7 +156,7 @@ final class ComputerUseMenuBarController: NSObject, NSMenuDelegate {
             keyEquivalent: ""
         )
         viewItem.target = self
-        viewItem.image = NSImage(systemSymbolName: "eye", accessibilityDescription: viewTitle)
+        viewItem.image = ShellXIcon.nsImage("eye", accessibilityDescription: viewTitle)
         if
             let identity = row.targetIdentity,
             let stateWriterIdentity = row.stateWriterIdentity,
@@ -195,7 +196,7 @@ final class ComputerUseMenuBarController: NSObject, NSMenuDelegate {
             keyEquivalent: ""
         )
         backgroundItem.target = self
-        backgroundItem.image = NSImage(systemSymbolName: "terminal", accessibilityDescription: backgroundTitle)
+        backgroundItem.image = ShellXIcon.nsImage("terminal", accessibilityDescription: backgroundTitle)
         backgroundItem.state = runningInBackground ? .on : .off
         if let stateWriterIdentity = row.stateWriterIdentity {
             backgroundActions[ObjectIdentifier(backgroundItem)] = {
@@ -227,8 +228,8 @@ final class ComputerUseMenuBarController: NSObject, NSMenuDelegate {
             keyEquivalent: ""
         )
         stopItem.target = self
-        stopItem.image = NSImage(
-            systemSymbolName: "stop.circle",
+        stopItem.image = ShellXIcon.nsImage(
+            "stop.circle",
             accessibilityDescription: stopTitle
         )
         if
@@ -263,11 +264,11 @@ final class ComputerUseMenuBarController: NSObject, NSMenuDelegate {
             let targetIcon = application.icon,
             let helperIcon = computerUseIcon()
         else {
-            let image = NSImage(
-                systemSymbolName: "cursorarrow.motionlines",
+            let image = ShellXIcon.nsImage(
+                "cursorarrow.motionlines",
                 accessibilityDescription: String(
                     localized: "computerUse.menu.title",
-                    defaultValue: "cmux Computer Use"
+                    defaultValue: "ShellX Computer Use"
                 )
             )
             image?.isTemplate = true
@@ -318,9 +319,9 @@ final class ComputerUseMenuBarController: NSObject, NSMenuDelegate {
         } == true
             ? String(
                 localized: "computerUse.menu.backgroundStatus",
-                defaultValue: "cmux Computer Use: Running in Background"
+                defaultValue: "ShellX Computer Use: Running in Background"
             )
-            : String(localized: "computerUse.menu.title", defaultValue: "cmux Computer Use")
+            : String(localized: "computerUse.menu.title", defaultValue: "ShellX Computer Use")
         let label = activeRow?.targetAppName.map { targetName in
             String(
                 localized: "computerUse.menu.statusWithTarget",

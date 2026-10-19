@@ -2,6 +2,7 @@ import AppKit
 import CmuxFoundation
 import CoreGraphics
 import Foundation
+import ShellXIcons
 
 @MainActor
 final class TextBoxInlineAttachmentRenderer {
@@ -328,7 +329,7 @@ final class TextBoxInlineAttachmentRenderer {
                 NSGraphicsContext.restoreGraphicsState()
             } else {
                 let symbolName = attachment.inlineThumbnailSource == nil ? "doc" : "photo"
-                let icon = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)
+                let icon = ShellXIcon.nsImage(symbolName, accessibilityDescription: nil)
                 icon?.withSymbolConfiguration(.init(pointSize: 11, weight: .medium))?
                     .draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: 0.9)
             }

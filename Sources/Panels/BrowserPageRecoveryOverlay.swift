@@ -2,6 +2,7 @@ import AppKit
 import CmuxBrowser
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// What a browser pane asks the user to do before its page comes back.
 enum BrowserPageRecoveryPrompt {
@@ -26,9 +27,9 @@ struct BrowserPageRecoveryOverlay: View {
                 Color(nsColor: backgroundColor)
                     .opacity(0.92)
                 Button(action: action) {
-                    Label(
+                    ShellXLabel(
                         String(localized: "browser.error.reload", defaultValue: "Reload"),
-                        systemImage: "arrow.clockwise"
+                        icon: "arrow.clockwise"
                     )
                     .cmuxFont(size: 13, weight: .medium)
                     .padding(.horizontal, 6)
@@ -58,9 +59,9 @@ struct BrowserPageRecoveryOverlay: View {
                     .cmuxFont(size: 13)
                     .foregroundStyle(.secondary)
                     Button(action: action) {
-                        Label(
+                        ShellXLabel(
                             String(localized: "browser.discard.restore", defaultValue: "Restore"),
-                            systemImage: "arrow.counterclockwise"
+                            icon: "arrow.counterclockwise"
                         )
                         .cmuxFont(size: 13, weight: .medium)
                         .padding(.horizontal, 6)

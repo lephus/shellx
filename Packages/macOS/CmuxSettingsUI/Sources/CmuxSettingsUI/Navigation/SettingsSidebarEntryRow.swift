@@ -1,5 +1,6 @@
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// Sidebar row used inside the settings window's `List`.
 ///
@@ -19,7 +20,7 @@ struct SettingsSidebarEntryRow: View {
             // Decorative: the title names the row. Exposed, VoiceOver read
             // the symbol's name or a guessed label ("gearshape", "Mostly
             // Cloudy") before every entry.
-            Image(systemName: symbolName)
+            ShellXIcon.image(symbolName)
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
                 .accessibilityHidden(true)

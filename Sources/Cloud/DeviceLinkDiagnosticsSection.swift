@@ -1,5 +1,6 @@
 import CmuxCloud
 import SwiftUI
+import ShellXIcons
 
 /// The My Devices part of the Cloud Diagnostics window: every device link's
 /// recent state changes, newest first, with the failure class and code that
@@ -20,7 +21,7 @@ struct DeviceLinkDiagnosticsSection: View {
             }
             ForEach(diagnostics.events.suffix(Self.shownEvents).reversed()) { event in
                 HStack(alignment: .top) {
-                    Image(systemName: Self.symbol(for: event))
+                    ShellXIcon.image(Self.symbol(for: event))
                         .foregroundStyle(event.relevantFailure == nil ? Color.secondary : Color.orange)
                     VStack(alignment: .leading, spacing: 2) {
                         // The attempt is a technical ordinal, shown as a bare number after the localized phase.

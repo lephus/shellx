@@ -6,7 +6,7 @@ extension CMUXCLI {
     static var vmAgentUpdatesUsage: String {
         String(
             localized: "cli.vm.agentUpdates.usage",
-            defaultValue: "Usage:\n  cmux vm agent-updates <id>                 Show the machine's setting.\n  cmux vm agent-updates <id> <latest|image>  Change it.\n\nlatest updates Claude Code, Codex, OpenCode, Pi, and agent-browser to each\ntool's newest GitHub release when you connect, at most once a day, checked\nagainst its sha256 digest. image keeps the versions the machine's image\nbaked (the default). Updates reach only GitHub, which every network mode\nallows. Add --json for the structured result.\nA new release installs only after it has been public for 3 days."
+            defaultValue: "Usage:\n  shellx vm agent-updates <id>                 Show the machine's setting.\n  shellx vm agent-updates <id> <latest|image>  Change it.\n\nlatest updates Claude Code, Codex, OpenCode, Pi, and agent-browser to each\ntool's newest GitHub release when you connect, at most once a day, checked\nagainst its sha256 digest. image keeps the versions the machine's image\nbaked (the default). Updates reach only GitHub, which every network mode\nallows. Add --json for the structured result.\nA new release installs only after it has been public for 3 days."
         )
     }
 

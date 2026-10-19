@@ -154,7 +154,7 @@ final class SettingsTerminalBehaviorUITests: SettingsUITestCase {
     private enum Subtitle {
         static let scrollBar = "Shows a scroll bar in terminals"
         static let copy = "Selecting text in a terminal copies it to the clipboard"
-        static let resume = "Reopening cmux resumes agent sessions automatically"
+        static let resume = "Reopening ShellX resumes agent sessions automatically"
         static let hibernate = "Hibernates idle background agent terminals"
         static let showTextBox = "Opening a terminal tab, split, or workspace shows the TextBox"
         static let focusTextBox = "Opening a terminal tab, split, or workspace puts keyboard focus in the TextBox"

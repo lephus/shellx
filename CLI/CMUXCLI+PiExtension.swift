@@ -2,8 +2,8 @@ import Foundation
 import Darwin
 
 extension CMUXCLI {
-    private static let piExtensionMarker = "cmux-pi-session-extension-marker"
-    private static let piExtensionFilename = "cmux-session.ts"
+    private static let piExtensionMarker = "shellx-pi-session-extension-marker"
+    private static let piExtensionFilename = "shellx-session.ts"
 
     private func piExtensionURL(for def: AgentHookDef) -> URL {
         URL(fileURLWithPath: def.resolvedConfigDir(), isDirectory: true)
@@ -39,7 +39,7 @@ extension CMUXCLI {
         if createParentDirectory {
             try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         }
-        let lockURL = directoryURL.appendingPathComponent(".cmux-session.lock", isDirectory: false)
+        let lockURL = directoryURL.appendingPathComponent(".shellx-session.lock", isDirectory: false)
         let descriptor = Darwin.open(
             lockURL.path,
             O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW,
@@ -130,7 +130,7 @@ extension CMUXCLI {
             throw CLIError(message: String.localizedStringWithFormat(
                 String(
                     localized: "cli.hooks.pi.error.notCmuxExtension",
-                    defaultValue: "%@ exists and is not a cmux extension; leaving it alone"
+                    defaultValue: "%@ exists and is not a ShellX extension; leaving it alone"
                 ),
                 extensionURL.path
             ))
@@ -158,7 +158,7 @@ extension CMUXCLI {
                 throw CLIError(message: String.localizedStringWithFormat(
                     String(
                         localized: "cli.hooks.pi.error.notCmuxExtension",
-                        defaultValue: "%@ exists and is not a cmux extension; leaving it alone"
+                        defaultValue: "%@ exists and is not a ShellX extension; leaving it alone"
                     ),
                     extensionURL.path
                 ))
@@ -183,7 +183,7 @@ extension CMUXCLI {
             print(String.localizedStringWithFormat(
                 String(
                     localized: "cli.hooks.pi.noneFound",
-                    defaultValue: "No Pi cmux extension found at %@"
+                    defaultValue: "No Pi ShellX extension found at %@"
                 ),
                 extensionURL.path
             ))
@@ -209,7 +209,7 @@ extension CMUXCLI {
             print(String.localizedStringWithFormat(
                 String(
                     localized: "cli.hooks.pi.refuseRemoveMissingMarker",
-                    defaultValue: "Refusing to remove %@: missing cmux marker"
+                    defaultValue: "Refusing to remove %@: missing ShellX marker"
                 ),
                 extensionURL.path
             ))
@@ -219,7 +219,7 @@ extension CMUXCLI {
             print(String.localizedStringWithFormat(
                 String(
                     localized: "cli.hooks.pi.noneFound",
-                    defaultValue: "No Pi cmux extension found at %@"
+                    defaultValue: "No Pi ShellX extension found at %@"
                 ),
                 extensionURL.path
             ))
@@ -228,7 +228,7 @@ extension CMUXCLI {
         print(String.localizedStringWithFormat(
             String(
                 localized: "cli.hooks.pi.removed",
-                defaultValue: "Removed Pi cmux extension from %@"
+                defaultValue: "Removed Pi ShellX extension from %@"
             ),
             extensionURL.path
         ))

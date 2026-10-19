@@ -13,6 +13,10 @@ let package = Package(
             targets: ["CmuxFoundation"]
         ),
     ],
+    dependencies: [
+        // ShellX look tokens (palette, accent default).
+        .package(path: "../../Shared/ShellXBrand"),
+    ],
     targets: [
         .target(
             name: "CmuxFoundationAtomicsC",
@@ -20,7 +24,10 @@ let package = Package(
         ),
         .target(
             name: "CmuxFoundation",
-            dependencies: ["CmuxFoundationAtomicsC"],
+            dependencies: [
+                "CmuxFoundationAtomicsC",
+                .product(name: "ShellXBrand", package: "ShellXBrand"),
+            ],
             resources: [.process("Resources")],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

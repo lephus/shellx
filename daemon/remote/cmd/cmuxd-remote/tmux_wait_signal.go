@@ -15,7 +15,7 @@ func tmuxWaitForSignalDirectory() (string, error) {
 		return "", err
 	}
 	directory := home
-	for _, component := range []string{".cmux", "wait-for"} {
+	for _, component := range []string{remoteStateDirName, "wait-for"} {
 		directory = filepath.Join(directory, component)
 		if err := ensurePrivateDaemonLeafDirectory(directory); err != nil {
 			return "", err

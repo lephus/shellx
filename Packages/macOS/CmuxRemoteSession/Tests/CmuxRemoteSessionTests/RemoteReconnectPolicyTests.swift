@@ -19,7 +19,7 @@ struct RemoteReconnectPolicyTests {
     func reconnectCleanupFixtureReturnsNeutralResult() throws {
         let result = try IntentionalCleanupUnusedProcessRunner().run(
             RemoteProcessRequest(
-                executable: "/usr/bin/cmuxd-remote",
+                executable: "/usr/bin/shellx-remote",
                 arguments: [],
                 timeout: 1
             ),
@@ -180,12 +180,12 @@ struct RemoteReconnectPolicyTests {
         )
         let first = RemoteSessionCoordinator.annotatedRemoteDaemonBootstrapError(
             underlying,
-            remotePath: "/home/test/.cmux/bin/cmuxd-remote/1/linux-amd64/cmuxd-remote",
+            remotePath: "/home/test/.shellx/bin/shellx-remote/1/linux-amd64/shellx-remote",
             diagnostic: "daemon log tail: authentication failed"
         )
         let second = RemoteSessionCoordinator.annotatedRemoteDaemonBootstrapError(
             underlying,
-            remotePath: "/home/test/.cmux/bin/cmuxd-remote/1/linux-amd64/cmuxd-remote",
+            remotePath: "/home/test/.shellx/bin/shellx-remote/1/linux-amd64/shellx-remote",
             diagnostic: "daemon log tail: checksum mismatch"
         )
 

@@ -1,5 +1,6 @@
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// Hit rects for one rendered tab, in the tab bar's local coordinates.
 /// Reported by the SwiftUI strip so `CanvasPaneView` can route AppKit mouse
@@ -136,12 +137,12 @@ private struct CanvasPaneTabItem: View {
     private var iconOrClose: some View {
         ZStack {
             if isHovered {
-                Image(systemName: "xmark")
+                ShellXIcon.image("xmark")
                     .cmuxFont(size: 9, weight: .bold)
                     .foregroundStyle(Color(nsColor: .labelColor))
                     .frame(width: 16, height: 16)
             } else if let iconSystemName = tab.iconSystemName {
-                Image(systemName: iconSystemName)
+                ShellXIcon.image(iconSystemName)
                     .cmuxFont(size: 11, weight: .medium)
                     .foregroundStyle(textColor)
             }

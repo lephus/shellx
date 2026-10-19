@@ -47,17 +47,17 @@ struct AgentResumeReturnShellStartupTests {
             agentBinding.restoreStartupInput(
                 repairPortableAgentExecutable: true
             )
-                == " cmux restore codex \(sessionID)\n"
+                == " shellx restore codex \(sessionID)\n"
         )
         #expect(
             manualBinding.restoreStartupInput(
                 repairPortableAgentExecutable: true
             )
-                == " cmux restore --surface\n"
+                == " shellx restore --surface\n"
         )
         #expect(
             snapshot.resumeStartupInput()
-                == " cmux restore codex \(sessionID)\n"
+                == " shellx restore codex \(sessionID)\n"
         )
     }
 

@@ -40,13 +40,13 @@ struct CLIClaudeHookTimeoutRegressionTests {
     @Test("Claude launch fallback omits blocking lifecycle hooks")
     func settingsGenerationFailureInstallsOnlyDecisionHooks() throws {
         let fileManager = FileManager.default
-        let wrapper = repositoryRoot.appendingPathComponent("Resources/bin/cmux-claude-wrapper")
+        let wrapper = repositoryRoot.appendingPathComponent("Resources/bin/shellx-claude-wrapper")
         let root = fileManager.temporaryDirectory.appendingPathComponent(
             "cmux-claude-settings-deadline-\(UUID().uuidString)",
             isDirectory: true
         )
         let binDirectory = root.appendingPathComponent("bin", isDirectory: true)
-        let fakeCLI = binDirectory.appendingPathComponent("cmux")
+        let fakeCLI = binDirectory.appendingPathComponent("shellx")
         let fakeClaude = binDirectory.appendingPathComponent("claude")
         let capturedSettings = root.appendingPathComponent("settings.json")
         let socketPath = makeCodexHookSocketPath("claude-deadline")
@@ -89,13 +89,13 @@ struct CLIClaudeHookTimeoutRegressionTests {
         try expectDirectHook(
             hooks,
             event: "PreToolUse",
-            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks claude cron-create-guard"#,
+            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}" hooks claude cron-create-guard"#,
             timeout: 5
         )
         try expectDirectHook(
             hooks,
             event: "PermissionRequest",
-            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks feed --source claude"#,
+            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}" hooks feed --source claude"#,
             timeout: 125
         )
     }
@@ -104,13 +104,13 @@ struct CLIClaudeHookTimeoutRegressionTests {
     func generatedSettingsUseQueuedAdmissionAndPreserveDecisionHooks() throws {
         let fileManager = FileManager.default
         let cliPath = try BundledCLITestSupport.bundledCLIPath(for: CLITestBundleAnchor.self)
-        let wrapper = repositoryRoot.appendingPathComponent("Resources/bin/cmux-claude-wrapper")
+        let wrapper = repositoryRoot.appendingPathComponent("Resources/bin/shellx-claude-wrapper")
         let root = fileManager.temporaryDirectory.appendingPathComponent(
             "cmux-claude-queued-hooks-\(UUID().uuidString)",
             isDirectory: true
         )
         let binDirectory = root.appendingPathComponent("bin", isDirectory: true)
-        let fakeCLI = binDirectory.appendingPathComponent("cmux")
+        let fakeCLI = binDirectory.appendingPathComponent("shellx")
         let fakeClaude = binDirectory.appendingPathComponent("claude")
         let capturedSettings = root.appendingPathComponent("settings.json")
         let socketPath = makeCodexHookSocketPath("claude-queue")
@@ -168,19 +168,19 @@ struct CLIClaudeHookTimeoutRegressionTests {
         try expectDirectHook(
             hooks,
             event: "PreToolUse",
-            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks claude cron-create-guard"#,
+            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}" hooks claude cron-create-guard"#,
             timeout: 5
         )
         try expectDirectHook(
             hooks,
             event: "PermissionRequest",
-            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks feed --source claude"#,
+            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}" hooks feed --source claude"#,
             timeout: 125
         )
         try expectDirectHook(
             hooks,
             event: "Stop",
-            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks claude auto-name"#,
+            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}" hooks claude auto-name"#,
             timeout: 120,
             isAsync: true
         )
@@ -190,7 +190,7 @@ struct CLIClaudeHookTimeoutRegressionTests {
             try expectDirectHook(
                 hooks,
                 event: event,
-                command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks claude inbox-wait"#,
+                command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}" hooks claude inbox-wait"#,
                 timeout: 86_400,
                 isAsync: true,
                 isAsyncRewake: true
@@ -199,7 +199,7 @@ struct CLIClaudeHookTimeoutRegressionTests {
         try expectDirectHook(
             hooks,
             event: "UserPromptSubmit",
-            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-cmux}" hooks claude inbox-drain 2>/dev/null || echo '{}'"#,
+            command: #""${CMUX_CLAUDE_HOOK_CMUX_BIN:-shellx}" hooks claude inbox-drain 2>/dev/null || echo '{}'"#,
             timeout: 5
         )
 
@@ -1361,27 +1361,27 @@ struct CLIClaudeHookTimeoutRegressionTests {
             Producer(
                 agent: "opencode",
                 environment: ["OPENCODE_CONFIG_DIR": opencodeRoot.path],
-                artifact: opencodeRoot.appendingPathComponent("plugins/cmux-session.js")
+                artifact: opencodeRoot.appendingPathComponent("plugins/shellx-session.js")
             ),
             Producer(
                 agent: "pi",
                 environment: ["PI_CODING_AGENT_DIR": piRoot.path],
-                artifact: piRoot.appendingPathComponent("extensions/cmux-session.ts")
+                artifact: piRoot.appendingPathComponent("extensions/shellx-session.ts")
             ),
             Producer(
                 agent: "omp",
                 environment: ["PI_CODING_AGENT_DIR": ompRoot.path],
-                artifact: ompRoot.appendingPathComponent("extensions/cmux-omp-session.ts")
+                artifact: ompRoot.appendingPathComponent("extensions/shellx-omp-session.ts")
             ),
             Producer(
                 agent: "campfire",
                 environment: ["CAMPFIRE_CODING_AGENT_DIR": campfireRoot.path],
-                artifact: campfireRoot.appendingPathComponent("extensions/cmux-campfire-session.ts")
+                artifact: campfireRoot.appendingPathComponent("extensions/shellx-campfire-session.ts")
             ),
             Producer(
                 agent: "amp",
                 environment: ["HOME": ampHome.path],
-                artifact: ampHome.appendingPathComponent(".config/amp/plugins/cmux-session.ts")
+                artifact: ampHome.appendingPathComponent(".config/amp/plugins/shellx-session.ts")
             ),
         ]
 

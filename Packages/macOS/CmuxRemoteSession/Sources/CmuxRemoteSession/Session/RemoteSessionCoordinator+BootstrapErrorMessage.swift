@@ -1,7 +1,7 @@
 public import CmuxRemoteDaemon
 internal import Foundation
 
-// User-facing text for a failed cmuxd-remote bootstrap. Split from the
+// User-facing text for a failed shellx-remote bootstrap. Split from the
 // coordinator's main file verbatim; tests pin this mapping against raw errors.
 extension RemoteSessionCoordinator {
     /// Maps a bootstrap failure to the user-facing message: capability
@@ -31,7 +31,7 @@ extension RemoteSessionCoordinator {
             // help, and nothing on the remote host needs repair.
             return String(
                 localized: "remoteDaemon.bootstrap.noDaemonForPlatform",
-                defaultValue: "This cmux build has no remote daemon for the remote host's platform"
+                defaultValue: "This ShellX build has no remote daemon for the remote host's platform"
             )
         case 24:
             return String(

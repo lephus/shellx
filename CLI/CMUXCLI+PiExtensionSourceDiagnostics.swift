@@ -110,8 +110,8 @@ async function runPiHookDiagnosticWrite(operation: () => Promise<void>): Promise
 
 function piHookDiagnosticPath(
   environment: Record<string, string | undefined> = process.env,
-  lastDebugLogPathFile = "/tmp/cmux-last-debug-log-path",
-  fallbackLogPath = "/tmp/cmux-debug.log",
+  lastDebugLogPathFile = "/tmp/shellx-last-debug-log-path",
+  fallbackLogPath = "/tmp/shellx-debug.log",
 ): string {
   const explicit = firstString(environment.CMUX_DEBUG_LOG);
   if (explicit) return expandedPiHookLogPath(explicit, environment.HOME);
@@ -119,7 +119,7 @@ function piHookDiagnosticPath(
   const socketPath = firstString(environment.CMUX_SOCKET_PATH, environment.CMUX_SOCKET);
   if (socketPath) {
     const socketName = path.basename(socketPath);
-    if (socketName.startsWith("cmux-debug-") && socketName.endsWith(".sock")) {
+    if (socketName.startsWith("shellx-debug-") && socketName.endsWith(".sock")) {
       return path.join("/tmp", `${socketName.slice(0, -".sock".length)}.log`);
     }
   }
@@ -156,8 +156,8 @@ function piHookDiagnosticPath(
 async function appendPiHookDiagnostic(
   payload: Record<string, unknown>,
   environment: Record<string, string | undefined> = process.env,
-  lastDebugLogPathFile = "/tmp/cmux-last-debug-log-path",
-  fallbackLogPath = "/tmp/cmux-debug.log",
+  lastDebugLogPathFile = "/tmp/shellx-last-debug-log-path",
+  fallbackLogPath = "/tmp/shellx-debug.log",
 ): Promise<void> {
   let line: string;
   try {

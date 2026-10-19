@@ -40,7 +40,7 @@ extension TerminalController {
                 code: "invalid_params",
                 message: String(
                     localized: "socket.agentMessage.error.missingSettingsTarget",
-                    defaultValue: "Give a target workspace or surface, or run this inside a cmux surface."
+                    defaultValue: "Give a target workspace or surface, or run this inside a ShellX surface."
                 ),
                 data: nil
             )
@@ -87,7 +87,7 @@ extension TerminalController {
                     code: "storage_failed",
                     message: String(
                         localized: "socket.agentMessage.error.settingNotSaved",
-                        defaultValue: "The setting was not changed: cmux could not save it to the message journal."
+                        defaultValue: "The setting was not changed: ShellX could not save it to the message journal."
                     ),
                     data: ["reason": error.reason]
                 )

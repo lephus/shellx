@@ -15,7 +15,7 @@ import Foundation
 enum CLIVersionSkew {
     /// What the connected app says about itself in `system.identify`.
     struct Peer: Equatable {
-        /// `app` from `system.identify` (`cmux`, `cmux-next`); nil from apps
+        /// `app` from `system.identify` (`shellx`, `cmux`, `cmux-next`); nil from apps
         /// that predate the field.
         var app: String?
         var version: String?
@@ -48,7 +48,8 @@ enum CLIVersionSkew {
     }
 
     /// The product name this CLI belongs to, as `system.identify` reports it.
-    static let cliProduct = "cmux"
+    /// ShellX's own product name, so a socket answered by cmux reads as another product.
+    static let cliProduct = "shellx"
 
     /// The user-facing explanation, or nil when the original error already
     /// says enough: the app is the same build as this CLI, lists the method,
@@ -146,7 +147,7 @@ enum CLIVersionSkew {
                 fix = String(
                     format: String(
                         localized: "cli.versionSkew.fix.otherProductNoPath",
-                        defaultValue: "This socket belongs to %@, which has its own CLI. Run the cmux CLI inside that app's bundle (Contents/Resources/bin/cmux).",
+                        defaultValue: "This socket belongs to %@, which has its own CLI. Run the ShellX CLI inside that app's bundle (Contents/Resources/bin/shellx).",
                         bundle: bundle
                     ),
                     locale: .current,
@@ -158,11 +159,11 @@ enum CLIVersionSkew {
             fix = String(
                 format: String(
                     localized: "cli.versionSkew.fix.cliOlder",
-                    defaultValue: "This CLI is older than the app. Run the app's CLI, %@, or remove the older cmux from PATH.",
+                    defaultValue: "This CLI is older than the app. Run the app's CLI, %@, or remove the older ShellX from PATH.",
                     bundle: bundle
                 ),
                 locale: .current,
-                peerCLI ?? "Contents/Resources/bin/cmux"
+                peerCLI ?? "Contents/Resources/bin/shellx"
             )
         } else if order == .orderedDescending || (peer != nil && peer?.app == nil && peer?.version == nil) {
             // The app is older, or answers identify without `app` and
@@ -170,7 +171,7 @@ enum CLIVersionSkew {
             // usually an installed update waiting for a relaunch.
             fix = String(
                 localized: "cli.versionSkew.fix.appOlder",
-                defaultValue: "The running app is older than this CLI. Quit and reopen cmux to finish an installed update, or update it with cmux > Check for Updates.",
+                defaultValue: "The running app is older than this CLI. Quit and reopen ShellX to finish an installed update, or update it with ShellX > Check for Updates.",
                 bundle: bundle
             )
         } else {
@@ -178,7 +179,7 @@ enum CLIVersionSkew {
             // the direction of the skew is unknown, so do not guess it.
             fix = String(
                 localized: "cli.versionSkew.fix.unknown",
-                defaultValue: "Could not read the app's version. Compare it in cmux > About cmux with this CLI, then relaunch or update the older one.",
+                defaultValue: "Could not read the app's version. Compare it in ShellX > About ShellX with this CLI, then relaunch or update the older one.",
                 bundle: bundle
             )
         }

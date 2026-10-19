@@ -274,7 +274,7 @@ extension TerminalSurface {
             fi
         fi
         if [[ ! -x "$cmux_wrapper" ]]; then
-            cmux_cli="$(command -v cmux 2>/dev/null || true)"
+            cmux_cli="$(command -v shellx 2>/dev/null || true)"
             if [[ -n "$cmux_cli" ]]; then
                 cmux_candidate="$(dirname "$cmux_cli")/\(definition.wrapperName)"
                 if [[ -x "$cmux_candidate" ]]; then

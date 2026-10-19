@@ -26,7 +26,7 @@ import Testing
         let attempt = Task { await harness.flow.signIn(timeout: 60) }
         await harness.waitForSession()
         let session = harness.factory.sessions[0]
-        session.deliver(URL(string: "cmux-dev://auth-callback?stack_refresh=victim-r&stack_access=victim-a&cmux_auth_state=\(harness.callbackState(session))")!)
+        session.deliver(URL(string: "shellx-dev://auth-callback?stack_refresh=victim-r&stack_access=victim-a&cmux_auth_state=\(harness.callbackState(session))")!)
         #expect(await attempt.value)
 
         let result = await harness.flow.handleCallbackURL(harness.fallbackCallbackURL())
@@ -88,7 +88,7 @@ import Testing
 
         #expect(await harness.flow.handleCallbackURL(harness.callbackURL(state: state)))
 
-        let replay = URL(string: "cmux-dev://auth-callback?stack_refresh=attacker-r&stack_access=attacker-a&cmux_auth_state=\(state)")!
+        let replay = URL(string: "shellx-dev://auth-callback?stack_refresh=attacker-r&stack_access=attacker-a&cmux_auth_state=\(state)")!
         #expect(await harness.flow.handleCallbackURL(replay) == false)
         #expect(await harness.tokenStore.getStoredRefreshToken() == "refresh-1")
         #expect(await harness.tokenStore.getStoredAccessToken() == "access-1")
@@ -143,7 +143,7 @@ import Testing
         let attempt = Task { await harness.flow.signIn(timeout: 60) }
         await harness.waitForSession()
         let session = harness.factory.sessions[0]
-        session.deliver(URL(string: "cmux-dev://auth-callback?stack_refresh=victim-r&stack_access=victim-a&cmux_auth_state=\(harness.callbackState(session))")!)
+        session.deliver(URL(string: "shellx-dev://auth-callback?stack_refresh=victim-r&stack_access=victim-a&cmux_auth_state=\(harness.callbackState(session))")!)
         #expect(await attempt.value)
 
         let result = await harness.flow.handleCallbackURL(Self.statelessURL(email: "attacker@example.com"))
@@ -219,7 +219,7 @@ import Testing
                 .replacingOccurrences(of: "=", with: "")
         }
         let jwt = "\(segment(["alg": "none"])).\(segment(["sub": "x", "email": email])).sig"
-        return URL(string: "cmux-dev://auth-callback?stack_refresh=refresh-1&stack_access=\(jwt)")!
+        return URL(string: "shellx-dev://auth-callback?stack_refresh=refresh-1&stack_access=\(jwt)")!
     }
 
     static func state(in url: URL) -> String? {

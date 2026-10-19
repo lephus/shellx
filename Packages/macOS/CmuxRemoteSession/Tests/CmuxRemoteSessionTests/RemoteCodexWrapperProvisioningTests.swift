@@ -30,7 +30,7 @@ struct RemoteCodexWrapperProvisioningTests {
         process.waitUntilExit()
         #expect(process.terminationStatus == 0)
 
-        let installed = root.appendingPathComponent(".cmux/bin/cmux-codex-wrapper")
+        let installed = root.appendingPathComponent(".shellx/bin/shellx-codex-wrapper")
         #expect(try String(contentsOf: installed, encoding: .utf8) == wrapper + "\n")
         #expect(FileManager.default.isExecutableFile(atPath: installed.path))
 
@@ -41,7 +41,7 @@ struct RemoteCodexWrapperProvisioningTests {
         launch.environment = [
             "CMUX_CODEX_WRAPPER_SHIM": installed.path,
             "HOME": root.path,
-            "PATH": root.appendingPathComponent(".cmux/bin").path + ":/usr/bin:/bin",
+            "PATH": root.appendingPathComponent(".shellx/bin").path + ":/usr/bin:/bin",
         ]
         launch.standardOutput = output
         try launch.run()
@@ -84,9 +84,9 @@ struct RemoteCodexWrapperProvisioningTests {
         process.waitUntilExit()
 
         #expect(process.terminationStatus != 0)
-        let bin = root.appendingPathComponent(".cmux/bin")
+        let bin = root.appendingPathComponent(".shellx/bin")
         let remaining = try FileManager.default.contentsOfDirectory(atPath: bin.path)
         #expect(!remaining.contains(where: { $0.hasPrefix(".codex-wrapper.tmp.") }))
-        #expect(!remaining.contains("cmux-codex-wrapper"))
+        #expect(!remaining.contains("shellx-codex-wrapper"))
     }
 }

@@ -15,7 +15,7 @@ public actor CmxIrohKeychainCredentialStore: CmxIrohSecureCredentialStoring {
     ///   - legacyService: An older service whose item may be adopted only from
     ///     the same exact access group.
     public init(
-        service: String = "com.cmuxterm.iroh.relay-credentials.v1",
+        service: String = "pro.shellx.desktop.iroh.relay-credentials.v1",
         accessGroup: String? = nil,
         legacyService: String? = nil
     ) {

@@ -1,6 +1,7 @@
 import AppKit
 import CmuxSettings
 import SwiftUI
+import ShellXIcons
 
 /// Search row above the shortcut list: a text field, plus a detector button
 /// that captures the next keystrokes and filters the list to the actions they
@@ -17,7 +18,7 @@ struct ShortcutListSearchBar: View {
     var body: some View {
         HStack(spacing: 12) {
             HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
+                ShellXIcon.image("magnifyingglass")
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
                 TextField(
@@ -71,7 +72,7 @@ struct ShortcutListSearchBar: View {
                 query = ShortcutListSearchQuery()
                 clearCount += 1
             } label: {
-                Image(systemName: "xmark.circle.fill")
+                ShellXIcon.image("xmark.circle.fill")
                     .imageScale(.medium)
             }
             .buttonStyle(.borderless)
@@ -144,7 +145,7 @@ private struct ShortcutDetectorView: NSViewRepresentable {
     /// A symbol sized to the button's title font so the two share a center line.
     private static func symbol(_ name: String, for button: RecorderHostButton) -> NSImage? {
         let pointSize = button.font?.pointSize ?? NSFont.systemFontSize
-        return NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+        return ShellXIcon.nsImage(name, accessibilityDescription: nil)?
             .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: pointSize, weight: .regular, scale: .small))
     }
 }

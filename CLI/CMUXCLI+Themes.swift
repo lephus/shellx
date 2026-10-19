@@ -1,10 +1,11 @@
 import Foundation
 import CmuxFoundation
 import Darwin
+import ShellXBrand
 
 extension CMUXCLI {
     static let cmuxThemeOverrideBundleIdentifier = CmuxGhosttyConfigPathResolver.releaseBundleIdentifier
-    static let cmuxThemesReloadNotificationName = "com.cmuxterm.themes.reload-config"
+    static let cmuxThemesReloadNotificationName = "\(ShellXBrand.bundleID).themes.reload-config"
 
     struct ThemeSelection {
         let rawValue: String?
@@ -289,7 +290,7 @@ extension CMUXCLI {
             )
         default:
             if subcommand.hasPrefix("-") {
-                throw CLIError(message: "Unknown themes subcommand '\(subcommand)'. Run 'cmux themes --help'.")
+                throw CLIError(message: "Unknown themes subcommand '\(subcommand)'. Run 'shellx themes --help'.")
             }
 
             try runThemesSet(

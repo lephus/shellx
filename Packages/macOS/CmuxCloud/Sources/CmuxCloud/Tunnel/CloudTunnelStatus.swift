@@ -30,22 +30,22 @@ public struct CloudTunnelStatus: Sendable, Equatable {
         case .starting:
             return String(
                 localized: "cloudTree.link.tunnelStarting",
-                defaultValue: "The cmux Cloud Tunnel is starting…"
+                defaultValue: "The ShellX Cloud Tunnel is starting…"
             )
         case .stopping:
             return String(
                 localized: "cloudTree.link.tunnelStopping",
-                defaultValue: "The cmux Cloud Tunnel is stopping…"
+                defaultValue: "The ShellX Cloud Tunnel is stopping…"
             )
         case .awaitingApproval:
             return String(
                 localized: "cloudTree.link.tunnelAwaitingApproval",
-                defaultValue: "macOS is waiting for you to allow the cmux Cloud Tunnel extension in System Settings › General › Login Items & Extensions."
+                defaultValue: "macOS is waiting for you to allow the ShellX Cloud Tunnel extension in System Settings › General › Login Items & Extensions."
             )
         case .failed(let message):
             let format = String(
                 localized: "cloudTree.link.tunnelFailed",
-                defaultValue: "The cmux Cloud Tunnel could not start: %@"
+                defaultValue: "The ShellX Cloud Tunnel could not start: %@"
             )
             return String(format: format, message)
         }

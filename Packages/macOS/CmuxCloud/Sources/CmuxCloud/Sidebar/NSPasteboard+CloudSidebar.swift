@@ -2,5 +2,5 @@ import AppKit
 
 extension NSPasteboard.PasteboardType {
     /// A sidebar-only row identity; the destination also validates the source outline.
-    public static let cloudSidebarRow = Self("com.cmux.cloud-sidebar-row")
+    public static let cloudSidebarRow = Self("pro.shellx.cloud-sidebar-row")
 }

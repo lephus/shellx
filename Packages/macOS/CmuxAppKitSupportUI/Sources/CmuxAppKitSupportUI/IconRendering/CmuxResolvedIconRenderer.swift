@@ -1,6 +1,7 @@
 public import AppKit
 public import Foundation
 public import UniformTypeIdentifiers
+import ShellXIcons
 
 /// Renders small AppKit icons after resolving asset variants, template masks, and dynamic colors.
 @MainActor
@@ -131,8 +132,8 @@ public final class CmuxResolvedIconRenderer {
     ) -> NSImage? {
         switch source {
         case .systemSymbol(let name, let accessibilityDescription):
-            guard let baseImage = NSImage(
-                systemSymbolName: name,
+            guard let baseImage = ShellXIcon.nsImage(
+                name,
                 accessibilityDescription: accessibilityDescription
             ) else {
                 return nil

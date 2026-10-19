@@ -1,4 +1,5 @@
 import SwiftUI
+import ShellXIcons
 
 // Keep the live coordinator above the row subtree. SwiftUI can skip this child
 // while its snapshot is unchanged without recursively comparing action closures.
@@ -16,7 +17,7 @@ struct SimulatorDevicePickerMenu: View {
                         actions.select(row.id)
                     } label: {
                         if row.isSelected {
-                            Label(row.label, systemImage: "checkmark")
+                            ShellXLabel(row.label, icon: "checkmark")
                         } else {
                             Text(row.label)
                         }
@@ -26,7 +27,7 @@ struct SimulatorDevicePickerMenu: View {
                 SimulatorLocalizedButton(simulatorStrings.refresh, action: actions.refresh)
             }
         } label: {
-            Label(snapshot.selectedDeviceName, systemImage: snapshot.selectedDeviceSymbol)
+            ShellXLabel(snapshot.selectedDeviceName, icon: snapshot.selectedDeviceSymbol)
                 .lineLimit(1)
         }
         .menuStyle(.borderlessButton)

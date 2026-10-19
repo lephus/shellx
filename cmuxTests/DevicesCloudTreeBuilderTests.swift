@@ -168,7 +168,7 @@ struct DevicesCloudTreeBuilderTests {
         trust: SurfaceDevicePresence.AccountTrust = .sameAccount,
         lastSeenAt: Date? = nil
     ) -> SurfaceDevicePresence {
-        SurfaceDevicePresence(state: online ? .online : .offline, lastSeenAt: lastSeenAt, tag: tag, bundleID: "com.cmuxterm.app", accountTrust: trust)
+        SurfaceDevicePresence(state: online ? .online : .offline, lastSeenAt: lastSeenAt, tag: tag, bundleID: "pro.shellx.desktop", accountTrust: trust)
     }
 
     private func info(

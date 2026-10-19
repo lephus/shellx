@@ -29,7 +29,7 @@ public final class CmuxWebView: CmuxUndoableWebView {
     private static let bonsplitTabTransferType = NSPasteboard.PasteboardType("com.splittabbar.tabtransfer")
 
     /// Pasteboard type of sidebar workspace reorder drags.
-    private static let sidebarTabReorderType = NSPasteboard.PasteboardType("com.cmux.sidebar-tab-reorder")
+    private static let sidebarTabReorderType = NSPasteboard.PasteboardType("pro.shellx.sidebar-tab-reorder")
 
     public var browserViewportModel: BrowserViewportModel?
     public var onBrowserViewportHierarchyChanged: (() -> Void)?
@@ -2228,7 +2228,7 @@ public final class CmuxWebView: CmuxUndoableWebView {
         NSPasteboard.PasteboardType("public.text"),
         NSPasteboard.PasteboardType("public.plain-text"),
         NSPasteboard.PasteboardType("com.splittabbar.tabtransfer"),
-        NSPasteboard.PasteboardType("com.cmux.sidebar-tab-reorder"),
+        NSPasteboard.PasteboardType("pro.shellx.sidebar-tab-reorder"),
     ]
 
     /// A custom drag UTI is only a hint: AppKit keeps it after a session ends.

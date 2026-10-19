@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import ShellXBrand
 
 extension TerminalController {
     final class WorkspaceCreateIdempotencyFileStore: WorkspaceCreateIdempotencyPersisting, @unchecked Sendable {
@@ -88,14 +89,14 @@ extension TerminalController {
                 in: .userDomainMask
             ).first ?? FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent("Library/Application Support", isDirectory: true)
-            let rawBundleID = Bundle.main.bundleIdentifier ?? "com.cmuxterm.app"
+            let rawBundleID = Bundle.main.bundleIdentifier ?? ShellXBrand.bundleID
             let bundleID = rawBundleID.map { character in
                 character.isLetter || character.isNumber || character == "." || character == "-"
                     ? character
                     : "_"
             }
             return appSupport
-                .appendingPathComponent("cmux", isDirectory: true)
+                .appendingPathComponent("ShellX", isDirectory: true)
                 .appendingPathComponent(
                     "workspace-create-tombstones-\(String(bundleID))-v1.json",
                     isDirectory: false

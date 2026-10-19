@@ -2,6 +2,7 @@ import Bonsplit
 import CmuxTerminalSharing
 import CmuxTerminalSizing
 import SwiftUI
+import ShellXIcons
 
 /// One participant row of the size panel: a neutral avatar
 /// (``TerminalSizingChromeColor/panelColor(_:)``), name, `sets size`
@@ -23,7 +24,7 @@ struct TerminalSizeParticipantRow: View {
     var body: some View {
         HStack(spacing: 8) {
             if showsDragHandle {
-                Image(systemName: "line.3.horizontal")
+                ShellXIcon.image("line.3.horizontal")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
@@ -83,7 +84,7 @@ struct TerminalSizeParticipantRow: View {
                 }
             }
         } label: {
-            Image(systemName: "ellipsis")
+            ShellXIcon.image("ellipsis")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 18, height: 18)

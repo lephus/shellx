@@ -19,7 +19,7 @@ protocol SudoBundledHelperResolving: Sendable {
 
 /// Resolves bundled helpers only after the enclosing app bundle passes signature validation.
 struct SudoBundledHelperResolver: SudoBundledHelperResolving {
-    static let executorResourcePath = "Resources/bin/cmux"
+    static let executorResourcePath = "Resources/bin/shellx"
     static let touchIDSetupResourcePath = "Resources/bin/setup-pam-tid.sh"
     static let touchIDSetupInterpreter = "/bin/bash"
 

@@ -2,7 +2,7 @@ internal import CmuxFoundation
 internal import Foundation
 
 // Best-effort cleanup of orphaned `ssh` transports (reverse relays and
-// cmuxd-remote serve-stdio children reparented to launchd after a crash or
+// shellx-remote serve-stdio children reparented to launchd after a crash or
 // force-quit) before each connection attempt. Faithful lift; the `ps` parse
 // and command classification are pinned by tests.
 extension RemoteSessionCoordinator {
@@ -152,7 +152,7 @@ extension RemoteSessionCoordinator {
     }
 
     private static func isCMUXRemoteDaemonServeStdioCommand(_ command: String) -> Bool {
-        guard command.contains("cmuxd-remote") else { return false }
+        guard command.contains("shellx-remote") else { return false }
         let normalized = command
             .replacingOccurrences(of: "'", with: " ")
             .replacingOccurrences(of: "\"", with: " ")

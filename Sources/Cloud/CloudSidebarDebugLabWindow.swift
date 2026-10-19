@@ -1,3 +1,4 @@
+import ShellXIcons
 #if DEBUG
 import CmuxCloud
 import AppKit
@@ -221,7 +222,7 @@ private struct CloudSidebarDebugPreview: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Image(systemName: "cloud.fill")
+                ShellXIcon.image("cloud.fill")
                     .foregroundStyle(.tint)
                 Text(String(localized: "debug.cloudSidebarSpacing.previewTitle", defaultValue: "Production outline preview"))
                     .font(.system(size: 12, weight: .semibold))
@@ -262,10 +263,10 @@ private struct CloudSidebarDebugPreviewNotes: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(String(localized: "debug.cloudSidebarSpacing.stressCases", defaultValue: "Stress cases"))
                 .font(.system(size: 12, weight: .semibold))
-            Label(String(localized: "debug.cloudSidebarSpacing.longNames", defaultValue: "Long machine and workspace names"), systemImage: "text.alignleft")
-            Label(String(localized: "debug.cloudSidebarSpacing.longTerminals", defaultValue: "Long terminal titles"), systemImage: "terminal")
-            Label(String(localized: "debug.cloudSidebarSpacing.browserPorts", defaultValue: "Browser URL and forwarded port rows"), systemImage: "globe")
-            Label(String(localized: "debug.cloudSidebarSpacing.displaysResources", defaultValue: "Displays and resource metrics"), systemImage: "rectangle.on.rectangle")
+            ShellXLabel(String(localized: "debug.cloudSidebarSpacing.longNames", defaultValue: "Long machine and workspace names"), icon: "text.alignleft")
+            ShellXLabel(String(localized: "debug.cloudSidebarSpacing.longTerminals", defaultValue: "Long terminal titles"), icon: "terminal")
+            ShellXLabel(String(localized: "debug.cloudSidebarSpacing.browserPorts", defaultValue: "Browser URL and forwarded port rows"), icon: "globe")
+            ShellXLabel(String(localized: "debug.cloudSidebarSpacing.displaysResources", defaultValue: "Displays and resource metrics"), icon: "rectangle.on.rectangle")
             Text(String(localized: "debug.cloudSidebarSpacing.resizeNotes", defaultValue: "Resize the preview width to find the first awkward breakpoint. Keep the row readable before making the sidebar wider."))
                 .cmuxFont(.caption)
                 .foregroundStyle(.secondary)

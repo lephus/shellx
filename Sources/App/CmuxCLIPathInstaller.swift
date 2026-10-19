@@ -1,5 +1,6 @@
 import CmuxFoundation
 import Foundation
+import ShellXBrand
 
 struct CmuxCLIPathInstaller {
     struct InstallOutcome {
@@ -52,7 +53,7 @@ struct CmuxCLIPathInstaller {
 
     init(
         fileManager: FileManager = .default,
-        destinationURL: URL = URL(fileURLWithPath: "/usr/local/bin/cmux"),
+        destinationURL: URL = URL(fileURLWithPath: "/usr/local/bin/\(ShellXBrand.cliName)"),
         bundledCLIURLProvider: @escaping () -> URL? = {
             CmuxCLIPathInstaller.defaultBundledCLIURL()
         },
@@ -228,12 +229,12 @@ struct CmuxCLIPathInstaller {
     }
 
     private static func defaultBundledCLIURL(bundle: Bundle = .main) -> URL? {
-        bundle.resourceURL?.appendingPathComponent("bin/cmux", isDirectory: false)
+        bundle.resourceURL?.appendingPathComponent("bin/shellx", isDirectory: false)
     }
 
     private static func defaultBundledCLIExpectedPath(bundle: Bundle = .main) -> String {
         bundle.bundleURL
-            .appendingPathComponent("Contents/Resources/bin/cmux", isDirectory: false)
+            .appendingPathComponent("Contents/Resources/bin/shellx", isDirectory: false)
             .path
     }
 

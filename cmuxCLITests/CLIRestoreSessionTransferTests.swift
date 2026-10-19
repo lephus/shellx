@@ -35,11 +35,11 @@ final class CLIRestoreSessionTransferTests {
         let (result, payloads) = try runAgainstMockServer(
             label: "from-ch",
             arguments: ["restore-session", "--from", "nightly"],
-            reply: ["restored": true, "source_path": "/support/session-com.cmuxterm.app.nightly.json", "window_count": 2]
+            reply: ["restored": true, "source_path": "/support/session-pro.shellx.desktop.nightly.json", "window_count": 2]
         )
 
         #expect(result.status == 0, Comment(rawValue: result.stderr))
-        #expect(result.stdout == "OK /support/session-com.cmuxterm.app.nightly.json\n")
+        #expect(result.stdout == "OK /support/session-pro.shellx.desktop.nightly.json\n")
         #expect(payloads.map { $0["method"] as? String } == ["session.import"])
         let params = payloads.first?["params"] as? [String: Any]
         #expect(params?["source"] as? String == "nightly")
@@ -98,7 +98,7 @@ final class CLIRestoreSessionTransferTests {
         let (result, payloads) = try runAgainstMockServer(
             label: "from-collide",
             arguments: ["restore-session", "--from", "nightly"],
-            reply: ["restored": true, "source_path": "/support/session-com.cmuxterm.app.nightly.json", "window_count": 1],
+            reply: ["restored": true, "source_path": "/support/session-pro.shellx.desktop.nightly.json", "window_count": 1],
             prepareWorkDirectory: { directory in
                 try Data("{}".utf8).write(to: directory.appendingPathComponent("nightly"))
             }
@@ -133,7 +133,7 @@ final class CLIRestoreSessionTransferTests {
         )
 
         #expect(result.status != 0)
-        #expect(result.stderr.contains("was saved by a newer cmux"), Comment(rawValue: result.stderr))
+        #expect(result.stderr.contains("was saved by a newer ShellX"), Comment(rawValue: result.stderr))
     }
 
     @Test(arguments: [

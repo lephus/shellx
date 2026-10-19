@@ -18,14 +18,14 @@ enum SSHControlSocketDirectory {
     /// that socket into place, so the bound path is 17 bytes longer.
     private static let opensshTransientSuffixLength = 17
 
-    /// Creates `<home>/.cmux/ssh` when missing and returns its resolved path
+    /// Creates `<home>/.shellx/ssh` when missing and returns its resolved path
     /// if only `userID` can add, rename or remove entries in it.
     ///
     /// - Returns: The directory, or `nil` when it is shared, can't be created,
     ///   or can't go into a `ControlPath` verbatim.
     static func prepare(home: String, userID: Int) -> String? {
         guard home.hasPrefix("/") else { return nil }
-        let cmuxDirectory = (home as NSString).appendingPathComponent(".cmux")
+        let cmuxDirectory = (home as NSString).appendingPathComponent(".shellx")
         let socketDirectory = (cmuxDirectory as NSString).appendingPathComponent("ssh")
         for directory in [cmuxDirectory, socketDirectory] {
             if mkdir(directory, 0o700) != 0, errno != EEXIST { return nil }

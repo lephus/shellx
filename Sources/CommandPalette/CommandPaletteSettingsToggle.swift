@@ -249,7 +249,7 @@ enum CommandPaletteSettingsToggleCommands {
                 title: {
                     String(
                         localized: "settings.app.openSupportedFilesInCmux",
-                        defaultValue: "Open Supported Files in cmux"
+                        defaultValue: "Open Supported Files in ShellX"
                     )
                 },
                 sectionTitle: app,
@@ -284,7 +284,7 @@ enum CommandPaletteSettingsToggleCommands {
                 title: {
                     String(
                         localized: "settings.app.openMarkdownInCmuxViewer",
-                        defaultValue: "Open Markdown in cmux Viewer"
+                        defaultValue: "Open Markdown in ShellX Viewer"
                     )
                 },
                 sectionTitle: app,
@@ -451,17 +451,7 @@ enum CommandPaletteSettingsToggleCommands {
                 defaultValue: NotificationPaneFlashSettings.defaultOnTyping,
                 defaultsKey: NotificationPaneFlashSettings.onTypingKey
             ),
-            CommandPaletteSettingToggleDescriptor(
-                commandId: commandIdPrefix + "sendAnonymousTelemetry",
-                settingsKey: "app.sendAnonymousTelemetry",
-                title: {
-                    String(localized: "settings.app.telemetry", defaultValue: "Send anonymous telemetry")
-                },
-                sectionTitle: app,
-                keywords: ["app.sendAnonymousTelemetry", "telemetry", "analytics", "crash", "reports", "privacy"],
-                defaultValue: AppCatalogSection().sendAnonymousTelemetry.defaultValue,
-                defaultsKey: AppCatalogSection().sendAnonymousTelemetry.userDefaultsKey
-            ),
+            // ShellX sends no telemetry: no "Send anonymous telemetry" toggle.
             CommandPaletteSettingToggleDescriptor(
                 commandId: commandIdPrefix + "warnBeforeQuit",
                 settingsKey: "app.confirmQuit",
@@ -760,7 +750,7 @@ enum CommandPaletteSettingsToggleCommands {
                 title: {
                     String(
                         localized: "settings.app.openSidebarPRLinks",
-                        defaultValue: "Open Sidebar PR Links in cmux Browser"
+                        defaultValue: "Open Sidebar PR Links in ShellX Browser"
                     )
                 },
                 sectionTitle: sidebar,
@@ -775,7 +765,7 @@ enum CommandPaletteSettingsToggleCommands {
                 title: {
                     String(
                         localized: "settings.app.openSidebarPortLinks",
-                        defaultValue: "Open Sidebar Port Links in cmux Browser"
+                        defaultValue: "Open Sidebar Port Links in ShellX Browser"
                     )
                 },
                 sectionTitle: sidebar,
@@ -978,7 +968,7 @@ enum CommandPaletteSettingsToggleCommands {
                 title: {
                     String(
                         localized: "settings.browser.openTerminalLinks",
-                        defaultValue: "Open Terminal Links in cmux Browser"
+                        defaultValue: "Open Terminal Links in ShellX Browser"
                     )
                 },
                 sectionTitle: browser,

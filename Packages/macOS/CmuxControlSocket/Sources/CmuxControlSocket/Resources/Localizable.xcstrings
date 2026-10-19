@@ -57,6 +57,12 @@
             "state": "translated",
             "value": "%@ は絶対パスである必要があります。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ phải là đường dẫn tuyệt đối."
+          }
         }
       }
     },
@@ -115,6 +121,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "session.import には params.source または params.path のいずれか一方だけが必要です。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "session.import yêu cầu đúng một trong params.source hoặc params.path."
           }
         }
       }
@@ -175,6 +187,12 @@
             "state": "translated",
             "value": "セッションコンテキストを利用できません。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không có ngữ cảnh phiên."
+          }
         }
       }
     },
@@ -233,6 +251,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "session.export には params.path が必要です。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "session.export yêu cầu params.path."
           }
         }
       }

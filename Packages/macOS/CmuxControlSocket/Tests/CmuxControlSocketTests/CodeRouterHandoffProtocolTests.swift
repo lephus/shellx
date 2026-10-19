@@ -244,10 +244,10 @@ struct CodeRouterHandoffProtocolTests {
 
     @Test("allows only the matching company-signed tagged Debug server")
     func debugServerIdentity() {
-        let identifier = "com.cmuxterm.app.debug.coderouter-dogfood"
+        let identifier = "pro.shellx.desktop.debug.coderouter-dogfood"
         #expect(debugIdentityPolicy.isAllowed(
             identifier: identifier,
-            teamIdentifier: "7WLXT3NR37",
+            teamIdentifier: "W4RF3W4VTZ",
             expectedBundleIdentifier: identifier
         ))
         #expect(!debugIdentityPolicy.isAllowed(
@@ -256,14 +256,14 @@ struct CodeRouterHandoffProtocolTests {
             expectedBundleIdentifier: identifier
         ))
         #expect(!debugIdentityPolicy.isAllowed(
-            identifier: "com.cmuxterm.app.debug.other",
-            teamIdentifier: "7WLXT3NR37",
+            identifier: "pro.shellx.desktop.debug.other",
+            teamIdentifier: "W4RF3W4VTZ",
             expectedBundleIdentifier: identifier
         ))
         #expect(!debugIdentityPolicy.isAllowed(
-            identifier: "com.cmuxterm.app",
-            teamIdentifier: "7WLXT3NR37",
-            expectedBundleIdentifier: "com.cmuxterm.app"
+            identifier: "pro.shellx.desktop",
+            teamIdentifier: "W4RF3W4VTZ",
+            expectedBundleIdentifier: "pro.shellx.desktop"
         ))
     }
 

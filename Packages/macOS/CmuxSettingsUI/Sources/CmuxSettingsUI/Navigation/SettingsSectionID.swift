@@ -75,13 +75,13 @@ public enum SettingsSectionID: String, CaseIterable, Identifiable, Sendable, Has
         case .customSidebars: return String(localized: "settings.section.customSidebars", defaultValue: "Custom Sidebars")
         case .betaFeatures: return String(localized: "settings.section.betaFeatures", defaultValue: "Beta Features")
         case .automation: return String(localized: "settings.section.automation", defaultValue: "Automation")
-        case .computerUse: return String(localized: "settings.section.computerUse", defaultValue: "cmux Computer Use")
+        case .computerUse: return String(localized: "settings.section.computerUse", defaultValue: "ShellX Computer Use")
         case .browser: return String(localized: "settings.section.browser", defaultValue: "Browser")
         case .browserImport: return String(localized: "settings.browser.import", defaultValue: "Import Browser Data")
         case .globalHotkey: return String(localized: "settings.section.globalHotkey", defaultValue: "Global Hotkey")
         case .keyboardShortcuts: return String(localized: "settings.section.keyboardShortcuts", defaultValue: "Keyboard Shortcuts")
         case .workspaceColors: return String(localized: "settings.section.workspaceColors", defaultValue: "Workspace Colors")
-        case .settingsJSON: return "cmux.json"
+        case .settingsJSON: return "shellx.json"
         case .reset: return String(localized: "settings.section.reset", defaultValue: "Reset")
         }
     }

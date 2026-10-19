@@ -1,0 +1,1951 @@
+# Review package: d960525974..HEAD
+
+## Commits
+709f470ef4 test(shellx): upstream tests assert ShellX behavior (no control-plane request, feedback mail draft, no telemetry row)
+1a2090818d fix(shellx): hide the Chord docs and custom-commands Open Docs links (no ShellX page)
+479fdd3a53 test(shellx): ShellXNoPhoneHomeTests drive the real capture and flag paths with private defaults
+ae6efa6286 fix(shellx): CodeRouter is hard-off on its own switch; guard allowlist reasons are precise
+
+## Files changed
+ CLI/CMUXCLI+CoderouterPassthrough.swift            | 223 ++-------------------
+ CLI/cmux.swift                                     |  10 +-
+ .../Sources/ShellXBrand/ShellXFeatures.swift       |   6 +
+ .../ShellXNetworkPolicyTests.swift                 |   7 +
+ .../Sections/KeyboardShortcutsSection.swift        |   9 +-
+ Resources/Localizable.xcstrings                    |  59 ++++++
+ Sources/AppDelegate+WorkspaceActionSave.swift      |  10 +-
+ Sources/ContentView.swift                          |  10 +
+ Sources/FeatureFlags.swift                         |   4 +-
+ Sources/PostHogAnalytics.swift                     |  19 +-
+ cmuxCLITests/CLICoderouterBootstrapTests.swift     | 189 ++++++-----------
+ cmuxTests/PostHogAnalyticsPropertiesTests.swift    |  49 +----
+ cmuxTests/ShellXNoPhoneHomeTests.swift             |  92 ++++++++-
+ cmuxUITests/SettingsAppBehaviorUITests.swift       |  11 +-
+ cmuxUITests/SettingsShortcutsBehaviorUITests.swift |  10 +-
+ cmuxUITests/SidebarHelpMenuUITests.swift           | 133 ++++++------
+ scripts/reload.sh                                  |   4 +-
+ tests/test_shellx_no_phone_home.py                 | 202 +++++++++++++++----
+ 18 files changed, 531 insertions(+), 516 deletions(-)
+
+## Diff
+diff --git a/CLI/CMUXCLI+CoderouterPassthrough.swift b/CLI/CMUXCLI+CoderouterPassthrough.swift
+index 7da8e77e14..d1500a63ce 100644
+--- a/CLI/CMUXCLI+CoderouterPassthrough.swift
++++ b/CLI/CMUXCLI+CoderouterPassthrough.swift
+@@ -1,266 +1,85 @@
+-import Darwin
+ import Foundation
+ import ShellXBrand
+ 
+ // `cmux cr ...`, and every `cmux coderouter ...` verb cmux does not own
+-// (CMUXCLI+Coderouter.swift), run the separately distributed CodeRouter CLI.
+-// This file owns that passthrough end to end: locating the executable,
+-// bootstrapping it on a machine that has none, and replacing this process
+-// with it. Routed agent commands use the signed native handoff in cmux.swift.
++// (CMUXCLI+Coderouter.swift), would run the separately distributed CodeRouter
++// CLI. CodeRouter is a Manaflow service that no ShellX wave replaces, so ShellX
++// never downloads, installs or runs it: `runCoderouterAlias` (cmux.swift)
++// stops at `ShellXFeatures.codeRouter`, which is always false and does not
++// depend on `ShellXFeatures.remoteMachines`, and exits 127 with
++// ``coderouterNotAvailable()`` before it looks for an executable. The locator
++// below is kept for that upstream exec path and is never reached.
+ extension CMUXCLI {
+-    /// The installer documented at https://cmux.com/coderouter. Every message
+-    /// quotes this exact command, and the interactive bootstrap runs it: cmux
+-    /// fetches the script and hands it to `sh` as two separate steps, so a
+-    /// failed or truncated download never reaches the shell. The script itself
+-    /// verifies the binary's checksum against the release manifest.
+-    static let coderouterInstallerURL = "https://cmux.com/coderouter/install.sh"
+-    static let coderouterInstallCommand = "curl -fsSL \(coderouterInstallerURL) | sh"
+-
+     private static let coderouterExecutableNames = ["coderouter", "cr"]
+ 
+-    /// Where install.sh puts the binary: `$CODEROUTER_INSTALL/bin`, default
+-    /// `$HOME/.coderouter/bin`, computed exactly as the script does.
++    /// Where CodeRouter's installer puts the binary: `$CODEROUTER_INSTALL/bin`,
++    /// default `$HOME/.coderouter/bin`.
+     static func coderouterInstallBinDirectory(environment: [String: String]) -> URL {
+         let explicitRoot = environment["CODEROUTER_INSTALL"]?
+             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+         let root: URL
+         if !explicitRoot.isEmpty {
+             root = URL(fileURLWithPath: explicitRoot, isDirectory: true)
+         } else {
+             let home = environment["HOME"].flatMap { $0.isEmpty ? nil : $0 } ?? NSHomeDirectory()
+             root = URL(fileURLWithPath: home, isDirectory: true)
+                 .appendingPathComponent(".coderouter", isDirectory: true)
+         }
+         return root.appendingPathComponent("bin", isDirectory: true)
+     }
+ 
+-    /// CodeRouter and its installer are independent executables. They never
+-    /// receive cmux's ambient terminal or control-plane context: CMUX_* and
+-    /// CMUXD_* may carry socket paths, capabilities, passwords, auth state, or
+-    /// internal paths. This environment is used for installation; the native
+-    /// handoff applies its own narrower execution policy.
+-    static func coderouterChildEnvironment(from environment: [String: String]) -> [String: String] {
+-        environment.filter { key, _ in
+-            !key.hasPrefix("CMUX_") && !key.hasPrefix("CMUXD_")
+-        }
+-    }
+-
+     func runCoderouterAlias(commandArgs: [String]) throws {
+         try runCoderouterAlias(
+             commandArgs: commandArgs,
+             explicitSocketPath: nil,
+             explicitPassword: nil,
+             environment: ProcessInfo.processInfo.environment,
+             bundleIdentifier: CLISocketPathResolver.currentAppBundleIdentifier() ?? ShellXBrand.bundleID
+         )
+     }
+ 
+     /// The app-bundled core first, then PATH (`coderouter`, then `cr`), then the
+-    /// installer's bin directory, so an install whose shell-profile line has
+-    /// not reached this process still runs. No hit involves the network.
++    /// installer's bin directory. No hit involves the network. ShellX never
++    /// calls this: `runCoderouterAlias` refuses first (`ShellXFeatures.codeRouter`).
+     func resolveCoderouterExecutable(environment: [String: String]) -> String? {
+-        // Tagged builds carry their tested core. All CodeRouter command names
+-        // then use the same version, including interactive provider setup.
+         if let bundle = CLIExecutableLocator.enclosingAppBundle() {
+             let binary = bundle.bundleURL.appendingPathComponent("Contents/Resources/bin/coderouter")
+             if FileManager.default.isExecutableFile(atPath: binary.path) {
+                 return binary.path
+             }
+         }
+         for name in Self.coderouterExecutableNames {
+             if let path = resolveExecutableInPath(name, searchPath: environment["PATH"]) {
+                 return path
+             }
+         }
+         return resolveExecutableInPath(
+             "coderouter",
+             searchPath: Self.coderouterInstallBinDirectory(environment: environment).path
+         )
+     }
+ 
+-    // MARK: - Bootstrap
+-
+-    /// Returns the path of a freshly installed CodeRouter CLI, or throws exit
+-    /// 127 carrying the exact install command whenever this process cannot or
+-    /// may not install: no terminal to ask on, a declined offer, a failed
+-    /// download, or a failed installer. The offer and the question go to
+-    /// stderr so stdout stays CodeRouter's; the answer comes from stdin, so
+-    /// both must be terminals.
+-    func bootstrapCoderouter(environment: [String: String]) throws -> String {
+-        let installCommand = Self.coderouterInstallCommand
+-        // ShellX never downloads CodeRouter (a Manaflow service) on its own;
+-        // with remote machines off it only reports that it is not installed.
+-        guard ShellXFeatures.remoteMachines, isatty(STDIN_FILENO) == 1, isatty(STDERR_FILENO) == 1 else {
+-            throw Self.coderouterUnavailable(String(
+-                format: Self.localizedPassthroughString(
+-                    "cli.coderouter.bootstrap.notInstalled",
+-                    defaultValue: "CodeRouter CLI is not installed. Install it, then retry:\n  %@"
+-                ),
+-                installCommand
+-            ))
+-        }
++    // MARK: - Presentation
+ 
+-        let binDirectory = Self.coderouterInstallBinDirectory(environment: environment)
+-        cliWriteStderr(String(
+-            format: Self.localizedPassthroughString(
+-                "cli.coderouter.bootstrap.offer",
+-                defaultValue: "CodeRouter CLI is not installed. cmux can install it now by running the official installer:\n  %1$@\nThis downloads the checksum-verified CodeRouter binary into %2$@ and adds that directory to your shell PATH."
+-            ),
+-            installCommand,
+-            binDirectory.path
+-        ) + "\n")
+-        cliWriteStderr(Self.localizedPassthroughString(
+-            "cli.coderouter.bootstrap.confirm",
+-            defaultValue: "Install CodeRouter now? [y/N] "
++    /// What every `cmux cr` and passthrough `cmux coderouter` invocation ends
++    /// with in ShellX: a neutral message on stderr and exit 127, the "command
++    /// not found" status scripts already handle. Nothing is downloaded,
++    /// installed or run, and no install command is suggested.
++    static func coderouterNotAvailable() -> CLIError {
++        coderouterUnavailable(localizedPassthroughString(
++            "cli.coderouter.unavailable",
++            defaultValue: "CodeRouter is not available in ShellX."
+         ))
+-        let answer = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+-        guard answer.hasPrefix("y") else {
+-            throw Self.coderouterUnavailable(String(
+-                format: Self.localizedPassthroughString(
+-                    "cli.coderouter.bootstrap.declined",
+-                    defaultValue: "CodeRouter was not installed. Install it later with:\n  %@"
+-                ),
+-                installCommand
+-            ))
+-        }
+-
+-        cliWriteStderr(Self.localizedPassthroughString(
+-            "cli.coderouter.bootstrap.installing",
+-            defaultValue: "Installing CodeRouter..."
+-        ) + "\n")
+-        let childEnvironment = Self.coderouterChildEnvironment(from: environment)
+-        let installer = try fetchCoderouterInstaller(environment: environment, childEnvironment: childEnvironment)
+-        defer { installer.cleanUp() }
+-        let status = try Self.runCoderouterChild(
+-            executable: "/bin/sh",
+-            arguments: [installer.scriptURL.path],
+-            environment: childEnvironment
+-        )
+-        guard status == 0 else {
+-            throw Self.coderouterUnavailable(String(
+-                format: Self.localizedPassthroughString(
+-                    "cli.coderouter.bootstrap.installerFailed",
+-                    defaultValue: "The CodeRouter installer exited with status %1$d. Retry, or install it with:\n  %2$@"
+-                ),
+-                status,
+-                installCommand
+-            ))
+-        }
+-        guard let installed = resolveCoderouterExecutable(environment: environment) else {
+-            throw Self.coderouterUnavailable(String(
+-                format: Self.localizedPassthroughString(
+-                    "cli.coderouter.bootstrap.installedNotFound",
+-                    defaultValue: "The CodeRouter installer finished, but its command could not be found in %@. Check the installation and try again."
+-                ),
+-                binDirectory.path
+-            ))
+-        }
+-        return installed
+-    }
+-
+-    private struct CoderouterInstallerScript {
+-        let scriptURL: URL
+-        /// Owned by cmux only when the script was downloaded here.
+-        let temporaryDirectory: URL?
+-
+-        func cleanUp() {
+-            guard let temporaryDirectory else { return }
+-            try? FileManager.default.removeItem(at: temporaryDirectory)
+-        }
+-    }
+-
+-    /// Downloads install.sh into a private temporary directory with the same
+-    /// transport rules the script applies to its own downloads (HTTPS only,
+-    /// TLS 1.2+). curl's stderr is inherited, so a network failure shows its
+-    /// own diagnosis before cmux's summary line.
+-    private func fetchCoderouterInstaller(
+-        environment: [String: String],
+-        childEnvironment: [String: String]
+-    ) throws -> CoderouterInstallerScript {
+-#if DEBUG
+-        // Tests run the bootstrap against a local stand-in for install.sh so
+-        // the offer, the install, the re-resolve, and the exec are exercised
+-        // without the network. Not compiled into release builds.
+-        if let override = environment["CMUX_CODEROUTER_INSTALLER_SCRIPT"]?
+-            .trimmingCharacters(in: .whitespacesAndNewlines),
+-           !override.isEmpty {
+-            return CoderouterInstallerScript(
+-                scriptURL: URL(fileURLWithPath: override, isDirectory: false),
+-                temporaryDirectory: nil
+-            )
+-        }
+-#endif
+-        let fileManager = FileManager.default
+-        let directory = fileManager.temporaryDirectory
+-            .appendingPathComponent("cmux-coderouter-install-\(UUID().uuidString)", isDirectory: true)
+-        try fileManager.createDirectory(
+-            at: directory,
+-            withIntermediateDirectories: true,
+-            attributes: [.posixPermissions: 0o700]
+-        )
+-        let scriptURL = directory.appendingPathComponent("install.sh", isDirectory: false)
+-        let status = try Self.runCoderouterChild(
+-            executable: "/usr/bin/curl",
+-            arguments: [
+-                "--proto", "=https",
+-                "--tlsv1.2",
+-                "-fsSL",
+-                "--max-time", "60",
+-                Self.coderouterInstallerURL,
+-                "-o", scriptURL.path,
+-            ],
+-            environment: childEnvironment,
+-            standardInput: FileHandle.nullDevice
+-        )
+-        guard status == 0 else {
+-            try? fileManager.removeItem(at: directory)
+-            throw Self.coderouterUnavailable(String(
+-                format: Self.localizedPassthroughString(
+-                    "cli.coderouter.bootstrap.downloadFailed",
+-                    defaultValue: "Could not download the CodeRouter installer (curl exited with status %1$d). Retry, or install it with:\n  %2$@"
+-                ),
+-                status,
+-                Self.coderouterInstallCommand
+-            ))
+-        }
+-        return CoderouterInstallerScript(scriptURL: scriptURL, temporaryDirectory: directory)
+     }
+ 
+-    /// Runs a bootstrap child on this terminal and waits for it. Returns its
+-    /// exit status, or 128 plus the signal number when a signal ended it, the
+-    /// shell convention the user already knows.
+-    private static func runCoderouterChild(
+-        executable: String,
+-        arguments: [String],
+-        environment: [String: String],
+-        standardInput: FileHandle? = nil
+-    ) throws -> Int32 {
+-        let process = Process()
+-        process.executableURL = URL(fileURLWithPath: executable, isDirectory: false)
+-        process.arguments = arguments
+-        process.environment = environment
+-        if let standardInput {
+-            process.standardInput = standardInput
+-        }
+-        try cliRunProcess(process)
+-        process.waitUntilExit()
+-        if process.terminationReason == .uncaughtSignal {
+-            return 128 + process.terminationStatus
+-        }
+-        return process.terminationStatus
+-    }
+-
+-    // MARK: - Presentation
+-
+-    /// Every way of not running CodeRouter exits 127, the "command not found"
+-    /// status scripts already handle; the reason is on stderr.
++    /// Every way of not running CodeRouter exits 127; the reason is on stderr.
+     private static func coderouterUnavailable(_ message: String) -> CLIError {
+         CLIError(message: message, exitCode: 127)
+     }
+ 
+     /// An explicit `AppleLanguages` override wins, then the app bundle's
+     /// catalog in the user's language, then the English default.
+     private static func localizedPassthroughString(_ key: String, defaultValue: String) -> String {
+         CMUXDiffViewerLocalization.string(key, defaultValue: defaultValue)
+     }
+ }
+diff --git a/CLI/cmux.swift b/CLI/cmux.swift
+index ec21059896..31e066688b 100644
+--- a/CLI/cmux.swift
++++ b/CLI/cmux.swift
+@@ -6277,22 +6277,28 @@ struct CMUXCLI {
+     /// use a hidden protocol-2 argv mode after cmux arms the current PID. The
+     /// socket path is not a credential. No lease, socket password, or descriptor
+     /// crosses exec. Arguments are built directly and are never parsed by a shell.
+     func runCoderouterAlias(
+         commandArgs: [String],
+         explicitSocketPath: String?,
+         explicitPassword: String?,
+         environment: [String: String],
+         bundleIdentifier: String
+     ) throws {
+-        let resolvedPath = try resolveCoderouterExecutable(environment: environment)
+-            ?? bootstrapCoderouter(environment: environment)
++        // ShellX never runs CodeRouter (a Manaflow service): not the
++        // app-bundled core, not one on PATH or in ~/.coderouter, and it never
++        // downloads one. `ShellXFeatures.codeRouter` is always false and does
++        // not follow `ShellXFeatures.remoteMachines`.
++        guard ShellXFeatures.codeRouter,
++              let resolvedPath = resolveCoderouterExecutable(environment: environment) else {
++            throw Self.coderouterNotAvailable()
++        }
+         guard let executablePath = Self.coderouterNativeExecutablePath(for: resolvedPath) else {
+             throw CLIError(message: localizedCoderouterHandoffUnsupported())
+         }
+ 
+         // Only routed agent commands consume a handoff. Management, help,
+         // version, and capability commands keep the normal standalone CLI
+         // contract and never contact the cmux socket.
+         let isRoutedAgentCommand = Self.coderouterCommandRequiresHandoff(commandArgs)
+         if !isRoutedAgentCommand {
+             let preserveProviderCredentials = commandArgs.first.map {
+diff --git a/Packages/Shared/ShellXBrand/Sources/ShellXBrand/ShellXFeatures.swift b/Packages/Shared/ShellXBrand/Sources/ShellXBrand/ShellXFeatures.swift
+index 6c5cb05a52..fbe8bcf61a 100644
+--- a/Packages/Shared/ShellXBrand/Sources/ShellXBrand/ShellXFeatures.swift
++++ b/Packages/Shared/ShellXBrand/Sources/ShellXBrand/ShellXFeatures.swift
+@@ -1,4 +1,10 @@
+ /// Compile-time feature switches. Wave 2 flips `remoteMachines`.
+ public enum ShellXFeatures {
+     public static let remoteMachines = false
++
++    /// CodeRouter is a Manaflow service that no ShellX wave replaces, so it
++    /// stays off for good and does not follow `remoteMachines`: `cmux cr` and
++    /// the CodeRouter passthrough never download, install or run a CodeRouter
++    /// CLI (bundled, on PATH or in `~/.coderouter`).
++    public static let codeRouter = false
+ }
+diff --git a/Packages/Shared/ShellXBrand/Tests/ShellXBrandTests/ShellXNetworkPolicyTests.swift b/Packages/Shared/ShellXBrand/Tests/ShellXBrandTests/ShellXNetworkPolicyTests.swift
+index 4c965c3c1d..095c3a5cf1 100644
+--- a/Packages/Shared/ShellXBrand/Tests/ShellXBrandTests/ShellXNetworkPolicyTests.swift
++++ b/Packages/Shared/ShellXBrand/Tests/ShellXBrandTests/ShellXNetworkPolicyTests.swift
+@@ -35,11 +35,18 @@ import Foundation
+         #expect(ShellXNetworkPolicy.isForbidden(host: "API.Stack-Auth.com"))
+         #expect(ShellXNetworkPolicy.isForbidden(host: "manaflow.ai"))
+         #expect(ShellXNetworkPolicy.isForbidden(url: URL(string: "https://github.com/manaflow-ai/cmux")!))
+         #expect(!ShellXNetworkPolicy.isForbidden(url: ShellXBrand.sourceCodeURL))
+     }
+ 
+     @Test func lookalikeHostsAreNotForbidden() {
+         #expect(!ShellXNetworkPolicy.isForbidden(host: "notcmux.com"))
+         #expect(!ShellXNetworkPolicy.isForbidden(host: "cmux.community"))
+     }
++
++    /// CodeRouter (a Manaflow service) stays off even after Wave 2 turns
++    /// remote machines on, so the CLI gate must not ride on `remoteMachines`.
++    @Test func codeRouterIsHardOff() {
++        #expect(ShellXFeatures.codeRouter == false)
++        #expect(ShellXNetworkPolicy.isForbidden(host: "coderouter.dev"))
++    }
+ }
+diff --git a/Packages/macOS/CmuxSettingsUI/Sources/CmuxSettingsUI/Sections/KeyboardShortcutsSection.swift b/Packages/macOS/CmuxSettingsUI/Sources/CmuxSettingsUI/Sections/KeyboardShortcutsSection.swift
+index 5a5ad66474..be66e4992e 100644
+--- a/Packages/macOS/CmuxSettingsUI/Sources/CmuxSettingsUI/Sections/KeyboardShortcutsSection.swift
++++ b/Packages/macOS/CmuxSettingsUI/Sources/CmuxSettingsUI/Sections/KeyboardShortcutsSection.swift
+@@ -129,28 +129,23 @@ public struct KeyboardShortcutsSection: View {
+     }
+ 
+     @ViewBuilder
+     private var chordsRow: some View {
+         SettingsCardRow(
+             configurationReview: .action,
+             searchAnchorID: "setting:keyboardShortcuts:shortcut-chords",
+             String(localized: "settings.shortcuts.chords", defaultValue: "Shortcut Chords"),
+             subtitle: String(localized: "settings.shortcuts.chords.subtitle", defaultValue: "Add tmux-style multi-step shortcuts in cmux.json, for example [\"ctrl+b\", \"c\"].")
+         ) {
++            // ShellX has no chord docs page (cmux's is on cmux.com and nothing
++            // under docs/ covers chords), so the "Chord docs" link is hidden.
+             HStack(spacing: 8) {
+-                Link(
+-                    String(localized: "settings.shortcuts.chords.docsButton", defaultValue: "Chord docs"),
+-                    destination: URL(string: "https://shellx.pro")!
+-                )
+-                .cmuxFont(.caption)
+-                .accessibilityIdentifier("SettingsKeyboardShortcutsChordDocsLink")
+-
+                 Button(String(localized: "settings.app.settingsFile.openButton", defaultValue: "Open cmux.json")) {
+                     hostActions.openConfigInExternalEditor()
+                 }
+                 .buttonStyle(.bordered)
+                 .controlSize(.small)
+                 .accessibilityIdentifier("SettingsKeyboardShortcutsOpenSettingsFileButton")
+             }
+         }
+     }
+ 
+diff --git a/Resources/Localizable.xcstrings b/Resources/Localizable.xcstrings
+index ae9709f74a..094f7272dd 100644
+--- a/Resources/Localizable.xcstrings
++++ b/Resources/Localizable.xcstrings
+@@ -656118,14 +656118,73 @@
+             "value": "현재 컨텍스트에 맞게 cmux Dock 컨트롤을 설정하세요.\n\n먼저, 편집하기 전에 이 기능에 대해 알아보세요:\n1. cmux CLI를 사용할 수 있다면 `cmux docs dock`을 실행하세요. 사용할 수 없다면 https://github.com/lephus/shellx/blob/main/docs/dock.md을 읽어보세요.\n2. 저장소 또는 현재 디렉터리를 탐색하여 프로젝트 유형, 스크립트, 패키지 관리자, 개발 서버, 로그, 태스크 러너, 테스트 명령어 및 기존 TUI 도구 등을 파악하세요.\n3. 어떤 Dock을 구성해야 할지 모호한 경우, 파일을 작성하기 전에 사용자에게 어떤 대상을 모니터링하거나 컨트롤하길 원하는지 물어보세요.\n\nDock은 cmux의 우측 사이드바 터미널 및 브라우저 컨트롤 영역입니다. Dock 설정은 최상위에 `controls` 배열이 있는 JSON 파일입니다. 터미널 컨트롤은 사용자의 로그인 셸을 사용하여 Ghostty 기반의 섹션에서 명령어를 실행하며, 브라우저 컨트롤은 URL을 내장합니다. 컨트롤은 프로젝트 대시보드, git/상태 뷰, 개발 서버 또는 빌드 상태, 테스트 감시 도구, 실시간 로그(log tail), 대기열, 로컬 서비스, 고정된 웹 대시보드 등에 유용합니다.\n\n설정을 작성할 위치를 선택하세요:\n- 팀원들과 공유할 수 있도록 저장소 또는 프로젝트 디렉터리에 `.cmux/dock.json` 파일을 생성하거나 편집하세요.\n- 저장소 외부의 개인용 기본 설정을 원한다면 `~/.config/cmux/dock.json` 파일을 생성하거나 편집하세요.\n- 두 설정이 모두 존재하는 경우, 프로젝트의 `.cmux/dock.json`이 해당 프로젝트에 대해 더 우선 적용됩니다. 중첩된 프로젝트 설정은 해당 디렉터리 트리에 적용되므로, 무관한 컨트롤을 전역으로 작성하는 대신 가장 가까운 관련 프로젝트 설정을 사용하세요.\n- 저장소가 없고 명확한 프로젝트 루트가 없다면, 사용자가 개인용 Dock을 원하는지 확인한 후에만 전역 설정을 사용하세요.\n\n스키마:\n{\n  \"controls\": [\n    {\n      \"id\": \"short-stable-id\",\n      \"title\": \"Human label\",\n      \"command\": \"safe command to run\",\n      \"cwd\": \"optional/path\",\n      \"height\": 220,\n      \"env\": { \"NAME\": \"value\" }\n    },\n    {\n      \"id\": \"dashboard\",\n      \"title\": \"Dashboard\",\n      \"type\": \"browser\",\n      \"url\": \"http://127.0.0.1:3000\",\n      \"chrome\": false\n    }\n  ]\n}\n\n규칙:\n- id는 고유하고 소문자이며 일관되게 유지하세요.\n- `type`은 선택 사항입니다. 기본값은 `terminal`이며, 필요 시 `browser`를 사용하세요.\n- 터미널 컨트롤에는 `command`가 필수이고, 브라우저 컨트롤에는 `url`이 필수입니다.\n- 브라우저 컨트롤은 기본적으로 `chrome: true`로 설정됩니다. 주소창 및 도구 모음을 포함하여 브라우저 크롬을 숨기려면 `chrome: false`로 설정하세요. 이 경우 해당 분할 창에서 '주소창 포커스'는 작동하지 않지만, `cmux browser goto` 및 `cmux browser reload`는 계속 사용할 수 있습니다.\n- 하위 디렉터리에는 `cwd`를 사용하세요. 상대 경로는 설정 파일의 위치를 기준으로 해석됩니다.\n- 컨트롤에 고정된 수직 공간이 필요한 경우에만 `height`를 사용하세요.\n- 단일 컨트롤에 필요한 보안에 무관한 값에만 `env`를 사용하세요.\n- 공유 프로젝트 설정에는 비밀 정보(secrets), 토큰, 기기 전용 비공개 경로 등을 입력하지 마세요.\n- 터미널에서 실행하기에 합당하고 반복적으로 안전하게 실행할 수 있는 명령어를 사용하는 것이 좋습니다.\n- 존재하지 않는 임의의 스크립트를 작성하지 마세요. 먼저 패키지 파일, Makefile, Procfile, README 문서, 설정 파일 및 기존 도구들을 확인하세요.\n- 공유 프로젝트 Dock은 팀원들 간에 이식 가능하게 유지하세요. 개인용 또는 기기 전용 컨트롤은 전역 Dock에 넣으세요.\n\n결과물:\n- 적절한 dock.json을 생성하거나 업데이트하세요.\n- 사용자가 교체를 요청하지 않은 한, 유용한 기존 컨트롤은 유지하세요.\n- JSON 파싱에 오류가 없는지 검증하세요.\n- 각 컨트롤이 수행하는 작업과 사용자가 Dock 설정을 신뢰하기 전에 검토해야 할 명령어를 요약해 알려주세요."
+           }
+         },
+         "ja": {
+           "stringUnit": {
+             "state": "translated",
+             "value": "現在のコンテキストに合わせて cmux Dock コントロールを設定してください。\n\n編集する前に機能を確認してください:\n1. cmux CLI が使える場合は `cmux docs dock` を実行してください。使えない場合は https://github.com/lephus/shellx/blob/main/docs/dock.md を読んでください。\n2. リポジトリまたは現在のディレクトリを調べ、プロジェクト種別、スクリプト、パッケージマネージャー、開発サーバー、ログ、タスクランナー、テストコマンド、既存の TUI ツールを把握してください。\n3. どの Dock を作るべきか曖昧な場合は、ファイルを書く前に何を監視または操作したいかユーザーに確認してください。\n\nDock は cmux の右サイドバーにあるターミナルとブラウザのコントロール領域です。Dock 設定はトップレベルに `controls` 配列を持つ JSON です。ターミナルコントロールはユーザーのログインシェルを使う Ghostty ベースのセクションでコマンドを実行し、ブラウザコントロールは URL を埋め込みます。プロジェクトダッシュボード、git/status、開発サーバーやビルド状態、テストウォッチャー、ログ tail、キュー、ローカルサービス、固定 Web ダッシュボードなどに向いています。\n\n設定を書く場所を選んでください:\n- リポジトリまたはプロジェクトディレクトリでは、チームで共有できるように `.cmux/dock.json` を作成または編集してください。\n- リポジトリ外の個人用デフォルトでは、`~/.config/cmux/dock.json` を作成または編集してください。\n- 両方がある場合、そのプロジェクトでは `.cmux/dock.json` がより具体的です。ネストしたプロジェクト設定はそのディレクトリツリーに適用されます。無関係なコントロールをグローバルに書かず、最も近い適切なプロジェクト設定を使ってください。\n- リポジトリがなく、明確なプロジェクトルートもない場合は、個人用 Dock でよいかユーザーに確認してからグローバル設定を使ってください。\n\nスキーマ:\n{\n  \"controls\": [\n    {\n      \"id\": \"short-stable-id\",\n      \"title\": \"Human label\",\n      \"command\": \"safe command to run\",\n      \"cwd\": \"optional/path\",\n      \"height\": 220,\n      \"env\": { \"NAME\": \"value\" }\n    },\n    {\n      \"id\": \"dashboard\",\n      \"title\": \"Dashboard\",\n      \"type\": \"browser\",\n      \"url\": \"http://127.0.0.1:3000\",\n      \"chrome\": false\n    }\n  ]\n}\n\nルール:\n- id は安定した小文字の一意な値にしてください。\n- `type` は省略可能です。デフォルトは `terminal` で、ブラウザには `browser` を指定します。\n- ターミナルコントロールには `command`、ブラウザコントロールには `url` が必要です。\n- ブラウザコントロールのデフォルトは `chrome: true` です。`chrome: false` にするとブラウザクローム（アドレスバーとツールバー）が非表示になり、そのペインでは「アドレスバーにフォーカス」は何もしません。`cmux browser goto` と `cmux browser reload` は引き続き利用できます。\n- サブディレクトリで実行する場合は `cwd` を使ってください。相対パスは設定ファイルの基準ディレクトリから解決されます。\n- `height` は固定の縦幅が必要なコントロールにだけ使ってください。\n- `env` はそのコントロールだけに必要な非秘密の値にだけ使ってください。\n- 共有するプロジェクト設定にシークレット、トークン、マシン固有の非公開パスを入れないでください。\n- 繰り返し起動しても安全で、ターミナル内で意味のあるコマンドを優先してください。\n- 存在しないスクリプトを作り上げないでください。先に package ファイル、Makefile、Procfile、README、設定ファイル、既存ツールを読んでください。\n- 共有プロジェクト Dock はチームメイトが使えるよう移植性を保ってください。個人用またはマシン固有のコントロールはグローバル Dock に入れてください。\n\n成果物:\n- 適切な dock.json を作成または更新してください。\n- ユーザーが置き換えを依頼していない限り、既存の有用なコントロールは残してください。\n- JSON がパースできることを検証してください。\n- 各コントロールの役割と、信頼する前にユーザーが確認すべきコマンドを要約してください。"
+           }
+         }
+       }
++    },
++    "cli.coderouter.unavailable": {
++      "extractionState": "manual",
++      "localizations": {
++        "en": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "CodeRouter is not available in ShellX."
++          }
++        },
++        "de": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "CodeRouter ist in ShellX nicht verfügbar."
++          }
++        },
++        "fr": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "CodeRouter n'est pas disponible dans ShellX."
++          }
++        },
++        "ar": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "CodeRouter غير متاح في ShellX."
++          }
++        },
++        "es": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "CodeRouter no está disponible en ShellX."
++          }
++        },
++        "zh-Hant": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "ShellX 不提供 CodeRouter。"
++          }
++        },
++        "zh-Hans": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "ShellX 不提供 CodeRouter。"
++          }
++        },
++        "ko": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "ShellX에서는 CodeRouter를 사용할 수 없습니다."
++          }
++        },
++        "ja": {
++          "stringUnit": {
++            "state": "translated",
++            "value": "ShellX では CodeRouter を利用できません。"
++          }
++        }
++      }
+     }
+   },
+   "version": "1.0"
+ }
+diff --git a/Sources/AppDelegate+WorkspaceActionSave.swift b/Sources/AppDelegate+WorkspaceActionSave.swift
+index 74da802b31..fb670d8860 100644
+--- a/Sources/AppDelegate+WorkspaceActionSave.swift
++++ b/Sources/AppDelegate+WorkspaceActionSave.swift
+@@ -1,13 +1,12 @@
+ import AppKit
+ import Foundation
+-import ShellXBrand
+ 
+ // MARK: - Save Workspace Layout (new-workspace plus-button menu)
+ 
+ /// Payload for delete-action menu items (submenu entries and ⌥-alternates).
+ @MainActor
+ final class WorkspaceActionDeleteBox: NSObject {
+     let windowId: UUID
+     let actionID: String
+     let actionTitle: String
+ 
+@@ -197,24 +196,22 @@ extension AppDelegate {
+         alert.accessoryView = actionsAndLaunchersAccessoryView(
+             text: model.summaryText,
+             entryCount: model.entries.count
+         )
+         // The path is already shown in informativeText; keep the button label
+         // short and fully localized.
+         alert.addButton(withTitle: String(
+             localized: "menu.app.openCmuxSettingsFile",
+             defaultValue: "Open cmux.json"
+         ))
+-        alert.addButton(withTitle: String(
+-            localized: "settings.settingsJSON.docsButton",
+-            defaultValue: "Open Docs"
+-        ))
++        // ShellX has no custom-commands docs page (cmux's is on cmux.com and
++        // nothing under docs/ covers actions), so there is no "Open Docs".
+         alert.addButton(withTitle: String(
+             localized: "common.ok",
+             defaultValue: "OK"
+         ))
+ 
+         let presentingWindow = context.flatMap { resolvedWindow(for: $0) } ?? preferredWindow
+         if let presentingWindow {
+             alert.beginSheetModal(for: presentingWindow) { [weak self] response in
+                 self?.handleActionsAndLaunchersResponse(response)
+             }
+@@ -265,23 +262,20 @@ extension AppDelegate {
+         scrollView.documentView = textView
+         return scrollView
+     }
+ 
+     private func handleActionsAndLaunchersResponse(_ response: NSApplication.ModalResponse) {
+         switch response {
+         case .alertFirstButtonReturn:
+             // Reuse the existing in-cmux config editor path used by Settings'
+             // workspace-layout customization.
+             openWorkspaceLayoutsCustomization()
+-        case .alertSecondButtonReturn:
+-            // No ShellX custom-commands page yet: the website stands in.
+-            NSWorkspace.shared.open(ShellXBrand.websiteURL)
+         default:
+             break
+         }
+     }
+ 
+     /// Actions defined in the global config (where saved workspace layouts
+     /// write) are deletable from the UI; project-local and built-in actions
+     /// are not.
+     func isDeletableGlobalAction(
+         _ action: CmuxResolvedConfigAction,
+diff --git a/Sources/ContentView.swift b/Sources/ContentView.swift
+index a62fab1419..4203b4a9bb 100644
+--- a/Sources/ContentView.swift
++++ b/Sources/ContentView.swift
+@@ -1,18 +1,19 @@
+ import CmuxCloud
+ import AppKit
+ import CmuxAppKitSupportUI
+ import CmuxCommandPalette
+ import CmuxCore
+ import CmuxFeedback
+ import ShellXBrand
+ import CmuxFoundation
++import CmuxTestSupport
+ import CmuxAgentJournal
+ import CmuxNotifications
+ import CmuxPanes
+ import CmuxSettings
+ import CmuxWorkspaces
+ import Bonsplit
+ import Combine
+ import CmuxSidebarInterpreterClient
+ import CmuxTerminal
+ @_spi(CmuxHostTransport) import CmuxExtensionKit
+@@ -10270,20 +10271,29 @@ struct ContentView: View {
+ #if DEBUG
+         cmuxDebugLog(
+             "palette.wsDescription.open end presented=\(isCommandPalettePresented ? 1 : 0) " +
+             "mode=\(debugCommandPaletteModeLabel(commandPaletteMode)) " +
+             "focusFlag=\(commandPaletteShouldFocusWorkspaceDescriptionEditor ? 1 : 0)"
+         )
+ #endif
+     }
+ 
+     private func presentFeedbackComposer() {
++#if DEBUG
++        // UI tests record the mail draft instead of opening the mail app.
++        if UITestCaptureSink().appendLineIfConfigured(
++            envKey: "CMUX_UI_TEST_CAPTURE_OPEN_URL_PATH",
++            line: FeedbackComposerSettings.submissionURL.absoluteString
++        ) {
++            return
++        }
++#endif
+         FeedbackComposerBridge.openMailDraft()
+     }
+ 
+     static func shouldHandleCommandPaletteRequest(
+         observedWindow: NSWindow?,
+         requestedWindow: NSWindow?,
+         keyWindow: NSWindow?,
+         mainWindow: NSWindow?
+     ) -> Bool {
+         guard let observedWindow else { return false }
+diff --git a/Sources/FeatureFlags.swift b/Sources/FeatureFlags.swift
+index 27b99ef109..fa219cf467 100644
+--- a/Sources/FeatureFlags.swift
++++ b/Sources/FeatureFlags.swift
+@@ -643,21 +643,23 @@ final class CmuxFeatureFlags {
+         let context: [String: Any] = personProperties.isEmpty
+             ? [:]
+             : ["personProperties": personProperties]
+         request.httpBody = try? JSONSerialization.data(withJSONObject: [
+             "distinctId": distinctID,
+             "context": context,
+         ])
+         return request
+     }
+ 
+-    nonisolated private static func loadPostHogControlPlaneFlags(
++    /// The default remote loader. Internal so ShellX's no-phone-home test can
++    /// show it returns without building a request.
++    nonisolated static func loadPostHogControlPlaneFlags(
+         distinctID: String,
+         personProperties: [String: String]
+     ) async -> [String: Bool]? {
+         guard Self.remoteConfigFetchEnabled else { return nil }
+         guard (try? await releaseControlRetryAfterGate.wait()) != nil else { return nil }
+         guard let request = postHogControlPlaneRequest(
+             distinctID: distinctID,
+             personProperties: personProperties
+         ) else { return nil }
+         let configuration = URLSessionConfiguration.ephemeral
+diff --git a/Sources/PostHogAnalytics.swift b/Sources/PostHogAnalytics.swift
+index bd4398baa1..878e3b8101 100644
+--- a/Sources/PostHogAnalytics.swift
++++ b/Sources/PostHogAnalytics.swift
+@@ -71,25 +71,38 @@ final class PostHogAnalytics: @unchecked Sendable {
+         workQueue.setSpecific(key: workQueueSpecificKey, value: ())
+     }
+ 
+     private var isEnabled: Bool {
+         // XCTest hosts can inherit the production PostHog configuration. Keep
+         // test launches from initializing the SDK or sending crash telemetry.
+         guard !MacSentryStartupPolicy.isRunningUnderXCTest(environment: environment) else {
+             return false
+         }
+         guard telemetryEnabled() else { return false }
++        return Self.buildAllowsCapture(environment: environment)
++    }
++
++    /// The build's own answer once telemetry is on: ShellX release builds never
++    /// capture, and debug builds only with the local `CMUX_POSTHOG_ENABLE=1`
++    /// opt-in (into the no-op default closures).
++    nonisolated static func buildAllowsCapture(
++        environment: [String: String],
++        isDebugBuild: Bool = PostHogAnalytics.isDebugBuild
++    ) -> Bool {
++        isDebugBuild && environment["CMUX_POSTHOG_ENABLE"] == "1"
++    }
++
++    nonisolated static var isDebugBuild: Bool {
+ #if DEBUG
+-        // Avoid polluting production analytics while iterating locally.
+-        return environment["CMUX_POSTHOG_ENABLE"] == "1"
++        true
+ #else
+-        return false
++        false
+ #endif
+     }
+ 
+     /// Retains the prior launch's identity before replacing it with this build.
+     /// Native Ghostty envelopes do not contain the host app's version.
+     func recordLaunchIdentity() {
+         dispatchAsyncOnWorkQueue { [weak self] in
+             guard let self else { return }
+             guard !MacSentryStartupPolicy.isRunningUnderXCTest(environment: self.environment) else { return }
+             guard self.telemetryEnabled() else {
+diff --git a/cmuxCLITests/CLICoderouterBootstrapTests.swift b/cmuxCLITests/CLICoderouterBootstrapTests.swift
+index 198d63dfcf..76b427bdd1 100644
+--- a/cmuxCLITests/CLICoderouterBootstrapTests.swift
++++ b/cmuxCLITests/CLICoderouterBootstrapTests.swift
+@@ -1,180 +1,150 @@
+ import Darwin
+ import Foundation
+ import Testing
+ 
+-/// `cmux cr` on a machine that has no CodeRouter CLI
+-/// (https://github.com/manaflow-ai/cmux/issues/12139).
++/// ShellX never downloads, installs or runs CodeRouter (a Manaflow service):
++/// `cmux cr` and the `cmux coderouter` passthrough print a neutral message and
++/// exit 127 whether or not a CodeRouter CLI is installed.
+ ///
+ /// Every test isolates HOME and PATH so the developer's own CodeRouter install,
+-/// `~/.coderouter`, and `~/.cmux` never take part, and none of them reaches the
+-/// network: the interactive bootstrap runs a local stand-in for install.sh
+-/// through the Debug-only `CMUX_CODEROUTER_INSTALLER_SCRIPT` seam. The stand-in
+-/// honors the real installer's contract (a `coderouter` executable in
+-/// `$HOME/.coderouter/bin`) so the re-resolve and exec after installing are the
+-/// production code path.
+-@Suite("CodeRouter CLI bootstrap")
++/// `~/.coderouter`, and `~/.cmux` never take part. The fake installs below would
++/// record their arguments if anything exec'd them.
++@Suite("CodeRouter is not available in ShellX")
+ struct CLICoderouterBootstrapTests {
+-    static let installCommand = "curl -fsSL https://cmux.com/coderouter/install.sh | sh"
+-    static let confirmPrompt = "Install CodeRouter now? [y/N]"
++    static let notAvailable = "CodeRouter is not available in ShellX."
+ 
+     enum InstallRoot: CustomStringConvertible {
++        case path
+         case installerDefault
+         case explicitCoderouterInstall
+ 
+         var description: String {
+             switch self {
++            case .path: return "PATH"
+             case .installerDefault: return "~/.coderouter"
+             case .explicitCoderouterInstall: return "$CODEROUTER_INSTALL"
+             }
+         }
+     }
+ 
+-    @Test("non-interactive: prints the exact install command, exits 127, touches nothing")
+-    func nonInteractiveMissingBinaryPrintsInstallCommand() throws {
++    @Test("non-interactive: neutral message, exit 127, no install command, touches nothing")
++    func nonInteractiveIsRefused() throws {
+         let fixture = try Fixture()
+         defer { fixture.cleanUp() }
+ 
+         let result = fixture.runCLI(
+             arguments: ["cr", "--version"],
+             extraEnvironment: [
+                 "CMUX_SOCKET_CAPABILITY": "missing-capability",
+                 "CMUX_SOCKET_PASSWORD": "missing-password",
+             ]
+         )
+ 
+         #expect(!result.timedOut, Comment(rawValue: result.stderr))
+         #expect(result.status == 127, Comment(rawValue: result.stderr))
+         #expect(result.stdout.isEmpty)
+-        #expect(result.stderr.contains(Self.installCommand), Comment(rawValue: result.stderr))
+-        // No terminal to answer on, so no question is asked.
+-        #expect(!result.stderr.contains("[y/N]"), Comment(rawValue: result.stderr))
++        #expect(result.stderr.contains(Self.notAvailable), Comment(rawValue: result.stderr))
++        Self.expectNoInstallOffer(result.stderr)
+         #expect(!result.stderr.contains(fixture.root.path))
+         #expect(!result.stderr.contains(fixture.socketPath))
+         #expect(!result.stderr.contains("missing-capability"))
+         #expect(!result.stderr.contains("missing-password"))
+         #expect(!fixture.fileManager.fileExists(atPath: fixture.installerDefaultRoot.path))
+     }
+ 
++    @Test("terminal: no offer and no prompt even with `y` typed, exit 127")
++    func terminalIsRefusedWithoutPrompt() throws {
++        let fixture = try Fixture()
++        defer { fixture.cleanUp() }
++
++        let result = try fixture.runCLIUnderPTY(arguments: ["cr", "--version"], input: "y\n")
++
++        #expect(!result.timedOut, Comment(rawValue: result.transcript))
++        #expect(result.status == 127, Comment(rawValue: result.transcript))
++        #expect(result.transcript.contains(Self.notAvailable), Comment(rawValue: result.transcript))
++        Self.expectNoInstallOffer(result.transcript)
++        #expect(!fixture.fileManager.fileExists(atPath: fixture.installerDefaultRoot.path))
++    }
++
+     @Test(
+-        "an install the shell PATH does not know yet is still exec'd, with no prompt",
+-        arguments: [InstallRoot.installerDefault, InstallRoot.explicitCoderouterInstall]
++        "an installed CodeRouter is never exec'd",
++        arguments: [InstallRoot.path, InstallRoot.installerDefault, InstallRoot.explicitCoderouterInstall]
+     )
+-    func installerLocationIsResolvedWithoutPATH(installRoot: InstallRoot) throws {
++    func installedCoderouterIsNeverRun(installRoot: InstallRoot) throws {
+         let fixture = try Fixture()
+         defer { fixture.cleanUp() }
+-        let root: URL
++        let binary: URL
+         var extraEnvironment: [String: String] = [:]
+         switch installRoot {
++        case .path:
++            let directory = fixture.root.appendingPathComponent("path-bin", isDirectory: true)
++            binary = directory.appendingPathComponent("coderouter", isDirectory: false)
++            extraEnvironment["PATH"] = directory.path
+         case .installerDefault:
+-            root = fixture.installerDefaultRoot
++            binary = fixture.installerDefaultRoot.appendingPathComponent("bin/coderouter", isDirectory: false)
+         case .explicitCoderouterInstall:
+-            root = fixture.root.appendingPathComponent("custom-install-root", isDirectory: true)
++            let root = fixture.root.appendingPathComponent("custom-install-root", isDirectory: true)
++            binary = root.appendingPathComponent("bin/coderouter", isDirectory: false)
+             extraEnvironment["CODEROUTER_INSTALL"] = root.path
+         }
+         try fixture.writeExecutable(
+             """
+             #!/bin/sh
+             printf '<%s>\\n' "$@" > "$HOME/coderouter-args"
+-            printf 'installed coderouter\\n'
++            printf 'installed coderouter ran\\n'
+             exit 41
+             """,
+-            at: root.appendingPathComponent("bin/coderouter", isDirectory: false)
++            at: binary
+         )
+ 
+         let result = fixture.runCLI(arguments: ["cr", "login", "--device-auth"], extraEnvironment: extraEnvironment)
+ 
+         #expect(!result.timedOut, Comment(rawValue: result.stderr))
+-        #expect(result.status == 41, Comment(rawValue: result.stderr))
+-        #expect(result.stdout == "installed coderouter\n")
+-        #expect(result.stderr.isEmpty, Comment(rawValue: result.stderr))
+-        #expect(try fixture.readHomeFile("coderouter-args") == "<login>\n<--device-auth>\n")
+-    }
+-
+-#if DEBUG
+-    @Test("terminal: offers the documented installer once, runs it after y, then execs the install")
+-    func terminalOfferInstallsAndExecs() throws {
+-        let fixture = try Fixture()
+-        defer { fixture.cleanUp() }
+-        let installerScript = try fixture.writeFakeInstaller()
+-
+-        let result = try fixture.runCLIUnderPTY(
+-            arguments: ["cr", "--version"],
+-            input: "y\n",
+-            extraEnvironment: ["CMUX_CODEROUTER_INSTALLER_SCRIPT": installerScript.path]
+-        )
+-
+-        #expect(!result.timedOut, Comment(rawValue: result.transcript))
+-        #expect(result.transcript.contains(Self.installCommand), Comment(rawValue: result.transcript))
+-        #expect(result.transcript.contains(Self.confirmPrompt), Comment(rawValue: result.transcript))
+-        #expect(fixture.installerRan, Comment(rawValue: result.transcript))
+-        #expect(result.transcript.contains("fake installer done"), Comment(rawValue: result.transcript))
+-        // The installed binary receives the original arguments and its exit status is ours.
+-        #expect(try fixture.readHomeFile("coderouter-args") == "<--version>\n")
+-        #expect(result.transcript.contains("installed coderouter ran"), Comment(rawValue: result.transcript))
+-        #expect(result.status == 41, Comment(rawValue: result.transcript))
+-    }
+-#endif
+-
+-    @Test("terminal: declining installs nothing, prints the install command, exits 127")
+-    func terminalDeclineKeepsMachineUntouched() throws {
+-        let fixture = try Fixture()
+-        defer { fixture.cleanUp() }
+-        let installerScript = try fixture.writeFakeInstaller()
+-
+-        let result = try fixture.runCLIUnderPTY(
+-            arguments: ["cr", "--version"],
+-            input: "n\n",
+-            extraEnvironment: ["CMUX_CODEROUTER_INSTALLER_SCRIPT": installerScript.path]
+-        )
+-
+-        #expect(!result.timedOut, Comment(rawValue: result.transcript))
+-        #expect(result.status == 127, Comment(rawValue: result.transcript))
+-        #expect(result.transcript.contains(Self.confirmPrompt), Comment(rawValue: result.transcript))
+-        #expect(result.transcript.contains(Self.installCommand), Comment(rawValue: result.transcript))
+-        #expect(!fixture.installerRan, Comment(rawValue: result.transcript))
+-        #expect(!fixture.fileManager.fileExists(atPath: fixture.installerDefaultRoot.path))
++        #expect(result.status == 127, Comment(rawValue: result.stderr))
++        #expect(result.stdout.isEmpty, Comment(rawValue: result.stdout))
++        #expect(result.stderr.contains(Self.notAvailable), Comment(rawValue: result.stderr))
++        #expect(!fixture.homeFileExists("coderouter-args"))
+     }
+ 
+-    @Test("an existing install is exec'd unchanged and the installer never runs")
+-    func existingInstallNeverRunsTheInstaller() throws {
++    @Test("`cmux coderouter` verbs cmux does not own are refused the same way")
++    func coderouterPassthroughIsRefused() throws {
+         let fixture = try Fixture()
+         defer { fixture.cleanUp() }
+-        let installerScript = try fixture.writeFakeInstaller()
+         let pathDirectory = fixture.root.appendingPathComponent("path-bin", isDirectory: true)
+         try fixture.writeExecutable(
+             """
+             #!/bin/sh
+             printf '<%s>\\n' "$@" > "$HOME/coderouter-args"
+-            printf 'path coderouter\\n'
+             exit 41
+             """,
+             at: pathDirectory.appendingPathComponent("coderouter", isDirectory: false)
+         )
+ 
+-        // A terminal with `y` already typed: were cmux to ask, it would install.
+-        let result = try fixture.runCLIUnderPTY(
+-            arguments: ["cr", "--version"],
+-            input: "y\n",
+-            extraEnvironment: [
+-                "PATH": pathDirectory.path,
+-                "CMUX_CODEROUTER_INSTALLER_SCRIPT": installerScript.path,
+-            ]
++        let result = fixture.runCLI(
++            arguments: ["coderouter", "login"],
++            extraEnvironment: ["PATH": pathDirectory.path]
+         )
+ 
+-        #expect(!result.timedOut, Comment(rawValue: result.transcript))
+-        #expect(result.status == 41, Comment(rawValue: result.transcript))
+-        #expect(result.transcript.contains("path coderouter"), Comment(rawValue: result.transcript))
+-        #expect(!result.transcript.contains(Self.confirmPrompt), Comment(rawValue: result.transcript))
+-        #expect(try fixture.readHomeFile("coderouter-args") == "<--version>\n")
+-        #expect(!fixture.installerRan, Comment(rawValue: result.transcript))
+-        #expect(!fixture.fileManager.fileExists(atPath: fixture.installerDefaultRoot.path))
++        #expect(!result.timedOut, Comment(rawValue: result.stderr))
++        #expect(result.status == 127, Comment(rawValue: result.stderr))
++        #expect(result.stderr.contains(Self.notAvailable), Comment(rawValue: result.stderr))
++        #expect(!fixture.homeFileExists("coderouter-args"))
++    }
++
++    /// Nothing points the user at an installer: no cmux.com URL, no curl
++    /// command, no install question.
++    static func expectNoInstallOffer(_ output: String) {
++        #expect(!output.contains("[y/N]"), Comment(rawValue: output))
++        #expect(!output.contains("curl"), Comment(rawValue: output))
++        #expect(!output.contains("install.sh"), Comment(rawValue: output))
++        #expect(!output.contains("cmux.com"), Comment(rawValue: output))
+     }
+ 
+     // MARK: - Fixture
+ 
+     struct ProcessResult {
+         let status: Int32
+         let stdout: String
+         let stderr: String
+         let timedOut: Bool
+     }
+@@ -216,35 +186,31 @@ struct CLICoderouterBootstrapTests {
+             root = fileManager.temporaryDirectory
+                 .appendingPathComponent("cmux-coderouter-bootstrap-\(UUID().uuidString)", isDirectory: true)
+             home = root.appendingPathComponent("home", isDirectory: true)
+             emptyPathDirectory = root.appendingPathComponent("empty-path", isDirectory: true)
+             try fileManager.createDirectory(at: home, withIntermediateDirectories: true)
+             try fileManager.createDirectory(at: emptyPathDirectory, withIntermediateDirectories: true)
+             let shortID = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)
+             socketPath = "/tmp/cli-crb-\(shortID).sock"
+         }
+ 
+-        /// Where install.sh puts the binary when `CODEROUTER_INSTALL` is unset.
++        /// Where CodeRouter's installer puts the binary when `CODEROUTER_INSTALL` is unset.
+         var installerDefaultRoot: URL {
+             home.appendingPathComponent(".coderouter", isDirectory: true)
+         }
+ 
+-        var installerRan: Bool {
+-            fileManager.fileExists(atPath: home.appendingPathComponent("installer-ran", isDirectory: false).path)
+-        }
+-
+         func cleanUp() {
+             try? fileManager.removeItem(at: root)
+         }
+ 
+-        func readHomeFile(_ name: String) throws -> String {
+-            try String(contentsOf: home.appendingPathComponent(name, isDirectory: false), encoding: .utf8)
++        func homeFileExists(_ name: String) -> Bool {
++            fileManager.fileExists(atPath: home.appendingPathComponent(name, isDirectory: false).path)
+         }
+ 
+         /// The CLI's environment: the test host's, minus every cmux control value,
+         /// with HOME and PATH pointed at this fixture and the socket at a path that
+         /// does not exist, so nothing here can reach a running cmux.
+         func environment(merging extra: [String: String]) -> [String: String] {
+             var environment = ProcessInfo.processInfo.environment
+             for key in environment.keys where key.hasPrefix("CMUX_") || key.hasPrefix("CMUXD_") {
+                 environment.removeValue(forKey: key)
+             }
+@@ -259,45 +225,20 @@ struct CLICoderouterBootstrapTests {
+             environment.merge(extra) { _, newValue in newValue }
+             return environment
+         }
+ 
+         func writeExecutable(_ contents: String, at url: URL) throws {
+             try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+             try contents.write(to: url, atomically: true, encoding: .utf8)
+             try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+         }
+ 
+-        /// A stand-in for install.sh that records that it ran and installs a fake
+-        /// `coderouter` where the real installer puts it. PATH is empty, so every
+-        /// tool is addressed absolutely.
+-        func writeFakeInstaller() throws -> URL {
+-            let url = root.appendingPathComponent("fake-install.sh", isDirectory: false)
+-            try writeExecutable(
+-                """
+-                #!/bin/sh
+-                set -eu
+-                /usr/bin/touch "$HOME/installer-ran"
+-                /bin/mkdir -p "$HOME/.coderouter/bin"
+-                /bin/cat > "$HOME/.coderouter/bin/coderouter" <<'CODEROUTER'
+-                #!/bin/sh
+-                printf '<%s>\\n' "$@" > "$HOME/coderouter-args"
+-                printf 'installed coderouter ran\\n'
+-                exit 41
+-                CODEROUTER
+-                /bin/chmod 755 "$HOME/.coderouter/bin/coderouter"
+-                printf 'fake installer done\\n'
+-                """,
+-                at: url
+-            )
+-            return url
+-        }
+-
+         /// Runs the CLI with piped stdio and stdin at /dev/null: the non-interactive case.
+         func runCLI(arguments: [String], extraEnvironment: [String: String] = [:]) -> ProcessResult {
+             let process = Process()
+             process.executableURL = URL(fileURLWithPath: cliPath)
+             process.arguments = arguments
+             process.environment = environment(merging: extraEnvironment)
+             let stdoutPipe = Pipe()
+             let stderrPipe = Pipe()
+             process.standardInput = FileHandle.nullDevice
+             process.standardOutput = stdoutPipe
+diff --git a/cmuxTests/PostHogAnalyticsPropertiesTests.swift b/cmuxTests/PostHogAnalyticsPropertiesTests.swift
+index 1723bb579b..69da4c5ef7 100644
+--- a/cmuxTests/PostHogAnalyticsPropertiesTests.swift
++++ b/cmuxTests/PostHogAnalyticsPropertiesTests.swift
+@@ -61,76 +61,39 @@ struct PostHogAnalyticsPropertiesTests {
+             remoteFlagLoader: { await probe.load() }
+         )
+ 
+         flags.start()
+         await probe.waitUntilCalled()
+ 
+         #expect(await probe.callCount == 1)
+     }
+ 
+     @MainActor
+-    @Test("feature flag control plane uses a stable anonymous rollout identity and targeting context")
++    @Test("ShellX builds no feature-flag control-plane request with telemetry consent, so no rollout identity leaves the Mac")
+     func featureFlagControlPlaneRespectsTelemetryConsent() throws {
+         let suiteName = "cmux.feature.flags.identity.\(UUID().uuidString)"
+         let defaults = try #require(UserDefaults(suiteName: suiteName))
+         defer { defaults.removePersistentDomain(forName: suiteName) }
+-        let identityKey = "cmux.flags.releaseControlDistinctID"
+ 
+-        let firstRequest = try #require(CmuxFeatureFlags.postHogControlPlaneRequest(
+-            telemetryEnabled: true,
+-            defaults: defaults
+-        ))
+-        let secondRequest = try #require(CmuxFeatureFlags.postHogControlPlaneRequest(
+-            telemetryEnabled: true,
+-            defaults: defaults
+-        ))
+-        let firstBody = try #require(firstRequest.httpBody)
+-        let secondBody = try #require(secondRequest.httpBody)
+-        let firstPayload = try #require(
+-            JSONSerialization.jsonObject(with: firstBody) as? [String: Any]
+-        )
+-        let secondPayload = try #require(
+-            JSONSerialization.jsonObject(with: secondBody) as? [String: Any]
+-        )
+-        let distinctID = try #require(firstPayload["distinctId"] as? String)
+-        let prefix = "cmux-desktop-release-control-"
+-        let context = try #require(firstPayload["context"] as? [String: Any])
+-        let personProperties = try #require(context["personProperties"] as? [String: Any])
+-
+-        #expect(firstRequest.url?.host == "cmux.com")
+-        #expect(distinctID.hasPrefix(prefix))
+-        #expect(UUID(uuidString: String(distinctID.dropFirst(prefix.count))) != nil)
+-        #expect(secondPayload["distinctId"] as? String == distinctID)
+-        #expect(personProperties["$os"] as? String == "macOS")
+-        #expect((personProperties["cmux_architecture"] as? String)?.isEmpty == false)
+-        #expect(firstPayload["$anon_distinct_id"] == nil)
+-        #expect(firstPayload["person_properties"] == nil)
++        #expect(CmuxFeatureFlags.remoteConfigFetchEnabled == false)
++        #expect(CmuxFeatureFlags.postHogControlPlaneRequest(telemetryEnabled: true, defaults: defaults) == nil)
++        #expect(CmuxFeatureFlags.postHogControlPlaneRequest(telemetryEnabled: true, defaults: defaults) == nil)
+     }
+ 
+     @MainActor
+-    @Test("feature flag control plane sends no persistent identity after telemetry opt-out")
++    @Test("ShellX builds no feature-flag control-plane request after telemetry opt-out and stores no identity")
+     func featureFlagControlPlaneHonorsTelemetryOptOut() throws {
+         let suiteName = "cmux.feature.flags.optout.\(UUID().uuidString)"
+         let defaults = try #require(UserDefaults(suiteName: suiteName))
+         defer { defaults.removePersistentDomain(forName: suiteName) }
+ 
+-        let request = try #require(CmuxFeatureFlags.postHogControlPlaneRequest(
+-            telemetryEnabled: false,
+-            defaults: defaults
+-        ))
+-        let body = try #require(request.httpBody)
+-        let payload = try #require(
+-            JSONSerialization.jsonObject(with: body) as? [String: Any]
+-        )
+-
+-        #expect(payload["distinctId"] as? String == "cmux-desktop-release-control")
+-        #expect((payload["context"] as? [String: Any])?.isEmpty == true)
++        #expect(CmuxFeatureFlags.postHogControlPlaneRequest(telemetryEnabled: false, defaults: defaults) == nil)
+         #expect(defaults.object(forKey: "cmux.flags.releaseControlDistinctID") == nil)
+     }
+ 
+     @Test("feature flag bool coercion accepts PostHog bool-like values")
+     func featureFlagBoolCoercionAcceptsPostHogBoolLikeValues() {
+         #expect(CmuxFeatureFlags.coerceBoolFlagValue(true, default: false))
+         #expect(!CmuxFeatureFlags.coerceBoolFlagValue(false, default: true))
+         #expect(CmuxFeatureFlags.coerceBoolFlagValue(NSNumber(value: true), default: false))
+         #expect(!CmuxFeatureFlags.coerceBoolFlagValue(NSNumber(value: false), default: true))
+         #expect(CmuxFeatureFlags.coerceBoolFlagValue("TRUE", default: false))
+diff --git a/cmuxTests/ShellXNoPhoneHomeTests.swift b/cmuxTests/ShellXNoPhoneHomeTests.swift
+index eeb5c077f5..26deefc20b 100644
+--- a/cmuxTests/ShellXNoPhoneHomeTests.swift
++++ b/cmuxTests/ShellXNoPhoneHomeTests.swift
+@@ -1,30 +1,106 @@
+ import CmuxFeedback
+ import Foundation
+ import Testing
+ 
+ #if canImport(cmux_DEV)
+ @testable import cmux_DEV
+ 
+ /// ShellX never phones home: no telemetry, no remote flag fetch, feedback by
+-/// mail, and Help links that stay on ShellX.
++/// mail, and Help links that stay on ShellX. Every test that touches defaults
++/// uses a private suite it removes, never the test host's `.standard`.
+ struct ShellXNoPhoneHomeTests {
+-    @MainActor
+-    @Test func telemetryAndRemoteFlagsAreOff() {
++    /// Records what analytics would have sent, from any queue.
++    private final class Recorder: @unchecked Sendable {
++        private let lock = NSLock()
++        private var recorded: [String] = []
++
++        func record(_ name: String) {
++            lock.lock()
++            recorded.append(name)
++            lock.unlock()
++        }
++
++        var names: [String] {
++            lock.lock()
++            defer { lock.unlock() }
++            return recorded
++        }
++    }
++
++    /// No XCTest markers and the debug opt-in set, so neither the XCTest guard
++    /// nor the debug-build gate stops capture: only the launch telemetry
++    /// switch (`TelemetrySettings.enabledForCurrentLaunch`) can.
++    @Test func analyticsNeverCaptureWithTheLaunchTelemetrySwitch() throws {
++        let suiteName = "shellx.no-phone-home.analytics.\(UUID().uuidString)"
++        let defaults = try #require(UserDefaults(suiteName: suiteName))
++        defer { defaults.removePersistentDomain(forName: suiteName) }
++        let recorder = Recorder()
++        let workQueue = DispatchQueue(label: "shellx.tests.no-phone-home.analytics")
++        let analytics = PostHogAnalytics(
++            workQueue: workQueue,
++            userDefaults: defaults,
++            capturePostHog: { event, _ in recorder.record(event) },
++            flushPostHog: { recorder.record("flush") },
++            contextCalls: PostHogContextCalls(register: { _ in recorder.record("register") }),
++            environment: ["CMUX_POSTHOG_ENABLE": "1"]
++        )
++
++        analytics.trackActive(reason: "shellx-test")
++        analytics.trackDailyActive(reason: "shellx-test")
++        analytics.trackHourlyActive(reason: "shellx-test")
++        analytics.capture("shellx_test_event", properties: ["source": "test"])
++        analytics.register(["plan": "test"])
++        analytics.identify(accountID: "shellx-test-account")
++        workQueue.sync {}
++
+         #expect(TelemetrySettings.enabledForCurrentLaunch == false)
+-        #expect(CmuxFeatureFlags.remoteConfigFetchEnabled == false)
+-        #expect(CmuxFeatureFlags.postHogControlPlaneRequest(telemetryEnabled: true) == nil)
+-        #expect(CmuxFeatureFlags.postHogControlPlaneRequest(telemetryEnabled: false) == nil)
++        #expect(analytics.isCaptureEnabled == false)
++        #expect(recorder.names.isEmpty, Comment(rawValue: recorder.names.joined(separator: ", ")))
++        #expect(defaults.persistentDomain(forName: suiteName)?.isEmpty ?? true)
+     }
+ 
+-    @Test func analyticsNeverCapture() {
+-        #expect(PostHogAnalytics.shared.isCaptureEnabled == false)
++    /// Release builds capture nothing even with telemetry consent and the
++    /// debug opt-in; only a debug build honors `CMUX_POSTHOG_ENABLE=1`.
++    @Test func releaseBuildsNeverCapture() {
++        let optIn = ["CMUX_POSTHOG_ENABLE": "1"]
++        #expect(PostHogAnalytics.buildAllowsCapture(environment: optIn, isDebugBuild: false) == false)
++        #expect(PostHogAnalytics.buildAllowsCapture(environment: [:], isDebugBuild: false) == false)
++        #expect(PostHogAnalytics.buildAllowsCapture(environment: [:], isDebugBuild: true) == false)
++    }
++
++    /// The default remote loader and a started flag store never reach a
++    /// control plane, with or without telemetry consent.
++    @MainActor
++    @Test func remoteFeatureFlagsAreNeverFetched() async throws {
++        let suiteName = "shellx.no-phone-home.flags.\(UUID().uuidString)"
++        let defaults = try #require(UserDefaults(suiteName: suiteName))
++        defer { defaults.removePersistentDomain(forName: suiteName) }
++
++        #expect(CmuxFeatureFlags.postHogControlPlaneRequest(telemetryEnabled: true, defaults: defaults) == nil)
++        #expect(CmuxFeatureFlags.postHogControlPlaneRequest(telemetryEnabled: false, defaults: defaults) == nil)
++        #expect(await CmuxFeatureFlags.loadPostHogControlPlaneFlags(
++            distinctID: "shellx-test",
++            personProperties: [:]
++        ) == nil)
++
++        // Not pinned to local values, telemetry on, default loader: start()
++        // runs the refresh, which must leave no remote value behind.
++        let flags = CmuxFeatureFlags(defaults: defaults, telemetryEnabled: true, pinsFlagsToLocalValues: false)
++        flags.start()
++        for _ in 0..<20 { await Task.yield() }
++
++        for definition in CmuxFeatureFlags.allFlags {
++            #expect(flags.remoteValue(for: definition) == nil, Comment(rawValue: definition.key))
++        }
++        let stored = defaults.persistentDomain(forName: suiteName) ?? [:]
++        #expect(!stored.keys.contains(where: { $0.hasPrefix("cmux.flags.remote.") }))
+     }
+ 
+     @Test func feedbackUsesMail() {
+         #expect(FeedbackComposerSettings.submissionURL.absoluteString == "mailto:phule9225@gmail.com")
+         #expect(FeedbackComposerSettings().endpointURL(environment: [:]) == nil)
+     }
+ 
+     // Literals, not ShellXBrand: this test target does not link ShellXBrand.
+     @Test func helpMenuLinksStayOnShellX() {
+         #expect(CmuxHelpResource.website.url.absoluteString == "https://shellx.pro")
+diff --git a/cmuxUITests/SettingsAppBehaviorUITests.swift b/cmuxUITests/SettingsAppBehaviorUITests.swift
+index 5ef6bb894c..7ca661ac1c 100644
+--- a/cmuxUITests/SettingsAppBehaviorUITests.swift
++++ b/cmuxUITests/SettingsAppBehaviorUITests.swift
+@@ -80,25 +80,26 @@ import XCTest
+ ///     "X" in the main window tab strip; needs a workspace tab present and
+ ///     has no stable accessibility id on its Settings toggle to flip.
+ ///   - Rename Selects Existing Name (commandPalette.renameSelectAllOnFocus):
+ ///     effect is whether the Command Palette rename field starts fully
+ ///     selected vs caret-at-end; needs the palette open on a renamable
+ ///     row and selection-range inspection.
+ ///   - Preferred Editor / Notification Sound / Notification Command:
+ ///     out-of-process effects (launch an editor, play a sound, run a shell
+ ///     command); not in-app observable.
+ ///
+-/// TIER 3 (not e2e): cross-app/external/no in-app UI effect.
+-///   - Send anonymous telemetry (sendAnonymousTelemetry): gates a network
+-///     analytics pipeline read only at next launch; no UI effect to assert
+-///     and nothing should hit the network from a test. Verify via the
+-///     telemetry client's unit tests instead.
++/// Not in ShellX:
++///   - Send anonymous telemetry (sendAnonymousTelemetry): ShellX sends no
++///     telemetry, so the App section hides this row
++///     (`AppSection.showsTelemetrySetting == false`) and no test here may
++///     expect it. `ShellXNoPhoneHomeTests` and
++///     tests/test_shellx_no_phone_home.py cover telemetry being off.
+ final class SettingsAppBehaviorUITests: SettingsUITestCase {
+     func testMobilePairingSettingsLightAndDarkCaptures() throws {
+         for appearance in ["light", "dark"] {
+             let app = XCUIApplication.cmuxTestApplication()
+             app.launchArguments += settingsLaunchArguments + ["-appearanceMode", appearance]
+             app.launchEnvironment["CMUX_UI_TEST_MODE"] = "1"
+             launchAndActivate(app)
+             defer { app.terminate() }
+             let window = openSettings(app)
+             navigate(window, to: "Mobile")
+diff --git a/cmuxUITests/SettingsShortcutsBehaviorUITests.swift b/cmuxUITests/SettingsShortcutsBehaviorUITests.swift
+index 31ac5496f7..5f200320f7 100644
+--- a/cmuxUITests/SettingsShortcutsBehaviorUITests.swift
++++ b/cmuxUITests/SettingsShortcutsBehaviorUITests.swift
+@@ -8,21 +8,21 @@ import XCTest
+ /// Global Hotkey section additionally owns the `systemWideHotkey.enabled`
+ /// UserDefaults flag. The controls in scope are:
+ ///
+ /// Global Hotkey section:
+ /// - `SettingsGlobalHotkeyToggle` — enable the system-wide hotkey.
+ /// - `SettingsGlobalHotkeyRecorder` — record the global chord.
+ /// - `ShortcutRecorderClearRestoreButton` — clear / restore the global chord.
+ /// - `SettingsGlobalHotkeyNote` — static permissions note.
+ ///
+ /// Keyboard Shortcuts section:
+-/// - `SettingsKeyboardShortcutsChordDocsLink` — external chord docs URL.
++/// - (`SettingsKeyboardShortcutsChordDocsLink` is hidden in ShellX: no chord docs page.)
+ /// - `SettingsKeyboardShortcutsOpenSettingsFileButton` — open cmux.json.
+ /// - `SettingsKeyboardShortcutsResetDefaultsButton` — reset all bindings.
+ /// - per-action `ShortcutRecorderView` + `ShortcutRecorderClearRestoreButton`.
+ /// - `ShortcutRecorderValidationMessage` — conflict / bare-key banner.
+ /// - `ShortcutRecordingHint` — static hint text.
+ ///
+ /// The tests below drive only the effects that are observable through
+ /// XCUITest from the Settings window surface. The actual runtime effect
+ /// of binding a hotkey (the OS-level global hotkey registration in
+ /// `SystemWideHotkeyController`) is not observable here and is documented
+@@ -320,21 +320,19 @@ final class SettingsShortcutsBehaviorUITests: SettingsUITestCase {
+ // MARK: - Tier 3 (not e2e)
+ 
+ // TIER 3 (not e2e): SettingsKeyboardShortcutsOpenSettingsFileButton
+ //   ("Open cmux.json") — Calls SettingsHostActions.openConfigInExternalEditor(),
+ //   which runs NSWorkspace.shared.open(configFileURL) to hand the cmux.json
+ //   file to the user's external editor. The effect is a separate application
+ //   launching/foregrounding outside the app under test, with no element in
+ //   the cmux UI surface to assert against. Not e2e-testable from XCUITest;
+ //   the host action itself can be unit-tested against a fake SettingsHostActions.
+ 
+-// TIER 3 (not e2e): SettingsKeyboardShortcutsChordDocsLink ("Chord docs") —
+-//   A SwiftUI Link to https://cmux.com/docs/keyboard-shortcuts#shortcut-chords.
+-//   Clicking it opens the default web browser to an external URL; there is no
+-//   in-app observable effect, so it is not e2e-testable. The destination URL
+-//   correctness is better covered by a unit assertion on the section, not a UI test.
++// Not in ShellX: SettingsKeyboardShortcutsChordDocsLink ("Chord docs") — ShellX
++//   has no chord docs page, so the section hides the link
++//   (tests/test_shellx_no_phone_home.py checks it stays hidden).
+ 
+ // TIER 3 (not e2e): SettingsGlobalHotkeyNote / ShortcutRecordingHint —
+ //   Static informational text only. They render fixed copy and have no
+ //   runtime behavior to drive or assert beyond their own presence, so there
+ //   is no meaningful behavioral test (a presence check would be a source-shape
+ //   assertion, which the test-quality policy forbids).
+diff --git a/cmuxUITests/SidebarHelpMenuUITests.swift b/cmuxUITests/SidebarHelpMenuUITests.swift
+index 488bd466b3..9398e0348c 100644
+--- a/cmuxUITests/SidebarHelpMenuUITests.swift
++++ b/cmuxUITests/SidebarHelpMenuUITests.swift
+@@ -10,20 +10,56 @@ private func sidebarHelpPollUntil(
+         if condition() {
+             return true
+         }
+         if (ProcessInfo.processInfo.systemUptime - start) >= timeout {
+             return false
+         }
+         RunLoop.current.run(until: Date().addingTimeInterval(pollInterval))
+     }
+ }
+ 
++/// Where the app records the mail drafts it would open (DEBUG-only
++/// `CMUX_UI_TEST_CAPTURE_OPEN_URL_PATH` seam), so no mail app launches.
++private func feedbackMailCapturePath() -> String {
++    FileManager.default.temporaryDirectory
++        .appendingPathComponent("shellx-ui-test-feedback-mail-\(UUID().uuidString).log")
++        .path
++}
++
++private func capturedFeedbackMailDrafts(_ path: String) -> [String] {
++    ((try? String(contentsOfFile: path, encoding: .utf8)) ?? "")
++        .split(separator: "\n")
++        .map(String.init)
++        .filter { $0.hasPrefix("mailto:") }
++}
++
++/// ShellX takes feedback by mail: Send Feedback opens one mail draft to
++/// ShellX and never presents the upload composer sheet.
++private func assertFeedbackOpensMailDraft(
++    app: XCUIApplication,
++    capturePath: String,
++    file: StaticString = #filePath,
++    line: UInt = #line
++) {
++    XCTAssertTrue(
++        sidebarHelpPollUntil(timeout: 3.0) { !capturedFeedbackMailDrafts(capturePath).isEmpty },
++        "Send Feedback opened no mail draft",
++        file: file,
++        line: line
++    )
++    let drafts = capturedFeedbackMailDrafts(capturePath)
++    XCTAssertEqual(drafts.count, 1, drafts.joined(separator: ", "), file: file, line: line)
++    XCTAssertFalse(drafts.joined().contains("cmux"), drafts.joined(separator: ", "), file: file, line: line)
++    XCTAssertFalse(app.textFields["SidebarFeedbackEmailField"].exists, file: file, line: line)
++    XCTAssertFalse(app.buttons["SidebarFeedbackSendButton"].exists, file: file, line: line)
++}
++
+ final class SidebarHelpMenuUITests: XCTestCase {
+     override func setUp() {
+         super.setUp()
+         continueAfterFailure = false
+     }
+ 
+     func testHelpMenuCheckForUpdatesTriggersSidebarUpdatePill() {
+         let app = XCUIApplication.cmuxTestApplication()
+         app.launchEnvironment["CMUX_UI_TEST_MODE"] = "1"
+         app.launchEnvironment["CMUX_UI_TEST_FEED_URL"] = "https://cmux.test/appcast.xml"
+@@ -46,88 +82,45 @@ final class SidebarHelpMenuUITests: XCTestCase {
+             timeout: 3.0,
+             description: "Check for Updates help menu item"
+         )
+         checkForUpdatesItem.click()
+ 
+         let updatePill = app.buttons["UpdatePill"]
+         XCTAssertTrue(updatePill.waitForExistence(timeout: 6.0))
+         XCTAssertEqual(updatePill.label, "Update Available: 9.9.9")
+     }
+ 
+-    func testHelpMenuSendFeedbackOpensComposerSheet() {
++    func testHelpMenuSendFeedbackOpensMailDraft() {
++        let capturePath = feedbackMailCapturePath()
++        defer { try? FileManager.default.removeItem(atPath: capturePath) }
+         let app = XCUIApplication.cmuxTestApplication()
+         app.launchEnvironment["CMUX_UI_TEST_MODE"] = "1"
++        app.launchEnvironment["CMUX_UI_TEST_CAPTURE_OPEN_URL_PATH"] = capturePath
+         launchAndActivate(app)
+ 
+         XCTAssertTrue(waitForWindowCount(atLeast: 1, app: app, timeout: 6.0))
+ 
+         let helpButton = requireElement(
+             candidates: helpButtonCandidates(in: app),
+             timeout: 6.0,
+             description: "sidebar help button"
+         )
+         helpButton.click()
+ 
+         let sendFeedbackItem = requireElement(
+             candidates: helpMenuItemCandidates(in: app, identifier: "SidebarHelpMenuOptionSendFeedback", title: "Send Feedback"),
+             timeout: 3.0,
+             description: "Send Feedback help menu item"
+         )
+         sendFeedbackItem.click()
+ 
+-        XCTAssertTrue(app.staticTexts["Send Feedback"].waitForExistence(timeout: 3.0))
+-        XCTAssertTrue(
+-            firstExistingElement(
+-                candidates: [
+-                    app.textFields["SidebarFeedbackEmailField"],
+-                    app.textFields["Your Email"],
+-                ],
+-                timeout: 2.0
+-            ) != nil
+-        )
+-        XCTAssertTrue(
+-            firstExistingElement(
+-                candidates: [
+-                    app.buttons["SidebarFeedbackAttachButton"],
+-                    app.buttons["Attach Images"],
+-                ],
+-                timeout: 2.0
+-            ) != nil
+-        )
+-        XCTAssertTrue(
+-            firstExistingElement(
+-                candidates: [
+-                    app.buttons["SidebarFeedbackSendButton"],
+-                    app.buttons["Send"],
+-                ],
+-                timeout: 2.0
+-            ) != nil
+-        )
+-        XCTAssertTrue(
+-            app.staticTexts[
+-                "You can also reach us at founders@cmux.com."
+-            ].waitForExistence(timeout: 2.0)
+-        )
+-
+-        let messageEditor = requireElement(
+-            candidates: [
+-                app.textViews["SidebarFeedbackMessageEditor"],
+-                app.scrollViews["SidebarFeedbackMessageEditor"],
+-                app.otherElements["SidebarFeedbackMessageEditor"],
+-                app.textViews["Message"],
+-            ],
+-            timeout: 2.0,
+-            description: "feedback message editor"
+-        )
+-        messageEditor.click()
+-        app.typeText("hello")
+-        XCTAssertTrue(app.staticTexts["5/4000"].waitForExistence(timeout: 2.0))
++        assertFeedbackOpensMailDraft(app: app, capturePath: capturePath)
+     }
+ 
+     func testHelpMenuSettingsOpensDismissesAndReopensWithShortcut() {
+         let app = XCUIApplication.cmuxTestApplication()
+         app.launchArguments += [
+             "-AppleLanguages", "(en)",
+             "-AppleLocale", "en_US",
+             "-ApplePersistenceIgnoreState", "YES",
+             "-NSQuitAlwaysKeepsWindows", "NO",
+             "-menuBarOnly", "false",
+@@ -309,91 +302,93 @@ final class SidebarHelpMenuUITests: XCTestCase {
+         XCTAssertTrue(
+             sidebarHelpPollUntil(timeout: 6.0) {
+                 app.state == .runningForeground
+             },
+             "App did not become foreground before interactions. state=\(app.state.rawValue)"
+         )
+     }
+ }
+ 
+ final class FeedbackComposerShortcutUITests: XCTestCase {
++    private var capturePath = ""
++
+     override func setUp() {
+         super.setUp()
+         continueAfterFailure = false
++        capturePath = feedbackMailCapturePath()
++    }
++
++    override func tearDown() {
++        try? FileManager.default.removeItem(atPath: capturePath)
++        super.tearDown()
+     }
+ 
+-    func testCmdOptionFOpensFeedbackComposer() {
++    private func launchApp(showSettings: Bool = false) -> XCUIApplication {
+         let app = XCUIApplication.cmuxTestApplication()
+         app.launchEnvironment["CMUX_UI_TEST_MODE"] = "1"
++        app.launchEnvironment["CMUX_UI_TEST_CAPTURE_OPEN_URL_PATH"] = capturePath
++        if showSettings {
++            app.launchEnvironment["CMUX_UI_TEST_SHOW_SETTINGS"] = "1"
++        }
+         app.launch()
+         app.activate()
++        return app
++    }
++
++    func testCmdOptionFOpensFeedbackMailDraft() {
++        let app = launchApp()
+ 
+         XCTAssertTrue(
+             sidebarHelpPollUntil(timeout: 6.0) {
+                 app.windows.count >= 1
+             }
+         )
+ 
+         app.typeKey("f", modifierFlags: [.command, .option])
+ 
+-        XCTAssertTrue(app.staticTexts["Send Feedback"].waitForExistence(timeout: 3.0))
+-        XCTAssertTrue(
+-            app.textFields["SidebarFeedbackEmailField"].waitForExistence(timeout: 2.0)
+-                || app.textFields["Your Email"].waitForExistence(timeout: 2.0)
+-        )
++        assertFeedbackOpensMailDraft(app: app, capturePath: capturePath)
+     }
+ 
+     func testCmdOptionFWorksWithHiddenSidebar() {
+-        let app = XCUIApplication.cmuxTestApplication()
+-        app.launchEnvironment["CMUX_UI_TEST_MODE"] = "1"
+-        app.launch()
+-        app.activate()
++        let app = launchApp()
+ 
+         XCTAssertTrue(
+             sidebarHelpPollUntil(timeout: 6.0) {
+                 app.windows.count >= 1
+             }
+         )
+ 
+         app.typeKey("b", modifierFlags: [.command])
+ 
+         XCTAssertTrue(
+             sidebarHelpPollUntil(timeout: 3.0) {
+                 !app.buttons["SidebarHelpMenuButton"].exists && !app.buttons["Help"].exists
+             }
+         )
+ 
+         app.typeKey("f", modifierFlags: [.command, .option])
+ 
+-        XCTAssertTrue(app.staticTexts["Send Feedback"].waitForExistence(timeout: 3.0))
++        assertFeedbackOpensMailDraft(app: app, capturePath: capturePath)
+     }
+ 
+     func testCmdOptionFWorksFromSettingsWindow() {
+-        let app = XCUIApplication.cmuxTestApplication()
+-        app.launchEnvironment["CMUX_UI_TEST_MODE"] = "1"
+-        app.launchEnvironment["CMUX_UI_TEST_SHOW_SETTINGS"] = "1"
+-        app.launch()
+-        app.activate()
++        let app = launchApp(showSettings: true)
+ 
+         XCTAssertTrue(
+             sidebarHelpPollUntil(timeout: 6.0) {
+                 app.windows.count >= 2
+             }
+         )
+ 
+         app.typeKey("f", modifierFlags: [.command, .option])
+ 
+-        XCTAssertTrue(app.staticTexts["Send Feedback"].waitForExistence(timeout: 3.0))
+-        XCTAssertTrue(
+-            app.textFields["SidebarFeedbackEmailField"].waitForExistence(timeout: 2.0)
+-                || app.textFields["Your Email"].waitForExistence(timeout: 2.0)
+-        )
++        assertFeedbackOpensMailDraft(app: app, capturePath: capturePath)
+     }
+ }
+ 
+ final class CommandPaletteAllSurfacesUITests: XCTestCase {
+     private var socketPath = ""
+     private let debugDefaultsDomain = "pro.shellx.desktop.debug"
+     private let hiddenSurfaceToken = "cmux-command-palette-hidden-surface"
+     private let visibleSurfaceToken = "cmux-command-palette-visible-surface"
+     private let noMatchWorkspaceQuery = "cmux-command-palette-no-match"
+ 
+diff --git a/scripts/reload.sh b/scripts/reload.sh
+index 2a65b9de07..aed5f55ae1 100755
+--- a/scripts/reload.sh
++++ b/scripts/reload.sh
+@@ -2130,21 +2130,23 @@ else
+     )
+   fi
+   # The installer verifies the published manifest's build-provenance attestation
+   # through gh. A dev Mac without an authenticated gh is the one explicit
+   # exception; the installer prints the unattested warning in that case.
+   if ! command -v gh >/dev/null 2>&1 || ! gh auth token >/dev/null 2>&1; then
+     cmux_tui_install_args+=(--allow-unattested)
+   fi
+   "$PWD/scripts/install-cmux-tui-client.sh" "${cmux_tui_install_args[@]}"
+ fi
+-"$PWD/scripts/install-coderouter-client.sh" "$APP_PATH"
++# ShellX never bundles CodeRouter (a Manaflow service; the CLI refuses `cr`),
++# so it skips scripts/install-coderouter-client.sh, which downloads Manaflow's
++# binary from GitHub into Contents/Resources/bin.
+ if command -v xattr >/dev/null 2>&1; then
+   xattr -cr "$APP_PATH" || true
+ fi
+ if ! /usr/bin/codesign --force --sign - --timestamp=none --generate-entitlement-der "$APP_PATH" >/dev/null 2>&1; then
+   if [[ "${CMUX_ALLOW_UNSIGNED_DEV_APP:-}" == "1" ]]; then
+     echo "warning: codesign failed for $APP_PATH; continuing because CMUX_ALLOW_UNSIGNED_DEV_APP=1" >&2
+   else
+     echo "error: codesign failed for $APP_PATH" >&2
+     exit 1
+   fi
+diff --git a/tests/test_shellx_no_phone_home.py b/tests/test_shellx_no_phone_home.py
+index d5cb1076e3..7227d3528f 100755
+--- a/tests/test_shellx_no_phone_home.py
++++ b/tests/test_shellx_no_phone_home.py
+@@ -47,57 +47,101 @@ def parse_forbidden_hosts():
+         return []
+     return re.findall(r'"([^"]+)"', match.group(1))
+ 
+ 
+ FORBIDDEN_HOSTS = parse_forbidden_hosts()  # mirrors ShellXNetworkPolicy.forbiddenHosts
+ 
+ # Code ShellX ships. Packages/iOS is upstream's iPhone app, which ShellX does
+ # not build; the SDK-import check below still covers it.
+ HOST_ROOTS = ["Sources", "CLI", "Packages/macOS", "Packages/Shared", "Resources"]
+ 
+-CLOUD_REASON = "unreachable: ShellXFeatures.remoteMachines == false / Cloud hard-off (Task 5)"
+-
+-# Whole files whose code only runs for cmux Cloud, Stack Auth, iroh device
+-# mirroring, the phone host, CodeRouter, cloud VMs or billing. Task 5 switches
+-# all of that off; Wave 2 removes entries as it swaps the transports.
++# Reasons shared by several allowlist entries.
++TASK5_GATED = "gated in Task 5 (hard-off Cloud, socket handlers + CLI)"
++TASK5_PARKED = ("parked behind ShellXFeatures.remoteMachines == false (Task 5); "
++                "Wave 2 swaps the transport before flipping it")
++TASK3_KEYCHAIN = "keychain service name, renamed by Task 3 (coexistence); entry becomes stale at merge"
++NOT_A_HOST = "email domain comparison, not a network host"
++
++# Whole files whose forbidden-host code runs only behind a Cloud, account,
++# billing or pairing entry point that Task 5 switches off. Each reason names
++# what the host is for and which gate keeps it unreachable. Wave 2 removes
++# entries as it replaces the transports.
+ CLOUD_ALLOWLIST = [
+-    ("CLI/CMUXCLI+CoderouterPassthrough.swift", CLOUD_REASON),
+-    ("CLI/CMUXCLI+VMTui.swift", CLOUD_REASON),
+-    ("Packages/Shared/CmuxAuthRuntime/Sources/CmuxAuthRuntime/Client/StackAuthClient.swift", CLOUD_REASON),
+-    ("Packages/Shared/CmuxAuthRuntime/Sources/CmuxAuthRuntime/Coordinator/AuthConfig.swift", CLOUD_REASON),
+-    ("Packages/Shared/CmuxIrohTransport/Package.resolved", CLOUD_REASON),
+-    ("Packages/Shared/CmuxIrohTransport/Package.swift", CLOUD_REASON),
+-    ("Packages/Shared/CmuxIrxTransport/Package.resolved", CLOUD_REASON),
+-    ("Packages/Shared/CmuxIrxTransport/Package.swift", CLOUD_REASON),
+-    ("Packages/macOS/CmuxCloud/Sources/CmuxCloud/Environment/AuthEnvironment.swift", CLOUD_REASON),
+-    ("Packages/macOS/CmuxCloud/Sources/CmuxCloud/VMClient/VMClient.swift", CLOUD_REASON),
+-    ("Packages/macOS/CmuxCloud/Sources/CmuxCloud/VMClient/VMTunnelManager.swift", CLOUD_REASON),
+-    ("Packages/macOS/CmuxFeedback/Sources/CmuxFeedback/DogfoodSink/DogfoodFeedbackService.swift", CLOUD_REASON),
+-    ("Packages/macOS/CmuxPhonePush/Sources/CmuxPhonePush/PhonePushCrypto.swift", CLOUD_REASON),
+-    ("Packages/macOS/CmuxPhonePush/Sources/CmuxPhonePush/PhonePushSharedStateStorage.swift", CLOUD_REASON),
+-    ("Resources/coderouter-cli.json", CLOUD_REASON),
+-    ("Resources/en.lproj/cloud-agent-skill.md", CLOUD_REASON),
+-    ("Sources/Cloud/CloudSecurityExplainer.swift", CLOUD_REASON),
+-    ("Sources/Cloud/CodeRouterHandoffClient.swift", CLOUD_REASON),
+-    ("Sources/Cloud/PresenceSettings.swift", CLOUD_REASON),
+-    ("Sources/Mobile/MobileHostV2Installation.swift", CLOUD_REASON),
+-    ("Sources/Mobile/Pairing/MobilePairingView.swift", CLOUD_REASON),
+-    ("Sources/PricingPlansScreen.swift", CLOUD_REASON),
++    ("CLI/CMUXCLI+VMTui.swift",
++     "`cmux vm tui` install hint for cmux-tui (printed, never fetched); " + TASK5_GATED),
++    ("Packages/Shared/CmuxAuthRuntime/Sources/CmuxAuthRuntime/Client/StackAuthClient.swift",
++     "Stack Auth API base, used only by sign-in (palette, footer, `cmux auth login` -> auth.*); " + TASK5_GATED),
++    ("Packages/Shared/CmuxAuthRuntime/Sources/CmuxAuthRuntime/Coordinator/AuthConfig.swift",
++     "sign-in callback URL on cmux.com, used only by sign-in; " + TASK5_GATED),
++    ("Packages/macOS/CmuxCloud/Sources/CmuxCloud/Environment/AuthEnvironment.swift",
++     "cmux.com and Stack Auth endpoints for sign-in, Cloud and billing; " + TASK5_GATED),
++    ("Packages/macOS/CmuxCloud/Sources/CmuxCloud/VMClient/VMClient.swift",
++     "Cloud VM API pricing links in error text (Cloud UI, `cmux vm|cloud` -> vm.*); " + TASK5_GATED),
++    ("Resources/en.lproj/cloud-agent-skill.md",
++     "Cloud agent skill text naming cmux.com/pricing for the agent to report (never fetched); "
++     "opened from the Machines panel and socket vm.cloud_agent_open, " + TASK5_GATED),
++    ("Sources/Cloud/CloudSecurityExplainer.swift",
++     "learn-more links shown only in the Cloud machine UI; " + TASK5_GATED),
++    ("Sources/Cloud/CodeRouterHandoffClient.swift",
++     "CodeRouter handoff, needs a Stack Auth session (sign-in and the coderouter socket handlers); "
++     + TASK5_GATED),
++    ("Sources/Cloud/PresenceSettings.swift",
++     "presence heartbeat service (opt-in with phone pairing); " + TASK5_PARKED),
++    ("Sources/Mobile/MobileHostV2Installation.swift",
++     "phone-host v2 relay origins (opt-in pairing); MobileHostService listening " + TASK5_PARKED),
++    ("Sources/Mobile/Pairing/MobilePairingView.swift",
++     "link to cmux's iPhone app in the pairing view; device pairing " + TASK5_PARKED),
++    ("Sources/PricingPlansScreen.swift",
++     "Enterprise mailto in the Pro pricing screen; billing entry points are unreachable after Task 5, "
++     + TASK5_GATED),
++]
++
++# Whole files that name a forbidden host without contacting it.
++NOT_A_HOST_ALLOWLIST = [
++    ("Packages/macOS/CmuxCloud/Sources/CmuxCloud/VMClient/VMTunnelManager.swift",
++     "host string comparison that labels a Cloud tunnel as cmux's, not a network request"),
++    ("Packages/macOS/CmuxFeedback/Sources/CmuxFeedback/DogfoodSink/DogfoodFeedbackService.swift", NOT_A_HOST),
++    ("Packages/macOS/CmuxPhonePush/Sources/CmuxPhonePush/PhonePushCrypto.swift", TASK3_KEYCHAIN),
++    ("Packages/macOS/CmuxPhonePush/Sources/CmuxPhonePush/PhonePushSharedStateStorage.swift", TASK3_KEYCHAIN),
+ ]
+ 
+-# Build-time inputs: SwiftPM fetches these while building, the app never does.
+-# Re-hosting the binaries is release work (Wave 3).
++# Build-time inputs: SwiftPM, Xcode or a dev script reads these while
++# building; the app never contacts the host. Re-hosting is release work (Wave 3).
++IROH_FFI_PIN = ("build-time: SwiftPM fetches the iroh-ffi package from github.com/manaflow-ai while "
++                "resolving packages; the app never contacts it")
+ BUILD_TIME_ALLOWLIST = [
+     ("Packages/Shared/CmuxTerminalClient/Package.swift",
+      "build-time: SwiftPM downloads the prebuilt cmux-terminal-client xcframework; the app never contacts it"),
++    ("Packages/Shared/CmuxIrohTransport/Package.swift", IROH_FFI_PIN),
++    ("Packages/Shared/CmuxIrohTransport/Package.resolved", IROH_FFI_PIN),
++    ("Packages/Shared/CmuxIrxTransport/Package.swift", IROH_FFI_PIN),
++    ("Packages/Shared/CmuxIrxTransport/Package.resolved", IROH_FFI_PIN),
++    ("Resources/coderouter-cli.json",
++     "build-time manifest read only by scripts/install-coderouter-client.sh, which no ShellX build "
++     "runs (reload.sh skips it); not in any Xcode resources phase, never bundled"),
+ ]
+ 
++# The Xcode project and the workspace pins live outside HOST_ROOTS. They may
++# name a forbidden host only through these exact literals.
++PROJECT_PIN_FILES = [
++    "cmux.xcodeproj/project.pbxproj",
++    "cmux.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
++]
++BUILD_TIME_PROJECT_LITERALS = [
++    ("cmux.xcodeproj/project.pbxproj", '"https://github.com/manaflow-ai/iroh-ffi.git"',
++     "build-time: XCRemoteSwiftPackageReference Xcode resolves for CmuxIrohTransport; the app never contacts it"),
++    ("cmux.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
++     '"https://github.com/manaflow-ai/iroh-ffi.git"', IROH_FFI_PIN),
++]
++
++ALL_FILE_ALLOWLISTS = CLOUD_ALLOWLIST + NOT_A_HOST_ALLOWLIST + BUILD_TIME_ALLOWLIST
++
+ # Literals that name a forbidden host but never reach it. They are removed from
+ # a line before the host scan; the rest of the line is still checked.
+ NON_NETWORK_LITERALS = [
+     ('"ai.manaflow.cmux"',
+      "reverse-DNS os_log subsystem, not a host (R3 keeps os_log subsystems)"),
+     ('"https://github.com/manaflow-ai/cmux/releases/",',
+      "UpdateFeedResolver prefix that classifies a feed URL; never fetched (ShellX's feed is download.shellx.pro)"),
+     ('"https://files.cmux.com/stable/",',
+      "UpdateFeedResolver prefix that classifies a feed URL; never fetched (ShellX's feed is download.shellx.pro)"),
+     ('"https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux-settings.schema.json"',
+@@ -158,20 +202,31 @@ def reachable_offenders(hosts, roots, allow):
+         if is_comment(path, line):
+             continue
+         for literal, _reason in NON_NETWORK_LITERALS:
+             line = line.replace(literal, "")
+         for host, regex in regexes.items():
+             if regex.search(line):
+                 hits[host].append(hit)
+     return hits
+ 
+ 
++def is_comment_hit(hit):
++    """Whether the `"path:line"` from offenders() is a comment line."""
++    path, number = hit.rsplit(":", 1)
++    return is_comment(path, read(path).splitlines()[int(number) - 1])
++
++
++def code_lines(path):
++    """The lines of `path` that are not comments."""
++    return [line for line in read(path).splitlines() if not is_comment(path, line)]
++
++
+ def catalogs():
+     found = []
+     for root in HOST_ROOTS:
+         found.extend(sorted((ROOT / root).rglob("*.xcstrings")))
+     return [p.relative_to(ROOT).as_posix() for p in found if ".build" not in p.parts]
+ 
+ 
+ class ShellXNoPhoneHomeTests(unittest.TestCase):
+     # Short failure messages: the sources are far too long to print whole.
+     def assertSourceHas(self, path, needle):
+@@ -193,44 +248,62 @@ class ShellXNoPhoneHomeTests(unittest.TestCase):
+             self.assertSourceLacks(path, "posthog-ios")
+         manifests = offenders(r"sentry-cocoa|posthog-ios|getsentry|PostHog/posthog", roots=["Packages"], allow=[])
+         manifests = [h for h in manifests if Path(h.rsplit(":", 1)[0]).name in ("Package.swift", "Package.resolved")]
+         self.assertEqual(manifests, [])
+         imports = (r"^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:public |internal |package |private |fileprivate )?import\s+"
+                    r"(?:(?:struct|class|enum|protocol|func|var|let|typealias)\s+)?(Sentry|PostHog)\b")
+         self.assertEqual(offenders(imports, roots=["Sources", "CLI", "Packages"], allow=[]), [])
+ 
+     def test_no_forbidden_hosts_in_reachable_code(self):
+         self.assertTrue(FORBIDDEN_HOSTS, "ShellXNetworkPolicy.forbiddenHosts is missing")
+-        hits = reachable_offenders(FORBIDDEN_HOSTS, HOST_ROOTS, CLOUD_ALLOWLIST + BUILD_TIME_ALLOWLIST)
++        hits = reachable_offenders(FORBIDDEN_HOSTS, HOST_ROOTS, ALL_FILE_ALLOWLISTS)
+         for host in FORBIDDEN_HOSTS:
+             self.assertEqual(hits[host], [], host)
+ 
+-    def test_cloud_allowlist_entries_are_live(self):
++    def test_allowlist_entries_are_live_and_reasoned(self):
+         pattern = "|".join(host_pattern(h) for h in EXPECTED_FORBIDDEN_HOSTS)
+-        for path, reason in CLOUD_ALLOWLIST + BUILD_TIME_ALLOWLIST:
+-            if (path, reason) in CLOUD_ALLOWLIST:
+-                self.assertEqual(reason, CLOUD_REASON, path)
++        paths = [path for path, _reason in ALL_FILE_ALLOWLISTS]
++        self.assertEqual(len(paths), len(set(paths)), "a file is allowlisted twice")
++        for path, reason in ALL_FILE_ALLOWLISTS:
++            self.assertGreater(len(reason.split()), 4, f"allowlist reason too vague: {path}")
+             self.assertTrue((ROOT / path).is_file(), f"stale allowlist entry: {path}")
+             self.assertTrue(re.search(pattern, read(path)), f"allowlisted file no longer names a forbidden host: {path}")
++        for path, literal, reason in BUILD_TIME_PROJECT_LITERALS:
++            self.assertTrue(reason.startswith("build-time: "), path)
++            self.assertIn(literal, read(path), f"stale build-time literal in {path}")
++
++    def test_no_forbidden_hosts_in_xcode_project_or_workspace_pins(self):
++        # Outside HOST_ROOTS, so scanned here line by line: only the reasoned
++        # build-time literals may name a forbidden host.
++        regex = re.compile("|".join(host_pattern(h) for h in EXPECTED_FORBIDDEN_HOSTS))
++        hits = []
++        for path in PROJECT_PIN_FILES:
++            literals = [literal for pin_path, literal, _reason in BUILD_TIME_PROJECT_LITERALS if pin_path == path]
++            for number, line in enumerate(read(path).splitlines(), start=1):
++                for literal in literals:
++                    line = line.replace(literal, "")
++                if regex.search(line):
++                    hits.append(f"{path}:{number}")
++        self.assertEqual(hits, [])
+ 
+     def test_catalog_strings_naming_forbidden_hosts_are_unused(self):
+         # Catalog entries are copy, not code. Upstream keys that still name a
+         # forbidden host stay in the catalogs (R8: only edit keys you add), but
+         # no reachable code may look them up.
+         pattern = re.compile("|".join(host_pattern(h) for h in EXPECTED_FORBIDDEN_HOSTS))
+         keys = set()
+         for catalog in catalogs():
+             for key, entry in json.loads(read(catalog)).get("strings", {}).items():
+                 if pattern.search(key) or pattern.search(json.dumps(entry, ensure_ascii=False)):
+                     keys.add(key)
+         self.assertTrue(keys)  # the upstream catalogs do carry such keys
+-        allowed = {path for path, _reason in CLOUD_ALLOWLIST}
++        allowed = {path for path, _reason in CLOUD_ALLOWLIST + NOT_A_HOST_ALLOWLIST}
+         literal = re.compile(r'"([^"\\\s]+)"')
+         hits = []
+         for root in ["Sources", "CLI", "Packages/macOS", "Packages/Shared"]:
+             for path in sorted((ROOT / root).rglob("*.swift")):
+                 rel = path.relative_to(ROOT).as_posix()
+                 if ".build" in path.parts or rel in allowed or is_skipped(rel):
+                     continue
+                 for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+                     if any(m in keys for m in literal.findall(line)) and not is_comment(rel, line):
+                         hits.append(f"{rel}:{number}")
+@@ -256,26 +329,81 @@ class ShellXNoPhoneHomeTests(unittest.TestCase):
+                                'settingsKey: "app.sendAnonymousTelemetry"')
+ 
+     def test_feedback_opens_mail_to_shellx(self):
+         settings = "Packages/macOS/CmuxFeedback/Sources/CmuxFeedback/Settings/FeedbackComposerSettings.swift"
+         self.assertSourceMatches(settings,
+                                  r'static let submissionURL\s*=\s*URL\(string:\s*"mailto:"\s*\+\s*ShellXBrand\.contactEmail\)!')
+         self.assertSourceLacks(settings, "https://")
+         self.assertSourceHas(settings, 'defaultEndpoint: String = ""')
+         self.assertSourceHas("Packages/macOS/CmuxFeedback/Sources/CmuxFeedback/Bridge/FeedbackComposerBridge.swift",
+                              "NSWorkspace.shared.open(FeedbackComposerSettings.submissionURL)")
+-        self.assertSourceMatches("Sources/ContentView.swift",
+-                                 r"private func presentFeedbackComposer\(\) \{\s*FeedbackComposerBridge\.openMailDraft\(\)")
++        # The sheet is never presented: the function ends in the mail draft
++        # (UI tests record it through the DEBUG-only capture seam instead).
++        body = re.search(r"private func presentFeedbackComposer\(\) \{\n(.*?)\n    \}\n",
++                         read("Sources/ContentView.swift"), re.S)
++        self.assertTrue(body, "presentFeedbackComposer() not found")
++        self.assertTrue(body.group(1).rstrip().endswith("FeedbackComposerBridge.openMailDraft()"), body.group(1))
++        self.assertNotIn("isFeedbackComposerPresented", body.group(1))
+ 
+     def test_help_menu_points_to_shellx(self):
+         resource = "Sources/App/CmuxHelpResource.swift"
+         self.assertSourceHas(resource, "ShellXBrand.websiteURL")
+         self.assertSourceHas(resource, "ShellXBrand.sourceCodeURL")
+         self.assertSourceLacks(resource, "https://")
+         commands = "Sources/App/CmuxHelpCommands.swift"
+         self.assertSourceHas(commands, "helpResourceButton(.website)")
+         self.assertSourceHas(commands, "helpResourceButton(.sourceCode)")
+         self.assertSourceLacks(commands, "helpResourceButton(.discord)")
+ 
++    def test_docs_links_without_a_shellx_page_are_hidden(self):
++        # cmux's "Chord docs" and custom-commands "Open Docs" pages were on
++        # cmux.com, and nothing under docs/ covers them, so both are hidden.
++        shortcuts = "\n".join(code_lines(
++            "Packages/macOS/CmuxSettingsUI/Sources/CmuxSettingsUI/Sections/KeyboardShortcutsSection.swift"))
++        self.assertNotIn("settings.shortcuts.chords.docsButton", shortcuts)
++        self.assertNotIn("SettingsKeyboardShortcutsChordDocsLink", shortcuts)
++        actions = "\n".join(code_lines("Sources/AppDelegate+WorkspaceActionSave.swift"))
++        self.assertNotIn("settings.settingsJSON.docsButton", actions)
++        self.assertNotIn("alertSecondButtonReturn", actions)
++        self.assertNotIn("websiteURL", actions)
++
++    def test_repository_docs_links_name_existing_files(self):
++        # Docs links that stay point at a file in this repository.
++        link = re.compile(r'(?:github\.com/lephus/shellx|sourceCodeURL\.absoluteString \+ ")/blob/main/([^"#)`\s]+)')
++        hits = offenders(link.pattern, roots=["Sources", "CLI", "Packages/macOS", "Packages/Shared"], allow=[])
++        self.assertTrue(hits)
++        missing = []
++        for hit in hits:
++            path, number = hit.rsplit(":", 1)
++            for target in link.findall(read(path).splitlines()[int(number) - 1]):
++                if not (ROOT / target.rstrip(".")).is_file():
++                    missing.append(f"{hit}: {target}")
++        self.assertEqual(missing, [])
++
++    def test_coderouter_is_never_downloaded_or_run(self):
++        # CodeRouter is a Manaflow service no ShellX wave replaces, so its gate
++        # is a switch of its own, not remoteMachines (Wave 2 flips that one).
++        self.assertSourceMatches("Packages/Shared/ShellXBrand/Sources/ShellXBrand/ShellXFeatures.swift",
++                                 r"public static let codeRouter = false\b")
++        # `cmux cr` and the passthrough refuse before looking for any executable.
++        self.assertSourceMatches(
++            "CLI/cmux.swift",
++            r"func runCoderouterAlias\(\s*commandArgs: \[String\],\s*explicitSocketPath: String\?,[^{]*\{"
++            r"(?:\s*//[^\n]*)*\s*guard ShellXFeatures\.codeRouter,\s*"
++            r"let resolvedPath = resolveCoderouterExecutable\(environment: environment\) else \{\s*"
++            r"throw Self\.coderouterNotAvailable\(\)")
++        self.assertSourceLacks("CLI/cmux.swift", "bootstrapCoderouter")
++        passthrough = "\n".join(code_lines("CLI/CMUXCLI+CoderouterPassthrough.swift"))
++        for needle in ("remoteMachines", "curl", "install.sh", "bootstrapCoderouter", "readLine", "Process()"):
++            self.assertNotIn(needle, passthrough)
++        self.assertIn('defaultValue: "CodeRouter is not available in ShellX."', passthrough)
++        # No ShellX build downloads or bundles the CodeRouter binary.
++        hits = offenders(r"install-coderouter-client\.sh", roots=["scripts", ".github"],
++                         allow=[("scripts/install-coderouter-client.sh", "the script itself")])
++        self.assertEqual([hit for hit in hits if not is_comment_hit(hit)], [])
++        pbx = read("cmux.xcodeproj/project.pbxproj")
++        self.assertNotIn("coderouter-cli.json", pbx)
++        self.assertNotIn("bin/coderouter", pbx)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

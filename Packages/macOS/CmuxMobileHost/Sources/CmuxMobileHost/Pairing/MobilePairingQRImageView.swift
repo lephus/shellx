@@ -2,6 +2,7 @@ import CmuxFoundation
 import AppKit
 import CMUXMobileCore
 public import SwiftUI
+import ShellXIcons
 
 /// Renders a payload string as a crisp, square QR code for the iOS pairing
 /// window.
@@ -41,7 +42,7 @@ public struct MobilePairingQRImageView: View {
                     .fill(Color.secondary.opacity(0.12))
                     .aspectRatio(1, contentMode: .fit)
                     .overlay(
-                        Image(systemName: "qrcode")
+                        ShellXIcon.image("qrcode")
                             .cmuxFont(size: 48)
                             .foregroundStyle(.secondary)
                     )

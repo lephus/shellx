@@ -5,10 +5,10 @@ extension TerminalController {
     nonisolated func controlSidebarManualPullRequestError(invalidTarget: Bool) -> String {
         let message = invalidTarget ? String(
             localized: "cli.pr.error.workspaceMissing",
-            defaultValue: "Workspace not found; run cmux list-workspaces and retry with --workspace."
+            defaultValue: "Workspace not found; run shellx list-workspaces and retry with --workspace."
         ) : String(
             localized: "cli.pr.error.invalidHandoff",
-            defaultValue: "Invalid PR handoff; use cmux pr --help."
+            defaultValue: "Invalid PR handoff; use shellx pr --help."
         )
         return "ERROR: " + message
     }

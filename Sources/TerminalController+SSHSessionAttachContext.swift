@@ -158,7 +158,7 @@ extension TerminalController {
         String.localizedStringWithFormat(
             String(
                 localized: "cli.error.sshSessionAttachSessionNotFound",
-                defaultValue: "ssh-session-attach: no persisted SSH PTY session with id '%@'. Run 'cmux ssh-session-list --all-workspaces' to see valid session ids."
+                defaultValue: "ssh-session-attach: no persisted SSH PTY session with id '%@'. Run 'shellx ssh-session-list --all-workspaces' to see valid session ids."
             ),
             sessionID
         )

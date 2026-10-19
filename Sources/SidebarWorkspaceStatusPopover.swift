@@ -233,7 +233,7 @@ struct SidebarWorkspaceStatusPopover: View {
                     .lineLimit(1)
                 Spacer(minLength: 8)
                 if lane.isSelected {
-                    CmuxSystemSymbolImage(systemName: "checkmark", pointSize: 10, weight: .semibold, tint: .secondary)
+                    CmuxSystemSymbolImage(symbolName: "checkmark", pointSize: 10, weight: .semibold, tint: .secondary)
                 }
             }
             .padding(.horizontal, 6)

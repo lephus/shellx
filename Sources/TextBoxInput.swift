@@ -8,6 +8,7 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 import os
+import ShellXBrand
 
 enum TextBoxLayout {
     static let minLines = 1
@@ -156,36 +157,14 @@ private struct TextBoxInputGlassPillBackground: View {
 #endif
     }
 
+    /// Pre-Tahoe pill: ShellX input field (spec §7.4), a flat `raise` fill
+    /// with a 1 px `border` stroke; no gradients.
     @ViewBuilder
     private func fallback(_ shape: RoundedRectangle) -> some View {
         shape
-            .fill(.regularMaterial)
+            .fill(ShellXPalette.raise.color)
             .overlay(
-                shape.fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.12),
-                            fallbackTint.opacity(0.20),
-                            Color.black.opacity(0.06)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-            )
-            .overlay(
-                shape.stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.34),
-                            foreground.opacity(0.16),
-                            Color.black.opacity(0.16)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
+                shape.stroke(ShellXPalette.border.color, lineWidth: 1)
             )
             .shadow(color: Color.black.opacity(0.18), radius: 12, y: 4)
     }
@@ -565,7 +544,7 @@ private enum TextBoxDraftAttachmentStorage {
             return nil
         }
         let directory = appSupportDirectory
-            .appendingPathComponent("cmux", isDirectory: true)
+            .appendingPathComponent("ShellX", isDirectory: true)
             .appendingPathComponent(directoryName, isDirectory: true)
         if createIfMissing {
             do {

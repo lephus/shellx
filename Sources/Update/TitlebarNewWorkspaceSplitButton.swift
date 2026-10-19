@@ -50,7 +50,7 @@ struct TitlebarNewWorkspaceSplitButton: View {
                     Rectangle()
                         .fill(Color.clear)
                     CmuxSystemSymbolImage(
-                        systemName: "plus",
+                        symbolName: "plus",
                         pointSize: config.iconSize,
                         weight: .medium,
                         tint: foregroundColor.opacity(foregroundOpacity)
@@ -90,7 +90,7 @@ struct TitlebarNewWorkspaceSplitButton: View {
                     Rectangle()
                         .fill(Color.clear)
                     CmuxSystemSymbolImage(
-                        systemName: "chevron.down",
+                        symbolName: "chevron.down",
                         pointSize: TitlebarNewWorkspaceSplitButtonMetrics.dropdownIconSize(config: config),
                         weight: .bold,
                         tint: foregroundColor.opacity(foregroundOpacity)

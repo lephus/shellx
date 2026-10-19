@@ -653,8 +653,16 @@ def check_guide_contract(cli_path: str) -> list[str]:
     prefix = ["--socket", f"/tmp/cmux-guide-{uuid.uuid4().hex}.sock", "--window", "window:999999"]
     topics = {
         "cmux": [["guide"], ["--skill"]],
-        "cloud": [["cloud", "guide"], ["cloud", "--skill"], ["vm", "guide"], ["vm", "--skill"]],
     }
+    # ShellX: Cloud is a Manaflow service, so its guide aliases are refused
+    # (exit 127) before the CLI looks for the socket.
+    for invocation in (["cloud", "guide"], ["cloud", "--skill"], ["vm", "guide"], ["vm", "--skill"]):
+        try:
+            refused = run_cli_args(cli_path, prefix + invocation)
+            if refused.returncode != 127 or refused.stdout or "not available in ShellX" not in refused.stderr:
+                failures.append(f"cmux {' '.join(invocation)}: expected the ShellX Cloud refusal: {refused}")
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            failures.append(f"cmux {' '.join(invocation)}: {exc}")
     for topic, aliases in topics.items():
         expected_content = None
         for invocation in aliases:

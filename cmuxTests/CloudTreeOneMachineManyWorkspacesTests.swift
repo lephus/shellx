@@ -634,7 +634,7 @@ struct CloudTreeOneMachineManyWorkspacesTests {
         #expect(updated.remoteViews?.first?.name == "renamed")
     }
 
-    @Test("The CLI shows every workspace tab as a flat sibling row")
+    @Test("The CLI shows every workspace tab as a flat sibling row", .enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm (Cloud is off)"))
     func cliTreeShowsFlatTabs() throws {
         let workspace: [String: Any] = ["id": "ws_main", "name": "main", "index": 0, "focused": true]
         let machine: [String: Any] = [
@@ -664,7 +664,7 @@ struct CloudTreeOneMachineManyWorkspacesTests {
         #expect(!result.stdout.contains("hidden"))
     }
 
-    @Test("CLI open commands name the exact tab when one terminal occupies several")
+    @Test("CLI open commands name the exact tab when one terminal occupies several", .enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm (Cloud is off)"))
     func cliTreeOpenCommandsIdentifyTheTab() throws {
         let workspace: [String: Any] = ["id": "ws_main", "name": "main", "index": 0, "focused": true]
         let machine: [String: Any] = [
@@ -798,7 +798,7 @@ struct CloudTreeOneMachineManyWorkspacesTests {
         #expect(CloudTreeRowContentView.screenLabel(displayKey: "display:") == nil)
     }
 
-    @Test("The CLI keeps detached terminals in the final Terminals section and mirrors the sidebar order")
+    @Test("The CLI keeps detached terminals in the final Terminals section and mirrors the sidebar order", .enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm (Cloud is off)"))
     func cliTreeUsesTheFourGroupOrder() throws {
         let workspace: [String: Any] = [
             "id": "ws_main",
@@ -870,7 +870,7 @@ struct CloudTreeOneMachineManyWorkspacesTests {
         #expect(lines[terminals...].contains { $0.contains("term_detached") }, "the final Terminals section lists every machine-owned terminal")
     }
 
-    @Test("CLI keeps machine-owned terminals visible while a cloud link is unavailable")
+    @Test("CLI keeps machine-owned terminals visible while a cloud link is unavailable", .enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm (Cloud is off)"))
     func cliTreeKeepsTerminalsWhenLinkUnavailable() throws {
         let machine: [String: Any] = [
             "id": machineID,
@@ -895,14 +895,14 @@ struct CloudTreeOneMachineManyWorkspacesTests {
         #expect(lines[terminals...].contains { $0.contains("term_sleeping") })
     }
 
-    @Test("CLI shows a failed link's message, never its raw error code")
+    @Test("CLI shows a failed link's message, never its raw error code", .enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm (Cloud is off)"))
     func cliTreeShowsLinkErrorMessageNotCode() throws {
         let machine: [String: Any] = [
             "id": machineID,
             "status": "running",
             "link_state": "error",
             "link_error": "cloud_api_unavailable",
-            "link_error_message": "cmux cannot reach the Cloud service for this machine right now.",
+            "link_error_message": "ShellX cannot reach the Cloud service for this machine right now.",
             "remote_workspaces": [],
         ]
 
@@ -910,7 +910,7 @@ struct CloudTreeOneMachineManyWorkspacesTests {
         #expect(result.status == 0, Comment(rawValue: result.stderr))
         let lines = result.stdout.split(whereSeparator: \.isNewline).map(String.init)
 
-        #expect(lines.contains { $0.contains("cmux cannot reach the Cloud service") })
+        #expect(lines.contains { $0.contains("ShellX cannot reach the Cloud service") })
         #expect(!lines.contains { $0.contains("cloud_api_unavailable") })
     }
 

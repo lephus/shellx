@@ -74,7 +74,7 @@ public struct AutomationCatalogSection: SettingCatalogSection {
     )
 
     /// When enabled, native agent-session panels receive a cmux-owned,
-    /// per-session `TMPDIR` under `~/.local/state/cmux/agent-artifacts`.
+    /// per-session `TMPDIR` under `~/.local/state/shellx/agent-artifacts`.
     /// This gives cmux a bounded ownership boundary for future retention and
     /// cleanup without rewriting provider-owned transcript directories.
     public let canonicalAgentScratch = DefaultsKey<Bool>(

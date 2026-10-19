@@ -2,6 +2,7 @@ import AppKit
 import CmuxCloud
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 /// Where the Cloud header puts Refresh and New Machine.
 enum CloudHeaderMachineActions {
@@ -108,7 +109,7 @@ struct CloudTeamPickerHeader<Status: View>: View {
             .help(newMachineLabel)
             .accessibilityLabel(newMachineLabel)
         } label: {
-            Image(systemName: "ellipsis")
+            ShellXIcon.image("ellipsis")
                 .font(.system(size: 11, weight: .medium))
                 .frame(width: 22, height: 20)
                 .contentShape(Rectangle())
@@ -122,7 +123,7 @@ struct CloudTeamPickerHeader<Status: View>: View {
 
     private func teamChangeErrorRow(_ message: String, onDismiss: @escaping () -> Void) -> some View {
         HStack(spacing: 5) {
-            Image(systemName: "exclamationmark.triangle")
+            ShellXIcon.image("exclamationmark.triangle")
                 .font(.system(size: 10, weight: .semibold))
             Text(message)
                 .cmuxFont(size: 11)

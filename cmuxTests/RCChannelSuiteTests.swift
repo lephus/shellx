@@ -11,14 +11,14 @@ import Testing
 /// Swift Testing coverage for the `rc` release channel, kept next to the suites
 /// it extends so the RC cases run under the same traits as their nightly twins.
 extension AuthEnvironmentTests {
-    @Test("rc bundle uses the cmux-rc callback scheme")
+    @Test("rc bundle uses the shellx-rc callback scheme")
     func rcBundleUsesRCCallbackScheme() {
         #expect(
             AuthEnvironment.callbackScheme(
                 environment: [:],
-                bundleIdentifier: "com.cmuxterm.app.rc",
+                bundleIdentifier: "pro.shellx.desktop.rc",
                 isDebugBuild: false
-            ) == "cmux-rc"
+            ) == "shellx-rc"
         )
     }
 }
@@ -27,11 +27,11 @@ extension MobileHostIdentityTests {
     @Test func instanceTagUsesRCChannelAndSlug() {
         #expect(MobileHostIdentity.instanceTag(
             environment: [:],
-            bundleIdentifier: "com.cmuxterm.app.rc"
+            bundleIdentifier: "pro.shellx.desktop.rc"
         ) == "rc")
         #expect(MobileHostIdentity.instanceTag(
             environment: [:],
-            bundleIdentifier: "com.cmuxterm.app.rc.candidate1"
+            bundleIdentifier: "pro.shellx.desktop.rc.candidate1"
         ) == "candidate1")
     }
 }
@@ -42,7 +42,7 @@ extension CMUXCLIErrorOutputRegressionTests {
     }
 
     /// `channel` is the socket/bundle infix shared by the release lanes: `cmux-<channel>-<slug>.sock`
-    /// maps to `com.cmuxterm.app.<channel>.<slug>`. The nightly twin in
+    /// maps to `pro.shellx.desktop.<channel>.<slug>`. The nightly twin in
     /// `CMUXCLIErrorOutputRegressionTests.swift` calls this with `"nightly"`.
     func assertThemesSetOverridePathIsReadableByChannelApp(channel: String) throws {
         let cliPath = try bundledCLIPath()
@@ -58,7 +58,7 @@ extension CMUXCLIErrorOutputRegressionTests {
         try writeTheme(named: "Theme A", background: "#101010", to: themesURL)
 
         // The reload target comes from the socket file name before CMUX_BUNDLE_ID is even
-        // consulted: `cmux-nightly-<slug>.sock` becomes `com.cmuxterm.app.nightly.<slug>`.
+        // consulted: `cmux-nightly-<slug>.sock` becomes `pro.shellx.desktop.nightly.<slug>`.
         // So scoping the identifier means scoping the socket name it is read from, and both
         // take the same hex-only suffix — a raw UUID's dashes would turn into dots in the
         // identifier. Scoping matters because the reload goes out machine-wide: on the
@@ -66,7 +66,7 @@ extension CMUXCLIErrorOutputRegressionTests {
         // config, and two runs at once shared one identifier.
         let uniqueSuffix = UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
         let socketPath = "/tmp/cmux-\(channel)-\(uniqueSuffix).sock"
-        let bundleIdentifier = "com.cmuxterm.app.\(channel).\(uniqueSuffix)"
+        let bundleIdentifier = "pro.shellx.desktop.\(channel).\(uniqueSuffix)"
         var environment = ProcessInfo.processInfo.environment
         for key in Array(environment.keys) where key.hasPrefix("CMUX_") {
             environment.removeValue(forKey: key)

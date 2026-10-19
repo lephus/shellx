@@ -41,7 +41,7 @@ final class MemoryPressureMonitor {
     @ObservationIgnored
     private let systemPressureHoldDuration: TimeInterval
     @ObservationIgnored
-    private let queue = DispatchQueue(label: "com.cmux.memory-pressure", qos: .utility)
+    private let queue = DispatchQueue(label: "pro.shellx.memory-pressure", qos: .utility)
     @ObservationIgnored
     private var memoryPressureSource: DispatchSourceMemoryPressure?
     @ObservationIgnored

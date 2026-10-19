@@ -26,6 +26,7 @@ import CMUXAgentLaunch
 import CMUXMobileCore
 import IOSurface
 import UniformTypeIdentifiers
+import ShellXIcons
 enum GhosttyStartupAppearancePreviewState {
     #if DEBUG
     // The selected debug preview profile. Backed by the CmuxTerminalCore seam
@@ -626,7 +627,7 @@ class GhosttyApp {
             return baseURL.deletingLastPathComponent().appendingPathComponent(bgName)
         }
 
-        return URL(fileURLWithPath: "/tmp/cmux-bg.log")
+        return URL(fileURLWithPath: "/tmp/shellx-bg.log")
     }
 
     let backgroundLogEnabled = {
@@ -740,7 +741,7 @@ class GhosttyApp {
     }
 
     #if DEBUG
-    private static let initLogPath = "/tmp/cmux-ghostty-init.log"
+    private static let initLogPath = "/tmp/shellx-ghostty-init.log"
 
     private static func initLog(_ message: String) {
         let timestamp = ISO8601DateFormatter().string(from: Date())
@@ -3754,7 +3755,7 @@ class GhosttyApp {
     func logBackground(_ message: String) {
         // Skip all work (timing capture, string formatting, and disk I/O) unless
         // background logging is explicitly enabled via env/defaults. Without this
-        // guard, direct callers wrote to /tmp/cmux-bg.log on every theme/OSC color
+        // guard, direct callers wrote to /tmp/shellx-bg.log on every theme/OSC color
         // event even in normal runs.
         guard backgroundLogEnabled else { return }
         // The writer captures cheap timing values here and performs all string
@@ -3873,7 +3874,7 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         NSPasteboard.PasteboardType(UTType.heif.identifier)
     ])
     private static let tabTransferPasteboardType = NSPasteboard.PasteboardType("com.splittabbar.tabtransfer")
-    private static let sidebarTabReorderPasteboardType = NSPasteboard.PasteboardType("com.cmux.sidebar-tab-reorder")
+    private static let sidebarTabReorderPasteboardType = NSPasteboard.PasteboardType("pro.shellx.sidebar-tab-reorder")
 
     /// Resolves internal drag identity through the live registries. AppKit
     /// drag callbacks arrive on the main thread, while this view predates the
@@ -9710,8 +9711,8 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         )
         splitHorizontallyItem.target = self
         applyConfiguredMenuShortcut(KeyboardShortcutSettings.menuShortcut(for: .splitDown), to: splitHorizontallyItem)
-        splitHorizontallyItem.image = NSImage(
-            systemSymbolName: "rectangle.bottomhalf.inset.filled",
+        splitHorizontallyItem.image = ShellXIcon.nsImage(
+            "rectangle.bottomhalf.inset.filled",
             accessibilityDescription: nil
         )
 
@@ -9722,8 +9723,8 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
         )
         splitVerticallyItem.target = self
         applyConfiguredMenuShortcut(KeyboardShortcutSettings.menuShortcut(for: .splitRight), to: splitVerticallyItem)
-        splitVerticallyItem.image = NSImage(
-            systemSymbolName: "rectangle.righthalf.inset.filled",
+        splitVerticallyItem.image = ShellXIcon.nsImage(
+            "rectangle.righthalf.inset.filled",
             accessibilityDescription: nil
         )
 
@@ -9733,8 +9734,8 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
             keyEquivalent: ""
         )
         swapPaneItem.target = self
-        swapPaneItem.image = NSImage(
-            systemSymbolName: "arrow.left.arrow.right",
+        swapPaneItem.image = ShellXIcon.nsImage(
+            "arrow.left.arrow.right",
             accessibilityDescription: nil
         )
         appendCurrentSurfaceContextMenuItems(to: menu)
@@ -9744,8 +9745,8 @@ class GhosttyNSView: NSView, NSUserInterfaceValidations {
             keyEquivalent: ""
         )
         resetTerminalItem.target = self
-        resetTerminalItem.image = NSImage(
-            systemSymbolName: "arrow.trianglehead.2.clockwise",
+        resetTerminalItem.image = ShellXIcon.nsImage(
+            "arrow.trianglehead.2.clockwise",
             accessibilityDescription: nil
         )
         if appendSSHClipboardWriteTrustMenuItem(to: menu) {
@@ -10715,7 +10716,7 @@ final class GhosttySurfaceScrollView: NSView {
     private var lastDragGeometryLogSignature: String?
     private var dragLayoutLogSequence: UInt64 = 0
     private static let tabTransferPasteboardType = NSPasteboard.PasteboardType("com.splittabbar.tabtransfer")
-    private static let sidebarTabReorderPasteboardType = NSPasteboard.PasteboardType("com.cmux.sidebar-tab-reorder")
+    private static let sidebarTabReorderPasteboardType = NSPasteboard.PasteboardType("pro.shellx.sidebar-tab-reorder")
     private static var flashCounts: [UUID: Int] = [:]
     private static var drawCounts: [UUID: Int] = [:]
     private static var lastDrawTimes: [UUID: CFTimeInterval] = [:]
@@ -11011,8 +11012,8 @@ final class GhosttySurfaceScrollView: NSView {
         keyboardCopyModeBadgeView.layer?.borderColor = NSColor.white.withAlphaComponent(0.12).cgColor
         keyboardCopyModeBadgeView.alphaValue = 0.97
         keyboardCopyModeBadgeIconView.translatesAutoresizingMaskIntoConstraints = false
-        keyboardCopyModeBadgeIconView.image = NSImage(
-            systemSymbolName: "keyboard.badge.ellipsis",
+        keyboardCopyModeBadgeIconView.image = ShellXIcon.nsImage(
+            "keyboard.badge.ellipsis",
             accessibilityDescription: terminalKeyTableIndicatorAccessibilityLabel
         )
         keyboardCopyModeBadgeIconView.contentTintColor = NSColor.secondaryLabelColor
@@ -11080,8 +11081,8 @@ final class GhosttySurfaceScrollView: NSView {
         imageTransferCancelButton.translatesAutoresizingMaskIntoConstraints = false
         imageTransferCancelButton.isBordered = false
         imageTransferCancelButton.imagePosition = .imageOnly
-        imageTransferCancelButton.image = NSImage(
-            systemSymbolName: "xmark.circle.fill",
+        imageTransferCancelButton.image = ShellXIcon.nsImage(
+            "xmark.circle.fill",
             accessibilityDescription: String(localized: "common.cancel", defaultValue: "Cancel")
         )
         imageTransferCancelButton.contentTintColor = NSColor.secondaryLabelColor

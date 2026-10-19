@@ -18,7 +18,7 @@ import Security
 /// - a stable per-build installation device fingerprint, so re-enrolling on
 ///   every launch resolves to the same tunnel and the same address on the
 ///   network,
-/// - the assembled WireGuard config at `~/.cmuxterm/wireguard/<scope>.conf`
+/// - the assembled WireGuard config at `~/.shellx/wireguard/<scope>.conf`
 ///   (0600), with one key and config for each tunnel role.
 ///
 /// The terminal role runs inside the bundled cmux-tui process and needs no
@@ -226,10 +226,10 @@ public struct VMTunnelManager: Sendable {
         return String(name)
     }
 
-    /// `~/.cmuxterm/wireguard`, 0700, alongside the cmux-tui client state,
+    /// `~/.shellx/wireguard`, 0700, alongside the cmux-tui client state,
     /// which follows the same file-permission model for its device key.
     public var stateDir: URL {
-        home.appendingPathComponent(".cmuxterm", isDirectory: true)
+        home.appendingPathComponent(".shellx", isDirectory: true)
             .appendingPathComponent("wireguard", isDirectory: true)
     }
 
@@ -518,7 +518,7 @@ public struct VMTunnelManager: Sendable {
         if id.contains("nightly") { return "nightly" }
         if id.contains("staging") { return "staging" }
         if id.hasSuffix(".rc") { return "rc" }
-        if id == "com.cmuxterm.app" { return "stable" }
+        if id == "pro.shellx.desktop" { return "stable" }
         return "dev"
     }
 }

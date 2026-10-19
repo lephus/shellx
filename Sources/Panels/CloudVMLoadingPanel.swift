@@ -80,7 +80,7 @@ final class CloudVMLoadingPanel: Panel {
         if lowercased.contains("local cmux web server") || lowercased.contains("localhost:") || lowercased.contains("127.0.0.1:") {
             return String(
                 localized: "panel.cloudVM.loading.failed.localServer",
-                defaultValue: "The local cmux web server is offline. Start it and retry Open Cloud VM."
+                defaultValue: "The local ShellX web server is offline. Start it and retry Open Cloud VM."
             )
         }
         if lowercased.contains("waiting for the cloud vm service")
@@ -90,13 +90,13 @@ final class CloudVMLoadingPanel: Panel {
             || lowercased.contains("service unavailable") {
             return String(
                 localized: "panel.cloudVM.loading.failed.serviceUnavailable",
-                defaultValue: "The Cloud VM service could not create a VM yet. Retry keeps using this pinned Cloud VM slot, and once a VM exists cmux will always reattach to that same VM."
+                defaultValue: "The Cloud VM service could not create a VM yet. Retry keeps using this pinned Cloud VM slot, and once a VM exists ShellX will always reattach to that same VM."
             )
         }
         if lowercased.contains("password") || lowercased.contains("permission denied") {
             return String(
                 localized: "panel.cloudVM.loading.failed.auth",
-                defaultValue: "cmux could not open a passwordless terminal session. Try opening the Cloud VM again."
+                defaultValue: "ShellX could not open a passwordless terminal session. Try opening the Cloud VM again."
             )
         }
 

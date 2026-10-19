@@ -38,9 +38,10 @@ extension UpdateController {
             return
         }
 
-        if isDevLikeBundle {
-            // DEV/staging builds are not on the public release train (#6292).
-            log.append("manual update check suppressed (dev/staging build, intent=\(intent.rawValue))")
+        if isDevLikeBundle || !hasUpdateSigningKey {
+            // DEV/staging builds are not on the public release train (#6292), and a build
+            // without an update signing key cannot verify an update, so neither checks.
+            log.append("manual update check suppressed (\(isDevLikeBundle ? "dev/staging build" : "no update signing key"), intent=\(intent.rawValue))")
             cancelReadinessRetry()
             pendingCheckIntent = nil
             activeCheckIntent = nil

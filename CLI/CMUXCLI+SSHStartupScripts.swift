@@ -273,11 +273,11 @@ extension CMUXCLI {
         let reconnectRecoveredNote = shellQuote(sshAutoReconnectRecoveredNoteFormat())
         let launchAcknowledgementTimeoutNote = shellQuote(String(
             localized: "cli.sshPtyAttach.launchAcknowledgementTimeoutRetry",
-            defaultValue: "[cmux] cmux did not acknowledge the SSH launch; retrying %s in %ss.",
+            defaultValue: "[ShellX] ShellX did not acknowledge the SSH launch; retrying %s in %ss.",
             bundle: CLIExecutableLocator.enclosingAppBundle() ?? .main
         ))
         let terminalExitPromptCommand = [
-            shellQuote(resolvedExecutableURL()?.path ?? (args.first ?? "cmux")),
+            shellQuote(resolvedExecutableURL()?.path ?? (args.first ?? "shellx")),
             "__ssh-terminal-exit-prompt",
         ].joined(separator: " ")
         var scriptLines: [String] = []
@@ -467,7 +467,7 @@ extension CMUXCLI {
             "&& [ -n \"${CMUX_WORKSPACE_ID:-}\" ]",
             "&& [ -n \"${CMUX_SURFACE_ID:-}\" ]; then",
             "\"${CMUX_BUNDLED_CLI_PATH}\" --socket \"${CMUX_SOCKET_PATH}\" ssh-session-end --relay-port \(remoteRelayPort) --workspace \"${CMUX_WORKSPACE_ID}\" --surface \"${CMUX_SURFACE_ID}\" --terminal-lifecycle-id \"${CMUX_TERMINAL_LIFECYCLE_ID:-}\" --session-id \"${CMUX_SSH_PTY_SESSION_ID:-}\" --lifecycle-id \"${CMUX_SSH_PTY_LIFECYCLE_ID:-}\" >/dev/null 2>&1 || true;",
-            "elif command -v cmux >/dev/null 2>&1",
+            "elif command -v shellx >/dev/null 2>&1",
             "&& [ -n \"${CMUX_WORKSPACE_ID:-}\" ]",
             "&& [ -n \"${CMUX_SURFACE_ID:-}\" ]; then",
             "cmux ssh-session-end --relay-port \(remoteRelayPort) --workspace \"${CMUX_WORKSPACE_ID}\" --surface \"${CMUX_SURFACE_ID}\" --terminal-lifecycle-id \"${CMUX_TERMINAL_LIFECYCLE_ID:-}\" --session-id \"${CMUX_SSH_PTY_SESSION_ID:-}\" --lifecycle-id \"${CMUX_SSH_PTY_LIFECYCLE_ID:-}\" >/dev/null 2>&1 || true;",
@@ -489,7 +489,7 @@ extension CMUXCLI {
             "&& [ -n \"${CMUX_WORKSPACE_ID:-}\" ]",
             "&& [ -n \"${CMUX_SURFACE_ID:-}\" ]; then",
             "CMUXTERM_CLI_RESPONSE_TIMEOUT_SEC=2 \"${CMUX_BUNDLED_CLI_PATH}\" --socket \"${CMUX_SOCKET_PATH}\" \(arguments) >/dev/null 2>&1;",
-            "elif command -v cmux >/dev/null 2>&1",
+            "elif command -v shellx >/dev/null 2>&1",
             "&& [ -n \"${CMUX_SOCKET_PATH:-}\" ]",
             "&& [ -n \"${CMUX_WORKSPACE_ID:-}\" ]",
             "&& [ -n \"${CMUX_SURFACE_ID:-}\" ]; then",

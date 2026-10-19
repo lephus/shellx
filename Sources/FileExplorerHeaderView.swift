@@ -1,6 +1,7 @@
 import AppKit
 import CmuxAppKitSupportUI
 import CmuxFoundation
+import ShellXIcons
 
 /// Pure AppKit header bar with folder icon, path label, and hidden files toggle.
 final class FileExplorerHeaderView: NSView {
@@ -34,7 +35,7 @@ final class FileExplorerHeaderView: NSView {
         addSubview(iconView)
         addSubview(pathLabel)
         retryButton.translatesAutoresizingMaskIntoConstraints = false
-        retryButton.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: nil)
+        retryButton.image = ShellXIcon.nsImage("arrow.clockwise", accessibilityDescription: nil)
         retryButton.bezelStyle = .inline
         retryButton.isBordered = false
         retryButton.target = self

@@ -1,3 +1,4 @@
+import ShellXIcons
 #if DEBUG
 import CmuxCloud
 import AppKit
@@ -90,7 +91,7 @@ private struct CloudTreeStyleGalleryColumn: View {
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 4)
                 if isSelected {
-                    Label("In use", systemImage: "checkmark.circle.fill")
+                    ShellXLabel("In use", icon: "checkmark.circle.fill")
                         .font(.system(size: 10.5))
                         .foregroundStyle(.green)
                         .labelStyle(.titleAndIcon)

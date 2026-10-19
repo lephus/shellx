@@ -170,11 +170,11 @@ import Testing
         let rcFeed = "https://files.cmux.com/rc/appcast-arm64.xml"
 
         let armURL = try #require(UpdateManualDownloadRecovery(hostArchitecture: .arm64).url(for: didNotStart, feedURLString: rcFeed))
-        #expect(armURL.absoluteString == "https://github.com/manaflow-ai/cmux/releases/download/rc/cmux-rc-macos-arm64.dmg")
+        #expect(armURL.absoluteString == "https://github.com/lephus/shellx/releases/download/rc/cmux-rc-macos-arm64.dmg")
 
         let sparkleInstallFailure = NSError(domain: SUSparkleErrorDomain, code: 4005)
         let intelURL = try #require(UpdateManualDownloadRecovery(hostArchitecture: .x86_64).url(for: sparkleInstallFailure, feedURLString: rcFeed))
-        #expect(intelURL.absoluteString == "https://github.com/manaflow-ai/cmux/releases/download/rc/cmux-rc-macos-x86_64.dmg")
+        #expect(intelURL.absoluteString == "https://github.com/lephus/shellx/releases/download/rc/cmux-rc-macos-x86_64.dmg")
         #expect(!intelURL.absoluteString.contains("latest/download"))
         #expect(!intelURL.absoluteString.contains("/nightly/"))
     }
@@ -202,7 +202,7 @@ import Testing
             for: didNotStart,
             feedURLString: driver.resolvedFeedURLString()
         ))
-        #expect(recoveryURL.absoluteString == "https://github.com/manaflow-ai/cmux/releases/download/nightly/cmux-nightly-macos-arm64.dmg")
+        #expect(recoveryURL.absoluteString == "https://github.com/lephus/shellx/releases/download/nightly/cmux-nightly-macos-arm64.dmg")
 
         let recordedFeed = "https://example.com/other/appcast.xml"
         driver.recordFeedURLString(recordedFeed, usedFallback: false)
@@ -221,7 +221,7 @@ import Testing
         let error = NSError(
             domain: UpdateStateModel.updateErrorDomain,
             code: UpdateStateModel.installDidNotStartCode,
-            userInfo: [NSLocalizedDescriptionKey: "cmux couldn’t start the update. Check your internet connection and try again."]
+            userInfo: [NSLocalizedDescriptionKey: "ShellX couldn’t start the update. Check your internet connection and try again."]
         )
         let title = UpdateStateModel.userFacingErrorTitle(for: error)
         let message = UpdateStateModel.userFacingErrorMessage(for: error)

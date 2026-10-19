@@ -1,8 +1,8 @@
 import Foundation
 
 extension CMUXCLI {
-    static let ampExtensionMarker = "cmux-amp-session-extension-marker"
-    static let ampExtensionFilename = "cmux-session.ts"
+    static let ampExtensionMarker = "shellx-amp-session-extension-marker"
+    static let ampExtensionFilename = "shellx-session.ts"
     static let ampExtensionSource =
         ampExtensionPrelude
         + ampExtensionReconciliation

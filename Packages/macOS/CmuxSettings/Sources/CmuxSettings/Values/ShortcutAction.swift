@@ -27,8 +27,6 @@ public enum ShortcutAction: String, CaseIterable, Sendable, Hashable, SettingCod
     case newTab
     case newLocalWorkspace
     case newBrowserWorkspace
-    case newCloudWorkspace
-    case newCloudMachine
     case saveLayoutTemplate
     case openFolder
     case reopenPreviousSession

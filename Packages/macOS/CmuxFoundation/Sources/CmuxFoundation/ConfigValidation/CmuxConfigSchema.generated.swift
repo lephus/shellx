@@ -12,7 +12,7 @@ enum CmuxEmbeddedConfigSchema {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux.schema.json",
   "title": "cmux.json",
-  "description": "cmux configuration. Global cmux.json supports app settings, shortcuts, actions, custom commands, notification hooks, and workspace layouts. Project-local .cmux/cmux.json or cmux.json supports actions, commands, notification hooks, UI action wiring, Agent Chat overrides, vault agents, workspace-group overrides, and workspace launch/button configuration.",
+  "description": "cmux configuration. Global cmux.json supports app settings, shortcuts, actions, custom commands, notification hooks, and workspace layouts. Project-local .shellx/shellx.json or cmux.json supports actions, commands, notification hooks, UI action wiring, Agent Chat overrides, vault agents, workspace-group overrides, and workspace launch/button configuration.",
   "descriptionKey": "schemaDescriptions.root",
   "type": "object",
   "additionalProperties": false,
@@ -75,7 +75,7 @@ enum CmuxEmbeddedConfigSchema {
     },
     "actions": {
       "title": "actions",
-      "description": "Action registry used by the surface tab bar, Command Palette, shortcuts, and plus-button menu. Each entry supports type \"builtin\", \"command\", \"agent\" (any CLI agent name, e.g. claude, codex, opencode, or a custom binary, with optional args), \"workspaceCommand\", \"workspace\" (inline workspace with name/cwd/color/env/setup/layout, plus optional restart), \"setting\" (change one setting in the global cmux.json: path plus exactly one of set, toggle: true, cycle, or unset: true), or \"settingPreset\" (apply a named entry from settingPresets). Setting actions only run when declared in the global ~/.config/cmux/cmux.json or a pack it references; with confirm: true they ask before saving. Inline workspace entries are auto-offered in the new-workspace plus-button menu; set newWorkspaceMenu true/false on any action to override. \"Save Workspace as Layout\" in the plus-button menu writes entries here.",
+      "description": "Action registry used by the surface tab bar, Command Palette, shortcuts, and plus-button menu. Each entry supports type \"builtin\", \"command\", \"agent\" (any CLI agent name, e.g. claude, codex, opencode, or a custom binary, with optional args), \"workspaceCommand\", \"workspace\" (inline workspace with name/cwd/color/env/setup/layout, plus optional restart), \"setting\" (change one setting in the global cmux.json: path plus exactly one of set, toggle: true, cycle, or unset: true), or \"settingPreset\" (apply a named entry from settingPresets). Setting actions only run when declared in the global ~/.config/shellx/shellx.json or a pack it references; with confirm: true they ask before saving. Inline workspace entries are auto-offered in the new-workspace plus-button menu; set newWorkspaceMenu true/false on any action to override. \"Save Workspace as Layout\" in the plus-button menu writes entries here.",
       "type": "object",
       "additionalProperties": true
     },
@@ -724,7 +724,8 @@ enum CmuxEmbeddedConfigSchema {
             "pt-BR",
             "ru",
             "th",
-            "tr"
+            "tr",
+            "vi"
           ],
           "default": "system",
           "description": "Preferred app language."
@@ -1374,7 +1375,7 @@ enum CmuxEmbeddedConfigSchema {
                 "type": "string",
                 "minLength": 1,
                 "pattern": "\\S",
-                "description": "Shell command run via /bin/sh -c, once per file. It receives the file and endpoint on its environment (CMUX_UPLOAD_LOCAL_PATH, CMUX_UPLOAD_REMOTE_PATH, CMUX_UPLOAD_DESTINATION, CMUX_UPLOAD_PORT, CMUX_UPLOAD_IDENTITY_FILE, CMUX_UPLOAD_SSH_OPTIONS). CMUX_UPLOAD_REMOTE_PATH is an absolute /tmp/cmux-drop-<uuid>.<ext> path whose parent already exists; the extension is lowercased. The command owns file permissions and cleanup. Its stdout is what cmux inserts at the cursor."
+                "description": "Shell command run via /bin/sh -c, once per file. It receives the file and endpoint on its environment (CMUX_UPLOAD_LOCAL_PATH, CMUX_UPLOAD_REMOTE_PATH, CMUX_UPLOAD_DESTINATION, CMUX_UPLOAD_PORT, CMUX_UPLOAD_IDENTITY_FILE, CMUX_UPLOAD_SSH_OPTIONS). CMUX_UPLOAD_REMOTE_PATH is an absolute /tmp/shellx-drop-<uuid>.<ext> path whose parent already exists; the extension is lowercased. The command owns file permissions and cleanup. Its stdout is what cmux inserts at the cursor."
               },
               "enabled": {
                 "type": "boolean",
@@ -1943,12 +1944,12 @@ enum CmuxEmbeddedConfigSchema {
       "properties": {
         "matchTerminalBackground": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Use the terminal background instead of the sidebar tint."
         },
         "tintColor": {
           "$ref": "#/$defs/colorHex",
-          "default": "#000000",
+          "default": "#100B1D",
           "description": "Base sidebar tint color used when light/dark overrides are not set."
         },
         "lightModeTintColor": {
@@ -1965,7 +1966,7 @@ enum CmuxEmbeddedConfigSchema {
           "type": "number",
           "minimum": 0,
           "maximum": 1,
-          "default": 0.18,
+          "default": 1.0,
           "description": "Sidebar tint opacity from 0 to 1. Note: this only controls the sidebar tint, not terminal/window transparency. For terminal background transparency or blur, set `background-opacity` and `background-blur` in `~/.config/ghostty/config` and run `cmux reload-config`."
         }
       }
@@ -2537,8 +2538,6 @@ enum CmuxEmbeddedConfigSchema {
               "newTab",
               "newLocalWorkspace",
               "newBrowserWorkspace",
-              "newCloudWorkspace",
-              "newCloudMachine",
               "saveLayoutTemplate",
               "openFolder",
               "reopenPreviousSession",

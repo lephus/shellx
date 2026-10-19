@@ -2,6 +2,7 @@ import AppKit
 import Bonsplit
 import CmuxWorkspaces
 import SwiftUI
+import ShellXBrand
 
 /// Owns the single iOS pairing window and presents it on demand.
 ///
@@ -35,6 +36,8 @@ final class MobilePairingWindowController: ReleasingWindowController {
 
     /// Brings the pairing window to the front, creating it if needed.
     func show() {
+        // ShellX: phone pairing is parked until Wave 2 flips `remoteMachines`.
+        guard ShellXFeatures.remoteMachines else { return }
         NSApp.activate(ignoringOtherApps: true)
 
         let window = managedWindow()

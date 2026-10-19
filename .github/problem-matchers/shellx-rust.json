@@ -1,0 +1,19 @@
+{
+  "problemMatcher": [
+    {
+      "owner": "shellx-rustc",
+      "severity": "error",
+      "pattern": [
+        { "regexp": "^error(?:\\[E\\d+\\])?: (.*)$", "message": 1 },
+        { "regexp": "^\\s+--> (.*?):(\\d+):(\\d+)$", "file": 1, "line": 2, "column": 3 }
+      ]
+    },
+    {
+      "owner": "shellx-rustc-nolocation",
+      "severity": "error",
+      "pattern": [
+        { "regexp": "^(error: .*|thread '.*' panicked at .*|test .* FAILED|.*smoke.*FAIL.*|.*FAIL: .*)$", "message": 1 }
+      ]
+    }
+  ]
+}

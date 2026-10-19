@@ -145,7 +145,7 @@ extension TerminalController {
         if let requested = params["transport"] as? String, RemoteTmuxTransportKind.parse(requested) == nil {
             return String(
                 localized: "socket.remoteTmux.transportUnknown",
-                defaultValue: "transport is not one cmux knows; use ssh or et"
+                defaultValue: "transport is not one ShellX knows; use ssh or et"
             )
         }
         if let transportPort = params["transport_port"] as? Int, !(1...65535).contains(transportPort) {
@@ -179,7 +179,7 @@ extension TerminalController {
         case .unknown(let name):
             return String(
                 localized: "socket.remoteTmux.brokerUnknown",
-                defaultValue: "no broker named '\(name)' is declared under remoteTmux.brokers in cmux.json"
+                defaultValue: "no broker named '\(name)' is declared under remoteTmux.brokers in shellx.json"
             )
         case .unusable(let name, let reason):
             return String(

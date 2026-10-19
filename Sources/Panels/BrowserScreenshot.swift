@@ -3,6 +3,7 @@ import CmuxBrowser
 import CmuxFoundation
 import ObjectiveC
 import QuartzCore
+import ShellXIcons
 
 @MainActor
 private final class BrowserScreenshotFlashView: NSView, CAAnimationDelegate {
@@ -352,7 +353,7 @@ extension CmuxWebView {
         for (title, action, symbolName) in items {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
             item.target = self
-            item.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: title)
+            item.image = ShellXIcon.nsImage(symbolName, accessibilityDescription: title)
             menu.addItem(item)
         }
     }

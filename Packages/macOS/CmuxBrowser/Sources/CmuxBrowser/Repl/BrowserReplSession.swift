@@ -613,10 +613,10 @@ public final class BrowserReplSession: @unchecked Sendable {
         self.sleeper = sleeper
         // The stack is in use until the thread ends, which close() only
         // queues behind the work already on it: it is given back then.
-        self.thread = BrowserReplJSThread(name: "com.cmux.browser-repl.\(id)") {
+        self.thread = BrowserReplJSThread(name: "pro.shellx.browser-repl.\(id)") {
             ledger.releaseAll([.threadStackBytes])
         }
-        self.eventQueue = DispatchQueue(label: "com.cmux.browser-repl.events.\(id)", qos: .userInitiated)
+        self.eventQueue = DispatchQueue(label: "pro.shellx.browser-repl.events.\(id)", qos: .userInitiated)
         self.fetcher = BrowserReplFetcher(driver: driver, ledger: ledger)
         let writeBudget = BrowserReplWriteBudget(ledger: ledger)
         self.writeBudget = writeBudget

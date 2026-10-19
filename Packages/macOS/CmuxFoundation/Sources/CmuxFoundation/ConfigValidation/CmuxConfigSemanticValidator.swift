@@ -67,7 +67,7 @@ public struct CmuxConfigSemanticValidator {
                     path: path,
                     message: CmuxConfigValidationLocalization().string(
                         "config.validation.scope.globalOnly",
-                        defaultValue: "is only supported in the global cmux.json"
+                        defaultValue: "is only supported in the global shellx.json"
                     )
                 )
             ]

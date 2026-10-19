@@ -21,7 +21,7 @@ final class HookPromptLengthUITests: XCTestCase {
         let products = Bundle(for: Self.self).bundleURL
             .deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
-        let appURL = try XCTUnwrap(["cmux DEV", "cmux"].map {
+        let appURL = try XCTUnwrap(["ShellX DEV", "ShellX"].map {
             products.appendingPathComponent("\($0).app")
         }.first { FileManager.default.isExecutableFile(atPath:
             $0.appendingPathComponent("Contents/MacOS/\($0.deletingPathExtension().lastPathComponent)").path

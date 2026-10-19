@@ -127,7 +127,7 @@ func defaultClaudeHookTmuxProbe(deadline time.Time) claudeHookTmuxProbe {
 			if err != nil || home == "" {
 				return socketPath
 			}
-			return claudeHookLiveRelay(socketPath, clientPID, claudeRelayProcessTree, filepath.Join(home, ".cmux", "relay"))
+			return claudeHookLiveRelay(socketPath, clientPID, claudeRelayProcessTree, filepath.Join(home, remoteStateDirName, "relay"))
 		},
 	}
 }

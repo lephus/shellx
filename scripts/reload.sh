@@ -8,10 +8,10 @@ source "$SCRIPT_DIR/lib/mobile-attach.sh"
 # shellcheck source=scripts/lib/dev-secrets.sh
 source "$SCRIPT_DIR/lib/dev-secrets.sh"
 
-APP_NAME="cmux DEV"
-BUNDLE_ID="com.cmuxterm.app.debug"
-BASE_APP_NAME="cmux DEV"
-# The configuration xcodebuild builds and the app it produces (Release: cmux.app).
+APP_NAME="ShellX DEV"
+BUNDLE_ID="pro.shellx.desktop.debug"
+BASE_APP_NAME="ShellX DEV"
+# The configuration xcodebuild builds and the app it produces (Release: ShellX.app).
 BUILD_CONFIGURATION="Debug"
 PRODUCT_APP_NAME="$BASE_APP_NAME"
 DERIVED_DATA=""
@@ -40,7 +40,7 @@ AUTH_EXPECTED_ACCOUNT=""
 CMUX_TUI_CLIENT_MANIFEST_URL_VALUE=""
 CLI_PATH=""
 NO_GLOBAL_CLI_LINKS="${CMUX_RELOAD_NO_GLOBAL_CLI_LINKS:-0}"
-# Matches CmuxStateDirectory (non-TCC ~/.local/state/cmux) where the app/CLI now
+# Matches CmuxStateDirectory (non-TCC ~/.local/state/shellx) where the app/CLI now
 # read the last-socket-path markers (https://github.com/manaflow-ai/cmux/issues/5146).
 # Resolve the real account home via getpwuid (the same syscall
 # homeDirectoryForCurrentUser uses) rather than $HOME, which a shell can override.
@@ -49,8 +49,8 @@ NO_GLOBAL_CLI_LINKS="${CMUX_RELOAD_NO_GLOBAL_CLI_LINKS:-0}"
 # a second line. `|| true` keeps the lookup from aborting the script under
 # `set -euo pipefail`; an empty result falls back to $HOME.
 _cmux_account_home="$(perl -e 'print((getpwuid($<))[7])' 2>/dev/null || true)"
-LAST_SOCKET_PATH_DIR="${_cmux_account_home:-$HOME}/.local/state/cmux"
-LEGACY_SOCKET_PATH_DIR="${_cmux_account_home:-$HOME}/Library/Application Support/cmux"
+LAST_SOCKET_PATH_DIR="${_cmux_account_home:-$HOME}/.local/state/shellx"
+LEGACY_SOCKET_PATH_DIR="${_cmux_account_home:-$HOME}/Library/Application Support/ShellX"
 SWIFT_FRONTEND_WORKAROUND=0
 XCODEBUILD_STARTED=0
 XCODEBUILD_OUTPUT_VALID=0
@@ -361,7 +361,7 @@ reload_cleanup_tag_state_with_lock() {
       close($fh);
       exit 1;
     }
-    my $cli_suffix = "/cmux DEV ${slug}.app/Contents/Resources/bin/cmux";
+    my $cli_suffix = "/ShellX DEV ${slug}.app/Contents/Resources/bin/shellx";
     my $pointer_ok = length($publish_cli_path)
       ? write_discovery_file($pointer_path, $publish_cli_path)
       : clear_matching_discovery_file($pointer_path, $cli_suffix, 1);
@@ -403,68 +403,68 @@ derive_socket_marker_names() {
   # uses the unscoped nightly/rc/staging/dev marker name.
   bundle_id="$(printf '%s' "$bundle_id" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
   CMUX_RELOAD_MARKER_NAME="last-socket-path"
-  CMUX_RELOAD_TMP_MARKER="/tmp/cmux-last-socket-path"
+  CMUX_RELOAD_TMP_MARKER="/tmp/shellx-last-socket-path"
   case "$bundle_id" in
-    com.cmuxterm.app.nightly)
+    pro.shellx.desktop.nightly)
       CMUX_RELOAD_MARKER_NAME="nightly-last-socket-path"
-      CMUX_RELOAD_TMP_MARKER="/tmp/cmux-nightly-last-socket-path"
+      CMUX_RELOAD_TMP_MARKER="/tmp/shellx-nightly-last-socket-path"
       ;;
-    com.cmuxterm.app.nightly.*)
-      variant_slug="$(sanitize_path "${bundle_id#com.cmuxterm.app.nightly.}")"
+    pro.shellx.desktop.nightly.*)
+      variant_slug="$(sanitize_path "${bundle_id#pro.shellx.desktop.nightly.}")"
       if [[ -n "$variant_slug" ]]; then
         CMUX_RELOAD_MARKER_NAME="nightly-${variant_slug}-last-socket-path"
-        CMUX_RELOAD_TMP_MARKER="/tmp/cmux-nightly-${variant_slug}-last-socket-path"
+        CMUX_RELOAD_TMP_MARKER="/tmp/shellx-nightly-${variant_slug}-last-socket-path"
       else
         CMUX_RELOAD_MARKER_NAME="nightly-last-socket-path"
-        CMUX_RELOAD_TMP_MARKER="/tmp/cmux-nightly-last-socket-path"
+        CMUX_RELOAD_TMP_MARKER="/tmp/shellx-nightly-last-socket-path"
       fi
       ;;
-    com.cmuxterm.app.rc)
+    pro.shellx.desktop.rc)
       CMUX_RELOAD_MARKER_NAME="rc-last-socket-path"
-      CMUX_RELOAD_TMP_MARKER="/tmp/cmux-rc-last-socket-path"
+      CMUX_RELOAD_TMP_MARKER="/tmp/shellx-rc-last-socket-path"
       ;;
-    com.cmuxterm.app.rc.*)
-      variant_slug="$(sanitize_path "${bundle_id#com.cmuxterm.app.rc.}")"
+    pro.shellx.desktop.rc.*)
+      variant_slug="$(sanitize_path "${bundle_id#pro.shellx.desktop.rc.}")"
       if [[ -n "$variant_slug" ]]; then
         CMUX_RELOAD_MARKER_NAME="rc-${variant_slug}-last-socket-path"
-        CMUX_RELOAD_TMP_MARKER="/tmp/cmux-rc-${variant_slug}-last-socket-path"
+        CMUX_RELOAD_TMP_MARKER="/tmp/shellx-rc-${variant_slug}-last-socket-path"
       else
         CMUX_RELOAD_MARKER_NAME="rc-last-socket-path"
-        CMUX_RELOAD_TMP_MARKER="/tmp/cmux-rc-last-socket-path"
+        CMUX_RELOAD_TMP_MARKER="/tmp/shellx-rc-last-socket-path"
       fi
       ;;
-    com.cmuxterm.app.staging)
+    pro.shellx.desktop.staging)
       CMUX_RELOAD_MARKER_NAME="staging-last-socket-path"
-      CMUX_RELOAD_TMP_MARKER="/tmp/cmux-staging-last-socket-path"
+      CMUX_RELOAD_TMP_MARKER="/tmp/shellx-staging-last-socket-path"
       ;;
-    com.cmuxterm.app.staging.*)
-      variant_slug="$(sanitize_path "${bundle_id#com.cmuxterm.app.staging.}")"
+    pro.shellx.desktop.staging.*)
+      variant_slug="$(sanitize_path "${bundle_id#pro.shellx.desktop.staging.}")"
       if [[ -n "$variant_slug" ]]; then
         CMUX_RELOAD_MARKER_NAME="staging-${variant_slug}-last-socket-path"
-        CMUX_RELOAD_TMP_MARKER="/tmp/cmux-staging-${variant_slug}-last-socket-path"
+        CMUX_RELOAD_TMP_MARKER="/tmp/shellx-staging-${variant_slug}-last-socket-path"
       else
         CMUX_RELOAD_MARKER_NAME="staging-last-socket-path"
-        CMUX_RELOAD_TMP_MARKER="/tmp/cmux-staging-last-socket-path"
+        CMUX_RELOAD_TMP_MARKER="/tmp/shellx-staging-last-socket-path"
       fi
       ;;
-    com.cmuxterm.app.debug)
+    pro.shellx.desktop.debug)
       variant_slug="$(sanitize_path "$tag_slug")"
       if [[ -n "$variant_slug" ]]; then
         CMUX_RELOAD_MARKER_NAME="dev-${variant_slug}-last-socket-path"
-        CMUX_RELOAD_TMP_MARKER="/tmp/cmux-dev-${variant_slug}-last-socket-path"
+        CMUX_RELOAD_TMP_MARKER="/tmp/shellx-dev-${variant_slug}-last-socket-path"
       else
         CMUX_RELOAD_MARKER_NAME="dev-last-socket-path"
-        CMUX_RELOAD_TMP_MARKER="/tmp/cmux-dev-last-socket-path"
+        CMUX_RELOAD_TMP_MARKER="/tmp/shellx-dev-last-socket-path"
       fi
       ;;
-    com.cmuxterm.app.debug.*)
-      variant_slug="$(sanitize_path "${bundle_id#com.cmuxterm.app.debug.}")"
+    pro.shellx.desktop.debug.*)
+      variant_slug="$(sanitize_path "${bundle_id#pro.shellx.desktop.debug.}")"
       if [[ -n "$variant_slug" ]]; then
         CMUX_RELOAD_MARKER_NAME="dev-${variant_slug}-last-socket-path"
-        CMUX_RELOAD_TMP_MARKER="/tmp/cmux-dev-${variant_slug}-last-socket-path"
+        CMUX_RELOAD_TMP_MARKER="/tmp/shellx-dev-${variant_slug}-last-socket-path"
       else
         CMUX_RELOAD_MARKER_NAME="dev-last-socket-path"
-        CMUX_RELOAD_TMP_MARKER="/tmp/cmux-dev-last-socket-path"
+        CMUX_RELOAD_TMP_MARKER="/tmp/shellx-dev-last-socket-path"
       fi
       ;;
   esac
@@ -472,7 +472,7 @@ derive_socket_marker_names() {
 
 cleanup_stale_tag_state() {
   local slug="$1"
-  local socket_path="${2:-/tmp/cmux-debug-${slug}.sock}"
+  local socket_path="${2:-/tmp/shellx-debug-${slug}.sock}"
   local publish_socket_path="${3:-}"
   local publish_cli_path="${4:-}"
   derive_socket_marker_names "${BUNDLE_ID:-}" "$slug"
@@ -483,7 +483,7 @@ cleanup_stale_tag_state() {
 
   # The Perl transaction performs the liveness probe after acquiring the tag
   # lock, so validation, stale-node removal, and publication share one owner.
-  local pointer_path="/tmp/cmux-last-cli-path"
+  local pointer_path="/tmp/shellx-last-cli-path"
   if [[ -n "$publish_socket_path" ]]; then
     mkdir -p "$LAST_SOCKET_PATH_DIR" || return 1
   fi
@@ -499,7 +499,7 @@ cleanup_stale_tag_state() {
 }
 
 cleanup_stale_cli_pointer_target() {
-  local pointer_path="/tmp/cmux-last-cli-path"
+  local pointer_path="/tmp/shellx-last-cli-path"
   [[ -f "$pointer_path" && ! -L "$pointer_path" ]] || return 0
   local cli_path=""
   cli_path="$(LC_ALL=C /usr/bin/head -c 4097 "$pointer_path" 2>/dev/null | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' || true)"
@@ -507,8 +507,8 @@ cleanup_stale_cli_pointer_target() {
   [[ -n "$cli_path" ]] || return 0
   local bundle_path=""
   case "$cli_path" in
-    */Contents/Resources/bin/cmux)
-      bundle_path="${cli_path%/Contents/Resources/bin/cmux}"
+    */Contents/Resources/bin/shellx)
+      bundle_path="${cli_path%/Contents/Resources/bin/shellx}"
       ;;
     *)
       return 0
@@ -516,15 +516,15 @@ cleanup_stale_cli_pointer_target() {
   esac
   local app_name="${bundle_path##*/}"
   app_name="${app_name%.app}"
-  [[ "$app_name" == "cmux DEV "* ]] || return 0
-  local slug="${app_name#cmux DEV }"
+  [[ "$app_name" == "ShellX DEV "* ]] || return 0
+  local slug="${app_name#ShellX DEV }"
   [[ "$slug" =~ ^[A-Za-z0-9_-]+$ ]] || return 0
   local socket_path=""
   if [[ -x /usr/libexec/PlistBuddy && -f "$bundle_path/Contents/Info.plist" ]]; then
     socket_path="$(/usr/libexec/PlistBuddy -c 'Print :LSEnvironment:CMUX_SOCKET_PATH' "$bundle_path/Contents/Info.plist" 2>/dev/null || true)"
   fi
   socket_path="$(printf '%s' "$socket_path" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-  cleanup_stale_tag_state "$slug" "${socket_path:-/tmp/cmux-debug-${slug}.sock}"
+  cleanup_stale_tag_state "$slug" "${socket_path:-/tmp/shellx-debug-${slug}.sock}"
 }
 
 wait_for_tag_socket_lock_release() {
@@ -576,7 +576,7 @@ should_skip_ghostty_cli_helper_zig_build() {
 write_dev_cli_shim() {
   local target="$1"
   local fallback_bin="$2"
-  local cli_path_file="${3:-/tmp/cmux-last-cli-path}"
+  local cli_path_file="${3:-/tmp/shellx-last-cli-path}"
   local cli_path_file_literal=""
   local fallback_bin_literal=""
   local socket_probe_function=""
@@ -636,10 +636,10 @@ bundle_socket_path() {
 
   local app_name="\${bundle_path##*/}"
   app_name="\${app_name%.app}"
-  if [[ "\$app_name" == "cmux DEV "* ]]; then
-    local tag="\${app_name#cmux DEV }"
+  if [[ "\$app_name" == "ShellX DEV "* ]]; then
+    local tag="\${app_name#ShellX DEV }"
     [[ "\$tag" =~ ^[A-Za-z0-9_-]+\$ ]] || return 1
-    printf '/tmp/cmux-debug-%s.sock\\n' "\$tag"
+    printf '/tmp/shellx-debug-%s.sock\\n' "\$tag"
     return 0
   fi
   return 1
@@ -661,14 +661,14 @@ if [[ -n "\${CMUX_SOCKET_PATH:-}" || -n "\${CMUX_SOCKET:-}" ]]; then
 fi
 if [[ -n "\$SOCKET_ARG" ]]; then
   SOCKET_NAME="\$(basename "\$SOCKET_ARG")"
-  if [[ "\$SOCKET_NAME" == cmux-debug-*.sock ]]; then
-    TAG="\${SOCKET_NAME#cmux-debug-}"
+  if [[ "\$SOCKET_NAME" == shellx-debug-*.sock ]]; then
+    TAG="\${SOCKET_NAME#shellx-debug-}"
     TAG="\${TAG%.sock}"
     if [[ "\$TAG" =~ ^[A-Za-z0-9_-]+$ ]]; then
-      # reload.sh links /tmp/cmux-<tag> to the DerivedData it built the tag into,
+      # reload.sh links /tmp/shellx-<tag> to the DerivedData it built the tag into,
       # which is not the per-tag default when tags share one.
-      TAG_CLI_SUFFIX="cmux DEV \$TAG.app/Contents/Resources/bin/cmux"
-      for TAG_CLI in "/tmp/cmux-\$TAG"/Build/Products/{Debug,Release}/"\$TAG_CLI_SUFFIX" \
+      TAG_CLI_SUFFIX="ShellX DEV \$TAG.app/Contents/Resources/bin/shellx"
+      for TAG_CLI in "/tmp/shellx-\$TAG"/Build/Products/{Debug,Release}/"\$TAG_CLI_SUFFIX" \
         "\$HOME/Library/Developer/Xcode/DerivedData/cmux-\$TAG"/Build/Products/{Debug,Release}/"\$TAG_CLI_SUFFIX"; do
         # /tmp is shared, so only trust a CLI this user owns.
         [[ -O "\$TAG_CLI" ]] || continue
@@ -714,15 +714,15 @@ if [[ -x ${fallback_bin_literal} ]]; then
   exec ${fallback_bin_literal} "\$@"
 fi
 
-echo "error: no reload-selected dev cmux CLI found. Run ./scripts/reload.sh --tag <name> first." >&2
+echo "error: no reload-selected dev ShellX CLI found. Run ./scripts/reload.sh --tag <name> first." >&2
 exit 1
 EOF
   chmod +x "$target"
 }
 
 select_cmux_shim_target() {
-  local app_cli_dir="/Applications/cmux.app/Contents/Resources/bin"
-  local marker="cmux dev shim (managed by scripts/reload.sh)"
+  local app_cli_dir="/Applications/ShellX.app/Contents/Resources/bin"
+  local marker="shellx dev shim (managed by scripts/reload.sh)"
   local target=""
   local path_entry=""
   local candidate=""
@@ -739,7 +739,7 @@ select_cmux_shim_target() {
       break
     fi
     [[ -d "$path_entry" && -w "$path_entry" ]] || continue
-    candidate="$path_entry/cmux"
+    candidate="$path_entry/shellx"
     if [[ ! -e "$candidate" ]]; then
       target="$candidate"
       break
@@ -758,7 +758,7 @@ select_cmux_shim_target() {
   # Fallback for PATH layouts where app CLI isn't listed or no earlier entries were writable.
   for path_entry in /opt/homebrew/bin /usr/local/bin "$HOME/.local/bin" "$HOME/bin"; do
     [[ -d "$path_entry" && -w "$path_entry" ]] || continue
-    candidate="$path_entry/cmux"
+    candidate="$path_entry/shellx"
     if [[ ! -e "$candidate" ]]; then
       echo "$candidate"
       return 0
@@ -781,15 +781,15 @@ publish_reload_cli_links() {
     return 0
   fi
 
-  ln -sfn "$cli_path" /tmp/cmux-cli || true
+  ln -sfn "$cli_path" /tmp/shellx-cli || true
 
   # Stable shim that always follows the last reload-selected dev CLI.
-  DEV_CLI_SHIM="$HOME/.local/bin/cmux-dev"
-  write_dev_cli_shim "$DEV_CLI_SHIM" "/Applications/cmux.app/Contents/Resources/bin/cmux"
+  DEV_CLI_SHIM="$HOME/.local/bin/shellx-dev"
+  write_dev_cli_shim "$DEV_CLI_SHIM" "/Applications/ShellX.app/Contents/Resources/bin/shellx"
 
   CMUX_SHIM_TARGET="$(select_cmux_shim_target || true)"
   if [[ -n "${CMUX_SHIM_TARGET:-}" ]]; then
-    write_dev_cli_shim "$CMUX_SHIM_TARGET" "/Applications/cmux.app/Contents/Resources/bin/cmux"
+    write_dev_cli_shim "$CMUX_SHIM_TARGET" "/Applications/ShellX.app/Contents/Resources/bin/shellx"
   fi
 }
 
@@ -802,7 +802,7 @@ publish_reload_cli_path() {
     return 0
   fi
 
-  reload_write_cli_pointer "/tmp/cmux-last-cli-path" "$cli_path" || return 1
+  reload_write_cli_pointer "/tmp/shellx-last-cli-path" "$cli_path" || return 1
   publish_reload_cli_links "$cli_path"
 }
 
@@ -935,7 +935,7 @@ Options:
                          Defaults to CMUX_DERIVED_DATA when set (an absolute
                          path to a DerivedData kept warm for this checkout and
                          shared by its tags), else one directory per tag.
-  --no-global-cli-links  Do not update /tmp/cmux-cli, /tmp/cmux-last-cli-path,
+  --no-global-cli-links  Do not update /tmp/shellx-cli, /tmp/shellx-last-cli-path,
                          or PATH cmux-dev shims. Useful for isolated dogfood.
   --swift-frontend-workaround
                          Work around Swift arm64 frontend spins for this reload
@@ -1156,13 +1156,13 @@ validate_app_bundle() {
 # that is not the tag's own may hold other tags, so only the tag's app is removed from it.
 tag_build_cleanup_paths() {
   local tag="$1" derived="${2:-}"
-  local own="" link="/tmp/cmux-${tag}"
+  local own="" link="/tmp/shellx-${tag}"
   own="$(tagged_derived_data_path "$tag")"
   if [[ -z "$derived" && -L "$link" ]]; then
     derived="$(readlink "$link" 2>/dev/null || true)"
   fi
   if [[ -n "$derived" && "$derived" != "$own" && "$derived" != "$link" ]]; then
-    printf '%q ' "${derived%/}/Build/Products/Debug/cmux DEV ${tag}.app" "${derived%/}/Build/Products/Release/cmux DEV ${tag}.app"
+    printf '%q ' "${derived%/}/Build/Products/Debug/ShellX DEV ${tag}.app" "${derived%/}/Build/Products/Release/ShellX DEV ${tag}.app"
     [[ -d "$own" ]] || return 0
   fi
   printf '%q ' "$own"
@@ -1173,10 +1173,10 @@ tag_build_cleanup_paths() {
 # argument is escaped with %q instead of being wrapped in quotes.
 print_tag_cleanup_commands() {
   local tag="$1" derived="${2:-}"
-  printf '  pkill -f %q\n' "cmux DEV ${tag}.app/Contents/MacOS/cmux DEV"
-  printf '  rm -rf %s%q %q\n' "$(tag_build_cleanup_paths "$tag" "$derived")" "/tmp/cmux-${tag}" "/tmp/cmux-debug-${tag}.sock"
-  printf '  rm -f %q\n' "/tmp/cmux-debug-${tag}.log"
-  printf '  rm -f %q\n' "$HOME/Library/Application Support/cmux/cmuxd-dev-${tag}.sock"
+  printf '  pkill -f %q\n' "ShellX DEV ${tag}.app/Contents/MacOS/ShellX DEV"
+  printf '  rm -rf %s%q %q\n' "$(tag_build_cleanup_paths "$tag" "$derived")" "/tmp/shellx-${tag}" "/tmp/shellx-debug-${tag}.sock"
+  printf '  rm -f %q\n' "/tmp/shellx-debug-${tag}.log"
+  printf '  rm -f %q\n' "$HOME/Library/Application Support/ShellX/cmuxd-dev-${tag}.sock"
 }
 
 print_tag_cleanup_reminder() {
@@ -1188,8 +1188,8 @@ print_tag_cleanup_reminder() {
   local -a stale_tags=()
 
   while IFS= read -r -d '' path; do
-    if [[ "$path" == /tmp/cmux-* ]]; then
-      tag="${path#/tmp/cmux-}"
+    if [[ "$path" == /tmp/shellx-* ]]; then
+      tag="${path#/tmp/shellx-}"
     elif [[ "$path" == "$HOME/Library/Developer/Xcode/DerivedData/cmux-"* ]]; then
       tag="${path#"$HOME"/Library/Developer/Xcode/DerivedData/cmux-}"
     else
@@ -1213,7 +1213,7 @@ print_tag_cleanup_reminder() {
     stale_tags+=("$tag")
   done < <(
     # The trailing slash makes find descend when /tmp is itself a symlink.
-    find /tmp/ -maxdepth 1 -name 'cmux-*' -print0 2>/dev/null
+    find /tmp/ -maxdepth 1 -name 'shellx-*' -print0 2>/dev/null
     find "$HOME/Library/Developer/Xcode/DerivedData" -maxdepth 1 -type d -name 'cmux-*' -print0 2>/dev/null
   )
 
@@ -1263,8 +1263,9 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       BUNDLE_ID_LOWER="$(printf '%s' "$BUNDLE_ID" | tr '[:upper:]' '[:lower:]')"
-      if [[ "$BUNDLE_ID_LOWER" == "com.cmuxterm.app" || ( "$BUNDLE_ID_LOWER" == com.cmuxterm.app.* && "$BUNDLE_ID_LOWER" != com.cmuxterm.app.debug.* ) ]]; then
-        echo "error: --bundle-id $BUNDLE_ID is not a com.cmuxterm.app.debug.* id; reload.sh would quit a user's running cmux" >&2
+      # ShellX's own release/channel ids and every cmux id belong to apps a user runs.
+      if [[ "$BUNDLE_ID_LOWER" == "pro.shellx.desktop" || ( "$BUNDLE_ID_LOWER" == pro.shellx.desktop.* && "$BUNDLE_ID_LOWER" != pro.shellx.desktop.debug.* ) || "$BUNDLE_ID_LOWER" == "com.cmuxterm.app" || "$BUNDLE_ID_LOWER" == com.cmuxterm.app.* ]]; then
+        echo "error: --bundle-id $BUNDLE_ID is not a pro.shellx.desktop.debug.* id; reload.sh would quit a user's running ShellX or cmux" >&2
         exit 1
       fi
       BUNDLE_SET=1
@@ -1360,11 +1361,11 @@ if [[ -z "$TAG" ]]; then
   exit 1
 fi
 
-# Release's product is cmux.app, which the tag step stages as the tagged app. It
+# Release's product is ShellX.app, which the tag step stages as the tagged app. It
 # bundles the pinned cmux-tui by default; dogfood the checkout's own instead. Its
 # entitlements need a signing team, and the tagged app is signed ad hoc.
 if [[ "$BUILD_CONFIGURATION" == Release ]]; then
-  PRODUCT_APP_NAME="cmux"
+  PRODUCT_APP_NAME="ShellX"
   export CMUX_NEXT_TUI_MODE=tree
 fi
 
@@ -1433,10 +1434,10 @@ if [[ -n "$TAG" ]]; then
       "$TAG_SLUG" "$0" "${RELOAD_ORIGINAL_ARGS[@]}"
   fi
   if [[ "$NAME_SET" -eq 0 ]]; then
-    APP_NAME="cmux DEV ${TAG_SLUG}"
+    APP_NAME="ShellX DEV ${TAG_SLUG}"
   fi
   if [[ "$BUNDLE_SET" -eq 0 ]]; then
-    BUNDLE_ID="com.cmuxterm.app.debug.${TAG_ID}"
+    BUNDLE_ID="pro.shellx.desktop.debug.${TAG_ID}"
   fi
   DERIVED_DATA="$(resolve_tagged_derived_data "$TAG_SLUG" "$DERIVED_SET" "${DERIVED_DATA:-}")"
   if [[ "$BUILD_ONLY" -ne 1 ]]; then
@@ -1507,7 +1508,7 @@ fi
 # Quiet logging: capture all noisy build output (xcodebuild, zig, codesign,
 # plistbuddy, etc.) to a single log file. On success we print only a one-line
 # summary plus the App/CLI paths. On failure we dump the log.
-RELOAD_LOG="/tmp/cmux-reload-${TAG_SLUG}.log"
+RELOAD_LOG="/tmp/shellx-reload-${TAG_SLUG}.log"
 RELOAD_START_TIME="$(date +%s)"
 : > "$RELOAD_LOG"
 
@@ -1574,7 +1575,7 @@ reload_finalize() {
     echo "  $CMUX_IROH_BROKER_BASE_URL_VALUE"
     if [[ -n "${TAG_SLUG:-}" ]]; then
       echo "Dev web command:"
-      echo "  cd web && CMUX_PORT=$CMUX_DEV_PORT CMUX_PORT_RANGE=$CMUX_DEV_PORT_RANGE CMUX_PORT_END=$CMUX_DEV_PORT_END CMUX_AUTH_CALLBACK_SCHEME=cmux-dev-$TAG_SLUG bun dev"
+      echo "  cd web && CMUX_PORT=$CMUX_DEV_PORT CMUX_PORT_RANGE=$CMUX_DEV_PORT_RANGE CMUX_PORT_END=$CMUX_DEV_PORT_END CMUX_AUTH_CALLBACK_SCHEME=shellx-dev-$TAG_SLUG bun dev"
     fi
   fi
   if [[ "$BUILD_ONLY" -ne 1 && -x "${CLI_PATH:-}" ]]; then
@@ -1587,8 +1588,8 @@ reload_finalize() {
     elif [[ "${CAN_PUBLISH_RELOAD_STATE:-1}" -ne 1 ]]; then
       echo "  not published: ${RELOAD_PUBLICATION_SKIP_REASON:-tag discovery ownership could not be verified}"
     else
-      echo "  /tmp/cmux-cli ..."
-      echo "  $HOME/.local/bin/cmux-dev ..."
+      echo "  /tmp/shellx-cli ..."
+      echo "  $HOME/.local/bin/shellx-dev ..."
       if [[ -n "${CMUX_SHIM_TARGET:-}" ]]; then
         echo "  $CMUX_SHIM_TARGET ..."
       fi
@@ -1692,7 +1693,7 @@ fi
 # their tagged sample extensions) don't share one point. The host bundle declares
 # the point under Contents/Extensions, and Info.plist carries the same identifier.
 if [[ -n "$TAG" ]]; then
-  XCODEBUILD_ARGS+=(CMUX_SIDEBAR_EXTENSION_POINT_ID="${BUNDLE_ID}.cmux.sidebar")
+  XCODEBUILD_ARGS+=(CMUX_SIDEBAR_EXTENSION_POINT_ID="${BUNDLE_ID}.sidebar")
 fi
 # Forward explicit CMUX_SKIP_ZIG_BUILD to xcodebuild run script phases.
 if [[ "${CMUX_SKIP_ZIG_BUILD:-}" == "1" ]]; then
@@ -1968,7 +1969,7 @@ if [[ "${SWIFT_INCREMENTAL_DIAGNOSTICS_EFFECTIVE:-0}" -eq 1 ]]; then
 fi
 
 if [[ "$BUILD_ONLY" -ne 1 && -n "${TAG_SLUG:-}" ]]; then
-  TMP_COMPAT_DERIVED_LINK="/tmp/cmux-${TAG_SLUG}"
+  TMP_COMPAT_DERIVED_LINK="/tmp/shellx-${TAG_SLUG}"
   if [[ "$DERIVED_DATA" != "$TMP_COMPAT_DERIVED_LINK" ]]; then
     ABS_DERIVED_DATA="$(cd "$DERIVED_DATA" && pwd)"
     rm -rf "$TMP_COMPAT_DERIVED_LINK"
@@ -1990,13 +1991,13 @@ if [[ -n "$TAG" && "$APP_NAME" != "$SEARCH_APP_NAME" ]]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID" "$INFO_PLIST" 2>/dev/null \
       || /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string $BUNDLE_ID" "$INFO_PLIST"
     if [[ -n "${TAG_SLUG:-}" ]]; then
-      APP_SUPPORT_DIR="$HOME/Library/Application Support/cmux"
+      APP_SUPPORT_DIR="$HOME/Library/Application Support/ShellX"
       CMUXD_SOCKET="${APP_SUPPORT_DIR}/cmuxd-dev-${TAG_SLUG}.sock"
-      CMUX_SOCKET_PATH_VALUE="/tmp/cmux-debug-${TAG_SLUG}.sock"
-      CMUX_DEBUG_LOG="/tmp/cmux-debug-${TAG_SLUG}.log"
-      CMUX_AUTH_CALLBACK_SCHEME_VALUE="cmux-dev-${TAG_SLUG}"
+      CMUX_SOCKET_PATH_VALUE="/tmp/shellx-debug-${TAG_SLUG}.sock"
+      CMUX_DEBUG_LOG="/tmp/shellx-debug-${TAG_SLUG}.log"
+      CMUX_AUTH_CALLBACK_SCHEME_VALUE="shellx-dev-${TAG_SLUG}"
       if [[ "$BUILD_ONLY" -ne 1 ]]; then
-        echo "$CMUX_DEBUG_LOG" > /tmp/cmux-last-debug-log-path || true
+        echo "$CMUX_DEBUG_LOG" > /tmp/shellx-last-debug-log-path || true
       fi
       /usr/libexec/PlistBuddy -c "Add :LSEnvironment dict" "$INFO_PLIST" 2>/dev/null || true
       set_plist_url_scheme "$INFO_PLIST" "$CMUX_AUTH_CALLBACK_SCHEME_VALUE"
@@ -2023,7 +2024,7 @@ if [[ -n "$TAG" && "$APP_NAME" != "$SEARCH_APP_NAME" ]]; then
       if [[ "$BUILD_ONLY" -eq 1 ]]; then
         BUNDLED_APP_PATH="$TAG_APP_STAGING_PATH"
       fi
-      set_plist_env "$INFO_PLIST" CMUX_BUNDLED_CLI_PATH "$BUNDLED_APP_PATH/Contents/Resources/bin/cmux"
+      set_plist_env "$INFO_PLIST" CMUX_BUNDLED_CLI_PATH "$BUNDLED_APP_PATH/Contents/Resources/bin/shellx"
       set_plist_env "$INFO_PLIST" CMUX_SHELL_INTEGRATION_DIR "$BUNDLED_APP_PATH/Contents/Resources/shell-integration"
       set_plist_env "$INFO_PLIST" CMUX_PORT "$CMUX_DEV_PORT"
       set_plist_env "$INFO_PLIST" CMUX_PORT_END "$CMUX_DEV_PORT_END"
@@ -2063,7 +2064,7 @@ if [[ -n "$TAG" && "$APP_NAME" != "$SEARCH_APP_NAME" ]]; then
   APP_PATH="$TAG_APP_STAGING_PATH"
 fi
 
-CLI_PATH="$(dirname "$APP_PATH")/cmux"
+CLI_PATH="$(dirname "$APP_PATH")/shellx"
 
 # Build cmuxd and ensure helper binaries are present (needed for both launch and no-launch).
 CMUXD_SRC="$PWD/cmuxd/zig-out/bin/cmuxd"
@@ -2083,7 +2084,10 @@ if [[ -d "$PWD/ghostty" ]]; then
   fi
 fi
 CMUX_CUA_HELPER_APP="$APP_PATH/Contents/Library/cmux Computer Use.app"
-if [[ -x "$CMUX_CUA_HELPER_APP/Contents/MacOS/cmux-cua" ]]; then
+# ShellX ships no Computer Use helper (see scripts/build-app-bundled-resources.sh).
+if [[ "${CMUX_CUA_HELPER_BUILD:-0}" != "1" ]]; then
+  rm -rf "$CMUX_CUA_HELPER_APP"
+elif [[ -x "$CMUX_CUA_HELPER_APP/Contents/MacOS/cmux-cua" ]]; then
   echo "Preserving Xcode-built cmux Computer Use helper at $CMUX_CUA_HELPER_APP"
 else
   "$PWD/scripts/build-cmux-cua.sh" --output "$PWD/build/cmux-cua/cmux-cua" \
@@ -2133,7 +2137,9 @@ else
   fi
   "$PWD/scripts/install-cmux-tui-client.sh" "${cmux_tui_install_args[@]}"
 fi
-"$PWD/scripts/install-coderouter-client.sh" "$APP_PATH"
+# ShellX never bundles CodeRouter (a Manaflow service; the CLI refuses `cr`),
+# so it skips scripts/install-coderouter-client.sh, which downloads Manaflow's
+# binary from GitHub into Contents/Resources/bin.
 if command -v xattr >/dev/null 2>&1; then
   xattr -cr "$APP_PATH" || true
 fi
@@ -2188,12 +2194,12 @@ elif [[ -n "${TAG_APP_FINAL_PATH:-}" && -n "${TAG_APP_STAGING_PATH:-}" ]]; then
   mv "$TAG_APP_STAGING_PATH" "$TAG_APP_FINAL_PATH"
   APP_PATH="$TAG_APP_FINAL_PATH"
 fi
-CLI_PATH="$APP_PATH/Contents/Resources/bin/cmux"
+CLI_PATH="$APP_PATH/Contents/Resources/bin/shellx"
 
 if [[ "$BUILD_ONLY" -eq 1 ]]; then
   CAN_PUBLISH_RELOAD_STATE=0
   RELOAD_PUBLICATION_SKIP_REASON="build-only mode left the running tagged app and tag state unchanged"
-elif [[ -n "$TAG" ]] && ! wait_for_tag_socket_lock_release "/tmp/cmux-debug-${TAG_SLUG}.sock"; then
+elif [[ -n "$TAG" ]] && ! wait_for_tag_socket_lock_release "/tmp/shellx-debug-${TAG_SLUG}.sock"; then
   CAN_PUBLISH_RELOAD_STATE=0
 fi
 if [[ "$CAN_PUBLISH_RELOAD_STATE" -eq 1 && -n "${TAG_SLUG:-}" ]]; then
@@ -2208,8 +2214,8 @@ if [[ "$CAN_PUBLISH_RELOAD_STATE" -eq 1 && -n "${TAG_SLUG:-}" ]]; then
   fi
   if ! cleanup_stale_tag_state \
       "$TAG_SLUG" \
-      "/tmp/cmux-debug-${TAG_SLUG}.sock" \
-      "/tmp/cmux-debug-${TAG_SLUG}.sock" \
+      "/tmp/shellx-debug-${TAG_SLUG}.sock" \
+      "/tmp/shellx-debug-${TAG_SLUG}.sock" \
       "$RELOAD_PUBLISH_CLI_PATH"; then
     # A replacement process may have reclaimed this tag while the old app was
     # terminating. Do not overwrite its discovery marker or ambient CLI pointer.
@@ -2285,9 +2291,9 @@ if [[ "$LAUNCH" -eq 1 ]]; then
   # password into the long-lived GUI process environment would leak it to every
   # child terminal/CLI it spawns, for zero added coverage, so we deliberately do
   # not set CMUX_UITEST_STACK_* here.
-  LAUNCH_AUTH_CALLBACK_SCHEME="cmux-dev"
+  LAUNCH_AUTH_CALLBACK_SCHEME="shellx-dev"
   if [[ -n "${TAG_SLUG:-}" ]]; then
-    LAUNCH_AUTH_CALLBACK_SCHEME="cmux-dev-${TAG_SLUG}"
+    LAUNCH_AUTH_CALLBACK_SCHEME="shellx-dev-${TAG_SLUG}"
   fi
   TAG_LAUNCH_ENV=(
     CMUX_TAG="${TAG_SLUG:-}"
@@ -2389,8 +2395,8 @@ if [[ "$LAUNCH" -eq 1 ]]; then
       exit 1
     fi
   else
-    echo "/tmp/cmux-debug.sock" > /tmp/cmux-last-socket-path || true
-    echo "/tmp/cmux-debug.log" > /tmp/cmux-last-debug-log-path || true
+    echo "/tmp/shellx-debug.sock" > /tmp/shellx-last-socket-path || true
+    echo "/tmp/shellx-debug.log" > /tmp/shellx-last-debug-log-path || true
     if [[ -n "${CMUX_SOCKET_PATH_VALUE:-}" ]]; then
       # Ensure explicit socket paths win even if the caller has CMUX_* overrides.
       LAUNCH_CMD=("${OPEN_CLEAN_ENV[@]}" "${TAG_LAUNCH_ENV[@]}" CMUX_SOCKET_PATH="$CMUX_SOCKET_PATH_VALUE" CMUXD_UNIX_PATH="$CMUXD_SOCKET" open -g "$APP_PATH")

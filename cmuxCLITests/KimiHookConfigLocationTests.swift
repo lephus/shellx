@@ -323,7 +323,7 @@ struct KimiHookConfigLocationTests {
         #expect(try String(contentsOf: kimiCodeConfig, encoding: .utf8) == kimiCodeContent)
         #expect(FileManager.default.fileExists(atPath: kimiCliConfig.path))
         #expect(result.output.contains(kimiCliConfig.path), Comment(rawValue: result.output))
-        #expect(result.output.contains("cmux hooks uninstall kimi"), Comment(rawValue: result.output))
+        #expect(result.output.contains("shellx hooks uninstall kimi"), Comment(rawValue: result.output))
     }
 
     private struct Fixture {

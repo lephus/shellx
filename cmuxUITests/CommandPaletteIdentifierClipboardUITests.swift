@@ -3,7 +3,7 @@ import Darwin
 import XCTest
 
 final class CommandPaletteIdentifierClipboardUITests: XCTestCase {
-    private let debugDefaultsDomain = "com.cmuxterm.app.debug"
+    private let debugDefaultsDomain = "pro.shellx.desktop.debug"
 
     override func setUp() {
         super.setUp()
@@ -305,8 +305,8 @@ final class CommandPaletteIdentifierClipboardUITests: XCTestCase {
             .deletingLastPathComponent()
         let configuration = productsDirectory.lastPathComponent.lowercased()
         let productNames = configuration.contains("release")
-            ? ["cmux", "cmux DEV"]
-            : ["cmux DEV", "cmux"]
+            ? ["ShellX", "ShellX DEV"]
+            : ["ShellX DEV", "ShellX"]
         let binaryPaths = productNames.map { productName in
             productsDirectory
                 .appendingPathComponent("\(productName).app")

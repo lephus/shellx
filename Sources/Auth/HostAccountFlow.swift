@@ -7,6 +7,7 @@ import CmuxAuthRuntime
 import CmuxSettingsUI
 import Foundation
 import Observation
+import ShellXBrand
 
 /// Adapts the shared ``CmuxAuthRuntime/AuthCoordinator`` and the macOS
 /// ``HostBrowserSignInFlow`` to the `CmuxSettingsUI` `AccountFlow` protocol so
@@ -27,11 +28,16 @@ final class HostAccountFlow: AccountFlow, AccountSignInFlow {
     var planTier: CmuxPlanTier? { hasLoadedBillingPlan ? billingPlanState.tier : nil }
     /// The tier every upgrade entrypoint offers, or nil to hide them.
     var upgradeOffer: CmuxPlanTier? {
-        CmuxPlanTier.upgradeOffer(isSignedIn: currentIdentity != nil, knownTier: planTier)
+        // ShellX: billing and Pro are Manaflow services; nothing offers an upgrade.
+        guard ShellXFeatures.cloud else { return nil }
+        return CmuxPlanTier.upgradeOffer(isSignedIn: currentIdentity != nil, knownTier: planTier)
     }
     /// The Settings plan row renders for every tier; it picks its own copy
     /// and actions from ``planTier``. Menus gate on ``upgradeOffer`` instead.
-    var isProUpgradeAvailable: Bool { true }
+    var isProUpgradeAvailable: Bool {
+        guard ShellXFeatures.cloud else { return false }
+        return true
+    }
     var canManageBilling: Bool { billingPlanState.canManageBilling }
     /// Who bills the signed-in account's personal plan, or nil while unknown.
     var planBillingSource: AccountPlanBillingSource? {
@@ -167,12 +173,17 @@ final class HostAccountFlow: AccountFlow, AccountSignInFlow {
         browserSignIn.isRetryingAfterRateLimit
     }
 
+    // ShellX: sign-in is a Manaflow service (Stack Auth, cmux.com). Every
+    // entry point below refuses before a browser or network flow starts, so a
+    // remaining UI row (Settings Account card) cannot reach it.
     func startSignIn() {
+        guard ShellXFeatures.cloud else { return }
         noteSignInStarted()
         browserSignIn.beginSignIn()
     }
 
     func startSignInForPane() -> URL? {
+        guard ShellXFeatures.cloud else { return nil }
         noteSignInStarted()
         browserSignIn.beginSignIn()
         return browserSignIn.activeAttemptSignInURL
@@ -185,6 +196,7 @@ final class HostAccountFlow: AccountFlow, AccountSignInFlow {
     /// Runs the same hosted Stack sign-in used by every UI entrypoint, while
     /// allowing socket callers to await a bounded result.
     func signIn(timeout: TimeInterval) async -> Bool {
+        guard ShellXFeatures.cloud else { return false }
         noteSignInStarted()
         return await browserSignIn.signIn(timeout: timeout)
     }
@@ -197,6 +209,7 @@ final class HostAccountFlow: AccountFlow, AccountSignInFlow {
 
     /// Completes an external hosted Stack callback through the shared attempt.
     func handleCallbackURL(_ url: URL, delivery: AuthCallbackDelivery) async -> Bool {
+        guard ShellXFeatures.cloud else { return false }
         let signedIn = await browserSignIn.handleCallbackURL(url, delivery: delivery)
         guard signedIn else { return false }
 
@@ -248,6 +261,7 @@ final class HostAccountFlow: AccountFlow, AccountSignInFlow {
     /// account. The browser may still hold a cmux session; the page's chooser
     /// offers "continue as" that account or a different one.
     func switchAccount() async {
+        guard ShellXFeatures.cloud else { return }
         // Clicking again while a switch's window is open (it may be behind
         // other windows) replaces that attempt with a fresh window; the
         // sign-out already happened, so it is not repeated. A click while the
@@ -298,6 +312,7 @@ final class HostAccountFlow: AccountFlow, AccountSignInFlow {
 
     @discardableResult
     func refreshBillingPlanAndReportSuccess() async -> Bool {
+        guard ShellXFeatures.cloud else { return false }
         guard coordinator.currentUser != nil, let identityID = currentIdentity?.id else {
             billingPlanState = .unknown
             return false

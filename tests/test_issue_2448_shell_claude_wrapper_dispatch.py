@@ -330,7 +330,7 @@ def main() -> int:
         current_bin.mkdir(parents=True, exist_ok=True)
 
         write_executable(
-            bundle_bin / "cmux-claude-wrapper",
+            bundle_bin / "shellx-claude-wrapper",
             """#!/bin/sh
 set -eu
 printf 'wrapper:%s\n' "$*" >> "$CMUX_TEST_LOG"
@@ -365,7 +365,7 @@ printf 'cmux-cli:%s\n' "$*" >> "$CMUX_TEST_LOG"
 """,
         )
         write_executable(
-            current_bin / "cmux-claude-wrapper",
+            current_bin / "shellx-claude-wrapper",
             """#!/bin/sh
 set -eu
 printf 'current-wrapper:%s\n' "$*" >> "$CMUX_TEST_LOG"
@@ -415,7 +415,7 @@ printf 'current-wrapper:%s\n' "$*" >> "$CMUX_TEST_LOG"
             failures.append(f"bash function case should preserve user function, saw {lines!r}")
 
         write_executable(
-            bundle_bin / "cmux-claude-wrapper",
+            bundle_bin / "shellx-claude-wrapper",
             """#!/bin/sh
 set -eu
 printf 'wrapper:%s\n' "$*" >> "$CMUX_TEST_LOG"
@@ -425,7 +425,7 @@ printf 'wrapper:%s\n' "$*" >> "$CMUX_TEST_LOG"
         rc, output, lines = run_zsh_with_stale_original_wrapper(
             shell_dir,
             real_bin,
-            bundle_bin / "cmux-claude-wrapper",
+            bundle_bin / "shellx-claude-wrapper",
             current_bin / "cmux",
             zsh_stale_wrapper_log,
         )
@@ -435,7 +435,7 @@ printf 'wrapper:%s\n' "$*" >> "$CMUX_TEST_LOG"
             failures.append(f"zsh stale wrapper case expected current wrapper dispatch, saw {lines!r}")
 
         write_executable(
-            bundle_bin / "cmux-claude-wrapper",
+            bundle_bin / "shellx-claude-wrapper",
             """#!/bin/sh
 set -eu
 printf 'wrapper:%s\n' "$*" >> "$CMUX_TEST_LOG"
@@ -445,7 +445,7 @@ printf 'wrapper:%s\n' "$*" >> "$CMUX_TEST_LOG"
         rc, output, lines = run_bash_with_stale_original_wrapper(
             shell_dir,
             real_bin,
-            bundle_bin / "cmux-claude-wrapper",
+            bundle_bin / "shellx-claude-wrapper",
             current_bin / "cmux",
             bash_stale_wrapper_log,
         )
@@ -455,7 +455,7 @@ printf 'wrapper:%s\n' "$*" >> "$CMUX_TEST_LOG"
             failures.append(f"bash stale wrapper case expected current wrapper dispatch, saw {lines!r}")
 
         write_executable(
-            bundle_bin / "cmux-claude-wrapper",
+            bundle_bin / "shellx-claude-wrapper",
             """#!/bin/sh
 set -eu
 printf 'wrapper:%s\n' "$*" >> "$CMUX_TEST_LOG"
@@ -465,7 +465,7 @@ printf 'wrapper:%s\n' "$*" >> "$CMUX_TEST_LOG"
         rc, output, lines = run_fish_with_stale_original_wrapper(
             shell_dir,
             real_bin,
-            bundle_bin / "cmux-claude-wrapper",
+            bundle_bin / "shellx-claude-wrapper",
             current_bin / "cmux",
             fish_stale_wrapper_log,
         )

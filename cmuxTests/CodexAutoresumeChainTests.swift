@@ -46,7 +46,7 @@ struct CodexAutoresumeChainTests {
         #expect(resumeArgv.contains("--yolo"))
         #expect(resumeArgv.filter { $0 == sessionID }.count == 1)
 
-        let selector = " cmux restore codex \(sessionID)\n"
+        let selector = " shellx restore codex \(sessionID)\n"
         let workspace = Workspace()
         defer { workspace.teardownAllPanels() }
         let panelID = try #require(workspace.focusedPanelId)

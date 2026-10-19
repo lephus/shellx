@@ -103,7 +103,7 @@ extension HostAccountFlow {
                     inviter,
                     invitation.teamName
                 ),
-                subtitle: String(localized: "notification.teamInvite.subtitle", defaultValue: "cmux Cloud team"),
+                subtitle: String(localized: "notification.teamInvite.subtitle", defaultValue: "ShellX Cloud team"),
                 body: String(
                     localized: "notification.teamInvite.body",
                     defaultValue: "Join from the team menu in the Cloud panel or Settings › Account."

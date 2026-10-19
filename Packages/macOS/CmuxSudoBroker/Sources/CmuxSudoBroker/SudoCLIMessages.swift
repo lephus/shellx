@@ -4,7 +4,7 @@ struct SudoCLIMessages: Sendable {
     var usage: String {
         String(
             localized: "sudo.cli.usage",
-            defaultValue: "Usage: cmux sudo run [-r reason] [-t timeout] (-c 'command' | script.sh | -)\n       cmux sudo pending\n       cmux sudo setup-touch-id"
+            defaultValue: "Usage: shellx sudo run [-r reason] [-t timeout] (-c 'command' | script.sh | -)\n       shellx sudo pending\n       shellx sudo setup-touch-id"
         )
     }
 
@@ -57,21 +57,21 @@ struct SudoCLIMessages: Sendable {
     var requestCapacityExceeded: String {
         String(
             localized: "sudo.cli.error.request_capacity",
-            defaultValue: "sudo: too many approval requests are pending; resolve one in cmux and retry"
+            defaultValue: "sudo: too many approval requests are pending; resolve one in ShellX and retry"
         )
     }
 
     var touchIDSetupFailed: String {
         String(
             localized: "sudo.cli.error.touch_id_setup_failed",
-            defaultValue: "sudo: could not start Touch ID setup; reinstall cmux and retry"
+            defaultValue: "sudo: could not start Touch ID setup; reinstall ShellX and retry"
         )
     }
 
     var appLaunchFailed: String {
         String(
             localized: "sudo.cli.error.app_launch_failed",
-            defaultValue: "sudo: could not open cmux for approval; open cmux and retry"
+            defaultValue: "sudo: could not open ShellX for approval; open ShellX and retry"
         )
     }
 
@@ -137,13 +137,13 @@ struct SudoCLIMessages: Sendable {
         if timeoutSeconds == 1 {
             return format(
                 key: "sudo.cli.queued.singular",
-                defaultValue: "sudo: request %@ queued; waiting up to 1 second for approval in cmux…",
+                defaultValue: "sudo: request %@ queued; waiting up to 1 second for approval in ShellX…",
                 id
             )
         }
         return format(
             key: "sudo.cli.queued",
-            defaultValue: "sudo: request %@ queued; waiting up to %d seconds for approval in cmux…",
+            defaultValue: "sudo: request %@ queued; waiting up to %d seconds for approval in ShellX…",
             id,
             timeoutSeconds
         )

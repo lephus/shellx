@@ -5,6 +5,7 @@ import CMUXMobileCore
 import CmuxFoundation
 import CmuxSurfaceCatalogModel
 import Foundation
+import ShellXBrand
 import CmuxCore
 import CmuxRemoteDaemon
 import CmuxRemoteSession
@@ -3772,7 +3773,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         let informativeText = String(
             format: String(
                 localized: "surfaceResumeApproval.runPrompt.message",
-                defaultValue: "cmux is restoring a terminal with this resume command:\n\nWorking directory: %@\n\n%@"
+                defaultValue: "ShellX is restoring a terminal with this resume command:\n\nWorking directory: %@\n\n%@"
             ),
             binding.cwd ?? String(localized: "surfaceResumeApproval.cwd.none", defaultValue: "None"),
             binding.command
@@ -4718,7 +4719,12 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         _ action: CmuxSurfaceTabBarBuiltInAction
     ) -> Bool {
         switch action {
-        case .mobileConnect: return CmuxFeatureFlags.shared.isMobileConnectButtonEnabled
+        // ShellX: mirror the gates the actions refuse on, so no dead button is drawn.
+        case .cloudVM, .newCloudWorkspace, .newCloudMachine: return CloudMachinesFeature.isEnabled
+        case .mobileConnect:
+            return ShellXFeatures.remoteMachines
+                && MobileRemoteControlPolicy.isEnabled
+                && CmuxFeatureFlags.shared.isMobileConnectButtonEnabled
         case .newAgentChat: return CmuxFeatureFlags.shared.isAgentChatUIEnabled
         case .newSimulator: return CmuxFeatureFlags.shared.isSimulatorEnabled
         case .newBrowser:
@@ -8108,7 +8114,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     private func defaultFreestyleSSHDTerminalStartupCommand(vmID: String) -> String {
         let lines = [
             "cmux_freestyle_cli=\"${CMUX_BUNDLED_CLI_PATH:-}\"",
-            "if [ -z \"$cmux_freestyle_cli\" ] || [ ! -x \"$cmux_freestyle_cli\" ]; then cmux_freestyle_cli=\"$(command -v cmux 2>/dev/null || true)\"; fi",
+            "if [ -z \"$cmux_freestyle_cli\" ] || [ ! -x \"$cmux_freestyle_cli\" ]; then cmux_freestyle_cli=\"$(command -v shellx 2>/dev/null || true)\"; fi",
             "if [ -z \"$cmux_freestyle_cli\" ]; then printf '%s\\n' '[cmux] bundled CLI not found for Cloud VM SSH attach.' >&2; exit 127; fi",
             "CMUX_SSH_RECONNECT_LIMIT=\"${CMUX_SSH_RECONNECT_LIMIT:-\(SSHReconnectBudget().maximumLimit)}\"",
             "CMUX_SSH_RECONNECT_DELAY_SECONDS=\"${CMUX_SSH_RECONNECT_DELAY_SECONDS:-2}\"",
@@ -13493,7 +13499,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         let failure = NSAlert()
         failure.alertStyle = .warning
         failure.messageText = String(localized: "alert.moveTab.failed.title", defaultValue: "Move Failed")
-        failure.informativeText = String(localized: "alert.moveTab.failed.message", defaultValue: "cmux could not move this tab to the selected destination.")
+        failure.informativeText = String(localized: "alert.moveTab.failed.message", defaultValue: "ShellX could not move this tab to the selected destination.")
         failure.addButton(withTitle: String(localized: "alert.ok", defaultValue: "OK"))
         _ = failure.runModal()
     }

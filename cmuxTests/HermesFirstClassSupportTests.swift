@@ -528,7 +528,7 @@ struct HermesFirstClassSupportTests {
         #expect(snapshot.sessionId == "python-session")
         #expect(snapshot.launchCommand?.executablePath == "hermes")
         #expect(snapshot.launchCommand?.arguments == ["hermes", "--resume", "python-session", "--tui"])
-        #expect(snapshot.resumeStartupInput() == " cmux restore hermes-agent python-session\n")
+        #expect(snapshot.resumeStartupInput() == " shellx restore hermes-agent python-session\n")
         #expect(CachedAgentProcessIdentityValidator().currentProcess(liveProcess, matches: snapshot))
     }
 
@@ -1579,7 +1579,7 @@ struct HermesFirstClassSupportTests {
 
         #expect(result.status == 0, Comment(rawValue: result.output))
         #expect(result.output.contains("grok"))
-        #expect(result.output.contains("Open a cmux workspace and run this command again."))
+        #expect(result.output.contains("Open a ShellX workspace and run this command again."))
         #expect(!result.output.contains("CMUX_SOCKET_PATH"))
         #expect(!result.output.contains("CMUX_TAG"))
         #expect(result.output.contains("hermes-agent:"))

@@ -40,26 +40,6 @@ lane = "macos-shell"
 serial = true
 
 [[test]]
-path = "tests/test_cli_vm_transfer_progress.py"
-lane = "macos-cli-no-socket"
-requirements = ["cmux-cli"]
-
-[[test]]
-path = "tests/test_cli_vm_resize.py"
-lane = "macos-cli-no-socket"
-requirements = ["cmux-cli"]
-
-[[test]]
-path = "tests/test_cli_vm_open_device_target.py"
-lane = "macos-cli-no-socket"
-requirements = ["cmux-cli"]
-
-[[test]]
-path = "tests/test_cli_cloud_hostname.py"
-lane = "macos-cli-no-socket"
-requirements = ["cmux-cli"]
-
-[[test]]
 path = "tests/test_cli_tmux_wait_for_private_dir.py"
 lane = "macos-cli-no-socket"
 
@@ -861,6 +841,30 @@ path = "tests/test_localizable_xcstrings_structure.py"
 lane = "linux-guard"
 
 [[test]]
+path = "tests/test_shellx_app_icon.py"
+lane = "linux-guard"
+
+[[test]]
+path = "tests/test_shellx_branding.py"
+lane = "linux-guard"
+
+[[test]]
+path = "tests/test_shellx_icons.py"
+lane = "linux-guard"
+
+[[test]]
+path = "tests/test_shellx_theme.py"
+lane = "linux-guard"
+
+[[test]]
+path = "tests/test_shellx_titlebar.py"
+lane = "linux-guard"
+
+[[test]]
+path = "tests/test_shellx_vi.py"
+lane = "linux-guard"
+
+[[test]]
 path = "tests/test_localization_catalog.py"
 lane = "linux-guard"
 
@@ -1153,10 +1157,6 @@ path = "tests/test_cli_version_memory_guard_harness.py"
 lane = "macos-shell"
 
 [[test]]
-path = "tests/test_cli_vm_create_name.py"
-lane = "legacy"
-
-[[test]]
 path = "tests/test_cloud_display_catalog.py"
 lane = "legacy"
 
@@ -1413,10 +1413,6 @@ path = "tests/test_tui_publish_workflow_security.py"
 lane = "linux-guard"
 
 [[test]]
-path = "tests/test_vm_scp.py"
-lane = "legacy"
-
-[[test]]
 path = "tests/test_web_validation.py"
 lane = "linux-guard"
 
@@ -1660,11 +1656,6 @@ path = "tests/test_iroh_drift_issue.py"
 lane = "linux-guard"
 
 [[test]]
-path = "tests/test_cli_vm_mutation_arguments.py"
-lane = "macos-cli-no-socket"
-requirements = ["cmux-cli"]
-
-[[test]]
 path = "tests/test_submodule_forward_only.py"
 lane = "linux-guard"
 
@@ -1796,9 +1787,33 @@ path = "tests/test_nightly_sign_shadow_workflow.py"
 lane = "linux-guard"
 
 [[test]]
+path = "tests/test_shellx_coexistence.py"
+lane = "linux-guard"
+
+[[test]]
+path = "tests/test_shellx_cloud_off.py"
+lane = "linux-guard"
+
+[[test]]
 path = "tests/test_shellx_entitlements.py"
 lane = "linux-guard"
 
 [[test]]
+path = "tests/test_shellx_guard.py"
+lane = "linux-guard"
+
+[[test]]
+path = "tests/test_shellx_identity.py"
+lane = "linux-guard"
+
+[[test]]
+path = "tests/test_shellx_no_phone_home.py"
+lane = "linux-guard"
+
+[[test]]
 path = "tests/test_shellx_perf_harness.py"
+lane = "linux-guard"
+
+[[test]]
+path = "tests/test_shellx_remote_daemon.py"
 lane = "linux-guard"

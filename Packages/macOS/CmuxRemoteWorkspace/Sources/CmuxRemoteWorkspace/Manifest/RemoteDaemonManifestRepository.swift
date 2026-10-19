@@ -3,7 +3,7 @@ public import Foundation
 internal import CmuxSettings
 internal import CryptoKit
 
-/// Mediates the cmuxd-remote release manifest and the local cache of
+/// Mediates the shellx-remote release manifest and the local cache of
 /// verified daemon binaries it indexes: downloads binaries, verifies them
 /// against the checksum pinned in the signed app's embedded manifest, and
 /// validates/places them in the shared on-disk cache the separately-signed
@@ -56,7 +56,7 @@ public struct RemoteDaemonManifestRepository: Sendable {
     }
 
     /// The cache path for one version/platform daemon binary
-    /// (`<state>/remote-daemons/<version>/<goOS>-<goArch>/cmuxd-remote`),
+    /// (`<state>/remote-daemons/<version>/<goOS>-<goArch>/shellx-remote`),
     /// creating the cache root directory if needed.
     ///
     /// Cached under the non-TCC cmux state directory (matching the CLI's
@@ -68,7 +68,7 @@ public struct RemoteDaemonManifestRepository: Sendable {
         try cacheRoot()
             .appendingPathComponent(version, isDirectory: true)
             .appendingPathComponent("\(goOS)-\(goArch)", isDirectory: true)
-            .appendingPathComponent("cmuxd-remote", isDirectory: false)
+            .appendingPathComponent("shellx-remote", isDirectory: false)
     }
 
     /// Returns the cached binary for `entry` when it exists, matches the

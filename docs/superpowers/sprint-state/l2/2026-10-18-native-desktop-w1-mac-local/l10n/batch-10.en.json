@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "iOS app: your Mac's terminals on your iPhone",
+"comment": ""
+},
+{
+"i": 1,
+"en": "cmux AI early access + priority support",
+"comment": ""
+},
+{
+"i": 2,
+"en": "Billed annually ($360/yr), or $45 month-to-month.",
+"comment": ""
+},
+{
+"i": 3,
+"en": "cmux is free and open source, and always will be. Pro adds the cloud.",
+"comment": ""
+},
+{
+"i": 4,
+"en": "Everything in Pro for every member",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Shared team billing",
+"comment": ""
+},
+{
+"i": 6,
+"en": "Centralized Cloud VM usage",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Everything in Pro, per seat.",
+"comment": ""
+},
+{
+"i": 8,
+"en": "personal",
+"comment": ""
+},
+{
+"i": 9,
+"en": "shared",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Archive target",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Environment",
+"comment": ""
+},
+{
+"i": 12,
+"en": "Launch arguments",
+"comment": ""
+},
+{
+"i": 13,
+"en": "Profile target",
+"comment": ""
+},
+{
+"i": 14,
+"en": "Run target",
+"comment": ""
+},
+{
+"i": 15,
+"en": "Test targets",
+"comment": ""
+},
+{
+"i": 16,
+"en": "Visibility",
+"comment": ""
+},
+{
+"i": 17,
+"en": "Personal (current user)",
+"comment": ""
+},
+{
+"i": 18,
+"en": "Shared",
+"comment": ""
+},
+{
+"i": 19,
+"en": "Pick a scheme on the left to inspect its run / test / profile / archive targets and launch settings.",
+"comment": ""
+},
+{
+"i": 20,
+"en": "Select a scheme",
+"comment": ""
+},
+{
+"i": 21,
+"en": "run: %@",
+"comment": ""
+},
+{
+"i": 22,
+"en": "test: %d",
+"comment": ""
+},
+{
+"i": 23,
+"en": "New terminal activity",
+"comment": ""
+},
+{
+"i": 24,
+"en": "Your Mac sent a test alert to cmux.",
+"comment": ""
+},
+{
+"i": 25,
+"en": "cmux Notification Test",
+"comment": ""
+},
+{
+"i": 26,
+"en": "%lldd",
+"comment": ""
+},
+{
+"i": 27,
+"en": "%lldh",
+"comment": ""
+},
+{
+"i": 28,
+"en": "%lldm",
+"comment": ""
+},
+{
+"i": 29,
+"en": "now",
+"comment": ""
+},
+{
+"i": 30,
+"en": "%lldw",
+"comment": ""
+},
+{
+"i": 31,
+"en": "[cmux] Press Enter to reconnect. This terminal will stay disconnected until then.",
+"comment": ""
+},
+{
+"i": 32,
+"en": "[cmux] Reconnect this workspace from the sidebar or by running the original cmux remote command again.",
+"comment": ""
+},
+{
+"i": 33,
+"en": "[cmux] remote session disconnected: %s",
+"comment": ""
+},
+{
+"i": 34,
+"en": "SSH Reconnect Paused",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Connected to %@ (VM, proxy disabled)",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Can't reach %@ — automatic reconnect is paused. Use Reconnect when your network is back.",
+"comment": ""
+},
+{
+"i": 37,
+"en": "Connecting",
+"comment": ""
+},
+{
+"i": 38,
+"en": "Disconnected",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Reconnecting",
+"comment": ""
+},
+{
+"i": 40,
+"en": "Unreachable",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Remote terminal session disconnected",
+"comment": ""
+},
+{
+"i": 42,
+"en": "SSH reconnect paused (%@): %@",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Cloud CLI notification clear requires a valid workspace_id",
+"comment": ""
+},
+{
+"i": 44,
+"en": "Cloud CLI notification clear target does not match this workspace",
+"comment": ""
+},
+{
+"i": 45,
+"en": "Cloud CLI notification clear requires a valid surface_id",
+"comment": ""
+},
+{
+"i": 46,
+"en": "Failed to encode Cloud CLI request",
+"comment": ""
+},
+{
+"i": 47,
+"en": "remote daemon does not support persistent SSH PTY sessions; reconnect the remote workspace to update cmux",
+"comment": ""
+},
+{
+"i": 48,
+"en": "remote daemon is missing required functionality; reconnect the remote workspace to update cmux",
+"comment": ""
+},
+{
+"i": 49,
+"en": "The remote daemon files are missing or empty",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Automatic reconnect paused because bootstrap cannot proceed; repair the reported remote failure and use Reconnect to try again.",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Could not prepare the remote daemon",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Could not confirm that the remote daemon is ready",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Could not inspect the remote daemon installation",
+"comment": ""
+},
+{
+"i": 54,
+"en": "failed to remove corrupt remote daemon install",
+"comment": ""
+},
+{
+"i": 55,
+"en": "failed to remove corrupt remote daemon install: %@",
+"comment": ""
+},
+{
+"i": 56,
+"en": "failed to create remote daemon directory",
+"comment": ""
+},
+{
+"i": 57,
+"en": "failed to create remote daemon directory: %@",
+"comment": ""
+},
+{
+"i": 58,
+"en": "failed to install remote daemon",
+"comment": ""
+},
+{
+"i": 59,
+"en": "failed to install remote daemon binary: %@",
+"comment": ""
+},
+{
+"i": 60,
+"en": "remote daemon integrity verification failed",
+"comment": ""
+},
+{
+"i": 61,
+"en": "remote daemon integrity verification failed: %@",
+"comment": ""
+},
+{
+"i": 62,
+"en": "failed to upload remote daemon",
+"comment": ""
+},
+{
+"i": 63,
+"en": "failed to upload cmuxd-remote: %@",
+"comment": ""
+},
+{
+"i": 64,
+"en": "remote PTY attach failed",
+"comment": ""
+},
+{
+"i": 65,
+"en": "remote daemon did not respond in time",
+"comment": ""
+},
+{
+"i": 66,
+"en": "remote PTY input is temporarily backed up",
+"comment": ""
+},
+{
+"i": 67,
+"en": "persistent SSH PTY session is no longer running",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Remote relay command denied",
+"comment": ""
+},
+{
+"i": 69,
+"en": "SSH connection is busy in another cmux process.",
+"comment": ""
+},
+{
+"i": 70,
+"en": "Remote proxy unavailable",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Remote SSH relay port unavailable; retrying in 2 seconds",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Remote SSH relay unavailable; retrying in 2 seconds",
+"comment": ""
+},
+{
+"i": 73,
+"en": "remote command failed (exit %d)",
+"comment": ""
+},
+{
+"i": 74,
+"en": "remote command failed (exit %d): %@",
+"comment": ""
+},
+{
+"i": 75,
+"en": "SSH control socket path is too long for a Unix domain socket (%lld > %#@count2@); home directory path is too long",
+"comment": ""
+},
+{
+"i": 76,
+"en": "%lld bytes",
+"comment": ""
+},
+{
+"i": 77,
+"en": "failed to launch SSH: %@",
+"comment": ""
+},
+{
+"i": 78,
+"en": "tmux was not found on %@. cmux ssh-tmux mirrors a remote tmux server (tmux %@ or newer required).\nInstall it on the host: brew install tmux (macOS), apt install tmux (Debian/Ubuntu), dnf install tmux (Fedora).",
+"comment": ""
+},
+{
+"i": 79,
+"en": "host unreachable: %@",
+"comment": ""
+},
+{
+"i": 80,
+"en": "remote session server is too old (found %@; cmux needs version %@ or newer)",
+"comment": ""
+},
+{
+"i": 81,
+"en": "cmux could not create a new window",
+"comment": ""
+},
+{
+"i": 82,
+"en": "tmux pane",
+"comment": ""
+},
+{
+"i": 83,
+"en": "tmux window",
+"comment": ""
+},
+{
+"i": 84,
+"en": "%1$@ [%2$@]",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Close Right Sidebar",
+"comment": ""
+},
+{
+"i": 86,
+"en": "No custom sidebar selected",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Pick one with: cmux right-sidebar set custom <name>",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Custom sidebar not found",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Feed",
+"comment": ""
+},
+{
+"i": 90,
+"en": "%@ · %#@count2@",
+"comment": ""
+},
+{
+"i": 91,
+"en": "%lld pending",
+"comment": ""
+},
+{
+"i": 92,
+"en": "Vault",
+"comment": ""
+},
+{
+"i": 93,
+"en": "Open %@ as Pane",
+"comment": ""
+},
+{
+"i": 94,
+"en": "Open as pane",
+"comment": ""
+},
+{
+"i": 95,
+"en": "ERROR: App delegate not available",
+"comment": ""
+},
+{
+"i": 96,
+"en": "ERROR: No custom sidebar named '%@' in ~/.config/cmux/sidebars",
+"comment": ""
+},
+{
+"i": 97,
+"en": "ERROR: No custom sidebar selected; run right_sidebar set custom <name>",
+"comment": ""
+},
+{
+"i": 98,
+"en": "ERROR: Custom sidebars are disabled (enable them in Settings → Beta Features)",
+"comment": ""
+},
+{
+"i": 99,
+"en": "ERROR: Failed to focus right sidebar",
+"comment": ""
+},
+{
+"i": 100,
+"en": "ERROR: Invalid right sidebar --%@ id '%@'",
+"comment": ""
+},
+{
+"i": 101,
+"en": "ERROR: Right sidebar mode '%@' is not available",
+"comment": ""
+},
+{
+"i": 102,
+"en": "ERROR: --no-focus is only valid with right_sidebar set",
+"comment": ""
+},
+{
+"i": 103,
+"en": "ERROR: %@ requires an id",
+"comment": ""
+},
+{
+"i": 104,
+"en": "ERROR: Right sidebar state not available",
+"comment": ""
+},
+{
+"i": 105,
+"en": "ERROR: Right sidebar target not found",
+"comment": ""
+},
+{
+"i": 106,
+"en": "ERROR: Right sidebar not available",
+"comment": ""
+},
+{
+"i": 107,
+"en": "ERROR: Unknown right sidebar command '%@'",
+"comment": ""
+},
+{
+"i": 108,
+"en": "ERROR: Unknown right sidebar mode '%@'",
+"comment": ""
+},
+{
+"i": 109,
+"en": "ERROR: Unknown right sidebar option '%@'",
+"comment": ""
+},
+{
+"i": 110,
+"en": "ERROR: Unknown right sidebar target option '%@'",
+"comment": ""
+},
+{
+"i": 111,
+"en": "ERROR: Usage: right_sidebar <toggle|show|hide|focus|set|mode> [mode] [--workspace=<workspace-id>] [--window=<window-id>] [--no-focus]",
+"comment": ""
+},
+{
+"i": 112,
+"en": "ERROR: Usage: right_sidebar focus [--workspace=<workspace-id>] [--window=<window-id>]",
+"comment": ""
+},
+{
+"i": 113,
+"en": "ERROR: Usage: right_sidebar hide [--workspace=<workspace-id>] [--window=<window-id>]",
+"comment": ""
+},
+{
+"i": 114,
+"en": "ERROR: Usage: right_sidebar mode [--workspace=<workspace-id>] [--window=<window-id>]",
+"comment": ""
+},
+{
+"i": 115,
+"en": "ERROR: Usage: right_sidebar set <files|find|vault|sessions|feed|dock|cloud|devices|custom> [sidebar-name] [--no-focus] [--workspace=<workspace-id>] [--window=<window-id>]",
+"comment": ""
+},
+{
+"i": 116,
+"en": "ERROR: Usage: right_sidebar show [--workspace=<workspace-id>] [--window=<window-id>]",
+"comment": ""
+},
+{
+"i": 117,
+"en": "ERROR: Usage: right_sidebar toggle [--workspace=<workspace-id>] [--window=<window-id>]",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Customize Tabs…",
+"comment": ""
+},
+{
+"i": 119,
+"en": "Toggle right sidebar",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Failed to respawn surface",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Missing or invalid focus",
+"comment": ""
+},
+{
+"i": 122,
+"en": "No focused surface",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Surface not found for the given surface_id",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Surface is not a terminal",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Unable to access the target workspace",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Initial command input can only be used with terminal surfaces",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Close (Esc)",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Next match (Return)",
+"comment": ""
+},
+{
+"i": 129,
+"en": "Previous match (Shift+Return)",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Grok",
+"comment": ""
+},
+{
+"i": 131,
+"en": "Hermes Agent",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Rovo Dev",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Amp session",
+"comment": ""
+},
+{
+"i": 134,
+"en": "Amp session in %@",
+"comment": ""
+},
+{
+"i": 135,
+"en": "(no folder)",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Claude Code, Codex, OpenCode, and Rovo Dev history will appear here.",
+"comment": ""
+},
+{
+"i": 137,
+"en": "Vault is empty",
+"comment": ""
+},
+{
+"i": 138,
+"en": "Session history is unavailable",
+"comment": ""
+},
+{
+"i": 139,
+"en": "OpenCode: cannot snapshot opencode.db (%@)",
+"comment": ""
+},
+{
+"i": 140,
+"en": "Loading Vault…",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Local command",
+"comment": ""
+},
+{
+"i": 142,
+"en": "You've reached the end",
+"comment": ""
+},
+{
+"i": 143,
+"en": "Search Vault",
+"comment": ""
+},
+{
+"i": 144,
+"en": "No previewable messages",
+"comment": ""
+},
+{
+"i": 145,
+"en": "Couldn't load transcript",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Large transcript record omitted",
+"comment": ""
+},
+{
+"i": 147,
+"en": "No transcript file",
+"comment": ""
+},
+{
+"i": 148,
+"en": "Resize preview",
+"comment": ""
+},
+{
+"i": 149,
+"en": "Event",
+"comment": ""
+},
+{
+"i": 150,
+"en": "You",
+"comment": ""
+},
+{
+"i": 151,
+"en": "Preview truncated",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Reload Vault",
+"comment": ""
+},
+{
+"i": 153,
+"en": "More Vault actions",
+"comment": ""
+},
+{
+"i": 154,
+"en": "Copy File Path",
+"comment": ""
+},
+{
+"i": 155,
+"en": "Copy Resume Command",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Focus Session",
+"comment": ""
+},
+{
+"i": 157,
+"en": "Open Session",
+"comment": ""
+},
+{
+"i": 158,
+"en": "Open Working Directory",
+"comment": ""
+},
+{
+"i": 159,
+"en": "Open Pull Request",
+"comment": ""
+},
+{
+"i": 160,
+"en": "Resume in New Workspace",
+"comment": ""
+},
+{
+"i": 161,
+"en": "This folder only",
+"comment": ""
+},
+{
+"i": 162,
+"en": "No chats",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Show %lld more",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Untitled chat",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Active Team",
+"comment": ""
+},
+{
+"i": 166,
+"en": "The sign-in callback was invalid.",
+"comment": ""
+},
+{
+"i": 167,
+"en": "Account access token is unavailable.",
+"comment": ""
+},
+{
+"i": 168,
+"en": "Account refresh token is unavailable.",
+"comment": ""
+},
+{
+"i": 169,
+"en": "Your Pro subscription is active. Manage billing or cancel in Stripe.",
+"comment": ""
+},
+{
+"i": 170,
+"en": "Your subscription is managed by our previous billing system. Contact support to make changes.",
+"comment": ""
+},
+{
+"i": 171,
+"en": "Manage billing",
+"comment": ""
+},
+{
+"i": 172,
+"en": "Up to 5 Cloud VMs sharing 20 vCPUs and 40 GB RAM, plus the iOS app. $50/month.",
+"comment": ""
+},
+{
+"i": 173,
+"en": "Upgrade…",
+"comment": ""
+},
+{
+"i": 174,
+"en": "Sign In…",
+"comment": ""
+},
+{
+"i": 175,
+"en": "Open in Browser",
+"comment": ""
+},
+{
+"i": 176,
+"en": "The system sign-in window may stop responding. If nothing happens, open sign-in in your default browser instead.",
+"comment": ""
+},
+{
+"i": 177,
+"en": "Sign in with your cmux account to enable sync across devices.",
+"comment": ""
+},
+{
+"i": 178,
+"en": "Not signed in",
+"comment": ""
+},
+{
+"i": 179,
+"en": "App Icon",
+"comment": ""
+},
+{
+"i": 180,
+"en": "Dock and app switcher",
+"comment": ""
+},
+{
+"i": 181,
+"en": "Accent Color",
+"comment": ""
+},
+{
+"i": 182,
+"en": "cmux Blue",
+"comment": ""
+},
+{
+"i": 183,
+"en": "Color of the selected workspace, attention ring, agent status, and other cmux highlights. System follows the macOS accent color.",
+"comment": ""
+},
+{
+"i": 184,
+"en": "System Accent Color",
+"comment": ""
+},
+{
+"i": 185,
+"en": "Canvas Pane Gap",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Spacing between panes in the canvas layout, in points. Snapping, tidy, and new-pane placement all use this one gap.",
+"comment": ""
+},
+{
+"i": 187,
+"en": "Canvas Snapping",
+"comment": ""
+},
+{
+"i": 188,
+"en": "Snap pane drags and resizes to neighbor edges and the pane gap. Hold Command to suspend snapping for one gesture.",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Keep Workspace Open When Closing Last Surface",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Command Palette Searches All Surfaces",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Terminal Config",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Open Config",
+"comment": ""
+},
+{
+"i": 193,
+"en": "Open the cmux terminal config and generated preview in one utility window.",
+"comment": ""
+},
+{
+"i": 194,
+"en": "Dirty Only",
+"comment": ""
+},
+{
+"i": 195,
+"en": "Never",
+"comment": ""
+},
+{
+"i": 196,
+"en": "DEV build: quit confirmations are disabled.",
+"comment": ""
+},
+{
+"i": 197,
+"en": "Default Terminal",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Set Default",
+"comment": ""
+},
+{
+"i": 199,
+"en": "Setting...",
+"comment": ""
+},
+{
+"i": 200,
+"en": "cmux will ask macOS to use this app for SSH links, .command/.tool files, and UNIX executables. macOS may show a confirmation prompt.",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Set cmux as default terminal?",
+"comment": ""
+},
+{
+"i": 202,
+"en": "cmux handles SSH links, .command/.tool files, and UNIX executables.",
+"comment": ""
+},
+{
+"i": 203,
+"en": "Set cmux as the handler for SSH links, .command/.tool files, and UNIX executables.",
+"comment": ""
+},
+{
+"i": 204,
+"en": "macOS may ask you to confirm this change.",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Dock Badge",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Show unread count on app icon (Dock and Cmd+Tab).",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Fade Buttons",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Keep action buttons always visible.",
+"comment": ""
+},
+{
+"i": 209,
+"en": "Show action buttons only on hover.",
+"comment": ""
+},
+{
+"i": 210,
+"en": "File Drops",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Open file preview",
+"comment": ""
+},
+{
+"i": 212,
+"en": "Dragging files opens previews or split panes. Hold Shift over terminals and editors to insert path text.",
+"comment": ""
+},
+{
+"i": 213,
+"en": "Drop path text",
+"comment": ""
+},
+{
+"i": 214,
+"en": "Over terminals and editors, dragging files inserts shell-escaped paths. Hold Shift to open a file preview or split.",
+"comment": ""
+},
+{
+"i": 215,
+"en": "File Editor Word Wrap",
+"comment": ""
+},
+{
+"i": 216,
+"en": "Wrap long lines at the editor's right edge instead of scrolling horizontally. Applies to the plain-text file editor.",
+"comment": ""
+},
+{
+"i": 217,
+"en": "Include Panes and Tabs in Focus History",
+"comment": ""
+},
+{
+"i": 218,
+"en": "Fork Conversation Default",
+"comment": ""
+},
+{
+"i": 219,
+"en": "Global Font Magnification",
+"comment": ""
+},
+{
+"i": 220,
+"en": "Hide All Sidebar Details",
+"comment": ""
+},
+{
+"i": 221,
+"en": "Hide Tab Close Button",
+"comment": ""
+},
+{
+"i": 222,
+"en": "iMessage Mode",
+"comment": ""
+},
+{
+"i": 223,
+"en": "Move a workspace to the top and show the submitted message when you send an agent prompt.",
+"comment": ""
+},
+{
+"i": 224,
+"en": "iMessage Mode: Float Groups by Latest Unread",
+"comment": ""
+},
+{
+"i": 225,
+"en": "Reorder whole group sections by their most-recent unread member when iMessage mode is on.",
+"comment": ""
+},
+{
+"i": 226,
+"en": "iMessage Mode: Sort Workspaces Inside Groups",
+"comment": ""
+},
+{
+"i": 227,
+"en": "When iMessage mode floats unread workspaces to the top, sort members within each group while the group section stays put.",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Language",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Restart to apply language change?",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Restart cmux to apply",
+"comment": ""
+},
+{
+"i": 231,
+"en": "Loading Spinner Position",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Left",
+"comment": ""
+},
+{
+"i": 233,
+"en": "Right",
+"comment": ""
+},
+{
+"i": 234,
+"en": "Show the spinner on the left (sharing the unread badge slot) or the right of the workspace row.",
+"comment": ""
+},
+{
+"i": 235,
+"en": "Make Sidebar PR Clickable",
+"comment": ""
+},
+{
+"i": 236,
+"en": "Review items stay visible as plain text, and clicks in that area select the workspace row.",
+"comment": ""
+},
+{
+"i": 237,
+"en": "Markdown Viewer Font",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Default body font family for newly opened markdown viewers. Leave empty for the system markdown font stack.",
+"comment": ""
+},
+{
+"i": 239,
+"en": "Markdown Viewer Font Size",
+"comment": ""
+},
+{
+"i": 240,
+"en": "Default body font size, in points, for newly opened markdown viewers. Zoom a viewer live with Cmd-+ / Cmd-- / Cmd-0.",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Markdown Viewer Max Width",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Default maximum reading column width, in CSS pixels, for newly opened markdown viewers.",
+"comment": ""
+},
+{
+"i": 243,
+"en": "Menu Bar Only",
+"comment": ""
+},
+{
+"i": 244,
+"en": "Hide the Dock icon and Cmd+Tab entry. Use the menu bar item to show cmux.",
+"comment": ""
+},
+{
+"i": 245,
+"en": "Minimal Mode",
+"comment": ""
+},
+{
+"i": 246,
+"en": "New Workspace Placement",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Notification Badge Position",
+"comment": ""
+},
+{
+"i": 248,
+"en": "Show the unread notification badge on the left or the right of the workspace row.",
+"comment": ""
+},
+{
+"i": 249,
+"en": "Notification Preview Lines",
+"comment": ""
+},
+{
+"i": 250,
+"en": "Maximum lines shown for the latest notification below each workspace title.",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Open Markdown in cmux Viewer",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Cmd-clicking Markdown files opens the rendered cmux markdown viewer instead of the generic file preview.",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Open Sidebar PR Links in cmux Browser",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Enable sidebar PR clickability to choose where PR links open.",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Enable sidebar PR visibility to choose where PR links open.",
+"comment": ""
+},
+{
+"i": 256,
+"en": "Open Sidebar Port Links in cmux Browser",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Open Supported Files in cmux",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Cmd-clicking readable files opens text, code, PDFs, images, audio, video, and Quick Look previews in cmux.",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Focus Pane on First Click",
+"comment": ""
+},
+{
+"i": 260,
+"en": "Truncate Path From Start",
+"comment": ""
+},
+{
+"i": 261,
+"en": "Open Files With",
+"comment": ""
+},
+{
+"i": 262,
+"en": "e.g. code, zed, subl",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Command used when Cmd-click file previews are disabled or a file is unsupported. Leave empty for system default.",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Rename Selects Existing Name",
+"comment": ""
+},
+{
+"i": 265,
+"en": "Reorder on Notification",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Move workspaces to the top when they receive a notification. Disable for stable shortcut positions.",
+"comment": ""
+},
+{
+"i": 267,
+"en": "Show Loading Spinner",
+"comment": ""
+},
+{
+"i": 268,
+"en": "Show a loading spinner on workspaces with running coding agents or active loaders. Stays visible even when sidebar details are hidden.",
+"comment": ""
+},
+{
+"i": 269,
+"en": "Show Branch + Directory in Sidebar",
+"comment": ""
+},
+{
+"i": 270,
+"en": "Display git branches and working directories.",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Show in Menu Bar",
+"comment": ""
+},
+{
+"i": 272,
+"en": "Keep cmux in the menu bar for unread notifications and quick actions.",
+"comment": ""
+},
+{
+"i": 273,
+"en": "Show Latest Log in Sidebar",
+"comment": ""
+},
+{
+"i": 274,
+"en": "Display the latest imperative log/status message.",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Show Custom Metadata in Sidebar",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Display custom metadata from report_meta/set_status and report_meta_block.",
+"comment": ""
+},
+{
+"i": 277,
+"en": "Show Notification Message in Sidebar",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Display the latest notification message below the workspace title.",
+"comment": ""
+},
+{
+"i": 279,
+"en": "Show Listening Ports in Sidebar",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Display detected listening ports for the active workspace.",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Show Progress in Sidebar",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Display the built-in progress bar from set_progress.",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Show Pull Requests in Sidebar",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Display review items (PR/MR/etc.) with status and number.",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Show SSH in Sidebar",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Display the SSH target for remote workspaces in its own row.",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Show Workspace Description in Sidebar",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Display custom workspace descriptions below the workspace title.",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Show Workspace Title Bar",
+"comment": ""
+},
+{
+"i": 290,
+"en": "Hide the folder and active title above pane tabs.",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Show the folder and active title above pane tabs.",
+"comment": ""
+},
+{
+"i": 292,
+"en": "Sidebar Branch Layout",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Inline",
+"comment": ""
+},
+{
+"i": 294,
+"en": "Stack Branch and Directory",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Send anonymous telemetry",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Share anonymized crash and usage data to help improve cmux.",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Change takes effect on next launch.",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Theme",
+"comment": ""
+},
+{
+"i": 299,
+"en": "Warn Before Closing Tab",
+"comment": ""
+}
+]

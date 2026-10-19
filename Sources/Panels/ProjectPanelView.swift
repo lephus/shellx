@@ -2,6 +2,7 @@ import CmuxFoundation
 import AppKit
 import CMUXProjectModel
 import SwiftUI
+import ShellXIcons
 
 /// Top-level SwiftUI view for a ``ProjectPanel``.
 ///
@@ -32,7 +33,7 @@ struct ProjectPanelView: View {
     private var chrome: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 10) {
-                Label(panel.displayTitle, systemImage: "hammer.fill")
+                ShellXLabel(panel.displayTitle, icon: "hammer.fill")
                     .cmuxFont(size: 13, weight: .semibold)
                     .help(panel.projectURL.path)
                 schemePicker
@@ -41,7 +42,7 @@ struct ProjectPanelView: View {
                 Button {
                     panel.reload()
                 } label: {
-                    Image(systemName: "arrow.clockwise")
+                    ShellXIcon.image("arrow.clockwise")
                         .cmuxFont(size: 11, weight: .semibold)
                 }
                 .buttonStyle(.plain)
@@ -50,7 +51,7 @@ struct ProjectPanelView: View {
             }
             if let error = panel.lastLoadError, case .loaded = panel.loadState {
                 HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
+                    ShellXIcon.image("exclamationmark.triangle.fill")
                         .cmuxFont(size: 10)
                     Text(String(
                         format: String(localized: "projectPanel.reloadErrors", defaultValue: "Reload returned errors: %@"),
@@ -63,7 +64,7 @@ struct ProjectPanelView: View {
                     Button {
                         panel.lastLoadError = nil
                     } label: {
-                        Image(systemName: "xmark")
+                        ShellXIcon.image("xmark")
                             .cmuxFont(size: 9)
                     }
                     .buttonStyle(.plain)
@@ -236,14 +237,14 @@ struct ProjectPanelStatusView: View {
 /// Replaces the floating 12 pt secondary text that read as a loading bug.
 /// Centered icon (tertiary), 13 pt semibold title, 11 pt secondary hint.
 struct ProjectEmptyDetailView: View {
-    let systemImage: String
+    let icon: String
     let title: String
     let hint: String
 
     var body: some View {
         VStack(spacing: 6) {
             Spacer()
-            Image(systemName: systemImage)
+            ShellXIcon.image(icon)
                 .cmuxFont(size: 28, weight: .light)
                 .foregroundStyle(.tertiary)
             Text(title)

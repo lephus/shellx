@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Keep the SSH client's embedded manifest and published daemon assets together.
 
+ShellX serves its SSH helper (shellx-remote) from
+https://download.shellx.pro/desktop/shellx-remote/<version>/ as produced by
+scripts/shellx/build_remote_daemon.sh: four binaries, checksums.txt and
+manifest.json.
+
 Run with --embed before signing, then without it against the signed bundle.
 No app is launched and no network access or daemon cache is needed.
 """
@@ -19,6 +24,11 @@ from urllib.parse import quote
 
 
 MANIFEST_KEY = "CMUXRemoteDaemonManifestJSON"
+DOWNLOAD_BASE = "https://download.shellx.pro/desktop/shellx-remote"
+ASSET_PREFIX = "shellx-remote"
+MANIFEST_NAME = "manifest.json"
+CHECKSUMS_NAME = "checksums.txt"
+BUNDLED_CLI = "Contents/Resources/bin/shellx"
 TARGETS = {("darwin", "arm64"), ("darwin", "amd64"),
            ("linux", "arm64"), ("linux", "amd64")}
 
@@ -61,23 +71,15 @@ def verify_assets(manifest_path, directory):
     require(isinstance(manifest["appVersion"], str) and manifest["appVersion"], "missing app version")
     require(isinstance(manifest["releaseTag"], str) and manifest["releaseTag"], "missing release tag")
     release_url = manifest["releaseURL"]
-    require(isinstance(release_url, str) and re.fullmatch(
-        r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/releases/download/"
-        + re.escape(quote(manifest["releaseTag"], safe="")), release_url),
-        "unexpected daemon release URL")
+    require(release_url == f"{DOWNLOAD_BASE}/{quote(manifest['appVersion'], safe='')}",
+            "unexpected daemon release URL")
     entries = manifest["entries"]
     require(len(entries) == len(TARGETS)
             and {(e["goOS"], e["goArch"]) for e in entries} == TARGETS,
             "daemon manifest must contain each supported platform exactly once")
-    suffix = ""
-    if manifest["releaseTag"] in ("nightly", "rc"):
-        channel = manifest["releaseTag"]
-        version_parts = manifest["appVersion"].rsplit(f"-{channel}.", 1)
-        require(len(version_parts) == 2 and version_parts[1].isdigit(), f"invalid {channel} daemon version")
-        suffix = "-" + version_parts[1]
-    require(manifest_path.name == f"cmuxd-remote-manifest{suffix}.json", "unexpected manifest filename")
-    require(manifest["checksumsAssetName"] == f"cmuxd-remote-checksums{suffix}.txt",
-            "unexpected checksums filename")
+    # Each version has its own download directory, so names carry no suffix.
+    require(manifest_path.name == MANIFEST_NAME, "unexpected manifest filename")
+    require(manifest["checksumsAssetName"] == CHECKSUMS_NAME, "unexpected checksums filename")
     checksum_path = asset_path(directory, manifest["checksumsAssetName"])
     require(manifest["checksumsURL"] == f"{release_url}/{checksum_path.name}", "unexpected checksums URL")
     checksum_lines = [line.split() for line in checksum_path.read_text().splitlines() if line.strip()]
@@ -86,7 +88,7 @@ def verify_assets(manifest_path, directory):
     checksums = {name: digest for digest, name in checksum_lines}
     expected_names = set()
     for entry in entries:
-        name = f"cmuxd-remote-{entry['goOS']}-{entry['goArch']}{suffix}"
+        name = f"{ASSET_PREFIX}-{entry['goOS']}-{entry['goArch']}"
         expected_names.add(name)
         require(entry["assetName"] == name, f"unexpected asset name for {name}")
         require(entry["downloadURL"] == f"{release_url}/{name}", f"unexpected download URL for {name}")
@@ -130,7 +132,7 @@ def verify_bundle(app, manifest, embed=False, verify_cli=False,
                     f"bundled daemon checksum mismatch: {entry['assetName']}")
     if not verify_cli:
         return
-    cli = app / "Contents/Resources/bin/cmux"
+    cli = app / BUNDLED_CLI
     refuse_with_signing_keychain()
     # A release check must never be rescued by the developer's local-build override.
     environment = {key: value for key, value in os.environ.items()

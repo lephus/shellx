@@ -17,6 +17,8 @@ let package = Package(
         .package(path: "../CmuxFoundation"),
         .package(path: "../../Shared/CMUXMobileCore"),
         .package(path: "../../Shared/CmuxAgentChat"),
+        // coolicons behind ShellXIcon (spec §7.4); the CLI never links this package.
+        .package(path: "../../Shared/ShellXBrand"),
     ],
     targets: [
         .target(
@@ -25,6 +27,7 @@ let package = Package(
                 .product(name: "CmuxFoundation", package: "CmuxFoundation"),
                 .product(name: "CMUXMobileCore", package: "CMUXMobileCore"),
                 .product(name: "CmuxAgentChat", package: "CmuxAgentChat"),
+                .product(name: "ShellXIcons", package: "ShellXBrand"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

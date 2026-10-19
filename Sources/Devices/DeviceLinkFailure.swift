@@ -61,7 +61,7 @@ struct DeviceLinkFailure: Equatable, Sendable {
             case .needsAuthorization:
                 return DeviceLinkFailure(kind: .unsupported, code: "needs-authorization", message: Self.needsAuthorizationMessage)
             case .noDialableRoute:
-                return DeviceLinkFailure(kind: .unsupported, code: "no-dialable-route", message: String(localized: "devices.link.error.noDialableRoute", defaultValue: "This Mac has no supported connection route. Update cmux on both Macs and try again."))
+                return DeviceLinkFailure(kind: .unsupported, code: "no-dialable-route", message: String(localized: "devices.link.error.noDialableRoute", defaultValue: "This Mac has no supported connection route. Update ShellX on both Macs and try again."))
             }
         }
         if let error = error as? DeviceLinkError {
@@ -100,7 +100,7 @@ struct DeviceLinkFailure: Equatable, Sendable {
         switch code {
         case .invalidGrant:
             return DeviceLinkFailure(kind: .hostDenied, code: code.rawValue, message: String(
-                format: String(localized: "devices.link.error.hostDenied", defaultValue: "%@ has not authorized this Mac. Update cmux on both Macs, then refresh."),
+                format: String(localized: "devices.link.error.hostDenied", defaultValue: "%@ has not authorized this Mac. Update ShellX on both Macs, then refresh."),
                 hostName
             ))
         case .grantExpired:

@@ -203,13 +203,13 @@ public struct WorkspaceColorsSection: View {
             SettingsCardDivider()
 
             SettingsCardNote(
-                String(localized: "settings.workspaceColors.dictionaryNote", defaultValue: "Edit cmux.json to add or remove named colors. \"Choose Custom Color...\" still adds local Custom N entries.")
+                String(localized: "settings.workspaceColors.dictionaryNote", defaultValue: "Edit shellx.json to add or remove named colors. \"Choose Custom Color...\" still adds local Custom N entries.")
             )
 
             let entries = effectivePaletteEntries(overrides: paletteModel.current)
             if entries.isEmpty {
                 SettingsCardNote(
-                    String(localized: "settings.workspaceColors.emptyPalette", defaultValue: "No palette entries. Add colors in cmux.json or use \"Choose Custom Color...\" from a workspace context menu.")
+                    String(localized: "settings.workspaceColors.emptyPalette", defaultValue: "No palette entries. Add colors in shellx.json or use \"Choose Custom Color...\" from a workspace context menu.")
                 )
             } else {
                 ForEach(Array(entries.enumerated()), id: \.element.name) { index, entry in

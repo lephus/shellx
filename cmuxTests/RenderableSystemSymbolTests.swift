@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ShellXIcons
 import Testing
 
 #if canImport(cmux_DEV)
@@ -92,7 +93,7 @@ struct RenderableSystemSymbolTests {
         // for a 1pt symbol is a platform detail (2x2 on macOS 15.7 and 26.5), so compare
         // against a 1pt configuration rather than hardcoding it. Without the clamp the 0pt
         // configuration rasterizes at the symbol's default 16x16 and this still fails.
-        let clampedBase = try #require(NSImage(systemSymbolName: "questionmark.circle", accessibilityDescription: nil))
+        let clampedBase = try #require(ShellXIcon.nsImage("questionmark.circle", accessibilityDescription: nil))
         let clampedConfiguration = NSImage.SymbolConfiguration(pointSize: 1, weight: .medium)
         let clampedImage = try #require(clampedBase.withSymbolConfiguration(clampedConfiguration))
         #expect(clampedImage.size.width > 0 && clampedImage.size.height > 0)
@@ -141,7 +142,7 @@ struct RenderableSystemSymbolTests {
         let systemName = "plus"
         let pointSize: CGFloat = 14
         let weight = NSFont.Weight.regular
-        let baseImage = try #require(NSImage(systemSymbolName: systemName, accessibilityDescription: nil))
+        let baseImage = try #require(ShellXIcon.nsImage(systemName, accessibilityDescription: nil))
         let configuration = NSImage.SymbolConfiguration(pointSize: pointSize, weight: weight)
         let directImage = try #require(baseImage.withSymbolConfiguration(configuration))
         let materializedImage = try #require(RenderableSystemSymbol.configuredAppKitImage(
@@ -181,11 +182,15 @@ struct RenderableSystemSymbolTests {
     @Test(arguments: [NSAppearance.Name.aqua, .darkAqua])
     func materializedTemplatePreservesFilledSymbolCutout(appearanceName: NSAppearance.Name) throws {
         RenderableSystemSymbol.resetRenderabilityCacheForTesting()
+        // coolicons are outlines, so the cutout case is a filled SF Symbol
+        // named in user configuration, which the icon map leaves to SF.
+        let symbol = "multiply.circle.fill"
+        #expect(ShellXIcon.cooliconName(for: symbol) == nil)
         let appearance = try #require(NSAppearance(named: appearanceName))
         var rendered: NSImage?
         appearance.performAsCurrentDrawingAppearance {
             rendered = RenderableSystemSymbol.configuredAppKitImage(
-                systemName: "xmark.circle.fill", pointSize: 24
+                systemName: symbol, pointSize: 24
             )
         }
         let image = try #require(rendered)
@@ -199,7 +204,7 @@ struct RenderableSystemSymbolTests {
 
     @Test @MainActor func configuredAppKitImagePreservesConfiguredSizeForNonSquareSymbols() throws {
         RenderableSystemSymbol.resetRenderabilityCacheForTesting()
-        let baseImage = try #require(NSImage(systemSymbolName: "arrow.left.and.right", accessibilityDescription: nil))
+        let baseImage = try #require(ShellXIcon.nsImage("arrow.left.and.right", accessibilityDescription: nil))
         let configuration = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
         let configuredImage = try #require(baseImage.withSymbolConfiguration(configuration))
         let image = try #require(RenderableSystemSymbol.configuredAppKitImage(
@@ -244,6 +249,41 @@ struct RenderableSystemSymbolTests {
             weight: .regular
         ) == nil)
         #expect(RenderableSystemSymbol.isRenderable("not.an.sf.symbol") == false)
+    }
+
+    /// Review Focus 3: a workspace group `iconSymbol` (or compact status
+    /// icon) from user configuration that the coolicons map does not know
+    /// still validates and rasterizes, as its SF Symbol.
+    @Test @MainActor func userConfiguredSymbolOutsideTheIconMapStillRenders() throws {
+        RenderableSystemSymbol.resetRenderabilityCacheForTesting()
+        let symbol = "figure.surfing"
+        #expect(ShellXIcon.cooliconName(for: symbol) == nil)
+        #expect(RenderableSystemSymbol.normalized(symbol) == symbol)
+        #expect(RenderableSystemSymbol.resolvedWorkspaceGroupIcon(explicit: symbol, configured: nil) == symbol)
+        let image = try #require(RenderableSystemSymbol.configuredAppKitImage(systemName: symbol, pointSize: 14))
+        let bitmap = try #require(image.representations.compactMap { $0 as? NSBitmapImageRep }.first)
+        #expect(PixelFootprint(bitmap: bitmap) != nil)
+    }
+
+    /// A mapped name rasterizes its coolicon: the same glyph ShellXIcon
+    /// resolves, not the SF Symbol of that name. (In the app, Xcode compiled
+    /// Coolicons.xcassets into the ShellXIcons bundle, so the coolicon
+    /// differs from the SF Symbol.)
+    @Test @MainActor func mappedSymbolRasterizesItsCoolicon() throws {
+        RenderableSystemSymbol.resetRenderabilityCacheForTesting()
+        #expect(ShellXIcon.cooliconName(for: "terminal") == "Terminal")
+        let configuration = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+        let coolicon = try #require(ShellXIcon.nsImage("terminal", accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration))
+        let sfSymbol = try #require(NSImage(systemSymbolName: "terminal", accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration))
+        #expect(coolicon.tiffRepresentation != sfSymbol.tiffRepresentation)
+        let image = try #require(RenderableSystemSymbol.configuredAppKitImage(
+            systemName: "terminal",
+            pointSize: 14,
+            weight: .regular
+        ))
+        #expect(image.size == coolicon.size)
     }
 
     @Test func failedSymbolLookupRetriesAfterNegativeCacheExpires() {

@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import CmuxFoundation
 import SwiftUI
+import ShellXIcons
 
 @MainActor
 final class WindowToolbarController: NSObject, NSToolbarDelegate {
@@ -250,11 +251,11 @@ final class WindowToolbarController: NSObject, NSToolbarDelegate {
             segmented.segmentCount = 2
             segmented.controlSize = .small
             segmented.setImage(
-                NSImage(systemSymbolName: "rectangle.split.2x1", accessibilityDescription: nil),
+                ShellXIcon.nsImage("rectangle.split.2x1", accessibilityDescription: nil),
                 forSegment: LayoutModeSegment.splits.rawValue
             )
             segmented.setImage(
-                NSImage(systemSymbolName: "square.on.square.dashed", accessibilityDescription: nil),
+                ShellXIcon.nsImage("square.on.square.dashed", accessibilityDescription: nil),
                 forSegment: LayoutModeSegment.canvas.rawValue
             )
             segmented.setToolTip(

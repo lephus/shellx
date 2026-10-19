@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ShellXIcons
 
 @MainActor
 extension AppDelegate {
@@ -163,7 +164,7 @@ extension AppDelegate {
                     if !management.defaultLayout.hasDefault {
                         noneItem.badge = defaultBadge()
                     }
-                    noneItem.image = NSImage(systemSymbolName: "terminal", accessibilityDescription: nil)
+                    noneItem.image = ShellXIcon.nsImage("terminal", accessibilityDescription: nil)
                     submenu.addItem(noneItem)
                     // Intentional redesign: the "Default for New Workspace"
                     // section header above replaces the old separator that used
@@ -224,8 +225,8 @@ extension AppDelegate {
                 )
                 actionsItem.target = self
                 actionsItem.representedObject = context.windowId as NSUUID
-                actionsItem.image = NSImage(
-                    systemSymbolName: "slider.horizontal.3",
+                actionsItem.image = ShellXIcon.nsImage(
+                    "slider.horizontal.3",
                     accessibilityDescription: nil
                 )
                 items.append(actionsItem)

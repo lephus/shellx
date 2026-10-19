@@ -1,10 +1,10 @@
 import Foundation
 
 extension CMUXCLI {
-    private static let ompExtensionMarker = "cmux-omp-session-extension-marker"
-    private static let ompExtensionFilename = "cmux-omp-session.ts"
+    private static let ompExtensionMarker = "shellx-omp-session-extension-marker"
+    private static let ompExtensionFilename = "shellx-omp-session.ts"
     private static let ompExtensionSource = #"""
-// cmux-omp-session-extension-marker v4
+// shellx-omp-session-extension-marker v4
 // Bridges OMP session lifecycle events into cmux's restorable session store.
 // Installed by `cmux hooks omp install` or `cmux hooks setup`.
 // DO NOT EDIT MANUALLY. cmux upgrades this file in place.
@@ -172,7 +172,7 @@ function hookInvocation(subcommand: string, ctx: ExtensionContext, extra: Record
     event: eventName(subcommand),
     ...extra,
   };
-  const cmux = process.env.CMUX_OMP_CMUX_BIN || "cmux";
+  const cmux = process.env.CMUX_OMP_CMUX_BIN || "shellx";
   return {
     cmux,
     cwd,
@@ -495,7 +495,7 @@ export default function cmuxOmpSessionExtension(api: ExtensionAPI) {
             throw CLIError(message: String.localizedStringWithFormat(
                 String(
                     localized: "cli.hooks.omp.error.notCmuxExtension",
-                    defaultValue: "%@ exists and is not a cmux extension; leaving it alone"
+                    defaultValue: "%@ exists and is not a ShellX extension; leaving it alone"
                 ),
                 extensionURL.path
             ))
@@ -534,7 +534,7 @@ export default function cmuxOmpSessionExtension(api: ExtensionAPI) {
             print(String.localizedStringWithFormat(
                 String(
                     localized: "cli.hooks.omp.noneFound",
-                    defaultValue: "No OMP cmux extension found at %@"
+                    defaultValue: "No OMP ShellX extension found at %@"
                 ),
                 extensionURL.path
             ))
@@ -545,7 +545,7 @@ export default function cmuxOmpSessionExtension(api: ExtensionAPI) {
             print(String.localizedStringWithFormat(
                 String(
                     localized: "cli.hooks.omp.refuseRemoveMissingMarker",
-                    defaultValue: "Refusing to remove %@: missing cmux marker"
+                    defaultValue: "Refusing to remove %@: missing ShellX marker"
                 ),
                 extensionURL.path
             ))
@@ -555,7 +555,7 @@ export default function cmuxOmpSessionExtension(api: ExtensionAPI) {
         print(String.localizedStringWithFormat(
             String(
                 localized: "cli.hooks.omp.removed",
-                defaultValue: "Removed OMP cmux extension from %@"
+                defaultValue: "Removed OMP ShellX extension from %@"
             ),
             extensionURL.path
         ))

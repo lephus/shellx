@@ -1,6 +1,7 @@
 import CmuxCloud
 import AppKit
 import Foundation
+import ShellXBrand
 
 // MARK: - New-workspace plus-button context menu
 
@@ -116,7 +117,7 @@ extension AppDelegate {
         case .newSimulator:
             return CmuxFeatureFlags.shared.isSimulatorEnabled
         case .mobileConnect:
-            return !MobileRemoteControlPolicy.isDisabled
+            return ShellXFeatures.remoteMachines && !MobileRemoteControlPolicy.isDisabled
         case .newWorkspace, .newTerminal, .splitRight, .splitDown,
              .copyWorkingDirectory, .copyProjectRoot, .copyScreen:
             return true

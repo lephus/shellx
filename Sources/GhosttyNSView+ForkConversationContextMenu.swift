@@ -1,6 +1,7 @@
 import AppKit
 import CmuxControlSocket
 import Foundation
+import ShellXIcons
 
 enum SurfaceResumeContextMenuState: Equatable, Sendable {
     case unavailable
@@ -329,7 +330,7 @@ extension GhosttyNSView {
                 keyEquivalent: ""
             )
             item.isEnabled = false
-            item.image = NSImage(systemSymbolName: "arrow.triangle.branch", accessibilityDescription: nil)
+            item.image = ShellXIcon.nsImage("arrow.triangle.branch", accessibilityDescription: nil)
             return true
         }
 
@@ -341,14 +342,14 @@ extension GhosttyNSView {
         )
         primaryItem.target = self
         primaryItem.representedObject = defaultDestination.rawValue
-        primaryItem.image = NSImage(systemSymbolName: "arrow.triangle.branch", accessibilityDescription: nil)
+        primaryItem.image = ShellXIcon.nsImage("arrow.triangle.branch", accessibilityDescription: nil)
 
         let submenuItem = NSMenuItem(
             title: String(localized: "terminalContextMenu.forkConversationTo", defaultValue: "Fork Conversation To"),
             action: nil,
             keyEquivalent: ""
         )
-        submenuItem.image = NSImage(systemSymbolName: "arrow.triangle.branch", accessibilityDescription: nil)
+        submenuItem.image = ShellXIcon.nsImage("arrow.triangle.branch", accessibilityDescription: nil)
         let submenu = NSMenu()
         for destination in AgentConversationForkDestination.allCases {
             let item = NSMenuItem(

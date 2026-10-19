@@ -4,7 +4,9 @@ import CmuxAppKitSupportUI
 import CmuxCommandPalette
 import CmuxCore
 import CmuxFeedback
+import ShellXBrand
 import CmuxFoundation
+import CmuxTestSupport
 import CmuxAgentJournal
 import CmuxNotifications
 import CmuxPanes
@@ -28,10 +30,12 @@ import CmuxUpdaterUI
 import ImageIO
 import Observation
 import CmuxProductAnalytics
+import ShellXBrand // ShellX: machine-grouped sidebar
 import SwiftUI
 import ObjectiveC
 import UniformTypeIdentifiers
 import WebKit
+import ShellXIcons
 
 var fileDropOverlayKey: UInt8 = 0
 private var commandPaletteWindowOverlayKey: UInt8 = 0
@@ -1845,6 +1849,9 @@ struct ContentView: View {
                             )
                         }
                     )
+                    // ShellX: offline/reconnecting banner above remote workspaces (W2 Task U4);
+                    // shows the workspace as it is while the remote UI is off.
+                    .shellXRemoteLinkBanner(workspaceID: tab.id, isSelected: isSelectedWorkspace)
                     .opacity(isSelectedWorkspace ? 1 : 0)
                     .allowsHitTesting(isSelectedWorkspace)
                     .accessibilityHidden(!isSelectedWorkspace)
@@ -7668,7 +7675,7 @@ struct ContentView: View {
         contributions.append(
             CommandPaletteCommandContribution(
                 commandId: "palette.installCLI",
-                title: constant(String(localized: "command.installCLI.title", defaultValue: "Shell Command: Install 'cmux' in PATH")),
+                title: constant(String(localized: "command.installCLI.title", defaultValue: "Shell Command: Install 'shellx' in PATH")),
                 subtitle: constant(String(localized: "command.installCLI.subtitle", defaultValue: "CLI")),
                 keywords: ["install", "cli", "path", "shell", "command", "symlink"],
                 when: { !$0.bool(CommandPaletteContextKeys.cliInstalledInPATH) }
@@ -7677,7 +7684,7 @@ struct ContentView: View {
         contributions.append(
             CommandPaletteCommandContribution(
                 commandId: "palette.uninstallCLI",
-                title: constant(String(localized: "command.uninstallCLI.title", defaultValue: "Shell Command: Uninstall 'cmux' from PATH")),
+                title: constant(String(localized: "command.uninstallCLI.title", defaultValue: "Shell Command: Uninstall 'shellx' from PATH")),
                 subtitle: constant(String(localized: "command.uninstallCLI.subtitle", defaultValue: "CLI")),
                 keywords: ["uninstall", "remove", "cli", "path", "shell", "command", "symlink"],
                 when: { $0.bool(CommandPaletteContextKeys.cliInstalledInPATH) }
@@ -7898,8 +7905,8 @@ struct ContentView: View {
         contributions.append(
             CommandPaletteCommandContribution(
                 commandId: "palette.openCmuxSettingsFile",
-                title: constant(String(localized: "settings.settingsJSON.openFile", defaultValue: "Open cmux.json")),
-                subtitle: constant(String(localized: "command.cmuxConfig.subtitle", defaultValue: "cmux.json")),
+                title: constant(String(localized: "settings.settingsJSON.openFile", defaultValue: "Open shellx.json")),
+                subtitle: constant(String(localized: "command.cmuxConfig.subtitle", defaultValue: "shellx.json")),
                 keywords: ["open", "cmux", "json", "config", "configuration", "settings", "file", "editor", "dotfile"]
             )
         )
@@ -7936,7 +7943,7 @@ struct ContentView: View {
                 title: constant(
                     String(
                         localized: "command.makeDefaultTerminal.title",
-                        defaultValue: "Make cmux the Default Terminal"
+                        defaultValue: "Make ShellX the Default Terminal"
                     )
                 ),
                 subtitle: constant(
@@ -7988,7 +7995,7 @@ struct ContentView: View {
         contributions.append(
             CommandPaletteCommandContribution(
                 commandId: "palette.disableBrowser",
-                title: constant(String(localized: "command.disableBrowser.title", defaultValue: "Disable cmux Browser")),
+                title: constant(String(localized: "command.disableBrowser.title", defaultValue: "Disable ShellX Browser")),
                 subtitle: constant(String(localized: "command.browserAvailability.subtitle", defaultValue: "Browser")),
                 keywords: ["browser", "disable", "external", "default", "open", "auth"],
                 when: {
@@ -8000,7 +8007,7 @@ struct ContentView: View {
         contributions.append(
             CommandPaletteCommandContribution(
                 commandId: "palette.enableBrowser",
-                title: constant(String(localized: "command.enableBrowser.title", defaultValue: "Enable cmux Browser")),
+                title: constant(String(localized: "command.enableBrowser.title", defaultValue: "Enable ShellX Browser")),
                 subtitle: constant(String(localized: "command.browserAvailability.subtitle", defaultValue: "Browser")),
                 keywords: ["browser", "enable", "embedded", "open"],
                 when: {
@@ -8804,7 +8811,7 @@ struct ContentView: View {
             )
         )
 
-        let cmuxConfigDefaultSubtitle = String(localized: "command.cmuxConfig.subtitle", defaultValue: "cmux.json")
+        let cmuxConfigDefaultSubtitle = String(localized: "command.cmuxConfig.subtitle", defaultValue: "shellx.json")
         for issue in cmuxConfigStore.configurationIssues {
             contributions.append(
                 CommandPaletteCommandContribution(
@@ -8877,12 +8884,12 @@ struct ContentView: View {
         case .schemaError:
             return String(
                 localized: "command.cmuxConfig.issue.schemaError.title",
-                defaultValue: "cmux.json Schema Error"
+                defaultValue: "shellx.json Schema Error"
             )
         default:
             return String(
                 localized: "command.cmuxConfig.issue.warning.title",
-                defaultValue: "cmux.json Configuration Warning"
+                defaultValue: "shellx.json Configuration Warning"
             )
         }
     }
@@ -8910,7 +8917,7 @@ struct ContentView: View {
             )
             let fallback = String(
                 localized: "command.cmuxConfig.issue.schemaError.fallback",
-                defaultValue: "Invalid cmux.json"
+                defaultValue: "Invalid shellx.json"
             )
             return String(format: format, issue.message ?? fallback)
         case .newWorkspaceActionNotFound:
@@ -10276,9 +10283,16 @@ struct ContentView: View {
     }
 
     private func presentFeedbackComposer() {
-        DispatchQueue.main.async {
-            isFeedbackComposerPresented = true
+#if DEBUG
+        // UI tests record the mail draft instead of opening the mail app.
+        if UITestCaptureSink().appendLineIfConfigured(
+            envKey: "CMUX_UI_TEST_CAPTURE_OPEN_URL_PATH",
+            line: FeedbackComposerSettings.submissionURL.absoluteString
+        ) {
+            return
         }
+#endif
+        FeedbackComposerBridge.openMailDraft()
     }
 
     static func shouldHandleCommandPaletteRequest(
@@ -11395,6 +11409,8 @@ struct VerticalTabsSidebar: View, Equatable {
         initialSidebarFontSize: GhosttyConfig.loadForCmux().sidebarFontSize
     )
     @State private var keyboardShortcutSettingsObserver = KeyboardShortcutSettingsObserver.shared
+    // ShellX: remote machine sections and sign-in row (W2 Task U1); never publishes while the gate is off.
+    @ObservedObject private var shellXRemoteUI = ShellXRemoteUIModel.shared
     @State var dragState = SidebarDragState()
     // Bonsplit tab drags arrive through AppKit pasteboard callbacks, not
     // `SidebarDragState`, so they need a separate transient collection flag.
@@ -11896,11 +11912,13 @@ struct VerticalTabsSidebar: View, Equatable {
         let workspaceGroupMenuSnapshot = WorkspaceGroupMenuSnapshot(
             items: workspaceGroups.map { WorkspaceGroupMenuSnapshot.Item(id: $0.id, name: $0.name) }
         )
-        let workspaceRenderItems = SidebarWorkspaceRenderItem.renderItems(
+        // ShellX: group the sidebar by machine (W1 Task 10), remote machines included (W2 Task U1).
+        let workspaceRenderItems = SidebarMachineSectionRenderItems.renderItems(
             tabs: tabs,
             groupsById: workspaceGroupById,
             orderedGroups: workspaceGroups,
-            effectiveMembership: workspaceGroupIdByWorkspaceId
+            effectiveMembership: workspaceGroupIdByWorkspaceId,
+            remote: shellXRemoteUI.snapshot
         )
         let numberedWorkspaceIndexById = SidebarWorkspaceRenderItem.numberedWorkspaceIndexById(
             from: workspaceRenderItems
@@ -12517,16 +12535,37 @@ struct VerticalTabsSidebar: View, Equatable {
             canCreateEmptyGroup: tabManager.selectedTab?.isRemoteTmuxMirror != true,
             notificationIndex: notificationIndex
         )
-        return renderContext.workspaceRenderItems.compactMap { item -> SidebarWorkspaceTableRowConfiguration? in
+        // ShellX: brand header row first; a group header repeated in a later
+        // machine section gets a per-section row id (W1 Task 10).
+        let brandHeaderRow = SidebarWorkspaceTableRowConfiguration(
+            shellXHeader: .brand,
+            environment: renderContext.environment
+        )
+        // ShellX: the sign-in row sits under "YOUR MACHINES" while signed out (W2 Task U1).
+        let signInRows: [SidebarWorkspaceTableRowConfiguration] = shellXRemoteUI.showsSignInRow
+            ? [SidebarWorkspaceTableRowConfiguration(shellXHeader: .signIn, environment: renderContext.environment)]
+            : []
+        let shellXRowIds = SidebarMachineSectionRenderItems.rowIds(for: renderContext.workspaceRenderItems)
+        return [brandHeaderRow] + signInRows + zip(renderContext.workspaceRenderItems, shellXRowIds).compactMap { pair -> SidebarWorkspaceTableRowConfiguration? in
+            let (item, shellXRowId) = pair
             switch item {
+            case .machineHeader(let header): // ShellX
+                return SidebarWorkspaceTableRowConfiguration(
+                    shellXHeader: .machine(header),
+                    environment: renderContext.environment
+                )
             case .groupHeader(let groupId, _):
                 guard let group = renderContext.workspaceGroupById[groupId] else { return nil }
-                return sidebarWorkspaceGroupTableConfiguration(
+                let configuration = sidebarWorkspaceGroupTableConfiguration(
                     group: group,
                     memberWorkspaceIds: renderContext.memberWorkspaceIdsByGroupId[groupId] ?? [],
                     memberStatusGlyphs: memberStatusGlyphs,
                     renderContext: renderContext
                 )
+                // ShellX: first appearance keeps `.group(id)`; repeats are keyed by section.
+                return shellXRowId == configuration.id
+                    ? configuration
+                    : configuration.reidentifiedGroupHeader(as: shellXRowId)
             case .workspace(let workspaceId):
                 guard let workspace = renderContext.workspaceById[workspaceId],
                       let input = workspaceRowInputsById[workspaceId] else { return nil }
@@ -14456,6 +14495,8 @@ struct VerticalTabsSidebar: View, Equatable {
                             shouldCollectWorkspaceDropTargets: shouldCollectWorkspaceDropTargets
                         )
                     }
+                case .machineHeader: // ShellX: the legacy SwiftUI list is not extended
+                    EmptyView()
                 }
             }
         }
@@ -15810,11 +15851,13 @@ private enum SidebarHelpMenuAction {
 }
 
 private struct SidebarHelpMenuButton: View {
-    private let docsURL = URL(string: "https://cmux.com/docs")
-    private let changelogURL = URL(string: "https://cmux.com/docs/changelog")
-    private let githubURL = URL(string: "https://github.com/manaflow-ai/cmux")
-    private let githubIssuesURL = URL(string: "https://github.com/manaflow-ai/cmux/issues")
-    private let discordURL = URL(string: "https://discord.gg/xsgFEVrWCZ")
+    // ShellX: the website stands in for docs; links with no ShellX page
+    // (changelog, cmux's Discord) are nil, which hides their rows.
+    private let docsURL: URL? = ShellXBrand.websiteURL
+    private let changelogURL: URL? = nil
+    private let githubURL: URL? = ShellXBrand.sourceCodeURL
+    private let githubIssuesURL: URL? = ShellXBrand.sourceCodeURL.appendingPathComponent("issues")
+    private let discordURL: URL? = nil
     private let helpTitle = String(localized: "sidebar.help.button", defaultValue: "Help")
     private let buttonSize = SidebarFooterButtonMetrics.buttonSize
 #if DEBUG
@@ -15882,7 +15925,7 @@ private struct SidebarHelpMenuButton: View {
     private var helpPopover: some View {
         VStack(alignment: .leading, spacing: 2) {
             helpOptionButton(
-                title: String(localized: "sidebar.help.welcome", defaultValue: "Welcome to cmux!"),
+                title: String(localized: "sidebar.help.welcome", defaultValue: "Welcome to ShellX!"),
                 action: .welcome,
                 accessibilityIdentifier: "SidebarHelpMenuOptionWelcome",
                 isExternalLink: false
@@ -16018,7 +16061,7 @@ private struct SidebarHelpMenuButton: View {
     }
 
     private func helpOptionTrailingIcon(systemName: String, size: CGFloat = 13) -> some View {
-        CmuxSystemSymbolImage(systemName: systemName, pointSize: size, tint: Color(nsColor: .secondaryLabelColor))
+        CmuxSystemSymbolImage(symbolName: systemName, pointSize: size, tint: Color(nsColor: .secondaryLabelColor))
     }
 
     private func perform(_ action: SidebarHelpMenuAction) {
@@ -16367,9 +16410,9 @@ struct TabItemView: View, Equatable {
                         Button {
                             actions.reconnectTargets([workspaceId])
                         } label: {
-                            Label(
+                            ShellXLabel(
                                 String(localized: "sidebar.remote.reconnect.button", defaultValue: "Reconnect"),
-                                systemImage: "arrow.clockwise"
+                                icon: "arrow.clockwise"
                             )
                             .labelStyle(.titleAndIcon)
                             .font(magnifiedFont(scaledFontSize(9), weight: .semibold))

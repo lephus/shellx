@@ -504,7 +504,7 @@ public struct TerminalSection: View {
             SettingsCardRow(
                 configurationReview: .json("terminal.showPasswordInputDots"),
                 String(localized: "settings.terminal.showPasswordInputDots", defaultValue: "Show Typed Password Dots"),
-                subtitle: String(localized: "settings.terminal.showPasswordInputDots.subtitle", defaultValue: "Shows one dot in the badge per typed character. cmux keeps only a count, never the characters. Pasted text is not counted.")
+                subtitle: String(localized: "settings.terminal.showPasswordInputDots.subtitle", defaultValue: "Shows one dot in the badge per typed character. ShellX keeps only a count, never the characters. Pasted text is not counted.")
             ) {
                 Toggle("", isOn: Binding(get: { passwordInputDots.current }, set: { passwordInputDots.set($0) }))
                     .labelsHidden()
@@ -527,7 +527,7 @@ public struct TerminalSection: View {
             SettingsCardRow(
                 configurationReview: .json("terminal.autoResumeAgentSessions"),
                 String(localized: "settings.terminal.agentAutoResume", defaultValue: "Resume Agent Sessions on Reopen"),
-                subtitle: String(localized: "settings.terminal.agentAutoResume.subtitle", defaultValue: "Reopening cmux resumes agent sessions automatically.")
+                subtitle: String(localized: "settings.terminal.agentAutoResume.subtitle", defaultValue: "Reopening ShellX resumes agent sessions automatically.")
             ) {
                 Toggle("", isOn: Binding(get: { autoResume.current }, set: { autoResume.set($0) }))
                     .labelsHidden()
@@ -538,7 +538,7 @@ public struct TerminalSection: View {
             SettingsCardRow(
                 configurationReview: .json("terminal.agentHibernation.enabled"),
                 String(localized: "settings.terminal.agentHibernation", defaultValue: "Agent Hibernation"),
-                subtitle: String(localized: "settings.terminal.agentHibernation.subtitle", defaultValue: "Hibernates idle background agent terminals above the live terminal limit. Even when this is off, cmux may hibernate them under memory pressure.")
+                subtitle: String(localized: "settings.terminal.agentHibernation.subtitle", defaultValue: "Hibernates idle background agent terminals above the live terminal limit. Even when this is off, ShellX may hibernate them under memory pressure.")
             ) {
                 Toggle("", isOn: Binding(get: { hibernation.current }, set: { hibernation.set($0) }))
                     .labelsHidden()

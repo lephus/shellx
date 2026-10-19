@@ -50,7 +50,7 @@ extension CMUXCLI {
         """
         # cmux guide
 
-        \(CMUXDiffViewerLocalization.string("cli.guide.overview.intro", defaultValue: "cmux puts terminals, browsers, and agents in one workspace. Use this guide to choose a method, then read its help before acting. `cmux --skill` prints this same guide."))
+        \(CMUXDiffViewerLocalization.string("cli.guide.overview.intro", defaultValue: "ShellX puts terminals, browsers, and agents in one workspace. Use this guide to choose a method, then read its help before acting. `shellx --skill` prints this same guide."))
 
         \(CMUXDiffViewerLocalization.string("cli.guide.overview.targets", defaultValue: "## Find your target\n\nA window contains workspaces. A workspace contains split panes. Each pane contains surfaces, such as a terminal or browser tab. Inspect the caller and use the returned IDs. Keep the caller's workspace and surface context; use explicit targets and `--focus false` where supported."))
 
@@ -65,7 +65,7 @@ extension CMUXCLI {
         `cmux new-workspace --help` · `cmux new-pane --help`
         `cmux read-screen --help` · `cmux send --help` · `cmux send-key --help`
 
-        \(CMUXDiffViewerLocalization.string("cli.guide.overview.browser", defaultValue: "## Use a browser\n\nUse `cmux browser` for a browser surface inside cmux. Use `agent-browser` for a separate browser session. Prefer an existing headful Chrome session when it exposes DevTools through remote debugging: `agent-browser --auto-connect snapshot`, or `agent-browser --cdp 9222 snapshot` for an explicit port. A normal Chrome window without remote debugging cannot be attached; `agent-browser --headed` starts a new visible browser. Read a snapshot, act on an observed element, then take a fresh snapshot. Check appearance with a screenshot. Keep each tool's target IDs within that tool."))
+        \(CMUXDiffViewerLocalization.string("cli.guide.overview.browser", defaultValue: "## Use a browser\n\nUse `shellx browser` for a browser surface inside ShellX. Use `agent-browser` for a separate browser session. Prefer an existing headful Chrome session when it exposes DevTools through remote debugging: `agent-browser --auto-connect snapshot`, or `agent-browser --cdp 9222 snapshot` for an explicit port. A normal Chrome window without remote debugging cannot be attached; `agent-browser --headed` starts a new visible browser. Read a snapshot, act on an observed element, then take a fresh snapshot. Check appearance with a screenshot. Keep each tool's target IDs within that tool."))
 
         ```sh
         cmux browser open https://example.com --focus false
@@ -77,13 +77,13 @@ extension CMUXCLI {
         agent-browser --help
         ```
 
-        [cmux browser](https://cmux.com/docs/browser-automation) · [agent-browser docs](https://agent-browser.dev/) · [agent-browser commands](https://agent-browser.dev/commands)
+        [cmux browser](https://github.com/lephus/shellx/blob/main/skills/cmux-browser/SKILL.md) · [agent-browser docs](https://agent-browser.dev/) · [agent-browser commands](https://agent-browser.dev/commands)
 
-        \(CMUXDiffViewerLocalization.string("cli.guide.overview.computer", defaultValue: "## Use app windows\n\nUse computer-use tools for native apps or visual controls. cmux provides these tools to Claude Code and Codex sessions launched in cmux. Complete setup in Settings > Computer Use. Read the `cmux-cua` skill for your agent's methods: inspect app or window state, click or type, then inspect again."))
+        \(CMUXDiffViewerLocalization.string("cli.guide.overview.computer", defaultValue: "## Use app windows\n\nUse computer-use tools for native apps or visual controls. ShellX provides these tools to Claude Code and Codex sessions launched in ShellX. Complete setup in Settings > Computer Use. Read the `cmux-cua` skill for your agent's methods: inspect app or window state, click or type, then inspect again."))
 
-        [cmux-cua](https://github.com/manaflow-ai/cmux/blob/main/skills/cmux-cua/SKILL.md#using-the-tools-agent-facing)
+        [cmux-cua](https://github.com/lephus/shellx/blob/main/skills/cmux-cua/SKILL.md#using-the-tools-agent-facing)
 
-        \(CMUXDiffViewerLocalization.string("cli.guide.overview.cloud", defaultValue: "## Use Cloud\n\nUse cmux Cloud when work needs a remote machine. List machines before choosing one. Use `exec` for a short command, `agent` for a coding agent, and `push` or `pull` for files. The default Cloud devbox includes Chrome and `cua-driver`; the Cloud guide explains how to verify and use them. Use the Cloud guide for desktop, browser, port, and machine lifecycle methods."))
+        \(CMUXDiffViewerLocalization.string("cli.guide.overview.cloud", defaultValue: "## Use Cloud\n\nUse ShellX Cloud when work needs a remote machine. List machines before choosing one. Use `exec` for a short command, `agent` for a coding agent, and `push` or `pull` for files. The default Cloud devbox includes Chrome and `cua-driver`; the Cloud guide explains how to verify and use them. Use the Cloud guide for desktop, browser, port, and machine lifecycle methods."))
 
         ```sh
         cmux cloud ls --json
@@ -103,7 +103,7 @@ extension CMUXCLI {
         """
         # cmux cloud guide
 
-        \(CMUXDiffViewerLocalization.string("cli.guide.cloud.intro", defaultValue: "cmux Cloud runs commands, agents, browsers, and desktops on remote machines. Run the commands below from cmux on your Mac. Cloud operations need the app and a signed-in account. `cmux cloud --skill` prints this same guide; `cmux vm` is an alias for `cmux cloud`."))
+        \(CMUXDiffViewerLocalization.string("cli.guide.cloud.intro", defaultValue: "ShellX Cloud runs commands, agents, browsers, and desktops on remote machines. Run the commands below from ShellX on your Mac. Cloud operations need the app and a signed-in account. `shellx cloud --skill` prints this same guide; `shellx vm` is an alias for `shellx cloud`."))
 
         \(CMUXDiffViewerLocalization.string("cli.guide.cloud.choose", defaultValue: "## Choose a machine\n\nInspect existing machines first. Route the current directory with `route --json`; reuse its machine when `would_provision` is false. When `machine` is null and `would_provision` is true, check `ls` and choose Base, an idle machine, or deliberate provisioning before creating anything. Check `vpn status`; run `vpn up` if a private operation reports a down or stale tunnel. Base is a persistent machine with a workspace that you can reopen. Prefer a new workspace on an existing machine; use `new` for isolation. Use returned machine, workspace, and terminal IDs in later commands."))
 
@@ -152,17 +152,17 @@ extension CMUXCLI {
         cmux cloud desktop <machine>
         ```
 
-        [agent-browser docs](https://agent-browser.dev/) · [agent-browser commands](https://agent-browser.dev/commands) · [cua-driver docs](https://cua.ai/docs/cua-driver) · [cmux cloud agent](https://github.com/manaflow-ai/cmux/blob/main/skills/cmux-cloud-vm/references/agent-workflows.md)
+        [agent-browser docs](https://agent-browser.dev/) · [agent-browser commands](https://agent-browser.dev/commands) · [cua-driver docs](https://cua.ai/docs/cua-driver) · [cmux cloud agent](https://github.com/lephus/shellx/blob/main/skills/cmux-cloud-vm/references/agent-workflows.md)
 
         \(CMUXDiffViewerLocalization.string("cli.guide.cloud.share", defaultValue: "## Observe, open, share, and clean up\n\nUse `tree`, `terminal read`, and `terminal wait` to observe live work and check its real output. Use `open` for a machine's terminal, desktop, or web port when there is something useful to show. Private web URLs need the Cloud network connection; read `vpn` help. Use `domains` to publish a web port with explicit access rules. Use snapshots and forks to keep or copy machine state. Delete forks and scratch machines you created. Never remove or reset a machine you did not create."))
 
         `cmux cloud open --help` · `cmux vpn --help` · `cmux cloud domains --help`
         `cmux cloud snapshot --help` · `cmux cloud fork --help` · `cmux cloud rm --help`
 
-        \(CMUXDiffViewerLocalization.string("cli.guide.cloud.more", defaultValue: "## Find exact methods\n\nRead command help for flags and examples. The full Cloud reference covers machine lifecycle, workspaces, terminals, and transfers. Use `cmux guide` for local workspace, browser, and computer-use methods."))
+        \(CMUXDiffViewerLocalization.string("cli.guide.cloud.more", defaultValue: "## Find exact methods\n\nRead command help for flags and examples. The full Cloud reference covers machine lifecycle, workspaces, terminals, and transfers. Use `shellx guide` for local workspace, browser, and computer-use methods."))
 
         `cmux cloud --help` · `cmux cloud <command> --help` · `cmux guide`
-        [cmux cloud](https://github.com/manaflow-ai/cmux/blob/main/skills/cmux-cloud-vm/references/commands.md)
+        [cmux cloud](https://github.com/lephus/shellx/blob/main/skills/cmux-cloud-vm/references/commands.md)
         """
     }
 }

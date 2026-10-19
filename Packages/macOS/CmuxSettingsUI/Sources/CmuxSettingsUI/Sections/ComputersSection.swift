@@ -1,5 +1,6 @@
 import CmuxSettings
 import SwiftUI
+import ShellXIcons
 
 /// **Devices** section under Remote & Devices: the settings home of the
 /// Cloud sidebar's My Devices. Holds the two independent switches (make
@@ -67,9 +68,9 @@ public struct ComputersSection: View {
                     SettingsCardNote(String(localized: "devices.discovery.settingsDisabled", defaultValue: "Turn on Discover other devices to see your devices."))
                 } else if snapshot.computers.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
-                        Label(String(localized: "devices.empty.title", defaultValue: "No other devices yet"), systemImage: "desktopcomputer")
+                        ShellXLabel(String(localized: "devices.empty.title", defaultValue: "No other devices yet"), icon: "desktopcomputer")
                             .font(.callout.weight(.medium))
-                        Text(String(localized: "devices.empty.help", defaultValue: "Sign in to cmux on another Mac and make it discoverable in Settings › Devices."))
+                        Text(String(localized: "devices.empty.help", defaultValue: "Sign in to ShellX on another Mac and make it discoverable in Settings › Devices."))
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
@@ -82,7 +83,7 @@ public struct ComputersSection: View {
                 }
             }
             if let error = snapshot.error {
-                Label(error, systemImage: "exclamationmark.triangle")
+                ShellXLabel(error, icon: "exclamationmark.triangle")
                     .font(.callout)
                     .foregroundStyle(.red)
                     .textSelection(.enabled)

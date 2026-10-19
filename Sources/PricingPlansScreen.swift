@@ -4,7 +4,9 @@ import AppKit
 import CMUXMobileCore
 import Bonsplit
 import Foundation
+import ShellXBrand
 import SwiftUI
+import ShellXIcons
 
 /// Shared entrypoint for every "Upgrade to cmux Pro" surface (sidebar badge,
 /// titlebar badge, Settings Account card, command palette, Help menu). Opens
@@ -21,9 +23,9 @@ enum ProUpgradePresenter {
     nonisolated static func upgradeMenuTitle(for tier: CmuxPlanTier) -> String {
         switch tier {
         case .max:
-            String(localized: "menu.help.upgradeToMax", defaultValue: "Upgrade to cmux Max…")
+            String(localized: "menu.help.upgradeToMax", defaultValue: "Upgrade to ShellX Max…")
         case .free, .go, .pro:
-            String(localized: "menu.help.upgradeToPro", defaultValue: "Upgrade to cmux Pro…")
+            String(localized: "menu.help.upgradeToPro", defaultValue: "Upgrade to ShellX Pro…")
         }
     }
 
@@ -31,9 +33,9 @@ enum ProUpgradePresenter {
     nonisolated static func upgradeCommandTitle(for tier: CmuxPlanTier) -> String {
         switch tier {
         case .max:
-            String(localized: "command.pro.upgradeToMax.title", defaultValue: "Upgrade to cmux Max")
+            String(localized: "command.pro.upgradeToMax.title", defaultValue: "Upgrade to ShellX Max")
         case .free, .go, .pro:
-            String(localized: "command.pro.upgrade.title", defaultValue: "Upgrade to cmux Pro")
+            String(localized: "command.pro.upgrade.title", defaultValue: "Upgrade to ShellX Pro")
         }
     }
 
@@ -41,6 +43,8 @@ enum ProUpgradePresenter {
     /// already on the top tier or its plan is not yet known.
     @MainActor
     static var currentUpgradeOffer: CmuxPlanTier? {
+        // ShellX: no upgrade offer anywhere (billing and Pro are Manaflow services).
+        guard ShellXFeatures.cloud else { return nil }
         guard let flow = AppDelegate.shared?.auth?.accountFlow else { return .pro }
         return flow.upgradeOffer
     }
@@ -58,6 +62,7 @@ enum ProUpgradePresenter {
         analytics: ProductAnalytics = .app,
         open: @MainActor (ProUpgradeSource) -> Void = { presentAppPricingWeb(source: $0) }
     ) {
+        guard ShellXFeatures.cloud else { return }
         analytics.track(.upgradeOpened(source, destination: .pricingPage))
         open(source)
     }
@@ -68,6 +73,7 @@ enum ProUpgradePresenter {
     /// entry is a no-op.
     @MainActor
     static func prefetch(source: ProUpgradeSource) {
+        guard ShellXFeatures.cloud else { return }
         guard BrowserAvailabilitySettings.isEnabled() else { return }
         // When an upgrade workspace already exists, present() refocuses it and
         // navigates its existing panel, so a prewarmed webview would go unused.
@@ -88,6 +94,7 @@ enum ProUpgradePresenter {
 
     @MainActor
     static func presentAppPricingWeb(source: ProUpgradeSource) {
+        guard ShellXFeatures.cloud else { return }
         let url = appPricingURLForCurrentAppearance(source: source)
         guard BrowserAvailabilitySettings.isEnabled() else {
             NSWorkspace.shared.open(url)
@@ -101,6 +108,7 @@ enum ProUpgradePresenter {
 
     @MainActor
     static func presentNativePricingPreview() {
+        guard ShellXFeatures.cloud else { return }
         NativePricingWindowController.shared.show()
     }
 
@@ -110,6 +118,7 @@ enum ProUpgradePresenter {
         plan: CheckoutPlan = .pro,
         analytics: ProductAnalytics = .app
     ) {
+        guard ShellXFeatures.cloud else { return }
         analytics.track(.upgradeOpened(source, plan: plan, destination: .checkout))
         NSWorkspace.shared.open(checkoutURL(source: source, plan: plan))
     }
@@ -126,6 +135,7 @@ enum ProUpgradePresenter {
 
     @MainActor
     static func presentBillingPortal() {
+        guard ShellXFeatures.cloud else { return }
         NSWorkspace.shared.open(AuthEnvironment.billingPortalURL)
     }
 
@@ -141,7 +151,7 @@ enum ProUpgradePresenter {
             workspaceReuseState.clear()
         }
 
-        let title = String(localized: "pricing.pro.workspace.title", defaultValue: "cmux Pro")
+        let title = String(localized: "pricing.pro.workspace.title", defaultValue: "ShellX Pro")
         guard let workspace = appDelegate.performProUpgradeWorkspaceAction(
             title: title,
             url: url,
@@ -216,7 +226,7 @@ private final class NativePricingWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = String(localized: "pricing.native.window.title", defaultValue: "cmux Upgrade")
+        window.title = String(localized: "pricing.native.window.title", defaultValue: "ShellX Upgrade")
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
         window.minSize = NSSize(width: 760, height: 520)
@@ -388,6 +398,7 @@ private final class NativePricingPlanStore: ObservableObject {
 enum NativePricingPlanRefresh {
     @MainActor
     static func refreshForProWelcomeChecklist() async {
+        guard ShellXFeatures.cloud else { return }
         await NativePricingPlanStore.refreshForProWelcomeChecklist()
     }
 }
@@ -540,7 +551,7 @@ private struct NativePricingPlansView: View {
                     String(localized: "pricing.native.pro.feature.vms", defaultValue: "Cloud agents on isolated Cloud VMs"),
                     String(localized: "pricing.native.pro.feature.hours", defaultValue: "Up to 5 Cloud VMs sharing 20 vCPUs and 40 GB RAM; one VM can use up to 16 GB RAM / 8 vCPU. The 24 GB / 12 vCPU and 32 GB / 16 vCPU sizes require Max."),
                     String(localized: "pricing.native.pro.feature.gateway", defaultValue: "Unlimited workspaces"),
-                    String(localized: "pricing.native.pro.feature.ios", defaultValue: "cmux iOS app and email support"),
+                    String(localized: "pricing.native.pro.feature.ios", defaultValue: "ShellX iOS app and email support"),
                 ]
             )
             NativePricingPlanCard(
@@ -670,7 +681,7 @@ private struct NativePricingPlanCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(features, id: \.self) { feature in
                     HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "checkmark")
+                        ShellXIcon.image("checkmark")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(.secondary)
                             .frame(width: 14)
@@ -907,7 +918,7 @@ private struct NativePricingCompareCell: View {
         Group {
             switch value {
             case .included:
-                Image(systemName: "checkmark")
+                ShellXIcon.image("checkmark")
                     .font(.system(size: 12, weight: .semibold))
             case .unavailable:
                 Text("-")

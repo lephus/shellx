@@ -1,10 +1,11 @@
 import Foundation
+import ShellXBrand
 
 /// Gives managed provider processes an owner that can outlive an app crash.
 struct AgentSessionOwnedProcessLauncher {
     private let supervisorExecutableURL: URL?
 
-    init(supervisorExecutableURL: URL? = Bundle.main.url(forResource: "cmux", withExtension: nil, subdirectory: "bin")) {
+    init(supervisorExecutableURL: URL? = Bundle.main.url(forResource: ShellXBrand.cliName, withExtension: nil, subdirectory: "bin")) {
         self.supervisorExecutableURL = supervisorExecutableURL
     }
 

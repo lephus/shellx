@@ -65,7 +65,7 @@ struct HostBrowserSignInFlowHarness {
             sessionFactory: factory,
             callbackRouter: AuthCallbackRouter(),
             makeSignInURL: { URL(string: "https://example.test/handler/sign-in?cmux_auth_state=\($0)")! },
-            callbackScheme: { "cmux-dev" },
+            callbackScheme: { "shellx-dev" },
             openExternalURL: { openedURLRecorder.append($0) },
             approveUnsolicitedCallback: approveUnsolicitedCallback,
             clock: clock ?? ContinuousClock(),
@@ -83,11 +83,11 @@ struct HostBrowserSignInFlowHarness {
     }
 
     func callbackURL(state: String) -> URL {
-        URL(string: "cmux-dev://auth-callback?stack_refresh=refresh-1&stack_access=access-1&cmux_auth_state=\(state)")!
+        URL(string: "shellx-dev://auth-callback?stack_refresh=refresh-1&stack_access=access-1&cmux_auth_state=\(state)")!
     }
 
     func fallbackCallbackURL() -> URL {
-        URL(string: "cmux-dev://auth-callback?stack_refresh=refresh-1&stack_access=access-1")!
+        URL(string: "shellx-dev://auth-callback?stack_refresh=refresh-1&stack_access=access-1")!
     }
 
     func callbackState(_ session: FakeBrowserAuthSession) -> String {

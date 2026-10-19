@@ -1,4 +1,4 @@
-/// What the scripted remote host reports about its cmuxd-remote install.
+/// What the scripted remote host reports about its shellx-remote install.
 enum ReadinessScriptedDaemon: Sendable {
     /// No daemon is installed, and the app under test carries no manifest to
     /// install one from, so bootstrap can never succeed.

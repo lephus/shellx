@@ -16,7 +16,7 @@ extension CMUXCLI {
         guard remaining.isEmpty else {
             throw CLIError(message: String(
                 localized: "cli.socketControlStatus.error.invalidArguments",
-                defaultValue: "Usage: cmux socket-status [--json]"
+                defaultValue: "Usage: shellx socket-status [--json]"
             ))
         }
 

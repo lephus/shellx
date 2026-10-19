@@ -46,7 +46,7 @@ extension Workspace {
         String(
             format: String(
                 localized: "remoteSession.parked.cleanupBlocked",
-                defaultValue: "cmux could not clean up the previous SSH connection to %@. Check that the host is reachable, then use Reconnect to try again."
+                defaultValue: "ShellX could not clean up the previous SSH connection to %@. Check that the host is reachable, then use Reconnect to try again."
             ),
             remoteDisplayTarget ?? ""
         )

@@ -2,6 +2,7 @@ import CmuxFoundation
 import AppKit
 import Bonsplit
 import SwiftUI
+import ShellXIcons
 
 /// Hosting root for the browser find bar: the overlay plus the cmux accent
 /// environment, since it mounts outside any window root.
@@ -78,7 +79,7 @@ struct BrowserSearchOverlay: View {
                     #endif
                     onNext()
                 }) {
-                    Image(systemName: "chevron.up")
+                    ShellXIcon.image("chevron.up")
                 }
                 .buttonStyle(SearchButtonStyle())
                 .safeHelp("Next match (Return)")
@@ -89,7 +90,7 @@ struct BrowserSearchOverlay: View {
                     #endif
                     onPrevious()
                 }) {
-                    Image(systemName: "chevron.down")
+                    ShellXIcon.image("chevron.down")
                 }
                 .buttonStyle(SearchButtonStyle())
                 .safeHelp("Previous match (Shift+Return)")
@@ -100,7 +101,7 @@ struct BrowserSearchOverlay: View {
                     #endif
                     onClose()
                 }) {
-                    Image(systemName: "xmark")
+                    ShellXIcon.image("xmark")
                 }
                 .buttonStyle(SearchButtonStyle())
                 .safeHelp("Close (Esc)")

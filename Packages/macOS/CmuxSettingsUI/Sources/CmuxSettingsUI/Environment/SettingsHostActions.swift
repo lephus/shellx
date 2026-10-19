@@ -68,7 +68,7 @@ public protocol SettingsHostActions: AnyObject, CloudMachinesSettingsActions {
     /// Reads the existing config-backed automation rules for Settings status.
     func automationRulesStatus() async -> AutomationRulesStatus
 
-    /// Opens ~/.cmuxterm/automations.json in the user's preferred editor.
+    /// Opens ~/.shellx/automations.json in the user's preferred editor.
     func openAutomationRulesInExternalEditor()
 
     /// Asks the running automation engine to reload its existing config file.
@@ -461,7 +461,7 @@ public extension SettingsHostActions {
     /// Empty automation summary for previews and package-only hosts.
     func automationRulesStatus() async -> AutomationRulesStatus {
         AutomationRulesStatus(
-            configPath: "~/.cmuxterm/automations.json",
+            configPath: "~/.shellx/automations.json",
             ruleCount: 0,
             enabledCount: 0,
             configExists: false

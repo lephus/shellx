@@ -345,7 +345,7 @@ struct MobileHostV2ConfigurationTests {
             try? FileManager.default.removeItem(at: directory)
         }
         let info: [String: String] = [
-            "CFBundleIdentifier": "com.cmuxterm.app.nightly",
+            "CFBundleIdentifier": "pro.shellx.desktop.nightly",
             "CMUX_IROH_V2_ENVIRONMENT": "",
             "CMUX_IROH_V2_BASE_URL": ""
         ]

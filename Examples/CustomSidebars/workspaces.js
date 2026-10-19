@@ -10,7 +10,7 @@
 // Group collapse is optimistic (a local signal flips instantly) and syncs via
 // workspace.group.collapse/expand so the built-in sidebar agrees.
 //
-// Install:  cp Examples/CustomSidebars/workspaces.js ~/.config/cmux/sidebars/
+// Install:  cp Examples/CustomSidebars/workspaces.js ~/.config/shellx/sidebars/
 // Open:     cmux sidebar open workspaces
 
 // --- optimistic UI -------------------------------------------------------------

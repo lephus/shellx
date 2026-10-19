@@ -7,8 +7,8 @@ struct AboutPanelView: View {
 
     @Environment(\.openURL) private var openURL
 
-    private let githubURL = URL(string: "https://github.com/manaflow-ai/cmux")
-    private let docsURL = URL(string: "https://cmux.com/docs")
+    private let githubURL = URL(string: "https://github.com/lephus/shellx")
+    private let docsURL = URL(string: "https://shellx.pro")
 
     private var version: String? { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String }
     private var build: String? { Bundle.main.infoDictionary?["CFBundleVersion"] as? String }
@@ -23,15 +23,16 @@ struct AboutPanelView: View {
 
     var body: some View {
         VStack(alignment: .center) {
-            Image(nsImage: NSApplication.shared.applicationIconImage)
+            Image("ShellXLogo")
                 .resizable()
                 .renderingMode(.original)
+                .aspectRatio(contentMode: .fit)
                 .frame(width: 96, height: 96)
-                .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 3)
+                .accessibilityHidden(true)
 
             VStack(alignment: .center, spacing: 32) {
                 VStack(alignment: .center, spacing: 8) {
-                    Text(String(localized: "about.appName", defaultValue: "cmux"))
+                    Text(String(localized: "about.appName", defaultValue: "ShellX"))
                         .cmuxFont(.title)
                         .bold()
                     Text(String(localized: "about.description", defaultValue: "A Ghostty-based terminal with vertical tabs\nand a notification panel for macOS."))
@@ -52,9 +53,24 @@ struct AboutPanelView: View {
                     }
                     let commitText = commit ?? "—"
                     let commitURL = commit.flatMap { hash in
-                        URL(string: "https://github.com/manaflow-ai/cmux/commit/\(hash)")
+                        URL(string: "https://github.com/lephus/shellx/commit/\(hash)")
                     }
                     AboutPropertyRow(label: String(localized: "about.commit", defaultValue: "Commit"), text: commitText, url: commitURL)
+                }
+                .frame(maxWidth: .infinity)
+
+                Link(AboutLicenseContent.licenseLine, destination: AboutLicenseContent.sourceCodeURL)
+                    .cmuxFont(.caption)
+                    .multilineTextAlignment(.center)
+
+                VStack(spacing: 2) {
+                    Text(String(localized: "about.shellx.credits", defaultValue: "Credits"))
+                        .cmuxFont(.caption)
+                        .bold()
+                        .padding(.bottom, 2)
+                    ForEach(AboutLicenseContent.attributions, id: \.name) { attribution in
+                        AboutPropertyRow(label: attribution.name, text: attribution.license, url: attribution.url)
+                    }
                 }
                 .frame(maxWidth: .infinity)
 

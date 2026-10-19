@@ -13,9 +13,9 @@ struct RemoteRelaySlotTeardownTests {
         let fileManager = FileManager.default
         let home = fileManager.temporaryDirectory
             .appendingPathComponent("cmux-relay-slot-teardown-\(UUID().uuidString)")
-        let relayDirectory = home.appendingPathComponent(".cmux/relay")
+        let relayDirectory = home.appendingPathComponent(".shellx/relay")
         let shellDirectory = relayDirectory.appendingPathComponent("64008.shell")
-        let daemonURL = home.appendingPathComponent("cmuxd-remote-test")
+        let daemonURL = home.appendingPathComponent("shellx-remote-test")
         let shutdownArgumentsURL = home.appendingPathComponent("shutdown.args")
         defer { try? fileManager.removeItem(at: home) }
 
@@ -87,9 +87,9 @@ struct RemoteRelaySlotTeardownTests {
         let fileManager = FileManager.default
         let home = fileManager.temporaryDirectory
             .appendingPathComponent("cmux-relay-transport-cleanup-\(UUID().uuidString)")
-        let relayDirectory = home.appendingPathComponent(".cmux/relay")
+        let relayDirectory = home.appendingPathComponent(".shellx/relay")
         let shellDirectory = relayDirectory.appendingPathComponent("64009.shell")
-        let socketAddressURL = home.appendingPathComponent(".cmux/socket_addr")
+        let socketAddressURL = home.appendingPathComponent(".shellx/socket_addr")
         defer { try? fileManager.removeItem(at: home) }
 
         try fileManager.createDirectory(at: shellDirectory, withIntermediateDirectories: true)
@@ -132,10 +132,10 @@ struct RemoteRelaySlotTeardownTests {
         let fileManager = FileManager.default
         let home = fileManager.temporaryDirectory
             .appendingPathComponent("cmux-relay-failed-shutdown-\(UUID().uuidString)")
-        let relayDirectory = home.appendingPathComponent(".cmux/relay")
+        let relayDirectory = home.appendingPathComponent(".shellx/relay")
         let shellDirectory = relayDirectory.appendingPathComponent("64011.shell")
-        let daemonURL = home.appendingPathComponent("cmuxd-remote-old")
-        let socketAddressURL = home.appendingPathComponent(".cmux/socket_addr")
+        let daemonURL = home.appendingPathComponent("shellx-remote-old")
+        let socketAddressURL = home.appendingPathComponent(".shellx/socket_addr")
         defer { try? fileManager.removeItem(at: home) }
 
         try fileManager.createDirectory(at: shellDirectory, withIntermediateDirectories: true)
@@ -185,11 +185,11 @@ struct RemoteRelaySlotTeardownTests {
         let fileManager = FileManager.default
         let home = fileManager.temporaryDirectory
             .appendingPathComponent("cmux-relay-mismatched-owner-\(UUID().uuidString)")
-        let relayDirectory = home.appendingPathComponent(".cmux/relay")
+        let relayDirectory = home.appendingPathComponent(".shellx/relay")
         let shellDirectory = relayDirectory.appendingPathComponent("64012.shell")
-        let daemonURL = home.appendingPathComponent("cmuxd-remote-owner")
+        let daemonURL = home.appendingPathComponent("shellx-remote-owner")
         let shutdownArgumentsURL = home.appendingPathComponent("shutdown.args")
-        let socketAddressURL = home.appendingPathComponent(".cmux/socket_addr")
+        let socketAddressURL = home.appendingPathComponent(".shellx/socket_addr")
         defer { try? fileManager.removeItem(at: home) }
 
         try fileManager.createDirectory(at: shellDirectory, withIntermediateDirectories: true)
@@ -244,9 +244,9 @@ struct RemoteRelaySlotTeardownTests {
         let fileManager = FileManager.default
         let home = fileManager.temporaryDirectory
             .appendingPathComponent("cmux-relay-malformed-slot-\(cleanupScope.rawValue)-\(UUID().uuidString)")
-        let relayDirectory = home.appendingPathComponent(".cmux/relay")
+        let relayDirectory = home.appendingPathComponent(".shellx/relay")
         let shellDirectory = relayDirectory.appendingPathComponent("64013.shell")
-        let socketAddressURL = home.appendingPathComponent(".cmux/socket_addr")
+        let socketAddressURL = home.appendingPathComponent(".shellx/socket_addr")
         defer { try? fileManager.removeItem(at: home) }
 
         try fileManager.createDirectory(at: shellDirectory, withIntermediateDirectories: true)
@@ -327,7 +327,7 @@ struct RemoteRelaySlotTeardownTests {
     func coordinatorStopsPersistentSlotAfterTransportCleanupWithoutRelayMetadata() async throws {
         let runner = SpyProcessRunner()
         let coordinator = makeCoordinator(runner: runner, relayPort: nil)
-        coordinator.queue.sync { coordinator.daemonRemotePath = ".cmux/bin/cmuxd-remote" }
+        coordinator.queue.sync { coordinator.daemonRemotePath = ".shellx/bin/shellx-remote" }
 
         let transportSucceeded = await coordinator.stopAndWait(cleanupScope: .transport)
         #expect(transportSucceeded)
@@ -337,9 +337,9 @@ struct RemoteRelaySlotTeardownTests {
 
         let cleanupCommand = try #require(runner.requests.last?.arguments.last)
         #expect(succeeded)
-        #expect(cleanupCommand.contains("$HOME/.cmux/bin/cmuxd-remote"))
+        #expect(cleanupCommand.contains("$HOME/.shellx/bin/shellx-remote"))
         #expect(cleanupCommand.contains("serve --persistent-stop --slot"))
-        #expect(!cleanupCommand.contains(".cmux/relay"))
+        #expect(!cleanupCommand.contains(".shellx/relay"))
     }
 
     @Test
@@ -349,7 +349,7 @@ struct RemoteRelaySlotTeardownTests {
             RemoteCommandResult(status: 0, stdout: "", stderr: ""),
         ])
         let coordinator = makeCoordinator(runner: runner)
-        coordinator.queue.sync { coordinator.daemonRemotePath = ".cmux/bin/cmuxd-remote" }
+        coordinator.queue.sync { coordinator.daemonRemotePath = ".shellx/bin/shellx-remote" }
 
         let succeeded = await coordinator.stopAndWait(cleanupScope: .persistentSlot)
 
@@ -358,7 +358,7 @@ struct RemoteRelaySlotTeardownTests {
         let metadataCleanup = try #require(runner.requests.first?.arguments.last)
         #expect(metadataCleanup.contains("64010.slot"))
         let directCleanup = try #require(runner.requests.last?.arguments.last)
-        #expect(directCleanup.contains("$HOME/.cmux/bin/cmuxd-remote"))
+        #expect(directCleanup.contains("$HOME/.shellx/bin/shellx-remote"))
         #expect(directCleanup.contains("serve --persistent-stop --slot"))
         #expect(!directCleanup.contains("relay_socket="))
     }

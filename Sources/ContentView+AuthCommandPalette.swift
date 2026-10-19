@@ -2,6 +2,7 @@ import CmuxCloud
 import CmuxCommandPalette
 import AppKit
 import Foundation
+import ShellXBrand
 
 extension ContentView {
     static let commandPaletteAuthSignInCommandId = "palette.auth.signIn"
@@ -10,6 +11,8 @@ extension ContentView {
     static let commandPaletteAuthTeamMembersCommandId = "palette.auth.teamMembers"
 
     static func commandPaletteAuthCommandContributions() -> [CommandPaletteCommandContribution] {
+        // ShellX: no Sign In/Out or team commands (accounts are a Manaflow service).
+        guard ShellXFeatures.cloud else { return [] }
         func constant(_ value: String) -> (CommandPaletteContextSnapshot) -> String {
             { _ in value }
         }
@@ -59,6 +62,7 @@ extension ContentView {
     }
 
     func registerAuthCommandHandlers(_ registry: inout CommandPaletteHandlerRegistry) {
+        guard ShellXFeatures.cloud else { return }
         registry.register(commandId: Self.commandPaletteAuthSignInCommandId) {
 #if DEBUG
             cmuxDebugLog("palette.auth.signIn.invoke")
@@ -114,6 +118,7 @@ extension ContentView {
     static func commandPaletteCloudCommandContributions(
         isAuthenticated: Bool? = nil
     ) -> [CommandPaletteCommandContribution] {
+        guard ShellXFeatures.cloud else { return [] }
         // Feature-gated: hide every Cloud VM command from the palette when the
         // Cloud VM UI flag is off, matching the dropdown and shortcut gates.
         guard CloudMachinesFeature.isEnabled,
@@ -233,6 +238,7 @@ extension ContentView {
 
     /// Registers Cloud palette handlers with the shared command dispatcher.
     func registerCloudCommandHandlers(_ registry: inout CommandPaletteHandlerRegistry) {
+        guard ShellXFeatures.cloud else { return }
         let commandWindow = observedWindow ?? NSApp.keyWindow ?? NSApp.mainWindow
         registry.register(commandId: Self.commandPaletteCloudAvailabilityInfoCommandId) {
             let alert = NSAlert()

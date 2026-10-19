@@ -2,6 +2,7 @@ import CmuxAgentChat
 import CmuxFoundation
 import Foundation
 import SwiftUI
+import ShellXIcons
 
 /// Current-main extraction of the useful conversation-sidebar behavior from
 /// the older fork experiment.
@@ -310,7 +311,7 @@ struct ConversationSidebarView: View {
 
     private func searchField(providerOptions: [SessionAgent]) -> some View {
         HStack(spacing: 7) {
-            Image(systemName: "magnifyingglass")
+            ShellXIcon.image("magnifyingglass")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
             TextField(
@@ -336,8 +337,8 @@ struct ConversationSidebarView: View {
                     }
                 }
             } label: {
-                Image(
-                    systemName: selectedProviderID == nil
+                ShellXIcon.image(
+                    selectedProviderID == nil
                         ? "line.3.horizontal.decrease.circle"
                         : "line.3.horizontal.decrease.circle.fill"
                 )

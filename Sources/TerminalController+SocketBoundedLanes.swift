@@ -193,7 +193,7 @@ extension TerminalController {
     /// cooperative-pool thread. This is the sanctioned legacy blocking
     /// boundary, not general async work.
     private nonisolated static let socketBlockingWorkerQueue = DispatchQueue(
-        label: "com.cmux.socket.blocking-worker",
+        label: "pro.shellx.socket.blocking-worker",
         qos: .userInitiated,
         attributes: .concurrent
     )
@@ -286,14 +286,14 @@ extension TerminalController {
     private nonisolated static var socketMainHopTimeoutNotRunMessage: String {
         String(
             localized: "socket.mainActorHop.timeout.notRun",
-            defaultValue: "cmux did not respond within 10 seconds, so the command was not run. Retry in a moment."
+            defaultValue: "ShellX did not respond within 10 seconds, so the command was not run. Retry in a moment."
         )
     }
 
     private nonisolated static var socketMainHopTimeoutMayHaveRunMessage: String {
         String(
             localized: "socket.mainActorHop.timeout.mayHaveRun",
-            defaultValue: "cmux did not respond within 10 seconds after the command started, so its result is unknown. Check the effect before retrying."
+            defaultValue: "ShellX did not respond within 10 seconds after the command started, so its result is unknown. Check the effect before retrying."
         )
     }
 

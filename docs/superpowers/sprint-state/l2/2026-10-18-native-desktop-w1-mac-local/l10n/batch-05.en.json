@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Remote workspace %@ is no longer available. Refresh and retry.",
+"comment": ""
+},
+{
+"i": 1,
+"en": "Remote workspace %@ has no available terminal placement. Refresh and retry.",
+"comment": ""
+},
+{
+"i": 2,
+"en": "Remote tab %@ is no longer available. Refresh and retry.",
+"comment": ""
+},
+{
+"i": 3,
+"en": "This remote workspace is no longer available.",
+"comment": ""
+},
+{
+"i": 4,
+"en": "The terminal state could not be refreshed. Try again.",
+"comment": ""
+},
+{
+"i": 5,
+"en": "The clicked Cloud terminal could not be restored in its workspace.",
+"comment": ""
+},
+{
+"i": 6,
+"en": "%@ uses an older Cloud protocol. Refresh it to enable live sync and rename operations.",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Rename",
+"comment": ""
+},
+{
+"i": 8,
+"en": "Rename “%@”",
+"comment": ""
+},
+{
+"i": 9,
+"en": "New Workspace",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Open All Here",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Open All in New Tabs",
+"comment": ""
+},
+{
+"i": 12,
+"en": "Open as New Workspace",
+"comment": ""
+},
+{
+"i": 13,
+"en": "Open Full cmux-tui Client",
+"comment": ""
+},
+{
+"i": 14,
+"en": "Open in New Pane",
+"comment": ""
+},
+{
+"i": 15,
+"en": "Open in New Tab",
+"comment": ""
+},
+{
+"i": 16,
+"en": "Refresh",
+"comment": ""
+},
+{
+"i": 17,
+"en": "Go to Workspace",
+"comment": ""
+},
+{
+"i": 18,
+"en": "Desktop",
+"comment": ""
+},
+{
+"i": 19,
+"en": "noVNC",
+"comment": ""
+},
+{
+"i": 20,
+"en": "Connecting to %@…",
+"comment": ""
+},
+{
+"i": 21,
+"en": "Couldn’t open %@",
+"comment": ""
+},
+{
+"i": 22,
+"en": "Close this pane and open it again from the sidebar.",
+"comment": ""
+},
+{
+"i": 23,
+"en": "This provider cannot open port previews. Do not retry; use `cmux vm exec` inside the machine or choose another machine.",
+"comment": ""
+},
+{
+"i": 24,
+"en": "%@’s provider cannot open machine ports as previews; reach the service from inside the machine with `cmux vm exec %@ -- …`.",
+"comment": ""
+},
+{
+"i": 25,
+"en": "No local workspace is showing %@; select a workspace and retry.",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Ports can only be opened on a cloud machine.",
+"comment": ""
+},
+{
+"i": 27,
+"en": "Closing on %@…",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Starting a terminal on %@…",
+"comment": ""
+},
+{
+"i": 29,
+"en": "Creating a workspace on %@…",
+"comment": ""
+},
+{
+"i": 30,
+"en": "Opening on %@…",
+"comment": ""
+},
+{
+"i": 31,
+"en": "Asleep — open to wake",
+"comment": ""
+},
+{
+"i": 32,
+"en": "Link failed",
+"comment": ""
+},
+{
+"i": 33,
+"en": "No terminals open",
+"comment": ""
+},
+{
+"i": 34,
+"en": "No terminals yet",
+"comment": ""
+},
+{
+"i": 35,
+"en": "No workspaces yet",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Sessions unavailable on this machine",
+"comment": ""
+},
+{
+"i": 37,
+"en": "CPU %d%%",
+"comment": ""
+},
+{
+"i": 38,
+"en": "Disk %@/%@ GB",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Mem %@/%@ GB",
+"comment": ""
+},
+{
+"i": 40,
+"en": "This terminal has a notification you have not read on this Mac",
+"comment": ""
+},
+{
+"i": 41,
+"en": "terminal",
+"comment": ""
+},
+{
+"i": 42,
+"en": "×%d",
+"comment": ""
+},
+{
+"i": 43,
+"en": "+%d",
+"comment": ""
+},
+{
+"i": 44,
+"en": "1 more tab in this pane, listed beneath this row. The pane shows this tab.",
+"comment": ""
+},
+{
+"i": 45,
+"en": "%d more tabs in this pane, listed beneath this row. The pane shows this tab.",
+"comment": ""
+},
+{
+"i": 46,
+"en": "Still running on the machine, but no tab shows it. Click to open it in a pane; right-click to kill it.",
+"comment": ""
+},
+{
+"i": 47,
+"en": "%d tabs on the machine show this terminal",
+"comment": ""
+},
+{
+"i": 48,
+"en": "1 terminal",
+"comment": ""
+},
+{
+"i": 49,
+"en": "1 more tab",
+"comment": ""
+},
+{
+"i": 50,
+"en": "%d more tabs",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Add Checklist Item…",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Global",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Apply Update (If Available)",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Attempt Update",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Sign Out",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Account",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Clear Browser History",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Show JavaScript Console",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Browser Layout",
+"comment": ""
+},
+{
+"i": 60,
+"en": "Duplicate Browser to the Right",
+"comment": ""
+},
+{
+"i": 61,
+"en": "Focus Address Bar",
+"comment": ""
+},
+{
+"i": 62,
+"en": "Forward",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Hide Browser Omnibar",
+"comment": ""
+},
+{
+"i": 64,
+"en": "Open Current Page in Default Browser",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Reload Page",
+"comment": ""
+},
+{
+"i": 66,
+"en": "Show Browser Omnibar",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Split Browser Down",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Split Browser Right",
+"comment": ""
+},
+{
+"i": 69,
+"en": "Zoom In",
+"comment": ""
+},
+{
+"i": 70,
+"en": "Zoom Out",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Actual Size",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Canvas",
+"comment": ""
+},
+{
+"i": 73,
+"en": "Check for Updates",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Clear Tab Name",
+"comment": ""
+},
+{
+"i": 75,
+"en": "Clear Workspace Description",
+"comment": ""
+},
+{
+"i": 76,
+"en": "Clear Workspace Name",
+"comment": ""
+},
+{
+"i": 77,
+"en": "Tab",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Close Tab",
+"comment": ""
+},
+{
+"i": 79,
+"en": "Window",
+"comment": ""
+},
+{
+"i": 80,
+"en": "Close Window",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Close Workspace",
+"comment": ""
+},
+{
+"i": 82,
+"en": "Select a Cloud VM workspace first, then retry this command.",
+"comment": ""
+},
+{
+"i": 83,
+"en": "No Cloud VM Selected",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Open a terminal and run `cmux auth status`, `cmux vm ls`, then `cmux vm base open`. If you hit the active VM limit, delete one with `cmux vm rm <id>` and retry.",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Refresh the Machines list and retry. A machine that no longer exists is removed from the list automatically. To see the full output, run `cmux vm rm <id>` in a terminal.",
+"comment": ""
+},
+{
+"i": 86,
+"en": "Retry, or run the Cloud VM command in a terminal to see the full output.",
+"comment": ""
+},
+{
+"i": 87,
+"en": "A label is printable text of at most 64 characters. Retry, or run `cmux vm rename <id> <label>` in a terminal to see the full output.",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Reload cmux so its command-line tools are available, then retry. If it still fails, run the Cloud VM command in a terminal and send us the output.",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Install or reload a fresh cmux build, then retry. You can also run the Cloud VM command in a terminal to see the full error.",
+"comment": ""
+},
+{
+"i": 90,
+"en": "Details:",
+"comment": ""
+},
+{
+"i": 91,
+"en": "Additional technical details are available in logs.",
+"comment": ""
+},
+{
+"i": 92,
+"en": "The Cloud VM command exited with status %d.",
+"comment": ""
+},
+{
+"i": 93,
+"en": "The Cloud VM command could not be launched.",
+"comment": ""
+},
+{
+"i": 94,
+"en": "The bundled cmux CLI is missing from this app build.",
+"comment": ""
+},
+{
+"i": 95,
+"en": "Couldn't Start Cloud VM",
+"comment": ""
+},
+{
+"i": 96,
+"en": "Couldn't Checkpoint Machine",
+"comment": ""
+},
+{
+"i": 97,
+"en": "Couldn't Delete Machine",
+"comment": ""
+},
+{
+"i": 98,
+"en": "Couldn't Fork Machine",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Cloud VM Command Failed",
+"comment": ""
+},
+{
+"i": 100,
+"en": "Couldn't Open Machine",
+"comment": ""
+},
+{
+"i": 101,
+"en": "Couldn't Rename Machine",
+"comment": ""
+},
+{
+"i": 102,
+"en": "Couldn't Restore Checkpoint",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Couldn't Read Machine Status",
+"comment": ""
+},
+{
+"i": 104,
+"en": "What to try:",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Cloud VM Forked",
+"comment": ""
+},
+{
+"i": 106,
+"en": "Fork Cloud VM",
+"comment": ""
+},
+{
+"i": 107,
+"en": "Cloud VM Handoff",
+"comment": ""
+},
+{
+"i": 108,
+"en": "Agent Handoff",
+"comment": ""
+},
+{
+"i": 109,
+"en": "New Cloud VM",
+"comment": ""
+},
+{
+"i": 110,
+"en": "New Cloud Machine…",
+"comment": ""
+},
+{
+"i": 111,
+"en": "Cloud VM Ports",
+"comment": ""
+},
+{
+"i": 112,
+"en": "Promote to Template",
+"comment": ""
+},
+{
+"i": 113,
+"en": "Paste a checkpoint or snapshot id to restore.",
+"comment": ""
+},
+{
+"i": 114,
+"en": "snapshot-id",
+"comment": ""
+},
+{
+"i": 115,
+"en": "Restore Cloud VM",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Cloud VM Restored",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Restore Checkpoint...",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Cloud VM",
+"comment": ""
+},
+{
+"i": 119,
+"en": "Cloud VM Checkpoint",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Checkpoint Cloud VM",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Cloud VM Status",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Cloud",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Cloud VM Template",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Open Base",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Cloud VM Tools",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Inspect Tools",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Custom: %@",
+"comment": ""
+},
+{
+"i": 128,
+"en": "%@ references missing action '%@'",
+"comment": ""
+},
+{
+"i": 129,
+"en": "%@ must reference a workspace command action",
+"comment": ""
+},
+{
+"i": 130,
+"en": "%@ references missing command '%@'",
+"comment": ""
+},
+{
+"i": 131,
+"en": "%@ '%@' must reference a workspace command",
+"comment": ""
+},
+{
+"i": 132,
+"en": "%@",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Invalid cmux.json",
+"comment": ""
+},
+{
+"i": 134,
+"en": "cmux.json Schema Error",
+"comment": ""
+},
+{
+"i": 135,
+"en": "%@: %@",
+"comment": ""
+},
+{
+"i": 136,
+"en": "cmux.json Configuration Warning",
+"comment": ""
+},
+{
+"i": 137,
+"en": "cmux.json",
+"comment": ""
+},
+{
+"i": 138,
+"en": "Copy Pane ID",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Copy Pane Link",
+"comment": ""
+},
+{
+"i": 140,
+"en": "Copy Surface Link",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Copy Workspace ID and Ref",
+"comment": ""
+},
+{
+"i": 142,
+"en": "Copy Workspace Link",
+"comment": ""
+},
+{
+"i": 143,
+"en": "Disable cmux Browser",
+"comment": ""
+},
+{
+"i": 144,
+"en": "Disable Match Terminal Background",
+"comment": ""
+},
+{
+"i": 145,
+"en": "Disable Minimal Mode",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Edit Workspace Description…",
+"comment": ""
+},
+{
+"i": 147,
+"en": "Enable cmux Browser",
+"comment": ""
+},
+{
+"i": 148,
+"en": "Enable Match Terminal Background",
+"comment": ""
+},
+{
+"i": 149,
+"en": "Enable Minimal Mode",
+"comment": ""
+},
+{
+"i": 150,
+"en": "Equalize Splits",
+"comment": ""
+},
+{
+"i": 151,
+"en": "Right Sidebar",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Fork Conversation to the Bottom",
+"comment": ""
+},
+{
+"i": 153,
+"en": "Fork Conversation to the Left",
+"comment": ""
+},
+{
+"i": 154,
+"en": "Fork Conversation to New Tab",
+"comment": ""
+},
+{
+"i": 155,
+"en": "Fork Conversation to New Workspace",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Fork Conversation to the Right",
+"comment": ""
+},
+{
+"i": 157,
+"en": "Fork Conversation to the Top",
+"comment": ""
+},
+{
+"i": 158,
+"en": "Shell Command: Install 'cmux' in PATH",
+"comment": ""
+},
+{
+"i": 159,
+"en": "Notifications",
+"comment": ""
+},
+{
+"i": 160,
+"en": "Jump to Latest Unread",
+"comment": ""
+},
+{
+"i": 161,
+"en": "default,terminal,ssh,launch,services,handler,command,tool,executable",
+"comment": ""
+},
+{
+"i": 162,
+"en": "Make cmux the Default Terminal",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Mark as Oldest Unread and Jump to Next Latest Unread",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Mark Tab as Read",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Mark Tab as Unread",
+"comment": ""
+},
+{
+"i": 166,
+"en": "Mark Workspace as Done",
+"comment": ""
+},
+{
+"i": 167,
+"en": "Choose Sidebar",
+"comment": ""
+},
+{
+"i": 168,
+"en": "Mobile",
+"comment": ""
+},
+{
+"i": 169,
+"en": "Open Mobile Pairing",
+"comment": ""
+},
+{
+"i": 170,
+"en": "Agent Chat",
+"comment": ""
+},
+{
+"i": 171,
+"en": "New agent chat",
+"comment": ""
+},
+{
+"i": 172,
+"en": "New Tab (Browser)",
+"comment": ""
+},
+{
+"i": 173,
+"en": "New Browser Workspace",
+"comment": ""
+},
+{
+"i": 174,
+"en": "iPhone and iPad",
+"comment": ""
+},
+{
+"i": 175,
+"en": "New Simulator Pane",
+"comment": ""
+},
+{
+"i": 176,
+"en": "New Tab (Terminal)",
+"comment": ""
+},
+{
+"i": 177,
+"en": "New Window",
+"comment": ""
+},
+{
+"i": 178,
+"en": "Tab Navigation",
+"comment": ""
+},
+{
+"i": 179,
+"en": "Next Tab in Pane",
+"comment": ""
+},
+{
+"i": 180,
+"en": "Workspace Navigation",
+"comment": ""
+},
+{
+"i": 181,
+"en": "Next Workspace",
+"comment": ""
+},
+{
+"i": 182,
+"en": "Open Diff Viewer",
+"comment": ""
+},
+{
+"i": 183,
+"en": "Open Directory Diff Viewer",
+"comment": ""
+},
+{
+"i": 184,
+"en": "Open Files as Pane",
+"comment": ""
+},
+{
+"i": 185,
+"en": "Open Find as Pane",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Open Folder…",
+"comment": ""
+},
+{
+"i": 187,
+"en": "VS Code Inline",
+"comment": ""
+},
+{
+"i": 188,
+"en": "Open Folder in VS Code (Inline)…",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Ghostty Config Files",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Open Ghostty Settings in TextEdit",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Pane",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Open Settings",
+"comment": ""
+},
+{
+"i": 193,
+"en": "Open Vault as Pane",
+"comment": ""
+},
+{
+"i": 194,
+"en": "Open Cloud as Pane",
+"comment": ""
+},
+{
+"i": 195,
+"en": "Open All Workspace PR Links",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Open Todo Pane",
+"comment": ""
+},
+{
+"i": 197,
+"en": "Pin Tab",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Pin Workspace",
+"comment": ""
+},
+{
+"i": 199,
+"en": "Previous Tab in Pane",
+"comment": ""
+},
+{
+"i": 200,
+"en": "Previous Workspace",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Upgrade to cmux Pro",
+"comment": ""
+},
+{
+"i": 202,
+"en": "Welcome to cmux Pro",
+"comment": ""
+},
+{
+"i": 203,
+"en": "Rename Tab…",
+"comment": ""
+},
+{
+"i": 204,
+"en": "Rename Workspace…",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Reopen Closed Browser Tab",
+"comment": ""
+},
+{
+"i": 206,
+"en": "History",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Restore Previous App Launch",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Restart CLI Listener",
+"comment": ""
+},
+{
+"i": 209,
+"en": "New Workspace from Layout: %@",
+"comment": ""
+},
+{
+"i": 210,
+"en": "Save Layout as Template…",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Saved Layouts",
+"comment": ""
+},
+{
+"i": 212,
+"en": "Show Notifications",
+"comment": ""
+},
+{
+"i": 213,
+"en": "View",
+"comment": ""
+},
+{
+"i": 214,
+"en": "Sleepy Mode",
+"comment": ""
+},
+{
+"i": 215,
+"en": "Surface Navigation",
+"comment": ""
+},
+{
+"i": 216,
+"en": "Sidebar: %@",
+"comment": ""
+},
+{
+"i": 217,
+"en": "Attach File to TextBox Input",
+"comment": ""
+},
+{
+"i": 218,
+"en": "Clear Screen (Keep Scrollback)",
+"comment": ""
+},
+{
+"i": 219,
+"en": "Find…",
+"comment": ""
+},
+{
+"i": 220,
+"en": "Find Next",
+"comment": ""
+},
+{
+"i": 221,
+"en": "Find Previous",
+"comment": ""
+},
+{
+"i": 222,
+"en": "Focus TextBox Input",
+"comment": ""
+},
+{
+"i": 223,
+"en": "Hide Find Bar",
+"comment": ""
+},
+{
+"i": 224,
+"en": "Send Ctrl-F to Terminal",
+"comment": ""
+},
+{
+"i": 225,
+"en": "Terminal Layout",
+"comment": ""
+},
+{
+"i": 226,
+"en": "Split Down",
+"comment": ""
+},
+{
+"i": 227,
+"en": "Split Right",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Toggle TextBox Input",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Use Selection for Find",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Toggle Full Screen",
+"comment": ""
+},
+{
+"i": 231,
+"en": "Toggle Full Width Tab",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Toggle Left Sidebar",
+"comment": ""
+},
+{
+"i": 233,
+"en": "Disable %@",
+"comment": ""
+},
+{
+"i": 234,
+"en": "Enable %@",
+"comment": ""
+},
+{
+"i": 235,
+"en": "Off",
+"comment": ""
+},
+{
+"i": 236,
+"en": "On",
+"comment": ""
+},
+{
+"i": 237,
+"en": "%@ • %@",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Layout",
+"comment": ""
+},
+{
+"i": 239,
+"en": "Toggle Pane Zoom",
+"comment": ""
+},
+{
+"i": 240,
+"en": "Toggle Unread",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Flash Focused Panel",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Shell Command: Uninstall 'cmux' from PATH",
+"comment": ""
+},
+{
+"i": 243,
+"en": "Unpin Tab",
+"comment": ""
+},
+{
+"i": 244,
+"en": "Unpin Workspace",
+"comment": ""
+},
+{
+"i": 245,
+"en": "Restart VS Code Inline Server",
+"comment": ""
+},
+{
+"i": 246,
+"en": "Stop VS Code Inline Server",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Workspace Status: %@",
+"comment": ""
+},
+{
+"i": 248,
+"en": "Workspace Status: Auto",
+"comment": ""
+},
+{
+"i": 249,
+"en": "Press Enter to save. Press Shift-Enter for a new line, or Escape to cancel.",
+"comment": ""
+},
+{
+"i": 250,
+"en": "Workspace description",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Custom Sidebar",
+"comment": ""
+},
+{
+"i": 252,
+"en": "File Preview",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Markdown",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Project",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Tool",
+"comment": ""
+},
+{
+"i": 256,
+"en": "Simulator",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Terminal",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Todos",
+"comment": ""
+},
+{
+"i": 259,
+"en": "(clear custom name)",
+"comment": ""
+},
+{
+"i": 260,
+"en": "Press Enter to apply this tab name, or Escape to cancel.",
+"comment": ""
+},
+{
+"i": 261,
+"en": "Choose a custom tab name.",
+"comment": ""
+},
+{
+"i": 262,
+"en": "Enter a tab name. Press Enter to rename, Escape to cancel.",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Tab name",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Rename Tab",
+"comment": ""
+},
+{
+"i": 265,
+"en": "Press Enter to apply this workspace name, or Escape to cancel.",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Choose a custom workspace name.",
+"comment": ""
+},
+{
+"i": 267,
+"en": "Press Enter to apply this group name, or Escape to cancel.",
+"comment": ""
+},
+{
+"i": 268,
+"en": "Enter a group name. Press Enter to rename, Escape to cancel.",
+"comment": ""
+},
+{
+"i": 269,
+"en": "Enter a workspace name. Press Enter to rename, Escape to cancel.",
+"comment": ""
+},
+{
+"i": 270,
+"en": "Workspace name",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Rename Workspace",
+"comment": ""
+},
+{
+"i": 272,
+"en": "No commands match your search.",
+"comment": ""
+},
+{
+"i": 273,
+"en": "Type a command",
+"comment": ""
+},
+{
+"i": 274,
+"en": "No workspaces match your search.",
+"comment": ""
+},
+{
+"i": 275,
+"en": "No workspaces or surfaces match your search.",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Search workspaces",
+"comment": ""
+},
+{
+"i": 277,
+"en": "Search workspaces and surfaces",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Browser • %@",
+"comment": ""
+},
+{
+"i": 279,
+"en": "Markdown • %@",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Tab • %@",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Terminal • %@",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Workspace • %@",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Window %lld",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Copy Details",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Create",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Don't Save",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Install and Relaunch",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Later",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Restart Later",
+"comment": ""
+},
+{
+"i": 290,
+"en": "Restart Now",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Retry",
+"comment": ""
+},
+{
+"i": 292,
+"en": "Skip",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Choose Custom Color…",
+"comment": ""
+},
+{
+"i": 294,
+"en": "Clear Color",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Clear Latest Notification",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Clear Latest Notifications",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Close Other Workspaces",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Close Workspaces",
+"comment": ""
+},
+{
+"i": 299,
+"en": "Close Workspaces Above",
+"comment": ""
+}
+]

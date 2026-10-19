@@ -698,7 +698,7 @@ enum CmuxButtonIcon: Codable, Sendable, Hashable {
 
     static func projectRoot(forConfigPath configPath: String) -> String {
         let configDir = (configPath as NSString).deletingLastPathComponent
-        if (configDir as NSString).lastPathComponent == ".cmux" {
+        if (configDir as NSString).lastPathComponent == ".shellx" {
             return (configDir as NSString).deletingLastPathComponent
         }
         return configDir
@@ -1478,7 +1478,7 @@ struct CmuxResolvedConfigAction: Identifiable, Sendable, Hashable {
         return CmuxResolvedConfigAction(
             id: builtIn.configID,
             title: metadata.title,
-            subtitle: String(localized: "command.cmuxConfig.builtInSubtitle", defaultValue: "cmux"),
+            subtitle: String(localized: "command.cmuxConfig.builtInSubtitle", defaultValue: "ShellX"),
             keywords: metadata.keywords,
             palette: true,
             shortcut: nil,
@@ -1843,7 +1843,7 @@ final class CmuxConfigStore: ObservableObject {
 
     nonisolated static func defaultGlobalConfigPath() -> String {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return (home as NSString).appendingPathComponent(".config/cmux/cmux.json")
+        return (home as NSString).appendingPathComponent(".config/shellx/shellx.json")
     }
 
     private struct ActionEntry {
@@ -1927,14 +1927,14 @@ final class CmuxConfigStore: ObservableObject {
     private var localFallbackDirectoryDescriptor: Int32 = -1
     private var globalWatcher: FileWatcher?
     private var globalWatchTask: Task<Void, Never>?
-    private let watchQueue = DispatchQueue(label: "com.cmux.config-file-watch")
+    private let watchQueue = DispatchQueue(label: "pro.shellx.config-file-watch")
 
     private static let maxReattachAttempts = 5
     private static let reattachDelay: TimeInterval = 0.5
 
     private static func searchDirectoryForLocalConfigPath(_ path: String) -> String {
         let configDirectory = (path as NSString).deletingLastPathComponent
-        if (configDirectory as NSString).lastPathComponent == ".cmux" {
+        if (configDirectory as NSString).lastPathComponent == ".shellx" {
             return (configDirectory as NSString).deletingLastPathComponent
         }
         return configDirectory
@@ -2048,8 +2048,8 @@ final class CmuxConfigStore: ObservableObject {
     }
 
     private func defaultLocalConfigPath(startingFrom directory: String) -> String {
-        (((directory as NSString).appendingPathComponent(".cmux") as NSString)
-            .appendingPathComponent("cmux.json"))
+        (((directory as NSString).appendingPathComponent(".shellx") as NSString)
+            .appendingPathComponent("shellx.json"))
     }
 
     private func findCmuxConfig(startingFrom directory: String) -> String? {
@@ -2057,9 +2057,9 @@ final class CmuxConfigStore: ObservableObject {
         let fs = FileManager.default
         while true {
             let candidates = [
-                ((current as NSString).appendingPathComponent(".cmux") as NSString)
-                    .appendingPathComponent("cmux.json"),
-                (current as NSString).appendingPathComponent("cmux.json")
+                ((current as NSString).appendingPathComponent(".shellx") as NSString)
+                    .appendingPathComponent("shellx.json"),
+                (current as NSString).appendingPathComponent("shellx.json")
             ]
             for candidate in candidates where fs.fileExists(atPath: candidate) {
                 return candidate
@@ -2077,9 +2077,9 @@ final class CmuxConfigStore: ObservableObject {
         var paths: [String] = []
         while true {
             let candidates = [
-                ((current as NSString).appendingPathComponent(".cmux") as NSString)
-                    .appendingPathComponent("cmux.json"),
-                (current as NSString).appendingPathComponent("cmux.json")
+                ((current as NSString).appendingPathComponent(".shellx") as NSString)
+                    .appendingPathComponent("shellx.json"),
+                (current as NSString).appendingPathComponent("shellx.json")
             ]
             if let candidate = candidates.first(where: { fs.fileExists(atPath: $0) }) {
                 paths.append(candidate)
@@ -2762,7 +2762,7 @@ final class CmuxConfigStore: ObservableObject {
                     defaultValue: "Custom: \(sanitizeConfigText(command.name))"
                 ),
                 subtitle: command.description.map { sanitizeConfigText($0) }
-                    ?? String(localized: "command.cmuxConfig.subtitle", defaultValue: "cmux.json"),
+                    ?? String(localized: "command.cmuxConfig.subtitle", defaultValue: "shellx.json"),
                 keywords: command.keywords ?? [],
                 palette: true,
                 shortcut: nil,
@@ -3044,7 +3044,7 @@ final class CmuxConfigStore: ObservableObject {
                 id: command.command.id,
                 title: command.command.name,
                 subtitle: command.command.description
-                    ?? String(localized: "command.cmuxConfig.subtitle", defaultValue: "cmux.json"),
+                    ?? String(localized: "command.cmuxConfig.subtitle", defaultValue: "shellx.json"),
                 keywords: command.command.keywords ?? [],
                 palette: false,
                 shortcut: nil,

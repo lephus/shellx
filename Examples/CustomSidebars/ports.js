@@ -1,6 +1,6 @@
 // Dev server board: every workspace with listening ports, port pills, jump on
 // tap. Shows reactive filtering and per-row context menus in the JS lane.
-//   cp Examples/CustomSidebars/ports.js ~/.config/cmux/sidebars/ && cmux sidebar open ports
+//   cp Examples/CustomSidebars/ports.js ~/.config/shellx/sidebars/ && cmux sidebar open ports
 
 const serving = () => (data.workspaces() ?? []).filter((w) => (w.ports ?? []).length > 0);
 

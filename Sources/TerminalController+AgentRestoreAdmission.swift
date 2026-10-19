@@ -369,7 +369,7 @@ extension TerminalController {
                 code: "conflict",
                 message: String(
                     localized: "agentRestore.admission.targetChanged",
-                    defaultValue: "The surface restore record changed. Run 'cmux restore --surface' again."
+                    defaultValue: "The surface restore record changed. Run 'shellx restore --surface' again."
                 )
             )
         case .recovering:

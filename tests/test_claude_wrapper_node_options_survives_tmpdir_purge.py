@@ -4,7 +4,7 @@
 The Claude wrapper points NODE_OPTIONS at a restore preload that every Node
 child loads. macOS purges $TMPDIR under long-lived sessions, so a preload kept
 there makes every later Node child die with MODULE_NOT_FOUND. The preload must
-live in ~/.cmuxterm instead. Ported from #12067.
+live in ~/.shellx instead. Ported from #12067.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from node_runtime import ensure_node_on_path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_WRAPPER = ROOT / "Resources" / "bin" / "cmux-claude-wrapper"
+SOURCE_WRAPPER = ROOT / "Resources" / "bin" / "shellx-claude-wrapper"
 
 
 def make_executable(path: Path, content: str) -> None:
@@ -59,7 +59,7 @@ def main() -> int:
         user_preload = root / "user-preload.cjs"
         user_preload.write_text("// preserved user preload\n", encoding="utf-8")
 
-        wrapper = wrapper_dir / "cmux-claude-wrapper"
+        wrapper = wrapper_dir / "shellx-claude-wrapper"
         shutil.copy2(SOURCE_WRAPPER, wrapper)
         wrapper.chmod(0o755)
 
@@ -80,7 +80,7 @@ done
 exec node -e 'process.stdout.write(process.env.NODE_OPTIONS || "__UNSET__")'
 """,
         )
-        make_executable(wrapper_dir / "cmux", "#!/usr/bin/env bash\nexit 0\n")
+        make_executable(wrapper_dir / "shellx", "#!/usr/bin/env bash\nexit 0\n")
 
         socket_path = root / "cmux.sock"
         test_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -98,7 +98,7 @@ exec node -e 'process.stdout.write(process.env.NODE_OPTIONS || "__UNSET__")'
                     "TMPDIR": str(session_tmpdir),
                     "CMUX_SURFACE_ID": "surface:test",
                     "CMUX_SOCKET_PATH": str(socket_path),
-                    "CMUX_BUNDLED_CLI_PATH": str(wrapper_dir / "cmux"),
+                    "CMUX_BUNDLED_CLI_PATH": str(wrapper_dir / "shellx"),
                     "CMUX_CUSTOM_CLAUDE_PATH": str(real_dir / "claude"),
                     "NODE_OPTIONS": f"--require={user_preload}",
                     "FAKE_READY_PATH": str(ready_path),
@@ -149,9 +149,9 @@ exec node -e 'process.stdout.write(process.env.NODE_OPTIONS || "__UNSET__")'
             print(f"FAIL: wrapped Claude did not receive a restore preload: {node_options!r}")
             return 1
         restore_path = Path(match.group(1) or match.group(2))
-        expected_dir = home_dir / ".cmuxterm" / "cmux-claude-node-options"
+        expected_dir = home_dir / ".shellx" / "cmux-claude-node-options"
         if restore_path != expected_dir / "restore-node-options.cjs":
-            print(f"FAIL: restore preload is not under ~/.cmuxterm: {restore_path}")
+            print(f"FAIL: restore preload is not under ~/.shellx: {restore_path}")
             return 1
         if node_options.count("restore-node-options.cjs") != 1:
             print(f"FAIL: expected one restore preload, got {node_options!r}")

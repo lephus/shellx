@@ -4,6 +4,7 @@ import AppKit
 import CmuxBrowser
 import CmuxTerminalCore
 import Foundation
+import ShellXBrand
 
 @MainActor
 struct AppWebThemeSnapshot: Equatable {
@@ -234,11 +235,14 @@ enum ProWelcomeChecklistPresenter {
 
     @MainActor
     static func present() {
+        // ShellX: Pro is a Manaflow service; the checklist never opens.
+        guard ShellXFeatures.cloud else { return }
         ProUpgradePresenter.presentProWelcomeWeb()
     }
 
     @MainActor
     static func presentIfNewlyPro(isPro: Bool, defaults: UserDefaults = .standard) {
+        guard ShellXFeatures.cloud else { return }
         guard consumeAutomaticPresentation(
             isPro: isPro,
             defaults: defaults
@@ -254,6 +258,7 @@ extension ProUpgradePresenter {
     /// same dedicated workspace surface used for pricing, matching upgrade/pricing.
     @MainActor
     static func presentProWelcomeWeb() {
+        guard ShellXFeatures.cloud else { return }
         let url = decoratedAppWebURL(AuthEnvironment.appProWelcomeURL)
         guard BrowserAvailabilitySettings.isEnabled() else {
             NSWorkspace.shared.open(url)
@@ -277,7 +282,7 @@ extension ProUpgradePresenter {
             ProWelcomeChecklistPresenter.workspaceReuseState.clear()
         }
 
-        let title = String(localized: "proWelcome.workspace.title", defaultValue: "Welcome to cmux Pro")
+        let title = String(localized: "proWelcome.workspace.title", defaultValue: "Welcome to ShellX Pro")
         guard let workspace = appDelegate.performProUpgradeWorkspaceAction(
             title: title,
             url: url,

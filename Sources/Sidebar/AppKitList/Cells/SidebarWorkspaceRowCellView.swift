@@ -35,6 +35,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     private let statusGlyphButton = SidebarRowTaskStatusGlyphButton()
     /// `sidebar.compactAgentStatus` leading status glyph.
     private let compactStatusGlyphView = SidebarCompactStatusGlyphImageView()
+    private let statusPillView = SidebarStatusPillView() // ShellX: status pill (W1 Task 10)
     private let titleView = SidebarRowTextView(lines: 1)
     private let cloudImageView = NSImageView()
     private let trailingBadge = SidebarRowUnreadBadgeView()
@@ -330,6 +331,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         }
         // The glyph view sets its own scaling mode, shared with the SwiftUI list.
         contentContainer.addSubview(compactStatusGlyphView)
+        contentContainer.addSubview(statusPillView) // ShellX: status pill
         statusGlyphButton.isHidden = true
         statusGlyphButton.onClick = { [weak self] in self?.toggleStatusPopover() }
         contentContainer.addSubview(statusGlyphButton)
@@ -896,12 +898,20 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         )
         compactStatusGlyphView.isPresentationActive = isPresentationActive
         compactStatusGlyphView.isHidden = glyph?.isDrawn != true
+        // ShellX: the status pill shows with default settings; unread still turns a settled row "done".
+        let pillGlyph = glyph ?? SidebarCompactStatusGlyph(
+            kind: model.snapshot.statusPillGlyphKind ?? .terminal,
+            tooltip: ""
+        ).applyingUnread(model.unreadCount, latestNotificationText: nil)
+        statusPillView.configure(glyphKind: pillGlyph.kind, fontScale: model.fontScale)
         guard let glyph, glyph.isDrawn else { return }
         compactStatusGlyphView.configure(
             glyph,
             pointSize: model.scaled(11),
+            // The ShellX `raise` selection keeps status colors readable, so
+            // only other selection fills flatten the glyph.
             color: glyph.color(
-                isActive: model.isActive,
+                isActive: model.isActive && !palette.usesShellXSelection,
                 selected: palette.selectedForeground(0.95),
                 secondary: palette.secondary(0.8)
             )
@@ -1338,12 +1348,21 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let closeHit = max(16, 16 * model.fontScale)
         let closeWidth = max(16, closeHit)
         let trailingSlotActive = !trailingBadge.isHidden || (trailingSpinner?.isHidden == false) || model.canCloseWorkspace
-        let titleMaxX = trailingSlotActive ? (trailing - closeWidth - titleRowSpacing) : trailing
+        let titleSlotMaxX = trailingSlotActive ? (trailing - closeWidth - titleRowSpacing) : trailing
+        // ShellX: the status pill takes the title line's trailing edge, before the trailing slot.
+        let pillSize = statusPillView.isHidden ? NSSize.zero : statusPillView.preferredSize
+        let titleMaxX = pillSize.width > 0 ? titleSlotMaxX - pillSize.width - 6 : titleSlotMaxX
         let titleWidth = max(10, titleMaxX - x)
         let renameField = renameSession?.field
         let titleHeight = renameField.map { ceil($0.intrinsicContentSize.height) }
             ?? titleView.measuredHeight(width: titleWidth)
         if apply {
+            if pillSize.width > 0 { // ShellX: status pill
+                statusPillView.frame = NSRect(
+                    x: titleSlotMaxX - pillSize.width, y: firstLineCenter - pillSize.height / 2,
+                    width: pillSize.width, height: pillSize.height
+                )
+            }
             let frame = NSRect(x: x, y: y, width: titleWidth, height: titleHeight)
             if let renameField {
                 renameField.frame = frame

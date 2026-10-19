@@ -8,18 +8,18 @@ struct CmuxCodexConfigEditorTests {
     private let editor = CmuxCodexConfigEditor()
 
     private static let featureBegin =
-        "# cmux-codex-hooks-feature-78f1e4ba-66df-4d35-93c1-67fdf1cbb7df begin"
+        "# shellx-codex-hooks-feature-78f1e4ba-66df-4d35-93c1-67fdf1cbb7df begin"
     private static let featureEnd =
-        "# cmux-codex-hooks-feature-78f1e4ba-66df-4d35-93c1-67fdf1cbb7df end"
+        "# shellx-codex-hooks-feature-78f1e4ba-66df-4d35-93c1-67fdf1cbb7df end"
     /// The in-place edit of an existing `[features]\nhooks = false` line.
     private static let replacedFalseHooksBlock =
         "[features]\n\(featureBegin)\n"
         + "\(CmuxCodexConfigEditor.cmuxCodexHooksFeaturePreviousLinePrefix)hooks = false\n"
         + "hooks = true\n\(featureEnd)\n"
     private static let trustBegin =
-        "# cmux-codex-hook-trust-f5cc24da-7a09-4b20-a756-89e7786f6738 begin"
+        "# shellx-codex-hook-trust-f5cc24da-7a09-4b20-a756-89e7786f6738 begin"
     private static let trustEnd =
-        "# cmux-codex-hook-trust-f5cc24da-7a09-4b20-a756-89e7786f6738 end"
+        "# shellx-codex-hook-trust-f5cc24da-7a09-4b20-a756-89e7786f6738 end"
 
     private static let trustEntries = [
         CmuxCodexConfigEditor.HookTrustEntry(
@@ -100,7 +100,7 @@ struct CmuxCodexConfigEditorTests {
         let original = "model_instructions = \"\"\"\n[features]\nhooks = false\ncodex_hooks = illustrative_text\n\"\"\"\nmodel = \"gpt-5.4\"\n"
 
         let installed = editor.installingHooks(in: original, trustEntries: [])
-        let expected = "model_instructions = \"\"\"\n[features]\nhooks = false\ncodex_hooks = illustrative_text\n\"\"\"\nmodel = \"gpt-5.4\"\n\n[features]\n# cmux-codex-hooks-feature-78f1e4ba-66df-4d35-93c1-67fdf1cbb7df begin\nhooks = true\n# cmux-codex-hooks-feature-78f1e4ba-66df-4d35-93c1-67fdf1cbb7df end\n"
+        let expected = "model_instructions = \"\"\"\n[features]\nhooks = false\ncodex_hooks = illustrative_text\n\"\"\"\nmodel = \"gpt-5.4\"\n\n[features]\n# shellx-codex-hooks-feature-78f1e4ba-66df-4d35-93c1-67fdf1cbb7df begin\nhooks = true\n# shellx-codex-hooks-feature-78f1e4ba-66df-4d35-93c1-67fdf1cbb7df end\n"
 
         #expect(installed.content == expected)
     }

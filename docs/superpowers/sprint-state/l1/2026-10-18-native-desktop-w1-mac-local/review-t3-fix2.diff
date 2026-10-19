@@ -1,0 +1,75 @@
+diff --git a/CLI/cmux.swift b/CLI/cmux.swift
+index 5a31535720..3f37b7dc69 100644
+--- a/CLI/cmux.swift
++++ b/CLI/cmux.swift
+@@ -36976,7 +36976,7 @@ export default {
+         try Self.openCodeTUIPluginPackageSource.write(to: directory.appendingPathComponent("package.json"), atomically: true, encoding: .utf8)
+         let feedSource = try bundledOpenCodePluginSource()
+         let serverSource = "// shellx-opencode-tui-plugin-server-marker v2\n"
+-            + feedSource.replacingOccurrences(of: "id: \"shellx.feed\"", with: "id: \"cmux.server\"")
++            + feedSource.replacingOccurrences(of: "id: \"shellx.feed\"", with: "id: \"shellx.server\"")
+         try serverSource.write(to: directory.appendingPathComponent("index.js"), atomically: true, encoding: .utf8)
+         try bundledOpenCodeTUIPluginSource().write(to: directory.appendingPathComponent("tui.js"), atomically: true, encoding: .utf8)
+         try (Self.openCodeTUIPluginOwnershipMarker + "\n").write(to: openCodeTUIPluginOwnershipURL(in: configDir), atomically: true, encoding: .utf8)
+diff --git a/cmuxTests/OpenCodeHookRegressionTests.swift b/cmuxTests/OpenCodeHookRegressionTests.swift
+index a4d2c3aa54..7ec78de624 100644
+--- a/cmuxTests/OpenCodeHookRegressionTests.swift
++++ b/cmuxTests/OpenCodeHookRegressionTests.swift
+@@ -180,7 +180,7 @@ final class OpenCodeHookRegressionTests: XCTestCase {
+         XCTAssertTrue(packageSource.contains("\"./tui\": \"./tui.js\""))
+         XCTAssertTrue(FileManager.default.fileExists(atPath: tuiDirectory.appendingPathComponent(".shellx-owned").path))
+         let serverSource = try String(contentsOf: tuiDirectory.appendingPathComponent("index.js"), encoding: .utf8)
+-        XCTAssertTrue(serverSource.contains("id: \"cmux.server\""))
++        XCTAssertTrue(serverSource.contains("id: \"shellx.server\""))
+         XCTAssertTrue(serverSource.contains("shellx-opencode-tui-plugin-server-marker"))
+         XCTAssertTrue(serverSource.contains("export const CMUXFeed"))
+         XCTAssertTrue(serverSource.contains("client.permission.reply"))
+diff --git a/tests/test_opencode_server_entry.py b/tests/test_opencode_server_entry.py
+index f56fb19414..0ed216f7b1 100644
+--- a/tests/test_opencode_server_entry.py
++++ b/tests/test_opencode_server_entry.py
+@@ -196,7 +196,7 @@ def main() -> int:
+         package_dir = plugin_dir / "cmux"
+         package_dir.mkdir(parents=True)
+         feed_source = (ROOT / "Resources/opencode-plugin.js").read_text(encoding="utf-8")
+-        server_source = feed_source.replace('id: "shellx.feed"', 'id: "cmux.server"')
++        server_source = feed_source.replace('id: "shellx.feed"', 'id: "shellx.server"')
+         (plugin_dir / "shellx-feed.js").write_text(feed_source, encoding="utf-8")
+         (plugin_dir / "shellx-session.js").write_text(session_plugin_source(), encoding="utf-8")
+         (package_dir / "index.js").write_text(
+diff --git a/tests/test_opencode_v2_tui_bridge.py b/tests/test_opencode_v2_tui_bridge.py
+index 041063862b..80f2ad0bbe 100755
+--- a/tests/test_opencode_v2_tui_bridge.py
++++ b/tests/test_opencode_v2_tui_bridge.py
+@@ -31,7 +31,7 @@ const { batch, createSignal } = await import("solid-js");
+ const mod = await import(path.join(packageDir, "tui.js"));
+ const serverMod = await import(path.join(packageDir, "index.js"));
+ if (typeof serverMod.default?.server !== "function") throw new Error("missing inert V2 server entrypoint");
+-if (serverMod.default.id !== "cmux.server") throw new Error(`unexpected V2 server plugin ID: ${serverMod.default.id}`);
++if (serverMod.default.id !== "shellx.server") throw new Error(`unexpected V2 server plugin ID: ${serverMod.default.id}`);
+ const serverCleanup = await serverMod.default.setup({});
+ if (typeof serverCleanup !== "function") throw new Error("legacy server setup did not return a cleanup function");
+ serverCleanup();
+@@ -326,7 +326,7 @@ console.log("PASS");
+     with tempfile.TemporaryDirectory(prefix="cmux-opencode-v2-package-") as package:
+         package_dir = Path(package)
+         feed_source = (ROOT / "Resources/opencode-plugin.js").read_text()
+-        (package_dir / "index.js").write_text(feed_source.replace('id: "shellx.feed"', 'id: "cmux.server"'))
++        (package_dir / "index.js").write_text(feed_source.replace('id: "shellx.feed"', 'id: "shellx.server"'))
+         (package_dir / "tui.js").write_text((ROOT / "Resources/opencode-tui-plugin.js").read_text())
+         (package_dir / "node_modules").symlink_to(ROOT / "node_modules", target_is_directory=True)
+         (package_dir / "harness.mjs").write_text(source)
+diff --git a/tests/test_shellx_coexistence.py b/tests/test_shellx_coexistence.py
+index dd134601c7..5737bfce4c 100644
+--- a/tests/test_shellx_coexistence.py
++++ b/tests/test_shellx_coexistence.py
+@@ -147,7 +147,8 @@ class ShellXCoexistenceTests(unittest.TestCase):
+                     r"cmux-(pi|amp|omp|campfire)-session-extension-marker", r"cmux-opencode-[a-z-]*marker",
+                     r"cmux-feed-plugin-marker", r'antigravityHookGroupName = "cmux"',
+                     r'openCodeTUIPluginDirectoryName = "cmux"', r'"\./plugins/cmux"', r"plugins/cmux/",
+-                    r"\.cmux-session\.lock", r'Symbol\.for\("cmux\.(session|feed|pi)\.'):
++                    r"\.cmux-session\.lock", r'Symbol\.for\("cmux\.(session|feed|pi)\.',
++                    r'id: \\?"cmux\.(server|session|feed|tui)\\?"'):
+             self.assertEqual(coexistence_offenders(pat), [], pat)
+         catalog = read("CLI/CMUXCLI+AgentHookCatalog.swift")
+         for config_file in ("plugins/shellx-session.js", "extensions/shellx-session.ts", "plugins/shellx-session.ts",

@@ -69,7 +69,7 @@ struct MachinesListStatusToolbarRowTests {
             ),
             (
                 .requiresPro,
-                String(localized: "machines.requiresPro.stale", defaultValue: "Cloud machines need cmux Pro — showing last known"),
+                String(localized: "machines.requiresPro.stale", defaultValue: "Cloud machines need ShellX Pro — showing last known"),
                 "sparkles"
             ),
         ]
@@ -141,7 +141,7 @@ struct MachinesListStatusToolbarRowTests {
         #expect(dismissed == raw)
         #expect(!Self.text(of: hosted).contains(raw))
         #expect(!Self.helpTexts(of: hosted).contains { $0.contains(raw) })
-        #expect(Self.helpTexts(of: hosted).contains { $0.contains("cmux couldn’t load the list") })
+        #expect(Self.helpTexts(of: hosted).contains { $0.contains("ShellX couldn’t load the list") })
     }
 
     // MARK: - Fixtures

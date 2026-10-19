@@ -43,7 +43,7 @@ public struct RenderNode: Codable, Sendable, Equatable {
         /// drop is persisted via ``ReorderSpec``.
         case reorderable
         case text
-        /// `Label(title, systemImage:)`: ``text`` is the title, ``systemName``
+        /// The DSL's `Label` with a title and a `systemImage` name: ``text`` is the title, ``systemName``
         /// the SF Symbol.
         case label
         case button
@@ -76,7 +76,7 @@ public struct RenderNode: Codable, Sendable, Equatable {
 
     public var kind: Kind
     public var text: String?
-    /// SF Symbol name for `.image` nodes (`Image(systemName:)`).
+    /// SF Symbol name for `.image` nodes (the `systemName` argument of the DSL's `Image`).
     public var systemName: String?
     public var spacing: Double?
     /// Corner radius for `.roundedRectangle` (`RoundedRectangle(cornerRadius:)`).

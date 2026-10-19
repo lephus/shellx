@@ -12,7 +12,7 @@ import Testing
         let home = URL(fileURLWithPath: "/Users/test-user", isDirectory: true)
         let url = CmuxStateDirectory.url(homeDirectory: home)
 
-        #expect(url.path == "/Users/test-user/.local/state/cmux")
+        #expect(url.path == "/Users/test-user/.local/state/shellx")
         // The whole point of the fix: never under a TCC-protected app-data root.
         #expect(!url.path.contains("/Library/Application Support"))
         #expect(!url.path.contains("/Library/Containers"))
@@ -27,15 +27,15 @@ import Testing
             isDirectory: true
         )
         let socket = CmuxStateDirectory.url(homeDirectory: home)
-            .appendingPathComponent("cmux.sock", isDirectory: false)
+            .appendingPathComponent("shellx.sock", isDirectory: false)
         #expect(socket.path.utf8.count < 104)
     }
 
     @Test func legacyApplicationSupportURLPointsAtOldLocation() {
         let legacy = CmuxStateDirectory.legacyApplicationSupportURL(fileManager: .default)
         // Only used for one-time migration; it must still address the old folder.
-        #expect(legacy?.lastPathComponent == "cmux")
-        #expect(legacy?.path.contains("/Application Support/cmux") == true)
+        #expect(legacy?.lastPathComponent == "ShellX")
+        #expect(legacy?.path.contains("/Application Support/ShellX") == true)
     }
 }
 

@@ -1,12 +1,45 @@
 import Foundation
+import ShellXBrand
 
 struct AboutLicenseContent {
+    /// A project or asset ShellX ships, credited in the About panel with its license.
+    struct Attribution: Equatable {
+        let name: String
+        let license: String
+        let url: URL?
+    }
+
+    /// Where the GPL corresponding source for ShellX lives.
+    static let sourceCodeURL = ShellXBrand.sourceCodeURL
+
+    /// The source URL as the About panel prints it: "github.com/lephus/shellx".
+    static var sourceCodeDisplay: String {
+        (sourceCodeURL.host ?? "") + sourceCodeURL.path
+    }
+
+    /// "GPL-3.0-or-later — source: github.com/lephus/shellx".
+    static var licenseLine: String {
+        String(
+            format: String(localized: "about.shellx.licenseLine", defaultValue: "GPL-3.0-or-later — source: %@"),
+            sourceCodeDisplay
+        )
+    }
+
+    /// Upstream code, fonts and icons ShellX is built from (spec §12). The full
+    /// third-party license texts stay behind the Licenses button.
+    static let attributions: [Attribution] = [
+        Attribution(name: "cmux (Manaflow, Inc.)", license: "GPL-3.0-or-later", url: nil),
+        Attribution(name: "Ghostty", license: "MIT", url: URL(string: "https://github.com/ghostty-org/ghostty")),
+        Attribution(name: "coolicons by Kryston Schwarze", license: "CC BY 4.0", url: URL(string: "https://github.com/krystonschwarze/coolicons")),
+        Attribution(name: "Space Grotesk", license: "OFL-1.1", url: URL(string: "https://github.com/floriankarsten/space-grotesk")),
+    ]
+
     let bundle: Bundle
     let repositoryURL: URL
 
     init(
         bundle: Bundle,
-        repositoryURL: URL = URL(string: "https://github.com/manaflow-ai/cmux")!
+        repositoryURL: URL = ShellXBrand.sourceCodeURL
     ) {
         self.bundle = bundle
         self.repositoryURL = repositoryURL
@@ -30,7 +63,7 @@ struct AboutLicenseContent {
         ) ?? missingMessage
         let projectHeading = String(
             localized: "about.licenses.projectHeading",
-            defaultValue: "cmux Project License",
+            defaultValue: "ShellX Project License",
             bundle: bundle
         )
         let projectSourceLabel = String(
@@ -71,7 +104,7 @@ struct AboutLicenseContent {
         bundleIdentifier: String?,
         commit: String?
     ) -> URL {
-        if bundleIdentifier == "com.cmuxterm.app", let version = normalized(version) {
+        if bundleIdentifier == ShellXBrand.bundleID, let version = normalized(version) {
             return repositoryURL
                 .appendingPathComponent("tree", isDirectory: true)
                 .appendingPathComponent("v\(version)")

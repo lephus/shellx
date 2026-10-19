@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_WRAPPER = ROOT / "Resources" / "bin" / "cmux-codex-wrapper"
+SOURCE_WRAPPER = ROOT / "Resources" / "bin" / "shellx-codex-wrapper"
 SESSION_ID = "0198f073-0a5b-7000-8000-000000000059"
 
 
@@ -36,7 +36,7 @@ def run_wrapper(
     inject_args_available: bool = True,
     subrouter_marker: str | None = None,
 ) -> tuple[int, list[str], list[str], dict[str, str], str]:
-    with tempfile.TemporaryDirectory(prefix="cmux-codex-wrapper-test-") as td:
+    with tempfile.TemporaryDirectory(prefix="shellx-codex-wrapper-test-") as td:
         tmp = Path(td)
         wrapper_dir = tmp / "wrapper-bin"
         real_dir = tmp / "real-bin"
@@ -45,7 +45,7 @@ def run_wrapper(
         real_dir.mkdir()
         bundled_dir.mkdir()
 
-        wrapper = wrapper_dir / "cmux-codex-wrapper"
+        wrapper = wrapper_dir / "shellx-codex-wrapper"
         shutil.copy2(SOURCE_WRAPPER, wrapper)
         wrapper.chmod(0o755)
 
@@ -168,7 +168,7 @@ def expect(condition: bool, message: str, failures: list[str]) -> None:
 
 
 # cmux-launched Codex always disables the native `computer_use` provider before
-# any other argument (Resources/bin/cmux-codex-wrapper), including when hook
+# any other argument (Resources/bin/shellx-codex-wrapper), including when hook
 # injection fails, so cmux-cua stays the only Computer Use provider.
 NATIVE_COMPUTER_USE_POLICY = ["--disable", "computer_use"]
 

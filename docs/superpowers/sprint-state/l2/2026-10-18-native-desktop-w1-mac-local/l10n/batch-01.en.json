@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "No matching sessions",
+"comment": ""
+},
+{
+"i": 1,
+"en": "Some session history could not be searched",
+"comment": ""
+},
+{
+"i": 2,
+"en": "Results",
+"comment": ""
+},
+{
+"i": 3,
+"en": "Recent",
+"comment": ""
+},
+{
+"i": 4,
+"en": "All statuses",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Reset Filters",
+"comment": ""
+},
+{
+"i": 6,
+"en": "All folders",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Today",
+"comment": ""
+},
+{
+"i": 8,
+"en": "Last 7 days",
+"comment": ""
+},
+{
+"i": 9,
+"en": "Last 30 days",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Any time",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Date",
+"comment": ""
+},
+{
+"i": 12,
+"en": "All agents",
+"comment": ""
+},
+{
+"i": 13,
+"en": "Agent",
+"comment": ""
+},
+{
+"i": 14,
+"en": "Yesterday",
+"comment": ""
+},
+{
+"i": 15,
+"en": "Sort sessions",
+"comment": ""
+},
+{
+"i": 16,
+"en": "Sort by",
+"comment": ""
+},
+{
+"i": 17,
+"en": "Search sessions…",
+"comment": ""
+},
+{
+"i": 18,
+"en": "Filter sessions",
+"comment": ""
+},
+{
+"i": 19,
+"en": "Clear search",
+"comment": ""
+},
+{
+"i": 20,
+"en": "Session view",
+"comment": ""
+},
+{
+"i": 21,
+"en": "Default view",
+"comment": ""
+},
+{
+"i": 22,
+"en": "Compact view",
+"comment": ""
+},
+{
+"i": 23,
+"en": "Choose session view",
+"comment": ""
+},
+{
+"i": 24,
+"en": "Show details",
+"comment": ""
+},
+{
+"i": 25,
+"en": "Hide details",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Unknown agent.",
+"comment": ""
+},
+{
+"i": 27,
+"en": "No Vault session matched.",
+"comment": ""
+},
+{
+"i": 28,
+"en": "This session has no readable transcript.",
+"comment": ""
+},
+{
+"i": 29,
+"en": "agent and session are required.",
+"comment": ""
+},
+{
+"i": 30,
+"en": "query is required.",
+"comment": ""
+},
+{
+"i": 31,
+"en": "No checkpoint matched. Pass checkpoint <id> or turn <n> from vault checkpoints.",
+"comment": ""
+},
+{
+"i": 32,
+"en": "Reply",
+"comment": ""
+},
+{
+"i": 33,
+"en": "Message the agent…",
+"comment": ""
+},
+{
+"i": 34,
+"en": "Send",
+"comment": ""
+},
+{
+"i": 35,
+"en": "cmux",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Build",
+"comment": ""
+},
+{
+"i": 37,
+"en": "Commit",
+"comment": ""
+},
+{
+"i": 38,
+"en": "A Ghostty-based terminal with vertical tabs\nand a notification panel for macOS.",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Docs",
+"comment": ""
+},
+{
+"i": 40,
+"en": "GitHub",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Licenses",
+"comment": ""
+},
+{
+"i": 42,
+"en": "Corresponding source for this build",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Licenses file not found.",
+"comment": ""
+},
+{
+"i": 44,
+"en": "cmux Project License",
+"comment": ""
+},
+{
+"i": 45,
+"en": "Project source",
+"comment": ""
+},
+{
+"i": 46,
+"en": "Third-Party Licenses",
+"comment": ""
+},
+{
+"i": 47,
+"en": "Version",
+"comment": ""
+},
+{
+"i": 48,
+"en": "%1$@, workspace %2$lld of %3$lld",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Couldn’t open your browser. Copy the link and paste it into any browser.",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Browser opened. Complete sign-in there.",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Couldn’t copy the link. Open it in your browser instead.",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Copy Sign-In Link",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Open the link in your browser, or copy it and paste it into any browser.",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Couldn’t open sign-in",
+"comment": ""
+},
+{
+"i": 55,
+"en": "No changes were made. Try again when you’re ready, or use the browser link below.",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Sign-in canceled",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Try again to create a fresh secure link. The old link cannot sign in.",
+"comment": ""
+},
+{
+"i": 58,
+"en": "That sign-in link is no longer valid",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Check your connection, then try again. Your account was not changed.",
+"comment": ""
+},
+{
+"i": 60,
+"en": "Couldn’t reach cmux",
+"comment": ""
+},
+{
+"i": 61,
+"en": "Connect to Wi-Fi or another network, then try again. You can keep this pane open.",
+"comment": ""
+},
+{
+"i": 62,
+"en": "No internet connection",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Check the account details in the browser and try again.",
+"comment": ""
+},
+{
+"i": 64,
+"en": "cmux couldn’t complete the sign-in",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Try again in a moment. Your account and existing cmux workspaces are unchanged.",
+"comment": ""
+},
+{
+"i": 66,
+"en": "cmux sign-in is temporarily unavailable",
+"comment": ""
+},
+{
+"i": 67,
+"en": "The sign-in window did not return to cmux. Reopen the browser link or start a new attempt.",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Sign-in timed out",
+"comment": ""
+},
+{
+"i": 69,
+"en": "Confirm you’re using the intended cmux account, then try again.",
+"comment": ""
+},
+{
+"i": 70,
+"en": "cmux couldn’t authorize this sign-in",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Try again. If the sign-in window still fails, copy the link and open it in your browser.",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Couldn’t finish sign-in",
+"comment": ""
+},
+{
+"i": 73,
+"en": "Sign in to cmux",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Complete sign-in in the window that opened. This pane updates automatically.",
+"comment": ""
+},
+{
+"i": 75,
+"en": "Link copied",
+"comment": ""
+},
+{
+"i": 76,
+"en": "Finishing sign-in…",
+"comment": ""
+},
+{
+"i": 77,
+"en": "cmux is verifying your account. Keep this pane open.",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Opening secure sign-in…",
+"comment": ""
+},
+{
+"i": 79,
+"en": "cmux is preparing a secure sign-in window.",
+"comment": ""
+},
+{
+"i": 80,
+"en": "Waiting for sign-in…",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Still waiting for sign-in…",
+"comment": ""
+},
+{
+"i": 82,
+"en": "The sign-in window is taking longer than expected. You can reopen or copy the same secure link without restarting.",
+"comment": ""
+},
+{
+"i": 83,
+"en": "Sign-in wasn’t completed.",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Open Again in Browser",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Continue with your cmux account.",
+"comment": ""
+},
+{
+"i": 86,
+"en": "Sign In",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Your cmux account is connected.",
+"comment": ""
+},
+{
+"i": 88,
+"en": "You’re signed in now",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Try Again",
+"comment": ""
+},
+{
+"i": 90,
+"en": "do something",
+"comment": ""
+},
+{
+"i": 91,
+"en": "browse files",
+"comment": ""
+},
+{
+"i": 92,
+"en": "queue a prompt",
+"comment": ""
+},
+{
+"i": 93,
+"en": "run a prompt now",
+"comment": ""
+},
+{
+"i": 94,
+"en": "interrupt the agent",
+"comment": ""
+},
+{
+"i": 95,
+"en": "run a shell command",
+"comment": ""
+},
+{
+"i": 96,
+"en": "add tools or skills",
+"comment": ""
+},
+{
+"i": 97,
+"en": "%@ is waiting to join the Campfire session",
+"comment": ""
+},
+{
+"i": 98,
+"en": "%1$@ asked for permission to %2$@",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Campfire relay connection failed",
+"comment": ""
+},
+{
+"i": 100,
+"en": "Someone",
+"comment": ""
+},
+{
+"i": 101,
+"en": "Completed",
+"comment": ""
+},
+{
+"i": 102,
+"en": "Completed in %@",
+"comment": ""
+},
+{
+"i": 103,
+"en": "%@ session completed",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Codex reported an error",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Codex ended before sending a final response",
+"comment": ""
+},
+{
+"i": 106,
+"en": "Codex auth error",
+"comment": ""
+},
+{
+"i": 107,
+"en": "Codex error",
+"comment": ""
+},
+{
+"i": 108,
+"en": "Codex network error",
+"comment": ""
+},
+{
+"i": 109,
+"en": "Codex rate limit",
+"comment": ""
+},
+{
+"i": 110,
+"en": "Auth error",
+"comment": ""
+},
+{
+"i": 111,
+"en": "Network error",
+"comment": ""
+},
+{
+"i": 112,
+"en": "Rate limit",
+"comment": ""
+},
+{
+"i": 113,
+"en": "Codex",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Codex is asking a question",
+"comment": ""
+},
+{
+"i": 115,
+"en": "Codex needs input",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Waiting",
+"comment": ""
+},
+{
+"i": 117,
+"en": "PID must be a positive integer",
+"comment": ""
+},
+{
+"i": 118,
+"en": "pid_resolution must be corroborated or controlling_tty",
+"comment": ""
+},
+{
+"i": 119,
+"en": "No live delivery target",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Delivery target resolution is unavailable; retry after cmux finishes starting.",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Agent hook notification delivery failed for %@ %@.",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Agent hook journal append failed for %@ %@.",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Agent hook target resolution failed for %@ %@.",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Approval needed",
+"comment": ""
+},
+{
+"i": 125,
+"en": "%@ reported an error",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Task completed",
+"comment": ""
+},
+{
+"i": 127,
+"en": "The task reported an error",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Waiting for input",
+"comment": ""
+},
+{
+"i": 129,
+"en": "%@ error",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Interrupted",
+"comment": ""
+},
+{
+"i": 131,
+"en": "%@ needs input",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Attention",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Permission",
+"comment": ""
+},
+{
+"i": 134,
+"en": "Running",
+"comment": ""
+},
+{
+"i": 135,
+"en": "Kimi Code",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Ollama",
+"comment": ""
+},
+{
+"i": 137,
+"en": "Possible owners: %1$@.",
+"comment": ""
+},
+{
+"i": 138,
+"en": "This conversation is in use by another process. Continue there or close it normally, then retry restoring it here.",
+"comment": ""
+},
+{
+"i": 139,
+"en": "The selected provider is unavailable.",
+"comment": ""
+},
+{
+"i": 140,
+"en": "Invalid bridge request.",
+"comment": ""
+},
+{
+"i": 141,
+"en": "The request is incomplete.",
+"comment": ""
+},
+{
+"i": 142,
+"en": "The provider is not ready yet.",
+"comment": ""
+},
+{
+"i": 143,
+"en": "An agent session is already running.",
+"comment": ""
+},
+{
+"i": 144,
+"en": "The agent session is no longer available.",
+"comment": ""
+},
+{
+"i": 145,
+"en": "This action is not supported.",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Agent transport is not supported.",
+"comment": ""
+},
+{
+"i": 147,
+"en": "Ran",
+"comment": ""
+},
+{
+"i": 148,
+"en": "Stopped",
+"comment": ""
+},
+{
+"i": 149,
+"en": "Creating",
+"comment": ""
+},
+{
+"i": 150,
+"en": "Deleted",
+"comment": ""
+},
+{
+"i": 151,
+"en": "Deleting",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Edited",
+"comment": ""
+},
+{
+"i": 153,
+"en": "Editing",
+"comment": ""
+},
+{
+"i": 154,
+"en": "cmux could not read the response from Codex. Try again.",
+"comment": ""
+},
+{
+"i": 155,
+"en": "The Codex request failed. Try again.",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Request from Codex app-server is not supported: %@",
+"comment": ""
+},
+{
+"i": 157,
+"en": "Codex reported a warning.",
+"comment": ""
+},
+{
+"i": 158,
+"en": "%@ was not found. Install it and make sure \"%@\" can be run from your terminal.",
+"comment": ""
+},
+{
+"i": 159,
+"en": "OpenCode event stream disconnected.",
+"comment": ""
+},
+{
+"i": 160,
+"en": "OpenCode session could not be created.",
+"comment": ""
+},
+{
+"i": 161,
+"en": "%@ · %@",
+"comment": ""
+},
+{
+"i": 162,
+"en": "Claude Code",
+"comment": ""
+},
+{
+"i": 163,
+"en": "OpenCode",
+"comment": ""
+},
+{
+"i": 164,
+"en": "React",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Solid",
+"comment": ""
+},
+{
+"i": 166,
+"en": "Add files and more",
+"comment": ""
+},
+{
+"i": 167,
+"en": "Add photos & files",
+"comment": ""
+},
+{
+"i": 168,
+"en": "Attach file",
+"comment": ""
+},
+{
+"i": 169,
+"en": "Context",
+"comment": ""
+},
+{
+"i": 170,
+"en": "Browse web",
+"comment": ""
+},
+{
+"i": 171,
+"en": "Change permissions",
+"comment": ""
+},
+{
+"i": 172,
+"en": "Collapse shell",
+"comment": ""
+},
+{
+"i": 173,
+"en": "No results",
+"comment": ""
+},
+{
+"i": 174,
+"en": "Copied",
+"comment": ""
+},
+{
+"i": 175,
+"en": "Copied shell contents",
+"comment": ""
+},
+{
+"i": 176,
+"en": "Copy output",
+"comment": ""
+},
+{
+"i": 177,
+"en": "Copy shell contents",
+"comment": ""
+},
+{
+"i": 178,
+"en": "Copy message",
+"comment": ""
+},
+{
+"i": 179,
+"en": "Native bridge request failed.",
+"comment": ""
+},
+{
+"i": 180,
+"en": "IDE context",
+"comment": ""
+},
+{
+"i": 181,
+"en": "Include IDE context",
+"comment": ""
+},
+{
+"i": 182,
+"en": "Provider exited %d",
+"comment": ""
+},
+{
+"i": 183,
+"en": "Provider started",
+"comment": ""
+},
+{
+"i": 184,
+"en": "%@ ready",
+"comment": ""
+},
+{
+"i": 185,
+"en": "Sent %d chars",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Current workspace",
+"comment": ""
+},
+{
+"i": 187,
+"en": "Mention",
+"comment": ""
+},
+{
+"i": 188,
+"en": "Auto-review",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Custom (config.toml)",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Default permissions",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Full access",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Plan mode",
+"comment": ""
+},
+{
+"i": 193,
+"en": "Use plan mode",
+"comment": ""
+},
+{
+"i": 194,
+"en": "Dismiss suggestion",
+"comment": ""
+},
+{
+"i": 195,
+"en": "Shift + Tab",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Create a plan",
+"comment": ""
+},
+{
+"i": 197,
+"en": "Ask anything",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Provider",
+"comment": ""
+},
+{
+"i": 199,
+"en": "%@d",
+"comment": ""
+},
+{
+"i": 200,
+"en": "%@h",
+"comment": ""
+},
+{
+"i": 201,
+"en": "%@m",
+"comment": ""
+},
+{
+"i": 202,
+"en": "Monthly",
+"comment": ""
+},
+{
+"i": 203,
+"en": "Primary",
+"comment": ""
+},
+{
+"i": 204,
+"en": "resets",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Secondary",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Usage remaining",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Weekly",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Rate limits",
+"comment": ""
+},
+{
+"i": 209,
+"en": "High",
+"comment": ""
+},
+{
+"i": 210,
+"en": "Remove attachment",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Shell",
+"comment": ""
+},
+{
+"i": 212,
+"en": "Success",
+"comment": ""
+},
+{
+"i": 213,
+"en": "Show less",
+"comment": ""
+},
+{
+"i": 214,
+"en": "Show more",
+"comment": ""
+},
+{
+"i": 215,
+"en": "Code review",
+"comment": ""
+},
+{
+"i": 216,
+"en": "Skills",
+"comment": ""
+},
+{
+"i": 217,
+"en": "Plan",
+"comment": "An agent planning skill, not a billing subscription tier."
+},
+{
+"i": 218,
+"en": "Research",
+"comment": ""
+},
+{
+"i": 219,
+"en": "Start",
+"comment": ""
+},
+{
+"i": 220,
+"en": "Failed",
+"comment": ""
+},
+{
+"i": 221,
+"en": "Loading",
+"comment": ""
+},
+{
+"i": 222,
+"en": "Starting",
+"comment": ""
+},
+{
+"i": 223,
+"en": "Stopping",
+"comment": ""
+},
+{
+"i": 224,
+"en": "Stop",
+"comment": ""
+},
+{
+"i": 225,
+"en": "Tools",
+"comment": ""
+},
+{
+"i": 226,
+"en": "Voice input",
+"comment": ""
+},
+{
+"i": 227,
+"en": "Apply",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Cancel",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Enter a hex color in the format #RRGGBB.",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Custom Workspace Color",
+"comment": ""
+},
+{
+"i": 231,
+"en": "\"%@\" is not a valid hex color. Use #RRGGBB.",
+"comment": ""
+},
+{
+"i": 232,
+"en": "OK",
+"comment": ""
+},
+{
+"i": 233,
+"en": "Invalid Color",
+"comment": ""
+},
+{
+"i": 234,
+"en": "cmux could not move this tab to the selected destination.",
+"comment": ""
+},
+{
+"i": 235,
+"en": "Move Failed",
+"comment": ""
+},
+{
+"i": 236,
+"en": "Choose a destination for this tab.",
+"comment": ""
+},
+{
+"i": 237,
+"en": "Move",
+"comment": ""
+},
+{
+"i": 238,
+"en": "New Workspace in Current Window",
+"comment": ""
+},
+{
+"i": 239,
+"en": "Selected Workspace in New Window",
+"comment": ""
+},
+{
+"i": 240,
+"en": "Move Tab",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Automatic",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Dark",
+"comment": ""
+},
+{
+"i": 243,
+"en": "Light",
+"comment": ""
+},
+{
+"i": 244,
+"en": "Auto",
+"comment": ""
+},
+{
+"i": 245,
+"en": "System",
+"comment": ""
+},
+{
+"i": 246,
+"en": "AppleScript is disabled by the macos-applescript configuration.",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Failed to create split.",
+"comment": ""
+},
+{
+"i": 248,
+"en": "Failed to create window.",
+"comment": ""
+},
+{
+"i": 249,
+"en": "Failed to create workspace.",
+"comment": ""
+},
+{
+"i": 250,
+"en": "Missing action string.",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Missing input text.",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Missing or unknown split direction.",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Missing terminal target.",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Terminal is no longer available.",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Window is no longer available.",
+"comment": ""
+},
+{
+"i": 256,
+"en": "Workspace is no longer available.",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Could not complete browser sign-in. Try again or open sign-in in your browser.",
+"comment": ""
+},
+{
+"i": 258,
+"en": "The sign-in callback was invalid. Try signing in again.",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Invalid code. Please try again.",
+"comment": ""
+},
+{
+"i": 260,
+"en": "Network error. Please check your connection.",
+"comment": ""
+},
+{
+"i": 261,
+"en": "No internet connection. Connect to Wi-Fi or cellular and try again.",
+"comment": ""
+},
+{
+"i": 262,
+"en": "Something went wrong. Please try again.",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Sign-in timed out. Check your connection and try again.",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Session expired. Please sign in again.",
+"comment": ""
+},
+{
+"i": 265,
+"en": "Incorrect email or password.",
+"comment": ""
+},
+{
+"i": 266,
+"en": "new tab",
+"comment": ""
+},
+{
+"i": 267,
+"en": "Search or enter URL",
+"comment": ""
+},
+{
+"i": 268,
+"en": "Address bar suggestions",
+"comment": ""
+},
+{
+"i": 269,
+"en": "Always allow this host in cmux",
+"comment": ""
+},
+{
+"i": 270,
+"en": "Timed out waiting for the browser document to become ready",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Timed out waiting for JavaScript result",
+"comment": ""
+},
+{
+"i": 272,
+"en": "The browser surface stopped responding and was recovered. Retry the command.",
+"comment": ""
+},
+{
+"i": 273,
+"en": "The browser surface was already recovered. Retry the command.",
+"comment": ""
+},
+{
+"i": 274,
+"en": "Open Link in Default Browser",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Open Link in New Tab",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Screenshot Page",
+"comment": ""
+},
+{
+"i": 277,
+"en": "Screenshot Section",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Design Mode (%@)",
+"comment": ""
+},
+{
+"i": 279,
+"en": "Describe the change",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Select one or more elements on the page.",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Remove selected element",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Remove %@ context",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Copying…",
+"comment": ""
+},
+{
+"i": 284,
+"en": "⌘↩",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Could not capture the annotation. Draw it again.",
+"comment": ""
+},
+{
+"i": 286,
+"en": "The selected element moved during capture. Try again when the page is still.",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Could not copy the design context.",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Design Mode cleanup failed. Reload the page or try again.",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Design Mode could not start.",
+"comment": ""
+},
+{
+"i": 290,
+"en": "The page returned invalid design data.",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Open a page before entering Design Mode.",
+"comment": ""
+},
+{
+"i": 292,
+"en": "The page stopped responding. Reload it and try again.",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Try again. If the problem continues, reload the page.",
+"comment": ""
+},
+{
+"i": 294,
+"en": "Design Mode could not close before starting React Grab. Reload the page and try again.",
+"comment": ""
+},
+{
+"i": 295,
+"en": "React Grab could not close. Reload the page and try again.",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Could not update the selected elements.",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Details: %1$@",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Design-mode context for the selected page elements.",
+"comment": ""
+},
+{
+"i": 299,
+"en": "Page: %1$@",
+"comment": ""
+}
+]

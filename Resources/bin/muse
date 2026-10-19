@@ -27,13 +27,13 @@ resolve_cmux_bin() {
     fi
 
     self_dir="$(cd "$(dirname "$0")" && pwd)"
-    bundled_cli="$self_dir/cmux"
+    bundled_cli="$self_dir/shellx"
     if [[ -x "$bundled_cli" ]]; then
         printf '%s' "$bundled_cli"
         return 0
     fi
 
-    bundled_cli="$(command -v cmux || true)"
+    bundled_cli="$(command -v shellx || true)"
     if [[ -n "$bundled_cli" ]]; then
         printf '%s' "$bundled_cli"
         return 0

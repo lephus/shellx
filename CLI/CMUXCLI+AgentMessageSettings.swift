@@ -6,13 +6,13 @@ import Foundation
 extension CMUXCLI {
     static var agentMessagesHelp: String {
         String(localized: "cli.help.agentMessages", defaultValue: """
-        Usage: cmux agent messages [on|off|status] [<target>] [--workspace] [--json]
+        Usage: shellx agent messages [on|off|status] [<target>] [--workspace] [--json]
 
         Turn agent messages off or on for one agent, or show whether it gets
         them. Turning messages off for an agent refuses new messages to it and
         marks the ones already queued for it as failed.
 
-        <target> is resolved like cmux agent message: a workspace or surface id
+        <target> is resolved like ShellX agent message: a workspace or surface id
         or ref, or a workspace title. Without one, the command applies to the
         surface it runs in. --workspace applies to every surface in the
         workspace instead.
@@ -22,13 +22,13 @@ extension CMUXCLI {
         becomes the workspace's agent later.
 
         To turn agent messages off everywhere, set agentMessages.enabled to
-        false in ~/.config/cmux/cmux.json or turn off Settings > Automation >
+        false in ~/.config/shellx/shellx.json or turn off Settings > Automation >
         Agent Messages.
 
         Examples:
-          cmux agent messages off
-          cmux agent messages on workspace:3
-          cmux agent messages off --workspace cmux-remote-status
+          shellx agent messages off
+          shellx agent messages on workspace:3
+          shellx agent messages off --workspace cmux-remote-status
         """)
     }
 
@@ -102,7 +102,7 @@ extension CMUXCLI {
         if payload["messages_enabled"] as? Bool == false {
             print(String(
                 localized: "cli.agentMessages.globalOff",
-                defaultValue: "Agent messages are turned off for all of cmux (agentMessages.enabled is false)."
+                defaultValue: "Agent messages are turned off for all of ShellX (agentMessages.enabled is false)."
             ))
         }
     }

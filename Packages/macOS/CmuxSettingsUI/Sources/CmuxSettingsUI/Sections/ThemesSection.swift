@@ -3,9 +3,10 @@ import CmuxSettings
 import SwiftUI
 
 /// **Themes** section: every color and appearance setting in one place.
-/// App appearance, accent color and app icon, the browser page theme, the adaptive
-/// default theme toggle, and the terminal theme gallery with every theme
-/// Ghostty ships.
+/// Accent color and app icon, the browser page theme, the adaptive default
+/// theme toggle, and the terminal theme gallery with every theme Ghostty
+/// ships. ShellX is dark-only (spec §7.4), so the app Appearance
+/// (light/dark/system) picker is not shown.
 @MainActor
 public struct ThemesSection: View {
     private let hostActions: SettingsHostActions
@@ -75,21 +76,15 @@ public struct ThemesSection: View {
     @ViewBuilder
     private var appCard: some View {
         SettingsCard {
-            ThemePickerRow(
-                selectedMode: appearance.current,
-                onSelect: { appearance.set($0) }
-            )
-            .settingsSearchAnchors(["setting:themes:appearance"])
-            SettingsCardDivider()
             SettingsCardRow(
                 configurationReview: .json("app.accentColor"),
                 String(localized: "settings.app.accentColor", defaultValue: "Accent Color"),
-                subtitle: String(localized: "settings.app.accentColor.subtitle", defaultValue: "Color of the selected workspace, attention ring, agent status, and other cmux highlights. System follows the macOS accent color."),
+                subtitle: String(localized: "settings.app.accentColor.subtitle", defaultValue: "Color of the selected workspace, attention ring, agent status, and other ShellX highlights. System follows the macOS accent color."),
                 controlWidth: Self.columnWidth
             ) {
                 HStack(spacing: 8) {
                     Picker("", selection: Binding(get: { displayedAccentColor.mode }, set: { selectAccentColorMode($0) })) {
-                        Text(String(localized: "settings.app.accentColor.cmux", defaultValue: "cmux Blue")).tag(CmuxAccentColorMode.cmux)
+                        Text(String(localized: "settings.app.accentColor.cmux", defaultValue: "ShellX Blue")).tag(CmuxAccentColorMode.cmux)
                         Text(String(localized: "settings.app.accentColor.system", defaultValue: "System")).tag(CmuxAccentColorMode.system)
                         Text(String(localized: "settings.app.accentColor.custom", defaultValue: "Custom")).tag(CmuxAccentColorMode.custom)
                     }

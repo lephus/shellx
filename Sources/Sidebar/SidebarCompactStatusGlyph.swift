@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ShellXBrand
 
 /// The single leading glyph a workspace row shows when
 /// `sidebar.compactAgentStatus` is on, modeled on the Claude desktop session
@@ -47,6 +48,10 @@ import Foundation
 ///    row's edge (a `terminal` entry in `sidebar.compactStatusIcons` adds one).
 /// Only the three agent states Claude marks with dots (needs input, unseen,
 /// running) are dots; everything settled gets a symbol that says what it is.
+///
+/// ShellX colors (spec §7.4 status table, ``ShellXStatus``): error `error`,
+/// needs input `primary`, running/subagents/starting `running` (soft yellow),
+/// unseen `done`, everything else `muted`.
 struct SidebarCompactStatusGlyph: Equatable, Hashable {
     enum Kind: Equatable, Hashable {
         case error
@@ -185,9 +190,8 @@ struct SidebarCompactStatusGlyph: Equatable, Hashable {
         }
     }
 
-    /// Needs input: an amber warmer than system yellow, which reads too
-    /// bright in the sidebar.
-    static let needsInputColor = NSColor(srgbRed: 0.98, green: 0.69, blue: 0.04, alpha: 1)
+    /// Needs input ("chờ bạn"): ShellX `primary`.
+    static let needsInputColor = ShellXStatus.needsYou.color.nsColor
 
     /// A plain terminal draws nothing unless an icon is configured for it.
     var isDrawn: Bool {
@@ -292,16 +296,22 @@ struct SidebarCompactStatusGlyph: Equatable, Hashable {
 
     /// Selected rows flatten the glyph to the selected foreground, like the
     /// metadata rows do, so colors never vanish into the selection fill.
-    func color(isActive: Bool, selected: NSColor, secondary: NSColor) -> NSColor {
+    /// `secondary` is kept for call-site compatibility; ShellX draws the
+    /// settled states in `muted`.
+    func color(isActive: Bool, selected: NSColor, secondary _: NSColor) -> NSColor {
         if isActive { return selected }
+        return Self.shellXStatus(for: kind).color.nsColor
+    }
+
+    /// The ShellX status a glyph kind is drawn as.
+    static func shellXStatus(for kind: Kind) -> ShellXStatus {
         switch kind {
-        case .error: return .systemRed
-        case .needsInput: return Self.needsInputColor
-        case .unseen: return .systemBlue
-        case .pullRequest(.merged): return .systemPurple
-        case .subagents, .running, .waiting, .pending, .idle, .branch, .terminal,
-             .pullRequest(.open), .pullRequest(.closed):
-            return secondary
+        case .error: return .error
+        case .needsInput: return .needsYou
+        case .subagents, .running, .pending: return .running
+        case .unseen: return .done
+        case .waiting, .idle, .branch, .terminal, .pullRequest:
+            return .idle
         }
     }
 }

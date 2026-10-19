@@ -198,11 +198,12 @@ struct BrowserAuthCallbackNavigationPolicy {
         return await delegate.handleAuthCallbackURLInProcess(url, delivery: .trustedEmbeddedBrowser)
     }
 
-    /// Any cmux-family scheme pointing at the auth-callback target, including
-    /// schemes this build does not accept (those must be blocked, not opened).
+    /// Any ShellX- or cmux-family scheme pointing at the auth-callback target,
+    /// including schemes this build does not accept (those must be blocked, not opened).
     private static func isAuthCallbackShapedURL(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased(),
-              scheme == "cmux" || scheme.hasPrefix("cmux-") else {
+              scheme == "shellx" || scheme.hasPrefix("shellx-")
+                || scheme == "cmux" || scheme.hasPrefix("cmux-") else {
             return false
         }
         return AuthCallbackRouter(extraAllowedScheme: scheme).isAuthCallbackURL(url)

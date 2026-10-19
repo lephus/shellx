@@ -1,6 +1,7 @@
 import AppKit
 import CmuxBrowser
 import SwiftUI
+import ShellXIcons
 
 /// Cursor-style floating composer card for Design Mode.
 ///
@@ -94,7 +95,7 @@ struct BrowserDesignModePopover: View {
         Button {
             Task { @MainActor in await controller.setInteractionMode(mode) }
         } label: {
-            Image(systemName: icon)
+            ShellXIcon.image(icon)
                 .font(.system(size: 10.5, weight: .semibold))
                 .foregroundStyle(controller.interactionMode == mode ? Color.white : Color.white.opacity(0.45))
                 .frame(width: 22, height: 22)
@@ -117,7 +118,7 @@ struct BrowserDesignModePopover: View {
     @ViewBuilder
     private var errorMessage: some View {
         if let message = controller.errorMessage {
-            Label(message, systemImage: "exclamationmark.triangle.fill")
+            ShellXLabel(message, icon: "exclamationmark.triangle.fill")
                 .cmuxFont(size: 11)
                 .foregroundStyle(.red)
                 .fixedSize(horizontal: false, vertical: true)
@@ -131,7 +132,7 @@ struct BrowserDesignModePopover: View {
         Button {
             Task { @MainActor in await controller.copySelection() }
         } label: {
-            Image(systemName: controller.didCopy ? "checkmark" : "doc.on.clipboard")
+            ShellXIcon.image(controller.didCopy ? "checkmark" : "doc.on.clipboard")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(
                     controller.didCopy

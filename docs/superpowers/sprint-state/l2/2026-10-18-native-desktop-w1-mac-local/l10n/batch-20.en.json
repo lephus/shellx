@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Save picture of selected area as a file",
+"comment": ""
+},
+{
+"i": 1,
+"en": "Copy picture of selected area to the clipboard",
+"comment": ""
+},
+{
+"i": 2,
+"en": "Screenshot and recording options",
+"comment": ""
+},
+{
+"i": 3,
+"en": "Move left a space",
+"comment": ""
+},
+{
+"i": 4,
+"en": "Move right a space",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Show Spotlight search",
+"comment": ""
+},
+{
+"i": 6,
+"en": "Turn Dock hiding on or off",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Turn VoiceOver on or off",
+"comment": ""
+},
+{
+"i": 8,
+"en": "base keymap preset iterm iterm2 terminal app tmux prefix keybindings coming from another terminal",
+"comment": ""
+},
+{
+"i": 9,
+"en": "Apply Keymap",
+"comment": ""
+},
+{
+"i": 10,
+"en": "⌘1…9 will select tabs in the focused pane instead of workspaces. Workspaces move to ⌥⌘1…9.",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Usage: cmux send [flags] [--] <text>\n\nSend text to a terminal surface as keystrokes. Escape sequences: \\n and \\r send Enter, \\t sends Tab.\n\nFor large text (for example over 4 KB, or several lines going to an agent), use --paste or cmux paste. Keystrokes press Enter at every newline, which can submit each line on its own.\n\nWith --paste, the text goes through the same paste path as cmux paste and Cmd+V, unchanged: escape sequences such as \\n are not interpreted, and control characters such as Esc and Ctrl-C are replaced with spaces. --paste must come before the text.\n\nIf an agent prompt in the target holds text someone is typing, or a question or permission dialog is open, nothing is sent and the command fails. --force sends anyway.\n\nFlags:\n  --workspace <id|ref|index>   Target workspace (default: $CMUX_WORKSPACE_ID)\n  --surface <id|ref|index>     Target surface (default: $CMUX_SURFACE_ID)\n  --window <id|ref|index>      Window context for workspace/surface refs and indexes\n  --paste                      Paste the text instead of typing it\n  --force                      Send even over a draft or into an open dialog\n\nExample:\n  cmux send \"echo hello\"\n  cmux send --surface surface:2 \"ls -la\\n\"\n  cmux send --paste --surface surface:2 \"$(cat notes.md)\"",
+"comment": ""
+},
+{
+"i": 12,
+"en": "hint: each newline was typed as Enter; for large multi-line text use cmux send --paste or cmux paste to deliver it as one paste",
+"comment": ""
+},
+{
+"i": 13,
+"en": "Lets supported agents see and control apps on this Mac. An agent's first Computer Use request starts setup automatically.",
+"comment": ""
+},
+{
+"i": 14,
+"en": "Closing the last surface in a workspace keeps the workspace open.",
+"comment": ""
+},
+{
+"i": 15,
+"en": "Includes terminal, browser, and Markdown surfaces from every workspace in command palette results.",
+"comment": ""
+},
+{
+"i": 16,
+"en": "Choose what dropping files on a terminal or editor does. Holding Shift while dragging does the other.",
+"comment": ""
+},
+{
+"i": 17,
+"en": "Using Back and Forward also returns to previous panes and tabs.",
+"comment": ""
+},
+{
+"i": 18,
+"en": "Scales all text in cmux. Command-Plus and Command-Minus still zoom the focused pane.",
+"comment": ""
+},
+{
+"i": 19,
+"en": "Shows only workspace titles in the sidebar.",
+"comment": ""
+},
+{
+"i": 20,
+"en": "Removes the close button from tabs.",
+"comment": ""
+},
+{
+"i": 21,
+"en": "Hides the workspace title bar and shows its controls in the sidebar.",
+"comment": ""
+},
+{
+"i": 22,
+"en": "Choose where new workspaces appear in the sidebar.",
+"comment": ""
+},
+{
+"i": 23,
+"en": "Clicking a pull request link in the sidebar opens it in the cmux browser.",
+"comment": ""
+},
+{
+"i": 24,
+"en": "Clicking a port link in the sidebar opens it in the cmux browser.",
+"comment": ""
+},
+{
+"i": 25,
+"en": "Clicking a pane while cmux is in the background focuses that pane right away.",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Shortens long paths from the start to keep their end visible.",
+"comment": ""
+},
+{
+"i": 27,
+"en": "Renaming from the command palette selects the current name.",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Choose whether branches share one line or each get their own line.",
+"comment": ""
+},
+{
+"i": 29,
+"en": "Shows the branch and directory on separate lines.",
+"comment": ""
+},
+{
+"i": 30,
+"en": "Closing a tab asks for confirmation first.",
+"comment": ""
+},
+{
+"i": 31,
+"en": "Clicking a tab's close button asks for confirmation first.",
+"comment": ""
+},
+{
+"i": 32,
+"en": "Choose when quitting with Command-Q asks for confirmation. Dirty Only asks only when a workspace would ask before closing.",
+"comment": ""
+},
+{
+"i": 33,
+"en": "Starts new workspaces in the working directory of the current workspace.",
+"comment": ""
+},
+{
+"i": 34,
+"en": "Shows long workspace titles in full on multiple lines.",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Shows Amp status and notifications in the sidebar.",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Automatic uses each session's own agent. Other supported agents need their command-line tool on the PATH.",
+"comment": ""
+},
+{
+"i": 37,
+"en": "Shows Claude Code status and notifications in the sidebar.",
+"comment": ""
+},
+{
+"i": 38,
+"en": "Shows Codex status and notifications in the sidebar.",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Shows Cursor status and notifications in the sidebar.",
+"comment": ""
+},
+{
+"i": 40,
+"en": "Shows Gemini CLI status and notifications in the sidebar.",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Shows Kiro CLI status and notifications in the sidebar, and its tool events in Feed.",
+"comment": ""
+},
+{
+"i": 42,
+"en": "Choose which local processes can control cmux.",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Lists subagent completions in Feed without sending notifications.",
+"comment": ""
+},
+{
+"i": 44,
+"en": "Generates workspace and tab titles from agent conversations.",
+"comment": ""
+},
+{
+"i": 45,
+"en": "Adds Cloud Machines to the right sidebar, Settings, the command palette, and the new workspace menu. Turn this on to enable Cloud work; an administrator can still disable Cloud with a managed policy.",
+"comment": ""
+},
+{
+"i": 46,
+"en": "Adds sidebars from ~/.config/cmux/sidebars to the sidebar picker.",
+"comment": ""
+},
+{
+"i": 47,
+"en": "Adds the extensions button and lets cmux install and run sidebar extensions.",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Adds Feed to the right sidebar for answering agent requests.",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Shows tmux sessions on remote hosts as workspaces in the sidebar. The sessions keep running after cmux quits.",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Shows Add Checklist Item and status controls on workspaces. A remote rollout can turn them on even while this is off.",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Choose whether clicking a workspace checklist opens a popover or expands it under the row.",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Opens browser tabs and links from terminals in the cmux browser.",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Frees page memory from hidden browser tabs. Scroll position, form input, and history come back when a tab is shown again.",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Choose light or dark pages for sites that support both. System matches the app appearance.",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Isolated process protects cmux from a faulty sidebar but accepts clicks only. In-app also accepts hover, focus, and typing.",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Pressing the shortcut in any app shows or hides all cmux windows.",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Choose how much of a folder iPhone and iPad can browse. One Level shows only the items directly inside it.",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Lets iPhone and iPad pair with and connect to this Mac.",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Sends agent notifications from this Mac to cmux on iPhone and iPad.",
+"comment": ""
+},
+{
+"i": 60,
+"en": "Holding Command or Control shows shortcut hints.",
+"comment": ""
+},
+{
+"i": 61,
+"en": "Lets the Dock in the right sidebar grow up to this width while leaving room for terminals.",
+"comment": ""
+},
+{
+"i": 62,
+"en": "Matches terminal colors to the light or dark appearance when no Ghostty theme or colors are set.",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Reopening cmux resumes agent sessions automatically.",
+"comment": ""
+},
+{
+"i": 64,
+"en": "Hibernates idle background agent terminals above the live terminal limit. Even when this is off, cmux may hibernate them under memory pressure.",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Selecting text in a terminal copies it to the clipboard.",
+"comment": ""
+},
+{
+"i": 66,
+"en": "Copying text also joins line breaks a program printed at the full terminal width and drops a short continuation indent. Soft-wrapped lines always copy as one line.",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Import from Another Terminal",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Bring over your font, colors, cursor and more from iTerm2, Terminal, Alacritty, Kitty, WezTerm or Warp.",
+"comment": ""
+},
+{
+"i": 69,
+"en": "Warns when the processes in one pane use too much memory.",
+"comment": ""
+},
+{
+"i": 70,
+"en": "Frees graphics memory from terminals that are out of view. Their processes keep running.",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Shows a scroll bar in terminals, except in full-screen apps.",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Wraps terminal and agent chat content at this width. Narrow panes still use their full width.",
+"comment": ""
+},
+{
+"i": 73,
+"en": "Command and Option arrow and delete keys move and delete by line and word at the shell prompt.",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Opening a terminal tab, split, or workspace puts keyboard focus in the TextBox.",
+"comment": ""
+},
+{
+"i": 75,
+"en": "Opening a terminal tab, split, or workspace shows the TextBox.",
+"comment": ""
+},
+{
+"i": 76,
+"en": "unknown key custom_color; set_color accepts hex or color",
+"comment": ""
+},
+{
+"i": 77,
+"en": "color must be a 6-digit hex color like #FF3EA5 (leading # optional)",
+"comment": ""
+},
+{
+"i": 78,
+"en": "color must be a string holding a hex color",
+"comment": ""
+},
+{
+"i": 79,
+"en": "unknown key icon_symbol; set_icon accepts symbol or icon",
+"comment": ""
+},
+{
+"i": 80,
+"en": "symbol must be a string",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Splitting a pane makes the panes in that direction equal in size.",
+"comment": ""
+},
+{
+"i": 82,
+"en": "Shows a lock badge in the terminal corner while a program such as sudo or ssh reads a password with echo off. Only local prompts are detected: ssh's own password prompt counts, but sudo inside an ssh session does not.",
+"comment": ""
+},
+{
+"i": 83,
+"en": "Shows one dot in the badge per typed character. cmux keeps only a count, never the characters. Pasted text is not counted.",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Usage: cmux session move <session-id> --to <ssh-destination|local> [options]\n\nMove a stopped Claude Code session to another machine and resume it there.\nExit the agent first: the move refuses while the session runs on either side.\n\nThe move carries:\n  - the cwd's git checkout: HEAD (on the same branch when safe) plus modified,\n    deleted and untracked non-ignored files; a worktree is added when the\n    repository exists on the destination but the path does not\n  - the transcript, its session directory, file history, and the project\n    memory directory (merged both ways, newest wins, nothing deleted)\n\nIt then opens a workspace on the destination (`cmux ssh` for a host, a local\nworkspace for `local`) that resumes the session with its recorded launcher.\nWhen the destination home is not at the same absolute path, paths under the\nhome are mapped and the project is re-slugged.\n\nOptions:\n  --to <destination>      SSH destination (user@host or ssh_config alias), or local\n  --from <destination>    Where the session is now (default: where the last move put it, else local)\n  --name <title>          Workspace title (default: the first 8 characters of the id)\n  --no-code               Do not carry the git checkout\n  --port <n>              SSH port\n  --identity <path>       SSH identity file\n  --ssh-option <opt>      Extra SSH -o option (repeatable)\n  --no-focus              Open the workspace without switching to it\n\nExamples:\n  cmux session move 0b7a1e7c-3f0a-4c6e-9d59-8a0d8f7c2b11 --to dev@my-host\n  cmux session move 0b7a1e7c-3f0a-4c6e-9d59-8a0d8f7c2b11 --to local",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Preview Sound",
+"comment": ""
+},
+{
+"i": 86,
+"en": "Unknown session subcommand: %@. Usage: cmux session move <session-id> --to <ssh-destination|local>",
+"comment": ""
+},
+{
+"i": 87,
+"en": "session move: branch %@ on the destination has commits the session's HEAD does not contain",
+"comment": ""
+},
+{
+"i": 88,
+"en": "session move: %@ on the destination has changes that did not come from this session; commit or stash them there first",
+"comment": ""
+},
+{
+"i": 89,
+"en": "session move: copying %@ failed: %@",
+"comment": ""
+},
+{
+"i": 90,
+"en": "session move: %@ does not exist on the destination",
+"comment": ""
+},
+{
+"i": 91,
+"en": "session move: %@ requires a value",
+"comment": ""
+},
+{
+"i": 92,
+"en": "session move: git %@ failed: %@",
+"comment": ""
+},
+{
+"i": 93,
+"en": "session move: '%@' is not a session id",
+"comment": ""
+},
+{
+"i": 94,
+"en": "session move: the session is already running on %@",
+"comment": ""
+},
+{
+"i": 95,
+"en": "session move: the session is still running on %@; exit the agent at the end of its turn, then move it",
+"comment": ""
+},
+{
+"i": 96,
+"en": "session move: no checkout at %@ and no repository at %@ on the destination; clone it there first",
+"comment": ""
+},
+{
+"i": 97,
+"en": "session move: the session is already there",
+"comment": ""
+},
+{
+"i": 98,
+"en": "session move: the destination transcript is newer; the session continued there, so move it the other way",
+"comment": ""
+},
+{
+"i": 99,
+"en": "session move: no Claude transcript for this session on %@",
+"comment": ""
+},
+{
+"i": 100,
+"en": "session move: the transcripts diverged (the destination copy is not a prefix of the source); resolve by hand",
+"comment": ""
+},
+{
+"i": 101,
+"en": "session move: unknown flag '%@'",
+"comment": ""
+},
+{
+"i": 102,
+"en": "session move: no record of where this session was moved; pass --from <ssh-destination>",
+"comment": ""
+},
+{
+"i": 103,
+"en": "session move: cannot reach %@: %@",
+"comment": ""
+},
+{
+"i": 104,
+"en": "session move: paths with whitespace are not supported: %@",
+"comment": ""
+},
+{
+"i": 105,
+"en": "session move: moves go between this Mac and one host; move the session back with --to local first",
+"comment": ""
+},
+{
+"i": 106,
+"en": "session move: unsupported SSH destination or option for '%@' (use user@host or an ssh_config alias, without whitespace)",
+"comment": ""
+},
+{
+"i": 107,
+"en": "Usage: cmux session move <session-id> --to <ssh-destination|local>",
+"comment": ""
+},
+{
+"i": 108,
+"en": "session move: the transcript does not record the session's working directory",
+"comment": ""
+},
+{
+"i": 109,
+"en": "session move: could not add a worktree at %@: %@",
+"comment": ""
+},
+{
+"i": 110,
+"en": "Code: %@ at %@ (%@) with working tree snapshot %@.",
+"comment": ""
+},
+{
+"i": 111,
+"en": "Moved session %@ to %@ (cwd %@).",
+"comment": ""
+},
+{
+"i": 112,
+"en": "Code: %@ is not a git checkout; no files were moved.",
+"comment": ""
+},
+{
+"i": 113,
+"en": "Paths were rewritten: %@ -> %@. Absolute paths inside the transcript still name the old home.",
+"comment": ""
+},
+{
+"i": 114,
+"en": "The copy on %@ stays; do not resume it there too.",
+"comment": ""
+},
+{
+"i": 115,
+"en": "session move: adding worktree %@ on the destination",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Update Ready",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Install Now",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Image is larger than 10 MB",
+"comment": ""
+},
+{
+"i": 119,
+"en": "Paste timed out",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Paste Last Screenshot",
+"comment": ""
+},
+{
+"i": 121,
+"en": "This text could run commands as soon as it is pasted, for example because it contains a line break. Paste it only if you trust it.",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Paste Potentially Unsafe Text?",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Confirm Unsafe Pastes",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Pastes Ghostty flags as unsafe go through without asking.",
+"comment": ""
+},
+{
+"i": 125,
+"en": "A paste Ghostty flags as unsafe, such as several lines into a program without bracketed paste, waits for you to confirm it in a sheet on the window.",
+"comment": ""
+},
+{
+"i": 126,
+"en": "terminal.confirmUnsafePaste confirm unsafe paste protection warning multi-line newline clipboard sheet",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Switch to Nightly",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Switch to Stable",
+"comment": ""
+},
+{
+"i": 129,
+"en": "The downloaded disk image does not contain the expected app.",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Download Manually",
+"comment": ""
+},
+{
+"i": 131,
+"en": "The download failed: %@",
+"comment": ""
+},
+{
+"i": 132,
+"en": "The app could not be installed: %@",
+"comment": ""
+},
+{
+"i": 133,
+"en": "The app could not be opened: %@",
+"comment": ""
+},
+{
+"i": 134,
+"en": "The disk image could not be opened: %@",
+"comment": ""
+},
+{
+"i": 135,
+"en": "Another app is already installed at %@.",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Couldn't switch to %@",
+"comment": ""
+},
+{
+"i": 137,
+"en": "The downloaded app did not pass code signature verification, so it was not installed.",
+"comment": ""
+},
+{
+"i": 138,
+"en": "Switch to Nightly…",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Switch to Stable…",
+"comment": ""
+},
+{
+"i": 140,
+"en": "Both apps can run side by side. Quit this one now?",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Keep Open",
+"comment": ""
+},
+{
+"i": 142,
+"en": "Quit This App",
+"comment": ""
+},
+{
+"i": 143,
+"en": "%@ is open",
+"comment": ""
+},
+{
+"i": 144,
+"en": "Downloading %@…",
+"comment": ""
+},
+{
+"i": 145,
+"en": "Switching to %@",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Verifying the code signature…",
+"comment": ""
+},
+{
+"i": 147,
+"en": "workspaceColors.subtleSelection subtle calm quiet selection highlight tint hairline edge selected workspace accent",
+"comment": ""
+},
+{
+"i": 148,
+"en": "workspaceColors.brightenInDarkMode brighten lighten dark mode workspace colors fill dim muted exact color",
+"comment": ""
+},
+{
+"i": 149,
+"en": "Subtle Selection Highlight",
+"comment": ""
+},
+{
+"i": 150,
+"en": "Show the selected workspace as a faint accent tint with a thin edge instead of a solid fill. A custom Selection Highlight color still uses a solid fill.",
+"comment": ""
+},
+{
+"i": 151,
+"en": "Fix the file and save it; cmux reloads the config automatically.",
+"comment": ""
+},
+{
+"i": 152,
+"en": "More errors are not shown.",
+"comment": ""
+},
+{
+"i": 153,
+"en": "Ghostty config errors",
+"comment": ""
+},
+{
+"i": 154,
+"en": "Open terminal as chat",
+"comment": ""
+},
+{
+"i": 155,
+"en": "Warn Before Closing Window",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Windows close immediately without confirmation.",
+"comment": ""
+},
+{
+"i": 157,
+"en": "Show a confirmation before closing a window with a running process, or all of a window's workspaces at once.",
+"comment": ""
+},
+{
+"i": 158,
+"en": "Warn Before Closing Workspace",
+"comment": ""
+},
+{
+"i": 159,
+"en": "Workspaces close immediately without confirmation. Pinned workspaces still ask.",
+"comment": ""
+},
+{
+"i": 160,
+"en": "Show a confirmation before closing a workspace with a running process, or several workspaces at once.",
+"comment": ""
+},
+{
+"i": 161,
+"en": "app.warnBeforeClosingWindow close window confirmation command-control-w cmd-ctrl-w running process",
+"comment": ""
+},
+{
+"i": 162,
+"en": "app.warnBeforeClosingWorkspace close workspace confirmation command-shift-w cmd-shift-w running process agent",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Background Blur",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Background Opacity",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Blinking Cursor",
+"comment": ""
+},
+{
+"i": 166,
+"en": "Cursor Style",
+"comment": ""
+},
+{
+"i": 167,
+"en": "Option as Alt",
+"comment": ""
+},
+{
+"i": 168,
+"en": "Scrollback Limit",
+"comment": ""
+},
+{
+"i": 169,
+"en": "Horizontal Padding",
+"comment": ""
+},
+{
+"i": 170,
+"en": "Vertical Padding",
+"comment": ""
+},
+{
+"i": 171,
+"en": "Bar",
+"comment": ""
+},
+{
+"i": 172,
+"en": "Block",
+"comment": ""
+},
+{
+"i": 173,
+"en": "Hollow",
+"comment": ""
+},
+{
+"i": 174,
+"en": "Underline",
+"comment": ""
+},
+{
+"i": 175,
+"en": "These rows show the value in effect and save to cmux's Ghostty config, which loads after your own Ghostty config. The caption under each row is its config key.",
+"comment": ""
+},
+{
+"i": 176,
+"en": "Both Option Keys",
+"comment": ""
+},
+{
+"i": 177,
+"en": "Left Option",
+"comment": ""
+},
+{
+"i": 178,
+"en": "Right Option",
+"comment": ""
+},
+{
+"i": 179,
+"en": "Couldn't save the Ghostty config. Please try again.",
+"comment": ""
+},
+{
+"i": 180,
+"en": "MB",
+"comment": ""
+},
+{
+"i": 181,
+"en": "Overridden by your config (%@)",
+"comment": ""
+},
+{
+"i": 182,
+"en": "Applies to new terminals.",
+"comment": ""
+},
+{
+"i": 183,
+"en": "Turn on Discover other devices to see your devices.",
+"comment": ""
+},
+{
+"i": 184,
+"en": "Enable Cloud Machines in the Cloud tab to use My Devices.",
+"comment": ""
+},
+{
+"i": 185,
+"en": "Find and connect to other Macs signed in to your account. Turning this off disconnects their panes without closing their terminals.",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Turning this off removes this Mac from discovery and disconnects incoming sessions. You can still connect to your other Macs.",
+"comment": ""
+},
+{
+"i": 187,
+"en": "devices my devices computers macs mac discovery discover discoverable incoming access tailscale pairing remote workspaces",
+"comment": ""
+},
+{
+"i": 188,
+"en": "Devices",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Your Macs",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Devices Settings…",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Sign in to the same account on both Macs to discover and connect to them.",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Unpair",
+"comment": ""
+},
+{
+"i": 193,
+"en": "Unpair this Mac? Its local workspaces will not be changed.",
+"comment": ""
+},
+{
+"i": 194,
+"en": "Online",
+"comment": ""
+},
+{
+"i": 195,
+"en": "Waiting for connection",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Enter a pairing link or a numeric Tailscale IP and port.",
+"comment": ""
+},
+{
+"i": 197,
+"en": "Use the other Mac’s pairing code with a numeric Tailscale IP address and port.",
+"comment": ""
+},
+{
+"i": 198,
+"en": "This code belongs to this Mac. Enter the other Mac’s pairing code.",
+"comment": ""
+},
+{
+"i": 199,
+"en": "The Mac’s authenticated identity could not be verified. Update cmux on both Macs and copy a fresh pairing code.",
+"comment": ""
+},
+{
+"i": 200,
+"en": "Wait for the current pairing attempt to finish.",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Your paired Macs could not be loaded. Check available disk space and restart cmux.",
+"comment": ""
+},
+{
+"i": 202,
+"en": "The computer operation failed. Check that both Macs are signed in and online, then try again.",
+"comment": ""
+},
+{
+"i": 203,
+"en": "Show in My Devices",
+"comment": ""
+},
+{
+"i": 204,
+"en": "Hide from My Devices",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Mac options",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Hidden from sidebar",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Could not refresh your Macs. Check your connection and try again.",
+"comment": ""
+},
+{
+"i": 208,
+"en": "This Mac isn’t discoverable. On that Mac, turn on “Make this Mac discoverable” in Settings › Devices.",
+"comment": ""
+},
+{
+"i": 209,
+"en": "Pi Integration",
+"comment": ""
+},
+{
+"i": 210,
+"en": "When enabled, cmux wraps the pi command and loads its bundled session extension without changing your Pi configuration. Disable if you prefer to manage Pi hooks yourself.",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Pi runs without cmux integration.",
+"comment": ""
+},
+{
+"i": 212,
+"en": "Sidebar shows Pi session status and notifications.",
+"comment": ""
+},
+{
+"i": 213,
+"en": "automation.piIntegration pi hooks agent integration status notifications",
+"comment": ""
+},
+{
+"i": 214,
+"en": "  (Antigravity, Claude Code, Grok, Muse, and Pi hooks are injected automatically via cmux wrappers)",
+"comment": ""
+},
+{
+"i": 215,
+"en": "New Pane (Auto Layout)",
+"comment": ""
+},
+{
+"i": 216,
+"en": "cmux is still restoring the terminal after it reopened and is checking which agent session to resume. Retry in a few seconds.",
+"comment": ""
+},
+{
+"i": 217,
+"en": "The terminal is closing and cannot be read.",
+"comment": ""
+},
+{
+"i": 218,
+"en": "The terminal is hibernated: cmux suspended its idle agent to save memory. Wake it by showing it (this brings its window to the front), then retry: %@",
+"comment": ""
+},
+{
+"i": 219,
+"en": "The terminal is hibernated: cmux suspended its idle agent to save memory. Show the terminal in cmux to wake it, then retry.",
+"comment": ""
+},
+{
+"i": 220,
+"en": "The terminal has not started yet. Retry in a few seconds.",
+"comment": ""
+},
+{
+"i": 221,
+"en": "Usage: cmux restore-session\n       cmux restore-session --from <stable|nightly|rc|staging|debug:<tag>|path>\n       cmux restore-session --export <path> [--force]\n\nReopen the previous saved cmux session.\n\nIf the app is already running, this restores the last saved session into the current app.\nIf the app is not running, this launches cmux and lets startup restore reopen the saved session.\n\nEach cmux install (stable, nightly, rc, staging, tagged debug builds) saves its own session.\n--from <channel>  Reopen another install's saved session in this running cmux, for example\n                  after trying nightly and switching back to stable. The session opens as\n                  additional windows; the other install's saved file is only read.\n--from <path>     Reopen a session file written by --export.\n--export <path>   Write this cmux's saved session to a file. Pass --force to replace an\n                  existing file.\n\n--from and --export require cmux to be running.",
+"comment": ""
+},
+{
+"i": 222,
+"en": "%@ already exists. Pass --force to replace it.",
+"comment": ""
+},
+{
+"i": 223,
+"en": "%@ is this cmux's own session file. Choose another path.",
+"comment": ""
+},
+{
+"i": 224,
+"en": "cmux has not saved a session yet. Try again in a few seconds.",
+"comment": ""
+},
+{
+"i": 225,
+"en": "Could not write %@.",
+"comment": ""
+},
+{
+"i": 226,
+"en": "No saved cmux session at %@.",
+"comment": ""
+},
+{
+"i": 227,
+"en": "%1$@ was saved by a newer cmux (session format %2$@, this cmux reads %3$@). Update cmux to import it.",
+"comment": ""
+},
+{
+"i": 228,
+"en": "%@ has no windows to restore.",
+"comment": ""
+},
+{
+"i": 229,
+"en": "%@ is not a cmux session snapshot.",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Nothing in %@ could be reopened.",
+"comment": ""
+},
+{
+"i": 231,
+"en": "%1$@ uses an older session format (%2$@) that this cmux no longer reads (%3$@).",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Unknown cmux channel \"%@\". Use stable, nightly, rc, staging, debug:<tag>, or a path to a session file.",
+"comment": ""
+},
+{
+"i": 233,
+"en": "Could not read %@.",
+"comment": ""
+},
+{
+"i": 234,
+"en": "%@ is the session this cmux is saving right now. Run cmux restore-session without --from to reopen the previous launch.",
+"comment": ""
+},
+{
+"i": 235,
+"en": "Usage: cmux session restore [--list] [--session <id>]...\n\nReopen Claude sessions that were running when cmux last quit unexpectedly.\ncmux finds them in the agent journal, skips any that are running or already\nopen, and resumes each in its own workspace through the launcher that started\nit.\n\nWithout --session, restore acts only after an unexpected quit.\n\nOptions:\n  --list            Show the sessions without restoring them.\n  --session <id>    Restore only this session (repeatable).",
+"comment": ""
+},
+{
+"i": 236,
+"en": "session: expected 'restore' (see cmux help session)",
+"comment": ""
+},
+{
+"i": 237,
+"en": "session restore: --session requires an id",
+"comment": ""
+},
+{
+"i": 238,
+"en": "session restore: unknown argument '%@'",
+"comment": ""
+},
+{
+"i": 239,
+"en": "No agent sessions to restore.",
+"comment": ""
+},
+{
+"i": 240,
+"en": "No agent sessions restored: cmux last quit normally. To restore one anyway, pass --session <id> from --list.",
+"comment": ""
+},
+{
+"i": 241,
+"en": "No agent sessions restored.",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Agent sessions restored: %lld",
+"comment": ""
+},
+{
+"i": 243,
+"en": "Restore agent sessions?",
+"comment": ""
+},
+{
+"i": 244,
+"en": "cmux quit unexpectedly while agent sessions were running. Sessions to restore: %lld. Each one reopens in its own workspace and resumes where it left off.",
+"comment": ""
+},
+{
+"i": 245,
+"en": "Restore Agent Sessions",
+"comment": ""
+},
+{
+"i": 246,
+"en": "Play the notification sound even when the pane that notified is already focused. When off, a focused pane shows its ring without a sound.",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Sound for Focused Pane",
+"comment": ""
+},
+{
+"i": 248,
+"en": "restore: this session was started through the routed launcher '%@', which is not on PATH. Resuming the agent directly instead.",
+"comment": ""
+},
+{
+"i": 249,
+"en": "Agent Activity",
+"comment": ""
+},
+{
+"i": 250,
+"en": "Move workspaces to the top when they receive a notification. Agent Activity also moves them when you send a prompt or an agent finishes a turn, needs input, or fails, but never while you point at the sidebar. Off keeps shortcut positions stable.",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Claude Code stopped on an API error",
+"comment": ""
+},
+{
+"i": 252,
+"en": "API error",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Billing error",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Connection dropped",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Output limit",
+"comment": ""
+},
+{
+"i": 256,
+"en": "API overloaded",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Rate limited",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Usage limit",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Usage limit, resets %@",
+"comment": ""
+},
+{
+"i": 260,
+"en": "No space for new pane",
+"comment": ""
+},
+{
+"i": 261,
+"en": "Default: focus when run interactively, stay in the background when run by an agent or script.",
+"comment": ""
+},
+{
+"i": 262,
+"en": "Focus:\n  --focus                 Switch to the new workspace\n  --no-focus              Open it in the background",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Compact Agent Status",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Show a workspace's agent, unread and pull request state as one colored icon before the title instead of separate rows. Hover the icon for details.",
+"comment": ""
+},
+{
+"i": 265,
+"en": "sidebar.compactAgentStatus compact agent status running needs input glyph icon title line dense claude codex",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Size Terminal to My Window",
+"comment": ""
+},
+{
+"i": 267,
+"en": "Disconnect Other Terminal Clients…",
+"comment": ""
+},
+{
+"i": 268,
+"en": "Show Terminal Size Panel",
+"comment": ""
+},
+{
+"i": 269,
+"en": "The terminal host shut down at %@.",
+"comment": ""
+},
+{
+"i": 270,
+"en": "The network dropped.",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Reattach",
+"comment": ""
+},
+{
+"i": 272,
+"en": "Reattach as Viewer",
+"comment": ""
+},
+{
+"i": 273,
+"en": "Reattach without changing the terminal size",
+"comment": ""
+},
+{
+"i": 274,
+"en": "Another window of this Mac replaced this one at %@.",
+"comment": ""
+},
+{
+"i": 275,
+"en": "iPad",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Mac",
+"comment": ""
+},
+{
+"i": 277,
+"en": "Terminal client",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Held size",
+"comment": ""
+},
+{
+"i": 279,
+"en": "Largest window",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Shared size",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Fits everyone",
+"comment": ""
+},
+{
+"i": 282,
+"en": "%1$@'s %2$@",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Fixed",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Size set by %1$@ · %2$@",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Follow Latest",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Fit Everyone",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Largest Window",
+"comment": ""
+},
+{
+"i": 288,
+"en": "sets size",
+"comment": ""
+},
+{
+"i": 289,
+"en": "not counted",
+"comment": ""
+},
+{
+"i": 290,
+"en": "Options for %@",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Disconnect Others",
+"comment": ""
+},
+{
+"i": 292,
+"en": "Detached",
+"comment": ""
+},
+{
+"i": 293,
+"en": "%1$@ disconnected this Mac at %2$@.",
+"comment": ""
+},
+{
+"i": 294,
+"en": "%ld cols hidden",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Disconnect all other clients?",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Disconnect",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Columns",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Rows",
+"comment": ""
+},
+{
+"i": 299,
+"en": "This terminal is not shared.",
+"comment": ""
+}
+]

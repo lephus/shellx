@@ -228,7 +228,7 @@ extension CMUXCLI {
             guard let workspace = try normalizeWorkspaceHandle(workspaceOption, client: client) else {
                 let prefix = String(
                     localized: "cli.browser.repl.error.workspaceInvalid",
-                    defaultValue: "Not a workspace in this cmux instance"
+                    defaultValue: "Not a workspace in this ShellX instance"
                 )
                 throw CLIError(message: "\(prefix): \(workspaceOption.debugDescription)")
             }

@@ -86,11 +86,11 @@ public struct UpdateFeedResolver: Sendable {
     ///
     /// - Parameters:
     ///   - fallbackFeedURL: The appcast URL to fall back to when the build-time feed URL is
-    ///     absent. Defaults to the project's latest-release appcast.
+    ///     absent. Defaults to ShellX's appcast (`ShellXBrand.updateFeedURL`).
     ///   - hostArchitecture: The architecture to select feeds for. Defaults to the machine's
     ///     native architecture.
     public init(
-        fallbackFeedURL: String = "https://github.com/manaflow-ai/cmux/releases/latest/download/appcast.xml",
+        fallbackFeedURL: String = "https://download.shellx.pro/desktop/appcast.xml",
         hostArchitecture: UpdateHostArchitecture = .current
     ) {
         self.fallbackFeedURL = fallbackFeedURL

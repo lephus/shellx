@@ -3,15 +3,15 @@ public import Foundation
 /// Where a cmux install keeps its session snapshot files.
 ///
 /// Every install (stable, nightly, rc, staging, tagged debug builds) writes
-/// `Application Support/cmux/session-<bundleId>.json` plus a
+/// `Application Support/ShellX/session-<bundleId>.json` plus a
 /// `session-<bundleId>-previous.json` manual-restore backup. Keying the file
 /// on the bundle identifier keeps channels from clobbering each other; this
 /// type lets one install locate another install's files so a session can be
 /// moved between channels (`cmux restore-session --from nightly`).
 public struct SessionSnapshotFileLocation: Sendable, Equatable {
     /// The stable channel's bundle identifier, also the fallback when the
-    /// running bundle has none.
-    public static let stableBundleIdentifier = "com.cmuxterm.app"
+    /// running bundle has none (`ShellXBrand.bundleID`).
+    public static let stableBundleIdentifier = "pro.shellx.desktop"
 
     /// Maps a release channel name to its bundle identifier.
     ///
@@ -20,8 +20,8 @@ public struct SessionSnapshotFileLocation: Sendable, Equatable {
     /// for tagged Debug builds. The tag is normalized the way
     /// `scripts/reload.sh --tag` builds the bundle id (lowercased, every run
     /// of other characters becomes `.`), so `debug:My-Tag` is
-    /// `com.cmuxterm.app.debug.my.tag`. A value that already is a cmux bundle
-    /// identifier (`com.cmuxterm.app…`) is returned unchanged. Names are
+    /// `pro.shellx.desktop.debug.my.tag`. A value that already is a ShellX bundle
+    /// identifier (`pro.shellx.desktop…`) is returned unchanged. Names are
     /// case-insensitive; returns nil for anything else.
     ///
     /// - Parameter name: The channel name or bundle identifier.
@@ -112,7 +112,7 @@ public struct SessionSnapshotFileLocation: Sendable, Equatable {
     /// `<appSupport>/cmux/`, the folder holding every install's snapshot
     /// files and the shared `session-history/` archive.
     public var cmuxDirectoryURL: URL {
-        appSupportDirectory.appendingPathComponent("cmux", isDirectory: true)
+        appSupportDirectory.appendingPathComponent("ShellX", isDirectory: true)
     }
 
     /// The file-name-safe form of `bundleIdentifier` used in snapshot and

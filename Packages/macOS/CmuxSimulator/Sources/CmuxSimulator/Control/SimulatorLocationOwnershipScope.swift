@@ -8,7 +8,7 @@ public struct SimulatorLocationOwnershipScope: Sendable {
     /// Creates an isolated scope for an independent service graph.
     public init(fileManager: FileManager = FileManager(), makeUUID: () -> UUID = UUID.init) {
         let directory = fileManager.temporaryDirectory.appendingPathComponent(
-                "com.cmux.simulator-location-\(makeUUID().uuidString)",
+                "pro.shellx.simulator-location-\(makeUUID().uuidString)",
                 isDirectory: true
             )
         registry = SimulatorLocationOwnershipRegistry(

@@ -119,7 +119,7 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertEqual(result.status, 0, result.stderr)
         XCTAssertTrue(result.stdout.isEmpty, result.stdout)
         XCTAssertTrue(
-            result.stderr.contains("[cmux] remote session was lost; starting a new shell."),
+            result.stderr.contains("[ShellX] remote session was lost; starting a new shell."),
             result.stderr
         )
 

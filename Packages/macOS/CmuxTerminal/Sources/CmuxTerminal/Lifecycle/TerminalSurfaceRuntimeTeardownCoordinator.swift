@@ -46,7 +46,7 @@ public actor TerminalSurfaceRuntimeTeardownCoordinator {
             0..<Self.maximumConcurrentCloseTeardownCount
         ).map { executionSlot in
             DispatchQueue(
-                label: "com.cmux.terminal-surface-close-teardown.\(executionSlot)",
+                label: "pro.shellx.terminal-surface-close-teardown.\(executionSlot)",
                 qos: .utility
             )
         }
@@ -54,7 +54,7 @@ public actor TerminalSurfaceRuntimeTeardownCoordinator {
             0..<Self.maximumIsolatedHibernationTeardownCount
         ).map { executionSlot in
             DispatchQueue(
-                label: "com.cmux.terminal-surface-hibernation-teardown.\(executionSlot)",
+                label: "pro.shellx.terminal-surface-hibernation-teardown.\(executionSlot)",
                 qos: .utility
             )
         }

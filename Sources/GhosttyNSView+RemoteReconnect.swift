@@ -1,4 +1,5 @@
 import AppKit
+import ShellXIcons
 
 extension GhosttyNSView {
     func appendReconnectRemotePaneMenuItem(to menu: NSMenu) {
@@ -12,7 +13,7 @@ extension GhosttyNSView {
             keyEquivalent: ""
         )
         item.target = self
-        item.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: nil)
+        item.image = ShellXIcon.nsImage("arrow.clockwise", accessibilityDescription: nil)
     }
 
     private func remoteWorkspaceForCurrentSurface() -> Workspace? {

@@ -3,6 +3,7 @@ import CMUXMobileCore
 import CmuxAppKitSupportUI
 import CmuxSettingsUI
 import SwiftUI
+import ShellXIcons
 
 /// The compact sidebar account button for account-level actions.
 struct SidebarAccountMenuButton: View {
@@ -145,9 +146,9 @@ private struct SidebarAccountPopover: View {
                     dismiss()
                     accountFlow?.startSignIn()
                 } label: {
-                    Label(
+                    ShellXLabel(
                         String(localized: "settings.account.signIn", defaultValue: "Sign In…"),
-                        systemImage: "person.crop.circle.badge.plus"
+                        icon: "person.crop.circle.badge.plus"
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -160,7 +161,7 @@ private struct SidebarAccountPopover: View {
                 }
                 accountMenuRow(
                     title: ProUpgradePresenter.upgradeMenuTitle(for: offer),
-                    systemImage: "sparkles"
+                    icon: "sparkles"
                 ) {
                     dismiss()
                     accountFlow?.openProUpgrade(source: .sidebarAccountMenu)
@@ -172,7 +173,7 @@ private struct SidebarAccountPopover: View {
                 // page's account chooser, and the app follows whichever is picked.
                 accountMenuRow(
                     title: String(localized: "cloud.teamPicker.switchAccount", defaultValue: "Switch Account…"),
-                    systemImage: "person.2"
+                    icon: "person.2"
                 ) {
                     dismiss()
                     Task { await accountFlow?.switchAccount() }
@@ -180,7 +181,7 @@ private struct SidebarAccountPopover: View {
                 .accessibilityIdentifier("SidebarAccountSwitchAccountButton")
                 accountMenuRow(
                     title: String(localized: "settings.account.signOut", defaultValue: "Sign Out"),
-                    systemImage: "rectangle.portrait.and.arrow.right"
+                    icon: "rectangle.portrait.and.arrow.right"
                 ) {
                     dismiss()
                     Task { await accountFlow?.signOut() }
@@ -206,9 +207,9 @@ private struct SidebarAccountPopover: View {
                 )
             } label: {
                 HStack(spacing: 8) {
-                    Label(
+                    ShellXLabel(
                         String(localized: "menu.app.settings", defaultValue: "Settings…"),
-                        systemImage: "gearshape"
+                        icon: "gearshape"
                     )
                     Spacer(minLength: 8)
                     Text(settingsShortcutHint)
@@ -229,11 +230,11 @@ private struct SidebarAccountPopover: View {
 
     private func accountMenuRow(
         title: String,
-        systemImage: String,
+        icon: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Label(title, systemImage: systemImage)
+            ShellXLabel(title, icon: icon)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }

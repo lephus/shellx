@@ -92,7 +92,7 @@ extension CMUXCLI {
     /// Text for `cmux help --help`.
     func helpCommandUsage() -> String {
         return """
-        \(String(localized: "cli.help.usage", defaultValue: "Usage: cmux help [topic]"))
+        \(String(localized: "cli.help.usage", defaultValue: "Usage: shellx help [topic]"))
 
         \(String(localized: "cli.help.description", defaultValue: "Show top-level CLI usage, or one task-focused command group."))
 
@@ -100,7 +100,7 @@ extension CMUXCLI {
         \(Self.taskHelpTopicSummary)
 
         \(String(localized: "cli.help.unknownTopic", defaultValue: "Unknown topics keep the top-level help behavior."))
-        \(String(localized: "cli.help.noSocket", defaultValue: "Also works without a running cmux app or socket."))
+        \(String(localized: "cli.help.noSocket", defaultValue: "Also works without a running ShellX app or socket."))
         """
     }
 
@@ -114,7 +114,7 @@ extension CMUXCLI {
         \(topic.title):
         \(commands)
 
-        \(String(localized: "cli.help.topic.commandUsage", defaultValue: "Run `cmux <command> --help` for command-specific usage."))
+        \(String(localized: "cli.help.topic.commandUsage", defaultValue: "Run `shellx <command> --help` for command-specific usage."))
         """
     }
 
@@ -165,11 +165,11 @@ extension CMUXCLI {
           Before editing, back up any existing cmux.json file to a timestamped .bak copy.
           Use printed curl commands to fetch the latest docs/schema; prefer Ghostty config for terminal behavior Ghostty already supports.
           Ghostty config lives at ~/.config/ghostty/config (terminal transparency, blur, font, theme, keybinds, etc.).
-          `cmux reload-config` reloads BOTH Ghostty config and ~/.config/cmux/cmux.json, then refreshes terminals in place. No app restart needed.
+          `cmux reload-config` reloads BOTH Ghostty config and ~/.config/shellx/shellx.json, then refreshes terminals in place. No app restart needed.
 
         \(String(localized: "cli.help.taskHelp.heading", defaultValue: "Task Help:"))
           cmux help <\(Self.taskHelpTopicNames)>
-          \(String(localized: "cli.help.taskHelp.description", defaultValue: "Show one command group without connecting to the cmux socket."))
+          \(String(localized: "cli.help.taskHelp.description", defaultValue: "Show one command group without connecting to the ShellX socket."))
 
         Commands:
         \(commandGroups)
@@ -180,7 +180,7 @@ extension CMUXCLI {
           CMUX_TAB_ID         Optional alias used by `tab-action`/`rename-tab` as default --tab.
           CMUX_SURFACE_ID     Auto-set in cmux terminals. Used as default --surface.
           CMUX_SOCKET_PATH    Override the Unix socket path. Without this, the CLI defaults
-                              to ~/.local/state/cmux/cmux.sock and auto-discovers tagged/debug sockets.
+                              to ~/.local/state/shellx/shellx.sock and auto-discovers tagged/debug sockets.
         """
     }
 

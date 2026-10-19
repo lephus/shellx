@@ -34,9 +34,9 @@ struct RemoteSessionInheritedMasterReapTests {
 
         coordinator.queue.sync {
             coordinator.daemonReady = true
-            coordinator.daemonRemotePath = "/tmp/cmuxd-remote"
+            coordinator.daemonRemotePath = "/tmp/shellx-remote"
             coordinator.startReverseRelayLocked(
-                remotePath: "/tmp/cmuxd-remote"
+                remotePath: "/tmp/shellx-remote"
             )
         }
 
@@ -137,15 +137,15 @@ struct RemoteSessionInheritedMasterReapTests {
         }
         sibling.queue.sync {
             sibling.daemonReady = true
-            sibling.daemonRemotePath = "/tmp/cmuxd-remote"
+            sibling.daemonRemotePath = "/tmp/shellx-remote"
             sibling.reverseRelayControlMasterForwardSpec =
                 "127.0.0.1:\(siblingIdentity.relayPort):127.0.0.1:55002"
         }
         first.queue.sync {
             first.daemonReady = true
-            first.daemonRemotePath = "/tmp/cmuxd-remote"
+            first.daemonRemotePath = "/tmp/shellx-remote"
             first.startReverseRelayLocked(
-                remotePath: "/tmp/cmuxd-remote"
+                remotePath: "/tmp/shellx-remote"
             )
         }
 
@@ -191,9 +191,9 @@ struct RemoteSessionInheritedMasterReapTests {
 
         coordinator.queue.sync {
             coordinator.daemonReady = true
-            coordinator.daemonRemotePath = "/tmp/cmuxd-remote"
+            coordinator.daemonRemotePath = "/tmp/shellx-remote"
             coordinator.startReverseRelayLocked(
-                remotePath: "/tmp/cmuxd-remote"
+                remotePath: "/tmp/shellx-remote"
             )
         }
         #expect(await exitStarts.next() != nil)

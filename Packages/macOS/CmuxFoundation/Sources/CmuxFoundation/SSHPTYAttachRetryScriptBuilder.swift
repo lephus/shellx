@@ -55,7 +55,7 @@ public struct SSHPTYAttachRetryScriptBuilder: Sendable {
         let noProgressPolicy = SSHPTYAttachExitCode.noProgressShellPolicy()
         let retryStatusFormat = String(
             localized: "cli.sshPtyAttach.retryStatus",
-            defaultValue: "[cmux] SSH disconnected (%s); retry %s in %ss; input discarded."
+            defaultValue: "[ShellX] SSH disconnected (%s); retry %s in %ss; input discarded."
         ).remoteCommandShellQuoted
         let hostUnreachableReason = String(
             localized: "cli.sshPtyAttach.retryReason.hostUnreachable",
@@ -79,15 +79,15 @@ public struct SSHPTYAttachRetryScriptBuilder: Sendable {
         ).remoteCommandShellQuoted
         let launchAcknowledgementTimeoutReason = String(
             localized: "cli.sshPtyAttach.retryReason.launchAcknowledgementTimeout",
-            defaultValue: "cmux did not acknowledge the SSH launch"
+            defaultValue: "ShellX did not acknowledge the SSH launch"
         ).remoteCommandShellQuoted
         let launchAcknowledgementTimeoutLimitFormat = String(
             localized: "cli.sshPtyAttach.launchAcknowledgementTimeoutLimitReached",
-            defaultValue: "[cmux] SSH pane could not contact cmux to start the remote session after %s attempts; reconnect to try again."
+            defaultValue: "[ShellX] SSH pane could not contact ShellX to start the remote session after %s attempts; reconnect to try again."
         ).remoteCommandShellQuoted
         let reconnectedFormat = String(
             localized: "cli.sshPtyAttach.reconnected",
-            defaultValue: "[cmux] remote PTY reconnected (attempt %s/%s)."
+            defaultValue: "[ShellX] remote PTY reconnected (attempt %s/%s)."
         ).remoteCommandShellQuoted
         let retryWithoutReauthenticationStatus =
             SSHPTYAttachExitCode.retryableWithoutReauthentication.rawValue

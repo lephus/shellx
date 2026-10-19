@@ -23,7 +23,7 @@ struct LocalTmuxSettingsCard: View {
                 ),
                 subtitle: String(
                     localized: "settings.terminal.localTmux.subtitle",
-                    defaultValue: "Named local-tmux sessions keep processes and scrollback alive across cmux quit, crashes, and updates. Ordinary terminals keep their current behavior.",
+                    defaultValue: "Named local-tmux sessions keep processes and scrollback alive across ShellX quit, crashes, and updates. Ordinary terminals keep their current behavior.",
                     bundle: .module
                 ),
                 controlWidth: 300
@@ -44,7 +44,7 @@ struct LocalTmuxSettingsCard: View {
 
                     Link(
                         String(localized: "settings.terminal.localTmux.details", defaultValue: "Details", bundle: .module),
-                        destination: URL(string: "https://github.com/manaflow-ai/cmux/blob/main/docs/local-tmux.md")!
+                        destination: URL(string: "https://github.com/lephus/shellx/blob/main/docs/local-tmux.md")!
                     )
                     .cmuxFont(.caption)
                     .accessibilityIdentifier("SettingsTerminalLocalTmuxDocsLink")
@@ -61,7 +61,7 @@ struct LocalTmuxSettingsCard: View {
                 ),
                 subtitle: String(
                     localized: "settings.terminal.localTmux.start.subtitle",
-                    defaultValue: "Creates a named local-tmux session in the selected workspace directory and attaches it to cmux.",
+                    defaultValue: "Creates a named local-tmux session in the selected workspace directory and attaches it to ShellX.",
                     bundle: .module
                 ),
                 controlWidth: 300

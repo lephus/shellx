@@ -1463,7 +1463,7 @@ import Testing
         #expect(!duplicateResult.timedOut, Comment(rawValue: duplicateResult.diagnostics))
         #expect(duplicateResult.status == 1, Comment(rawValue: duplicateResult.diagnostics))
         #expect(
-            duplicateResult.stderr.contains("Usage: cmux restore --surface [id|ref]"),
+            duplicateResult.stderr.contains("Usage: shellx restore --surface [id|ref]"),
             Comment(rawValue: duplicateResult.diagnostics)
         )
         #expect(duplicateResponder.receivedRequests.isEmpty)
@@ -1502,7 +1502,7 @@ import Testing
         XCTAssertEqual(result.status, 1, result.diagnostics)
         XCTAssertTrue(
             result.stderr.contains(
-                "restore: the current cmux surface could not be identified. "
+                "restore: the current ShellX surface could not be identified. "
                     + "Retry from this terminal or pass --surface <id|ref>."
             ),
             result.diagnostics
@@ -1558,7 +1558,7 @@ import Testing
             XCTAssertFalse(result.timedOut, result.diagnostics)
             XCTAssertEqual(result.status, 1, result.diagnostics)
             XCTAssertTrue(
-                result.stderr.contains("Run 'cmux restore --surface'"),
+                result.stderr.contains("Run 'shellx restore --surface'"),
                 result.diagnostics
             )
         }
@@ -1982,7 +1982,7 @@ import Testing
         #expect(!result.timedOut, Comment(rawValue: result.diagnostics))
         #expect(result.status != 0, Comment(rawValue: result.diagnostics))
         #expect(
-            result.stderr.contains("the current cmux surface could not be identified"),
+            result.stderr.contains("the current ShellX surface could not be identified"),
             Comment(rawValue: result.diagnostics)
         )
         let requests = try responder.receivedRequests.map { request in
@@ -2346,7 +2346,7 @@ import Testing
         #expect(!result.timedOut, Comment(rawValue: result.diagnostics))
         #expect(result.status != 0, Comment(rawValue: result.diagnostics))
         #expect(
-            result.stderr.contains("the current cmux surface could not be identified"),
+            result.stderr.contains("the current ShellX surface could not be identified"),
             Comment(rawValue: result.diagnostics)
         )
         let requests = try responder.receivedRequests.map { request in
@@ -2640,8 +2640,8 @@ import Testing
             (["shortcuts", "--invalid"], "shortcuts: unknown flag '--invalid'"),
             (["open"], "open requires at least one path or URL"),
             (["diff", "one.patch", "two.patch"], "diff accepts at most one patch file"),
-            (["restore", "codex", UUID().uuidString.lowercased()], "restore: cmux is still opening."),
-            (["fork", "pi", UUID().uuidString.lowercased()], "fork: cmux is still opening."),
+            (["restore", "codex", UUID().uuidString.lowercased()], "restore: ShellX is still opening."),
+            (["fork", "pi", UUID().uuidString.lowercased()], "fork: ShellX is still opening."),
             (["restore-session", "--invalid"], "restore-session: unknown flag '--invalid'"),
             (["feedback", "--invalid"], "feedback: unknown flag '--invalid'"),
         ]
@@ -2660,7 +2660,7 @@ import Testing
                 Comment(rawValue: result.diagnostics)
             )
             #expect(
-                !result.stderr.contains("No live cmux socket found"),
+                !result.stderr.contains("No live ShellX socket found"),
                 Comment(rawValue: result.diagnostics)
             )
         }
@@ -2734,7 +2734,7 @@ import Testing
             sourceCLIPath: cliPath,
             tagSlug: tagSlug
         )
-        let bundleIdentifier = "com.cmuxterm.app.debug.\(tagSlug.replacingOccurrences(of: "-", with: "."))"
+        let bundleIdentifier = "pro.shellx.desktop.debug.\(tagSlug.replacingOccurrences(of: "-", with: "."))"
         let tmpMarkerPath = SocketPathMarkerFiles.variant(
             bundleIdentifier: bundleIdentifier,
             environment: ["CMUX_TAG": tagSlug]
@@ -2760,7 +2760,7 @@ import Testing
         #expect(leakedResponder.receivedRequests.isEmpty, Comment(rawValue: result.diagnostics))
         #expect(!result.stdout.contains("PONG LEAKED"), Comment(rawValue: result.diagnostics))
         #expect(!result.stderr.contains(leakedSocketPath), Comment(rawValue: result.diagnostics))
-        #expect(result.stderr.contains("No live cmux socket found"), Comment(rawValue: result.diagnostics))
+        #expect(result.stderr.contains("No live ShellX socket found"), Comment(rawValue: result.diagnostics))
         #expect(result.stderr.contains(taggedSocketPath), Comment(rawValue: result.diagnostics))
     }
 
@@ -2774,7 +2774,7 @@ import Testing
         let stateDirectory = CmuxStateDirectory.url(homeDirectory: home)
         try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
         let tagSlug = "resolver-isolated-\(UUID().uuidString.prefix(8).lowercased())"
-        let bundleIdentifier = "com.cmuxterm.app.debug.\(tagSlug.replacingOccurrences(of: "-", with: "."))"
+        let bundleIdentifier = "pro.shellx.desktop.debug.\(tagSlug.replacingOccurrences(of: "-", with: "."))"
         let tagEnvironment = ["CMUX_TAG": tagSlug]
         let variant = SocketPathMarkerFiles.variant(
             bundleIdentifier: bundleIdentifier,
@@ -3048,7 +3048,7 @@ import Testing
         let fakeStableCLIPath = try fakeTaggedBundledCLIPath(
             sourceCLIPath: cliPath,
             tagSlug: "stable-\(UUID().uuidString.lowercased())",
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "pro.shellx.desktop",
             bundleName: "cmux"
         )
         let defaultResponder = try UnixSocketResponder(path: defaultStableSocketPath, response: "OK DEFAULT")
@@ -3108,7 +3108,7 @@ import Testing
         let fakeStableCLIPath = try fakeTaggedBundledCLIPath(
             sourceCLIPath: cliPath,
             tagSlug: "stable-\(UUID().uuidString.lowercased())",
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "pro.shellx.desktop",
             bundleName: "cmux"
         )
         let defaultResponder = try UnixSocketResponder(path: defaultStableSocketPath, response: "OK DEFAULT")
@@ -3157,7 +3157,7 @@ import Testing
         let fakeStableCLIPath = try fakeTaggedBundledCLIPath(
             sourceCLIPath: cliPath,
             tagSlug: "stable-\(UUID().uuidString.lowercased())",
-            bundleIdentifier: "com.cmuxterm.app",
+            bundleIdentifier: "pro.shellx.desktop",
             bundleName: "cmux"
         )
         let defaultResponder = try UnixSocketResponder(path: defaultStableSocketPath, response: "OK DEFAULT")
@@ -3301,7 +3301,7 @@ import Testing
         XCTAssertFalse(result.timedOut, result.diagnostics)
         XCTAssertEqual(result.status, 0, result.diagnostics)
         XCTAssertTrue(result.stdout.contains("Offline Theme"), result.diagnostics)
-        XCTAssertFalse(result.stderr.contains("No live cmux socket found"), result.diagnostics)
+        XCTAssertFalse(result.stderr.contains("No live ShellX socket found"), result.diagnostics)
     }
 
     @Test func testThemesSetReloadsRunningAppAfterEveryThemeWrite() async throws {
@@ -3328,7 +3328,7 @@ import Testing
         // run's expectation and appends to its list, so the identifier carries a per-run
         // suffix. The CLI takes the identifier from CMUX_BUNDLE_ID here because this
         // socket file name has no channel prefix to derive one from.
-        let bundleIdentifier = "com.cmuxterm.app.debug.issue-4355-test."
+        let bundleIdentifier = "pro.shellx.desktop.debug.issue-4355-test."
             + UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
         let notificationQueue = OperationQueue()
         notificationQueue.maxConcurrentOperationCount = 1
@@ -3352,7 +3352,7 @@ import Testing
             expectedCount: 3
         ) { reloadConfirmed in
             let observer = DistributedNotificationCenter.default().addObserver(
-                forName: Notification.Name("com.cmuxterm.themes.reload-config"),
+                forName: Notification.Name("pro.shellx.desktop.themes.reload-config"),
                 object: nil,
                 queue: notificationQueue
             ) { notification in
@@ -3404,21 +3404,21 @@ import Testing
         try writeTheme(named: "Theme A", background: "#101010", to: themesURL)
 
         // The reload target is derived from the socket file name, not from CMUX_BUNDLE_ID:
-        // `cmux-debug-<slug>.sock` becomes `com.cmuxterm.app.debug.<slug>`, where every run of
+        // `cmux-debug-<slug>.sock` becomes `pro.shellx.desktop.debug.<slug>`, where every run of
         // non-alphanumerics in the slug collapses to a dot. A raw UUID here would put its dashes
         // into the identifier as dots, so keep the unique part hex-only and the expected
         // identifier stays a plain template rather than a call into the CLI's own helper.
         let uniqueSuffix = UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
         let socketPath = "/tmp/cmux-debug-active-theme-\(uniqueSuffix).sock"
-        let staleBundleIdentifier = "com.cmuxterm.app.debug.stale.theme"
-        let targetBundleIdentifier = "com.cmuxterm.app.debug.active.theme.\(uniqueSuffix)"
+        let staleBundleIdentifier = "pro.shellx.desktop.debug.stale.theme"
+        let targetBundleIdentifier = "pro.shellx.desktop.debug.active.theme.\(uniqueSuffix)"
         let reloadExpectation = expectation(description: "cmux themes set targets the resolved socket bundle")
         let notificationQueue = OperationQueue()
         notificationQueue.maxConcurrentOperationCount = 1
         let notificationLock = NSLock()
         var observedReloads: [(bundleIdentifier: String?, phase: String?, socketPath: String?)] = []
         let observer = DistributedNotificationCenter.default().addObserver(
-            forName: Notification.Name("com.cmuxterm.themes.reload-config"),
+            forName: Notification.Name("pro.shellx.desktop.themes.reload-config"),
             object: nil,
             queue: notificationQueue
         ) { notification in
@@ -3514,14 +3514,14 @@ import Testing
         let socketPath = "/tmp/cmux-theme-picker-\(UUID().uuidString.prefix(8)).sock"
         let responder = try UnixSocketResponder(path: socketPath, response: "OK")
         defer { responder.stop() }
-        let bundleIdentifier = "com.cmuxterm.app.debug.theme-picker.\(UUID().uuidString.lowercased())"
+        let bundleIdentifier = "pro.shellx.desktop.debug.theme-picker.\(UUID().uuidString.lowercased())"
         let reloadExpectation = expectation(description: "bare cmux themes posts final reload notification")
         let notificationQueue = OperationQueue()
         notificationQueue.maxConcurrentOperationCount = 1
         let notificationLock = NSLock()
         var observedReloads: [(bundleIdentifier: String?, phase: String?)] = []
         let observer = DistributedNotificationCenter.default().addObserver(
-            forName: Notification.Name("com.cmuxterm.themes.reload-config"),
+            forName: Notification.Name("pro.shellx.desktop.themes.reload-config"),
             object: nil,
             queue: notificationQueue
         ) { notification in
@@ -4317,7 +4317,7 @@ import Testing
         try FileManager.default.createDirectory(at: binURL, withIntermediateDirectories: true)
 
         let info: [String: Any] = [
-            "CFBundleIdentifier": bundleIdentifier ?? "com.cmuxterm.app.debug.\(tagSlug.replacingOccurrences(of: "-", with: "."))",
+            "CFBundleIdentifier": bundleIdentifier ?? "pro.shellx.desktop.debug.\(tagSlug.replacingOccurrences(of: "-", with: "."))",
             "CFBundleName": bundleName ?? "cmux DEV \(tagSlug)",
             "CFBundlePackageType": "APPL"
         ]

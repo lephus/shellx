@@ -428,8 +428,8 @@ final class WorkspaceRemoteConnectionTests: XCTestCase {
     func testRemoteRelayMetadataCleanupScriptRemovesMatchingSocketAddr() {
         let fileManager = FileManager.default
         let home = fileManager.temporaryDirectory.appendingPathComponent("cmux-relay-cleanup-\(UUID().uuidString)")
-        let relayDir = home.appendingPathComponent(".cmux/relay")
-        let socketAddrURL = home.appendingPathComponent(".cmux/socket_addr")
+        let relayDir = home.appendingPathComponent(".shellx/relay")
+        let socketAddrURL = home.appendingPathComponent(".shellx/socket_addr")
         let authURL = relayDir.appendingPathComponent("64008.auth")
         let daemonPathURL = relayDir.appendingPathComponent("64008.daemon_path")
         let slotURL = relayDir.appendingPathComponent("64008.slot")
@@ -465,8 +465,8 @@ final class WorkspaceRemoteConnectionTests: XCTestCase {
     func testRemoteRelayMetadataCleanupScriptPreservesDifferentSocketAddr() {
         let fileManager = FileManager.default
         let home = fileManager.temporaryDirectory.appendingPathComponent("cmux-relay-cleanup-preserve-\(UUID().uuidString)")
-        let relayDir = home.appendingPathComponent(".cmux/relay")
-        let socketAddrURL = home.appendingPathComponent(".cmux/socket_addr")
+        let relayDir = home.appendingPathComponent(".shellx/relay")
+        let socketAddrURL = home.appendingPathComponent(".shellx/socket_addr")
         let authURL = relayDir.appendingPathComponent("64009.auth")
         let daemonPathURL = relayDir.appendingPathComponent("64009.daemon_path")
         let slotURL = relayDir.appendingPathComponent("64009.slot")
@@ -2139,7 +2139,7 @@ final class WorkspaceRemoteConnectionTests: XCTestCase {
         try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: directoryURL) }
 
-        let fakeDaemonURL = directoryURL.appendingPathComponent("cmuxd-remote", isDirectory: false)
+        let fakeDaemonURL = directoryURL.appendingPathComponent("shellx-remote", isDirectory: false)
         try Data("fake daemon".utf8).write(to: fakeDaemonURL)
         try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fakeDaemonURL.path)
 
@@ -2224,7 +2224,7 @@ final class WorkspaceRemoteConnectionTests: XCTestCase {
             // becoming another scripted process owner.
             sshOptions: ["ControlMaster=no"],
             localProxyPort: nil,
-            // A relay is what keeps this configuration on the cmuxd-remote
+            // A relay is what keeps this configuration on the shellx-remote
             // lifecycle: the CLI's no-TTY `cmux ssh` path sends one, and a
             // relay-less SSH configuration belongs to cmux-tui instead.
             relayPort: 64_011,
@@ -2246,11 +2246,11 @@ final class WorkspaceRemoteConnectionTests: XCTestCase {
         // of an scp destination, so assert it there.
         let command = try XCTUnwrap(capturedCommand)
         XCTAssertTrue(
-            command.contains("/home/test/.cmux/bin/cmuxd-remote/"),
+            command.contains("/home/test/.shellx/bin/shellx-remote/"),
             "expected the upload to target an absolute path under remote HOME, got \(command)"
         )
         XCTAssertTrue(
-            command.contains("/linux-amd64/cmuxd-remote.tmp-"),
+            command.contains("/linux-amd64/shellx-remote.tmp-"),
             "expected daemon platform temp path in \(command)"
         )
         XCTAssertEqual(try XCTUnwrap(capturedDestination), "test@hpc.example")

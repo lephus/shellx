@@ -184,9 +184,9 @@ struct AuthEnvironmentTests {
         #expect(
             AuthEnvironment.callbackScheme(
                 environment: ["CMUX_TAG": "Safari Auth!"],
-                bundleIdentifier: "com.cmuxterm.app.debug.safari-auth",
+                bundleIdentifier: "pro.shellx.desktop.debug.safari-auth",
                 isDebugBuild: true
-            ) == "cmux-dev-safari-auth"
+            ) == "shellx-dev-safari-auth"
         )
     }
 
@@ -195,16 +195,16 @@ struct AuthEnvironmentTests {
         #expect(
             AuthEnvironment.callbackScheme(
                 environment: ["CMUX_TAG": "safari-auth"],
-                bundleIdentifier: "com.cmuxterm.app",
+                bundleIdentifier: "pro.shellx.desktop",
                 isDebugBuild: false
-            ) == "cmux"
+            ) == "shellx"
         )
         #expect(
             AuthEnvironment.callbackScheme(
                 environment: ["CMUX_TAG": "safari-auth"],
-                bundleIdentifier: "com.cmuxterm.app.nightly",
+                bundleIdentifier: "pro.shellx.desktop.nightly",
                 isDebugBuild: false
-            ) == "cmux-nightly"
+            ) == "shellx-nightly"
         )
     }
 
@@ -221,7 +221,7 @@ struct AuthEnvironmentTests {
                 "CMUX_AUTH_WWW_ORIGIN": "https://cmux.com",
                 "CMUX_AUTH_CALLBACK_SCHEME": "cmux",
             ],
-            bundleIdentifier: "com.cmuxterm.app"
+            bundleIdentifier: "pro.shellx.desktop"
         )
 
         assertNativeSignInURL(url)
@@ -235,7 +235,7 @@ struct AuthEnvironmentTests {
                 "CMUX_TAG": "pair-auth",
                 "CMUX_PORT": "4123",
             ],
-            bundleIdentifier: "com.cmuxterm.app.debug.pair-auth"
+            bundleIdentifier: "pro.shellx.desktop.debug.pair-auth"
         )
 
         #expect(url.scheme == "http")
@@ -257,7 +257,7 @@ struct AuthEnvironmentTests {
             .first(where: { $0.name == "native_app_return_to" })?
             .value)
         let nativeCallbackURL = try #require(URL(string: nativeReturnTo))
-        #expect(nativeCallbackURL.scheme == "cmux-dev-pair-auth")
+        #expect(nativeCallbackURL.scheme == "shellx-dev-pair-auth")
         #expect(nativeCallbackURL.host == "auth-callback")
     }
 
@@ -272,7 +272,7 @@ struct AuthEnvironmentTests {
                 "CMUX_AUTH_WWW_ORIGIN": "https://cmux.com",
                 "CMUX_AUTH_CALLBACK_SCHEME": "cmux",
             ],
-            bundleIdentifier: "com.cmuxterm.app"
+            bundleIdentifier: "pro.shellx.desktop"
         )
         let russianURL = AuthEnvironment.signInURL(
             callbackState: "state-1",
@@ -283,7 +283,7 @@ struct AuthEnvironmentTests {
                 "CMUX_AUTH_WWW_ORIGIN": "https://cmux.com",
                 "CMUX_AUTH_CALLBACK_SCHEME": "cmux",
             ],
-            bundleIdentifier: "com.cmuxterm.app"
+            bundleIdentifier: "pro.shellx.desktop"
         )
 
         #expect(russianURL == englishURL)
@@ -371,9 +371,9 @@ struct AuthEnvironmentTests {
 
         #expect(url.path == "/api/billing/checkout")
         #if DEBUG
-        let expectedScheme = "cmux-dev"
+        let expectedScheme = "shellx-dev"
         #else
-        let expectedScheme = "cmux"
+        let expectedScheme = "shellx"
         #endif
         #expect(URLComponents(url: url, resolvingAgainstBaseURL: false)?
             .queryItems?
@@ -448,15 +448,15 @@ struct AuthEnvironmentTests {
         #expect(darkSnapshot.appearance == "dark")
         #expect(darkSnapshot.background == "#101010")
         #expect(darkSnapshot.foreground == "#F0F0F0")
-        #expect(darkSnapshot.accent == "#0091FF")
+        #expect(darkSnapshot.accent == "#60A5FA")
         #expect(lightSnapshot.appearance == "light")
         #expect(lightSnapshot.background == "#F0F0F0")
         #expect(lightSnapshot.foreground == "#101010")
-        #expect(lightSnapshot.accent == "#0088FF")
-        #expect(darkSnapshot.accentOnBackground == "#0091FF")
+        #expect(lightSnapshot.accent == "#60A5FA")
+        #expect(darkSnapshot.accentOnBackground == "#60A5FA")
         #expect(darkSnapshot.accentOnForeground != darkSnapshot.accent)
         #expect(lightSnapshot.accentOnBackground != lightSnapshot.accent)
-        #expect(lightSnapshot.accentOnForeground == "#0088FF")
+        #expect(lightSnapshot.accentOnForeground == "#60A5FA")
     }
 
     @MainActor

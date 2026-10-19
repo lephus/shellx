@@ -21,7 +21,7 @@ extension CMUXCLI {
     }
 
     static let recoveryUsage = """
-    Usage: cmux recover [options]
+    Usage: shellx recover [options]
 
     Find interrupted local Claude sessions through sr. Pass --session to open
     one exact session in an isolated workspace running sr codex.
@@ -119,7 +119,7 @@ extension CMUXCLI {
     static let vaultUsage = String(
         localized: "cli.vault.usage",
         defaultValue: """
-        Usage: cmux vault <subcommand> [options]
+        Usage: shellx vault <subcommand> [options]
 
         Browse, search, checkpoint, and fork agent sessions from the Vault index.
 
@@ -218,7 +218,7 @@ extension CMUXCLI {
             guard checkpointID != nil || turn != nil else {
                 throw CLIError(message: String(
                     localized: "cli.vault.error.checkpointRequired",
-                    defaultValue: "vault fork requires --checkpoint <id> or --turn <n> (see cmux vault checkpoints)"
+                    defaultValue: "vault fork requires --checkpoint <id> or --turn <n> (see shellx vault checkpoints)"
                 ))
             }
             guard checkpointID == nil || turn == nil else {
@@ -284,7 +284,7 @@ extension CMUXCLI {
         guard let agent, !agent.hasPrefix("--"), let session, !session.hasPrefix("--") else {
             throw CLIError(message: String(
                 localized: "cli.vault.error.sessionSelectorRequired",
-                defaultValue: "This subcommand requires --agent <id> --session <id> (see cmux vault sessions)"
+                defaultValue: "This subcommand requires --agent <id> --session <id> (see shellx vault sessions)"
             ))
         }
         return ((agent, session), rem1)
@@ -306,7 +306,7 @@ extension CMUXCLI {
         guard let unexpected = remainder.first else { return }
         throw CLIError(message: String(format: String(
             localized: "cli.vault.error.unexpectedArgument",
-            defaultValue: "Unexpected argument '%@' for cmux vault %@"
+            defaultValue: "Unexpected argument '%@' for shellx vault %@"
         ), unexpected, subcommand))
     }
 

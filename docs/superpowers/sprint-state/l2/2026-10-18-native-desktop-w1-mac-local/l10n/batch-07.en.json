@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "The SSH link included an invalid boolean value for parameter: %@",
+"comment": ""
+},
+{
+"i": 1,
+"en": "The SSH link included an invalid host key policy for parameter: %@",
+"comment": ""
+},
+{
+"i": 2,
+"en": "The SSH link included an invalid integer value for parameter: %@",
+"comment": ""
+},
+{
+"i": 3,
+"en": "The SSH port must be between 1 and 65535.",
+"comment": ""
+},
+{
+"i": 4,
+"en": "The link did not include an SSH host.",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Only one SSH link can be opened at a time.",
+"comment": ""
+},
+{
+"i": 6,
+"en": "The workspace title contains hidden control or formatting characters, so cmux refused to use it.",
+"comment": ""
+},
+{
+"i": 7,
+"en": "The workspace title is too long. The maximum length is %lld characters.",
+"comment": ""
+},
+{
+"i": 8,
+"en": "The SSH link included an unsupported parameter: %@",
+"comment": ""
+},
+{
+"i": 9,
+"en": "cmux ssh exited with status %d.",
+"comment": ""
+},
+{
+"i": 10,
+"en": "cmux ssh could not be launched.",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Couldn't Open SSH Link",
+"comment": ""
+},
+{
+"i": 12,
+"en": "An external link wants to open \"%@\" in cmux. Do you want to open this SSH workspace?\n\nIf you did not initiate this request, it may represent an attempted attack on your system. Only continue if you explicitly started this action.",
+"comment": ""
+},
+{
+"i": 13,
+"en": "SSH target: %@",
+"comment": ""
+},
+{
+"i": 14,
+"en": "Open SSH Workspace in cmux?",
+"comment": ""
+},
+{
+"i": 15,
+"en": "cmux Link Blocked",
+"comment": ""
+},
+{
+"i": 16,
+"en": "The link repeated a parameter: %@",
+"comment": ""
+},
+{
+"i": 17,
+"en": "The link included an invalid boolean value for parameter: %@",
+"comment": ""
+},
+{
+"i": 18,
+"en": "The link did not include text.",
+"comment": ""
+},
+{
+"i": 19,
+"en": "Only one cmux external link can be opened at a time.",
+"comment": ""
+},
+{
+"i": 20,
+"en": "The link name contains hidden control or formatting characters, so cmux refused to use it.",
+"comment": ""
+},
+{
+"i": 21,
+"en": "The link name is too long. The maximum length is %lld characters.",
+"comment": ""
+},
+{
+"i": 22,
+"en": "The link text contains unsupported or hidden characters, so cmux refused to use it.",
+"comment": ""
+},
+{
+"i": 23,
+"en": "The link text is too long. The maximum length is %lld characters.",
+"comment": ""
+},
+{
+"i": 24,
+"en": "The link title contains hidden control or formatting characters, so cmux refused to use it.",
+"comment": ""
+},
+{
+"i": 25,
+"en": "The link title is too long. The maximum length is %lld characters.",
+"comment": ""
+},
+{
+"i": 26,
+"en": "The link included an unsupported parameter: %@",
+"comment": ""
+},
+{
+"i": 27,
+"en": "Prompt",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Rules",
+"comment": ""
+},
+{
+"i": 29,
+"en": "Link type: %@",
+"comment": ""
+},
+{
+"i": 30,
+"en": "Paste",
+"comment": ""
+},
+{
+"i": 31,
+"en": "cmux could not send the link text to a terminal.",
+"comment": ""
+},
+{
+"i": 32,
+"en": "Text preview:",
+"comment": ""
+},
+{
+"i": 33,
+"en": "A %@:// link is asking cmux to paste a prompt into the current workspace. cmux cannot verify which website or app opened this link.\n\ncmux will paste the text into the terminal and will not press Return. Only continue if you trust this prompt.",
+"comment": ""
+},
+{
+"i": 34,
+"en": "Couldn't Paste Prompt Link",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Paste a Prompt From an External Link?",
+"comment": ""
+},
+{
+"i": 36,
+"en": "A %@:// link is asking cmux to paste rules into the current workspace. cmux cannot verify which website or app opened this link.\n\ncmux will paste the rules into the terminal and will not write files or press Return. Only continue if you trust these rules.",
+"comment": ""
+},
+{
+"i": 37,
+"en": "Couldn't Paste Rules Link",
+"comment": ""
+},
+{
+"i": 38,
+"en": "Paste Rules From an External Link?",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Title: %@",
+"comment": ""
+},
+{
+"i": 40,
+"en": "This page cannot use diff comments.",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Add comment",
+"comment": ""
+},
+{
+"i": 42,
+"en": "Additions",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Bars",
+"comment": ""
+},
+{
+"i": 44,
+"en": "created from",
+"comment": ""
+},
+{
+"i": 45,
+"en": "default",
+"comment": ""
+},
+{
+"i": 46,
+"en": "fork point",
+"comment": ""
+},
+{
+"i": 47,
+"en": "manual",
+"comment": ""
+},
+{
+"i": 48,
+"en": "PR base",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Binary file",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Branch base",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Base:",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Comparing {head} against {base}",
+"comment": ""
+},
+{
+"i": 53,
+"en": "current",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Filter branches",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Could not generate the diff. Choose a branch to retry.",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Generating diff against {ref}...",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Branches",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Remotes",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Suggested",
+"comment": ""
+},
+{
+"i": 60,
+"en": "Worktrees",
+"comment": ""
+},
+{
+"i": 61,
+"en": "Could not load branches.",
+"comment": ""
+},
+{
+"i": 62,
+"en": "Loading branches...",
+"comment": ""
+},
+{
+"i": 63,
+"en": "{count} more, type to filter",
+"comment": ""
+},
+{
+"i": 64,
+"en": "No matching branches",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Change diff base",
+"comment": ""
+},
+{
+"i": 66,
+"en": "Use \"{ref}\" (raw)",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Changed files",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Classic",
+"comment": ""
+},
+{
+"i": 69,
+"en": "Collapse all diffs",
+"comment": ""
+},
+{
+"i": 70,
+"en": "Collapse unchanged context",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Leave a comment",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Comments",
+"comment": ""
+},
+{
+"i": 73,
+"en": "Copied git apply command",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Could not copy git apply command.",
+"comment": ""
+},
+{
+"i": 75,
+"en": "Copy git apply command",
+"comment": ""
+},
+{
+"i": 76,
+"en": "Deletions",
+"comment": ""
+},
+{
+"i": 77,
+"en": "Diff stats",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Diff target",
+"comment": ""
+},
+{
+"i": 79,
+"en": "Diff viewer",
+"comment": ""
+},
+{
+"i": 80,
+"en": "Disable word diffs",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Disable word wrap",
+"comment": ""
+},
+{
+"i": 82,
+"en": "Edit",
+"comment": ""
+},
+{
+"i": 83,
+"en": "No branch changes to diff.",
+"comment": ""
+},
+{
+"i": 84,
+"en": "No last-turn changes to diff.",
+"comment": ""
+},
+{
+"i": 85,
+"en": "No staged changes to diff.",
+"comment": ""
+},
+{
+"i": 86,
+"en": "No unstaged changes to diff.",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Enable word diffs",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Enable word wrap",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Diff viewer allowlist is too large",
+"comment": ""
+},
+{
+"i": 90,
+"en": "Expand all diffs",
+"comment": ""
+},
+{
+"i": 91,
+"en": "Expand unchanged context",
+"comment": ""
+},
+{
+"i": 92,
+"en": "Files",
+"comment": ""
+},
+{
+"i": 93,
+"en": "Close find",
+"comment": ""
+},
+{
+"i": 94,
+"en": "Find in diff",
+"comment": ""
+},
+{
+"i": 95,
+"en": "Next match",
+"comment": ""
+},
+{
+"i": 96,
+"en": "Previous match",
+"comment": ""
+},
+{
+"i": 97,
+"en": "Hide backgrounds",
+"comment": ""
+},
+{
+"i": 98,
+"en": "Hide file search",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Hide files",
+"comment": ""
+},
+{
+"i": 100,
+"en": "Hide line numbers",
+"comment": ""
+},
+{
+"i": 101,
+"en": "Indicator style",
+"comment": ""
+},
+{
+"i": 102,
+"en": "Jump to file",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Loading diff...",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Loading diff: %@",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Loading renderer...",
+"comment": ""
+},
+{
+"i": 106,
+"en": "Mode {old} → {new}",
+"comment": ""
+},
+{
+"i": 107,
+"en": "No comments yet",
+"comment": ""
+},
+{
+"i": 108,
+"en": "No file diffs found in patch input.",
+"comment": ""
+},
+{
+"i": 109,
+"en": "None",
+"comment": ""
+},
+{
+"i": 110,
+"en": "Open source URL",
+"comment": ""
+},
+{
+"i": 111,
+"en": "Options",
+"comment": ""
+},
+{
+"i": 112,
+"en": "Outdated",
+"comment": ""
+},
+{
+"i": 113,
+"en": "Parsing diff...",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Could not render this diff. Check the patch input and try again.",
+"comment": ""
+},
+{
+"i": 115,
+"en": "Rendering diff...",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Repository path",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Comment",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Show backgrounds",
+"comment": ""
+},
+{
+"i": 119,
+"en": "Show file search",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Show files",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Show line numbers",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Branch",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Last turn",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Staged",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Unstaged",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Switch to split diff",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Switch to unified diff",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Branch diff",
+"comment": ""
+},
+{
+"i": 129,
+"en": "Last turn diff",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Staged changes",
+"comment": ""
+},
+{
+"i": 131,
+"en": "Unstaged changes",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Untitled",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Focus Control",
+"comment": ""
+},
+{
+"i": 134,
+"en": "New Browser",
+"comment": ""
+},
+{
+"i": 135,
+"en": "New Dock Pane",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Open Dock Config",
+"comment": ""
+},
+{
+"i": 137,
+"en": "Reload Dock",
+"comment": ""
+},
+{
+"i": 138,
+"en": "Restart Control",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Set up cmux Dock controls for the current context.\n\nFirst, learn the feature before editing:\n1. Run `cmux docs dock` if the cmux CLI is available. If it is not, read https://cmux.com/docs/dock.\n2. Inspect the repository or current directory to understand the project type, scripts, package manager, dev servers, logs, task runners, test commands, and any existing TUI tools.\n3. If the desired Dock is ambiguous, ask the user what they want monitored or controlled before writing files.\n\nDock is cmux's right-sidebar terminal and browser control area. A Dock config is JSON with a top-level `controls` array. Terminal controls run commands in Ghostty-backed sections using the user's login shell; browser controls embed URLs. Controls are useful for project dashboards, git/status views, dev server or build status, test watchers, log tails, queues, local services, or fixed web dashboards.\n\nChoose where to write the config:\n- In a repository or project directory, create or edit `.cmux/dock.json` so teammates can share it.\n- For a personal default outside a repo, create or edit `~/.config/cmux/dock.json`.\n- If both exist, project `.cmux/dock.json` is more specific for that project. Nested project configs apply to that directory tree; use the nearest relevant project config instead of writing unrelated controls globally.\n- If there is no repo and no clear project root, use the global config only after confirming the user wants a personal Dock.\n\nSchema:\n{\n  \"controls\": [\n    {\n      \"id\": \"short-stable-id\",\n      \"title\": \"Human label\",\n      \"command\": \"safe command to run\",\n      \"cwd\": \"optional/path\",\n      \"height\": 220,\n      \"env\": { \"NAME\": \"value\" }\n    },\n    {\n      \"id\": \"dashboard\",\n      \"title\": \"Dashboard\",\n      \"type\": \"browser\",\n      \"url\": \"http://127.0.0.1:3000\",\n      \"chrome\": false\n    }\n  ]\n}\n\nRules:\n- Keep ids stable, lowercase, and unique.\n- `type` is optional: `terminal` is the default, or use `browser`.\n- Terminal controls require `command`; browser controls require `url`.\n- Browser controls default to `chrome: true`. Set `chrome: false` to hide browser chrome, including the address bar and toolbar; Focus Address Bar then does nothing for that pane, while `cmux browser goto` and `cmux browser reload` remain available.\n- Use `cwd` for subdirectories; relative paths resolve from the config base.\n- Use `height` only when a control needs a fixed amount of vertical space.\n- Use `env` only for non-secret values needed by one control.\n- Do not put secrets, tokens, or machine-specific private paths in a shared project config.\n- Prefer commands that are safe to start repeatedly and make sense in a terminal.\n- Do not invent unavailable scripts. Read package files, Makefiles, Procfiles, README docs, config files, and existing tooling first.\n- Keep shared project Docks portable for teammates. Put personal or machine-specific controls in the global Dock.\n\nDeliverable:\n- Create or update the appropriate dock.json.\n- Preserve existing useful controls unless the user asked to replace them.\n- Validate that the JSON parses.\n- Summarize what each control does and any commands the user should review before trusting the Dock config.",
+"comment": ""
+},
+{
+"i": 140,
+"en": "Copy Agent Prompt",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Copy a prompt you can paste into an AI coding agent",
+"comment": ""
+},
+{
+"i": 142,
+"en": "Open the Dock documentation",
+"comment": ""
+},
+{
+"i": 143,
+"en": "Show Agent Prompt",
+"comment": ""
+},
+{
+"i": 144,
+"en": "Show the prompt that will be copied",
+"comment": ""
+},
+{
+"i": 145,
+"en": "Agent Prompt",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Add controls to .cmux/dock.json.",
+"comment": ""
+},
+{
+"i": 147,
+"en": "No Dock Controls",
+"comment": ""
+},
+{
+"i": 148,
+"en": "Empty Dock Pane",
+"comment": ""
+},
+{
+"i": 149,
+"en": "Dock control command must not be blank.",
+"comment": ""
+},
+{
+"i": 150,
+"en": "Dock control id must not be blank.",
+"comment": ""
+},
+{
+"i": 151,
+"en": "Dock browser control url must not be blank.",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Conflicting Dock routing selectors",
+"comment": ""
+},
+{
+"i": 153,
+"en": "Dock control ids must be unique.",
+"comment": ""
+},
+{
+"i": 154,
+"en": "Dock could not be revealed",
+"comment": ""
+},
+{
+"i": 155,
+"en": "Could not load the Dock config. Check dock.json and try again.",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Could not open the Dock config. Check permissions and try again.",
+"comment": ""
+},
+{
+"i": 157,
+"en": "Dock Config Error",
+"comment": ""
+},
+{
+"i": 158,
+"en": "Dock placement is unavailable",
+"comment": ""
+},
+{
+"i": 159,
+"en": "Dock control type must be terminal or browser.",
+"comment": ""
+},
+{
+"i": 160,
+"en": "Dock placement supports only terminal and browser surfaces",
+"comment": ""
+},
+{
+"i": 161,
+"en": "Global Dock is active in another window",
+"comment": ""
+},
+{
+"i": 162,
+"en": "Dock",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Global Dock",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Project Dock",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Trust and Start",
+"comment": ""
+},
+{
+"i": 166,
+"en": "This project wants to start commands from its Dock config.",
+"comment": ""
+},
+{
+"i": 167,
+"en": "Trust Project Dock?",
+"comment": ""
+},
+{
+"i": 168,
+"en": "Empty Panel",
+"comment": ""
+},
+{
+"i": 169,
+"en": "Could not load any folder path from the clipboard.",
+"comment": ""
+},
+{
+"i": 170,
+"en": "%@ isn't a valid JSON object, so the workspace layout couldn't be updated. Fix the file and try again.",
+"comment": ""
+},
+{
+"i": 171,
+"en": "Couldn't read %@.",
+"comment": ""
+},
+{
+"i": 172,
+"en": "cmux could not register as the default terminal app.",
+"comment": ""
+},
+{
+"i": 173,
+"en": "Dropped item is not a file URL.",
+"comment": ""
+},
+{
+"i": 174,
+"en": "Remote drop is unavailable.",
+"comment": ""
+},
+{
+"i": 175,
+"en": "Failed to upload dropped file: %@",
+"comment": ""
+},
+{
+"i": 176,
+"en": "User extension",
+"comment": ""
+},
+{
+"i": 177,
+"en": "Attention Queue",
+"comment": ""
+},
+{
+"i": 178,
+"en": "Reading List",
+"comment": ""
+},
+{
+"i": 179,
+"en": "Pinned",
+"comment": ""
+},
+{
+"i": 180,
+"en": "Browser Stack",
+"comment": ""
+},
+{
+"i": 181,
+"en": "Dev Servers",
+"comment": ""
+},
+{
+"i": 182,
+"en": "Live Servers",
+"comment": ""
+},
+{
+"i": 183,
+"en": "Local",
+"comment": ""
+},
+{
+"i": 184,
+"en": "Needs Attention",
+"comment": ""
+},
+{
+"i": 185,
+"en": "No Folder",
+"comment": ""
+},
+{
+"i": 186,
+"en": "No Prompts",
+"comment": ""
+},
+{
+"i": 187,
+"en": "Quiet",
+"comment": ""
+},
+{
+"i": 188,
+"en": "Recent Prompts",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Remote",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Last Prompt",
+"comment": ""
+},
+{
+"i": 191,
+"en": "No prompts yet",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Project Worktrees",
+"comment": ""
+},
+{
+"i": 193,
+"en": "Super Compact",
+"comment": ""
+},
+{
+"i": 194,
+"en": "Shows the Agent chat entrypoints in the new-workspace dropdown, command palette, and surface tab bar.",
+"comment": ""
+},
+{
+"i": 195,
+"en": "Agent chat UI",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Renders the workspace sidebar with a native AppKit list and divider for smoother scrolling and resizing with many workspaces.",
+"comment": ""
+},
+{
+"i": 197,
+"en": "Lawrence Sidebar",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Clear all overrides",
+"comment": ""
+},
+{
+"i": 199,
+"en": "Current",
+"comment": ""
+},
+{
+"i": 200,
+"en": "Flag",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Override",
+"comment": ""
+},
+{
+"i": 202,
+"en": "Source",
+"comment": ""
+},
+{
+"i": 203,
+"en": "Remote values take priority, except for local Cloud overrides in Nightly and debug builds.",
+"comment": ""
+},
+{
+"i": 204,
+"en": "Shows the Mobile Pairing button in the sidebar footer.",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Mobile Pairing button",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Enables the iOS New Task composer, including task model discovery, directory picking, and attachment staging.",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Mobile Task Composer",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Shows the Files chip over iOS terminals and runs its visible-path count scan.",
+"comment": ""
+},
+{
+"i": 209,
+"en": "Mobile terminal Files chip",
+"comment": ""
+},
+{
+"i": 210,
+"en": "Serves workspace diffs to paired phones: the iOS changes chip, toolbar button, and Changes sheet.",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Mobile diff viewer",
+"comment": ""
+},
+{
+"i": 212,
+"en": "Cloud overrides take priority in this Nightly or debug build.",
+"comment": ""
+},
+{
+"i": 213,
+"en": "No override",
+"comment": ""
+},
+{
+"i": 214,
+"en": "Controlled remotely; local override inactive.",
+"comment": ""
+},
+{
+"i": 215,
+"en": "Shows Pro upgrade entrypoints in the sidebar, Settings, command palette, and Help menu.",
+"comment": ""
+},
+{
+"i": 216,
+"en": "Pro upgrade UI",
+"comment": ""
+},
+{
+"i": 217,
+"en": "Shows the profile and sign-in control in the sidebar footer.",
+"comment": ""
+},
+{
+"i": 218,
+"en": "Sidebar account button",
+"comment": ""
+},
+{
+"i": 219,
+"en": "Shows a spinner in workspace rows while coding agents are running.",
+"comment": ""
+},
+{
+"i": 220,
+"en": "Workspace agent spinner",
+"comment": ""
+},
+{
+"i": 221,
+"en": "Enables iPhone and iPad Simulator panes, commands, and automation.",
+"comment": ""
+},
+{
+"i": 222,
+"en": "Feature Flags",
+"comment": ""
+},
+{
+"i": 223,
+"en": "Inspect remote feature flag state and local overrides for this Mac.",
+"comment": ""
+},
+{
+"i": 224,
+"en": "Shows Add Checklist Item and workspace completion status controls.",
+"comment": ""
+},
+{
+"i": 225,
+"en": "Workspace todo controls",
+"comment": ""
+},
+{
+"i": 226,
+"en": "Allowed",
+"comment": ""
+},
+{
+"i": 227,
+"en": "Answered",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Refined",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Submitted",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Apply Raycast Glass",
+"comment": ""
+},
+{
+"i": 231,
+"en": "Background",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Border",
+"comment": ""
+},
+{
+"i": 233,
+"en": "Colors",
+"comment": ""
+},
+{
+"i": 234,
+"en": "Compact horizontal padding",
+"comment": ""
+},
+{
+"i": 235,
+"en": "Compact radius",
+"comment": ""
+},
+{
+"i": 236,
+"en": "Compact vertical padding",
+"comment": ""
+},
+{
+"i": 237,
+"en": "Foreground",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Glass tint",
+"comment": ""
+},
+{
+"i": 239,
+"en": "Medium horizontal padding",
+"comment": ""
+},
+{
+"i": 240,
+"en": "Hover",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Button Kind",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Destructive",
+"comment": ""
+},
+{
+"i": 243,
+"en": "Ghost",
+"comment": "Button style with a transparent background, not the ghost mascot."
+},
+{
+"i": 244,
+"en": "Soft",
+"comment": ""
+},
+{
+"i": 245,
+"en": "Warning",
+"comment": ""
+},
+{
+"i": 246,
+"en": "Medium radius",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Medium vertical padding",
+"comment": ""
+},
+{
+"i": 248,
+"en": "Palette",
+"comment": ""
+},
+{
+"i": 249,
+"en": "Aqua",
+"comment": ""
+},
+{
+"i": 250,
+"en": "Contrast",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Ember",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Glass Neutral",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Graphite",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Orchard",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Clear Glass",
+"comment": ""
+},
+{
+"i": 256,
+"en": "Command Dark",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Command Light",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Compact Glass",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Frosted Outline",
+"comment": ""
+},
+{
+"i": 260,
+"en": "Hairline Glass",
+"comment": ""
+},
+{
+"i": 261,
+"en": "Halo Glow",
+"comment": ""
+},
+{
+"i": 262,
+"en": "Liquid Capsule",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Liquid Mono",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Minimal Flat",
+"comment": ""
+},
+{
+"i": 265,
+"en": "Native Blue",
+"comment": ""
+},
+{
+"i": 266,
+"en": "Native Glass",
+"comment": ""
+},
+{
+"i": 267,
+"en": "Prominent Glass",
+"comment": ""
+},
+{
+"i": 268,
+"en": "Raycast Glass",
+"comment": ""
+},
+{
+"i": 269,
+"en": "Soft Halo",
+"comment": ""
+},
+{
+"i": 270,
+"en": "Solid Classic",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Standard Liquid Glass",
+"comment": ""
+},
+{
+"i": 272,
+"en": "Tinted Liquid Glass",
+"comment": ""
+},
+{
+"i": 273,
+"en": "Base",
+"comment": ""
+},
+{
+"i": 274,
+"en": "Command",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Material",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Flat",
+"comment": ""
+},
+{
+"i": 277,
+"en": "Halo",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Liquid",
+"comment": ""
+},
+{
+"i": 279,
+"en": "Outline",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Standard Glass",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Standard Tinted Glass",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Tune every Feed button kind live.",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Feed Buttons",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Variations",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Feed Button Style",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Agent:",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Plan:",
+"comment": ""
+},
+{
+"i": 288,
+"en": "You:",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Resolved",
+"comment": ""
+},
+{
+"i": 290,
+"en": "Permission, plan, and question requests from AI agents will appear here.",
+"comment": ""
+},
+{
+"i": 291,
+"en": "No pending decisions",
+"comment": ""
+},
+{
+"i": 292,
+"en": "Agent decisions and todo-list updates will appear here.",
+"comment": ""
+},
+{
+"i": 293,
+"en": "No activity yet",
+"comment": ""
+},
+{
+"i": 294,
+"en": "Tool use, messages, and session events will appear here.",
+"comment": ""
+},
+{
+"i": 295,
+"en": "No feed activity yet",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Allowed prompts",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Bypass",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Deny",
+"comment": ""
+},
+{
+"i": 299,
+"en": "Tell Claude what to change…",
+"comment": ""
+}
+]

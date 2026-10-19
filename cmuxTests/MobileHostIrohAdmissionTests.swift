@@ -362,14 +362,14 @@ struct IrohTailscaleVersionSkewMacGateTests {
     // the same v2 endpoint, gated by the same pairing opt-in. These two tests
     // keep the original guarantee: on Stable, either the current or the
     // historical setting starts Iroh and keeps the legacy dialect reachable.
-    @Test func testStableExplicitSettingStartsIrohAndLegacyCompatibilityListener() throws {
+    @Test(.enabled(if: ShellXSwitches.remoteMachines, "ShellX: the phone host listener is parked until Wave 2")) func testStableExplicitSettingStartsIrohAndLegacyCompatibilityListener() throws {
         try assertStablePairingStartsIrohAndLegacyDialect(
             suffix: "Current",
             key: MobileHostService.listeningEnabledDefaultsKey
         )
     }
 
-    @Test func testStableHistoricalSettingStartsIrohAndLegacyCompatibilityListener() throws {
+    @Test(.enabled(if: ShellXSwitches.remoteMachines, "ShellX: the phone host listener is parked until Wave 2")) func testStableHistoricalSettingStartsIrohAndLegacyCompatibilityListener() throws {
         try assertStablePairingStartsIrohAndLegacyDialect(
             suffix: "Historical",
             key: "cmuxMobilePairingHostEnabled"

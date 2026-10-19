@@ -16,6 +16,9 @@ import Darwin
 import Bonsplit
 import UniformTypeIdentifiers
 import CmuxTerminal
+import ShellXBrand
+import ShellXIcons
+
 struct cmuxApp: App {
     /// App-owned settings graph, injected into each SwiftUI hosting root.
     private let settingsRuntime: SettingsRuntime
@@ -212,6 +215,8 @@ struct cmuxApp: App {
         )
         StartupBreadcrumbLog.append("app.init.settingsRuntime.created")
 
+        // ShellX is dark-only: pin the stored mode before anything resolves it.
+        AppearanceSettings.enforceShellXDarkOnly()
         let startupAppearance = AppearanceSettings.resolvedMode()
         Self.applyAppearance(startupAppearance, duringLaunch: true)
         StartupBreadcrumbLog.append("app.init.appearance.applied", fields: ["mode": startupAppearance.rawValue])
@@ -534,7 +539,7 @@ struct cmuxApp: App {
                         preferredWindow: NSApp.keyWindow ?? NSApp.mainWindow
                     )
                 }
-                Button(String(localized: "menu.app.openCmuxSettingsFile", defaultValue: "Open cmux.json")) {
+                Button(String(localized: "menu.app.openCmuxSettingsFile", defaultValue: "Open shellx.json")) {
                     openCmuxSettingsFileInEditor()
                 }
                 Button(String(localized: "menu.app.ghosttySettings", defaultValue: "Ghostty Settings…")) {
@@ -543,7 +548,7 @@ struct cmuxApp: App {
                 splitCommandButton(title: String(localized: "menu.app.reloadConfiguration", defaultValue: "Reload Configuration"), shortcut: menuShortcut(for: .reloadConfiguration)) {
                     dispatchReloadConfigurationMenuCommand()
                 }
-                Button(String(localized: "menu.app.makeDefaultTerminal", defaultValue: "Make cmux the Default Terminal")) {
+                Button(String(localized: "menu.app.makeDefaultTerminal", defaultValue: "Make ShellX the Default Terminal")) {
                     DefaultTerminalUserAction.setAsDefault(debugSource: "menu.makeDefaultTerminal")
                 }
                 Divider()
@@ -557,7 +562,7 @@ struct cmuxApp: App {
             }
 
             CommandGroup(replacing: .appInfo) {
-                Button(String(localized: "menu.app.about", defaultValue: "About cmux")) {
+                Button(String(localized: "menu.app.about", defaultValue: "About ShellX")) {
                     showAboutPanel()
                 }
                 Button(String(localized: "menu.app.checkForUpdates", defaultValue: "Check for Updates…")) {
@@ -567,7 +572,7 @@ struct cmuxApp: App {
             }
 
             CommandGroup(replacing: .appTermination) {
-                splitCommandButton(title: String(localized: "menu.quitCmux", defaultValue: "Quit cmux"), shortcut: menuShortcut(for: .quit)) {
+                splitCommandButton(title: String(localized: "menu.quitCmux", defaultValue: "Quit ShellX"), shortcut: menuShortcut(for: .quit)) {
                     AppDelegate.requestApplicationTermination()
                 }
             }
@@ -842,7 +847,7 @@ struct cmuxApp: App {
                                 Label {
                                     Text(verbatim: "\(spacing)")
                                 } icon: {
-                                    Image(systemName: "checkmark")
+                                    ShellXIcon.image("checkmark")
                                 }
                             } else {
                                 Text(verbatim: "\(spacing)")
@@ -925,15 +930,6 @@ struct cmuxApp: App {
                             // shared action path.
                             activeTabManager.addWorkspaceIfActive(initialSurface: .browser)
                         }
-                    }
-                }
-
-                if CloudMachinesFeature.isEnabled && AppDelegate.shared?.auth?.accountFlow.isAuthenticated == true {
-                    splitCommandButton(title: String(localized: "menu.file.newCloudWorkspace", defaultValue: "New Cloud Workspace"), shortcut: menuShortcut(for: .newCloudWorkspace)) {
-                        _ = AppDelegate.shared?.performNewCloudWorkspaceOnResolvedMachineAction(tabManager: activeTabManager, debugSource: "menu.newCloudWorkspace")
-                    }
-                    splitCommandButton(title: String(localized: "menu.file.newCloudMachine", defaultValue: "New Cloud Machine"), shortcut: menuShortcut(for: .newCloudMachine)) {
-                        _ = AppDelegate.shared?.performNewCloudMachineAction(tabManager: activeTabManager, debugSource: "menu.newCloudMachine")
                     }
                 }
 
@@ -1102,7 +1098,7 @@ struct cmuxApp: App {
         }
         helpCommands
         historyCommands
-        cloudCommands
+        // ShellX: no Cloud menu (Cloud is a Manaflow service, hard-off).
         CommandGroup(after: .toolbar) {
             splitCommandButton(title: String(localized: "menu.view.toggleLeftSidebar", defaultValue: "Toggle Left Sidebar"), shortcut: menuShortcut(for: .toggleSidebar)) {
                 // The AppKit-hosted Settings window has no SwiftUI
@@ -1338,8 +1334,9 @@ struct cmuxApp: App {
     }
 
     private func applyAppearance() {
+        // ShellX is dark-only: any stored mode applies (and is pinned back) as dark.
         let mode = AppearanceSettings.applyStoredMode(
-            rawValue: appearanceMode,
+            rawValue: ShellXAppearance.forcedModeRawValue,
             source: "cmuxApp.appearanceModeChanged"
         )
         if appearanceMode != mode.rawValue {
@@ -2091,7 +2088,7 @@ private struct DebugWindowControlsView: View {
                         HStack(spacing: 8) {
                             Text("Preview")
                             Spacer()
-                            Image(systemName: selectedDevToolsIconOption.rawValue)
+                            ShellXIcon.image(selectedDevToolsIconOption.rawValue)
                                 .cmuxFont(size: 12, weight: .medium)
                                 .foregroundStyle(selectedDevToolsColorOption.color(accent: cmuxAccent))
                         }
@@ -2313,7 +2310,7 @@ private struct BrowserProfilePopoverDebugView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
-                    Image(systemName: "checkmark")
+                    ShellXIcon.image("checkmark")
                         .cmuxFont(size: 10, weight: .semibold)
                         .frame(width: 12, alignment: .center)
                     Text(String(localized: "browser.profile.default", defaultValue: "Default"))
@@ -2555,7 +2552,7 @@ private struct FileExplorerStyleDebugView: View {
                         NotificationCenter.default.post(name: .fileExplorerStyleDidChange, object: nil)
                     }) {
                         HStack(spacing: 8) {
-                            Image(systemName: styleRawValue == style.rawValue ? "checkmark.circle.fill" : "circle")
+                            ShellXIcon.image(styleRawValue == style.rawValue ? "checkmark.circle.fill" : "circle")
                                 .foregroundColor(styleRawValue == style.rawValue ? .accentColor : .secondary)
                                 .frame(width: 16)
                             VStack(alignment: .leading, spacing: 2) {
@@ -2948,7 +2945,7 @@ private struct SidebarFooterIconChoiceControls: View {
                         Label {
                             Text(verbatim: choice.rawValue)
                         } icon: {
-                            Image(systemName: choice.rawValue)
+                            ShellXIcon.image(choice.rawValue)
                         }
                         .tag(choice.rawValue)
                     }
@@ -2981,7 +2978,7 @@ private struct SidebarFooterIconChoiceControls: View {
                         Label {
                             Text(verbatim: choice.rawValue)
                         } icon: {
-                            Image(systemName: choice.rawValue)
+                            ShellXIcon.image(choice.rawValue)
                         }
                         .tag(choice.rawValue)
                     }
@@ -3278,7 +3275,7 @@ private struct SidebarFooterHoverIntensityPreview: View {
             .accessibilityLabel(accessibilityLabel)
 
             Button(action: {}) {
-                CmuxSystemSymbolImage(systemName: "iphone", pointSize: CGFloat(mobileSize), weight: .medium, tint: Color(nsColor: .secondaryLabelColor))
+                CmuxSystemSymbolImage(symbolName: "iphone", pointSize: CGFloat(mobileSize), weight: .medium, tint: Color(nsColor: .secondaryLabelColor))
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(SidebarFooterIconButtonStyle())
@@ -3311,7 +3308,7 @@ private struct SidebarFooterIconBalanceVariantCard: View {
         Button(action: onSelect) {
             VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 5) {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    ShellXIcon.image(isSelected ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(isSelected ? Color.accentColor : .secondary)
                     Text(verbatim: "\(Int(variant.pointSize)) pt · \(variant.weight.displayName)")
@@ -3428,7 +3425,7 @@ private struct SidebarFooterMobileIconReference: View {
     let size: Double
 
     var body: some View {
-        CmuxSystemSymbolImage(systemName: "iphone", pointSize: CGFloat(size), weight: .medium, tint: Color(nsColor: .secondaryLabelColor))
+        CmuxSystemSymbolImage(symbolName: "iphone", pointSize: CGFloat(size), weight: .medium, tint: Color(nsColor: .secondaryLabelColor))
             .frame(width: 22, height: 22)
     }
 }
@@ -4397,7 +4394,7 @@ private struct TabBarBackdropLabSample: View {
 
         let titles = [
             String(localized: "debug.tabBarBackdropLab.tab.agentBrowserLogs", defaultValue: "agent-browser logs"),
-            String(localized: "debug.tabBarBackdropLab.tab.terminalTransparency", defaultValue: "cmux terminal transparency"),
+            String(localized: "debug.tabBarBackdropLab.tab.terminalTransparency", defaultValue: "ShellX terminal transparency"),
             String(localized: "debug.tabBarBackdropLab.tab.underlayText", defaultValue: "underlay tab text visible here"),
             String(localized: "debug.tabBarBackdropLab.tab.backdropCheck", defaultValue: "split button backdrop check"),
             String(localized: "debug.tabBarBackdropLab.tab.rightEdgeOverflow", defaultValue: "right edge overflow sample"),
@@ -4992,7 +4989,8 @@ enum AppIconLaunchState {
 enum AppIconSettings {
     static let modeKey = "appIconMode"
     static let defaultMode: AppIconMode = .automatic
-    private static let dockTileIconDidChangeNotification = Notification.Name("com.cmuxterm.appIconDidChange")
+    // Distributed to the dock tile plugin (AppIconDockTilePlugin.swift spells the same name).
+    private static let dockTileIconDidChangeNotification = Notification.Name("pro.shellx.desktop.appIconDidChange")
     private static var liveEnvironmentProvider: () -> Environment = { .live() }
 
     private static func isRunningUnderXCTest(_ env: [String: String] = ProcessInfo.processInfo.environment) -> Bool {

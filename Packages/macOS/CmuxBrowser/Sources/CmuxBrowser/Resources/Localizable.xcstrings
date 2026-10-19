@@ -58,6 +58,12 @@
             "state": "translated",
             "value": "Diff 뷰어 허용 목록이 너무 큽니다"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Danh sách cho phép của trình xem diff quá lớn"
+          }
         }
       }
     },
@@ -116,6 +122,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "중복된 Diff 뷰어 허용 목록 항목"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mục danh sách cho phép của trình xem diff bị trùng"
           }
         }
       }
@@ -176,6 +188,12 @@
             "state": "translated",
             "value": "Diff 뷰어 허용 목록이 비어 있습니다"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Danh sách cho phép của trình xem diff đang trống"
+          }
         }
       }
     },
@@ -234,6 +252,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "잘못된 Diff 뷰어 허용 목록 항목"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mục danh sách cho phép của trình xem diff không hợp lệ"
           }
         }
       }
@@ -294,6 +318,12 @@
             "state": "translated",
             "value": "Diff 뷰어를 불러올 수 없습니다. 다시 시도하세요."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể tải trình xem diff. Hãy thử lại."
+          }
         }
       }
     },
@@ -352,6 +382,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diff 뷰어를 열 수 없습니다. 다시 시도하세요."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể mở trình xem diff. Hãy thử lại."
           }
         }
       }
@@ -412,6 +448,12 @@
             "state": "translated",
             "value": "차이가 너무 커서 표시할 수 없습니다. 여는 파일 수를 줄여 보세요."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diff quá lớn để hiển thị. Hãy thử mở ít tệp hơn."
+          }
         }
       }
     },
@@ -470,6 +512,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diff 뷰어 파일을 읽을 수 없습니다"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không đọc được tệp của trình xem diff"
           }
         }
       }
@@ -530,6 +578,12 @@
             "state": "translated",
             "value": "Diff 뷰어 신뢰할 수 있는 디렉토리가 안전하지 않습니다"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thư mục tin cậy của trình xem diff không an toàn"
+          }
         }
       }
     },
@@ -588,6 +642,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "將標籤頁移至新工作區"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chuyển tab sang phiên mới"
           }
         }
       }

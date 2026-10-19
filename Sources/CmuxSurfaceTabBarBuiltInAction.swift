@@ -154,13 +154,13 @@ extension CmuxSurfaceTabBarBuiltInAction {
     var shortcutAction: KeyboardShortcutSettings.Action? {
         switch self {
         case .newWorkspace: return .newTab
-        case .newCloudWorkspace: return .newCloudWorkspace
-        case .newCloudMachine: return .newCloudMachine
         case .newTerminal: return .newSurface
         case .newBrowser: return .openBrowser
         case .splitRight: return .splitRight
         case .splitDown: return .splitDown
-        case .newAgentChat, .cloudVM, .mobileConnect, .newSimulator,
+        // ShellX: the Cloud create actions have no shortcut (Cloud is off).
+        case .newCloudWorkspace, .newCloudMachine,
+             .newAgentChat, .cloudVM, .mobileConnect, .newSimulator,
              .copyWorkingDirectory, .copyProjectRoot, .copyScreen: return nil
         }
     }

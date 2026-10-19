@@ -22,7 +22,7 @@ extension CloudWireGuardHub {
         return Enrollment(configPath: state.configPath, routes: VMTunnelManager.allowedIPs(in: state.completedConfig))
     }
 
-    /// The production hub for the bundled client, writing under `~/.cmuxterm/wireguard`.
+    /// The production hub for the bundled client, writing under `~/.shellx/wireguard`.
     public static func production(clientURL: URL, home: URL = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)) -> CloudWireGuardHub {
         let manager = VMTunnelManager(home: home, purpose: .terminal)
         let configuration = Configuration(

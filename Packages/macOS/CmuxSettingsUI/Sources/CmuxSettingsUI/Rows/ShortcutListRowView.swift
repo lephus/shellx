@@ -3,6 +3,7 @@ import AppKit
 import CmuxFoundation
 import CmuxSettings
 import SwiftUI
+import ShellXIcons
 
 /// A single shortcut-recorder row for the Keyboard Shortcuts settings section.
 ///
@@ -55,7 +56,7 @@ struct ShortcutListRowView: View, Equatable {
                     Button {
                         actions.onClearOrRestore()
                     } label: {
-                        Image(systemName: snapshot.canRestore ? "arrow.counterclockwise.circle.fill" : "xmark.circle.fill")
+                        ShellXIcon.image(snapshot.canRestore ? "arrow.counterclockwise.circle.fill" : "xmark.circle.fill")
                             .imageScale(.medium)
                     }
                     .buttonStyle(.borderless)
@@ -75,7 +76,7 @@ struct ShortcutListRowView: View, Equatable {
 
                 if let validationMessage = snapshot.validationMessage {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
+                        ShellXIcon.image("exclamationmark.triangle.fill")
                             .cmuxFont(.caption)
                             .foregroundStyle(.red)
 

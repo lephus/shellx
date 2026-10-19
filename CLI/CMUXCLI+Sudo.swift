@@ -1,6 +1,7 @@
 import CmuxSudoBroker
 import Darwin
 import Foundation
+import ShellXBrand
 
 extension CMUXCLI {
     func runSudoCommand(commandArgs: [String]) throws -> Int32 {
@@ -59,7 +60,7 @@ extension CMUXCLI {
             writeSudoError(
                 String(
                     localized: "sudo.cli.error.runner_context",
-                    defaultValue: "sudo: could not start secure execution; retry from a cmux terminal"
+                    defaultValue: "sudo: could not start secure execution; retry from a ShellX terminal"
                 )
             )
             return 126
@@ -83,7 +84,7 @@ extension CMUXCLI {
             throw CLIError(
                 message: String(
                     localized: "sudo.cli.error.enclosing_app",
-                    defaultValue: "sudo: use the cmux CLI included with the cmux app, then retry"
+                    defaultValue: "sudo: use the ShellX CLI included with the ShellX app, then retry"
                 )
             )
         }
@@ -98,8 +99,8 @@ extension CMUXCLI {
         )
     }
 
-    /// The Developer ID team that signs every distributed cmux build.
-    private static let sudoReleaseTeamIdentifier = "7WLXT3NR37"
+    /// The Developer ID team that signs every distributed ShellX build.
+    private static let sudoReleaseTeamIdentifier = ShellXBrand.teamID
 
     /// Pins the signing identity of bundled helpers before any of them reaches sudo.
     ///
