@@ -104,9 +104,20 @@ shown on both machines, approve on the Mac).
 - While the pane is not connected, input is refused and nothing is queued: a short flash
   "Mất kết nối, tạm ngừng nhập" appears. Reconnect uses a freshly minted ticket.
 - Exiting a remote shell closes only that pane. Signing out closes every remote tab.
+- A remote paste larger than 8 MB (after encoding) is refused whole with the flash "Nội dung
+  dán quá lớn (tối đa 8 MB)"; it is never cut.
 - A shell that exits right after it starts (for example a wrong `SHELLX_SHELL`) is respawned at
   most 5 times in 10 s; then the pane shows "Shell thoát ngay khi khởi động. Kiểm tra
   SHELLX_SHELL." and waits for "Thử lại" or any key.
+
+## Known limitations
+
+- `Ctrl+Shift+W` on a remote pane only detaches: the shell keeps running on the Mac. Every
+  second "Mở" and every remote split creates a new workspace on the Mac (close them there).
+- Input typed during the first ~30 s of a relay hiccup may arrive late: while the client
+  library recovers the relay link by itself the pane still shows as connected and the
+  typed bytes are sent once the link is back (a buffered command may run late). Only after
+  that does the pane show "đang kết nối lại…" and refuse input.
 
 ## Coexistence with the Flutter ShellX
 
@@ -122,11 +133,18 @@ GPUI 0.2.2 exposes no UI Automation tree, so Narrator and other screen readers c
 the terminal grid or the controls. This is a known gap (expected to fail gate G1) and the
 real fix, a UIA provider, is a post-sprint item.
 
-Stopgap in this build: the focused pane (local or remote) writes the window title as
-`<cursor line, else terminal title> - ShellX` (just `ShellX` when both are empty). Narrator
-is expected NOT to read the terminal grid; at most it reads the window title (`Insert+T`).
-Only the focused pane writes the title. No other accessibility features exist yet. For
-screen-reader-heavy work use Windows Terminal until UIA lands.
+The window title never carries screen text by default (it is visible in the taskbar,
+Alt+Tab, `GetWindowText` and screen sharing): it is `<terminal title> - ShellX`, or just
+`ShellX` when the shell set no title (the terminal title is cut to 80 characters, control
+characters removed).
+
+Stopgap in this build, screen-reader mode only: while a screen reader is running
+(`SPI_GETSCREENREADER`, which Narrator itself turns on; checked at most once per second) or
+when `SHELLX_A11Y_TITLE=1` is set, the focused pane (local or remote) writes its cursor line
+instead: `<cursor line, else terminal title> - ShellX`. Narrator is expected NOT to read the
+terminal grid; at most it reads the window title (`Insert+T`). Only the focused pane writes
+the title. No other accessibility features exist yet. For screen-reader-heavy work use
+Windows Terminal until UIA lands.
 
 ## Latency procedure (gate G1)
 

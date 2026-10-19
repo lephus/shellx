@@ -26,7 +26,7 @@ Dùng `shellx-desktop.exe` (bản portable) hoặc bản đã cài. Mở PowerSh
 - [ ] **Độ nét 150 %**: Settings > Display > Scale 150 %, đăng xuất/đăng nhập nếu cần. Đạt: chữ terminal và icon sắc nét, không mờ, không lệch ô.
 - [ ] **Độ nét 200 %**: như trên với 200 %. Đạt như trên.
 - [ ] **Độ trễ**: làm theo mục "Latency procedure" trong `windows/README.md` (Typometer, ShellX so với Windows Terminal, cùng máy, cùng cỡ chữ, 5 lần mỗi bên). Đạt: ghi median và p95 của cả hai; mục tiêu ShellX không tệ hơn Windows Terminal đáng kể. Báo: bảng 2 dòng.
-- [ ] **Narrator (dự kiến KHÔNG đạt)**: bật Narrator (Win+Ctrl+Enter), duyệt app. Dự kiến: không đọc được lưới terminal và các nút (GPUI chưa có UI Automation). Chỉ cần xác nhận: `Insert+T` đọc được tiêu đề cửa sổ dạng `<dòng con trỏ, nếu trống thì tiêu đề terminal> - ShellX` (chỉ khung đang chọn ghi tiêu đề). Cần đọc terminal nhiều: dùng Windows Terminal. Báo: ghi "đúng dự kiến" hoặc có gì khác.
+- [ ] **Narrator (dự kiến KHÔNG đạt)**: bật Narrator (Win+Ctrl+Enter), duyệt app. Dự kiến: không đọc được lưới terminal và các nút (GPUI chưa có UI Automation). Chỉ cần xác nhận: khi Narrator đang chạy (Narrator tự bật chế độ trình đọc màn hình, app kiểm tra mỗi giây), `Insert+T` đọc được tiêu đề cửa sổ dạng `<dòng con trỏ, nếu trống thì tiêu đề terminal> - ShellX` (chỉ khung đang chọn ghi tiêu đề). Tắt Narrator: tiêu đề chỉ còn `<tiêu đề terminal> - ShellX` hoặc `ShellX`, KHÔNG có chữ trên màn hình (xem thanh tác vụ / Alt+Tab). Cần đọc terminal nhiều: dùng Windows Terminal. Báo: ghi "đúng dự kiến" hoặc có gì khác.
 
 ## G3: cài đặt và dùng thật
 
@@ -51,14 +51,16 @@ Dùng `shellx-desktop.exe` (bản portable) hoặc bản đã cài. Mở PowerSh
 
 - [ ] **Mở từ bảng ghép cặp**: sau khi được chấp thuận bấm "Mở". Đạt: bảng đóng, tab mới hiện "đang kết nối…" rồi shell của Mac; file `%LOCALAPPDATA%\ShellX\native\core\tickets\invite-*.uri` đã bị xoá.
 - [ ] **Mở từ thanh bên**: Mac đã cấp quyền có nút "Mở". Đạt: tab mới dưới nhóm của Mac; bấm "Mở" lần hai mở shell MỚI trên Mac (cửa sổ ShellX trên Mac cũng thấy).
-- [ ] **Telex vào Mac (byte chính xác)**: trên Mac chạy `cat | xxd`; bên Windows dùng Telex có sẵn của Windows (TSF), gõ `tiếng Việt` rồi Enter. Đạt: đúng `74 69 e1 ba bf 6e 67 20 56 69 e1 bb 87 74 0a`. Với Unikey/EVKey (mặc định xoá lùi) Mac thấy chuỗi `e`, DEL, `ê`...: đây là đặc tính của công cụ, chỉ cần dòng cuối đúng và không mất/lặp ký tự.
-- [ ] **Dán có `ESC[201~`**: trên Mac chạy `cat -v`; dán đoạn hai dòng chứa `\x1b[201~` bằng `Ctrl+Shift+V`. Đạt: hiện dạng chữ (`^[[201~`), không lệnh nào tự chạy; kéo chọn + `Ctrl+Shift+C` vẫn sao chép được.
+- [ ] **Telex vào Mac (byte chính xác)**: trên Mac chạy `cat | xxd`; bên Windows dùng Telex có sẵn của Windows (TSF), gõ `tiếng Việt` rồi Enter, rồi `Ctrl+D` (`xxd` chỉ in khi gặp EOF; hoặc dùng `od -An -tx1`, in ngay sau Enter). Đạt: đúng `74 69 e1 ba bf 6e 67 20 56 69 e1 bb 87 74 0a`. Với Unikey/EVKey (mặc định xoá lùi) Mac thấy chuỗi `e`, DEL, `ê`...: đây là đặc tính của công cụ, chỉ cần dòng cuối đúng và không mất/lặp ký tự.
+- [ ] **Dán có `ESC[201~`**: đưa ký tự ESC thật vào clipboard bằng PowerShell: ``Set-Clipboard "a`e[201~b`nc"`` (`` `e `` là ESC, `` `n `` là xuống dòng). Trên Mac chạy `cat -v`; dán bằng `Ctrl+Shift+V`. Đạt: cả hai dòng tới nơi (`ab` rồi `c`), app XOÁ dấu kết thúc nên `cat -v` KHÔNG hiện `^[[201~` hay chuỗi ESC nào, không lệnh nào tự chạy; kéo chọn + `Ctrl+Shift+C` vẫn sao chép được.
 - [ ] **Đổi cỡ và chia khung**: kéo đổi cỡ cửa sổ, `stty size` trên Mac đổi theo. `Alt+Shift+=` / `Alt+Shift+-` trong khung Mac tạo khung Mac mới (shell mới trên Mac); cùng phím trong khung cục bộ ra PowerShell cục bộ; `Ctrl+Shift+T` luôn mở tab cục bộ.
-- [ ] **Mất mạng / nối lại**: tắt Wi-Fi của Mac (hoặc thoát ShellX trên Mac). Đạt: nhãn "đang kết nối lại…" (có lý do bên dưới) hoặc "ngoại tuyến"; gõ/Enter/dán chỉ hiện dòng "Mất kết nối, tạm ngừng nhập" và sau khi nối lại không có gì bị gửi trễ; bật lại: tự nối trong khoảng 30 giây, nhãn mất, gõ được; app không đơ.
+- [ ] **Mất mạng / nối lại**: tắt Wi-Fi của Mac (hoặc thoát ShellX trên Mac). Đạt: nhãn "đang kết nối lại…" (có lý do bên dưới) hoặc "ngoại tuyến"; gõ/Enter/dán chỉ hiện dòng "Mất kết nối, tạm ngừng nhập" và sau khi nối lại không có gì bị gửi trễ; bật lại: tự nối trong khoảng 30 giây, nhãn mất, gõ được; app không đơ. Giới hạn đã biết: chữ gõ trong khoảng 30 giây đầu của một lần relay chập chờn (lúc nhãn chưa hiện) có thể tới trễ.
+- [ ] **`Ctrl+Shift+W` trong khung Mac**: khung đóng nhưng chỉ tách ra, shell VẪN chạy trên Mac (ghi chú phát hành: mỗi lần "Mở" thứ hai hoặc chia khung Mac tạo một workspace mới trên Mac; đóng chúng trên Mac). Đạt: đúng như vậy, app không lỗi.
 - [ ] **`exit` trong khung Mac**: chỉ khung đó đóng, khung bên cạnh chiếm chỗ; `exit` ở khung cuối của tab cuối: mở tab PowerShell cục bộ mới, app không thoát.
 - [ ] **Đăng xuất** (Settings): mọi tab Mac đóng, còn một tab cục bộ; đăng nhập lại rồi "Mở" kết nối lại được.
 - [ ] **Bảng đang mở**: mở Settings, thử `Ctrl+Shift+T`: không có tab mới; `Esc` đóng bảng, rồi bàn phím về terminal.
-- [ ] **Tiêu đề / Narrator**: trong khung Mac, `Insert+T` đọc `<dòng con trỏ> - ShellX`; Narrator không đọc lưới terminal (đúng dự kiến).
+- [ ] **Tiêu đề / Narrator**: Narrator đang chạy, trong khung Mac `Insert+T` đọc `<dòng con trỏ> - ShellX`; Narrator không đọc lưới terminal (đúng dự kiến). Tắt Narrator: tiêu đề không còn dòng con trỏ.
+- [ ] **Dán quá lớn vào Mac**: ``Set-Clipboard ("a" * 9MB)`` rồi `Ctrl+Shift+V` trong khung Mac. Đạt: hiện dòng "Nội dung dán quá lớn (tối đa 8 MB)", Mac không nhận gì, khung vẫn dùng được.
 - [ ] **Nhìn bằng mắt ở 100 % và 150 %**: nhãn trạng thái ở giữa khung và dòng báo ở đáy khung rõ ràng, không có hiệu ứng sáng/bóng. Báo: ảnh chụp nếu lệch.
 
 ### Gỡ cài đặt
