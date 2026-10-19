@@ -113,6 +113,11 @@ class SwitchesAreConstant(unittest.TestCase):
         for name in ("remoteMachines", "codeRouter", "cloud"):
             self.assertRegex(text, rf"public static let {name} = false\b", name)
 
+    def test_app_side_switch_mirror_reads_shellx_features(self):
+        text = read("Sources/ShellX/ShellXSwitches.swift")
+        for name in ("cloud", "codeRouter", "remoteMachines"):
+            self.assertRegex(text, rf"static let {name} = ShellXFeatures\.{name}\n", name)
+
     def test_cloud_machines_feature_is_constant_false(self):
         for signature in (r"static func isAvailable\(policy: ManagedDevicePolicy\) -> Bool \{",
                           r"static func isEnabled\(\s*defaults: UserDefaults,\s*policy: ManagedDevicePolicy\s*\) -> Bool \{"):
@@ -289,6 +294,31 @@ class SocketMethodsAreRefused(unittest.TestCase):
                              and not m.endswith((".json", ".swift")))
         self.assertEqual(not_refused, [], "Cloud socket methods the ShellX gate does not refuse")
         self.assertFalse(socket_refused("auth.login"), "socket password login must stay local")
+
+
+class CloudHandlersOutsideTheGatedPrefixes(unittest.TestCase):
+    WORKSPACE_CREATE = "Sources/TerminalController+WorkspaceCreate.swift"
+
+    def test_workspace_cloud_vm_handlers_refuse_first(self):
+        """`workspace.cloud_vm_*` sits under `workspace.`, which the socket gate
+        does not cover: every such case must route to a handler whose first
+        statement checks the constant-false CloudMachinesFeature."""
+        dispatch = read("Sources/TerminalController.swift")
+        cases = re.findall(r'case "(workspace\.cloud_vm_\w+)":\s*\n\s*return [^\n]*?(v2WorkspaceCloudVM\w+)\(', dispatch)
+        self.assertGreaterEqual(len(cases), 3, "parsed too few workspace.cloud_vm_* cases")
+        literals = set(re.findall(r'"(workspace\.cloud_vm_\w+)"', dispatch))
+        self.assertEqual(literals, {method for method, _handler in cases},
+                         "every workspace.cloud_vm_* literal must be a dispatched, gated case")
+        for method, handler in cases:
+            first = first_statement(self.WORKSPACE_CREATE, r"func " + handler + r"\(params: \[String: Any\]\) -> V2CallResult \{")
+            self.assertIn("CloudMachinesFeature.offMainIsEnabled()", first, f"{method} -> {handler}")
+        self.assertEqual(first_statement(CLOUD_FEATURE, r"static func isEnabled\(\s*defaults: UserDefaults,\s*policy: ManagedDevicePolicy\s*\) -> Bool \{"), "false")
+
+    def test_team_picker_shortcut_and_opener_refuse_first(self):
+        path = "Sources/AppDelegate+CloudTeamPicker.swift"
+        self.assertRegex(first_statement(path, r"func handleCloudTeamPickerShortcut\(_ event: NSEvent\) -> Bool \{"),
+                         CLOUD_OFF + r" \{ return false \}")
+        self.assertRegex(first_statement(path, r"func openCloudTeamPicker\([^{]*\{"), CLOUD_OFF + r" \{ return false \}")
 
 
 class CLIVerbsAreRefused(unittest.TestCase):
