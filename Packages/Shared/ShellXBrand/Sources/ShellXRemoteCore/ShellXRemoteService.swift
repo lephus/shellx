@@ -100,7 +100,7 @@ public final class ShellXRemoteService: ObservableObject {
     public func stopForTermination() {
         guard !terminated else { return }
         terminated = true
-        guard started || isSignedIn else { return }
+        guard started || isSignedIn || teardown != nil else { return }   // a sign-out's stops may still run
         generation += 1
         bootTask?.cancel()
         cancelAllTasks()
