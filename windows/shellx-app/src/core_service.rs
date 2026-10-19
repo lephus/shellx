@@ -120,7 +120,7 @@ impl CoreCall for ConfiguredCore {
 }
 
 /// Runs one account action. `ScheduleTick` is not a core call (the UI arms a
-/// timer) and the heartbeat result has no event: both give `None`.
+/// timer): it gives `None`.
 pub fn run_account_action(
     core: &dyn CoreCall,
     facts: &MachineFacts,
@@ -140,11 +140,11 @@ pub fn run_account_action(
             &facts.os_version,
             shellx_model::VERSION,
         ))),
-        AccountAction::CallHeartbeat => {
-            // A lost session shows on the next list (not_logged_in).
-            let _ = heartbeat(core);
-            None
-        }
+        // A lost session shows on the next list (not_logged_in); a removed
+        // machine (machine_not_found) lets the flow register it again.
+        AccountAction::CallHeartbeat => Some(AccountEvent::HeartbeatResult(
+            heartbeat(core).map(|_| ()),
+        )),
         AccountAction::CallLogout => Some(AccountEvent::LogoutResult(logout(core))),
         AccountAction::ScheduleTick { .. } => None,
     }
@@ -260,15 +260,22 @@ mod tests {
     #[test]
     fn actions_map_to_calls_and_events() {
         let fake = FakeCore::new();
-        fake.on("machines.heartbeat", Err(CoreErr::new("network", "down")));
+        fake.on(
+            "machines.heartbeat",
+            Err(CoreErr::new("machine_not_found", "gone")),
+        );
         fake.on("auth.logout", Ok(json!({})));
         fake.on(
             "machines.register",
             Ok(json!({"machine_id":"m","slot":"s"})),
         );
+        // the heartbeat result reaches the flow (a removed machine registers again)
         assert_eq!(
             run_account_action(&fake, &facts(), AccountAction::CallHeartbeat),
-            None
+            Some(AccountEvent::HeartbeatResult(Err(CoreErr::new(
+                "machine_not_found",
+                "gone"
+            ))))
         );
         assert_eq!(
             run_account_action(&fake, &facts(), AccountAction::ScheduleTick { at_ms: 5 }),

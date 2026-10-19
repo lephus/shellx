@@ -39,6 +39,11 @@ pub enum AccountEvent {
     LoginResult(Result<LoginInfo, CoreErr>),
     Registered(Result<Registered, CoreErr>),
     Tick(u64),
+    /// Result of `CallHeartbeat`. `machine_not_found` / `not_registered`
+    /// (this machine was removed or revoked elsewhere) lists at once and
+    /// allows one more `machines.register`; other errors are ignored (a lost
+    /// session shows on the next list).
+    HeartbeatResult(Result<(), CoreErr>),
     LogoutRequested,
     /// Result of `CallLogout`. A failure keeps the session (LoggedIn) and
     /// sets `notice`; `not_logged_in` counts as signed out.
@@ -70,6 +75,9 @@ impl fmt::Debug for AccountEvent {
             AccountEvent::LoginResult(r) => f.debug_tuple("LoginResult").field(r).finish(),
             AccountEvent::Registered(r) => f.debug_tuple("Registered").field(r).finish(),
             AccountEvent::Tick(t) => f.debug_tuple("Tick").field(t).finish(),
+            AccountEvent::HeartbeatResult(r) => {
+                f.debug_tuple("HeartbeatResult").field(r).finish()
+            }
             AccountEvent::LogoutRequested => write!(f, "LogoutRequested"),
             AccountEvent::LogoutResult(r) => f.debug_tuple("LogoutResult").field(r).finish(),
             AccountEvent::LoggedOut => write!(f, "LoggedOut"),
@@ -103,7 +111,8 @@ pub struct AccountFlow {
     /// Last good machine list; kept across network errors.
     machines: Vec<MachineInfo>,
     /// `machines.register` already requested since the last time this machine
-    /// was in the list; reset when it fails and on entering LoggedIn.
+    /// was in the list; reset when it fails, on every list that has this
+    /// machine, on login/logout and when a heartbeat says the machine is gone.
     register_requested: bool,
     list_in_flight: bool,
     login_in_flight: bool,
@@ -326,6 +335,18 @@ impl AccountFlow {
                     _ => {}
                 }
             }
+            AccountEvent::HeartbeatResult(Err(e))
+                if matches!(e.code.as_str(), "machine_not_found" | "not_registered")
+                    && self.state != AccountState::LoggedOut =>
+            {
+                self.register_requested = false;
+                if !self.list_in_flight && !self.login_in_flight {
+                    self.list_in_flight = true;
+                    self.last_list_ms = now_ms;
+                    out.push(AccountAction::CallList);
+                }
+            }
+            AccountEvent::HeartbeatResult(_) => {}
             AccountEvent::LogoutRequested => {
                 if !self.logout_in_flight {
                     self.logout_in_flight = true;
@@ -689,6 +710,60 @@ mod tests {
                 machine_id: "me2".into()
             }
         );
+    }
+
+    #[test]
+    fn heartbeat_machine_not_found_lists_and_registers_again() {
+        for code in ["machine_not_found", "not_registered"] {
+            let mut f = AccountFlow::new();
+            f.on(AccountEvent::Started, 0);
+            // register once; the machine still misses from the list (stuck)
+            f.on(AccountEvent::ListResult(Ok(vec![])), 1);
+            f.on(
+                AccountEvent::Registered(Ok(Registered {
+                    machine_id: "me".into(),
+                    slot: "s".into(),
+                })),
+                2,
+            );
+            f.on(AccountEvent::ListResult(Ok(vec![m("me", true)])), 3);
+            f.on(AccountEvent::Tick(30_003), 30_003); // list + heartbeat
+            f.on(AccountEvent::ListResult(Ok(vec![m("me", true)])), 30_004);
+            // removed on the server: the heartbeat answers machine_not_found
+            let acts = f.on(
+                AccountEvent::HeartbeatResult(Err(CoreErr::new(code, "gone"))),
+                30_005,
+            );
+            assert_eq!(acts, vec![AccountAction::CallList], "{code}");
+            let acts = f.on(AccountEvent::ListResult(Ok(vec![m("mac", false)])), 30_006);
+            assert_eq!(acts, vec![AccountAction::CallRegister], "{code}");
+        }
+        // a heartbeat error that is not about the machine changes nothing
+        let mut f = logged_in();
+        assert!(
+            f.on(AccountEvent::HeartbeatResult(Err(net())), 2_000)
+                .is_empty()
+        );
+        assert!(f.on(AccountEvent::HeartbeatResult(Ok(())), 2_001).is_empty());
+        // a revoked machine that failed to show up after its one register
+        // may register again once a heartbeat says it is gone
+        let mut g = AccountFlow::new();
+        g.on(AccountEvent::Started, 0);
+        g.on(AccountEvent::ListResult(Ok(vec![])), 1);
+        g.on(
+            AccountEvent::Registered(Ok(Registered {
+                machine_id: "me".into(),
+                slot: "s".into(),
+            })),
+            2,
+        );
+        g.on(AccountEvent::ListResult(Ok(vec![])), 3); // Error(not_registered)
+        g.on(
+            AccountEvent::HeartbeatResult(Err(CoreErr::new("machine_not_found", ""))),
+            4,
+        );
+        let acts = g.on(AccountEvent::ListResult(Ok(vec![])), 5);
+        assert!(acts.contains(&AccountAction::CallRegister), "{acts:?}");
     }
 
     #[test]
