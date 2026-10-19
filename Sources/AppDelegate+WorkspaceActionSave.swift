@@ -1,6 +1,5 @@
 import AppKit
 import Foundation
-import ShellXBrand
 
 // MARK: - Save Workspace Layout (new-workspace plus-button menu)
 
@@ -204,10 +203,8 @@ extension AppDelegate {
             localized: "menu.app.openCmuxSettingsFile",
             defaultValue: "Open cmux.json"
         ))
-        alert.addButton(withTitle: String(
-            localized: "settings.settingsJSON.docsButton",
-            defaultValue: "Open Docs"
-        ))
+        // ShellX has no custom-commands docs page (cmux's is on cmux.com and
+        // nothing under docs/ covers actions), so there is no "Open Docs".
         alert.addButton(withTitle: String(
             localized: "common.ok",
             defaultValue: "OK"
@@ -272,9 +269,6 @@ extension AppDelegate {
             // Reuse the existing in-cmux config editor path used by Settings'
             // workspace-layout customization.
             openWorkspaceLayoutsCustomization()
-        case .alertSecondButtonReturn:
-            // No ShellX custom-commands page yet: the website stands in.
-            NSWorkspace.shared.open(ShellXBrand.websiteURL)
         default:
             break
         }

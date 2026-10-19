@@ -6284,8 +6284,14 @@ struct CMUXCLI {
         environment: [String: String],
         bundleIdentifier: String
     ) throws {
-        let resolvedPath = try resolveCoderouterExecutable(environment: environment)
-            ?? bootstrapCoderouter(environment: environment)
+        // ShellX never runs CodeRouter (a Manaflow service): not the
+        // app-bundled core, not one on PATH or in ~/.coderouter, and it never
+        // downloads one. `ShellXFeatures.codeRouter` is always false and does
+        // not follow `ShellXFeatures.remoteMachines`.
+        guard ShellXFeatures.codeRouter,
+              let resolvedPath = resolveCoderouterExecutable(environment: environment) else {
+            throw Self.coderouterNotAvailable()
+        }
         guard let executablePath = Self.coderouterNativeExecutablePath(for: resolvedPath) else {
             throw CLIError(message: localizedCoderouterHandoffUnsupported())
         }

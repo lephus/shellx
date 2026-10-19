@@ -68,62 +68,24 @@ struct PostHogAnalyticsPropertiesTests {
     }
 
     @MainActor
-    @Test("feature flag control plane uses a stable anonymous rollout identity and targeting context")
+    @Test("ShellX builds no feature-flag control-plane request with telemetry consent, so no rollout identity leaves the Mac")
     func featureFlagControlPlaneRespectsTelemetryConsent() throws {
         let suiteName = "cmux.feature.flags.identity.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
-        let identityKey = "cmux.flags.releaseControlDistinctID"
 
-        let firstRequest = try #require(CmuxFeatureFlags.postHogControlPlaneRequest(
-            telemetryEnabled: true,
-            defaults: defaults
-        ))
-        let secondRequest = try #require(CmuxFeatureFlags.postHogControlPlaneRequest(
-            telemetryEnabled: true,
-            defaults: defaults
-        ))
-        let firstBody = try #require(firstRequest.httpBody)
-        let secondBody = try #require(secondRequest.httpBody)
-        let firstPayload = try #require(
-            JSONSerialization.jsonObject(with: firstBody) as? [String: Any]
-        )
-        let secondPayload = try #require(
-            JSONSerialization.jsonObject(with: secondBody) as? [String: Any]
-        )
-        let distinctID = try #require(firstPayload["distinctId"] as? String)
-        let prefix = "cmux-desktop-release-control-"
-        let context = try #require(firstPayload["context"] as? [String: Any])
-        let personProperties = try #require(context["personProperties"] as? [String: Any])
-
-        #expect(firstRequest.url?.host == "cmux.com")
-        #expect(distinctID.hasPrefix(prefix))
-        #expect(UUID(uuidString: String(distinctID.dropFirst(prefix.count))) != nil)
-        #expect(secondPayload["distinctId"] as? String == distinctID)
-        #expect(personProperties["$os"] as? String == "macOS")
-        #expect((personProperties["cmux_architecture"] as? String)?.isEmpty == false)
-        #expect(firstPayload["$anon_distinct_id"] == nil)
-        #expect(firstPayload["person_properties"] == nil)
+        #expect(CmuxFeatureFlags.remoteConfigFetchEnabled == false)
+        #expect(CmuxFeatureFlags.postHogControlPlaneRequest(telemetryEnabled: true, defaults: defaults) == nil)
     }
 
     @MainActor
-    @Test("feature flag control plane sends no persistent identity after telemetry opt-out")
+    @Test("ShellX builds no feature-flag control-plane request after telemetry opt-out and stores no identity")
     func featureFlagControlPlaneHonorsTelemetryOptOut() throws {
         let suiteName = "cmux.feature.flags.optout.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let request = try #require(CmuxFeatureFlags.postHogControlPlaneRequest(
-            telemetryEnabled: false,
-            defaults: defaults
-        ))
-        let body = try #require(request.httpBody)
-        let payload = try #require(
-            JSONSerialization.jsonObject(with: body) as? [String: Any]
-        )
-
-        #expect(payload["distinctId"] as? String == "cmux-desktop-release-control")
-        #expect((payload["context"] as? [String: Any])?.isEmpty == true)
+        #expect(CmuxFeatureFlags.postHogControlPlaneRequest(telemetryEnabled: false, defaults: defaults) == nil)
         #expect(defaults.object(forKey: "cmux.flags.releaseControlDistinctID") == nil)
     }
 

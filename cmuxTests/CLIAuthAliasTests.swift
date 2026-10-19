@@ -543,436 +543,75 @@ struct CLICoderouterAliasTests {
         #expect(!protocolCodec.responseRawShapeIsValid(unknownDataKey))
     }
 
-    @Test("the short alias still prefers coderouter when both names exist")
-    func crAliasPrefersCoderouter() throws {
+    /// ShellX never runs CodeRouter (a Manaflow service): `cmux cr` and every
+    /// passthrough `cmux coderouter` verb, management or routed, stop with exit
+    /// 127 before any CodeRouter on PATH runs, before a capability probe, and
+    /// before a handoff is armed on the socket. This replaces upstream's exec,
+    /// descriptor, signal, capability-probe and arm tests, which needed a
+    /// CodeRouter to run (CLICoderouterBootstrapTests covers the install
+    /// locations).
+    @Test("ShellX refuses every CodeRouter alias before exec, probe, or arm")
+    func everyAliasIsRefusedBeforeExecProbeOrArm() throws {
         let cliPath = try BundledCLITestSupport.bundledCLIPath(
             for: BundledCLILinkageTests.self
         )
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-cr-preference-\(UUID().uuidString)", isDirectory: true)
-        defer { try? fileManager.removeItem(at: root) }
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            printf 'canonical coderouter\\n'
-            exit 41
-            """,
-            at: root.appendingPathComponent("coderouter", isDirectory: false)
-        )
-        try writeExecutable(
-            """
-            #!/bin/sh
-            printf 'the cr executable was selected\\n' >&2
-            exit 99
-            """,
-            at: root.appendingPathComponent("cr", isDirectory: false)
-        )
-
-        let result = runCLI(
-            cliPath: cliPath,
-            arguments: ["cr", "--version"],
-            environment: [
-                "PATH": root.path,
-                "CMUX_SOCKET_PATH": makeSocketPath("missing"),
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ]
-        )
-
-        #expect(!result.timedOut, Comment(rawValue: result.stderr))
-        #expect(result.status == 41, Comment(rawValue: result.stderr))
-        #expect(result.stdout == "canonical coderouter\n")
-        #expect(result.stderr.isEmpty)
-    }
-
-    @Test("alias exec preserves standard input, output, error, and exit status")
-    func aliasExecPreservesStdioAndExitStatus() throws {
-        let cliPath = try BundledCLITestSupport.bundledCLIPath(
-            for: BundledCLILinkageTests.self
-        )
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-coderouter-stdio-\(UUID().uuidString)", isDirectory: true)
-        let stdinURL = root.appendingPathComponent("stdin.txt", isDirectory: false)
-        defer { try? fileManager.removeItem(at: root) }
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            /bin/cat > "$CODEROUTER_STDIN_FILE"
-            printf 'coderouter stdout\\n'
-            printf 'coderouter stderr\\n' >&2
-            exit 37
-            """,
-            at: root.appendingPathComponent("coderouter", isDirectory: false)
-        )
-
-        let result = runCLI(
-            cliPath: cliPath,
-            arguments: ["coderouter", "--version"],
-            environment: [
-                "PATH": root.path,
-                "CODEROUTER_STDIN_FILE": stdinURL.path,
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ],
-            standardInput: "interactive input\n"
-        )
-
-        #expect(!result.timedOut, Comment(rawValue: result.stderr))
-        #expect(result.status == 37, Comment(rawValue: result.stderr))
-        #expect(result.stdout == "coderouter stdout\n")
-        #expect(result.stderr == "coderouter stderr\n")
-        #expect(try String(contentsOf: stdinURL, encoding: .utf8) == "interactive input\n")
-    }
-
-    @Test("an npm launcher resolves to the native vendor executable")
-    func npmLauncherUsesNativeVendorExecutable() throws {
-        let cliPath = try BundledCLITestSupport.bundledCLIPath(
-            for: BundledCLILinkageTests.self
-        )
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-coderouter-npm-\(UUID().uuidString)", isDirectory: true)
-        defer { try? fileManager.removeItem(at: root) }
-
-        #if arch(arm64)
-        let npmTarget = "darwin-arm64"
-        #elseif arch(x86_64)
-        let npmTarget = "darwin-x64"
-        #else
-        return
-        #endif
-
-        let packageRoot = root.appendingPathComponent("package", isDirectory: true)
-        let binDirectory = packageRoot.appendingPathComponent("bin", isDirectory: true)
-        let vendorDirectory = packageRoot
-            .appendingPathComponent("vendor", isDirectory: true)
-            .appendingPathComponent(npmTarget, isDirectory: true)
-        try fileManager.createDirectory(at: binDirectory, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: vendorDirectory, withIntermediateDirectories: true)
-        let launcherURL = binDirectory.appendingPathComponent("coderouter.js", isDirectory: false)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            printf 'javascript-launcher-ran\\n'
-            exit 98
-            """,
-            at: launcherURL
-        )
-        try writeExecutable(
-            """
-            #!/bin/sh
-            if [ "${1-}" = "capabilities" ] && [ "${2-}" = "--json" ]; then
-              printf '%s\\n' '{"product":"coderouter","protocolVersion":2,"authModes":["cmux-socket-v1"]}'
-              exit 0
-            fi
-            printf 'native-vendor:%s\\n' "$*"
-            """,
-            at: vendorDirectory.appendingPathComponent("coderouter", isDirectory: false)
-        )
-        try fileManager.createSymbolicLink(
-            at: root.appendingPathComponent("coderouter", isDirectory: false),
-            withDestinationURL: launcherURL
-        )
-
-        let result = runCLI(
-            cliPath: cliPath,
-            arguments: ["coderouter", "--version"],
-            environment: [
-                "PATH": root.path,
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ]
-        )
-
-        #expect(!result.timedOut, Comment(rawValue: result.stderr))
-        #expect(result.status == 0, Comment(rawValue: result.stderr))
-        #expect(result.stdout == "native-vendor:--version\n")
-        #expect(!result.stdout.contains("javascript-launcher-ran"))
-        #expect(result.stderr.isEmpty)
-    }
-
-    @Test("alias exec keeps normal termination signal behavior")
-    func aliasExecKeepsNormalTerminationSignalBehavior() throws {
-        let cliPath = try BundledCLITestSupport.bundledCLIPath(
-            for: BundledCLILinkageTests.self
-        )
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-coderouter-signal-\(UUID().uuidString)", isDirectory: true)
-        let signalURL = root.appendingPathComponent("signal.txt", isDirectory: false)
-        defer { try? fileManager.removeItem(at: root) }
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            if [ "${1-}" = "capabilities" ] && [ "${2-}" = "--json" ]; then
-              printf '%s\\n' '{"product":"coderouter","protocolVersion":2,"authModes":["cmux-socket-v1"]}'
-              exit 0
-            fi
-            trap 'printf received > "$CODEROUTER_SIGNAL_FILE"; exit 42' TERM
-            kill -TERM "$$"
-            /bin/sleep 1
-            exit 90
-            """,
-            at: root.appendingPathComponent("coderouter", isDirectory: false)
-        )
-
-        let result = runCLI(
-            cliPath: cliPath,
-            arguments: ["coderouter", "--version"],
-            environment: [
-                "PATH": root.path,
-                "CODEROUTER_SIGNAL_FILE": signalURL.path,
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ]
-        )
-
-        #expect(!result.timedOut, Comment(rawValue: result.stderr))
-        #expect(result.status == 42, Comment(rawValue: result.stderr))
-        #expect(try String(contentsOf: signalURL, encoding: .utf8) == "received")
-    }
-
-    @Test("capabilities stays credential-free when cmux is absent")
-    func capabilitiesDoesNotTouchControlSocket() throws {
-        let cliPath = try BundledCLITestSupport.bundledCLIPath(
-            for: BundledCLILinkageTests.self
-        )
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-coderouter-capabilities-\(UUID().uuidString)", isDirectory: true)
-        defer { try? fileManager.removeItem(at: root) }
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            printf 'capabilities-ok\\n'
-            """,
-            at: root.appendingPathComponent("coderouter", isDirectory: false)
-        )
-
-        let result = runCLI(
-            cliPath: cliPath,
-            arguments: ["coderouter", "capabilities", "--json"],
-            environment: [
-                "PATH": root.path,
-                "CMUX_SOCKET_PATH": makeSocketPath("missing"),
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ]
-        )
-
-        #expect(!result.timedOut, Comment(rawValue: result.stderr))
-        #expect(result.status == 0, Comment(rawValue: result.stderr))
-        #expect(result.stdout == "capabilities-ok\n")
-        #expect(result.stderr.isEmpty)
-    }
-
-    @Test("closes a high inherited descriptor after the soft limit is reduced")
-    func closesHighInheritedDescriptorBeyondCurrentLimit() throws {
-        let cliPath = try BundledCLITestSupport.bundledCLIPath(
-            for: BundledCLILinkageTests.self
-        )
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-coderouter-fd-boundary-\(UUID().uuidString)", isDirectory: true)
-        defer { try? fileManager.removeItem(at: root) }
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-
-        let sourceFD = Darwin.open("/dev/null", O_RDONLY)
-        #expect(sourceFD >= 0)
-        guard sourceFD >= 0 else { return }
-        defer { Darwin.close(sourceFD) }
-        let sentinelFD = fcntl(sourceFD, F_DUPFD, 1_024)
-        #expect(sentinelFD >= 1_024)
-        guard sentinelFD >= 1_024 else { return }
-        defer { Darwin.close(sentinelFD) }
-        let descriptorFlags = fcntl(sentinelFD, F_GETFD)
-        #expect(descriptorFlags >= 0)
-        _ = fcntl(sentinelFD, F_SETFD, descriptorFlags & ~FD_CLOEXEC)
-
-        try writeExecutable(
-            """
-            #!/bin/sh
-            if [ -e "/dev/fd/$CODEROUTER_SENTINEL_FD" ]; then
-              printf 'sentinel-open\\n'
-            else
-              printf 'sentinel-closed\\n'
-            fi
-            """,
-            at: root.appendingPathComponent("coderouter", isDirectory: false)
-        )
-        let wrapperURL = root.appendingPathComponent("cmux-low-limit", isDirectory: false)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            ulimit -n 256
-            exec "$CMUX_UNDER_TEST" "$@"
-            """,
-            at: wrapperURL
-        )
-
-        let result = runCLI(
-            cliPath: wrapperURL.path,
-            arguments: ["coderouter", "--version"],
-            environment: [
-                "PATH": root.path,
-                "CMUX_UNDER_TEST": cliPath,
-                "CODEROUTER_SENTINEL_FD": String(sentinelFD),
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ]
-        )
-
-        #expect(!result.timedOut, Comment(rawValue: result.stderr))
-        #expect(result.status == 0, Comment(rawValue: result.stderr))
-        #expect(result.stdout == "sentinel-closed\n")
-        #expect(result.stderr.isEmpty)
-    }
-
-    @Test("does not pass inherited descriptor three to CodeRouter")
-    func closesInheritedDescriptorThree() throws {
-        let cliPath = try BundledCLITestSupport.bundledCLIPath(
-            for: BundledCLILinkageTests.self
-        )
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-coderouter-fd3-\(UUID().uuidString)", isDirectory: true)
-        defer { try? fileManager.removeItem(at: root) }
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            if (: <&3) 2>/dev/null; then
-              printf 'fd3-open\\n'
-              exit 92
-            fi
-            printf 'fd3-closed\\n'
-            """,
-            at: root.appendingPathComponent("coderouter", isDirectory: false)
-        )
-        let wrapperURL = root.appendingPathComponent("cmux-open-fd3", isDirectory: false)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            exec 3</dev/null
-            exec "$CMUX_UNDER_TEST" "$@"
-            """,
-            at: wrapperURL
-        )
-
-        let result = runCLI(
-            cliPath: wrapperURL.path,
-            arguments: ["coderouter", "--version"],
-            environment: [
-                "PATH": root.path,
-                "CMUX_UNDER_TEST": cliPath,
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ]
-        )
-
-        #expect(!result.timedOut, Comment(rawValue: result.stderr))
-        #expect(result.status == 0, Comment(rawValue: result.stderr))
-        #expect(result.stdout == "fd3-closed\n")
-        #expect(result.stderr.isEmpty)
-    }
-
-    @Test("a closed standard input stays closed without blocking alias exec")
-    func closedStandardInputStaysClosed() throws {
-        let cliPath = try BundledCLITestSupport.bundledCLIPath(
-            for: BundledCLILinkageTests.self
-        )
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-coderouter-closed-stdin-\(UUID().uuidString)", isDirectory: true)
-        defer { try? fileManager.removeItem(at: root) }
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            # With descriptor 0 closed, sh opens this script on it, so a plain
-            # `<&0` probe always succeeds. Stdin is open only when descriptor 0
-            # exists and is not this script.
-            if [ -e /dev/fd/0 ] && ! [ /dev/fd/0 -ef "$0" ]; then
-              printf 'stdin-open\\n'
-              exit 91
-            fi
-            printf 'stdin-closed\\n'
-            exit 31
-            """,
-            at: root.appendingPathComponent("coderouter", isDirectory: false)
-        )
-        let wrapperURL = root.appendingPathComponent("cmux-closed-stdin", isDirectory: false)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            exec 0<&-
-            exec "$CMUX_UNDER_TEST" "$@"
-            """,
-            at: wrapperURL
-        )
-
-        let result = runCLI(
-            cliPath: wrapperURL.path,
-            arguments: ["coderouter", "--version"],
-            environment: [
-                "PATH": root.path,
-                "CMUX_UNDER_TEST": cliPath,
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ]
-        )
-
-        #expect(!result.timedOut, Comment(rawValue: result.stderr))
-        #expect(result.status == 31, Comment(rawValue: result.stderr))
-        #expect(result.stdout == "stdin-closed\n")
-        #expect(result.stderr.isEmpty)
-    }
-
-    @Test("management commands use cr without requesting a handoff")
-    func crFallbackManagementCommandDoesNotRequestHandoff() throws {
-        let cliPath = try BundledCLITestSupport.bundledCLIPath(
-            for: BundledCLILinkageTests.self
-        )
-        let handoffServer = try CLICoderouterMockHandoffServer(name: "fallback")
+        let handoffServer = try CLICoderouterMockHandoffServer(name: "refused")
         defer { handoffServer.stop() }
         let fileManager = FileManager.default
         let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-cr-alias-\(UUID().uuidString)", isDirectory: true)
-        let argsURL = root.appendingPathComponent("args.txt", isDirectory: false)
+            .appendingPathComponent("cmux-coderouter-refused-\(UUID().uuidString)", isDirectory: true)
+        let markerURL = root.appendingPathComponent("coderouter-ran.txt", isDirectory: false)
         defer { try? fileManager.removeItem(at: root) }
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            printf '<%s>\\n' "$@" > "$CR_ARGS_FILE"
-            printf 'cr fallback\\n'
-            exit 23
-            """,
-            at: root.appendingPathComponent("cr", isDirectory: false)
-        )
+        for name in ["coderouter", "cr"] {
+            try writeExecutable(
+                """
+                #!/bin/sh
+                printf '%s:%s\\n' "$0" "$*" >> "$CODEROUTER_MARKER_FILE"
+                if [ "${1-}" = "capabilities" ]; then
+                  printf '%s\\n' '{"product":"coderouter","protocolVersion":2,"authModes":["cmux-socket-v1"]}'
+                  exit 0
+                fi
+                printf 'must-not-run\\n'
+                exit 41
+                """,
+                at: root.appendingPathComponent(name, isDirectory: false)
+            )
+        }
 
-        let result = runCLI(
-            cliPath: cliPath,
-            arguments: ["cr", "login", "--device-auth"],
-            environment: [
-                "PATH": root.path,
-                "CR_ARGS_FILE": argsURL.path,
-                "CMUX_SOCKET_PATH": handoffServer.path,
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ]
-        )
-
-        #expect(!handoffServer.waitForRequest(timeout: 0.2), "Management commands must not arm")
-        #expect(!result.timedOut, Comment(rawValue: result.stderr))
-        #expect(result.status == 23, Comment(rawValue: result.stderr))
-        #expect(result.stdout == "cr fallback\n")
-        #expect(result.stderr.isEmpty)
-        #expect(
-            try String(contentsOf: argsURL, encoding: .utf8)
-                == "<login>\n<--device-auth>\n"
-        )
+        let cases: [[String]] = [
+            ["cr", "--version"],
+            ["coderouter", "--version"],
+            ["coderouter", "capabilities", "--json"],
+            ["cr", "login", "--device-auth"],
+            ["coderouter", "launch"],
+            ["coderouter", "codex"],
+            ["cr", "pi"],
+        ]
+        for arguments in cases {
+            let result = runCLI(
+                cliPath: cliPath,
+                arguments: arguments,
+                environment: [
+                    "PATH": root.path,
+                    "CODEROUTER_MARKER_FILE": markerURL.path,
+                    "CMUX_SOCKET_PATH": handoffServer.path,
+                    "CMUX_CLI_SENTRY_DISABLED": "1",
+                ]
+            )
+            let label = Comment(rawValue: "\(arguments): \(result.stderr)")
+            #expect(!result.timedOut, label)
+            #expect(result.status == 127, label)
+            #expect(result.stdout.isEmpty, label)
+            #expect(result.stderr.contains("CodeRouter is not available in ShellX."), label)
+            #expect(!result.stderr.contains(root.path), label)
+        }
+        #expect(!fileManager.fileExists(atPath: markerURL.path), "No CodeRouter executable may run")
+        #expect(!handoffServer.waitForRequest(timeout: 0.2), "No alias may arm a handoff")
     }
 
     @Test("only exact top-level agent names use socket handoff")
-    func routedCommandClassificationIsExact() throws {
+    func routedCommandClassificationIsExact() {
         #expect(launchPolicy.commandRequiresHandoff(["codex"]))
         #expect(!launchPolicy.commandRequiresHandoff(["add", "codex"]))
         #expect(launchPolicy.commandRequiresHandoff(["opencode", "--help"]))
@@ -980,246 +619,9 @@ struct CLICoderouterAliasTests {
         #expect(!launchPolicy.commandRequiresHandoff([]))
         #expect(!launchPolicy.commandRequiresHandoff(["login"]))
         #expect(!launchPolicy.commandRequiresHandoff(["capabilities", "--json"]))
-        let cliPath = try BundledCLITestSupport.bundledCLIPath(
-            for: BundledCLILinkageTests.self
-        )
-        let handoffServer = try CLICoderouterMockHandoffServer(name: "classification")
-        defer { handoffServer.stop() }
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-coderouter-classification-\(UUID().uuidString)", isDirectory: true)
-        defer { try? fileManager.removeItem(at: root) }
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            printf '<%s>\\n' "$@"
-            """,
-            at: root.appendingPathComponent("coderouter", isDirectory: false)
-        )
-
-        let cases: [[String]] = [
-            ["codex-helper"],
-            ["Codex"],
-            ["--", "codex"],
-        ]
-        for commandArguments in cases {
-            let result = runCLI(
-                cliPath: cliPath,
-                arguments: ["coderouter"] + commandArguments,
-                environment: [
-                    "PATH": root.path,
-                    "CMUX_SOCKET_PATH": handoffServer.path,
-                    "CMUX_CLI_SENTRY_DISABLED": "1",
-                ]
-            )
-            #expect(!result.timedOut, Comment(rawValue: result.stderr))
-            #expect(result.status == 0, Comment(rawValue: result.stderr))
-            #expect(
-                result.stdout
-                    == commandArguments.map { "<\($0)>\n" }.joined(),
-                Comment(rawValue: result.stdout)
-            )
-        }
-        #expect(!handoffServer.waitForRequest(timeout: 0.2), "Near matches must not arm")
-    }
-
-    @Test("rejects an executable without secure handoff support before arm")
-    func rejectsUnsupportedExecutableBeforeArm() throws {
-        let cliPath = try BundledCLITestSupport.bundledCLIPath(
-            for: BundledCLILinkageTests.self
-        )
-        let handoffServer = try CLICoderouterMockHandoffServer(name: "old-cli")
-        defer { handoffServer.stop() }
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-coderouter-old-\(UUID().uuidString)", isDirectory: true)
-        defer { try? fileManager.removeItem(at: root) }
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            if [ "${1-}" = "capabilities" ]; then
-              printf '{"product":"coderouter","protocolVersion":%s,"authModes":[]}\\n' "${CODEROUTER_PROTOCOL_VALUE-0}"
-              exit 0
-            fi
-            printf 'must-not-run\\n'
-            """,
-            at: root.appendingPathComponent("coderouter", isDirectory: false)
-        )
-
-        let result = runCLI(
-            cliPath: cliPath,
-            arguments: ["coderouter", "codex"],
-            environment: [
-                "PATH": root.path,
-                "CMUX_SOCKET_PATH": handoffServer.path,
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ]
-        )
-
-        #expect(!handoffServer.waitForRequest(timeout: 0.2), "An unsupported CLI must not arm")
-        #expect(!result.timedOut)
-        #expect(result.status != 0)
-        #expect(!result.stdout.contains("must-not-run"))
-        #expect(!result.stderr.contains(root.path))
-        #expect(result.stderr.contains("does not support secure cmux handoff"))
-
-        let booleanResult = runCLI(
-            cliPath: cliPath,
-            arguments: ["coderouter", "codex"],
-            environment: [
-                "PATH": root.path,
-                "CODEROUTER_PROTOCOL_VALUE": "true",
-                "CMUX_SOCKET_PATH": handoffServer.path,
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ]
-        )
-        #expect(booleanResult.status != 0)
-        #expect(!booleanResult.stdout.contains("must-not-run"))
-        #expect(
-            !handoffServer.waitForRequest(timeout: 0.2),
-            "Boolean protocol versions must not arm"
-        )
-    }
-
-    @Test("rejects an unrelated cr executable before arm")
-    func rejectsUnrelatedFallbackBeforeArm() throws {
-        let cliPath = try BundledCLITestSupport.bundledCLIPath(
-            for: BundledCLILinkageTests.self
-        )
-        let handoffServer = try CLICoderouterMockHandoffServer(name: "wrong-cr")
-        defer { handoffServer.stop() }
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-unrelated-cr-\(UUID().uuidString)", isDirectory: true)
-        defer { try? fileManager.removeItem(at: root) }
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            if [ "${1-}" = "capabilities" ]; then
-              printf '%s\\n' '{"product":"unrelated","protocolVersion":2,"authModes":["cmux-socket-v1"]}'
-              exit 0
-            fi
-            printf 'must-not-run\\n'
-            """,
-            at: root.appendingPathComponent("cr", isDirectory: false)
-        )
-
-        let result = runCLI(
-            cliPath: cliPath,
-            arguments: ["cr", "pi"],
-            environment: [
-                "PATH": root.path,
-                "CMUX_SOCKET_PATH": handoffServer.path,
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ]
-        )
-
-        #expect(!handoffServer.waitForRequest(timeout: 0.2), "An unrelated cr must not arm")
-        #expect(!result.timedOut)
-        #expect(result.status != 0)
-        #expect(!result.stdout.contains("must-not-run"))
-    }
-
-    @Test("rejects an unsigned executable before capability execution or arm")
-    func rejectsUnsignedExecutableBeforeArm() throws {
-        let cliPath = try BundledCLITestSupport.bundledCLIPath(
-            for: BundledCLILinkageTests.self
-        )
-        let handoffServer = try CLICoderouterMockHandoffServer(name: "unsigned")
-        defer { handoffServer.stop() }
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-unsigned-coderouter-\(UUID().uuidString)", isDirectory: true)
-        defer { try? fileManager.removeItem(at: root) }
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            if [ "${1-}" = "capabilities" ]; then
-              printf '%s\\n' '{"product":"coderouter","protocolVersion":2,"authModes":["cmux-socket-v1"]}'
-              exit 0
-            fi
-            printf 'must-not-run\\n'
-            """,
-            at: root.appendingPathComponent("coderouter", isDirectory: false)
-        )
-
-        let result = runCLI(
-            cliPath: cliPath,
-            arguments: ["coderouter", "codex"],
-            environment: [
-                "PATH": root.path,
-                "CMUX_SOCKET_PATH": handoffServer.path,
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ],
-            allowUnsignedCoderouter: false
-        )
-
-        #expect(!handoffServer.waitForRequest(timeout: 0.2), "Unsigned code must not arm")
-        #expect(!result.timedOut)
-        #expect(result.status != 0)
-        #expect(!result.stdout.contains("must-not-run"))
-        #expect(result.stderr.contains("does not support secure cmux handoff"))
-    }
-
-    @Test("bounds capability probe time and output before arm")
-    func boundsCapabilityProbeBeforeArm() throws {
-        let cliPath = try BundledCLITestSupport.bundledCLIPath(
-            for: BundledCLILinkageTests.self
-        )
-        let handoffServer = try CLICoderouterMockHandoffServer(name: "probe-bound")
-        defer { handoffServer.stop() }
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-coderouter-probe-\(UUID().uuidString)", isDirectory: true)
-        defer { try? fileManager.removeItem(at: root) }
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            if [ "${1-}" = "capabilities" ]; then
-              if [ "${CODEROUTER_CAPABILITY_TEST_MODE-}" = "slow" ]; then
-                /bin/sleep 10
-              else
-                /usr/bin/yes x | /usr/bin/head -c 20000
-              fi
-              exit 0
-            fi
-            printf 'must-not-run\\n'
-            """,
-            at: root.appendingPathComponent("coderouter", isDirectory: false)
-        )
-
-        let slowResult = runCLI(
-            cliPath: cliPath,
-            arguments: ["coderouter", "codex"],
-            environment: [
-                "PATH": root.path,
-                "CODEROUTER_CAPABILITY_TEST_MODE": "slow",
-                "CMUX_SOCKET_PATH": handoffServer.path,
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ],
-            timeout: 4
-        )
-        #expect(!slowResult.timedOut)
-        #expect(slowResult.status != 0)
-
-        let oversizedResult = runCLI(
-            cliPath: cliPath,
-            arguments: ["coderouter", "codex"],
-            environment: [
-                "PATH": root.path,
-                "CODEROUTER_CAPABILITY_TEST_MODE": "oversized",
-                "CMUX_SOCKET_PATH": handoffServer.path,
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ]
-        )
-        #expect(!oversizedResult.timedOut)
-        #expect(oversizedResult.status != 0)
-        #expect(!handoffServer.waitForRequest(timeout: 0.2), "Invalid probes must not arm")
+        #expect(!launchPolicy.commandRequiresHandoff(["codex-helper"]))
+        #expect(!launchPolicy.commandRequiresHandoff(["Codex"]))
+        #expect(!launchPolicy.commandRequiresHandoff(["--", "codex"]))
     }
 
     @Test("localizes the alias help entry")
@@ -1248,8 +650,8 @@ struct CLICoderouterAliasTests {
         )
     }
 
-    @Test("does not leak cmux control environment to the child")
-    func childEnvironmentExcludesCmuxControlValues() throws {
+    @Test("the launch policy keeps cmux control values out of a child environment")
+    func childEnvironmentExcludesCmuxControlValues() {
         let routedEnvironment = launchPolicy.childEnvironment(
             [
                 "PATH": "/usr/bin",
@@ -1321,160 +723,6 @@ struct CLICoderouterAliasTests {
         #expect(nakedEnvironment["CMUX_SOCKET_CAPABILITY"] == nil)
         #expect(nakedEnvironment["CODEROUTER_HANDOFF_FD"] == nil)
         #expect(nakedEnvironment["DYLD_LIBRARY_PATH"] == nil)
-
-        let cliPath = try BundledCLITestSupport.bundledCLIPath(
-            for: BundledCLILinkageTests.self
-        )
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-coderouter-environment-\(UUID().uuidString)", isDirectory: true)
-        let environmentURL = root.appendingPathComponent("environment.txt", isDirectory: false)
-        defer { try? fileManager.removeItem(at: root) }
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        try writeExecutable(
-            """
-            #!/bin/sh
-            /usr/bin/env | /usr/bin/sort > "$CODEROUTER_ENV_FILE"
-            printf 'environment captured\\n'
-            """,
-            at: root.appendingPathComponent("coderouter", isDirectory: false)
-        )
-
-        let result = runCLI(
-            cliPath: cliPath,
-            // Use the credential-free top-level provider version form so this
-            // environment-boundary test does not need a live cmux socket.
-            arguments: ["coderouter", "--version"],
-            environment: [
-                "PATH": root.path,
-                "CODEROUTER_ENV_FILE": environmentURL.path,
-                "CODEROUTER_TEST_MARKER": "preserved",
-                "CMUX": "cmux-root-secret",
-                "CMUXD": "cmuxd-root-secret",
-                "CMUX_SOCKET": "/tmp/cmux-private.sock",
-                "CMUX_SOCKET_PATH": "/tmp/cmux-private-path.sock",
-                "CMUX_SOCKET_CAPABILITY": "capability-secret",
-                "CMUX_SOCKET_PASSWORD": "password-secret",
-                "CMUX_AUTH_CREDENTIALS_FILE": "/tmp/cmux-credentials",
-                "CMUX_WORKSPACE_ID": "workspace-secret",
-                "CMUX_SURFACE_ID": "surface-secret",
-                "CMUXD_UNIX_PATH": "/tmp/cmuxd-private.sock",
-                "STACK_ACCESS_TOKEN": "stack-access-secret",
-                "STACK_REFRESH_TOKEN": "stack-refresh-secret",
-                "OPENAI_API_KEY": "openai-secret",
-                "GITHUB_PAT": "github-pat-secret",
-                "GITHUB_TOKEN": "github-token-secret",
-                "CUSTOM_SECRET_TOKEN": "custom-secret-token",
-                "CODEROUTER_CMUX_HANDOFF_SOCKET": "/tmp/stale-handoff.sock",
-                "CODEROUTER_HANDOFF_FD": "3",
-                "CODEROUTER_HANDOFF_LEASE": "stale-handoff-lease",
-                "CODEROUTER_HANDOFF_TEST_ORIGIN": "http://127.0.0.1:43123",
-                "DYLD_LIBRARY_PATH": "/tmp/dyld-secret",
-                "NPM_CONFIG__AUTH": "npm-auth-secret",
-                "NPM_TOKEN": "npm-token-secret",
-                "DOCKER_AUTH_CONFIG": "docker-auth-secret",
-                "CI_JOB_JWT_V2": "ci-jwt-secret",
-                "SSH_AUTH_SOCK": "/tmp/ssh-agent-preserved.sock",
-                "AWS_REGION": "us-west-2",
-                "AWS_PROFILE": "dev-profile",
-                "AWS_ACCESS_KEY_ID": "aws-access-id-secret",
-                "AWS_SECRET_ACCESS_KEY": "aws-secret-access-secret",
-                "AWS_SESSION_TOKEN": "aws-session-token-secret",
-                "AZURE_CONFIG_DIR": "/tmp/azure-config",
-                "GCP_PROJECT": "gcp-project-config",
-                "GOOGLE_CLOUD_PROJECT": "google-project-config",
-                "GOOGLE_APPLICATION_CREDENTIALS": "/tmp/google-secret.json",
-                "CMUX_CLI_SENTRY_DISABLED": "1",
-            ]
-        )
-
-        #expect(!result.timedOut, Comment(rawValue: result.stderr))
-        #expect(result.status == 0, Comment(rawValue: result.stderr))
-        #expect(result.stdout == "environment captured\n")
-        #expect(result.stderr.isEmpty)
-        let childEnvironment = try String(contentsOf: environmentURL, encoding: .utf8)
-        let childEnvironmentLines = childEnvironment.split(separator: "\n").map(String.init)
-        #expect(
-            !childEnvironmentLines.contains { line in
-                line.hasPrefix("CMUX_") || line.hasPrefix("CMUXD_")
-            },
-            Comment(rawValue: childEnvironment)
-        )
-        #expect(childEnvironmentLines.contains("CODEROUTER_TEST_MARKER=preserved"))
-        #expect(!childEnvironment.contains("cmux-root-secret"))
-        #expect(!childEnvironment.contains("cmuxd-root-secret"))
-        #expect(!childEnvironment.contains("capability-secret"))
-        #expect(!childEnvironment.contains("password-secret"))
-        #expect(!childEnvironment.contains("workspace-secret"))
-        #expect(!childEnvironment.contains("surface-secret"))
-        #expect(!childEnvironment.contains("stack-access-secret"))
-        #expect(!childEnvironment.contains("stack-refresh-secret"))
-        #expect(!childEnvironment.contains("openai-secret"))
-        #expect(!childEnvironment.contains("github-pat-secret"))
-        #expect(!childEnvironment.contains("github-token-secret"))
-        #expect(!childEnvironment.contains("custom-secret-token"))
-        #expect(!childEnvironment.contains("stale-handoff.sock"))
-        #expect(!childEnvironment.contains("stale-handoff-lease"))
-        #expect(!childEnvironment.contains("127.0.0.1:43123"))
-        #expect(!childEnvironment.contains("dyld-secret"))
-        #expect(!childEnvironment.contains("npm-auth-secret"))
-        #expect(!childEnvironment.contains("npm-token-secret"))
-        #expect(!childEnvironment.contains("docker-auth-secret"))
-        #expect(!childEnvironment.contains("ci-jwt-secret"))
-        #expect(!childEnvironment.contains("aws-access-id-secret"))
-        #expect(!childEnvironment.contains("aws-secret-access-secret"))
-        #expect(!childEnvironment.contains("aws-session-token-secret"))
-        #expect(!childEnvironment.contains("google-secret"))
-        #expect(childEnvironmentLines.contains("SSH_AUTH_SOCK=/tmp/ssh-agent-preserved.sock"))
-        #expect(childEnvironmentLines.contains("AWS_REGION=us-west-2"))
-        #expect(childEnvironmentLines.contains("AWS_PROFILE=dev-profile"))
-        #expect(childEnvironmentLines.contains("AZURE_CONFIG_DIR=/tmp/azure-config"))
-        #expect(childEnvironmentLines.contains("GCP_PROJECT=gcp-project-config"))
-        #expect(childEnvironmentLines.contains("GOOGLE_CLOUD_PROJECT=google-project-config"))
-    }
-
-    @Test("keeps launch diagnostics internal")
-    func launchFailureDoesNotExposePathOrSystemError() throws {
-        let cliPath = try BundledCLITestSupport.bundledCLIPath(
-            for: BundledCLILinkageTests.self
-        )
-        let handoffServer = try CLICoderouterMockHandoffServer(name: "failure")
-        defer { handoffServer.stop() }
-        let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory
-            .appendingPathComponent("cmux-coderouter-launch-failure-\(UUID().uuidString)", isDirectory: true)
-        let executableURL = root.appendingPathComponent("coderouter", isDirectory: false)
-        let debugLogURL = root.appendingPathComponent("debug.log", isDirectory: false)
-        defer { try? fileManager.removeItem(at: root) }
-        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-        // An executable file without a recognized format makes execve fail after
-        // PATH resolution, exercising the internal diagnostic path.
-        try writeExecutable("not an executable format\n", at: executableURL)
-
-        let result = runCLI(
-            cliPath: cliPath,
-            arguments: ["coderouter", "launch"],
-            environment: [
-                "PATH": root.path,
-                "CMUX_SOCKET_PATH": handoffServer.path,
-                "CMUX_DEBUG_LOG": debugLogURL.path,
-            ]
-        )
-
-        #expect(!handoffServer.waitForRequest(timeout: 0.2), "A management launch must not arm")
-        #expect(!result.timedOut, Comment(rawValue: result.stderr))
-        #expect(result.status == 127, Comment(rawValue: result.stderr))
-        #expect(result.stdout.isEmpty)
-        #expect(result.stderr.contains("Could not start the required CLI"))
-        #expect(!result.stderr.contains(root.path))
-        #expect(!result.stderr.contains("Exec format error"))
-
-#if DEBUG
-        let debugLog = try String(contentsOf: debugLogURL, encoding: .utf8)
-        #expect(debugLog.contains("cli.coderouter.exec_failed"))
-        #expect(debugLog.contains(executableURL.path))
-        #expect(debugLog.contains("errno="))
-#endif
     }
 
     private func runCLI(
@@ -1566,10 +814,5 @@ struct CLICoderouterAliasTests {
             [.posixPermissions: 0o755],
             ofItemAtPath: url.path
         )
-    }
-
-    private func makeSocketPath(_ name: String) -> String {
-        let shortID = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)
-        return "/tmp/cli-\(name.prefix(3))-\(shortID).sock"
     }
 }

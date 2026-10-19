@@ -650,7 +650,9 @@ final class CmuxFeatureFlags {
         return request
     }
 
-    nonisolated private static func loadPostHogControlPlaneFlags(
+    /// The default remote loader. Internal so ShellX's no-phone-home test can
+    /// show it returns without building a request.
+    nonisolated static func loadPostHogControlPlaneFlags(
         distinctID: String,
         personProperties: [String: String]
     ) async -> [String: Bool]? {

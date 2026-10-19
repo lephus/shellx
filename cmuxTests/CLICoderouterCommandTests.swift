@@ -194,8 +194,9 @@ import Testing
 }
 
 // `cmux coderouter <status|machines|claude>` drives the app's `coderouter.*`
-// socket methods; every other `cmux coderouter` verb still execs the installed
-// CodeRouter CLI. These run the bundled CLI against a mock socket server and
+// socket methods; every other `cmux coderouter` verb would exec the CodeRouter
+// CLI, which ShellX refuses (exit 127, "CodeRouter is not available in
+// ShellX."). These run the bundled CLI against a mock socket server and
 // assert the wire method, the params, and the printed result.
 extension CLINotifyProcessIntegrationRegressionTests {
     private static let sampleOAuthToken = "sk-ant-oat01-abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJ"
@@ -807,11 +808,10 @@ extension CLINotifyProcessIntegrationRegressionTests {
         XCTAssertTrue(state.commands.contains { $0.contains(#""method":"auth.status""#) })
     }
 
-    func testCoderouterUnknownVerbStillPassesThroughToTheInstalledCLI() throws {
-        // With an empty PATH and an empty HOME (the passthrough also looks in
-        // the installer's ~/.coderouter/bin) there is no `coderouter`/`cr` to
-        // run; the point is that the socket is never consulted for a non-cmux
-        // verb.
+    func testCoderouterUnknownVerbIsRefusedWithoutTheSocket() throws {
+        // A verb cmux does not own goes to the CodeRouter passthrough, which
+        // ShellX refuses before looking for an executable; the socket is never
+        // consulted for a non-cmux verb.
         let emptyPath = FileManager.default.temporaryDirectory
             .appendingPathComponent("cmux-empty-path-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: emptyPath, withIntermediateDirectories: true)
@@ -824,11 +824,13 @@ extension CLINotifyProcessIntegrationRegressionTests {
                 "PATH": emptyPath.path,
                 "HOME": emptyPath.path,
                 "CFFIXED_USER_HOME": emptyPath.path,
+                "AppleLanguages": "(en)",
             ],
             waitForSocket: false
         ) { _, _ in nil }
 
         XCTAssertEqual(result.status, 127, result.stderr)
+        XCTAssertTrue(result.stderr.contains("CodeRouter is not available in ShellX."), result.stderr)
         XCTAssertTrue(state.commands.isEmpty, "passthrough verbs must not touch the cmux socket: \(state.commands)")
     }
 }

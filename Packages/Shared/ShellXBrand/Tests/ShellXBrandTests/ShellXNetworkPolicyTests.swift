@@ -42,4 +42,11 @@ import Foundation
         #expect(!ShellXNetworkPolicy.isForbidden(host: "notcmux.com"))
         #expect(!ShellXNetworkPolicy.isForbidden(host: "cmux.community"))
     }
+
+    /// CodeRouter (a Manaflow service) stays off even after Wave 2 turns
+    /// remote machines on, so the CLI gate must not ride on `remoteMachines`.
+    @Test func codeRouterIsHardOff() {
+        #expect(ShellXFeatures.codeRouter == false)
+        #expect(ShellXNetworkPolicy.isForbidden(host: "coderouter.dev"))
+    }
 }

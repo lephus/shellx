@@ -136,14 +136,9 @@ public struct KeyboardShortcutsSection: View {
             String(localized: "settings.shortcuts.chords", defaultValue: "Shortcut Chords"),
             subtitle: String(localized: "settings.shortcuts.chords.subtitle", defaultValue: "Add tmux-style multi-step shortcuts in cmux.json, for example [\"ctrl+b\", \"c\"].")
         ) {
+            // ShellX has no chord docs page (cmux's is on cmux.com and nothing
+            // under docs/ covers chords), so the "Chord docs" link is hidden.
             HStack(spacing: 8) {
-                Link(
-                    String(localized: "settings.shortcuts.chords.docsButton", defaultValue: "Chord docs"),
-                    destination: URL(string: "https://shellx.pro")!
-                )
-                .cmuxFont(.caption)
-                .accessibilityIdentifier("SettingsKeyboardShortcutsChordDocsLink")
-
                 Button(String(localized: "settings.app.settingsFile.openButton", defaultValue: "Open cmux.json")) {
                     hostActions.openConfigInExternalEditor()
                 }

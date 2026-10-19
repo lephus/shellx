@@ -78,11 +78,24 @@ final class PostHogAnalytics: @unchecked Sendable {
             return false
         }
         guard telemetryEnabled() else { return false }
+        return Self.buildAllowsCapture(environment: environment)
+    }
+
+    /// The build's own answer once telemetry is on: ShellX release builds never
+    /// capture, and debug builds only with the local `CMUX_POSTHOG_ENABLE=1`
+    /// opt-in (into the no-op default closures).
+    nonisolated static func buildAllowsCapture(
+        environment: [String: String],
+        isDebugBuild: Bool = PostHogAnalytics.isDebugBuild
+    ) -> Bool {
+        isDebugBuild && environment["CMUX_POSTHOG_ENABLE"] == "1"
+    }
+
+    nonisolated static var isDebugBuild: Bool {
 #if DEBUG
-        // Avoid polluting production analytics while iterating locally.
-        return environment["CMUX_POSTHOG_ENABLE"] == "1"
+        true
 #else
-        return false
+        false
 #endif
     }
 
