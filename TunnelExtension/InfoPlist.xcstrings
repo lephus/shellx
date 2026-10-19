@@ -57,6 +57,12 @@
             "state": "translated",
             "value": "ShellX Cloud Tunnel"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX Cloud Tunnel"
+          }
         }
       }
     }

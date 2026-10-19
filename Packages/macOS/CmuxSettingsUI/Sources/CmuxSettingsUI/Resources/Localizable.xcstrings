@@ -122,6 +122,12 @@
             "state": "translated",
             "value": "Зберігати локальні сеанси"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giữ phiên cục bộ luôn chạy"
+          }
         }
       }
     },
@@ -245,6 +251,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Іменовані сеанси local-tmux зберігають процеси й історію прокручування після виходу, збоїв та оновлень ShellX. Звичайні термінали зберігають поточну поведінку."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các phiên local-tmux có tên giữ tiến trình và scrollback tồn tại qua các lần thoát, sự cố và cập nhật ShellX. Terminal thông thường giữ nguyên hành vi hiện tại."
           }
         }
       }
@@ -370,6 +382,12 @@
             "state": "translated",
             "value": "Оновити"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Làm mới"
+          }
         }
       }
     },
@@ -493,6 +511,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Докладніше"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chi tiết"
           }
         }
       }
@@ -618,6 +642,12 @@
             "state": "translated",
             "value": "Запустити постійний сеанс"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bắt đầu phiên bền vững"
+          }
         }
       }
     },
@@ -741,6 +771,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Створює іменований сеанс local-tmux у каталозі вибраного робочого простору та підключає його до ShellX."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tạo một phiên local-tmux có tên trong thư mục của phiên đã chọn và gắn nó vào ShellX."
           }
         }
       }
@@ -866,6 +902,12 @@
             "state": "translated",
             "value": "Назва сеансу"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tên phiên"
+          }
         }
       }
     },
@@ -989,6 +1031,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Запустити"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bắt đầu"
           }
         }
       }
@@ -1114,6 +1162,12 @@
             "state": "translated",
             "value": "Стан"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trạng thái"
+          }
         }
       }
     },
@@ -1237,6 +1291,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Підключити"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đính kèm"
           }
         }
       }
@@ -1362,6 +1422,12 @@
             "state": "translated",
             "value": "Застарілий"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cũ"
+          }
         }
       }
     },
@@ -1485,6 +1551,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Перевірка…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang kiểm tra…"
           }
         }
       }
@@ -1610,6 +1682,12 @@
             "state": "translated",
             "value": "Немає активних сеансів"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không có phiên nào đang chạy"
+          }
         }
       }
     },
@@ -1733,6 +1811,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Активні"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang chạy"
           }
         }
       }
@@ -1858,6 +1942,12 @@
             "state": "translated",
             "value": "Керований"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Được quản lý"
+          }
         }
       }
     },
@@ -1981,6 +2071,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Некерований"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không được quản lý"
           }
         }
       }
@@ -2106,6 +2202,12 @@
             "state": "translated",
             "value": "Клієнти"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Client"
+          }
         }
       }
     },
@@ -2229,6 +2331,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Відкрийте робочу область і спробуйте ще раз."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hãy mở một phiên rồi thử lại."
           }
         }
       }
@@ -2354,6 +2462,12 @@
             "state": "translated",
             "value": "Не вдалося оновити збережені сеанси. Спробуйте ще раз."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể cập nhật các phiên đã lưu. Hãy thử lại."
+          }
         }
       }
     },
@@ -2477,6 +2591,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Збереження сеансів недоступне. Перевстановіть ShellX і спробуйте ще раз."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tính năng lưu giữ phiên không khả dụng. Hãy cài đặt lại ShellX rồi thử lại."
           }
         }
       }
@@ -2602,6 +2722,12 @@
             "state": "translated",
             "value": "Не вдалося оновити збережені сеанси. Спробуйте ще раз."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể cập nhật các phiên đã lưu. Hãy thử lại."
+          }
         }
       }
     },
@@ -2725,6 +2851,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Активні: %lld"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang chạy: %lld"
           }
         }
       }
@@ -2850,6 +2982,12 @@
             "state": "translated",
             "value": "Клієнти: %lld"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Client: %lld"
+          }
         }
       }
     },
@@ -2973,6 +3111,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "自動化規則"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quy tắc tự động hóa"
           }
         }
       }
@@ -3098,6 +3242,12 @@
             "state": "translated",
             "value": "共 %1$lld 條 • 已啟用 %2$lld 條 • 已停用 %3$lld 條"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld tổng • %2$lld đã bật • %3$lld đã tắt"
+          }
         }
       }
     },
@@ -3221,6 +3371,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編輯規則"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sửa quy tắc"
           }
         }
       }
@@ -3346,6 +3502,12 @@
             "state": "translated",
             "value": "尚未設定規則。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa cấu hình quy tắc nào."
+          }
         }
       }
     },
@@ -3469,6 +3631,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "無法載入自動化規則檔案。請編輯 JSON 檔案後重新載入。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể tải tệp quy tắc tự động hóa. Hãy sửa tệp JSON rồi tải lại."
           }
         }
       }
@@ -3594,6 +3762,12 @@
             "state": "translated",
             "value": "正在載入規則…"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang tải quy tắc…"
+          }
         }
       }
     },
@@ -3717,6 +3891,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "尚無規則檔案。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa có tệp quy tắc."
           }
         }
       }
@@ -3842,6 +4022,12 @@
             "state": "translated",
             "value": "規則位於 ~/.cmuxterm/automations.json。直接編輯 JSON，然後重新載入正在執行的引擎。`shellx automation` CLI 仍可用於測試與記錄診斷。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quy tắc nằm trong ~/.cmuxterm/automations.json. Hãy sửa trực tiếp tệp JSON, rồi tải lại engine đang chạy. CLI tự động hóa shellx vẫn dùng được để kiểm thử và chẩn đoán log."
+          }
         }
       }
     },
@@ -3965,6 +4151,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "重新載入"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tải lại"
           }
         }
       }
@@ -4090,6 +4282,12 @@
             "state": "translated",
             "value": "已要求重新載入。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã yêu cầu tải lại."
+          }
         }
       }
     },
@@ -4214,6 +4412,12 @@
             "state": "translated",
             "value": "自動化引擎無法使用。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engine tự động hóa không khả dụng."
+          }
         }
       }
     },
@@ -4271,6 +4475,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "一般"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chung"
           }
         }
       }
@@ -4330,6 +4540,12 @@
             "state": "translated",
             "value": "工作區"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên"
+          }
         }
       }
     },
@@ -4387,6 +4603,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "側邊欄與 Dock"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thanh bên & Dock"
           }
         }
       }
@@ -4446,6 +4668,12 @@
             "state": "translated",
             "value": "代理程式與自動化"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent & Tự động hóa"
+          }
         }
       }
     },
@@ -4503,6 +4731,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "瀏覽器與檔案"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trình duyệt & Tệp"
           }
         }
       }
@@ -4562,6 +4796,12 @@
             "state": "translated",
             "value": "遠端與裝置"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Từ xa & Thiết bị"
+          }
         }
       }
     },
@@ -4619,6 +4859,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "鍵盤與進階"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bàn phím & Nâng cao"
           }
         }
       }
@@ -4745,6 +4991,12 @@
             "state": "translated",
             "value": "Ghostty 預設顏色"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Màu mặc định của Ghostty"
+          }
         }
       }
     },
@@ -4869,6 +5121,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "沒有符合搜尋的主題。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không có theme nào khớp với tìm kiếm của bạn."
           }
         }
       }
@@ -4995,6 +5253,12 @@
             "state": "translated",
             "value": "在終端機中開啟…"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở trong terminal…"
+          }
         }
       }
     },
@@ -5119,6 +5383,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "在新的終端機分頁中執行可搜尋的 ShellX 主題選擇器。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chạy bộ chọn theme ShellX có thể tìm kiếm trong một tab terminal mới."
           }
         }
       }
@@ -5245,6 +5515,12 @@
             "state": "translated",
             "value": "淺色：%1$@ · 深色：%2$@"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sáng: %1$@ · Tối: %2$@"
+          }
         }
       }
     },
@@ -5369,6 +5645,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "還原"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoàn nguyên"
           }
         }
       }
@@ -5495,6 +5777,12 @@
             "state": "translated",
             "value": "搜尋所有主題"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tìm tất cả theme"
+          }
         }
       }
     },
@@ -5619,6 +5907,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "外觀"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giao diện"
           }
         }
       }
@@ -5745,6 +6039,12 @@
             "state": "translated",
             "value": "無法儲存終端機主題。請再試一次。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể lưu theme terminal. Vui lòng thử lại."
+          }
         }
       }
     },
@@ -5869,6 +6169,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Current dark theme"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theme tối hiện tại"
           }
         }
       }
@@ -5995,6 +6301,12 @@
             "state": "translated",
             "value": "Current light theme"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theme sáng hiện tại"
+          }
         }
       }
     },
@@ -6120,6 +6432,12 @@
             "state": "translated",
             "value": "Current light and dark theme"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theme sáng và tối hiện tại"
+          }
         }
       }
     },
@@ -6178,6 +6496,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "切換至 Nightly"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chuyển sang Nightly"
           }
         }
       }
@@ -6238,6 +6562,12 @@
             "state": "translated",
             "value": "開啟 ShellX NIGHTLY，每天以最新程式碼建置。它會安裝在此 App 旁邊，並獨立更新。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở ShellX NIGHTLY, được build hằng ngày từ mã mới nhất. Bản này được cài cạnh ứng dụng này và cập nhật riêng."
+          }
         }
       }
     },
@@ -6296,6 +6626,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nightly 版本"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bản Nightly"
           }
         }
       }
@@ -6356,6 +6692,12 @@
             "state": "translated",
             "value": "切換至穩定版"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chuyển sang Stable"
+          }
         }
       }
     },
@@ -6414,6 +6756,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "開啟穩定版 ShellX App。若尚未安裝，會安裝在此 App 旁邊。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở ứng dụng ShellX ổn định. Nếu chưa có, nó sẽ được cài cạnh ứng dụng này."
           }
         }
       }
@@ -6474,6 +6822,12 @@
             "state": "translated",
             "value": "穩定版"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bản ổn định"
+          }
         }
       }
     },
@@ -6533,6 +6887,12 @@
             "state": "translated",
             "value": "深色主題"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theme tối"
+          }
         }
       }
     },
@@ -6591,6 +6951,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "淺色主題"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theme sáng"
           }
         }
       }
@@ -6717,6 +7083,12 @@
             "state": "translated",
             "value": "Інтеграція Pi"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tích hợp Pi"
+          }
         }
       }
     },
@@ -6841,6 +7213,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Якщо ввімкнено, ShellX обгортає команду pi й завантажує вбудоване розширення сеансу, не змінюючи конфігурацію Pi. Вимкніть цей параметр, якщо хочете самостійно керувати хуками Pi."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Khi bật, ShellX bao bọc lệnh pi và tải tiện ích mở rộng phiên đi kèm mà không thay đổi cấu hình Pi của bạn. Hãy tắt nếu bạn muốn tự quản lý các hook của Pi."
           }
         }
       }
@@ -6967,6 +7345,12 @@
             "state": "translated",
             "value": "Pi працює без інтеграції з ShellX."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pi chạy mà không có tích hợp ShellX."
+          }
         }
       }
     },
@@ -7092,6 +7476,12 @@
             "state": "translated",
             "value": "Бічна панель показує стан сеансу Pi та сповіщення."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thanh bên hiện trạng thái phiên và thông báo của Pi."
+          }
         }
       }
     },
@@ -7150,6 +7540,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "停止尋找其他裝置"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ngừng khám phá các thiết bị khác"
           }
         }
       }
@@ -7210,6 +7606,12 @@
             "state": "translated",
             "value": "從「我的裝置」隱藏此 Mac"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ẩn Mac này khỏi Thiết bị của tôi"
+          }
         }
       }
     },
@@ -7268,6 +7670,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "從範本新增…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mới từ mẫu…"
           }
         }
       }
@@ -7328,6 +7736,12 @@
             "state": "translated",
             "value": "アクティビティ"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoạt động"
+          }
         }
       }
     },
@@ -7386,6 +7800,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các phiên chưa đọc lên trước, kèm thao tác nhanh để phân loại."
           }
         }
       }
@@ -7446,6 +7866,12 @@
             "state": "translated",
             "value": "エージェントボード"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bảng agent"
+          }
         }
       }
     },
@@ -7504,6 +7930,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bảng kiểu kanban cho các phiên agent."
           }
         }
       }
@@ -7564,6 +7996,12 @@
             "state": "translated",
             "value": "エージェントカード"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thẻ agent"
+          }
         }
       }
     },
@@ -7622,6 +8060,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các phiên agent dạng thẻ trạng thái gọn."
           }
         }
       }
@@ -7682,6 +8126,12 @@
             "state": "translated",
             "value": "エージェント密集"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent dày đặc"
+          }
         }
       }
     },
@@ -7740,6 +8190,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Danh sách agent dày đặc, ưu tiên thông tin."
           }
         }
       }
@@ -7800,6 +8256,12 @@
             "state": "translated",
             "value": "エージェントフォーカス"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tập trung agent"
+          }
         }
       }
     },
@@ -7858,6 +8320,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Góc nhìn tập trung vào agent đang hoạt động và hàng đợi của nó."
           }
         }
       }
@@ -7918,6 +8386,12 @@
             "state": "translated",
             "value": "エージェントタイムライン"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dòng thời gian agent"
+          }
         }
       }
     },
@@ -7976,6 +8450,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoạt động của agent sắp xếp thành dòng thời gian trực tiếp."
           }
         }
       }
@@ -8036,6 +8516,12 @@
             "state": "translated",
             "value": "btopエージェント"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "btop Agents"
+          }
         }
       }
     },
@@ -8094,6 +8580,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trình giám sát kiểu terminal cho hoạt động của agent."
           }
         }
       }
@@ -8154,6 +8646,12 @@
             "state": "translated",
             "value": "時計"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đồng hồ"
+          }
         }
       }
     },
@@ -8212,6 +8710,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đồng hồ đơn giản kèm phím tắt đến các phiên."
           }
         }
       }
@@ -8272,6 +8776,12 @@
             "state": "translated",
             "value": "コンパクト"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thu gọn"
+          }
         }
       }
     },
@@ -8330,6 +8840,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Danh sách phiên gọn cho thanh bên hẹp."
           }
         }
       }
@@ -8390,6 +8906,12 @@
             "state": "translated",
             "value": "Finder サイドバー"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finder"
+          }
         }
       }
     },
@@ -8448,6 +8970,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trình duyệt phiên và tab kiểu Finder."
           }
         }
       }
@@ -8508,6 +9036,12 @@
             "state": "translated",
             "value": "フォーカス"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tập trung"
+          }
         }
       }
     },
@@ -8566,6 +9100,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên đang chọn lên trước, theo sau là những gì cần chú ý."
           }
         }
       }
@@ -8626,6 +9166,12 @@
             "state": "translated",
             "value": "全部入り"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kitchen Sink"
+          }
         }
       }
     },
@@ -8684,6 +9230,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tham quan các tính năng runtime thanh bên tùy chỉnh."
           }
         }
       }
@@ -8744,6 +9296,12 @@
             "state": "translated",
             "value": "パネル情報"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Panel Info"
+          }
         }
       }
     },
@@ -8802,6 +9360,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tổng quan phiên đang chọn kèm port và pull request."
           }
         }
       }
@@ -8862,6 +9426,12 @@
             "state": "translated",
             "value": "パネルセッション"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Panel Sessions"
+          }
         }
       }
     },
@@ -8920,6 +9490,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các phiên có thể tìm kiếm cho phiên này hoặc tất cả phiên."
           }
         }
       }
@@ -8980,6 +9556,12 @@
             "state": "translated",
             "value": "パネルサブエージェント"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Panel Subagents"
+          }
         }
       }
     },
@@ -9038,6 +9620,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các phiên agent lập trình nhóm theo phiên, kèm trạng thái trực tiếp."
           }
         }
       }
@@ -9098,6 +9686,12 @@
             "state": "translated",
             "value": "パネルToDo"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Panel Todo"
+          }
         }
       }
     },
@@ -9156,6 +9750,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Danh sách việc nháp tương tác cho phiên hiện tại."
           }
         }
       }
@@ -9216,6 +9816,12 @@
             "state": "translated",
             "value": "ポート"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cổng"
+          }
         }
       }
     },
@@ -9274,6 +9880,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các port đang lắng nghe trên các phiên hiện tại."
           }
         }
       }
@@ -9334,6 +9946,12 @@
             "state": "translated",
             "value": "ステータスボード"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bảng trạng thái"
+          }
         }
       }
     },
@@ -9392,6 +10010,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các phiên nhóm theo độ khẩn cấp, xem xét, tiến độ và hoàn tất."
           }
         }
       }
@@ -9452,6 +10076,12 @@
             "state": "translated",
             "value": "ワークスペース"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên"
+          }
         }
       }
     },
@@ -9510,6 +10140,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "編集できるカスタムサイドバーのテンプレートです。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Danh sách phiên trực tiếp đơn giản."
           }
         }
       }
@@ -9570,6 +10206,12 @@
             "state": "translated",
             "value": "瀏覽範本…"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duyệt mẫu…"
+          }
         }
       }
     },
@@ -9628,6 +10270,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "從範本開始"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bắt đầu với một mẫu"
           }
         }
       }
@@ -9688,6 +10336,12 @@
             "state": "translated",
             "value": "已安裝 %@"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã cài %@"
+          }
         }
       }
     },
@@ -9746,6 +10400,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "保留"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giữ lại"
           }
         }
       }
@@ -9806,6 +10466,12 @@
             "state": "translated",
             "value": "正在側邊欄中預覽"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang xem trước trong thanh bên của bạn"
+          }
         }
       }
     },
@@ -9864,6 +10530,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "還原"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoàn nguyên"
           }
         }
       }
@@ -9924,6 +10596,12 @@
             "state": "translated",
             "value": "安裝前先試用精選側邊欄。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dùng thử một thanh bên được tuyển chọn trước khi cài."
+          }
         }
       }
     },
@@ -9982,6 +10660,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "側邊欄範本"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mẫu thanh bên"
           }
         }
       }
@@ -10042,6 +10726,12 @@
             "state": "translated",
             "value": "試用"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dùng thử"
+          }
         }
       }
     },
@@ -10100,6 +10790,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "使用"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dùng"
           }
         }
       }
@@ -10160,6 +10856,12 @@
             "state": "translated",
             "value": "左側邊欄"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thanh bên trái"
+          }
         }
       }
     },
@@ -10218,6 +10920,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "右側面板"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bảng bên phải"
           }
         }
       }
@@ -10278,6 +10986,12 @@
             "state": "translated",
             "value": "預測性本機回顯"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dự đoán local echo"
+          }
         }
       }
     },
@@ -10336,6 +11050,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "在其他機器上的終端機中，連線較慢時輸入的字元會立即顯示並加上底線，直到遠端主機確認為止。本機終端機、密碼提示和全螢幕 App 不適用此功能。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trong terminal trên máy khác, ký tự bạn gõ hiện ngay khi kết nối chậm. Chúng được gạch chân cho đến khi máy từ xa xác nhận. Terminal cục bộ, lời nhắc mật khẩu và ứng dụng toàn màn hình bị loại trừ."
           }
         }
       }
@@ -10462,6 +11182,12 @@
             "state": "translated",
             "value": "還有更多相符的主題。繼續輸入以縮小清單範圍。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Còn nhiều theme khớp nữa. Hãy gõ tiếp để thu hẹp danh sách."
+          }
         }
       }
     },
@@ -10520,6 +11246,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "邀請成員"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mời mọi người"
           }
         }
       }
@@ -10580,6 +11312,12 @@
             "state": "translated",
             "value": "無法邀請：%@"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể mời: %@"
+          }
         }
       }
     },
@@ -10638,6 +11376,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "電子郵件地址，以逗號分隔"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Địa chỉ email, cách nhau bằng dấu phẩy"
           }
         }
       }
@@ -10698,6 +11442,12 @@
             "state": "translated",
             "value": "邀請角色"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vai trò được mời"
+          }
         }
       }
     },
@@ -10756,6 +11506,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "傳送邀請"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi lời mời"
           }
         }
       }
@@ -10816,6 +11572,12 @@
             "state": "translated",
             "value": "邀請已送出。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã gửi lời mời."
+          }
         }
       }
     },
@@ -10874,6 +11636,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "離開"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rời đi"
           }
         }
       }
@@ -10934,6 +11702,12 @@
             "state": "translated",
             "value": "已複製邀請連結，7 天後失效。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã sao chép liên kết mời. Liên kết hết hạn sau 7 ngày."
+          }
         }
       }
     },
@@ -10992,6 +11766,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "複製邀請連結"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sao chép liên kết mời"
           }
         }
       }
@@ -11052,6 +11832,12 @@
             "state": "translated",
             "value": "%1$@ · 到期日 %2$@"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · hết hạn %2$@"
+          }
         }
       }
     },
@@ -11110,6 +11896,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在載入成員…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang tải thành viên…"
           }
         }
       }
@@ -11170,6 +11962,12 @@
             "state": "translated",
             "value": "重新整理成員"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Làm mới thành viên"
+          }
         }
       }
     },
@@ -11228,6 +12026,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "移除 %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xóa %@"
           }
         }
       }
@@ -11288,6 +12092,12 @@
             "state": "translated",
             "value": "撤銷"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thu hồi"
+          }
         }
       }
     },
@@ -11346,6 +12156,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "管理員"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quản trị viên"
           }
         }
       }
@@ -11406,6 +12222,12 @@
             "state": "translated",
             "value": "成員"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thành viên"
+          }
         }
       }
     },
@@ -11464,6 +12286,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "待處理的邀請"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lời mời đang chờ"
           }
         }
       }
@@ -11524,6 +12352,12 @@
             "state": "translated",
             "value": "邀請連結"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Liên kết mời"
+          }
         }
       }
     },
@@ -11582,6 +12416,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "共用此團隊 Cloud 機器的成員。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Những người dùng chung các máy Cloud của nhóm này."
           }
         }
       }
@@ -11642,6 +12482,12 @@
             "state": "translated",
             "value": "團隊成員"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thành viên nhóm"
+          }
         }
       }
     },
@@ -11701,6 +12547,12 @@
             "state": "translated",
             "value": "你"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bạn"
+          }
         }
       }
     },
@@ -11759,6 +12611,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "無法更新團隊。請再試一次。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không thể cập nhật nhóm. Hãy thử lại."
           }
         }
       }
@@ -11935,6 +12793,18 @@
                 "stringUnit": {
                   "state": "translated",
                   "value": "%d 回使用"
+                }
+              }
+            }
+          }
+        },
+        "vi": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%d lượt dùng"
                 }
               }
             }
@@ -12202,6 +13072,28 @@
                     "stringUnit": {
                       "state": "translated",
                       "value": "%d 回"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$d trên %#@uses@"
+          },
+          "substitutions": {
+            "uses": {
+              "argNum": 2,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%d lượt dùng"
                     }
                   }
                 }
@@ -12477,6 +13369,28 @@
               }
             }
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · đã dùng %2$d trên %#@seats@"
+          },
+          "substitutions": {
+            "seats": {
+              "argNum": 3,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%d chỗ"
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -12746,6 +13660,28 @@
               }
             }
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · %#@members@"
+          },
+          "substitutions": {
+            "members": {
+              "argNum": 2,
+              "formatSpecifier": "d",
+              "variations": {
+                "plural": {
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%d thành viên"
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -12804,6 +13740,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "取消"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hủy"
           }
         }
       }
@@ -12864,6 +13806,12 @@
             "state": "translated",
             "value": "傳送"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi"
+          }
         }
       }
     },
@@ -12922,6 +13870,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "邀請…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mời…"
           }
         }
       }
@@ -12982,6 +13936,12 @@
             "state": "translated",
             "value": "複製連結"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sao chép liên kết"
+          }
         }
       }
     },
@@ -13040,6 +14000,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "成員"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thành viên"
           }
         }
       }
@@ -13100,6 +14066,12 @@
             "state": "translated",
             "value": "移除"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gỡ"
+          }
         }
       }
     },
@@ -13158,6 +14130,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "忽略"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bỏ qua"
           }
         }
       }
@@ -13218,6 +14196,12 @@
             "state": "translated",
             "value": "由 %1$@ 邀請 · %2$@"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Được mời bởi %1$@ · %2$@"
+          }
         }
       }
     },
@@ -13276,6 +14260,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "加入"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tham gia"
           }
         }
       }
@@ -13336,6 +14326,12 @@
             "state": "translated",
             "value": "邀請"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lời mời"
+          }
         }
       }
     },
@@ -13394,6 +14390,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "フラッシュにターミナルテーマの前景色を使い、未読リングは ShellX ブルーのままにします。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dùng màu chữ của theme terminal cho hiệu ứng nhấp nháy; vòng chưa đọc vẫn giữ màu xanh ShellX."
           }
         }
       }
@@ -13454,6 +14456,12 @@
             "state": "translated",
             "value": "テーマの前景色を使う"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dùng màu chữ của theme"
+          }
         }
       }
     },
@@ -13512,6 +14520,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "代理訊息"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tin nhắn agent"
           }
         }
       }
@@ -13572,6 +14586,12 @@
             "state": "translated",
             "value": "關閉後，等待遞送的訊息也會標為失敗。若只要關閉某個代理的訊息，請在它的終端機中執行 shellx agent messages off。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tắt tùy chọn này cũng làm các tin nhắn đang chờ gửi bị lỗi. Để tắt tin nhắn cho một agent, hãy chạy shellx agent messages off trong terminal của nó."
+          }
         }
       }
     },
@@ -13630,6 +14650,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "代理訊息已關閉。傳送會失敗，也不會遞送任何訊息。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tin nhắn agent đang tắt. Việc gửi sẽ lỗi và không có gì được chuyển đi."
           }
         }
       }
@@ -13690,6 +14716,12 @@
             "state": "translated",
             "value": "代理可以使用 ShellX agent message 互相傳送訊息。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các agent có thể nhắn cho nhau bằng shellx agent message."
+          }
         }
       }
     },
@@ -13748,6 +14780,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "中鍵點按貼上"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dán bằng nút giữa chuột"
           }
         }
       }
@@ -13808,6 +14846,12 @@
             "state": "translated",
             "value": "使用滑鼠的 App 仍會收到中鍵點按。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các ứng dụng dùng chuột vẫn nhận được nhấp chuột giữa."
+          }
         }
       }
     },
@@ -13866,6 +14910,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "工作區描述顏色"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Màu mô tả phiên"
           }
         }
       }
@@ -13926,6 +14976,12 @@
             "state": "translated",
             "value": "統一代理程式暫存目錄"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scratch agent chuẩn tắc"
+          }
         }
       }
     },
@@ -13984,6 +15040,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "啟用後，新的 Claude、Codex 和 OpenCode 面板暫存檔案將統一存放在 ~/.local/state/shellx/agent-artifacts 下。提供者的對話紀錄和現有檔案不會被移動。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chọn bật để sắp xếp các tệp scratch mới của bảng Claude, Codex và OpenCode trong ~/.local/state/shellx/agent-artifacts. Bản ghi của nhà cung cấp và các tệp hiện có không bị di chuyển."
           }
         }
       }
@@ -14044,6 +15106,12 @@
             "state": "translated",
             "value": "原生代理程式面板使用系統暫存目錄。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các bảng agent gốc dùng thư mục tạm của hệ thống."
+          }
         }
       }
     },
@@ -14102,6 +15170,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "原生代理程式面板為每個工作階段使用由 ShellX 管理的暫存目錄。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các bảng agent gốc dùng một thư mục scratch riêng của ShellX cho mỗi phiên."
           }
         }
       }
@@ -14162,6 +15236,12 @@
             "state": "translated",
             "value": "重置"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đặt lại"
+          }
         }
       }
     },
@@ -14220,6 +15300,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "工作區描述使用的文字顏色。預設跟隨目前主題。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Màu chữ dùng cho mô tả phiên. Mặc định theo theme hiện tại."
           }
         }
       }
@@ -14280,6 +15366,12 @@
             "state": "translated",
             "value": "원격 호스트 색상 출처 색 색조 호스트별 서버 작업 공간 사이드바 행 탭 베타 불안정"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Màu máy từ xa màu máy từ xa màu gốc sắc thái từng máy chủ server phiên thanh bên hàng tab beta không ổn định"
+          }
         }
       }
     },
@@ -14338,6 +15430,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "중복 제목의 원격 호스트 이름 호스트명 서버 중복 같은 제목 충돌 작업 공간 사이드바 행 베타 불안정"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tên máy từ xa trên tiêu đề trùng hostname máy chủ server trùng cùng tiêu đề xung đột phiên thanh bên hàng beta không ổn định"
           }
         }
       }
@@ -14398,6 +15496,12 @@
             "state": "translated",
             "value": "遠端主機顏色"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Màu máy từ xa"
+          }
         }
       }
     },
@@ -14456,6 +15560,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "在此處啟用之前，遠端工作區不會顯示來源顏色。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giữ các phiên từ xa không có màu gốc cho đến khi bạn bật tại đây."
           }
         }
       }
@@ -14516,6 +15626,12 @@
             "state": "translated",
             "value": "為每個遠端工作區的側邊欄列加上依主機固定的顏色，方便區分伺服器。你手動設定的工作區顏色一律優先。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tô hàng thanh bên của mỗi phiên từ xa bằng một màu ổn định theo từng máy để dễ phân biệt các máy chủ. Màu phiên bạn đặt thủ công luôn được ưu tiên."
+          }
         }
       }
     },
@@ -14574,6 +15690,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "在重複標題中顯示遠端主機名稱"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tên máy từ xa trên các tiêu đề trùng"
           }
         }
       }
@@ -14634,6 +15756,12 @@
             "state": "translated",
             "value": "在此處啟用之前，重複的工作區標題維持不變。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giữ nguyên các tiêu đề phiên trùng nhau cho đến khi bạn bật tại đây."
+          }
         }
       }
     },
@@ -14692,6 +15820,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "當多個工作區標題相同時，在每個遠端工作區的標題後顯示主機名稱，並省略這些主機共用的網域。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Khi các phiên có cùng tiêu đề, hiển thị máy của từng phiên từ xa sau tiêu đề, bỏ phần tên miền mà các máy dùng chung."
           }
         }
       }
@@ -14752,6 +15886,12 @@
             "state": "translated",
             "value": "依提示點按"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nhấp theo gợi ý"
+          }
         }
       }
     },
@@ -14810,6 +15950,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "預覽：Cmd-J 會為視窗中每個可點按的控制項加上標籤，輸入標籤即可點按。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xem trước: Cmd-J gắn nhãn mọi điều khiển có thể nhấp trong cửa sổ, và gõ một nhãn sẽ nhấp vào điều khiển đó."
           }
         }
       }
@@ -14936,6 +16082,12 @@
             "state": "translated",
             "value": "Новий робочий простір на віддаленому хості"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên mới trên máy từ xa"
+          }
         }
       }
     },
@@ -15060,6 +16212,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "Новий робочий простір віддалений хост новий сеанс tmux локальний робочий простір дзеркало бета нестабільно"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên mới trên máy từ xa phiên mới từ xa phiên tmux máy chủ phiên cục bộ phản chiếu beta không ổn định"
           }
         }
       }
@@ -15186,6 +16344,12 @@
             "state": "translated",
             "value": "Новий робочий простір завжди відкриває локальний робочий простір, навіть коли вибрано віддалений простір tmux."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên mới luôn mở một phiên cục bộ, kể cả khi đang chọn một phiên tmux từ xa."
+          }
         }
       }
     },
@@ -15311,6 +16475,12 @@
             "state": "translated",
             "value": "Коли вибрано віддалений простір tmux, новий робочий простір запускає сеанс tmux на його хості. Новий локальний робочий простір відкриває локальний."
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Khi đang chọn một phiên tmux từ xa, Phiên mới sẽ bắt đầu một phiên tmux trên máy của phiên đó. Phiên cục bộ mới mở một phiên cục bộ."
+          }
         }
       }
     },
@@ -15370,6 +16540,12 @@
             "state": "translated",
             "value": "你的 Max 訂閱已啟用，包含 Pro 的所有功能。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gói Max của bạn đang hoạt động. Gói này bao gồm mọi thứ trong Pro."
+          }
         }
       }
     },
@@ -15425,6 +16601,12 @@
           }
         },
         "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX Max"
+          }
+        },
+        "vi": {
           "stringUnit": {
             "state": "translated",
             "value": "ShellX Max"
@@ -15487,6 +16669,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "升級至 Max…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nâng cấp lên Max…"
           }
         }
       }
@@ -15613,6 +16801,12 @@
             "state": "translated",
             "value": "你的 Pro 訂閱已啟用。請透過訂閱服務供應商管理。"
           }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gói Pro của bạn đang hoạt động. Hãy quản lý qua nhà cung cấp gói đăng ký của bạn."
+          }
         }
       }
     },
@@ -15737,6 +16931,12 @@
           "stringUnit": {
             "state": "translated",
             "value": "你的 Pro 方案已啟用。"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gói Pro của bạn đang hoạt động."
           }
         }
       }

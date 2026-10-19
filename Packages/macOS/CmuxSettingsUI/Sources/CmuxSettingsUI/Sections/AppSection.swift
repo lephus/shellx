@@ -157,14 +157,11 @@ public struct AppSection: View {
 
     private static let columnWidth: CGFloat = 196
 
-    /// Languages legacy `AppLanguage` exposes (cmuxApp.swift line
-    /// 4338). The shared `CmuxSettings.AppLanguage` adds `.vi` for a
-    /// future Vietnamese localization that the legacy in-app picker
-    /// doesn't surface yet; filter it out here so the Settings UI
-    /// matches the legacy menu shape exactly.
+    /// Languages the in-app picker offers, in the legacy menu order.
+    /// ShellX ships a complete Vietnamese localization, so `.vi` is listed.
     private static let legacyLanguageCases: [AppLanguage] = [
         .system, .en, .ar, .bs, .zhHans, .zhHant, .da, .de, .es, .fr,
-        .it, .ja, .ko, .nb, .pl, .ptBR, .ru, .th, .tr,
+        .it, .ja, .ko, .nb, .pl, .ptBR, .ru, .th, .tr, .vi,
     ]
 
     public var body: some View {
