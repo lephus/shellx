@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Tune the production outline with long machine, workspace, terminal, browser, and port names. Values apply live to the Cloud sidebar.",
+"comment": ""
+},
+{
+"i": 1,
+"en": "Machine line gap",
+"comment": ""
+},
+{
+"i": 2,
+"en": "Long machine and workspace names",
+"comment": ""
+},
+{
+"i": 3,
+"en": "Long terminal titles",
+"comment": ""
+},
+{
+"i": 4,
+"en": "Preset",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Aero",
+"comment": ""
+},
+{
+"i": 6,
+"en": "Chips",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Ledger",
+"comment": ""
+},
+{
+"i": 8,
+"en": "Sections",
+"comment": ""
+},
+{
+"i": 9,
+"en": "Production outline preview",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Preview width",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Previewing %@, with spacing overrides below.",
+"comment": ""
+},
+{
+"i": 12,
+"en": "Reset spacing",
+"comment": ""
+},
+{
+"i": 13,
+"en": "Reset %1$@ to %2$@",
+"comment": "Reset button tooltip and accessibility label in the debug Cloud sidebar spacing lab. First argument is the control name; second is its default value."
+},
+{
+"i": 14,
+"en": "Resize the preview width to find the first awkward breakpoint. Keep the row readable before making the sidebar wider.",
+"comment": ""
+},
+{
+"i": 15,
+"en": "Row content",
+"comment": ""
+},
+{
+"i": 16,
+"en": "Row height",
+"comment": ""
+},
+{
+"i": 17,
+"en": "Stress cases",
+"comment": ""
+},
+{
+"i": 18,
+"en": "Cloud Sidebar Spacing Lab",
+"comment": ""
+},
+{
+"i": 19,
+"en": "Trailing gap",
+"comment": ""
+},
+{
+"i": 20,
+"en": "Trailing inset",
+"comment": ""
+},
+{
+"i": 21,
+"en": "Machine vertical pad",
+"comment": ""
+},
+{
+"i": 22,
+"en": "%d pt",
+"comment": ""
+},
+{
+"i": 23,
+"en": "Cloud Sidebar Spacing Lab…",
+"comment": ""
+},
+{
+"i": 24,
+"en": "Pin Machine",
+"comment": ""
+},
+{
+"i": 25,
+"en": "Unpin Machine",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Cloud VM access moved to another team.",
+"comment": ""
+},
+{
+"i": 27,
+"en": "This cmux build has no remote daemon for the remote host's platform",
+"comment": ""
+},
+{
+"i": 28,
+"en": "cmux could not clean up the previous SSH connection to %@. Check that the host is reachable, then use Reconnect to try again.",
+"comment": ""
+},
+{
+"i": 29,
+"en": "The SSH connection is not active. Use Reconnect to try again.",
+"comment": ""
+},
+{
+"i": 30,
+"en": "The cmux proxy tunnel to %@ did not become ready. Automatic reconnect paused; use Reconnect to try again.",
+"comment": ""
+},
+{
+"i": 31,
+"en": "The cmux relay on %@ did not become ready (the host may not allow SSH remote port forwarding). Automatic reconnect paused; use Reconnect to try again.",
+"comment": ""
+},
+{
+"i": 32,
+"en": "Managed by your organization. Effective mode: %@.",
+"comment": ""
+},
+{
+"i": 33,
+"en": ", active",
+"comment": ""
+},
+{
+"i": 34,
+"en": "Could not create that team. Try again.",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Team name",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Loading teams…",
+"comment": ""
+},
+{
+"i": 37,
+"en": "No team",
+"comment": ""
+},
+{
+"i": 38,
+"en": "Could not switch teams. Try again.",
+"comment": ""
+},
+{
+"i": 39,
+"en": "%1$@%2$@",
+"comment": ""
+},
+{
+"i": 40,
+"en": "%1$@ · Pro",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Directory unavailable",
+"comment": ""
+},
+{
+"i": 42,
+"en": "Team actions require asynchronous socket dispatch.",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Could not update the team. Try again.",
+"comment": ""
+},
+{
+"i": 44,
+"en": "Enter a team name.",
+"comment": ""
+},
+{
+"i": 45,
+"en": "A team name is required.",
+"comment": ""
+},
+{
+"i": 46,
+"en": "A team id is required.",
+"comment": ""
+},
+{
+"i": 47,
+"en": "You are not a member of that team.",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Sign in to manage teams.",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Unknown team action.",
+"comment": ""
+},
+{
+"i": 50,
+"en": "Invalid file transfer error number.",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Expected a structured file transfer failure.",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Connect to this Cloud display",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Connecting to Cloud display…",
+"comment": ""
+},
+{
+"i": 54,
+"en": "The Cloud page connection was cancelled. Retry to connect.",
+"comment": ""
+},
+{
+"i": 55,
+"en": "The Cloud display did not connect within 45 seconds. Retry to reconnect.",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Creating a display on %@…",
+"comment": ""
+},
+{
+"i": 57,
+"en": "The new display could not start. Refresh Displays, then retry. Existing displays are unchanged.",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Additional displays are unavailable on this machine. Use a desktop image with display creation support, then refresh Displays.",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Display %d",
+"comment": ""
+},
+{
+"i": 60,
+"en": "This Cloud display or browser is unavailable. Refresh its machine to reconnect.",
+"comment": ""
+},
+{
+"i": 61,
+"en": "New Display",
+"comment": ""
+},
+{
+"i": 62,
+"en": "Worktree Agents",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Start a worktree with two coding-agent terminals and optional context-menu actions.",
+"comment": ""
+},
+{
+"i": 64,
+"en": "Full-Stack Dev",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Open a dev server, test watcher, and browser preview, with optional Git and Feed Dock controls.",
+"comment": ""
+},
+{
+"i": 66,
+"en": "SSH Devbox",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Pair a remote shell with a browser preview in one workspace.",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Review PR",
+"comment": ""
+},
+{
+"i": 69,
+"en": "Keep pull-request commands beside the browser review page.",
+"comment": ""
+},
+{
+"i": 70,
+"en": "Docs Workspace",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Run documentation tools beside a Markdown view and browser preview.",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Quick Agent Buttons",
+"comment": ""
+},
+{
+"i": 73,
+"en": "Put Codex and Claude launch actions on the tab bar and in Command Palette.",
+"comment": ""
+},
+{
+"i": 74,
+"en": "CI Watch",
+"comment": ""
+},
+{
+"i": 75,
+"en": "Keep long-running CI and Feed monitors in Dock instead of workspace panes.",
+"comment": ""
+},
+{
+"i": 76,
+"en": "List saved layouts",
+"comment": ""
+},
+{
+"i": 77,
+"en": "Inspect a layout",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Open a layout for this project",
+"comment": ""
+},
+{
+"i": 79,
+"en": "Save the adapted workspace",
+"comment": ""
+},
+{
+"i": 80,
+"en": "Delete an old layout",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Saved layouts capture a live workspace arrangement. Use an example as a starting point, adapt the workspace, and save the result for reuse.",
+"comment": ""
+},
+{
+"i": 82,
+"en": "Saved layouts:",
+"comment": ""
+},
+{
+"i": 83,
+"en": "Native saved-layout entry points:",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Shipped workflow examples:",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Adapt and save:",
+"comment": ""
+},
+{
+"i": 86,
+"en": "Pick an example that fits the task and lists requirements you have.",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Open the recipe and copy only the needed top-level keys into .cmux/cmux.json or ~/.config/cmux/cmux.json. Add .cmux/dock.json when the example uses Dock.",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Replace sample paths, commands, URLs, tool names, and placements with values for this repository.",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Validate the JSON or JSONC, run cmux reload-config, and check the resulting entry point.",
+"comment": ""
+},
+{
+"i": 90,
+"en": "When the workspace looks right, save it with cmux layout save <name> --description \"<what this creates>\".",
+"comment": ""
+},
+{
+"i": 91,
+"en": "parallel agent work",
+"comment": ""
+},
+{
+"i": 92,
+"en": "feature worktrees",
+"comment": ""
+},
+{
+"i": 93,
+"en": "repositories where Codex and Claude should open together",
+"comment": ""
+},
+{
+"i": 94,
+"en": "a Worktree Agents new-workspace action",
+"comment": ""
+},
+{
+"i": 95,
+"en": "a workspace rooted at the chosen worktree",
+"comment": ""
+},
+{
+"i": 96,
+"en": "side-by-side Codex and Claude terminal panes",
+"comment": ""
+},
+{
+"i": 97,
+"en": "plus-button context-menu alternatives",
+"comment": ""
+},
+{
+"i": 98,
+"en": "a worktree path",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Open the Worktree Agents recipe, merge its actions/ui/commands entries into cmux.json, adapt the worktree cwd and agent commands, then run cmux reload-config.",
+"comment": ""
+},
+{
+"i": 100,
+"en": "change the worktree path",
+"comment": ""
+},
+{
+"i": 101,
+"en": "swap or add agent commands",
+"comment": ""
+},
+{
+"i": 102,
+"en": "change split direction",
+"comment": ""
+},
+{
+"i": 103,
+"en": "keep only the plus-menu entries the project needs",
+"comment": ""
+},
+{
+"i": 104,
+"en": "web apps",
+"comment": ""
+},
+{
+"i": 105,
+"en": "full-stack repositories",
+"comment": ""
+},
+{
+"i": 106,
+"en": "projects with a local dev server and watch tests",
+"comment": ""
+},
+{
+"i": 107,
+"en": "a Web terminal",
+"comment": ""
+},
+{
+"i": 108,
+"en": "a Tests terminal",
+"comment": ""
+},
+{
+"i": 109,
+"en": "a browser preview",
+"comment": ""
+},
+{
+"i": 110,
+"en": "optional lazygit and Feed TUI Dock controls",
+"comment": ""
+},
+{
+"i": 111,
+"en": "the project's dev command",
+"comment": ""
+},
+{
+"i": 112,
+"en": "the project's watch-test command",
+"comment": ""
+},
+{
+"i": 113,
+"en": "optional lazygit",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Open the Full-Stack Dev recipe, merge the workspace command and optional Dock controls, replace the sample bun commands and preview URL, then run cmux reload-config.",
+"comment": ""
+},
+{
+"i": 115,
+"en": "use the repository's package manager and scripts",
+"comment": ""
+},
+{
+"i": 116,
+"en": "change the preview URL/port",
+"comment": ""
+},
+{
+"i": 117,
+"en": "replace lazygit or Feed with project-specific Dock monitors",
+"comment": ""
+},
+{
+"i": 118,
+"en": "terminal surfaces",
+"comment": ""
+},
+{
+"i": 119,
+"en": "browser surfaces",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Dock controls",
+"comment": ""
+},
+{
+"i": 121,
+"en": "remote development",
+"comment": ""
+},
+{
+"i": 122,
+"en": "SSH-backed devboxes",
+"comment": ""
+},
+{
+"i": 123,
+"en": "projects developed on another machine",
+"comment": ""
+},
+{
+"i": 124,
+"en": "an SSH terminal pane",
+"comment": ""
+},
+{
+"i": 125,
+"en": "a browser preview pane",
+"comment": ""
+},
+{
+"i": 126,
+"en": "a working ssh target or alias",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Open the SSH Devbox recipe, replace ssh devbox and the preview URL for the project, merge the command into cmux.json, then run cmux reload-config.",
+"comment": ""
+},
+{
+"i": 128,
+"en": "change the SSH host/command",
+"comment": ""
+},
+{
+"i": 129,
+"en": "change the preview URL",
+"comment": ""
+},
+{
+"i": 130,
+"en": "add local notes, logs, or another remote pane",
+"comment": ""
+},
+{
+"i": 131,
+"en": "pull-request review",
+"comment": ""
+},
+{
+"i": 132,
+"en": "GitHub-hosted repositories",
+"comment": ""
+},
+{
+"i": 133,
+"en": "tasks that combine gh output with browser review",
+"comment": ""
+},
+{
+"i": 134,
+"en": "a terminal running gh pr status",
+"comment": ""
+},
+{
+"i": 135,
+"en": "a browser pane on the repository pull-request page",
+"comment": ""
+},
+{
+"i": 136,
+"en": "gh for the sample terminal command",
+"comment": ""
+},
+{
+"i": 137,
+"en": "Open the Review PR recipe, point its command and URL at the repository's review flow, merge it into cmux.json, then run cmux reload-config.",
+"comment": ""
+},
+{
+"i": 138,
+"en": "replace gh pr status with the team's review command",
+"comment": ""
+},
+{
+"i": 139,
+"en": "use a specific PR URL",
+"comment": ""
+},
+{
+"i": 140,
+"en": "add a notes or diff pane when useful",
+"comment": ""
+},
+{
+"i": 141,
+"en": "documentation work",
+"comment": ""
+},
+{
+"i": 142,
+"en": "docs sites",
+"comment": ""
+},
+{
+"i": 143,
+"en": "projects with a local docs preview",
+"comment": ""
+},
+{
+"i": 144,
+"en": "a docs-server terminal",
+"comment": ""
+},
+{
+"i": 145,
+"en": "a cmux Markdown viewer terminal",
+"comment": ""
+},
+{
+"i": 146,
+"en": "a browser docs preview",
+"comment": ""
+},
+{
+"i": 147,
+"en": "the project's docs-dev command",
+"comment": ""
+},
+{
+"i": 148,
+"en": "Open the Docs Workspace recipe, replace the docs command, Markdown path, and preview URL, merge it into cmux.json, then run cmux reload-config.",
+"comment": ""
+},
+{
+"i": 149,
+"en": "use the repository's docs command",
+"comment": ""
+},
+{
+"i": 150,
+"en": "point at the primary Markdown file",
+"comment": ""
+},
+{
+"i": 151,
+"en": "change the preview path/port",
+"comment": ""
+},
+{
+"i": 152,
+"en": "drop panes the docs workflow does not need",
+"comment": ""
+},
+{
+"i": 153,
+"en": "frequent agent launches",
+"comment": ""
+},
+{
+"i": 154,
+"en": "projects that use multiple coding agents",
+"comment": ""
+},
+{
+"i": 155,
+"en": "personal agent shortcuts",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Codex and Claude agent actions",
+"comment": ""
+},
+{
+"i": 157,
+"en": "surface-tab-bar buttons",
+"comment": ""
+},
+{
+"i": 158,
+"en": "Command Palette entries",
+"comment": ""
+},
+{
+"i": 159,
+"en": "the agent binaries you keep in the recipe",
+"comment": ""
+},
+{
+"i": 160,
+"en": "Open the Quick Agent Buttons recipe, keep the agent actions you use, merge actions/ui into cmux.json, then run cmux reload-config.",
+"comment": ""
+},
+{
+"i": 161,
+"en": "remove unused agents",
+"comment": ""
+},
+{
+"i": 162,
+"en": "change action targets",
+"comment": ""
+},
+{
+"i": 163,
+"en": "add or remove built-in tab-bar buttons",
+"comment": ""
+},
+{
+"i": 164,
+"en": "rename button labels",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Command Palette action exposure",
+"comment": ""
+},
+{
+"i": 166,
+"en": "CI-heavy repositories",
+"comment": ""
+},
+{
+"i": 167,
+"en": "GitHub Actions monitoring",
+"comment": ""
+},
+{
+"i": 168,
+"en": "long-running status views that should stay beside the workspace",
+"comment": ""
+},
+{
+"i": 169,
+"en": "a GitHub Runs Dock control",
+"comment": ""
+},
+{
+"i": 170,
+"en": "a Feed TUI Dock control",
+"comment": ""
+},
+{
+"i": 171,
+"en": "gh for the sample GitHub Runs control",
+"comment": ""
+},
+{
+"i": 172,
+"en": "Open the CI Watch recipe, merge the controls into .cmux/dock.json, adapt commands for the repository, validate the JSON, then reload the Dock/config.",
+"comment": ""
+},
+{
+"i": 173,
+"en": "change the CI command",
+"comment": ""
+},
+{
+"i": 174,
+"en": "replace or add monitor controls",
+"comment": ""
+},
+{
+"i": 175,
+"en": "adjust control heights",
+"comment": ""
+},
+{
+"i": 176,
+"en": "use the global Dock file only for personal cross-project controls",
+"comment": ""
+},
+{
+"i": 177,
+"en": "Saved layouts plus shipped customization examples for common project workflows.",
+"comment": ""
+},
+{
+"i": 178,
+"en": "workflow examples",
+"comment": ""
+},
+{
+"i": 179,
+"en": "customization skill",
+"comment": ""
+},
+{
+"i": 180,
+"en": "Use `cmux docs workflows --json` to choose a shipped workflow example or discover the saved-layout lifecycle.",
+"comment": ""
+},
+{
+"i": 181,
+"en": "Command Palette: Save Layout as Template…",
+"comment": ""
+},
+{
+"i": 182,
+"en": "Command Palette: New Workspace from Layout: <name>",
+"comment": ""
+},
+{
+"i": 183,
+"en": "New Workspace menu: New Workspace from Template",
+"comment": ""
+},
+{
+"i": 184,
+"en": "Fits",
+"comment": ""
+},
+{
+"i": 185,
+"en": "Creates",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Requires",
+"comment": ""
+},
+{
+"i": 187,
+"en": "Adapt",
+"comment": ""
+},
+{
+"i": 188,
+"en": "Discover workflow starters:",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Default Machine",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Set as Default Machine",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Default machine for New Cloud Workspace",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Default machine",
+"comment": ""
+},
+{
+"i": 193,
+"en": "Setup",
+"comment": ""
+},
+{
+"i": 194,
+"en": "Finish Setup…",
+"comment": ""
+},
+{
+"i": 195,
+"en": "Enable cmux Computer Use to finish setup.",
+"comment": ""
+},
+{
+"i": 196,
+"en": "cmux Computer Use is unavailable. Retry setup.",
+"comment": ""
+},
+{
+"i": 197,
+"en": "Accessibility permission is required.",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Screen Recording permission is required.",
+"comment": ""
+},
+{
+"i": 199,
+"en": "Permissions are granted. Finish setup to confirm screen capture with macOS.",
+"comment": ""
+},
+{
+"i": 200,
+"en": "Setup is complete. cmux Computer Use is ready.",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Toggle File Editor Word Wrap",
+"comment": ""
+},
+{
+"i": 202,
+"en": "SSH authentication did not open the connection. Check your SSH credentials and retry.",
+"comment": ""
+},
+{
+"i": 203,
+"en": "This SSH terminal is no longer available.",
+"comment": ""
+},
+{
+"i": 204,
+"en": "SSH authentication requires a terminal. Run this command from an interactive shell.",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Could not hand the terminal to SSH for %@. Authentication was cancelled to avoid a hang (%@).",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Could not launch SSH: %@",
+"comment": ""
+},
+{
+"i": 207,
+"en": "SSH authentication requires the system SSH executable.",
+"comment": ""
+},
+{
+"i": 208,
+"en": "SSH authentication to %@ failed (exit %@).",
+"comment": ""
+},
+{
+"i": 209,
+"en": "Undo preserved a newer choice. Review this setting before changing it:",
+"comment": ""
+},
+{
+"i": 210,
+"en": "The proposed config is invalid. No changes were saved.",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Connection to cmux was denied. Run this command from a cmux terminal or review socket access in Settings > Automation.",
+"comment": ""
+},
+{
+"i": 212,
+"en": "cmux returned an error while starting the event stream. Check the command and try again.",
+"comment": ""
+},
+{
+"i": 213,
+"en": "No device link activity recorded in this session.",
+"comment": ""
+},
+{
+"i": 214,
+"en": "Full link journal: %@",
+"comment": ""
+},
+{
+"i": 215,
+"en": "Could not connect to this Mac. Check that it is online and try again.",
+"comment": ""
+},
+{
+"i": 216,
+"en": "The Devices service is out of date. Connections between Macs resume once it updates.",
+"comment": ""
+},
+{
+"i": 217,
+"en": "%@ has not authorized this Mac. Update cmux on both Macs, then refresh.",
+"comment": ""
+},
+{
+"i": 218,
+"en": "%@ no longer holds an authorization for this Mac. Refresh to try again.",
+"comment": ""
+},
+{
+"i": 219,
+"en": "This Mac has no supported connection route. Update cmux on both Macs and try again.",
+"comment": ""
+},
+{
+"i": 220,
+"en": "This Mac has not published a route yet.",
+"comment": ""
+},
+{
+"i": 221,
+"en": "Access between these Macs was revoked. Sign in again on both Macs to restore it.",
+"comment": ""
+},
+{
+"i": 222,
+"en": "This Mac is not accepting connections right now.",
+"comment": ""
+},
+{
+"i": 223,
+"en": "A different Mac answered at this address. Pair it again from Settings › Devices.",
+"comment": ""
+},
+{
+"i": 224,
+"en": "%@ revoked this Mac’s access.",
+"comment": ""
+},
+{
+"i": 225,
+"en": "Pair this Mac in Settings › Devices to connect.",
+"comment": ""
+},
+{
+"i": 226,
+"en": "Waiting for the Devices directory to refresh…",
+"comment": ""
+},
+{
+"i": 227,
+"en": "Waiting to confirm this Mac belongs to your account…",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Browsers on another Mac can’t be opened here yet.",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Scope is invalid.",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Scope must be a non-empty string.",
+"comment": ""
+},
+{
+"i": 231,
+"en": "cmux could not hand this command to its bundled command-line tool because forwarding resolved back to the app itself. Reinstall cmux or run the command from a standard cmux CLI installation.",
+"comment": ""
+},
+{
+"i": 232,
+"en": "Couldn't upload the file to the remote session: %@",
+"comment": ""
+},
+{
+"i": 233,
+"en": "Nothing was typed into the terminal",
+"comment": ""
+},
+{
+"i": 234,
+"en": "Couldn't upload the dropped file",
+"comment": ""
+},
+{
+"i": 235,
+"en": "Anonymous collaborator",
+"comment": ""
+},
+{
+"i": 236,
+"en": "Viewing this workspace",
+"comment": ""
+},
+{
+"i": 237,
+"en": "SSH could not connect to the host.",
+"comment": ""
+},
+{
+"i": 238,
+"en": "SSH did not finish connecting in time.",
+"comment": ""
+},
+{
+"i": 239,
+"en": "SSH could not be started: %@",
+"comment": ""
+},
+{
+"i": 240,
+"en": "Cloud file previews are limited to 1 MB.",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Remote command failed",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Remote files unavailable: %@",
+"comment": ""
+},
+{
+"i": 243,
+"en": "Remote files unavailable",
+"comment": ""
+},
+{
+"i": 244,
+"en": "Unable to resolve remote home: %@",
+"comment": ""
+},
+{
+"i": 245,
+"en": "Cloud machine is not connected",
+"comment": ""
+},
+{
+"i": 246,
+"en": "Workspace Color: %@",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Unable to open remote file",
+"comment": ""
+},
+{
+"i": 248,
+"en": "The remote file could not be downloaded. Reconnect and try again.",
+"comment": ""
+},
+{
+"i": 249,
+"en": "Close a Cloud file preview and try again.",
+"comment": ""
+},
+{
+"i": 250,
+"en": "Sign in to cmux on another Mac and make it discoverable in Settings › Devices.",
+"comment": ""
+},
+{
+"i": 251,
+"en": "ssh-tmux: --name requires a workspace title",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Window handle is blank",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Workspace handle is blank",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Focus Last",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Equalize Splits on Create",
+"comment": ""
+},
+{
+"i": 256,
+"en": "Password input",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Password Input Indicator",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Show Typed Password Dots",
+"comment": ""
+},
+{
+"i": 259,
+"en": "terminal.showPasswordInputIndicator password input indicator secure input echo off lock badge sudo ssh passwd gpg prompt",
+"comment": ""
+},
+{
+"i": 260,
+"en": "terminal.showPasswordInputDots password dots typed characters count bullets feedback sudo ssh prompt",
+"comment": ""
+},
+{
+"i": 261,
+"en": "set-buffer: stdin is not valid UTF-8 text",
+"comment": ""
+},
+{
+"i": 262,
+"en": "Usage: cmux paste [flags] [--] [text | -]\n\nPaste text into a terminal surface through the same paste path as Cmd+V. If the running program has turned on bracketed paste, the text arrives as one paste and newlines stay inside it; otherwise each newline is sent as Enter. As with Cmd+V, control characters such as Esc, Backspace, Ctrl-C and Ctrl-U are replaced with spaces. Escape sequences such as \\n are not interpreted. With no text argument, or with - before --, the text is read from stdin. Text over 15 MiB after JSON escaping is rejected.\n\nIf an agent prompt in the target holds text someone is typing, or a question or permission dialog is open, nothing is sent and the command fails. --force sends anyway.\n\nFlags:\n  --workspace <id|ref|index>   Target workspace (default: $CMUX_WORKSPACE_ID)\n  --surface <id|ref|index>     Target surface (default: $CMUX_SURFACE_ID)\n  --window <id|ref|index>      Window context for workspace/surface refs and indexes\n  --submit                     Press the agent's submit key after the paste\n  --force                      Send even over a draft or into an open dialog\n\nExample:\n  git diff | cmux paste --surface surface:2\n  cmux read-screen --surface surface:1 --lines 40 | cmux paste --surface surface:2\n  cmux paste --surface surface:2 --submit \"Review this change\"",
+"comment": ""
+},
+{
+"i": 263,
+"en": "paste: stdin is not valid UTF-8 text",
+"comment": ""
+},
+{
+"i": 264,
+"en": "paste requires text as an argument or on stdin",
+"comment": ""
+},
+{
+"i": 265,
+"en": "warning: text was pasted but the submit key was not sent (%@)",
+"comment": ""
+},
+{
+"i": 266,
+"en": "paste: pass text or -, not both",
+"comment": ""
+},
+{
+"i": 267,
+"en": "paste: unknown flag or missing value: %@ (put text that starts with - after a -- separator)",
+"comment": ""
+},
+{
+"i": 268,
+"en": "%@: text is too large; the limit is %@ MiB after JSON escaping",
+"comment": ""
+},
+{
+"i": 269,
+"en": "Base Keymap: %@",
+"comment": ""
+},
+{
+"i": 270,
+"en": "Base Keymap",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Change or turn off the macOS shortcut in System Settings > Keyboard > Keyboard Shortcuts.",
+"comment": ""
+},
+{
+"i": 272,
+"en": "Start from another terminal's shortcuts. Only the differences are written to cmux.json; choose cmux to remove them.",
+"comment": ""
+},
+{
+"i": 273,
+"en": "cmux (Default)",
+"comment": ""
+},
+{
+"i": 274,
+"en": "iTerm2",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Terminal.app",
+"comment": ""
+},
+{
+"i": 276,
+"en": "tmux-style (Ctrl-B Prefix)",
+"comment": ""
+},
+{
+"i": 277,
+"en": "%1$@: %2$@ → %3$@",
+"comment": ""
+},
+{
+"i": 278,
+"en": "%1$@ is also a macOS shortcut (%2$@). macOS may handle it before cmux.",
+"comment": ""
+},
+{
+"i": 279,
+"en": "Kept your own shortcut for %@.",
+"comment": ""
+},
+{
+"i": 280,
+"en": "No shortcuts changed.",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Show Accessibility Shortcuts",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Switch apps",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Switch apps backward",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Show application windows",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Show Emoji & Symbols",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Show Finder search window",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Move focus to the Dock",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Move focus to the menu bar",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Show Help menu",
+"comment": ""
+},
+{
+"i": 290,
+"en": "Lock Screen",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Log Out",
+"comment": ""
+},
+{
+"i": 292,
+"en": "Look up & data detectors",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Show Mission Control",
+"comment": ""
+},
+{
+"i": 294,
+"en": "Select the next input source",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Move focus to the next window",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Select the previous input source",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Move focus to the previous window",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Save picture of screen as a file",
+"comment": ""
+},
+{
+"i": 299,
+"en": "Copy picture of screen to the clipboard",
+"comment": ""
+}
+]

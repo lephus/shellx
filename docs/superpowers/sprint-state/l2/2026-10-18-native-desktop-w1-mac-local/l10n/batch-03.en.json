@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Invalid notification correlation key",
+"comment": ""
+},
+{
+"i": 1,
+"en": "--correlation-key requires --panel",
+"comment": ""
+},
+{
+"i": 2,
+"en": "clear_notifications [--tab=X] [--panel=ID] [--correlation-key=UUID]",
+"comment": ""
+},
+{
+"i": 3,
+"en": "mark-notification-read requires exactly one selector: --id, --workspace, or --all",
+"comment": ""
+},
+{
+"i": 4,
+"en": "--surface requires --workspace",
+"comment": ""
+},
+{
+"i": 5,
+"en": "open-notification requires --id",
+"comment": ""
+},
+{
+"i": 6,
+"en": "ssh-session-attach: no persisted SSH PTY session with id '%@'. Run 'cmux ssh-session-list --all-workspaces' to see valid session ids.",
+"comment": ""
+},
+{
+"i": 7,
+"en": "ssh-session-attach: persisted SSH PTY session state is unavailable. Run 'cmux ssh-session-list --all-workspaces' and retry.",
+"comment": ""
+},
+{
+"i": 8,
+"en": "ssh-session-attach: session '%1$@' exists in multiple workspaces (%2$@). Pass --workspace <workspace> to choose one.",
+"comment": ""
+},
+{
+"i": 9,
+"en": "ssh-session-attach: session '%1$@' belongs to workspace %2$@, but --workspace requested a different workspace",
+"comment": ""
+},
+{
+"i": 10,
+"en": "ssh-session-attach: --workspace requires a value",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Invalid --id '%@'. Use letters, digits, '.', '_', or '-' (no spaces).",
+"comment": ""
+},
+{
+"i": 12,
+"en": "Invalid state '%@'. Expected on or off. %@",
+"comment": ""
+},
+{
+"i": 13,
+"en": "No workspace resolved. Run inside a cmux workspace or pass --workspace <id>.",
+"comment": ""
+},
+{
+"i": 14,
+"en": "workspace requires a subcommand. Try: list, create, env, close, rename, select, status, reconnect, disconnect, loading, group",
+"comment": ""
+},
+{
+"i": 15,
+"en": "Unknown workspace subcommand: %@. Try: list, create, env, close, rename, select, status, reconnect, disconnect, loading, group",
+"comment": ""
+},
+{
+"i": 16,
+"en": "--timeout must be greater than 0",
+"comment": ""
+},
+{
+"i": 17,
+"en": "Timed out waiting for a matching event",
+"comment": ""
+},
+{
+"i": 18,
+"en": "Print the subscription snapshot and exit",
+"comment": ""
+},
+{
+"i": 19,
+"en": "Exit unsuccessfully if no matching event arrives before the deadline",
+"comment": ""
+},
+{
+"i": 20,
+"en": "cmux could not start this command. Try again, or reinstall cmux if the problem continues.",
+"comment": ""
+},
+{
+"i": 21,
+"en": "cmux could not start the command-line tool from the app bundle. Reinstall cmux or run the command from a standard cmux CLI installation.",
+"comment": ""
+},
+{
+"i": 22,
+"en": "cmux could not run this command from the app bundle. Reinstall cmux or run the command from a standard cmux CLI installation.",
+"comment": ""
+},
+{
+"i": 23,
+"en": "Usage: cmux clear-notifications [--workspace <id|ref|index>] [--surface <id|ref|index>] [--window <id|ref|index>]\n\nClear queued notifications, optionally scoped to a workspace and surface.\n\nFlags: --workspace <id|ref|index> --surface <id|ref|index> --window <id|ref|index>",
+"comment": ""
+},
+{
+"i": 24,
+"en": "Usage: cmux dismiss-notification (--id <uuid> | --all-read)\n\nRemove one notification, or remove every already-read notification.\n\nFlags:\n  --id <uuid>           Notification id to remove\n  --all-read            Remove every already-read notification\n  --json                Print JSON\n  --id-format <mode>    refs, uuids, or both",
+"comment": ""
+},
+{
+"i": 25,
+"en": "ios <subcommand> [args] [--surface <id|ref|index>]",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Usage: cmux iroh-diag\n\nPrint the host's Iroh Connection Report as a plain-language timeline,\nthe same data as Settings > Networking > Connection Report.",
+"comment": ""
+},
+{
+"i": 27,
+"en": "Usage: cmux jump-to-unread\n\nFocus the latest unread notification, matching the Notifications page action.\n\nFlags:\n  --json                Print JSON\n  --id-format <mode>    refs, uuids, or both",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Usage: cmux mark-notification-read (--id <uuid> | --workspace <id|ref> [--surface <id|ref>] | --all)\n\nMark notifications read without opening them. Exactly one selector is required.\n\nFlags:\n  --id <uuid>           Mark one notification read\n  --workspace <id|ref>  Mark notifications for a workspace\n  --surface <id|ref>    Narrow --workspace to one surface\n  --all                 Mark every notification read\n  --json                Print JSON\n  --id-format <mode>    refs, uuids, or both",
+"comment": ""
+},
+{
+"i": 29,
+"en": "Usage: cmux memory [flags]\n\nDiagnose cmux app memory separately from recursive terminal child-process RSS.\n\nFlags:\n  --all                         Include all windows (default: current window only)\n  --workspace <id|ref|index>   Limit workspace context for attribution labels\n  --groups <count>              Number of child command groups to show (default: 12)\n  --json                        Structured JSON output\n\nOutput:\n  App footprint is the direct cmux process physical footprint from macOS process accounting.\n  Child RSS is recursive resident memory for descendants of the cmux app process,\n  grouped by command name and attributed back to workspace, pane, and surface when known.\n\nExample:\n  cmux memory\n  cmux memory --groups 20\n  cmux --json memory --all",
+"comment": ""
+},
+{
+"i": 30,
+"en": "Usage: cmux mosh <destination> [flags] [-- <remote-command-args>]\n\nMosh terminal transport:\n  --transport <ssh|mosh>  Interactive terminal transport (default: mosh)\n\nSSH continues to handle remote features; Mosh carries only the interactive\nterminal. If Mosh is missing locally or remotely, cmux reports it and uses SSH.\n\nExample:\n  cmux ssh dev@my-host --transport mosh\n\n  cmux mosh dev@my-host",
+"comment": ""
+},
+{
+"i": 31,
+"en": "Usage: cmux mosh-tmux <destination> [--session <name>] [flags]\n\nCreate a Mosh workspace that creates or attaches to a named tmux session (default: main). The tmux profile persists across reconnect and app session restore. This is a roaming tmux terminal, not the native mirror from cmux ssh-tmux. --session <name> selects the session; all other flags match cmux mosh. Without Mosh, the same profile runs over SSH.\n\nExample:\n  cmux mosh-tmux dev@my-host\n  cmux mosh-tmux dev@my-host --session agent-main",
+"comment": ""
+},
+{
+"i": 32,
+"en": "Usage: cmux open-notification --id <uuid>\n\nFocus the notification's workspace and surface, then mark the row read.\n\nFlags:\n  --id <uuid>           Notification id to open\n  --json                Print JSON\n  --id-format <mode>    refs, uuids, or both",
+"comment": ""
+},
+{
+"i": 33,
+"en": "Usage: cmux reorder-workspaces --order <id|ref|index>,<id|ref|index>,... [flags]\n\nReorder workspaces within a window as one atomic batch. The comma-separated\norder is the final leading order inside the pinned and unpinned groups;\nunmentioned workspaces keep their relative order after listed peers in the\nsame group.\n\nFlags:\n  --order <refs>                Comma-separated workspace refs to place first\n  --window <id|ref|index>       Window context\n  --dry-run                     Print the resolved final indexes without applying\n\nExample:\n  cmux reorder-workspaces --order workspace:1,workspace:11,workspace:31\n  cmux reorder-workspaces --order workspace:11,workspace:1 --dry-run",
+"comment": ""
+},
+{
+"i": 34,
+"en": "restore [--surface <id|ref>] <kind> <checkpoint-id> | restore --surface [id|ref]",
+"comment": ""
+},
+{
+"i": 35,
+"en": "Usage: cmux set-status <key> <value> [flags]\n\nSet a sidebar status entry for a workspace. Status entries appear as\npills in the sidebar tab row. Use a unique key so different tools\n(e.g. \"claude_code\", \"build\") can manage their own entries.\n\nFlags:\n  --icon <name>          Icon name (e.g. \"sparkle\", \"hammer\")\n  --color <#hex>         Pill color (e.g. \"#ff9500\")\n                         \"#4C8DFF\" draws as the cmux accent (app.accentColor)\n  --priority <n>         Sort priority; higher appears first (default: 0)\n  --workspace <id|ref|index>   Target workspace (default: $CMUX_WORKSPACE_ID)\n  --window <id|ref|index>      Window context for workspace refs and indexes\n\nExample:\n  cmux set-status build \"compiling\" --icon hammer --color \"#ff9500\" --priority 80\n  cmux set-status deploy \"v1.2.3\" --workspace workspace:2",
+"comment": ""
+},
+{
+"i": 36,
+"en": "simulator <subcommand> [args] [--surface <id|ref|index>]",
+"comment": ""
+},
+{
+"i": 37,
+"en": "local-tmux cleanup could not list sessions; the registry was left unchanged.",
+"comment": ""
+},
+{
+"i": 38,
+"en": "local-tmux cleanup does not take a session selector",
+"comment": ""
+},
+{
+"i": 39,
+"en": "local-tmux could not inspect attached clients.",
+"comment": ""
+},
+{
+"i": 40,
+"en": "local-tmux client not found for session %@: %@",
+"comment": ""
+},
+{
+"i": 41,
+"en": "local-tmux could not list sessions; liveness is unknown.",
+"comment": ""
+},
+{
+"i": 42,
+"en": "local-tmux session listing was incomplete; liveness is unknown.",
+"comment": ""
+},
+{
+"i": 43,
+"en": "local-tmux close failed",
+"comment": ""
+},
+{
+"i": 44,
+"en": "could not create local-tmux state directory",
+"comment": ""
+},
+{
+"i": 45,
+"en": "local-tmux working directory is not an accessible directory: %@",
+"comment": ""
+},
+{
+"i": 46,
+"en": "local-tmux --client/--all are only valid with detach",
+"comment": ""
+},
+{
+"i": 47,
+"en": "local-tmux workspace and attachment options are only valid with start or attach",
+"comment": ""
+},
+{
+"i": 48,
+"en": "local-tmux detach accepts either --client or --all, not both",
+"comment": ""
+},
+{
+"i": 49,
+"en": "local-tmux: session name was supplied more than once",
+"comment": ""
+},
+{
+"i": 50,
+"en": "local-tmux --headless is only valid with attach or start",
+"comment": ""
+},
+{
+"i": 51,
+"en": "local-tmux state path is not owned by the current user or is group/world accessible: %@",
+"comment": ""
+},
+{
+"i": 52,
+"en": "local-tmux interactive client exited with status %d",
+"comment": ""
+},
+{
+"i": 53,
+"en": "local-tmux could not start an interactive client",
+"comment": ""
+},
+{
+"i": 54,
+"en": "local-tmux session already exists; use attach or close it before supplying a new command",
+"comment": ""
+},
+{
+"i": 55,
+"en": "local-tmux session already exists with a different working directory; use attach or close it first",
+"comment": ""
+},
+{
+"i": 56,
+"en": "local-tmux: --focus must be true or false",
+"comment": ""
+},
+{
+"i": 57,
+"en": "local-tmux: --id must be a UUID",
+"comment": ""
+},
+{
+"i": 58,
+"en": "local-tmux session names must contain only letters, numbers, underscore, or dash (1–128 characters)",
+"comment": ""
+},
+{
+"i": 59,
+"en": "local-tmux state is invalid: %@",
+"comment": ""
+},
+{
+"i": 60,
+"en": "local-tmux list does not take a session selector",
+"comment": ""
+},
+{
+"i": 61,
+"en": "could not lock local-tmux state: %@",
+"comment": ""
+},
+{
+"i": 62,
+"en": "local-tmux session has multiple clients; pass --client <id> or --all to detach explicitly",
+"comment": ""
+},
+{
+"i": 63,
+"en": "local-tmux --new-client is only valid with attach",
+"comment": ""
+},
+{
+"i": 64,
+"en": "local-tmux session has no attached clients: %@",
+"comment": ""
+},
+{
+"i": 65,
+"en": "local-tmux %@ failed (exit %d)",
+"comment": ""
+},
+{
+"i": 66,
+"en": "could not persist %@",
+"comment": ""
+},
+{
+"i": 67,
+"en": "local-tmux --prune is only valid with cleanup",
+"comment": ""
+},
+{
+"i": 68,
+"en": "local-tmux %@ requires a running cmux app; use --headless for a direct tmux client",
+"comment": ""
+},
+{
+"i": 69,
+"en": "local-tmux: %@ requires a value",
+"comment": ""
+},
+{
+"i": 70,
+"en": "local-tmux could not run tmux",
+"comment": ""
+},
+{
+"i": 71,
+"en": "local-tmux: use either a session name or --id, not both",
+"comment": ""
+},
+{
+"i": 72,
+"en": "local-tmux %@ requires a session name or --id\n%@",
+"comment": ""
+},
+{
+"i": 73,
+"en": "local-tmux session not found for id %@",
+"comment": ""
+},
+{
+"i": 74,
+"en": "local-tmux session identity changed; refusing to operate on replacement session: %@",
+"comment": ""
+},
+{
+"i": 75,
+"en": "local-tmux could not verify the tmux session identity: %@",
+"comment": ""
+},
+{
+"i": 76,
+"en": "local-tmux session not found: %@",
+"comment": ""
+},
+{
+"i": 77,
+"en": "local-tmux session is no longer running: %@",
+"comment": ""
+},
+{
+"i": 78,
+"en": "local-tmux state directory is too long for a Unix socket: %@",
+"comment": ""
+},
+{
+"i": 79,
+"en": "local-tmux state could not be accessed safely",
+"comment": ""
+},
+{
+"i": 80,
+"en": "local-tmux surface target was not found",
+"comment": ""
+},
+{
+"i": 81,
+"en": "local-tmux start accepts a name, not --id",
+"comment": ""
+},
+{
+"i": 82,
+"en": "local-tmux --cwd and --command are only valid with start",
+"comment": ""
+},
+{
+"i": 83,
+"en": "local-tmux start requires a session name",
+"comment": ""
+},
+{
+"i": 84,
+"en": "local-tmux command timed out",
+"comment": ""
+},
+{
+"i": 85,
+"en": "local-tmux requires tmux. Install tmux or configure an executable tmux path",
+"comment": ""
+},
+{
+"i": 86,
+"en": "the tmux alias only supports attach; use local-tmux for other session operations",
+"comment": ""
+},
+{
+"i": 87,
+"en": "local-tmux could not resolve %@ target %@",
+"comment": ""
+},
+{
+"i": 88,
+"en": "local-tmux could not verify the existing surface; no new client was created",
+"comment": ""
+},
+{
+"i": 89,
+"en": "local-tmux workspace target was not found",
+"comment": ""
+},
+{
+"i": 90,
+"en": "local-tmux pane or surface targets require a workspace",
+"comment": ""
+},
+{
+"i": 91,
+"en": "local-tmux: unexpected argument '%@'",
+"comment": ""
+},
+{
+"i": 92,
+"en": "local-tmux: unknown flag '%@'\n%@",
+"comment": ""
+},
+{
+"i": 93,
+"en": "Unknown local-tmux subcommand '%@'.\n%@",
+"comment": ""
+},
+{
+"i": 94,
+"en": "could not write %@",
+"comment": ""
+},
+{
+"i": 95,
+"en": "local-tmux could not create a workspace for %@",
+"comment": ""
+},
+{
+"i": 96,
+"en": "OK session=%@ surface=%@ mode=local-tmux",
+"comment": ""
+},
+{
+"i": 97,
+"en": "OK closed session=%@",
+"comment": ""
+},
+{
+"i": 98,
+"en": "OK detached session=%@ client=%@",
+"comment": ""
+},
+{
+"i": 99,
+"en": "OK detached all clients from session=%@",
+"comment": ""
+},
+{
+"i": 100,
+"en": "Found %lld stale local tmux sessions; pass --prune to remove them",
+"comment": ""
+},
+{
+"i": 101,
+"en": " id=%@",
+"comment": ""
+},
+{
+"i": 102,
+"en": "No local tmux sessions",
+"comment": ""
+},
+{
+"i": 103,
+"en": "No stale local tmux sessions",
+"comment": ""
+},
+{
+"i": 104,
+"en": "OK session=%@ id=%@ state=%@ socket=%@",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Removed %lld stale local tmux sessions",
+"comment": ""
+},
+{
+"i": 106,
+"en": "%@ [%@] clients=%lld",
+"comment": ""
+},
+{
+"i": 107,
+"en": "%@ [%@] clients=%lld socket=%@",
+"comment": ""
+},
+{
+"i": 108,
+"en": "detached",
+"comment": ""
+},
+{
+"i": 109,
+"en": "live",
+"comment": ""
+},
+{
+"i": 110,
+"en": "stale",
+"comment": ""
+},
+{
+"i": 111,
+"en": "pane",
+"comment": ""
+},
+{
+"i": 112,
+"en": "surface",
+"comment": ""
+},
+{
+"i": 113,
+"en": "Usage: cmux local-tmux <start|attach|list|status|detach|close|cleanup> [session] [options]\n\nOpt-in local tmux sessions survive cmux quit, crash, and app updates. Ordinary cmux terminals are unchanged.\n\nstart <name> [--cwd <path>] [--command <shell>] [--detached]\nattach <name|--id <uuid>> [--workspace <id|ref|index>] [--focus <true|false>] [--headless] [--new-client]\nlist [--json]\nstatus <name|--id <uuid>> [--json]\ndetach <name|--id <uuid>> [--client <id> | --all]\nclose <name|--id <uuid>>\ncleanup [--prune]\n\nThe registry and tmux server socket live under ~/.cmux/local-tmux with user-only permissions. `attach --headless` hands the terminal directly to tmux for a client outside the cmux GUI.",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Usage: cmux ssh <destination> [flags] [-- <remote-command-args>]\n\nCreate a new workspace, mark it as remote-SSH, and start an SSH session in that workspace.\ncmux will also establish a local SSH proxy endpoint so browser traffic can egress from the remote host.\n\nFlags:\n  --name <title>          Optional workspace title\n  --port <n>              SSH port\n  --identity <path>       SSH identity file path\n  -A, --forward-agent     Forward the caller's SSH agent; also honors ForwardAgent yes from ssh_config\n  -a, --no-forward-agent  Disable SSH agent forwarding for this workspace\n  --ssh-option <opt>      Extra SSH -o option (repeatable)\n  --window <id|ref|index> Target window for the managed workspace\n  --no-focus              Create workspace without switching to it\n\nExample:\n  cmux ssh dev@my-host\n  cmux ssh dev@my-host --name \"gpu-box\" --port 2222 --identity ~/.ssh/id_ed25519\n  cmux ssh dev@my-host --forward-agent\n  cmux ssh dev@my-host --ssh-option UserKnownHostsFile=/dev/null --ssh-option StrictHostKeyChecking=no",
+"comment": ""
+},
+{
+"i": 115,
+"en": "Usage: cmux ssh-tmux <destination> [--port <n>] [--identity <path>] [--name <title>]\n                     [--transport ssh|et] [--transport-port <n>] [--broker <name>] [--no-focus]\n\nMirror a remote host's tmux sessions into the current window's sidebar over\nSSH tmux control mode (tmux -CC). Each session becomes a workspace, each\nwindow a tab, and each multi-pane window a native split. Requires the\n\"Remote tmux\" beta setting.\n\nIf the host needs interactive authentication (password, host-key confirmation,\nMFA, or a security-key touch), cmux runs ssh inline in this terminal so you can\nauthenticate, then mirrors the sessions over the shared SSH connection. Hosts\nthat authenticate non-interactively (ssh-agent / key in ~/.ssh/config) mirror\nwith no prompt. ~/.ssh/config aliases and their IdentityFile/ProxyJump/Port settings are honored.\n\nFlags:\n  --port <n>            SSH port\n  --identity <path>     SSH identity file path\n  --name <title>        Set the mirrored workspace's local display title. This is\n                        cosmetic only: it does not rename the remote tmux session.\n                        Applies to the first newly-mirrored session when the host\n                        has more than one.\n  --transport <name>    ssh (default) or et. et carries the control stream over EternalTerminal, which reconnects on its own after a network change\n  --transport-port <n>  Port the transport connects to: sshd's for ssh, etserver's for et (default 22 for ssh, 2022 for et)\n  --broker <name>       Reach the host through a broker declared under remoteTmux.brokers in cmux.json (a named entry, not a command)\n  --no-focus            Do not select the mirror workspace or focus its window\n\nExample:\n  cmux ssh-tmux dev@my-host\n  cmux ssh-tmux dev@my-host --port 2222 --identity ~/.ssh/id_ed25519\n  cmux ssh-tmux dev@my-host --name \"prod db\"\n  cmux ssh-tmux dev@my-host --transport et --transport-port 8080\n  cmux ssh-tmux my-host --transport et --broker corp",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Additional flag:\n  --new-window        Open the mirror in a dedicated new window",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Initial command:\n  --command <text>        Run text once in the initial remote terminal after shell startup\n\nExample:\n  cmux ssh dev@my-host --command 'omp \"investigate auth\"'",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Mosh terminal transport:\n  --transport <ssh|mosh>  Interactive terminal transport (default: ssh)\n\nSSH continues to handle remote features; Mosh carries only the interactive\nterminal. If Mosh is missing locally or remotely, cmux reports it and uses SSH.\n\nExample:\n  cmux ssh dev@my-host --transport mosh",
+"comment": ""
+},
+{
+"i": 119,
+"en": "Amp hooks already up to date at %@",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Aborted.",
+"comment": ""
+},
+{
+"i": 121,
+"en": "%@ hooks already up to date at %@",
+"comment": ""
+},
+{
+"i": 122,
+"en": "\nProceed? [y/N] ",
+"comment": ""
+},
+{
+"i": 123,
+"en": "%@ exists but is not valid JSON. Fix or remove it before installing hooks.",
+"comment": ""
+},
+{
+"i": 124,
+"en": "%@ hooks installed at %@",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Malformed %@ at %@. Fix or remove it before uninstalling hooks.",
+"comment": ""
+},
+{
+"i": 126,
+"en": "No %@ found at %@",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Removed Antigravity cmux hooks from %@",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Removed 0 cmux hook(s) from %@",
+"comment": ""
+},
+{
+"i": 129,
+"en": "Campfire hooks already up to date at %@",
+"comment": ""
+},
+{
+"i": 130,
+"en": "%@ exists and is not a cmux extension; leaving it alone",
+"comment": ""
+},
+{
+"i": 131,
+"en": "Failed to read %@",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Campfire hooks installed at %@",
+"comment": ""
+},
+{
+"i": 133,
+"en": "No Campfire cmux extension found at %@",
+"comment": ""
+},
+{
+"i": 134,
+"en": "Refusing to remove %@: missing cmux marker",
+"comment": ""
+},
+{
+"i": 135,
+"en": "Removed Campfire cmux extension from %@",
+"comment": ""
+},
+{
+"i": 136,
+"en": "cmux could not create the hooks directory at %@. Check the parent directory permissions and try again.",
+"comment": ""
+},
+{
+"i": 137,
+"en": "cmux could not create the hooks directory: a file exists at %@. Remove or rename the conflicting file, then run `cmux hooks setup` again.",
+"comment": ""
+},
+{
+"i": 138,
+"en": "cmux could not connect this hook installation to a running app. Open a cmux workspace and run this command again.",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Removed Kimi Code cmux hooks from %@",
+"comment": ""
+},
+{
+"i": 140,
+"en": "Warning: cmux hooks are installed at %@, but cmux could not refresh its existing hook block in %@. Check that path and re-run `cmux hooks setup kimi` to finish the update.",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Warning: cmux could not remove its hook block from %@. Check that path and re-run `cmux hooks uninstall kimi` to finish cleanup.",
+"comment": ""
+},
+{
+"i": 142,
+"en": "Kiro applies these hooks only when run as the cmux agent. Start Kiro with `kiro-cli chat --agent cmux`, or make it the default with `kiro-cli settings chat.defaultAgent cmux`.",
+"comment": ""
+},
+{
+"i": 143,
+"en": "OMP hooks already up to date at %@",
+"comment": ""
+},
+{
+"i": 144,
+"en": "OMP hooks installed at %@",
+"comment": ""
+},
+{
+"i": 145,
+"en": "No OMP cmux extension found at %@",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Removed OMP cmux extension from %@",
+"comment": ""
+},
+{
+"i": 147,
+"en": "Pi hooks already up to date at %@",
+"comment": ""
+},
+{
+"i": 148,
+"en": "cmux did not receive acknowledgment for Pi feed ingestion",
+"comment": ""
+},
+{
+"i": 149,
+"en": "Pi hooks installed at %@",
+"comment": ""
+},
+{
+"i": 150,
+"en": "No Pi cmux extension found at %@",
+"comment": ""
+},
+{
+"i": 151,
+"en": "Removed Pi cmux extension from %@",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Administrator privileges were required to write to /usr/local/bin.",
+"comment": ""
+},
+{
+"i": 153,
+"en": "Created symlink:\n\n%1$@ -> %2$@",
+"comment": ""
+},
+{
+"i": 154,
+"en": "Couldn't Install cmux CLI",
+"comment": ""
+},
+{
+"i": 155,
+"en": "cmux CLI Installed",
+"comment": ""
+},
+{
+"i": 156,
+"en": "Found %lld iOS Simulator panes; pass --surface <ref> or --all",
+"comment": ""
+},
+{
+"i": 157,
+"en": "The requested iOS Simulator device was not found",
+"comment": ""
+},
+{
+"i": 158,
+"en": "The requested iOS Simulator device did not start streaming",
+"comment": ""
+},
+{
+"i": 159,
+"en": "The selected iOS pane has no Simulator identifier",
+"comment": ""
+},
+{
+"i": 160,
+"en": "The selected iOS pane has no surface reference",
+"comment": ""
+},
+{
+"i": 161,
+"en": "No matching iOS Simulator panes were found",
+"comment": ""
+},
+{
+"i": 162,
+"en": "--out must name an existing directory when capturing multiple Simulators",
+"comment": ""
+},
+{
+"i": 163,
+"en": "--out must name a file when capturing one Simulator",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Found %lld iOS Simulator panes; screenshot --all supports at most 8",
+"comment": ""
+},
+{
+"i": 165,
+"en": "The iOS Simulator screenshot batch exceeded its 10-minute deadline",
+"comment": ""
+},
+{
+"i": 166,
+"en": "One or more iOS Simulator screenshots failed",
+"comment": ""
+},
+{
+"i": 167,
+"en": "No iOS Simulator panes",
+"comment": ""
+},
+{
+"i": 168,
+"en": "Usage: cmux ios <subcommand> [args] [--surface <ref>]\n\nEvery native `cmux simulator` subcommand is accepted unchanged.\n\nAdditional subcommands:\n  list [--workspace <ref>]            List Simulator panes and device identifiers\n  context [--udid]                    Print one selected Simulator identity\n  select <device-udid>                Bind a pane to an iPhone or iPad Simulator\n  screenshot [--out <path>]           Capture one or many selected Simulators\n\nExamples:\n  cmux ios list --json\n  cmux ios screenshot --surface surface:2 --out phone.png\n  cmux ios screenshot --all --out screenshots/\n  cmux ios rotate landscape-left",
+"comment": ""
+},
+{
+"i": 169,
+"en": "cmux memory requires a running cmux build that supports memory diagnostics",
+"comment": ""
+},
+{
+"i": 170,
+"en": "memory requires --groups <count>",
+"comment": ""
+},
+{
+"i": 171,
+"en": "memory: invalid --groups value '%@'. Use an integer from 1 to 100",
+"comment": ""
+},
+{
+"i": 172,
+"en": "memory: invalid workspace handle '%@'",
+"comment": ""
+},
+{
+"i": 173,
+"en": "memory: unexpected argument '%@'",
+"comment": ""
+},
+{
+"i": 174,
+"en": "memory: unknown flag '%@'. Known flags: --all --workspace <id|ref|index> --groups <count> --json",
+"comment": ""
+},
+{
+"i": 175,
+"en": "memory requires --workspace <id|ref|index>",
+"comment": ""
+},
+{
+"i": 176,
+"en": "  footprint %@",
+"comment": ""
+},
+{
+"i": 177,
+"en": "APP",
+"comment": ""
+},
+{
+"i": 178,
+"en": "  rss       %@",
+"comment": ""
+},
+{
+"i": 179,
+"en": "CHILD PROCESSES",
+"comment": ""
+},
+{
+"i": 180,
+"en": "  no child process groups",
+"comment": ""
+},
+{
+"i": 181,
+"en": "No memory diagnostic available",
+"comment": ""
+},
+{
+"i": 182,
+"en": "pane %@",
+"comment": ""
+},
+{
+"i": 183,
+"en": "1 process",
+"comment": ""
+},
+{
+"i": 184,
+"en": "%lld processes",
+"comment": ""
+},
+{
+"i": 185,
+"en": "  recursive RSS %@ across %@",
+"comment": ""
+},
+{
+"i": 186,
+"en": "surface %@",
+"comment": ""
+},
+{
+"i": 187,
+"en": "      RSS  PROC  COMMAND                    ATTRIBUTION",
+"comment": ""
+},
+{
+"i": 188,
+"en": "TOP CHILD GROUPS",
+"comment": ""
+},
+{
+"i": 189,
+"en": "unattributed",
+"comment": ""
+},
+{
+"i": 190,
+"en": "workspace %@",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Granted Mac dev tags for paired phones: %@ (pushed to connected device(s)).",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Granted Mac dev tags for paired phones: %@ (applies when a phone next connects).",
+"comment": ""
+},
+{
+"i": 193,
+"en": "No additional Mac dev tags are granted to this Mac's paired phones.",
+"comment": ""
+},
+{
+"i": 194,
+"en": "(none)",
+"comment": ""
+},
+{
+"i": 195,
+"en": "Usage: cmux mobile compatible-tags [list|set <tags...>|add <tags...>|remove <tags...>|clear]",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Set mobile terminal font to %@pt on connected device(s).",
+"comment": ""
+},
+{
+"i": 197,
+"en": "Set mobile terminal font to %@pt (no iOS device is currently connected).",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Usage: cmux mobile set-font <points> [--surface <id>] [--workspace <id>]",
+"comment": ""
+},
+{
+"i": 199,
+"en": "mosh-tmux accepts a destination and --session, not a separate remote command",
+"comment": ""
+},
+{
+"i": 200,
+"en": "mosh-tmux: --session requires a non-empty session name without hidden characters",
+"comment": ""
+},
+{
+"i": 201,
+"en": "--profile <name|uuid>                Browser profile name or UUID",
+"comment": ""
+},
+{
+"i": 202,
+"en": "Failed to install %1$@. Try manually: npm install -g %2$@",
+"comment": ""
+},
+{
+"i": 203,
+"en": "Installing %@ plugin (this may take a minute on first run)...",
+"comment": ""
+},
+{
+"i": 204,
+"en": "Neither bun nor npm found in PATH. Install %1$@ manually: bunx %2$@ install",
+"comment": ""
+},
+{
+"i": 205,
+"en": "%@ plugin installed",
+"comment": ""
+},
+{
+"i": 206,
+"en": "Retrying %@ install with a clean shadow package state...",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Usage: cmux omo [opencode-args...]\n\nLaunch OpenCode with oh-my-openagent in a cmux-aware environment.\n\noh-my-openagent orchestrates multiple AI models as specialized agents in\nparallel. This command sets up a tmux shim so agent panes become native\ncmux splits with sidebar metadata and notifications.\n\nThis command:\n  - sets a tmux-like environment so oh-my-openagent uses cmux splits\n  - prepends a private tmux shim to PATH\n  - forwards all remaining arguments to opencode\n\nThe tmux shim translates tmux window/pane commands into cmux workspace\nand split operations in the current cmux session.\n\nExamples:\n  cmux omo\n  cmux omo --continue\n  cmux omo --model claude-sonnet-4-6",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Failed to activate cmux",
+"comment": ""
+},
+{
+"i": 209,
+"en": "Failed to launch cmux",
+"comment": ""
+},
+{
+"i": 210,
+"en": "Failed to open %@ in cmux",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Path does not exist: %@",
+"comment": ""
+},
+{
+"i": 212,
+"en": "Failed to monitor process exit",
+"comment": ""
+},
+{
+"i": 213,
+"en": "%@ (timed out)",
+"comment": ""
+},
+{
+"i": 214,
+"en": "reorder-workspaces requires at least one workspace in --order",
+"comment": ""
+},
+{
+"i": 215,
+"en": "reorder-workspaces --order cannot contain empty workspace refs",
+"comment": ""
+},
+{
+"i": 216,
+"en": "reorder-workspaces requires --order <id|ref|index>,<id|ref|index>,...",
+"comment": ""
+},
+{
+"i": 217,
+"en": "Workspace not found: %@",
+"comment": ""
+},
+{
+"i": 218,
+"en": "OK workspace=%@ window=%@ index=%@",
+"comment": ""
+},
+{
+"i": 219,
+"en": "OK plan workspace=%@ window=%@ index=%@",
+"comment": ""
+},
+{
+"i": 220,
+"en": "restore: waiting for cmux to verify that this agent session is not already running…",
+"comment": ""
+},
+{
+"i": 221,
+"en": "restore: the saved agent session is unavailable. The terminal remains in its saved directory; retry later or start a new agent session.",
+"comment": ""
+},
+{
+"i": 222,
+"en": "restore: this command no longer matches the session. Run 'cmux restore --surface' to use the current record.",
+"comment": ""
+},
+{
+"i": 223,
+"en": "restore: the saved process could not be started. Retry the visible restore command.",
+"comment": ""
+},
+{
+"i": 224,
+"en": "restore: the current cmux surface could not be identified. Retry from this terminal or pass --surface <id|ref>.",
+"comment": ""
+},
+{
+"i": 225,
+"en": "restore: the saved agent command is unavailable. Make sure the agent is installed, then retry.",
+"comment": ""
+},
+{
+"i": 226,
+"en": "restore: this session's saved restore data is not compatible. Start the agent again in this terminal.",
+"comment": ""
+},
+{
+"i": 227,
+"en": "restore: this session has nothing to restore. Start the agent again in this terminal.",
+"comment": ""
+},
+{
+"i": 228,
+"en": "restore: provider setup could not start. Check the agent's provider settings, then retry.",
+"comment": ""
+},
+{
+"i": 229,
+"en": "restore: provider setup failed. Check the agent's provider settings, then retry.",
+"comment": ""
+},
+{
+"i": 230,
+"en": "restore: provider setup took too long. Check the provider connection, then retry.",
+"comment": ""
+},
+{
+"i": 231,
+"en": "restore: provider setup is unavailable. Check the agent's provider settings, then retry.",
+"comment": ""
+},
+{
+"i": 232,
+"en": "restore: provider setup could not complete. Retry the visible restore command.",
+"comment": ""
+},
+{
+"i": 233,
+"en": "restore: cmux is still opening. Retry the visible restore command in a moment.",
+"comment": ""
+},
+{
+"i": 234,
+"en": "restore: the requested surface was not found. Check the surface reference, then retry.",
+"comment": ""
+},
+{
+"i": 235,
+"en": "restore: the saved working directory is inaccessible. Restore access to it, then retry.",
+"comment": ""
+},
+{
+"i": 236,
+"en": "Usage: cmux restore [--surface <id|ref>] <kind> <checkpoint-id>\n       cmux restore <kind> <checkpoint-id> --surface <id|ref>\n       cmux restore --surface=<id|ref> <kind> <checkpoint-id>\n       cmux restore --surface [id|ref]\n\nReplace this CLI process with the persisted surface process. New\nrecords preserve launch arguments and cwd as structured values;\ncommand-only records from older builds use a compatibility shell.\nWith no id or ref, --surface uses the calling cmux surface.",
+"comment": ""
+},
+{
+"i": 237,
+"en": "Usage: cmux restore [--surface <id|ref>] <kind> <checkpoint-id>\n       cmux restore <kind> <checkpoint-id> --surface <id|ref>\n       cmux restore --surface=<id|ref> <kind> <checkpoint-id>",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Usage: cmux restore --surface [id|ref]",
+"comment": ""
+},
+{
+"i": 239,
+"en": "Invalid window handle: %@",
+"comment": ""
+},
+{
+"i": 240,
+"en": "Invalid workspace handle: %@",
+"comment": ""
+},
+{
+"i": 241,
+"en": "right-sidebar requires a subcommand",
+"comment": ""
+},
+{
+"i": 242,
+"en": "right-sidebar: --no-focus is only valid with set",
+"comment": ""
+},
+{
+"i": 243,
+"en": "right-sidebar set requires a mode: files, find, vault, sessions, feed, dock, cloud, devices, or custom [sidebar-name]",
+"comment": ""
+},
+{
+"i": 244,
+"en": "right-sidebar %@ received unexpected arguments",
+"comment": ""
+},
+{
+"i": 245,
+"en": "Unknown right-sidebar command '%@'",
+"comment": ""
+},
+{
+"i": 246,
+"en": "right-sidebar: unknown flag '%@'",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Unknown right-sidebar mode '%@'",
+"comment": ""
+},
+{
+"i": 248,
+"en": "Window ref not found",
+"comment": ""
+},
+{
+"i": 249,
+"en": "right-sidebar: --window requires an id",
+"comment": ""
+},
+{
+"i": 250,
+"en": "Workspace ref not found",
+"comment": ""
+},
+{
+"i": 251,
+"en": "right-sidebar: --workspace requires an id",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Usage: cmux right-sidebar <command> [flags]\n\nControl the right sidebar from the CLI.\n\nCommands:\n  toggle                         Toggle right sidebar visibility\n  show                           Show the right sidebar\n  hide                           Hide the right sidebar\n  focus                          Focus the current right sidebar mode\n  set <files|find|vault|sessions|feed|dock|cloud|devices|custom> [sidebar-name]\n                                 Show, switch mode, and focus. `custom`\n                                 renders a JS/Swift sidebar from\n                                 ~/.config/cmux/sidebars as a right panel;\n                                 the optional name picks which one.\n  mode                           Print {\"visible\":bool,\"mode\":string}\n  files|find|vault|sessions|feed|dock|cloud|devices|custom\n                                 Alias for show + set + focus\n\nFlags:\n  --workspace <id|ref|index>     Target the window containing a workspace\n  --window <id|ref|index>        Target a window\n  --no-focus                     With set, switch mode without moving focus\n\nExamples:\n  cmux right-sidebar toggle\n  cmux right-sidebar set find\n  cmux right-sidebar set custom panel-info\n  cmux right-sidebar mode",
+"comment": ""
+},
+{
+"i": 253,
+"en": "queued (terminal starting; input will be sent when its PTY is ready)",
+"comment": ""
+},
+{
+"i": 254,
+"en": "sessions [list] [options]",
+"comment": ""
+},
+{
+"i": 255,
+"en": "sessions list: --agent requires a value",
+"comment": ""
+},
+{
+"i": 256,
+"en": "sessions list: --limit must be a positive integer",
+"comment": ""
+},
+{
+"i": 257,
+"en": "sessions list: unexpected argument '%@'",
+"comment": ""
+},
+{
+"i": 258,
+"en": "sessions list: unknown agent '%@'",
+"comment": ""
+},
+{
+"i": 259,
+"en": "sessions list: unknown flag '%@'",
+"comment": ""
+},
+{
+"i": 260,
+"en": "Unknown sessions subcommand: %@. Usage: cmux sessions list [options]",
+"comment": ""
+},
+{
+"i": 261,
+"en": "... %lld more. Pass --all or --limit <n>.",
+"comment": ""
+},
+{
+"i": 262,
+"en": "No saved agent sessions matched.",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Usage: cmux sessions list [options]\n       cmux sessions [options]\n\nPrint saved agent session records from ~/.cmuxterm/*-hook-sessions.json.\nThis command does not require a running cmux socket.\nBy default, broad output shows active, restorable, or transcript-backed records.\nPass --all to inspect every saved hook record.\n\nOptions:\n  --agent <name>        Filter to one agent, for example codex or claude\n  --session <id>        Filter to one agent session id\n  --workspace <id>      Filter to one saved workspace id\n  --surface <id>        Filter to one saved surface id\n  --cwd <text>          Filter by saved cwd or launch working directory\n  --state-dir <path>    Override hook state directory\n  --codex-home <path>   Override the default Codex home used for transcript checks\n  --limit <n>           Limit text output (default: 100)\n  --all                 Print all matches\n  --json                Print structured JSON\n\nCodex rows include whether the saved id exists in CODEX_HOME/session_index.jsonl\nand whether a matching transcript file exists under CODEX_HOME/sessions or\nCODEX_HOME/archived_sessions.\n\nCompatibility aliases:\n  cmux sessions debug [options]\n  cmux session-debug [options]",
+"comment": ""
+},
+{
+"i": 264,
+"en": "sidebar %@: use either --all or a sidebar name, not both",
+"comment": ""
+},
+{
+"i": 265,
+"en": "sidebar requires a subcommand: templates, try, new, validate, reload, select, or open",
+"comment": ""
+},
+{
+"i": 266,
+"en": "sidebar %@ does not support --all",
+"comment": ""
+},
+{
+"i": 267,
+"en": "sidebar %@ requires one sidebar name",
+"comment": ""
+},
+{
+"i": 268,
+"en": "sidebar select does not support --all",
+"comment": ""
+},
+{
+"i": 269,
+"en": "sidebar select requires one sidebar name",
+"comment": ""
+},
+{
+"i": 270,
+"en": "sidebar %@ accepts at most one sidebar name",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Unknown sidebar command '%@'",
+"comment": ""
+},
+{
+"i": 272,
+"en": "No custom sidebars found.",
+"comment": ""
+},
+{
+"i": 273,
+"en": "ERROR %@ [%@] %@: %@",
+"comment": ""
+},
+{
+"i": 274,
+"en": "OK %@ [%@] %@",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Opened %@ as pane %@.",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Reloaded %#@count1@. %#@count2@, %#@count3@.",
+"comment": ""
+},
+{
+"i": 277,
+"en": "%d valid sidebars",
+"comment": ""
+},
+{
+"i": 278,
+"en": "%d valid",
+"comment": ""
+},
+{
+"i": 279,
+"en": "%d invalid",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Selected %@.",
+"comment": ""
+},
+{
+"i": 281,
+"en": "%#@count1@, %#@count2@.",
+"comment": ""
+},
+{
+"i": 282,
+"en": "Unknown error",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Usage: cmux sidebar <templates|try|new|validate|reload|select|open> [name|--all] [--json]\nValidate, reload, select, or open custom sidebars from ~/.config/cmux/sidebars.\nCommands:\n  templates [--json] List the curated built-in templates\n  try <template>    Create a temporary preview file and show open/remove commands\n  new <name> --from <template> [--force]\n                     Install an editable sidebar from a template\n  validate [name]   Validate all custom sidebars, or one named sidebar\n  reload [name]     Validate all sidebars, then reload every valid one\n  select <name>     Activate one custom sidebar\n  open <name>       Open one custom sidebar as a Bonsplit pane",
+"comment": ""
+},
+{
+"i": 284,
+"en": "The Simulator worker returned no accessibility snapshot",
+"comment": ""
+},
+{
+"i": 285,
+"en": "Multiple Simulator surfaces were found; pass surface_id",
+"comment": ""
+},
+{
+"i": 286,
+"en": "The caller surface is no longer available. Pass --surface or --window to select a Simulator.",
+"comment": ""
+},
+{
+"i": 287,
+"en": "The Simulator camera operation failed",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Camera source %@ requires a file path",
+"comment": ""
+},
+{
+"i": 289,
+"en": "The Simulator worker returned no camera status",
+"comment": ""
+},
+{
+"i": 290,
+"en": "The camera file is not a readable image or video",
+"comment": ""
+},
+{
+"i": 291,
+"en": "The active Simulator worker does not support this operation",
+"comment": ""
+},
+{
+"i": 292,
+"en": "The Simulator pane has no selected device",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Simulator has been disabled remotely",
+"comment": ""
+},
+{
+"i": 294,
+"en": "The Simulator worker returned no foreground-app result",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Simulator input transmission failed",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Simulator input transmission did not complete before the deadline",
+"comment": ""
+},
+{
+"i": 297,
+"en": "simulator input exceeds the %lld-byte UTF-8 limit",
+"comment": ""
+},
+{
+"i": 298,
+"en": "The Simulator worker returned no interface status",
+"comment": ""
+},
+{
+"i": 299,
+"en": "Invalid arguments for simulator %@",
+"comment": ""
+}
+]

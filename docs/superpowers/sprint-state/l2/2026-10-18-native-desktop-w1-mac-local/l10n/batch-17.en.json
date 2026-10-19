@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Usage: cmux fork [--surface <id|ref>] <kind> <checkpoint-id>\n       cmux fork <kind> <checkpoint-id> --surface <id|ref>\n       cmux fork --surface=<id|ref> <kind> <checkpoint-id>",
+"comment": ""
+},
+{
+"i": 1,
+"en": "fork: this session has nothing to fork. Start the agent again in this terminal.",
+"comment": ""
+},
+{
+"i": 2,
+"en": "fork: the requested surface was not found. Check the surface reference, then retry.",
+"comment": ""
+},
+{
+"i": 3,
+"en": "fork: the current cmux surface could not be identified. Retry from this terminal or pass --surface <id|ref>.",
+"comment": ""
+},
+{
+"i": 4,
+"en": "fork: this command no longer matches the session. Run 'cmux fork --surface' to use the current record.",
+"comment": ""
+},
+{
+"i": 5,
+"en": "fork: this session's saved fork data is not compatible. Start the agent again in this terminal.",
+"comment": ""
+},
+{
+"i": 6,
+"en": "fork: this session's saved restore data is not compatible. Start the agent again in this terminal.",
+"comment": ""
+},
+{
+"i": 7,
+"en": "fork: this agent does not support forking. Configure a fork command for this agent, then retry.",
+"comment": ""
+},
+{
+"i": 8,
+"en": "fork: agent setup failed. Check the agent settings, then retry.",
+"comment": ""
+},
+{
+"i": 9,
+"en": "fork: the saved working directory is inaccessible. Restore access to it, then retry.",
+"comment": ""
+},
+{
+"i": 10,
+"en": "fork: the saved agent command is unavailable. Make sure the agent is installed, then retry.",
+"comment": ""
+},
+{
+"i": 11,
+"en": "fork: the saved process could not be started. Retry the visible fork command.",
+"comment": ""
+},
+{
+"i": 12,
+"en": "fork: the saved agent session is unavailable. The terminal remains in its saved directory; retry later or start a new agent session.",
+"comment": ""
+},
+{
+"i": 13,
+"en": "fork: cmux is still opening. Retry the visible fork command in a moment.",
+"comment": ""
+},
+{
+"i": 14,
+"en": "Couldn't create machine",
+"comment": ""
+},
+{
+"i": 15,
+"en": "Couldn't set up Base",
+"comment": ""
+},
+{
+"i": 16,
+"en": "Cancel Create",
+"comment": ""
+},
+{
+"i": 17,
+"en": "Retry Create",
+"comment": ""
+},
+{
+"i": 18,
+"en": "Show Error…",
+"comment": ""
+},
+{
+"i": 19,
+"en": "%@ did not get created. The command reported:",
+"comment": ""
+},
+{
+"i": 20,
+"en": "Creation continues in the Machines panel.",
+"comment": ""
+},
+{
+"i": 21,
+"en": "Setup continues in the Machines panel.",
+"comment": ""
+},
+{
+"i": 22,
+"en": "It's open in its own workspace. Click to go there.",
+"comment": ""
+},
+{
+"i": 23,
+"en": "Find it in the Machines list.",
+"comment": ""
+},
+{
+"i": 24,
+"en": "%@ was created, but opening it failed",
+"comment": ""
+},
+{
+"i": 25,
+"en": "Open it from the Machines list.",
+"comment": ""
+},
+{
+"i": 26,
+"en": "Retry or dismiss it from the Machines list.",
+"comment": ""
+},
+{
+"i": 27,
+"en": "%1$@ was created, but opening it failed: %2$@ Open it from the list.",
+"comment": ""
+},
+{
+"i": 28,
+"en": "Advanced",
+"comment": ""
+},
+{
+"i": 29,
+"en": "The workspace closes on the machine.",
+"comment": ""
+},
+{
+"i": 30,
+"en": "Its terminal is killed with it. To keep it, use “Close Workspace” instead — it moves to the Terminals pool.",
+"comment": ""
+},
+{
+"i": 31,
+"en": "Its %d terminals are killed with it. To keep them, use “Close Workspace” instead — they move to the Terminals pool.",
+"comment": ""
+},
+{
+"i": 32,
+"en": "Delete workspace “%@”?",
+"comment": ""
+},
+{
+"i": 33,
+"en": "Delete Workspace and Terminals…",
+"comment": ""
+},
+{
+"i": 34,
+"en": "1 tab on the machine shows this terminal",
+"comment": ""
+},
+{
+"i": 35,
+"en": "No tabs on the machine show this terminal",
+"comment": ""
+},
+{
+"i": 36,
+"en": "File Editor Current Line Highlight",
+"comment": ""
+},
+{
+"i": 37,
+"en": "Highlight the line that contains the caret when nothing is selected.",
+"comment": ""
+},
+{
+"i": 38,
+"en": "File Editor Indent Guides",
+"comment": ""
+},
+{
+"i": 39,
+"en": "Draw vertical guides at indent columns in the built-in file editor.",
+"comment": ""
+},
+{
+"i": 40,
+"en": "File Editor Line Numbers",
+"comment": ""
+},
+{
+"i": 41,
+"en": "Show a line-number gutter beside the built-in file editor.",
+"comment": ""
+},
+{
+"i": 42,
+"en": "File Editor Syntax Highlighting",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Color keywords, strings, and other tokens in the built-in file editor.",
+"comment": ""
+},
+{
+"i": 44,
+"en": "File Editor Tab Width",
+"comment": ""
+},
+{
+"i": 45,
+"en": "Columns per tab stop, used by indent guides.",
+"comment": ""
+},
+{
+"i": 46,
+"en": "fileEditor.currentLineHighlight current line caret",
+"comment": ""
+},
+{
+"i": 47,
+"en": "fileEditor.indentGuides indent guides columns",
+"comment": ""
+},
+{
+"i": 48,
+"en": "fileEditor.lineNumbers gutter line numbers",
+"comment": ""
+},
+{
+"i": 49,
+"en": "fileEditor.syntaxHighlighting syntax highlight colors tokens code",
+"comment": ""
+},
+{
+"i": 50,
+"en": "fileEditor.tabWidth tab width indent columns",
+"comment": ""
+},
+{
+"i": 51,
+"en": "file editor word wrap soft wrap reflow lines text horizontal scroll preview",
+"comment": ""
+},
+{
+"i": 52,
+"en": "syntax highlight colors tokens code",
+"comment": ""
+},
+{
+"i": 53,
+"en": "gutter line numbers",
+"comment": ""
+},
+{
+"i": 54,
+"en": "indent guides columns",
+"comment": ""
+},
+{
+"i": 55,
+"en": "workspaceColors.unselectedFillOpacity opacity transparency alpha solid fill unselected inactive workspace row color dull faded strength",
+"comment": ""
+},
+{
+"i": 56,
+"en": "current line caret highlight",
+"comment": ""
+},
+{
+"i": 57,
+"en": "tab width indent columns",
+"comment": ""
+},
+{
+"i": 58,
+"en": "Public access lets anyone open %@ (VM %@, port %@). Continue? [y/N]",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Public access was not enabled.",
+"comment": ""
+},
+{
+"i": 60,
+"en": "cmux could not open a local port for the forward: %@",
+"comment": ""
+},
+{
+"i": 61,
+"en": "The local port forward was closed before it started.",
+"comment": ""
+},
+{
+"i": 62,
+"en": "%@ has no port to open.",
+"comment": ""
+},
+{
+"i": 63,
+"en": "%@ has no private network address yet; refresh the machine list and retry.",
+"comment": ""
+},
+{
+"i": 64,
+"en": "This cmux build has no user-space WireGuard hub, so it cannot reach ports on Cloud machines.",
+"comment": ""
+},
+{
+"i": 65,
+"en": "cmux Cloud Tunnel is on: every app on this Mac can reach your Cloud VM network. `cmux vpn down` turns it off.",
+"comment": ""
+},
+{
+"i": 66,
+"en": "cmux Cloud Tunnel is on: every app on this Mac can reach your Cloud VM network. It stops on its own when idle.",
+"comment": ""
+},
+{
+"i": 67,
+"en": "The cmux Cloud Tunnel is a macOS network extension that gives every app on this Mac a route to your Cloud VM network. cmux itself does not need it: terminals, Ports, and Desktop use the built-in user-space tunnel.",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Preparing the link…",
+"comment": ""
+},
+{
+"i": 69,
+"en": "Copy Private Address URL",
+"comment": ""
+},
+{
+"i": 70,
+"en": "This installs the cmux Cloud Tunnel network extension and a macOS VPN configuration named “cmux Cloud”, so every app on this Mac can reach your Cloud VM network. cmux itself does not need it: terminals, Ports, and Desktop use the built-in user-space tunnel. The first time, macOS asks you to allow the extension in System Settings › General › Login Items & Extensions.",
+"comment": ""
+},
+{
+"i": 71,
+"en": "The cmux Cloud Tunnel is stopping…",
+"comment": ""
+},
+{
+"i": 72,
+"en": "cmux could not build a local address for this port forward.",
+"comment": ""
+},
+{
+"i": 73,
+"en": "This turns the cmux Cloud Tunnel back on, so every app on this Mac can reach your Cloud VM network. cmux itself does not need it: terminals, Ports, and Desktop use the built-in user-space tunnel.",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Agent restore admission requires a valid workspace, surface, kind, and session.",
+"comment": ""
+},
+{
+"i": 75,
+"en": "Agent restore claim release requires a valid kind, session, and claim identifier.",
+"comment": ""
+},
+{
+"i": 76,
+"en": "The surface restore record changed. Run 'cmux restore --surface' again.",
+"comment": ""
+},
+{
+"i": 77,
+"en": "This agent session is already running in process %1$lld. cmux did not start another copy. To take it over here, stop process %1$lld, then run 'cmux restore --surface' again.",
+"comment": ""
+},
+{
+"i": 78,
+"en": "restore: this session's live ownership could not be verified. Run 'cmux restore --surface' again.",
+"comment": ""
+},
+{
+"i": 79,
+"en": "restore: another launch of this agent session is already starting. Wait for it to appear, or retry 'cmux restore --surface'.",
+"comment": ""
+},
+{
+"i": 80,
+"en": "restore: this agent session is already running in process %1$lld. cmux did not start another copy. To take it over here, stop process %1$lld, then run 'cmux restore --surface' again.",
+"comment": ""
+},
+{
+"i": 81,
+"en": "Timed out waiting for Chromium CDP command",
+"comment": ""
+},
+{
+"i": 82,
+"en": "Timed out registering Chromium document script",
+"comment": ""
+},
+{
+"i": 83,
+"en": "Invalid cookie payload",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Chromium returned malformed cookies",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Timed out waiting for Chromium navigation",
+"comment": ""
+},
+{
+"i": 86,
+"en": "Chromium returned no CDP command result",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Chromium returned no JavaScript value",
+"comment": ""
+},
+{
+"i": 88,
+"en": "Chromium returned no screenshot",
+"comment": ""
+},
+{
+"i": 89,
+"en": "Chromium operation ended without a result",
+"comment": ""
+},
+{
+"i": 90,
+"en": "Timed out waiting for Chromium screenshot",
+"comment": ""
+},
+{
+"i": 91,
+"en": "Could not encode CDP command",
+"comment": ""
+},
+{
+"i": 92,
+"en": "CDP connection closed",
+"comment": ""
+},
+{
+"i": 93,
+"en": "CDP endpoint is unavailable",
+"comment": ""
+},
+{
+"i": 94,
+"en": "JavaScript evaluation failed",
+"comment": ""
+},
+{
+"i": 95,
+"en": "Chromium returned malformed navigation history",
+"comment": ""
+},
+{
+"i": 96,
+"en": "Chromium navigation stream ended",
+"comment": ""
+},
+{
+"i": 97,
+"en": "Chromium has no page target",
+"comment": ""
+},
+{
+"i": 98,
+"en": "Chromium has no page websocket",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Chromium renderer exited (%lld)",
+"comment": ""
+},
+{
+"i": 100,
+"en": "Timed out waiting for Chromium",
+"comment": ""
+},
+{
+"i": 101,
+"en": "Unknown CDP error",
+"comment": ""
+},
+{
+"i": 102,
+"en": "Chromium unavailable",
+"comment": ""
+},
+{
+"i": 103,
+"en": "A browser engine can only be selected when creating a browser pane or surface.",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Choose WebKit or Chromium for the browser engine.",
+"comment": ""
+},
+{
+"i": 105,
+"en": "Chromium browser host is not in a visible window",
+"comment": ""
+},
+{
+"i": 106,
+"en": "Cookie import into Chromium is not available yet. Open a WebKit browser pane or set WebKit as the default engine and try again.",
+"comment": ""
+},
+{
+"i": 107,
+"en": "Cookies were not imported because Chromium uses an isolated cookie store. Select WebKit as the destination engine and try again.",
+"comment": ""
+},
+{
+"i": 108,
+"en": "Unsupported browser navigation action",
+"comment": ""
+},
+{
+"i": 109,
+"en": "Timed out setting Chromium viewport",
+"comment": ""
+},
+{
+"i": 110,
+"en": "Browser viewport layout is unavailable",
+"comment": ""
+},
+{
+"i": 111,
+"en": "Page zoom is not supported for Chromium browser panes",
+"comment": ""
+},
+{
+"i": 112,
+"en": "--engine is only supported when browser open creates a new pane; omit the surface selector",
+"comment": ""
+},
+{
+"i": 113,
+"en": "--engine is only supported when opening a browser URL",
+"comment": ""
+},
+{
+"i": 114,
+"en": "Rendering engine (browser only)",
+"comment": ""
+},
+{
+"i": 115,
+"en": "[--engine <webkit|chromium>]",
+"comment": ""
+},
+{
+"i": 116,
+"en": "Could not read browser cookies",
+"comment": ""
+},
+{
+"i": 117,
+"en": "Could not write browser cookies",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Browser navigation failed",
+"comment": ""
+},
+{
+"i": 119,
+"en": "Browser screenshot failed",
+"comment": ""
+},
+{
+"i": 120,
+"en": "open: unknown flag '%@'. Usage: cmux open <path-or-url>... [--engine <webkit|chromium>] [--workspace <id|ref|index>] [--surface <id|ref|index>] [--pane <id|ref|index>] [--window <id|ref|index>] [--focus true|false] [--no-focus]",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Open in a pane",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Open Cloud VM",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Split Button Layout Debug…",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Always Show Hover State",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Backdrop Options",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Caret Segment",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Cloud Split Button",
+"comment": ""
+},
+{
+"i": 128,
+"en": "Forced Hover Segment",
+"comment": ""
+},
+{
+"i": 129,
+"en": "Both",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Caret",
+"comment": ""
+},
+{
+"i": 131,
+"en": "Plus",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Inner Padding and Width",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Changes apply live.",
+"comment": ""
+},
+{
+"i": 134,
+"en": "controlBackgroundColor",
+"comment": ""
+},
+{
+"i": 135,
+"en": "Pre-composited barBackground",
+"comment": ""
+},
+{
+"i": 136,
+"en": "Pre-composited paneBackground",
+"comment": ""
+},
+{
+"i": 137,
+"en": "barBackground (tab chrome)",
+"comment": ""
+},
+{
+"i": 138,
+"en": "Raw paneBackground (opaque)",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Translucent chrome",
+"comment": ""
+},
+{
+"i": 140,
+"en": "windowBackgroundColor",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Bottom",
+"comment": ""
+},
+{
+"i": 142,
+"en": "Trailing",
+"comment": ""
+},
+{
+"i": 143,
+"en": "Plus clicks: %d",
+"comment": ""
+},
+{
+"i": 144,
+"en": "Plus Segment",
+"comment": ""
+},
+{
+"i": 145,
+"en": "Reset Padding and Widths",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Section Width",
+"comment": ""
+},
+{
+"i": 147,
+"en": "Button Backdrop Color",
+"comment": ""
+},
+{
+"i": 148,
+"en": "Caret Width Offset",
+"comment": ""
+},
+{
+"i": 149,
+"en": "Plus Width Offset",
+"comment": ""
+},
+{
+"i": 150,
+"en": "Split Button Layout",
+"comment": ""
+},
+{
+"i": 151,
+"en": "Chromium Extensions",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Unpacked extension directories loaded into Chromium browser panes. One absolute path per line; each directory must contain a manifest.json. Applies when the next pane starts.",
+"comment": ""
+},
+{
+"i": 153,
+"en": "Default Browser Engine",
+"comment": ""
+},
+{
+"i": 154,
+"en": "Auto (Match Default Browser)",
+"comment": ""
+},
+{
+"i": 155,
+"en": "Chromium",
+"comment": ""
+},
+{
+"i": 156,
+"en": "New browser panes use Chromium when your default browser is Chromium-based (Chrome, Edge, Brave, Arc…), otherwise WebKit.",
+"comment": ""
+},
+{
+"i": 157,
+"en": "Use a managed out-of-process Chromium runtime for new browser panes.",
+"comment": ""
+},
+{
+"i": 158,
+"en": "Use the built-in WebKit engine for new browser panes.",
+"comment": ""
+},
+{
+"i": 159,
+"en": "WebKit",
+"comment": ""
+},
+{
+"i": 160,
+"en": "Chromium Remote Debugging Port",
+"comment": ""
+},
+{
+"i": 161,
+"en": "Off by default. Chromium panes still use private CDP internally; no external endpoint is exposed.",
+"comment": ""
+},
+{
+"i": 162,
+"en": "New panes request http://127.0.0.1:%lld. If busy, cmux chooses another loopback port; CLI JSON reports the actual Playwright endpoint.",
+"comment": ""
+},
+{
+"i": 163,
+"en": "browser.chromiumExtensionDirectories chrome extension unpacked load-extension addon plugin",
+"comment": ""
+},
+{
+"i": 164,
+"en": "browser.defaultEngine auto match default browser webkit chromium chrome rendering engine out of process",
+"comment": ""
+},
+{
+"i": 165,
+"en": "browser.remoteDebuggingPort cdp devtools protocol playwright puppeteer loopback localhost attach",
+"comment": ""
+},
+{
+"i": 166,
+"en": "Cloud VM Menu",
+"comment": ""
+},
+{
+"i": 167,
+"en": "Cloud VM actions",
+"comment": ""
+},
+{
+"i": 168,
+"en": "cmux Cloud",
+"comment": ""
+},
+{
+"i": 169,
+"en": "This cmux build does not include the signed Network Extension required for browser access.",
+"comment": ""
+},
+{
+"i": 170,
+"en": "Sign in to cmux Cloud first (`cmux auth login`), then retry.",
+"comment": ""
+},
+{
+"i": 171,
+"en": "macOS needs a restart to finish installing the cmux Cloud Tunnel extension.",
+"comment": ""
+},
+{
+"i": 172,
+"en": "macOS only loads the cmux Cloud Tunnel extension from the Applications folder. Move cmux.app to /Applications and retry.",
+"comment": ""
+},
+{
+"i": 173,
+"en": "The tunnel could not start: %@",
+"comment": ""
+},
+{
+"i": 174,
+"en": "The tunnel did not come up in time.",
+"comment": ""
+},
+{
+"i": 175,
+"en": "macOS reported the VPN as disconnected before it came up.",
+"comment": ""
+},
+{
+"i": 176,
+"en": "VPN status updates stopped arriving.",
+"comment": ""
+},
+{
+"i": 177,
+"en": "cmux could not start the Cloud VPN. Try again.",
+"comment": ""
+},
+{
+"i": 178,
+"en": "macOS rejected the VPN configuration (code %d).",
+"comment": ""
+},
+{
+"i": 179,
+"en": "The request to load the cmux Cloud Tunnel extension was canceled.",
+"comment": ""
+},
+{
+"i": 180,
+"en": "macOS did not allow the cmux Cloud Tunnel extension to load. Allow it in System Settings › General › Login Items & Extensions, then retry.",
+"comment": ""
+},
+{
+"i": 181,
+"en": "macOS could not load the cmux Cloud Tunnel extension (code %d).",
+"comment": ""
+},
+{
+"i": 182,
+"en": "Bringing the tunnel up (app-managed, no sudo needed)…",
+"comment": ""
+},
+{
+"i": 183,
+"en": "macOS needs your approval to load the cmux Cloud Tunnel extension. Open System Settings › General › Login Items & Extensions › Network Extensions, allow cmux, then return here (waiting up to 10 minutes)…",
+"comment": ""
+},
+{
+"i": 184,
+"en": "Pinned up until `cmux vpn down`. Otherwise cmux starts the tunnel when you open a Cloud machine and stops it when no Cloud sessions remain.",
+"comment": ""
+},
+{
+"i": 185,
+"en": "Internal hostnames: run `cmux vpn hosts` to map <machine>.internal in /etc/hosts (needs sudo).",
+"comment": ""
+},
+{
+"i": 186,
+"en": "Tunnel: starting",
+"comment": ""
+},
+{
+"i": 187,
+"en": "Tunnel: waiting for approval in System Settings › General › Login Items & Extensions",
+"comment": ""
+},
+{
+"i": 188,
+"en": "Tunnel: failed (%@)",
+"comment": ""
+},
+{
+"i": 189,
+"en": "Tunnel: down (starts automatically when you open a Cloud machine)",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Tunnel: not set up (enrolls automatically when you open a Cloud machine)",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Pinned up by `cmux vpn up`; run `cmux vpn down` to release.",
+"comment": ""
+},
+{
+"i": 192,
+"en": "The tunnel starts automatically when you open a Cloud machine and stops when no Cloud sessions remain.",
+"comment": ""
+},
+{
+"i": 193,
+"en": "The tunnel start was cancelled.",
+"comment": ""
+},
+{
+"i": 194,
+"en": "The cmux Cloud Tunnel is starting…",
+"comment": ""
+},
+{
+"i": 195,
+"en": "macOS is waiting for you to allow the cmux Cloud Tunnel extension in System Settings › General › Login Items & Extensions.",
+"comment": ""
+},
+{
+"i": 196,
+"en": "The cmux Cloud Tunnel could not start: %@",
+"comment": ""
+},
+{
+"i": 197,
+"en": "This Mac's tunnel to your Cloud VM network is down; reopen the machine to start it.",
+"comment": ""
+},
+{
+"i": 198,
+"en": "The VPN configuration was not saved before the tunnel was started.",
+"comment": ""
+},
+{
+"i": 199,
+"en": "Discovering ports…",
+"comment": ""
+},
+{
+"i": 200,
+"en": "Couldn’t discover ports. Refresh to retry.",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Open the machine to discover ports",
+"comment": ""
+},
+{
+"i": 202,
+"en": "Port discovery unavailable. Refresh to retry.",
+"comment": ""
+},
+{
+"i": 203,
+"en": "No ports yet",
+"comment": ""
+},
+{
+"i": 204,
+"en": "Cloud Machines are disabled by your administrator.",
+"comment": ""
+},
+{
+"i": 205,
+"en": "Missing or invalid title",
+"comment": ""
+},
+{
+"i": 206,
+"en": "surface.sync_codex_native_title requires asynchronous socket dispatch",
+"comment": ""
+},
+{
+"i": 207,
+"en": "Missing or invalid panel_id",
+"comment": ""
+},
+{
+"i": 208,
+"en": "Panel not found",
+"comment": ""
+},
+{
+"i": 209,
+"en": "Discovering displays…",
+"comment": ""
+},
+{
+"i": 210,
+"en": "Couldn’t discover displays. Refresh to retry.",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Displays unavailable while the machine sleeps",
+"comment": ""
+},
+{
+"i": 212,
+"en": "Display discovery unavailable. Refresh to retry.",
+"comment": ""
+},
+{
+"i": 213,
+"en": "No displays available",
+"comment": ""
+},
+{
+"i": 214,
+"en": "The machine’s sessions are unavailable. Refresh and retry.",
+"comment": ""
+},
+{
+"i": 215,
+"en": "(none available)",
+"comment": ""
+},
+{
+"i": 216,
+"en": "Cloud Machines is turned off. Open the Cloud tab and enable Cloud, then retry.",
+"comment": ""
+},
+{
+"i": 217,
+"en": "Create a Cloud machine first. The cmux Cloud Tunnel runs only for an account with at least one machine.",
+"comment": ""
+},
+{
+"i": 218,
+"en": "Tunnel: unavailable (%@)",
+"comment": ""
+},
+{
+"i": 219,
+"en": "Required CLI not found. Install the command and retry.",
+"comment": ""
+},
+{
+"i": 220,
+"en": "Shows Cloud VM entrypoints in the new-workspace dropdown and command palette.",
+"comment": ""
+},
+{
+"i": 221,
+"en": "Cloud VM UI",
+"comment": ""
+},
+{
+"i": 222,
+"en": "Cloud private-network access is disabled by your organization.",
+"comment": ""
+},
+{
+"i": 223,
+"en": "Cloud VM access ended because your organization disabled cmux Cloud.",
+"comment": ""
+},
+{
+"i": 224,
+"en": "Remote connections are disabled by your organization.",
+"comment": ""
+},
+{
+"i": 225,
+"en": "File transfer is disabled by your organization.",
+"comment": ""
+},
+{
+"i": 226,
+"en": "cmux relay networking is disabled by your organization.",
+"comment": ""
+},
+{
+"i": 227,
+"en": "cmux could not read its saved session records for this agent, so it cannot tell whether the session is already running. Retry 'cmux restore --surface'.",
+"comment": ""
+},
+{
+"i": 228,
+"en": "cmux could not finish checking whether this agent session is already running before the time limit. Retry 'cmux restore --surface'.",
+"comment": ""
+},
+{
+"i": 229,
+"en": "cmux could not verify whether this agent session is already running, so it did not resume the session automatically. Run 'cmux restore --surface' to resume it here.",
+"comment": ""
+},
+{
+"i": 230,
+"en": "surface open: --tab and a pane side (--left/--right/--up/--down) are two different placements; pass one",
+"comment": ""
+},
+{
+"i": 231,
+"en": "Waiting for %1$@ to finish (Ctrl-C stops waiting; the agent keeps running — %2$@).\n",
+"comment": ""
+},
+{
+"i": 232,
+"en": "vm env ls: unknown flag '%1$@'\n\n%2$@",
+"comment": ""
+},
+{
+"i": 233,
+"en": "OK removed %1$ld variables on %2$@: %3$@",
+"comment": ""
+},
+{
+"i": 234,
+"en": "OK removed %1$ld variable on %2$@: %3$@",
+"comment": ""
+},
+{
+"i": 235,
+"en": "vm env rm: give at least one KEY\n\n%1$@",
+"comment": ""
+},
+{
+"i": 236,
+"en": "vm env rm: invalid variable name '%1$@' (keys match [A-Za-z_][A-Za-z0-9_]*)",
+"comment": ""
+},
+{
+"i": 237,
+"en": "vm env rm: unknown flag '%1$@'\n\n%2$@",
+"comment": ""
+},
+{
+"i": 238,
+"en": "vm env set: %1$@",
+"comment": ""
+},
+{
+"i": 239,
+"en": "OK set %1$ld variables on %2$@: %3$@",
+"comment": ""
+},
+{
+"i": 240,
+"en": "OK set %1$ld variable on %2$@: %3$@",
+"comment": ""
+},
+{
+"i": 241,
+"en": "vm env set: cannot read %1$@",
+"comment": ""
+},
+{
+"i": 242,
+"en": "vm.env_set: every entry needs a string `key` and a string `value`.",
+"comment": ""
+},
+{
+"i": 243,
+"en": "vm env set: give KEY=VALUE pairs, --from-file <.env>, or - for stdin\n\n%1$@",
+"comment": ""
+},
+{
+"i": 244,
+"en": "vm.env_set: invalid variable name '%1$@' (keys match [A-Za-z_][A-Za-z0-9_]*).",
+"comment": ""
+},
+{
+"i": 245,
+"en": "vm.env_set requires `entries`: a non-empty array of {key, value}.",
+"comment": ""
+},
+{
+"i": 246,
+"en": "vm.env_set requires `id`. Run `cmux vm ls` to find one.",
+"comment": ""
+},
+{
+"i": 247,
+"en": "vm env set: unknown flag '%1$@'\n\n%2$@",
+"comment": ""
+},
+{
+"i": 248,
+"en": "vm env: unknown verb '%1$@'\n\n%2$@",
+"comment": ""
+},
+{
+"i": 249,
+"en": "Usage:\n  cmux vm env set <machine> KEY=VALUE [KEY2=VALUE2 …] [--from-file <.env>] [-]\n                                                      Set environment variables for every terminal, agent, and\n                                                      command cmux starts on the machine. They persist in\n                                                      ~/.config/cmux/env on its durable volume (mode 0600) and are\n                                                      sourced by login and interactive shells there. --from-file\n                                                      and `-` (stdin) read KEY=VALUE lines (dotenv rules: blank\n                                                      lines and # comments skipped, optional `export `, matching\n                                                      quotes stripped) — prefer them over KEY=VALUE on the command\n                                                      line so values stay out of your shell history and `ps`.\n  cmux vm env ls <machine> [--show]                   List the variable names; --show prints the values too.\n  cmux vm env rm <machine> KEY [KEY2 …]               Remove variables.\n\nHow values travel: over the machine's cmux-tui link (end-to-end encrypted, brokered but never\nread by the control plane) into the machine's `cmux env receive`, which turns terminal echo\noff before it reads. Nothing passes through vm.exec, a command line, or a terminal's screen,\nand only names are ever printed back (use --show to see values). Forks, snapshots, and\ntemplates of the machine inherit the file; `cmux vm env rm` before you promote one.\nKeys match [A-Za-z_][A-Za-z0-9_]*. Add --json for the raw result.",
+"comment": ""
+},
+{
+"i": 250,
+"en": "vm layout apply: cannot read %1$@",
+"comment": ""
+},
+{
+"i": 251,
+"en": "vm layout apply: empty layout document on stdin",
+"comment": ""
+},
+{
+"i": 252,
+"en": "vm layout apply: --from-saved needs a layout name (see `cmux layout list`)",
+"comment": ""
+},
+{
+"i": 253,
+"en": "vm layout apply: give a layout file, `-` for stdin, or --from-saved <name>\n\n%1$@",
+"comment": ""
+},
+{
+"i": 254,
+"en": "vm layout apply: invalid layout document: %1$@",
+"comment": ""
+},
+{
+"i": 255,
+"en": "vm layout apply: pass a file (or -) OR --from-saved <name>, not both\n\n%1$@",
+"comment": ""
+},
+{
+"i": 256,
+"en": "vm layout apply: saved layout %1$@ could not be encoded",
+"comment": ""
+},
+{
+"i": 257,
+"en": "vm layout apply: the layout is applied to workspace %1$@ on %2$@, but it could not be opened here yet (%3$@). Open it with: cmux vm workspace open %4$@ %5$@",
+"comment": ""
+},
+{
+"i": 258,
+"en": "vm layout apply: the layout was applied but the machine reported no workspace id to open (output: %1$@)",
+"comment": ""
+},
+{
+"i": 259,
+"en": "vm layout apply: unknown flag '%1$@'\n\n%2$@",
+"comment": ""
+},
+{
+"i": 260,
+"en": "%1$@ at %2$@",
+"comment": ""
+},
+{
+"i": 261,
+"en": "vm layout export: unknown flag '%1$@'\n\n%2$@",
+"comment": ""
+},
+{
+"i": 262,
+"en": "vm layout: unknown verb '%1$@'\n\n%2$@",
+"comment": ""
+},
+{
+"i": 263,
+"en": "Usage:\n  cmux vm layout export <machine> [<workspace-id|name>] [--raw]\n                                                      Print a machine workspace's layout as a declarative layout\n                                                      document — the same JSON `cmux new-workspace --layout`,\n                                                      `cmux layout save/open`, and cmux.json use. Default: the\n                                                      machine's focused workspace. --raw prints the daemon's own\n                                                      LayoutDocument (exact pane/tab ids) instead.\n  cmux vm layout apply <machine> (<file>|- | --from-saved <name>) [--workspace <workspace-id>|--name <name>] [--cwd <dir>] [--open]\n                                                      Build panes, splits, and tabs on the machine from a layout\n                                                      document: a file, stdin (-), or a layout saved on this Mac\n                                                      (`cmux layout list`). Default: a NEW machine workspace named\n                                                      after the document (--name overrides); --workspace targets an\n                                                      existing EMPTY workspace. Terminal `command`s are typed into\n                                                      login shells started in each surface's `cwd` (relative to\n                                                      --cwd, default: the work user's home). --open then opens the workspace here\n                                                      with the same geometry.\n\nDocument (one of):\n  {\"pane\": {\"surfaces\": [{\"type\": \"terminal\", \"name\": \"tests\", \"command\": \"bun test\", \"cwd\": \"work/app\"}]}}\n  {\"direction\": \"horizontal\"|\"vertical\", \"split\": 0.6, \"children\": [<node>, <node>]}\n  {\"name\": …, \"cwd\": …, \"layout\": <node>}      or      {\"name\": …, \"workspace\": {\"cwd\": …, \"layout\": <node>}}\n`horizontal` = side by side (first child left), `vertical` = stacked (first child top); `split` is the\nfirst child's share (0.1–0.9, default 0.5). Surface types: terminal (name, command, cwd, env),\nbrowser (url, name); project surfaces are Mac-only and skipped on a machine.\nWorkspace ids come from `cmux vm tree`. Add --json for the raw result. Exit 2 = the document is invalid.",
+"comment": ""
+},
+{
+"i": 264,
+"en": "browser surface needs url",
+"comment": ""
+},
+{
+"i": 265,
+"en": "'children' must be an array of exactly 2 layout nodes",
+"comment": ""
+},
+{
+"i": 266,
+"en": "cmux %1$@ failed on %2$@ (exit %3$@)",
+"comment": ""
+},
+{
+"i": 267,
+"en": "'direction' must be \"horizontal\" or \"vertical\"",
+"comment": ""
+},
+{
+"i": 268,
+"en": "'env' must be an object of string values",
+"comment": ""
+},
+{
+"i": 269,
+"en": "expected KEY=VALUE, got '%1$@'",
+"comment": ""
+},
+{
+"i": 270,
+"en": "'focus' must be true or false",
+"comment": ""
+},
+{
+"i": 271,
+"en": "invalid variable name '%1$@' (keys match [A-Za-z_][A-Za-z0-9_]*)",
+"comment": ""
+},
+{
+"i": 272,
+"en": "layout document must be a JSON object",
+"comment": ""
+},
+{
+"i": 273,
+"en": "'layout' must be a layout node object",
+"comment": ""
+},
+{
+"i": 274,
+"en": "layout node must be an object",
+"comment": ""
+},
+{
+"i": 275,
+"en": "layout node must not have both 'pane' and 'direction'",
+"comment": ""
+},
+{
+"i": 276,
+"en": "layout node needs 'pane' (a leaf) or 'direction' (a split)",
+"comment": ""
+},
+{
+"i": 277,
+"en": "line %1$@: expected KEY=VALUE, got '%2$@'",
+"comment": ""
+},
+{
+"i": 278,
+"en": "line %1$@: invalid variable name '%2$@' (keys match [A-Za-z_][A-Za-z0-9_]*)",
+"comment": ""
+},
+{
+"i": 279,
+"en": "no layout found: expected a node ({\"pane\": …} or {\"direction\": …}), {\"layout\": <node>}, or {\"workspace\": {\"layout\": <node>}}",
+"comment": ""
+},
+{
+"i": 280,
+"en": "not valid JSON",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Open it: cmux vm workspace open %1$@ %2$@",
+"comment": ""
+},
+{
+"i": 282,
+"en": "'pane' must be an object",
+"comment": ""
+},
+{
+"i": 283,
+"en": "'split' must be a number (the first child's share, 0.1–0.9)",
+"comment": ""
+},
+{
+"i": 284,
+"en": "split needs exactly 2 children (got %1$@)",
+"comment": ""
+},
+{
+"i": 285,
+"en": "stdin is not UTF-8 text",
+"comment": ""
+},
+{
+"i": 286,
+"en": "surface must be an object",
+"comment": ""
+},
+{
+"i": 287,
+"en": "'surfaces' must be a non-empty array",
+"comment": ""
+},
+{
+"i": 288,
+"en": "this machine's cmux shim predates %1$@ support — reconnect it (cmux vm tree %2$@ --refresh) to heal, then retry",
+"comment": ""
+},
+{
+"i": 289,
+"en": "'type' must be \"terminal\", \"browser\", or \"project\"",
+"comment": ""
+},
+{
+"i": 290,
+"en": "'%1$@' must be a string",
+"comment": ""
+},
+{
+"i": 291,
+"en": "value of %1$@ must be a single line",
+"comment": ""
+},
+{
+"i": 292,
+"en": "OK %1$@ (%#@bytes@, mode %3$@) delivered over the link",
+"comment": ""
+},
+{
+"i": 293,
+"en": "%ld bytes",
+"comment": ""
+},
+{
+"i": 294,
+"en": "vm: unsupported Cloud VM service override. Omit --provider and retry the same command.",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Environment delivery was cancelled.",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Environment delivery failed.",
+"comment": ""
+},
+{
+"i": 297,
+"en": "The temporary environment receiver workspace %@ could not be removed. Inspect the machine before retrying.",
+"comment": ""
+},
+{
+"i": 298,
+"en": "The Cloud VM request failed. Retry, or check the machine's status with `cmux vm ls`.",
+"comment": ""
+},
+{
+"i": 299,
+"en": "%1$@ offers no `%2$@` transport (its provider has no cmux-tui daemon route), so cmux cannot attach a terminal to it. %3$@",
+"comment": ""
+}
+]

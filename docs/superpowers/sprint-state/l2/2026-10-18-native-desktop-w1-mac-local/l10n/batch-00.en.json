@@ -1,0 +1,1502 @@
+[
+{
+"i": 0,
+"en": "Address and search bar",
+"comment": ""
+},
+{
+"i": 1,
+"en": "%@: invalid arguments.",
+"comment": ""
+},
+{
+"i": 2,
+"en": "%1$@: unexpected argument '%2$@'.",
+"comment": ""
+},
+{
+"i": 3,
+"en": "%1$@: unknown flag '%2$@'.",
+"comment": ""
+},
+{
+"i": 4,
+"en": "Reload Project",
+"comment": ""
+},
+{
+"i": 5,
+"en": "Reload returned errors: %@",
+"comment": ""
+},
+{
+"i": 6,
+"en": "Dismiss Errors",
+"comment": ""
+},
+{
+"i": 7,
+"en": "Scheme",
+"comment": ""
+},
+{
+"i": 8,
+"en": "Configuration",
+"comment": ""
+},
+{
+"i": 9,
+"en": "Loading %@",
+"comment": ""
+},
+{
+"i": 10,
+"en": "Failed: %@",
+"comment": ""
+},
+{
+"i": 11,
+"en": "Could Not Create Automation Rules",
+"comment": ""
+},
+{
+"i": 12,
+"en": "Check that the configuration folder is writable and the disk has free space, then try again.",
+"comment": ""
+},
+{
+"i": 13,
+"en": "Could not load the sidebar template. Reinstall cmux and try again.",
+"comment": ""
+},
+{
+"i": 14,
+"en": "Could not create the sidebar. Check folder permissions and free disk space, then try again.",
+"comment": ""
+},
+{
+"i": 15,
+"en": "The Cloud desktop connection failed. Retry to reconnect to the machine.",
+"comment": ""
+},
+{
+"i": 16,
+"en": "This HTTPS service requires a private network connection. Run cmux vpn up, then reload.",
+"comment": ""
+},
+{
+"i": 17,
+"en": "Usage:",
+"comment": ""
+},
+{
+"i": 18,
+"en": "Read a short guide and find specific methods. No running app, network access, or sign-in is needed to read it.",
+"comment": ""
+},
+{
+"i": 19,
+"en": "cmux puts terminals, browsers, and agents in one workspace. Use this guide to choose a method, then read its help before acting. `cmux --skill` prints this same guide.",
+"comment": ""
+},
+{
+"i": 20,
+"en": "## Find your target\n\nA window contains workspaces. A workspace contains split panes. Each pane contains surfaces, such as a terminal or browser tab. Inspect the caller and use the returned IDs. Keep the caller's workspace and surface context; use explicit targets and `--focus false` where supported.",
+"comment": ""
+},
+{
+"i": 21,
+"en": "## Work with terminals\n\nCreate a workspace for a task, add panes for parallel work, and read terminal output before sending input. `send` enters text; `send-key` sends keys. Read the screen again to check the result.",
+"comment": ""
+},
+{
+"i": 22,
+"en": "## Use a browser\n\nUse `cmux browser` for a browser surface inside cmux. Use `agent-browser` for a separate browser session. Prefer an existing headful Chrome session when it exposes DevTools through remote debugging: `agent-browser --auto-connect snapshot`, or `agent-browser --cdp 9222 snapshot` for an explicit port. A normal Chrome window without remote debugging cannot be attached; `agent-browser --headed` starts a new visible browser. Read a snapshot, act on an observed element, then take a fresh snapshot. Check appearance with a screenshot. Keep each tool's target IDs within that tool.",
+"comment": ""
+},
+{
+"i": 23,
+"en": "## Use app windows\n\nUse computer-use tools for native apps or visual controls. cmux provides these tools to Claude Code and Codex sessions launched in cmux. The first functional cmux Computer Use request opens setup automatically when needed. You can resume setup in Settings > cmux Computer Use. Read the `cmux-cua` skill for your agent's methods: inspect app or window state, click or type, then inspect again.",
+"comment": ""
+},
+{
+"i": 24,
+"en": "## Use Cloud\n\nUse cmux Cloud when work needs a remote machine. List machines before choosing one. Use `exec` for a short command, `agent` for a coding agent, and `push` or `pull` for files. The default Cloud devbox includes Chrome and `cua-driver`; the Cloud guide explains how to verify and use them. Use the Cloud guide for desktop, browser, port, and machine lifecycle methods.",
+"comment": ""
+},
+{
+"i": 25,
+"en": "## Show work and find more methods\n\nUse Markdown and diff views to show results. Use notifications and progress to report task state. Read the Cloud guide for remote machines. Settings and integration docs list their own methods.",
+"comment": ""
+},
+{
+"i": 26,
+"en": "cmux Cloud runs commands, agents, browsers, and desktops on remote machines. Run the commands below from cmux on your Mac. Cloud operations need the app and a signed-in account. `cmux cloud --skill` prints this same guide; `cmux vm` is an alias for `cmux cloud`.",
+"comment": ""
+},
+{
+"i": 27,
+"en": "## Choose a machine\n\nInspect existing machines first. Route the current directory with `route --json`; reuse its machine when `would_provision` is false. When `machine` is null and `would_provision` is true, check `ls` and choose Base, an idle machine, or deliberate provisioning before creating anything. Check `vpn status`; run `vpn up` if a private operation reports a down or stale tunnel. Base is a persistent machine with a workspace that you can reopen. Prefer a new workspace on an existing machine; use `new` for isolation. Use returned machine, workspace, and terminal IDs in later commands.",
+"comment": ""
+},
+{
+"i": 28,
+"en": "## Run work and collect results\n\nUse `exec` for a short non-GUI command on a chosen machine. Use `run -- <command>` to route a bounded command; add `--sync` only when you want to upload the current directory. Use `dev <machine> --no-open` to stage a recognized project with its development layout, or use `agent` to start a coding agent. Use a machine `terminal` for long-running, interactive, or GUI work. Machine workspaces and terminals keep running when a pane closes or the Mac sleeps; terminal IDs come from `tree`, and you can reattach with the `vm open <machine>/<workspace>/<terminal>` address. Use `push` and `pull` to transfer files. Use `terminal wait` for a screen pattern and `terminal wait-exit` plus `terminal output` for process completion and logs. Read terminal output before reporting success.",
+"comment": ""
+},
+{
+"i": 29,
+"en": "## Use browsers and computer use\n\nFor browser automation on the machine, run `agent-browser` there and read its documentation. Prefer the machine's existing headful Chrome session when it exposes DevTools. The devbox installs Chrome, but its dock launcher does not enable remote debugging by default. If no debugging-enabled session exists, use a machine terminal under the work-user desktop session to start a separate visible Chrome with `DISPLAY=:1`, `--remote-debugging-port=9222`, and a dedicated `--user-data-dir`, then use `agent-browser --cdp 9222 snapshot`, or try `agent-browser --auto-connect snapshot`. `cloud exec` is for short provider commands and may not have the work-user desktop bus. Inspect the installed browser and driver with `command -v` and `--version`; `cloud tools` only checks general utilities. The default devbox also installs `cua-driver` for Linux desktop automation. Run `cua-driver doctor` from the machine terminal and read its X11 and AT-SPI results; a zero exit alone does not prove the desktop is ready. Use `cua-driver list-tools` to inspect its actions. Configure a remote agent's MCP host to launch `cua-driver mcp`; use `cua-driver call <tool> [JSON args]` for shell automation. These commands need the desktop display (`DISPLAY=:1`) and accessibility bus. Use `cua-driver` for visible desktop windows and `agent-browser` for web pages. Historical shell-only machines may not have a desktop or driver. Inspect the remote screen, act, then verify. Local computer-use tools target your Mac unless configured for a remote target.",
+"comment": ""
+},
+{
+"i": 30,
+"en": "## Observe, open, share, and clean up\n\nUse `tree`, `terminal read`, and `terminal wait` to observe live work and check its real output. Use `open` for a machine's terminal, desktop, or web port when there is something useful to show. Private web URLs need the Cloud network connection; read `vpn` help. Use `domains` to publish a web port with explicit access rules. Use snapshots and forks to keep or copy machine state. Delete forks and scratch machines you created. Never remove or reset a machine you did not create.",
+"comment": ""
+},
+{
+"i": 31,
+"en": "## Find exact methods\n\nRead command help for flags and examples. The full Cloud reference covers machine lifecycle, workspaces, terminals, and transfers. Use `cmux guide` for local workspace, browser, and computer-use methods.",
+"comment": ""
+},
+{
+"i": 32,
+"en": "the connection is unavailable",
+"comment": ""
+},
+{
+"i": 33,
+"en": "the machine returned an unusable response",
+"comment": ""
+},
+{
+"i": 34,
+"en": "the machine could not attach the terminal",
+"comment": ""
+},
+{
+"i": 35,
+"en": "the terminal is not ready to attach",
+"comment": ""
+},
+{
+"i": 36,
+"en": "Attaching to %@…",
+"comment": ""
+},
+{
+"i": 37,
+"en": "Attaching to %@… (attempt %lld)",
+"comment": ""
+},
+{
+"i": 38,
+"en": "Reconnecting to %@… (attempt %lld; %@)",
+"comment": ""
+},
+{
+"i": 39,
+"en": "the machine did not finish the attach handshake",
+"comment": ""
+},
+{
+"i": 40,
+"en": "the connection stopped answering",
+"comment": ""
+},
+{
+"i": 41,
+"en": "the connection closed",
+"comment": ""
+},
+{
+"i": 42,
+"en": "this Cloud machine is running an older terminal runtime; upgrade it, then retry",
+"comment": ""
+},
+{
+"i": 43,
+"en": "Could not attach %@ in time (%@). The terminal may still be running on the machine; try opening it again.",
+"comment": ""
+},
+{
+"i": 44,
+"en": "%@ already exited on the machine.",
+"comment": ""
+},
+{
+"i": 45,
+"en": "cmux vm tree --sidebar [list|pin|unpin|up|down|before|after] [node-id] [target-id]\nOrganize this Mac's Cloud sidebar. Use list to find row IDs; before/after require a target in the same group and pin section. Sessions and pane layouts are unchanged.",
+"comment": ""
+},
+{
+"i": 46,
+"en": "Pin",
+"comment": ""
+},
+{
+"i": 47,
+"en": "Unpin",
+"comment": ""
+},
+{
+"i": 48,
+"en": "Cannot move this item. Choose a current item in the same group and pin section.",
+"comment": ""
+},
+{
+"i": 49,
+"en": "Unread notification",
+"comment": ""
+},
+{
+"i": 50,
+"en": "This port does not have a valid HTTP or HTTPS address.",
+"comment": ""
+},
+{
+"i": 51,
+"en": "Ports",
+"comment": ""
+},
+{
+"i": 52,
+"en": "Remote port",
+"comment": ""
+},
+{
+"i": 53,
+"en": "Local address",
+"comment": ""
+},
+{
+"i": 54,
+"en": "Status",
+"comment": ""
+},
+{
+"i": 55,
+"en": "Copy",
+"comment": ""
+},
+{
+"i": 56,
+"en": "Stop Forwarding",
+"comment": ""
+},
+{
+"i": 57,
+"en": "Forward Port",
+"comment": ""
+},
+{
+"i": 58,
+"en": "VPN not connected",
+"comment": ""
+},
+{
+"i": 59,
+"en": "Stopping…",
+"comment": ""
+},
+{
+"i": 60,
+"en": "Connecting…",
+"comment": ""
+},
+{
+"i": 61,
+"en": "Private VPN",
+"comment": ""
+},
+{
+"i": 62,
+"en": "Forwarding",
+"comment": ""
+},
+{
+"i": 63,
+"en": "Closed",
+"comment": ""
+},
+{
+"i": 64,
+"en": "Connect to this Cloud port",
+"comment": ""
+},
+{
+"i": 65,
+"en": "Connect Cloud VPN, or choose Forward Port. Forwarding stays off until you start it. This table shows the address and lets you stop it.",
+"comment": ""
+},
+{
+"i": 66,
+"en": "Loading Cloud page…",
+"comment": ""
+},
+{
+"i": 67,
+"en": "Unsupported queued hook: %@ %@",
+"comment": ""
+},
+{
+"i": 68,
+"en": "Usage: cmux hooks enqueue <agent> <subcommand>",
+"comment": ""
+},
+{
+"i": 69,
+"en": "Pairing could not finish. Check your connection and try again.",
+"comment": ""
+},
+{
+"i": 70,
+"en": "Agent hook barrier timed out",
+"comment": ""
+},
+{
+"i": 71,
+"en": "Invalid agent hook barrier",
+"comment": ""
+},
+{
+"i": 72,
+"en": "Invalid agent hook event",
+"comment": ""
+},
+{
+"i": 73,
+"en": "Agent hook delivery queue is full",
+"comment": ""
+},
+{
+"i": 74,
+"en": "Connect Safari, Chrome, and other apps to your Cloud machines. Each machine keeps its private IP address and original ports. Only traffic to your Cloud network uses this encrypted connection. cmux terminals, Ports, and Desktop work without it.",
+"comment": ""
+},
+{
+"i": 75,
+"en": "open creates it: the devbox with a VNC screen.",
+"comment": ""
+},
+{
+"i": 76,
+"en": "accepted for older scripts; Base always has a screen",
+"comment": ""
+},
+{
+"i": 77,
+"en": "accepted for older scripts; every machine has a screen",
+"comment": ""
+},
+{
+"i": 78,
+"en": "Create a new machine: the devbox with devtools,",
+"comment": ""
+},
+{
+"i": 79,
+"en": "the image for the size; --image <id> is an",
+"comment": ""
+},
+{
+"i": 80,
+"en": "explicit override you normally omit.",
+"comment": ""
+},
+{
+"i": 81,
+"en": "coding agents and a VNC screen. The server picks",
+"comment": ""
+},
+{
+"i": 82,
+"en": "The Cloud service returned an unusable preview address. Refresh and retry.",
+"comment": ""
+},
+{
+"i": 83,
+"en": "Claude reported an error",
+"comment": ""
+},
+{
+"i": 84,
+"en": "Invalid notification payload",
+"comment": ""
+},
+{
+"i": 85,
+"en": "Usage: cmux read-screen [flags]\n\nRead terminal text from a surface as plain text.\n\nFlags:\n  --workspace <id|ref|index>   Target workspace (default: $CMUX_WORKSPACE_ID)\n  --surface <id|ref|index>     Target surface (default: $CMUX_SURFACE_ID)\n  --window <id|ref|index>      Window context for workspace/surface refs and indexes\n  --scrollback                 Include scrollback (not just visible viewport)\n  --lines <n>                  Limit to the last n lines (implies --scrollback)\n  --selection                  Read only the active selection; cannot be combined with --scrollback or --lines\n\nExample:\n  cmux read-screen\n  cmux read-screen --surface surface:2 --scrollback --lines 200\n  cmux read-screen --surface surface:2 --selection",
+"comment": ""
+},
+{
+"i": 86,
+"en": "Usage: cmux read-selection [flags]\n\nRead the active selection from any selectable surface. Plain output includes source context; --json returns the complete response.\n\nFlags:\n  --workspace <id|ref|index>   Target workspace (default: $CMUX_WORKSPACE_ID)\n  --surface <id|ref|index>     Target surface (default: $CMUX_SURFACE_ID)\n  --window <id|ref|index>      Window context for workspace/surface refs and indexes\n\nExample:\n  cmux read-selection --surface surface:2\n  cmux read-selection --surface surface:2 --json",
+"comment": ""
+},
+{
+"i": 87,
+"en": "Has selection: false",
+"comment": ""
+},
+{
+"i": 88,
+"en": "read-screen: --selection cannot be combined with --scrollback or --lines",
+"comment": ""
+},
+{
+"i": 89,
+"en": "%@: unexpected arguments: %@",
+"comment": ""
+},
+{
+"i": 90,
+"en": "File: %@",
+"comment": ""
+},
+{
+"i": 91,
+"en": "Kind: %@",
+"comment": ""
+},
+{
+"i": 92,
+"en": "Line: %lld",
+"comment": ""
+},
+{
+"i": 93,
+"en": "Lines: %lld-%lld",
+"comment": ""
+},
+{
+"i": 94,
+"en": "URL: %@",
+"comment": ""
+},
+{
+"i": 95,
+"en": "read-screen [--workspace <id|ref|index>] [--surface <id|ref|index>] [--window <id|ref|index>] [--scrollback] [--lines <n>] [--selection]",
+"comment": ""
+},
+{
+"i": 96,
+"en": "read-selection [--workspace <id|ref|index>] [--surface <id|ref|index>] [--window <id|ref|index>]",
+"comment": ""
+},
+{
+"i": 97,
+"en": "No surface is focused.",
+"comment": ""
+},
+{
+"i": 98,
+"en": "Invalid selector for `%@`.",
+"comment": ""
+},
+{
+"i": 99,
+"en": "Surface not found for the given surface selector.",
+"comment": ""
+},
+{
+"i": 100,
+"en": "Selection reading is currently unavailable.",
+"comment": ""
+},
+{
+"i": 101,
+"en": "Request timed out after 5 seconds",
+"comment": ""
+},
+{
+"i": 102,
+"en": "This surface does not support selection reads.",
+"comment": ""
+},
+{
+"i": 103,
+"en": "Workspace not found.",
+"comment": ""
+},
+{
+"i": 104,
+"en": "Unknown method",
+"comment": ""
+},
+{
+"i": 105,
+"en": "feed.jump requires workstream_id",
+"comment": ""
+},
+{
+"i": 106,
+"en": "Computer-use cursor",
+"comment": ""
+},
+{
+"i": 107,
+"en": "cmux Computer Use: Running in Background",
+"comment": ""
+},
+{
+"i": 108,
+"en": "Continue in Background",
+"comment": ""
+},
+{
+"i": 109,
+"en": "Focus cmux Computer Use",
+"comment": ""
+},
+{
+"i": 110,
+"en": "Focus Calling Terminal",
+"comment": ""
+},
+{
+"i": 111,
+"en": "No computer-use activity yet",
+"comment": ""
+},
+{
+"i": 112,
+"en": "No live agent sessions",
+"comment": ""
+},
+{
+"i": 113,
+"en": "%1$@ · %2$@",
+"comment": ""
+},
+{
+"i": 114,
+"en": "%1$@: %2$@",
+"comment": ""
+},
+{
+"i": 115,
+"en": "Stop Using %@",
+"comment": ""
+},
+{
+"i": 116,
+"en": "cmux Computer Use",
+"comment": ""
+},
+{
+"i": 117,
+"en": "App",
+"comment": ""
+},
+{
+"i": 118,
+"en": "Unknown Workspace",
+"comment": ""
+},
+{
+"i": 119,
+"en": "View cmux Computer Use",
+"comment": ""
+},
+{
+"i": 120,
+"en": "Allows cmux to access app interfaces",
+"comment": ""
+},
+{
+"i": 121,
+"en": "Accessibility lets the Computer Use helper inspect controls, click buttons, and type in apps you ask an agent to use.",
+"comment": ""
+},
+{
+"i": 122,
+"en": "Accessibility",
+"comment": ""
+},
+{
+"i": 123,
+"en": "Grant Accessibility",
+"comment": ""
+},
+{
+"i": 124,
+"en": "Allow",
+"comment": ""
+},
+{
+"i": 125,
+"en": "Back",
+"comment": ""
+},
+{
+"i": 126,
+"en": "Drag %@ into Accessibility",
+"comment": ""
+},
+{
+"i": 127,
+"en": "Allow screen capture in the macOS alert",
+"comment": ""
+},
+{
+"i": 128,
+"en": "The system “bypass” warning is expected here.",
+"comment": ""
+},
+{
+"i": 129,
+"en": "Drag %@ into Screenshots",
+"comment": ""
+},
+{
+"i": 130,
+"en": "Then turn it on.",
+"comment": ""
+},
+{
+"i": 131,
+"en": "Complete %@ in System Settings",
+"comment": ""
+},
+{
+"i": 132,
+"en": "Complete in System Settings",
+"comment": ""
+},
+{
+"i": 133,
+"en": "Continue",
+"comment": ""
+},
+{
+"i": 134,
+"en": "Done",
+"comment": ""
+},
+{
+"i": 135,
+"en": "Setup is complete. You can now ask cmux to use apps on your Mac.",
+"comment": ""
+},
+{
+"i": 136,
+"en": "cmux Computer Use Is Ready",
+"comment": ""
+},
+{
+"i": 137,
+"en": "Drag",
+"comment": ""
+},
+{
+"i": 138,
+"en": "Drag this app into the list in System Settings, turn it on, then come back here.",
+"comment": ""
+},
+{
+"i": 139,
+"en": "Drag the app card, not this window, into the permission list.",
+"comment": ""
+},
+{
+"i": 140,
+"en": "Drag %@ into the permission list",
+"comment": ""
+},
+{
+"i": 141,
+"en": "Finish screenshot access",
+"comment": ""
+},
+{
+"i": 142,
+"en": "macOS is asking to confirm screen capture.\nChoose Allow in the system alert to finish setup.",
+"comment": ""
+},
+{
+"i": 143,
+"en": "cmux Computer Use needs these permissions to use apps on your Mac.\nThese permissions are used when you ask cmux to perform tasks.",
+"comment": ""
+},
+{
+"i": 144,
+"en": "cmux Computer Use runs independently from cmux. You can quit or reopen it without closing cmux or your terminal sessions.",
+"comment": ""
+},
+{
+"i": 145,
+"en": "Enable cmux Computer Use",
+"comment": ""
+},
+{
+"i": 146,
+"en": "Check Again",
+"comment": ""
+},
+{
+"i": 147,
+"en": "Checking…",
+"comment": ""
+},
+{
+"i": 148,
+"en": "Not Now",
+"comment": ""
+},
+{
+"i": 149,
+"en": "Let agents work across apps you choose",
+"comment": ""
+},
+{
+"i": 150,
+"en": "Computer use",
+"comment": ""
+},
+{
+"i": 151,
+"en": "Open System Settings",
+"comment": ""
+},
+{
+"i": 152,
+"en": "Control apps you choose",
+"comment": ""
+},
+{
+"i": 153,
+"en": "When a task needs more than the terminal, supported agents can see and drive local apps. Permissions belong to a separate helper, so granting them never requires restarting cmux.",
+"comment": ""
+},
+{
+"i": 154,
+"en": "Runs locally with separate cmux Computer Use permissions",
+"comment": ""
+},
+{
+"i": 155,
+"en": "Only the Computer Use helper needs to restart after permission changes. cmux stays open.",
+"comment": ""
+},
+{
+"i": 156,
+"en": "See app windows and screen content",
+"comment": ""
+},
+{
+"i": 157,
+"en": "How it works",
+"comment": ""
+},
+{
+"i": 158,
+"en": "Driver telemetry and update checks are disabled",
+"comment": ""
+},
+{
+"i": 159,
+"en": "Agents can work across apps on this Mac",
+"comment": ""
+},
+{
+"i": 160,
+"en": "You can continue to the next step.",
+"comment": ""
+},
+{
+"i": 161,
+"en": "Permission granted",
+"comment": ""
+},
+{
+"i": 162,
+"en": "In System Settings, turn on %@, then return here.",
+"comment": ""
+},
+{
+"i": 163,
+"en": "Preparing cmux Computer Use…",
+"comment": ""
+},
+{
+"i": 164,
+"en": "Allows cmux Computer Use to see app windows and screen content",
+"comment": ""
+},
+{
+"i": 165,
+"en": "Screen Recording lets the Computer Use helper see app windows and screen content so it can act on what is visible.",
+"comment": ""
+},
+{
+"i": 166,
+"en": "Screen Recording",
+"comment": ""
+},
+{
+"i": 167,
+"en": "Grant Screen Recording",
+"comment": ""
+},
+{
+"i": 168,
+"en": "cmux uses screenshots to know where to click",
+"comment": ""
+},
+{
+"i": 169,
+"en": "macOS asks for confirmation. Allow screen capture.",
+"comment": ""
+},
+{
+"i": 170,
+"en": "Screenshots",
+"comment": ""
+},
+{
+"i": 171,
+"en": "Granted",
+"comment": ""
+},
+{
+"i": 172,
+"en": "Not Granted",
+"comment": ""
+},
+{
+"i": 173,
+"en": "Step %lld of 3",
+"comment": ""
+},
+{
+"i": 174,
+"en": "cmux Computer Use Setup",
+"comment": ""
+},
+{
+"i": 175,
+"en": "Shows the Computer Use menu-bar item and automatic onboarding.",
+"comment": ""
+},
+{
+"i": 176,
+"en": "cmux Computer Use UX",
+"comment": ""
+},
+{
+"i": 177,
+"en": "cmux Computer Use runs locally in the bundled cmux Computer Use app. Its permissions and restart lifecycle are independent from cmux. Telemetry and update checks are disabled.",
+"comment": ""
+},
+{
+"i": 178,
+"en": "Lets cmux Computer Use inspect and control app interfaces.",
+"comment": ""
+},
+{
+"i": 179,
+"en": "Grant…",
+"comment": ""
+},
+{
+"i": 180,
+"en": "Unknown",
+"comment": ""
+},
+{
+"i": 181,
+"en": "Lets cmux Computer Use see app windows and screen content.",
+"comment": ""
+},
+{
+"i": 182,
+"en": "Permissions",
+"comment": ""
+},
+{
+"i": 183,
+"en": "Show cmux Computer Use in Menu Bar",
+"comment": ""
+},
+{
+"i": 184,
+"en": "Show live agent sessions and shortcuts to their terminal and driven app.",
+"comment": ""
+},
+{
+"i": 185,
+"en": "computer use cua accessibility screen capture recording permissions cursor mcp agents menu bar onboarding",
+"comment": ""
+},
+{
+"i": 186,
+"en": "computerUse.enabled enable disable computer use cua mcp agent sessions",
+"comment": ""
+},
+{
+"i": 187,
+"en": "accessibility screen recording capture permissions privacy system settings grant",
+"comment": ""
+},
+{
+"i": 188,
+"en": "computerUse.showInMenuBar menu bar menubar status item cursor agents",
+"comment": ""
+},
+{
+"i": 189,
+"en": "computer use accessibility screen recording permissions cursor mcp agents menu bar onboarding",
+"comment": ""
+},
+{
+"i": 190,
+"en": "Pass enabled=true or enabled=false.",
+"comment": ""
+},
+{
+"i": 191,
+"en": "Keep Mac Awake isn't available yet.",
+"comment": ""
+},
+{
+"i": 192,
+"en": "Usage: cmux notify [flags]\n\nSend a notification to a workspace/surface, or clear that resolved target with --clear.\n\nFlags:\n  --title <text>         Notification title (default: \"Notification\")\n  --subtitle <text>      Notification subtitle\n  --body <text>          Notification body\n  --reply                Allow a free-text inline reply\n  --desktop <true|false> Post a native macOS banner (default: true). false keeps the entry in the Notifications panel, sidebar badge and pane ring without a banner\n  --clear                Clear notifications for the resolved caller/target instead of posting\n  --workspace <id|ref|index>   Target workspace, except explicit surface UUIDs resolve globally\n  --surface <id|ref|index>     Target surface (refs/indexes use workspace/window context)\n  --window <id|ref|index>      Window context for workspace/surface refs and indexes\n  --json                 Print the response payload as JSON\n  --id-format <mode>     refs, uuids, or both for human-readable ids\n\nThe response includes the created notification id. Use cmux dismiss-notification --id <uuid|notification:<uuid>>, cmux list-notifications, or cmux clear-notifications to manage notifications.\n--desktop sets the notification's desktop effect before notification hooks run; hooks can still override it. It has no effect with --clear.\n\nExample:\n  cmux notify --title \"Build done\" --body \"All tests passed\"\n  cmux notify --title \"Error\" --subtitle \"test.swift\" --body \"Line 42: syntax error\"\n  cmux notify --surface <uuid> --title \"Build done\"\n  cmux notify --title \"Deploy finished\" --desktop false\n  cmux notify --clear",
+"comment": ""
+},
+{
+"i": 193,
+"en": "--clear                Clear notifications for the resolved caller/target instead of posting",
+"comment": ""
+},
+{
+"i": 194,
+"en": "The response includes the created notification id. Use cmux dismiss-notification --id <uuid>, cmux list-notifications, or cmux clear-notifications to manage notifications.",
+"comment": ""
+},
+{
+"i": 195,
+"en": "--reply                Allow a free-text inline reply",
+"comment": ""
+},
+{
+"i": 196,
+"en": "Usage: cmux vault <subcommand> [options]\n\nBrowse, search, checkpoint, and fork agent sessions from the Vault index.\n\nSubcommands:\n  sessions [--agent <id>] [--folder <path>] [--limit <n>]\n      List indexed agent sessions, newest first.\n  search <query> [--limit <n>]\n      Search sessions. Supports agent:, repo:, ws:, before:/after:\n      operators and quoted phrases, ranked by recency.\n  checkpoints --agent <id> --session <id>\n      List a session's checkpoint timeline (derived turns + manual).\n  checkpoint --agent <id> --session <id> [--name <text>]\n      Create a manual named checkpoint at the session's current tip.\n  fork --agent <id> --session <id> (--checkpoint <id> | --turn <n>) [--open]\n      Fork a new session from a checkpoint. Prints the new session id\n      and its resume command; --open also opens it in a new workspace.\n\nAll subcommands support --json for machine-readable output.",
+"comment": ""
+},
+{
+"i": 197,
+"en": "No sessions.",
+"comment": ""
+},
+{
+"i": 198,
+"en": "Resume with: %@",
+"comment": ""
+},
+{
+"i": 199,
+"en": "Opened in a new workspace.",
+"comment": ""
+},
+{
+"i": 200,
+"en": "Forked session %@",
+"comment": ""
+},
+{
+"i": 201,
+"en": "Unknown vault subcommand '%@'. Try: sessions, search, checkpoints, checkpoint, fork",
+"comment": ""
+},
+{
+"i": 202,
+"en": "Unexpected argument '%@' for cmux vault %@",
+"comment": ""
+},
+{
+"i": 203,
+"en": "vault requires a subcommand. Try: sessions, search, checkpoints, checkpoint, fork",
+"comment": ""
+},
+{
+"i": 204,
+"en": "This subcommand requires --agent <id> --session <id> (see cmux vault sessions)",
+"comment": ""
+},
+{
+"i": 205,
+"en": "vault search requires a query. Operators: agent:, repo:, ws:, before:/after:",
+"comment": ""
+},
+{
+"i": 206,
+"en": "--turn requires a positive number",
+"comment": ""
+},
+{
+"i": 207,
+"en": "--limit requires a positive number",
+"comment": ""
+},
+{
+"i": 208,
+"en": "vault fork requires --checkpoint <id> or --turn <n> (see cmux vault checkpoints)",
+"comment": ""
+},
+{
+"i": 209,
+"en": "note: this agent's checkpoints are view-only (fork not supported yet)",
+"comment": ""
+},
+{
+"i": 210,
+"en": "No checkpoints.",
+"comment": ""
+},
+{
+"i": 211,
+"en": "Usage: cmux automation <list|show|test|enable|disable|logs|reload> [args]\n\nRules live in ~/.cmuxterm/automations.json.\nExamples:\n  cmux automation list\n  cmux automation show surface-needs-input\n  cmux automation test surface-needs-input --event '{\"name\":\"agent.needs_input\"}'\n  cmux automation enable surface-needs-input\n  cmux automation disable surface-needs-input\n  cmux automation logs [--limit <n>]\n  cmux automation reload",
+"comment": ""
+},
+{
+"i": 212,
+"en": "Could not prepare the automation action. Check the rule configuration and try again.",
+"comment": ""
+},
+{
+"i": 213,
+"en": "Automation is unavailable. Check ~/.cmuxterm/automations.json, then run cmux automation reload.",
+"comment": ""
+},
+{
+"i": 214,
+"en": "This automation action requires permission to focus or select a surface. Update the rule to allow focus, then try again.",
+"comment": ""
+},
+{
+"i": 215,
+"en": "Unsupported automation configuration version %lld",
+"comment": ""
+},
+{
+"i": 216,
+"en": "Invalid automation rule: %@",
+"comment": ""
+},
+{
+"i": 217,
+"en": "Automation configuration is larger than 4 MiB",
+"comment": ""
+},
+{
+"i": 218,
+"en": "Missing automation rule id",
+"comment": ""
+},
+{
+"i": 219,
+"en": "Automation rule not found: %@",
+"comment": ""
+},
+{
+"i": 220,
+"en": "automation.test requires event object",
+"comment": ""
+},
+{
+"i": 221,
+"en": "automation test requires --event <json>",
+"comment": ""
+},
+{
+"i": 222,
+"en": "automation test event must be a JSON object",
+"comment": ""
+},
+{
+"i": 223,
+"en": "offline automation test requires workspace tags in the event payload",
+"comment": ""
+},
+{
+"i": 224,
+"en": "No automation rules",
+"comment": ""
+},
+{
+"i": 225,
+"en": "%1$@ [%2$@] when %3$@",
+"comment": ""
+},
+{
+"i": 226,
+"en": "Automation configuration reload requested",
+"comment": ""
+},
+{
+"i": 227,
+"en": "Enabled %@",
+"comment": ""
+},
+{
+"i": 228,
+"en": "Disabled %@",
+"comment": ""
+},
+{
+"i": 229,
+"en": "Enable request queued for %@. Run cmux automation logs to verify completion.",
+"comment": ""
+},
+{
+"i": 230,
+"en": "Disable request queued for %@. Run cmux automation logs to verify completion.",
+"comment": ""
+},
+{
+"i": 231,
+"en": "enabled",
+"comment": ""
+},
+{
+"i": 232,
+"en": "disabled",
+"comment": ""
+},
+{
+"i": 233,
+"en": "Emit All",
+"comment": ""
+},
+{
+"i": 234,
+"en": "CLI",
+"comment": ""
+},
+{
+"i": 235,
+"en": "CLI Reply",
+"comment": ""
+},
+{
+"i": 236,
+"en": "Emit Notification",
+"comment": ""
+},
+{
+"i": 237,
+"en": "Error",
+"comment": ""
+},
+{
+"i": 238,
+"en": "Feed Exit Plan",
+"comment": ""
+},
+{
+"i": 239,
+"en": "Feed Permission",
+"comment": ""
+},
+{
+"i": 240,
+"en": "Feed Question",
+"comment": ""
+},
+{
+"i": 241,
+"en": "Feed Question (4 Options)",
+"comment": ""
+},
+{
+"i": 242,
+"en": "Feed Question (Many Options)",
+"comment": ""
+},
+{
+"i": 243,
+"en": "Feed Question (Multiple)",
+"comment": ""
+},
+{
+"i": 244,
+"en": "Feed Question (Multi-select)",
+"comment": ""
+},
+{
+"i": 245,
+"en": "Hook Failed",
+"comment": ""
+},
+{
+"i": 246,
+"en": "Idle Reminder",
+"comment": ""
+},
+{
+"i": 247,
+"en": "Notification Debug Mode",
+"comment": ""
+},
+{
+"i": 248,
+"en": "Needs Permission",
+"comment": ""
+},
+{
+"i": 249,
+"en": "OSC",
+"comment": ""
+},
+{
+"i": 250,
+"en": "Turn Complete",
+"comment": ""
+},
+{
+"i": 251,
+"en": "Unknown kind or no notification target",
+"comment": ""
+},
+{
+"i": 252,
+"en": "Pass enabled=true or enabled=false to turn notification debug mode on or off.",
+"comment": ""
+},
+{
+"i": 253,
+"en": "Pass kind=<notification kind> to choose which debug notification to emit.",
+"comment": ""
+},
+{
+"i": 254,
+"en": "Synthetic %@ notification",
+"comment": ""
+},
+{
+"i": 255,
+"en": "Option %d",
+"comment": ""
+},
+{
+"i": 256,
+"en": "Inspect the notification and verify the actions.",
+"comment": ""
+},
+{
+"i": 257,
+"en": "Choose a notification debug answer",
+"comment": ""
+},
+{
+"i": 258,
+"en": "Notification Debug",
+"comment": ""
+},
+{
+"i": 259,
+"en": "Revise…",
+"comment": ""
+},
+{
+"i": 260,
+"en": "Other…",
+"comment": ""
+},
+{
+"i": 261,
+"en": "Fork from checkpoint isn't available for this agent yet",
+"comment": ""
+},
+{
+"i": 262,
+"en": "Couldn't write the forked transcript",
+"comment": ""
+},
+{
+"i": 263,
+"en": "An unexpected error occurred",
+"comment": ""
+},
+{
+"i": 264,
+"en": "Couldn't read the original transcript",
+"comment": ""
+},
+{
+"i": 265,
+"en": "The original transcript file is missing",
+"comment": ""
+},
+{
+"i": 266,
+"en": "The new session id is invalid",
+"comment": ""
+},
+{
+"i": 267,
+"en": "There is nothing before this checkpoint to fork",
+"comment": ""
+},
+{
+"i": 268,
+"en": "The transcript is too large to fork",
+"comment": ""
+},
+{
+"i": 269,
+"en": "This checkpoint no longer matches the transcript",
+"comment": ""
+},
+{
+"i": 270,
+"en": "Fork from checkpoint isn't available for this agent yet — the timeline is view-only",
+"comment": ""
+},
+{
+"i": 271,
+"en": "Turn %lld",
+"comment": ""
+},
+{
+"i": 272,
+"en": "Long transcript — earliest turns not shown",
+"comment": ""
+},
+{
+"i": 273,
+"en": "Transcript",
+"comment": ""
+},
+{
+"i": 274,
+"en": "Checkpoints",
+"comment": ""
+},
+{
+"i": 275,
+"en": "Couldn't save checkpoint",
+"comment": ""
+},
+{
+"i": 276,
+"en": "Checkpoint Now is unavailable until the full transcript is read",
+"comment": ""
+},
+{
+"i": 277,
+"en": "Save a checkpoint at the current end of the transcript",
+"comment": ""
+},
+{
+"i": 278,
+"en": "Restore rewinds by forking a new session — the original session is never modified",
+"comment": ""
+},
+{
+"i": 279,
+"en": "Checkpoint Now",
+"comment": ""
+},
+{
+"i": 280,
+"en": "Name (optional)",
+"comment": ""
+},
+{
+"i": 281,
+"en": "Manual checkpoint",
+"comment": ""
+},
+{
+"i": 282,
+"en": "%@ (fork)",
+"comment": ""
+},
+{
+"i": 283,
+"en": "Fork from Here",
+"comment": ""
+},
+{
+"i": 284,
+"en": "Couldn't fork: %@",
+"comment": ""
+},
+{
+"i": 285,
+"en": "No checkpoints yet",
+"comment": ""
+},
+{
+"i": 286,
+"en": "Name a point above to make it easy to return here.",
+"comment": ""
+},
+{
+"i": 287,
+"en": "Fork",
+"comment": ""
+},
+{
+"i": 288,
+"en": "Copy commit SHA",
+"comment": ""
+},
+{
+"i": 289,
+"en": "Live",
+"comment": "Agent session is currently running, as opposed to an archived session."
+},
+{
+"i": 290,
+"en": "Idle",
+"comment": ""
+},
+{
+"i": 291,
+"en": "Ended",
+"comment": ""
+},
+{
+"i": 292,
+"en": "Active in pane",
+"comment": ""
+},
+{
+"i": 293,
+"en": "Active",
+"comment": ""
+},
+{
+"i": 294,
+"en": "Inactive",
+"comment": ""
+},
+{
+"i": 295,
+"en": "Last activity",
+"comment": ""
+},
+{
+"i": 296,
+"en": "Folder",
+"comment": ""
+},
+{
+"i": 297,
+"en": "Duration",
+"comment": ""
+},
+{
+"i": 298,
+"en": "Created",
+"comment": ""
+},
+{
+"i": 299,
+"en": "Searching…",
+"comment": ""
+}
+]
