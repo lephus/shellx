@@ -90,12 +90,12 @@ def main() -> int:
             print(f"stderr={install.stderr.strip()}")
             return 1
 
-        extension_path = root / ".config" / "amp" / "plugins" / "cmux-session.ts"
+        extension_path = root / ".config" / "amp" / "plugins" / "shellx-session.ts"
         if not extension_path.exists():
             print(f"FAIL: expected plugin at {extension_path}")
             return 1
         extension_text = extension_path.read_text(encoding="utf-8")
-        if "cmux-amp-session-extension-marker" not in extension_text:
+        if "shellx-amp-session-extension-marker" not in extension_text:
             print(f"FAIL: expected cmux marker in {extension_path}")
             return 1
         installed_stat = extension_path.stat()

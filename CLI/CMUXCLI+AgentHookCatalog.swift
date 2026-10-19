@@ -47,7 +47,7 @@ extension CMUXCLI {
         ),
         AgentHookDef(
             name: "opencode", displayName: "OpenCode", statusKey: "opencode",
-            configDir: ".config/opencode", configFile: "plugins/cmux-session.js", configDirEnvOverride: "OPENCODE_CONFIG_DIR",
+            configDir: ".config/opencode", configFile: "plugins/shellx-session.js", configDirEnvOverride: "OPENCODE_CONFIG_DIR",
             configDirResolver: { OpenCodePaths(environment: ProcessInfo.processInfo.environment).configDirectory.path },
             sessionStoreSuffix: "opencode", disableEnvVar: "CMUX_OPENCODE_HOOKS_DISABLED",
             hookMarker: "shellx hooks opencode", format: .flat,
@@ -55,14 +55,14 @@ extension CMUXCLI {
         ),
         AgentHookDef(
             name: "pi", displayName: "Pi", statusKey: "pi",
-            configDir: ".pi/agent", configFile: "extensions/cmux-session.ts", configDirEnvOverride: "PI_CODING_AGENT_DIR",
+            configDir: ".pi/agent", configFile: "extensions/shellx-session.ts", configDirEnvOverride: "PI_CODING_AGENT_DIR",
             sessionStoreSuffix: "pi", disableEnvVar: "CMUX_PI_HOOKS_DISABLED",
             hookMarker: "shellx hooks pi", format: .flat,
             events: []
         ),
         AgentHookDef(
             name: "omp", displayName: "OMP", statusKey: "omp",
-            configDir: ".omp/agent", configFile: "extensions/cmux-omp-session.ts",
+            configDir: ".omp/agent", configFile: "extensions/shellx-omp-session.ts",
             createConfigDirIfMissing: true,
             configDirResolver: { CMUXCLI.resolvedOmpAgentDirectory().path },
             sessionStoreSuffix: "omp", disableEnvVar: "CMUX_OMP_HOOKS_DISABLED",
@@ -71,7 +71,7 @@ extension CMUXCLI {
         ),
         AgentHookDef(
             name: "campfire", displayName: "Campfire", statusKey: "campfire",
-            configDir: ".campfire/agent", configFile: "extensions/cmux-campfire-session.ts",
+            configDir: ".campfire/agent", configFile: "extensions/shellx-campfire-session.ts",
             createConfigDirIfMissing: true,
             configDirResolver: { CMUXCLI.resolvedCampfireAgentDirectory().path },
             sessionStoreSuffix: "campfire", disableEnvVar: "CMUX_CAMPFIRE_HOOKS_DISABLED",
@@ -80,7 +80,7 @@ extension CMUXCLI {
         ),
         AgentHookDef(
             name: "amp", displayName: "Amp", statusKey: "amp",
-            configDir: ".config/amp", configFile: "plugins/cmux-session.ts",
+            configDir: ".config/amp", configFile: "plugins/shellx-session.ts",
             sessionStoreSuffix: "amp", disableEnvVar: "CMUX_AMP_HOOKS_DISABLED",
             hookMarker: "shellx hooks amp", format: .flat,
             events: []

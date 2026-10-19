@@ -326,7 +326,7 @@ console.log("PASS");
     with tempfile.TemporaryDirectory(prefix="cmux-opencode-v2-package-") as package:
         package_dir = Path(package)
         feed_source = (ROOT / "Resources/opencode-plugin.js").read_text()
-        (package_dir / "index.js").write_text(feed_source.replace('id: "cmux.feed"', 'id: "cmux.server"'))
+        (package_dir / "index.js").write_text(feed_source.replace('id: "shellx.feed"', 'id: "cmux.server"'))
         (package_dir / "tui.js").write_text((ROOT / "Resources/opencode-tui-plugin.js").read_text())
         (package_dir / "node_modules").symlink_to(ROOT / "node_modules", target_is_directory=True)
         (package_dir / "harness.mjs").write_text(source)

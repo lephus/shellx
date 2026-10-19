@@ -67,15 +67,15 @@ final class OpenCodeHookRegressionTests: XCTestCase {
 
         let configDir = xdgConfigHome.appendingPathComponent("opencode", isDirectory: true)
         XCTAssertTrue(
-            fileManager.fileExists(atPath: configDir.appendingPathComponent("plugins/cmux-session.js").path),
+            fileManager.fileExists(atPath: configDir.appendingPathComponent("plugins/shellx-session.js").path),
             "OpenCode's lifecycle plugin must follow XDG_CONFIG_HOME"
         )
         XCTAssertTrue(
-            fileManager.fileExists(atPath: configDir.appendingPathComponent("plugins/cmux-feed.js").path),
+            fileManager.fileExists(atPath: configDir.appendingPathComponent("plugins/shellx-feed.js").path),
             "OpenCode's Feed bridge must follow XDG_CONFIG_HOME"
         )
         XCTAssertFalse(
-            fileManager.fileExists(atPath: root.appendingPathComponent("home/.config/opencode/plugins/cmux-session.js").path),
+            fileManager.fileExists(atPath: root.appendingPathComponent("home/.config/opencode/plugins/shellx-session.js").path),
             "OpenCode hooks must not be split across legacy and XDG config directories"
         )
     }
@@ -144,7 +144,7 @@ final class OpenCodeHookRegressionTests: XCTestCase {
         try FileManager.default.createDirectory(at: binDir, withIntermediateDirectories: true)
 
         let configURL = configDir.appendingPathComponent("opencode.json", isDirectory: false)
-        try #"{"plugin":["other-plugin","./plugins/cmux-session.js"]}"#.write(to: configURL, atomically: true, encoding: .utf8)
+        try #"{"plugin":["other-plugin","./plugins/shellx-session.js"]}"#.write(to: configURL, atomically: true, encoding: .utf8)
         let fakeOpenCodeURL = binDir.appendingPathComponent("opencode", isDirectory: false)
         try "#!/bin/sh\nexit 0\n".write(to: fakeOpenCodeURL, atomically: true, encoding: .utf8)
         chmod(fakeOpenCodeURL.path, 0o755)
@@ -157,9 +157,9 @@ final class OpenCodeHookRegressionTests: XCTestCase {
 
         XCTAssertFalse(result.timedOut, result.stderr)
         XCTAssertEqual(result.status, 0, result.stderr)
-        let pluginURL = configDir.appendingPathComponent("plugins", isDirectory: true).appendingPathComponent("cmux-session.js", isDirectory: false)
+        let pluginURL = configDir.appendingPathComponent("plugins", isDirectory: true).appendingPathComponent("shellx-session.js", isDirectory: false)
         let pluginSource = try String(contentsOf: pluginURL, encoding: .utf8)
-        XCTAssertTrue(pluginSource.contains("cmux-opencode-session-plugin-marker"))
+        XCTAssertTrue(pluginSource.contains("shellx-opencode-session-plugin-marker"))
         XCTAssertTrue(pluginSource.contains("id: \"cmux.session\""))
         XCTAssertFalse(pluginSource.contains("ctx.event.subscribe({ signal"))
         XCTAssertTrue(pluginSource.contains("event.properties || event.data"))
@@ -171,17 +171,17 @@ final class OpenCodeHookRegressionTests: XCTestCase {
         XCTAssertEqual(secondResult.status, 0, secondResult.stderr)
         XCTAssertFalse(secondResult.stdout.contains("Will write OpenCode cmux plugin"), secondResult.stdout)
         XCTAssertTrue(secondResult.stdout.contains("OpenCode hooks already up to date"), secondResult.stdout)
-        let feedSource = try String(contentsOf: configDir.appendingPathComponent("plugins/cmux-feed.js"), encoding: .utf8)
-        XCTAssertTrue(feedSource.contains("cmux-feed-plugin-marker"))
-        XCTAssertTrue(feedSource.contains("id: \"cmux.feed\""))
+        let feedSource = try String(contentsOf: configDir.appendingPathComponent("plugins/shellx-feed.js"), encoding: .utf8)
+        XCTAssertTrue(feedSource.contains("shellx-feed-plugin-marker"))
+        XCTAssertTrue(feedSource.contains("id: \"shellx.feed\""))
         XCTAssertFalse(feedSource.contains("ctx.event.subscribe({ signal"))
-        let tuiDirectory = configDir.appendingPathComponent("plugins/cmux", isDirectory: true)
+        let tuiDirectory = configDir.appendingPathComponent("plugins/shellx", isDirectory: true)
         let packageSource = try String(contentsOf: tuiDirectory.appendingPathComponent("package.json"), encoding: .utf8)
         XCTAssertTrue(packageSource.contains("\"./tui\": \"./tui.js\""))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: tuiDirectory.appendingPathComponent(".cmux-owned").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: tuiDirectory.appendingPathComponent(".shellx-owned").path))
         let serverSource = try String(contentsOf: tuiDirectory.appendingPathComponent("index.js"), encoding: .utf8)
         XCTAssertTrue(serverSource.contains("id: \"cmux.server\""))
-        XCTAssertTrue(serverSource.contains("cmux-opencode-tui-plugin-server-marker"))
+        XCTAssertTrue(serverSource.contains("shellx-opencode-tui-plugin-server-marker"))
         XCTAssertTrue(serverSource.contains("export const CMUXFeed"))
         XCTAssertTrue(serverSource.contains("client.permission.reply"))
         XCTAssertTrue(serverSource.contains("requestID: requestId"))
@@ -194,7 +194,7 @@ final class OpenCodeHookRegressionTests: XCTestCase {
 
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: try Data(contentsOf: configURL), options: []) as? [String: Any])
         XCTAssertNil(json["plugins"])
-        XCTAssertEqual(try XCTUnwrap(json["plugin"] as? [String]), ["other-plugin", "./plugins/cmux"])
+        XCTAssertEqual(try XCTUnwrap(json["plugin"] as? [String]), ["other-plugin", "./plugins/shellx"])
     }
 
     // Regression for https://github.com/manaflow-ai/cmux/issues/7140: opencode resolves
@@ -229,7 +229,7 @@ final class OpenCodeHookRegressionTests: XCTestCase {
         XCTAssertFalse(rawConfig.contains("\\/"), rawConfig)
         XCTAssertTrue(rawConfig.contains("{file:./AGENTS.md}"), rawConfig)
         XCTAssertTrue(rawConfig.contains("https://opencode.ai/config.json"), rawConfig)
-        XCTAssertTrue(rawConfig.contains("./plugins/cmux"), rawConfig)
+        XCTAssertTrue(rawConfig.contains("./plugins/shellx"), rawConfig)
     }
 
     func testLegacyHookAliasesAreHiddenFromHelp() throws {

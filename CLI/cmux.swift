@@ -21621,12 +21621,12 @@ struct CMUXCLI {
               feed               Internal Feed decision bridge
 
             Generated files:
-              ~/.config/opencode/plugins/cmux-session.js
-              ~/.config/opencode/plugins/cmux-feed.js
-              ~/.pi/agent/extensions/cmux-session.ts
-              ~/.omp/agent/extensions/cmux-omp-session.ts
-              ~/.campfire/agent/extensions/cmux-campfire-session.ts
-              ~/.config/amp/plugins/cmux-session.ts
+              ~/.config/opencode/plugins/shellx-session.js
+              ~/.config/opencode/plugins/shellx-feed.js
+              ~/.pi/agent/extensions/shellx-session.ts
+              ~/.omp/agent/extensions/shellx-omp-session.ts
+              ~/.campfire/agent/extensions/shellx-campfire-session.ts
+              ~/.config/amp/plugins/shellx-session.ts
               ~/.kiro/agents/cmux.json
               See docs/agent-hooks.md for the full integration matrix.
 
@@ -28816,11 +28816,11 @@ struct CMUXCLI {
 
     private static let omoPluginName = "oh-my-openagent"
     private static let legacyOmoPluginName = "oh-my-opencode"
-    private static let openCodeSessionPluginConfigSpec = "./plugins/cmux"
-    private static let openCodeTUIPluginDirectoryName = "cmux"
+    private static let openCodeSessionPluginConfigSpec = "./plugins/shellx"
+    private static let openCodeTUIPluginDirectoryName = "shellx"
     private static let openCodeTUIPluginPackageSource = #"""
 {
-  "name": "cmux-opencode-plugin",
+  "name": "shellx-opencode-plugin",
   "type": "module",
   "exports": {
     ".": "./index.js",
@@ -28828,7 +28828,7 @@ struct CMUXCLI {
   }
 }
 """#
-    private static let openCodeTUIPluginOwnershipMarker = "cmux-opencode-tui-plugin-ownership-marker v2"
+    private static let openCodeTUIPluginOwnershipMarker = "shellx-opencode-tui-plugin-ownership-marker v2"
     func resolveExecutableInPath(_ name: String, searchPath: String? = nil) -> String? {
         let entries = (searchPath ?? ProcessInfo.processInfo.environment["PATH"])?
             .split(separator: ":")
@@ -36476,10 +36476,10 @@ struct CMUXCLI {
         }
     }
 
-    private static let openCodeSessionPluginMarker = "cmux-opencode-session-plugin-marker"
-    private static let openCodeSessionPluginFilename = "cmux-session.js"
+    private static let openCodeSessionPluginMarker = "shellx-opencode-session-plugin-marker"
+    private static let openCodeSessionPluginFilename = "shellx-session.js"
     private static let openCodeSessionPluginSource = #"""
-// cmux-opencode-session-plugin-marker v1
+// shellx-opencode-session-plugin-marker v1
 // Bridges OpenCode session lifecycle events into cmux's restorable session store.
 // Installed by `cmux hooks opencode install` or `cmux hooks setup`.
 // DO NOT EDIT MANUALLY. cmux upgrades this file in place.
@@ -36488,7 +36488,7 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-const CMUX_PLUGIN_INSTALLED_KEY = Symbol.for("cmux.session.restore.plugin.installed");
+const CMUX_PLUGIN_INSTALLED_KEY = Symbol.for("shellx.session.restore.plugin.installed");
 const MAX_TRACKED_SESSIONS = 100;
 const messageRoles = new Map();
 const sessions = new Map();
@@ -36872,10 +36872,10 @@ function isTUIProcessServerContext(ctx) {
   return Boolean(ctx && typeof ctx === "object" && ctx.client && ctx.serverUrl && ctx.directory);
 }
 
-const CMUX_SESSION_SERVER_SCOPES_KEY = Symbol.for("cmux.session.server.scopes");
+const CMUX_SESSION_SERVER_SCOPES_KEY = Symbol.for("shellx.session.server.scopes");
 
 export default {
-  id: "cmux.session",
+  id: "shellx.session",
   async server(ctx) {
     if (!isTUIProcessServerContext(ctx)) return {};
     // Every loader in one plugin scope receives the same ctx. OpenCode keeps
@@ -36914,7 +36914,7 @@ export default {
     }
 
     private func openCodeTUIPluginOwnershipURL(in configDir: URL) -> URL {
-        openCodeTUIPluginDirectory(in: configDir).appendingPathComponent(".cmux-owned", isDirectory: false)
+        openCodeTUIPluginDirectory(in: configDir).appendingPathComponent(".shellx-owned", isDirectory: false)
     }
 
     private func openCodeTUIPluginPathIsSymlink(_ url: URL) -> Bool {
@@ -36931,12 +36931,12 @@ export default {
         guard let contents = try? String(contentsOf: url, encoding: .utf8) else { return false }
         switch name {
         case "package.json":
-            return contents.contains("\"name\": \"cmux-opencode-plugin\"")
+            return contents.contains("\"name\": \"shellx-opencode-plugin\"")
         case "index.js":
-            return contents.contains("cmux-opencode-tui-plugin-server-marker")
+            return contents.contains("shellx-opencode-tui-plugin-server-marker")
         case "tui.js":
-            return contents.contains("cmux-opencode-tui-plugin-marker")
-        case ".cmux-owned":
+            return contents.contains("shellx-opencode-tui-plugin-marker")
+        case ".shellx-owned":
             return contents.contains(Self.openCodeTUIPluginOwnershipMarker)
         default:
             return false
@@ -36950,12 +36950,12 @@ export default {
             throw CLIError(message: String(localized: "cli.hooks.error.pluginDirectoryOwned", defaultValue: "cmux could not install the selected agent integration because its plugin directory is already in use."))
         }
         if fileManager.fileExists(atPath: directory.path) {
-            for name in [".cmux-owned", "package.json", "index.js", "tui.js"] {
+            for name in [".shellx-owned", "package.json", "index.js", "tui.js"] {
                 if openCodeTUIPluginPathIsSymlink(directory.appendingPathComponent(name, isDirectory: false)) {
                     throw CLIError(message: String(localized: "cli.hooks.error.pluginDirectoryOwned", defaultValue: "cmux could not install the selected agent integration because its plugin directory is already in use."))
                 }
             }
-            let marked = openCodeTUIPluginFileIsOwned(".cmux-owned", in: directory)
+            let marked = openCodeTUIPluginFileIsOwned(".shellx-owned", in: directory)
                 || openCodeTUIPluginFileIsOwned("index.js", in: directory)
             guard marked else {
                 throw CLIError(message: String(localized: "cli.hooks.error.pluginDirectoryOwned", defaultValue: "cmux could not install the selected agent integration because its plugin directory is already in use."))
@@ -36975,8 +36975,8 @@ export default {
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         try Self.openCodeTUIPluginPackageSource.write(to: directory.appendingPathComponent("package.json"), atomically: true, encoding: .utf8)
         let feedSource = try bundledOpenCodePluginSource()
-        let serverSource = "// cmux-opencode-tui-plugin-server-marker v2\n"
-            + feedSource.replacingOccurrences(of: "id: \"cmux.feed\"", with: "id: \"cmux.server\"")
+        let serverSource = "// shellx-opencode-tui-plugin-server-marker v2\n"
+            + feedSource.replacingOccurrences(of: "id: \"shellx.feed\"", with: "id: \"cmux.server\"")
         try serverSource.write(to: directory.appendingPathComponent("index.js"), atomically: true, encoding: .utf8)
         try bundledOpenCodeTUIPluginSource().write(to: directory.appendingPathComponent("tui.js"), atomically: true, encoding: .utf8)
         try (Self.openCodeTUIPluginOwnershipMarker + "\n").write(to: openCodeTUIPluginOwnershipURL(in: configDir), atomically: true, encoding: .utf8)
@@ -37130,7 +37130,7 @@ export default {
             return value != Self.openCodeSessionPluginConfigSpec
                 && value != "./plugins"
                 && value != "./plugins/\(Self.openCodeTUIPluginDirectoryName)"
-                && value != "cmux-session"
+                && value != "shellx-session"
                 && value != "./plugins/\(Self.openCodeSessionPluginFilename)"
                 && !value.hasSuffix("/plugins/\(Self.openCodeSessionPluginFilename)")
                 && !value.hasSuffix("/\(Self.openCodeSessionPluginFilename)")
@@ -37201,7 +37201,7 @@ export default {
             throw CLIError(message: String(localized: "cli.hooks.error.pluginDirectoryOwned", defaultValue: "cmux could not install the selected agent integration because its plugin directory is already in use."))
         }
         let markerURL = openCodeTUIPluginOwnershipURL(in: configDir)
-        let markerOwned = openCodeTUIPluginFileIsOwned(".cmux-owned", in: directory)
+        let markerOwned = openCodeTUIPluginFileIsOwned(".shellx-owned", in: directory)
         let legacyOwned = openCodeTUIPluginFileIsOwned("index.js", in: directory)
         guard markerOwned || legacyOwned else { return }
         if legacyOwned && !markerOwned {
@@ -37215,7 +37215,7 @@ export default {
             if fileManager.fileExists(atPath: url.path) { try fileManager.removeItem(at: url) }
         }
         let remaining = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
-        if remaining.count == 1, openCodeTUIPluginFileIsOwned(".cmux-owned", in: directory) {
+        if remaining.count == 1, openCodeTUIPluginFileIsOwned(".shellx-owned", in: directory) {
             try fileManager.removeItem(at: markerURL)
         }
         if (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil))?.isEmpty == true {
@@ -37259,7 +37259,7 @@ export default {
         }
     }
 
-    private static let antigravityHookGroupName = "cmux"
+    private static let antigravityHookGroupName = "shellx"
 
     private func installAntigravityHooks(_ def: AgentHookDef) throws {
         let fm = FileManager.default
@@ -43899,12 +43899,12 @@ export default {
 
     // MARK: - OpenCode plugin install
 
-    /// Marker matching the `// cmux-feed-plugin-marker` line emitted at
+    /// Marker matching the `// shellx-feed-plugin-marker` line emitted at
     /// the top of the generated plugin JS. Lets us detect our own
     /// plugin file and upgrade/uninstall without touching user plugins.
-    private static let openCodePluginMarker = "cmux-feed-plugin-marker"
+    private static let openCodePluginMarker = "shellx-feed-plugin-marker"
 
-    private static let openCodePluginFileName = "cmux-feed.js"
+    private static let openCodePluginFileName = "shellx-feed.js"
 
     private func openCodeConfigDirPath() -> String {
         OpenCodePaths(environment: ProcessInfo.processInfo.environment).configDirectory.path

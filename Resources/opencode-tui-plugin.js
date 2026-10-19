@@ -1,4 +1,4 @@
-// cmux-opencode-tui-plugin-marker v2
+// shellx-opencode-tui-plugin-marker v2
 // OpenCode V2 bridge loaded inside each TUI process.
 // The server entry is inert; this module owns the TUI's cmux identity.
 
@@ -393,7 +393,7 @@ export async function createCMUXTUIBridge(ctx, options = {}) {
 }
 
 export default {
-  id: "cmux.tui",
+  id: "shellx.tui",
   async tui(ctx) { return createCMUXTUIBridge(ctx); },
   // Compatibility alias for older V2 snapshots that called setup().
   async setup(ctx) { return createCMUXTUIBridge(ctx); },

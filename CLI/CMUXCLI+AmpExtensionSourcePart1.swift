@@ -1,6 +1,6 @@
 extension CMUXCLI {
     static let ampExtensionPrelude = #"""
-// cmux-amp-session-extension-marker v3
+// shellx-amp-session-extension-marker v3
 // Bridges Amp thread lifecycle, title, and authoritative state into cmux.
 // Installed and refreshed automatically by cmux's managed Amp wrapper.
 // DO NOT EDIT MANUALLY. cmux upgrades this file in place.

@@ -469,15 +469,15 @@ def main() -> int:
         home = root / "home"
         home.mkdir()
         shared_agent_dir = root / "shared-agent-dir"
-        shared_pi_extension = shared_agent_dir / "extensions" / "cmux-session.ts"
+        shared_pi_extension = shared_agent_dir / "extensions" / "shellx-session.ts"
         shared_pi_extension.parent.mkdir(parents=True)
-        shared_pi_extension.write_text("// cmux-pi-session-extension-marker v1\n", encoding="utf-8")
+        shared_pi_extension.write_text("// shellx-pi-session-extension-marker v1\n", encoding="utf-8")
 
         env = os.environ.copy()
         env["HOME"] = str(home)
         # OMP treats PI_CODING_AGENT_DIR as the full agent directory override.
         # Install the OMP extension there while proving it does not collide with
-        # Pi's different cmux-session.ts filename in the same extensions folder.
+        # Pi's different shellx-session.ts filename in the same extensions folder.
         env["PI_CODING_AGENT_DIR"] = str(shared_agent_dir)
 
         install = subprocess.run(
@@ -495,15 +495,15 @@ def main() -> int:
             print(f"stderr={install.stderr.strip()}")
             return 1
 
-        extension_path = shared_agent_dir / "extensions" / "cmux-omp-session.ts"
+        extension_path = shared_agent_dir / "extensions" / "shellx-omp-session.ts"
         if not extension_path.exists():
             print(f"FAIL: expected extension at {extension_path}")
             return 1
         extension_text = extension_path.read_text(encoding="utf-8")
-        if "cmux-omp-session-extension-marker" not in extension_text:
+        if "shellx-omp-session-extension-marker" not in extension_text:
             print(f"FAIL: expected cmux marker in {extension_path}")
             return 1
-        if shared_pi_extension.read_text(encoding="utf-8") != "// cmux-pi-session-extension-marker v1\n":
+        if shared_pi_extension.read_text(encoding="utf-8") != "// shellx-pi-session-extension-marker v1\n":
             print("FAIL: OMP install modified the Pi extension in PI_CODING_AGENT_DIR")
             return 1
 
@@ -987,7 +987,7 @@ for (const rawPid of hungPidLines.slice(-2)) {
             env=config_env,
             timeout=20,
         )
-        config_extension_path = config_override / "agent" / "extensions" / "cmux-omp-session.ts"
+        config_extension_path = config_override / "agent" / "extensions" / "shellx-omp-session.ts"
         if config_install.returncode != 0 or not config_extension_path.exists():
             print("FAIL: omp extension install did not respect absolute PI_CONFIG_DIR")
             print(f"exit={config_install.returncode}")
@@ -1040,11 +1040,11 @@ for (const rawPid of hungPidLines.slice(-2)) {
             print(f"stderr={install.stderr.strip()}")
             return 1
 
-        omp_extension = omp_agent_dir / "extensions" / "cmux-omp-session.ts"
+        omp_extension = omp_agent_dir / "extensions" / "shellx-omp-session.ts"
         if not omp_extension.exists():
             print(f"FAIL: OMP_AGENT_DIR ignored, expected extension at {omp_extension}")
             return 1
-        if (pi_agent_dir / "extensions" / "cmux-omp-session.ts").exists():
+        if (pi_agent_dir / "extensions" / "shellx-omp-session.ts").exists():
             print("FAIL: OMP install wrote into PI_CODING_AGENT_DIR while OMP_AGENT_DIR was set")
             return 1
 

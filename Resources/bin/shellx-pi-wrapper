@@ -68,12 +68,12 @@ done
 cmux_pi_managed_extension() {
     local candidate="$1"
     [ -f "$candidate" ] || return 1
-    grep -q "cmux-pi-session-extension-marker" "$candidate" 2>/dev/null
+    grep -q "shellx-pi-session-extension-marker" "$candidate" 2>/dev/null
 }
 
 cmux_pi_agent_dir="${PI_CODING_AGENT_DIR:-${HOME:-}/.pi/agent}"
-if cmux_pi_managed_extension "$cmux_pi_agent_dir/extensions/cmux-session.ts" ||
-   cmux_pi_managed_extension "$PWD/.pi/extensions/cmux-session.ts"; then
+if cmux_pi_managed_extension "$cmux_pi_agent_dir/extensions/shellx-session.ts" ||
+   cmux_pi_managed_extension "$PWD/.pi/extensions/shellx-session.ts"; then
     exec "$cmux_pi" "$@"
 fi
 
@@ -87,8 +87,8 @@ fi
 
 cmux_surface_tag="${CMUX_SURFACE_ID:-default}"
 cmux_extension_root="${TMPDIR:-/tmp}/cmux-pi-extensions/$cmux_surface_tag"
-cmux_extension="$cmux_extension_root/cmux-session.ts"
-cmux_extension_tmp="$cmux_extension_root/.cmux-session.ts.$$"
+cmux_extension="$cmux_extension_root/shellx-session.ts"
+cmux_extension_tmp="$cmux_extension_root/.shellx-session.ts.$$"
 if [ -s "$cmux_extension" ] && cmux_pi_managed_extension "$cmux_extension"; then
     # Refresh a valid per-surface copy when the bundled source changes. If the
     # CLI is temporarily unavailable, keep the last known-good copy.

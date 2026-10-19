@@ -150,7 +150,7 @@ def main() -> int:
         env = os.environ.copy()
         env["PI_CODING_AGENT_DIR"] = str(config_dir)
         extension_text = extension_path.read_text(encoding="utf-8")
-        if "cmux-pi-session-extension-marker" not in extension_text:
+        if "shellx-pi-session-extension-marker" not in extension_text:
             print(f"FAIL: expected cmux marker in {extension_path}")
             return 1
 
@@ -159,7 +159,7 @@ def main() -> int:
             return 1
 
         extension_path.write_text(
-            "// cmux-pi-session-extension-marker v2\n"
+            "// shellx-pi-session-extension-marker v2\n"
             "// stale managed fixture using synchronous hook dispatch\n"
             'import { spawnSync } from "node:child_process";\n',
             encoding="utf-8",
@@ -226,10 +226,10 @@ def main() -> int:
             return 1
 
         extension_path.write_text(
-            "// cmux-pi-session-extension-marker v2\n// stale managed race fixture\n",
+            "// shellx-pi-session-extension-marker v2\n// stale managed race fixture\n",
             encoding="utf-8",
         )
-        lock_path = extension_path.parent / ".cmux-session.lock"
+        lock_path = extension_path.parent / ".shellx-session.lock"
         replacement = "// user replacement without the cmux ownership marker\n"
         with lock_path.open("a", encoding="utf-8") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
@@ -261,7 +261,7 @@ def main() -> int:
         extension_path = install_pi_extension(config_dir, cli_path)
         extension_text = extension_path.read_text(encoding="utf-8")
         extension_path.write_text(
-            "// cmux-pi-session-extension-marker v2\n// stale uninstall race fixture\n",
+            "// shellx-pi-session-extension-marker v2\n// stale uninstall race fixture\n",
             encoding="utf-8",
         )
         with lock_path.open("a", encoding="utf-8") as lock:
@@ -314,7 +314,7 @@ def main() -> int:
         extension_text = extension_path.read_text(encoding="utf-8")
 
         stale_symlink_fixture = (
-            "// cmux-pi-session-extension-marker v2\n"
+            "// shellx-pi-session-extension-marker v2\n"
             "// stale lock symlink fixture\n"
         )
         extension_path.write_text(stale_symlink_fixture, encoding="utf-8")

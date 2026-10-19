@@ -1361,27 +1361,27 @@ struct CLIClaudeHookTimeoutRegressionTests {
             Producer(
                 agent: "opencode",
                 environment: ["OPENCODE_CONFIG_DIR": opencodeRoot.path],
-                artifact: opencodeRoot.appendingPathComponent("plugins/cmux-session.js")
+                artifact: opencodeRoot.appendingPathComponent("plugins/shellx-session.js")
             ),
             Producer(
                 agent: "pi",
                 environment: ["PI_CODING_AGENT_DIR": piRoot.path],
-                artifact: piRoot.appendingPathComponent("extensions/cmux-session.ts")
+                artifact: piRoot.appendingPathComponent("extensions/shellx-session.ts")
             ),
             Producer(
                 agent: "omp",
                 environment: ["PI_CODING_AGENT_DIR": ompRoot.path],
-                artifact: ompRoot.appendingPathComponent("extensions/cmux-omp-session.ts")
+                artifact: ompRoot.appendingPathComponent("extensions/shellx-omp-session.ts")
             ),
             Producer(
                 agent: "campfire",
                 environment: ["CAMPFIRE_CODING_AGENT_DIR": campfireRoot.path],
-                artifact: campfireRoot.appendingPathComponent("extensions/cmux-campfire-session.ts")
+                artifact: campfireRoot.appendingPathComponent("extensions/shellx-campfire-session.ts")
             ),
             Producer(
                 agent: "amp",
                 environment: ["HOME": ampHome.path],
-                artifact: ampHome.appendingPathComponent(".config/amp/plugins/cmux-session.ts")
+                artifact: ampHome.appendingPathComponent(".config/amp/plugins/shellx-session.ts")
             ),
         ]
 
