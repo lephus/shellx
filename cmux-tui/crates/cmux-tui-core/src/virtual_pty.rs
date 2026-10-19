@@ -18,6 +18,11 @@
 //! grid did not change (the app's forced echo after a remote resize). `E` or
 //! end of stream ends the child.
 //!
+//! Unknown type bytes: this side ignores them, but the app's Swift
+//! `BridgeFrameDecoder` (`ShellXRemoteCore/BridgeFrame.swift`) throws
+//! `unknownType` and drops the connection. A new daemon -> app type therefore
+//! needs the Swift decoder updated (and shipped) before the daemon sends it.
+//!
 //! Enabled when the daemon runs with `CMUX_SHELLX_BRIDGE_SOCKET=<path>`: every
 //! default-shell terminal it creates becomes a Mac terminal. The socket's
 //! directory must be a real directory owned by this user with no group or
@@ -38,6 +43,12 @@ pub(crate) const BRIDGE_SOCKET_ENV: &str = "CMUX_SHELLX_BRIDGE_SOCKET";
 const PROTOCOL: u32 = 1;
 /// Largest payload either side may send in one frame.
 const MAX_FRAME: usize = 16 * 1024 * 1024;
+/// Output the app may send during the handshake (before its `S`) that `open`
+/// holds in memory. Matches the app's own 64 MiB pending cap
+/// (`ShellXBridgeServer.maxPendingBytes`); past it `open` fails, as the app
+/// drops a daemon that falls that far behind. Failing is the conservative
+/// choice: dropping bytes would leave the mirror showing a corrupt screen.
+const MAX_HANDSHAKE_OUTPUT: usize = 64 * 1024 * 1024;
 /// How long `kill` may spend sending its best-effort `K` frame.
 const KILL_WRITE_TIMEOUT: Duration = Duration::from_millis(500);
 
@@ -205,6 +216,15 @@ fn check_socket_dir(socket: &Path) -> anyhow::Result<()> {
 
 /// Connects to the app, binds (or creates) one Mac terminal and returns a
 /// master/child pair the surface code uses exactly like a real PTY.
+///
+/// Blocking: this runs synchronously on the thread creating the surface
+/// (`Surface::spawn*` from `Mux::spawn_surface_with`) and can wait up to
+/// 10 s for the app's `A` plus up to 2 s for its `S`. No mux-wide lock is
+/// held there (`state`, `workspace_registry` and the cell-pixel lock are
+/// taken and released around the spawn), but the per-workspace lifecycle
+/// mutex is: `create_terminal_in_workspace` and `apply_layout` keep it across
+/// the spawn, so other creates/layouts/closes of the *same* workspace wait,
+/// and a layout with several default-shell leaves opens them one after another.
 pub(crate) fn open(
     spec: &VirtualPtySpec,
     size: PtySize,
@@ -237,7 +257,14 @@ pub(crate) fn open(
     while host_size.is_none() && Instant::now() < deadline {
         match read_frame(&mut stream) {
             Ok((SIZE, payload)) => host_size = parse_size(&payload),
-            Ok((OUTPUT, payload)) => early_output.extend_from_slice(&payload),
+            Ok((OUTPUT, payload)) => {
+                if early_output.len() + payload.len() > MAX_HANDSHAKE_OUTPUT {
+                    anyhow::bail!(
+                        "shellx bridge: handshake output exceeds {MAX_HANDSHAKE_OUTPUT} bytes before the size report"
+                    );
+                }
+                early_output.extend_from_slice(&payload);
+            }
             Ok((EXIT, _)) => anyhow::bail!("shellx bridge: app ended the terminal during setup"),
             Ok(_) => {}
             Err(error)
@@ -668,6 +695,45 @@ mod tests {
         assert!(got[..EARLY] == expected[..], "early output reordered or corrupted");
         assert_eq!(&got[EARLY..], b"<after>");
         child.kill().unwrap();
+        app.join().unwrap();
+    }
+
+    /// Output held during the handshake is capped at 64 MiB (the app's own
+    /// pending cap): an app that floods it without a size report fails the
+    /// open instead of growing daemon memory without bound.
+    #[test]
+    fn handshake_output_over_cap_fails_open() {
+        let dir = SocketDir::new("early-cap");
+        let listener = UnixListener::bind(dir.socket()).unwrap();
+        let app = std::thread::spawn(move || {
+            let (mut conn, _) = listener.accept().unwrap();
+            let (kind, _) = read_frame(&mut conn).unwrap();
+            assert_eq!(kind, HELLO);
+            conn.write_all(&frame(ACK, br#"{"surface_id":"x","mode":"attach"}"#)).unwrap();
+            let chunk = vec![b'x'; MAX_FRAME];
+            let header = |len: usize| {
+                let mut h = vec![OUTPUT];
+                h.extend_from_slice(&(len as u32).to_be_bytes());
+                h
+            };
+            // Exactly the cap, then one byte more; the daemon may hang up mid-way.
+            for _ in 0..4 {
+                if conn.write_all(&header(MAX_FRAME)).is_err() || conn.write_all(&chunk).is_err() {
+                    return;
+                }
+            }
+            let _ = conn.write_all(&frame(OUTPUT, b"!"));
+            let _ = conn.write_all(&size_frame(80, 24));
+            while read_frame(&mut conn).is_ok() {}
+        });
+        let socket = dir.socket();
+        let result = within("open with flooding app", move || {
+            open(&VirtualPtySpec { socket }, SIZE_80X24, None)
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        });
+        let error = result.expect_err("handshake output over the cap was accepted");
+        assert!(error.contains("handshake output"), "{error}");
         app.join().unwrap();
     }
 
