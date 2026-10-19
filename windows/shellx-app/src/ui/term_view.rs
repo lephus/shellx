@@ -827,7 +827,9 @@ impl Render for TermView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let lang = cx.global::<Services>().lang;
         let pill = match &self.backend {
-            Backend::Remote(remote) => overlay(&remote.status, lang),
+            Backend::Remote(remote) => {
+                overlay(&remote.status, remote.mirror.link().accepts_input(), lang)
+            }
             _ => self.failed.clone(),
         };
         let flash = self.flash.clone();

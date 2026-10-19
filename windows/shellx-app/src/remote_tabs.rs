@@ -6,8 +6,11 @@
 //!   on the first pane, reused while it has not finished, replaced by a new
 //!   one once it has (closed, ended, failed for good).
 //! - Model `PaneId` -> (session, session pane id): closing a pane in the
-//!   window detaches its view (`close_pane`); a session no pane uses any more
-//!   is dropped (which closes it).
+//!   window detaches its view (`close_pane`). The session itself is kept
+//!   until it has finished: after its last pane it finishes on its own,
+//!   except while an invitation's enrollment still waits for the Mac
+//!   owner's approval; the next Open then reuses it, so one invitation is
+//!   never enrolled twice. Finished sessions no pane uses are let go.
 //! - What a new pane shows (`Want`): sidebar Open on a Mac without panes
 //!   shows its first terminal, another Open or a split of a remote pane
 //!   creates a new terminal on the Mac (spec §8.6 C12), a stored terminal id
@@ -221,30 +224,31 @@ impl<S: SessionApi> RemoteTabs<S> {
     }
 
     /// The window dropped `pane` (closed, its terminal ended, its tab
-    /// closed): detach its view on the Mac. A session no pane uses any more
-    /// is dropped, which closes it.
+    /// closed): detach its view on the Mac. The session is NOT dropped here
+    /// (dropping it would close it): its last pane gone, it finishes by
+    /// itself, or, while an invitation's enrollment still waits for
+    /// approval, stays for the next Open (one invitation, one enrollment).
     pub fn pane_closed(&mut self, pane: PaneId) {
         self.planned.remove(&pane);
-        let Some(closed) = self.panes.remove(&pane) else {
-            return;
-        };
-        closed.session.close_pane(closed.id);
-        let in_use = self
-            .panes
-            .values()
-            .any(|p| Arc::ptr_eq(&p.session, &closed.session));
-        let current = self
-            .sessions
-            .get(&closed.machine_id)
-            .is_some_and(|s| Arc::ptr_eq(&s.session, &closed.session));
-        if !in_use && current {
-            self.sessions.remove(&closed.machine_id);
+        if let Some(closed) = self.panes.remove(&pane) {
+            closed.session.close_pane(closed.id);
         }
+        self.prune();
+    }
+
+    /// Lets go of sessions that have finished and that no pane uses.
+    fn prune(&mut self) {
+        let panes = &self.panes;
+        self.sessions.retain(|_, s| {
+            !s.session.status().finished
+                || panes.values().any(|p| Arc::ptr_eq(&p.session, &s.session))
+        });
     }
 
     /// The machine list (15 s poll): each open session learns whether its
     /// Mac is online, when that changed.
     pub fn machines_updated(&mut self, machines: &[MachineInfo]) {
+        self.prune();
         for (machine_id, s) in &mut self.sessions {
             let Some(m) = machines.iter().find(|m| &m.machine_id == machine_id) else {
                 continue;
@@ -413,9 +417,11 @@ fn tone_of(title: Str) -> Tone {
 }
 
 /// The pill of a remote pane, or none while it is connected and attached.
-/// Shown while the phase is not Connected, or a session error / attach
-/// error is set; the save error (links.json) is a detail line while shown.
-pub fn overlay(status: &SessionStatus, lang: Lang) -> Option<Overlay> {
+/// Shown while the phase is not Connected, or a session error is set, or
+/// the session's attach error is set and THIS pane is not `attached` (the
+/// error is session-wide; a sibling that works shows nothing); the save
+/// error (links.json) is a detail line while shown.
+pub fn overlay(status: &SessionStatus, attached: bool, lang: Lang) -> Option<Overlay> {
     let mut details = Vec::new();
     let title = match (&status.error, &status.phase) {
         (Some(SessionError::FingerprintMismatch { .. }), _) => Str::FingerprintMismatch,
@@ -424,6 +430,9 @@ pub fn overlay(status: &SessionStatus, lang: Lang) -> Option<Overlay> {
             Str::NeedsPairing
         }
         (None, ConnPhase::Connected) => {
+            if attached {
+                return None;
+            }
             details.push(status.attach_error.clone()?);
             Str::RemoteAttachFailed
         }
@@ -886,7 +895,7 @@ mod tests {
     }
 
     #[test]
-    fn closing_panes_detaches_and_the_last_one_drops_the_session() {
+    fn closing_panes_detaches_and_keeps_the_session_until_it_finishes() {
         let mut remotes = RemoteTabs::new();
         let mut starter = Starter::default();
         let m1 = record("m1", true);
@@ -902,11 +911,133 @@ mod tests {
             *starter.started[0].closed_panes.lock().unwrap(),
             vec![a.id, b.id]
         );
-        assert!(remotes.session("m1").is_none());
         assert_eq!(remotes.pane_count(), 0);
-        // the next Open starts afresh
+        // Kept while it has not finished (an enrollment may still be waiting
+        // for approval): the next Open reuses it, never a second session.
+        assert!(remotes.session("m1").is_some());
+        assert_eq!(starter.started[0].closes.load(Ordering::Acquire), 0);
         open(&mut remotes, &mut starter, 3, "m1", "", Some(&m1), None).unwrap();
+        assert_eq!(starter.started.len(), 1);
+        remotes.pane_closed(PaneId(3));
+        // Once it finished (idle), it is let go and the next Open starts afresh.
+        starter.started[0].finish();
+        remotes.machines_updated(&[]);
+        assert!(remotes.session("m1").is_none());
+        open(&mut remotes, &mut starter, 4, "m1", "", Some(&m1), None).unwrap();
         assert_eq!(starter.started.len(), 2);
+    }
+
+    /// Fix round 1 (review Important 1): the tab is closed while the Mac
+    /// owner has not approved yet, then "Mở" again from the cached (not yet
+    /// enrolled) record: one session, ONE invitation connect, one approval.
+    #[test]
+    fn closing_the_tab_during_an_approval_never_enrolls_twice() {
+        use std::sync::mpsc;
+        use std::time::{Duration, Instant};
+
+        use shellx_model::links::Links;
+
+        use crate::remote_session::fake::FakeConnector;
+        use crate::remote_session::{MintingCore, ticket_file_name};
+
+        let dir = std::env::temp_dir().join(format!("shellx-rt-reopen-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let invite = dir.join("invite-m1.uri");
+        std::fs::write(&invite, "cmux://enroll/secret").unwrap();
+        let rec = LinkRecord {
+            machine_id: "m1".into(),
+            machine_name: "Mac".into(),
+            relay_route: "route".into(),
+            relay_slot: "slot".into(),
+            invite_path: Some(invite.to_string_lossy().into_owned()),
+            daemon_fingerprint: "fp-1".into(),
+            enrolled: false,
+        };
+        let mut links = Links::default();
+        links.upsert(rec.clone());
+        LinksStore::new(dir.join("links.json"))
+            .save(&links)
+            .unwrap();
+        let core = Arc::new(MintingCore::new(dir.join(ticket_file_name("m1"))));
+        let connector = Arc::new(FakeConnector::new("fp-1", 1));
+        let (approve, approval) = mpsc::channel();
+        *connector.approval.lock().unwrap() = Some(approval);
+        let mut starts = 0u32;
+        let mut start = |record: LinkRecord| -> Result<RemoteSession> {
+            starts += 1;
+            RemoteSession::start(SessionConfig {
+                record,
+                core: core.clone(),
+                connector: connector.clone(),
+                state_dir: dir.clone(),
+                invite_dir: dir.clone(),
+                device_name: "PC test".into(),
+                links: Some(LinksStore::new(dir.join("links.json"))),
+                time_scale: 50,
+            })
+        };
+        let wait = |what: &str, done: &dyn Fn() -> bool| {
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while !done() {
+                assert!(Instant::now() < deadline, "timed out waiting for {what}");
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        };
+        let mut remotes: RemoteTabs<RemoteSession> = RemoteTabs::new();
+
+        remotes.plan(PaneId(1), Want::First);
+        let (session, first) = remotes
+            .open(
+                PaneId(1),
+                "m1",
+                "",
+                Some(&rec),
+                Some(true),
+                sink(),
+                &mut start,
+            )
+            .map_err(|e| format!("{e:?}"))
+            .unwrap();
+        wait("the enrolling connect", &|| connector.seen().len() == 1);
+        // The user closes the tab: the window drops the pane and its view
+        // (with the view's handle on the session).
+        remotes.pane_closed(PaneId(1));
+        drop((session, first));
+        std::thread::sleep(Duration::from_millis(100));
+
+        // "Mở" again, from the cached record (not enrolled, invite named).
+        remotes.plan(PaneId(2), Want::First);
+        let (_session, second) = remotes
+            .open(
+                PaneId(2),
+                "m1",
+                "",
+                Some(&rec),
+                Some(true),
+                sink(),
+                &mut start,
+            )
+            .map_err(|e| format!("{e:?}"))
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(connector.seen().len(), 1, "a second enrollment started");
+        approve.send(()).unwrap();
+        wait("the new pane's attach", &|| second.link.accepts_input());
+        let seen = connector.seen();
+        assert_eq!(starts, 1, "a second session was started");
+        assert_eq!(seen.len(), 1, "{} invitation connects", seen.len());
+        assert!(seen[0].invite_path.is_some());
+        assert_eq!(connector.host_count(), 1);
+        assert!(!invite.exists());
+        let saved = LinksStore::new(dir.join("links.json")).load().unwrap();
+        assert!(
+            saved
+                .get("m1")
+                .is_some_and(|l| l.enrolled && l.invite_path.is_none())
+        );
+        remotes.close_all();
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1097,34 +1228,34 @@ mod tests {
     #[test]
     fn pill_per_status() {
         let vi = Lang::Vi;
-        assert_eq!(overlay(&status(ConnPhase::Connected), vi), None);
-        let o = overlay(&status(ConnPhase::Disconnected), vi).unwrap();
+        assert_eq!(overlay(&status(ConnPhase::Connected), true, vi), None);
+        let o = overlay(&status(ConnPhase::Disconnected), false, vi).unwrap();
         assert_eq!((o.title, o.tone), (Str::Connecting, Tone::Running));
         let mut s = status(ConnPhase::Connecting { attempt: 1 });
         s.shown = Some(Str::Connecting);
-        assert_eq!(overlay(&s, vi).unwrap().title, Str::Connecting);
+        assert_eq!(overlay(&s, false, vi).unwrap().title, Str::Connecting);
         let mut s = status(ConnPhase::Reconnecting {
             attempt: 2,
             retry_at_ms: 9,
         });
         s.shown = Some(Str::Reconnecting);
         s.reason = Some("relay closed".into());
-        let o = overlay(&s, vi).unwrap();
+        let o = overlay(&s, false, vi).unwrap();
         assert_eq!((o.title, o.tone), (Str::Reconnecting, Tone::Running));
         assert_eq!(o.details, vec!["relay closed".to_string()]);
         // a retry in flight still says reconnecting
         let mut s = status(ConnPhase::Connecting { attempt: 3 });
         s.shown = Some(Str::Reconnecting);
-        assert_eq!(overlay(&s, vi).unwrap().title, Str::Reconnecting);
+        assert_eq!(overlay(&s, false, vi).unwrap().title, Str::Reconnecting);
         let mut s = status(ConnPhase::Offline);
         s.shown = Some(Str::Offline);
         s.reason = Some("x".into());
-        let o = overlay(&s, vi).unwrap();
+        let o = overlay(&s, false, vi).unwrap();
         assert_eq!(
             (o.title, o.tone, o.details.len()),
             (Str::Offline, Tone::Muted, 0)
         );
-        let o = overlay(&status(ConnPhase::Ended), vi).unwrap();
+        let o = overlay(&status(ConnPhase::Ended), false, vi).unwrap();
         assert_eq!((o.title, o.tone), (Str::RemoteEnded, Tone::Muted));
         // errors win over the phase
         let mut s = status(ConnPhase::Ended);
@@ -1132,24 +1263,26 @@ mod tests {
             expected: "a".into(),
             got: "b".into(),
         });
-        let o = overlay(&s, vi).unwrap();
+        let o = overlay(&s, false, vi).unwrap();
         assert_eq!((o.title, o.tone), (Str::FingerprintMismatch, Tone::Error));
         s.error = Some(SessionError::NeedsPairing("invitation expired".into()));
-        let o = overlay(&s, vi).unwrap();
+        let o = overlay(&s, false, vi).unwrap();
         assert_eq!((o.title, o.tone), (Str::NeedsPairing, Tone::Error));
         assert_eq!(o.details, vec!["invitation expired".to_string()]);
-        // connected but a pane cannot attach: shown, with the reason
+        // connected but a pane cannot attach: shown on THAT pane (not
+        // attached), with the reason; an attached sibling shows nothing
         let mut s = status(ConnPhase::Connected);
         s.attach_error = Some("no terminal 4".into());
-        let o = overlay(&s, vi).unwrap();
+        let o = overlay(&s, false, vi).unwrap();
         assert_eq!(o.title, Str::RemoteAttachFailed);
         assert_eq!(o.details, vec!["no terminal 4".to_string()]);
+        assert_eq!(overlay(&s, true, vi), None);
         // the save error is a detail while the pill shows (never alone)
         s.attach_error = None;
         s.save_error = Some("disk full".into());
-        assert_eq!(overlay(&s, vi), None);
+        assert_eq!(overlay(&s, false, vi), None);
         s.phase = ConnPhase::Offline;
-        let o = overlay(&s, vi).unwrap();
+        let o = overlay(&s, false, vi).unwrap();
         assert_eq!(
             o.details,
             vec!["Không lưu được quyền truy cập: disk full".to_string()]
@@ -1157,7 +1290,7 @@ mod tests {
         // long details are clipped
         s.save_error = None;
         s.attach_error = Some("x".repeat(500));
-        let o = overlay(&s, vi).unwrap();
+        let o = overlay(&s, false, vi).unwrap();
         assert_eq!(o.details[0].chars().count(), DETAIL_MAX + 1);
         assert!(o.details[0].ends_with('…'));
     }

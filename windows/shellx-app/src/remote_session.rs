@@ -407,7 +407,9 @@ struct Ctx {
 /// Why the worker loop stopped.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Stop {
-    /// The last pane closed: a queued `OpenPane` revives the session.
+    /// The last pane closed: a queued `OpenPane` revives the session. While
+    /// an enrollment job still runs the session is not finished yet (see
+    /// `Worker::park`).
     Idle,
     /// Closed by the app, the remote side ended, or a session error.
     Final,
@@ -508,6 +510,9 @@ impl Worker {
     fn run(mut self, rx: Receiver<Msg>) {
         loop {
             self.serve(&rx);
+            if self.stop == Some(Stop::Idle) && self.enrolling.is_some() && self.park(&rx) {
+                continue; // a new pane came while the enrollment ran
+            }
             // `finished` is published under the status lock that
             // `open_pane` sends under, so every OpenPane sent before it is
             // already queued here.
@@ -549,6 +554,32 @@ impl Worker {
         if let Some(path) = lock(&self.ctx.last_ticket).take() {
             let _ = std::fs::remove_file(path);
         }
+    }
+
+    /// The last pane closed while the invitation's enrollment still waits
+    /// for the Mac owner (up to 300 s). The session stays, NOT finished, so
+    /// the app reuses it for its next pane instead of starting a second
+    /// session that would enroll the same invitation again (Task 13b review).
+    /// Returns true when a new pane revived it (its connect then waits for
+    /// the enrollment and takes its host, see `linked`); false when the
+    /// enrollment ended with no pane (finish idle, as before) or the session
+    /// was closed (sign-out, app exit).
+    fn park(&mut self, rx: &Receiver<Msg>) -> bool {
+        self.publish(); // not finished: `open_pane` still sends here
+        while self.stop == Some(Stop::Idle) && self.enrolling.is_some() {
+            match rx.recv() {
+                Ok(msg @ Msg::OpenPane { .. }) => {
+                    self.revive();
+                    self.handle(msg);
+                    return true;
+                }
+                // The enrollment result ends `enrolling` (its client drops:
+                // no pane wants it); `Close` makes the stop final.
+                Ok(msg) => self.handle(msg),
+                Err(_) => self.handle(Msg::Close),
+            }
+        }
+        false
     }
 
     /// The last pane closed and a new one was already on its way: start over.
@@ -626,7 +657,12 @@ impl Worker {
             error: self.error.clone(),
             save_error: self.save_error.clone(),
             attach_error: self.attach_error.clone(),
-            finished: self.stop.is_some(),
+            // Idle with an enrollment in flight is parked, not finished.
+            finished: match self.stop {
+                None => false,
+                Some(Stop::Idle) => self.enrolling.is_none(),
+                Some(Stop::Final) => true,
+            },
         };
         let changed = {
             let mut status = lock(&self.status);
@@ -785,6 +821,13 @@ impl Worker {
                 if self.panes.is_empty() {
                     self.stop(Stop::Idle);
                     self.feed(ConnEvent::Close);
+                } else if self.attach_error.is_some()
+                    && self.panes.values().all(|p| p.attach_failures == 0)
+                {
+                    // The failing pane is gone: its error must not stay on
+                    // the panes that work.
+                    self.attach_error = None;
+                    self.publish();
                 }
             }
             Msg::MachineOnline(online) => self.feed(if online {
@@ -2111,6 +2154,112 @@ mod tests {
         assert_eq!(r.connector.host_count(), 1);
         assert!(!r.invite.exists());
         assert_eq!(r.session.status().phase, ConnPhase::Connected);
+    }
+
+    /// Task 13b fix round 1: the last pane closes while the Mac owner has
+    /// not approved yet; the session stays (not finished) and a pane opened
+    /// later gets the enrolled host, with one invitation connect only.
+    #[test]
+    fn last_pane_closing_during_an_enrollment_keeps_the_session_for_the_next_pane() {
+        let connector = FakeConnector::new("fp-1", 1);
+        let (approve, approval) = mpsc::channel();
+        *lock(&connector.approval) = Some(approval);
+        let r = rig_with("park-enroll", connector, false);
+        let first = r
+            .session
+            .open_pane(Want::First, 80, 24, r.sink.clone())
+            .unwrap();
+        wait("enrolling connect", || r.connector.seen().len() == 1);
+        r.session.close_pane(first.id);
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(
+            !r.session.status().finished,
+            "the session finished while its enrollment waits for approval"
+        );
+        let pane = r
+            .session
+            .open_pane(Want::First, 80, 24, r.sink.clone())
+            .expect("a new pane is refused during the enrollment");
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(r.connector.seen().len(), 1, "a second enrollment started");
+        approve.send(()).unwrap();
+        wait("attach", || pane.link.accepts_input());
+        let seen = r.connector.seen();
+        assert_eq!(seen.len(), 1);
+        assert!(seen[0].invite_path.is_some());
+        assert_eq!(r.connector.host_count(), 1);
+        assert!(!r.invite.exists());
+        assert_eq!(r.session.status().phase, ConnPhase::Connected);
+        assert!(!r.session.status().finished);
+    }
+
+    #[test]
+    fn an_enrollment_ending_without_a_pane_finishes_idle_and_close_ends_it_early() {
+        // approved with no pane waiting: the result lands, then the session
+        // finishes (the next open starts a new one, already enrolled)
+        let connector = FakeConnector::new("fp-1", 1);
+        let (approve, approval) = mpsc::channel();
+        *lock(&connector.approval) = Some(approval);
+        let r = rig_with("park-ends", connector, false);
+        let first = r
+            .session
+            .open_pane(Want::First, 80, 24, r.sink.clone())
+            .unwrap();
+        wait("enrolling connect", || r.connector.seen().len() == 1);
+        r.session.close_pane(first.id);
+        std::thread::sleep(Duration::from_millis(50));
+        assert!(!r.session.status().finished);
+        approve.send(()).unwrap();
+        wait("finished after the enrollment", || {
+            r.session.status().finished
+        });
+        assert!(!r.invite.exists());
+        let saved = LinksStore::new(r.dir.join("links.json")).load().unwrap();
+        assert!(saved.get("Mac/1").unwrap().enrolled);
+        assert!(
+            r.session
+                .open_pane(Want::First, 80, 24, r.sink.clone())
+                .is_err()
+        );
+
+        // sign-out (close) during the approval wait ends it at once
+        let connector = FakeConnector::new("fp-1", 1);
+        let (_approve, approval) = mpsc::channel::<()>();
+        *lock(&connector.approval) = Some(approval);
+        let r = rig_with("park-close", connector, false);
+        let first = r
+            .session
+            .open_pane(Want::First, 80, 24, r.sink.clone())
+            .unwrap();
+        wait("enrolling connect", || r.connector.seen().len() == 1);
+        r.session.close_pane(first.id);
+        std::thread::sleep(Duration::from_millis(50));
+        assert!(!r.session.status().finished);
+        r.session.close();
+        wait("finished after close", || r.session.status().finished);
+    }
+
+    #[test]
+    fn closing_the_failing_pane_clears_the_attach_error() {
+        let r = rig_with("attach-error-close", FakeConnector::new("fp-1", 1), true);
+        let good = r
+            .session
+            .open_pane(Want::First, 80, 24, r.sink.clone())
+            .unwrap();
+        wait("first attach", || good.link.accepts_input());
+        let host = r.connector.host(0).unwrap();
+        host.fail_attach.store(true, Ordering::Release);
+        let bad = r
+            .session
+            .open_pane(Want::New, 80, 24, r.sink.clone())
+            .unwrap();
+        wait("attach error", || r.session.status().attach_error.is_some());
+        r.session.close_pane(bad.id);
+        wait("attach error cleared", || {
+            r.session.status().attach_error.is_none()
+        });
+        assert!(good.link.accepts_input());
+        assert!(!r.session.status().finished);
     }
 
     /// Close `pane` and open a new one in one go. Both messages are queued
