@@ -877,6 +877,10 @@ path = "tests/test_shellx_theme.py"
 lane = "linux-guard"
 
 [[test]]
+path = "tests/test_shellx_titlebar.py"
+lane = "linux-guard"
+
+[[test]]
 path = "tests/test_shellx_vi.py"
 lane = "linux-guard"
 

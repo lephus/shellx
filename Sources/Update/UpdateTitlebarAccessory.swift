@@ -7,6 +7,7 @@ import CmuxSettings
 import CmuxSettingsUI
 import CmuxTestSupport
 import Observation
+import ShellXBrand
 import SwiftUI
 
 enum TitlebarControlsStyle: Int, CaseIterable, Identifiable {
@@ -987,12 +988,9 @@ private struct TitlebarNotificationBadge: View {
     let unreadModel: SidebarUnreadModel
     let config: TitlebarControlsStyleConfig
     @Environment(\.cmuxGlobalFontMagnificationPercent) private var globalFontPercent
-    @Environment(\.cmuxAccentColor) private var cmuxAccent
-
     var body: some View {
-        let unreadCount = unreadModel.totalUnreadCount
-        if unreadCount > 0 {
-            Text("\(min(unreadCount, 99))")
+        if let badgeText = ShellXTitlebarModel(unreadCount: unreadModel.totalUnreadCount).badgeText {
+            Text(badgeText)
                 .cmuxFont(
                     size: titlebarNotificationBadgeFontSize(for: config)
                         / max(1, GlobalFontMagnification.scale(for: globalFontPercent)),
@@ -1000,7 +998,7 @@ private struct TitlebarNotificationBadge: View {
                 )
                 .foregroundColor(.white)
                 .frame(width: config.badgeSize, height: config.badgeSize)
-                .background(Circle().fill(cmuxAccent.color))
+                .background(Circle().fill(ShellXPalette.primary.color))
                 .offset(x: config.badgeOffset.width, y: config.badgeOffset.height)
         }
     }
@@ -2983,6 +2981,10 @@ final class UpdateTitlebarAccessoryController {
             controlsControllers.add(controls)
         }
 
+        if !window.titlebarAccessoryViewControllers.contains(where: { $0.view.identifier == ShellXTitlebarAccessoryViewController.identifier }) {
+            window.addTitlebarAccessoryViewController(ShellXTitlebarAccessoryViewController())
+        }
+
         attachedWindows.add(window)
         applyAccessoryVisibility(for: window)
 
@@ -3004,7 +3006,8 @@ final class UpdateTitlebarAccessoryController {
         let shouldHide = WorkspacePresentationModeSettings.mode() == .minimal
             || window.styleMask.contains(.fullScreen)
         for accessory in window.titlebarAccessoryViewControllers
-            where accessory.view.identifier == controlsIdentifier {
+            where accessory.view.identifier == controlsIdentifier
+                || accessory.view.identifier == ShellXTitlebarAccessoryViewController.identifier {
             accessory.isHidden = shouldHide
             accessory.view.isHidden = shouldHide
             accessory.view.alphaValue = shouldHide ? 0 : 1
@@ -3019,7 +3022,7 @@ final class UpdateTitlebarAccessoryController {
         }
         let matchingIndices = window.titlebarAccessoryViewControllers.indices.reversed().filter { index in
             let id = window.titlebarAccessoryViewControllers[index].view.identifier
-            return id == controlsIdentifier
+            return id == controlsIdentifier || id == ShellXTitlebarAccessoryViewController.identifier
         }
         guard !matchingIndices.isEmpty || attachedWindows.contains(window) else { return }
 
