@@ -116,14 +116,18 @@ final class RightSidebarCommandPaletteTests: XCTestCase {
                 XCTAssertTrue(contribution.enablement(context))
             }
 
-            // Files/Find/Vault, the graduated Dock, and the Cloud tab are
-            // discoverable before the local activation marker is set.
+            // Files/Find/Vault and the graduated Dock are discoverable before
+            // the local activation marker is set. ShellX: the Machines (Cloud)
+            // tab is parked behind remoteMachines, so it has no command.
             let machinesAvailable = RightSidebarMode.machines.isAvailable()
-            XCTAssertTrue(machinesAvailable)
-            XCTAssertEqual(contributions.count, 5)
+            XCTAssertEqual(machinesAvailable, ShellXSwitches.remoteMachines)
+            XCTAssertEqual(contributions.count, ShellXSwitches.remoteMachines ? 5 : 4)
             XCTAssertNil(contributionsByID[ContentView.commandPaletteRightSidebarModeCommandID(.feed)])
             XCTAssertNotNil(contributionsByID[ContentView.commandPaletteRightSidebarModeCommandID(.dock)])
-            XCTAssertNotNil(contributionsByID[ContentView.commandPaletteRightSidebarModeCommandID(.machines)])
+            XCTAssertEqual(
+                contributionsByID[ContentView.commandPaletteRightSidebarModeCommandID(.machines)] != nil,
+                ShellXSwitches.remoteMachines
+            )
         }
     }
 

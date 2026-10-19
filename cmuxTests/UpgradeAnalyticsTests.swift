@@ -75,9 +75,6 @@ struct UpgradeAnalyticsTests {
         #expect(sink.named("cmux_upgrade_badge_dismissed").compactMap { $0["source"] } == [AnalyticsValue.string("mac_sidebar_badge")])
     }
 
-    @Test("the welcome card's Upgrade records shown, click, close and the checkout source",
-          arguments: [CloudWelcomeTrigger.launchAnnouncement, .newCloudWorkspace, .newCloudMachine])
-
     @Test("Enable, Not Now and a plain window close each end the card once")
     func welcomeOtherOutcomes() async throws {
         for (step, act, button, outcome) in [

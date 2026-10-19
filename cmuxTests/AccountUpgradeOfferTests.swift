@@ -23,13 +23,6 @@ struct AccountUpgradeOfferTests {
         ))
     }
 
-    @Test(arguments: [
-        (CmuxPlanTier.free, Optional(CmuxPlanTier.pro)),
-        (CmuxPlanTier.go, Optional(CmuxPlanTier.pro)),
-        (CmuxPlanTier.pro, Optional(CmuxPlanTier.max)),
-        (CmuxPlanTier.max, nil),
-    ])
-
     /// ShellX: billing and Pro are Manaflow services, so no tier shows the
     /// footer upgrade badge and the palette offers no upgrade command.
     @Test func footerBadgeAndPaletteNeverOfferAnUpgrade() {

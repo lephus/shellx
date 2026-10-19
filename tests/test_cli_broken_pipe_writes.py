@@ -128,6 +128,27 @@ class BrokenPipeWritesTests(unittest.TestCase):
             self.assertEqual(writer.getsockopt(socket.SOL_SOCKET, DARWIN_SO_NOSIGPIPE), original)
             self.assertTrue(reader.recv(4096).startswith(b"cmux "))
 
+    def test_consumer_closes_during_large_stdout_write(self) -> None:
+        # ShellX refuses `vm prompt` (Cloud is off), so a local verb that
+        # prints its socket result carries the large write instead.
+        with FakeUnixServer(self.responder("system.capabilities", {"padding": "x" * 262_144})) as server:
+            with subprocess.Popen(
+                [self.cli, "--socket", server.path, "capabilities"],
+                cwd=self.root.name, env=self.env, stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            ) as process:
+                try:
+                    ready, _, _ = select.select([process.stdout], [], [], 15)
+                    self.assertTrue(ready, "CLI did not start writing stdout")
+                    self.assertTrue(os.read(process.stdout.fileno(), 16).startswith(b"{"))
+                    process.stdout.close()
+                    process.wait(timeout=15)
+                    self.assertEqual(process.returncode, 0, process.stderr.read())
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                        process.wait()
+
     def run_socket_disconnect(self) -> subprocess.CompletedProcess:
         def disconnect(conn: socket.socket, _stop: threading.Event) -> None:
             # Read one byte to prove a request has started, then tear down its

@@ -17,7 +17,7 @@ import Testing
 @MainActor
 @Suite("Host account flow team changes")
 struct HostAccountFlowTeamChangeTests {
-    @Test func successfulAuthCallbackRefreshesThePaidEntitlement() async throws {
+    @Test(.enabled(if: ShellXSwitches.cloud, "ShellX: sign-in and billing are off")) func successfulAuthCallbackRefreshesThePaidEntitlement() async throws {
         let planClient = BillingPlanClient(
             session: BillingPlanCallbackURLProtocol.session(body: """
             {"authenticated":true,"billingAvailable":true,"planId":"pro",
@@ -40,6 +40,31 @@ struct HostAccountFlowTeamChangeTests {
             canManageBilling: true,
             tier: .pro
         ))
+    }
+
+    /// ShellX: sign-in and billing are Manaflow services, so a callback URL never
+    /// completes a sign-in and the billing plan is never fetched.
+    @Test(.enabled(if: !ShellXSwitches.cloud))
+    func authCallbackNeitherSignsInNorRefreshesBillingInShellX() async throws {
+        let planClient = BillingPlanClient(
+            session: BillingPlanCallbackURLProtocol.session(body: """
+            {"authenticated":true,"billingAvailable":true,"planId":"pro",
+             "subscriptionPlanId":"pro","isPro":true,"billingManagement":"stripe",
+             "teamPlanId":"free","teamBillingManagement":"none"}
+            """
+            )
+        )
+        let flow = try await HostAccountFlow.makeForTeamChangeTests(
+            client: TeamChangeAuthClient(),
+            billingPlanClient: planClient
+        )
+
+        let callback = URL(string: "shellx://auth-callback?stack_refresh=refresh-1&stack_access=access-1")!
+        #expect(await flow.handleCallbackURL(callback, delivery: .trustedEmbeddedBrowser) == false)
+        #expect(await flow.refreshBillingPlanAndReportSuccess() == false)
+        #expect(flow.billingPlanState == .unknown)
+        #expect(flow.upgradeOffer == nil)
+        #expect(!flow.isProUpgradeAvailable)
     }
 
     @Test func switchDuringPendingCreateIsRefusedAndTheCreateCompletes() async throws {

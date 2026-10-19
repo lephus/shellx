@@ -37,7 +37,7 @@ struct SSHStartupManualReconnectTests {
         }
     }
 
-    @Test func failedVMStartupClosesAfterDismissalWithoutImplicitReconnect() throws {
+    @Test(.enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm ssh, which builds this fixture")) func failedVMStartupClosesAfterDismissalWithoutImplicitReconnect() throws {
         let fileManager = FileManager.default
         let root = fileManager.temporaryDirectory
             .appendingPathComponent("cmux-ssh-manual-retry-\(UUID().uuidString)", isDirectory: true)
@@ -96,7 +96,7 @@ struct SSHStartupManualReconnectTests {
         #expect(!recordedCalls.contains("rpc workspace.remote.reconnect "))
     }
 
-    @Test func terminalTeardownDisablesRemoteInputReportingModesBeforePrompt() throws {
+    @Test(.enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm ssh, which builds this fixture")) func terminalTeardownDisablesRemoteInputReportingModesBeforePrompt() throws {
         let fileManager = FileManager.default
         let root = fileManager.temporaryDirectory
             .appendingPathComponent("cmux-ssh-terminal-mode-reset-\(UUID().uuidString)", isDirectory: true)
@@ -409,7 +409,7 @@ struct SSHStartupManualReconnectTests {
         #expect(try String(contentsOf: attachFile, encoding: .utf8) == "attached\n")
     }
 
-    @Test func terminalExitPromptIgnoresQueuedWakeReportsAndEOTUntilFreshEnter() throws {
+    @Test(.enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm ssh, which builds this fixture")) func terminalExitPromptIgnoresQueuedWakeReportsAndEOTUntilFreshEnter() throws {
         let prompt = try Self.makeTerminalExitPromptProcess()
         defer { Self.stopAndCleanUp(prompt) }
 
@@ -434,7 +434,7 @@ struct SSHStartupManualReconnectTests {
         }
     }
 
-    @Test func terminalExitPromptDoesNotDismissOnClosedInput() throws {
+    @Test(.enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm ssh, which builds this fixture")) func terminalExitPromptDoesNotDismissOnClosedInput() throws {
         let prompt = try Self.makeTerminalExitPromptProcess()
         defer { Self.stopAndCleanUp(prompt) }
 

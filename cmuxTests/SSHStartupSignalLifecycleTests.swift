@@ -2,6 +2,12 @@ import XCTest
 import CmuxFoundation
 import Darwin
 
+#if canImport(cmux_DEV)
+@testable import cmux_DEV
+#elseif canImport(cmux)
+@testable import cmux
+#endif
+
 extension CLINotifyProcessIntegrationRegressionTests {
     func testSSHPaneCloseSignalDoesNotReportSessionEndToSharedTransport() throws {
         let fileManager = FileManager.default
@@ -1452,6 +1458,8 @@ extension CLINotifyProcessIntegrationRegressionTests {
     private func generatedVMSSHInitialStartupCommand(
         replacingSystemSSHWith fakeSSH: URL
     ) throws -> String {
+        // ShellX refuses `cmux vm ssh` (Cloud is off), so this fixture cannot be built.
+        try XCTSkipUnless(ShellXSwitches.cloud, "ShellX refuses cmux vm ssh, which builds this fixture")
         let cliPath = try bundledCLIPath()
         let socketPath = makeSocketPath("vm-ssh-startup")
         let listenerFD = try bindUnixSocket(at: socketPath)
