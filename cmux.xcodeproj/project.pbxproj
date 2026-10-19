@@ -3138,6 +3138,7 @@
 		D36A00080000000000000001 /* RendererRealizationSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = D36A00080000000000000002 /* RendererRealizationSurface.swift */; };
 		A9126000C5E7F90123456789 /* ReopenLastClosedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9126001C5E7F90123456789 /* ReopenLastClosedTests.swift */; };
 		804100000000000000000003 /* ReorderShortcutActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 804100000000000000000004 /* ReorderShortcutActionTests.swift */; };
+		92E17B073907FD147649091B /* RequestAccessSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A212508A0843A8B7F2FAD38F /* RequestAccessSheet.swift */; };
 		B7F100070000000000000001 /* ResolvedNotificationSoundPlaybackSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7F100070000000000000002 /* ResolvedNotificationSoundPlaybackSelection.swift */; };
 		F5410004A1B2C3D4E5F60718 /* RestorableAgentHookProviderHermesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5410005A1B2C3D4E5F60718 /* RestorableAgentHookProviderHermesTests.swift */; };
 		F5410000A1B2C3D4E5F60718 /* RestorableAgentHookProviderResumeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5410001A1B2C3D4E5F60718 /* RestorableAgentHookProviderResumeTests.swift */; };
@@ -7720,6 +7721,7 @@
 		D36A00080000000000000002 /* RendererRealizationSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/RendererRealizationSurface.swift; sourceTree = "<group>"; };
 		A9126001C5E7F90123456789 /* ReopenLastClosedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReopenLastClosedTests.swift; sourceTree = "<group>"; };
 		804100000000000000000004 /* ReorderShortcutActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReorderShortcutActionTests.swift; sourceTree = "<group>"; };
+		A212508A0843A8B7F2FAD38F /* RequestAccessSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/UI/RequestAccessSheet.swift; sourceTree = "<group>"; };
 		B7F100070000000000000002 /* ResolvedNotificationSoundPlaybackSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResolvedNotificationSoundPlaybackSelection.swift; sourceTree = "<group>"; };
 		F5410005A1B2C3D4E5F60718 /* RestorableAgentHookProviderHermesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestorableAgentHookProviderHermesTests.swift; sourceTree = "<group>"; };
 		F5410001A1B2C3D4E5F60718 /* RestorableAgentHookProviderResumeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestorableAgentHookProviderResumeTests.swift; sourceTree = "<group>"; };
@@ -12408,6 +12410,7 @@
 				5223C753F4D56F05A0A0B6B0 /* ShellXRemoteServicing.swift */,
 				A2BD91002A2294345F3973E1 /* ShellXRemoteUIActions.swift */,
 				824631F88DAD95EDD1FFB05F /* SignInSheet.swift */,
+				A212508A0843A8B7F2FAD38F /* RequestAccessSheet.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -16465,6 +16468,7 @@
 				D36A00060000000000000001 /* RendererRealizationPlanner.swift in Sources */,
 				D36A00070000000000000001 /* RendererRealizationReclaimTrigger.swift in Sources */,
 				D36A00080000000000000001 /* RendererRealizationSurface.swift in Sources */,
+				92E17B073907FD147649091B /* RequestAccessSheet.swift in Sources */,
 				B7F100070000000000000001 /* ResolvedNotificationSoundPlaybackSelection.swift in Sources */,
 				C6711A040000000000000001 /* RestorableAgentHookSessionRecord.swift in Sources */,
 				C6711A060000000000000001 /* RestorableAgentHookSessionStoreFile.swift in Sources */,

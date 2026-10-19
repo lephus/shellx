@@ -9,9 +9,17 @@ import ShellXRemoteCore
 /// Signed in it serves an online granted PC, an offline Mac mini, a MacBook
 /// Air with a pending request (code 123456) and an online Mac Studio with
 /// no access yet, so every header state shows.
+/// Request access: each request is an `OutgoingPairing` from this Mac
+/// (fingerprint `ownFingerprint`) that is approved after `approvalDelay`.
+/// The MacBook Air's pending request expires `expiryDelay` after sign-in, so
+/// the sheet's "Try again" can be seen by reopening it from its header.
 @MainActor
 final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing {
     static let requestCode = "123456"
+    /// This Mac's fingerprint as the fixture reports it in outgoing pairings.
+    static let ownFingerprint = "a1b2c3d4e5f60718"
+    static let approvalDelay: UInt64 = 4_000_000_000
+    static let expiryDelay: UInt64 = 8_000_000_000
 
     @Published private(set) var machines: [RemoteMachine] = []
     @Published private(set) var pendingApprovals: [PairingRequest] = []
@@ -21,6 +29,7 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
     @Published private(set) var remoteWorkspaces: [UUID: RemoteMachine.ID] = [:]
 
     private let now: () -> Date
+    private var requestSerial = 0
 
     init(now: @escaping () -> Date = { Date() }) {
         self.now = now
@@ -52,8 +61,29 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
     }
 
     func requestAccess(to machineID: RemoteMachine.ID) async throws -> String {
-        update(machineID) { $0.access = .requested(pairingID: "p-" + machineID, code: Self.requestCode) }
+        requestSerial += 1
+        let pairingID = "p-\(machineID)-\(requestSerial)"
+        update(machineID) { $0.access = .requested(pairingID: pairingID, code: Self.requestCode) }
+        // A new request replaces any earlier one to the same machine.
+        outgoing.removeAll { $0.toMachineID == machineID }
+        outgoing.append(OutgoingPairing(
+            id: pairingID, toMachineID: machineID, code: Self.requestCode,
+            ownFingerprint: Self.ownFingerprint, status: .waiting, createdAt: now()
+        ))
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: Self.approvalDelay)
+            self?.finish(pairingID, as: .approved, access: .granted)
+        }
         return Self.requestCode
+    }
+
+    /// Settles a still-waiting pairing and updates its machine's access.
+    private func finish(_ pairingID: OutgoingPairing.ID, as status: OutgoingPairing.Status, access: RemoteMachine.Access) {
+        guard isSignedIn,
+              let index = outgoing.firstIndex(where: { $0.id == pairingID }),
+              outgoing[index].status == .waiting else { return }
+        outgoing[index].status = status
+        update(outgoing[index].toMachineID) { $0.access = access }
     }
 
     func approve(_ id: PairingRequest.ID) async throws {
@@ -80,11 +110,21 @@ final class ShellXRemoteFixtureService: ObservableObject, ShellXRemoteServicing 
             throw ShellXCoreError(code: "invalid_credentials", message: "email or password is incorrect")
         }
         machines = Self.fixtureMachines(now: now())
+        // The MacBook Air's pending request, reopened from its header.
+        outgoing = [OutgoingPairing(
+            id: "p1", toMachineID: "fixture-air", code: Self.requestCode,
+            ownFingerprint: Self.ownFingerprint, status: .waiting, createdAt: now()
+        )]
         isSignedIn = true
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: Self.expiryDelay)
+            self?.finish("p1", as: .expired, access: .none)
+        }
     }
 
     func signOut() async {
         machines = []
+        outgoing = []
         remoteWorkspaces = [:]
         isSignedIn = false
     }
