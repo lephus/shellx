@@ -25,10 +25,16 @@ symbol/icon/image/glyph/systemName).
   (the view resolves through ``ShellXIcon.nsImage``; the label is renamed so
   the guard pattern stays meaningful)
 
-and adds ``import ShellXIcons`` to each rewritten file. The rewrite is
-idempotent. Strings and comments are never rewritten. Files on the dynamic
-allowlist (user-supplied symbol syntax) are skipped; see
-``tests/test_shellx_icons.py``.
+and adds ``import ShellXIcons`` (after the last unconditional import, never
+inside ``#if``) to each file that now names ``ShellXIcon``/``ShellXLabel``.
+The rewrite is idempotent. Strings and comments are never rewritten. The
+ShellXIcons package itself and the custom sidebar DSL's user-written Swift
+(``SKIP_PREFIXES``) are skipped; see ``tests/test_shellx_icons.py``.
+
+Not covered (done by hand once, guarded by the test): project-owned
+wrappers whose parameter is labelled ``systemImage:`` (renamed ``icon:``),
+``ContentUnavailableView(_:systemImage:description:)`` and comments that
+spell the SF Symbol APIs.
 """
 from __future__ import annotations
 
@@ -71,81 +77,79 @@ def swift_files() -> list[Path]:
     return files
 
 
+_TOP_LEVEL_TOKEN = re.compile(r'//|/\*|(#*)("""|")')
+_BLOCK_COMMENT_TOKEN = re.compile(r"/\*|\*/")
+_STRING_TOKENS: dict[tuple[bool, int], "re.Pattern[str]"] = {}
+
+
 def mask(text: str) -> str:
     """Blank out comments and string-literal contents (same length, newlines
     kept) so code patterns never match inside them. Interpolations
-    ``\\( ... )`` inside strings are kept as code."""
+    ``\\( ... )`` inside strings are kept as code. Escapes (``\\"``) are left
+    as they are. Jumps from token to token with regexes; a whole-tree pass
+    takes a few seconds."""
     out = list(text)
     n = len(text)
+
+    def blank(a: int, b: int, fill: str) -> None:
+        out[a:b] = ["\n" if c == "\n" else fill for c in text[a:b]]
+
+    def skip_string(j: int, multiline: bool, hashes: int) -> int:
+        token = _STRING_TOKENS.get((multiline, hashes))
+        if token is None:
+            close = ('"""' if multiline else '"') + "#" * hashes
+            token = re.compile(re.escape("\\" + "#" * hashes) + "|" + re.escape(close) + ("" if multiline else r"|\n"))
+            _STRING_TOKENS[(multiline, hashes)] = token
+        while True:
+            m = token.search(text, j)
+            if m is None:
+                blank(j, n, "_")
+                return n
+            blank(j, m.start(), "_")
+            if not m.group().startswith("\\"):
+                return m.start()  # the closing quote, or the end of a single-line string
+            k = m.end()
+            if k < n and text[k] == "(":
+                depth = 0
+                while k < n:
+                    if text[k] == "(":
+                        depth += 1
+                    elif text[k] == ")":
+                        depth -= 1
+                        if depth == 0:
+                            break
+                    k += 1
+            j = k + 1
+
     i = 0
-
-    def blank(a: int, b: int, fill: str = " ") -> None:
-        for k in range(a, b):
-            if out[k] != "\n":
-                out[k] = fill
-
-    def skip_string(i: int, multiline: bool, hashes: int) -> int:
-        close = '"""' if multiline else '"'
-        close += "#" * hashes
-        j = i
-        while j < n:
-            if text[j] == "\\" and text.startswith("#" * hashes, j + 1):
-                k = j + 1 + hashes
-                if k < n and text[k] == "(":
-                    depth = 0
-                    while k < n:
-                        if text[k] == "(":
-                            depth += 1
-                        elif text[k] == ")":
-                            depth -= 1
-                            if depth == 0:
-                                break
-                        k += 1
-                    j = k + 1
-                    continue
-                j = k + 1
-                continue
-            if text.startswith(close, j):
-                return j
-            if not multiline and text[j] == "\n":
-                return j
-            blank(j, j + 1, "_")
-            j += 1
-        return n
-
     while i < n:
-        if text.startswith("//", i):
+        m = _TOP_LEVEL_TOKEN.search(text, i)
+        if m is None:
+            break
+        i = m.start()
+        if m.group() == "//":
             j = text.find("\n", i)
             j = n if j < 0 else j
-            blank(i, j)
+            blank(i, j, " ")
             i = j
-            continue
-        if text.startswith("/*", i):
+        elif m.group() == "/*":
             depth, j = 0, i
-            while j < n:
-                if text.startswith("/*", j):
-                    depth += 1
-                    j += 2
-                    continue
-                if text.startswith("*/", j):
-                    depth -= 1
-                    j += 2
-                    if depth == 0:
-                        break
-                    continue
-                j += 1
-            blank(i, j)
+            while True:
+                c = _BLOCK_COMMENT_TOKEN.search(text, j)
+                if c is None:
+                    j = n
+                    break
+                j = c.end()
+                depth += 1 if c.group() == "/*" else -1
+                if depth == 0:
+                    break
+            blank(i, j, " ")
             i = j
-            continue
-        m = re.match(r'(#*)("""|")', text[i : i + 8])
-        if m and (m.group(1) == "" or text[i] == "#"):
+        else:
             hashes = len(m.group(1))
             multiline = m.group(2) == '"""'
-            start = i + hashes + len(m.group(2))
-            end = skip_string(start, multiline, hashes)
+            end = skip_string(m.end(), multiline, hashes)
             i = end + (3 if multiline else 1) + hashes
-            continue
-        i += 1
     return "".join(out)
 
 
@@ -223,6 +227,53 @@ def literal_symbols(sf_names: set[str]) -> set[str]:
     return found
 
 
+ICON_API_CALLS = {
+    # call pattern: argument label holding the SF Symbol name (None: the first argument)
+    r"\bShellXIcon\.(?:image|nsImage)\(": None,
+    r"(?<![\w.])ShellXLabel\(": ("icon",),
+    r"(?<![\w.])CmuxSystemSymbolImage\(": ("symbolName", "magnified"),
+}
+
+
+def literals_at_icon_calls() -> list[tuple[str, int, str]]:
+    """(path, line, literal) for every string literal in the symbol-name
+    argument of a ShellXIcon / ShellXLabel / CmuxSystemSymbolImage call.
+    Each must be in icon-map.json, or the call quietly draws an SF Symbol."""
+    found = []
+    for path in swift_files():
+        text = path.read_text(encoding="utf-8")
+        masked = mask(text)
+        for pattern, labels in ICON_API_CALLS.items():
+            for m in re.finditer(pattern, masked):
+                open_idx = m.end() - 1
+                close_idx = matching_paren(masked, open_idx)
+                spans = top_level_label_spans(masked, open_idx, close_idx)
+                if labels is None:
+                    start = open_idx + 1
+                else:
+                    hit = next((label for label in labels if label in spans), None)
+                    if hit is None:
+                        continue
+                    start = spans[hit][1]
+                ends = sorted(s for s, _ in spans.values() if s > start)
+                end = ends[0] if ends else close_idx
+                if labels is None:
+                    depth, i = 0, start
+                    while i < end:
+                        if masked[i] in "([{":
+                            depth += 1
+                        elif masked[i] in ")]}":
+                            depth -= 1
+                        elif masked[i] == "," and depth == 0:
+                            end = i
+                            break
+                        i += 1
+                for lit in re.finditer(r'"(_*)"', masked[start:end]):
+                    a, b = start + lit.start(1), start + lit.end(1)
+                    found.append((path.relative_to(ROOT).as_posix(), text.count("\n", 0, a) + 1, text[a:b]))
+    return found
+
+
 # ---------------------------------------------------------------- --apply
 
 IMAGE_CALL = re.compile(r"(?<![\w.])Image\((\s*)systemName:\s*")
@@ -268,23 +319,51 @@ def rewrite(text: str) -> tuple[str, dict[str, int]]:
         out.append(new)
         last = b
     out.append(text[last:])
-    return add_import("".join(out)), counts
+    new_text = "".join(out)
+    # The CmuxSystemSymbolImage label rename alone needs no import.
+    if re.search(r"\bShellX(?:Icon|Label)\b", mask(new_text)):
+        new_text = add_import(new_text)
+    return new_text, counts
+
+
+IMPORT_LINE = re.compile(r"^(?:@[\w()]+\s+)*(?:(?:public|internal|private|fileprivate|package)\s+)?import\s+\w")
 
 
 def add_import(text: str) -> str:
-    if re.search(r"^(?:@\w+\s+)?(?:\w+\s+)?import ShellXIcons\s*$", text, re.M):
+    """Add `import ShellXIcons` after the file's last unconditional import
+    (never inside an `#if` block), or above the first declaration when the
+    file has no unconditional import."""
+    if re.search(r"^(?:@[\w()]+\s+)*(?:\w+\s+)?import ShellXIcons\s*$", text, re.M):
         return text
-    imports = list(re.finditer(r"^(?:@[\w()]+\s+)?(?:public |internal |private |package )?import \w[\w.]*\s*$", text, re.M))
-    if imports:
-        # Keep `#if` blocks intact: place after the last top-level import that
-        # precedes the first declaration.
-        last = imports[-1]
-        for m in imports:
-            if text.rfind("#if", 0, m.start()) > text.rfind("#endif", 0, m.start()):
-                break
-            last = m
-        return text[: last.end()] + "\nimport ShellXIcons" + text[last.end() :]
-    return "import ShellXIcons\n" + text
+    lines = text.split("\n")
+    depth = 0
+    last_import = None
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("#if"):
+            depth += 1
+        elif stripped.startswith("#endif"):
+            depth -= 1
+        elif stripped.startswith(("#else", "#elseif")) or not stripped or stripped.startswith(("//", "/*", "*")):
+            pass
+        elif IMPORT_LINE.match(stripped):
+            if depth == 0:
+                last_import = index
+        else:
+            break  # the first declaration ends the import section
+    if last_import is not None:
+        lines.insert(last_import + 1, "import ShellXIcons")
+        return "\n".join(lines)
+    # No unconditional import: insert after the leading comment header (a
+    # doc comment belongs to the declaration below it).
+    insert_at = 0
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith(("///", "/**")) or (stripped and not stripped.startswith(("//", "/*", "*"))):
+            break
+        insert_at = index + 1
+    lines.insert(insert_at, "import ShellXIcons")
+    return "\n".join(lines)
 
 
 def apply() -> dict[str, int]:

@@ -869,6 +869,10 @@ path = "tests/test_shellx_branding.py"
 lane = "linux-guard"
 
 [[test]]
+path = "tests/test_shellx_icons.py"
+lane = "linux-guard"
+
+[[test]]
 path = "tests/test_shellx_theme.py"
 lane = "linux-guard"
 
