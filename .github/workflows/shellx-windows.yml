@@ -39,6 +39,10 @@ jobs:
       - name: Set up pinned Rust
         uses: ./.github/actions/setup-cmux-tui-rust
 
+      - name: Problem matchers (compile and test errors become annotations)
+        shell: bash
+        run: echo "::add-matcher::.github/problem-matchers/shellx-rust.json"
+
       - name: Cache target dir
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -81,6 +85,10 @@ jobs:
 
       - name: Set up pinned Rust
         uses: ./.github/actions/setup-cmux-tui-rust
+
+      - name: Problem matchers (compile and test errors become annotations)
+        shell: bash
+        run: echo "::add-matcher::.github/problem-matchers/shellx-rust.json"
 
       - name: Cache target dirs
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
@@ -150,6 +158,10 @@ jobs:
 
       - name: Set up pinned Rust
         uses: ./.github/actions/setup-cmux-tui-rust
+
+      - name: Problem matchers (compile and test errors become annotations)
+        shell: bash
+        run: echo "::add-matcher::.github/problem-matchers/shellx-rust.json"
 
       - name: Install Rust target
         shell: bash
