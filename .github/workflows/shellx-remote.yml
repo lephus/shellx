@@ -217,4 +217,10 @@ jobs:
           set -euo pipefail
           export SHELLX_E2E_BIN="$GITHUB_WORKSPACE/cmux-tui/target/debug"
           export SHELLX_E2E_CORE_BIN="$GITHUB_WORKSPACE/shellx-core/target/debug"
-          python3 tests/test_shellx_remote_e2e.py -v
+          # -u: unbuffered, so the log is complete if the step is cancelled. tee keeps the
+          # (already redacted) output for annotate_log.py; pipefail keeps a failing test red.
+          python3 -u tests/test_shellx_remote_e2e.py -v 2>&1 | tee "$RUNNER_TEMP/e2e.log"
+
+      - name: Annotate the e2e log (job logs need auth, annotations do not)
+        if: failure()
+        run: python3 scripts/shellx/remote-e2e/annotate_log.py "$RUNNER_TEMP/e2e.log"

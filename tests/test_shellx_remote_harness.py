@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Binary-free tests of the pure parts of the remote e2e harness
-(scripts/shellx/remote-e2e/harness.py).
+(scripts/shellx/remote-e2e/harness.py, annotate_log.py).
 
 The e2e itself needs built binaries and runs in CI (shellx-remote.yml); these
 pin what it must keep: the two `remote connect` argvs, the ticket refresh
-schedule and the "connected" line.
+schedule, the "connected" line, and the CI annotation chunking.
     python3 tests/test_shellx_remote_harness.py
 """
 
@@ -18,6 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts" / "shellx" / "remote-e2e"))
 
+import annotate_log  # noqa: E402
 import harness  # noqa: E402
 
 CMUX = "/bin/cmux-tui"
@@ -175,6 +176,98 @@ class RouteHelpers(unittest.TestCase):
         self.assertEqual(harness.relay_route("wss://relay.example/v2/relay"), "relay+wss://relay.example/v2/relay")
         with self.assertRaises(harness.HarnessError):
             harness.relay_route("http://127.0.0.1/")
+
+
+class AnnotateLog(unittest.TestCase):
+    TICKET = "v2." + "A" * 24 + "." + "B" * 10
+    INVITE = "cmux://enroll/" + "Q" * 30
+
+    def test_message_escaping(self):
+        self.assertEqual(annotate_log.escape_message("100%\r\nnext\nlast"), "100%25%0D%0Anext%0Alast")
+        self.assertEqual(annotate_log.escape_message("a:b,c"), "a:b,c")
+        self.assertEqual(annotate_log.escape_property("a:b,c%\n"), "a%3Ab%2Cc%25%0A")
+
+    def test_chunks_keep_order_and_are_at_most_nine(self):
+        for count in (0, 1, 5, 9, 10, 17, 200, 201):
+            lines = [f"line {n}" for n in range(count)]
+            parts = annotate_log.chunk(lines)
+            self.assertLessEqual(len(parts), annotate_log.MAX_CHUNKS, count)
+            self.assertEqual([line for part in parts for line in part], lines, count)
+            self.assertTrue(all(parts), count)             # no empty part
+            self.assertEqual(len({len(part) for part in parts[:-1]}), max(0, min(1, len(parts) - 1)), count)  # equal size
+
+    def test_two_hundred_lines_make_nine_parts(self):
+        parts = annotate_log.chunk([str(n) for n in range(200)])
+        self.assertEqual(len(parts), 9)
+        self.assertEqual([len(p) for p in parts], [23] * 8 + [16])
+
+    def test_commands_summary_first_then_numbered_parts(self):
+        log = "\n".join([f"line {n}" for n in range(500)]
+                        + ["ERROR: test_a (m.C.test_a)", "FAIL: test_b (m.C.test_b)", "FAIL: test_b (m.C.test_b)",
+                           "Ran 2 tests"])
+        commands = annotate_log.build_commands(log)
+        self.assertLessEqual(len(commands), 10)
+        self.assertEqual(commands[0], "::error title=e2e failing tests::ERROR: test_a (m.C.test_a)"
+                                      "%0AFAIL: test_b (m.C.test_b)")
+        n = len(commands) - 1
+        self.assertEqual(n, 9)
+        for number, line in enumerate(commands[1:], start=1):
+            self.assertTrue(line.startswith(f"::error title=e2e log (part {number}/{n})::"), line[:60])
+        tail = "%0A".join(c.split("::", 2)[2] for c in commands[1:])
+        self.assertIn("line 304", tail)
+        self.assertNotIn("line 303", tail)                  # only the last 200 lines
+        self.assertTrue(tail.endswith("Ran 2 tests"))
+
+    def test_every_command_is_one_line_and_special_characters_are_escaped(self):
+        commands = annotate_log.build_commands("a\r\nb 100%\n\x1b[31mred\x00\x1b[0m\n" + "x" * 1000)
+        for line in commands:
+            self.assertNotIn("\n", line)
+            self.assertNotIn("\r", line)
+            self.assertNotIn("\x1b", line)
+            self.assertTrue(line.startswith("::error title="))
+        body = "\n".join(commands[1:])
+        self.assertIn("b 100%25", body)
+        self.assertNotIn("x" * 500, body)                   # long lines are cut
+
+    def test_ticket_invite_and_secret_lines_are_never_printed(self):
+        log = "\n".join([
+            "before", f"assert no ticket in {self.TICKET} here", f"uri {self.INVITE}",
+            "CMUX_RELAY_HMAC_SECRET=deadbeef", "SHELLX_FAKE_PASSWORD: hunter2", f"FAIL: test {self.TICKET}",
+            "after"])
+        output = "\n".join(annotate_log.build_commands(log))
+        for secret in (self.TICKET, "A" * 24, self.INVITE, "deadbeef", "hunter2"):
+            self.assertNotIn(secret, output)
+        self.assertIn("before", output)
+        self.assertIn("after", output)
+        self.assertIn(annotate_log.DROPPED.split(":")[0], output)
+
+    def test_no_failing_line_still_gives_a_summary(self):
+        commands = annotate_log.build_commands("only noise\n")
+        self.assertEqual(len(commands), 2)
+        self.assertTrue(commands[0].startswith("::error title=e2e failing tests::no FAIL:/ERROR: line"))
+
+    def test_empty_log(self):
+        commands = annotate_log.build_commands("")
+        self.assertEqual(len(commands), 1)
+
+    def test_main_prints_commands_and_survives_a_missing_log(self):
+        import contextlib
+        import io
+        import os
+        import tempfile
+
+        out = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stdout(out):
+            path = os.path.join(tmp, "e2e.log")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("FAIL: test_x (m.C.test_x)\nRan 1 test\n")
+            self.assertEqual(annotate_log.main([path]), 0)
+            self.assertEqual(annotate_log.main([os.path.join(tmp, "missing.log")]), 0)
+        lines = out.getvalue().splitlines()
+        self.assertEqual(lines[0], "::error title=e2e failing tests::FAIL: test_x (m.C.test_x)")
+        self.assertEqual(lines[1], "::error title=e2e log (part 1/2)::FAIL: test_x (m.C.test_x)")
+        self.assertEqual(lines[2], "::error title=e2e log (part 2/2)::Ran 1 test")
+        self.assertEqual(lines[3], "::error title=e2e log::cannot read the e2e log: FileNotFoundError")
 
 
 if __name__ == "__main__":
