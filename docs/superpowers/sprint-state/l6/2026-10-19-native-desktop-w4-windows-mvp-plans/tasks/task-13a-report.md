@@ -266,3 +266,87 @@ Output:
 CI:
 - Run `39178012013` (my push of `5f849c0ef5`) was cancelled by the concurrency group when Task 12b pushed `e31b82e77d`.
 - Run `39178302908` (head `e31b82e77d`, which contains `5f849c0ef5`) is all green: app, model, remote-e2e and installer.
+
+## Fix round 2 (re-review findings F1, F2)
+
+Commit `5dc5a09c3a` `fix(shellx-app): announce a terminal created by a failed attach, never reuse attempt ids after a revive (13a review 2)`. Not pushed (the controller pushes).
+
+Files: `windows/shellx-app/src/remote_session.rs`, `windows/shellx-model/src/remote_state.rs` (one additive method). No public API change: `SessionConfig`, `SessionStatus`, `RemotePane`, `Want`, `PaneEvent`, `RemoteMirror` and `Applied` are untouched. The only additions are the private `Pane.announced` field, `ConnState::restarted()`, and the test-fake field `FakeHost.fail_next_attaches`. No UI files were touched.
+
+### Premise check
+
+- **F1: confirmed.** The `Err(fail)` arm of `Worker::attached` sets `p.terminal_id = Some(created)` and `p.want = Want::Terminal(created)`. The success arm then tests `terminal_id != attached || want is not Terminal`, which is false, so no `Retargeted` is sent. The RED run below shows zero `Retargeted` events.
+- **F2 (a): confirmed.** `revive()` set `ConnState::new()` (`cur = 0`), so the next attempt was 1 again. `enrolling = Some(1)` survives `serve()`, which clears only `connecting` and `deferred`. The guard `enrolling.is_some_and(|e| e != attempt)` therefore let the new attempt 1 through, and it started a second connect with the invitation. RED shows 2 connects.
+- **F2 (b): confirmed for `Minted` and `Linked`.** These messages carry no pane id. A late `Linked{1}` from the old incarnation matched `connecting == Some(1)` of the new one.
+- **F2 (b): not reachable for `Attached`, `ViewEnd` and `EndChecked`.** These are also checked against the pane, and pane ids never repeat: `RemoteSession.next_pane` is an `AtomicU64` that is never reset. A revive happens only on `Stop::Idle`, which is set only when `panes.is_empty()` (`Msg::ClosePane`). So an old incarnation's pane result names a removed pane and was already ignored. The fix rejects these results by attempt id as well, and the new test injects them with the live pane's id, which is the worst case.
+- **Found while fixing F2.** The drain in `run()` discarded every non-`OpenPane` message queued before the reviving `OpenPane` (`_ => {}`). With unique attempt ids, an enrollment `Linked` that landed in that window would be lost. `enrolling` would then never clear, and the revived connect would stay deferred forever. The RED run (id fix only) shows a 10 s timeout. A `Close` queued before the reviving `OpenPane` was also ignored before this fix; it now makes the stop final.
+
+### Changes
+
+1. **F1.** `Pane.announced: Option<String>` holds the terminal id the UI knows. It is seeded from `Want::Terminal(id)` at `OpenPane` and set only when the sink accepted a `Retargeted`.
+   - On every successful attach, `Retargeted{attached}` is sent when `announced != attached`.
+   - `terminal_id` and `want` keep their round-1 role: claims against splits, and reusing the created terminal.
+   - Behaviour for `First`, `New`, `Terminal(id)` and the daemon-restart move is unchanged.
+2. **F2.**
+   - `ConnState::restarted(&self)` (in shellx-model, additive) returns a machine like `new()`, but its attempt ids continue after this one's.
+   - `revive()` uses it, so attempt ids never repeat within one `RemoteSession`.
+   - `enrolling` deliberately survives the revive: that job still runs. A new `Connect` is deferred and takes its result through the round-1 `deferred` path, so one invitation still gives one enrollment.
+   - The drain in `run()` now hands every non-`OpenPane` message to `handle` even while stopped. Each handler ignores a stopped state:
+     - `Minted`: the state is `Ended`.
+     - `Linked`: it clears `enrolling`, then `connecting` is `None`.
+     - `Attached`, `ViewEnd`, `EndChecked`: there is no live client.
+     - `ClosePane`, `MachineOnline`: no effect.
+     - `Close`: the stop becomes `Final`, and any later `OpenPane` is answered as late.
+
+### Tests (TDD)
+
+New tests:
+
+- **`a_terminal_created_by_a_failed_attach_is_announced_once`** (F1). An empty Mac with `fail_next_attaches = 1`. The pane gets terminal `"1"` from `create_terminal`, the first attach fails, and the retry attaches. Checks:
+  - 2 attach calls and 1 create
+  - after a reconnect, the new host lists `"1"` and it is reattached
+  - the sink got exactly `[Retargeted{"1"}]`
+- **`reviving_during_an_enrollment_never_enrolls_twice`** (F2). The invite connect blocks on approval. The test closes the last pane and opens a new one in one step: helper `close_and_reopen` holds the status lock, so the revive is deterministic. Checks:
+  - after the revived attempt minted, there is still 1 connect
+  - after approval: 1 connect (with the invitation), 1 host, 1 attach of the new pane, the invite file gone, links.json enrolled, no `save_error`, Connected
+  - then stale `Minted`, `Linked`, `Attached` and `ViewEnd` messages of attempt 1 (with the live pane id) are injected. The view gen is unchanged, input is still accepted, Connected, the counts are still 1 connect and 2 mints, and a write reaches the original view.
+- **`an_enrollment_ending_while_the_session_stops_is_not_lost`** (drain). The queue order `ClosePane`, enrollment `Linked`, `OpenPane` is forced by holding the status lock. Checks: the new pane attaches; 2 connects, and only the first has the invitation.
+- **`restarted_machine_never_reuses_an_attempt_id`** (shellx-model). Checks:
+  - after `Close` and `restarted()`: `Disconnected`, then `Open` gives a new id greater than the old one
+  - the old id's `TicketMinted`, `Connected` and `Disconnected` are ignored or dropped
+  - the new attempt connects
+  - a restart of the restart keeps counting
+
+RED, with the unfixed code (`cargo test --locked -p shellx-app --bin shellx-desktop -- a_terminal_created_by_a_failed_attach_is_announced_once reviving_during_an_enrollment_never_enrolls_twice`):
+```
+test remote_session::tests::a_terminal_created_by_a_failed_attach_is_announced_once ... FAILED
+test remote_session::tests::reviving_during_an_enrollment_never_enrolls_twice ... FAILED
+  left: []
+ right: [Retargeted { terminal_id: "1" }]
+assertion `left == right` failed: a second enrollment started
+  left: 2
+ right: 1
+test result: FAILED. 0 passed; 2 failed; ... finished in 0.06s
+```
+RED for the model (`cargo test --locked -p shellx-model restarted`): `error[E0599]: no method named 'restarted' found for struct 'remote_state::ConnState'`.
+
+RED for the drain, with the attempt-id fix only:
+```
+test remote_session::tests::reviving_during_an_enrollment_never_enrolls_twice ... ok
+test remote_session::tests::an_enrollment_ending_while_the_session_stops_is_not_lost ... FAILED
+panicked at shellx-app/src/remote_session.rs:1825:13: timed out waiting for attach
+```
+
+GREEN (env: `export PATH=$HOME/.cargo/bin:<zig 0.16.0>:$PATH CARGO_INCREMENTAL=0; unset CMUX_GHOSTTY_SRC`, run in `windows/`):
+- `cargo test --locked -p shellx-app --bin shellx-desktop` gives `test result: ok. 86 passed; 0 failed`. That is 83 before plus the 3 new tests.
+- `cargo test --locked -p shellx-model` gives `test result: ok. 130 passed; 0 failed`, including the new model test.
+- `cargo test --locked -p shellx-app --bin shellx-desktop -- remote_`, run 10 times in a row after rustfmt: 10/10 `ok. 31 passed; 0 failed`, about 0.77–0.80 s each.
+- `rustfmt --edition 2024 --check` on both touched files: clean.
+- `cargo clippy --locked -p shellx-app --bin shellx-desktop --tests` and `-p shellx-model --tests`: 0 findings in `remote_session.rs`, `remote_state.rs` and `remote_link.rs`. The existing findings are in `selection.rs`, `fonts.rs`, `term_core.rs` and cmux-tui, none of them mine.
+- rustfmt and clippy were not installed for this Mac's only toolchain (1.95.0), so I added them with `rustup component add rustfmt clippy`.
+
+### Remaining concerns (not in scope, unchanged from round 1)
+
+- **Brief `finished` during a revive.** The worker publishes `finished = true` and only then drains the reviving `OpenPane`. A UI that polls `status()` at that instant could start a second session for the Mac. If 13b only checks `finished` right before `open_pane` and treats an `Err` from `open_pane` as "start a new session", this is harmless.
+- **A late enrollment that ends in a fingerprint mismatch** with no deferred connect waiting leaves the invite in the record. The next connect would offer the invitation again, which the Mac should refuse. Per round 1, a mismatch with an invitation only happens for a tampered link.
+- **Commit identity.** The commit author on this machine is the auto-configured `Richard <richard@Richards-Mac-mini.local>`, the same as `d05c44e7a8`.
