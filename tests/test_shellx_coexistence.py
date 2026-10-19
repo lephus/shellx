@@ -147,7 +147,8 @@ class ShellXCoexistenceTests(unittest.TestCase):
                     r"cmux-(pi|amp|omp|campfire)-session-extension-marker", r"cmux-opencode-[a-z-]*marker",
                     r"cmux-feed-plugin-marker", r'antigravityHookGroupName = "cmux"',
                     r'openCodeTUIPluginDirectoryName = "cmux"', r'"\./plugins/cmux"', r"plugins/cmux/",
-                    r"\.cmux-session\.lock", r'Symbol\.for\("cmux\.(session|feed|pi)\.'):
+                    r"\.cmux-session\.lock", r'Symbol\.for\("cmux\.(session|feed|pi)\.',
+                    r'id: \\?"cmux\.(server|session|feed|tui)\\?"'):
             self.assertEqual(coexistence_offenders(pat), [], pat)
         catalog = read("CLI/CMUXCLI+AgentHookCatalog.swift")
         for config_file in ("plugins/shellx-session.js", "extensions/shellx-session.ts", "plugins/shellx-session.ts",

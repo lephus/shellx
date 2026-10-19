@@ -36976,7 +36976,7 @@ export default {
         try Self.openCodeTUIPluginPackageSource.write(to: directory.appendingPathComponent("package.json"), atomically: true, encoding: .utf8)
         let feedSource = try bundledOpenCodePluginSource()
         let serverSource = "// shellx-opencode-tui-plugin-server-marker v2\n"
-            + feedSource.replacingOccurrences(of: "id: \"shellx.feed\"", with: "id: \"cmux.server\"")
+            + feedSource.replacingOccurrences(of: "id: \"shellx.feed\"", with: "id: \"shellx.server\"")
         try serverSource.write(to: directory.appendingPathComponent("index.js"), atomically: true, encoding: .utf8)
         try bundledOpenCodeTUIPluginSource().write(to: directory.appendingPathComponent("tui.js"), atomically: true, encoding: .utf8)
         try (Self.openCodeTUIPluginOwnershipMarker + "\n").write(to: openCodeTUIPluginOwnershipURL(in: configDir), atomically: true, encoding: .utf8)

@@ -180,7 +180,7 @@ final class OpenCodeHookRegressionTests: XCTestCase {
         XCTAssertTrue(packageSource.contains("\"./tui\": \"./tui.js\""))
         XCTAssertTrue(FileManager.default.fileExists(atPath: tuiDirectory.appendingPathComponent(".shellx-owned").path))
         let serverSource = try String(contentsOf: tuiDirectory.appendingPathComponent("index.js"), encoding: .utf8)
-        XCTAssertTrue(serverSource.contains("id: \"cmux.server\""))
+        XCTAssertTrue(serverSource.contains("id: \"shellx.server\""))
         XCTAssertTrue(serverSource.contains("shellx-opencode-tui-plugin-server-marker"))
         XCTAssertTrue(serverSource.contains("export const CMUXFeed"))
         XCTAssertTrue(serverSource.contains("client.permission.reply"))

@@ -196,7 +196,7 @@ def main() -> int:
         package_dir = plugin_dir / "cmux"
         package_dir.mkdir(parents=True)
         feed_source = (ROOT / "Resources/opencode-plugin.js").read_text(encoding="utf-8")
-        server_source = feed_source.replace('id: "shellx.feed"', 'id: "cmux.server"')
+        server_source = feed_source.replace('id: "shellx.feed"', 'id: "shellx.server"')
         (plugin_dir / "shellx-feed.js").write_text(feed_source, encoding="utf-8")
         (plugin_dir / "shellx-session.js").write_text(session_plugin_source(), encoding="utf-8")
         (package_dir / "index.js").write_text(
