@@ -44,6 +44,17 @@ public enum RemoteCommandLine {
             + (daemonFingerprint.map { ["--daemon", $0] } ?? [])
     }
 
+    /// `cmux-tui --socket <client socket> terminal list --json`: the remote session's terminals as a JSON array
+    /// of public terminal snapshots (`{"id", "tab_id", "title", …}`, `cmux-tui-core/src/resource_api.rs`).
+    public static func terminalList(clientSocket: URL) -> [String] {
+        ["--socket", clientSocket.path, "terminal", "list", "--json"]
+    }
+
+    /// `workspace create --name <name>` (`cli/command.rs` `parse_workspace`); starts with one terminal.
+    public static func workspaceCreate(clientSocket: URL, name: String) -> [String] {
+        ["--socket", clientSocket.path, "workspace", "create", "--name", name, "--json"]
+    }
+
     /// Pane patience: give up after this many consecutive failed attaches (about 90 s at 2 s sleeps),
     /// which must outlast the link's own backoff (1+2+4+8+16+30 s).
     static let attachMaxConsecutiveFailures = 45

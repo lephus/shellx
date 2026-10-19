@@ -1,7 +1,6 @@
 import CmuxTerminal
 import Foundation
 import GhosttyKit
-import os
 import ShellXRemoteCore
 
 /// ShellX: lets the one-line hook in `cmuxTerminalOutputTeeCallback` call the package tee
@@ -131,34 +130,3 @@ final class TerminalControllerBridgeHost: ShellXBridgeHost {
         ])?.target
     }
 }
-
-#if DEBUG
-/// ShellX: temporary DEBUG-only bridge start for the Task 11 live check, enabled by
-/// `SHELLX_REMOTE_MACHINES=1`. Task 13's remote service replaces it (and its AppDelegate calls).
-@MainActor
-enum ShellXBridgeDebugStart {
-    private static var server: ShellXBridgeServer?
-
-    static func startIfRequested(environment: [String: String]) {
-        guard environment["SHELLX_REMOTE_MACHINES"] == "1", server == nil,
-              let bundleID = Bundle.main.bundleIdentifier else { return }
-        let paths = RemotePaths(bundleID: bundleID,
-                                home: FileManager.default.homeDirectoryForCurrentUser,
-                                temporaryDirectory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true))
-        let candidate = ShellXBridgeServer(socket: paths.bridgeSocket, host: TerminalControllerBridgeHost())
-        do {
-            try candidate.start()
-            server = candidate
-        } catch {
-            // StartError carries operation names, errno and reasons only (no paths, no payloads).
-            Logger(subsystem: "pro.shellx.desktop", category: "remote-bridge")
-                .error("bridge did not start: \(String(describing: error), privacy: .public)")
-        }
-    }
-
-    static func stop() {
-        server?.stop()
-        server = nil
-    }
-}
-#endif

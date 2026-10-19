@@ -1,4 +1,5 @@
 import Foundation
+import os
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
@@ -150,7 +151,9 @@ public actor ShellXClientLinkSupervisor: LinkSupervising {
                 dropInvite()
                 record.enrolled = true
                 // The enrollment itself lives in cmux-tui's client state; this flag only skips invites later.
-                try? store.upsert(record)
+                do { try store.upsert(record) } catch {
+                    RemoteLog.service.error("link record not saved machine=\(self.machine, privacy: .public) error=\(RemoteLog.code(error), privacy: .public)")
+                }
             }
         case .failed:
             dropInvite()
