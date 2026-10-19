@@ -4,13 +4,15 @@ Việc của bạn trên một máy Windows 10 1809+ hoặc Windows 11. Đánh d
 
 ## Run id (điều phối viên cập nhật mục này)
 
-Run xanh mới nhất lúc viết: **39176242679** (nhánh `shellx/l6-windows`). Lấy bản mới nhất bằng:
+Run mới nhất lúc viết: **39205433045** (head `0f7d20ca36`, nhánh `shellx/l6-windows`; điều phối viên sẽ thay bằng run xanh mới hơn trong báo cáo cuối nếu có). Lấy run mới nhất bằng:
 `gh run list -R lephus/shellx --branch shellx/l6-windows --workflow shellx-windows.yml -L 1`
 
 ```
-gh run download 39176242679 -R lephus/shellx -n shellx-desktop
-gh run download 39176242679 -R lephus/shellx -n ShellX-Setup-2.0.0-sprint
+gh run download 39205433045 -R lephus/shellx -n shellx-desktop
+gh run download 39205433045 -R lephus/shellx -n ShellX-Setup-2.0.0-sprint
 ```
+
+Artifact chỉ giữ 14 ngày; hết hạn thì nhờ điều phối viên chạy lại workflow.
 
 Bản cài chưa ký: SmartScreen hiện "Unknown publisher", chọn More info, rồi Run anyway.
 
@@ -18,13 +20,13 @@ Bản cài chưa ký: SmartScreen hiện "Unknown publisher", chọn More info, 
 
 Dùng `shellx-desktop.exe` (bản portable) hoặc bản đã cài. Mở PowerShell trong app.
 
-- [ ] **Telex có sẵn của Windows**: bật bộ gõ Telex của Windows, gõ `tiếng Việt`. Đạt: chữ đã chốt đúng, không dư ký tự, không mất dấu; cửa sổ gợi ý/preedit nằm ngay tại con trỏ. Báo: ghi lại nếu cửa sổ gợi ý lệch vị trí.
-- [ ] **Unikey**: gõ `tiếng Việt` (Telex). Đạt như trên.
-- [ ] **EVKey**: gõ `tiếng Việt`. Đạt như trên.
+- [ ] **Telex có sẵn của Windows (TSF)**: bật bàn phím Vietnamese Telex của Windows, gõ `tiếng Việt` trong PowerShell. Đạt: chữ đã chốt đúng, không dư ký tự, không mất dấu; cửa sổ gợi ý/preedit nằm ngay tại con trỏ. Báo: ghi lại nếu cửa sổ gợi ý lệch vị trí. (Kiểm byte chính xác ở mục G3 "Telex vào Mac".)
+- [ ] **Unikey**: gõ `tiếng Việt` (Telex). Đạt: chữ cuối cùng trên màn hình đúng, không mất, không lặp ký tự. Lưu ý: ở chế độ mặc định (SendInput/xoá lùi) Unikey gõ rồi xoá lùi để sửa dấu, nên đây là đặc tính của công cụ, không phải lỗi app; chỉ chữ cuối cùng cần đúng.
+- [ ] **EVKey**: như Unikey (cùng lưu ý, cùng tiêu chí đạt).
 - [ ] **Độ nét 150 %**: Settings > Display > Scale 150 %, đăng xuất/đăng nhập nếu cần. Đạt: chữ terminal và icon sắc nét, không mờ, không lệch ô.
 - [ ] **Độ nét 200 %**: như trên với 200 %. Đạt như trên.
 - [ ] **Độ trễ**: làm theo mục "Latency procedure" trong `windows/README.md` (Typometer, ShellX so với Windows Terminal, cùng máy, cùng cỡ chữ, 5 lần mỗi bên). Đạt: ghi median và p95 của cả hai; mục tiêu ShellX không tệ hơn Windows Terminal đáng kể. Báo: bảng 2 dòng.
-- [ ] **Narrator (dự kiến KHÔNG đạt)**: bật Narrator (Win+Ctrl+Enter), duyệt app. Dự kiến: không đọc được lưới terminal và các nút (GPUI chưa có UI Automation). Chỉ cần xác nhận: `Insert+T` đọc được tiêu đề cửa sổ dạng `<dòng hiện tại> - ShellX`. Báo: ghi "đúng dự kiến" hoặc có gì khác.
+- [ ] **Narrator (dự kiến KHÔNG đạt)**: bật Narrator (Win+Ctrl+Enter), duyệt app. Dự kiến: không đọc được lưới terminal và các nút (GPUI chưa có UI Automation). Chỉ cần xác nhận: `Insert+T` đọc được tiêu đề cửa sổ dạng `<dòng con trỏ, nếu trống thì tiêu đề terminal> - ShellX` (chỉ khung đang chọn ghi tiêu đề). Cần đọc terminal nhiều: dùng Windows Terminal. Báo: ghi "đúng dự kiến" hoặc có gì khác.
 
 ## G3: cài đặt và dùng thật
 
@@ -40,14 +42,24 @@ Dùng `shellx-desktop.exe` (bản portable) hoặc bản đã cài. Mở PowerSh
 - [ ] **Ctrl+C ngắt lệnh**: chạy `ping -t 127.0.0.1`, không chọn gì, bấm `Ctrl+C`. Đạt: lệnh dừng.
 - [ ] **Dán nhiều dòng**: sao chép 3 dòng chữ từ Notepad, `Ctrl+Shift+V` (hoặc `Shift+Insert`). Đạt: dán nguyên 3 dòng, không tự chạy dòng nào ngoài ý muốn.
 
-### Đăng nhập và Mac từ xa (nếu bản build có)
+### Đăng nhập và ghép cặp
 
-- [ ] **Đăng nhập**: mở Settings (`Ctrl+,`) hoặc màn hình đăng nhập, đăng nhập bằng tài khoản ShellX (nhập mật khẩu trực tiếp trong app, không gửi qua chat). Đạt: hiện tên tài khoản.
-- [ ] **Mac xuất hiện**: sidebar liệt kê Mac của bạn (Mac đang chạy ShellX và online). Đạt: thấy tên Mac, trạng thái online.
-- [ ] **Xin quyền truy cập** (cần bản có giao diện ghép cặp, Task 12b): bấm "Xin quyền truy cập" ở Mac. Đạt: hiện mã 6 số dạng `123 456` và mã thiết bị của bạn; trên Mac hiện yêu cầu có **cùng mã**; bấm duyệt trên Mac; bên Windows hiện "Đã được duyệt". Báo: nếu mã khác nhau, từ chối trên Mac và báo ngay.
-- [ ] **Mở terminal Mac** (cần bản có giao diện terminal từ xa, Task 13b): bấm Mở. Đạt: thấy shell của Mac trong tab mới.
-- [ ] **Gõ tiếng Việt vào Mac**: trong terminal Mac gõ `tiếng Việt`. Đạt: Mac nhận đúng `tiếng Việt` (thử `echo tiếng Việt`).
-- [ ] **Mất mạng**: rút mạng (tắt Wi-Fi). Đạt: khung hiện "đang kết nối lại…" (hoặc "ngoại tuyến"), gõ phím không bị gửi đi, app không đơ. Bật mạng lại: tự kết nối lại và dùng tiếp được.
+- [ ] **Đăng nhập**: mở Settings (`Ctrl+,`) hoặc ô đăng nhập ở thanh bên, nhập mật khẩu trực tiếp trong app (không gửi qua chat). Đạt: hiện tên tài khoản; sidebar liệt kê Mac đang chạy ShellX và online.
+- [ ] **Xin quyền truy cập**: bấm "+" ở đầu danh sách máy (hoặc "Xin quyền truy cập") chọn Mac. Đạt: hiện mã 6 số và mã thiết bị của bạn; Mac hiện **cùng mã**; duyệt trên Mac; Windows hiện "Đã được chấp thuận". Báo: nếu mã khác nhau, từ chối trên Mac và báo ngay.
+
+### Mac từ xa (cần relay v2, ShellX trên Mac đang chạy và đã đăng nhập)
+
+- [ ] **Mở từ bảng ghép cặp**: sau khi được chấp thuận bấm "Mở". Đạt: bảng đóng, tab mới hiện "đang kết nối…" rồi shell của Mac; file `%LOCALAPPDATA%\ShellX\native\core\tickets\invite-*.uri` đã bị xoá.
+- [ ] **Mở từ thanh bên**: Mac đã cấp quyền có nút "Mở". Đạt: tab mới dưới nhóm của Mac; bấm "Mở" lần hai mở shell MỚI trên Mac (cửa sổ ShellX trên Mac cũng thấy).
+- [ ] **Telex vào Mac (byte chính xác)**: trên Mac chạy `cat | xxd`; bên Windows dùng Telex có sẵn của Windows (TSF), gõ `tiếng Việt` rồi Enter. Đạt: đúng `74 69 e1 ba bf 6e 67 20 56 69 e1 bb 87 74 0a`. Với Unikey/EVKey (mặc định xoá lùi) Mac thấy chuỗi `e`, DEL, `ê`...: đây là đặc tính của công cụ, chỉ cần dòng cuối đúng và không mất/lặp ký tự.
+- [ ] **Dán có `ESC[201~`**: trên Mac chạy `cat -v`; dán đoạn hai dòng chứa `\x1b[201~` bằng `Ctrl+Shift+V`. Đạt: hiện dạng chữ (`^[[201~`), không lệnh nào tự chạy; kéo chọn + `Ctrl+Shift+C` vẫn sao chép được.
+- [ ] **Đổi cỡ và chia khung**: kéo đổi cỡ cửa sổ, `stty size` trên Mac đổi theo. `Alt+Shift+=` / `Alt+Shift+-` trong khung Mac tạo khung Mac mới (shell mới trên Mac); cùng phím trong khung cục bộ ra PowerShell cục bộ; `Ctrl+Shift+T` luôn mở tab cục bộ.
+- [ ] **Mất mạng / nối lại**: tắt Wi-Fi của Mac (hoặc thoát ShellX trên Mac). Đạt: nhãn "đang kết nối lại…" (có lý do bên dưới) hoặc "ngoại tuyến"; gõ/Enter/dán chỉ hiện dòng "Mất kết nối, tạm ngừng nhập" và sau khi nối lại không có gì bị gửi trễ; bật lại: tự nối trong khoảng 30 giây, nhãn mất, gõ được; app không đơ.
+- [ ] **`exit` trong khung Mac**: chỉ khung đó đóng, khung bên cạnh chiếm chỗ; `exit` ở khung cuối của tab cuối: mở tab PowerShell cục bộ mới, app không thoát.
+- [ ] **Đăng xuất** (Settings): mọi tab Mac đóng, còn một tab cục bộ; đăng nhập lại rồi "Mở" kết nối lại được.
+- [ ] **Bảng đang mở**: mở Settings, thử `Ctrl+Shift+T`: không có tab mới; `Esc` đóng bảng, rồi bàn phím về terminal.
+- [ ] **Tiêu đề / Narrator**: trong khung Mac, `Insert+T` đọc `<dòng con trỏ> - ShellX`; Narrator không đọc lưới terminal (đúng dự kiến).
+- [ ] **Nhìn bằng mắt ở 100 % và 150 %**: nhãn trạng thái ở giữa khung và dòng báo ở đáy khung rõ ràng, không có hiệu ứng sáng/bóng. Báo: ảnh chụp nếu lệch.
 
 ### Gỡ cài đặt
 
