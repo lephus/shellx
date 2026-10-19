@@ -125,7 +125,7 @@ class ShellXCoexistenceTests(unittest.TestCase):
         for pat in (r'forResource: "cmux", withExtension: nil, subdirectory: "bin"',
                     r'cliStartupExecutableToken = "cmux"', r'fallbackExecutable: "cmux"',
                     r'typedCommandText = " cmux ', r'"cmux focus-panel ', r'_cmux_wrapper_path "cmux"',
-                    r"\bwhich cmux \|", r"command -v cmux\b"):
+                    r"\bwhich cmux \|", r"command -v cmux\b", r"command -s cmux\b"):
             self.assertEqual(coexistence_offenders(pat), [], pat)
         self.assertIn('public static let cliStartupExecutableToken = "shellx"',
                       read("Packages/macOS/CMUXAgentLaunch/Sources/CMUXAgentLaunch/AgentRestoreLaunch.swift"))
@@ -138,6 +138,30 @@ class ShellXCoexistenceTests(unittest.TestCase):
         self.assertIn('"# shellx hooks hermes-agent begin"', read(base + "HermesAgentHookConfig.swift"))
         self.assertIn('"# shellx-kimi-hooks-', read(base + "KimiCodeHookConfig.swift"))
         self.assertEqual(coexistence_offenders(r'"# cmux hooks (rovodev|hermes-agent) |"# cmux-kimi-hooks-'), [])
+
+    def test_agent_integration_files_are_shellx(self):
+        # Plugin/extension files, ownership markers, the OpenCode TUI package dir and
+        # the Antigravity hook group are ShellX's own, so installing, refreshing or
+        # removing ShellX's integration never adopts, rewrites or deletes cmux's.
+        for pat in (r"cmux-session\.(js|ts)\b(?!on)", r"cmux-(omp|campfire)-session\.ts", r"cmux-feed\.js",
+                    r"cmux-(pi|amp|omp|campfire)-session-extension-marker", r"cmux-opencode-[a-z-]*marker",
+                    r"cmux-feed-plugin-marker", r'antigravityHookGroupName = "cmux"',
+                    r'openCodeTUIPluginDirectoryName = "cmux"', r'"\./plugins/cmux"', r"plugins/cmux/",
+                    r"\.cmux-session\.lock", r'Symbol\.for\("cmux\.(session|feed|pi)\.'):
+            self.assertEqual(coexistence_offenders(pat), [], pat)
+        catalog = read("CLI/CMUXCLI+AgentHookCatalog.swift")
+        for config_file in ("plugins/shellx-session.js", "extensions/shellx-session.ts", "plugins/shellx-session.ts",
+                            "extensions/shellx-omp-session.ts", "extensions/shellx-campfire-session.ts"):
+            self.assertIn(f'configFile: "{config_file}"', catalog)
+
+    def test_cua_skill_link_policy_manages_only_shellx_bundles(self):
+        # ~/.claude/skills/cmux-cua links into a cmux bundle belong to cmux.
+        policy = read("skills/cmux-cua/link-policy.sh")
+        managed = policy.split("cmux_cua_skill_target_is_managed() {", 1)[1].split("\n}\n", 1)[0]
+        self.assertNotIn("== com.cmuxterm", managed)
+        self.assertIn('"$bundle_id" == pro.shellx.desktop.*', managed)
+        self.assertIn("/Applications/ShellX*.app", managed)
+        self.assertNotRegex(managed, r"/Applications/cmux\*\.app|/tmp/cmux-\*")
 
     def test_cli_product_is_shellx(self):
         pbx = read(PBXPROJ)
