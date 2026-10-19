@@ -353,12 +353,12 @@ def main() -> int:
             print(f"stderr={install.stderr.strip()}")
             return 1
 
-        extension_path = home / ".campfire" / "agent" / "extensions" / "cmux-campfire-session.ts"
+        extension_path = home / ".campfire" / "agent" / "extensions" / "shellx-campfire-session.ts"
         if not extension_path.exists():
             print(f"FAIL: expected extension at {extension_path}")
             return 1
         extension_text = extension_path.read_text(encoding="utf-8")
-        if "cmux-campfire-session-extension-marker" not in extension_text:
+        if "shellx-campfire-session-extension-marker" not in extension_text:
             print(f"FAIL: expected cmux marker in {extension_path}")
             return 1
 
@@ -666,7 +666,7 @@ await new Promise((resolve) => setTimeout(resolve, 300));
             env=override_env,
             timeout=20,
         )
-        override_extension_path = agent_override / "extensions" / "cmux-campfire-session.ts"
+        override_extension_path = agent_override / "extensions" / "shellx-campfire-session.ts"
         if override_install.returncode != 0 or not override_extension_path.exists():
             print("FAIL: campfire extension install did not respect CAMPFIRE_CODING_AGENT_DIR")
             print(f"exit={override_install.returncode}")

@@ -200,7 +200,7 @@ if test "$_cmux_integration_enabled" != 0
         test -z "$TMUX"; or return 0
         set -l cli (string replace -r '/?shell-integration/?$' '' -- "$CMUX_SHELL_INTEGRATION_DIR")/bin/shellx
         if not test -x "$cli"
-            set cli (command -s cmux)
+            set cli (command -s shellx)
         end
         test -n "$cli"; or return 0
         "$cli" welcome 2>/dev/null; or true

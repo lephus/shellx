@@ -60,24 +60,24 @@ struct CLIVersionSkewMessageTests {
     @Test("A newer app points at its own CLI")
     func newerAppSaysCLIOlder() throws {
         let peer = CLIVersionSkew.Peer(
-            app: "cmux", version: "0.66.0", build: "120",
+            app: "shellx", version: "0.66.0", build: "120",
             cliPath: "/Applications/cmux.app/Contents/Resources/bin/cmux"
         )
         let text = try #require(message(peer: peer))
         #expect(text.contains("This CLI is older than the app"))
         #expect(text.contains("/Applications/cmux.app/Contents/Resources/bin/cmux"))
-        #expect(text.contains("cmux 0.66.0 (120)"))
+        #expect(text.contains("shellx 0.66.0 (120)"))
     }
 
     @Test("An older app gets the relaunch fix")
     func olderAppSaysRelaunch() throws {
-        let peer = CLIVersionSkew.Peer(app: "cmux", version: "0.64.2", build: "100", cliPath: nil)
+        let peer = CLIVersionSkew.Peer(app: "shellx", version: "0.64.2", build: "100", cliPath: nil)
         #expect(try #require(message(peer: peer)).contains("Quit and reopen cmux"))
     }
 
     @Test("An unparsable app version does not guess a direction")
     func unparsablePeerVersionIsUnknown() throws {
-        let peer = CLIVersionSkew.Peer(app: "cmux", version: "dev", build: nil, cliPath: nil)
+        let peer = CLIVersionSkew.Peer(app: "shellx", version: "dev", build: nil, cliPath: nil)
         let text = try #require(message(peer: peer))
         #expect(text.contains("Could not read the app's version"))
         #expect(!text.contains("is older than"))
@@ -85,7 +85,7 @@ struct CLIVersionSkewMessageTests {
 
     @Test("A CLI without its own version keeps the original error")
     func unknownCLIVersionIsNotSkew() {
-        let peer = CLIVersionSkew.Peer(app: "cmux", version: "0.64.0", build: nil, cliPath: nil)
+        let peer = CLIVersionSkew.Peer(app: "shellx", version: "0.64.0", build: nil, cliPath: nil)
         #expect(message(cliShortVersion: nil, peer: peer) == nil)
         #expect(message(cliShortVersion: "dev", peer: peer) == nil)
     }
@@ -105,7 +105,7 @@ struct CLIVersionSkewMessageTests {
 
     @Test("Same version and build keeps the original error")
     func sameBuildIsNotSkew() {
-        let peer = CLIVersionSkew.Peer(app: "cmux", version: "0.65.0", build: "108", cliPath: nil)
+        let peer = CLIVersionSkew.Peer(app: "shellx", version: "0.65.0", build: "108", cliPath: nil)
         #expect(message(peer: peer) == nil)
     }
 
@@ -139,7 +139,7 @@ struct CLIVersionSkewMessageTests {
             cliVersion: "cmux 0.65.0 (108)",
             cliShortVersion: "0.65.0",
             cliPath: nil,
-            peer: CLIVersionSkew.Peer(app: "cmux", version: "0.64.0", build: nil, cliPath: nil),
+            peer: CLIVersionSkew.Peer(app: "shellx", version: "0.64.0", build: nil, cliPath: nil),
             original: "method_not_found: x\n\nReason:\n  y",
             bundle: Self.sourceTextBundle
         ))
@@ -154,7 +154,7 @@ struct CLIVersionSkewMessageTests {
             cliVersion: "cmux 0.65.0 (108)",
             cliShortVersion: "0.65.0",
             cliPath: nil,
-            peer: CLIVersionSkew.Peer(app: "cmux", version: "0.64.0", build: nil, cliPath: nil),
+            peer: CLIVersionSkew.Peer(app: "shellx", version: "0.64.0", build: nil, cliPath: nil),
             original: "method_not_found: x\u{1B}[2J",
             bundle: Self.sourceTextBundle
         ))

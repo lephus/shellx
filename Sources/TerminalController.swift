@@ -3800,7 +3800,7 @@ class TerminalController {
         result["app_bundle_path"] = Bundle.main.bundleURL.path
         // Lets a CLI from another build explain an unknown method
         // (`CLIVersionSkew`): product, version, and build of this process.
-        result["app"] = "cmux"
+        result["app"] = "shellx"
         if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
             result["version"] = version
         }

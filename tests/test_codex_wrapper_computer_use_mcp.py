@@ -703,7 +703,7 @@ exit 1
                         / "Build"
                         / "Products"
                         / "Debug"
-                        / "cmux DEV old.app"
+                        / "ShellX DEV old.app"
                         / "Contents"
                         / "Resources"
                         / "cmux-cua"
@@ -715,7 +715,7 @@ exit 1
                     )
                     write_helper_info(
                         old_skill.parents[1] / "Info.plist",
-                        "com.cmuxterm.app.debug.fixture",
+                        "pro.shellx.desktop.debug.fixture",
                     )
                     destination.symlink_to(old_skill)
                 else:

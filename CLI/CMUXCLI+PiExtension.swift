@@ -2,8 +2,8 @@ import Foundation
 import Darwin
 
 extension CMUXCLI {
-    private static let piExtensionMarker = "cmux-pi-session-extension-marker"
-    private static let piExtensionFilename = "cmux-session.ts"
+    private static let piExtensionMarker = "shellx-pi-session-extension-marker"
+    private static let piExtensionFilename = "shellx-session.ts"
 
     private func piExtensionURL(for def: AgentHookDef) -> URL {
         URL(fileURLWithPath: def.resolvedConfigDir(), isDirectory: true)
@@ -39,7 +39,7 @@ extension CMUXCLI {
         if createParentDirectory {
             try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         }
-        let lockURL = directoryURL.appendingPathComponent(".cmux-session.lock", isDirectory: false)
+        let lockURL = directoryURL.appendingPathComponent(".shellx-session.lock", isDirectory: false)
         let descriptor = Darwin.open(
             lockURL.path,
             O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW,

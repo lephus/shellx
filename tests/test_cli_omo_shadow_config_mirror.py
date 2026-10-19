@@ -117,9 +117,9 @@ def check_auto_discovered_entries_are_not_mirrored(cli_path: str, failures: list
         ]:
             if os.path.lexists(shadow / relative):
                 failures.append(f"shadow {relative} exists, so OpenCode would load or write it a second time")
-        if not (shadow / "plugins" / "cmux-session.js").exists():
+        if not (shadow / "plugins" / "shellx-session.js").exists():
             failures.append(f"cmux session plugin missing from the shadow dir; exit={run.returncode} stderr={run.stderr.strip()}")
-        if (user_dir / "plugins" / "cmux-session.js").exists():
+        if (user_dir / "plugins" / "shellx-session.js").exists():
             failures.append("cmux wrote its session plugin into the user's plugins dir")
 
 
@@ -141,7 +141,7 @@ def check_removed_user_entries_do_not_leave_dangling_links(cli_path: str, failur
 
         if os.path.lexists(shadow / "snippets"):
             failures.append(f"shadow snippets still exists after the user removed it; exit={run.returncode}")
-        if not (shadow / "plugins" / "cmux-session.js").exists():
+        if not (shadow / "plugins" / "shellx-session.js").exists():
             failures.append("pruning removed the cmux session plugin")
         if not (shadow / "prompts" / "chief.md").exists():
             failures.append("pruning removed a link whose target still exists")

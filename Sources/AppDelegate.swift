@@ -18792,8 +18792,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 )
                 return
             case .leaveOlderShellXRunning:
-                // The older (Flutter) ShellX the user just opened keeps running;
-                // it used to be force-terminated here without a word.
+                // The older (Flutter) ShellX the user just opened, or a bundle
+                // LaunchServices did not identify, keeps running; it used to be
+                // force-terminated here without a word.
                 StartupBreadcrumbLog.append(
                     "singleInstance.observe.olderShellXLaunch",
                     fields: [

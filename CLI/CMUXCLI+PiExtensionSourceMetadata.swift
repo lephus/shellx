@@ -145,7 +145,7 @@ function installPiUIDialogHooks(
 ): (() => void) | undefined {
   if (process.env.CMUX_PI_HOOKS_DISABLED === "1" || !context.hasUI) return undefined;
   const ui = context.ui as any;
-  const patchKey = Symbol.for("cmux.pi.cmux-dialog-hooks");
+  const patchKey = Symbol.for("shellx.pi.dialog-hooks");
   if (ui[patchKey]) return undefined;
 
   const originalConfirm = ui.confirm.bind(ui);

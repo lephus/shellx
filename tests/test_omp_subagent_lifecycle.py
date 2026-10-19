@@ -75,7 +75,7 @@ def main() -> int:
             print(f"stdout={install.stdout.strip()}")
             print(f"stderr={install.stderr.strip()}")
             return 1
-        extension_path = agent_dir / "extensions" / "cmux-omp-session.ts"
+        extension_path = agent_dir / "extensions" / "shellx-omp-session.ts"
         if not extension_path.exists():
             print(f"FAIL: expected extension at {extension_path}")
             return 1

@@ -47,6 +47,7 @@ def run_wrapper(
     disabled: bool = False,
     preexisting_link_target: Path | None = None,
     preexisting_valid_cmux_link: bool = False,
+    preexisting_cmux_owned_link: bool = False,
     preexisting_directory: bool = False,
     preexisting_legacy_link_target: Path | None = None,
     project_skill_collision: bool = False,
@@ -154,16 +155,29 @@ exit 1
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.symlink_to(preexisting_link_target)
     if preexisting_valid_cmux_link:
+        # A link into an older ShellX build: ShellX manages (retires/retargets) it.
         destination.parent.mkdir(parents=True, exist_ok=True)
-        old_skill = home / "Library" / "Developer" / "Xcode" / "DerivedData" / "cmux-fixture" / "Build" / "Products" / "Debug" / "cmux DEV old.app" / "Contents" / "Resources" / "cmux-cua"
+        old_skill = home / "Library" / "Developer" / "Xcode" / "DerivedData" / "cmux-fixture" / "Build" / "Products" / "Debug" / "ShellX DEV old.app" / "Contents" / "Resources" / "cmux-cua"
         old_skill.mkdir(parents=True)
         (old_skill / "SKILL.md").write_text(
-            "---\nname: cmux-cua\ndescription: Old cmux skill.\n---\n\nOld bundle.\n",
+            "---\nname: cmux-cua\ndescription: Old ShellX skill.\n---\n\nOld bundle.\n",
             encoding="utf-8",
         )
         with (old_skill.parents[1] / "Info.plist").open("wb") as stream:
-            plistlib.dump({"CFBundleIdentifier": "com.cmuxterm.app.debug.fixture"}, stream)
+            plistlib.dump({"CFBundleIdentifier": "pro.shellx.desktop.debug.fixture"}, stream)
         destination.symlink_to(old_skill)
+    if preexisting_cmux_owned_link:
+        # A link an installed cmux created into its own bundle: never ShellX's to touch.
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        cmux_skill = home / "Applications" / "cmux.app" / "Contents" / "Resources" / "cmux-cua"
+        cmux_skill.mkdir(parents=True)
+        (cmux_skill / "SKILL.md").write_text(
+            "---\nname: cmux-cua\ndescription: cmux's skill.\n---\n\ncmux bundle.\n",
+            encoding="utf-8",
+        )
+        with (cmux_skill.parents[1] / "Info.plist").open("wb") as stream:
+            plistlib.dump({"CFBundleIdentifier": "com.cmuxterm.app"}, stream)
+        destination.symlink_to(cmux_skill)
     if preexisting_directory:
         destination.mkdir(parents=True, exist_ok=True)
         (destination / "SKILL.md").write_text("user-owned\n", encoding="utf-8")
@@ -372,6 +386,21 @@ def test_claude_home_ancestor_is_not_project_collision(
                    f"retired managed Claude link must be diagnosed, got {result.stderr!r}", failures)
         expect(add_dir_arg(args) is None,
                f"HOME ancestor must not add an automatic skill directory: {args}", failures)
+
+
+def test_claude_never_touches_a_cmux_owned_skill_link(failures: list[str]) -> None:
+    # cmux and ShellX can be installed side by side; cmux's own link survives every
+    # ShellX launch, whatever ShellX's opt-in says.
+    for opt_in in (False, True):
+        result, link, bundled_skill, _args = run_wrapper(
+            ["hello"], preexisting_cmux_owned_link=True, install_global_skill=opt_in,
+        )
+        expect(result.returncode == 0,
+               f"cmux-owned link (opt-in={opt_in}): wrapper exited {result.returncode}: {result.stderr}", failures)
+        expect(link.is_symlink() and os.readlink(link).endswith("/cmux.app/Contents/Resources/cmux-cua"),
+               f"cmux-owned link (opt-in={opt_in}) must survive a ShellX launch unchanged: {link}", failures)
+        expect("managed-link-retired" not in result.stderr,
+               f"cmux-owned link (opt-in={opt_in}) must not be retired: {result.stderr!r}", failures)
 
 
 def test_claude_collision_keeps_project_skill_and_avoids_second_row(
@@ -614,6 +643,7 @@ def main() -> int:
     test_claude_explicit_opt_in_preserves_unverified_dangling_link(failures)
     test_claude_default_preserves_positional_prompt_without_skill_directory(failures)
     test_claude_home_ancestor_is_not_project_collision(failures)
+    test_claude_never_touches_a_cmux_owned_skill_link(failures)
     test_claude_collision_keeps_project_skill_and_avoids_second_row(failures)
     test_claude_explicit_global_opt_in_remains_available(failures)
     test_claude_preserves_unverified_legacy_computer_use_link(failures)

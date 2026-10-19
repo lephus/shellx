@@ -35,7 +35,8 @@ public struct SingleInstanceConflictPolicy: Sendable {
     public enum DuplicateLaunchAction: Equatable, Sendable {
         /// The same bundle relaunched; the newcomer yields on its own.
         case ignoreSameBundle
-        /// An older (Flutter) ShellX: leave it running, never kill it silently.
+        /// An older (Flutter) ShellX, or a bundle that cannot be verified:
+        /// leave it running, never kill it silently.
         case leaveOlderShellXRunning
         /// Another native copy: quit it, as before.
         case terminateDuplicate
@@ -125,7 +126,10 @@ public struct SingleInstanceConflictPolicy: Sendable {
         if let launchedBundleURL, isSameBundle(launchedBundleURL, currentBundleURL) {
             return .ignoreSameBundle
         }
-        if launchedKind == .olderShellX {
+        // An unverifiable bundle (no path from LaunchServices) could be the
+        // Flutter ShellX, so it is left running too: only a verified native copy
+        // is ever terminated.
+        if launchedKind == .olderShellX || launchedKind == .unknown {
             return .leaveOlderShellXRunning
         }
         return .terminateDuplicate
