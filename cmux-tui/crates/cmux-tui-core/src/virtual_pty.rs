@@ -284,6 +284,10 @@ pub(crate) fn open(
                     Ok(_) => {}
                 }
             }
+            // Hang up whatever stopped the loop (`E`, a protocol or read
+            // error, the mirror gone): the app sees the end of stream now,
+            // not when the surface drops the other descriptors.
+            let _ = stream.shutdown(std::net::Shutdown::Both);
             drop(pipe_writer);
             shared.mark_exited();
         }
@@ -372,8 +376,13 @@ impl std::fmt::Debug for VirtualChild {
 }
 
 impl ChildKiller for VirtualChild {
-    /// Tells the app to unbind the terminal (best effort), then hangs up;
-    /// the demux thread sees the end of stream and marks the child exited.
+    /// Tells the app to unbind the terminal (best effort), hangs up, and marks
+    /// the child exited: a killed Mac terminal is gone, and `wait` must not
+    /// depend on the demux thread, which may be blocked writing into a pipe
+    /// nobody reads until the master drops (a failed surface start drops the
+    /// startup guard, which kills and waits, before the master). Final output
+    /// still drains: the surface publishes the exit only after its reader
+    /// sees the pipe's end, which the demux closes as it stops.
     ///
     /// The daemon-side descriptors are closed, not only shut down: on macOS a
     /// `shutdown` while another descriptor of the socket is blocked in `read`
@@ -396,6 +405,7 @@ impl ChildKiller for VirtualChild {
         // side is closed) and fails. Dropping the stream closes this side's
         // last descriptor apart from the demux thread's, closed as it exits.
         drop(self.shared.writer.lock().unwrap().take());
+        self.shared.mark_exited();
         Ok(())
     }
 
@@ -427,6 +437,7 @@ mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
     use std::os::unix::net::UnixListener;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::mpsc;
     use std::thread::JoinHandle;
 
@@ -803,6 +814,87 @@ mod tests {
             let error = writer.write_all(b"late").unwrap_err();
             assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
             assert!(spawned.master.resize(PtySize { cols: 60, ..SIZE_80X24 }).is_err());
+        }
+    }
+
+    /// A killed terminal is gone even while the demux thread is blocked
+    /// writing a big snapshot into the full in-process pipe that nothing reads
+    /// (surface creation failed after `open`, or the mirror's reader stopped):
+    /// `wait` after `kill` returns, so the startup guard cannot hang. Dropping
+    /// the master then frees the demux, which closes the connection.
+    #[test]
+    fn kill_does_not_hang_with_undrained_pipe() {
+        const SNAPSHOT: usize = 1024 * 1024;
+        const CHUNK: usize = 4096;
+        let dir = SocketDir::new("undrained");
+        let sent = Arc::new(AtomicUsize::new(0));
+        let app = fake_app(&dir, (80, 24), {
+            let sent = sent.clone();
+            move |conn, _| {
+                let chunk = frame(OUTPUT, &[b'x'; CHUNK]);
+                for _ in 0..SNAPSHOT / CHUNK {
+                    if conn.write_all(&chunk).is_err() {
+                        break;
+                    }
+                    sent.fetch_add(CHUNK, Ordering::SeqCst);
+                }
+                while read_frame(conn).is_ok() {}
+            }
+        });
+        let (spawned, _handle) = open(&dir.spec(), SIZE_80X24, None).unwrap();
+        // The app's writes stall once the pipe and the socket are both full,
+        // that is once the demux is blocked writing into the pipe.
+        let deadline = Instant::now() + WAIT;
+        let mut last = 0;
+        loop {
+            std::thread::sleep(Duration::from_millis(300));
+            let now = sent.load(Ordering::SeqCst);
+            if now > 0 && now == last {
+                break;
+            }
+            assert!(Instant::now() < deadline, "the app's output never stalled");
+            last = now;
+        }
+        assert!(last < SNAPSHOT, "the pipe never filled ({last} bytes sent)");
+        let mut child = spawned.child;
+        let mut child = within("kill with undrained pipe", move || {
+            child.kill().unwrap();
+            child
+        });
+        let mut child = within("wait after kill with undrained pipe", move || {
+            assert!(child.wait().unwrap().success());
+            child
+        });
+        assert!(child.try_wait().unwrap().is_some());
+        drop(spawned.master);
+        within("app sees EOF once the master is gone", move || app.join().unwrap());
+    }
+
+    /// When the demux stops on its own (a protocol error, or `E`), it hangs up
+    /// at once: the app sees the end of stream while the daemon still holds
+    /// the terminal, instead of a half-open binding until the surface drops.
+    #[test]
+    fn protocol_error_hangs_up() {
+        let mut oversize = vec![OUTPUT];
+        oversize.extend_from_slice(&(MAX_FRAME as u32 + 1).to_be_bytes());
+        for (name, last) in [("oversize", oversize), ("exit", frame(EXIT, &[]))] {
+            for round in 0..20 {
+                let dir = SocketDir::new(&format!("hangup-{name}-{round}"));
+                let last = last.clone();
+                let app = fake_app(&dir, (80, 24), move |conn, _| {
+                    conn.write_all(&last).unwrap();
+                    while read_frame(conn).is_ok() {}
+                });
+                let (spawned, _handle) = open(&dir.spec(), SIZE_80X24, None).unwrap();
+                within(&format!("app sees EOF after {name}, round {round}"), move || {
+                    app.join().unwrap();
+                });
+                let mut child = spawned.child;
+                within("child ends after the demux stopped", move || {
+                    assert!(child.wait().unwrap().success());
+                });
+                drop(spawned.master);
+            }
         }
     }
 
