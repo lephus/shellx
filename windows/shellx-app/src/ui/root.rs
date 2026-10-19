@@ -88,10 +88,10 @@ pub struct RootView {
     account_watch: AccountWatch,
     /// Holds the keyboard while the forced-update overlay is up.
     overlay_focus: FocusHandle,
-    /// The root element's own focus: holds the keyboard while the machine
-    /// picker (which has no field) is the topmost panel, so Esc reaches
-    /// `on_key_down`.
-    root_focus: FocusHandle,
+    /// The machine picker's own focus (tracked by the picker list, never by
+    /// an inert element): holds the keyboard while the picker is the topmost
+    /// panel, so Esc bubbles to `on_key_down`.
+    picker_focus: FocusHandle,
     /// Stops respawning a last pane whose shell exits as it starts.
     respawn: RespawnGuard,
     started: Instant,
@@ -142,6 +142,15 @@ impl RootView {
                 window,
                 |this, _, event: &LoginPanelEvent, window, cx| match event {
                     LoginPanelEvent::Closed => this.after_focus_change(window, cx),
+                    // Only when nothing above the sign-in fields is open;
+                    // else they close again and the keyboard stays put.
+                    LoginPanelEvent::Opened => {
+                        if this.panels(cx).may_open(Panel::Login) {
+                            this.after_focus_change(window, cx);
+                        } else {
+                            this.login.update(cx, |p, cx| p.close(cx));
+                        }
+                    }
                 },
             ),
         ];
@@ -158,7 +167,7 @@ impl RootView {
             remotes: RemoteTabs::new(),
             account_watch: AccountWatch::default(),
             overlay_focus: cx.focus_handle(),
-            root_focus: cx.focus_handle(),
+            picker_focus: cx.focus_handle(),
             respawn: RespawnGuard::new(),
             started: Instant::now(),
             _subscriptions: subscriptions,
@@ -205,7 +214,7 @@ impl RootView {
             Some(Panel::Settings) => self.settings.read(cx).focus_handle(cx),
             Some(Panel::Pairing) => self.pairing.read(cx).focus_handle(cx),
             Some(Panel::Login) => self.login.read(cx).focus_target(cx),
-            Some(Panel::Picker) => self.root_focus.clone(),
+            Some(Panel::Picker) => self.picker_focus.clone(),
             None => match self.host.get(self.tabs.active().focused) {
                 Some(live) => live.view.read(cx).focus_handle(cx),
                 None => return,
@@ -716,7 +725,9 @@ impl Render for RootView {
                 &rows,
                 &local_id,
                 &login,
-                picker.as_deref(),
+                picker
+                    .as_deref()
+                    .map(|entries| (entries, &self.picker_focus)),
                 lang,
                 cx,
             ))
@@ -782,7 +793,6 @@ impl Render for RootView {
             .font(theme::ui_font())
             .text_size(theme::UI_SIZE)
             .line_height(relative(1.4))
-            .track_focus(&self.root_focus)
             .on_key_down(cx.listener(Self::on_key_down))
             .child(titlebar)
             .child(

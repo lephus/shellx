@@ -15,8 +15,9 @@
 //! that machine's tabs are listed under it.
 
 use gpui::{
-    AnyView, App, ClickEvent, Context, Div, Entity, FontWeight, ImageSource, IntoElement, Pixels,
-    Render, Resource, SharedString, Stateful, Window, div, img, prelude::*, px, svg,
+    AnyView, App, ClickEvent, Context, Div, Entity, FocusHandle, FontWeight, ImageSource,
+    IntoElement, Pixels, Render, Resource, SharedString, Stateful, Window, div, img, prelude::*,
+    px, svg,
 };
 use shellx_model::palette::{Pill, Status};
 use shellx_model::sidebar::{MachineGroup, MachineIcon, RowAction};
@@ -53,19 +54,19 @@ pub struct PickerEntry {
 /// `local_id`: this PC's group (its server id when signed in).
 /// `sessions`: every tab, each listed under its `machine_id` group.
 /// `login`: the sign-in card, drawn under this PC's sessions.
-/// `picker`: the "+" list, when open.
+/// `picker`: the "+" list and its focus handle, when open.
 pub fn render(
     groups: &[MachineGroup],
     sessions: &[SessionRow],
     local_id: &str,
     login: &Entity<LoginPanel>,
-    picker: Option<&[PickerEntry]>,
+    picker: Option<(&[PickerEntry], &FocusHandle)>,
     lang: Lang,
     cx: &mut Context<RootView>,
 ) -> Div {
     let mut list = div().flex().flex_col().flex_1().min_h_0().overflow_hidden();
-    if let Some(entries) = picker {
-        list = list.child(machine_picker(entries, lang, cx));
+    if let Some((entries, focus)) = picker {
+        list = list.child(machine_picker(entries, focus, lang, cx));
     }
     for (ix, group) in groups.iter().enumerate() {
         let local = group.machine_id == local_id;
@@ -195,8 +196,15 @@ fn new_tab_button(lang: Lang, cx: &mut Context<RootView>) -> Stateful<Div> {
 /// The "+" list: the account's other machines without a link. Online ones
 /// request access on click; offline ones are dimmed (approval needs the
 /// other machine).
-fn machine_picker(entries: &[PickerEntry], lang: Lang, cx: &mut Context<RootView>) -> Div {
+fn machine_picker(
+    entries: &[PickerEntry],
+    focus: &FocusHandle,
+    lang: Lang,
+    cx: &mut Context<RootView>,
+) -> Div {
+    // The picker holds the keyboard while open (Esc bubbles to RootView).
     let mut list = div()
+        .track_focus(focus)
         .flex()
         .flex_col()
         .mx(px(10.0))

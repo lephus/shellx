@@ -64,16 +64,29 @@ impl std::fmt::Debug for TextEdit {
     }
 }
 
-/// Overwrites the string's bytes with zeros, then empties it; the
-/// allocation is kept (and reused), so the old text does not linger in
-/// freed memory.
+/// Overwrites the whole allocation with zeros (the live bytes and the spare
+/// capacity, where Backspace / Delete / a mid-line edit left the bytes they
+/// shifted away), then empties the string; the allocation is kept (and
+/// reused), so the old text does not linger in freed memory.
 fn wipe(s: &mut String) {
     let mut bytes = std::mem::take(s).into_bytes();
+    let cap = bytes.capacity();
     bytes.fill(0);
+    // Zero the spare capacity too; within the capacity, so no reallocation.
+    bytes.resize(cap, 0);
     // Keep the zeroing from being optimized away as a dead store.
     std::hint::black_box(&mut bytes);
     bytes.clear();
     *s = String::from_utf8(bytes).unwrap_or_default();
+}
+
+/// A masked field wipes its buffer when it goes away.
+impl Drop for TextEdit {
+    fn drop(&mut self) {
+        if self.masked {
+            wipe(&mut self.content);
+        }
+    }
 }
 
 fn is_attached(c: char) -> bool {
@@ -88,8 +101,10 @@ impl TextEdit {
             } else {
                 String::new()
             },
+            selected: 0..0,
+            reversed: false,
+            marked: None,
             masked,
-            ..TextEdit::default()
         }
     }
 
@@ -141,7 +156,10 @@ impl TextEdit {
     }
 
     pub fn set_text(&mut self, text: &str) {
-        self.content = clean(text);
+        let mut text = clean(text);
+        wipe(&mut self.content);
+        self.content.push_str(&text);
+        wipe(&mut text);
         let end = self.content.len();
         self.selected = end..end;
         self.reversed = false;
@@ -247,9 +265,11 @@ impl TextEdit {
     }
 
     fn splice(&mut self, range: Range<usize>, text: &str) -> usize {
-        let text = clean(text);
+        let mut text = clean(text);
         self.content.replace_range(range.clone(), &text);
         let end = range.start + text.len();
+        // The cleaned copy of typed or pasted text is not left behind.
+        wipe(&mut text);
         self.selected = end..end;
         self.reversed = false;
         end
@@ -605,6 +625,48 @@ mod tests {
         assert!(dbg.contains("***"), "{dbg}");
         // the plain field still shows its text
         assert!(format!("{:?}", typed("ab")).contains("\"ab\""));
+    }
+
+    /// The whole allocation behind the content, spare capacity included.
+    /// Test only: every byte read here was written (by typing or by the
+    /// wipe), the allocation is live, and the length is its capacity.
+    fn backing(t: &TextEdit) -> Vec<u8> {
+        let s = &t.content;
+        unsafe { std::slice::from_raw_parts(s.as_ptr(), s.capacity()) }.to_vec()
+    }
+
+    fn has(hay: &[u8], needle: &[u8]) -> bool {
+        hay.windows(needle.len()).any(|w| w == needle)
+    }
+
+    #[test]
+    fn clear_zeroes_bytes_edited_away() {
+        let mut t = TextEdit::new(true);
+        t.insert("hunter2");
+        t.backspace();
+        t.backspace();
+        assert_eq!(t.text(), "hunte");
+        // Backspace shortened the string; "r2" is still in the spare capacity
+        assert!(has(&backing(&t), b"r2"));
+        t.clear();
+        assert!(backing(&t).iter().all(|&b| b == 0), "{:?}", backing(&t));
+        // mid-edit: a deletion in the middle shifts the tail left
+        let mut t = TextEdit::new(true);
+        t.insert("abcXYZ");
+        t.move_to(1);
+        t.delete();
+        t.delete();
+        t.clear();
+        assert!(backing(&t).iter().all(|&b| b == 0));
+        // set_text replaces the content: the old text is wiped too
+        let mut t = TextEdit::new(true);
+        t.insert("oldsecret");
+        let before = t.content.as_ptr();
+        t.set_text("new");
+        assert_eq!(t.text(), "new");
+        if t.content.as_ptr() == before {
+            assert!(!has(&backing(&t), b"oldsecret"));
+        }
     }
 
     #[test]

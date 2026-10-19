@@ -34,6 +34,9 @@ use super::theme;
 pub enum LoginPanelEvent {
     /// Esc / Cancel: RootView gives the keyboard back to the terminal.
     Closed,
+    /// "Đăng nhập" on the card: RootView keeps the panel open and focuses
+    /// its field only if no higher panel is open (modal rule), else closes it.
+    Opened,
 }
 
 pub struct LoginPanel {
@@ -121,14 +124,10 @@ impl LoginPanel {
         }
     }
 
-    fn open(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Shows the fields; RootView decides about the keyboard (`Opened`).
+    fn open(&mut self, cx: &mut Context<Self>) {
         self.open = true;
-        let target = if self.email.read(cx).text().trim().is_empty() {
-            &self.email
-        } else {
-            &self.password
-        };
-        window.focus(&target.read(cx).focus_handle(cx));
+        cx.emit(LoginPanelEvent::Opened);
         cx.notify();
     }
 
@@ -165,15 +164,16 @@ impl LoginPanel {
             return;
         }
         let email = self.email.read(cx).text().trim().to_string();
-        let password = self.password.read(cx).text().to_string();
         if email.is_empty() {
             window.focus(&self.email.read(cx).focus_handle(cx));
             return;
         }
-        if password.is_empty() {
+        if self.password.read(cx).text().is_empty() {
             window.focus(&self.password.read(cx).focus_handle(cx));
             return;
         }
+        // The only copy outside the field; it moves into the login call.
+        let password = self.password.read(cx).text().to_string();
         self.password.update(cx, |f, cx| f.clear(cx));
         window.focus(&self.password.read(cx).focus_handle(cx));
         self.submitted = true;
@@ -292,11 +292,12 @@ impl Render for LoginPanel {
                         .child(t(lang, Str::NotLoggedIn)),
                 )
                 .children(login_error.map(Self::error_line))
-                .child(div().flex().child(
-                    button("login-open", t(lang, Str::Login), Kind::Primary, false).on_click(
-                        cx.listener(|this, _: &ClickEvent, window, cx| this.open(window, cx)),
+                .child(
+                    div().flex().child(
+                        button("login-open", t(lang, Str::Login), Kind::Primary, false)
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open(cx))),
                     ),
-                ));
+                );
         }
         // Not from this panel: offline at start, state folder, register.
         match error {

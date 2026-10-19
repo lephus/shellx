@@ -20,6 +20,17 @@ pub enum Panel {
     Picker,
 }
 
+/// Position in the drawing order, 0 = topmost.
+fn rank(panel: Panel) -> u8 {
+    match panel {
+        Panel::ForcedUpdate => 0,
+        Panel::Settings => 1,
+        Panel::Pairing => 2,
+        Panel::Login => 3,
+        Panel::Picker => 4,
+    }
+}
+
 /// Which panels are open right now.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Panels {
@@ -58,6 +69,13 @@ impl Panels {
     /// overlay (nothing closes it).
     pub fn esc_target(&self) -> Option<Panel> {
         self.top().filter(|p| *p != Panel::ForcedUpdate)
+    }
+
+    /// Whether `panel` may open (and take the keyboard) now: nothing above
+    /// it in the drawing order is open. Opening the sign-in fields while the
+    /// pairing or settings panel (or the overlay) is up is refused.
+    pub fn may_open(&self, panel: Panel) -> bool {
+        self.top().is_none_or(|top| rank(top) >= rank(panel))
     }
 
     /// A panel that must close now: the settings panel never stays open
@@ -146,6 +164,47 @@ mod tests {
             [Panel::Settings, Panel::Pairing, Panel::Login, Panel::Picker]
         );
         assert!(p.allows_app_commands());
+    }
+
+    #[test]
+    fn a_panel_opens_only_when_nothing_above_it_is_open() {
+        let none = Panels::default();
+        assert!(none.may_open(Panel::Login));
+        let login = Panels {
+            login: true,
+            ..Panels::default()
+        };
+        assert!(login.may_open(Panel::Login));
+        let picker = Panels {
+            picker: true,
+            ..Panels::default()
+        };
+        // the sign-in fields sit above the picker
+        assert!(picker.may_open(Panel::Login));
+        for above in [
+            Panels {
+                pairing: true,
+                ..Panels::default()
+            },
+            Panels {
+                settings: true,
+                ..Panels::default()
+            },
+            Panels {
+                forced_update: true,
+                ..Panels::default()
+            },
+        ] {
+            assert!(!above.may_open(Panel::Login), "{above:?}");
+            assert!(above.may_open(above.top().unwrap()));
+        }
+        assert!(
+            !Panels {
+                forced_update: true,
+                ..Panels::default()
+            }
+            .may_open(Panel::Settings)
+        );
     }
 
     #[test]
