@@ -547,6 +547,8 @@ final class WorkspaceContentViewVisibilityTests {
         #expect(publicationCount == 1, "Applying an equivalent snapshot must stay silent.")
     }
 
+    /// ShellX: the account, Cloud and Pro controls are Manaflow services and
+    /// phone pairing is parked, so neither mode shows them.
     @Test
     func minimalModeSidebarFooterKeepsOnlyUpgradeControl() {
         let minimalControls = SidebarFooterControl.allCases.filter {
@@ -556,14 +558,17 @@ final class WorkspaceContentViewVisibilityTests {
             SidebarFooterPresentationPolicy.isVisible($0, presentationMode: .standard)
         }
 
-        #expect(minimalControls == [.upgrade])
-        #expect(standardControls == SidebarFooterControl.allCases)
+        #expect(minimalControls.isEmpty)
+        #expect(standardControls == SidebarFooterControl.allCases.filter {
+            ![SidebarFooterControl.account, .cloud, .upgrade, .mobileConnect].contains($0)
+        })
     }
 
+    /// ShellX: no entitlement shows the upgrade badge (billing is off).
     @Test
     func upgradeVisibilityRequiresKnownFreeEntitlement() {
         #expect(
-            SidebarFooterPresentationPolicy.isUpgradeVisible(
+            !SidebarFooterPresentationPolicy.isUpgradeVisible(
                 isProActive: false,
                 isProStatusKnown: true
             )

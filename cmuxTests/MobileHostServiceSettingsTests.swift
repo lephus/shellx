@@ -23,23 +23,22 @@ struct MobileHostServiceSettingsTests {
         defaults.set(incoming, forKey: DevicesCatalogSection().incomingAccessEnabled.userDefaultsKey)
         #expect(!MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: .dev))
         defaults.set(true, forKey: MobileHostService.listeningEnabledDefaultsKey)
-        #expect(MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: .dev))
+        // ShellX: the phone host listener is parked behind remoteMachines, so
+        // even the explicit opt-in does not start it.
+        #expect(!MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: .dev))
     }
 
+    /// ShellX: phone pairing is parked behind remoteMachines, so neither the
+    /// current nor the historical opt-in starts the listener on any build.
     @Test(arguments: [BuildFlavor.dev, .nightly, .stable])
-    func pairingRequiresExplicitOptInAndPreservesHistoricalChoice(buildFlavor: BuildFlavor) throws {
+    func pairingStaysParkedWhateverTheOptIn(buildFlavor: BuildFlavor) throws {
         let suiteName = "MobileHostServiceSettingsTests.v2.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         #expect(!MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: buildFlavor))
         defaults.set(true, forKey: "cmuxMobilePairingHostEnabled")
-        #expect(MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: buildFlavor))
-        defaults.set(false, forKey: "cmuxMobilePairingHostEnabled")
         #expect(!MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: buildFlavor))
         defaults.set(true, forKey: MobileHostService.listeningEnabledDefaultsKey)
-        #expect(MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: buildFlavor))
-        defaults.set(true, forKey: "cmuxMobilePairingHostEnabled")
-        defaults.set(false, forKey: MobileHostService.listeningEnabledDefaultsKey)
         #expect(!MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: buildFlavor))
         #expect(SettingCatalog().mobile.iOSPairingHost.defaultValue == false)
     }

@@ -40,26 +40,6 @@ lane = "macos-shell"
 serial = true
 
 [[test]]
-path = "tests/test_cli_vm_transfer_progress.py"
-lane = "macos-cli-no-socket"
-requirements = ["cmux-cli"]
-
-[[test]]
-path = "tests/test_cli_vm_resize.py"
-lane = "macos-cli-no-socket"
-requirements = ["cmux-cli"]
-
-[[test]]
-path = "tests/test_cli_vm_open_device_target.py"
-lane = "macos-cli-no-socket"
-requirements = ["cmux-cli"]
-
-[[test]]
-path = "tests/test_cli_cloud_hostname.py"
-lane = "macos-cli-no-socket"
-requirements = ["cmux-cli"]
-
-[[test]]
 path = "tests/test_cli_tmux_wait_for_private_dir.py"
 lane = "macos-cli-no-socket"
 
@@ -1153,10 +1133,6 @@ path = "tests/test_cli_version_memory_guard_harness.py"
 lane = "macos-shell"
 
 [[test]]
-path = "tests/test_cli_vm_create_name.py"
-lane = "legacy"
-
-[[test]]
 path = "tests/test_cloud_display_catalog.py"
 lane = "legacy"
 
@@ -1413,10 +1389,6 @@ path = "tests/test_tui_publish_workflow_security.py"
 lane = "linux-guard"
 
 [[test]]
-path = "tests/test_vm_scp.py"
-lane = "legacy"
-
-[[test]]
 path = "tests/test_web_validation.py"
 lane = "linux-guard"
 
@@ -1658,11 +1630,6 @@ lane = "linux-guard"
 [[test]]
 path = "tests/test_iroh_drift_issue.py"
 lane = "linux-guard"
-
-[[test]]
-path = "tests/test_cli_vm_mutation_arguments.py"
-lane = "macos-cli-no-socket"
-requirements = ["cmux-cli"]
 
 [[test]]
 path = "tests/test_submodule_forward_only.py"
