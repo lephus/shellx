@@ -1180,15 +1180,8 @@
 		D3D88AECC723469EAF760A5D /* CloudWorkspaceSidebarPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD117951D664D05A4D9612C /* CloudWorkspaceSidebarPresentation.swift */; };
 		D13184000000000000000008 /* CloudWorkspaceTargetingFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = D13184000000000000000007 /* CloudWorkspaceTargetingFixture.swift */; };
 		D1318400000000000000000A /* CloudWorkspaceTargetingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D13184000000000000000009 /* CloudWorkspaceTargetingTests.swift */; };
-		B900000BA1B2C3D4E5F60719 /* shellx in Copy CLI */ = {isa = PBXBuildFile; fileRef = B9000004A1B2C3D4E5F60719 /* shellx */; };
-		9758A0029758A0029758A002 /* shellx-amp-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = 9758A0019758A0019758A001 /* shellx-amp-wrapper */; };
-		C1ADE20002A1B2C3D4E5F719 /* shellx-claude-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE20001A1B2C3D4E5F719 /* shellx-claude-wrapper */; };
-		C1ADE30002A1B2C3D4E5F719 /* shellx-codex-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE30001A1B2C3D4E5F719 /* shellx-codex-wrapper */; };
 		C0DEC0DE0000000000000011 /* cmux-cua in Resources */ = {isa = PBXBuildFile; fileRef = C0DEC0DE0000000000000012 /* cmux-cua */; };
-		C1ADE40002A1B2C3D4E5F719 /* shellx-hermes-agent-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE40001A1B2C3D4E5F719 /* shellx-hermes-agent-wrapper */; };
-		C1ADE50002A1B2C3D4E5F719 /* shellx-hermes-python-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE50001A1B2C3D4E5F719 /* shellx-hermes-python-wrapper */; };
 		C1ADE60002A1B2C3D4E5F719 /* cmux-hermes-sitecustomize.py in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE60001A1B2C3D4E5F719 /* cmux-hermes-sitecustomize.py */; };
-		C1ADE70002A1B2C3D4E5F719 /* shellx-pi-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE70001A1B2C3D4E5F719 /* shellx-pi-wrapper */; };
 		D96970000000000000000007 /* cmux-sudo in Copy CLI */ = {isa = PBXBuildFile; fileRef = D96971000000000000000002 /* cmux-sudo */; };
 		F390E470FA17BD417C031111 /* cmux-tmux-agent.py in Copy CLI */ = {isa = PBXBuildFile; fileRef = F390E470FA17BD417C032222 /* cmux-tmux-agent.py */; };
 		A5001623 /* cmux.sdef in Resources */ = {isa = PBXBuildFile; fileRef = A5001622 /* cmux.sdef */; };
@@ -3334,6 +3327,13 @@
 		EE45396CAC0142289F52DCA0 /* ShellIntegrationSendTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 831E0F65E3D945CE8970852E /* ShellIntegrationSendTransportTests.swift */; };
 		C0F16A000000000000000001 /* ShellStartupMatrixTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F16A000000000000000002 /* ShellStartupMatrixTests.swift */; };
 		C0F16C000000000000000001 /* ShellStartupMissingBundleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F16C000000000000000002 /* ShellStartupMissingBundleTests.swift */; };
+		B900000BA1B2C3D4E5F60719 /* shellx in Copy CLI */ = {isa = PBXBuildFile; fileRef = B9000004A1B2C3D4E5F60719 /* shellx */; };
+		9758A0029758A0029758A002 /* shellx-amp-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = 9758A0019758A0019758A001 /* shellx-amp-wrapper */; };
+		C1ADE20002A1B2C3D4E5F719 /* shellx-claude-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE20001A1B2C3D4E5F719 /* shellx-claude-wrapper */; };
+		C1ADE30002A1B2C3D4E5F719 /* shellx-codex-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE30001A1B2C3D4E5F719 /* shellx-codex-wrapper */; };
+		C1ADE40002A1B2C3D4E5F719 /* shellx-hermes-agent-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE40001A1B2C3D4E5F719 /* shellx-hermes-agent-wrapper */; };
+		C1ADE50002A1B2C3D4E5F719 /* shellx-hermes-python-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE50001A1B2C3D4E5F719 /* shellx-hermes-python-wrapper */; };
+		C1ADE70002A1B2C3D4E5F719 /* shellx-pi-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE70001A1B2C3D4E5F719 /* shellx-pi-wrapper */; };
 		5E11A00000000000000000A2 /* ShellXBrand in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000A1 /* ShellXBrand */; };
 		5E11A00000000000000000A3 /* ShellXBrand in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000A1 /* ShellXBrand */; };
 		7413037583554EAA6E41D32F /* ShellXPathsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A657627F06A42A092E1F085 /* ShellXPathsTests.swift */; };
@@ -4708,20 +4708,20 @@
 			dstSubfolderSpec = 7;
 			files = (
 				C1ADE80002A1B2C3D4E5F719 /* agy in Copy CLI */,
-				B900000BA1B2C3D4E5F60719 /* shellx in Copy CLI */,
-				9758A0029758A0029758A002 /* shellx-amp-wrapper in Copy CLI */,
-				C1ADE20002A1B2C3D4E5F719 /* shellx-claude-wrapper in Copy CLI */,
-				C1ADE30002A1B2C3D4E5F719 /* shellx-codex-wrapper in Copy CLI */,
-				C1ADE40002A1B2C3D4E5F719 /* shellx-hermes-agent-wrapper in Copy CLI */,
-				C1ADE50002A1B2C3D4E5F719 /* shellx-hermes-python-wrapper in Copy CLI */,
 				C1ADE60002A1B2C3D4E5F719 /* cmux-hermes-sitecustomize.py in Copy CLI */,
-				C1ADE70002A1B2C3D4E5F719 /* shellx-pi-wrapper in Copy CLI */,
 				D96970000000000000000007 /* cmux-sudo in Copy CLI */,
 				F390E470FA17BD417C031111 /* cmux-tmux-agent.py in Copy CLI */,
 				C1ADE10002A1B2C3D4E5F719 /* grok in Copy CLI */,
 				C1ADE10004A1B2C3D4E5F719 /* muse in Copy CLI */,
 					D1BEF00002A1B2C3D4E5F719 /* open in Copy CLI */,
 				D96970000000000000000008 /* setup-pam-tid.sh in Copy CLI */,
+				B900000BA1B2C3D4E5F60719 /* shellx in Copy CLI */,
+				9758A0029758A0029758A002 /* shellx-amp-wrapper in Copy CLI */,
+				C1ADE20002A1B2C3D4E5F719 /* shellx-claude-wrapper in Copy CLI */,
+				C1ADE30002A1B2C3D4E5F719 /* shellx-codex-wrapper in Copy CLI */,
+				C1ADE40002A1B2C3D4E5F719 /* shellx-hermes-agent-wrapper in Copy CLI */,
+				C1ADE50002A1B2C3D4E5F719 /* shellx-hermes-python-wrapper in Copy CLI */,
+				C1ADE70002A1B2C3D4E5F719 /* shellx-pi-wrapper in Copy CLI */,
 					C0DE70500000000000000002 /* start-cmux-profiling in Copy CLI */,
 					C0DE70530000000000000002 /* submit-cmux-profile in Copy CLI */,
 				);
@@ -5884,16 +5884,9 @@
 		7AD117951D664D05A4D9612C /* CloudWorkspaceSidebarPresentation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudWorkspaceSidebarPresentation.swift; sourceTree = "<group>"; };
 		D13184000000000000000007 /* CloudWorkspaceTargetingFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudWorkspaceTargetingFixture.swift"; sourceTree = "<group>"; };
 		D13184000000000000000009 /* CloudWorkspaceTargetingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudWorkspaceTargetingTests.swift"; sourceTree = "<group>"; };
-		B9000004A1B2C3D4E5F60719 /* shellx */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = shellx; sourceTree = BUILT_PRODUCTS_DIR; };
-		9758A0019758A0019758A001 /* shellx-amp-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-amp-wrapper"; sourceTree = SOURCE_ROOT; };
 		A5001018 /* cmux-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "cmux-Bridging-Header.h"; sourceTree = "<group>"; };
-		C1ADE20001A1B2C3D4E5F719 /* shellx-claude-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-claude-wrapper"; sourceTree = SOURCE_ROOT; };
-		C1ADE30001A1B2C3D4E5F719 /* shellx-codex-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-codex-wrapper"; sourceTree = SOURCE_ROOT; };
 		C0DEC0DE0000000000000012 /* cmux-cua */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "cmux-cua"; path = "skills/cmux-cua"; sourceTree = SOURCE_ROOT; };
-		C1ADE40001A1B2C3D4E5F719 /* shellx-hermes-agent-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-hermes-agent-wrapper"; sourceTree = SOURCE_ROOT; };
-		C1ADE50001A1B2C3D4E5F719 /* shellx-hermes-python-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-hermes-python-wrapper"; sourceTree = SOURCE_ROOT; };
 		C1ADE60001A1B2C3D4E5F719 /* cmux-hermes-sitecustomize.py */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.python; path = "Resources/bin/cmux-hermes-sitecustomize.py"; sourceTree = SOURCE_ROOT; };
-		C1ADE70001A1B2C3D4E5F719 /* shellx-pi-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-pi-wrapper"; sourceTree = SOURCE_ROOT; };
 		D96971000000000000000002 /* cmux-sudo */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/cmux-sudo"; sourceTree = SOURCE_ROOT; };
 		F390E470FA17BD417C032222 /* cmux-tmux-agent.py */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.python; path = "Resources/bin/cmux-tmux-agent.py"; sourceTree = SOURCE_ROOT; };
 		A5001000 /* cmux.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = cmux.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -7883,6 +7876,13 @@
 		831E0F65E3D945CE8970852E /* ShellIntegrationSendTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellIntegrationSendTransportTests.swift; sourceTree = "<group>"; };
 		C0F16A000000000000000002 /* ShellStartupMatrixTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellStartupMatrixTests.swift; sourceTree = "<group>"; };
 		C0F16C000000000000000002 /* ShellStartupMissingBundleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellStartupMissingBundleTests.swift; sourceTree = "<group>"; };
+		B9000004A1B2C3D4E5F60719 /* shellx */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = shellx; sourceTree = BUILT_PRODUCTS_DIR; };
+		9758A0019758A0019758A001 /* shellx-amp-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-amp-wrapper"; sourceTree = SOURCE_ROOT; };
+		C1ADE20001A1B2C3D4E5F719 /* shellx-claude-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-claude-wrapper"; sourceTree = SOURCE_ROOT; };
+		C1ADE30001A1B2C3D4E5F719 /* shellx-codex-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-codex-wrapper"; sourceTree = SOURCE_ROOT; };
+		C1ADE40001A1B2C3D4E5F719 /* shellx-hermes-agent-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-hermes-agent-wrapper"; sourceTree = SOURCE_ROOT; };
+		C1ADE50001A1B2C3D4E5F719 /* shellx-hermes-python-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-hermes-python-wrapper"; sourceTree = SOURCE_ROOT; };
+		C1ADE70001A1B2C3D4E5F719 /* shellx-pi-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-pi-wrapper"; sourceTree = SOURCE_ROOT; };
 		8A657627F06A42A092E1F085 /* ShellXPathsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXPathsTests.swift"; sourceTree = "<group>"; };
 		6083A7DAD962E287FC2FFE94 /* ShortcutAndCommandPaletteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutAndCommandPaletteTests.swift; sourceTree = "<group>"; };
 		AB7F2E9143904957AAA70726 /* ShortcutBareStartRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/ShortcutBareStartRouting.swift; sourceTree = "<group>"; };
