@@ -69,8 +69,11 @@ public final class ShellXRemoteService: ObservableObject {
     var linkStates: [RemoteMachine.ID: LinkState] = [:]
     var records: [RemoteMachine.ID: RemoteLinkRecord] = [:]
     var gate = ApprovalGate()
-    /// Approved or denied here: a lagging `pair.pending` never shows them again.
+    /// Approved, denied or expired here: a lagging `pair.pending` never shows them again.
     var handledPairings: Set<PairingRequest.ID> = []
+    /// Every request as first shown (sticky `suspicious`, original `firstSeen`) until its 300 s are up, even
+    /// while the server leaves it out of a poll.
+    var pairingMemory: [PairingRequest.ID: PairingRequest] = [:]
     var approving: Set<PairingRequest.ID> = []
     var requesting: Set<RemoteMachine.ID> = []
     var connectWaiters: [RemoteMachine.ID: [UUID: CheckedContinuation<Bool, Never>]] = [:]
@@ -100,14 +103,18 @@ public final class ShellXRemoteService: ObservableObject {
         bootTask?.cancel()
         cancelAllTasks()
         resumeAllWaiters(connected: false)
-        let clients = Array(self.clients.values), daemon = self.daemon, bridge = env.bridge
+        gate = ApprovalGate()
+        pairingMemory = [:]
+        let clients = Array(self.clients.values), daemon = self.daemon, bridge = env.bridge, teardown = self.teardown
         self.clients = [:]
         self.daemon = nil
         let done = DispatchSemaphore(value: 0)
+        // Nothing in here needs the main actor, which stays blocked below.
         Task.detached {
             await withTaskGroup(of: Void.self) { group in
                 for client in clients { group.addTask { await client.stop() } }
                 if let daemon { group.addTask { await daemon.stop() } }
+                if let teardown { group.addTask { await teardown.value } }   // a sign-out's stops still running
             }
             bridge.stop()
             done.signal()
@@ -153,6 +160,7 @@ public final class ShellXRemoteService: ObservableObject {
             if removed > 0 { RemoteLog.service.info("removed \(removed) stale invite file(s)") }
             return FileManager.default.isExecutableFile(atPath: cmuxTui.path)
         }) ?? false
+        guard !terminated else { return }
         do { try await ensureConfigured() } catch {
             let code = RemoteLog.code(error)
             RemoteLog.service.error("config.set failed: \(code, privacy: .public)")
@@ -212,9 +220,17 @@ public final class ShellXRemoteService: ObservableObject {
 
     func runSession(_ gen: Int) async {
         // Links this Mac already holds; enrolled ones reconnect by themselves while their machine is online.
+        // A grant that never enrolled cannot succeed now: its invite file was swept at launch, or dropped when
+        // the previous session stopped its link (R33). Such records are removed.
         let store = env.store
         let loaded: [RemoteLinkRecord]
-        do { loaded = try await Self.offMain { try store.load() } } catch {
+        do {
+            loaded = try await Self.onLinkStore {
+                let all = try store.load()
+                for stale in all where !stale.enrolled { try store.remove(machineID: stale.machineID) }
+                return all.filter(\.enrolled)
+            }
+        } catch {
             RemoteLog.service.error("link records not loaded: \(RemoteLog.code(error), privacy: .public)")
             loaded = []
         }
@@ -330,11 +346,12 @@ public final class ShellXRemoteService: ObservableObject {
         self.daemon = nil
         linkStates = [:]; records = [:]; listed = []
         thisMachineID = nil; hostRoute = nil; hostSlot = nil
-        gate = ApprovalGate(); handledPairings = []
+        gate = ApprovalGate(); handledPairings = []; pairingMemory = [:]
         isSignedIn = false
-        machines = []; pendingApprovals = []; outgoing = []
+        machines = []; pendingApprovals = []; outgoing = []; remoteWorkspaces = [:]
         hostState = .idle
-        let task = Task {
+        // Detached: `stopForTermination` may block the main actor right after a sign-out and joins this task.
+        let task = Task.detached {
             await previous?.value
             for client in clients { await client.stop() }
             await daemon?.stop()

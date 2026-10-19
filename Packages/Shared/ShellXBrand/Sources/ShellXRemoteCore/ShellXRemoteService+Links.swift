@@ -45,6 +45,12 @@ extension ShellXRemoteService {
         RemoteLog.service.info("opened \(terminal, privacy: .public) of \(machine, privacy: .public)")
     }
 
+    /// The local workspace `id` was closed: it no longer shows a remote terminal. L3 calls this on workspace
+    /// close; entries may also name a machine that is no longer in `machines`.
+    public func forgetRemoteWorkspace(_ id: UUID) {
+        remoteWorkspaces[id] = nil
+    }
+
     func firstTerminal(_ socket: URL) async throws -> String? {
         let listed = try await run(RemoteCommandLine.terminalList(clientSocket: socket))
         guard listed.status == 0 else {
@@ -97,10 +103,28 @@ extension ShellXRemoteService {
         case .failed(let code):
             RemoteLog.service.error("link to \(machine, privacy: .public) failed: \(code, privacy: .public)")
             if Self.isSignedOutCode(code) { handleSignedOut(gen); return }
+            // R33: a grant that never enrolled cannot recover (its invite is gone): forget it, so the
+            // machine offers "Request access" again.
+            if records[machine]?.enrolled == false { forgetGrant(machine) }
         default:
             break
         }
         rebuildMachines()
+    }
+
+    /// Removes the link, its in-memory and stored record (R33).
+    func forgetGrant(_ machine: RemoteMachine.ID) {
+        RemoteLog.service.notice("grant to \(machine, privacy: .public) never enrolled; record removed")
+        clients[machine] = nil
+        tasks.removeValue(forKey: "link:" + machine)?.cancel()
+        linkStates[machine] = nil
+        records[machine] = nil
+        let store = env.store
+        Self.linkStoreQueue.async {
+            do { try store.remove(machineID: machine) } catch {
+                RemoteLog.service.error("link record not removed machine=\(machine, privacy: .public) error=\(RemoteLog.code(error), privacy: .public)")
+            }
+        }
     }
 
     /// From each `machines.list`: an idle link to an online machine starts; the others learn whether their

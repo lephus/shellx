@@ -403,6 +403,12 @@ private extension ServiceRig {
     #expect(opened.command == RemoteCommandLine.attachShellCommand(clientPath: rig.cmuxTui.path, socketPath: socket.path,
                                                                    terminalID: "term_7"))
     #expect(rig.service.remoteWorkspaces == [opened.id: "m_1"])
+    rig.service.forgetRemoteWorkspace(opened.id)                     // L3 calls this when the workspace closes
+    #expect(rig.service.remoteWorkspaces.isEmpty)
+    try await rig.service.openSession(on: "m_1")
+    #expect(rig.service.remoteWorkspaces.count == 1)
+    await rig.service.signOut()
+    #expect(rig.service.remoteWorkspaces.isEmpty)
 }
 
 @MainActor @Test func openSessionThrowsOfflineAfter20s() async throws {
@@ -441,4 +447,126 @@ private extension ServiceRig {
                                     "pair.pending", "pair.approve", "pair.deny", "pair.request", "pair.poll",
                                     "machines.heartbeat", "auth.logout"]))
     #expect(rig.core.calls.allSatisfy { !$0.onMainThread })
+}
+
+// MARK: - Fix round 1
+
+@MainActor private func serverStopArgs(_ rig: ServiceRig) -> [String] { RemoteCommandLine.serverStop(paths: rig.paths) }
+
+@MainActor @Test func pairingThatVanishesAndReturnsChangedStaysSuspicious() async {          // I1
+    let rig = ServiceRig()
+    #expect(await rig.withPending([FakeRemoteCore.pairing("p1", fingerprint: fpA), FakeRemoteCore.pairing("p2", code: "222222")]))
+    // The server leaves both out of one poll...
+    rig.core.pending.with { $0 = [] }
+    #expect(await rig.advance(5, waitingFor: "pair.pending"))
+    #expect(await until { rig.service.pendingApprovals.isEmpty })
+    // ...then lists p1 with another key and p2 unchanged.
+    rig.core.pending.with { $0 = [FakeRemoteCore.pairing("p1", fingerprint: "ffffffffffffffff"),
+                                  FakeRemoteCore.pairing("p2", code: "222222")] }
+    #expect(await rig.advance(5, waitingFor: "pair.pending"))
+    #expect(await until { rig.service.pendingApprovals.count == 2 })
+    let p1 = rig.service.pendingApprovals.first { $0.id == "p1" }, p2 = rig.service.pendingApprovals.first { $0.id == "p2" }
+    #expect(p1?.suspicious == true)
+    #expect(p1?.fingerprint == fpA)                                   // what the person saw
+    #expect(p1?.firstSeen == supT0)                                   // the 300 s cap does not restart
+    #expect(p2?.suspicious == false)
+    #expect(p2?.firstSeen == supT0)
+    let thrown = await errorCode { try await rig.service.approve("p1") }
+    #expect(thrown == "fingerprint_mismatch")
+    #expect(rig.core.count("pair.approve") == 0)
+}
+
+@MainActor @Test func expiredPairingIsNotShownAgain() async {
+    let rig = ServiceRig()
+    #expect(await rig.withPending([FakeRemoteCore.pairing("p1")]))
+    #expect(await until { rig.clock.deadlines.contains(supT0 + 5) })
+    let polls = rig.core.count("pair.pending")
+    rig.clock.advance(to: supT0 + 300)
+    #expect(await until { rig.core.count("pair.pending") > polls })
+    #expect(await until { rig.service.pendingApprovals.isEmpty })
+    #expect(await rig.advance(5, waitingFor: "pair.pending"))         // the server keeps listing it
+    await settle()
+    #expect(rig.service.pendingApprovals.isEmpty)
+}
+
+@MainActor @Test func unenrolledRecordsAreDroppedAtLaunch() async throws {                  // R33
+    let rig = ServiceRig()
+    try rig.seedRecord("m_1", enrolled: false)
+    try rig.seedRecord("m_2", enrolled: true)
+    #expect(await rig.startConnected())                               // records are loaded before the host starts
+    #expect(try rig.store.load().map(\.machineID) == ["m_2"])
+    #expect(rig.service.machines.first?.access == RemoteMachine.Access.none)
+    #expect(rig.connectIndex == nil)
+}
+
+@MainActor @Test func failedFirstEnrollmentForgetsTheGrant() async throws {                 // R33
+    let rig = ServiceRig()
+    #expect(await rig.startConnected())
+    _ = try await rig.service.requestAccess(to: "m_1")
+    rig.core.pollStatus.with { $0["p_out"] = "approved" }
+    rig.core.failures.with { $0["tickets.mint"] = ["not_granted"] }   // the link's first connect mint fails for good
+    #expect(await rig.advance(2, waitingFor: "pair.poll"))
+    #expect(await until { rig.service.outgoing.first?.status == .approved })
+    #expect(await until { rig.service.machines.first?.access == RemoteMachine.Access.none })
+    #expect(await until { (try? rig.store.load())?.isEmpty == true })
+    #expect(rig.connectIndex == nil)
+    rig.core.pollStatus.with { $0["p_out"] = "pending" }
+    let code = try await rig.service.requestAccess(to: "m_1")         // requesting again works
+    #expect(code == "123456")
+    #expect(rig.service.machines.first?.access == .requested(pairingID: "p_out", code: "123456"))
+}
+
+@MainActor @Test func terminationRightAfterTeardownStillStopsTheDaemon() async {           // M2
+    let rig = ServiceRig()
+    #expect(await rig.startConnected())
+    let runs = rig.launcher.runs.count
+    rig.service.beginTeardown()                                      // what signOut and a 401 do first, on main
+    let began = Date()
+    rig.service.stopForTermination()                                 // then main blocks until the stops are done
+    #expect(Date().timeIntervalSince(began) < 1)
+    #expect(rig.launcher.runs.dropFirst(runs).contains { $0.args == serverStopArgs(rig) })
+    #expect(rig.launcher.procs.allSatisfy { $0.terminated })
+}
+
+@MainActor @Test func terminationBeforeBootstrapMakesNoCoreCall() async {                  // M4
+    let rig = ServiceRig()
+    rig.service.startIfEnabled()
+    rig.service.stopForTermination()
+    for _ in 0..<5 { await settle() }
+    #expect(rig.core.calls.isEmpty)
+    #expect(rig.launcher.calls.isEmpty)
+}
+
+@MainActor @Test func signOutThenSignInConnectsTheHostAgain() async throws {               // M7
+    let rig = ServiceRig()
+    #expect(await rig.startConnected())
+    await rig.service.signOut()
+    #expect(rig.service.hostState == .idle)
+    #expect(rig.launcher.procs.first?.terminated == true)
+    try await rig.service.signIn(email: "dev@shellx.test", password: "pw")
+    #expect(await until { rig.service.hostState == rig.hostConnected })
+    #expect(rig.launcher.launches.filter { $0.args.starts(with: ["server", "start"]) }.count == 2)
+    #expect(rig.bridge.starts.get().count == 2)
+    #expect(await until { rig.service.machines.map(\.id) == ["m_1"] })
+}
+
+@MainActor @Test func terminationDuringApproveIsBoundedAndLeavesNothing() async {          // M7
+    let rig = ServiceRig()
+    #expect(await rig.withPending([FakeRemoteCore.pairing("p1", fingerprint: fpA)]))
+    rig.stub(["remote", "enroll", "create"], stdout: fixtureInviteURI(id: "inv1"))
+    rig.core.holdNext.with { $0 = "pair.approve" }
+    let approving = Task { @MainActor in await errorCode { try await rig.service.approve("p1") } }
+    #expect(await until { rig.core.isHoldingCall })
+    let runs = rig.launcher.runs.count
+    let began = Date()
+    rig.service.stopForTermination()
+    #expect(Date().timeIntervalSince(began) < 2)
+    #expect(rig.launcher.runs.dropFirst(runs).contains { $0.args == serverStopArgs(rig) })
+    #expect(rig.launcher.procs.allSatisfy { $0.terminated })
+    #expect(rig.service.gate.isEmpty)
+    rig.core.releaseHeldCall()                                       // the server answers after the quit began
+    #expect(await approving.value == "cancelled")
+    for _ in 0..<5 { await settle() }
+    #expect(rig.service.gate.isEmpty)
+    #expect(!rig.launcher.runs.dropFirst(runs).contains { $0.args.starts(with: ["remote", "enroll"]) })
 }

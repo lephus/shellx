@@ -223,6 +223,18 @@ private let route = "relay+wss://relay.shellx.pro/v2/relay"
     #expect(ShellXRemoteDevice.machineName(base: "Phu's Mac", bundleID: "pro.shellx.desktop.debug.") == "Phu's Mac (DEV)")
 }
 
+@Test func linkStoreRemovesARecord() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("sx-store-" + UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let store = RemoteLinkStore(file: dir.appendingPathComponent("links.json"))
+    try store.remove(machineID: "m_0")                               // nothing stored yet
+    for id in ["m_1", "m_2"] {
+        try store.upsert(RemoteLinkRecord(machineID: id, route: route, slot: "s", daemonFingerprint: "f", enrolled: false))
+    }
+    try store.remove(machineID: "m_1")
+    #expect(try store.load().map(\.machineID) == ["m_2"])
+}
+
 @Test func gateRevokesAndPrunes() {
     var g = ApprovalGate()
     #expect(g.isEmpty)

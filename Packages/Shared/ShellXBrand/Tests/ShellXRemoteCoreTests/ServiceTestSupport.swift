@@ -31,6 +31,12 @@ final class FakeRemoteCore: ShellXCoreCalling, @unchecked Sendable {
     let down = Locked<[String: String]>([:])
     /// Runs inside the call (on the caller's thread) before the reply is built.
     let onCall = Locked<(@Sendable (String) -> Void)?>(nil)
+    /// When set, the next call of this method blocks (on its global-queue thread) until `releaseHeldCall()`.
+    let holdNext = Locked<String?>(nil)
+    private let heldGate = DispatchSemaphore(value: 0)
+    private let holding = Locked(false)
+    var isHoldingCall: Bool { holding.get() }
+    func releaseHeldCall() { heldGate.signal() }
 
     init(clock: ManualClock, log: EventLog, coreStateDir: URL) {
         self.clock = clock; self.log = log; self.coreStateDir = coreStateDir
@@ -57,6 +63,11 @@ final class FakeRemoteCore: ShellXCoreCalling, @unchecked Sendable {
     func call(method: String, json: Data) throws -> Data {
         let params = (try? JSONDecoder().decode([String: JSONValue].self, from: json)) ?? [:]
         onCall.get()?(method)                       // before the call becomes visible to the test
+        if holdNext.with({ held in let hit = held == method; if hit { held = nil }; return hit }) {
+            holding.with { $0 = true }
+            heldGate.wait()
+            holding.with { $0 = false }
+        }
         recorded.with { $0.append(Call(method: method, params: params, onMainThread: Thread.isMainThread)) }
         log.add("core:" + method)
         if let code = failures.with({ $0[method]?.isEmpty == false ? $0[method]!.removeFirst() : nil }) ?? down.get()[method] {

@@ -52,14 +52,19 @@ extension ShellXRemoteService {
         } catch {
             let code = RemoteLog.code(error)
             RemoteLog.service.error("approve \(id, privacy: .public) failed: \(code, privacy: .public)")
-            if isCurrent(gen) { gate.revoke(invitationID: invitation.invitationID) }
-            _ = try? await run(RemoteCommandLine.enrollDeny(paths: env.paths, invitationID: invitation.invitationID))
-            if code == "fingerprint_mismatch", isCurrent(gen) { markSuspicious(id) }
+            // A session that ended (sign-out, 401, quit) already dropped the gate and stops the daemon.
+            if isCurrent(gen) {
+                gate.revoke(invitationID: invitation.invitationID)
+                _ = try? await run(RemoteCommandLine.enrollDeny(paths: env.paths, invitationID: invitation.invitationID))
+                if code == "fingerprint_mismatch" { markSuspicious(id) }
+            }
             throw error
         }
-        guard isCurrent(gen) else { return }
+        // Approved at the server, but the session ended meanwhile: the daemon is going away with the gate.
+        try checkCurrent(gen)
         RemoteLog.service.info("approved \(id, privacy: .public), invitation \(invitation.invitationID, privacy: .public)")
         handledPairings.insert(id)
+        pairingMemory[id] = nil
         pendingApprovals.removeAll { $0.id == id }
         ensureEnrollPoller(gen)
     }
@@ -67,6 +72,7 @@ extension ShellXRemoteService {
     /// `pair.deny`; the request leaves `pendingApprovals` whatever the server answers.
     public func deny(_ id: PairingRequest.ID) async {
         handledPairings.insert(id)
+        pairingMemory[id] = nil
         pendingApprovals.removeAll { $0.id == id }
         do { _ = try await call("pair.deny", ["pairing_id": .string(id)], as: EmptyReply.self) } catch {
             RemoteLog.service.error("deny \(id, privacy: .public) failed: \(RemoteLog.code(error), privacy: .public)")
@@ -86,8 +92,11 @@ extension ShellXRemoteService {
         }
     }
 
-    /// `nil` keeps the shown list (API down) and only drops expired entries. A request whose code or
-    /// fingerprint changes while shown is replaced by a sticky suspicious copy of what the person saw.
+    /// Shows the requests the server lists now, each as remembered from its first sighting this session:
+    /// the original `firstSeen` (the 300 s cap never restarts) and a sticky `suspicious`, set when the code or
+    /// fingerprint differs from what was first shown, even after the server left it out of some polls, or when
+    /// the core flags it. Once its 300 s are up an id is retired and never shown again. `nil` (API down)
+    /// keeps the shown list and only expires entries.
     func applyPending(_ items: [PendingReply.Item]?) {
         let now = env.clock.now
         var next: [PairingRequest] = []
@@ -95,28 +104,34 @@ extension ShellXRemoteService {
             for item in items where !handledPairings.contains(item.pairing_id) && !next.contains(where: { $0.id == item.pairing_id }) {
                 let fingerprint = item.fingerprint ?? ""
                 let flagged = (item.suspicious ?? true) || fingerprint.isEmpty
-                if let shown = pendingApprovals.first(where: { $0.id == item.pairing_id }) {
-                    let changed = shown.fingerprint != fingerprint || shown.code != item.code
-                    if (changed || flagged) && !shown.suspicious {
-                        RemoteLog.service.error("pairing \(shown.id, privacy: .public) changed while shown; marked suspicious")
-                        next.append(Self.suspicious(shown))
-                    } else {
-                        next.append(shown)
+                var entry: PairingRequest
+                if let known = pairingMemory[item.pairing_id] {
+                    entry = known
+                    if !known.suspicious && (flagged || known.fingerprint != fingerprint || known.code != item.code) {
+                        RemoteLog.service.error("pairing \(known.id, privacy: .public) changed since it was shown; marked suspicious")
+                        entry = Self.suspicious(known)
                     }
                 } else {
-                    next.append(PairingRequest(id: item.pairing_id, fromMachineID: item.from_machine_id,
-                                               requesterName: machineName(item.from_machine_id), code: item.code,
-                                               fingerprint: fingerprint, suspicious: flagged, firstSeen: now))
+                    entry = PairingRequest(id: item.pairing_id, fromMachineID: item.from_machine_id,
+                                           requesterName: machineName(item.from_machine_id), code: item.code,
+                                           fingerprint: fingerprint, suspicious: flagged, firstSeen: now)
                 }
+                pairingMemory[entry.id] = entry
+                next.append(entry)
             }
         } else {
             next = pendingApprovals
         }
-        next.removeAll { now >= $0.expiresAt }
+        for entry in pairingMemory.values where now >= entry.expiresAt {
+            pairingMemory[entry.id] = nil
+            handledPairings.insert(entry.id)
+        }
+        next.removeAll { now >= $0.expiresAt || handledPairings.contains($0.id) }
         if next != pendingApprovals { pendingApprovals = next }
     }
 
     func markSuspicious(_ id: PairingRequest.ID) {
+        if let known = pairingMemory[id], !known.suspicious { pairingMemory[id] = Self.suspicious(known) }
         guard let index = pendingApprovals.firstIndex(where: { $0.id == id }), !pendingApprovals[index].suspicious else { return }
         pendingApprovals[index] = Self.suspicious(pendingApprovals[index])
     }
@@ -250,7 +265,7 @@ extension ShellXRemoteService {
         let record = RemoteLinkRecord(machineID: machine, route: route, slot: slot, daemonFingerprint: fingerprint, enrolled: false)
         records[machine] = record
         let store = env.store
-        do { try await Self.offMain { try store.upsert(record) } } catch {
+        do { try await Self.onLinkStore { try store.upsert(record) } } catch {
             RemoteLog.service.error("link record not saved machine=\(machine, privacy: .public) error=\(RemoteLog.code(error), privacy: .public)")
         }
         guard isCurrent(gen) else { removeInvite(inviteName); return }

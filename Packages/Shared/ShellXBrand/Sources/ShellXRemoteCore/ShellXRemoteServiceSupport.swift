@@ -86,6 +86,15 @@ extension ShellXRemoteService {
         }
     }
 
+    /// `links.json` reads and writes, in order on one serial queue (a removal never overtakes a later upsert).
+    nonisolated static let linkStoreQueue = DispatchQueue(label: "pro.shellx.remote-service.links", qos: .utility)
+
+    nonisolated static func onLinkStore<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            linkStoreQueue.async { continuation.resume(with: Result { try work() }) }
+        }
+    }
+
     /// One K3 call through the core (blocks on HTTP and disk inside, so always off main).
     func call<R: Decodable & Sendable>(_ method: String, _ params: [String: JSONValue] = [:], as type: R.Type) async throws -> R {
         let core = env.core

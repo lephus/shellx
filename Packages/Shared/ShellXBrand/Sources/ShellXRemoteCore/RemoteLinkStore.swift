@@ -48,4 +48,12 @@ public struct RemoteLinkStore: Sendable {
         }
         try save(records)
     }
+
+    /// Drops the record of `machineID` (a grant whose first enrollment can no longer succeed).
+    public func remove(machineID: String) throws {
+        Self.lock.lock(); defer { Self.lock.unlock() }
+        let records = try load()
+        let kept = records.filter { $0.machineID != machineID }
+        if kept.count != records.count { try save(kept) }
+    }
 }
