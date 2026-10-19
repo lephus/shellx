@@ -1,0 +1,1858 @@
+# Review package: 778dc9c1cc..HEAD
+
+## Commits
+1c44e7bfd9 test(shellx): fix dangling @Test attributes; gate or retarget the remaining Cloud-dependent tests
+0947d7e545 fix(shellx): team-picker shortcut passes through; drop deleted UI tests from the project
+
+## Files changed
+ Sources/AppDelegate+CloudTeamPicker.swift          |   5 +
+ Sources/ShellX/ShellXSwitches.swift                |  14 ++
+ cmux.xcodeproj/project.pbxproj                     |  24 +--
+ cmuxCLITests/CLIExplicitSurfaceRoutingTests.swift  |  43 -----
+ cmuxTests/AccountUpgradeOfferTests.swift           |   7 -
+ .../CloudTreeOneMachineManyWorkspacesTests.swift   |  10 +-
+ cmuxTests/CmuxSocketEventMapperTests.swift         |  36 +++-
+ cmuxTests/CmuxTuiSurfaceProviderTests.swift        |   2 +-
+ cmuxTests/DevicesSidebarModeTests.swift            |  63 +++++--
+ cmuxTests/HostAccountFlowTeamChangeTests.swift     |  27 ++-
+ cmuxTests/MobileHostIrohAdmissionTests.swift       |   4 +-
+ cmuxTests/MobileHostServiceSettingsTests.swift     |  29 ++-
+ cmuxTests/RightSidebarCommandPaletteTests.swift    |  14 +-
+ cmuxTests/SSHStartupManualReconnectTests.swift     |   8 +-
+ cmuxTests/SSHStartupSignalLifecycleTests.swift     |   8 +
+ cmuxTests/SurfaceSocketCommandTests.swift          | 199 +++++++++++++++++++++
+ cmuxTests/UpgradeAnalyticsTests.swift              |   3 -
+ tests/test_cli_broken_pipe_writes.py               |  21 +++
+ tests/test_shellx_cloud_off.py                     |  30 ++++
+ 19 files changed, 428 insertions(+), 119 deletions(-)
+
+## Diff
+diff --git a/Sources/AppDelegate+CloudTeamPicker.swift b/Sources/AppDelegate+CloudTeamPicker.swift
+index 74ef88f04c..523b8ff863 100644
+--- a/Sources/AppDelegate+CloudTeamPicker.swift
++++ b/Sources/AppDelegate+CloudTeamPicker.swift
+@@ -1,32 +1,37 @@
+ import CmuxCloud
+ import AppKit
+ import CmuxCloud
++import ShellXBrand
+ 
+ extension AppDelegate {
+     @MainActor
+     func handleCloudTeamPickerShortcut(_ event: NSEvent) -> Bool {
++        // ShellX: teams are a Manaflow Cloud service; the key passes through
++        // and no "Cloud unavailable" alert appears.
++        guard ShellXFeatures.cloud else { return false }
+         guard matchConfiguredShortcut(event: event, action: .openTeamPicker) else { return false }
+         _ = openCloudTeamPicker(
+             preferredWindow: event.window ?? shortcutRoutingActiveWindow,
+             debugSource: "shortcut.openTeamPicker"
+         )
+         return true
+     }
+ 
+     /// Reveals the active window's Cloud panel and requests its team menu.
+     @MainActor
+     @discardableResult
+     func openCloudTeamPicker(
+         preferredWindow: NSWindow? = nil,
+         debugSource: String
+     ) -> Bool {
++        guard ShellXFeatures.cloud else { return false }
+         guard CloudMachinesFeature.isEnabled,
+               RightSidebarMode.machines.isAvailable() else {
+             let alert = NSAlert()
+             alert.messageText = String(localized: "command.auth.teamPicker.title", defaultValue: "Open Team Picker")
+             alert.informativeText = CloudMachinesFeature.disabledMessage
+             alert.alertStyle = .informational
+             alert.addButton(withTitle: String(localized: "common.ok", defaultValue: "OK"))
+             if let window = preferredWindow ?? NSApp.keyWindow ?? NSApp.mainWindow {
+                 alert.beginSheetModal(for: window)
+             } else {
+diff --git a/Sources/ShellX/ShellXSwitches.swift b/Sources/ShellX/ShellXSwitches.swift
+new file mode 100644
+index 0000000000..b0c2c197e4
+--- /dev/null
++++ b/Sources/ShellX/ShellXSwitches.swift
+@@ -0,0 +1,14 @@
++import ShellXBrand
++
++/// App-side mirror of ``ShellXFeatures`` for code that cannot import
++/// ShellXBrand, chiefly the app-hosted test bundle: upstream tests of logic
++/// parked behind a switch use `.enabled(if: ShellXSwitches.remoteMachines)` so
++/// they come back on their own when Wave 2 flips it.
++enum ShellXSwitches {
++    /// Manaflow Cloud (sign-in, accounts, Cloud machines, billing, Pro). Off for good.
++    static let cloud = ShellXFeatures.cloud
++    /// CodeRouter. Off for good.
++    static let codeRouter = ShellXFeatures.codeRouter
++    /// ShellX's own remote machines and device mirroring (Wave 2).
++    static let remoteMachines = ShellXFeatures.remoteMachines
++}
+diff --git a/cmux.xcodeproj/project.pbxproj b/cmux.xcodeproj/project.pbxproj
+index 0f37ece70b..f82ff4aa34 100644
+--- a/cmux.xcodeproj/project.pbxproj
++++ b/cmux.xcodeproj/project.pbxproj
+@@ -912,21 +912,20 @@
+ 		C13151C00000000000000031 /* CloudReadIdentityAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C13151C00000000000000030 /* CloudReadIdentityAuthClient.swift */; };
+ 		C12625B00000000000000006 /* CloudReadManualClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12625B00000000000000005 /* CloudReadManualClock.swift */; };
+ 		C12625B00000000000000004 /* CloudReadRequestCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12625B00000000000000003 /* CloudReadRequestCoordinatorTests.swift */; };
+ 		9F046FC7A14BBDB098F471B3 /* CloudReadResponseGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9A79D080D5B1E7996CC8586 /* CloudReadResponseGate.swift */; };
+ 		C13151C00000000000000023 /* CloudRefreshAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C13151C00000000000000022 /* CloudRefreshAuthClient.swift */; };
+ 		C13151C00000000000000021 /* CloudRefreshFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C13151C00000000000000020 /* CloudRefreshFixture.swift */; };
+ 		C12625000000000000000004 /* CloudRefreshURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12625000000000000000003 /* CloudRefreshURLProtocol.swift */; };
+ 		C12575000000000000000050 /* CloudRenameOptimismTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12575000000000000000051 /* CloudRenameOptimismTests.swift */; };
+ 		EFD5BEC316FCF70B7E4FDFBE /* CloudRestoreReplayFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 283DE1F547455A79CD6EC26D /* CloudRestoreReplayFixture.swift */; };
+ 		9A1E85136C5F9BDC2E66DC08 /* CloudRestoreReplayGridTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD277217AB02219F074EDADA /* CloudRestoreReplayGridTests.swift */; };
+-		A14485000000000000000002 /* CloudSectionHeaderActionsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14485000000000000000001 /* CloudSectionHeaderActionsUITests.swift */; };
+ 		B5F7FD4791E006CF41AFDE98 /* CloudSecurityExplainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 651CA0786CE6EF620FA48D5C /* CloudSecurityExplainer.swift */; };
+ 		B4C75A04BD9133EBF9073562 /* CloudSheetWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB385AD0EF7105ED9471B5F7 /* CloudSheetWindow.swift */; };
+ 		46383D21CF46427F36EBEB7B /* CloudSidebarAcceptanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8150EA26C949866059F3B6EA /* CloudSidebarAcceptanceTests.swift */; };
+ 		5E3484F75CE048CC95018CF1 /* CloudSidebarAttentionLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB4F197C29A4C03B61418A1 /* CloudSidebarAttentionLayoutTests.swift */; };
+ 		D075FB64A68C4CA0A4042528 /* CloudSidebarConsistencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27A4938294E4A109BC6D2B3 /* CloudSidebarConsistencyTests.swift */; };
+ 		B12357000000000000000004 /* CloudSidebarDebugLabWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B12357000000000000000003 /* CloudSidebarDebugLabWindow.swift */; };
+ 		1B2372910F434AD5B1AF5F62 /* CloudSidebarDraggingInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F416621204C404E82980AEA /* CloudSidebarDraggingInfo.swift */; };
+ 		4C8528C316114F9A9999DFA8 /* CloudSidebarDraggingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C2630FE0F0747A68FBAD58F /* CloudSidebarDraggingSession.swift */; };
+ 		7E053E8CC6384D3191E1BD7C /* CloudSidebarInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB88F9DE494D4AF99C2E09BF /* CloudSidebarInteractionTests.swift */; };
+ 		E1238CF4BA264AF3B8F20C49 /* CloudSidebarNativeDropTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 890B21137A724FE8A2861566 /* CloudSidebarNativeDropTests.swift */; };
+@@ -951,21 +950,20 @@
+ 		D318853B007D48AD9532F83F /* CloudSurfaceDropGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9DF6ACE0DBF4ACE823A6CE8 /* CloudSurfaceDropGate.swift */; };
+ 		09FBC463786149D49E73B297 /* CloudSurfaceDropGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A23E881DEAE40649BC8FFCF /* CloudSurfaceDropGateView.swift */; };
+ 		5CB4AC1D92064236B5C2DDF1 /* CloudSurfaceMoveOwnershipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF212BA811D54BB986A5E27F /* CloudSurfaceMoveOwnershipTests.swift */; };
+ 		6D2669CD5E4944C2B8C0F49C /* CloudSurfaceOwnershipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4DAE66C6AF74046B5545B47 /* CloudSurfaceOwnershipTests.swift */; };
+ 		6FE12D85D9F41A0BC7FAD03A /* CloudTeamInvitePopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE52542ACA80E2B6E3EE6977 /* CloudTeamInvitePopover.swift */; };
+ 		A14327000000000000000004 /* CloudTeamPickerHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14327000000000000000003 /* CloudTeamPickerHeader.swift */; };
+ 		270246D98C0855B7EFB5C087 /* CloudTeamPickerMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 080D6C181C210FE2F33B5B35 /* CloudTeamPickerMenu.swift */; };
+ 		F3652B9AAF82CE9B22C69255 /* CloudTeamPickerMenuAnchor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCB0A8E1552E2CD2205B9B33 /* CloudTeamPickerMenuAnchor.swift */; };
+ 		D1958D1287A709CAF4AEC411 /* CloudTeamPickerMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 491AEB05DEFFB15C16C047E1 /* CloudTeamPickerMenuTests.swift */; };
+ 		CE9C97EB3B681DC189DD258E /* CloudTeamPickerMenuTrackingProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDE00B4BB2EAB5C599C44E2C /* CloudTeamPickerMenuTrackingProbe.swift */; };
+-		A14327000000000000000006 /* CloudTeamPickerPlacementUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14327000000000000000005 /* CloudTeamPickerPlacementUITests.swift */; };
+ 		A14327000000000000000002 /* CloudTeamPickerPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14327000000000000000001 /* CloudTeamPickerPresentation.swift */; };
+ 		F6C95FCFE1E49B46D88F5E80 /* CloudTeamPickerPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E57F1AD01A2B2E01B4FCA5F /* CloudTeamPickerPresentationTests.swift */; };
+ 		13019A000000000000000006 /* CloudTeamPickerRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13019A000000000000000005 /* CloudTeamPickerRow.swift */; };
+ 		8E7A44FCE0578DD1BFF23845 /* CloudTeamPickerTestMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6426F864486E91FB202B0ED6 /* CloudTeamPickerTestMenu.swift */; };
+ 		13019C000000000000000002 /* CloudTeamScopeObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13019C000000000000000001 /* CloudTeamScopeObserver.swift */; };
+ 		83EFE46711801D1A82B94FD1 /* CloudTerminalAttachmentRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBC170FBE7AEBB71A5BE2922 /* CloudTerminalAttachmentRecoveryTests.swift */; };
+ 		C12537000000000000000313 /* CloudTerminalCardFlashRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12537000000000000000314 /* CloudTerminalCardFlashRegressionTests.swift */; };
+ 		C12537000000000000000309 /* CloudTerminalConnectionPresentationPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12537000000000000000310 /* CloudTerminalConnectionPresentationPolicyTests.swift */; };
+ 		3EAC8AAF4F2E473CA9DA0194 /* CloudTerminalCreationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9720CD7F02C94F41A07E193D /* CloudTerminalCreationCoordinator.swift */; };
+ 		8D00A9B0971047B181BBEDCE /* CloudTerminalCreationCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80491D6123C848EB921CB912 /* CloudTerminalCreationCoordinatorTests.swift */; };
+@@ -1894,21 +1892,20 @@
+ 		CDEFAC0300DEBACE00000002 /* DevBackendStartup.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDEFAC0300DEBACE00000001 /* DevBackendStartup.swift */; };
+ 				DEC1CE00000000000000000E /* DeviceDirectory.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC1CE00000000000000000D /* DeviceDirectory.swift */; };
+ 		544A4A15A4FB5A6243834ABB /* DeviceDirectoryIdentityIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18FE0EAB7C182A6C89D1F0E2 /* DeviceDirectoryIdentityIndex.swift */; };
+ 				DECE17900000000000000002 /* DeviceDirectoryLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DECE17900000000000000001 /* DeviceDirectoryLifecycleTests.swift */; };
+ 				DEC1CE00000000000000000C /* DeviceDirectoryMerge.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC1CE00000000000000000B /* DeviceDirectoryMerge.swift */; };
+ 				DEC1CE000000000000000042 /* DeviceDirectoryMergeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC1CE000000000000000041 /* DeviceDirectoryMergeTests.swift */; };
+ 				DEC1CE00000000000000000A /* DeviceDirectoryRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC1CE000000000000000009 /* DeviceDirectoryRecord.swift */; };
+ 				DE1345800000000000000008 /* DeviceDirectoryStamp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE1345800000000000000007 /* DeviceDirectoryStamp.swift */; };
+ 		7CC491D04AFA42653C123DAE /* DeviceDiscoverabilityConfirmation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9E08FF3907FC5F144872BDF /* DeviceDiscoverabilityConfirmation.swift */; };
+ 		8D511275057429561500B9C4 /* DeviceDiscoverabilityGatingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AD84F07ADB08D5E8EBAA10D /* DeviceDiscoverabilityGatingTests.swift */; };
+-		1732E7B4DB84E108A8177DC7 /* DeviceDiscoverabilityUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45FD277385970AA8FA5508D /* DeviceDiscoverabilityUITests.swift */; };
+ 		25BAC4717E0901C8A510F919 /* DeviceDiscoveredMac.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06AF0F85D707A431CF2BB770 /* DeviceDiscoveredMac.swift */; };
+ 		49D94E476EC9DD72E69C0688 /* DeviceGridQueueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D3F4EA811FB31EA9AEB386 /* DeviceGridQueueTests.swift */; };
+ 		C6AE395504837C8CB50BED10 /* DeviceIrxClient+Account.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8531E9BC250D511DA6C71250 /* DeviceIrxClient+Account.swift */; };
+ 		C77BE808713A7FAC21E5DC96 /* DeviceIrxClient+Discovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B357957683C6E50B1C4263 /* DeviceIrxClient+Discovery.swift */; };
+ 				DF2CA4E950714E03D73EF850 /* DeviceIrxClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 269118819F1F884672CFA7E4 /* DeviceIrxClient.swift */; };
+ 				7CE56CC2201E73B994B1DE90 /* DeviceIrxClientContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = E74955A61FF70525F27DAA8A /* DeviceIrxClientContext.swift */; };
+ 				D44F126C5ADC43644BB030D9 /* DeviceIrxPeerTransportProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9CE5C9947FB0EB965C69FE8 /* DeviceIrxPeerTransportProvider.swift */; };
+ 				DEC1CE000000000000000018 /* DeviceLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC1CE000000000000000017 /* DeviceLink.swift */; };
+ 				DEC1CE00000000000000001A /* DeviceLinkAuthorization.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC1CE000000000000000019 /* DeviceLinkAuthorization.swift */; };
+ 				DE1345800000000000000006 /* DeviceLinkControlPlaneRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE1345800000000000000005 /* DeviceLinkControlPlaneRules.swift */; };
+@@ -2699,21 +2696,20 @@
+ 		A1002000000000000000000F /* NativeTextSurfaceSelectionReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10020000000000000000010 /* NativeTextSurfaceSelectionReader.swift */; };
+ 		8B1B2AB6EC6ACDB2CD39A9BB /* NewBrowserWorkspaceShortcutUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04698069140539D8495D6B9B /* NewBrowserWorkspaceShortcutUITests.swift */; };
+ 		001BEAAF850238E93D30046A /* NewCloudWorkspaceShortcutWindowFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27114D4287F6D2D20F8B68F /* NewCloudWorkspaceShortcutWindowFixture.swift */; };
+ 		5CA1AFB486DF86FAF22509F3 /* NewMachineModel+PlanRefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751BACEC44FF7CFC02CE9A58 /* NewMachineModel+PlanRefresh.swift */; };
+ 		5CA1AFB486DF86FAF22509F2 /* NewMachineModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751BACEC44FF7CFC02CE9A57 /* NewMachineModel.swift */; };
+ 		D5EB22366F37AB2B52CD4B2A /* NewMachineModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5130177E80C2A18E09DBBBC4 /* NewMachineModelTests.swift */; };
+ 		EBEEFD57F5B44FD3D569C2A7 /* NewMachineModelUncappedPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70D01FA1A02DF947CEAEA499 /* NewMachineModelUncappedPlanTests.swift */; };
+ 		DD3322FE8D4021EB0FAFE7F6 /* NewMachineSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3770734999CDCF396F04F32 /* NewMachineSheet.swift */; };
+ 		9D7E898A080AA8345EEEAD95 /* NewMachineSheetDataCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 824223A64E8F745270FDC7E1 /* NewMachineSheetDataCache.swift */; };
+ 		21A7C9D7E9E167B2E19ACB56 /* NewMachineSheetDataCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB7D6198F7C1685FA3C44C5F /* NewMachineSheetDataCacheTests.swift */; };
+-		C0DE1223900000000000000B /* NewMachineSheetKindUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE1223900000000000000A /* NewMachineSheetKindUITests.swift */; };
+ 		53A08722C45B0FF7D95C8C46 /* NewMachineSheetLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D3B724235A7A6C21D3D5F25 /* NewMachineSheetLayoutTests.swift */; };
+ 		548D90758DB3CF890BFDC603 /* NewMachineSheetPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EC4096C4A05D3A58980308A /* NewMachineSheetPresenter.swift */; };
+ 		58907F88770FA478C542C13C /* NewMachineSheetPresenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E130576821882FB0DDFB0F3 /* NewMachineSheetPresenterTests.swift */; };
+ 		A1122301A1B2C3D4E5F60718 /* NewWorkspaceButtonHitAreaUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1122302A1B2C3D4E5F60718 /* NewWorkspaceButtonHitAreaUITests.swift */; };
+ 		C0DE77060000000000000003 /* NewWorkspaceMenuModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE77060000000000000004 /* NewWorkspaceMenuModel.swift */; };
+ 		A5FB1400 /* NewWorkspaceMenuModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5FB1401 /* NewWorkspaceMenuModelTests.swift */; };
+ 		734F49D37E543DD01C2F4FEF /* NotificationAndMenuBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2C075029771815DD5DA1332 /* NotificationAndMenuBarTests.swift */; };
+ 		C06552010000000000000003 /* NotificationBurstCoalescer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C06552010000000000000004 /* NotificationBurstCoalescer.swift */; };
+ 		7490C00D7490C00D7490C00D /* NotificationCacheMemoryPressureResponder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7490D00D7490D00D7490D00D /* NotificationCacheMemoryPressureResponder.swift */; };
+ 		A11E00010000000000000001 /* NotificationDebugEmitter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11E00010000000000000004 /* NotificationDebugEmitter.swift */; };
+@@ -3287,21 +3283,20 @@
+ 		FE00310B /* SessionTranscriptPopoverLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE00300B /* SessionTranscriptPopoverLayout.swift */; };
+ 		FE00310C /* SessionTranscriptPopoverSizeModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE00300C /* SessionTranscriptPopoverSizeModel.swift */; };
+ 		F5320002A1B2C3D4E5F60718 /* SessionTranscriptTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5320003A1B2C3D4E5F60718 /* SessionTranscriptTypes.swift */; };
+ 		9666F2019666F2019666F201 /* SessionWindowSnapshot+Scrollback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9666F2029666F2029666F202 /* SessionWindowSnapshot+Scrollback.swift */; };
+ 		077A3D2FFBE248DD88CF85BA /* SetAutoTitleSocketTests+CloudSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE006CEA49324833982DA204 /* SetAutoTitleSocketTests+CloudSidebar.swift */; };
+ 		583A675AA1224E8D82A44883 /* SetAutoTitleSocketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F92AB6D1CB714189A8F167E5 /* SetAutoTitleSocketTests.swift */; };
+ 		D10000000000000000A00020 /* SettingsAccountJSONResetBehaviorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000A00021 /* SettingsAccountJSONResetBehaviorUITests.swift */; };
+ 		D10000000000000000A00012 /* SettingsAppBehaviorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000A00013 /* SettingsAppBehaviorUITests.swift */; };
+ 		D10000000000000000A00018 /* SettingsAutomationBehaviorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000A00019 /* SettingsAutomationBehaviorUITests.swift */; };
+ 		D10000000000000000A0001A /* SettingsBrowserBehaviorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000A0001B /* SettingsBrowserBehaviorUITests.swift */; };
+-		20F2B44223BBBA9A4ED185C4 /* SettingsComputersBehaviorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83418958EF0A36762FBB8A36 /* SettingsComputersBehaviorUITests.swift */; };
+ 		8A6F8FF7A90FFAD07DFF9F03 /* SettingsHostingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4252144220782379B2B347BE /* SettingsHostingView.swift */; };
+ 		D9CCF002D9CCF002D9CCF002 /* SettingsLazyLoadHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9CCF001D9CCF001D9CCF001 /* SettingsLazyLoadHelpers.swift */; };
+ 		D5671401D5671401D5671401 /* SettingsNavigation+TerminalScrollSpeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5671402D5671402D5671402 /* SettingsNavigation+TerminalScrollSpeed.swift */; };
+ 		A50019A0 /* SettingsNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50019A1 /* SettingsNavigation.swift */; };
+ 		D10000000000000000A00022 /* SettingsNetworkingBehaviorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000A00023 /* SettingsNetworkingBehaviorUITests.swift */; };
+ 		A50019B0 /* SettingsSearchAliases.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50019B1 /* SettingsSearchAliases.swift */; };
+ 		1559C88C4BE54850A7185058 /* SettingsSearchIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DD89A398F134C93ACED1A9A /* SettingsSearchIndex.swift */; };
+ 		A50019B2 /* SettingsSearchIndexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50019B3 /* SettingsSearchIndexTests.swift */; };
+ 		D10000000000000000A0001C /* SettingsShortcutsBehaviorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000A0001D /* SettingsShortcutsBehaviorUITests.swift */; };
+ 		D10000000000000000A00016 /* SettingsSidebarBetaBehaviorUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000A00017 /* SettingsSidebarBetaBehaviorUITests.swift */; };
+@@ -3323,20 +3318,21 @@
+ 		F0ACC0DF0000000000000001 /* SharedLiveAgentIndexAgentLivenessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0ACC0DF0000000000000002 /* SharedLiveAgentIndexAgentLivenessTests.swift */; };
+ 		F0ACC0DE0000000000000007 /* SharedLiveAgentIndexLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0ACC0DE0000000000000008 /* SharedLiveAgentIndexLoader.swift */; };
+ 		121580061215800612158006 /* SharedLiveAgentIndexRefreshOutcome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121580051215800512158005 /* SharedLiveAgentIndexRefreshOutcome.swift */; };
+ 		EE45396CAC0142289F52DCA0 /* ShellIntegrationSendTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 831E0F65E3D945CE8970852E /* ShellIntegrationSendTransportTests.swift */; };
+ 		C0F16A000000000000000001 /* ShellStartupMatrixTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F16A000000000000000002 /* ShellStartupMatrixTests.swift */; };
+ 		C0F16C000000000000000001 /* ShellStartupMissingBundleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F16C000000000000000002 /* ShellStartupMissingBundleTests.swift */; };
+ 		5E11A00000000000000000A2 /* ShellXBrand in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000A1 /* ShellXBrand */; };
+ 		5E11A00000000000000000A3 /* ShellXBrand in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000A1 /* ShellXBrand */; };
+ 		1A8C19D1252050EBAB35B5D1 /* ShellXCloudOffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71099E791FDFEEBC0898FEAB /* ShellXCloudOffTests.swift */; };
+ 		068517128CB0B3002C263E47 /* ShellXNoPhoneHomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 670CA928F698AA3B4424ED2D /* ShellXNoPhoneHomeTests.swift */; };
++		9CBA983FD767551CAFB913EA /* ShellXSwitches.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE04344F1F44FBBC99583161 /* ShellXSwitches.swift */; };
+ 		1521D55DC63D5E5FC4955E31 /* ShortcutAndCommandPaletteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6083A7DAD962E287FC2FFE94 /* ShortcutAndCommandPaletteTests.swift */; };
+ 		76027A12C93B4538BF22C71E /* ShortcutBareStartRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB7F2E9143904957AAA70726 /* ShortcutBareStartRouting.swift */; };
+ 		5C0DE0DE0000000000000004 /* ShortcutDiscoveryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0DE0DE0000000000000003 /* ShortcutDiscoveryButton.swift */; };
+ 		6042A0016042A0016042A001 /* ShortcutHintModifierPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6042B0016042B0016042B001 /* ShortcutHintModifierPolicyTests.swift */; };
+ 		125BAEF2FE3B454547B964D1 /* ShortcutHintPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = A080D1F6CCCBFBED8D95DD1D /* ShortcutHintPill.swift */; };
+ 		6042C0046042C0046042C004 /* ShortcutHintTitlebarPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6042D0046042D0046042D004 /* ShortcutHintTitlebarPolicy.swift */; };
+ 		D35A00000000000000000010 /* ShortcutRecorderRejectedAttempt.swift in Sources */ = {isa = PBXBuildFile; fileRef = D35B00000000000000000010 /* ShortcutRecorderRejectedAttempt.swift */; };
+ 		5C3E0454B6C24B02A2F091A8 /* ShortcutRoutingSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B42A82C6AA614E74873D9A5F /* ShortcutRoutingSupport.swift */; };
+ 		F6001000A1B2C3D4E5F60718 /* ShortcutUnbindingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6001001A1B2C3D4E5F60718 /* ShortcutUnbindingTests.swift */; };
+ 		29B9EA7A64AF6741463D582B /* SidebarAccessibilityTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 521EAC2D4A600581B92BC865 /* SidebarAccessibilityTreeTests.swift */; };
+@@ -5607,21 +5603,20 @@
+ 		C13151C00000000000000030 /* CloudReadIdentityAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudReadIdentityAuthClient.swift"; sourceTree = "<group>"; };
+ 		C12625B00000000000000005 /* CloudReadManualClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudReadManualClock.swift; sourceTree = "<group>"; };
+ 		C12625B00000000000000003 /* CloudReadRequestCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudReadRequestCoordinatorTests.swift; sourceTree = "<group>"; };
+ 		E9A79D080D5B1E7996CC8586 /* CloudReadResponseGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudReadResponseGate.swift"; sourceTree = "<group>"; };
+ 		C13151C00000000000000022 /* CloudRefreshAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudRefreshAuthClient.swift; sourceTree = "<group>"; };
+ 		C13151C00000000000000020 /* CloudRefreshFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudRefreshFixture.swift; sourceTree = "<group>"; };
+ 		C12625000000000000000003 /* CloudRefreshURLProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudRefreshURLProtocol.swift; sourceTree = "<group>"; };
+ 		C12575000000000000000051 /* CloudRenameOptimismTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudRenameOptimismTests.swift; sourceTree = "<group>"; };
+ 		283DE1F547455A79CD6EC26D /* CloudRestoreReplayFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudRestoreReplayFixture.swift"; sourceTree = "<group>"; };
+ 		DD277217AB02219F074EDADA /* CloudRestoreReplayGridTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudRestoreReplayGridTests.swift"; sourceTree = "<group>"; };
+-		A14485000000000000000001 /* CloudSectionHeaderActionsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSectionHeaderActionsUITests.swift; sourceTree = "<group>"; };
+ 		651CA0786CE6EF620FA48D5C /* CloudSecurityExplainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSecurityExplainer.swift; sourceTree = "<group>"; };
+ 		DB385AD0EF7105ED9471B5F7 /* CloudSheetWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSheetWindow.swift; sourceTree = "<group>"; };
+ 		8150EA26C949866059F3B6EA /* CloudSidebarAcceptanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudSidebarAcceptanceTests.swift"; sourceTree = "<group>"; };
+ 		5DB4F197C29A4C03B61418A1 /* CloudSidebarAttentionLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudSidebarAttentionLayoutTests.swift"; sourceTree = "<group>"; };
+ 		B27A4938294E4A109BC6D2B3 /* CloudSidebarConsistencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSidebarConsistencyTests.swift; sourceTree = "<group>"; };
+ 		B12357000000000000000003 /* CloudSidebarDebugLabWindow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudSidebarDebugLabWindow.swift; sourceTree = "<group>"; };
+ 		0F416621204C404E82980AEA /* CloudSidebarDraggingInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudSidebarDraggingInfo.swift"; sourceTree = "<group>"; };
+ 		6C2630FE0F0747A68FBAD58F /* CloudSidebarDraggingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudSidebarDraggingSession.swift"; sourceTree = "<group>"; };
+ 		EB88F9DE494D4AF99C2E09BF /* CloudSidebarInteractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSidebarInteractionTests.swift; sourceTree = "<group>"; };
+ 		890B21137A724FE8A2861566 /* CloudSidebarNativeDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudSidebarNativeDropTests.swift"; sourceTree = "<group>"; };
+@@ -5646,21 +5641,20 @@
+ 		D9DF6ACE0DBF4ACE823A6CE8 /* CloudSurfaceDropGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSurfaceDropGate.swift; sourceTree = "<group>"; };
+ 		3A23E881DEAE40649BC8FFCF /* CloudSurfaceDropGateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSurfaceDropGateView.swift; sourceTree = "<group>"; };
+ 		DF212BA811D54BB986A5E27F /* CloudSurfaceMoveOwnershipTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudSurfaceMoveOwnershipTests.swift; sourceTree = "<group>"; };
+ 		D4DAE66C6AF74046B5545B47 /* CloudSurfaceOwnershipTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudSurfaceOwnershipTests.swift; sourceTree = "<group>"; };
+ 		BE52542ACA80E2B6E3EE6977 /* CloudTeamInvitePopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudTeamInvitePopover.swift; sourceTree = "<group>"; };
+ 		A14327000000000000000003 /* CloudTeamPickerHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudTeamPickerHeader.swift; sourceTree = "<group>"; };
+ 		080D6C181C210FE2F33B5B35 /* CloudTeamPickerMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudTeamPickerMenu.swift; sourceTree = "<group>"; };
+ 		CCB0A8E1552E2CD2205B9B33 /* CloudTeamPickerMenuAnchor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudTeamPickerMenuAnchor.swift; sourceTree = "<group>"; };
+ 		491AEB05DEFFB15C16C047E1 /* CloudTeamPickerMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudTeamPickerMenuTests.swift"; sourceTree = "<group>"; };
+ 		EDE00B4BB2EAB5C599C44E2C /* CloudTeamPickerMenuTrackingProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudTeamPickerMenuTrackingProbe.swift"; sourceTree = "<group>"; };
+-		A14327000000000000000005 /* CloudTeamPickerPlacementUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudTeamPickerPlacementUITests.swift; sourceTree = "<group>"; };
+ 		A14327000000000000000001 /* CloudTeamPickerPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudTeamPickerPresentation.swift; sourceTree = "<group>"; };
+ 		1E57F1AD01A2B2E01B4FCA5F /* CloudTeamPickerPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudTeamPickerPresentationTests.swift"; sourceTree = "<group>"; };
+ 		13019A000000000000000005 /* CloudTeamPickerRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudTeamPickerRow.swift; sourceTree = "<group>"; };
+ 		6426F864486E91FB202B0ED6 /* CloudTeamPickerTestMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudTeamPickerTestMenu.swift"; sourceTree = "<group>"; };
+ 		13019C000000000000000001 /* CloudTeamScopeObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CloudTeamScopeObserver.swift"; sourceTree = "<group>"; };
+ 		BBC170FBE7AEBB71A5BE2922 /* CloudTerminalAttachmentRecoveryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudTerminalAttachmentRecoveryTests.swift; sourceTree = "<group>"; };
+ 		C12537000000000000000314 /* CloudTerminalCardFlashRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudTerminalCardFlashRegressionTests.swift; sourceTree = "<group>"; };
+ 		C12537000000000000000310 /* CloudTerminalConnectionPresentationPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudTerminalConnectionPresentationPolicyTests.swift; sourceTree = "<group>"; };
+ 		9720CD7F02C94F41A07E193D /* CloudTerminalCreationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudTerminalCreationCoordinator.swift; sourceTree = "<group>"; };
+ 		80491D6123C848EB921CB912 /* CloudTerminalCreationCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudTerminalCreationCoordinatorTests.swift; sourceTree = "<group>"; };
+@@ -6452,21 +6446,20 @@
+ 		CDEFAC0300DEBACE00000001 /* DevBackendStartup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DevBackendStartup.swift"; sourceTree = "<group>"; };
+ 				DEC1CE00000000000000000D /* DeviceDirectory.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "Devices/DeviceDirectory.swift"; sourceTree = "<group>"; };
+ 		18FE0EAB7C182A6C89D1F0E2 /* DeviceDirectoryIdentityIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/Devices/DeviceDirectoryIdentityIndex.swift"; sourceTree = SOURCE_ROOT; };
+ 				DECE17900000000000000001 /* DeviceDirectoryLifecycleTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeviceDirectoryLifecycleTests.swift; sourceTree = "<group>"; };
+ 				DEC1CE00000000000000000B /* DeviceDirectoryMerge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "Devices/DeviceDirectoryMerge.swift"; sourceTree = "<group>"; };
+ 				DEC1CE000000000000000041 /* DeviceDirectoryMergeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeviceDirectoryMergeTests.swift; sourceTree = "<group>"; };
+ 				DEC1CE000000000000000009 /* DeviceDirectoryRecord.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "Devices/DeviceDirectoryRecord.swift"; sourceTree = "<group>"; };
+ 				DE1345800000000000000007 /* DeviceDirectoryStamp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "Devices/DeviceDirectoryStamp.swift"; sourceTree = "<group>"; };
+ 		E9E08FF3907FC5F144872BDF /* DeviceDiscoverabilityConfirmation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Devices/DeviceDiscoverabilityConfirmation.swift; sourceTree = "<group>"; };
+ 		4AD84F07ADB08D5E8EBAA10D /* DeviceDiscoverabilityGatingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeviceDiscoverabilityGatingTests.swift"; sourceTree = "<group>"; };
+-		A45FD277385970AA8FA5508D /* DeviceDiscoverabilityUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDiscoverabilityUITests.swift; sourceTree = "<group>"; };
+ 		06AF0F85D707A431CF2BB770 /* DeviceDiscoveredMac.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/Devices/DeviceDiscoveredMac.swift"; sourceTree = SOURCE_ROOT; };
+ 		E9D3F4EA811FB31EA9AEB386 /* DeviceGridQueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeviceGridQueueTests.swift"; sourceTree = "<group>"; };
+ 		8531E9BC250D511DA6C71250 /* DeviceIrxClient+Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Devices/DeviceIrxClient+Account.swift"; sourceTree = "<group>"; };
+ 		28B357957683C6E50B1C4263 /* DeviceIrxClient+Discovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/Devices/DeviceIrxClient+Discovery.swift"; sourceTree = SOURCE_ROOT; };
+ 				269118819F1F884672CFA7E4 /* DeviceIrxClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "Devices/DeviceIrxClient.swift"; sourceTree = "<group>"; };
+ 				E74955A61FF70525F27DAA8A /* DeviceIrxClientContext.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "Devices/DeviceIrxClientContext.swift"; sourceTree = "<group>"; };
+ 				E9CE5C9947FB0EB965C69FE8 /* DeviceIrxPeerTransportProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "Devices/DeviceIrxPeerTransportProvider.swift"; sourceTree = "<group>"; };
+ 				DEC1CE000000000000000017 /* DeviceLink.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "Devices/DeviceLink.swift"; sourceTree = "<group>"; };
+ 				DEC1CE000000000000000019 /* DeviceLinkAuthorization.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "Devices/DeviceLinkAuthorization.swift"; sourceTree = "<group>"; };
+ 				DE1345800000000000000005 /* DeviceLinkControlPlaneRules.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "Devices/DeviceLinkControlPlaneRules.swift"; sourceTree = "<group>"; };
+@@ -7248,21 +7241,20 @@
+ 		A10020000000000000000010 /* NativeTextSurfaceSelectionReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/NativeTextSurfaceSelectionReader.swift; sourceTree = "<group>"; };
+ 		04698069140539D8495D6B9B /* NewBrowserWorkspaceShortcutUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewBrowserWorkspaceShortcutUITests.swift; sourceTree = "<group>"; };
+ 		B27114D4287F6D2D20F8B68F /* NewCloudWorkspaceShortcutWindowFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NewCloudWorkspaceShortcutWindowFixture.swift"; sourceTree = "<group>"; };
+ 		751BACEC44FF7CFC02CE9A58 /* NewMachineModel+PlanRefresh.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "NewMachineModel+PlanRefresh.swift"; sourceTree = "<group>"; };
+ 		751BACEC44FF7CFC02CE9A57 /* NewMachineModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewMachineModel.swift; sourceTree = "<group>"; };
+ 		5130177E80C2A18E09DBBBC4 /* NewMachineModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewMachineModelTests.swift; sourceTree = "<group>"; };
+ 		70D01FA1A02DF947CEAEA499 /* NewMachineModelUncappedPlanTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewMachineModelUncappedPlanTests.swift; sourceTree = "<group>"; };
+ 		D3770734999CDCF396F04F32 /* NewMachineSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewMachineSheet.swift; sourceTree = "<group>"; };
+ 		824223A64E8F745270FDC7E1 /* NewMachineSheetDataCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewMachineSheetDataCache.swift; sourceTree = "<group>"; };
+ 		CB7D6198F7C1685FA3C44C5F /* NewMachineSheetDataCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NewMachineSheetDataCacheTests.swift"; sourceTree = "<group>"; };
+-		C0DE1223900000000000000A /* NewMachineSheetKindUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewMachineSheetKindUITests.swift; sourceTree = "<group>"; };
+ 		3D3B724235A7A6C21D3D5F25 /* NewMachineSheetLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NewMachineSheetLayoutTests.swift"; sourceTree = "<group>"; };
+ 		7EC4096C4A05D3A58980308A /* NewMachineSheetPresenter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewMachineSheetPresenter.swift; sourceTree = "<group>"; };
+ 		8E130576821882FB0DDFB0F3 /* NewMachineSheetPresenterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NewMachineSheetPresenterTests.swift"; sourceTree = "<group>"; };
+ 		A1122302A1B2C3D4E5F60718 /* NewWorkspaceButtonHitAreaUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewWorkspaceButtonHitAreaUITests.swift; sourceTree = "<group>"; };
+ 		C0DE77060000000000000004 /* NewWorkspaceMenuModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewWorkspaceMenuModel.swift; sourceTree = "<group>"; };
+ 		A5FB1401 /* NewWorkspaceMenuModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewWorkspaceMenuModelTests.swift; sourceTree = "<group>"; };
+ 		D2C075029771815DD5DA1332 /* NotificationAndMenuBarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationAndMenuBarTests.swift; sourceTree = "<group>"; };
+ 		C06552010000000000000004 /* NotificationBurstCoalescer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationBurstCoalescer.swift; sourceTree = "<group>"; };
+ 		7490D00D7490D00D7490D00D /* NotificationCacheMemoryPressureResponder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/NotificationCacheMemoryPressureResponder.swift; sourceTree = "<group>"; };
+ 		A11E00010000000000000004 /* NotificationDebugEmitter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationDebugEmitter.swift; sourceTree = "<group>"; };
+@@ -7828,21 +7820,20 @@
+ 		FE00300B /* SessionTranscriptPopoverLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTranscriptPopoverLayout.swift; sourceTree = "<group>"; };
+ 		FE00300C /* SessionTranscriptPopoverSizeModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTranscriptPopoverSizeModel.swift; sourceTree = "<group>"; };
+ 		F5320003A1B2C3D4E5F60718 /* SessionTranscriptTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTranscriptTypes.swift; sourceTree = "<group>"; };
+ 		9666F2029666F2029666F202 /* SessionWindowSnapshot+Scrollback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SessionWindowSnapshot+Scrollback.swift"; sourceTree = "<group>"; };
+ 		FE006CEA49324833982DA204 /* SetAutoTitleSocketTests+CloudSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SetAutoTitleSocketTests+CloudSidebar.swift"; sourceTree = "<group>"; };
+ 		F92AB6D1CB714189A8F167E5 /* SetAutoTitleSocketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetAutoTitleSocketTests.swift; sourceTree = "<group>"; };
+ 		D10000000000000000A00021 /* SettingsAccountJSONResetBehaviorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAccountJSONResetBehaviorUITests.swift; sourceTree = "<group>"; };
+ 		D10000000000000000A00013 /* SettingsAppBehaviorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAppBehaviorUITests.swift; sourceTree = "<group>"; };
+ 		D10000000000000000A00019 /* SettingsAutomationBehaviorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAutomationBehaviorUITests.swift; sourceTree = "<group>"; };
+ 		D10000000000000000A0001B /* SettingsBrowserBehaviorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsBrowserBehaviorUITests.swift; sourceTree = "<group>"; };
+-		83418958EF0A36762FBB8A36 /* SettingsComputersBehaviorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsComputersBehaviorUITests.swift; sourceTree = "<group>"; };
+ 		4252144220782379B2B347BE /* SettingsHostingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/SettingsHostingView.swift; sourceTree = "<group>"; };
+ 		D9CCF001D9CCF001D9CCF001 /* SettingsLazyLoadHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsLazyLoadHelpers.swift; sourceTree = "<group>"; };
+ 		D5671402D5671402D5671402 /* SettingsNavigation+TerminalScrollSpeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsNavigation+TerminalScrollSpeed.swift"; sourceTree = "<group>"; };
+ 		A50019A1 /* SettingsNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsNavigation.swift; sourceTree = "<group>"; };
+ 		D10000000000000000A00023 /* SettingsNetworkingBehaviorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsNetworkingBehaviorUITests.swift; sourceTree = "<group>"; };
+ 		A50019B1 /* SettingsSearchAliases.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSearchAliases.swift; sourceTree = "<group>"; };
+ 		6DD89A398F134C93ACED1A9A /* SettingsSearchIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsSearchIndex.swift"; sourceTree = "<group>"; };
+ 		A50019B3 /* SettingsSearchIndexTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSearchIndexTests.swift; sourceTree = "<group>"; };
+ 		D10000000000000000A0001D /* SettingsShortcutsBehaviorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsShortcutsBehaviorUITests.swift; sourceTree = "<group>"; };
+ 		D10000000000000000A00017 /* SettingsSidebarBetaBehaviorUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSidebarBetaBehaviorUITests.swift; sourceTree = "<group>"; };
+@@ -7862,20 +7853,21 @@
+ 		226DDE616BF03D38B4845245 /* SharedLiveAgentIndex+ScheduledHibernation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SharedLiveAgentIndex+ScheduledHibernation.swift"; sourceTree = "<group>"; };
+ 		F0ACC0DE0000000000000012 /* SharedLiveAgentIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLiveAgentIndex.swift; sourceTree = "<group>"; };
+ 		F0ACC0DF0000000000000002 /* SharedLiveAgentIndexAgentLivenessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLiveAgentIndexAgentLivenessTests.swift; sourceTree = "<group>"; };
+ 		F0ACC0DE0000000000000008 /* SharedLiveAgentIndexLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLiveAgentIndexLoader.swift; sourceTree = "<group>"; };
+ 		121580051215800512158005 /* SharedLiveAgentIndexRefreshOutcome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLiveAgentIndexRefreshOutcome.swift; sourceTree = "<group>"; };
+ 		831E0F65E3D945CE8970852E /* ShellIntegrationSendTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellIntegrationSendTransportTests.swift; sourceTree = "<group>"; };
+ 		C0F16A000000000000000002 /* ShellStartupMatrixTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellStartupMatrixTests.swift; sourceTree = "<group>"; };
+ 		C0F16C000000000000000002 /* ShellStartupMissingBundleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellStartupMissingBundleTests.swift; sourceTree = "<group>"; };
+ 		71099E791FDFEEBC0898FEAB /* ShellXCloudOffTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXCloudOffTests.swift"; sourceTree = "<group>"; };
+ 		670CA928F698AA3B4424ED2D /* ShellXNoPhoneHomeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXNoPhoneHomeTests.swift"; sourceTree = "<group>"; };
++		AE04344F1F44FBBC99583161 /* ShellXSwitches.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/ShellXSwitches.swift; sourceTree = "<group>"; };
+ 		6083A7DAD962E287FC2FFE94 /* ShortcutAndCommandPaletteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutAndCommandPaletteTests.swift; sourceTree = "<group>"; };
+ 		AB7F2E9143904957AAA70726 /* ShortcutBareStartRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/ShortcutBareStartRouting.swift; sourceTree = "<group>"; };
+ 		5C0DE0DE0000000000000003 /* ShortcutDiscoveryButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutDiscoveryButton.swift; sourceTree = "<group>"; };
+ 		6042B0016042B0016042B001 /* ShortcutHintModifierPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutHintModifierPolicyTests.swift; sourceTree = "<group>"; };
+ 		A080D1F6CCCBFBED8D95DD1D /* ShortcutHintPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutHintPill.swift; sourceTree = "<group>"; };
+ 		6042D0046042D0046042D004 /* ShortcutHintTitlebarPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutHintTitlebarPolicy.swift; sourceTree = "<group>"; };
+ 		D35B00000000000000000010 /* ShortcutRecorderRejectedAttempt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutRecorderRejectedAttempt.swift; sourceTree = "<group>"; };
+ 		B42A82C6AA614E74873D9A5F /* ShortcutRoutingSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/ShortcutRoutingSupport.swift; sourceTree = "<group>"; };
+ 		F6001001A1B2C3D4E5F60718 /* ShortcutUnbindingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutUnbindingTests.swift; sourceTree = "<group>"; };
+ 		C12791000000000000000004 /* Sidebar/SidebarRowSnapshotCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar/SidebarRowSnapshotCache.swift; sourceTree = "<group>"; };
+@@ -9535,21 +9527,20 @@
+ 				B900001CA1B2C3D4E5F60719 /* CloseWorkspacesConfirmDialogUITests.swift */,
+ 				B9000026A1B2C3D4E5F60719 /* CloseWindowConfirmDialogUITests.swift */,
+ 				B9000016A1B2C3D4E5F60719 /* MultiWindowNotificationsUITests.swift */,
+ 				D77690000000000000000006 /* MultiWindowNotificationsWorkspaceHeadlineUITests.swift */,
+ 				04698069140539D8495D6B9B /* NewBrowserWorkspaceShortcutUITests.swift */,
+ 				818DBCD4AB69EB72573E8138 /* SidebarResizeUITests.swift */,
+ 				21A082A233635DC9DB397DAB /* SplitDividerDragUITests.swift */,
+ 				C0DE34020000000000000006 /* HelpMenuUITests.swift */,
+ 				B8F266256A1A3D9A45BD840F /* SidebarHelpMenuUITests.swift */,
+ 				C0DE32470000000000000006 /* CommandPaletteIdentifierClipboardUITests.swift */,
+-				C0DE1223900000000000000A /* NewMachineSheetKindUITests.swift */,
+ 				B8F266276A1A3D9A45BD840F /* DisplayResolutionRegressionUITests.swift */,
+ 				F0F0A002A1B2C3D4E5F60718 /* WorkspaceSidebarScrollUITests.swift */,
+ 				A1B2C3D410248002A1B2C3D4E5F60718 /* SidebarEmptyAreaDoubleClickUITests.swift */,
+ 				A1122302A1B2C3D4E5F60718 /* NewWorkspaceButtonHitAreaUITests.swift */,
+ 				C2577001A1B2C3D4E5F60718 /* TerminalCmdClickUITests.swift */,
+ 				B82090010000000000000002 /* TCCUsageDescriptionUITests.swift */,
+ 				B9000131A1B2C3D4E5F60719 /* SidebarPullRequestInteractivityUITests.swift */,
+ 				E6FA9085A1B2C3D4E5F60718 /* WorkspaceDescriptionUITests.swift */,
+ 				D0E0F0B1A1B2C3D4E5F60718 /* BrowserPaneNavigationKeybindUITests.swift */,
+ 				A13387000000000000000012 /* SplitPaneBackgroundUITests.swift */,
+@@ -9580,27 +9571,23 @@
+ 				D10000000000000000A0001D /* SettingsShortcutsBehaviorUITests.swift */,
+ 				D10000000000000000A0001F /* SettingsWorkspaceColorsBehaviorUITests.swift */,
+ 				D10000000000000000A00021 /* SettingsAccountJSONResetBehaviorUITests.swift */,
+ 				E1000001A1B2C3D4E5F60718 /* MenuKeyEquivalentRoutingUITests.swift */,
+ 				AA1B2C3D4E5F60719 /* BonsplitTabDragUITests.swift */,
+ 				C0DE51DE0002C0DE0002C0DE /* RemoteTmuxSizingUITests.swift */,
+ 				FA5DCDD25A59CDCAC318B58E /* RemoteTmuxSizingUITests+Lab.swift */,
+ 				2D7997450F5175FDC84FC976 /* RemoteTmuxSizingUITests+Oracle.swift */,
+ 				2D7997460F5175FDC84FC977 /* RemoteTmuxSizingUITests+Content.swift */,
+ 				E93214F8A3E0C68058E9EEF6 /* RemoteTmuxSizingUITests+Socket.swift */,
+-				A14327000000000000000005 /* CloudTeamPickerPlacementUITests.swift */,
+-				A14485000000000000000001 /* CloudSectionHeaderActionsUITests.swift */,
+ 				AA1B2C3D4E5F60721 /* RightSidebarChromeHeightUITests.swift */,
+ 				340AACC8DD8772A000EA1971 /* VaultRefreshUITests.swift */,
+-				83418958EF0A36762FBB8A36 /* SettingsComputersBehaviorUITests.swift */,
+ 				94600B483EE4B6BC3F7506DA /* SidebarCompactAgentStatusUITests.swift */,
+-				A45FD277385970AA8FA5508D /* DeviceDiscoverabilityUITests.swift */,
+ 				5A074689235BE614781DC6FA /* BrowserReturnSubmissionUITests.swift */,
+ 			);
+ 			path = cmuxUITests;
+ 			sourceTree = "<group>";
+ 		};
+ 		ACA7C4A70000000000000100 /* AgentChat */ = {
+ 			isa = PBXGroup;
+ 			children = (
+ 				ACA7C4A70000000000000006 /* AgentChatTranscriptResolver.swift */,
+ 					ACA7C4A70000000000000008 /* AgentChatSessionRegistry.swift */,
+@@ -12322,20 +12309,21 @@
+ 				02CFC6590048910718C3FAB7 /* AppDelegate+ProductAnalytics.swift */,
+ 				BE0A832803DD479693FA71A0 /* HostAccountFlow+Analytics.swift */,
+ 				7BF00B6EA5F80726C036DA53 /* PostHogProductAnalyticsSink.swift */,
+ 				F89797AE49756191CC98B2C1 /* ProBadgeActions.swift */,
+ 				7A46D27DF741643885DBBFA2 /* ProductAnalytics+App.swift */,
+ 				E0AFE40AA472BB58AEEBDB6E /* ProductAnalyticsEvent+Upgrade.swift */,
+ 				6E0312C285F7C7C82024BF62 /* UpgradePromptImpression.swift */,
+ 				899EDFB4688088904AEC67B4 /* RightSidebarMode+ProductFeature.swift */,
+ 				34F76A7191862A9BFADE3869 /* PostHogContextCalls.swift */,
+ 				30AA2D44945B6C4A24A6D837 /* TerminalController+BrowserEmulation.swift */,
++				AE04344F1F44FBBC99583161 /* ShellXSwitches.swift */,
+ 			);
+ 			path = Sources;
+ 			sourceTree = "<group>";
+ 		};
+ 		CA52D0010000000000000000 /* Canvas */ = {
+ 			isa = PBXGroup;
+ 			children = (
+ 				CA52C0010000000000000000 /* CanvasAction.swift */,
+ 				CA52F0030000000000000000 /* CanvasInlineBrowserHostingEnvironment.swift */,
+ 				CA52F0010000000000000000 /* ContentView+CanvasCommandPalette.swift */,
+@@ -16493,20 +16481,21 @@
+ 				A50019B0 /* SettingsSearchAliases.swift in Sources */,
+ 				1559C88C4BE54850A7185058 /* SettingsSearchIndex.swift in Sources */,
+ 				D36090030000000000000001 /* SettingsWindowFactory.swift in Sources */,
+ 				D37777030000000000000001 /* SettingsWindowGeometry.swift in Sources */,
+ 				D37777070000000000000001 /* SettingsWindowNavigationDelivery.swift in Sources */,
+ 				D36090010000000000000001 /* SettingsWindowPresenter.swift in Sources */,
+ 				91C2053A2732340DD329CD30 /* SharedLiveAgentIndex+ScheduledHibernation.swift in Sources */,
+ 				F0ACC0DE0000000000000011 /* SharedLiveAgentIndex.swift in Sources */,
+ 				F0ACC0DE0000000000000007 /* SharedLiveAgentIndexLoader.swift in Sources */,
+ 				121580061215800612158006 /* SharedLiveAgentIndexRefreshOutcome.swift in Sources */,
++				9CBA983FD767551CAFB913EA /* ShellXSwitches.swift in Sources */,
+ 				76027A12C93B4538BF22C71E /* ShortcutBareStartRouting.swift in Sources */,
+ 				5C0DE0DE0000000000000004 /* ShortcutDiscoveryButton.swift in Sources */,
+ 				125BAEF2FE3B454547B964D1 /* ShortcutHintPill.swift in Sources */,
+ 				6042C0046042C0046042C004 /* ShortcutHintTitlebarPolicy.swift in Sources */,
+ 				D35A00000000000000000010 /* ShortcutRecorderRejectedAttempt.swift in Sources */,
+ 				5C3E0454B6C24B02A2F091A8 /* ShortcutRoutingSupport.swift in Sources */,
+ 				173E29C3FB4A4A0F867894B0 /* SidebarAccountMenuButtonStyle.swift in Sources */,
+ 				13019A000000000000000002 /* SidebarAccountTeamPopover.swift in Sources */,
+ 				A6AC71020000000000000001 /* SidebarAgentActivityIndicator.swift in Sources */,
+ 				A6AC71040000000000000001 /* SidebarAgentActivitySummary.swift in Sources */,
+@@ -17748,51 +17737,46 @@
+ 				C13BE417A8C24EE79F00A102 /* BrowserNativeHoverUITests.swift in Sources */,
+ 				D0E0F0B2A1B2C3D4E5F60718 /* BrowserOmnibarSuggestionsUITests.swift in Sources */,
+ 				D0E0F0B0A1B2C3D4E5F60718 /* BrowserPaneNavigationKeybindUITests.swift in Sources */,
+ 				8478A0000000000000000002 /* BrowserRecoveryHTTPServer.swift in Sources */,
+ 				7B5F1A2E9C0D4B6A8E217304 /* BrowserReliabilityRegressionUITests.swift in Sources */,
+ 				D5F4120F22CDD7AFA015F7BB /* BrowserReturnSubmissionUITests.swift in Sources */,
+ 				B9000025A1B2C3D4E5F60719 /* CloseWindowConfirmDialogUITests.swift in Sources */,
+ 				B9000023A1B2C3D4E5F60719 /* CloseWorkspaceCmdDUITests.swift in Sources */,
+ 				B900001AA1B2C3D4E5F60719 /* CloseWorkspaceConfirmDialogUITests.swift in Sources */,
+ 				B900001BA1B2C3D4E5F60719 /* CloseWorkspacesConfirmDialogUITests.swift in Sources */,
+-				A14485000000000000000002 /* CloudSectionHeaderActionsUITests.swift in Sources */,
+-				A14327000000000000000006 /* CloudTeamPickerPlacementUITests.swift in Sources */,
+ 				C0DE32470000000000000005 /* CommandPaletteIdentifierClipboardUITests.swift in Sources */,
+ 				D10000000000000000B00000 /* ControlSocketReadinessUITestSupport.swift in Sources */,
+-				1732E7B4DB84E108A8177DC7 /* DeviceDiscoverabilityUITests.swift in Sources */,
+ 				B8F266266A1A3D9A45BD840F /* DisplayResolutionRegressionUITests.swift in Sources */,
+ 				D0F00D01A1B2C3D4E5F60719 /* DogfoodScenarioUITests.swift in Sources */,
+ 				FEED0000000000000000F009 /* FeedSidebarUITests.swift in Sources */,
+ 				D0E0F0B4A1B2C3D4E5F60718 /* FindSelectionShortcutUITests.swift in Sources */,
+ 				FE00AA10C1B2C3D4E5F60718 /* FocusHistoryShortcutUITests.swift in Sources */,
+ 				CC000000A1B2C3D4E5F60718 /* GotoSplitCycleUITests.swift in Sources */,
+ 				C0DE34020000000000000005 /* HelpMenuUITests.swift in Sources */,
+ 				140240000000000000000002 /* HookPromptLengthUITests.swift in Sources */,
+ 				B9000014A1B2C3D4E5F60719 /* JumpToUnreadUITests.swift in Sources */,
+ 				E1000000A1B2C3D4E5F60718 /* MenuKeyEquivalentRoutingUITests.swift in Sources */,
+ 				B9000015A1B2C3D4E5F60719 /* MultiWindowNotificationsUITests.swift in Sources */,
+ 				D77690000000000000000005 /* MultiWindowNotificationsWorkspaceHeadlineUITests.swift in Sources */,
+ 				8B1B2AB6EC6ACDB2CD39A9BB /* NewBrowserWorkspaceShortcutUITests.swift in Sources */,
+-				C0DE1223900000000000000B /* NewMachineSheetKindUITests.swift in Sources */,
+ 				A1122301A1B2C3D4E5F60718 /* NewWorkspaceButtonHitAreaUITests.swift in Sources */,
+ 				0857775ACBD4B3C507EBB232 /* RemoteTmuxSizingUITests+Content.swift in Sources */,
+ 				703CAAF15AF4CA4399BDD26B /* RemoteTmuxSizingUITests+Lab.swift in Sources */,
+ 				08577759CBD4B3C507EBB231 /* RemoteTmuxSizingUITests+Oracle.swift in Sources */,
+ 				3D85F2D32DF59EEFFF7EB0B6 /* RemoteTmuxSizingUITests+Socket.swift in Sources */,
+ 				C0DE51DE0001C0DE0001C0DE /* RemoteTmuxSizingUITests.swift in Sources */,
+ 				AA1B2C3D4E5F60720 /* RightSidebarChromeHeightUITests.swift in Sources */,
+ 				D10000000000000000A00020 /* SettingsAccountJSONResetBehaviorUITests.swift in Sources */,
+ 				D10000000000000000A00012 /* SettingsAppBehaviorUITests.swift in Sources */,
+ 				D10000000000000000A00018 /* SettingsAutomationBehaviorUITests.swift in Sources */,
+ 				D10000000000000000A0001A /* SettingsBrowserBehaviorUITests.swift in Sources */,
+-				20F2B44223BBBA9A4ED185C4 /* SettingsComputersBehaviorUITests.swift in Sources */,
+ 				D10000000000000000A00022 /* SettingsNetworkingBehaviorUITests.swift in Sources */,
+ 				D10000000000000000A0001C /* SettingsShortcutsBehaviorUITests.swift in Sources */,
+ 				D10000000000000000A00016 /* SettingsSidebarBetaBehaviorUITests.swift in Sources */,
+ 				D10000000000000000A00014 /* SettingsTerminalBehaviorUITests.swift in Sources */,
+ 				D10000000000000000A00010 /* SettingsUITestSupport.swift in Sources */,
+ 				D10000000000000000A0001E /* SettingsWorkspaceColorsBehaviorUITests.swift in Sources */,
+ 				6C5DBAE06100A599005206C9 /* SidebarCompactAgentStatusUITests.swift in Sources */,
+ 				A1B2C3D410248001A1B2C3D4E5F60718 /* SidebarEmptyAreaDoubleClickUITests.swift in Sources */,
+ 				B8F266246A1A3D9A45BD840F /* SidebarHelpMenuUITests.swift in Sources */,
+ 				B9000130A1B2C3D4E5F60719 /* SidebarPullRequestInteractivityUITests.swift in Sources */,
+diff --git a/cmuxCLITests/CLIExplicitSurfaceRoutingTests.swift b/cmuxCLITests/CLIExplicitSurfaceRoutingTests.swift
+index 563a8b7a8c..334e64e405 100644
+--- a/cmuxCLITests/CLIExplicitSurfaceRoutingTests.swift
++++ b/cmuxCLITests/CLIExplicitSurfaceRoutingTests.swift
+@@ -131,63 +131,20 @@ struct CLIExplicitSurfaceRoutingTests {
+             arguments: ["notify", "--title", "Build", "--desktop", "false"],
+             socketName: "notify-desktop-valid"
+         ) { line in
+             Self.malformedRequestResponse(raw: line)
+         }
+         #expect(!execution.result.timedOut, Comment(rawValue: execution.result.stderr))
+         #expect(!execution.result.stderr.contains("unexpected"), Comment(rawValue: execution.result.stderr))
+         #expect(try !execution.state.requestObjects().isEmpty)
+     }
+ 
+-    @Test func vmTreeUsesCloudLinkErrorMessageInHumanOutput() throws {
+-        let temporaryHome = FileManager.default.temporaryDirectory
+-            .appendingPathComponent("cmux-cli-vm-tree-\(UUID().uuidString)", isDirectory: true)
+-        try FileManager.default.createDirectory(at: temporaryHome, withIntermediateDirectories: true)
+-        defer { try? FileManager.default.removeItem(at: temporaryHome) }
+-
+-        let execution = try runMockCommand(
+-            arguments: ["vm", "tree"],
+-            socketName: "vm-tree-link-error",
+-            environmentOverrides: [
+-                "CFFIXED_USER_HOME": temporaryHome.path,
+-                "HOME": temporaryHome.path,
+-            ]
+-        ) { line in
+-            guard let request = Self.jsonObject(line),
+-                  let id = request["id"] as? String,
+-                  request["method"] as? String == "surface.catalog" else {
+-                return Self.malformedRequestResponse(raw: line)
+-            }
+-            return Self.v2Response(
+-                id: id,
+-                ok: true,
+-                result: [
+-                    "machines": [[
+-                        "id": "brave-otter",
+-                        "status": "running",
+-                        "link_state": "error",
+-                        "link_error": "cloud_api_unavailable",
+-                        "link_error_message": "cmux cannot reach the Cloud service for this machine right now."
+-                    ]],
+-                    "resources": []
+-                ]
+-            )
+-        }
+-
+-        #expect(execution.result.status == 0, Comment(rawValue: execution.result.stderr))
+-        #expect(
+-            execution.result.stdout.contains("cmux cannot reach the Cloud service"),
+-            Comment(rawValue: execution.result.stdout)
+-        )
+-        #expect(!execution.result.stdout.contains("cloud_api_unavailable"))
+-    }
+-
+     @Test func sendKeyCommandsRejectExtraArgumentsWithoutSocketRequest() throws {
+         let cases: [[String]] = [
+             ["send-key", "--surface", Self.targetSurfaceRef, "ctrl+c", "enter"],
+             ["send-key-panel", "--panel", Self.targetSurfaceRef, "ctrl+c", "enter"],
+         ]
+         for (index, arguments) in cases.enumerated() {
+             let execution = try runMockCommand(arguments: arguments, socketName: "key-arity-\(index)") { line in
+                 Self.malformedRequestResponse(raw: line)
+             }
+             let requests = try execution.state.requestObjects()
+diff --git a/cmuxTests/AccountUpgradeOfferTests.swift b/cmuxTests/AccountUpgradeOfferTests.swift
+index 3a4a8f452d..e38110ba8d 100644
+--- a/cmuxTests/AccountUpgradeOfferTests.swift
++++ b/cmuxTests/AccountUpgradeOfferTests.swift
+@@ -16,26 +16,19 @@ import Testing
+ struct AccountUpgradeOfferTests {
+     @Test func menuTitlesNameTheOfferedTier() {
+         #expect(ProUpgradePresenter.upgradeMenuTitle(for: .pro) == String(
+             localized: "menu.help.upgradeToPro", defaultValue: "Upgrade to cmux Pro…"
+         ))
+         #expect(ProUpgradePresenter.upgradeMenuTitle(for: .max) == String(
+             localized: "menu.help.upgradeToMax", defaultValue: "Upgrade to cmux Max…"
+         ))
+     }
+ 
+-    @Test(arguments: [
+-        (CmuxPlanTier.free, Optional(CmuxPlanTier.pro)),
+-        (CmuxPlanTier.go, Optional(CmuxPlanTier.pro)),
+-        (CmuxPlanTier.pro, Optional(CmuxPlanTier.max)),
+-        (CmuxPlanTier.max, nil),
+-    ])
+-
+     /// ShellX: billing and Pro are Manaflow services, so no tier shows the
+     /// footer upgrade badge and the palette offers no upgrade command.
+     @Test func footerBadgeAndPaletteNeverOfferAnUpgrade() {
+         for tier in CmuxPlanTier.allCases {
+             #expect(!SidebarFooterPresentationPolicy.isUpgradeVisible(isProActive: tier.includesPro), "\(tier)")
+         }
+         #expect(ContentView.commandPaletteProCommandContributions().isEmpty)
+     }
+ }
+diff --git a/cmuxTests/CloudTreeOneMachineManyWorkspacesTests.swift b/cmuxTests/CloudTreeOneMachineManyWorkspacesTests.swift
+index 7acfb5899b..56135bc508 100644
+--- a/cmuxTests/CloudTreeOneMachineManyWorkspacesTests.swift
++++ b/cmuxTests/CloudTreeOneMachineManyWorkspacesTests.swift
+@@ -627,21 +627,21 @@ struct CloudTreeOneMachineManyWorkspacesTests {
+         let before = try workspaceRow(initial)
+         let after = try workspaceRow(rowLocal)
+         let refreshed = try workspaceRow(CmuxTuiSnapshotParser.resources(from: next))
+         #expect(before.children.count == 2)
+         #expect(before.children.allSatisfy { $0.children.isEmpty })
+         #expect(after.children.map(\.id) == before.children.map(\.id))
+         #expect(refreshed.children.map(\.id) == after.children.map(\.id))
+         #expect(updated.remoteViews?.first?.name == "renamed")
+     }
+ 
+-    @Test("The CLI shows every workspace tab as a flat sibling row")
++    @Test("The CLI shows every workspace tab as a flat sibling row", .enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm (Cloud is off)"))
+     func cliTreeShowsFlatTabs() throws {
+         let workspace: [String: Any] = ["id": "ws_main", "name": "main", "index": 0, "focused": true]
+         let machine: [String: Any] = [
+             "id": machineID, "status": "running", "link_state": "connected", "has_desktop": false,
+             "remote_workspaces": [workspace],
+         ]
+         func terminal(_ key: String, tab: String, index: Int, focused: Bool) -> [String: Any] {
+             [
+                 "id": "\(machineID)/terminal/\(key)", "key": key, "kind": "terminal", "title": key, "lifecycle": "running",
+                 "remote_workspace": workspace,
+@@ -657,21 +657,21 @@ struct CloudTreeOneMachineManyWorkspacesTests {
+         ])
+         #expect(result.status == 0, Comment(rawValue: result.stderr))
+         let lines = result.stdout.split(whereSeparator: \.isNewline).map(String.init)
+         let rows = lines.filter { $0.hasPrefix("      ") }
+         #expect(rows.count == 2, Comment(rawValue: result.stdout))
+         #expect(rows[0].contains("term_a"), Comment(rawValue: rows[0]))
+         #expect(rows[1].contains("term_b"), Comment(rawValue: rows[1]))
+         #expect(!result.stdout.contains("hidden"))
+     }
+ 
+-    @Test("CLI open commands name the exact tab when one terminal occupies several")
++    @Test("CLI open commands name the exact tab when one terminal occupies several", .enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm (Cloud is off)"))
+     func cliTreeOpenCommandsIdentifyTheTab() throws {
+         let workspace: [String: Any] = ["id": "ws_main", "name": "main", "index": 0, "focused": true]
+         let machine: [String: Any] = [
+             "id": machineID, "status": "running", "link_state": "connected", "has_desktop": false,
+             "remote_workspaces": [workspace],
+         ]
+         let resource: [String: Any] = [
+             "id": "\(machineID)/terminal/term_shared",
+             "key": "term_shared",
+             "kind": "terminal",
+@@ -791,21 +791,21 @@ struct CloudTreeOneMachineManyWorkspacesTests {
+             Issue.record("expected the Displays group"); return
+         }
+         #expect(count == 2)
+         #expect(CloudTreeRowContentView.text(for: first) == "noVNC · :1")
+         #expect(CloudTreeRowContentView.text(for: second) == "noVNC · :2")
+         #expect(CloudTreeRowContentView.screenLabel(displayKey: "display:2") == ":2")
+         #expect(CloudTreeRowContentView.screenLabel(displayKey: "desktop") == nil)
+         #expect(CloudTreeRowContentView.screenLabel(displayKey: "display:") == nil)
+     }
+ 
+-    @Test("The CLI keeps detached terminals in the final Terminals section and mirrors the sidebar order")
++    @Test("The CLI keeps detached terminals in the final Terminals section and mirrors the sidebar order", .enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm (Cloud is off)"))
+     func cliTreeUsesTheFourGroupOrder() throws {
+         let workspace: [String: Any] = [
+             "id": "ws_main",
+             "name": "main",
+             "index": 0,
+             "focused": true,
+         ]
+         let machine: [String: Any] = [
+             "id": machineID,
+             "status": "running",
+@@ -863,21 +863,21 @@ struct CloudTreeOneMachineManyWorkspacesTests {
+         let displays = try #require(lines.firstIndex { $0.trimmingCharacters(in: .whitespaces) == "Displays/" })
+         let terminals = try #require(lines.firstIndex { $0.trimmingCharacters(in: .whitespaces) == "terminals/" })
+ 
+         #expect(workspaces < ports)
+         #expect(ports < displays)
+         #expect(displays < terminals)
+         #expect(!lines[..<terminals].contains { $0.contains("term_detached") }, "a zero-view terminal is not a detached workspace child")
+         #expect(lines[terminals...].contains { $0.contains("term_detached") }, "the final Terminals section lists every machine-owned terminal")
+     }
+ 
+-    @Test("CLI keeps machine-owned terminals visible while a cloud link is unavailable")
++    @Test("CLI keeps machine-owned terminals visible while a cloud link is unavailable", .enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm (Cloud is off)"))
+     func cliTreeKeepsTerminalsWhenLinkUnavailable() throws {
+         let machine: [String: Any] = [
+             "id": machineID,
+             "status": "paused",
+             "link_state": "asleep",
+             "remote_workspaces": [],
+         ]
+         let terminal: [String: Any] = [
+             "id": "\(machineID)/terminal/term_sleeping",
+             "key": "term_sleeping",
+@@ -888,21 +888,21 @@ struct CloudTreeOneMachineManyWorkspacesTests {
+         ]
+ 
+         let result = try runCLICloudTree(machine: machine, resources: [terminal])
+         #expect(result.status == 0, Comment(rawValue: result.stderr))
+         let lines = result.stdout.split(whereSeparator: \.isNewline).map(String.init)
+         let terminals = try #require(lines.firstIndex { $0.trimmingCharacters(in: .whitespaces) == "terminals/" })
+ 
+         #expect(lines[terminals...].contains { $0.contains("term_sleeping") })
+     }
+ 
+-    @Test("CLI shows a failed link's message, never its raw error code")
++    @Test("CLI shows a failed link's message, never its raw error code", .enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm (Cloud is off)"))
+     func cliTreeShowsLinkErrorMessageNotCode() throws {
+         let machine: [String: Any] = [
+             "id": machineID,
+             "status": "running",
+             "link_state": "error",
+             "link_error": "cloud_api_unavailable",
+             "link_error_message": "cmux cannot reach the Cloud service for this machine right now.",
+             "remote_workspaces": [],
+         ]
+ 
+diff --git a/cmuxTests/CmuxSocketEventMapperTests.swift b/cmuxTests/CmuxSocketEventMapperTests.swift
+index a8d37ff74a..6eac3d65b1 100644
+--- a/cmuxTests/CmuxSocketEventMapperTests.swift
++++ b/cmuxTests/CmuxSocketEventMapperTests.swift
+@@ -194,21 +194,41 @@ private actor CodeRouterHandoffGate {
+         released = true
+         continuation?.resume()
+         continuation = nil
+     }
+ }
+ 
+ @Suite("CodeRouter native handoff client")
+ struct CodeRouterHandoffClientTests {
+     private let baseURL = URL(string: "http://127.0.0.1:39123")!
+ 
+-    @Test
++    /// ShellX: CodeRouter is a Manaflow service, so `mint()` refuses before it
++    /// reads the session or sends any request.
++    @Test(.enabled(if: !ShellXSwitches.codeRouter))
++    func mintRefusesBeforeAnyRequestInShellX() async throws {
++        let probe = CodeRouterHandoffRequestProbe()
++        let handler: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in
++            await probe.record(request)
++            throw URLError(.badServerResponse)
++        }
++        let client = CodeRouterHandoffClient(
++            auth: CodeRouterHandoffTestAuth(),
++            baseURL: baseURL,
++            requestHandler: handler
++        )
++        await #expect(throws: CodeRouterHandoffClientError.sessionUnavailable) {
++            _ = try await client.mint()
++        }
++        #expect(await probe.request == nil)
++    }
++
++    @Test(.enabled(if: ShellXSwitches.codeRouter, "ShellX: CodeRouter is off; mint() refuses first"))
+     func mintsLeaseWithNativeHeadersAndNoCookies() async throws {
+         let auth = CodeRouterHandoffTestAuth()
+         let probe = CodeRouterHandoffRequestProbe()
+         let lease = "crh_" + String(repeating: "B", count: 43)
+         let expiry = "2099-01-01T00:00:00.000Z"
+         let handler: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in
+             await probe.record(request)
+             let response = HTTPURLResponse(
+                 url: request.url!,
+                 statusCode: 200,
+@@ -245,21 +265,21 @@ struct CodeRouterHandoffClientTests {
+     }
+ 
+     @Test
+     func handoffTimeoutsRemainNestedAndBounded() {
+         #expect(CodeRouterHandoffClient.httpTimeoutSeconds == 18)
+         #expect(TerminalController.codeRouterHandoffWorkerTimeoutSeconds == 22)
+         // The CLI waits 25 s for the socket reply (CMUXCLI.coderouterHandoffSocketResponseTimeoutSeconds);
+         // app-host tests cannot import the CLI, so that bound is not checked here.
+     }
+ 
+-    @Test
++    @Test(.enabled(if: ShellXSwitches.codeRouter, "ShellX: CodeRouter is off; mint() refuses first"))
+     func rejectsAccountOrTeamChangeBeforeReturningLease() async throws {
+         let auth = CodeRouterHandoffTestAuth()
+         let gate = CodeRouterHandoffGate()
+         let probe = CodeRouterHandoffRequestProbe()
+         let handler: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in
+             await probe.record(request)
+             await gate.wait()
+             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+             let data = try JSONSerialization.data(withJSONObject: [
+                 "teamId": "team_a",
+@@ -276,21 +296,21 @@ struct CodeRouterHandoffClientTests {
+         await gate.release()
+ 
+         do {
+             _ = try await task.value
+             Issue.record("handoff returned a lease after sign-out/team change")
+         } catch let error as CodeRouterHandoffClientError {
+             #expect(error == .sessionChanged)
+         }
+     }
+ 
+-    @Test
++    @Test(.enabled(if: ShellXSwitches.codeRouter, "ShellX: CodeRouter is off; mint() refuses first"))
+     func rejectsAccountChangeBeforeReturningLease() async throws {
+         let auth = CodeRouterHandoffTestAuth()
+         let gate = CodeRouterHandoffGate()
+         let probe = CodeRouterHandoffRequestProbe()
+         let handler: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in
+             await probe.record(request)
+             await gate.wait()
+             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+             let data = try JSONSerialization.data(withJSONObject: [
+                 "teamId": "team_a",
+@@ -306,41 +326,41 @@ struct CodeRouterHandoffClientTests {
+         await gate.release()
+ 
+         do {
+             _ = try await task.value
+             Issue.record("handoff returned a lease after account change")
+         } catch let error as CodeRouterHandoffClientError {
+             #expect(error == .sessionChanged)
+         }
+     }
+ 
+-    @Test
++    @Test(.enabled(if: ShellXSwitches.codeRouter, "ShellX: CodeRouter is off; mint() refuses first"))
+     func rejectsExpiredAndReplayedResponsesWithoutEchoingBody() async throws {
+         let auth = CodeRouterHandoffTestAuth()
+         let secretLease = "crh_" + String(repeating: "D", count: 43)
+         let handler: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in
+             let response = HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!
+             let data = Data(#"{"error":"invalid_handoff_lease","lease":"\#(secretLease)"}"#.utf8)
+             return (data, response)
+         }
+         let client = CodeRouterHandoffClient(auth: auth, baseURL: baseURL, requestHandler: handler)
+ 
+         do {
+             _ = try await client.mint()
+             Issue.record("expected 401 handoff error")
+         } catch let error as CodeRouterHandoffClientError {
+             #expect(error == .httpStatus(401))
+             #expect(!error.description.contains(secretLease))
+         }
+     }
+ 
+-    @Test
++    @Test(.enabled(if: ShellXSwitches.codeRouter, "ShellX: CodeRouter is off; mint() refuses first"))
+     func rejectsExpiredAndOversizedSuccessBodies() async throws {
+         let auth = CodeRouterHandoffTestAuth()
+         let expiredHandler: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in
+             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+             let data = try JSONSerialization.data(withJSONObject: [
+                 "teamId": "team_a",
+                 "lease": "crh_" + String(repeating: "E", count: 43),
+                 "expiresAt": "2000-01-01T00:00:00.000Z",
+             ])
+             return (data, response)
+@@ -368,21 +388,21 @@ struct CodeRouterHandoffClientTests {
+             requestHandler: oversizedHandler
+         )
+         do {
+             _ = try await oversizedClient.mint()
+             Issue.record("expected oversized response failure")
+         } catch let error as CodeRouterHandoffClientError {
+             #expect(error == .invalidResponse)
+         }
+     }
+ 
+-    @Test
++    @Test(.enabled(if: ShellXSwitches.codeRouter, "ShellX: CodeRouter is off; mint() refuses first"))
+     func rejectsUntrustedHostAndInvalidLeaseSyntax() async throws {
+         let auth = CodeRouterHandoffTestAuth()
+         let handler: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { _ in
+             Issue.record("untrusted host must not receive a request")
+             throw URLError(.badURL)
+         }
+         let client = CodeRouterHandoffClient(
+             auth: auth,
+             baseURL: URL(string: "https://evil.example")!,
+             requestHandler: handler
+@@ -390,42 +410,42 @@ struct CodeRouterHandoffClientTests {
+         do {
+             _ = try await client.mint()
+             Issue.record("expected invalid host failure")
+         } catch let error as CodeRouterHandoffClientError {
+             #expect(error == .invalidResponse)
+         }
+         #expect(!CodeRouterHandoffClient.isValidLeaseSyntax("crh_short"))
+         #expect(!CodeRouterHandoffClient.isValidLeaseSyntax("crh_" + String(repeating: "!", count: 43)))
+     }
+ 
+-    @Test
++    @Test(.enabled(if: ShellXSwitches.codeRouter, "ShellX: CodeRouter is off; mint() refuses first"))
+     func rejectsRedirectedMintResponse() async throws {
+         let auth = CodeRouterHandoffTestAuth()
+         let handler: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in
+             let redirected = HTTPURLResponse(
+                 url: URL(string: "https://evil.example/api/coderouter/handoff")!,
+                 statusCode: 200,
+                 httpVersion: nil,
+                 headerFields: nil
+             )!
+             return (Data("{}".utf8), redirected)
+         }
+         let client = CodeRouterHandoffClient(auth: auth, baseURL: baseURL, requestHandler: handler)
+         do {
+             _ = try await client.mint()
+             Issue.record("expected redirected response failure")
+         } catch let error as CodeRouterHandoffClientError {
+             #expect(error == .redirectedResponse)
+         }
+     }
+ 
+-    @Test
++    @Test(.enabled(if: ShellXSwitches.codeRouter, "ShellX: CodeRouter is off; mint() refuses first"))
+     func rejectsTeamMismatchForExplicitTeamRequest() async throws {
+         let auth = CodeRouterHandoffTestAuth()
+         let handler: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in
+             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+             let data = try JSONSerialization.data(withJSONObject: [
+                 "teamId": "team_a",
+                 "lease": "crh_" + String(repeating: "G", count: 43),
+                 "expiresAt": "2099-01-01T00:00:00.000Z",
+             ])
+             return (data, response)
+diff --git a/cmuxTests/CmuxTuiSurfaceProviderTests.swift b/cmuxTests/CmuxTuiSurfaceProviderTests.swift
+index 74e29394f5..2aabe443dd 100644
+--- a/cmuxTests/CmuxTuiSurfaceProviderTests.swift
++++ b/cmuxTests/CmuxTuiSurfaceProviderTests.swift
+@@ -1233,21 +1233,21 @@ import Testing
+         // The daemon treats an empty tab name as a clear operation. Keep the
+         // empty token in argv so this stays distinct from a missing value.
+         #expect(CloudTuiCommandLine.renameTabArguments(socketPath: "/k.sock", tabID: "tab_1", name: "") ==
+             ["--socket", "/k.sock", "--json", "tab", "tab_1", "rename", "--name", ""])
+         #expect(CloudRemoteRenameName(rawValue: " \n") == .cleared)
+         #expect(CloudRemoteRenameName(rawValue: "  db shell  ").wireValue == "db shell")
+         #expect(CloudTuiCommandLine.renameTabArguments(socketPath: "/k.sock", tabID: "tab_1", name: "db shell", expectedRevision: 9) ==
+             ["--socket", "/k.sock", "--json", "--expected-revision", "9", "tab", "tab_1", "rename", "--name", "db shell"])
+     }
+ 
+-    @Test func vmTuiConnectPassesReceiptSession() throws {
++    @Test(.enabled(if: ShellXSwitches.cloud, "ShellX refuses vm-tui-connect (Cloud is off)")) func vmTuiConnectPassesReceiptSession() throws {
+         let harness = CMUXCLIErrorOutputRegressionTests()
+         let cliPath = try harness.bundledCLIPath()
+         // The pane helper enters through the CLI's app-socket connection gate.
+         let socketPath = "/tmp/cmux-tui-argv-\(UUID().uuidString.prefix(8)).sock"
+         let responder = try UnixSocketResponder(path: socketPath, response: "OK")
+         defer { responder.stop() }
+         let root = FileManager.default.temporaryDirectory
+             .appendingPathComponent("cmux-tui-argv-\(UUID().uuidString)", isDirectory: true)
+         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+         defer { try? FileManager.default.removeItem(at: root) }
+diff --git a/cmuxTests/DevicesSidebarModeTests.swift b/cmuxTests/DevicesSidebarModeTests.swift
+index 14d789eaa6..caeb468f1c 100644
+--- a/cmuxTests/DevicesSidebarModeTests.swift
++++ b/cmuxTests/DevicesSidebarModeTests.swift
+@@ -14,105 +14,142 @@ import Testing
+ /// its CLI spelling, the independent preferences, managed policy, and host listener.
+ @Suite("Devices: sidebar mode, gate, and host listener")
+ struct DevicesSidebarModeTests {
+     private func makeDefaults() -> UserDefaults {
+         let name = "DevicesSidebarModeTests-\(UUID().uuidString)"
+         let defaults = UserDefaults(suiteName: name)!
+         defaults.removePersistentDomain(forName: name)
+         return defaults
+     }
+ 
+-    /// ShellX: the Machines tab is parked with device mirroring (`remoteMachines`).
+-    @Test("Cloud off prevents discovery and hosting, and ShellX hides the Machines tab")
++    @Test("Cloud off prevents discovery and hosting while the Cloud sidebar stays available", .enabled(if: ShellXSwitches.remoteMachines, "ShellX: device mirroring is parked until Wave 2"))
+     func cloudOffDisablesDevices() {
+         let defaults = makeDefaults()
+         defaults.set(false, forKey: RightSidebarBetaFeatureSettings.cloudMachinesEnabledKey)
+         defaults.set(true, forKey: DevicesCatalogSection().discoveryEnabled.userDefaultsKey)
+         defaults.set(true, forKey: DevicesCatalogSection().incomingAccessEnabled.userDefaultsKey)
+         #expect(!DevicesFeature.isDiscoveryEnabled(defaults: defaults))
+         #expect(!MobileRemoteControlPolicy.allowsIncomingAccess(defaults: defaults))
+-        #expect(!RightSidebarMode.availableModes(defaults: defaults).contains(.machines))
++        #expect(RightSidebarMode.availableModes(defaults: defaults).contains(.machines))
+     }
+ 
+     @Test("Enabling Cloud alone does not opt a fresh install into Mac discovery or hosting")
+     func freshInstallDoesNotStartDeviceNetworking() {
+         let defaults = makeDefaults()
+         defaults.set(true, forKey: RightSidebarBetaFeatureSettings.cloudMachinesEnabledKey)
+         #expect(!DevicesFeature.isDiscoveryEnabled(defaults: defaults, cloudEnabled: true))
+         #expect(!MobileRemoteControlPolicy.allowsIncomingAccess(defaults: defaults, cloudEnabled: true))
+         #expect(!MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: .dev))
+     }
+ 
++    @Test("The two device preferences remain independent within Cloud", .enabled(if: ShellXSwitches.remoteMachines, "ShellX: device mirroring is parked until Wave 2"))
++    func independentPreferencesWithinCloud() {
++        let defaults = makeDefaults()
++        let keys = DevicesCatalogSection()
++        defaults.set(true, forKey: keys.discoveryEnabled.userDefaultsKey)
++        defaults.set(false, forKey: keys.incomingAccessEnabled.userDefaultsKey)
++        #expect(DevicesFeature.isDiscoveryEnabled(defaults: defaults, cloudEnabled: true))
++        #expect(!MobileRemoteControlPolicy.allowsIncomingAccess(defaults: defaults, cloudEnabled: true))
++        defaults.set(false, forKey: keys.discoveryEnabled.userDefaultsKey)
++        defaults.set(true, forKey: keys.incomingAccessEnabled.userDefaultsKey)
++        #expect(!DevicesFeature.isDiscoveryEnabled(defaults: defaults, cloudEnabled: true))
++        #expect(MobileRemoteControlPolicy.allowsIncomingAccess(defaults: defaults, cloudEnabled: true))
++    }
++
+     @Test("Managed DisableCloud wins over saved device preferences")
+     func managedCloudPolicyDisablesDevices() {
+         let defaults = makeDefaults()
+         defaults.set(true, forKey: RightSidebarBetaFeatureSettings.cloudMachinesEnabledKey)
+         defaults.set(true, forKey: DevicesCatalogSection().discoveryEnabled.userDefaultsKey)
+         defaults.set(true, forKey: DevicesCatalogSection().incomingAccessEnabled.userDefaultsKey)
+         let policy = ManagedDevicePolicy(defaults: defaults, releaseDomainDefaults: nil) { _, key in
+             key == ManagedDevicePolicyKey.disableCloud.rawValue ? true : nil
+         }
+         let enabled = CloudMachinesFeature.isEnabled(defaults: defaults, policy: policy)
+         #expect(!DevicesFeature.isEnabled(defaults: defaults, policy: policy, cloudEnabled: enabled))
+         #expect(!MobileRemoteControlPolicy.allowsIncomingAccess(defaults: defaults, cloudEnabled: enabled))
+     }
+ 
++    /// ShellX: discovery, hosting and the Machines tab stay off until Wave 2
++    /// flips `remoteMachines`, whatever the saved preferences and Cloud say.
++    @Test("ShellX parks device discovery, hosting and the Machines tab", .enabled(if: !ShellXSwitches.remoteMachines))
++    func devicesAreParkedInShellX() {
++        let defaults = makeDefaults()
++        let keys = DevicesCatalogSection()
++        defaults.set(true, forKey: keys.discoveryEnabled.userDefaultsKey)
++        defaults.set(true, forKey: keys.incomingAccessEnabled.userDefaultsKey)
++        let permissive = ManagedDevicePolicy(defaults: defaults, releaseDomainDefaults: nil) { _, _ in nil }
++        #expect(!DevicesFeature.isAvailable(defaults: defaults, policy: permissive, cloudEnabled: true))
++        #expect(!DevicesFeature.isEnabled(defaults: defaults, policy: permissive, cloudEnabled: true))
++        #expect(!DevicesFeature.isDiscoveryEnabled(defaults: defaults, cloudEnabled: true))
++        #expect(!MobileRemoteControlPolicy.allowsIncomingAccess(defaults: defaults, cloudEnabled: true))
++        #expect(!RightSidebarMode.machines.isAvailable(feedEnabled: true, machinesEnabled: true, devicesEnabled: true))
++        #expect(!RightSidebarMode.availableModes(defaults: defaults).contains(.machines))
++    }
++
+     @Test("Device aliases open the same Cloud sidebar")
+     func cliArgument() {
+         #expect(RightSidebarMode.from(cliArgument: "devices") == .machines)
+         #expect(RightSidebarMode.from(cliArgument: "device") == .machines)
+         #expect(RightSidebarMode.from(cliArgument: "macs") == .machines)
+         #expect(RightSidebarMode.from(cliArgument: "machines") == .machines, "the Cloud spelling is untouched")
+         #expect(RightSidebarMode.machines.rawValue == "machines")
+         #expect(RightSidebarMode.machines.shortcutAction == .switchRightSidebarToMachines)
+         // The Cloud tool opens as a pane since 2f8f5af7a0c; the aliases must not change that.
+         #expect(RightSidebarMode.machines.canOpenAsPane)
+     }
+ 
+-    /// ShellX: `.machines` stays unavailable until Wave 2 flips `remoteMachines`,
+-    /// whatever its callers pass; the other modes are unchanged.
+-    @Test("ShellX parks the Machines tab behind remoteMachines")
++    @Test("Cloud availability gates both machine sources", .enabled(if: ShellXSwitches.remoteMachines, "ShellX: device mirroring is parked until Wave 2"))
+     func availability() {
+-        #expect(!RightSidebarMode.machines.isAvailable(feedEnabled: true, machinesEnabled: true, devicesEnabled: false))
++        #expect(RightSidebarMode.machines.isAvailable(feedEnabled: true, machinesEnabled: true, devicesEnabled: false))
+         #expect(!RightSidebarMode.machines.isAvailable(feedEnabled: false, machinesEnabled: false, devicesEnabled: true))
+         #expect(RightSidebarMode.machines.isAvailable(feedEnabled: false, machinesEnabled: false) == false, "callers that predate Devices see it hidden")
+         #expect(
+             RightSidebarMode.availableModes(feedEnabled: false, machinesEnabled: true, devicesEnabled: true)
+-                == [.files, .find, .sessions, .dock]
++                == [.files, .find, .sessions, .dock, .machines]
+         )
+         #expect(
+             RightSidebarMode.availableModes(feedEnabled: true, machinesEnabled: false, devicesEnabled: true)
+                 == [.files, .find, .sessions, .feed, .dock]
+         )
+         #expect(
+             RightSidebarMode.availableModes(feedEnabled: false, machinesEnabled: true)
+-                == [.files, .find, .sessions, .dock]
++                == [.files, .find, .sessions, .dock, .machines]
+         )
+     }
+ 
+     @Test("Reveal requests stay scoped to their target window")
+     @MainActor
+     func revealRequestsAreWindowScoped() {
+         let registry = DeviceSurfaceProviderRegistry()
+         let first = UUID()
+         let second = UUID()
+         let instance = SurfaceDeviceInstanceID(deviceID: "mac-a", tag: "default")
+         registry.reveal(instance: instance, windowID: first)
+         #expect(registry.takePendingReveal(windowID: second) == nil)
+         #expect(registry.takePendingReveal(windowID: first) == instance)
+     }
+ 
+-    /// ShellX: discovery is parked behind `remoteMachines`, so even a
+-    /// permissive policy with Cloud on keeps it off.
+-    @Test("Managed discovery policy overrides the discovery preference; ShellX parks discovery")
++    @Test("Managed discovery policy overrides the discovery preference", .enabled(if: ShellXSwitches.remoteMachines, "ShellX: device mirroring is parked until Wave 2"))
+     func featureGate() {
+         let defaults = makeDefaults()
+         defaults.set(true, forKey: DevicesCatalogSection().discoveryEnabled.userDefaultsKey)
+         let banned = ManagedDevicePolicy(defaults: defaults, releaseDomainDefaults: nil) { _, key -> Any? in
+             key == ManagedDevicePolicyKey.disableRemoteControl.rawValue ? (true as Any) : nil
+         }
+         #expect(!DevicesFeature.isEnabled(defaults: defaults, policy: banned, cloudEnabled: true))
+         let permissive = ManagedDevicePolicy(defaults: defaults, releaseDomainDefaults: nil) { _, _ in nil }
+-        #expect(!DevicesFeature.isEnabled(defaults: defaults, policy: permissive, cloudEnabled: true))
++        #expect(DevicesFeature.isEnabled(defaults: defaults, policy: permissive, cloudEnabled: true))
+     }
+ 
++    @Test("Hosting remains opt-in and separate from discovery", .enabled(if: ShellXSwitches.remoteMachines, "ShellX: device mirroring is parked until Wave 2"))
++    func hostListenerGate() {
++        let defaults = makeDefaults()
++        let keys = DevicesCatalogSection()
++        #expect(!MobileRemoteControlPolicy.allowsIncomingAccess(defaults: defaults, cloudEnabled: true))
++        defaults.set(false, forKey: keys.discoveryEnabled.userDefaultsKey)
++        defaults.set(true, forKey: keys.incomingAccessEnabled.userDefaultsKey)
++        #expect(MobileRemoteControlPolicy.allowsIncomingAccess(defaults: defaults, cloudEnabled: true))
++        defaults.set(false, forKey: keys.incomingAccessEnabled.userDefaultsKey)
++        #expect(!MobileRemoteControlPolicy.allowsIncomingAccess(defaults: defaults, cloudEnabled: true))
++    }
+ }
+diff --git a/cmuxTests/HostAccountFlowTeamChangeTests.swift b/cmuxTests/HostAccountFlowTeamChangeTests.swift
+index 326b8b77dc..736e173f6f 100644
+--- a/cmuxTests/HostAccountFlowTeamChangeTests.swift
++++ b/cmuxTests/HostAccountFlowTeamChangeTests.swift
+@@ -10,21 +10,21 @@ import Testing
+ @testable import cmux
+ #endif
+ 
+ /// Team changes from every surface (the Cloud picker, Settings and the socket)
+ /// share the runtime coordinator's exclusion policy. The flow owns only the
+ /// optimistic projection and preserves it when the coordinator refuses a
+ /// request from another surface.
+ @MainActor
+ @Suite("Host account flow team changes")
+ struct HostAccountFlowTeamChangeTests {
+-    @Test func successfulAuthCallbackRefreshesThePaidEntitlement() async throws {
++    @Test(.enabled(if: ShellXSwitches.cloud, "ShellX: sign-in and billing are off")) func successfulAuthCallbackRefreshesThePaidEntitlement() async throws {
+         let planClient = BillingPlanClient(
+             session: BillingPlanCallbackURLProtocol.session(body: """
+             {"authenticated":true,"billingAvailable":true,"planId":"pro",
+              "subscriptionPlanId":"pro","isPro":true,"billingManagement":"stripe",
+              "teamPlanId":"free","teamBillingManagement":"none"}
+             """
+             )
+         )
+         let client = TeamChangeAuthClient()
+         let flow = try await HostAccountFlow.makeForTeamChangeTests(
+@@ -35,20 +35,45 @@ struct HostAccountFlowTeamChangeTests {
+         let callback = URL(string: "shellx://auth-callback?stack_refresh=refresh-1&stack_access=access-1")!
+         #expect(await flow.handleCallbackURL(callback, delivery: .trustedEmbeddedBrowser))
+         #expect(flow.billingPlanState == BillingPlanState(
+             accountID: "fixture",
+             isPro: true,
+             canManageBilling: true,
+             tier: .pro
+         ))
+     }
+ 
++    /// ShellX: sign-in and billing are Manaflow services, so a callback URL never
++    /// completes a sign-in and the billing plan is never fetched.
++    @Test(.enabled(if: !ShellXSwitches.cloud))
++    func authCallbackNeitherSignsInNorRefreshesBillingInShellX() async throws {
++        let planClient = BillingPlanClient(
++            session: BillingPlanCallbackURLProtocol.session(body: """
++            {"authenticated":true,"billingAvailable":true,"planId":"pro",
++             "subscriptionPlanId":"pro","isPro":true,"billingManagement":"stripe",
++             "teamPlanId":"free","teamBillingManagement":"none"}
++            """
++            )
++        )
++        let flow = try await HostAccountFlow.makeForTeamChangeTests(
++            client: TeamChangeAuthClient(),
++            billingPlanClient: planClient
++        )
++
++        let callback = URL(string: "shellx://auth-callback?stack_refresh=refresh-1&stack_access=access-1")!
++        #expect(await flow.handleCallbackURL(callback, delivery: .trustedEmbeddedBrowser) == false)
++        #expect(await flow.refreshBillingPlanAndReportSuccess() == false)
++        #expect(flow.billingPlanState == .unknown)
++        #expect(flow.upgradeOffer == nil)
++        #expect(!flow.isProUpgradeAvailable)
++    }
++
+     @Test func switchDuringPendingCreateIsRefusedAndTheCreateCompletes() async throws {
+         let client = TeamChangeAuthClient()
+         let flow = try await makeFlow(client: client)
+         await client.holdNextCreate()
+         let create = Task { try await flow.createTeam(displayName: "New Team") }
+         try await waitUntil { await client.isHoldingCreate }
+ 
+         await #expect(throws: TeamChangeInProgressError()) {
+             try await flow.selectTeam(id: "team-b")
+         }
+diff --git a/cmuxTests/MobileHostIrohAdmissionTests.swift b/cmuxTests/MobileHostIrohAdmissionTests.swift
+index 15b02ea4a2..2ece70e209 100644
+--- a/cmuxTests/MobileHostIrohAdmissionTests.swift
++++ b/cmuxTests/MobileHostIrohAdmissionTests.swift
+@@ -355,28 +355,28 @@ struct IrohTailscaleVersionSkewMacGateTests {
+         #expect(host == "100.71.210.41")
+         #expect(port == 58_465)
+         #expect(host != "127.0.0.1")
+     }
+ 
+     // IROH v2 (#12326) retired the separate legacy TCP listener. Shipped iOS
+     // builds now reach the Mac through the legacy `cmux/mobile/1` dialect on
+     // the same v2 endpoint, gated by the same pairing opt-in. These two tests
+     // keep the original guarantee: on Stable, either the current or the
+     // historical setting starts Iroh and keeps the legacy dialect reachable.
+-    @Test func testStableExplicitSettingStartsIrohAndLegacyCompatibilityListener() throws {
++    @Test(.enabled(if: ShellXSwitches.remoteMachines, "ShellX: the phone host listener is parked until Wave 2")) func testStableExplicitSettingStartsIrohAndLegacyCompatibilityListener() throws {
+         try assertStablePairingStartsIrohAndLegacyDialect(
+             suffix: "Current",
+             key: MobileHostService.listeningEnabledDefaultsKey
+         )
+     }
+ 
+-    @Test func testStableHistoricalSettingStartsIrohAndLegacyCompatibilityListener() throws {
++    @Test(.enabled(if: ShellXSwitches.remoteMachines, "ShellX: the phone host listener is parked until Wave 2")) func testStableHistoricalSettingStartsIrohAndLegacyCompatibilityListener() throws {
+         try assertStablePairingStartsIrohAndLegacyDialect(
+             suffix: "Historical",
+             key: "cmuxMobilePairingHostEnabled"
+         )
+     }
+ 
+     private func assertStablePairingStartsIrohAndLegacyDialect(
+         suffix: String,
+         key: String
+     ) throws {
+diff --git a/cmuxTests/MobileHostServiceSettingsTests.swift b/cmuxTests/MobileHostServiceSettingsTests.swift
+index 77a1461bce..6c5c6f1ae4 100644
+--- a/cmuxTests/MobileHostServiceSettingsTests.swift
++++ b/cmuxTests/MobileHostServiceSettingsTests.swift
+@@ -6,48 +6,63 @@ import CmuxSettings
+ import Foundation
+ import Testing
+ 
+ #if canImport(cmux_DEV)
+ @testable import cmux_DEV
+ #elseif canImport(cmux)
+ @testable import cmux
+ #endif
+ 
+ struct MobileHostServiceSettingsTests {
+-    @Test("Mac discovery and hosting never enable the iOS pairing setting", arguments: [false, true], [false, true])
++    @Test("Mac discovery and hosting never enable the iOS pairing setting", .enabled(if: ShellXSwitches.remoteMachines, "ShellX: the phone host listener is parked until Wave 2"), arguments: [false, true], [false, true])
+     func macPreferencesDoNotEnablePhonePairing(discovery: Bool, incoming: Bool) throws {
+         let suiteName = "MobileHostServiceSettingsTests.mac-isolation.\(UUID().uuidString)"
+         let defaults = try #require(UserDefaults(suiteName: suiteName))
+         defer { defaults.removePersistentDomain(forName: suiteName) }
+         defaults.set(true, forKey: BetaFeaturesCatalogSection().cloudMachines.userDefaultsKey)
+         defaults.set(discovery, forKey: DevicesCatalogSection().discoveryEnabled.userDefaultsKey)
+         defaults.set(incoming, forKey: DevicesCatalogSection().incomingAccessEnabled.userDefaultsKey)
+         #expect(!MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: .dev))
+         defaults.set(true, forKey: MobileHostService.listeningEnabledDefaultsKey)
+-        // ShellX: the phone host listener is parked behind remoteMachines, so
+-        // even the explicit opt-in does not start it.
+-        #expect(!MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: .dev))
++        #expect(MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: .dev))
++    }
++
++    @Test(.enabled(if: ShellXSwitches.remoteMachines, "ShellX: the phone host listener is parked until Wave 2"), arguments: [BuildFlavor.dev, .nightly, .stable])
++    func pairingRequiresExplicitOptInAndPreservesHistoricalChoice(buildFlavor: BuildFlavor) throws {
++        let suiteName = "MobileHostServiceSettingsTests.v2.\(UUID().uuidString)"
++        let defaults = try #require(UserDefaults(suiteName: suiteName))
++        defer { defaults.removePersistentDomain(forName: suiteName) }
++        #expect(!MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: buildFlavor))
++        defaults.set(true, forKey: "cmuxMobilePairingHostEnabled")
++        #expect(MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: buildFlavor))
++        defaults.set(false, forKey: "cmuxMobilePairingHostEnabled")
++        #expect(!MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: buildFlavor))
++        defaults.set(true, forKey: MobileHostService.listeningEnabledDefaultsKey)
++        #expect(MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: buildFlavor))
++        defaults.set(true, forKey: "cmuxMobilePairingHostEnabled")
++        defaults.set(false, forKey: MobileHostService.listeningEnabledDefaultsKey)
++        #expect(!MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: buildFlavor))
++        #expect(SettingCatalog().mobile.iOSPairingHost.defaultValue == false)
+     }
+ 
+     /// ShellX: phone pairing is parked behind remoteMachines, so neither the
+     /// current nor the historical opt-in starts the listener on any build.
+-    @Test(arguments: [BuildFlavor.dev, .nightly, .stable])
++    @Test(.enabled(if: !ShellXSwitches.remoteMachines), arguments: [BuildFlavor.dev, .nightly, .stable])
+     func pairingStaysParkedWhateverTheOptIn(buildFlavor: BuildFlavor) throws {
+-        let suiteName = "MobileHostServiceSettingsTests.v2.\(UUID().uuidString)"
++        let suiteName = "MobileHostServiceSettingsTests.parked.\(UUID().uuidString)"
+         let defaults = try #require(UserDefaults(suiteName: suiteName))
+         defer { defaults.removePersistentDomain(forName: suiteName) }
+         #expect(!MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: buildFlavor))
+         defaults.set(true, forKey: "cmuxMobilePairingHostEnabled")
+         #expect(!MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: buildFlavor))
+         defaults.set(true, forKey: MobileHostService.listeningEnabledDefaultsKey)
+         #expect(!MobileHostService.isListeningEnabled(defaults: defaults, buildFlavor: buildFlavor))
+-        #expect(SettingCatalog().mobile.iOSPairingHost.defaultValue == false)
+     }
+ 
+     @Test func configuredPortDefaultsToCatalogDefaultWhenUnset() throws {
+         let suiteName = "MobileHostServiceSettingsTests.Port.Default.\(UUID().uuidString)"
+         let defaults = try #require(UserDefaults(suiteName: suiteName))
+         defer { defaults.removePersistentDomain(forName: suiteName) }
+ 
+         let expected = SettingCatalog().mobile.iOSPairingPort.defaultValue
+         #expect(MobileHostService.configuredPort(defaults: defaults) == expected)
+     }
+diff --git a/cmuxTests/RightSidebarCommandPaletteTests.swift b/cmuxTests/RightSidebarCommandPaletteTests.swift
+index 387b9e3ecf..16fdc623c7 100644
+--- a/cmuxTests/RightSidebarCommandPaletteTests.swift
++++ b/cmuxTests/RightSidebarCommandPaletteTests.swift
+@@ -109,28 +109,32 @@ final class RightSidebarCommandPaletteTests: XCTestCase {
+                     contribution.subtitle(context),
+                     String(localized: "command.rightSidebarMode.subtitle", defaultValue: "Right Sidebar")
+                 )
+                 XCTAssertTrue(contribution.keywords.contains("right"))
+                 XCTAssertTrue(contribution.keywords.contains("sidebar"))
+                 XCTAssertTrue(contribution.keywords.contains(mode.rawValue))
+                 XCTAssertTrue(contribution.when(context))
+                 XCTAssertTrue(contribution.enablement(context))
+             }
+ 
+-            // Files/Find/Vault, the graduated Dock, and the Cloud tab are
+-            // discoverable before the local activation marker is set.
++            // Files/Find/Vault and the graduated Dock are discoverable before
++            // the local activation marker is set. ShellX: the Machines (Cloud)
++            // tab is parked behind remoteMachines, so it has no command.
+             let machinesAvailable = RightSidebarMode.machines.isAvailable()
+-            XCTAssertTrue(machinesAvailable)
+-            XCTAssertEqual(contributions.count, 5)
++            XCTAssertEqual(machinesAvailable, ShellXSwitches.remoteMachines)
++            XCTAssertEqual(contributions.count, ShellXSwitches.remoteMachines ? 5 : 4)
+             XCTAssertNil(contributionsByID[ContentView.commandPaletteRightSidebarModeCommandID(.feed)])
+             XCTAssertNotNil(contributionsByID[ContentView.commandPaletteRightSidebarModeCommandID(.dock)])
+-            XCTAssertNotNil(contributionsByID[ContentView.commandPaletteRightSidebarModeCommandID(.machines)])
++            XCTAssertEqual(
++                contributionsByID[ContentView.commandPaletteRightSidebarModeCommandID(.machines)] != nil,
++                ShellXSwitches.remoteMachines
++            )
+         }
+     }
+ 
+     @MainActor
+     func testCommandPaletteRightSidebarActionsUseModeShortcutActions() {
+         withSavedBetaFeatureDefaults {
+             let defaults = UserDefaults.standard
+             defaults.set(true, forKey: RightSidebarBetaFeatureSettings.feedEnabledKey)
+             defaults.set(true, forKey: RightSidebarBetaFeatureSettings.cloudMachinesEnabledKey)
+ 
+diff --git a/cmuxTests/SSHStartupManualReconnectTests.swift b/cmuxTests/SSHStartupManualReconnectTests.swift
+index 69f75d48de..a954ac29bd 100644
+--- a/cmuxTests/SSHStartupManualReconnectTests.swift
++++ b/cmuxTests/SSHStartupManualReconnectTests.swift
+@@ -30,21 +30,21 @@ struct SSHStartupManualReconnectTests {
+             lock.unlock()
+         }
+ 
+         func snapshot() -> [String] {
+             lock.lock()
+             defer { lock.unlock() }
+             return commands
+         }
+     }
+ 
+-    @Test func failedVMStartupClosesAfterDismissalWithoutImplicitReconnect() throws {
++    @Test(.enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm ssh, which builds this fixture")) func failedVMStartupClosesAfterDismissalWithoutImplicitReconnect() throws {
+         let fileManager = FileManager.default
+         let root = fileManager.temporaryDirectory
+             .appendingPathComponent("cmux-ssh-manual-retry-\(UUID().uuidString)", isDirectory: true)
+         let fakeCLI = root.appendingPathComponent("cmux")
+         let fakeSSH = root.appendingPathComponent("ssh")
+         let logFile = root.appendingPathComponent("ssh-session-end.log")
+         let attemptFile = root.appendingPathComponent("ssh-attempts.txt")
+ 
+         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+         defer { try? fileManager.removeItem(at: root) }
+@@ -89,21 +89,21 @@ struct SSHStartupManualReconnectTests {
+         // ordinary input; Enter dismisses this failed attempt without an RPC.
+         try prompt.standardInput.fileHandleForWriting.write(contentsOf: Data("r\n".utf8))
+         try #require(Self.waitForExit(prompt.process, timeout: 3))
+         #expect(prompt.process.terminationStatus == 1)
+         #expect(try String(contentsOf: attemptFile, encoding: .utf8) == "1")
+         let recordedCalls = try String(contentsOf: logFile, encoding: .utf8)
+         #expect(recordedCalls.split(separator: "\n").filter { $0.contains("ssh-session-end") }.count == 1)
+         #expect(!recordedCalls.contains("rpc workspace.remote.reconnect "))
+     }
+ 
+-    @Test func terminalTeardownDisablesRemoteInputReportingModesBeforePrompt() throws {
++    @Test(.enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm ssh, which builds this fixture")) func terminalTeardownDisablesRemoteInputReportingModesBeforePrompt() throws {
+         let fileManager = FileManager.default
+         let root = fileManager.temporaryDirectory
+             .appendingPathComponent("cmux-ssh-terminal-mode-reset-\(UUID().uuidString)", isDirectory: true)
+         let fakeCLI = root.appendingPathComponent("cmux")
+         let fakeSSH = root.appendingPathComponent("ssh")
+ 
+         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+         defer { try? fileManager.removeItem(at: root) }
+ 
+         try Self.writeFakeSSHCLI(at: fakeCLI)
+@@ -402,21 +402,21 @@ struct SSHStartupManualReconnectTests {
+             environment: environment,
+             timeout: 5
+         )
+ 
+         #expect(!result.timedOut, Comment(rawValue: result.stderr))
+         #expect(result.status == 0, Comment(rawValue: result.stderr))
+         #expect(try String(contentsOf: attemptFile, encoding: .utf8) == "auth\n")
+         #expect(try String(contentsOf: attachFile, encoding: .utf8) == "attached\n")
+     }
+ 
+-    @Test func terminalExitPromptIgnoresQueuedWakeReportsAndEOTUntilFreshEnter() throws {
++    @Test(.enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm ssh, which builds this fixture")) func terminalExitPromptIgnoresQueuedWakeReportsAndEOTUntilFreshEnter() throws {
+         let prompt = try Self.makeTerminalExitPromptProcess()
+         defer { Self.stopAndCleanUp(prompt) }
+ 
+         let queuedWakeInput = Data("\u{1B}[I\u{1B}[O\u{1B}[13;2u".utf8) + Data([0x04])
+         try prompt.standardInput.fileHandleForWriting.write(contentsOf: queuedWakeInput)
+         #expect(
+             Self.waitForTerminalExitPrompt(prompt),
+             "terminal exit prompt was not emitted"
+         )
+ 
+@@ -427,21 +427,21 @@ struct SSHStartupManualReconnectTests {
+         #expect(!dismissedByWakeInput, "late focus reports, CSI-u, paste, and repeated EOT must not dismiss the prompt")
+         if !dismissedByWakeInput {
+             try prompt.standardInput.fileHandleForWriting.write(contentsOf: Data([0x0A]))
+             #expect(Self.waitForExit(prompt.process, timeout: 2), "a fresh Enter must dismiss the prompt")
+             if !prompt.process.isRunning {
+                 #expect(prompt.process.terminationStatus == 255)
+             }
+         }
+     }
+ 
+-    @Test func terminalExitPromptDoesNotDismissOnClosedInput() throws {
++    @Test(.enabled(if: ShellXSwitches.cloud, "ShellX refuses cmux vm ssh, which builds this fixture")) func terminalExitPromptDoesNotDismissOnClosedInput() throws {
+         let prompt = try Self.makeTerminalExitPromptProcess()
+         defer { Self.stopAndCleanUp(prompt) }
+ 
+         #expect(
+             Self.waitForTerminalExitPrompt(prompt),
+             "terminal exit prompt was not emitted"
+         )
+         try prompt.standardInput.fileHandleForWriting.close()
+ 
+         #expect(
+diff --git a/cmuxTests/SSHStartupSignalLifecycleTests.swift b/cmuxTests/SSHStartupSignalLifecycleTests.swift
+index ff74501be6..0a2766a8ff 100644
+--- a/cmuxTests/SSHStartupSignalLifecycleTests.swift
++++ b/cmuxTests/SSHStartupSignalLifecycleTests.swift
+@@ -1,14 +1,20 @@
+ import XCTest
+ import CmuxFoundation
+ import Darwin
+ 
++#if canImport(cmux_DEV)
++@testable import cmux_DEV
++#elseif canImport(cmux)
++@testable import cmux
++#endif
++
+ extension CLINotifyProcessIntegrationRegressionTests {
+     func testSSHPaneCloseSignalDoesNotReportSessionEndToSharedTransport() throws {
+         let fileManager = FileManager.default
+         let root = fileManager.temporaryDirectory
+             .appendingPathComponent("cmux-ssh-pane-close-\(UUID().uuidString)", isDirectory: true)
+         let fakeCLI = root.appendingPathComponent("cmux")
+         let fakeSSH = root.appendingPathComponent("ssh")
+         let logFile = root.appendingPathComponent("ssh-session-end.log")
+ 
+         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+@@ -1445,20 +1451,22 @@ extension CLINotifyProcessIntegrationRegressionTests {
+             requests.first { ($0["method"] as? String) == "workspace.remote.configure" }
+         )
+         let configureParams = try XCTUnwrap(configureRequest["params"] as? [String: Any])
+         let startupCommand = try XCTUnwrap(configureParams["terminal_startup_command"] as? String)
+         return try rewritingSystemSSH(in: startupCommand, with: fakeSSH)
+     }
+ 
+     private func generatedVMSSHInitialStartupCommand(
+         replacingSystemSSHWith fakeSSH: URL
+     ) throws -> String {
++        // ShellX refuses `cmux vm ssh` (Cloud is off), so this fixture cannot be built.
++        try XCTSkipUnless(ShellXSwitches.cloud, "ShellX refuses cmux vm ssh, which builds this fixture")
+         let cliPath = try bundledCLIPath()
+         let socketPath = makeSocketPath("vm-ssh-startup")
+         let listenerFD = try bindUnixSocket(at: socketPath)
+         let state = MockSocketServerState()
+         let vmID = "vm-test-startup"
+         let workspaceID = "11111111-1111-1111-1111-111111111111"
+         let workspaceRef = "workspace:vm-startup"
+ 
+         defer {
+             Darwin.close(listenerFD)
+diff --git a/cmuxTests/SurfaceSocketCommandTests.swift b/cmuxTests/SurfaceSocketCommandTests.swift
+index a8b7546b3f..fda0653180 100644
+--- a/cmuxTests/SurfaceSocketCommandTests.swift
++++ b/cmuxTests/SurfaceSocketCommandTests.swift
+@@ -411,20 +411,219 @@ struct SurfaceSocketCommandTests {
+ 
+     private static func error(_ response: [String: Any]) throws -> [String: Any] {
+         #expect(response["ok"] as? Bool == false, "expected an error, got \(response)")
+         return try #require(response["error"] as? [String: Any])
+     }
+ 
+     private static func resourceIDs(_ result: [String: Any]) -> Set<String> {
+         Set(((result["resources"] as? [[String: Any]]) ?? []).compactMap { $0["id"] as? String })
+     }
+ 
++    // MARK: - surface.catalog
++    //
++    // ShellX: these run on a device machine (another Mac, parked with device
++    // mirroring but still served by `surface.*`); Cloud machines answer
++    // `cloud_disabled` and every `vm.*` method is refused (ShellXCloudOffTests).
++
++    @Test func catalogListsTheMachineAndItsResources() async throws {
++        try await Self.withFixture(device: true) { fixture in
++
++            let all = try Self.ok(try await Self.call("surface.catalog", [:]))
++            let machines = try #require(all["machines"] as? [[String: Any]])
++            #expect(machines.contains { ($0["id"] as? String) == fixture.machineID })
++            let ownMachine = try #require(machines.first { ($0["id"] as? String) == fixture.machineID })
++            #expect((ownMachine["remote_workspaces"] as? [[String: Any]])?.compactMap { $0["id"] as? String } == ["ws_a", "ws_b", "ws_empty"])
++            #expect(Self.resourceIDs(all).isSuperset(of: [fixture.termA1.rawValue, fixture.termA2.rawValue, fixture.termB.rawValue, fixture.browserA.rawValue]))
++            #expect(all["workspaces"] == nil)
++            #expect((all["cloud_states"] as? [[String: Any]])?.isEmpty == true)
++            // A machine filter narrows every section of the catalog.
++            let one = try Self.ok(try await Self.call("surface.catalog", ["machine": fixture.machineID]))
++            #expect((one["machines"] as? [[String: Any]])?.count == 1)
++            #expect(Self.resourceIDs(one) == [fixture.termA1.rawValue, fixture.termA2.rawValue, fixture.termB.rawValue, fixture.browserA.rawValue])
++            #expect(one["workspaces"] == nil)
++
++            // `refresh` re-syncs the provider.
++            _ = try Self.ok(try await Self.call("surface.catalog", ["machine": fixture.machineID, "refresh": true]))
++            #expect(fixture.provider.refreshes == 1)
++        }
++    }
++
++    // MARK: - surface.project
++
++    @Test func projectReusesFocusesAndHonorsPlacementFlags() async throws {
++        try await Self.withFixture(device: true) { fixture in
++            let resource = fixture.termA1.rawValue
++
++            let first = try Self.ok(try await Self.call("surface.project", ["resource": resource]))
++            #expect(first["reused"] as? Bool == false)
++            #expect(first["workspace_id"] as? String == fixture.workspaceID.uuidString, "no target → the selected workspace")
++            #expect(fixture.provider.materialized.count == 1)
++            #expect(fixture.provider.materialized[0].destination == .workspace(id: fixture.workspaceID, placement: .split))
++            // A socket client that does not ask for focus opens in the background: an agent
++            // must not pull the person away from what they are typing in.
++            #expect(fixture.provider.materialized[0].focus == false)
++
++            // The catalog reuses the pane already showing the resource…
++            let again = try Self.ok(try await Self.call("surface.project", ["resource": resource]))
++            #expect(again["reused"] as? Bool == true)
++            #expect(again["surface_id"] as? String == first["surface_id"] as? String)
++            #expect(fixture.provider.materialized.count == 1)
++
++            // …unless `reuse: false` (`--new`): a second pane, at the pane edge the caller named
++            // (a LIVE pane: the workspace's own focused pane).
++            let pane = try #require(fixture.livePaneID)
++            let split = try Self.ok(try await Self.call("surface.project", [
++                "resource": resource, "reuse": false, "workspace_id": fixture.workspaceID.uuidString,
++                "pane_id": pane, "direction": "left", "focus": false,
++            ]))
++            #expect(split["reused"] as? Bool == false)
++            #expect(fixture.provider.materialized.count == 2)
++            #expect(fixture.provider.materialized[1].destination == .split(workspaceID: fixture.workspaceID, paneID: pane, direction: .left))
++            #expect(fixture.provider.materialized[1].focus == false)
++
++            // `placement: tab` on a pane becomes a tab destination.
++            _ = try Self.ok(try await Self.call("surface.project", [
++                "resource": resource, "reuse": false, "workspace_id": fixture.workspaceID.uuidString,
++                "pane_id": pane, "placement": "tab",
++            ]))
++            #expect(fixture.provider.materialized.last?.destination == .tab(workspaceID: fixture.workspaceID, paneID: pane, index: nil))
++            #expect(fixture.provider.materialized.last?.focus == false)
++
++            // An explicit `focus: true` (an interactive `cmux surface open`, or `--focus`) is honored.
++            _ = try Self.ok(try await Self.call("surface.project", [
++                "resource": resource, "reuse": false, "workspace_id": fixture.workspaceID.uuidString, "focus": true,
++            ]))
++            #expect(fixture.provider.materialized.last?.focus == true)
++
++            let projections = try Self.ok(try await Self.call("surface.catalog", ["machine": fixture.machineID]))["projections"] as? [[String: Any]]
++            #expect(projections?.filter { ($0["resource"] as? String) == resource }.count == 4)
++        }
++    }
++
++    @Test func projectRejectsUnknownSurfacesAndUnresolvableTargets() async throws {
++        try await Self.withFixture(device: true) { fixture in
++
++            let unknown = try Self.error(try await Self.call("surface.project", ["resource": "\(fixture.machineID)/terminal/term_ghost"]))
++            #expect((unknown["message"] as? String)?.contains("Unknown surface") == true)
++
++            // An explicit workspace that resolves to nothing is an error, never a silent
++            // fall-through to the selected workspace.
++            let bogus = try Self.error(try await Self.call("surface.project", ["resource": fixture.termA1.rawValue, "workspace_id": "workspace:999999"]))
++            #expect(bogus["code"] as? String == "invalid_params")
++            #expect((bogus["message"] as? String)?.contains("workspace:999999") == true)
++            let bogusPane = try Self.error(try await Self.call("surface.project", ["resource": fixture.termA1.rawValue, "pane_id": "pane:999999"]))
++            #expect(bogusPane["code"] as? String == "invalid_params")
++            // Well-formed but dead ids are just as unresolvable: a closed pane's UUID, a
++            // workspace UUID nobody has, a surface UUID that is not a panel.
++            for (key, value) in [("pane_id", UUID().uuidString), ("workspace_id", UUID().uuidString), ("surface_id", UUID().uuidString)] {
++                let dead = try Self.error(try await Self.call("surface.project", ["resource": fixture.termA1.rawValue, key: value]))
++                #expect(dead["code"] as? String == "invalid_params", "\(key) \(value) must not fall back to the selected workspace")
++            }
++            #expect(fixture.provider.materialized.isEmpty, "nothing opened anywhere")
++
++            let malformed = try Self.error(try await Self.call("surface.project", ["resource": "not-a-resource"]))
++            #expect(malformed["code"] as? String == "invalid_params")
++        }
++    }
++
++    @Test func projectResolvesAnExplicitSurfaceInAnotherWindow() async throws {
++        try await Self.withFixture(device: true) { fixture in
++            let app = try #require(AppDelegate.shared)
++            // This test exercises ownership lookup, not window rendering.
++            // Keep the second window context deterministic and avoid leaving
++            // SwiftUI render/teardown work running into the next socket test.
++            let manager = TabManager(autoWelcomeIfNeeded: false)
++            let windowID = app.registerMainWindowContextForTesting(tabManager: manager)
++            defer {
++                app.unregisterMainWindowContextForTesting(windowId: windowID)
++                manager.tabs.forEach { $0.teardownAllPanels() }
++            }
++            let workspace = try #require(manager.selectedWorkspace)
++            let surfaceID = try #require(workspace.focusedPanelId)
++            let paneID = try #require(workspace.paneId(forPanelId: surfaceID))
++            TerminalController.shared.setActiveTabManager(fixture.manager)
++
++            let result = try Self.ok(try await Self.call("surface.project", [
++                "resource": fixture.termA1.rawValue,
++                "workspace_id": workspace.id.uuidString,
++                "surface_id": surfaceID.uuidString,
++                "direction": "left",
++                "focus": false,
++            ]))
++
++            #expect(result["workspace_id"] as? String == workspace.id.uuidString)
++            #expect(fixture.provider.materialized.count == 1)
++            #expect(fixture.provider.materialized[0].destination == .split(
++                workspaceID: workspace.id, paneID: paneID.id.uuidString, direction: .left
++            ))
++            #expect(fixture.provider.materialized[0].focus == false)
++        }
++    }
++
++    // MARK: - surface.new_terminal
++
++    @Test func newTerminalPassesTheRecipeThroughAndOpensUnlessToldNotTo() async throws {
++        try await Self.withFixture(device: true) { fixture in
++
++            let headless = try Self.ok(try await Self.call("surface.new_terminal", [
++                "machine": fixture.machineID, "open": false, "command": ["bun", "test"], "cwd": "/root/app", "name": "tests", "remote_workspace_id": "ws_b",
++            ]))
++            try #require(fixture.provider.createdTerminals.count == 1)
++            let created = fixture.provider.createdTerminals[0]
++            #expect(created.command == ["bun", "test"])
++            #expect(created.cwd == "/root/app")
++            #expect(created.name == "tests")
++            #expect(created.remoteWorkspaceID == "ws_b")
++            #expect(headless["terminal_id"] as? String == "term_new_1")
++            #expect(headless["resource"] as? String == "\(fixture.machineID)/terminal/term_new_1")
++            #expect(headless["remote_workspace_id"] as? String == "ws_b")
++            #expect(headless["surface_id"] == nil, "headless: no pane")
++            #expect(fixture.provider.materialized.isEmpty)
++
++            let opened = try Self.ok(try await Self.call("surface.new_terminal", ["machine": fixture.machineID]))
++            #expect(fixture.provider.createdTerminals.count == 2)
++            #expect(fixture.provider.createdTerminals[1].remoteWorkspaceID == nil, "the provider picks the workspace")
++            #expect(opened["workspace_id"] as? String == fixture.workspaceID.uuidString)
++            #expect((opened["surface_id"] as? String).flatMap(UUID.init(uuidString:)) != nil)
++            #expect(fixture.provider.materialized.count == 1)
++            #expect(fixture.provider.materialized[0].resource.key == "term_new_2")
++            #expect(fixture.provider.materialized[0].focus == false, "no `focus` param: a background open")
++
++            let missing = try Self.error(try await Self.call("surface.new_terminal", [:]))
++            #expect(missing["code"] as? String == "invalid_params")
++            let unresolvable = try Self.error(try await Self.call("surface.new_terminal", ["machine": fixture.machineID, "workspace_id": "workspace:999999"]))
++            #expect(unresolvable["code"] as? String == "invalid_params")
++            #expect(fixture.provider.createdTerminals.count == 2, "a bad target creates nothing")
++        }
++    }
++
++    // MARK: - background opens
++
++    @Test func backgroundOpenMarksThePaneUnreadUnlessThePersonIsLookingAtIt() async throws {
++        try await Self.withFixture(device: true) { fixture in
++            let manager = fixture.manager
++            let selected = try #require(manager.selectedWorkspace)
++            let background = try #require(manager.addWorkspaceIfActive(select: false, autoWelcomeIfNeeded: false))
++            defer { manager.closeWorkspace(background, recordHistory: false) }
++            #expect(manager.selectedTabId == selected.id)
++            let landed = try #require(background.focusedPanelId)
++            #expect(!background.panelIsUnread(landed))
++
++            SurfacePaneFactory.markOpenedInBackground(panelID: landed, in: background.id)
++            #expect(background.panelIsUnread(landed), "something landed where the person is not looking")
++
++            let onScreen = try #require(selected.focusedPanelId)
++            SurfacePaneFactory.markOpenedInBackground(panelID: onScreen, in: selected.id)
++            #expect(!selected.panelIsUnread(onScreen), "the pane the person is looking at is not news")
++        }
++    }
++
+     // MARK: - surface.catalog / vm.tree
+ 
+     // MARK: - surface.project
+ 
+     // MARK: - surface.new_terminal / vm.terminal_new
+ 
+     // MARK: - background opens
+ 
+     // MARK: - vm.workspace_*
+ 
+diff --git a/cmuxTests/UpgradeAnalyticsTests.swift b/cmuxTests/UpgradeAnalyticsTests.swift
+index 1b6cb5d78b..7308d79a3f 100644
+--- a/cmuxTests/UpgradeAnalyticsTests.swift
++++ b/cmuxTests/UpgradeAnalyticsTests.swift
+@@ -68,23 +68,20 @@ struct UpgradeAnalyticsTests {
+         let click = sink.named("cmux_upgrade_entrypoint_opened")
+         #expect(click.count == 1)
+         #expect(click.first?["source"] == .string("mac_sidebar_badge"))
+         #expect(click.first?["destination"] == .string("pricing_page"))
+         #expect(click.first?["plan"] == .string("pro"))
+         #expect(click.first?["client"] == .string("mac"))
+         #expect(click.first?["account_plan"] != nil)
+         #expect(sink.named("cmux_upgrade_badge_dismissed").compactMap { $0["source"] } == [AnalyticsValue.string("mac_sidebar_badge")])
+     }
+ 
+-    @Test("the welcome card's Upgrade records shown, click, close and the checkout source",
+-          arguments: [CloudWelcomeTrigger.launchAnnouncement, .newCloudWorkspace, .newCloudMachine])
+-
+     @Test("Enable, Not Now and a plain window close each end the card once")
+     func welcomeOtherOutcomes() async throws {
+         for (step, act, button, outcome) in [
+             (CloudWelcomeNextStep.enable, "next", "enable", "enable"),
+             (.signIn, "next", "sign_in", "sign_in"),
+             (.upgrade, "notNow", "not_now", "not_now"),
+             (.upgrade, "close", nil, "window_closed"),
+         ] as [(CloudWelcomeNextStep, String, String?, String)] {
+             let (analytics, sink, ledgerSuite) = TestAnalytics.make()
+             defer { TestAnalytics.remove(ledgerSuite) }
+diff --git a/tests/test_cli_broken_pipe_writes.py b/tests/test_cli_broken_pipe_writes.py
+index 763616b899..2e00d66d24 100644
+--- a/tests/test_cli_broken_pipe_writes.py
++++ b/tests/test_cli_broken_pipe_writes.py
+@@ -121,20 +121,41 @@ class BrokenPipeWritesTests(unittest.TestCase):
+         with reader, writer:
+             original = writer.getsockopt(socket.SOL_SOCKET, DARWIN_SO_NOSIGPIPE)
+             result = subprocess.run(
+                 [self.cli, "--version"], cwd=self.root.name, env=self.env,
+                 stdin=subprocess.DEVNULL, stdout=writer, stderr=subprocess.PIPE, timeout=15,
+             )
+             self.assertEqual(result.returncode, 0, result.stderr)
+             self.assertEqual(writer.getsockopt(socket.SOL_SOCKET, DARWIN_SO_NOSIGPIPE), original)
+             self.assertTrue(reader.recv(4096).startswith(b"cmux "))
+ 
++    def test_consumer_closes_during_large_stdout_write(self) -> None:
++        # ShellX refuses `vm prompt` (Cloud is off), so a local verb that
++        # prints its socket result carries the large write instead.
++        with FakeUnixServer(self.responder("system.capabilities", {"padding": "x" * 262_144})) as server:
++            with subprocess.Popen(
++                [self.cli, "--socket", server.path, "capabilities"],
++                cwd=self.root.name, env=self.env, stdin=subprocess.DEVNULL,
++                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
++            ) as process:
++                try:
++                    ready, _, _ = select.select([process.stdout], [], [], 15)
++                    self.assertTrue(ready, "CLI did not start writing stdout")
++                    self.assertTrue(os.read(process.stdout.fileno(), 16).startswith(b"{"))
++                    process.stdout.close()
++                    process.wait(timeout=15)
++                    self.assertEqual(process.returncode, 0, process.stderr.read())
++                finally:
++                    if process.poll() is None:
++                        process.kill()
++                        process.wait()
++
+     def run_socket_disconnect(self) -> subprocess.CompletedProcess:
+         def disconnect(conn: socket.socket, _stop: threading.Event) -> None:
+             # Read one byte to prove a request has started, then tear down its
+             # reader while a request larger than the send buffer is in flight.
+             conn.settimeout(5)
+             if conn.recv(1):
+                 conn.shutdown(socket.SHUT_RDWR)
+ 
+         with FakeUnixServer(disconnect) as server:
+             return self.run_cli(
+diff --git a/tests/test_shellx_cloud_off.py b/tests/test_shellx_cloud_off.py
+index a8c11c967c..01fbc3f361 100644
+--- a/tests/test_shellx_cloud_off.py
++++ b/tests/test_shellx_cloud_off.py
+@@ -106,20 +106,25 @@ def socket_refused(method):
+                 + swift_string_list(GATE, "codeRouterSocketMethodPrefixes"))
+     return any(method.startswith(prefix) for prefix in prefixes)
+ 
+ 
+ class SwitchesAreConstant(unittest.TestCase):
+     def test_shellx_switches_are_false(self):
+         text = read(FEATURES)
+         for name in ("remoteMachines", "codeRouter", "cloud"):
+             self.assertRegex(text, rf"public static let {name} = false\b", name)
+ 
++    def test_app_side_switch_mirror_reads_shellx_features(self):
++        text = read("Sources/ShellX/ShellXSwitches.swift")
++        for name in ("cloud", "codeRouter", "remoteMachines"):
++            self.assertRegex(text, rf"static let {name} = ShellXFeatures\.{name}\n", name)
++
+     def test_cloud_machines_feature_is_constant_false(self):
+         for signature in (r"static func isAvailable\(policy: ManagedDevicePolicy\) -> Bool \{",
+                           r"static func isEnabled\(\s*defaults: UserDefaults,\s*policy: ManagedDevicePolicy\s*\) -> Bool \{"):
+             self.assertEqual(first_statement(CLOUD_FEATURE, signature), "false", signature)
+ 
+     def test_no_manaflow_service_is_gated_on_remote_machines(self):
+         for path in MANAFLOW_FILES:
+             self.assertNotIn("remoteMachines", strip_comments(read(path)), path)
+ 
+ 
+@@ -284,20 +289,45 @@ class SocketMethodsAreRefused(unittest.TestCase):
+                 for found in literal.findall(path.read_text(encoding="utf-8")):
+                     methods.add(found)
+         self.assertGreater(len([m for m in methods if m.startswith("vm.")]), 40, "parsed too few vm.* methods")
+         not_refused = sorted(m for m in methods if not socket_refused(m)
+                              and m not in swift_string_list(GATE, "localSocketMethods")
+                              and not m.endswith((".json", ".swift")))
+         self.assertEqual(not_refused, [], "Cloud socket methods the ShellX gate does not refuse")
+         self.assertFalse(socket_refused("auth.login"), "socket password login must stay local")
+ 
+ 
++class CloudHandlersOutsideTheGatedPrefixes(unittest.TestCase):
++    WORKSPACE_CREATE = "Sources/TerminalController+WorkspaceCreate.swift"
++
++    def test_workspace_cloud_vm_handlers_refuse_first(self):
++        """`workspace.cloud_vm_*` sits under `workspace.`, which the socket gate
++        does not cover: every such case must route to a handler whose first
++        statement checks the constant-false CloudMachinesFeature."""
++        dispatch = read("Sources/TerminalController.swift")
++        cases = re.findall(r'case "(workspace\.cloud_vm_\w+)":\s*\n\s*return [^\n]*?(v2WorkspaceCloudVM\w+)\(', dispatch)
++        self.assertGreaterEqual(len(cases), 3, "parsed too few workspace.cloud_vm_* cases")
++        literals = set(re.findall(r'"(workspace\.cloud_vm_\w+)"', dispatch))
++        self.assertEqual(literals, {method for method, _handler in cases},
++                         "every workspace.cloud_vm_* literal must be a dispatched, gated case")
++        for method, handler in cases:
++            first = first_statement(self.WORKSPACE_CREATE, r"func " + handler + r"\(params: \[String: Any\]\) -> V2CallResult \{")
++            self.assertIn("CloudMachinesFeature.offMainIsEnabled()", first, f"{method} -> {handler}")
++        self.assertEqual(first_statement(CLOUD_FEATURE, r"static func isEnabled\(\s*defaults: UserDefaults,\s*policy: ManagedDevicePolicy\s*\) -> Bool \{"), "false")
++
++    def test_team_picker_shortcut_and_opener_refuse_first(self):
++        path = "Sources/AppDelegate+CloudTeamPicker.swift"
++        self.assertRegex(first_statement(path, r"func handleCloudTeamPickerShortcut\(_ event: NSEvent\) -> Bool \{"),
++                         CLOUD_OFF + r" \{ return false \}")
++        self.assertRegex(first_statement(path, r"func openCloudTeamPicker\([^{]*\{"), CLOUD_OFF + r" \{ return false \}")
++
++
+ class CLIVerbsAreRefused(unittest.TestCase):
+     CLOUD_CALL = re.compile(
+         r'sendV2\(method: "(?:vm|remotes|aiAccounts|coderouter|billing)\.|sendV2\(method: "auth\.(?!login")'
+         r"|run(?:VPN|Remotes|AIAccounts|Coderouter|CloudDomains|AuthTeam|VMPtyAttach|VMTuiConnect|VMSSHAttach)\w*\(")
+ 
+     def test_gate_runs_before_any_dispatch(self):
+         text = read(CLI_MAIN)
+         start = text.index("let rawCommandArgs = Array(args[(index + 1)...])")
+         following = [line.strip() for line in text[start:].splitlines()[1:] if line.strip()]
+         self.assertEqual(following[0], "if let service = ShellXCloudGate.unavailableService(forCLICommand: command) {")
