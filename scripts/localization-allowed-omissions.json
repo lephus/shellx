@@ -3248,6 +3248,10 @@
       "vi": "Product, agent, plan or app name is invariant in Vietnamese; the translated entry is still required."
     }
   },
+  "sidebar.machine.ssh": {
+    "class": "technical",
+    "source": "SSH"
+  },
   "sidebar.pathMenu.macintoshHD": {
     "class": "brand",
     "source": "Macintosh HD"

@@ -1,5 +1,6 @@
 import CmuxWorkspaces
 import Foundation
+import ShellXBrand
 
 /// Stable value identity for one drawable item in the workspace sidebar.
 ///
@@ -13,6 +14,8 @@ import Foundation
 enum SidebarWorkspaceRenderItem {
     case groupHeader(groupId: UUID, anchorWorkspaceId: UUID)
     case workspace(workspaceId: UUID)
+    // ShellX: machine section header (W1 Task 10); built by SidebarMachineSectionRenderItems.
+    case machineHeader(SidebarMachineHeaderModel)
 
     var id: SidebarWorkspaceRenderItemID {
         switch self {
@@ -20,6 +23,8 @@ enum SidebarWorkspaceRenderItem {
             return .group(groupId)
         case .workspace(let workspaceId):
             return .workspace(workspaceId)
+        case .machineHeader(let header): // ShellX: machine section header
+            return .machine(header.key.stableID)
         }
     }
 
@@ -29,6 +34,8 @@ enum SidebarWorkspaceRenderItem {
             return anchorWorkspaceId
         case .workspace(let workspaceId):
             return workspaceId
+        case .machineHeader(let header): // ShellX: matches no workspace
+            return header.key.stableID
         }
     }
 
@@ -157,6 +164,8 @@ enum SidebarWorkspaceRenderItem {
                         return !group.isPinned
                     }
                     return !workspace.isPinned
+                case .machineHeader: // ShellX: never emitted by this function
+                    return false
                 }
             } ?? rendered.count
             rendered.insert(contentsOf: trailingPinned.map {
@@ -198,7 +207,8 @@ enum SidebarWorkspaceRenderItem {
         tabs: [Workspace],
         groupsById: [UUID: WorkspaceGroup]
     ) -> [UUID] {
-        numberedWorkspaceIds(from: renderItems(tabs: tabs, groupsById: groupsById))
+        // ShellX: number rows in their machine-grouped display order (W1 Task 10).
+        numberedWorkspaceIds(from: SidebarMachineSectionRenderItems.renderItems(tabs: tabs, groupsById: groupsById))
     }
 
     static func memberWorkspaceIdsByGroupId(tabs: [Workspace]) -> [UUID: [UUID]] {

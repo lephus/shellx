@@ -30,6 +30,7 @@ import CmuxUpdaterUI
 import ImageIO
 import Observation
 import CmuxProductAnalytics
+import ShellXBrand // ShellX: machine-grouped sidebar
 import SwiftUI
 import ObjectiveC
 import UniformTypeIdentifiers
@@ -1848,6 +1849,9 @@ struct ContentView: View {
                             )
                         }
                     )
+                    // ShellX: offline/reconnecting banner above remote workspaces (W2 Task U4);
+                    // shows the workspace as it is while the remote UI is off.
+                    .shellXRemoteLinkBanner(workspaceID: tab.id, isSelected: isSelectedWorkspace)
                     .opacity(isSelectedWorkspace ? 1 : 0)
                     .allowsHitTesting(isSelectedWorkspace)
                     .accessibilityHidden(!isSelectedWorkspace)
@@ -11405,6 +11409,8 @@ struct VerticalTabsSidebar: View, Equatable {
         initialSidebarFontSize: GhosttyConfig.loadForCmux().sidebarFontSize
     )
     @State private var keyboardShortcutSettingsObserver = KeyboardShortcutSettingsObserver.shared
+    // ShellX: remote machine sections and sign-in row (W2 Task U1); never publishes while the gate is off.
+    @ObservedObject private var shellXRemoteUI = ShellXRemoteUIModel.shared
     @State var dragState = SidebarDragState()
     // Bonsplit tab drags arrive through AppKit pasteboard callbacks, not
     // `SidebarDragState`, so they need a separate transient collection flag.
@@ -11906,11 +11912,13 @@ struct VerticalTabsSidebar: View, Equatable {
         let workspaceGroupMenuSnapshot = WorkspaceGroupMenuSnapshot(
             items: workspaceGroups.map { WorkspaceGroupMenuSnapshot.Item(id: $0.id, name: $0.name) }
         )
-        let workspaceRenderItems = SidebarWorkspaceRenderItem.renderItems(
+        // ShellX: group the sidebar by machine (W1 Task 10), remote machines included (W2 Task U1).
+        let workspaceRenderItems = SidebarMachineSectionRenderItems.renderItems(
             tabs: tabs,
             groupsById: workspaceGroupById,
             orderedGroups: workspaceGroups,
-            effectiveMembership: workspaceGroupIdByWorkspaceId
+            effectiveMembership: workspaceGroupIdByWorkspaceId,
+            remote: shellXRemoteUI.snapshot
         )
         let numberedWorkspaceIndexById = SidebarWorkspaceRenderItem.numberedWorkspaceIndexById(
             from: workspaceRenderItems
@@ -12527,16 +12535,37 @@ struct VerticalTabsSidebar: View, Equatable {
             canCreateEmptyGroup: tabManager.selectedTab?.isRemoteTmuxMirror != true,
             notificationIndex: notificationIndex
         )
-        return renderContext.workspaceRenderItems.compactMap { item -> SidebarWorkspaceTableRowConfiguration? in
+        // ShellX: brand header row first; a group header repeated in a later
+        // machine section gets a per-section row id (W1 Task 10).
+        let brandHeaderRow = SidebarWorkspaceTableRowConfiguration(
+            shellXHeader: .brand,
+            environment: renderContext.environment
+        )
+        // ShellX: the sign-in row sits under "YOUR MACHINES" while signed out (W2 Task U1).
+        let signInRows: [SidebarWorkspaceTableRowConfiguration] = shellXRemoteUI.showsSignInRow
+            ? [SidebarWorkspaceTableRowConfiguration(shellXHeader: .signIn, environment: renderContext.environment)]
+            : []
+        let shellXRowIds = SidebarMachineSectionRenderItems.rowIds(for: renderContext.workspaceRenderItems)
+        return [brandHeaderRow] + signInRows + zip(renderContext.workspaceRenderItems, shellXRowIds).compactMap { pair -> SidebarWorkspaceTableRowConfiguration? in
+            let (item, shellXRowId) = pair
             switch item {
+            case .machineHeader(let header): // ShellX
+                return SidebarWorkspaceTableRowConfiguration(
+                    shellXHeader: .machine(header),
+                    environment: renderContext.environment
+                )
             case .groupHeader(let groupId, _):
                 guard let group = renderContext.workspaceGroupById[groupId] else { return nil }
-                return sidebarWorkspaceGroupTableConfiguration(
+                let configuration = sidebarWorkspaceGroupTableConfiguration(
                     group: group,
                     memberWorkspaceIds: renderContext.memberWorkspaceIdsByGroupId[groupId] ?? [],
                     memberStatusGlyphs: memberStatusGlyphs,
                     renderContext: renderContext
                 )
+                // ShellX: first appearance keeps `.group(id)`; repeats are keyed by section.
+                return shellXRowId == configuration.id
+                    ? configuration
+                    : configuration.reidentifiedGroupHeader(as: shellXRowId)
             case .workspace(let workspaceId):
                 guard let workspace = renderContext.workspaceById[workspaceId],
                       let input = workspaceRowInputsById[workspaceId] else { return nil }
@@ -14466,6 +14495,8 @@ struct VerticalTabsSidebar: View, Equatable {
                             shouldCollectWorkspaceDropTargets: shouldCollectWorkspaceDropTargets
                         )
                     }
+                case .machineHeader: // ShellX: the legacy SwiftUI list is not extended
+                    EmptyView()
                 }
             }
         }

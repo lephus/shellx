@@ -1,4 +1,5 @@
 import CoreGraphics
+import ShellXBrand
 
 /// Supplies deterministic estimates while AppKit resolves exact hosted SwiftUI row heights.
 struct SidebarWorkspaceTableRowHeightCalculator {
@@ -22,5 +23,10 @@ struct SidebarWorkspaceTableRowHeightCalculator {
 
     func estimatedGroupHeaderHeight(fontScale: CGFloat) -> CGFloat {
         ceil(26 * max(0.5, fontScale) + 10)
+    }
+
+    // ShellX: machine section header rows have one fixed height; the title truncates (W1 Task 10).
+    static func height(forMachineHeaderTitle title: String) -> CGFloat {
+        SidebarMachineHeaderLayout.height(forTitle: title)
     }
 }

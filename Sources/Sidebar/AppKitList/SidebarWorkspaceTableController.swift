@@ -1040,6 +1040,11 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             || configuration.appKitGroupHeaderModel != nil {
             return .awaitingActions
         }
+        // ShellX: sign-in row opens the sheet; an accessible remote machine header opens a session (W2 Task U1).
+        if let shellXHeaderRow = configuration.shellXHeaderRow,
+           ShellXRemoteUIActions.handleClick(on: shellXHeaderRow) {
+            return .dispatched
+        }
         return .invalid
     }
 
@@ -1125,6 +1130,9 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         row: Int
     ) -> NSView? {
         guard rows.indices.contains(row) else { return nil }
+        if let shellXHeaderRow = rows[row].shellXHeaderRow { // ShellX: brand / machine header rows
+            return ShellXSidebarHeaderCells.cell(for: shellXHeaderRow, in: tableView, owner: self)
+        }
         if rows[row].appKitGroupHeaderModel != nil {
             let cell = tableView.makeView(
                 withIdentifier: SidebarGroupHeaderTableCellView.reuseIdentifier,
@@ -1174,6 +1182,7 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
         _ = tableView
         guard rows.indices.contains(row), let actions else { return nil }
         let rowConfiguration = rows[row]
+        if rowConfiguration.shellXHeaderRow != nil { return nil } // ShellX: header rows never drag
         // Group headers resolve through the live anchor map captured for the
         // drag. A missing anchor fails closed; workspace rows retain the
         // optional feature resolver for compatibility with older action
@@ -1940,7 +1949,8 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
             clearReorderDropTargets()
             return []
         }
-        let targets = (lower..<upper).map { row in
+        // ShellX: brand / machine header rows are not drop targets.
+        let targets = (lower..<upper).filter { rows[$0].shellXHeaderRow == nil }.map { row in
             let configuration = rows[row]
             return SidebarWorkspaceReorderDropOverlay.Target(
                 workspaceId: configuration.workspaceId,
@@ -2517,6 +2527,10 @@ final class SidebarWorkspaceTableController: NSObject, NSTableViewDataSource, NS
                 configure(workspaceCell: cell, at: row)
             case let cell as SidebarWorkspaceTableCellView:
                 configure(cell: cell, at: row)
+            case let cell as ShellXSidebarHeaderCell: // ShellX: brand / machine header rows
+                if let shellXHeaderRow = rows[row].shellXHeaderRow {
+                    cell.configure(header: shellXHeaderRow)
+                }
             default:
                 continue
             }
