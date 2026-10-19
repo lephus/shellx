@@ -76,7 +76,6 @@ struct PostHogAnalyticsPropertiesTests {
 
         #expect(CmuxFeatureFlags.remoteConfigFetchEnabled == false)
         #expect(CmuxFeatureFlags.postHogControlPlaneRequest(telemetryEnabled: true, defaults: defaults) == nil)
-        #expect(CmuxFeatureFlags.postHogControlPlaneRequest(telemetryEnabled: true, defaults: defaults) == nil)
     }
 
     @MainActor
