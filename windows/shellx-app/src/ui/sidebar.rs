@@ -151,8 +151,8 @@ fn machines_header(lang: Lang, cx: &mut Context<RootView>) -> Div {
                 .rounded(px(4.0))
                 .cursor_pointer()
                 .tooltip(move |_, cx| Tooltip::view(tip.clone(), cx))
-                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.toggle_machine_picker(cx);
+                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                    this.toggle_machine_picker(window, cx);
                 }))
                 .child(
                     svg()

@@ -94,6 +94,10 @@ pub enum Str {
     FingerprintMismatch,
     NeedsPairing,
     RemoteAttachFailed,
+    /// A held pane (`tabs::RespawnGuard`): the shell exits as it starts.
+    ShellExitsAtStart,
+    /// Under `ShellExitsAtStart`.
+    PressAnyKeyToRetry,
 }
 
 impl Str {
@@ -168,6 +172,8 @@ impl Str {
         Str::FingerprintMismatch,
         Str::NeedsPairing,
         Str::RemoteAttachFailed,
+        Str::ShellExitsAtStart,
+        Str::PressAnyKeyToRetry,
     ];
 }
 
@@ -245,6 +251,8 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::FingerprintMismatch => "Khóa của máy không khớp, không kết nối",
             Str::NeedsPairing => "Cần xin quyền truy cập lại",
             Str::RemoteAttachFailed => "Không mở được phiên trên máy kia, đang thử lại…",
+            Str::ShellExitsAtStart => "Shell thoát ngay khi khởi động. Kiểm tra SHELLX_SHELL.",
+            Str::PressAnyKeyToRetry => "Nhấn phím bất kỳ hoặc Thử lại.",
         },
         Lang::En => match key {
             Str::AppName => "ShellX",
@@ -317,6 +325,8 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::FingerprintMismatch => "The machine's key does not match; not connecting",
             Str::NeedsPairing => "Request access again",
             Str::RemoteAttachFailed => "Could not open the session on the other machine, retrying…",
+            Str::ShellExitsAtStart => "The shell exits as soon as it starts. Check SHELLX_SHELL.",
+            Str::PressAnyKeyToRetry => "Press any key or Retry.",
         },
     }
 }
@@ -421,7 +431,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 70);
+        assert_eq!(Str::ALL.len(), 72);
     }
 
     #[test]
@@ -439,6 +449,11 @@ mod tests {
         assert_eq!(t(Lang::En, Str::MachinesHeader), "YOUR MACHINES");
         assert_eq!(t(Lang::En, Str::StatusWaiting), "waiting");
         assert_eq!(t(Lang::Vi, Str::IconCredits), t(Lang::En, Str::IconCredits));
+        assert_eq!(
+            t(Lang::Vi, Str::ShellExitsAtStart),
+            "Shell thoát ngay khi khởi động. Kiểm tra SHELLX_SHELL."
+        );
+        assert_eq!(t(Lang::Vi, Str::Retry), "Thử lại");
     }
 
     #[test]

@@ -5,6 +5,7 @@ pub mod core_api;
 pub mod keys;
 pub mod layout;
 pub mod links;
+pub mod modal;
 pub mod palette;
 pub mod paste;
 pub mod remote_state;

@@ -1,6 +1,6 @@
 //! Tabs of layouts, pane ownership, local/remote targets.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 
 use crate::keys::Dir;
 use crate::layout::{Axis, Close, Layout, PaneId, Rect};
@@ -219,9 +219,132 @@ impl Tabs {
     }
 }
 
+/// Respawns of the last pane allowed within `RESPAWN_WINDOW_MS`.
+pub const RESPAWN_LIMIT: usize = 5;
+pub const RESPAWN_WINDOW_MS: u64 = 10_000;
+
+/// Stops a respawn storm: a shell that exits right after it starts (a bad
+/// `SHELLX_SHELL`) would otherwise close the last pane, respawn, exit again,
+/// forever. After `RESPAWN_LIMIT` respawns within `RESPAWN_WINDOW_MS` the
+/// next respawned pane is *held*: the window shows a message there and
+/// starts no shell until the user retries ("Thử lại" or any key).
+#[derive(Debug, Default)]
+pub struct RespawnGuard {
+    /// When the recent allowed respawns happened (ms, oldest first).
+    recent: VecDeque<u64>,
+    held: Option<PaneId>,
+}
+
+impl RespawnGuard {
+    pub fn new() -> RespawnGuard {
+        RespawnGuard::default()
+    }
+
+    /// Feeds a `Tabs::close_pane` outcome. A `Respawned` pane is held when
+    /// the limit was already reached in the window ending at `now_ms`.
+    pub fn on_close(&mut self, outcome: &CloseOutcome, now_ms: u64) {
+        let CloseOutcome::Respawned { pane, .. } = outcome else {
+            return;
+        };
+        self.recent
+            .retain(|&at| now_ms.saturating_sub(at) < RESPAWN_WINDOW_MS);
+        if self.recent.len() >= RESPAWN_LIMIT {
+            self.held = Some(*pane);
+        } else {
+            self.recent.push_back(now_ms);
+            self.held = None;
+        }
+    }
+
+    /// The pane shows the "shell exits at start" message instead of a shell.
+    pub fn is_held(&self, pane: PaneId) -> bool {
+        self.held == Some(pane)
+    }
+
+    pub fn held(&self) -> Option<PaneId> {
+        self.held
+    }
+
+    /// Retry from the held pane: forgets the history and replaces the held
+    /// pane with a fresh one (which starts a shell). `NotFound` when no pane
+    /// is held.
+    pub fn retry(&mut self, tabs: &mut Tabs, now_ms: u64) -> CloseOutcome {
+        let Some(pane) = self.held.take() else {
+            return CloseOutcome::NotFound;
+        };
+        self.recent.clear();
+        let out = tabs.close_pane(pane);
+        self.on_close(&out, now_ms);
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn respawn_storm_stops_after_five_in_ten_seconds() {
+        let (mut t, _) = Tabs::new();
+        let mut g = RespawnGuard::new();
+        let mut now = 0;
+        // the shell exits instantly: the last pane closes every 500 ms
+        for i in 0..RESPAWN_LIMIT {
+            now += 500;
+            let out = t.close_pane(t.active().focused);
+            g.on_close(&out, now);
+            assert!(matches!(out, CloseOutcome::Respawned { .. }), "{i}");
+            assert_eq!(g.held(), None, "respawn {i} starts a shell");
+        }
+        now += 500;
+        let out = t.close_pane(t.active().focused);
+        g.on_close(&out, now);
+        let CloseOutcome::Respawned { pane, .. } = out else {
+            panic!("{out:?}")
+        };
+        // the window keeps one tab, its pane held (no shell)
+        assert!(g.is_held(pane));
+        assert_eq!(t.tabs().len(), 1);
+        assert_eq!(t.active().focused, pane);
+        // closing the held pane again soon stays held
+        now += 500;
+        let out = t.close_pane(pane);
+        g.on_close(&out, now);
+        let held = g.held().expect("still held");
+        assert_eq!(t.active().focused, held);
+        // other outcomes do not count
+        let (_, other) = t.new_tab(PaneTarget::Local);
+        g.on_close(&t.close_pane(other), now);
+        assert_eq!(g.held(), Some(held));
+        // retry: a fresh pane that starts a shell, history forgotten
+        let out = g.retry(&mut t, now + 1);
+        let CloseOutcome::Respawned { pane: fresh, .. } = out else {
+            panic!("{out:?}")
+        };
+        assert_ne!(fresh, held);
+        assert!(!g.is_held(fresh) && g.held().is_none());
+        assert_eq!(t.target(held), None);
+        assert_eq!(g.retry(&mut t, now + 2), CloseOutcome::NotFound);
+    }
+
+    #[test]
+    fn slow_exits_keep_respawning() {
+        let (mut t, _) = Tabs::new();
+        let mut g = RespawnGuard::new();
+        // one exit every 2.5 s: at most 4 in any 10 s window
+        for i in 0..20u64 {
+            let out = t.close_pane(t.active().focused);
+            g.on_close(&out, i * 2_500);
+            assert_eq!(g.held(), None, "{i}");
+        }
+        // a burst after a quiet 10 s starts counting from zero
+        let mut g = RespawnGuard::new();
+        for i in 0..RESPAWN_LIMIT as u64 {
+            g.on_close(&t.close_pane(t.active().focused), i);
+        }
+        g.on_close(&t.close_pane(t.active().focused), 10_000);
+        assert_eq!(g.held(), None);
+    }
 
     const B: Rect = Rect {
         x: 0.0,

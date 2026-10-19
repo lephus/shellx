@@ -26,7 +26,7 @@ const GLYPH_CLOSE: &str = "\u{E8BB}";
 
 pub fn render(lang: Lang, window: &Window, cx: &mut Context<RootView>) -> Div {
     let toggle = icon_button("titlebar-sidebar", Icon::WindowSidebar)
-        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_sidebar(cx)));
+        .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_sidebar(window, cx)));
     // Notifications are display-only in the MVP (no badge, no panel).
     let bell = icon_button("titlebar-bell", Icon::BellRing);
     let settings = icon_button("titlebar-settings", Icon::Settings)

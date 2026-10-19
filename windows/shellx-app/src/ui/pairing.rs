@@ -150,6 +150,14 @@ impl PairingPanel {
         cx.notify();
     }
 
+    /// Esc, or the sidebar hiding: the "+" list goes away.
+    pub fn close_picker(&mut self, cx: &mut Context<Self>) {
+        if self.picker_open {
+            self.picker_open = false;
+            cx.notify();
+        }
+    }
+
     /// Sidebar access: a saved link -> Granted, the code being waited on ->
     /// Pending, else None.
     pub fn access_for(&self, machine_id: &str) -> Access {

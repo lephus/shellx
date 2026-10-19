@@ -47,13 +47,13 @@ use std::time::Duration;
 
 use ghostty_vt::{CellWidth, CursorShape, Rgb};
 use gpui::{
-    App, BorderStyle, Bounds, ClipboardItem, Context, DispatchPhase, Div, Element, ElementId,
-    ElementInputHandler, Entity, EntityInputHandler, EventEmitter, FocusHandle, Focusable, Font,
-    FontFallbacks, GlobalElementId, Hitbox, HitboxBehavior, Hsla, InspectorElementId, IntoElement,
-    KeyDownEvent, LayoutId, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PaintQuad,
-    Pixels, Point, Render, ScrollWheelEvent, ShapedLine, SharedString, StrikethroughStyle, Style,
-    Subscription, TextRun, UTF16Selection, UnderlineStyle, Window, div, fill, font, outline, point,
-    prelude::*, px, relative, size,
+    App, BorderStyle, Bounds, ClickEvent, ClipboardItem, Context, DispatchPhase, Div, Element,
+    ElementId, ElementInputHandler, Entity, EntityInputHandler, EventEmitter, FocusHandle,
+    Focusable, Font, FontFallbacks, GlobalElementId, Hitbox, HitboxBehavior, Hsla,
+    InspectorElementId, IntoElement, KeyDownEvent, LayoutId, MouseButton, MouseDownEvent,
+    MouseMoveEvent, MouseUpEvent, PaintQuad, Pixels, Point, Render, ScrollWheelEvent, ShapedLine,
+    SharedString, StrikethroughStyle, Style, Subscription, TextRun, UTF16Selection, UnderlineStyle,
+    Window, div, fill, font, outline, point, prelude::*, px, relative, size,
 };
 
 use std::sync::Arc;
@@ -68,6 +68,7 @@ use shellx_model::selection::{
 use shellx_model::strings::{Lang, Str, save_link_failed, t};
 
 use super::app::Services;
+use super::button::{Kind, button};
 use super::theme;
 use crate::fonts;
 use crate::local_pty::{LocalPty, spawn_reader};
@@ -90,6 +91,8 @@ pub(super) enum TermEvent {
     /// A remote pane's session status changed (links.json may have been
     /// rewritten by the enrollment).
     RemoteStatus,
+    /// "Thử lại" (or any key) in a held pane: start a fresh shell.
+    Retry,
 }
 
 const FONT_SIZE: f32 = 14.0;
@@ -217,6 +220,9 @@ pub(super) struct TermView {
     backend: Backend,
     /// The local shell could not start (drawn instead of the grid).
     error: Option<String>,
+    /// A held pane (`RespawnGuard`): the shell kept exiting as it started,
+    /// so none runs; the pane shows why and waits for a retry.
+    held: bool,
     /// The remote pane could not open: the pill shows why.
     failed: Option<Overlay>,
     /// A short status line at the bottom of the pane ("Mất kết nối, tạm
@@ -258,6 +264,7 @@ impl TermView {
             font: terminal_font(),
             backend: Backend::None,
             error: None,
+            held: false,
             failed: None,
             flash: None,
             flash_seq: 0,
@@ -332,6 +339,14 @@ impl TermView {
             }
             Err(error) => view.error = Some(format!("{error:#}")),
         }
+        view
+    }
+
+    /// A held pane: no shell; "Shell thoát ngay khi khởi động. Kiểm tra
+    /// SHELLX_SHELL." and "Thử lại". Any key or the button sends `Retry`.
+    pub(super) fn new_held(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let mut view = TermView::blank(window, cx);
+        view.held = true;
         view
     }
 
@@ -675,6 +690,11 @@ impl TermView {
     }
 
     fn on_key_down(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
+        if self.held {
+            cx.emit(TermEvent::Retry);
+            cx.stop_propagation();
+            return;
+        }
         let keystroke = &event.keystroke;
         let mods = keystroke.modifiers;
         let key = KeyIn {
@@ -798,6 +818,35 @@ fn status_pill(pill: &Overlay, lang: Lang) -> Div {
         .child(card)
 }
 
+/// What a held pane shows instead of a terminal: the reason, a hint and
+/// "Thử lại".
+fn held_message(lang: Lang, cx: &mut Context<TermView>) -> Div {
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(10.0))
+        .p(px(16.0))
+        .font(theme::ui_font())
+        .text_size(theme::UI_SIZE)
+        .child(
+            div()
+                .text_color(theme::hsla(ERROR))
+                .child(t(lang, Str::ShellExitsAtStart)),
+        )
+        .child(
+            div()
+                .text_size(theme::SMALL_SIZE)
+                .text_color(theme::muted())
+                .child(t(lang, Str::PressAnyKeyToRetry)),
+        )
+        .child(
+            div().flex().child(
+                button("held-retry", t(lang, Str::Retry), Kind::Primary, false)
+                    .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(TermEvent::Retry))),
+            ),
+        )
+}
+
 /// The short status line at the bottom of a pane (`TermView::flash`).
 fn flash_line(text: String) -> Div {
     div()
@@ -851,6 +900,7 @@ impl Render for TermView {
                 }),
             );
         let root = match &self.error {
+            _ if self.held => root.child(held_message(lang, cx)),
             Some(error) => root.child(format!("Could not start the shell: {error}")),
             None => root.child(TermElement { view: cx.entity() }),
         };
