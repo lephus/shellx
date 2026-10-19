@@ -229,6 +229,10 @@ jobs:
           path: ${{ env.DERIVED_DATA }}
           key: shellx-dd-unit-v1-${{ env.XCODE_VER }}-${{ steps.keys.outputs.ghostty }}-${{ hashFiles('cmux.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}-${{ github.sha }}
 
+      - name: Annotate unit test errors
+        if: failure() && steps.test.outcome == 'failure'
+        run: python3 scripts/shellx/ci/annotate-log.py "$RUNNER_TEMP/unit.log" "unit tests"
+
       - name: Upload unit log on failure
         if: failure() && steps.test.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
