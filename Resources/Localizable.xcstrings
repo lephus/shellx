@@ -75948,7 +75948,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "browser download yêu cầu một surface handle"
+            "value": "browser download yêu cầu một tab handle"
           }
         }
       }
@@ -77011,7 +77011,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "--profile chỉ được hỗ trợ khi browser open tạo khung mới; hãy bỏ bộ chọn surface"
+            "value": "--profile chỉ được hỗ trợ khi browser open tạo khung mới; hãy bỏ bộ chọn tab"
           }
         }
       }
@@ -77294,7 +77294,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Surface handle không hợp lệ: %@"
+            "value": "Tab handle không hợp lệ: %@"
           }
         }
       }
@@ -77359,7 +77359,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không tìm thấy surface: %@"
+            "value": "Không tìm thấy tab: %@"
           }
         }
       }
@@ -77692,7 +77692,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "close-surface yêu cầu --workspace hoặc --window cùng với --surface tường minh"
+            "value": "close-tab yêu cầu --workspace hoặc --window cùng với --surface tường minh"
           }
         }
       }
@@ -84522,7 +84522,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cách dùng: shellx clear-notifications [--workspace <id|ref|index>] [--surface <id|ref|index>] [--window <id|ref|index>]\n\nXóa các thông báo trong hàng đợi, có thể giới hạn theo phiên và surface.\n\nCờ: --workspace <id|ref|index> --surface <id|ref|index> --window <id|ref|index>"
+            "value": "Cách dùng: shellx clear-notifications [--workspace <id|ref|index>] [--surface <id|ref|index>] [--window <id|ref|index>]\n\nXóa các thông báo trong hàng đợi, có thể giới hạn theo phiên và tab.\n\nCờ: --workspace <id|ref|index> --surface <id|ref|index> --window <id|ref|index>"
           }
         }
       }
@@ -84871,7 +84871,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cách dùng: shellx mark-notification-read (--id <uuid> | --workspace <id|ref> [--surface <id|ref>] | --all)\n\nĐánh dấu thông báo đã đọc mà không mở chúng. Cần đúng một bộ chọn.\n\nCờ:\n  --id <uuid>           Đánh dấu một thông báo đã đọc\n  --workspace <id|ref>  Đánh dấu thông báo của một phiên\n  --surface <id|ref>    Thu hẹp --workspace xuống một surface\n  --all                 Đánh dấu mọi thông báo đã đọc\n  --json                In JSON\n  --id-format <mode>    refs, uuids hoặc both"
+            "value": "Cách dùng: shellx mark-notification-read (--id <uuid> | --workspace <id|ref> [--surface <id|ref>] | --all)\n\nĐánh dấu thông báo đã đọc mà không mở chúng. Cần đúng một bộ chọn.\n\nCờ:\n  --id <uuid>           Đánh dấu một thông báo đã đọc\n  --workspace <id|ref>  Đánh dấu thông báo của một phiên\n  --surface <id|ref>    Thu hẹp --workspace xuống một tab\n  --all                 Đánh dấu mọi thông báo đã đọc\n  --json                In JSON\n  --id-format <mode>    refs, uuids hoặc both"
           }
         }
       }
@@ -84996,7 +84996,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cách dùng: shellx memory [flags]\n\nChẩn đoán bộ nhớ của ứng dụng ShellX tách biệt với RSS đệ quy của các tiến trình con trong terminal.\n\nCờ:\n  --all                         Gồm mọi cửa sổ (mặc định: chỉ cửa sổ hiện tại)\n  --workspace <id|ref|index>   Giới hạn ngữ cảnh phiên cho nhãn phân bổ\n  --groups <count>              Số nhóm lệnh con cần hiển thị (mặc định: 12)\n  --json                        Xuất JSON có cấu trúc\n\nKết quả:\n  App footprint là footprint vật lý trực tiếp của tiến trình ShellX theo thống kê tiến trình của macOS.\n  Child RSS là bộ nhớ resident đệ quy của các tiến trình con của ứng dụng ShellX,\n  nhóm theo tên lệnh và quy về phiên, khung và surface khi biết.\n\nVí dụ:\n  shellx memory\n  shellx memory --groups 20\n  shellx --json memory --all"
+            "value": "Cách dùng: shellx memory [flags]\n\nChẩn đoán bộ nhớ của ứng dụng ShellX tách biệt với RSS đệ quy của các tiến trình con trong terminal.\n\nCờ:\n  --all                         Gồm mọi cửa sổ (mặc định: chỉ cửa sổ hiện tại)\n  --workspace <id|ref|index>   Giới hạn ngữ cảnh phiên cho nhãn phân bổ\n  --groups <count>              Số nhóm lệnh con cần hiển thị (mặc định: 12)\n  --json                        Xuất JSON có cấu trúc\n\nKết quả:\n  App footprint là footprint vật lý trực tiếp của tiến trình ShellX theo thống kê tiến trình của macOS.\n  Child RSS là bộ nhớ resident đệ quy của các tiến trình con của ứng dụng ShellX,\n  nhóm theo tên lệnh và quy về phiên, khung và tab khi biết.\n\nVí dụ:\n  shellx memory\n  shellx memory --groups 20\n  shellx --json memory --all"
           }
         }
       }
@@ -85323,7 +85323,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cách dùng: shellx open-notification --id <uuid>\n\nChuyển tiêu điểm tới phiên và surface của thông báo, rồi đánh dấu dòng đã đọc.\n\nCờ:\n  --id <uuid>           Id thông báo cần mở\n  --json                In JSON\n  --id-format <mode>    refs, uuids hoặc both"
+            "value": "Cách dùng: shellx open-notification --id <uuid>\n\nChuyển tiêu điểm tới phiên và tab của thông báo, rồi đánh dấu dòng đã đọc.\n\nCờ:\n  --id <uuid>           Id thông báo cần mở\n  --json                In JSON\n  --id-format <mode>    refs, uuids hoặc both"
           }
         }
       }
@@ -88533,7 +88533,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không tìm thấy đích surface của local-tmux"
+            "value": "Không tìm thấy đích tab của local-tmux"
           }
         }
       }
@@ -89053,7 +89053,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "local-tmux không thể xác minh surface hiện có; chưa tạo client mới"
+            "value": "local-tmux không thể xác minh tab hiện có; chưa tạo client mới"
           }
         }
       }
@@ -89183,7 +89183,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Đích khung hoặc surface của local-tmux yêu cầu một phiên"
+            "value": "Đích khung hoặc tab của local-tmux yêu cầu một phiên"
           }
         }
       }
@@ -99053,7 +99053,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Khung iOS đã chọn không có tham chiếu surface"
+            "value": "Khung iOS đã chọn không có tham chiếu tab"
           }
         }
       }
@@ -105619,7 +105619,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "restore: không xác định được surface ShellX hiện tại. Hãy thử lại từ terminal này hoặc truyền --surface <id|ref>."
+            "value": "restore: không xác định được tab ShellX hiện tại. Hãy thử lại từ terminal này hoặc truyền --surface <id|ref>."
           }
         }
       }
@@ -106659,7 +106659,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "restore: không tìm thấy surface được yêu cầu. Hãy kiểm tra tham chiếu surface rồi thử lại."
+            "value": "restore: không tìm thấy tab được yêu cầu. Hãy kiểm tra tham chiếu tab rồi thử lại."
           }
         }
       }
@@ -106920,7 +106920,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cách dùng: shellx restore [--surface <id|ref>] <kind> <checkpoint-id>\n       shellx restore <kind> <checkpoint-id> --surface <id|ref>\n       shellx restore --surface=<id|ref> <kind> <checkpoint-id>\n       shellx restore --surface [id|ref]\n\nThay tiến trình CLI này bằng tiến trình surface đã lưu. Các bản ghi\nmới giữ đối số khởi chạy và cwd dưới dạng giá trị có cấu trúc;\ncác bản ghi chỉ có lệnh từ bản dựng cũ dùng một shell tương thích.\nKhi không có id hay ref, --surface dùng surface ShellX đang gọi."
+            "value": "Cách dùng: shellx restore [--surface <id|ref>] <kind> <checkpoint-id>\n       shellx restore <kind> <checkpoint-id> --surface <id|ref>\n       shellx restore --surface=<id|ref> <kind> <checkpoint-id>\n       shellx restore --surface [id|ref]\n\nThay tiến trình CLI này bằng tiến trình của tab đã lưu. Các bản ghi\nmới giữ đối số khởi chạy và cwd dưới dạng giá trị có cấu trúc;\ncác bản ghi chỉ có lệnh từ bản dựng cũ dùng một shell tương thích.\nKhi không có id hay ref, --surface dùng tab ShellX đang gọi."
           }
         }
       }
@@ -108999,7 +108999,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cách dùng: shellx sessions list [options]\n       shellx sessions [options]\n\nIn các bản ghi phiên agent đã lưu từ ~/.cmuxterm/*-hook-sessions.json.\nLệnh này không yêu cầu socket ShellX đang chạy.\nMặc định, đầu ra rộng hiển thị các bản ghi đang hoạt động, khôi phục được hoặc có bản ghi hội thoại.\nTruyền --all để xem mọi bản ghi hook đã lưu.\n\nTùy chọn:\n  --agent <name>        Lọc theo một agent, ví dụ codex hoặc claude\n  --session <id>        Lọc theo một id phiên agent\n  --workspace <id>      Lọc theo một id phiên đã lưu\n  --surface <id>        Lọc theo một id surface đã lưu\n  --cwd <text>          Lọc theo cwd đã lưu hoặc thư mục làm việc khi khởi chạy\n  --state-dir <path>    Ghi đè thư mục trạng thái hook\n  --codex-home <path>   Ghi đè Codex home mặc định dùng để kiểm tra bản ghi hội thoại\n  --limit <n>           Giới hạn đầu ra văn bản (mặc định: 100)\n  --all                 In mọi kết quả khớp\n  --json                In JSON có cấu trúc\n\nCác dòng Codex cho biết id đã lưu có tồn tại trong CODEX_HOME/session_index.jsonl\nvà có tệp bản ghi hội thoại khớp trong CODEX_HOME/sessions hoặc\nCODEX_HOME/archived_sessions hay không.\n\nBí danh tương thích:\n  shellx sessions debug [options]\n  shellx session-debug [options]"
+            "value": "Cách dùng: shellx sessions list [options]\n       shellx sessions [options]\n\nIn các bản ghi phiên agent đã lưu từ ~/.cmuxterm/*-hook-sessions.json.\nLệnh này không yêu cầu socket ShellX đang chạy.\nMặc định, đầu ra rộng hiển thị các bản ghi đang hoạt động, khôi phục được hoặc có bản ghi hội thoại.\nTruyền --all để xem mọi bản ghi hook đã lưu.\n\nTùy chọn:\n  --agent <name>        Lọc theo một agent, ví dụ codex hoặc claude\n  --session <id>        Lọc theo một id phiên agent\n  --workspace <id>      Lọc theo một id phiên đã lưu\n  --surface <id>        Lọc theo một id tab đã lưu\n  --cwd <text>          Lọc theo cwd đã lưu hoặc thư mục làm việc khi khởi chạy\n  --state-dir <path>    Ghi đè thư mục trạng thái hook\n  --codex-home <path>   Ghi đè Codex home mặc định dùng để kiểm tra bản ghi hội thoại\n  --limit <n>           Giới hạn đầu ra văn bản (mặc định: 100)\n  --all                 In mọi kết quả khớp\n  --json                In JSON có cấu trúc\n\nCác dòng Codex cho biết id đã lưu có tồn tại trong CODEX_HOME/session_index.jsonl\nvà có tệp bản ghi hội thoại khớp trong CODEX_HOME/sessions hoặc\nCODEX_HOME/archived_sessions hay không.\n\nBí danh tương thích:\n  shellx sessions debug [options]\n  shellx session-debug [options]"
           }
         }
       }
@@ -111304,7 +111304,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tìm thấy nhiều surface Simulator; hãy truyền surface_id"
+            "value": "Tìm thấy nhiều tab Simulator; hãy truyền surface_id"
           }
         }
       }
@@ -111369,7 +111369,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Surface của bên gọi không còn khả dụng. Hãy truyền --surface hoặc --window để chọn một Simulator."
+            "value": "Tab của bên gọi không còn khả dụng. Hãy truyền --surface hoặc --window để chọn một Simulator."
           }
         }
       }
@@ -113965,7 +113965,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không tìm thấy bề mặt Simulator nào"
+            "value": "Không tìm thấy tab Simulator nào"
           }
         }
       }
@@ -114160,7 +114160,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không tìm thấy bề mặt"
+            "value": "Không tìm thấy tab"
           }
         }
       }
@@ -114225,7 +114225,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bề mặt đích không phải là Simulator"
+            "value": "Tab đích không phải là Simulator"
           }
         }
       }
@@ -121909,7 +121909,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Handle bề mặt đang trống"
+            "value": "Handle tab đang trống"
           }
         }
       }
@@ -122040,7 +122040,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không tìm thấy chỉ mục bề mặt"
+            "value": "Không tìm thấy chỉ mục tab"
           }
         }
       }
@@ -122171,7 +122171,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Handle bề mặt không hợp lệ: %@ (cần UUID, ref như surface:1, hoặc chỉ mục)"
+            "value": "Handle tab không hợp lệ: %@ (cần UUID, ref như surface:1, hoặc chỉ mục)"
           }
         }
       }
@@ -122302,7 +122302,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không tìm thấy surface: %@"
+            "value": "Không tìm thấy tab: %@"
           }
         }
       }
@@ -122433,7 +122433,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không tìm thấy ref bề mặt: %@"
+            "value": "Không tìm thấy ref tab: %@"
           }
         }
       }
@@ -122498,7 +122498,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cách dùng: shellx surface ls [<machine>|local] [--refresh] [--json]\n       shellx surface open <resource> [--workspace <id|ref|index>] [--pane <id|ref>] [--left|--right|--up|--down|--tab] [--new] [--focus <true|false>]\n       shellx surface new-terminal --machine <id|local> [--cwd <dir>] [--name <name>] [--remote-workspace <ws_…>] [--workspace <id|ref|index>] [--no-open] [-- <command...>]\n       shellx surface resume set [flags] -- <argv...>\n       shellx surface resume set [flags] --shell <command>\n       shellx surface resume show [--json] [flags]\n       shellx surface resume get [--json] [flags]\n       shellx surface resume clear [flags]\n       shellx surface size|participants [--surface <id|ref|index>] [--json]\n       shellx surface size-policy <latest|smallest|largest|priority|fixed> [--cols <n> --rows <n>] [--surface <id|ref|index>]\n       shellx surface size-to-me|disconnect-others [--surface <id|ref|index>]\n       shellx surface size-counts <true|false|auto> [--participant <id>] [--surface <id|ref|index>]\n       shellx surface disconnect-participant <participant-id> [--surface <id|ref|index>]\n\nls / open / new-terminal: danh mục bề mặt. Terminal, màn hình VNC và trình duyệt\ntrên Máy này và trên mọi máy cloud đều là tài nguyên (`<machine>/<kind>/<key>`,\nví dụ local/terminal/<uuid>, vivid-newt/terminal/term_2f9c…, vivid-newt/display/display:1,\nvivid-newt/browser/port:3000); các khung hiển thị chúng. `open` dùng lại khung đang\nhiển thị một tài nguyên trừ khi có --new; --pane kèm một phía sẽ chia khung đó ở phía ấy,\n--tab thêm một tab vào khung. Terminal cục bộ được chuyển đến đích (chỉ hiển thị một lần).\n`new-terminal` tạo một terminal trên máy (cloud: trong phiên cmux-tui của máy).\n`shellx vm tree` in cùng danh mục này.\n\nresume: gắn metadata lệnh khởi động lại vào một bề mặt terminal.\nCác liên kết CLI công khai được lưu để kiểm tra và khôi phục thủ công.\n\nCờ:\n  --workspace <id|ref|index>   Ngữ cảnh phiên (mặc định: $CMUX_WORKSPACE_ID)\n  --surface <id|ref|index>     Ngữ cảnh bề mặt (mặc định: $CMUX_SURFACE_ID)\n  --window <id|ref|index>      Ngữ cảnh cửa sổ cho ref/chỉ mục của phiên và bề mặt\n  --cwd <path>             Thư mục làm việc khi khôi phục (mặc định: $PWD)\n  --name <name>            Tên hiển thị của liên kết\n  --kind <kind>            Loại liên kết, ví dụ agent hoặc tmux\n  --checkpoint <id>        Checkpoint của nhà cung cấp hoặc id phiên\n  --checkpoint-id <id>     Giống --checkpoint và được ưu tiên hơn\n  --source <source>        Nhãn nguồn của liên kết\n\nVí dụ:\n  shellx surface resume set --kind tmux --shell \"tmux attach -t work\"\n  shellx surface resume set --kind opencode --checkpoint ses_123 -- opencode --session ses_123\n  shellx surface resume show --json"
+            "value": "Cách dùng: shellx surface ls [<machine>|local] [--refresh] [--json]\n       shellx surface open <resource> [--workspace <id|ref|index>] [--pane <id|ref>] [--left|--right|--up|--down|--tab] [--new] [--focus <true|false>]\n       shellx surface new-terminal --machine <id|local> [--cwd <dir>] [--name <name>] [--remote-workspace <ws_…>] [--workspace <id|ref|index>] [--no-open] [-- <command...>]\n       shellx surface resume set [flags] -- <argv...>\n       shellx surface resume set [flags] --shell <command>\n       shellx surface resume show [--json] [flags]\n       shellx surface resume get [--json] [flags]\n       shellx surface resume clear [flags]\n       shellx surface size|participants [--surface <id|ref|index>] [--json]\n       shellx surface size-policy <latest|smallest|largest|priority|fixed> [--cols <n> --rows <n>] [--surface <id|ref|index>]\n       shellx surface size-to-me|disconnect-others [--surface <id|ref|index>]\n       shellx surface size-counts <true|false|auto> [--participant <id>] [--surface <id|ref|index>]\n       shellx surface disconnect-participant <participant-id> [--surface <id|ref|index>]\n\nls / open / new-terminal: danh mục tab. Terminal, màn hình VNC và trình duyệt\ntrên Máy này và trên mọi máy cloud đều là tài nguyên (`<machine>/<kind>/<key>`,\nví dụ local/terminal/<uuid>, vivid-newt/terminal/term_2f9c…, vivid-newt/display/display:1,\nvivid-newt/browser/port:3000); các khung hiển thị chúng. `open` dùng lại khung đang\nhiển thị một tài nguyên trừ khi có --new; --pane kèm một phía sẽ chia khung đó ở phía ấy,\n--tab thêm một tab vào khung. Terminal cục bộ được chuyển đến đích (chỉ hiển thị một lần).\n`new-terminal` tạo một terminal trên máy (cloud: trong phiên cmux-tui của máy).\n`shellx vm tree` in cùng danh mục này.\n\nresume: gắn metadata lệnh khởi động lại vào một tab terminal.\nCác liên kết CLI công khai được lưu để kiểm tra và khôi phục thủ công.\n\nCờ:\n  --workspace <id|ref|index>   Ngữ cảnh phiên (mặc định: $CMUX_WORKSPACE_ID)\n  --surface <id|ref|index>     Ngữ cảnh tab (mặc định: $CMUX_SURFACE_ID)\n  --window <id|ref|index>      Ngữ cảnh cửa sổ cho ref/chỉ mục của phiên và tab\n  --cwd <path>             Thư mục làm việc khi khôi phục (mặc định: $PWD)\n  --name <name>            Tên hiển thị của liên kết\n  --kind <kind>            Loại liên kết, ví dụ agent hoặc tmux\n  --checkpoint <id>        Checkpoint của nhà cung cấp hoặc id phiên\n  --checkpoint-id <id>     Giống --checkpoint và được ưu tiên hơn\n  --source <source>        Nhãn nguồn của liên kết\n\nVí dụ:\n  shellx surface resume set --kind tmux --shell \"tmux attach -t work\"\n  shellx surface resume set --kind opencode --checkpoint ses_123 -- opencode --session ses_123\n  shellx surface resume show --json"
           }
         }
       }
@@ -122693,7 +122693,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ phải được chạy từ một bề mặt terminal do ShellX quản lý. Hãy mở một bề mặt terminal trong ShellX và chạy lệnh này ở đó."
+            "value": "%@ phải được chạy từ một tab terminal do ShellX quản lý. Hãy mở một tab terminal trong ShellX và chạy lệnh này ở đó."
           }
         }
       }
@@ -127625,7 +127625,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bề mặt '%@' không xác định. Xem: shellx surface ls --json"
+            "value": "Tab '%@' không xác định. Xem: shellx surface ls --json"
           }
         }
       }
@@ -128170,7 +128170,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cách dùng: shellx vm tree [<machine>|local] [--refresh] [--json]\n       shellx surface ls [<machine>|local] [--refresh] [--json]\n\nChế độ xem kiểu Finder cho mọi bề mặt: Máy này trước (terminal của nó nhóm theo\nphiên, và các trình duyệt), rồi đến từng máy cloud — Workspaces, Ports, VNC\nDisplays (mỗi màn hình một dòng), và mục Terminals cuối cùng chứa mọi\nterminal thuộc máy. Mỗi dòng mang một địa chỉ mà `shellx vm open` hoặc\n`shellx surface open` chấp nhận.\n\nTùy chọn:\n  <machine>   Chỉ máy này (`local` cho Máy này).\n  --refresh   Đọc lại mọi nhà cung cấp (danh sách máy, liên kết, khung cục bộ) trước.\n  --json      In payload danh mục ({machines, resources, projections})."
+            "value": "Cách dùng: shellx vm tree [<machine>|local] [--refresh] [--json]\n       shellx surface ls [<machine>|local] [--refresh] [--json]\n\nChế độ xem kiểu Finder cho mọi tab: Máy này trước (terminal của nó nhóm theo\nphiên, và các trình duyệt), rồi đến từng máy cloud — Workspaces, Ports, VNC\nDisplays (mỗi màn hình một dòng), và mục Terminals cuối cùng chứa mọi\nterminal thuộc máy. Mỗi dòng mang một địa chỉ mà `shellx vm open` hoặc\n`shellx surface open` chấp nhận.\n\nTùy chọn:\n  <machine>   Chỉ máy này (`local` cho Máy này).\n  --refresh   Đọc lại mọi nhà cung cấp (danh sách máy, liên kết, khung cục bộ) trước.\n  --json      In payload danh mục ({machines, resources, projections})."
           }
         }
       }
@@ -134460,7 +134460,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sao chép ID bề mặt"
+            "value": "Sao chép ID tab"
           }
         }
       }
@@ -151110,7 +151110,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sao chép ID bề mặt"
+            "value": "Sao chép ID tab"
           }
         }
       }
@@ -151241,7 +151241,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sao chép liên kết bề mặt"
+            "value": "Sao chép liên kết tab"
           }
         }
       }
@@ -160159,7 +160159,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Điều hướng bề mặt"
+            "value": "Điều hướng tab"
           }
         }
       }
@@ -168196,7 +168196,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không có phiên hoặc bề mặt nào khớp với tìm kiếm của bạn."
+            "value": "Không có phiên hoặc tab nào khớp với tìm kiếm của bạn."
           }
         }
       }
@@ -168392,7 +168392,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tìm phiên và bề mặt"
+            "value": "Tìm phiên và tab"
           }
         }
       }
@@ -177097,7 +177097,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Xóa khỏi nhóm"
+            "value": "Gỡ khỏi nhóm"
           }
         }
       }
@@ -185168,7 +185168,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Độ mờ bề mặt"
+            "value": "Độ mờ nền"
           }
         }
       }
@@ -222543,7 +222543,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vị trí Dock chỉ hỗ trợ bề mặt terminal và trình duyệt"
+            "value": "Vị trí Dock chỉ hỗ trợ tab terminal và trình duyệt"
           }
         }
       }
@@ -225612,7 +225612,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hiện các lối vào chat với Agent trong menu thả xuống phiên mới, bảng lệnh và thanh tab bề mặt."
+            "value": "Hiện các lối vào chat với Agent trong menu thả xuống phiên mới, bảng lệnh và thanh tab."
           }
         }
       }
@@ -264244,7 +264244,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mở thư mục trong VS Code (Inline)"
+            "value": "Mở thư mục trong VS Code (nội tuyến)"
           }
         }
       }
@@ -274334,7 +274334,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mở thư mục hiện tại trong VS Code (Inline)"
+            "value": "Mở thư mục hiện tại trong VS Code (nội tuyến)"
           }
         }
       }
@@ -277183,7 +277183,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Surface tiếp theo"
+            "value": "Tab tiếp theo"
           }
         }
       }
@@ -277433,7 +277433,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Surface trước"
+            "value": "Tab trước"
           }
         }
       }
@@ -288052,7 +288052,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Luôn cho phép"
+            "value": "Luôn gửi"
           }
         }
       }
@@ -288370,7 +288370,7 @@
               "other": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "Rời khỏi nghĩa là màn hình bị khóa hoặc ngủ, trình bảo vệ màn hình đang chạy, hoặc không có thao tác bàn phím hay chuột trong %lld phút."
+                  "value": "Bạn đang vắng mặt khi màn hình bị khóa hoặc ngủ, trình bảo vệ màn hình đang chạy, hoặc không có thao tác bàn phím hay chuột trong %lld phút."
                 }
               }
             }
@@ -288706,7 +288706,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nhảy tới mới nhất"
+            "value": "Chuyển đến thông báo mới nhất"
           }
         }
       }
@@ -423634,7 +423634,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không tìm thấy bề mặt"
+            "value": "Không tìm thấy tab"
           }
         }
       }
@@ -468614,7 +468614,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không tìm thấy bề mặt"
+            "value": "Không tìm thấy tab"
           }
         }
       }
@@ -469719,7 +469719,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Chỉ các surface terminal mới có thể nhắm tới khung tmux từ xa; terminal được tạo thành cửa sổ tmux mới sau cửa sổ của khung đó."
+            "value": "Chỉ các tab terminal mới có thể nhắm tới khung tmux từ xa; terminal được tạo thành cửa sổ tmux mới sau cửa sổ của khung đó."
           }
         }
       }
@@ -469850,7 +469850,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không tìm thấy bề mặt"
+            "value": "Không tìm thấy tab"
           }
         }
       }
@@ -470435,7 +470435,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không thể di chuyển surface"
+            "value": "Không thể di chuyển tab"
           }
         }
       }
@@ -470630,7 +470630,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không tìm thấy bề mặt"
+            "value": "Không tìm thấy tab"
           }
         }
       }
@@ -470695,7 +470695,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không tìm thấy surface trong cửa sổ"
+            "value": "Không tìm thấy tab trong cửa sổ"
           }
         }
       }
@@ -470760,7 +470760,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không tìm thấy surface trong phiên"
+            "value": "Không tìm thấy tab trong phiên"
           }
         }
       }
@@ -470956,7 +470956,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không tìm thấy bề mặt"
+            "value": "Không tìm thấy tab"
           }
         }
       }
@@ -471282,7 +471282,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Surface terminal không còn khả dụng; hãy mở lại hoặc tạo phiên terminal mới."
+            "value": "Tab terminal không còn khả dụng; hãy mở lại hoặc tạo phiên terminal mới."
           }
         }
       }
@@ -568903,7 +568903,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cách dùng: shellx current [--limit <1...200>] [--json]\n\nĐọc các thông tin công việc hiện tại có giới hạn mà ShellX đã biết trên các bề mặt cục bộ và Cloud.\nKhông làm mới máy, không đọc transcript và không thay đổi công việc.\n\nCờ:\n  --limit <1...200>  Số mục tối đa (mặc định: 100)\n  --json            Payload gốc của chủ sở hữu kèm danh tính, bằng chứng và độ mới\n\nVăn bản và JSON dùng cùng một snapshot. Thông tin chưa biết vẫn là chưa biết; các\nnghĩa vụ có thể có của con người chỉ là quan sát, không phải quyền để hành động. --window không\nfocus hay lọc truy vấn trên toàn ứng dụng này; --id-format không viết lại danh tính của nó.\n\nVí dụ:\n  shellx current\n  shellx current --json --limit 50"
+            "value": "Cách dùng: shellx current [--limit <1...200>] [--json]\n\nĐọc các thông tin công việc hiện tại có giới hạn mà ShellX đã biết trên các tab cục bộ và Cloud.\nKhông làm mới máy, không đọc transcript và không thay đổi công việc.\n\nCờ:\n  --limit <1...200>  Số mục tối đa (mặc định: 100)\n  --json            Payload gốc của chủ sở hữu kèm danh tính, bằng chứng và độ mới\n\nVăn bản và JSON dùng cùng một snapshot. Thông tin chưa biết vẫn là chưa biết; các\nnghĩa vụ có thể có của con người chỉ là quan sát, không phải quyền để hành động. --window không\nfocus hay lọc truy vấn trên toàn ứng dụng này; --id-format không viết lại danh tính của nó.\n\nVí dụ:\n  shellx current\n  shellx current --json --limit 50"
           }
         }
       }
@@ -584486,7 +584486,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "bề mặt terminal"
+            "value": "tab terminal"
           }
         }
       }
@@ -584551,7 +584551,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "bề mặt trình duyệt"
+            "value": "tab trình duyệt"
           }
         }
       }
@@ -585331,7 +585331,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "bề mặt terminal"
+            "value": "tab terminal"
           }
         }
       }
@@ -585396,7 +585396,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "bề mặt trình duyệt"
+            "value": "tab trình duyệt"
           }
         }
       }
@@ -586111,7 +586111,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "bề mặt terminal"
+            "value": "tab terminal"
           }
         }
       }
@@ -586176,7 +586176,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "bề mặt trình duyệt"
+            "value": "tab trình duyệt"
           }
         }
       }
@@ -587021,7 +587021,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "bề mặt terminal"
+            "value": "tab terminal"
           }
         }
       }
@@ -587086,7 +587086,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "bề mặt trình duyệt"
+            "value": "tab trình duyệt"
           }
         }
       }
@@ -600120,7 +600120,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cách dùng: shellx send [cờ] [--] <văn bản>\n\nGửi văn bản đến một terminal surface dưới dạng phím gõ. Chuỗi escape: \\n và \\r gửi Enter, \\t gửi Tab.\n\nVới văn bản lớn (ví dụ trên 4 KB, hoặc nhiều dòng gửi cho một agent), hãy dùng --paste hoặc shellx paste. Phím gõ sẽ nhấn Enter ở mỗi dòng mới, nên có thể gửi từng dòng riêng lẻ.\n\nVới --paste, văn bản đi qua cùng đường dán như shellx paste và Cmd+V, không thay đổi: các chuỗi escape như \\n không được diễn giải, và ký tự điều khiển như Esc và Ctrl-C được thay bằng dấu cách. --paste phải đặt trước văn bản.\n\nNếu prompt của agent ở đích đang có văn bản ai đó đang gõ, hoặc đang mở một câu hỏi hay hộp thoại cấp quyền, sẽ không có gì được gửi và lệnh thất bại. --force vẫn gửi.\n\nCờ:\n  --workspace <id|ref|index>   Phiên đích (mặc định: $CMUX_WORKSPACE_ID)\n  --surface <id|ref|index>     Surface đích (mặc định: $CMUX_SURFACE_ID)\n  --window <id|ref|index>      Cửa sổ chứa tham chiếu và chỉ số của phiên/surface\n  --paste                      Dán văn bản thay vì gõ\n  --force                      Gửi dù đang có bản nháp hoặc hộp thoại đang mở\n\nVí dụ:\n  shellx send \"echo hello\"\n  shellx send --surface surface:2 \"ls -la\\n\"\n  shellx send --paste --surface surface:2 \"$(cat notes.md)\""
+            "value": "Cách dùng: shellx send [cờ] [--] <văn bản>\n\nGửi văn bản đến một tab terminal dưới dạng phím gõ. Chuỗi escape: \\n và \\r gửi Enter, \\t gửi Tab.\n\nVới văn bản lớn (ví dụ trên 4 KB, hoặc nhiều dòng gửi cho một agent), hãy dùng --paste hoặc shellx paste. Phím gõ sẽ nhấn Enter ở mỗi dòng mới, nên có thể gửi từng dòng riêng lẻ.\n\nVới --paste, văn bản đi qua cùng đường dán như shellx paste và Cmd+V, không thay đổi: các chuỗi escape như \\n không được diễn giải, và ký tự điều khiển như Esc và Ctrl-C được thay bằng dấu cách. --paste phải đặt trước văn bản.\n\nNếu prompt của agent ở đích đang có văn bản ai đó đang gõ, hoặc đang mở một câu hỏi hay hộp thoại cấp quyền, sẽ không có gì được gửi và lệnh thất bại. --force vẫn gửi.\n\nCờ:\n  --workspace <id|ref|index>   Phiên đích (mặc định: $CMUX_WORKSPACE_ID)\n  --surface <id|ref|index>     Tab đích (mặc định: $CMUX_SURFACE_ID)\n  --window <id|ref|index>      Cửa sổ chứa tham chiếu và chỉ số của phiên/tab\n  --paste                      Dán văn bản thay vì gõ\n  --force                      Gửi dù đang có bản nháp hoặc hộp thoại đang mở\n\nVí dụ:\n  shellx send \"echo hello\"\n  shellx send --surface surface:2 \"ls -la\\n\"\n  shellx send --paste --surface surface:2 \"$(cat notes.md)\""
           }
         }
       }
@@ -600315,7 +600315,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Đóng surface cuối cùng trong một phiên vẫn giữ phiên đó mở."
+            "value": "Đóng tab cuối cùng trong một phiên vẫn giữ phiên đó mở."
           }
         }
       }
@@ -600380,7 +600380,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Đưa các surface terminal, trình duyệt và Markdown từ mọi phiên vào kết quả của bảng lệnh."
+            "value": "Đưa các tab terminal, trình duyệt và Markdown từ mọi phiên vào kết quả của bảng lệnh."
           }
         }
       }
@@ -622947,7 +622947,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cloud machines cần ShellX Pro — đang hiện dữ liệu gần nhất"
+            "value": "Máy Cloud cần ShellX Pro — đang hiện dữ liệu gần nhất"
           }
         }
       }
@@ -630991,7 +630991,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dùng Cloud machines từ bất kỳ ứng dụng nào"
+            "value": "Dùng máy Cloud từ bất kỳ ứng dụng nào"
           }
         }
       }
@@ -637745,7 +637745,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Surface có tiến trình đang chạy; hãy thử lại với --force"
+            "value": "Tab có tiến trình đang chạy; hãy thử lại với --force"
           }
         }
       }
@@ -637810,7 +637810,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không thể đóng surface"
+            "value": "Không thể đóng tab"
           }
         }
       }
@@ -637875,7 +637875,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Surface có tiến trình đang chạy; hãy thử lại với force=true"
+            "value": "Tab có tiến trình đang chạy; hãy thử lại với force=true"
           }
         }
       }
@@ -637940,7 +637940,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không thể đóng surface"
+            "value": "Không thể đóng tab"
           }
         }
       }
@@ -638005,7 +638005,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Một hoặc nhiều surface có tiến trình đang chạy; hãy thử lại với force=true"
+            "value": "Một hoặc nhiều tab có tiến trình đang chạy; hãy thử lại với force=true"
           }
         }
       }
@@ -638135,7 +638135,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Một hoặc nhiều phiên hoặc surface Dock có tiến trình đang chạy; hãy thử lại với --force"
+            "value": "Một hoặc nhiều phiên hoặc tab Dock có tiến trình đang chạy; hãy thử lại với --force"
           }
         }
       }
@@ -638395,7 +638395,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cloud machine không khả dụng"
+            "value": "Máy Cloud không khả dụng"
           }
         }
       }
@@ -642642,7 +642642,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Chưa thấy hoạt động agent nào trên surface đó. Tin nhắn sẽ chờ cho đến khi một agent ở đó nhận nó."
+            "value": "Chưa thấy hoạt động agent nào trên tab đó. Tin nhắn sẽ chờ cho đến khi một agent ở đó nhận nó."
           }
         }
       }
@@ -642772,7 +642772,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cách dùng: shellx agent inbox [--surface <target>] [--state queued|delivered|read|failed] [--limit <n>] [--mark-read] [--json]\n\nLiệt kê tin nhắn của agent, mới nhất trước. Không có --surface, liệt kê tin nhắn của\nmọi surface. --mark-read đánh dấu các tin nhắn được liệt kê là đã đọc."
+            "value": "Cách dùng: shellx agent inbox [--surface <target>] [--state queued|delivered|read|failed] [--limit <n>] [--mark-read] [--json]\n\nLiệt kê tin nhắn của agent, mới nhất trước. Không có --surface, liệt kê tin nhắn của\nmọi tab. --mark-read đánh dấu các tin nhắn được liệt kê là đã đọc."
           }
         }
       }
@@ -642837,7 +642837,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cách dùng: shellx agent message <target> [--from <name>] [--thread <id>] [--json] [--] <text|->\n            shellx agent message --reply-to <message-id> [--from <name>] [--json] [--] <text|->\n\nGửi tin nhắn đến agent đang chạy trong một phiên hoặc surface khác. ShellX\ngiao nó qua hook của agent đó, không bao giờ gõ vào terminal của nó,\nnên nó không thể rơi vào một prompt đang gõ dở. Một phiên Claude Code đang rảnh sẽ thức dậy\nđể đọc; phiên đang bận đọc nó ở bước tiếp theo.\n\n<target> là id hoặc ref của phiên hoặc surface (workspace:2, surface:5), hoặc\ntiêu đề phiên (khớp chính xác, rồi tiền tố duy nhất). Dùng - để đọc văn bản từ\nstdin. --from mặc định là tiêu đề của phiên gửi.\n\nVí dụ:\n  shellx agent message cmux-remote-status \"The relay fix is on main, rebase when free.\"\n  shellx agent message --reply-to 3f2a... \"Done, PR is #123.\""
+            "value": "Cách dùng: shellx agent message <target> [--from <name>] [--thread <id>] [--json] [--] <text|->\n            shellx agent message --reply-to <message-id> [--from <name>] [--json] [--] <text|->\n\nGửi tin nhắn đến agent đang chạy trong một phiên hoặc tab khác. ShellX\ngiao nó qua hook của agent đó, không bao giờ gõ vào terminal của nó,\nnên nó không thể rơi vào một prompt đang gõ dở. Một phiên Claude Code đang rảnh sẽ thức dậy\nđể đọc; phiên đang bận đọc nó ở bước tiếp theo.\n\n<target> là id hoặc ref của phiên hoặc tab (workspace:2, surface:5), hoặc\ntiêu đề phiên (khớp chính xác, rồi tiền tố duy nhất). Dùng - để đọc văn bản từ\nstdin. --from mặc định là tiêu đề của phiên gửi.\n\nVí dụ:\n  shellx agent message cmux-remote-status \"The relay fix is on main, rebase when free.\"\n  shellx agent message --reply-to 3f2a... \"Done, PR is #123.\""
           }
         }
       }
@@ -643292,7 +643292,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hãy cung cấp phiên hoặc surface đích, hoặc id tin nhắn để trả lời."
+            "value": "Hãy cung cấp phiên hoặc tab đích, hoặc id tin nhắn để trả lời."
           }
         }
       }
@@ -643357,7 +643357,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tin nhắn đó không có surface người gửi để trả lời."
+            "value": "Tin nhắn đó không có tab người gửi để trả lời."
           }
         }
       }
@@ -643487,7 +643487,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không có phiên hoặc surface nào khớp với đích đó."
+            "value": "Không có phiên hoặc tab nào khớp với đích đó."
           }
         }
       }
@@ -644072,7 +644072,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không có terminal nào khớp với surface đó."
+            "value": "Không có terminal nào khớp với tab đó."
           }
         }
       }
@@ -644527,7 +644527,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không có terminal nào khớp với surface đó."
+            "value": "Không có terminal nào khớp với tab đó."
           }
         }
       }
@@ -647874,7 +647874,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Các thành viên dùng chung Cloud machines của nhóm này. Mac của bạn vẫn riêng tư."
+            "value": "Các thành viên dùng chung các máy Cloud của nhóm này. Mac của bạn vẫn riêng tư."
           }
         }
       }
@@ -658436,7 +658436,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cách dùng: shellx agent messages [on|off|status] [<target>] [--workspace] [--json]\n\nBật hoặc tắt tin nhắn agent cho một agent, hoặc xem agent đó có nhận\nđược tin nhắn hay không. Tắt tin nhắn cho một agent sẽ từ chối tin nhắn mới gửi đến nó và\nđánh dấu các tin đang chờ của nó là thất bại.\n\n<target> được xác định như shellx agent message: id hoặc ref của phiên hay surface,\nhoặc tiêu đề phiên. Nếu không có, lệnh áp dụng cho\nsurface đang chạy nó. --workspace áp dụng cho mọi surface trong\nphiên.\n\nKhi không có --workspace, đích là phiên nghĩa là một agent surface\nmà nó xác định lúc này. Surface đó vẫn tắt dù surface khác\ntrở thành agent của phiên sau này.\n\nĐể tắt tin nhắn agent ở mọi nơi, đặt agentMessages.enabled thành\nfalse trong ~/.config/shellx/shellx.json hoặc tắt Cài đặt > Tự động hóa >\nTin nhắn agent.\n\nVí dụ:\n  shellx agent messages off\n  shellx agent messages on workspace:3\n  shellx agent messages off --workspace cmux-remote-status"
+            "value": "Cách dùng: shellx agent messages [on|off|status] [<target>] [--workspace] [--json]\n\nBật hoặc tắt tin nhắn agent cho một agent, hoặc xem agent đó có nhận\nđược tin nhắn hay không. Tắt tin nhắn cho một agent sẽ từ chối tin nhắn mới gửi đến nó và\nđánh dấu các tin đang chờ của nó là thất bại.\n\n<target> được xác định như shellx agent message: id hoặc ref của phiên hay tab,\nhoặc tiêu đề phiên. Nếu không có, lệnh áp dụng cho\ntab đang chạy nó. --workspace áp dụng cho mọi tab trong\nphiên.\n\nKhi không có --workspace, đích là phiên nghĩa là một tab agent\nmà nó xác định lúc này. Tab đó vẫn tắt dù tab khác\ntrở thành agent của phiên sau này.\n\nĐể tắt tin nhắn agent ở mọi nơi, đặt agentMessages.enabled thành\nfalse trong ~/.config/shellx/shellx.json hoặc tắt Cài đặt > Tự động hóa >\nTin nhắn agent.\n\nVí dụ:\n  shellx agent messages off\n  shellx agent messages on workspace:3\n  shellx agent messages off --workspace cmux-remote-status"
           }
         }
       }
@@ -659021,7 +659021,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Phạm vi phải là surface hoặc workspace."
+            "value": "Phạm vi phải là `surface` hoặc `workspace`."
           }
         }
       }
@@ -659086,7 +659086,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hãy chỉ định phiên hoặc surface đích, hoặc chạy lệnh này trong một surface ShellX."
+            "value": "Hãy chỉ định phiên hoặc tab đích, hoặc chạy lệnh này trong một tab ShellX."
           }
         }
       }
@@ -666697,7 +666697,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "local-zellij không thể xác minh surface hiện có; chưa tạo client mới"
+            "value": "local-zellij không thể xác minh tab hiện có; chưa tạo client mới"
           }
         }
       }
@@ -666957,7 +666957,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Đích khung hoặc surface của local-zellij cần một phiên"
+            "value": "Đích khung hoặc tab của local-zellij cần một phiên"
           }
         }
       }
@@ -690201,7 +690201,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không thể đóng surface"
+            "value": "Không thể đóng tab"
           }
         }
       }
@@ -690331,7 +690331,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không thể đóng surface cuối cùng"
+            "value": "Không thể đóng tab cuối cùng"
           }
         }
       }
@@ -690396,7 +690396,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Không tìm thấy surface terminal"
+            "value": "Không tìm thấy tab terminal"
           }
         }
       }
@@ -699925,7 +699925,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cách dùng: shellx jump-to-last-prompt\n\nĐưa tiêu điểm đến surface nơi bạn gửi lời nhắc cuối cho một agent lập trình, chuyển phiên và cửa sổ khi cần. Với --json, opened là false khi không có.\n\nCờ:\n  --json                In JSON\n  --id-format <mode>    refs, uuids hoặc both"
+            "value": "Cách dùng: shellx jump-to-last-prompt\n\nĐưa tiêu điểm đến tab nơi bạn gửi lời nhắc cuối cho một agent lập trình, chuyển phiên và cửa sổ khi cần. Với --json, opened là false khi không có.\n\nCờ:\n  --json                In JSON\n  --id-format <mode>    refs, uuids hoặc both"
           }
         }
       }
