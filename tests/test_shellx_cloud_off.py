@@ -156,7 +156,7 @@ class DeviceMirroringIsParked(unittest.TestCase):
             "Sources/Workspace.swift", r"static func surfaceTabBarBuiltInActionIsAvailable\([^{]*\{"))
         self.assertRegex(
             tab_bar, r"case \.cloudVM, \.newCloudWorkspace, \.newCloudMachine:\s*return CloudMachinesFeature\.isEnabled")
-        self.assertRegex(tab_bar, r"case \.mobileConnect:[^\n]*ShellXFeatures\.remoteMachines")
+        self.assertRegex(tab_bar, r"case \.mobileConnect:\s*return ShellXFeatures\.remoteMachines")
         menu = strip_comments(body(
             "Sources/AppDelegate+NewWorkspaceContextMenu.swift",
             r"static func isBuiltInActionAvailableInNewWorkspaceMenu\([^{]*\{"))

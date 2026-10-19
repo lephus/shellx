@@ -5,6 +5,7 @@ import CMUXMobileCore
 import CmuxFoundation
 import CmuxSurfaceCatalogModel
 import Foundation
+import ShellXBrand
 import CmuxCore
 import CmuxRemoteDaemon
 import CmuxRemoteSession
@@ -4718,7 +4719,12 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         _ action: CmuxSurfaceTabBarBuiltInAction
     ) -> Bool {
         switch action {
-        case .mobileConnect: return CmuxFeatureFlags.shared.isMobileConnectButtonEnabled
+        // ShellX: mirror the gates the actions refuse on, so no dead button is drawn.
+        case .cloudVM, .newCloudWorkspace, .newCloudMachine: return CloudMachinesFeature.isEnabled
+        case .mobileConnect:
+            return ShellXFeatures.remoteMachines
+                && MobileRemoteControlPolicy.isEnabled
+                && CmuxFeatureFlags.shared.isMobileConnectButtonEnabled
         case .newAgentChat: return CmuxFeatureFlags.shared.isAgentChatUIEnabled
         case .newSimulator: return CmuxFeatureFlags.shared.isSimulatorEnabled
         case .newBrowser:
