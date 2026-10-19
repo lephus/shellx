@@ -94,7 +94,7 @@ struct OlderShellXConflictTests {
         )
     }
 
-    @Test("a same-bundle relaunch is ignored and another native copy is terminated as before")
+    @Test("a same-bundle relaunch is ignored and another verified native copy is terminated as before")
     func duplicateLaunchOfNative() {
         #expect(
             SingleInstanceConflictPolicy.duplicateLaunchAction(
@@ -108,10 +108,14 @@ struct OlderShellXConflictTests {
                 launchedBundleURL: native, currentBundleURL: current, launchedKind: .nativeShellX
             ) == .terminateDuplicate
         )
+    }
+
+    @Test("an unverifiable launched bundle is left running, never force-terminated")
+    func duplicateLaunchOfUnknownIsLeftAlone() {
         #expect(
             SingleInstanceConflictPolicy.duplicateLaunchAction(
                 launchedBundleURL: nil, currentBundleURL: current, launchedKind: .unknown
-            ) == .terminateDuplicate
+            ) == .leaveOlderShellXRunning
         )
     }
 }
