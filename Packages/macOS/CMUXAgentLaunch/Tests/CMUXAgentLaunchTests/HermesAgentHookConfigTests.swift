@@ -13,7 +13,7 @@ struct HermesAgentHookConfigTests {
 
         let installed = HermesAgentHookConfig.installing(events: events, in: "")
 
-        #expect(installed.contains("# cmux hooks hermes-agent begin\nhooks:\n  on_session_start:"))
+        #expect(installed.contains("# shellx hooks hermes-agent begin\nhooks:\n  on_session_start:"))
         #expect(installed.contains("    - command: \"sh -c 'cmux hooks hermes-agent session-start'\""))
         #expect(installed.contains("      timeout: 120"))
         #expect(HermesAgentHookConfig.uninstalling(from: installed) == "")
@@ -63,12 +63,12 @@ struct HermesAgentHookConfigTests {
         #expect(
             installed.contains("""
               pre_approval_request:
-                # cmux hooks hermes-agent begin
+                # shellx hooks hermes-agent begin
                 - command: "sh -c 'cmux hooks hermes-agent notification'"
                   timeout: 5
                 - command: "sh -c 'cmux hooks feed --source hermes-agent --event pre_approval_request'"
                   timeout: 120
-                # cmux hooks hermes-agent end
+                # shellx hooks hermes-agent end
                 - command: "echo user"
                   timeout: 10
             """)
@@ -96,7 +96,7 @@ struct HermesAgentHookConfigTests {
         let installed = HermesAgentHookConfig.installing(events: events, in: existing)
 
         #expect(installed.components(separatedBy: "\n  pre_tool_call:").count == 2)
-        #expect(installed.contains("  pre_tool_call:\n    # cmux hooks hermes-agent begin\n    - command: \"sh -c 'cmux hooks feed --source hermes-agent --event pre_tool_call'\""))
+        #expect(installed.contains("  pre_tool_call:\n    # shellx hooks hermes-agent begin\n    - command: \"sh -c 'cmux hooks feed --source hermes-agent --event pre_tool_call'\""))
         #expect(installed.contains("    - command: \"echo user\""))
         #expect(installed.contains("  on_session_end:"))
         #expect(HermesAgentHookConfig.uninstalling(from: installed) == existing)
@@ -119,8 +119,8 @@ struct HermesAgentHookConfigTests {
 
         let installed = HermesAgentHookConfig.installing(events: events, in: existing)
 
-        #expect(installed.contains("  pre_tool_call:\n    # cmux hooks hermes-agent begin"))
-        #expect(installed.contains("  post_tool_call:\n    # cmux hooks hermes-agent begin"))
+        #expect(installed.contains("  pre_tool_call:\n    # shellx hooks hermes-agent begin"))
+        #expect(installed.contains("  post_tool_call:\n    # shellx hooks hermes-agent begin"))
         #expect(installed.contains("    - command: \"echo pre\""))
         #expect(installed.contains("    - command: \"echo post\""))
         #expect(HermesAgentHookConfig.uninstalling(from: installed) == existing)
@@ -141,10 +141,10 @@ struct HermesAgentHookConfigTests {
 
         let installed = HermesAgentHookConfig.installing(events: events, in: existing)
 
-        #expect(installed.contains("  pre_tool_call:\n    # cmux hooks hermes-agent begin"))
-        #expect(installed.contains("  post_tool_call:\n    # cmux hooks hermes-agent begin"))
-        #expect(!installed.contains("pre_tool_call: []\n    # cmux hooks hermes-agent begin"))
-        #expect(!installed.contains("post_tool_call: {} # intentionally empty\n    # cmux hooks hermes-agent begin"))
+        #expect(installed.contains("  pre_tool_call:\n    # shellx hooks hermes-agent begin"))
+        #expect(installed.contains("  post_tool_call:\n    # shellx hooks hermes-agent begin"))
+        #expect(!installed.contains("pre_tool_call: []\n    # shellx hooks hermes-agent begin"))
+        #expect(!installed.contains("post_tool_call: {} # intentionally empty\n    # shellx hooks hermes-agent begin"))
         #expect(HermesAgentHookConfig.uninstalling(from: installed) == existing)
     }
 
@@ -162,7 +162,7 @@ struct HermesAgentHookConfigTests {
 
         let installed = HermesAgentHookConfig.installing(events: events, in: existing)
 
-        #expect(installed.contains("hooks:\n  # cmux hooks hermes-agent begin restore-line-base64:"))
+        #expect(installed.contains("hooks:\n  # shellx hooks hermes-agent begin restore-line-base64:"))
         #expect(installed.contains("  pre_tool_call:"))
         #expect(HermesAgentHookConfig.uninstalling(from: installed) == existing)
     }
@@ -187,8 +187,8 @@ struct HermesAgentHookConfigTests {
                 with: "  pre_tool_call:\n    - command: \"my_tool pre\"\n      timeout: 3\n"
             )
             .replacingOccurrences(
-                of: "# cmux hooks hermes-agent end",
-                with: "    - matcher: \"terminal\"\n      command: 'my_tool post'\n# cmux hooks hermes-agent end"
+                of: "# shellx hooks hermes-agent end",
+                with: "    - matcher: \"terminal\"\n      command: 'my_tool post'\n# shellx hooks hermes-agent end"
             )
         #expect(occurrences(of: "my_tool", in: shared) == 2)
 
@@ -229,8 +229,8 @@ struct HermesAgentHookConfigTests {
         """
         let installed = HermesAgentHookConfig.installing(events: lifecycleEvents, in: existing)
         let shared = installed.replacingOccurrences(
-            of: "  # cmux hooks hermes-agent end",
-            with: "    - command: my_tool post\n  on_custom:\n    - command: my_tool custom\n  # cmux hooks hermes-agent end"
+            of: "  # shellx hooks hermes-agent end",
+            with: "    - command: my_tool post\n  on_custom:\n    - command: my_tool custom\n  # shellx hooks hermes-agent end"
         )
         #expect(occurrences(of: "my_tool", in: shared) == 2)
 
@@ -283,8 +283,8 @@ struct HermesAgentHookConfigTests {
         """
         let installed = HermesAgentHookConfig.installing(events: lifecycleEvents, in: existing)
         let shared = installed.replacingOccurrences(
-            of: "    # cmux hooks hermes-agent end\n    - command: \"echo user\"",
-            with: "    - command: \"my_tool pre\"\n    # cmux hooks hermes-agent end\n    - command: \"echo user\""
+            of: "    # shellx hooks hermes-agent end\n    - command: \"echo user\"",
+            with: "    - command: \"my_tool pre\"\n    # shellx hooks hermes-agent end\n    - command: \"echo user\""
         )
         #expect(occurrences(of: "my_tool", in: shared) == 1)
 
@@ -388,10 +388,10 @@ struct HermesAgentHookConfigTests {
         let installed = HermesAgentHookConfig.installing(events: lifecycleEvents, in: unindentedList)
         #expect(installed.contains("""
           pre_tool_call:
-          # cmux hooks hermes-agent begin
+          # shellx hooks hermes-agent begin
           - command: "sh -c 'cmux hooks feed --source hermes-agent --event pre_tool_call'"
             timeout: 120
-          # cmux hooks hermes-agent end
+          # shellx hooks hermes-agent end
           - command: my_tool pre
             timeout: 3
         """))
@@ -406,7 +406,7 @@ struct HermesAgentHookConfigTests {
         let installedFourSpaces = HermesAgentHookConfig.installing(events: lifecycleEvents, in: fourSpaces)
         #expect(installedFourSpaces.contains("""
         hooks:
-            # cmux hooks hermes-agent begin
+            # shellx hooks hermes-agent begin
             pre_tool_call:
               - command: "sh -c 'cmux hooks feed --source hermes-agent --event pre_tool_call'"
         """))
@@ -473,12 +473,12 @@ struct HermesAgentHookConfigTests {
 
     @Test("Allowlist ownership preserves embedded text and removes legacy cmux invocations")
     func allowlistOwnershipRequiresCmuxInvocation() throws {
-        let userMarker = "echo cmux-hermes-agent-hook-v2"
-        let userMarkerSuffix = "echo cmux-hermes-agent-hook-v2-user"
+        let userMarker = "echo shellx-hermes-agent-hook-v2"
+        let userMarkerSuffix = "echo shellx-hermes-agent-hook-v2-user"
         let userLifecycle = "printf '%s' 'hooks hermes-agent prompt-submit'"
-        let pinned = "sh -c ': cmux-hermes-agent-hook-v2; cmux hooks hermes-agent session-start'"
-        let legacyLifecycle = #"sh -c 'cmux_cli=cmux; "$cmux_cli" hooks hermes-agent prompt-submit'"#
-        let legacyFeed = "sh -c 'cmux hooks feed --source hermes-agent --event pre_tool_call'"
+        let pinned = "sh -c ': shellx-hermes-agent-hook-v2; shellx hooks hermes-agent session-start'"
+        let legacyLifecycle = #"sh -c 'cmux_cli=shellx; "$cmux_cli" hooks hermes-agent prompt-submit'"#
+        let legacyFeed = "sh -c 'shellx hooks feed --source hermes-agent --event pre_tool_call'"
         let commands = [
             userMarker,
             userMarkerSuffix,

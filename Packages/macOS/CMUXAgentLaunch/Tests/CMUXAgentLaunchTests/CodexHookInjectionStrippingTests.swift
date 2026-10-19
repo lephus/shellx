@@ -28,7 +28,7 @@ struct CodexHookInjectionStrippingTests {
         let arguments = ["codex"] + hookArguments(
             events: legacySavedLayoutHookEvents
         ) { subcommand in
-            "/Users/u/.cmux/hooks/cmux-codex-hook-\(subcommand).sh"
+            "/Users/u/.shellx/hooks/shellx-codex-hook-\(subcommand).sh"
         } + ["--model", "gpt-5.5"]
         #expect(
             AgentLaunchSanitizer.sanitizedLaunchArguments(
@@ -44,7 +44,7 @@ struct CodexHookInjectionStrippingTests {
         let arguments = ["codex"] + hookArguments(
             events: legacySynchronousChildHookEvents
         ) { subcommand in
-            "/Users/u/.cmux/hooks/cmux-codex-hook-\(subcommand).sh"
+            "/Users/u/.shellx/hooks/shellx-codex-hook-\(subcommand).sh"
         } + ["--model", "gpt-5.5"]
         #expect(
             AgentLaunchSanitizer.sanitizedLaunchArguments(
@@ -76,7 +76,7 @@ struct CodexHookInjectionStrippingTests {
             )
         }
         let arguments = ["codex"] + hookArguments(events: events) { subcommand in
-            "/Users/u/.cmux/hooks/cmux-codex-hook-\(subcommand).sh"
+            "/Users/u/.shellx/hooks/shellx-codex-hook-\(subcommand).sh"
         } + ["--model", "gpt-5.5"]
         #expect(
             AgentLaunchSanitizer.sanitizedLaunchArguments(
@@ -109,7 +109,7 @@ struct CodexHookInjectionStrippingTests {
             events: legacyAliasHookEvents,
             joined: true
         ) { subcommand in
-            "/Users/u/.cmux/hooks/cmux-codex-hook-\(subcommand).sh"
+            "/Users/u/.shellx/hooks/shellx-codex-hook-\(subcommand).sh"
         } + ["--model", "gpt-5.5"]
         #expect(
             AgentLaunchSanitizer.sanitizedLaunchArguments(
@@ -123,7 +123,7 @@ struct CodexHookInjectionStrippingTests {
     @Test("Strips inline cmux Codex hook snippets")
     func stripsInlineCmuxCodexHookSnippets() {
         let arguments = ["codex"] + codexWrapperHookArguments { subcommand in
-            "payload=$(mktemp -t cmux-codex-hook.XXXXXX); sh -c 'echo ok' cmux-codex-hook \"$payload\" \"$cmux_cli\" hooks codex \(subcommand)"
+            "payload=$(mktemp -t shellx-codex-hook.XXXXXX); sh -c 'echo ok' shellx-codex-hook \"$payload\" \"$cmux_cli\" hooks codex \(subcommand)"
         } + ["--model", "gpt-5.5"]
         #expect(
             AgentLaunchSanitizer.sanitizedLaunchArguments(
@@ -136,14 +136,14 @@ struct CodexHookInjectionStrippingTests {
 
     @Test("Strips the inline queued hook fallback")
     func stripsInlineQueuedHookFallback() {
-        // If ~/.cmux/hooks cannot be written, the wrapper embeds this marked
+        // If ~/.shellx/hooks cannot be written, the wrapper embeds this marked
         // shell body directly in Codex argv. Resume capture must still remove
         // it so the wrapper does not inject a second hook set.
         let arguments = ["codex"] + codexWrapperHookArguments { subcommand in
             if subcommand == "notification" {
-                return ": cmux-codex-hook; cmux hooks codex notification"
+                return ": shellx-codex-hook; shellx hooks codex notification"
             }
-            return ": cmux-codex-hook; cmux hooks enqueue codex \(subcommand)"
+            return ": shellx-codex-hook; shellx hooks enqueue codex \(subcommand)"
         } + ["--model", "gpt-5.5"]
         #expect(
             AgentLaunchSanitizer.sanitizedLaunchArguments(
@@ -171,7 +171,7 @@ struct CodexHookInjectionStrippingTests {
     @Test("Strips content-addressed cmux Codex hook scripts")
     func stripsContentAddressedCmuxCodexHookScripts() {
         let arguments = ["codex"] + codexWrapperHookArguments { subcommand in
-            "/Users/u/.cmux/hooks/cmux-codex-hook-0123456789abcdef-\(subcommand).sh"
+            "/Users/u/.shellx/hooks/shellx-codex-hook-0123456789abcdef-\(subcommand).sh"
         } + ["--model", "gpt-5.5"]
         #expect(
             AgentLaunchSanitizer.sanitizedLaunchArguments(
@@ -185,7 +185,7 @@ struct CodexHookInjectionStrippingTests {
     @Test("Strips content-addressed hooks below a spaced home path")
     func stripsContentAddressedHooksBelowSpacedHomePath() {
         let arguments = ["codex"] + codexWrapperHookArguments { subcommand in
-            "/Volumes/Home Disk/u/.cmux/hooks/cmux-codex-hook-0123456789abcdef-\(subcommand).sh"
+            "/Volumes/Home Disk/u/.shellx/hooks/shellx-codex-hook-0123456789abcdef-\(subcommand).sh"
         } + ["--model", "gpt-5.5"]
         #expect(
             AgentLaunchSanitizer.sanitizedLaunchArguments(
@@ -204,7 +204,7 @@ struct CodexHookInjectionStrippingTests {
             "hooks",
             "--dangerously-bypass-hook-trust",
             "-c",
-            "hooks.Stop=[{hooks=[{type=\"command\",command='''/Users/u/.cmux/hooks/cmux-codex-hook-not-a-content-id-stop.sh''',timeout=10000}]}]",
+            "hooks.Stop=[{hooks=[{type=\"command\",command='''/Users/u/.shellx/hooks/shellx-codex-hook-not-a-content-id-stop.sh''',timeout=10000}]}]",
             "--model",
             "gpt-5.5",
         ]
@@ -225,7 +225,7 @@ struct CodexHookInjectionStrippingTests {
             "hooks",
             "--dangerously-bypass-hook-trust",
             "-c",
-            "hooks.Stop=[{hooks=[{type=\"command\",command='''curl https://example.test/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh''',timeout=10000}]}]",
+            "hooks.Stop=[{hooks=[{type=\"command\",command='''curl https://example.test/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh''',timeout=10000}]}]",
             "--model",
             "gpt-5.5",
         ]
@@ -243,7 +243,7 @@ struct CodexHookInjectionStrippingTests {
             "hooks",
             "--dangerously-bypass-hook-trust",
             "-c",
-            "hooks.Stop=[{hooks=[{type=\"command\",command='''/bin/echo /Users/u/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh''',timeout=10000}]}]",
+            "hooks.Stop=[{hooks=[{type=\"command\",command='''/bin/echo /Users/u/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh''',timeout=10000}]}]",
             "--model",
             "gpt-5.5",
         ]
@@ -256,10 +256,10 @@ struct CodexHookInjectionStrippingTests {
         )
 
         for command in [
-            "/bin/true&&/Users/u/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh",
-            "/bin/true\\Users/u/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh",
-            "/usr/bin/env sh relative/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh",
-            "/Users/u/.cmux/hooks/cmux-codex-hook-0123456789abcdef-stop.sh*",
+            "/bin/true&&/Users/u/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh",
+            "/bin/true\\Users/u/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh",
+            "/usr/bin/env sh relative/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh",
+            "/Users/u/.shellx/hooks/shellx-codex-hook-0123456789abcdef-stop.sh*",
         ] {
             let userHookArguments = [
                 "--enable",
@@ -280,7 +280,7 @@ struct CodexHookInjectionStrippingTests {
             )
 
             let compoundCommandArguments = ["codex"] + codexWrapperHookArguments { subcommand in
-                "/Users/u/.cmux/hooks/cmux-codex-hook-0123456789abcdef-\(subcommand).sh"
+                "/Users/u/.shellx/hooks/shellx-codex-hook-0123456789abcdef-\(subcommand).sh"
             } + userHookArguments
             #expect(
                 AgentLaunchSanitizer.sanitizedLaunchArguments(
@@ -303,7 +303,7 @@ struct CodexHookInjectionStrippingTests {
             "--enable",
             "hooks",
             "-c",
-            "hooks.SessionStart=[{hooks=[{type=\"command\",command='''/Users/u/bin/cmux-codex-hook-wrapper.sh'''}]}]",
+            "hooks.SessionStart=[{hooks=[{type=\"command\",command='''/Users/u/bin/shellx-codex-hook-wrapper.sh'''}]}]",
             "--model",
             "gpt-5.5",
         ]
@@ -317,7 +317,7 @@ struct CodexHookInjectionStrippingTests {
                 "--enable",
                 "hooks",
                 "-c",
-                "hooks.SessionStart=[{hooks=[{type=\"command\",command='''/Users/u/bin/cmux-codex-hook-wrapper.sh'''}]}]",
+                "hooks.SessionStart=[{hooks=[{type=\"command\",command='''/Users/u/bin/shellx-codex-hook-wrapper.sh'''}]}]",
                 "--model",
                 "gpt-5.5",
             ]
@@ -351,7 +351,7 @@ struct CodexHookInjectionStrippingTests {
                     "--enable",
                     "hooks",
                     "-c",
-                    "hooks.SessionStart=[{hooks=[{type=\"command\",command='''/Users/u/bin/cmux-codex-hook-wrapper.sh'''}]}]",
+                    "hooks.SessionStart=[{hooks=[{type=\"command\",command='''/Users/u/bin/shellx-codex-hook-wrapper.sh'''}]}]",
                     "--model",
                     "gpt-5.5",
                 ],
@@ -362,7 +362,7 @@ struct CodexHookInjectionStrippingTests {
                 "--enable",
                 "hooks",
                 "-c",
-                "hooks.SessionStart=[{hooks=[{type=\"command\",command='''/Users/u/bin/cmux-codex-hook-wrapper.sh'''}]}]",
+                "hooks.SessionStart=[{hooks=[{type=\"command\",command='''/Users/u/bin/shellx-codex-hook-wrapper.sh'''}]}]",
                 "--model",
                 "gpt-5.5",
             ]
@@ -380,7 +380,7 @@ struct CodexHookInjectionStrippingTests {
         #expect(resume.contains("--dangerously-bypass-hook-trust"))
         #expect(resume.contains("--enable"))
         #expect(resume.contains("hooks"))
-        #expect(resume.contains { $0.contains("cmux-codex-hook") })
+        #expect(resume.contains { $0.contains("shellx-codex-hook") })
         #expect(resume.first == codexExecutable)
         #expect(resume.contains("--dangerously-bypass-approvals-and-sandbox"))
         #expect(resume.contains("gpt-5.5"))
@@ -396,7 +396,7 @@ struct CodexHookInjectionStrippingTests {
             arguments: realisticCodexHookArgv()
         ))
         #expect(fork.contains("--dangerously-bypass-hook-trust"))
-        #expect(fork.contains { $0.contains("cmux-codex-hook") })
+        #expect(fork.contains { $0.contains("shellx-codex-hook") })
         #expect(fork.first == codexExecutable)
     }
 
@@ -621,7 +621,7 @@ struct CodexHookInjectionStrippingTests {
             "hooks",
             "--dangerously-bypass-hook-trust",
             "-c",
-            "hooks.Stop=[{hooks=[{type=\"command\",command='''/Users/u/.cmux/hooks/cmux-codex-hook-stop.sh''',timeout=10000}]}]",
+            "hooks.Stop=[{hooks=[{type=\"command\",command='''/Users/u/.shellx/hooks/shellx-codex-hook-stop.sh''',timeout=10000}]}]",
             "--model",
             "gpt-5.5",
         ]))
@@ -634,8 +634,8 @@ struct CodexHookInjectionStrippingTests {
     /// them; the agent message handlers only ever had content-addressed names.
     private func legacyNamedScriptPath(_ subcommand: String) -> String {
         subcommand.hasPrefix("inbox-")
-            ? "/Users/u/.cmux/hooks/cmux-codex-hook-0123456789abcdef-\(subcommand).sh"
-            : "/Users/u/.cmux/hooks/cmux-codex-hook-\(subcommand).sh"
+            ? "/Users/u/.shellx/hooks/shellx-codex-hook-0123456789abcdef-\(subcommand).sh"
+            : "/Users/u/.shellx/hooks/shellx-codex-hook-\(subcommand).sh"
     }
 
     private var runtimeUnwrapper: JavaScriptRuntimeAgentLaunchUnwrapper {
@@ -734,7 +734,7 @@ struct CodexHookInjectionStrippingTests {
         "--enable",
         "hooks",
         "--dangerously-bypass-hook-trust",
-        "-c=hooks.Stop=[{hooks=[{type=\"command\",command='''/Users/u/.cmux/hooks/cmux-codex-hook-stop.sh''',timeout=10000}]}]",
+        "-c=hooks.Stop=[{hooks=[{type=\"command\",command='''/Users/u/.shellx/hooks/shellx-codex-hook-stop.sh''',timeout=10000}]}]",
     ]
 
     /// A cmux-wrapper-injected claude hook settings payload in joined
