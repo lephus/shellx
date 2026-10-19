@@ -133,12 +133,22 @@ impl TermCore {
     /// Paste clipboard text as data: bracketed only while the app enabled
     /// mode 2004; embedded markers are stripped by `encode_paste`.
     pub fn paste(&mut self, text: &str) {
-        let bytes = encode_paste(text, self.bracketed_paste());
+        let bytes = self.encode_paste(text);
+        self.write_paste(&bytes);
+    }
+
+    /// `text` as `paste` would send it (for a caller that checks its size).
+    pub fn encode_paste(&self, text: &str) -> Vec<u8> {
+        encode_paste(text, self.bracketed_paste())
+    }
+
+    /// Writes an `encode_paste` result (nothing when empty).
+    pub fn write_paste(&mut self, bytes: &[u8]) {
         if bytes.is_empty() {
             return;
         }
         self.terminal.scroll_to_bottom();
-        self.link.write(&bytes);
+        self.link.write(bytes);
     }
 
     pub fn bracketed_paste(&self) -> bool {

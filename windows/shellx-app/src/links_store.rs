@@ -1,7 +1,12 @@
 //! Persists `Links` at `remote_dir()/links.json`. No secrets inside (invite
 //! file paths only). Security review note: on Windows the file is protected by
 //! the per-user `%LOCALAPPDATA%` ACL; no extra ACL is applied. Writes are
-//! atomic (temp file + rename).
+//! atomic (temp file with a name unique in the process + rename).
+//!
+//! Several threads write it (the pairing panel's job, each remote session's
+//! `forget_invite`), each through its own `LinksStore`: every load, save and
+//! `update` (load-modify-save) holds one process-wide lock, so no writer
+//! loses another's record.
 //!
 //! A corrupt `links.json` is never overwritten in place: `load` renames it to
 //! `links.json.bad-<unix seconds>` (logged), and the app starts with no links.
@@ -9,9 +14,21 @@
 
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use shellx_model::links::Links;
+
+/// Held around every read-modify-write of a links file in this process.
+static LINKS_LOCK: Mutex<()> = Mutex::new(());
+
+/// Makes each temp file name unique within the process.
+static TMP_SEQ: AtomicU64 = AtomicU64::new(0);
+
+fn links_lock() -> MutexGuard<'static, ()> {
+    LINKS_LOCK.lock().unwrap_or_else(|e| e.into_inner())
+}
 
 pub struct LinksStore {
     /// `Err` when the state folder is unknown (e.g. `LOCALAPPDATA` unset):
@@ -52,6 +69,11 @@ impl LinksStore {
     /// A missing file is an empty set. A corrupt one is moved aside to
     /// `links.json.bad-<unix>` and an empty set is returned.
     pub fn load(&self) -> io::Result<Links> {
+        let _guard = links_lock();
+        self.load_locked()
+    }
+
+    fn load_locked(&self) -> io::Result<Links> {
         let Ok(path) = &self.path else {
             return Ok(Links::default());
         };
@@ -76,7 +98,22 @@ impl LinksStore {
         }
     }
 
+    /// Load, `change`, save, under the process-wide lock (no other writer
+    /// runs in between). Returns what was saved.
+    pub fn update(&self, change: impl FnOnce(&mut Links)) -> io::Result<Links> {
+        let _guard = links_lock();
+        let mut links = self.load_locked()?;
+        change(&mut links);
+        self.save_locked(&links)?;
+        Ok(links)
+    }
+
     pub fn save(&self, links: &Links) -> io::Result<()> {
+        let _guard = links_lock();
+        self.save_locked(links)
+    }
+
+    fn save_locked(&self, links: &Links) -> io::Result<()> {
         let path = self
             .path
             .as_ref()
@@ -84,7 +121,8 @@ impl LinksStore {
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?;
         }
-        let tmp = path.with_extension(format!("json.tmp{}", std::process::id()));
+        let seq = TMP_SEQ.fetch_add(1, Ordering::Relaxed);
+        let tmp = path.with_extension(format!("json.tmp{}-{seq}", std::process::id()));
         std::fs::write(&tmp, links.to_string_pretty())?;
         std::fs::rename(&tmp, path).inspect_err(|_| {
             let _ = std::fs::remove_file(&tmp);
@@ -174,6 +212,70 @@ mod tests {
         // and saving works again
         store.save(&sample()).unwrap();
         assert_eq!(store.load().unwrap(), sample());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn link(machine: &str) -> RemoteLink {
+        RemoteLink {
+            machine_id: machine.into(),
+            machine_name: format!("Mac {machine}"),
+            relay_route: "r".into(),
+            relay_slot: format!("slot-{machine}"),
+            invite_path: None,
+            daemon_fingerprint: "f".into(),
+            enrolled: false,
+        }
+    }
+
+    #[test]
+    fn concurrent_updates_through_separate_stores_lose_nothing() {
+        // PairingService and every session's forget_invite write links.json
+        // from their own threads, each with its own LinksStore.
+        const N: usize = 16;
+        for round in 0..5 {
+            let dir = tmp(&format!("race-{round}"));
+            let path = dir.join("links.json");
+            let barrier = std::sync::Arc::new(std::sync::Barrier::new(N));
+            let threads: Vec<_> = (0..N)
+                .map(|i| {
+                    let (path, barrier) = (path.clone(), barrier.clone());
+                    std::thread::spawn(move || {
+                        let store = LinksStore::new(path);
+                        barrier.wait();
+                        store
+                            .update(|links| links.upsert(link(&format!("m{i}"))))
+                            .unwrap();
+                    })
+                })
+                .collect();
+            for t in threads {
+                t.join().unwrap();
+            }
+            let text = std::fs::read_to_string(&path).unwrap();
+            let links = Links::load_from_str(&text).expect("valid links.json");
+            for i in 0..N {
+                assert!(
+                    links.get(&format!("m{i}")).is_some(),
+                    "round {round}: m{i} lost"
+                );
+            }
+            // no temp file is left behind
+            assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+    }
+
+    #[test]
+    fn update_returns_the_saved_links() {
+        let dir = tmp("update");
+        let store = LinksStore::new(dir.join("links.json"));
+        let saved = store.update(|l| l.upsert(link("a"))).unwrap();
+        assert!(saved.get("a").is_some());
+        assert_eq!(store.load().unwrap(), saved);
+        let e = LinksStore::unavailable("no dir")
+            .update(|l| l.upsert(link("a")))
+            .unwrap_err();
+        assert_eq!(e.to_string(), "no dir");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

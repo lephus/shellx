@@ -15,11 +15,20 @@
 //! Both variants keep a `shellx-slots.json` map from relay slot to daemon
 //! fingerprint: every Mac shares the relay route, so the slot (from
 //! `pair.poll`) selects which pinned daemon key a reconnect must expect.
+//!
+//! Several sessions (one per Mac) use the same state dir from their own
+//! threads: every read-modify-write of the files this module owns (slot map,
+//! plain identity creation, plain daemon pins) holds one process-wide lock,
+//! and each write goes through a temp file whose name is unique in the
+//! process, so no writer loses another's entry and the identity is created
+//! once.
 
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, MutexGuard};
 
 use anyhow::{Context, anyhow};
 use base64::Engine;
@@ -27,6 +36,16 @@ use cmux_remote::crypto::{StaticIdentity, public_key_fingerprint};
 use serde::{Deserialize, Serialize};
 
 const SLOTS_FILE: &str = "shellx-slots.json";
+
+/// Held around every read-modify-write of this module's state files.
+static STATE_LOCK: Mutex<()> = Mutex::new(());
+
+/// Makes each temp file name unique within the process.
+static TMP_SEQ: AtomicU64 = AtomicU64::new(0);
+
+fn state_lock() -> MutexGuard<'static, ()> {
+    STATE_LOCK.lock().unwrap_or_else(|error| error.into_inner())
+}
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct SlotMap {
@@ -49,10 +68,11 @@ fn encode_key(key: &[u8; 32]) -> String {
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(key)
 }
 
-/// Write `bytes` to `path` through a temporary sibling and a rename.
-/// Unix: the file is created `0600`.
+/// Write `bytes` to `path` through a temporary sibling (unique name) and a
+/// rename. Unix: the file is created `0600`.
 fn write_private(path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
-    let tmp = path.with_extension("tmp");
+    let seq = TMP_SEQ.fetch_add(1, Ordering::Relaxed);
+    let tmp = path.with_extension(format!("tmp{}-{seq}", std::process::id()));
     let mut options = fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
     #[cfg(unix)]
@@ -63,11 +83,15 @@ fn write_private(path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
     let mut file = options
         .open(&tmp)
         .with_context(|| format!("could not write {}", tmp.display()))?;
-    file.write_all(bytes)?;
-    file.sync_all()?;
+    let written = file.write_all(bytes).and_then(|()| file.sync_all());
     drop(file);
-    fs::rename(&tmp, path).with_context(|| format!("could not replace {}", path.display()))?;
-    Ok(())
+    let result = written.map_err(anyhow::Error::from).and_then(|()| {
+        fs::rename(&tmp, path).with_context(|| format!("could not replace {}", path.display()))
+    });
+    if result.is_err() {
+        let _ = fs::remove_file(&tmp);
+    }
+    result
 }
 
 fn read_json<T: for<'de> Deserialize<'de> + Default>(path: &Path) -> anyhow::Result<T> {
@@ -85,6 +109,7 @@ fn slot_fingerprint(state_dir: &Path, slot: &str) -> anyhow::Result<Option<Strin
 }
 
 fn remember_slot(state_dir: &Path, slot: &str, fingerprint: &str) -> anyhow::Result<()> {
+    let _guard = state_lock();
     let path = state_dir.join(SLOTS_FILE);
     let mut map: SlotMap = read_json(&path)?;
     map.version = 1;
@@ -207,6 +232,9 @@ impl PlainStore {
     pub(crate) fn open(state_dir: &Path) -> anyhow::Result<Self> {
         fs::create_dir_all(state_dir)
             .with_context(|| format!("could not create {}", state_dir.display()))?;
+        // Single-flight: read-or-create under the lock, so two sessions
+        // opening a fresh dir at once get the same identity.
+        let _guard = state_lock();
         let path = state_dir.join(PLAIN_IDENTITY_FILE);
         let persisted: PlainIdentity = read_json(&path)?;
         let identity = if persisted.private_key.is_empty() {
@@ -228,6 +256,7 @@ impl PlainStore {
     }
 
     fn pin(&self, name: &str, key: [u8; 32]) -> anyhow::Result<()> {
+        let _guard = state_lock();
         let path = self.state_dir.join(PLAIN_DAEMONS_FILE);
         let mut daemons: PlainDaemons = read_json(&path)?;
         daemons.version = 1;
@@ -285,6 +314,71 @@ mod tests {
         assert_eq!(first.daemon_key(&fingerprint).unwrap(), None);
         first.pin("Mac", daemon).unwrap();
         assert_eq!(again.daemon_key(&fingerprint).unwrap(), Some(daemon));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn concurrent_opens_create_one_identity() {
+        // Two sessions starting at once on a fresh state dir must end up
+        // with the same client identity (single-flight creation).
+        for round in 0..20 {
+            let dir = scratch(&format!("race-{round}"));
+            let barrier = std::sync::Arc::new(std::sync::Barrier::new(4));
+            let threads: Vec<_> = (0..4)
+                .map(|_| {
+                    let (dir, barrier) = (dir.clone(), barrier.clone());
+                    std::thread::spawn(move || {
+                        barrier.wait();
+                        PlainStore::open(&dir).unwrap().identity.public_key()
+                    })
+                })
+                .collect();
+            let keys: Vec<_> = threads.into_iter().map(|t| t.join().unwrap()).collect();
+            assert!(keys.iter().all(|k| *k == keys[0]), "round {round}");
+            let again = PlainStore::open(&dir).unwrap();
+            assert_eq!(again.identity.public_key(), keys[0]);
+            fs::remove_dir_all(&dir).unwrap();
+        }
+    }
+
+    #[test]
+    fn concurrent_pins_and_slots_lose_nothing() {
+        let dir = scratch("race-pins");
+        let store = std::sync::Arc::new(PlainStore::open(&dir).unwrap());
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(8));
+        let threads: Vec<_> = (0..8)
+            .map(|i| {
+                let (dir, store, barrier) = (dir.clone(), store.clone(), barrier.clone());
+                std::thread::spawn(move || {
+                    let key = StaticIdentity::generate().unwrap().public_key();
+                    barrier.wait();
+                    store.pin(&format!("Mac {i}"), key).unwrap();
+                    remember_slot(&dir, &format!("slot-{i}"), &public_key_fingerprint(&key))
+                        .unwrap();
+                    key
+                })
+            })
+            .collect();
+        let keys: Vec<_> = threads.into_iter().map(|t| t.join().unwrap()).collect();
+        for (i, key) in keys.iter().enumerate() {
+            let fingerprint = public_key_fingerprint(key);
+            assert_eq!(
+                store.daemon_key(&fingerprint).unwrap(),
+                Some(*key),
+                "pin {i}"
+            );
+            assert_eq!(
+                slot_fingerprint(&dir, &format!("slot-{i}")).unwrap(),
+                Some(fingerprint),
+                "slot {i}"
+            );
+        }
+        // no temp file is left behind
+        let names: Vec<_> = fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert!(names.iter().all(|n| !n.contains("tmp")), "{names:?}");
         fs::remove_dir_all(&dir).unwrap();
     }
 

@@ -12,6 +12,9 @@ use crate::strings::Str;
 pub const POLL_INTERVAL_MS: u64 = 2_000;
 pub const PAIRING_TIMEOUT_MS: u64 = 300_000;
 pub const BACKOFF_CAP_MS: u64 = 30_000;
+/// A link must stay connected this long before the backoff starts over at
+/// 1 s (a connect-then-drop loop keeps backing off, minting less often).
+pub const STABLE_CONNECTED_MS: u64 = 10_000;
 
 // ---------------------------------------------------------------- pairing
 
@@ -291,6 +294,9 @@ pub struct ConnState {
     /// Unique id of the current (or last) attempt.
     cur: u32,
     failures: u32,
+    /// When the live link connected; the failure count is reset once it has
+    /// been up `STABLE_CONNECTED_MS` (checked on the next event).
+    connected_at_ms: Option<u64>,
     machine_online: bool,
     last_reason: Option<String>,
 }
@@ -308,6 +314,7 @@ impl ConnState {
             step: Step::Minting,
             cur: 0,
             failures: 0,
+            connected_at_ms: None,
             machine_online: true,
             last_reason: None,
         }
@@ -337,6 +344,7 @@ impl ConnState {
     }
 
     pub fn on(&mut self, ev: ConnEvent, now_ms: u64) -> Vec<ConnAction> {
+        self.settle(now_ms);
         match ev {
             ConnEvent::Open => {
                 if self.phase != ConnPhase::Disconnected {
@@ -372,7 +380,9 @@ impl ConnState {
                     && attempt == self.cur
                 {
                     self.phase = ConnPhase::Connected;
-                    self.failures = 0;
+                    // `failures` is reset by `settle` once this link has
+                    // been up `STABLE_CONNECTED_MS`, not now.
+                    self.connected_at_ms = Some(now_ms);
                     Vec::new()
                 } else if self.phase == ConnPhase::Connected && attempt == self.cur {
                     // duplicate notice for the live link
@@ -449,6 +459,19 @@ impl ConnState {
                 self.phase = ConnPhase::Ended;
                 vec![ConnAction::Drop { attempt: None }]
             }
+        }
+    }
+
+    /// A link that has stayed connected `STABLE_CONNECTED_MS` ends the
+    /// failure streak: its next drop retries after 1 s again.
+    fn settle(&mut self, now_ms: u64) {
+        if self.phase != ConnPhase::Connected {
+            self.connected_at_ms = None;
+        } else if let Some(at) = self.connected_at_ms
+            && now_ms.saturating_sub(at) >= STABLE_CONNECTED_MS
+        {
+            self.failures = 0;
+            self.connected_at_ms = None;
         }
     }
 
@@ -581,6 +604,12 @@ mod tests {
                 panic!("expected Connect, got {a:?}")
             };
             paths.push(ticket_path.clone());
+            if n % 2 == 0 {
+                // connect-then-drop (under 10 s connected) still backs off
+                assert!(c.on(ConnEvent::Connected { attempt: id }, now).is_empty());
+                assert!(c.accepts_input());
+                now += STABLE_CONNECTED_MS - 1;
+            }
             let a = c.on(dis(id), now);
             assert_eq!(a[0], ConnAction::ShowStatus(Str::Reconnecting));
             assert!(!c.accepts_input());
@@ -619,8 +648,54 @@ mod tests {
         c.on(minted(id), now);
         c.on(ConnEvent::Connected { attempt: id }, now);
         assert!(c.accepts_input());
-        let a = c.on(dis(id), now + 5);
-        assert_eq!(sched(&a), Some(now + 5 + 1000));
+        // the link stayed up for 10 s: the next drop starts over at 1 s
+        let at = now + STABLE_CONNECTED_MS;
+        let a = c.on(dis(id), at);
+        assert_eq!(sched(&a), Some(at + 1000));
+        assert_eq!(
+            c.phase(),
+            &ConnPhase::Reconnecting {
+                attempt: 1,
+                retry_at_ms: at + 1000
+            }
+        );
+    }
+
+    #[test]
+    fn connect_then_drop_keeps_backing_off() {
+        // A link that connects and drops at once must not retry (and mint)
+        // every second forever.
+        let mut c = ConnState::new();
+        let mut id = mint_id(&c.on(ConnEvent::Open, 0));
+        let mut now = 0;
+        let mut delays = Vec::new();
+        for _ in 0..6 {
+            c.on(minted(id), now);
+            c.on(ConnEvent::Connected { attempt: id }, now);
+            assert!(c.accepts_input());
+            now += 500;
+            let a = c.on(dis(id), now);
+            let at = sched(&a).unwrap();
+            delays.push(at - now);
+            now = at;
+            id = mint_id(&c.on(ConnEvent::Tick, now));
+        }
+        assert_eq!(delays, [1000, 2000, 4000, 8000, 16000, 30000]);
+        // a later stable link resets the count once it has been up 10 s,
+        // seen on the next event (here the drop itself)
+        c.on(minted(id), now);
+        c.on(ConnEvent::Connected { attempt: id }, now);
+        let a = c.on(dis(id), now + 9_999);
+        assert_eq!(sched(&a), Some(now + 9_999 + 30_000));
+        now += 9_999 + 30_000;
+        id = mint_id(&c.on(ConnEvent::Tick, now));
+        c.on(minted(id), now);
+        c.on(ConnEvent::Connected { attempt: id }, now);
+        // a duplicate Connected notice does not restart the 10 s window
+        c.on(ConnEvent::Connected { attempt: id }, now + 5_000);
+        assert!(c.on(ConnEvent::Tick, now + 10_000).is_empty());
+        let a = c.on(dis(id), now + 10_001);
+        assert_eq!(sched(&a), Some(now + 10_001 + 1000));
     }
 
     #[test]

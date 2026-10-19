@@ -74,6 +74,7 @@ pub const SHELL_STRINGS: &[Str] = &[
     Str::Reconnecting,
     Str::RemoteEnded,
     Str::InputPaused,
+    Str::PasteTooLarge,
     Str::FingerprintMismatch,
     Str::NeedsPairing,
     Str::RemoteAttachFailed,
@@ -131,6 +132,75 @@ pub fn remote_session_title(terminal_title: Option<&str>, machine_name: &str) ->
         .filter(|title| !title.is_empty())
         .unwrap_or(machine_name)
         .to_string()
+}
+
+/// The window title's own name (also the whole title when nothing else fits).
+pub const BASE_TITLE: &str = "ShellX";
+
+/// Longest text (in chars) put before `" - ShellX"` in the window title.
+pub const TITLE_MAX_CHARS: usize = 80;
+
+/// Control chars removed, surrounding blanks trimmed, clipped to
+/// `TITLE_MAX_CHARS` chars (never inside a char).
+fn title_text(text: &str) -> String {
+    let clean: String = text.chars().filter(|c| !c.is_control()).collect();
+    clean.trim().chars().take(TITLE_MAX_CHARS).collect()
+}
+
+/// The window title (visible through GetWindowText, the taskbar, Alt+Tab and
+/// screen sharing). Default: the terminal's OSC title, else nothing, before
+/// " - ShellX", and NEVER any screen text. `screen_reader` (a screen reader
+/// is running, or `SHELLX_A11Y_TITLE=1`): the accessibility stopgap, the
+/// focused pane's cursor line instead (GPUI 0.2.2 has no UIA tree; Narrator
+/// reads the title with Insert+T).
+pub fn window_title(osc_title: Option<&str>, cursor_line: &str, screen_reader: bool) -> String {
+    let line = if screen_reader {
+        title_text(cursor_line)
+    } else {
+        String::new()
+    };
+    let text = if line.is_empty() {
+        osc_title.map(title_text).unwrap_or_default()
+    } else {
+        line
+    };
+    if text.is_empty() {
+        BASE_TITLE.to_string()
+    } else {
+        format!("{text} - {BASE_TITLE}")
+    }
+}
+
+/// `SHELLX_A11Y_TITLE`: `1` forces the cursor-line title.
+pub fn a11y_title_env(value: Option<&str>) -> bool {
+    value.is_some_and(|v| v.trim() == "1")
+}
+
+/// Caches the "is a screen reader running" answer; asks again at most once
+/// per second (the title is computed every frame).
+#[derive(Debug, Default)]
+pub struct ScreenReaderProbe {
+    /// (asked at ms, answer)
+    last: Option<(u64, bool)>,
+}
+
+impl ScreenReaderProbe {
+    pub const RECHECK_MS: u64 = 1_000;
+
+    pub const fn new() -> ScreenReaderProbe {
+        ScreenReaderProbe { last: None }
+    }
+
+    pub fn running(&mut self, now_ms: u64, ask: impl FnOnce() -> bool) -> bool {
+        match self.last {
+            Some((at, answer)) if now_ms >= at && now_ms - at < Self::RECHECK_MS => answer,
+            _ => {
+                let answer = ask();
+                self.last = Some((now_ms, answer));
+                answer
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -227,6 +297,91 @@ mod tests {
         );
         assert_eq!(remote_session_title(Some(" "), "MacBook"), "MacBook");
         assert_eq!(remote_session_title(None, "MacBook"), "MacBook");
+    }
+
+    #[test]
+    fn default_title_never_carries_screen_text() {
+        let line = "PS C:\\Users\\phu> mysql -p hunter2";
+        assert_eq!(window_title(None, line, false), "ShellX");
+        assert_eq!(
+            window_title(Some("vim notes.txt"), line, false),
+            "vim notes.txt - ShellX"
+        );
+        assert_eq!(window_title(Some("  "), line, false), "ShellX");
+        for osc in [None, Some("t")] {
+            let title = window_title(osc, line, false);
+            assert!(!title.contains("hunter2"), "{title}");
+            assert!(!title.contains("mysql"), "{title}");
+        }
+    }
+
+    #[test]
+    fn screen_reader_title_carries_the_cursor_line() {
+        let line = "PS C:\\> dir   ";
+        assert_eq!(window_title(None, line, true), "PS C:\\> dir - ShellX");
+        assert_eq!(
+            window_title(Some("vim"), line, true),
+            "PS C:\\> dir - ShellX"
+        );
+        // an empty cursor line falls back to the short title
+        assert_eq!(window_title(Some("vim"), "   ", true), "vim - ShellX");
+        assert_eq!(window_title(None, "", true), "ShellX");
+    }
+
+    #[test]
+    fn title_text_is_clipped_and_has_no_control_chars() {
+        let osc = format!("a\x1b]0;evil\x07b\tc\r\nd{}", "x".repeat(500));
+        let title = window_title(Some(&osc), "", false);
+        assert!(!title.chars().any(char::is_control), "{title:?}");
+        assert!(title.starts_with("a]0;evilbcd"), "{title:?}");
+        assert!(title.ends_with(" - ShellX"), "{title:?}");
+        let text = title.trim_end_matches(" - ShellX");
+        assert_eq!(text.chars().count(), TITLE_MAX_CHARS);
+        // char-based clipping never splits a multi-byte char
+        let vi = "tiếng Việt ".repeat(40);
+        let title = window_title(Some(&vi), "", false);
+        assert_eq!(
+            title.trim_end_matches(" - ShellX").chars().count(),
+            TITLE_MAX_CHARS
+        );
+        // the screen-reader line is cleaned the same way
+        let line = format!("ls\x07{}", "y".repeat(500));
+        let title = window_title(None, &line, true);
+        assert!(!title.chars().any(char::is_control));
+        assert_eq!(
+            title.trim_end_matches(" - ShellX").chars().count(),
+            TITLE_MAX_CHARS
+        );
+    }
+
+    #[test]
+    fn a11y_title_env_needs_exactly_one() {
+        assert!(a11y_title_env(Some("1")));
+        assert!(a11y_title_env(Some(" 1 ")));
+        for v in [None, Some(""), Some("0"), Some("true"), Some("yes")] {
+            assert!(!a11y_title_env(v), "{v:?}");
+        }
+    }
+
+    #[test]
+    fn screen_reader_probe_asks_at_most_once_per_second() {
+        let mut probe = ScreenReaderProbe::default();
+        let mut asked = 0;
+        let mut query = |now: u64, answer: bool, probe: &mut ScreenReaderProbe| {
+            probe.running(now, || {
+                asked += 1;
+                answer
+            })
+        };
+        assert!(!query(0, false, &mut probe));
+        assert!(!query(999, true, &mut probe)); // cached
+        assert!(query(1_000, true, &mut probe)); // re-asked
+        assert!(query(1_500, false, &mut probe)); // cached
+        assert!(!query(2_000, false, &mut probe));
+        // a clock that went backwards asks again instead of caching forever
+        assert!(query(10, true, &mut probe));
+        drop(query);
+        assert_eq!(asked, 4);
     }
 
     #[test]

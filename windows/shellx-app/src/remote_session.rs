@@ -400,8 +400,6 @@ struct Ctx {
     device_name: String,
     links: Option<Arc<LinksStore>>,
     record: Arc<Mutex<LinkRecord>>,
-    /// The last ticket file shellx-core wrote (deleted when the session ends).
-    last_ticket: Arc<Mutex<Option<PathBuf>>>,
 }
 
 /// Why the worker loop stopped.
@@ -474,7 +472,6 @@ impl Worker {
                 device_name: cfg.device_name,
                 links: cfg.links.map(Arc::new),
                 record: Arc::new(Mutex::new(cfg.record)),
-                last_ticket: Arc::new(Mutex::new(None)),
             },
             tx,
             status,
@@ -551,9 +548,10 @@ impl Worker {
             }
             break;
         }
-        if let Some(path) = lock(&self.ctx.last_ticket).take() {
-            let _ = std::fs::remove_file(path);
-        }
+        // No ticket cleanup here: shellx-remote deletes each ticket file
+        // right after reading it, and a replacement session for this Mac
+        // mints to the same file name (deleting "our last one" could
+        // delete its fresh ticket).
     }
 
     /// The last pane closed while the invitation's enrollment still waits
@@ -1158,9 +1156,7 @@ fn resolve_and_attach(
 
 impl Ctx {
     fn mint(&self) -> Result<TicketFile, CoreErr> {
-        let ticket = mint_connect_ticket(&*self.core, &self.machine_id, &self.ticket_name)?;
-        *lock(&self.last_ticket) = Some(PathBuf::from(&ticket.path));
-        Ok(ticket)
+        mint_connect_ticket(&*self.core, &self.machine_id, &self.ticket_name)
     }
 
     /// The next connect enrolls with the invitation (not enrolled yet by the
@@ -1256,7 +1252,7 @@ impl Ctx {
         updated.invite_path = None;
         *lock(&self.record) = updated.clone();
         if let Some(store) = &self.links {
-            let saved = store.load().and_then(|mut links| {
+            let saved = store.update(|links| {
                 let mut link = links
                     .get(&updated.machine_id)
                     .cloned()
@@ -1264,7 +1260,6 @@ impl Ctx {
                 link.enrolled |= enrolled;
                 link.invite_path = None;
                 links.upsert(link);
-                store.save(&links)
             });
             if let Err(error) = saved {
                 problems.push(format!("could not save links.json: {error}"));
@@ -2439,7 +2434,6 @@ mod tests {
             device_name: "PC".into(),
             links: None,
             record: Arc::new(Mutex::new(record(&base, false))),
-            last_ticket: Arc::new(Mutex::new(None)),
         };
         let mut rec = record(&base, false);
         rec.invite_path = Some(other.join("invite-m1.uri").to_string_lossy().into_owned());
@@ -2640,9 +2634,32 @@ mod tests {
         r.session.close_pane(pane.id);
         wait("finish", || r.session.status().finished);
         assert!(!pane.link.accepts_input());
+        // The client consumed (read and deleted) the ticket it connected
+        // with: no live ticket is left on disk.
         assert!(
             !r.dir.join(ticket_file_name("Mac/1")).exists(),
-            "ticket file cleaned up"
+            "no stale ticket left"
+        );
+    }
+
+    #[test]
+    fn a_finishing_session_leaves_a_newer_ticket_alone() {
+        // A replacement session for the same Mac mints to the same file
+        // name; the old session ending must not delete that fresh ticket.
+        let r = rig_with("fresh-ticket", FakeConnector::new("fp-1", 1), true);
+        let pane = r
+            .session
+            .open_pane(Want::First, 80, 24, r.sink.clone())
+            .unwrap();
+        wait("attach", || pane.link.accepts_input());
+        let path = r.dir.join(ticket_file_name("Mac/1"));
+        std::fs::write(&path, "fresh ticket of the next session").unwrap();
+        r.session.close_pane(pane.id);
+        wait("finish", || r.session.status().finished);
+        std::thread::sleep(Duration::from_millis(20));
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "fresh ticket of the next session"
         );
     }
 

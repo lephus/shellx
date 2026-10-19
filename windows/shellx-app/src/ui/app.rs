@@ -13,9 +13,9 @@ use shellx_model::strings::Lang;
 
 use super::assets::Assets;
 use super::root::RootView;
-use super::term_view::BASE_TITLE;
 use crate::core_service::{ConfiguredCore, MachineFacts};
 use crate::fonts;
+use crate::shell_info::BASE_TITLE;
 
 /// App-wide services the views read with `cx.global::<Services>()`.
 /// Later tasks add the remote client here.

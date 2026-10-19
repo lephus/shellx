@@ -12,6 +12,7 @@ mod core_bridge;
 mod core_service;
 mod fonts;
 mod icons;
+mod ime;
 mod links_store;
 mod local_pty;
 mod os_info;

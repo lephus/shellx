@@ -431,10 +431,7 @@ impl PairingService {
             enrolled: false,
         };
         self.saved_generation = Some(self.generation);
-        let saved = self.store.load().and_then(|mut links| {
-            links.upsert(link);
-            self.store.save(&links).map(|()| links)
-        });
+        let saved = self.store.update(|links| links.upsert(link));
         match saved {
             Ok(links) => self.links = links,
             Err(e) => self.save_error = Some(e.to_string()),

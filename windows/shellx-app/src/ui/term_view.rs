@@ -43,7 +43,8 @@
 //! per pane drains its `PaneEvent`s (sent by the session's threads).
 
 use std::ops::Range;
-use std::time::Duration;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use ghostty_vt::{CellWidth, CursorShape, Rgb};
 use gpui::{
@@ -71,10 +72,13 @@ use super::app::Services;
 use super::button::{Kind, button};
 use super::theme;
 use crate::fonts;
+use crate::ime::{self, ImeTarget};
 use crate::local_pty::{LocalPty, spawn_reader};
-use crate::remote_link::{Applied, PaneEvent, RemoteMirror};
+use crate::os_info;
+use crate::remote_link::{Applied, PaneEvent, Paste, RemoteMirror};
 use crate::remote_session::{RemotePane, RemoteSession, SessionStatus};
 use crate::remote_tabs::{OpenError, Overlay, Tone, coalesce, failed_overlay, overlay};
+use crate::shell_info::{BASE_TITLE, ScreenReaderProbe, a11y_title_env, window_title};
 use crate::term_core::{PtyLink, TermCore, rgb};
 use crate::workspace::spawn_local_pane;
 
@@ -98,7 +102,6 @@ pub(super) enum TermEvent {
 const FONT_SIZE: f32 = 14.0;
 const LINE_HEIGHT: f32 = 1.3;
 const PADDING: f32 = 6.0;
-pub(super) const BASE_TITLE: &str = "ShellX";
 /// How long a status flash ("Mất kết nối, tạm ngừng nhập") stays up.
 const FLASH: Duration = Duration::from_millis(2500);
 
@@ -122,6 +125,28 @@ struct Remote {
     /// The mirror's OSC title after the last update (read from the core of
     /// that moment; RootView asks for it without a `&mut`).
     title: Option<String>,
+}
+
+/// The pane's link for the IME rules (`crate::ime`).
+impl ImeTarget for Backend {
+    fn write_text(&mut self, text: &str) -> bool {
+        match self {
+            Backend::None => true,
+            Backend::Local { core, .. } => {
+                core.send_text(text);
+                true
+            }
+            // ONE write of the committed UTF-8 while attached; otherwise
+            // refused: dropped, never queued for later.
+            Backend::Remote(remote) => remote.mirror.send_text(text),
+        }
+    }
+
+    fn scroll_to_bottom(&mut self) {
+        if let Some(core) = self.core() {
+            core.scroll_to_bottom();
+        }
+    }
 }
 
 impl Backend {
@@ -533,14 +558,24 @@ impl TermView {
         let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) else {
             return;
         };
-        if self.backend.input_refused() {
-            self.flash_input_paused(cx);
-            return;
+        match &mut self.backend {
+            Backend::None => {}
+            Backend::Local { core, .. } => core.paste(&text),
+            // Refused whole when not attached or over 8 MiB encoded.
+            Backend::Remote(remote) => match remote.mirror.paste(&text) {
+                Paste::Sent => {}
+                Paste::Refused => {
+                    self.flash_input_paused(cx);
+                    return;
+                }
+                Paste::TooLarge => {
+                    let lang = cx.global::<Services>().lang;
+                    self.flash(t(lang, Str::PasteTooLarge).to_string(), cx);
+                    return;
+                }
+            },
         }
         self.clear_selection(cx);
-        if let Some(core) = self.backend.core() {
-            core.paste(&text);
-        }
         cx.notify();
     }
 
@@ -955,27 +990,18 @@ impl EntityInputHandler for TermView {
         cx: &mut Context<Self>,
     ) {
         // Commit: typed characters, IME results, Unikey/EVKey injected text.
-        // ONE send_text of the whole committed string, never per keystroke.
-        self.marked = None;
-        self.marked_selection = None;
-        let text: String = text
-            .chars()
-            .filter(|c| *c == '\t' || !c.is_control())
-            .collect();
-        if !text.is_empty() {
+        // ONE write of the whole committed string, never per keystroke
+        // (`ime::commit`; a remote pane that is not attached refuses it).
+        let done = ime::commit(
+            &mut self.marked,
+            &mut self.marked_selection,
+            text,
+            &mut self.backend,
+        );
+        if done.clears_selection() {
             self.clear_selection(cx);
         }
-        let sent = match &mut self.backend {
-            Backend::None => true,
-            Backend::Local { core, .. } => {
-                core.send_text(&text);
-                true
-            }
-            // ONE write of the committed UTF-8 while attached; otherwise
-            // refused: dropped, never queued for later.
-            Backend::Remote(remote) => text.is_empty() || remote.mirror.send_text(&text),
-        };
-        if !sent {
+        if done == ime::Commit::Refused {
             self.flash_input_paused(cx);
         }
         cx.notify();
@@ -989,18 +1015,17 @@ impl EntityInputHandler for TermView {
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if new_text.is_empty() {
-            self.marked = None;
-            self.marked_selection = None;
-        } else {
-            // Composing is typing: drop the selection and show the live
-            // screen, where the preedit is drawn (nothing is sent yet).
+        // Composing is typing: drop the selection and show the live screen,
+        // where the preedit is drawn (nothing is sent yet).
+        let composing = ime::update_preedit(
+            &mut self.marked,
+            &mut self.marked_selection,
+            new_text,
+            new_selected_range,
+            &mut self.backend,
+        );
+        if composing {
             self.clear_selection(cx);
-            if let Some(core) = self.backend.core() {
-                core.scroll_to_bottom();
-            }
-            self.marked = Some(new_text.to_string());
-            self.marked_selection = new_selected_range;
         }
         cx.notify();
     }
@@ -1048,6 +1073,23 @@ impl EntityInputHandler for TermView {
             self.marked.as_deref()?,
         )
     }
+}
+
+/// The window title shows the cursor line (`shell_info::window_title`):
+/// `SHELLX_A11Y_TITLE=1`, or a screen reader is running (asked again at
+/// most once per second).
+fn screen_reader_title() -> bool {
+    static FORCED: OnceLock<bool> = OnceLock::new();
+    static START: OnceLock<Instant> = OnceLock::new();
+    static PROBE: Mutex<ScreenReaderProbe> = Mutex::new(ScreenReaderProbe::new());
+    if *FORCED.get_or_init(|| a11y_title_env(std::env::var("SHELLX_A11Y_TITLE").ok().as_deref())) {
+        return true;
+    }
+    let now_ms = START.get_or_init(Instant::now).elapsed().as_millis() as u64;
+    PROBE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .running(now_ms, os_info::screen_reader_running)
 }
 
 fn to_bounds(r: Rect) -> Bounds<Pixels> {
@@ -1279,6 +1321,8 @@ impl Element for TermElement {
             out.texts.push(TextPaint { origin, line });
         };
 
+        // Read the cursor line only when the title will show it.
+        let a11y_title = focused && screen_reader_title();
         let mut cursor_line_text = String::new();
         let mut cell_lines = Vec::with_capacity(frame.styled_rows().len());
         for (row, cells) in frame.styled_rows().iter().enumerate() {
@@ -1300,7 +1344,7 @@ impl Element for TermElement {
                     cell.text.as_str()
                 };
                 cell_line.push(text.chars().next().unwrap_or(' '));
-                if is_cursor_row {
+                if a11y_title && is_cursor_row {
                     cursor_line_text.push_str(text);
                 }
                 let style = cell_style(cell, default_fg, default_bg);
@@ -1407,15 +1451,13 @@ impl Element for TermElement {
             });
         }
 
-        // Accessibility stopgap: GPUI 0.2.2 has no UIA tree, so expose the
-        // cursor line through the window title (Narrator: Insert+T). Only
-        // the focused pane writes it, so split panes do not fight over it.
-        let line = cursor_line_text.trim_end();
-        let wanted = match (title, line.is_empty()) {
-            (Some(t), true) => format!("{t} - {BASE_TITLE}"),
-            (_, false) => format!("{line} - {BASE_TITLE}"),
-            (None, true) => BASE_TITLE.to_string(),
-        };
+        // The window title carries no screen text by default (it shows in
+        // the taskbar, Alt+Tab and screen sharing). Accessibility stopgap:
+        // GPUI 0.2.2 has no UIA tree, so while a screen reader runs (or
+        // SHELLX_A11Y_TITLE=1) the cursor line goes there instead
+        // (Narrator: Insert+T). Only the focused pane writes it, so split
+        // panes do not fight over it.
+        let wanted = window_title(title.as_deref(), &cursor_line_text, a11y_title);
         let grid = Grid {
             origin: grid_origin,
             cell_w,

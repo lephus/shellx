@@ -69,6 +69,14 @@ impl std::fmt::Debug for TextEdit {
 /// shifted away), then empties the string; the allocation is kept (and
 /// reused), so the old text does not linger in freed memory.
 fn wipe(s: &mut String) {
+    let mut bytes = zeroed_allocation(s);
+    bytes.clear();
+    *s = String::from_utf8(bytes).unwrap_or_default();
+}
+
+/// Takes `s`'s allocation and zeroes all of it: returned with its length
+/// set to its capacity (every byte initialized to 0), `s` left empty.
+fn zeroed_allocation(s: &mut String) -> Vec<u8> {
     let mut bytes = std::mem::take(s).into_bytes();
     let cap = bytes.capacity();
     bytes.fill(0);
@@ -76,8 +84,7 @@ fn wipe(s: &mut String) {
     bytes.resize(cap, 0);
     // Keep the zeroing from being optimized away as a dead store.
     std::hint::black_box(&mut bytes);
-    bytes.clear();
-    *s = String::from_utf8(bytes).unwrap_or_default();
+    bytes
 }
 
 /// A masked field wipes its buffer when it goes away.
@@ -627,46 +634,59 @@ mod tests {
         assert!(format!("{:?}", typed("ab")).contains("\"ab\""));
     }
 
-    /// The whole allocation behind the content, spare capacity included.
-    /// Test only: every byte read here was written (by typing or by the
-    /// wipe), the allocation is live, and the length is its capacity.
-    fn backing(t: &TextEdit) -> Vec<u8> {
-        let s = &t.content;
-        unsafe { std::slice::from_raw_parts(s.as_ptr(), s.capacity()) }.to_vec()
-    }
+    // No test reads a String's spare capacity (that would read memory that
+    // may be uninitialized): the zeroing is checked on the full-length Vec
+    // `zeroed_allocation` returns, and `clear` / `set_text` / drop are
+    // checked to go through it (same allocation, emptied).
 
-    fn has(hay: &[u8], needle: &[u8]) -> bool {
-        hay.windows(needle.len()).any(|w| w == needle)
+    #[test]
+    fn zeroed_allocation_zeroes_bytes_edited_away() {
+        // Backspace-like truncation leaves "r2" in the spare capacity.
+        let mut s = String::with_capacity(32);
+        s.push_str("hunter2");
+        s.truncate(5);
+        let (ptr, cap) = (s.as_ptr(), s.capacity());
+        let bytes = zeroed_allocation(&mut s);
+        // the same allocation, all of it (live and spare bytes), now zero
+        assert_eq!(bytes.as_ptr(), ptr);
+        assert_eq!(bytes.len(), cap);
+        assert_eq!(bytes.capacity(), cap);
+        assert!(bytes.iter().all(|&b| b == 0), "{bytes:?}");
+        assert!(s.is_empty() && s.capacity() == 0);
     }
 
     #[test]
     fn clear_zeroes_bytes_edited_away() {
         let mut t = TextEdit::new(true);
         t.insert("hunter2");
+        let (ptr, cap) = (t.content.as_ptr(), t.capacity());
         t.backspace();
         t.backspace();
         assert_eq!(t.text(), "hunte");
-        // Backspace shortened the string; "r2" is still in the spare capacity
-        assert!(has(&backing(&t), b"r2"));
+        // Backspace only shortened the live text (the tail is in the spare
+        // capacity until a wipe)
+        assert_eq!((t.content.as_ptr(), t.capacity()), (ptr, cap));
         t.clear();
-        assert!(backing(&t).iter().all(|&b| b == 0), "{:?}", backing(&t));
+        // wiped in place through `zeroed_allocation`: same allocation, empty
+        assert!(t.is_empty());
+        assert_eq!((t.content.as_ptr(), t.capacity()), (ptr, cap));
         // mid-edit: a deletion in the middle shifts the tail left
         let mut t = TextEdit::new(true);
         t.insert("abcXYZ");
         t.move_to(1);
         t.delete();
         t.delete();
+        assert_eq!(t.text(), "aXYZ");
+        let ptr = t.content.as_ptr();
         t.clear();
-        assert!(backing(&t).iter().all(|&b| b == 0));
-        // set_text replaces the content: the old text is wiped too
+        assert!(t.is_empty() && t.content.as_ptr() == ptr);
+        // set_text replaces the content in the same (wiped) allocation
         let mut t = TextEdit::new(true);
         t.insert("oldsecret");
-        let before = t.content.as_ptr();
+        let (ptr, cap) = (t.content.as_ptr(), t.capacity());
         t.set_text("new");
         assert_eq!(t.text(), "new");
-        if t.content.as_ptr() == before {
-            assert!(!has(&backing(&t), b"oldsecret"));
-        }
+        assert_eq!((t.content.as_ptr(), t.capacity()), (ptr, cap));
     }
 
     #[test]

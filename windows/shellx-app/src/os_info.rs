@@ -57,6 +57,27 @@ pub fn utc_offset_secs() -> i32 {
     }
 }
 
+/// Whether a screen reader (Narrator, NVDA, JAWS) says it is running
+/// (`SPI_GETSCREENREADER`; Narrator sets it while it runs). False off Windows
+/// or when the query fails.
+pub fn screen_reader_running() -> bool {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            SPI_GETSCREENREADER, SystemParametersInfoW,
+        };
+        let mut on: windows_sys::core::BOOL = 0;
+        // SAFETY: SPI_GETSCREENREADER writes one BOOL to `pvparam`, which
+        // points at a live, writable BOOL.
+        let ok = unsafe { SystemParametersInfoW(SPI_GETSCREENREADER, 0, (&raw mut on).cast(), 0) };
+        ok != 0 && on != 0
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
 /// `GetTimeZoneInformation` result -> seconds east of UTC. The biases are
 /// minutes with UTC = local + bias; the id says which extra bias is in effect
 /// (1 = TIME_ZONE_ID_STANDARD, 2 = TIME_ZONE_ID_DAYLIGHT, 0 = no DST rules,

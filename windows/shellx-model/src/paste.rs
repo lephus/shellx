@@ -24,6 +24,16 @@ pub fn encode_paste(text: &str, bracketed: bool) -> Vec<u8> {
     }
 }
 
+/// Largest encoded paste a remote pane sends: one relay send of more than
+/// about 12 MB fails, so a bigger paste is refused whole (never cut).
+pub const REMOTE_PASTE_MAX_BYTES: usize = 8 * 1024 * 1024;
+
+/// Whether a remote paste of `encoded_len` bytes (`encode_paste` output,
+/// markers included) may be sent.
+pub fn remote_paste_fits(encoded_len: usize) -> bool {
+    encoded_len <= REMOTE_PASTE_MAX_BYTES
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -72,5 +82,20 @@ mod tests {
             encode_paste("tiếng Việt", false),
             "tiếng Việt".as_bytes().to_vec()
         );
+    }
+
+    #[test]
+    fn remote_paste_cap_is_8_mib_of_encoded_bytes() {
+        assert_eq!(REMOTE_PASTE_MAX_BYTES, 8 * 1024 * 1024);
+        assert!(remote_paste_fits(0));
+        assert!(remote_paste_fits(REMOTE_PASTE_MAX_BYTES));
+        assert!(!remote_paste_fits(REMOTE_PASTE_MAX_BYTES + 1));
+        // the rule counts encoded bytes: the markers count too
+        let text = "a".repeat(REMOTE_PASTE_MAX_BYTES - 6);
+        assert!(remote_paste_fits(encode_paste(&text, false).len()));
+        assert!(!remote_paste_fits(encode_paste(&text, true).len()));
+        // and UTF-8 bytes, not chars
+        let vi = "ệ".repeat(REMOTE_PASTE_MAX_BYTES / 2);
+        assert!(!remote_paste_fits(encode_paste(&vi, false).len()));
     }
 }

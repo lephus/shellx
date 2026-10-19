@@ -24,6 +24,7 @@ use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
+use shellx_model::paste::remote_paste_fits;
 use shellx_remote::{AttachEvent, AttachmentInput};
 
 use crate::term_core::{PtyLink, TermCore};
@@ -239,6 +240,16 @@ pub enum Applied {
     Ended,
 }
 
+/// What `RemoteMirror::paste` did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Paste {
+    Sent,
+    /// Not attached: show `Str::InputPaused`.
+    Refused,
+    /// Over `REMOTE_PASTE_MAX_BYTES`: show `Str::PasteTooLarge`.
+    TooLarge,
+}
+
 /// UI-thread state of a remote pane: a mirror `TermCore` over the pane's
 /// `RemoteLink`, replaced on every `Reset`.
 pub struct RemoteMirror {
@@ -278,6 +289,22 @@ impl RemoteMirror {
             PaneEvent::Retargeted { terminal_id } => Applied::Retargeted(terminal_id),
             PaneEvent::Ended => Applied::Ended,
         })
+    }
+
+    /// Clipboard text as data (`TermCore::paste`), refused whole while not
+    /// attached (`Str::InputPaused`) or when its encoded size is over
+    /// `REMOTE_PASTE_MAX_BYTES` (`Str::PasteTooLarge`; one relay send above
+    /// ~12 MB fails). Never cut, never queued.
+    pub fn paste(&mut self, text: &str) -> Paste {
+        if !self.link.accepts_input() {
+            return Paste::Refused;
+        }
+        let bytes = self.core.encode_paste(text);
+        if !remote_paste_fits(bytes.len()) {
+            return Paste::TooLarge;
+        }
+        self.core.write_paste(&bytes);
+        Paste::Sent
     }
 
     /// Committed text (typing, IME commit): one write while connected.
@@ -345,6 +372,41 @@ mod tests {
         link.install(new.clone(), (80, 24));
         assert!(mirror.send_text("a"));
         assert_eq!(new.writes.lock().unwrap().clone(), vec![b"a".to_vec()]);
+    }
+
+    #[test]
+    fn remote_paste_over_8_mib_is_refused_whole() {
+        use shellx_model::paste::REMOTE_PASTE_MAX_BYTES;
+        let link = RemoteLink::new(80, 24);
+        let view = Arc::new(RecView::default());
+        link.install(view.clone(), (80, 24));
+        let mut mirror = RemoteMirror::new(link.clone()).unwrap();
+        // at the cap (not bracketed: no markers): one write
+        let fits = "a".repeat(REMOTE_PASTE_MAX_BYTES);
+        assert_eq!(mirror.paste(&fits), Paste::Sent);
+        assert_eq!(view.writes.lock().unwrap().len(), 1);
+        assert_eq!(view.writes.lock().unwrap()[0].len(), REMOTE_PASTE_MAX_BYTES);
+        // one byte over: nothing at all is sent (never a cut paste)
+        let over = "a".repeat(REMOTE_PASTE_MAX_BYTES + 1);
+        assert_eq!(mirror.paste(&over), Paste::TooLarge);
+        // bracketed: the markers count, so the cap-sized text is too large
+        mirror
+            .apply(PaneEvent::Output(b"\x1b[?2004h".to_vec()))
+            .unwrap();
+        assert!(mirror.core().bracketed_paste());
+        assert_eq!(mirror.paste(&fits), Paste::TooLarge);
+        assert_eq!(view.writes.lock().unwrap().len(), 1);
+        // a small paste still goes, bracketed, in one write
+        assert_eq!(mirror.paste("ls\n"), Paste::Sent);
+        assert_eq!(
+            view.writes.lock().unwrap()[1],
+            b"\x1b[200~ls\r\x1b[201~".to_vec()
+        );
+        // not attached: refused before any size check, nothing sent
+        link.clear_view();
+        assert_eq!(mirror.paste("ls"), Paste::Refused);
+        assert_eq!(mirror.paste(&over), Paste::Refused);
+        assert_eq!(view.writes.lock().unwrap().len(), 2);
     }
 
     #[test]

@@ -72,6 +72,7 @@ pub enum Str {
     LocalShell,
     RemoteEnded,
     InputPaused,
+    PasteTooLarge,
     NoTerminalOnMachine,
     Error,
     Account,
@@ -150,6 +151,7 @@ impl Str {
         Str::LocalShell,
         Str::RemoteEnded,
         Str::InputPaused,
+        Str::PasteTooLarge,
         Str::NoTerminalOnMachine,
         Str::Error,
         Str::Account,
@@ -229,6 +231,7 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::LocalShell => "PowerShell",
             Str::RemoteEnded => "Phiên ở xa đã kết thúc",
             Str::InputPaused => "Mất kết nối, tạm ngừng nhập",
+            Str::PasteTooLarge => "Nội dung dán quá lớn (tối đa 8 MB)",
             Str::NoTerminalOnMachine => "Máy này chưa có phiên nào",
             Str::Error => "Lỗi",
             Str::Account => "Tài khoản",
@@ -303,6 +306,7 @@ pub fn t(lang: Lang, key: Str) -> &'static str {
             Str::LocalShell => "PowerShell",
             Str::RemoteEnded => "The remote session ended",
             Str::InputPaused => "Disconnected, input paused",
+            Str::PasteTooLarge => "Paste too large (8 MB max)",
             Str::NoTerminalOnMachine => "No sessions on this machine",
             Str::Error => "Error",
             Str::Account => "Account",
@@ -431,7 +435,7 @@ mod tests {
     fn all_has_no_duplicates() {
         let set: HashSet<Str> = Str::ALL.iter().copied().collect();
         assert_eq!(set.len(), Str::ALL.len());
-        assert_eq!(Str::ALL.len(), 72);
+        assert_eq!(Str::ALL.len(), 73);
     }
 
     #[test]
@@ -530,5 +534,13 @@ mod tests {
         assert_eq!(t(Lang::Vi, Str::Offline), "ngoại tuyến");
         assert_eq!(t(Lang::Vi, Str::InputPaused), "Mất kết nối, tạm ngừng nhập");
         assert_eq!(t(Lang::En, Str::NeedsPairing), "Request access again");
+        assert_eq!(
+            t(Lang::Vi, Str::PasteTooLarge),
+            "Nội dung dán quá lớn (tối đa 8 MB)"
+        );
+        assert_eq!(
+            t(Lang::En, Str::PasteTooLarge),
+            "Paste too large (8 MB max)"
+        );
     }
 }
