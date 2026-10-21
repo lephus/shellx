@@ -3348,6 +3348,7 @@
 		6CDDB319FED107C3EB57AE87 /* ShellXRemoteUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0766083F21AAC8FF1BDCB01C /* ShellXRemoteUITests.swift */; };
 		7FE3DBDC782F741D0908C14A /* ShellXShareController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28727A245A45CE6FF2F3B847 /* ShellXShareController.swift */; };
 		0EBF253D2B12A5B1950B96F2 /* ShellXSharePopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F87374CBE57AAC30DC9F08 /* ShellXSharePopover.swift */; };
+		3E00FDBF8A15A3810B29B565 /* ShellXShareStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 510EA0A2A7CAF653E3E7D26E /* ShellXShareStore.swift */; };
 		FA7DD6E004CD07E9E7CE313D /* ShellXShareTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABEC2C3533141A19CA114B71 /* ShellXShareTests.swift */; };
 		0C0CF1B5A6F9AF1DFDC29B01 /* ShellXSidebarHeaderRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1123DE0D564CD722CC853FA0 /* ShellXSidebarHeaderRow.swift */; };
 		E4A2B0CAB6AAA1AC7127FD53 /* ShellXSidebarIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82421054CBFF9ECFC3CA2E2B /* ShellXSidebarIcon.swift */; };
@@ -7919,6 +7920,7 @@
 		0766083F21AAC8FF1BDCB01C /* ShellXRemoteUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXRemoteUITests.swift"; sourceTree = "<group>"; };
 		28727A245A45CE6FF2F3B847 /* ShellXShareController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Share/ShellXShareController.swift; sourceTree = "<group>"; };
 		86F87374CBE57AAC30DC9F08 /* ShellXSharePopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Share/ShellXSharePopover.swift; sourceTree = "<group>"; };
+		510EA0A2A7CAF653E3E7D26E /* ShellXShareStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Share/ShellXShareStore.swift; sourceTree = "<group>"; };
 		ABEC2C3533141A19CA114B71 /* ShellXShareTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXShareTests.swift"; sourceTree = "<group>"; };
 		1123DE0D564CD722CC853FA0 /* ShellXSidebarHeaderRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Sidebar/ShellXSidebarHeaderRow.swift; sourceTree = "<group>"; };
 		82421054CBFF9ECFC3CA2E2B /* ShellXSidebarIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Sidebar/ShellXSidebarIcon.swift; sourceTree = "<group>"; };
@@ -12422,6 +12424,7 @@
 				28727A245A45CE6FF2F3B847 /* ShellXShareController.swift */,
 				86F87374CBE57AAC30DC9F08 /* ShellXSharePopover.swift */,
 				BB1AB2A2159DE90CD845C988 /* WorkspaceShareSource.swift */,
+				510EA0A2A7CAF653E3E7D26E /* ShellXShareStore.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -16646,6 +16649,7 @@
 				1DD66080021B6033F57D2308 /* ShellXRemoteUIActions.swift in Sources */,
 				7FE3DBDC782F741D0908C14A /* ShellXShareController.swift in Sources */,
 				0EBF253D2B12A5B1950B96F2 /* ShellXSharePopover.swift in Sources */,
+				3E00FDBF8A15A3810B29B565 /* ShellXShareStore.swift in Sources */,
 				0C0CF1B5A6F9AF1DFDC29B01 /* ShellXSidebarHeaderRow.swift in Sources */,
 				E4A2B0CAB6AAA1AC7127FD53 /* ShellXSidebarIcon.swift in Sources */,
 				9CBA983FD767551CAFB913EA /* ShellXSwitches.swift in Sources */,

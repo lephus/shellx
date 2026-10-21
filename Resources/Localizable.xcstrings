@@ -712857,6 +712857,71 @@
           }
         }
       }
+    },
+    "share.error.revokeFailed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Viewers were disconnected, but ShellX couldn't confirm the link was revoked."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Người xem đã bị ngắt, nhưng ShellX chưa xác nhận được link đã bị thu hồi."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Zuschauer wurden getrennt, aber ShellX konnte den Widerruf des Links nicht bestätigen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les spectateurs ont été déconnectés, mais ShellX n’a pas pu confirmer la révocation du lien."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los espectadores se desconectaron, pero ShellX no pudo confirmar que el enlace se revocó."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "視聴者は切断されましたが、ShellX はリンクの取り消しを確認できませんでした。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "보는 사람은 연결이 끊겼지만 ShellX가 링크 취소를 확인하지 못했습니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看者已断开，但 ShellX 无法确认链接已撤销。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "檢視者已中斷連線，但 ShellX 無法確認連結已撤銷。"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تم فصل المشاهدين، لكن ShellX لم يتمكن من تأكيد إلغاء الرابط."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

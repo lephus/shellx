@@ -157,16 +157,28 @@ public actor ShareHost {
 
     /// Sends `bye(reason)` on every circuit, closes every socket and finishes `viewerStream`.
     public func stop(reason: ShareByeReason) async {
+        await shutdown(reason: reason, mainActorAvailable: true)
+    }
+
+    /// Quit (`applicationWillTerminate`, main thread blocked): like `stop`, but never waits on the main
+    /// actor. `onPanesChanged` and the output subscriptions are left for process exit.
+    public func stopForTermination(reason: ShareByeReason) async {
+        await shutdown(reason: reason, mainActorAvailable: false)
+    }
+
+    private func shutdown(reason: ShareByeReason, mainActorAvailable: Bool) async {
         guard !stopped else { return }
         stopped = true
         running = false
         for timer in timers.values { timer.cancel() }
         timers.removeAll()
         let source = self.source
-        await MainActor.run { source.onPanesChanged = nil }
+        if mainActorAvailable { await MainActor.run { source.onPanesChanged = nil } }
         var ending: [(any ShareSocket, Task<Void, Never>)] = []
         for id in Array(circuits.keys) {
-            if let ended = await endCircuit(id, bye: reason) { ending.append(ended) }
+            if let ended = await endCircuit(id, bye: reason, releaseSubscription: mainActorAvailable) {
+                ending.append(ended)
+            }
         }
         let writers = ending.map(\.1)
         await withTaskGroup(of: Void.self) { group in
@@ -606,7 +618,8 @@ public actor ShareHost {
     }
 
     /// Removes the circuit; with a reason, the viewer gets `bye` before the socket closes.
-    private func endCircuit(_ id: String, bye: ShareByeReason?) async -> (any ShareSocket, Task<Void, Never>)? {
+    private func endCircuit(_ id: String, bye: ShareByeReason?,
+                            releaseSubscription: Bool = true) async -> (any ShareSocket, Task<Void, Never>)? {
         guard var circuit = circuits[id] else { return nil }
         if let bye, let frame = try? circuit.cipher.seal(.bye(bye)) {
             circuit.outbox.yield(Outgoing(message: .data(frame), bytes: frame.count, outEpoch: nil))
@@ -616,7 +629,7 @@ public actor ShareHost {
         cancelTimer(circuit.helloTimer)
         cancelTimer(circuit.keepaliveTimer)
         if circuit.viewer != nil { publishViewers() }
-        await circuit.subscription?.release()
+        if releaseSubscription { await circuit.subscription?.release() }
         return (circuit.socket, circuit.writer)
     }
 

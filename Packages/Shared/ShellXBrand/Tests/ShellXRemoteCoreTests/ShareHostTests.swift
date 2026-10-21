@@ -325,6 +325,23 @@ final class ShareHostTests: XCTestCase {
         XCTAssertTrue(control.isClosed)
     }
 
+    /// Quit runs with the main thread blocked in `applicationWillTerminate`: the bye must go out anyway.
+    func testStopForTerminationSendsByeWhileMainIsBlocked() async throws {
+        let host = makeHost()
+        let control = try await startRegistered(host)
+        let v1 = try await connectViewer(control, circuit: "c1")
+        let done = DispatchSemaphore(value: 0)
+        Task.detached {
+            await host.stopForTermination(reason: .hostQuit)
+            done.signal()
+        }
+        // The test body runs on the main actor; block it like the quit path does.
+        XCTAssertEqual(done.wait(timeout: .now() + 2), .success, "never waits on the main actor")
+        XCTAssertTrue(v1.socket.isClosed)
+        XCTAssertEqual(v1.messages().last, .bye(.hostQuit))
+        XCTAssertTrue(control.isClosed)
+    }
+
     func testOutputChunksStayUnder48KiB() async throws {
         let host = makeHost()
         let control = try await startRegistered(host)

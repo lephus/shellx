@@ -14,7 +14,7 @@ import SwiftUI
 final class ShellXPhoneHandoffModel: ObservableObject {
     let workspaceID: UUID
     private let controller: ShellXShareController
-    private let clock: () -> Date
+    private let sleeper: any ShareSleeper
     @Published private(set) var shareID: String?
     @Published private(set) var qrImage: CGImage?
     @Published private(set) var errorText: String?
@@ -22,10 +22,10 @@ final class ShellXPhoneHandoffModel: ObservableObject {
     private var renewal: Task<Void, Never>?
     private var isOpen = false
 
-    init(workspaceID: UUID, controller: ShellXShareController, clock: @escaping () -> Date = Date.init) {
+    init(workspaceID: UUID, controller: ShellXShareController, sleeper: any ShareSleeper = ShareSystemSleeper()) {
         self.workspaceID = workspaceID
         self.controller = controller
-        self.clock = clock
+        self.sleeper = sleeper
     }
 
     var share: ActiveShare? { shareID.flatMap { id in controller.active.first { $0.id == id } } }
@@ -58,6 +58,7 @@ final class ShellXPhoneHandoffModel: ObservableObject {
         defer { isWorking = false }
         if let old = shareID, !isClaimed {
             shareID = nil
+            qrImage = nil
             await controller.revoke(old)
         }
         do {
@@ -74,9 +75,9 @@ final class ShellXPhoneHandoffModel: ObservableObject {
     private func scheduleRenewal(at deadline: Date?) {
         renewal?.cancel()
         guard let deadline else { return }
-        let delay = max(deadline.timeIntervalSince(clock()), 1)
+        let sleeper = self.sleeper
         renewal = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(delay))
+            do { try await sleeper.sleep(until: deadline) } catch { return }
             guard !Task.isCancelled, let self, self.isOpen, !self.isClaimed else { return }
             await self.refresh()
         }

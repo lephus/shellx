@@ -6,8 +6,13 @@ import ShellXBrand
 import ShellXRemoteCore
 
 /// ShellX: the one switch for share links (L7). On when `ShellXFeatures.shareLinks` is flipped, or in
-/// DEBUG builds launched with `SHELLX_SHARE_LINKS=1`. Off, no entrypoint shows and nothing calls the
-/// core. Independent of `ShellXRemoteGate` (ruling R1).
+/// DEBUG builds launched with `SHELLX_SHARE_LINKS=1`, **and** the remote-machines gate is on. Off, no
+/// entrypoint shows and nothing calls the core.
+///
+/// Ruling R1b: a share needs a signed-in account, and the account (core configuration, sign-in sheet,
+/// `isSignedIn`) still lives in `ShellXRemoteService`, which only runs with `ShellXRemoteGate` on. Until
+/// the account moves out of that service, share links also require `ShellXRemoteGate`, so the
+/// entrypoints are hidden rather than showing a sign-in button that cannot work.
 enum ShellXShareGate {
     static let environmentKey = "SHELLX_SHARE_LINKS"
 
@@ -15,10 +20,12 @@ enum ShellXShareGate {
         #if DEBUG
         if let overrideForTesting { return overrideForTesting }
         #endif
-        return isEnabled(flag: ShellXFeatures.shareLinks, environment: ProcessInfo.processInfo.environment)
+        return isEnabled(flag: ShellXFeatures.shareLinks, remoteMachines: ShellXRemoteGate.isEnabled,
+                         environment: ProcessInfo.processInfo.environment)
     }
 
-    static func isEnabled(flag: Bool, environment: [String: String]) -> Bool {
+    static func isEnabled(flag: Bool, remoteMachines: Bool, environment: [String: String]) -> Bool {
+        guard remoteMachines else { return false }
         if flag { return true }
         #if DEBUG
         return environment[environmentKey] == "1"
@@ -28,7 +35,7 @@ enum ShellXShareGate {
     }
 
     #if DEBUG
-    /// Tests only: forces the gate either way; nil reads the flag and environment.
+    /// Tests only: forces the gate either way; nil reads the flags and environment.
     @MainActor static var overrideForTesting: Bool?
     #endif
 }
@@ -44,9 +51,13 @@ struct ActiveShare: Identifiable, Equatable {
     let workspaceID: UUID
     /// The phone-handoff QR (R5): one viewer, claimed within `claimUntil`.
     let oneTime: Bool
-    let expiresAt: Date?
+    /// The API's `expires_at` (for until_quit the 24 h cap, R5); the host stops at it.
+    let expiresAt: Date
     let claimUntil: Date?
     var viewers: [ShareViewer]
+
+    /// 15 m / 1 h links outlive a quit and resume at the next launch (§7.3); until_quit and QR shares don't.
+    var resumesAfterRelaunch: Bool { !oneTime && lifetime != .untilQuit }
 }
 
 /// Why a share could not be made. `errorDescription` is localized (Vietnamese and English and the
@@ -59,6 +70,8 @@ enum ShellXShareError: Error, Equatable, LocalizedError {
     /// The API answered with a share id other than the proposed one, so viewers could not open the link;
     /// the share was revoked at once.
     case secureLinkUnavailable
+    /// The link was stopped here, but the API did not confirm the revoke.
+    case revokeFailed
     case failed(code: String)
 
     static func from(_ error: any Error) -> ShellXShareError {
@@ -82,6 +95,9 @@ enum ShellXShareError: Error, Equatable, LocalizedError {
             return String(localized: "share.error.limit", defaultValue: "Too many open links. Revoke one and try again.")
         case .network:
             return String(localized: "share.error.network", defaultValue: "Can't reach ShellX. Check your connection and try again.")
+        case .revokeFailed:
+            return String(localized: "share.error.revokeFailed",
+                          defaultValue: "Viewers were disconnected, but ShellX couldn't confirm the link was revoked.")
         case .secureLinkUnavailable, .failed:
             return String(localized: "share.error.failed", defaultValue: "Couldn't create the link. Try again.")
         }
@@ -92,6 +108,8 @@ enum ShellXShareError: Error, Equatable, LocalizedError {
 protocol ShellXShareHosting: AnyObject, Sendable {
     func start() async
     func stop(reason: ShareByeReason) async
+    /// Quit: sends the bye without waiting on the main actor (it is blocked in `applicationWillTerminate`).
+    func stopForTermination(reason: ShareByeReason) async
     var viewerStream: AsyncStream<[ShareViewer]> { get }
 }
 
@@ -110,12 +128,17 @@ struct ShellXShareEnvironment {
 
     var core: ShellXCoreClient
     var sockets: any ShareSocketFactory
-    var isSignedIn: @MainActor () -> Bool
+    /// The account's sign-in state, delivered on the main thread (sends its current value on subscribe).
+    var signedIn: AnyPublisher<Bool, Never>
     var presentSignIn: @MainActor () -> Void
     var source: @MainActor (UUID) -> (any ShareSource)?
+    /// Where 15 m / 1 h links wait for the next launch (the Keychain in the app).
+    var store: any ShellXShareStore
     /// A fresh 8-character share id the client proposes (ruling 6; R4 derives `access` from it).
     var newShareID: @Sendable () -> String = { ShellXShareLink.randomID() }
     var clock: @Sendable () -> Date = { Date() }
+    /// Waits for a share's `expiresAt`.
+    var sleeper: any ShareSleeper = ShareSystemSleeper()
     /// nil: a real `ShareHost` over `core` tickets and `sockets`.
     var makeHost: (@MainActor (HostSpec) -> any ShellXShareHosting)?
 }
@@ -150,6 +173,12 @@ final class ShellXShareController: ObservableObject {
         return made
     }
 
+    /// Launch: with the gate on, makes the controller so 15 m / 1 h links resume once signed in.
+    static func resumeIfEnabled() {
+        guard ShellXShareGate.isEnabled else { return }
+        _ = shared
+    }
+
     /// Quit: stops and revokes only if a controller was ever made (gate off makes no core call).
     static func stopAllForTerminationIfStarted() {
         instance?.stopAllForTermination()
@@ -159,21 +188,35 @@ final class ShellXShareController: ObservableObject {
     nonisolated static let terminationBudget: TimeInterval = 1.5
 
     @Published private(set) var active: [ActiveShare] = []
+    @Published private(set) var isSignedIn = false
+
+    private struct Entry {
+        let host: any ShellXShareHosting
+        let persisted: PersistedShare?
+        var tasks: [Task<Void, Never>] = []
+    }
 
     private let env: ShellXShareEnvironment
-    private var hosts: [String: any ShellXShareHosting] = [:]
-    private var viewerTasks: [String: Task<Void, Never>] = [:]
+    private var entries: [String: Entry] = [:]
+    private var signedInObserver: AnyCancellable?
+    private var resumed = false
 
     init(environment: ShellXShareEnvironment) {
         env = environment
+        signedInObserver = environment.signedIn.sink { [weak self] signedIn in
+            MainActor.assumeIsolated { self?.signedInChanged(signedIn) }
+        }
     }
-
-    var isSignedIn: Bool { env.isSignedIn() }
 
     func presentSignIn() { env.presentSignIn() }
 
     func shares(for workspaceID: UUID) -> [ActiveShare] {
         active.filter { $0.workspaceID == workspaceID }
+    }
+
+    private func signedInChanged(_ signedIn: Bool) {
+        if isSignedIn != signedIn { isSignedIn = signedIn }
+        if signedIn { resumePersisted() }
     }
 
     // MARK: Create
@@ -187,7 +230,7 @@ final class ShellXShareController: ObservableObject {
     /// The phone QR (§7.2, R5): "Được gõ", one viewer, claimable for 2 minutes, streamed until quit.
     /// Each call makes a new one-time share; the popover replaces an unclaimed one on expiry.
     func phoneHandoff(workspaceID: UUID) async throws -> URL {
-        try await start(workspaceID: workspaceID, permission: .type, lifetime: .untilQuit, oneTime: true).url
+        try await startPhoneHandoff(workspaceID: workspaceID).url
     }
 
     /// Same as `phoneHandoff`, returning the whole share (the popover needs `claimUntil`).
@@ -197,7 +240,7 @@ final class ShellXShareController: ObservableObject {
 
     private func start(workspaceID: UUID, permission: SharePermission, lifetime: ShareLifetime,
                        oneTime: Bool) async throws -> ActiveShare {
-        guard env.isSignedIn() else { throw ShellXShareError.notSignedIn }
+        guard isSignedIn else { throw ShellXShareError.notSignedIn }
         guard let source = env.source(workspaceID) else { throw ShellXShareError.workspaceUnavailable }
         let core = env.core, newID = env.newShareID
         let minted: Minted
@@ -206,29 +249,57 @@ final class ShellXShareController: ObservableObject {
                 try Self.mint(core: core, newID: newID, permission: permission, lifetime: lifetime, oneTime: oneTime)
             }
         } catch {
-            Self.log.error("share create failed: \(RemoteLogCode.of(error), privacy: .public)")
+            Self.log.error("share create failed: \(ShellXShareLogCode.of(error), privacy: .public)")
             throw ShellXShareError.from(error)
         }
-        let expiresAt = lifetime == .untilQuit ? nil : Date(timeIntervalSince1970: minted.created.expiresAtUnix)
         let share = ActiveShare(
             id: ShellXShareLink.displayID(minted.created.id),
             url: ShellXShareLink.url(id: minted.created.id, secret: minted.secret),
             permission: permission, lifetime: lifetime, workspaceID: workspaceID, oneTime: oneTime,
-            expiresAt: expiresAt,
+            expiresAt: Date(timeIntervalSince1970: minted.created.expiresAtUnix),
             claimUntil: minted.created.claimUntilUnix.map(Date.init(timeIntervalSince1970:)),
             viewers: [])
+        let persisted = share.resumesAfterRelaunch
+            ? PersistedShare(id: ShellXShareLink.apiID(minted.created.id), slot: minted.created.slot,
+                             secret: minted.secret.base64url, permission: permission, lifetime: lifetime,
+                             expiresAt: share.expiresAt, workspaceID: workspaceID)
+            : nil
+        attach(share, slot: minted.created.slot, secret: minted.secret, source: source, persisted: persisted)
+        return share
+    }
+
+    /// Starts a host for `share` and keeps it until revoke, expiry or quit.
+    private func attach(_ share: ActiveShare, slot: String, secret: ShareSecret, source: any ShareSource,
+                        persisted: PersistedShare?) {
         let spec = ShellXShareEnvironment.HostSpec(
-            shareID: minted.created.id, slot: minted.created.slot, secret: minted.secret,
-            permission: permission, expiresAt: expiresAt, source: source)
+            shareID: ShellXShareLink.apiID(share.id), slot: slot, secret: secret,
+            permission: share.permission, expiresAt: share.expiresAt, source: source)
         let host = env.makeHost?(spec) ?? ShareHost(
             shareID: spec.shareID, slot: spec.slot, secret: spec.secret, permission: spec.permission,
-            expiresAt: spec.expiresAt, source: spec.source, tickets: ShellXCoreShareTickets(core: core),
+            expiresAt: spec.expiresAt, source: spec.source, tickets: ShellXCoreShareTickets(core: env.core),
             sockets: env.sockets, clock: env.clock)
-        hosts[share.id] = host
+        let id = share.id
+        var entry = Entry(host: host, persisted: persisted)
+        let stream = host.viewerStream
+        // The stream finishes when the host stops on its own (expiry): the link leaves the list.
+        entry.tasks.append(Task { @MainActor [weak self] in
+            for await viewers in stream {
+                guard let self, let index = self.active.firstIndex(where: { $0.id == id }) else { return }
+                self.active[index].viewers = viewers
+            }
+            guard !Task.isCancelled else { return }
+            self?.ended(id, reason: nil)
+        })
+        let sleeper = env.sleeper, expiresAt = share.expiresAt
+        entry.tasks.append(Task { @MainActor [weak self] in
+            do { try await sleeper.sleep(until: expiresAt) } catch { return }
+            guard !Task.isCancelled else { return }
+            self?.ended(id, reason: .expired)
+        })
+        entries[id] = entry
         active.append(share)
-        watchViewers(of: host, shareID: share.id)
+        persist()
         Task { await host.start() }
-        return share
     }
 
     private struct Minted: Sendable {
@@ -254,67 +325,128 @@ final class ShellXShareController: ObservableObject {
         return Minted(secret: secret, created: created)
     }
 
-    private func watchViewers(of host: any ShellXShareHosting, shareID: String) {
-        let stream = host.viewerStream
-        viewerTasks[shareID] = Task { @MainActor [weak self] in
-            for await viewers in stream {
-                guard let self, let index = self.active.firstIndex(where: { $0.id == shareID }) else { return }
-                self.active[index].viewers = viewers
-            }
+    // MARK: Resume (§7.3: a link still valid works again after the app reopens)
+
+    /// Once signed in, re-hosts every persisted 15 m / 1 h link that has not expired and whose workspace
+    /// still exists. The rest are forgotten; an unexpired one whose workspace is gone is revoked.
+    private func resumePersisted() {
+        guard !resumed else { return }
+        resumed = true
+        let now = env.clock()
+        var orphaned: [String] = []
+        for saved in env.store.load() {
+            let id = ShellXShareLink.displayID(saved.id)
+            guard saved.expiresAt > now, entries[id] == nil, let secret = ShareSecret(base64url: saved.secret)
+            else { continue }
+            guard let source = env.source(saved.workspaceID) else { orphaned.append(saved.id); continue }
+            let share = ActiveShare(
+                id: id, url: ShellXShareLink.url(id: saved.id, secret: secret), permission: saved.permission,
+                lifetime: saved.lifetime, workspaceID: saved.workspaceID, oneTime: false,
+                expiresAt: saved.expiresAt, claimUntil: nil, viewers: [])
+            attach(share, slot: saved.slot, secret: secret, source: source, persisted: saved)
         }
+        persist()
+        if !orphaned.isEmpty {
+            let core = env.core
+            Task { _ = await Self.revokeOnCore(core: core, ids: orphaned) }
+        }
+    }
+
+    private func persist() {
+        env.store.save(entries.values.compactMap(\.persisted).sorted { $0.id < $1.id })
     }
 
     // MARK: Stop
 
-    /// "Thu hồi link": every viewer gets `bye(revoked)` and the API forgets the link.
-    func revoke(_ id: String) async {
-        guard let share = take(id) else { return }
-        await share.host?.stop(reason: .revoked)
-        await Self.revokeOnCore(core: env.core, ids: [share.share.id])
+    /// "Thu hồi link": every viewer gets `bye(revoked)` and the API forgets the link. False when the API
+    /// did not confirm (the link is stopped here either way).
+    @discardableResult
+    func revoke(_ id: String) async -> Bool {
+        guard let entry = take(id) else { return true }
+        await entry.host.stop(reason: .revoked)
+        return await Self.revokeOnCore(core: env.core, ids: [ShellXShareLink.apiID(id)])
+    }
+
+    /// The host ended (its stream finished) or `expiresAt` passed.
+    private func ended(_ id: String, reason: ShareByeReason?) {
+        guard let entry = take(id) else { return }
+        if let reason { Task { await entry.host.stop(reason: reason) } }
     }
 
     /// Quit (U14): `bye(host_quit)` to everyone; revokes until-quit and one-time shares. 15 m / 1 h links
-    /// stay valid on the API until they expire.
+    /// stay valid on the API and in the store, and resume at the next launch.
     func stopAll() async {
-        let taken = active.map(\.id).compactMap(take)
-        let revokeIDs = taken.filter { $0.share.lifetime == .untilQuit || $0.share.oneTime }.map(\.share.id)
+        let (hosts, revokeIDs) = takeAllForQuit()
         let core = env.core
         await withTaskGroup(of: Void.self) { group in
-            for entry in taken { if let host = entry.host { group.addTask { await host.stop(reason: .hostQuit) } } }
-            group.addTask { await Self.revokeOnCore(core: core, ids: revokeIDs) }
+            for host in hosts { group.addTask { await host.stop(reason: .hostQuit) } }
+            group.addTask { _ = await Self.revokeOnCore(core: core, ids: revokeIDs) }
         }
     }
 
-    /// `applicationWillTerminate`: `stopAll`, bounded by `terminationBudget`. The revokes run off the
-    /// main thread; the hosts need the main actor, so the main run loop turns while waiting.
+    /// `applicationWillTerminate`. The main thread is blocked here (and may already be inside a main-actor
+    /// task, so nothing new on the main actor would run): the hosts send `bye(host_quit)` through
+    /// `stopForTermination` and the API revokes run on a background queue, waited on for at most
+    /// `terminationBudget`.
     func stopAllForTermination() {
-        guard !active.isEmpty else { return }
-        let done = OSAllocatedUnfairLock(initialState: false)
-        Task { @MainActor in
-            await self.stopAll()
-            done.withLock { $0 = true }
-        }
-        let deadline = Date().addingTimeInterval(Self.terminationBudget)
-        while !done.withLock({ $0 }), Date() < deadline {
-            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.02))
-        }
-        if !done.withLock({ $0 }) { Self.log.error("share stop exceeded the termination budget") }
-    }
-
-    private func take(_ id: String) -> (share: ActiveShare, host: (any ShellXShareHosting)?)? {
-        guard let index = active.firstIndex(where: { $0.id == id }) else { return nil }
-        let share = active.remove(at: index)
-        viewerTasks.removeValue(forKey: id)?.cancel()
-        return (share, hosts.removeValue(forKey: id))
-    }
-
-    nonisolated private static func revokeOnCore(core: ShellXCoreClient, ids: [String]) async {
-        guard !ids.isEmpty else { return }
-        await offMainVoid {
-            for id in ids {
-                do { try core.revokeShare(id: id) } catch {
-                    Self.log.error("share revoke failed: \(RemoteLogCode.of(error), privacy: .public)")
+        let (hosts, revokeIDs) = takeAllForQuit()
+        guard !hosts.isEmpty || !revokeIDs.isEmpty else { return }
+        let core = env.core
+        let done = DispatchSemaphore(value: 0)
+        Task.detached {
+            await withTaskGroup(of: Void.self) { group in
+                for host in hosts { group.addTask { await host.stopForTermination(reason: .hostQuit) } }
+                group.addTask {
+                    for id in revokeIDs {
+                        do { try core.revokeShare(id: id) } catch {
+                            Self.log.error("share revoke failed: \(ShellXShareLogCode.of(error), privacy: .public)")
+                        }
+                    }
                 }
+            }
+            done.signal()
+        }
+        if done.wait(timeout: .now() + Self.terminationBudget) == .timedOut {
+            Self.log.error("share stop exceeded the termination budget")
+        }
+    }
+
+    /// Empties the list for quit; the store keeps the links that resume.
+    private func takeAllForQuit() -> (hosts: [any ShellXShareHosting], revokeIDs: [String]) {
+        let shares = active
+        let revokeIDs = shares.filter { !$0.resumesAfterRelaunch }.map { ShellXShareLink.apiID($0.id) }
+        var hosts: [any ShellXShareHosting] = []
+        for share in shares {
+            guard let entry = entries.removeValue(forKey: share.id) else { continue }
+            entry.tasks.forEach { $0.cancel() }
+            hosts.append(entry.host)
+        }
+        active = []
+        return (hosts, revokeIDs)
+    }
+
+    /// Removes one share from the list and the store.
+    private func take(_ id: String) -> Entry? {
+        guard let entry = entries.removeValue(forKey: id) else { return nil }
+        entry.tasks.forEach { $0.cancel() }
+        active.removeAll { $0.id == id }
+        persist()
+        return entry
+    }
+
+    /// True when every revoke succeeded.
+    nonisolated private static func revokeOnCore(core: ShellXCoreClient, ids: [String]) async -> Bool {
+        guard !ids.isEmpty else { return true }
+        return await withCheckedContinuation { cont in
+            DispatchQueue.global(qos: .userInitiated).async {
+                var ok = true
+                for id in ids {
+                    do { try core.revokeShare(id: id) } catch {
+                        ok = false
+                        log.error("share revoke failed: \(ShellXShareLogCode.of(error), privacy: .public)")
+                    }
+                }
+                cont.resume(returning: ok)
             }
         }
     }
@@ -324,16 +456,10 @@ final class ShellXShareController: ObservableObject {
             DispatchQueue.global(qos: .userInitiated).async { cont.resume(with: Result { try work() }) }
         }
     }
-
-    nonisolated private static func offMainVoid(_ work: @escaping @Sendable () -> Void) async {
-        await withCheckedContinuation { cont in
-            DispatchQueue.global(qos: .userInitiated).async { work(); cont.resume() }
-        }
-    }
 }
 
 /// A secret-free code for logs.
-enum RemoteLogCode {
+enum ShellXShareLogCode {
     static func of(_ error: any Error) -> String {
         switch error {
         case let core as ShellXCoreError: return core.code
@@ -349,11 +475,12 @@ extension ShellXShareEnvironment {
         ShellXShareEnvironment(
             core: ShellXCoreClient(ShellXCoreFFI.shared),
             sockets: URLSessionShareSocketFactory(),
-            isSignedIn: { ShellXRemoteService.shared.isSignedIn },
+            signedIn: ShellXRemoteService.shared.$isSignedIn.removeDuplicates().eraseToAnyPublisher(),
             presentSignIn: { ShellXRemoteUIActions.presentSignIn() },
             source: { workspaceID in
                 guard let workspace = ShellXShareActions.workspace(id: workspaceID) else { return nil }
                 return WorkspaceShareSource(workspace: workspace)
-            })
+            },
+            store: KeychainShellXShareStore())
     }
 }

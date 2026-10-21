@@ -91,6 +91,8 @@ final class ShellXSharePresenter: NSObject, NSPopoverDelegate {
 
     nonisolated func popoverDidClose(_ notification: Notification) {
         MainActor.assumeIsolated {
+            // A popover closed by `present` replacing it must not tear down its successor.
+            guard let closed = notification.object as? NSPopover, closed === popover else { return }
             phoneModel?.close()
             phoneModel = nil
             popover = nil
@@ -160,7 +162,10 @@ final class ShellXSharePopoverModel: ObservableObject {
     func revoke() async {
         guard let share else { return }
         copied = false
-        await controller.revoke(share.id)
+        errorText = nil
+        if !(await controller.revoke(share.id)) {
+            errorText = ShellXShareError.revokeFailed.errorDescription
+        }
     }
 }
 

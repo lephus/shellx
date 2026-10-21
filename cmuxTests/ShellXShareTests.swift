@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Foundation
 import ShellXRemoteCore
 import SwiftUI
@@ -120,6 +121,70 @@ final class ShareByteCollector: @unchecked Sendable {
     var received: Data { lock.lock(); defer { lock.unlock() }; return bytes }
 }
 
+/// A `ShareHost` stand-in that records how it was stopped.
+final class ShareFakeHost: ShellXShareHosting, @unchecked Sendable {
+    let spec: ShellXShareEnvironment.HostSpec
+    let viewerStream: AsyncStream<[ShareViewer]>
+    private let continuation: AsyncStream<[ShareViewer]>.Continuation
+    private let lock = NSLock()
+    private var stops: [String] = []
+
+    init(spec: ShellXShareEnvironment.HostSpec) {
+        self.spec = spec
+        (viewerStream, continuation) = AsyncStream.makeStream(of: [ShareViewer].self)
+    }
+
+    /// "stop:revoked", "terminate:host_quit", …
+    var stopCalls: [String] { lock.withLock { stops } }
+
+    func start() async {}
+    func stop(reason: ShareByeReason) async { lock.withLock { stops.append("stop:\(reason.rawValue)") }; continuation.finish() }
+    func stopForTermination(reason: ShareByeReason) async {
+        lock.withLock { stops.append("terminate:\(reason.rawValue)") }
+        continuation.finish()
+    }
+    func publish(_ viewers: [ShareViewer]) { continuation.yield(viewers) }
+    /// The host ended on its own (as `ShareHost` does at `expiresAt`).
+    func finish() { continuation.finish() }
+}
+
+@MainActor
+final class ShareFakeHosts {
+    private(set) var made: [ShareFakeHost] = []
+    func make(_ spec: ShellXShareEnvironment.HostSpec) -> any ShellXShareHosting {
+        let host = ShareFakeHost(spec: spec)
+        made.append(host)
+        return host
+    }
+    func host(_ apiID: String) -> ShareFakeHost? { made.last { $0.spec.shareID == apiID } }
+}
+
+@MainActor
+final class ShareMemoryStore: ShellXShareStore {
+    var shares: [PersistedShare] = []
+    func load() -> [PersistedShare] { shares }
+    func save(_ shares: [PersistedShare]) { self.shares = shares }
+}
+
+/// Sleeps until `fireAll`.
+final class ShareManualSleeper: ShareSleeper, @unchecked Sendable {
+    private let lock = NSLock()
+    private var waiters: [CheckedContinuation<Void, any Error>] = []
+    var waiting: Int { lock.withLock { waiters.count } }
+
+    func sleep(until deadline: Date) async throws {
+        try await withCheckedThrowingContinuation { cont in lock.withLock { waiters.append(cont) } }
+    }
+
+    func fireAll() {
+        let pending = lock.withLock { () -> [CheckedContinuation<Void, any Error>] in
+            defer { waiters = [] }
+            return waiters
+        }
+        for waiter in pending { waiter.resume() }
+    }
+}
+
 @MainActor
 @Suite(.serialized)
 struct ShellXShareTests {
@@ -146,16 +211,31 @@ struct ShellXShareTests {
     }
 
     private func makeController(core: ShareFakeCore, sockets: ShareFakeSocketFactory = ShareFakeSocketFactory(),
-                                workspace: Workspace?, signedIn: Bool = true) -> ShellXShareController {
-        let env = ShellXShareEnvironment(
+                                workspace: Workspace?, signedIn: Bool = true,
+                                store: ShareMemoryStore? = nil,
+                                sleeper: (any ShareSleeper)? = nil,
+                                hosts: ShareFakeHosts? = nil) -> ShellXShareController {
+        var env = ShellXShareEnvironment(
             core: ShellXCoreClient(core), sockets: sockets,
-            isSignedIn: { signedIn }, presentSignIn: {},
+            signedIn: Just(signedIn).eraseToAnyPublisher(), presentSignIn: {},
             source: { [weak workspace] id in
                 guard let workspace, workspace.id == id else { return nil }
                 return WorkspaceShareSource(workspace: workspace, io: ShareFakeTerminalIO())
             },
+            store: store ?? ShareMemoryStore(),
             newShareID: { core.nextID() })
+        if let sleeper { env.sleeper = sleeper }
+        if let hosts { env.makeHost = { hosts.make($0) } }
         return ShellXShareController(environment: env)
+    }
+
+    /// Polls `condition` on the main actor for up to 2 s.
+    private func eventually(_ condition: () -> Bool) async throws -> Bool {
+        for _ in 0..<200 {
+            if condition() { return true }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        return condition()
     }
 
     @Test func testSourceListsTerminalAndPlaceholderPanes() throws {
@@ -287,6 +367,128 @@ struct ShellXShareTests {
         await controller.stopAll()
     }
 
+    @Test func testQuitCleanupRunsInsideMainActorTask() async throws {
+        let f = try makeFixture()
+        defer { f.browser.close() }
+        let core = ShareFakeCore(), hosts = ShareFakeHosts(), store = ShareMemoryStore()
+        let controller = makeController(core: core, workspace: f.workspace, store: store, hosts: hosts)
+        _ = try await controller.share(workspaceID: f.workspace.id, permission: .view, lifetime: .oneHour)
+        _ = try await controller.share(workspaceID: f.workspace.id, permission: .type, lifetime: .untilQuit)
+        _ = try await controller.startPhoneHandoff(workspaceID: f.workspace.id)
+        // `NSApp.reply(toApplicationShouldTerminate:)` runs inside main-actor tasks: quit cleanup starts there,
+        // with the main thread blocked until it returns.
+        await Task { @MainActor in controller.stopAllForTermination() }.value
+        #expect(controller.active.isEmpty)
+        #expect(Set(core.revokedIDs()) == ["k7f29q02", "k7f29q03"])
+        #expect(hosts.made.map(\.stopCalls) == [["terminate:host_quit"], ["terminate:host_quit"], ["terminate:host_quit"]])
+        #expect(store.shares.map(\.id) == ["k7f29q01"], "the 1 h link stays for the next launch")
+    }
+
+    @Test func testRevokeStopsHostAndForgetsLink() async throws {
+        let f = try makeFixture()
+        defer { f.browser.close() }
+        let core = ShareFakeCore(), hosts = ShareFakeHosts(), store = ShareMemoryStore()
+        let controller = makeController(core: core, workspace: f.workspace, store: store, hosts: hosts)
+        _ = try await controller.share(workspaceID: f.workspace.id)
+        #expect(store.shares.count == 1)
+        #expect(await controller.revoke("k7f2-9q01"))
+        #expect(hosts.host("k7f29q01")?.stopCalls == ["stop:revoked"])
+        #expect(core.revokedIDs() == ["k7f29q01"])
+        #expect(controller.active.isEmpty)
+        #expect(store.shares.isEmpty, "a revoked link never resumes")
+    }
+
+    @Test func testLinkResumesAfterRelaunch() async throws {
+        let f = try makeFixture()
+        defer { f.browser.close() }
+        let core = ShareFakeCore(), store = ShareMemoryStore()
+        let first = makeController(core: core, workspace: f.workspace, store: store, hosts: ShareFakeHosts())
+        let url = try await first.share(workspaceID: f.workspace.id, permission: .type, lifetime: .fifteenMinutes)
+        first.stopAllForTermination()
+        #expect(core.revokedIDs().isEmpty)
+        let saved = try #require(store.shares.first)
+        #expect(saved.workspaceID == f.workspace.id && saved.slot == "slot-k7f29q01")
+
+        let hosts = ShareFakeHosts()
+        let relaunched = makeController(core: core, workspace: f.workspace, store: store, hosts: hosts)
+        let resumed = try #require(relaunched.active.first)
+        #expect(resumed.url == url, "same id and secret: the old link works again")
+        #expect(resumed.permission == .type && resumed.lifetime == .fifteenMinutes)
+        let spec = try #require(hosts.made.first?.spec)
+        #expect(spec.shareID == "k7f29q01" && spec.slot == "slot-k7f29q01")
+        #expect(spec.secret.base64url == url.fragment)
+        #expect(spec.expiresAt == saved.expiresAt)
+        relaunched.stopAllForTermination()
+    }
+
+    @Test func testExpiredOrOrphanedPersistedLinksAreDropped() async throws {
+        let f = try makeFixture()
+        defer { f.browser.close() }
+        let core = ShareFakeCore(), store = ShareMemoryStore(), hosts = ShareFakeHosts()
+        let secret = ShareSecret.random().base64url
+        store.shares = [
+            PersistedShare(id: "aaaabbbb", slot: "s1", secret: secret, permission: .view, lifetime: .oneHour,
+                           expiresAt: Date().addingTimeInterval(-5), workspaceID: f.workspace.id),
+            PersistedShare(id: "ccccdddd", slot: "s2", secret: secret, permission: .view, lifetime: .oneHour,
+                           expiresAt: Date().addingTimeInterval(600), workspaceID: UUID()),
+        ]
+        let controller = makeController(core: core, workspace: f.workspace, store: store, hosts: hosts)
+        #expect(controller.active.isEmpty)
+        #expect(hosts.made.isEmpty)
+        #expect(store.shares.isEmpty)
+        #expect(try await eventually { core.revokedIDs() == ["ccccdddd"] }, "a live link whose workspace is gone is revoked")
+    }
+
+    @Test func testSecretNeverInUserDefaults() async throws {
+        let f = try makeFixture()
+        defer { f.browser.close() }
+        let core = ShareFakeCore(), store = ShareMemoryStore()
+        let controller = makeController(core: core, workspace: f.workspace, store: store, hosts: ShareFakeHosts())
+        let link = try await controller.share(workspaceID: f.workspace.id)
+        let qr = try await controller.phoneHandoff(workspaceID: f.workspace.id)
+        let secrets = [try #require(link.fragment), try #require(qr.fragment)]
+        let defaults = String(describing: UserDefaults.standard.dictionaryRepresentation())
+        for secret in secrets { #expect(!defaults.contains(secret)) }
+        #expect(store.shares.map(\.secret) == [secrets[0]], "only the 1 h link is kept, and only in the store")
+        controller.stopAllForTermination()
+    }
+
+    @Test func testExpiredShareLeavesTheList() async throws {
+        let f = try makeFixture()
+        defer { f.browser.close() }
+        let core = ShareFakeCore(), hosts = ShareFakeHosts(), store = ShareMemoryStore()
+        let sleeper = ShareManualSleeper()
+        let controller = makeController(core: core, workspace: f.workspace, store: store, sleeper: sleeper, hosts: hosts)
+        _ = try await controller.share(workspaceID: f.workspace.id)
+        _ = try await controller.share(workspaceID: f.workspace.id, lifetime: .fifteenMinutes)
+        #expect(try await eventually { sleeper.waiting == 2 })
+        // The host ended on its own: the entry goes.
+        hosts.host("k7f29q02")?.finish()
+        #expect(try await eventually { controller.active.map(\.id) == ["k7f2-9q01"] })
+        // expiresAt passed: the host gets bye(expired) and the link leaves list and store.
+        sleeper.fireAll()
+        #expect(try await eventually { controller.active.isEmpty })
+        #expect(try await eventually { hosts.host("k7f29q01")?.stopCalls == ["stop:expired"] })
+        #expect(store.shares.isEmpty)
+    }
+
+    @Test func testQRRenewsWhenUnclaimedCodeExpires() async throws {
+        let f = try makeFixture()
+        defer { f.browser.close() }
+        let core = ShareFakeCore(), hosts = ShareFakeHosts()
+        let controller = makeController(core: core, workspace: f.workspace, hosts: hosts)
+        let sleeper = ShareManualSleeper()
+        let model = ShellXPhoneHandoffModel(workspaceID: f.workspace.id, controller: controller, sleeper: sleeper)
+        model.open()
+        #expect(try await eventually { model.shareID == "k7f2-9q01" && model.qrImage != nil && sleeper.waiting == 1 })
+        sleeper.fireAll()
+        #expect(try await eventually { model.shareID == "k7f2-9q02" && model.qrImage != nil })
+        #expect(core.revokedIDs() == ["k7f29q01"])
+        #expect(hosts.host("k7f29q01")?.stopCalls == ["stop:revoked"])
+        model.close()
+        #expect(try await eventually { core.revokedIDs() == ["k7f29q01", "k7f29q02"] }, "closing revokes the unclaimed code")
+    }
+
     @Test func testSignedOutShareMakesNoCoreCall() async throws {
         let f = try makeFixture()
         defer { f.browser.close() }
@@ -301,8 +503,14 @@ struct ShellXShareTests {
 
     @Test func testGateOffHidesEntrypoints() throws {
         defer { ShellXShareGate.overrideForTesting = nil }
-        #expect(!ShellXShareGate.isEnabled(flag: false, environment: [:]))
-        #expect(ShellXShareGate.isEnabled(flag: true, environment: [:]))
+        #expect(!ShellXShareGate.isEnabled(flag: false, remoteMachines: true, environment: [:]))
+        #expect(ShellXShareGate.isEnabled(flag: true, remoteMachines: true, environment: [:]))
+        // Ruling R1b: no remote-machines gate, no share entrypoints (the sign-in path lives there).
+        #expect(!ShellXShareGate.isEnabled(flag: true, remoteMachines: false, environment: [:]))
+        #expect(!ShellXShareGate.isEnabled(flag: false, remoteMachines: false,
+                                           environment: [ShellXShareGate.environmentKey: "1"]))
+        #expect(ShellXShareGate.isEnabled(flag: false, remoteMachines: true,
+                                          environment: [ShellXShareGate.environmentKey: "1"]))
         let shareTitles = [ShellXShareActions.title(.share), ShellXShareActions.title(.phone)]
 
         ShellXShareGate.overrideForTesting = false
