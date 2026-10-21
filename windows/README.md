@@ -1,8 +1,8 @@
 # ShellX for Windows (native MVP)
 
 A native Windows terminal for ShellX: GPUI window (Direct3D 11 + DirectWrite), libghostty-vt
-grid, ConPTY local shells, and remote terminals on your Macs over relay v2. Version 2.0.0
-(sprint build, unsigned). Dark theme only; UI text is Vietnamese by default.
+grid, ConPTY local shells, and remote terminals on your Macs over relay v2. Version 1.2.0
+(unsigned). Dark theme only; UI text is Vietnamese by default.
 
 It is a separate app from the Flutter ShellX for Windows and installs next to it.
 
@@ -26,12 +26,12 @@ for 14 days; after that, re-run the workflow for the branch.
 
 ```
 gh run download <run-id> -R lephus/shellx -n shellx-desktop            # shellx-desktop.exe (portable)
-gh run download <run-id> -R lephus/shellx -n ShellX-Setup-2.0.0-sprint # ShellX-Setup-2.0.0-sprint.exe
+gh run download <run-id> -R lephus/shellx -n ShellX-Setup-1.2.0 # ShellX-Setup-1.2.0.exe
 ```
 
 The installer is unsigned and per-user (no UAC). SmartScreen shows "Unknown publisher":
 choose "More info", then "Run anyway". Installs to `%LOCALAPPDATA%\Programs\ShellX Native`,
-Start menu entry "ShellX 2 (thử nghiệm)". Needs Windows 10 1809 (build 17763) or later.
+Start menu entry "ShellX". Needs Windows 10 1809 (build 17763) or later.
 
 ## Command line
 
@@ -61,7 +61,7 @@ All state is under `%LOCALAPPDATA%\ShellX\native\`:
 
 These never overlap the Flutter app's data: `%APPDATA%\pro.shellx\ShellX` and
 `%LOCALAPPDATA%\ShellX\{bin,term,restore,cli,mux}`, which the Flutter uninstaller deletes.
-Uninstalling ShellX 2 removes the program; the `native\` state is kept.
+Uninstalling ShellX removes the program; the `native\` state is kept.
 
 ## Keyboard shortcuts
 
@@ -122,9 +122,11 @@ shown on both machines, approve on the Mac).
 ## Coexistence with the Flutter ShellX
 
 Different AppId, executable (`shellx-desktop.exe`, never `ShellX.exe`, because the Flutter
-installer runs `taskkill /IM ShellX.exe`), install directory (`ShellX Native`), Start-menu
-name ("ShellX 2 (thử nghiệm)") and data directories. Installing or uninstalling one never
-stops or removes the other. CI checks this statically
+installer runs `taskkill /IM ShellX.exe`), install directory (`ShellX Native`) and data
+directories. Installing or uninstalling one never stops or removes the other. Since 1.2.0 the
+display name and the Start-menu shortcut are "ShellX", like the Flutter app's: the native app
+replaces it, so its shortcut takes over the Flutter one, and uninstalling the Flutter app
+afterwards removes that shortcut (reinstalling ShellX restores it). CI checks this statically
 (`installer/check_coexistence.py`) and with an install/run/uninstall smoke.
 
 ## Accessibility stopgap
