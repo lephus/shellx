@@ -34,7 +34,7 @@ Máy chủ chuyển tiếp chỉ ghép hai thiết bị của bạn và chuyển
 
 ## Cài đặt trong ba bước
 
-1. **Cài ShellX trên máy tính** (macOS 12+ hoặc Windows 10 bản 1809+) và đăng ký tài khoản.
+1. **Cài ShellX trên máy tính** (macOS 14+ hoặc Windows 10 bản 1809+) và đăng ký tài khoản.
 2. **Cài app trên điện thoại** (iOS 15+ hoặc Android 8.0+) và đăng nhập cùng tài khoản.
 3. **Ghép nối.** Mở menu khay trên máy tính, chọn ghép nối điện thoại, và quét mã QR.
 

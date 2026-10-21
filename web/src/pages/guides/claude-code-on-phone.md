@@ -17,7 +17,7 @@ ShellX giải quyết đúng chỗ đó. Agent vẫn chạy trên máy Mac hoặ
 
 ## Cần chuẩn bị
 
-- ShellX trên máy tính (macOS 12 trở lên, Windows 10 bản 1809 trở lên).
+- ShellX trên máy tính (macOS 14 trở lên, Windows 10 bản 1809 trở lên).
 - App ShellX trên điện thoại (iOS 15 trở lên, Android 8.0 trở lên), đăng nhập cùng tài khoản và đã ghép nối bằng mã QR.
 - Claude Code, Codex hoặc agent dòng lệnh khác đã cài trên máy tính như bình thường.
 
