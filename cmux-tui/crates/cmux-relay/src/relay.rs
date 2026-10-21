@@ -282,7 +282,14 @@ impl Relay {
         headers: HeaderMap,
         upgrade: WebSocketUpgrade,
     ) -> Response {
-        if headers.contains_key(ORIGIN) {
+        if let Some(origin) = headers.get(ORIGIN)
+            && !relay
+                .inner
+                .config
+                .allowed_origins
+                .iter()
+                .any(|allowed| allowed.as_bytes() == origin.as_bytes())
+        {
             return StatusCode::FORBIDDEN.into_response();
         }
         let Some(permit) = relay.try_admit_upgraded_socket() else {
@@ -2275,6 +2282,60 @@ mod tests {
 
         let native = server.connect().await;
         drop(native);
+    }
+
+    async fn connect_with_origin(
+        server: &TestServer,
+        origin: &'static str,
+    ) -> Result<TestSocket, tokio_tungstenite::tungstenite::Error> {
+        let mut request =
+            format!("ws://{}/v1/relay", server.address).into_client_request().unwrap();
+        request.headers_mut().insert(ORIGIN, HeaderValue::from_static(origin));
+        connect_async(request).await.map(|(socket, _)| socket)
+    }
+
+    #[tokio::test]
+    async fn allowed_origin_is_admitted() {
+        let config = RelayConfig {
+            allowed_origins: vec!["https://shellx.pro".into()],
+            ..RelayConfig::default()
+        };
+        let server = TestServer::start(config).await;
+        let mut socket = connect_with_origin(&server, "https://shellx.pro").await.unwrap();
+        send_control(
+            &mut socket,
+            RelayControl::Register {
+                protocol: REMOTE_PROTOCOL_VERSION,
+                slot: "slot-a".into(),
+                ticket: "slot-a-daemon-ticket".into(),
+            },
+        )
+        .await;
+        assert!(matches!(receive_control(&mut socket).await, RelayControl::Registered { .. }));
+    }
+
+    #[tokio::test]
+    async fn other_origin_still_rejected() {
+        let config = RelayConfig {
+            allowed_origins: vec!["https://shellx.pro".into()],
+            ..RelayConfig::default()
+        };
+        let server = TestServer::start(config).await;
+        for origin in [
+            "https://shellx.pro.evil.example",
+            "https://shellx.pro/",
+            "https://SHELLX.pro",
+            "http://shellx.pro",
+        ] {
+            let error = connect_with_origin(&server, origin)
+                .await
+                .err()
+                .unwrap_or_else(|| panic!("origin {origin} was upgraded"));
+            let tokio_tungstenite::tungstenite::Error::Http(response) = error else {
+                panic!("origin rejection was not an HTTP response");
+            };
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{origin}");
+        }
     }
 
     #[tokio::test]
