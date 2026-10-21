@@ -8,15 +8,16 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "node scripts/check-placeholders.mjs && astro build && node --test tests/site.test.mjs tests/placeholders.test.mjs",
+    "build": "node scripts/check-placeholders.mjs && astro build && node --test tests/site.test.mjs tests/placeholders.test.mjs tests/share.test.mjs",
     "preview": "astro preview",
-    "test": "node --test tests/site.test.mjs tests/placeholders.test.mjs",
+    "test": "node --test tests/site.test.mjs tests/placeholders.test.mjs tests/share.test.mjs",
     "astro": "astro",
     "lighthouse": "node scripts/lighthouse.mjs",
     "images": "node scripts/render-images.mjs",
     "indexnow": "node scripts/indexnow.mjs"
   },
   "dependencies": {
+    "@xterm/xterm": "5.5.0",
     "astro": "^7.3.5"
   },
   "allowScripts": {

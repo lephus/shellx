@@ -35,6 +35,8 @@ public enum ShareMessage: Sendable, Equatable, Codable {
     case out(pane: String, data: Data)
     case size(pane: String, cols: Int, rows: Int)
     case bye(ShareByeReason)
+    /// Host keepalive (amendment A2): sent on a live circuit idle for 60 s; carries only `seq`.
+    case ka
     case hello(nonce: Data, label: String)
     case select(pane: String)
     case input(pane: String, data: Data)
@@ -74,6 +76,7 @@ public enum ShareMessage: Sendable, Equatable, Codable {
             self = .size(pane: try c.decode(String.self, forKey: .pane), cols: try c.decode(Int.self, forKey: .cols),
                          rows: try c.decode(Int.self, forKey: .rows))
         case "bye": self = .bye(try c.decode(ShareByeReason.self, forKey: .reason))
+        case "ka": self = .ka
         case "hello": self = .hello(nonce: try nonce(c), label: try c.decode(String.self, forKey: .label))
         case "select": self = .select(pane: try c.decode(String.self, forKey: .pane))
         case "in": self = .input(pane: try c.decode(String.self, forKey: .pane), data: try b64(.data))
@@ -113,6 +116,7 @@ public enum ShareMessage: Sendable, Equatable, Codable {
         case .size(let pane, let cols, let rows):
             [("t", .string("size")), ("pane", .string(pane)), ("cols", .int(cols)), ("rows", .int(rows))]
         case .bye(let reason): [("t", .string("bye")), ("reason", .string(reason.rawValue))]
+        case .ka: [("t", .string("ka"))]
         case .hello(let nonce, let label):
             [("t", .string("hello")), ("nonce", .string(nonce.base64EncodedString())), ("label", .string(label))]
         case .select(let pane): [("t", .string("select")), ("pane", .string(pane))]

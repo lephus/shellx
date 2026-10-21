@@ -238,6 +238,61 @@ describe("tickets", () => {
     expect(await errorCode(hostExpired)).toBe("share_expired");
   });
 
+  it("a wrong access token for a revoked or expired share answers 404 share_not_found, not 410", async () => {
+    const c = clock();
+    const app = makeApp({ now: c.now });
+    const { session } = await desk(app);
+    const revoked = await create(app, session);
+    await call(app, "DELETE", `/v2/shares/${revoked.share.id}`, { token: session.token });
+    const expired = await create(app, session, { lifetime: "15m" });
+    const r = await viewerTicket(app, revoked.share.id, newAccess());
+    expect(r.status).toBe(404);
+    expect(await errorCode(r)).toBe("share_not_found");
+    c.advance(901);
+    const e = await viewerTicket(app, expired.share.id, newAccess());
+    expect(e.status).toBe(404);
+    expect(await errorCode(e)).toBe("share_not_found");
+  });
+
+  it("host_offline boundary: older than 150 s is offline, exactly 150 s is online", async () => {
+    for (const [seconds, status] of [[149, 200], [150, 200], [151, 503]] as const) {
+      for (const viaHostTicket of [false, true]) {
+        const c = clock();
+        const app = makeApp({ now: c.now });
+        const { session } = await desk(app);
+        const { share, access } = await create(app, session);
+        if (viaHostTicket) {
+          c.advance(30);
+          expect((await hostTicket(app, session, share.id)).status).toBe(200);
+        }
+        c.advance(seconds);
+        const res = await viewerTicket(app, share.id, access);
+        expect(res.status, `${seconds}s via ${viaHostTicket ? "host ticket" : "create"}`).toBe(status);
+        if (status === 503) expect(await errorCode(res)).toBe("host_offline");
+      }
+    }
+  });
+
+  it("retries once with a fresh slot when the slot is taken, then fails", async () => {
+    const slots = ["a".repeat(22), "a".repeat(22), "b".repeat(22)];
+    const app = makeApp({ now: () => T0, shareSlot: () => slots.shift() ?? "c".repeat(22) });
+    const { session } = await desk(app);
+    expect((await create(app, session)).res.status).toBe(201); // takes the first "a"
+    const second = await create(app, session); // draws "a" (taken), then "b"
+    expect(second.res.status).toBe(201);
+    expect(second.share.slot).toBe("b".repeat(22));
+    // two collisions in a row are not retried again
+    expect((await create(app, session)).res.status).toBe(201); // "c"
+  });
+
+  it("gives up after a second slot collision", async () => {
+    const app = makeApp({ now: () => T0, shareSlot: () => "d".repeat(22) });
+    const { session } = await desk(app);
+    expect((await create(app, session)).res.status).toBe(201);
+    expect((await create(app, session)).res.status).toBe(500);
+    expect(db().get<{ n: number }>("SELECT COUNT(*) AS n FROM shares")!.n).toBe(1);
+  });
+
   it("one-time share binds the first viewer", async () => {
     const c = clock();
     const app = makeApp({ now: c.now });
@@ -273,6 +328,10 @@ describe("tickets", () => {
     expect((await viewerTicket(app, share.id, access, "short")).status).toBe(400);
     expect((await viewerTicket(app, share.id, access, "not base64url!!!!!!!!!")).status).toBe(400);
     expect((await call(app, "POST", `/v2/shares/${share.id}/ticket`, { body: { access, viewer: VIEWER_A, secret: "x" } })).status).toBe(400);
+    // secret wins over an unknown or malformed id
+    for (const id of ["zzzzzzzz", "not-an-id"]) {
+      expect((await call(app, "POST", `/v2/shares/${id}/ticket`, { body: { access, viewer: VIEWER_A, secret: "x" } })).status).toBe(400);
+    }
   });
 
   it("limits creates per device and viewer tickets per IP", async () => {

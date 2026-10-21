@@ -20,7 +20,7 @@ const homePages = [
 const guideSlugs = ['claude-code-on-phone', 'ssh-from-phone', 'remote-terminal-without-vpn', 'shellx-vs-termius', 'shellx-vs-tailscale'];
 const guidePages = ['/guides/', '/en/guides/', ...guideSlugs.flatMap((s) => [`/guides/${s}/`, `/en/guides/${s}/`])];
 const indexablePages = ['/', '/en/', '/privacy/', '/terms/', '/en/privacy/', '/en/terms/', ...guidePages];
-const everyPage = [...indexablePages, '/404.html'];
+const everyPage = [...indexablePages, '/404.html', '/s/'];
 
 function fileFor(pathname) {
   return pathname.endsWith('/') ? join(dist, pathname, 'index.html') : join(dist, pathname);
@@ -40,6 +40,7 @@ test('site config is valid', () => {
   assert.match(config.desktopVersion, /^\d+\.\d+\.\d+$/);
   assert.equal(config.downloadBaseUrl, 'https://download.shellx.pro/desktop');
   assert.match(config.supportEmail, /^[^@\s]+@[^@\s]+\.[^@\s]+$/);
+  assert.match(config.shareApiBase, /^https:\/\/[a-z0-9.-]+$/, 'shareApiBase is an https origin without a path');
   assert.ok(config.appStoreUrl === null || config.appStoreUrl.startsWith('https://apps.apple.com/'));
   assert.ok(config.googlePlayUrl === null || config.googlePlayUrl.startsWith('https://play.google.com/'));
 });
@@ -182,10 +183,22 @@ test('no external scripts, styles, fonts or media on any page', () => {
     }
   }
 
-  // Check all .css files in dist/_astro/ for external URL references
+  // Check all .css files in dist/_astro/ for external URL references, and every bundled script
+  // (the /s/ viewer and xterm.js) for any URL other than shellx.pro and relay.shellx.pro.
   const astroDir = join(dist, '_astro');
+  const jsUrlPattern = /https?:\/\/(?!(?:relay\.)?shellx\.pro(?![\w.-]))[^\s"'`)]*/gi;
+  assert.ok(!jsUrlPattern.test('"https://relay.shellx.pro/v2"'), 'JS pattern allows relay.shellx.pro');
+  jsUrlPattern.lastIndex = 0;
+  assert.ok(jsUrlPattern.test('"https://shellx.pro.evil.com/"'), 'JS pattern catches shellx.pro.evil.com');
   if (existsSync(astroDir)) {
     for (const file of readdirSync(astroDir)) {
+      if (file.endsWith('.js')) {
+        const js = readFileSync(join(astroDir, file), 'utf8');
+        jsUrlPattern.lastIndex = 0;
+        for (const m of js.matchAll(jsUrlPattern)) {
+          assert.fail(`dist/_astro/${file}: external URL in script: ${m[0].slice(0, 120)}`);
+        }
+      }
       if (file.endsWith('.css')) {
         const css = readFileSync(join(astroDir, file), 'utf8');
         cssUrlPattern.lastIndex = 0;
@@ -348,8 +361,9 @@ test('manifest icons exist; sitemap carries lastmod and x-default for every page
   assert.equal((xml.match(/hreflang="x-default"/g) ?? []).length, indexablePages.length);
 });
 
-test('404 is noindex; every indexable page is index, follow', () => {
+test('404 and the share viewer are noindex; every indexable page is index, follow', () => {
   assert.match(readPage('/404.html'), /<meta name="robots" content="noindex"/);
+  assert.match(readPage('/s/'), /<meta name="robots" content="noindex"/);
   for (const p of indexablePages) assert.match(readPage(p), /<meta name="robots" content="index, follow/, p);
 });
 
@@ -428,4 +442,56 @@ test('IndexNow key file is served at /<key>.txt and holds exactly the key', () =
   const file = readdirSync(dist).find((f) => /^[0-9a-f]{32}\.txt$/.test(f));
   assert.ok(file, 'IndexNow key file missing');
   assert.equal(readFileSync(join(dist, file), 'utf8'), file.slice(0, -4));
+});
+
+test('share viewer /s/ sends no referrer, has no canonical and is not in the sitemap', () => {
+  const html = readPage('/s/');
+  assert.match(html, /<meta name="referrer" content="no-referrer">/);
+  assert.ok(!html.includes('rel="canonical"'), '/s/ must not declare a canonical URL');
+  assert.ok(!/hreflang=/.test(html.match(/<head>[\s\S]*<\/head>/)[0]), '/s/ must not declare hreflang');
+  const xml = readFileSync(join(dist, 'sitemap.xml'), 'utf8');
+  assert.ok(!xml.includes('/s/'), 'sitemap lists /s/');
+  assert.match(html, /<script type="module" src="\/_astro\/[^"]+\.js"/, 'viewer bundle is served from /_astro/');
+  assert.ok(html.includes(`data-api-base="${config.shareApiBase}"`), 'the API base from site.config.json is rendered');
+});
+
+test('share viewer boot script strips the fragment before any request', () => {
+  const html = readPage('/s/');
+  const boot = html.match(/<script data-share-boot>([\s\S]*?)<\/script>/);
+  assert.ok(boot, 'missing the inline <script data-share-boot>');
+  const code = boot[1];
+  const strip = code.indexOf('history.replaceState');
+  assert.ok(strip >= 0, 'boot script must call history.replaceState');
+  assert.ok(code.indexOf('location.hash') >= 0 && code.indexOf('location.hash') < strip, 'boot reads the hash first');
+  const fetchAt = code.search(/\bfetch\b|XMLHttpRequest|WebSocket|sendBeacon/);
+  assert.ok(fetchAt === -1 || fetchAt > strip, 'a request happens before the fragment is stripped');
+  // The boot script runs before the viewer bundle (and any other script file) is loaded.
+  const firstFile = html.search(/<script\b[^>]*\bsrc=/);
+  assert.ok(firstFile > html.indexOf('<script data-share-boot>'), 'a script file loads before the boot script');
+  // Nothing else on the page reads the fragment: the bundle gets the secret from the boot script only.
+  for (const file of readdirSync(join(dist, '_astro')).filter((f) => f.endsWith('.js'))) {
+    const js = readFileSync(join(dist, '_astro', file), 'utf8');
+    assert.ok(!/location\.hash/.test(js), `dist/_astro/${file} reads location.hash`);
+  }
+});
+
+test('share viewer carries its Vietnamese and English state texts', () => {
+  const html = readPage('/s/');
+  for (const needle of ['Link đã hết hạn', 'Link đã bị thu hồi', 'Máy chủ phiên đang tắt',
+    'This link has expired', 'This link was revoked', 'The host is offline']) {
+    assert.ok(html.includes(needle), `/s/ missing "${needle}"`);
+  }
+});
+
+test('share viewer header is minimal: no marketing nav, no gradient download CTA; other pages keep it', () => {
+  const html = readPage('/s/');
+  const header = html.match(/<header class="top"[\s\S]*?<\/header>/)[0];
+  assert.ok(!header.includes('btn-primary'), '/s/ header has the download CTA');
+  assert.ok(!header.includes('class="top-nav"'), '/s/ header has the marketing nav');
+  assert.ok(!html.includes('linear-gradient'), '/s/ carries a gradient');
+  assert.ok(!html.includes('grad-text'), '/s/ uses gradient text');
+  for (const p of ['/', '/en/', '/privacy/', '/404.html']) {
+    const other = readPage(p).match(/<header class="top"[\s\S]*?<\/header>/)[0];
+    assert.ok(other.includes('btn btn-primary btn-sm'), `${p} lost its header CTA`);
+  }
 });

@@ -272,6 +272,15 @@ impl FakeApi {
         }
     }
 
+    /// Overwrite a share's `created_at` and `expires_at` (unix seconds). Test hook (list
+    /// ordering and expiry without waiting).
+    pub fn set_share_times(&self, id: &str, created_at: u64, expires_at: u64) {
+        if let Some(s) = self.shared.lock().shares.get_mut(id) {
+            s.created_at = created_at;
+            s.expires_at = expires_at;
+        }
+    }
+
     /// Overwrite a machine's stored `noise_public_key_b64` verbatim (e.g. padded
     /// standard base64 as the L4 server may hold it, or garbage). Test hook.
     pub fn set_machine_key_b64(&self, machine_id: &str, key_b64: &str) {
