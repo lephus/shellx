@@ -678,3 +678,103 @@ test('viewer sources never log (the secret, tickets and keys must not reach a co
     assert.ok(!/\bconsole\./.test(src), `src/share/${f} uses console`);
   }
 });
+
+// ---------------------------------------------------------------------------------------------
+// Fix round 1
+
+for (const [label, fetchImpl] of [
+  ['a ticket request that never answers', (calls) => (url, init) => { calls.push(init); return new Promise(() => {}); }],
+  ['a ticket body that never arrives', (calls) => async (url, init) => {
+    calls.push(init);
+    return { ok: true, status: 200, json: () => new Promise(() => {}) };
+  }],
+]) {
+  test(`one 15 s deadline covers ${label}: host_offline, request aborted`, async () => {
+    const clock = fakeClock();
+    const calls = [];
+    const WebSocket = fakeWebSocketClass();
+    const session = createSession({
+      id: SHARE_ID, secret: SECRET, storage: memoryStorage(), WebSocket, fetch: fetchImpl(calls),
+      now: clock.now, setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,
+    });
+    const seen = states(session);
+    session.start(); // never settles while the request hangs; the deadline ends the session anyway
+    await settle(() => calls.length === 1, 'ticket fetch');
+    assert.ok(calls[0].signal instanceof AbortSignal, 'fetch gets an abort signal');
+    clock.advance(14_999);
+    assert.equal(session.state, 'loading');
+    clock.advance(1);
+    assert.equal(session.state, 'host_offline');
+    assert.deepEqual(seen, ['loading', 'host_offline']);
+    assert.ok(calls[0].signal.aborted, 'the ticket request was aborted');
+    assert.equal(WebSocket.sockets.length, 0);
+    assert.equal(clock.pending(), 0);
+  });
+}
+
+test('the deadline started at the ticket request still bounds the relay handshake', async () => {
+  const ctx = setup();
+  ctx.session.start();
+  await settle(() => ctx.WebSocket.sockets.length === 1);
+  ctx.clock.advance(15_000);
+  assert.equal(ctx.session.state, 'host_offline');
+  assert.equal(ctx.clock.pending(), 0);
+});
+
+test('keepalive (A2): a ka after welcome changes nothing and is not counted', async () => {
+  const ctx = setup();
+  const events = [];
+  for (const ev of ['state', 'out', 'panes', 'replay', 'size', 'welcome']) ctx.session.on(ev, (e) => events.push([ev, e]));
+  const live = await goLive(ctx);
+  events.length = 0;
+  await live.host.send({ t: 'ka' }); // seq 2
+  await live.host.send({ t: 'ka' }); // seq 3
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(ctx.session.state, 'live');
+  assert.equal(ctx.session.dropped, 0);
+  assert.deepEqual(events, []);
+  // ka advanced seq: a replay of seq 3 is now dropped, seq 4 is accepted.
+  const aad = aadFor('circuit-1', live.host.hello.nonce, live.host.hostNonce);
+  await live.host.sendRaw({ t: 'out', pane: 'p1', data: b64Encode(utf8('old')) }, 3, aad);
+  await live.host.sendRaw({ t: 'out', pane: 'p1', data: b64Encode(utf8('new')) }, 4, aad);
+  await settle(() => events.length === 1 && ctx.session.dropped === 1);
+  assert.equal(text(events[0][1].data), 'new');
+});
+
+test('keepalive (A2): a ka before welcome is dropped and counted', async () => {
+  const ctx = setup();
+  ctx.session.start();
+  const { circuit } = await relayToReady(ctx);
+  const host = await hostFor(circuit);
+  await host.send({ t: 'ka' }, 'welcome');
+  await settle(() => ctx.session.dropped === 1);
+  assert.equal(ctx.session.state, 'connecting');
+  await host.welcome();
+  await settle(() => ctx.session.state === 'live');
+});
+
+test('a throwing page listener is counted; three in a row end in error', async () => {
+  const ctx = setup();
+  ctx.session.on('out', () => { throw new Error('render failed'); });
+  const live = await goLive(ctx);
+  await live.host.send({ t: 'out', pane: 'p1', data: b64Encode(utf8('a')) });
+  await settle(() => ctx.session.dropped === 1);
+  assert.equal(ctx.session.state, 'live');
+  await live.host.send({ t: 'out', pane: 'p1', data: b64Encode(utf8('b')) });
+  await live.host.send({ t: 'out', pane: 'p1', data: b64Encode(utf8('c')) });
+  await settle(() => ctx.session.state === 'error');
+  assert.ok(live.circuit.closed);
+});
+
+test('Ctrl+V and Ctrl+Shift+V are left to the browser paste outside macOS', () => {
+  const { input, out } = collect();
+  assert.equal(input.handle({ type: 'keydown', key: 'v', ctrlKey: true }), false);
+  assert.equal(input.handle({ type: 'keydown', key: 'V', ctrlKey: true, shiftKey: true }), false);
+  assert.deepEqual(out, []);
+  input.handle({ type: 'paste', text: 'pasted' });
+  assert.deepEqual(out, ['pasted']);
+  const mac = [];
+  const macInput = createInput({ onData: (b) => mac.push(text(b)), isMac: true });
+  assert.equal(macInput.handle({ type: 'keydown', key: 'v', ctrlKey: true }), true);
+  assert.deepEqual(mac, ['\x16'], 'on a Mac Cmd+V pastes, so Ctrl+V is the terminal ^V');
+});

@@ -482,3 +482,16 @@ test('share viewer carries its Vietnamese and English state texts', () => {
     assert.ok(html.includes(needle), `/s/ missing "${needle}"`);
   }
 });
+
+test('share viewer header is minimal: no marketing nav, no gradient download CTA; other pages keep it', () => {
+  const html = readPage('/s/');
+  const header = html.match(/<header class="top"[\s\S]*?<\/header>/)[0];
+  assert.ok(!header.includes('btn-primary'), '/s/ header has the download CTA');
+  assert.ok(!header.includes('class="top-nav"'), '/s/ header has the marketing nav');
+  assert.ok(!html.includes('linear-gradient'), '/s/ carries a gradient');
+  assert.ok(!html.includes('grad-text'), '/s/ uses gradient text');
+  for (const p of ['/', '/en/', '/privacy/', '/404.html']) {
+    const other = readPage(p).match(/<header class="top"[\s\S]*?<\/header>/)[0];
+    assert.ok(other.includes('btn btn-primary btn-sm'), `${p} lost its header CTA`);
+  }
+});

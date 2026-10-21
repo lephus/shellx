@@ -7,6 +7,7 @@
 //   welcome `shellx-share/1|<circuit>|<viewer nonce b64>`
 //   later  `shellx-share/1|<circuit>|<viewer nonce b64>|<host nonce b64>`
 // Plaintext: UTF-8 JSON, keys in a fixed order (t, seq, then the v1 fields).
+// A2: after welcome the host may send a keepalive `{"t":"ka","seq"}`; it only advances seq.
 
 export const MAX_FRAME_BYTES = 64 * 1024;
 export const MAX_INPUT_BYTES = 4096;
@@ -137,6 +138,7 @@ const FIELDS = {
   out: ['pane', 'data'],
   size: ['pane', 'cols', 'rows'],
   bye: ['reason'],
+  ka: [],
 };
 const PANE_FIELDS = ['id', 'title', 'kind', 'cols', 'rows'];
 
@@ -201,6 +203,8 @@ export function decodeHostMessage(plaintext) {
     case 'size':
       if (!isStr(m.pane) || !isInt(m.cols) || !isInt(m.rows)) return null;
       return { t: 'size', seq: m.seq, pane: m.pane, cols: m.cols, rows: m.rows };
+    case 'ka':
+      return { t: 'ka', seq: m.seq };
     case 'bye':
       if (!['revoked', 'expired', 'host_quit'].includes(m.reason)) return null;
       return { t: 'bye', seq: m.seq, reason: m.reason };

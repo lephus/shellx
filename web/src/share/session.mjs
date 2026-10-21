@@ -12,6 +12,7 @@ export const RELAY_PROTOCOL = 5;
 export const CONNECT_TIMEOUT_MS = 15_000;
 export const DEFAULT_API_BASE = 'https://relay.shellx.pro';
 
+const MAX_LISTENER_FAILURES = 3;
 const TERMINAL = new Set(['expired', 'revoked', 'used', 'host_offline', 'not_found', 'ended', 'error']);
 const API_CODES = {
   share_not_found: 'not_found',
@@ -125,6 +126,14 @@ export function createSession({
     }
   }
 
+  // A page listener threw while handling a frame: count it, and give up after a few in a row.
+  let listenerFailures = 0;
+  function listenerFailed() {
+    dropped += 1;
+    listenerFailures += 1;
+    if (listenerFailures >= MAX_LISTENER_FAILURES) setState('error', { listener: true });
+  }
+
   function relayError(msg) {
     setState(RELAY_OFFLINE.has(msg.code) && state !== 'live' ? 'host_offline' : state === 'live' ? 'ended' : 'error',
       { relay: String(msg.code ?? '') });
@@ -139,7 +148,9 @@ export function createSession({
     outbound = outbound.then(async () => {
       const frame = await sealFrame(keys.viewerToHost, aad, plaintext);
       if (ws && ws === circuit) ws.send(frame);
-    }).catch(() => {});
+    }).catch(() => {
+      dropped += 1; // seal or send failed; the frame is lost
+    });
     return outbound;
   }
 
@@ -152,6 +163,7 @@ export function createSession({
       if (!TERMINAL.has(state)) dropped += 1;
       return;
     }
+    // Before welcome only welcome or bye (A1); ka and everything else is dropped.
     if (hostNonce === null && msg.t !== 'welcome' && msg.t !== 'bye') {
       dropped += 1;
       return;
@@ -161,7 +173,15 @@ export function createSession({
       return;
     }
     lastSeq = msg.seq;
+    dispatch(msg);
+    listenerFailures = 0;
+  }
+
+  function dispatch(msg) {
     switch (msg.t) {
+      case 'ka':
+        // A2 keepalive: only advances seq.
+        break;
       case 'welcome':
         hostNonce = msg.nonce;
         perm = msg.perm;
@@ -234,7 +254,7 @@ export function createSession({
       }
       if (!ready) return;
       const bytes = new Uint8Array(event.data);
-      inbound = inbound.then(() => receiveFrame(bytes)).catch(() => {});
+      inbound = inbound.then(() => receiveFrame(bytes)).catch(listenerFailed);
     };
     ws.onclose = () => {
       if (circuit !== ws) return;
@@ -250,10 +270,6 @@ export function createSession({
     const slot = ticket.slot;
     const lane = b64urlEncode(randomBytes(24));
     const generation = 1;
-    timer = setTimer(() => {
-      timer = null;
-      setState('host_offline', { timeout: true });
-    }, timeoutMs);
     let ws;
     try {
       ws = new WebSocket(relayUrl);
@@ -287,7 +303,7 @@ export function createSession({
     ws.onerror = () => {};
   }
 
-  async function requestTicket(shareId, access, viewer) {
+  async function requestTicket(shareId, access, viewer, signal) {
     let response;
     try {
       response = await fetch(`${apiBase.replace(/\/+$/, '')}/v2/shares/${shareId}/ticket`, {
@@ -297,6 +313,7 @@ export function createSession({
         credentials: 'omit',
         referrerPolicy: 'no-referrer',
         cache: 'no-store',
+        signal,
       });
     } catch {
       return { state: 'error', detail: { api: 'network' } };
@@ -319,7 +336,7 @@ export function createSession({
   }
 
   async function start() {
-    if (state !== 'loading' || keys) return;
+    if (state !== 'loading' || keys || timer !== null) return;
     const shareId = normalizeShareId(id);
     // Exactly 43 canonical base64url characters (32 bytes), as the Swift ShareSecret parser demands.
     const secretBytes = typeof secret === 'string' && secret.length === 43 ? b64urlDecode(secret) : null;
@@ -327,6 +344,13 @@ export function createSession({
       setState('not_found', { link: 'invalid' });
       return;
     }
+    // One deadline covers the ticket request, its body and the relay handshake up to welcome.
+    const abort = typeof AbortController === 'function' ? new AbortController() : null;
+    timer = setTimer(() => {
+      timer = null;
+      abort?.abort();
+      setState('host_offline', { timeout: true });
+    }, timeoutMs);
     try {
       keys = await deriveKeys(secretBytes, shareId);
     } catch {
@@ -335,7 +359,8 @@ export function createSession({
     } finally {
       secretBytes.fill(0);
     }
-    const result = await requestTicket(shareId, keys.access, viewerIdFrom(storage, shareId));
+    if (TERMINAL.has(state)) return;
+    const result = await requestTicket(shareId, keys.access, viewerIdFrom(storage, shareId), abort?.signal);
     if (TERMINAL.has(state)) return;
     if (result.state) {
       setState(result.state, result.detail);

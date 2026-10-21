@@ -87,6 +87,15 @@ function ensureTerminal(cols, rows) {
   // The page owns typing (input.mjs); xterm only renders.
   term.attachCustomKeyEventHandler(() => false);
   term.open(el.term);
+  // xterm focuses its own helper textarea on every mousedown; keep it from ever raising a phone
+  // keyboard or swallowing keystrokes. Typing goes through el.input only.
+  const helper = term.textarea;
+  if (helper) {
+    helper.readOnly = true;
+    helper.inputMode = 'none';
+    helper.tabIndex = -1;
+    helper.setAttribute('aria-hidden', 'true');
+  }
   return term;
 }
 
@@ -161,7 +170,8 @@ function showMeta(perm, expiresAt) {
 }
 
 // ----- typing -----
-const input = createInput({ onData: (bytes) => session?.input(bytes) });
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const input = createInput({ onData: (bytes) => session?.input(bytes), isMac });
 
 function forward(ev) {
   if (!session?.canType) return;
@@ -174,7 +184,10 @@ for (const type of ['keydown', 'input', 'compositionstart', 'compositionupdate',
   el.input.addEventListener(type, forward);
 }
 el.termScroll.addEventListener('click', () => {
-  if (session?.canType && !window.getSelection()?.toString()) el.input.focus({ preventScroll: true });
+  // Every tap, even with a selection (xterm keeps its own selection model), so keys never land in
+  // xterm's helper textarea. View-only shares never focus anything that raises a keyboard.
+  if (session?.canType) el.input.focus({ preventScroll: true });
+  else el.input.blur();
 });
 el.keys.addEventListener('pointerdown', (ev) => {
   const button = ev.target.closest('button[data-key]');
@@ -209,7 +222,10 @@ async function fontsReady() {
 }
 
 function connect() {
-  session?.close();
+  // Detach the old session first so its closing "ended" never reaches the page (no flash on Retry).
+  const old = session;
+  session = null;
+  old?.close();
   shownPane = null;
   const s = createSession({
     id: link.id,
