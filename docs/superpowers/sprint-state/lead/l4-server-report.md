@@ -53,10 +53,10 @@ None. R17 makes a K1 rule stricter without changing its shape; please record it 
 
 ## Needs user (G2; never paste values in chat)
 1. Before pushing main: run the "Pre-check" in deploy/README.md "Relay v2": `PRAGMA foreign_key_check` on a COPY of relay.db; any row means stop.
-2. Merge `feat/relay-v2` into main with `git merge --no-ff` (keeps 57dd520ccf reachable) and push main. That push is the production deploy; relay2 stays off.
+2. Merge `feat/relay-v2` into main with `git merge --no-ff` (keeps the relay2 pin reachable; now 08de0bb35e) and push main. That push is the production deploy; relay2 stays off.
 3. VPS secret: append `CMUX_RELAY_HMAC_SECRET` via `openssl rand` to `~/phu/shellx/.env`, per the README.
 4. nginx-proxy image tag: does it support `VIRTUAL_PATH "= /v2/relay"`? If not, use DNS `relay2.shellx.pro` and the `feat/relay-v2-subdomain` branch.
-5. Stage the relay2 source: on the Mac run `scripts/shellx/relay2/source-tarball.sh 57dd520ccf… <dir>`, scp it, extract to `relay2-src/`, check the sha256.
+5. Stage the relay2 source: on the Mac run `scripts/shellx/relay2/source-tarball.sh 08de0bb35e… (re-pinned from 57dd520ccf by the L7 final fix: the older commit lacks the Origin allowlist) <dir>`, scp it, extract to `relay2-src/`, check the sha256.
 6. Pre-build once with `docker compose --profile relay2 build relay2`, then set `COMPOSE_PROFILES=relay2` and the repo variable `RELAY2_ENABLED=true`.
 7. Copy the vhost file (330 s timeouts) into nginx-proxy's vhost.d, then check `nginx -T`.
 8. Run `npm run relay2:smoke` in your own terminal (password hidden); expected output `relay2 smoke: OK (registered, lease 30 s)`.

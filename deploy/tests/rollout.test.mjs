@@ -401,7 +401,7 @@ test('heals a live item left missing by a crash between removing it and moving i
 
 // --- relay2: built on the VPS from relay2-src/<R> when .env has COMPOSE_PROFILES=relay2 ---
 
-const R = '57dd520ccf20b55c7eac662f1e09eae1c5069917';
+const R = '08de0bb35efbd46e3cade25446fdb6ffffac41bc';
 const RELAY2_COMPOSE = `services:\n  relay2:\n    build:\n      context: ./relay2-src/${R}\n`;
 const RELAY2_ENV = 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\nCOMPOSE_PROFILES=relay2\n';
 
