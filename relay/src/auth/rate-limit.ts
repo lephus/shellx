@@ -17,6 +17,10 @@ export interface RateLimiters {
   ticketMint: RateLimiter;
   /** Relay v2 pairing create, keyed by device id: 10 per window. */
   pairingCreate: RateLimiter;
+  /** Share create, keyed by device id: 10 per window. */
+  shareCreate: RateLimiter;
+  /** Anonymous share viewer ticket, keyed by client IP: 30 per window. */
+  shareTicket: RateLimiter;
 }
 
 /** Spec §5.2: 60-second window; login 10/IP and 5/email, register 3/IP. */
@@ -33,6 +37,8 @@ export const UPGRADES_PER_IP = 60;
 export const NOTIFICATIONS_PER_AGENT = 120;
 export const TICKET_MINTS_PER_DEVICE = 60;
 export const PAIRING_CREATES_PER_DEVICE = 10;
+export const SHARE_CREATES_PER_DEVICE = 10;
+export const SHARE_TICKETS_PER_IP = 30;
 export const NOTIFICATIONS_WINDOW_MS = 60 * 60_000;
 
 export interface SlidingWindowOptions {
@@ -104,7 +110,7 @@ const allowAll: RateLimiter = { limit: async () => true };
 /** Production wiring: one limiter set per process. RATE_LIMITS_ENABLED=false turns all of them off. */
 export function createRateLimiters(config: Pick<Config, "rateLimitsEnabled">, now: () => number = Date.now): RateLimiters {
   if (!config.rateLimitsEnabled) {
-    return { loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll, ticketMint: allowAll, pairingCreate: allowAll };
+    return { loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll, ticketMint: allowAll, pairingCreate: allowAll, shareCreate: allowAll, shareTicket: allowAll };
   }
   return {
     loginIp: new SlidingWindowLimiter({ limit: LOGIN_PER_IP, now }),
@@ -114,5 +120,7 @@ export function createRateLimiters(config: Pick<Config, "rateLimitsEnabled">, no
     notifyAgent: new SlidingWindowLimiter({ limit: NOTIFICATIONS_PER_AGENT, windowMs: NOTIFICATIONS_WINDOW_MS, now }),
     ticketMint: new SlidingWindowLimiter({ limit: TICKET_MINTS_PER_DEVICE, now }),
     pairingCreate: new SlidingWindowLimiter({ limit: PAIRING_CREATES_PER_DEVICE, now }),
+    shareCreate: new SlidingWindowLimiter({ limit: SHARE_CREATES_PER_DEVICE, now }),
+    shareTicket: new SlidingWindowLimiter({ limit: SHARE_TICKETS_PER_IP, now }),
   };
 }

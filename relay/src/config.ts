@@ -43,6 +43,8 @@ export interface Config {
   relayIssuer: string;
   /** WebSocket URL of the v2 relay handed to clients (RELAY_V2_URL). */
   relayV2Url: string;
+  /** The one origin whose pages may call POST /v2/shares/:id/ticket cross-origin (SHARE_ALLOWED_ORIGIN). */
+  shareAllowedOrigin: string;
 }
 
 export class ConfigError extends Error {
@@ -57,6 +59,7 @@ export const DEFAULT_DB_PATH = "/data/relay.db";
 export const DEFAULT_NATIVE_MIN = "2.0.0";
 export const DEFAULT_NATIVE_MANIFEST_DIR = "/srv/downloads/desktop";
 export const DEFAULT_ADMIN_HOST = "admin.shellx.pro";
+export const DEFAULT_SHARE_ALLOWED_ORIGIN = "https://shellx.pro";
 export const DEFAULT_RELAY_ISSUER = "shellx-relay";
 export const DEFAULT_RELAY_V2_URL = "wss://relay.shellx.pro/v2/relay";
 export const RELAY_HMAC_SECRET_MIN_BYTES = 32;
@@ -125,5 +128,6 @@ export function loadConfig(env: Readonly<Record<string, string | undefined>>): C
     relayV2DisabledReason,
     relayIssuer,
     relayV2Url,
+    shareAllowedOrigin: value("SHARE_ALLOWED_ORIGIN") ?? DEFAULT_SHARE_ALLOWED_ORIGIN,
   };
 }
