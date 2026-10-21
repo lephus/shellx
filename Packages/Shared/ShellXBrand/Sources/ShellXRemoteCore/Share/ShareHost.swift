@@ -727,9 +727,3 @@ final class ShareSubscription {
         }
     }
 }
-
-// MARK: - Ticket provider (moves to ShareTicketProvider.swift at merge)
-
-public protocol ShareTicketProvider: Sendable {
-    func hostTicket(shareID: String) async throws -> (ticket: String, relayURL: URL, expiresAt: Date)
-}
