@@ -120,6 +120,32 @@ for (const [path, inApp] of [
   });
 }
 
+for (const [path, facts] of [
+  [
+    '/privacy/',
+    ['Phiên AI trên điện thoại', 'Thông báo của phiên AI', 'hỏi bạn', 'mở khóa ứng dụng', 'hướng xoay', 'thư mục của phiên'],
+  ],
+  [
+    '/en/privacy/',
+    [
+      'AI sessions on the phone',
+      'AI session notifications',
+      'has a question',
+      'unlock the app',
+      'keeping only its orientation',
+      // As built: the page's markdown turns ' into ’.
+      'inside the session’s folder',
+    ],
+  ],
+]) {
+  test(`privacy page ${path} says what AI sessions and their notifications carry (V2-2b B25)`, () => {
+    const html = readPage(path);
+    for (const fact of facts) {
+      assert.ok(html.includes(fact), `privacy page ${path} must mention "${fact}"`);
+    }
+  });
+}
+
 test('404 page exists (nginx answers unknown paths with it and status 404)', () => {
   assert.ok(existsSync(join(dist, '404.html')), 'missing dist/404.html');
 });

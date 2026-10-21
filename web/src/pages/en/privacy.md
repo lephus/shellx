@@ -4,7 +4,7 @@ lang: en
 page: privacy
 title: Privacy Policy
 description: "What data ShellX collects, why, how long it is kept, how end-to-end encryption protects your terminal content, and how to delete your account."
-updated: "2026-10-09"
+updated: "2026-10-15"
 ---
 
 ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Android), a relay server at `relay.shellx.pro` and the website `shellx.pro` (together, the "Service"). This policy explains what data is collected, what it is used for, how long it is kept, and what rights you have.
@@ -14,6 +14,7 @@ ShellX ("we") provides a desktop agent (macOS, Windows), a mobile app (iOS, Andr
 - Terminal content (the commands you type and the output you see) is **end-to-end encrypted** between your phone and your computer. The relay only forwards encrypted data and **cannot read** it, except for the content of push notifications (section 3).
 - We store only what is needed to run your account: your email, a hash of your password, device information and pairing records.
 - Push notifications: while the computer's "Notify when long commands finish" setting is on (the default), or when a program sends a notification, the agent sends the notification text through our server, Google Firebase Cloud Messaging and Apple Push Notification service, without end-to-end encryption, to paired phones that allowed notifications (section 3).
+- AI sessions on the phone: your messages, the agent's answers, diffs, files and images of an AI session travel only through the end-to-end encrypted channel between your phone and your computer. AI session notifications carry the name of the action the agent asks for, without end-to-end encryption, like command lines (section 3).
 - Voice input: when you tap the mic, what you say is turned into text by Apple's (iPhone) or Google's (Android, when the phone cannot do it itself) speech recognition, which may process the audio on their servers. ShellX does not store or receive the audio (section 2).
 - No ads, no analytics or tracking tools, and we never sell data.
 
@@ -50,27 +51,35 @@ To replay output produced while your phone is briefly disconnected, the agent ke
 
 ### Voice input
 
-- The mobile app uses the microphone only when you tap the mic on the terminal screen; it never records in the background.
+- The mobile app uses the microphone only when you tap the mic on the terminal screen or in the message field of an AI session; it never records in the background.
 - Speech is turned into text by the phone's speech recognition, **before** end-to-end encryption. On iPhone, Apple's speech recognition is used: Apple may process the audio on the phone or on its servers. On Android, speech is recognized on the phone when it can be; otherwise the audio goes to Google's speech recognition service. Apple and Google handle it under their own policies.
-- ShellX does not store audio and does not send audio to ShellX servers. The text you send goes to the terminal like typed keys, end-to-end encrypted as above; the relay cannot read it.
+- ShellX does not store audio and does not send audio to ShellX servers. The text you send goes to the terminal like typed keys, or to the AI session as a message, end-to-end encrypted as above; the relay cannot read it.
 - Your recognition language choice (Vietnamese/English) is stored on the phone.
+
+### AI sessions on the phone
+
+- When you open one of your computer's AI sessions (for example Claude) on the phone, its content — your messages, the agent's answers, what the agent does, diffs, file lists and paths, the images you send — travels only through the end-to-end encrypted channel above; the relay cannot read it.
+- A photo you pick from your library or take in an AI session is scaled down on the phone and sent to your computer through that channel. The computer keeps it in memory only until it goes to the agent (an image not used is dropped after 2 minutes); ShellX does not store it. Before sending, the app removes the information embedded in the photo, such as where and when it was taken or the camera model, keeping only its orientation.
+- The phone can only point at files inside the session's folder; the computer checks each path again before using it.
+- The agent runs on your computer and sends the session's content, images included, to its provider (for example Anthropic for Claude) under that provider's own policy, as when you use it on the computer.
 
 ## 3. Push notifications
 
 The agent on your computer can tell your paired phones when a long-running command finishes, or when a program sends a notification — even when the mobile app is closed.
 
 - **What the agent sends, and when.** While the computer's "Notify when long commands finish" setting is on (default: 30 seconds) — and whenever a program in the terminal emits a notification sequence (for example `shellx notify`, OSC 9, OSC 777) — the agent sends the **notification text** to the ShellX relay: the computer's name, the session or terminal window name, the command line, its exit code and running time, or the text the program sent. This text is **not end-to-end encrypted**.
+- **AI session notifications.** When an AI session needs your answer and nobody is looking at it, or a long turn has just finished, the agent sends a notification with: the computer's name and the agent's name; for a permission request, the name of the action in clear (for example "Needs your answer: Edit src/main.ts"), like the command lines above; for a question, only "Claude has a question" (the agent's name), never what it asks; for a finished turn, its number and running time. It also carries the session's id, the request's number, two option ids ("allow once" and "reject once") and a tag that lets the phone show the notification with buttons. Tapping "Allow" or "Deny" opens the app; the answer is sent only after you unlock the app, through the end-to-end encrypted channel.
 - **What the relay does with it.** The relay only forwards it through **Google Firebase Cloud Messaging** and, for iPhones, **Apple Push Notification service**, and only to phones that are paired with that computer and have allowed notifications. The relay does not store it or write it to its logs; Google and Apple process it under their own policies.
 - **When no phone can receive it** (no phone has allowed notifications, or all are signed out), the agent stops sending for up to 15 minutes — less if a phone connects to the computer in the meantime.
 - **Push tokens.** When you allow notifications, the mobile app receives a push token (FCM token) from Google Firebase Cloud Messaging and sends it to our server. The server keeps it until you sign out on that phone, delete your account, turn off ShellX notifications in the phone's settings (the next time the app opens), or Firebase reports the token is no longer valid.
-- This is the only exception to section 2: only the content of notifications, not the rest of your terminal.
+- This is the only exception to section 2: only the content of notifications, not the rest of your terminal or of your AI sessions.
 - **How to turn it off:** choose "Off" under "Notify when long commands finish" in the ShellX menu on the computer (notifications when commands finish), turn off ShellX notifications in your phone's settings, or sign out on the phone.
 
 ## 4. Data that stays on your devices
 
 The device private key, access token, the list of trusted phones (on the computer), the list of paired computers (on the phone) and your settings are stored in the operating system's secure storage (Keychain on macOS/iOS, Windows Credential Manager with AES-encrypted files on Windows, Android Keystore) or in the app's settings storage. They are not sent to our servers, except for the access token, which accompanies each request to authenticate it.
 
-- **Camera:** the mobile app uses the camera only to scan pairing QR codes. Images are neither stored nor sent anywhere.
+- **Camera and photos:** the mobile app uses the camera to scan pairing QR codes, and to take a photo when you choose "Camera" in an AI session. QR code images are neither stored nor sent anywhere; photos for an AI session are sent only to your computer (section 2). The app reads only the photos you pick in the operating system's photo picker.
 - **Biometrics:** the app lock uses Face ID, fingerprint or the device passcode through the operating system. The app only receives a success or failure result, never biometric data.
 - **Full Disk Access (macOS):** this optional permission only lets the commands you run in the terminal reach your folders. The agent itself never reads or uploads your files.
 - **Session restore (computer):** to reopen your workspace after you quit the app or restart the computer, ShellX saves the tab/pane layout, each terminal's working folder and — if "Save terminal contents on quit" is on (the default) — up to the last 2,000 lines of each terminal (at most 256 KiB per terminal). These files stay on your computer, in the app's data folder for your account: on macOS `~/Library/Application Support/pro.shellx.desktop/restore`, readable only by your account and excluded from Time Machine backups; on Windows `%LOCALAPPDATA%\ShellX\restore`, deleted when you uninstall. These contents can include anything that was shown in the terminal; they are never sent to our servers, to your phone, or synced anywhere. You can turn off saving the contents, or clear what was saved, at any time from the ShellX menu on the computer → Terminal. An image you paste into the terminal stays on your computer, in the app's private folder, and is deleted after 24 hours, or when ShellX quits and closes your shells; ShellX does not send it anywhere.

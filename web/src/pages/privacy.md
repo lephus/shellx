@@ -4,7 +4,7 @@ lang: vi
 page: privacy
 title: Chính sách quyền riêng tư
 description: "ShellX thu thập dữ liệu gì, dùng để làm gì, lưu bao lâu, mã hóa đầu cuối bảo vệ nội dung terminal ra sao, và cách xóa tài khoản của bạn."
-updated: "2026-10-09"
+updated: "2026-10-15"
 ---
 
 ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng dụng di động (iOS, Android), máy chủ chuyển tiếp (relay) tại `relay.shellx.pro` và trang web `shellx.pro` (gọi chung là "Dịch vụ"). Chính sách này mô tả dữ liệu nào được thu thập, dùng để làm gì, lưu bao lâu và bạn có những quyền gì.
@@ -14,6 +14,7 @@ ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng d
 - Nội dung terminal (lệnh bạn gõ và kết quả hiển thị) được **mã hóa đầu cuối** giữa điện thoại và máy tính của bạn. Máy chủ chuyển tiếp chỉ chuyển dữ liệu đã mã hóa và **không thể đọc** nội dung đó, ngoại trừ nội dung thông báo đẩy (mục 3).
 - Chúng tôi chỉ lưu những gì cần để vận hành tài khoản: email, mật khẩu ở dạng băm, thông tin thiết bị và bản ghi ghép nối.
 - Thông báo đẩy (push notification): trong lúc cài đặt "Thông báo khi lệnh chạy lâu xong" trên máy tính đang bật (mặc định) hoặc khi một chương trình gửi thông báo, agent gửi nội dung thông báo qua máy chủ của chúng tôi, Google Firebase Cloud Messaging và Apple Push Notification service, ở dạng không mã hóa đầu cuối, tới điện thoại đã ghép nối và cho phép thông báo (mục 3).
+- Phiên AI trên điện thoại: tin bạn gửi, câu trả lời của agent, diff, tệp và ảnh của một phiên AI chỉ đi trong kênh mã hóa đầu cuối giữa điện thoại và máy tính. Thông báo của phiên AI mang tên việc agent xin làm ở dạng không mã hóa đầu cuối, như dòng lệnh (mục 3).
 - Nhập lệnh bằng giọng nói: khi bạn chạm nút mic, lời nói được chuyển thành chữ bằng nhận dạng giọng nói của Apple (iPhone) hoặc Google (Android, khi điện thoại không tự nhận dạng được), có thể xử lý âm thanh trên máy chủ của họ. ShellX không lưu và không nhận âm thanh (mục 2).
 - Không quảng cáo, không công cụ phân tích hay theo dõi, không bán dữ liệu.
 
@@ -50,27 +51,35 @@ ShellX ("chúng tôi") cung cấp agent cho máy tính (macOS, Windows), ứng d
 
 ### Nhập lệnh bằng giọng nói
 
-- Ứng dụng di động chỉ dùng micro khi bạn chạm nút mic trên màn terminal; không ghi âm nền.
+- Ứng dụng di động chỉ dùng micro khi bạn chạm nút mic trên màn terminal hoặc trong ô nhập của một phiên AI; không ghi âm nền.
 - Lời nói được chuyển thành chữ bằng tính năng nhận dạng giọng nói của điện thoại, **trước khi** mã hóa đầu cuối. Trên iPhone, ứng dụng dùng nhận dạng giọng nói của Apple: Apple có thể xử lý âm thanh ngay trên điện thoại hoặc trên máy chủ của Apple. Trên Android, lời nói được nhận dạng ngay trên điện thoại khi máy làm được; nếu không, âm thanh được gửi tới dịch vụ nhận dạng giọng nói của Google. Apple và Google xử lý theo chính sách riêng của họ.
-- ShellX không lưu âm thanh và không gửi âm thanh tới máy chủ của ShellX. Chữ bạn gửi đi vào terminal như phím gõ, được mã hóa đầu cuối như trên; máy chủ chuyển tiếp không đọc được.
+- ShellX không lưu âm thanh và không gửi âm thanh tới máy chủ của ShellX. Chữ bạn gửi đi vào terminal như phím gõ, hoặc vào phiên AI như một tin nhắn, được mã hóa đầu cuối như trên; máy chủ chuyển tiếp không đọc được.
 - Lựa chọn ngôn ngữ nhận dạng (tiếng Việt/tiếng Anh) được lưu trên điện thoại.
+
+### Phiên AI trên điện thoại
+
+- Khi bạn mở trên điện thoại một phiên AI của máy tính (ví dụ Claude), nội dung của phiên — tin bạn gửi, câu trả lời của agent, các việc agent làm, diff, danh sách và đường dẫn tệp, ảnh bạn gửi — chỉ đi trong kênh mã hóa đầu cuối nói trên; máy chủ chuyển tiếp không đọc được.
+- Ảnh bạn chọn trong thư viện hoặc chụp trong một phiên AI được thu nhỏ trên điện thoại rồi gửi tới máy tính qua kênh đó. Máy tính chỉ giữ ảnh trong bộ nhớ tới khi gửi cho agent (ảnh không dùng tới bị bỏ sau 2 phút); ShellX không lưu ảnh. Trước khi gửi, ứng dụng bỏ các thông tin đi kèm trong ảnh, như vị trí, thời gian chụp hay loại máy; chỉ giữ hướng xoay của ảnh.
+- Điện thoại chỉ nhắc được tệp nằm trong thư mục của phiên; máy tính kiểm lại từng đường dẫn trước khi dùng.
+- Agent chạy trên máy tính của bạn và gửi nội dung phiên, kể cả ảnh, tới nhà cung cấp của nó (ví dụ Anthropic với Claude) theo chính sách riêng của nhà cung cấp đó, như khi bạn dùng nó trên máy tính.
 
 ## 3. Thông báo đẩy
 
 Agent trên máy tính có thể báo cho điện thoại đã ghép nối khi một lệnh chạy lâu kết thúc, hoặc khi một chương trình gửi thông báo — kể cả khi ứng dụng di động đã đóng.
 
 - **Agent gửi gì, khi nào.** Trong lúc cài đặt "Thông báo khi lệnh chạy lâu xong" trên máy tính đang bật (mặc định: 30 giây) — và bất cứ khi nào một chương trình trong terminal phát chuỗi thông báo (ví dụ `shellx notify`, OSC 9, OSC 777) — agent gửi **nội dung thông báo** tới máy chủ chuyển tiếp ShellX: tên máy tính, tên phiên hoặc cửa sổ terminal, dòng lệnh, mã thoát và thời gian chạy, hoặc chữ do chương trình gửi. Nội dung này **không được mã hóa đầu cuối**.
+- **Thông báo của phiên AI.** Khi một phiên AI cần bạn trả lời mà không ai đang xem, hoặc một lượt dài vừa xong, agent gửi một thông báo gồm: tên máy tính và tên agent; với yêu cầu xin quyền, tên việc ở dạng rõ (ví dụ "Cần bạn trả lời: Sửa src/main.ts"), như dòng lệnh ở trên; với câu hỏi, chỉ "Claude hỏi bạn" (tên agent), không bao giờ nội dung câu hỏi; với lượt xong, số lượt và thời gian. Kèm theo là mã của phiên, số của yêu cầu, hai mã lựa chọn ("cho phép một lần" và "từ chối một lần") và một nhãn để điện thoại hiện thông báo có nút. Chạm "Cho phép" hoặc "Từ chối" mở ứng dụng; câu trả lời chỉ được gửi sau khi bạn mở khóa ứng dụng, qua kênh mã hóa đầu cuối.
 - **Máy chủ làm gì với nó.** Máy chủ chỉ chuyển tiếp nội dung đó qua **Google Firebase Cloud Messaging** và, với iPhone, **Apple Push Notification service**, và chỉ tới những điện thoại đã ghép nối với chính máy tính đó và đã cho phép thông báo. Máy chủ không lưu nội dung này và không ghi nó vào nhật ký; Google và Apple xử lý nó theo chính sách riêng của họ.
 - **Khi không điện thoại nào nhận được** (chưa điện thoại nào cho phép thông báo, hoặc đều đã đăng xuất), agent ngừng gửi tối đa 15 phút — sớm hơn nếu trong lúc đó có điện thoại kết nối tới máy tính.
 - **Mã thông báo đẩy.** Ứng dụng di động nhận một mã thông báo đẩy (FCM token) từ Google Firebase Cloud Messaging và gửi lên máy chủ khi bạn cho phép thông báo. Máy chủ lưu mã này tới khi bạn đăng xuất trên điện thoại đó, xóa tài khoản, tắt thông báo của ShellX trong cài đặt điện thoại (ở lần mở ứng dụng tiếp theo), hoặc Firebase báo mã không còn hiệu lực.
-- Đây là ngoại lệ duy nhất đối với mục 2: chỉ nội dung thông báo, không phải phần còn lại của terminal.
+- Đây là ngoại lệ duy nhất đối với mục 2: chỉ nội dung thông báo, không phải phần còn lại của terminal hay của phiên AI.
 - **Cách tắt:** chọn "Tắt" ở "Thông báo khi lệnh chạy lâu xong" trong menu ShellX trên máy tính (thông báo khi lệnh kết thúc), hoặc tắt thông báo của ShellX trong cài đặt điện thoại, hoặc đăng xuất trên điện thoại.
 
 ## 4. Dữ liệu chỉ nằm trên thiết bị của bạn
 
 Khóa bí mật của thiết bị, mã truy cập, danh sách điện thoại được tin cậy (trên máy tính), danh sách máy đã ghép nối (trên điện thoại) và các cài đặt được lưu trong kho bảo mật của hệ điều hành (Keychain trên macOS/iOS, Windows Credential Manager cùng tệp mã hóa AES trên Windows, Android Keystore) hoặc vùng cài đặt của ứng dụng. Những dữ liệu này không được gửi lên máy chủ, trừ mã truy cập được gửi kèm mỗi yêu cầu để xác thực.
 
-- **Camera:** ứng dụng di động chỉ dùng camera để quét mã QR ghép nối. Hình ảnh không được lưu hay gửi đi.
+- **Camera và ảnh:** ứng dụng di động dùng camera để quét mã QR ghép nối, và để chụp ảnh khi bạn chọn "Chụp ảnh" trong một phiên AI. Ảnh mã QR không được lưu hay gửi đi; ảnh cho phiên AI chỉ được gửi tới máy tính của bạn (mục 2). Ứng dụng chỉ đọc những ảnh bạn chọn trong trình chọn ảnh của hệ điều hành.
 - **Sinh trắc học:** khóa ứng dụng bằng Face ID, vân tay hoặc mã máy do hệ điều hành xử lý. Ứng dụng chỉ nhận kết quả thành công hoặc thất bại, không bao giờ nhận dữ liệu sinh trắc học.
 - **Full Disk Access (macOS):** quyền này không bắt buộc và chỉ để các lệnh bạn chạy trong terminal truy cập được thư mục của bạn. Agent không tự đọc hay tải lên tệp nào của bạn.
 - **Khôi phục phiên (máy tính):** để mở lại đúng chỗ làm việc sau khi bạn thoát ứng dụng hoặc khởi động lại máy, ShellX lưu bố cục tab/pane, thư mục làm việc của từng terminal và — nếu "Lưu nội dung terminal khi thoát" đang bật (mặc định bật) — tối đa 2.000 dòng nội dung cuối của mỗi terminal (không quá 256 KiB mỗi terminal). Các tệp này chỉ nằm trên máy tính của bạn, trong thư mục dữ liệu của ứng dụng thuộc tài khoản của bạn: trên macOS là `~/Library/Application Support/pro.shellx.desktop/restore`, chỉ tài khoản của bạn đọc được và không đưa vào bản sao lưu Time Machine; trên Windows là `%LOCALAPPDATA%\ShellX\restore`, được xóa khi gỡ cài đặt. Nội dung này có thể chứa bất cứ thứ gì đã hiện trên terminal; nó không bao giờ được gửi lên máy chủ, tới điện thoại hay đồng bộ đi đâu. Bạn có thể tắt việc lưu nội dung hoặc xóa nội dung đã lưu bất cứ lúc nào trong menu ShellX trên máy tính → Terminal. Ảnh bạn dán vào terminal được lưu tạm trên máy tính, trong thư mục riêng của ứng dụng, và bị xoá sau 24 giờ, hoặc khi ShellX thoát và đóng các shell của bạn; ShellX không gửi ảnh đi đâu.
