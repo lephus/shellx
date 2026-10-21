@@ -357,6 +357,176 @@ final class ShareHostTests: XCTestCase {
         viewers = await host.viewers
         XCTAssertTrue(viewers.isEmpty)
     }
+
+    // MARK: Fix round 1
+
+    func testSlowViewerBacklogIsBoundedAndResyncsWithReplay() async throws {
+        let host = makeHost()
+        let control = try await startRegistered(host)
+        let viewer = try await connectViewer(control, circuit: "c1")
+        viewer.socket.stallDataSends = true
+        let piece = Data(repeating: 0x41, count: 64 * 1024)
+        var maxBacklog = 0
+        for _ in 0..<48 { // 3 MiB against a stalled socket
+            source.emit(pane: "p1", piece)
+            try await Task.sleep(for: .milliseconds(2))
+            maxBacklog = max(maxBacklog, await host.backlogBytes("c1") ?? 0)
+        }
+        try await shareEventually { await host.isResyncing("c1") }
+        XCTAssertLessThanOrEqual(maxBacklog, ShareHost.maxBacklogBytes)
+        XCTAssertGreaterThan(maxBacklog, 0)
+        viewer.socket.unstall()
+        let replay = ShareMessage.replay(pane: "p1", cols: 80, rows: 24, data: Data("\u{1b}[2Jp1-screen".utf8))
+        try await shareEventually { viewer.messages().dropFirst(2).contains(replay) }
+        XCTAssertLessThan(viewer.outBytes(pane: "p1").count, 48 * piece.count, "backlog was dropped")
+        let backlog = await host.backlogBytes("c1")
+        XCTAssertEqual(backlog, 0)
+        let resyncing = await host.isResyncing("c1")
+        XCTAssertFalse(resyncing)
+        source.emit(pane: "p1", Data("after".utf8))
+        try await shareEventually { viewer.messages().last == .out(pane: "p1", data: Data("after".utf8)) }
+        XCTAssertFalse(viewer.socket.isClosed)
+        await host.stop(reason: .revoked)
+    }
+
+    func testRepeatedResyncsEndCircuit() async throws {
+        let host = makeHost()
+        let control = try await startRegistered(host)
+        let viewer = try await connectViewer(control, circuit: "c1")
+        let flood = Data(repeating: 0x42, count: ShareHost.maxBacklogBytes + 1)
+        func replays() -> Int { viewer.messages().filter { if case .replay = $0 { true } else { false } }.count }
+        for round in 1...3 {
+            source.emit(pane: "p1", flood) // overflows the pump buffer -> resync -> replay
+            try await shareEventually { replays() == 1 + round }
+        }
+        XCTAssertFalse(viewer.socket.isClosed)
+        source.emit(pane: "p1", flood) // 4th resync within 10 s
+        try await shareEventually { viewer.socket.isClosed }
+        try await shareEventually { await host.viewers.isEmpty }
+        XCTAssertEqual(source.subscriberCount(pane: "p1"), 0)
+        await host.stop(reason: .revoked)
+    }
+
+    func testOutputPumpIsBoundedAndStartsPaused() async throws {
+        let flushes = LockedBox<[ShareOutputPump.Flush]>([])
+        let pump = ShareOutputPump(limit: 100, interval: .milliseconds(1)) { flush in flushes.mutate { $0.append(flush) } }
+        pump.push(Data(repeating: 1, count: 60))
+        try await Task.sleep(for: .milliseconds(15))
+        XCTAssertTrue(flushes.value.isEmpty, "paused until resume")
+        pump.push(Data(repeating: 2, count: 60)) // 120 > 100: buffer discarded
+        XCTAssertEqual(pump.bufferedBytes, 0)
+        pump.push(Data(repeating: 3, count: 30))
+        XCTAssertLessThanOrEqual(pump.bufferedBytes, 100)
+        pump.resume()
+        try await shareEventually { !flushes.value.isEmpty }
+        XCTAssertEqual(flushes.value, [.overflow])
+        pump.push(Data([9]))
+        try await shareEventually { flushes.value.count == 2 }
+        XCTAssertEqual(flushes.value.last, .data(Data([9])))
+        pump.cancel()
+    }
+
+    func testSelectUnknownPaneKeepsStream() async throws {
+        let host = makeHost()
+        let control = try await startRegistered(host)
+        let viewer = try await connectViewer(control, circuit: "c1")
+        viewer.send(.select(pane: "nope"))
+        viewer.send(.select(pane: "p1")) // sentinel: processed after "nope"
+        try await shareEventually { viewer.messages().count >= 3 }
+        XCTAssertEqual(source.subscriberCount(pane: "p1"), 1)
+        source.emit(pane: "p1", Data("still".utf8))
+        try await shareEventually { viewer.messages().last == .out(pane: "p1", data: Data("still".utf8)) }
+        XCTAssertEqual(viewer.messages().filter { if case .replay = $0 { true } else { false } }.count, 2)
+        await host.stop(reason: .revoked)
+    }
+
+    func testMissingPongFailsControlAfter25s() async throws {
+        let host = makeHost()
+        let control = try await startRegistered(host)
+        clock.advance(by: 10)
+        try await shareEventually { control.sentControls.contains(.ping(nonce: 1)) }
+        clock.advance(by: 24)
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertFalse(control.isClosed)
+        clock.advance(by: 1)
+        try await shareEventually { control.isClosed }
+        let registered = await host.isRegistered
+        XCTAssertFalse(registered)
+        await host.stop(reason: .revoked)
+    }
+
+    func testPongKeepsControl() async throws {
+        let host = makeHost()
+        let control = try await startRegistered(host)
+        control.autoPong = true
+        for _ in 0..<6 {
+            let pings = control.pingCount
+            clock.advance(by: 10)
+            try await shareEventually { await host.lastPongNonce == UInt64(pings + 1) }
+        }
+        XCTAssertFalse(control.isClosed)
+        await host.stop(reason: .revoked)
+    }
+
+    func testExpiredShareRefusesWelcomeAndInput() async throws {
+        let expires = clock.now.addingTimeInterval(60)
+        let host = makeHost(permission: .type, expiresAt: expires)
+        let control = try await startRegistered(host)
+        let typing = try await connectViewer(control, circuit: "c1")
+        let late = try await connectViewer(control, circuit: "c2", sendHello: false)
+        clock.set(now: expires) // the expiry timer has not run yet
+        typing.send(.input(pane: "p1", data: Data("x".utf8)))
+        try await shareEventually { await host.droppedInputCount == 1 }
+        XCTAssertTrue(source.inputs.isEmpty)
+        late.send(.hello(nonce: late.nonce, label: "late"))
+        try await shareEventually { late.socket.isClosed }
+        XCTAssertEqual(late.messages(), [.bye(.expired)])
+        await host.stop(reason: .expired)
+    }
+
+    func testViewerSurvivesReRegister() async throws {
+        let host = makeHost()
+        let first = try await startRegistered(host)
+        first.autoPong = true
+        let viewer = try await connectViewer(first, circuit: "c1")
+        for _ in 0..<9 {
+            let pings = first.pingCount
+            clock.advance(by: 10)
+            try await shareEventually { await host.lastPongNonce == UInt64(pings + 1) }
+        }
+        let second = try await relay.socket(2) // 0 control, 1 circuit, 2 new control
+        try await shareEventually { !second.sentControls.isEmpty }
+        second.feed(.text(ShareRelayControl.registered(leaseSeconds: 30).encoded()))
+        try await shareEventually { first.isClosed }
+        source.emit(pane: "p1", Data("after-rotate".utf8))
+        try await shareEventually { viewer.messages().last == .out(pane: "p1", data: Data("after-rotate".utf8)) }
+        XCTAssertFalse(viewer.socket.isClosed)
+        let viewers = await host.viewers
+        XCTAssertEqual(viewers.map(\.id), ["c1"])
+        await host.stop(reason: .revoked)
+    }
+
+    func testIdleCircuitGetsKeepaliveAt60s() async throws {
+        let host = makeHost()
+        let control = try await startRegistered(host)
+        control.autoPong = true
+        let viewer = try await connectViewer(control, circuit: "c1")
+        source.emit(pane: "p1", Data("x".utf8))
+        try await shareEventually { viewer.messages().count == 3 } // welcome, replay, out (all at t=0)
+        clock.advance(by: 59)
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(viewer.messages().count, 3, "no ka before 60 s idle")
+        clock.advance(by: 1)
+        try await shareEventually { viewer.messages().count == 4 }
+        XCTAssertEqual(viewer.messages().last, .ka)
+        clock.advance(by: 30)
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertEqual(viewer.messages().count, 4)
+        clock.advance(by: 30)
+        try await shareEventually { viewer.messages().count == 5 }
+        XCTAssertEqual(viewer.messages().last, .ka)
+        await host.stop(reason: .revoked)
+    }
 }
 
 // MARK: - Test doubles
@@ -374,6 +544,14 @@ private func shareEventually(_ file: StaticString = #filePath, line: UInt = #lin
     throw CancellationError()
 }
 
+final class LockedBox<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: T
+    init(_ value: T) { stored = value }
+    var value: T { lock.withLock { stored } }
+    func mutate(_ body: (inout T) -> Void) { lock.withLock { body(&stored) } }
+}
+
 /// Virtual time: `sleep(until:)` suspends until `advance` passes the deadline.
 final class ManualShareClock: ShareSleeper, @unchecked Sendable {
     private let lock = NSLock()
@@ -385,6 +563,9 @@ final class ManualShareClock: ShareSleeper, @unchecked Sendable {
     var now: Date { lock.withLock { current } }
     var pendingCount: Int { lock.withLock { waiters.count } }
     var pendingDeadlines: [Date] { lock.withLock { waiters.values.map(\.0).sorted() } }
+
+    /// Moves time without waking sleepers (a timer that has not run yet).
+    func set(now date: Date) { lock.withLock { current = date } }
 
     func advance(by seconds: TimeInterval) { advance(to: now.addingTimeInterval(seconds)) }
 
@@ -425,6 +606,30 @@ final class FakeSocket: ShareSocket, @unchecked Sendable {
     private var closed = false
     private var sent: [ShareSocketMessage] = []
     private var sentAtClose = -1
+    private var stalled: [CheckedContinuation<Void, Error>] = []
+    private var stalling = false
+    private var pongs = false
+
+    /// While true, `send(data:)` suspends until `unstall()` or `close()`.
+    var stallDataSends: Bool {
+        get { lock.withLock { stalling } }
+        set { lock.withLock { stalling = newValue } }
+    }
+    /// Answers every `ping` with a `pong`, as the relay does.
+    var autoPong: Bool {
+        get { lock.withLock { pongs } }
+        set { lock.withLock { pongs = newValue } }
+    }
+    var pingCount: Int { sentControls.filter { if case .ping = $0 { true } else { false } }.count }
+
+    func unstall() {
+        let waiting: [CheckedContinuation<Void, Error>] = lock.withLock {
+            stalling = false
+            defer { stalled = [] }
+            return stalled
+        }
+        for c in waiting { c.resume() }
+    }
 
     init(url: URL) { self.url = url }
 
@@ -445,8 +650,24 @@ final class FakeSocket: ShareSocket, @unchecked Sendable {
         w?.resume(returning: message)
     }
 
-    func send(text: String) async throws { try record(.text(text)) }
-    func send(data: Data) async throws { try record(.data(data)) }
+    func send(text: String) async throws {
+        try record(.text(text))
+        if autoPong, case .ping(let n)? = ShareRelayControl.decode(text) {
+            feed(.text(ShareRelayControl.pong(nonce: n).encoded()))
+        }
+    }
+
+    func send(data: Data) async throws {
+        try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
+            let wait: Bool = lock.withLock {
+                guard stalling, !closed else { return false }
+                stalled.append(c)
+                return true
+            }
+            if !wait { c.resume() }
+        }
+        try record(.data(data))
+    }
 
     private func record(_ m: ShareSocketMessage) throws {
         try lock.withLock {
@@ -468,12 +689,13 @@ final class FakeSocket: ShareSocket, @unchecked Sendable {
     }
 
     func close() {
-        let w: CheckedContinuation<ShareSocketMessage, Error>? = lock.withLock {
+        let (w, waiting): (CheckedContinuation<ShareSocketMessage, Error>?, [CheckedContinuation<Void, Error>]) = lock.withLock {
             if !closed { closed = true; sentAtClose = sent.count }
-            defer { waiter = nil }
-            return waiter
+            defer { waiter = nil; stalled = [] }
+            return (waiter, stalled)
         }
         w?.resume(throwing: URLError(.networkConnectionLost))
+        for c in waiting { c.resume(throwing: URLError(.networkConnectionLost)) }
     }
 }
 

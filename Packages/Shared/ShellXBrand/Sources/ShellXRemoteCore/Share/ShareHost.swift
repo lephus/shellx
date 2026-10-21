@@ -4,20 +4,30 @@ import os
 /// The host side of one share link: registers the share's own slot on relay2 and serves one
 /// encrypted circuit per viewer, enforcing the share's permission and expiry.
 ///
-/// Control socket: `register` -> `registered`, `ping` every 10 s, a fresh socket and `register`
-/// every 90 s (the old one is closed after the new `registered`), backoff 1/2/4/8/16/30 s on errors.
+/// Control socket: `register` -> `registered`, `ping` every 10 s (no `pong` within 25 s fails the
+/// socket), a fresh socket and `register` every 90 s (the old one is closed after the new
+/// `registered`), backoff 1/2/4/8/16/30 s on errors.
 /// Circuit: `incoming` -> new socket -> `join(role: daemon)` -> `ready` -> wait <= 10 s for `hello`
 /// (anything else is dropped) -> `welcome` + `replay` of the active pane -> `out`/`size` of the
-/// viewer's selected pane only.
+/// viewer's selected pane only, and `ka` after 60 s without traffic.
+/// Slow viewers: once more than `maxBacklogBytes` of `out` is queued, the queued and buffered
+/// output is discarded and a fresh `replay` follows when the writer drains (drop-to-replay);
+/// more than 3 resyncs in 10 s ends the circuit.
 public actor ShareHost {
     static let pingInterval: TimeInterval = 10
+    static let pongTimeout: TimeInterval = 25
     static let reRegisterInterval: TimeInterval = 90
     static let registerTimeout: TimeInterval = 10
     static let helloTimeout: TimeInterval = 10
+    static let keepaliveInterval: TimeInterval = 60
     static let maxInputBytes = 4 * 1024
     static let maxLabelCharacters = 40
     /// Raw bytes per `out`/`replay` frame; base64 + JSON keeps the plaintext under 48 KiB.
     static let chunkBytes = 32 * 1024
+    /// Per circuit: queued frames and the output pump buffer each stay at or below this.
+    static let maxBacklogBytes = 1024 * 1024
+    static let maxResyncs = 3
+    static let resyncWindow: TimeInterval = 10
 
     private let shareID: String
     private let slot: String
@@ -34,7 +44,7 @@ public actor ShareHost {
     public nonisolated let viewerStream: AsyncStream<[ShareViewer]>
     private let viewerContinuation: AsyncStream<[ShareViewer]>.Continuation
 
-    /// `in` frames refused: view-only share, unknown or non-terminal pane, or over 4 KiB.
+    /// `in` frames refused: view-only or expired share, unknown or non-terminal pane, or over 4 KiB.
     public private(set) var droppedInputCount = 0
     /// Frames that failed to open, or were not `hello` before the handshake.
     public private(set) var droppedFrameCount = 0
@@ -50,27 +60,47 @@ public actor ShareHost {
     private var controlGeneration = 0
     private var attempt = 0
     private var pingNonce: UInt64 = 0
+    private(set) var lastPongNonce: UInt64 = 0
     private var registerTimer: Int?
     private var pingTimer: Int?
 
     private enum Stage { case joining, awaitingHello, live }
+
+    /// One queued frame; `outEpoch` marks droppable `out` data.
+    private struct Outgoing: Sendable {
+        let message: ShareSocketMessage
+        let bytes: Int
+        let outEpoch: Int?
+    }
+
     private struct Circuit {
+        let serial: Int
         let socket: any ShareSocket
-        let outbox: AsyncStream<ShareSocketMessage>.Continuation
+        let outbox: AsyncStream<Outgoing>.Continuation
         let writer: Task<Void, Never>
         var cipher: ShareCipher
         var stage = Stage.joining
         var helloTimer: Int?
+        var keepaliveTimer: Int?
+        var lastSentAt: Date
         var viewer: ShareViewer?
         var pane: String?
         var subscription: ShareSubscription?
+        var pump: ShareOutputPump?
         var subscriptionGeneration = 0
+        var queuedBytes = 0
+        var queuedItems = 0
+        var outEpoch = 0
+        var resyncPending = false
+        var resyncTimes: [Date] = []
     }
     private var circuits: [String: Circuit] = [:]
+    private var nextCircuitSerial = 0
     private var knownPanes: [SharePane] = []
 
     private enum TimerAction: Sendable {
-        case ping(Int), reRegister(Int), registerTimeout(Int), reconnect, helloTimeout(String), expiry
+        case ping(Int), pongTimeout(Int, UInt64), reRegister(Int), registerTimeout(Int), reconnect
+        case helloTimeout(String, Int), keepalive(String, Int), expiry
     }
     private var timers: [Int: Task<Void, Never>] = [:]
     private var nextTimerID = 0
@@ -98,6 +128,10 @@ public actor ShareHost {
     }
 
     var isRegistered: Bool { current != nil }
+    func backlogBytes(_ id: String) -> Int? { circuits[id]?.queuedBytes }
+    func isResyncing(_ id: String) -> Bool { circuits[id]?.resyncPending ?? false }
+
+    private var isExpired: Bool { expiresAt.map { clock() >= $0 } ?? false }
 
     // MARK: Lifecycle
 
@@ -163,13 +197,16 @@ public actor ShareHost {
         guard timers.removeValue(forKey: id) != nil, running else { return }
         switch action {
         case .ping(let generation): await ping(generation)
+        case .pongTimeout(let generation, let nonce):
+            if current?.generation == generation, lastPongNonce < nonce { controlFailed(generation) }
         case .reRegister(let generation):
             if current?.generation == generation, connectingGeneration == nil { connectControl() }
         case .registerTimeout(let generation):
             if pending?.generation == generation { controlFailed(generation) }
         case .reconnect: connectControl()
-        case .helloTimeout(let circuit):
-            if circuits[circuit]?.stage != .live { _ = await endCircuit(circuit, bye: nil) }
+        case .helloTimeout(let circuit, let serial):
+            if let c = circuits[circuit], c.serial == serial, c.stage != .live { _ = await endCircuit(circuit, bye: nil) }
+        case .keepalive(let circuit, let serial): keepalive(circuit, serial: serial)
         case .expiry:
             await stop(reason: .expired) // this timer is already untracked, so stop cannot cancel it
         }
@@ -224,12 +261,15 @@ public actor ShareHost {
             pending = nil
             connectingGeneration = nil
             attempt = 0
+            lastPongNonce = pingNonce // pings sent on the old socket are not owed a pong here
             cancelTimer(registerTimer); registerTimer = nil
             old?.socket.close()
             cancelTimer(pingTimer)
             let now = clock()
             pingTimer = schedule(.ping(generation), at: now + Self.pingInterval)
             schedule(.reRegister(generation), at: now + Self.reRegisterInterval)
+        case .pong(let nonce):
+            if current?.generation == generation { lastPongNonce = max(lastPongNonce, nonce) }
         case .incoming(let circuit, let lane, let circuitGeneration, let joinTicket):
             openCircuit(circuit, lane: lane, generation: circuitGeneration, joinTicket: joinTicket)
         case .error:
@@ -242,9 +282,12 @@ public actor ShareHost {
     private func ping(_ generation: Int) async {
         guard let control = current, control.generation == generation else { return }
         pingNonce += 1
-        pingTimer = schedule(.ping(generation), at: clock() + Self.pingInterval)
+        let nonce = pingNonce
+        let now = clock()
+        pingTimer = schedule(.ping(generation), at: now + Self.pingInterval)
+        schedule(.pongTimeout(generation, nonce), at: now + Self.pongTimeout)
         do {
-            try await control.socket.send(text: ShareRelayControl.ping(nonce: pingNonce).encoded())
+            try await control.socket.send(text: ShareRelayControl.ping(nonce: nonce).encoded())
         } catch {
             controlFailed(generation)
         }
@@ -283,48 +326,60 @@ public actor ShareHost {
 
     private func attachCircuit(_ id: String, socket: any ShareSocket, join: ShareRelayControl) {
         guard running, circuits[id] == nil else { socket.close(); return }
-        let (outbox, continuation) = AsyncStream.makeStream(of: ShareSocketMessage.self)
+        nextCircuitSerial += 1
+        let serial = nextCircuitSerial
+        let (outbox, continuation) = AsyncStream.makeStream(of: Outgoing.self)
         let writer = Task {
-            do {
-                for await message in outbox {
-                    switch message {
+            for await item in outbox {
+                if let epoch = item.outEpoch, self.isStale(id, serial, outEpoch: epoch) {
+                    await self.dequeued(id, serial, bytes: item.bytes)
+                    continue
+                }
+                do {
+                    switch item.message {
                     case .text(let text): try await socket.send(text: text)
                     case .data(let data): try await socket.send(data: data)
                     }
+                } catch {
+                    await self.circuitFailed(id, serial)
+                    break
                 }
-            } catch {
-                await self.circuitFailed(id, socket)
+                await self.dequeued(id, serial, bytes: item.bytes)
             }
             socket.close()
         }
-        circuits[id] = Circuit(socket: socket, outbox: continuation, writer: writer,
-                               cipher: ShareCipher(sendKey: keys.hostToViewer, receiveKey: keys.viewerToHost, circuit: id))
-        continuation.yield(.text(join.encoded()))
+        circuits[id] = Circuit(serial: serial, socket: socket, outbox: continuation, writer: writer,
+                               cipher: ShareCipher(sendKey: keys.hostToViewer, receiveKey: keys.viewerToHost, circuit: id),
+                               lastSentAt: clock())
+        let text = join.encoded()
+        enqueue(id, Outgoing(message: .text(text), bytes: text.utf8.count, outEpoch: nil))
         Task {
             do {
-                while true { await self.handleCircuit(id, socket, try await socket.receive()) }
+                while true { await self.handleCircuit(id, serial, try await socket.receive()) }
             } catch {
-                await self.circuitFailed(id, socket)
+                await self.circuitFailed(id, serial)
             }
         }
     }
 
-    private func isCurrent(_ id: String, _ socket: any ShareSocket) -> Bool {
-        guard let circuit = circuits[id] else { return false }
-        return circuit.socket as AnyObject === socket as AnyObject
+    private func isLive(_ id: String, _ serial: Int) -> Bool { circuits[id]?.serial == serial }
+
+    private func isStale(_ id: String, _ serial: Int, outEpoch: Int) -> Bool {
+        guard let circuit = circuits[id], circuit.serial == serial else { return true }
+        return outEpoch < circuit.outEpoch
     }
 
-    private func circuitFailed(_ id: String, _ socket: any ShareSocket) async {
-        if isCurrent(id, socket) { _ = await endCircuit(id, bye: nil) }
+    private func circuitFailed(_ id: String, _ serial: Int) async {
+        if isLive(id, serial) { _ = await endCircuit(id, bye: nil) }
     }
 
-    private func handleCircuit(_ id: String, _ socket: any ShareSocket, _ message: ShareSocketMessage) async {
-        guard running, isCurrent(id, socket), var circuit = circuits[id] else { return }
+    private func handleCircuit(_ id: String, _ serial: Int, _ message: ShareSocketMessage) async {
+        guard running, var circuit = circuits[id], circuit.serial == serial else { return }
         switch message {
         case .text(let text):
             if circuit.stage == .joining, case .ready = ShareRelayControl.decode(text) {
                 circuit.stage = .awaitingHello
-                circuit.helloTimer = schedule(.helloTimeout(id), at: clock() + Self.helloTimeout)
+                circuit.helloTimer = schedule(.helloTimeout(id, serial), at: clock() + Self.helloTimeout)
                 circuits[id] = circuit
             } else {
                 _ = await endCircuit(id, bye: nil) // relay error, or text on a paired circuit
@@ -352,12 +407,17 @@ public actor ShareHost {
         cancelTimer(circuit.helloTimer)
         circuit.helloTimer = nil
         circuit.cipher.setViewerNonce(viewerNonce)
-        circuit.viewer = ShareViewer(id: id, label: String(label.prefix(Self.maxLabelCharacters)), connectedAt: clock())
         circuits[id] = circuit
+        guard !isExpired else {
+            _ = await endCircuit(id, bye: .expired) // sealed under the welcome-stage AAD
+            return
+        }
+        circuits[id]?.viewer = ShareViewer(id: id, label: String(label.prefix(Self.maxLabelCharacters)),
+                                           connectedAt: clock())
         publishViewers()
         let source = self.source
         let (panes, active) = await MainActor.run { (source.panes, source.activePane) }
-        guard circuits[id] != nil else { return }
+        guard circuits[id]?.serial == circuit.serial else { return }
         knownPanes = panes
         let activeID = active ?? panes.first?.id ?? ""
         let hostNonce = Data((0..<16).map { _ in UInt8.random(in: 0...255) })
@@ -366,22 +426,17 @@ public actor ShareHost {
         circuits[id]?.cipher.setHostNonce(hostNonce)
         // Live only after welcome, so a concurrent `panes` broadcast cannot precede it.
         circuits[id]?.stage = .live
+        scheduleKeepalive(id)
         await select(id, pane: activeID)
     }
 
-    /// Switches the circuit's stream to `pane` and sends its `replay`; unknown panes are ignored.
+    /// Switches the circuit's stream to `pane` and sends its `replay`. An unknown pane changes nothing.
     private func select(_ id: String, pane: String) async {
-        guard var circuit = circuits[id] else { return }
-        circuit.subscriptionGeneration += 1
-        let generation = circuit.subscriptionGeneration
-        let old = circuit.subscription
-        circuit.subscription = nil
-        circuit.pane = nil
-        circuits[id] = circuit
-        await old?.release()
-
-        let pump = ShareOutputPump(interval: coalesceInterval) { [weak self] data in
-            await self?.deliver(id, generation: generation, data: data)
+        guard let circuit = circuits[id] else { return }
+        let serial = circuit.serial
+        let generation = circuit.subscriptionGeneration + 1
+        let pump = ShareOutputPump(limit: Self.maxBacklogBytes, interval: coalesceInterval) { [weak self] flush in
+            await self?.deliver(id, serial, generation: generation, flush)
         }
         let source = self.source
         let result = await MainActor.run { () -> (SharePane, (cols: Int, rows: Int, vt: Data)?, ShareSubscription?)? in
@@ -392,41 +447,119 @@ public actor ShareHost {
             return (info, snapshot, ShareSubscription(token: token, pump: pump))
         }
         guard let (info, snapshot, subscription) = result else { pump.cancel(); return }
-        guard circuits[id]?.subscriptionGeneration == generation else {
+        guard var updated = circuits[id], updated.serial == serial, updated.subscriptionGeneration == generation - 1 else {
             await subscription?.release()
+            pump.cancel()
             return
         }
-        circuits[id]?.pane = pane
-        circuits[id]?.subscription = subscription
+        let old = updated.subscription
+        updated.subscriptionGeneration = generation
+        updated.pane = pane
+        updated.subscription = subscription
+        updated.pump = subscription == nil ? nil : pump
+        updated.resyncPending = false
+        updated.outEpoch += 1 // output of the previous pane still queued is now stale
+        circuits[id] = updated
         if subscription == nil { pump.cancel() }
         let vt = snapshot?.vt ?? Data()
         send(id, .replay(pane: pane, cols: snapshot?.cols ?? info.cols, rows: snapshot?.rows ?? info.rows,
                          data: vt.prefix(Self.chunkBytes)))
-        sendOut(id, pane: pane, vt.dropFirst(Self.chunkBytes))
+        sendOut(id, pane: pane, vt.dropFirst(Self.chunkBytes), droppable: false)
+        pump.resume() // only now, so nothing flushed before the replay is lost
+        await old?.release()
     }
 
-    private func deliver(_ id: String, generation: Int, data: Data) {
-        guard let circuit = circuits[id], circuit.subscriptionGeneration == generation, let pane = circuit.pane else { return }
-        sendOut(id, pane: pane, data)
+    private func deliver(_ id: String, _ serial: Int, generation: Int, _ flush: ShareOutputPump.Flush) {
+        guard let circuit = circuits[id], circuit.serial == serial, circuit.subscriptionGeneration == generation,
+              let pane = circuit.pane else { return }
+        switch flush {
+        case .data(let data): sendOut(id, pane: pane, data, droppable: true)
+        case .overflow: resync(id)
+        }
     }
 
-    private func sendOut(_ id: String, pane: String, _ data: Data) {
+    private func sendOut(_ id: String, pane: String, _ data: Data, droppable: Bool) {
         var offset = data.startIndex
         while offset < data.endIndex {
+            guard let circuit = circuits[id] else { return }
+            if droppable, circuit.resyncPending { return }
             let end = data.index(offset, offsetBy: Self.chunkBytes, limitedBy: data.endIndex) ?? data.endIndex
-            send(id, .out(pane: pane, data: Data(data[offset..<end])))
+            guard let frame = seal(id, .out(pane: pane, data: Data(data[offset..<end]))) else { return }
+            if droppable, circuit.queuedBytes + frame.count > Self.maxBacklogBytes {
+                resync(id) // the sealed frame is discarded; the viewer tolerates the seq gap
+                return
+            }
+            enqueue(id, Outgoing(message: .data(frame), bytes: frame.count, outEpoch: droppable ? circuit.outEpoch : nil))
             offset = end
         }
     }
 
     private func send(_ id: String, _ message: ShareMessage) {
-        guard var circuit = circuits[id], let frame = try? circuit.cipher.seal(message) else { return }
+        guard let frame = seal(id, message) else { return }
+        enqueue(id, Outgoing(message: .data(frame), bytes: frame.count, outEpoch: nil))
+    }
+
+    private func seal(_ id: String, _ message: ShareMessage) -> Data? {
+        guard var circuit = circuits[id], let frame = try? circuit.cipher.seal(message) else { return nil }
+        circuit.lastSentAt = clock()
         circuits[id] = circuit
-        circuit.outbox.yield(.data(frame))
+        return frame
+    }
+
+    private func enqueue(_ id: String, _ item: Outgoing) {
+        guard var circuit = circuits[id] else { return }
+        circuit.queuedBytes += item.bytes
+        circuit.queuedItems += 1
+        circuits[id] = circuit
+        circuit.outbox.yield(item)
+    }
+
+    private func dequeued(_ id: String, _ serial: Int, bytes: Int) async {
+        guard var circuit = circuits[id], circuit.serial == serial else { return }
+        circuit.queuedBytes -= bytes
+        circuit.queuedItems -= 1
+        circuits[id] = circuit
+        if circuit.resyncPending, circuit.queuedItems == 0, let pane = circuit.pane {
+            await select(id, pane: pane) // drained: fresh replay, resubscribed
+        }
+    }
+
+    /// Drop-to-replay: discards queued and buffered output; the replay follows once the writer drains.
+    private func resync(_ id: String) {
+        guard var circuit = circuits[id], !circuit.resyncPending else { return }
+        let now = clock()
+        circuit.resyncTimes = circuit.resyncTimes.filter { now.timeIntervalSince($0) < Self.resyncWindow } + [now]
+        guard circuit.resyncTimes.count <= Self.maxResyncs else {
+            circuit.socket.close() // hard ceiling: the reader/writer failure ends the circuit
+            let serial = circuit.serial
+            Task { await self.circuitFailed(id, serial) }
+            return
+        }
+        circuit.resyncPending = true
+        circuit.outEpoch += 1
+        circuit.pump?.discard()
+        circuits[id] = circuit
+        if circuit.queuedItems == 0, let pane = circuit.pane {
+            Task { await self.select(id, pane: pane) }
+        }
+    }
+
+    private func scheduleKeepalive(_ id: String) {
+        guard var circuit = circuits[id] else { return }
+        cancelTimer(circuit.keepaliveTimer)
+        circuit.keepaliveTimer = schedule(.keepalive(id, circuit.serial),
+                                          at: circuit.lastSentAt + Self.keepaliveInterval)
+        circuits[id] = circuit
+    }
+
+    private func keepalive(_ id: String, serial: Int) {
+        guard let circuit = circuits[id], circuit.serial == serial, circuit.stage == .live else { return }
+        if clock().timeIntervalSince(circuit.lastSentAt) >= Self.keepaliveInterval { send(id, .ka) }
+        scheduleKeepalive(id)
     }
 
     private func input(pane: String, data: Data) async {
-        guard permission == .type, data.count <= Self.maxInputBytes else { droppedInputCount += 1; return }
+        guard permission == .type, !isExpired, data.count <= Self.maxInputBytes else { droppedInputCount += 1; return }
         let source = self.source
         let written = await MainActor.run { () -> Bool in
             guard source.panes.first(where: { $0.id == pane })?.kind == .terminal else { return false }
@@ -439,10 +572,13 @@ public actor ShareHost {
     /// Removes the circuit; with a reason, the viewer gets `bye` before the socket closes.
     private func endCircuit(_ id: String, bye: ShareByeReason?) async -> (any ShareSocket, Task<Void, Never>)? {
         guard var circuit = circuits[id] else { return nil }
-        if let bye, let frame = try? circuit.cipher.seal(.bye(bye)) { circuit.outbox.yield(.data(frame)) }
+        if let bye, let frame = try? circuit.cipher.seal(.bye(bye)) {
+            circuit.outbox.yield(Outgoing(message: .data(frame), bytes: frame.count, outEpoch: nil))
+        }
         circuits[id] = nil
         circuit.outbox.finish()
         cancelTimer(circuit.helloTimer)
+        cancelTimer(circuit.keepaliveTimer)
         if circuit.viewer != nil { publishViewers() }
         await circuit.subscription?.release()
         return (circuit.socket, circuit.writer)
@@ -473,33 +609,65 @@ public actor ShareHost {
 
 // MARK: - Output plumbing
 
-/// Coalesces pane output: `push` only appends under a lock (safe on the libghostty IO thread);
-/// one consumer task flushes at most every `interval`, off the main actor.
+/// Coalesces pane output: `push` only appends under a lock (safe on the libghostty IO thread) and
+/// never holds more than `limit` bytes (past it, the buffer is discarded and `overflow` is
+/// flushed instead). One consumer task, started paused until `resume()`, flushes at most every
+/// `interval`, off the main actor.
 final class ShareOutputPump: Sendable {
-    private let buffer = OSAllocatedUnfairLock(initialState: Data())
+    enum Flush: Sendable, Equatable { case data(Data), overflow }
+
+    private struct Buffer { var data = Data(); var overflowed = false }
+    private let buffer = OSAllocatedUnfairLock(initialState: Buffer())
+    private let limit: Int
     private let signal: AsyncStream<Void>.Continuation
+    private let gate: AsyncStream<Void>.Continuation
     private let consumer: Task<Void, Never>
 
-    init(interval: Duration, flush: @escaping @Sendable (Data) async -> Void) {
+    init(limit: Int, interval: Duration, flush: @escaping @Sendable (Flush) async -> Void) {
+        self.limit = limit
         let (signals, signal) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
+        let (gates, gate) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
         self.signal = signal
+        self.gate = gate
         let buffer = self.buffer
         consumer = Task.detached {
+            for await _ in gates { break }
             for await _ in signals {
                 try? await Task.sleep(for: interval)
                 if Task.isCancelled { return }
-                let data = buffer.withLock { b -> Data in defer { b = Data() }; return b }
-                if !data.isEmpty { await flush(data) }
+                let taken = buffer.withLock { b -> Buffer in defer { b = Buffer() }; return b }
+                if taken.overflowed {
+                    await flush(.overflow)
+                } else if !taken.data.isEmpty {
+                    await flush(.data(taken.data))
+                }
             }
         }
     }
 
+    var bufferedBytes: Int { buffer.withLock { $0.data.count } }
+
     func push(_ data: Data) {
-        buffer.withLock { $0.append(data) }
+        let limit = self.limit
+        buffer.withLock { b in
+            if b.overflowed { return }
+            if b.data.count + data.count > limit {
+                b.data = Data()
+                b.overflowed = true
+            } else {
+                b.data.append(data)
+            }
+        }
         signal.yield()
     }
 
+    /// Drops buffered output (the host is resyncing).
+    func discard() { buffer.withLock { $0 = Buffer() } }
+
+    func resume() { gate.yield() }
+
     func cancel() {
+        gate.finish()
         signal.finish()
         consumer.cancel()
     }
