@@ -101,7 +101,7 @@ describe("migrate", () => {
   it("applies every migration once, in file-name order, and records them", () => {
     const db = openFresh();
     try {
-      const all = ["0001_init.sql", "0002_hub_state.sql", "0003_push_tokens.sql", "0004_admin.sql"];
+      const all = ["0001_init.sql", "0002_hub_state.sql", "0003_push_tokens.sql", "0004_admin.sql", "0005_relay_v2.sql"];
       expect(migrate(db)).toEqual(all);
       const rows = db.all<{ name: string; applied_at: number }>("SELECT name, applied_at FROM schema_migrations ORDER BY name");
       expect(rows.map((r) => r.name)).toEqual(all);
@@ -153,6 +153,75 @@ describe("migrate", () => {
       expect(() => migrate(db, dir)).toThrow(expect.objectContaining({ code: "SQLITE_ERROR" }));
       expect(db.all<{ name: string }>("SELECT name FROM schema_migrations").map((r) => r.name)).toEqual(["0001_ok.sql"]);
       expect(db.get("SELECT 1 FROM sqlite_master WHERE name = 'half'")).toBeUndefined();
+    } finally {
+      db.close();
+    }
+  });
+
+  it("a foreign_keys=off migration that leaves a dangling reference is rolled back and foreign keys are on again", () => {
+    const dir = join(tempDir(), "dangling");
+    mkdirSync(dir);
+    writeFileSync(
+      join(dir, "0001_base.sql"),
+      "CREATE TABLE devices (id TEXT PRIMARY KEY); CREATE TABLE tokens (device_id TEXT NOT NULL REFERENCES devices(id));",
+    );
+    writeFileSync(
+      join(dir, "0002_bad.sql"),
+      "-- migrate: foreign_keys=off\nINSERT INTO tokens (device_id) VALUES ('missing');\n",
+    );
+    const db = openFresh();
+    try {
+      expect(() => migrate(db, dir)).toThrow(/foreign_key_check/);
+      expect(db.all<{ name: string }>("SELECT name FROM schema_migrations").map((r) => r.name)).toEqual(["0001_base.sql"]);
+      expect(db.get("SELECT 1 FROM tokens")).toBeUndefined();
+      expect(db.get("PRAGMA foreign_keys")).toEqual({ foreign_keys: 1 });
+    } finally {
+      db.close();
+    }
+  });
+
+  it("refuses a DROP TABLE migration without the foreign_keys=off directive before executing anything", () => {
+    const dir = join(tempDir(), "droptrap");
+    mkdirSync(dir);
+    writeFileSync(
+      join(dir, "0001_base.sql"),
+      "CREATE TABLE devices (id TEXT PRIMARY KEY); CREATE TABLE tokens (device_id TEXT NOT NULL REFERENCES devices(id) ON DELETE CASCADE); INSERT INTO devices VALUES ('d'); INSERT INTO tokens VALUES ('d');",
+    );
+    const db = openFresh();
+    try {
+      migrate(db, dir);
+      writeFileSync(join(dir, "0002_rebuild.sql"), "CREATE TABLE side (x INTEGER);\ndrop table devices;\n");
+      expect(() => migrate(db, dir)).toThrow(/foreign_keys=off/);
+      expect(db.all("SELECT 1 FROM tokens")).toHaveLength(1);
+      expect(db.get("SELECT 1 FROM sqlite_master WHERE name = 'side'")).toBeUndefined();
+      expect(db.all<{ name: string }>("SELECT name FROM schema_migrations").map((r) => r.name)).toEqual(["0001_base.sql"]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("honours the directive behind a UTF-8 BOM and with trailing whitespace", () => {
+    const dir = join(tempDir(), "bom");
+    mkdirSync(dir);
+    writeFileSync(join(dir, "0001_probe.sql"), "\uFEFF-- migrate: foreign_keys=off  \t\r\nCREATE TABLE probe AS SELECT foreign_keys AS fk FROM pragma_foreign_keys;\r\n");
+    const db = openFresh();
+    try {
+      migrate(db, dir);
+      expect(db.get("SELECT fk FROM probe")).toEqual({ fk: 0 });
+      expect(db.get("PRAGMA foreign_keys")).toEqual({ foreign_keys: 1 });
+    } finally {
+      db.close();
+    }
+  });
+
+  it("a migration without the directive still runs with foreign keys on", () => {
+    const dir = join(tempDir(), "plain");
+    mkdirSync(dir);
+    writeFileSync(join(dir, "0001_probe.sql"), "CREATE TABLE probe AS SELECT foreign_keys AS fk FROM pragma_foreign_keys;");
+    const db = openFresh();
+    try {
+      migrate(db, dir);
+      expect(db.get("SELECT fk FROM probe")).toEqual({ fk: 1 });
     } finally {
       db.close();
     }

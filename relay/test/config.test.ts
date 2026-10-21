@@ -20,9 +20,16 @@ describe("loadConfig", () => {
       latestAgentVersion: "1.2.0",
       macUrl: REQUIRED.MAC_URL,
       winUrl: REQUIRED.WIN_URL,
+      minMacos: "2.0.0",
+      minWindows: "2.0.0",
+      nativeManifestDir: "/srv/downloads/desktop",
       rateLimitsEnabled: true,
       adminHost: "admin.shellx.pro",
       adminPassword: null,
+      relayHmacSecret: null,
+      relayV2DisabledReason: "missing_secret",
+      relayIssuer: "shellx-relay",
+      relayV2Url: "wss://relay.shellx.pro/v2/relay",
     });
   });
 
@@ -67,5 +74,45 @@ describe("loadConfig", () => {
       expect(() => loadConfig({ ...REQUIRED, PORT: port })).toThrow(`PORT must be an integer from 0 to 65535, got "${port}"`);
     }
     expect(loadConfig({ ...REQUIRED, PORT: "0" }).port).toBe(0);
+  });
+
+  describe("relay v2", () => {
+    const SECRET = "0123456789abcdef0123456789abcdef";
+    it("keeps the secret untrimmed (36 bytes with its spaces)", () => {
+      const c = loadConfig({ ...REQUIRED, CMUX_RELAY_HMAC_SECRET: `  ${SECRET}  ` });
+      expect(c.relayHmacSecret?.length).toBe(36);
+      expect(new TextDecoder().decode(c.relayHmacSecret!)).toBe(`  ${SECRET}  `);
+      expect(c.relayV2DisabledReason).toBeNull();
+    });
+    it("a 31-byte secret disables v2 without failing", () => {
+      const c = loadConfig({ ...REQUIRED, CMUX_RELAY_HMAC_SECRET: SECRET.slice(1) });
+      expect(c.relayHmacSecret).toBeNull();
+      expect(c.relayV2DisabledReason).toBe("short_secret");
+    });
+    it("unset or empty secret is missing_secret", () => {
+      expect(loadConfig(REQUIRED).relayV2DisabledReason).toBe("missing_secret");
+      expect(loadConfig({ ...REQUIRED, CMUX_RELAY_HMAC_SECRET: "" }).relayV2DisabledReason).toBe("missing_secret");
+    });
+    it("refuses a CMUX_RELAY_ISSUER with surrounding whitespace (cmux-relay reads it raw) without echoing it", () => {
+      expect(() => loadConfig({ ...REQUIRED, CMUX_RELAY_ISSUER: "shellx-relay " })).toThrow(ConfigError);
+      expect(() => loadConfig({ ...REQUIRED, CMUX_RELAY_ISSUER: " shellx-relay" })).toThrow(/CMUX_RELAY_ISSUER/);
+      try {
+        loadConfig({ ...REQUIRED, CMUX_RELAY_ISSUER: "sekret-issuer\t" });
+        expect.unreachable();
+      } catch (e) {
+        expect((e as Error).message).not.toContain("sekret-issuer");
+      }
+      expect(loadConfig({ ...REQUIRED, CMUX_RELAY_ISSUER: "shellx-relay" }).relayIssuer).toBe("shellx-relay");
+      expect(loadConfig(REQUIRED).relayIssuer).toBe("shellx-relay");
+    });
+
+    it("validates CMUX_RELAY_ISSUER and RELAY_V2_URL", () => {
+      expect(loadConfig({ ...REQUIRED, CMUX_RELAY_ISSUER: "x" }).relayIssuer).toBe("x");
+      expect(() => loadConfig({ ...REQUIRED, CMUX_RELAY_ISSUER: "a\nb" })).toThrow(ConfigError);
+      expect(() => loadConfig({ ...REQUIRED, CMUX_RELAY_ISSUER: "a".repeat(257) })).toThrow(ConfigError);
+      expect(loadConfig({ ...REQUIRED, RELAY_V2_URL: "ws://127.0.0.1:1/v1/relay" }).relayV2Url).toBe("ws://127.0.0.1:1/v1/relay");
+      expect(() => loadConfig({ ...REQUIRED, RELAY_V2_URL: "https://x" })).toThrow(ConfigError);
+      expect(() => loadConfig({ ...REQUIRED, RELAY_V2_URL: "nonsense" })).toThrow(ConfigError);
+    });
   });
 });

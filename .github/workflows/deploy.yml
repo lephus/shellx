@@ -154,6 +154,10 @@ jobs:
         run: ssh -F "$SSH_CONFIG" vps bash -s -- "$SHA" "$APP_DIR" < deploy/rollout.sh
 
       - name: Check the public endpoints (retries while a first certificate is issued)
+        env:
+          # Repository variable, set to true once relay2 is staged and enabled on the VPS
+          # (deploy/README.md, "Relay v2"). relay2-src/ is staged by hand, never by this workflow.
+          RELAY2_ENABLED: ${{ vars.RELAY2_ENABLED }}
         run: |
           check() {
             for attempt in $(seq 1 10); do
@@ -171,6 +175,44 @@ jobs:
           check https://shellx.pro/
           # 200 whether or not ADMIN_PASSWORD is set on the VPS ({"enabled": false} without it).
           check https://admin.shellx.pro/api/session
+
+          # Same retry loop, but on an exact status (and body).
+          check_status() { # url, accepted status codes (space separated), curl args...
+            local url="$1" accepted="$2" code
+            shift 2
+            for attempt in $(seq 1 10); do
+              code="$(curl -s --connect-timeout 10 --max-time 30 -o /dev/null -w '%{http_code}' "$@" "$url" || true)"
+              for want in $accepted; do
+                if [ "$code" = "$want" ]; then
+                  echo "$url answers $code"
+                  return 0
+                fi
+              done
+              echo "$url answered $code, expected $accepted (attempt $attempt/10)"
+              if (( attempt < 10 )); then sleep 15; fi
+            done
+            echo "::error::$url did not answer $accepted after 10 attempts"
+            return 1
+          }
+          # The Node relay owns /v2/relay/tickets whether or not relay2 runs: 401 without a session.
+          check_tickets() {
+            for attempt in $(seq 1 10); do
+              body="$(curl -s --connect-timeout 10 --max-time 30 -w '\n%{http_code}' -X POST https://relay.shellx.pro/v2/relay/tickets || true)"
+              if [ "$(printf '%s' "$body" | tail -n 1)" = 401 ] && printf '%s' "$body" | grep -q '"code":"unauthorized"'; then
+                echo "https://relay.shellx.pro/v2/relay/tickets answers 401 unauthorized"
+                return 0
+              fi
+              echo "tickets route not answering 401 unauthorized yet (attempt $attempt/10)"
+              if (( attempt < 10 )); then sleep 15; fi
+            done
+            echo "::error::POST https://relay.shellx.pro/v2/relay/tickets did not answer 401 unauthorized"
+            return 1
+          }
+          check_tickets
+          if [ "$RELAY2_ENABLED" = true ]; then
+            # cmux-relay refuses a plain GET (400 or 426); the Node relay would answer 404 JSON.
+            check_status https://relay.shellx.pro/v2/relay "400 426"
+          fi
 
       - name: Remove the SSH key
         if: always()

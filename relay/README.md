@@ -116,6 +116,61 @@ adds `devices.app_version` and the admin's `app_settings`.
 - **Logs:** one JSON line per event with metadata only (time, `device_id`, error kind). Never
   payloads, tokens, passwords, e-mail or IP addresses.
 
+## API v2
+
+Native desktop apps (`kind = "desktop"`, logged in through the v1 `/v1/auth` flow) use these routes
+with the same bearer token. Every route needs a desktop token (an agent or phone token gets 403
+`desktop_only`); bodies are JSON, errors are `{"error":{"code","message"}}`.
+
+| Method + path | Body | Response |
+|---|---|---|
+| `POST /v2/machines` | `{name, platform: "macos"\|"windows", os_version, app_version, noise_public_key_b64}` | `201 {machine_id, slot}` (`200` with the same ids when the device is already registered) |
+| `GET /v2/machines` | | `{machines: [{machine_id, name, platform, online, last_seen_unix, fingerprint}]}` |
+| `POST /v2/machines/:id/heartbeat` | | `204` |
+| `DELETE /v2/machines/:id` | | `204` |
+| `POST /v2/relay/tickets` | `{machine_id, permission: "register"\|"connect", target_machine_id?}` | `{ticket, expires_at_unix, relay_url}` |
+| `POST /v2/pairings` | `{from_machine_id, to_machine_id, requester_x25519_b64}` | `201 {pairing_id, code}` |
+| `GET /v2/pairings?role=target\|requester` | | `{pairings: [{pairing_id, from_machine_id, to_machine_id, requester_fingerprint, requester_x25519_b64, code, status, sealed_invite_b64?}]}` |
+| `POST /v2/pairings/:id/approve` | `{sealed_invite_b64}` | `204` |
+| `POST /v2/pairings/:id/deny` | | `204` |
+
+Error codes: `desktop_only` (403), `invalid_machine` (400), `machine_not_found` (404),
+`pairing_not_found` (404), `not_granted` (403), `pairing_not_pending` (409), `pairing_expired` (410),
+`plaintext_invite` (400), `relay_v2_unavailable` (503), plus the generic `bad_request`, `forbidden`,
+`rate_limited` and `unauthorized`.
+
+- **Machines:** one machine per device token. A second `POST` refreshes `name`, `os_version` and
+  `app_version`; a changed `noise_public_key_b64` also updates the fingerprint (first 16 hex of
+  SHA-256 of the key), deletes every grant from or to the machine and expires its pending pairings.
+  `slot` (16 random bytes, base64url) is the machine's address on relay2; it is returned only to its
+  owner and never listed. `online` = heartbeat within 90 s; the heartbeat is owner only (403
+  `forbidden` for another machine of the account), `DELETE` works for any desktop of the account and
+  removes the machine's grants and pairings. Other accounts' machines are always 404.
+- **Pairings:** `from` must be the caller's own machine, `to` another machine of the account. The
+  server draws the 6-digit `code` (distinct among a target's pending requests) and takes the
+  fingerprint from the stored key; nothing of either is read from the body. Pending requests expire
+  after 5 minutes; a newer request from the same requester supersedes the older one; at most 10
+  pending per target (429). `requester_x25519_b64` (the public key to seal the invite to) is on both
+  roles' items and must equal the requester machine's `noise_public_key_b64` (D1; else 400). Only the target approves (a second approve after the TTL is 410, after a decision
+  409); approving stores `sealed_invite_b64` verbatim (at most 8192 decoded bytes) and grants
+  `from -> to` `connect`. The server never reads the invite beyond a length check and a guard that
+  refuses a plaintext `cmux://` URI (case-insensitive, 400 `plaintext_invite`). Only the requester
+  gets the invite back. The target or the requester can deny.
+- **Relay tickets:** checks run in this order: auth, desktop, body size, relay v2 configured (503
+  `relay_v2_unavailable` when `CMUX_RELAY_HMAC_SECRET` is missing or under 32 bytes), per-device
+  rate limit, then the body: `permission` must be `register` or `connect` (400), `machine_id` must
+  be the caller's own machine (another machine of the account 403 `forbidden`, anything else 404).
+  `register` signs the caller's own slot (never another machine's). `connect` needs
+  `target_machine_id` (400) in the account (404); connecting to your own machine needs no grant
+  (the host mints it for an enrollment invite); any other target needs an approved pairing
+  (403 `not_granted`, revoked by a key rotation or by deleting either machine) and signs the
+  target's slot. The slot always comes from the database, never from the body. The ticket lives
+  120 s; `relay_url` is `RELAY_V2_URL`. Tickets, slots and secrets are never logged.
+- **Configuration:** `CMUX_RELAY_HMAC_SECRET` (at least 32 bytes, used verbatim),
+  `CMUX_RELAY_ISSUER` (default `shellx-relay`), `RELAY_V2_URL`. Without a usable secret the relay
+  runs and `/v2/relay/tickets` answers 503. The exact path `/v2/relay` is the relay2 WebSocket
+  behind nginx and is not served by this app.
+
 ## Push notifications
 
 Design: `docs/superpowers/specs/2026-10-05-push-notifications-design.md` §5.

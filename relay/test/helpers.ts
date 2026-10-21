@@ -25,14 +25,23 @@ export const TEST_CONFIG: Config = {
   latestAgentVersion: "1.0.0",
   macUrl: "https://download.shellx.pro/desktop/1.0.0/ShellX-1.0.0.dmg",
   winUrl: "https://download.shellx.pro/desktop/1.0.0/ShellX-Setup-1.0.0.exe",
+  minMacos: "2.0.0",
+  minWindows: "2.0.0",
+  // makeApp points this at a per-test temp dir; nothing ever reads /srv in tests.
+  nativeManifestDir: join(tmpdir(), "shellx-relay-no-native-manifest"),
   rateLimitsEnabled: false,
   adminHost: "admin.shellx.pro",
   adminPassword: null,
+  relayHmacSecret: new TextEncoder().encode("0123456789abcdef0123456789abcdef"),
+  relayV2DisabledReason: null,
+  relayIssuer: "shellx-relay",
+  relayV2Url: "ws://127.0.0.1:1/v1/relay",
 };
 
 export const allowAll: RateLimiter = { limit: async () => true };
 export const unlimited: RateLimiters = {
   loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll,
+  ticketMint: allowAll, pairingCreate: allowAll,
 };
 
 /** Fake limiter: allows `max` calls per key, then refuses; records every key it saw. */
@@ -127,7 +136,7 @@ export interface TestApp {
  */
 export function makeApp(deps: Partial<AppDeps> = {}, listen: Partial<ListenOptions> = {}): TestApp {
   const ready = startRelay(
-    { config: TEST_CONFIG, db: db(), hubs: hubs(), limiters: unlimited, ...deps },
+    { config: { ...TEST_CONFIG, nativeManifestDir: join(tempDir(), "desktop") }, db: db(), hubs: hubs(), limiters: unlimited, ...deps },
     { ...listen, host: "127.0.0.1", port: 0 },
   );
   onCleanup(async () => {
@@ -232,13 +241,13 @@ export function randomPublicKey(): string {
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 }
 
-export type Kind = "agent" | "mobile";
+export type Kind = "agent" | "mobile" | "desktop";
 
 export function deviceBody(kind: Kind, overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     kind,
-    name: kind === "agent" ? "MacBook-Pro" : "iPhone 16",
-    platform: kind === "agent" ? "macos" : "ios",
+    name: kind === "agent" ? "MacBook-Pro" : kind === "desktop" ? "Mac-Studio" : "iPhone 16",
+    platform: kind === "mobile" ? "ios" : "macos",
     public_key: randomPublicKey(),
     ...overrides,
   };
@@ -278,6 +287,62 @@ export async function loginDevice(app: TestApp, account: Account, kind: Kind, pu
   if (res.status !== 200) throw new Error(`login failed: ${res.status} ${await res.text()}`);
   const body = await res.json<{ user_id: string; device_id: string; token: string }>();
   return { userId: body.user_id, deviceId: body.device_id, token: body.token, publicKey };
+}
+
+/** Logs in a native desktop device (kind `desktop`, Mac-Studio / macos unless `overrides` say otherwise). */
+export async function loginDesktop(app: TestApp, account: Account, overrides: Record<string, unknown> = {}): Promise<Session> {
+  const device = deviceBody("desktop", overrides);
+  const res = await call(app, "POST", "/v1/auth/login", { body: { email: account.email, password: account.password, device } });
+  if (res.status !== 200) throw new Error(`login failed: ${res.status} ${await res.text()}`);
+  const body = await res.json<{ user_id: string; device_id: string; token: string }>();
+  return { userId: body.user_id, deviceId: body.device_id, token: body.token, publicKey: device.public_key as string };
+}
+
+/** Registers the desktop's machine (valid defaults, a fresh noise key unless `overrides` say otherwise). */
+export async function registerMachine(
+  app: TestApp, token: string, overrides: Record<string, unknown> = {},
+): Promise<{ machine_id: string; slot: string; noiseKey: string }> {
+  const noiseKey = (overrides.noise_public_key_b64 as string | undefined) ?? randomPublicKey();
+  const res = await call(app, "POST", "/v2/machines", {
+    token,
+    body: {
+      name: "Mac-Studio", platform: "macos", os_version: "15.2", app_version: "1.0.0",
+      ...overrides, noise_public_key_b64: noiseKey,
+    },
+  });
+  if (res.status !== 201 && res.status !== 200) throw new Error(`register machine failed: ${res.status} ${await res.text()}`);
+  const body = await res.json<{ machine_id: string; slot: string }>();
+  return { ...body, noiseKey };
+}
+
+/** A stand-in sealed invite: random bytes (ciphertext-like), standard base64 with padding. */
+export function randomSealedInvite(bytes = 96): string {
+  return Buffer.from(crypto.getRandomValues(new Uint8Array(bytes))).toString("base64");
+}
+
+/** POST /v2/pairings as `token` (requester key = the from-machine's noise key, D1, unless `overrides` say otherwise); throws unless 201. */
+export async function requestPairing(
+  app: TestApp, token: string, fromMachineId: string, toMachineId: string, overrides: Record<string, unknown> = {},
+): Promise<{ pairing_id: string; code: string }> {
+  const own = db().get<{ noise_public_key: Buffer }>("SELECT noise_public_key FROM machines WHERE id = ?", fromMachineId);
+  const res = await call(app, "POST", "/v2/pairings", {
+    token,
+    body: {
+      from_machine_id: fromMachineId, to_machine_id: toMachineId,
+      requester_x25519_b64: own?.noise_public_key.toString("base64url") ?? randomPublicKey(), ...overrides,
+    },
+  });
+  if (res.status !== 201) throw new Error(`request pairing failed: ${res.status} ${await res.text()}`);
+  return res.json<{ pairing_id: string; code: string }>();
+}
+
+/** POST /v2/pairings/:id/approve as the target's `token`; throws unless 204. Returns the sealed invite sent. */
+export async function approvePairing(
+  app: TestApp, token: string, pairingId: string, sealedInvite: string = randomSealedInvite(),
+): Promise<string> {
+  const res = await call(app, "POST", `/v2/pairings/${pairingId}/approve`, { token, body: { sealed_invite_b64: sealedInvite } });
+  if (res.status !== 204) throw new Error(`approve pairing failed: ${res.status} ${await res.text()}`);
+  return sealedInvite;
 }
 
 /** A UUIDv7 (RFC 9562) for unix-millisecond timestamp `ms`, lower case, random in the other bits. */

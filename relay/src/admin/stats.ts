@@ -8,7 +8,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const SIGNUP_DAYS = 30;
 
 /** Platforms listed for each kind even at zero, so the dashboard always shows both. */
-const PLATFORMS: Record<DeviceKind, readonly string[]> = { agent: ["macos", "windows"], mobile: ["ios", "android"] };
+const PLATFORMS: Record<DeviceKind, readonly string[]> = {
+  agent: ["macos", "windows"], mobile: ["ios", "android"], desktop: ["macos", "windows"],
+};
 
 export interface DeviceStats {
   /** Every device row of this kind, signed in or not. */
@@ -76,6 +78,7 @@ export function adminStats(db: Db, now: number, live: LiveDevice[] | null): Admi
   const devices: Record<DeviceKind, DeviceStats> = {
     agent: { total: 0, online: live === null ? null : 0, by_platform: Object.fromEntries(PLATFORMS.agent.map((p) => [p, 0])) },
     mobile: { total: 0, online: live === null ? null : 0, by_platform: Object.fromEntries(PLATFORMS.mobile.map((p) => [p, 0])) },
+    desktop: { total: 0, online: live === null ? null : 0, by_platform: Object.fromEntries(PLATFORMS.desktop.map((p) => [p, 0])) },
   };
   for (const row of db.all<{ kind: DeviceKind; platform: string; count: number }>(
     "SELECT kind, platform, COUNT(*) AS count FROM devices GROUP BY kind, platform",
@@ -85,7 +88,7 @@ export function adminStats(db: Db, now: number, live: LiveDevice[] | null): Admi
   }
   for (const device of live ?? []) devices[device.kind].online! += 1;
 
-  const versions: Record<DeviceKind, VersionCount[]> = { agent: [], mobile: [] };
+  const versions: Record<DeviceKind, VersionCount[]> = { agent: [], mobile: [], desktop: [] };
   for (const row of db.all<{ kind: DeviceKind; version: string | null; count: number }>(
     "SELECT kind, app_version AS version, COUNT(*) AS count FROM devices GROUP BY kind, app_version",
   )) {
@@ -93,6 +96,7 @@ export function adminStats(db: Db, now: number, live: LiveDevice[] | null): Admi
   }
   versions.agent.sort(byVersionDesc);
   versions.mobile.sort(byVersionDesc);
+  versions.desktop.sort(byVersionDesc);
 
   const firstDay = Math.floor(now / DAY_MS) * DAY_MS - (SIGNUP_DAYS - 1) * DAY_MS;
   const signups = new Map(
