@@ -87,6 +87,10 @@ public actor ShareHost {
         var pane: String?
         var subscription: ShareSubscription?
         var pump: ShareOutputPump?
+        /// The pane the viewer asked for; only a viewer `select` of an existing pane sets it.
+        var wantedPane: String?
+        /// Bumped at the start of every select; only the latest request commits.
+        var selectRequest = 0
         var subscriptionGeneration = 0
         var queuedBytes = 0
         var queuedItems = 0
@@ -97,6 +101,9 @@ public actor ShareHost {
     private var circuits: [String: Circuit] = [:]
     private var nextCircuitSerial = 0
     private var knownPanes: [SharePane] = []
+    /// Test seam: awaited inside every select before it reads the source, with the target pane.
+    private var selectHook: (@Sendable (String) async -> Void)?
+    func setSelectHook(_ hook: (@Sendable (String) async -> Void)?) { selectHook = hook }
 
     private enum TimerAction: Sendable {
         case ping(Int), pongTimeout(Int, UInt64), reRegister(Int), registerTimeout(Int), reconnect
@@ -393,7 +400,7 @@ public actor ShareHost {
             case (.awaitingHello, .hello(let nonce, let label)):
                 await welcome(id, viewerNonce: nonce, label: label)
             case (.live, .select(let pane)):
-                await select(id, pane: pane)
+                await viewerSelect(id, pane: pane)
             case (.live, .input(let pane, let data)):
                 await input(pane: pane, data: data)
             default:
@@ -427,33 +434,58 @@ public actor ShareHost {
         // Live only after welcome, so a concurrent `panes` broadcast cannot precede it.
         circuits[id]?.stage = .live
         scheduleKeepalive(id)
-        await select(id, pane: activeID)
+        circuits[id]?.wantedPane = activeID
+        await reselect(id)
     }
 
-    /// Switches the circuit's stream to `pane` and sends its `replay`. An unknown pane changes nothing.
-    private func select(_ id: String, pane: String) async {
-        guard let circuit = circuits[id] else { return }
-        let serial = circuit.serial
-        let generation = circuit.subscriptionGeneration + 1
-        let pump = ShareOutputPump(limit: Self.maxBacklogBytes, interval: coalesceInterval) { [weak self] flush in
-            await self?.deliver(id, serial, generation: generation, flush)
-        }
+    /// A viewer's `select`: an unknown pane changes nothing; a known one becomes the wanted pane.
+    private func viewerSelect(_ id: String, pane: String) async {
         let source = self.source
-        let result = await MainActor.run { () -> (SharePane, (cols: Int, rows: Int, vt: Data)?, ShareSubscription?)? in
-            guard let info = source.panes.first(where: { $0.id == pane }) else { return nil }
+        let exists = await MainActor.run { source.panes.contains { $0.id == pane } }
+        guard exists, circuits[id] != nil else { return }
+        circuits[id]?.wantedPane = pane
+        await reselect(id)
+    }
+
+    /// Streams the circuit's `wantedPane` (falling back to the active pane if it vanished) and sends
+    /// its `replay`. The latest request wins: a select superseded while it waited is discarded.
+    private func reselect(_ id: String) async {
+        guard var circuit = circuits[id] else { return }
+        circuit.selectRequest += 1
+        let request = circuit.selectRequest
+        let serial = circuit.serial
+        let wanted = circuit.wantedPane ?? ""
+        circuits[id] = circuit
+        let pump = ShareOutputPump(limit: Self.maxBacklogBytes, interval: coalesceInterval) { [weak self] flush in
+            await self?.deliver(id, serial, generation: request, flush)
+        }
+        if let selectHook { await selectHook(wanted) }
+        let source = self.source
+        let result = await MainActor.run {
+            () -> (SharePane, (cols: Int, rows: Int, vt: Data)?, ShareSubscription?)? in
+            let panes = source.panes
+            guard let info = panes.first(where: { $0.id == wanted })
+                ?? panes.first(where: { $0.id == source.activePane }) ?? panes.first else { return nil }
             guard info.kind == .terminal else { return (info, nil, nil) }
-            let snapshot = source.snapshot(pane: pane)
-            let token = source.subscribe(pane: pane) { pump.push($0) }
+            let snapshot = source.snapshot(pane: info.id)
+            let token = source.subscribe(pane: info.id) { pump.push($0) }
             return (info, snapshot, ShareSubscription(token: token, pump: pump))
         }
-        guard let (info, snapshot, subscription) = result else { pump.cancel(); return }
-        guard var updated = circuits[id], updated.serial == serial, updated.subscriptionGeneration == generation - 1 else {
-            await subscription?.release()
+        guard var updated = circuits[id], updated.serial == serial, updated.selectRequest == request else {
+            await result?.2?.release()
             pump.cancel()
             return
         }
+        guard let (info, snapshot, subscription) = result else {
+            updated.resyncPending = false // no pane left to replay
+            circuits[id] = updated
+            pump.cancel()
+            return
+        }
+        let pane = info.id
         let old = updated.subscription
-        updated.subscriptionGeneration = generation
+        updated.subscriptionGeneration = request
+        updated.wantedPane = pane
         updated.pane = pane
         updated.subscription = subscription
         updated.pump = subscription == nil ? nil : pump
@@ -519,8 +551,8 @@ public actor ShareHost {
         circuit.queuedBytes -= bytes
         circuit.queuedItems -= 1
         circuits[id] = circuit
-        if circuit.resyncPending, circuit.queuedItems == 0, let pane = circuit.pane {
-            await select(id, pane: pane) // drained: fresh replay, resubscribed
+        if circuit.resyncPending, circuit.queuedItems == 0 {
+            await reselect(id) // drained: fresh replay, resubscribed
         }
     }
 
@@ -539,22 +571,26 @@ public actor ShareHost {
         circuit.outEpoch += 1
         circuit.pump?.discard()
         circuits[id] = circuit
-        if circuit.queuedItems == 0, let pane = circuit.pane {
-            Task { await self.select(id, pane: pane) }
+        if circuit.queuedItems == 0 {
+            Task { await self.reselect(id) }
         }
     }
 
     private func scheduleKeepalive(_ id: String) {
         guard var circuit = circuits[id] else { return }
         cancelTimer(circuit.keepaliveTimer)
-        circuit.keepaliveTimer = schedule(.keepalive(id, circuit.serial),
-                                          at: circuit.lastSentAt + Self.keepaliveInterval)
+        // Never in the past: a skipped check (frames still queued) waits a full interval.
+        let wait = circuit.queuedItems > 0 ? Self.keepaliveInterval : 0
+        let deadline = max(circuit.lastSentAt + Self.keepaliveInterval, clock() + wait)
+        circuit.keepaliveTimer = schedule(.keepalive(id, circuit.serial), at: deadline)
         circuits[id] = circuit
     }
 
     private func keepalive(_ id: String, serial: Int) {
         guard let circuit = circuits[id], circuit.serial == serial, circuit.stage == .live else { return }
-        if clock().timeIntervalSince(circuit.lastSentAt) >= Self.keepaliveInterval { send(id, .ka) }
+        if circuit.queuedItems == 0, clock().timeIntervalSince(circuit.lastSentAt) >= Self.keepaliveInterval {
+            send(id, .ka) // queued frames will carry traffic; no ka behind them
+        }
         scheduleKeepalive(id)
     }
 
@@ -601,7 +637,7 @@ public actor ShareHost {
                     send(id, .size(pane: selected, cols: now.cols, rows: now.rows))
                 }
             } else if panes.contains(where: { $0.id == activeID }) {
-                await select(id, pane: activeID) // the selected pane closed
+                await reselect(id) // the selected pane closed: wanted pane, else the active one
             }
         }
     }

@@ -803,3 +803,111 @@ final class FakeViewer {
         messages().reduce(into: Data()) { acc, m in if case .out(pane, let d) = m { acc += d } }
     }
 }
+
+// MARK: - Fix round 2
+
+/// Holds each select at the host's hook until the test releases its pane.
+final class SelectGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var waiting: [String: [CheckedContinuation<Void, Never>]] = [:]
+    private var arrivals: [String] = []
+    private var open = false
+
+    var arrived: [String] { lock.withLock { arrivals } }
+
+    func enter(_ pane: String) async {
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+            let pass: Bool = lock.withLock {
+                arrivals.append(pane)
+                if open { return true }
+                waiting[pane, default: []].append(c)
+                return false
+            }
+            if pass { c.resume() }
+        }
+    }
+
+    func release(_ pane: String) {
+        let cs = lock.withLock { waiting.removeValue(forKey: pane) ?? [] }
+        for c in cs { c.resume() }
+    }
+
+    func openAll() {
+        let cs: [CheckedContinuation<Void, Never>] = lock.withLock {
+            open = true
+            defer { waiting = [:] }
+            return waiting.values.flatMap { $0 }
+        }
+        for c in cs { c.resume() }
+    }
+}
+
+extension ShareHostTests {
+    func testViewerSelectWinsOverInFlightResync() async throws {
+        let host = makeHost()
+        let control = try await startRegistered(host)
+        let viewer = try await connectViewer(control, circuit: "c1")
+        let gate = SelectGate()
+        await host.setSelectHook { await gate.enter($0) }
+        // Internal select first: a pump overflow resyncs p1 and its reselect blocks at the gate.
+        source.emit(pane: "p1", Data(repeating: 0x43, count: ShareHost.maxBacklogBytes + 1))
+        try await shareEventually { gate.arrived == ["p1"] }
+        // Then the viewer selects p2, which also blocks.
+        viewer.send(.select(pane: "p2"))
+        try await shareEventually { gate.arrived == ["p1", "p2"] }
+        // The internal select finishes first; the viewer's request is the latest and must still win.
+        gate.release("p1")
+        try await Task.sleep(for: .milliseconds(20))
+        gate.release("p2")
+        gate.openAll()
+        let replayP2 = ShareMessage.replay(pane: "p2", cols: 100, rows: 30, data: Data("\u{1b}[2Jp2-screen".utf8))
+        try await shareEventually { viewer.messages().contains(replayP2) }
+        try await Task.sleep(for: .milliseconds(30))
+        let lastReplay = viewer.messages().last { if case .replay = $0 { true } else { false } }
+        XCTAssertEqual(lastReplay, replayP2)
+        XCTAssertEqual(source.subscriberCount(pane: "p1"), 0)
+        XCTAssertEqual(source.subscriberCount(pane: "p2"), 1)
+        source.emit(pane: "p2", Data("b".utf8))
+        try await shareEventually { viewer.messages().last == .out(pane: "p2", data: Data("b".utf8)) }
+        let resyncing = await host.isResyncing("c1")
+        XCTAssertFalse(resyncing)
+        await host.stop(reason: .revoked)
+    }
+
+    func testResyncOnVanishedPaneFallsBackToActive() async throws {
+        let host = makeHost()
+        let control = try await startRegistered(host)
+        let viewer = try await connectViewer(control, circuit: "c1")
+        viewer.send(.select(pane: "p2"))
+        try await shareEventually { viewer.messages().count >= 3 }
+        let gate = SelectGate()
+        await host.setSelectHook { await gate.enter($0) }
+        source.emit(pane: "p2", Data(repeating: 0x44, count: ShareHost.maxBacklogBytes + 1))
+        try await shareEventually { gate.arrived.count == 1 }
+        source.panes.remove(at: 1) // p2 closes while the resync is in flight (no panes callback yet)
+        gate.openAll()
+        let replayP1 = ShareMessage.replay(pane: "p1", cols: 80, rows: 24, data: Data("\u{1b}[2Jp1-screen".utf8))
+        try await shareEventually { viewer.messages().last == replayP1 }
+        let resyncing = await host.isResyncing("c1")
+        XCTAssertFalse(resyncing)
+        XCTAssertEqual(source.subscriberCount(pane: "p1"), 1)
+        await host.stop(reason: .revoked)
+    }
+
+    func testKeepaliveSkipsWhileFramesQueued() async throws {
+        let host = makeHost()
+        let control = try await startRegistered(host)
+        control.autoPong = true
+        let viewer = try await connectViewer(control, circuit: "c1")
+        viewer.socket.stallDataSends = true
+        source.emit(pane: "p1", Data("q".utf8)) // queued behind a stalled socket
+        try await shareEventually { (await host.backlogBytes("c1") ?? 0) > 0 }
+        clock.advance(by: 60) // 60 s since the last sealed frame, but that frame is still queued
+        try await Task.sleep(for: .milliseconds(30))
+        viewer.socket.unstall()
+        try await shareEventually { viewer.messages().count >= 3 }
+        try await Task.sleep(for: .milliseconds(20))
+        XCTAssertFalse(viewer.messages().contains(.ka))
+        await host.stop(reason: .revoked)
+    }
+}
