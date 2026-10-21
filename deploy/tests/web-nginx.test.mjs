@@ -11,7 +11,7 @@ const nginx = readFileSync(join(deployDir, 'web', 'nginx.conf'), 'utf8');
 
 const SHARE_PATTERN = '^/s/[0-9a-z]{4}-[0-9a-z]{4}/?$';
 const CSP =
-  "default-src 'self'; connect-src https://relay.shellx.pro wss://relay.shellx.pro; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'";
+  "default-src 'self'; connect-src https://relay.shellx.pro wss://relay.shellx.pro; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'";
 
 /**
  * The text from `start` to the `}` closing the block whose `{` is at `open`, found by counting braces.
