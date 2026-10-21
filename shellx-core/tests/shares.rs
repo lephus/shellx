@@ -19,7 +19,7 @@ fn create(core: &shellx_core::Core) -> Value {
 
 #[test]
 fn create_then_host_ticket() {
-    let (core, _fake, _dir) = support::logged_in();
+    let (core, fake, _dir) = support::logged_in();
     let s = create(&core);
     let id = s["id"].as_str().unwrap();
     assert_eq!(id.len(), 8);
@@ -36,7 +36,7 @@ fn create_then_host_ticket() {
     // The display form with a dash is accepted and stripped before the call.
     let dashed = format!("{}-{}", &id[..4], &id[4..]);
     core.call("shares.host_ticket", json!({"id": dashed})).unwrap();
-    let paths: Vec<String> = support::requests_to(&_fake, &format!("/v2/shares/{id}/host-ticket")).into_iter().map(|r| r.path).collect();
+    let paths: Vec<String> = requests_to(&fake, &format!("/v2/shares/{id}/host-ticket")).into_iter().map(|r| r.path).collect();
     assert_eq!(paths.len(), 2);
     let l = core.call("shares.list", json!({})).unwrap();
     assert_eq!(l["shares"][0]["id"], id);
@@ -45,8 +45,31 @@ fn create_then_host_ticket() {
 }
 
 #[test]
-fn revoke_is_idempotent() {
+fn one_time_create_forces_type_until_quit_and_claim_window() {
     let (core, _fake, _dir) = support::logged_in();
+    let s = core.call("shares.create", json!({"permission":"view","lifetime":"15m","one_time":true,"access":ACCESS})).unwrap();
+    let claim = s["claim_until_unix"].as_u64().unwrap();
+    let exp = s["expires_at_unix"].as_u64().unwrap();
+    assert_eq!(exp - claim, 86400 - 120);
+    let l = core.call("shares.list", json!({})).unwrap();
+    assert_eq!(l["shares"][0]["permission"], "type");
+    assert_eq!(l["shares"][0]["lifetime"], "until_quit");
+}
+
+#[test]
+fn ids_use_the_strict_alphabet_and_ignore_case() {
+    let (core, fake, _dir) = support::logged_in();
+    for id in ["ilou0000", "ILOU-0000"] {
+        assert_eq!(core.call("shares.revoke", json!({"id": id})).unwrap_err().code, "invalid_params", "{id}");
+    }
+    assert!(requests_to(&fake, "/v2/shares/ilou0000").is_empty());
+    core.call("shares.revoke", json!({"id": "K7F2-9QD1"})).unwrap_err(); // reaches the server (404), lowercased
+    assert_eq!(requests_to(&fake, "/v2/shares/k7f29qd1").len(), 1);
+}
+
+#[test]
+fn revoke_is_idempotent() {
+    let (core, fake, _dir) = support::logged_in();
     let id = create(&core)["id"].as_str().unwrap().to_string();
     core.call("shares.revoke", json!({"id": id})).unwrap();
     core.call("shares.revoke", json!({"id": id})).unwrap();
@@ -56,7 +79,7 @@ fn revoke_is_idempotent() {
 
 #[test]
 fn revoked_share_host_ticket_maps_code() {
-    let (core, _fake, _dir) = support::logged_in();
+    let (core, fake, _dir) = support::logged_in();
     let id = create(&core)["id"].as_str().unwrap().to_string();
     core.call("shares.revoke", json!({"id": id})).unwrap();
     let e = core.call("shares.host_ticket", json!({"id": id})).unwrap_err();
@@ -96,6 +119,6 @@ fn invalid_params_do_not_reach_the_server() {
 
 #[test]
 fn shares_need_a_session() {
-    let (core, _fake, _dir) = support::logged_out();
+    let (core, fake, _dir) = support::logged_out();
     assert_eq!(core.call("shares.list", json!({})).unwrap_err().code, "not_logged_in");
 }

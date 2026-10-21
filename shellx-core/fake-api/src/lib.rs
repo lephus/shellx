@@ -179,6 +179,7 @@ struct Share {
     slot: String,
     permission: String,
     lifetime: String,
+    created_at: u64,
     expires_at: u64,
     revoked: bool,
 }
@@ -660,11 +661,20 @@ fn create_share(rec: &Recorded, st: &mut State) -> Reply {
     if !matches!(permission, "view" | "type") {
         return Reply::error(400, "bad_request", "permission must be view or type");
     }
-    let Some(life) = lifetime_secs(lifetime) else { return Reply::error(400, "bad_request", "bad lifetime") };
+    if lifetime_secs(lifetime).is_none() {
+        return Reply::error(400, "bad_request", "bad lifetime");
+    }
     if b.get("access").and_then(Value::as_str).is_none_or(|a| a.len() != 43) {
         return Reply::error(400, "bad_request", "access must be 43 characters");
     }
-    let one_time = b.get("one_time").and_then(Value::as_bool).unwrap_or(false);
+    let one_time = match b.get("one_time") {
+        None | Some(Value::Null) => false,
+        Some(Value::Bool(v)) => *v,
+        Some(_) => return Reply::error(400, "bad_request", "one_time must be a boolean"),
+    };
+    // R5: a one-time share is a typing share until quit with a 2-minute claim window.
+    let (permission, lifetime) = if one_time { ("type", "until_quit") } else { (permission, lifetime) };
+    let life = lifetime_secs(lifetime).expect("validated lifetime");
     let live = st.shares.values().filter(|s| s.device_id == who.device_id && !s.revoked && s.expires_at > now_unix()).count();
     if live >= 20 {
         return Reply::error(409, "share_limit", "Too many active shares");
@@ -673,7 +683,7 @@ fn create_share(rec: &Recorded, st: &mut State) -> Reply {
     getrandom::fill(&mut raw).expect("random source");
     let id: String = raw.iter().map(|x| SHARE_ALPHABET[(*x as usize) % 32] as char).collect();
     let now = now_unix();
-    let (expires_at, claim_until) = if one_time { (now + 86400, Some(now + 120)) } else { (now + life, None) };
+    let (expires_at, claim_until) = (now + life, one_time.then_some(now + 120));
     let slot = random_b64url(16);
     st.shares.insert(
         id.clone(),
@@ -682,6 +692,7 @@ fn create_share(rec: &Recorded, st: &mut State) -> Reply {
             slot: slot.clone(),
             permission: permission.to_string(),
             lifetime: lifetime.to_string(),
+            created_at: now,
             expires_at,
             revoked: false,
         },
@@ -691,8 +702,10 @@ fn create_share(rec: &Recorded, st: &mut State) -> Reply {
 
 fn list_shares(rec: &Recorded, st: &State) -> Reply {
     let Some(who) = caller(rec, st) else { return unauthorized() };
-    let mut items: Vec<(&String, &Share)> = st.shares.iter().filter(|(_, s)| s.device_id == who.device_id).collect();
-    items.sort_by(|a, b| a.0.cmp(b.0));
+    let now = now_unix();
+    let mut items: Vec<(&String, &Share)> =
+        st.shares.iter().filter(|(_, s)| s.device_id == who.device_id && s.expires_at > now).collect();
+    items.sort_by(|a, b| (a.1.created_at, a.0).cmp(&(b.1.created_at, b.0)));
     let shares: Vec<Value> = items
         .into_iter()
         .map(|(id, s)| {

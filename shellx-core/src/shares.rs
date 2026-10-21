@@ -15,6 +15,8 @@ use serde_json::{Value, json};
 use zeroize::Zeroizing;
 
 const TICKET_MAX_BYTES: usize = 4096;
+/// Share id alphabet (no `i`, `l`, `o`, `u`).
+const ID_ALPHABET: &[u8] = b"0123456789abcdefghjkmnpqrstvwxyz";
 const ACCESS_LEN: usize = 43;
 
 #[derive(Serialize)]
@@ -37,8 +39,8 @@ fn share_id(params: &Value) -> Result<String, CoreError> {
         .get("id")
         .and_then(Value::as_str)
         .ok_or_else(|| CoreError::invalid_params("id must be a string"))?;
-    let id: String = raw.chars().filter(|c| *c != '-').collect();
-    if id.len() != 8 || !id.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()) {
+    let id: String = raw.chars().filter(|c| *c != '-').collect::<String>().to_ascii_lowercase();
+    if id.len() != 8 || !id.bytes().all(|c| ID_ALPHABET.contains(&c)) {
         return Err(CoreError::invalid_params("id must be 8 characters like k7f29qd1"));
     }
     Ok(id)
