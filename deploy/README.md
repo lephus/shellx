@@ -274,10 +274,13 @@ upstream authors is open), so nothing is pulled or pushed for it: it is built fr
 profile `relay2`; a deploy without `COMPOSE_PROFILES=relay2` in the VPS's `.env` behaves exactly as
 before (relay + web + backup). deploy.yml never syncs `relay2-src/`.
 
-**Merge procedure (read first).** The relay2 pin `57dd520ccf20b55c7eac662f1e09eae1c5069917` in
+**Merge procedure (read first).** The relay2 pin `08de0bb35efbd46e3cade25446fdb6ffffac41bc` in
 `docker-compose.yml` must stay reachable from `main`, because the rollout stages and the workflow
 rollback checks require it. Merge `feat/relay-v2` with a real merge commit (`git merge --no-ff`;
 never squash, never rebase), or re-pin compose to a commit that is on `main` before enabling relay2.
+The pin is the first commit whose cmux-relay reads `CMUX_RELAY_ALLOWED_ORIGINS` (the browser share
+viewer's Origin allowlist); an older pin answers every viewer 403. It reaches `main` with the share
+links branch (`shellx/l7-share`), so merge that one with `--no-ff` too.
 
 **G2 pre-check, before you push main with migration 0005 (once).** deploy.yml deploys `main`, so the
 push that carries migration 0005 IS the production deploy of it. Migration 0005 rebuilds the
@@ -305,19 +308,19 @@ Any output row means a dangling reference: stop, do not deploy, and report it. N
    df -h ~        # >= 4 GB free
    ```
 
-2. **Stage the source** (for every new pinned commit; it is `57dd520ccf20b55c7eac662f1e09eae1c5069917` today, the sha in
+2. **Stage the source** (for every new pinned commit; it is `08de0bb35efbd46e3cade25446fdb6ffffac41bc` today, the sha in
    `docker-compose.yml`). On your Mac, in any checkout of `lephus/shellx` that has that commit:
 
    ```bash
-   scripts/shellx/relay2/source-tarball.sh 57dd520ccf20b55c7eac662f1e09eae1c5069917 /tmp   # prints the path, its sha256 and the sha
-   scp /tmp/relay2-src-57dd520ccf20b55c7eac662f1e09eae1c5069917.tar.gz <deploy-user>@<vps>:phu/shellx/
+   scripts/shellx/relay2/source-tarball.sh 08de0bb35efbd46e3cade25446fdb6ffffac41bc /tmp   # prints the path, its sha256 and the sha
+   scp /tmp/relay2-src-08de0bb35efbd46e3cade25446fdb6ffffac41bc.tar.gz <deploy-user>@<vps>:phu/shellx/
    ```
 
-   On the VPS, compare `sha256sum relay2-src-57dd520ccf20b55c7eac662f1e09eae1c5069917.tar.gz` with the value the script printed, then:
+   On the VPS, compare `sha256sum relay2-src-08de0bb35efbd46e3cade25446fdb6ffffac41bc.tar.gz` with the value the script printed, then:
 
    ```bash
-   cd ~/phu/shellx && mkdir -p relay2-src && tar -xzf relay2-src-57dd520ccf20b55c7eac662f1e09eae1c5069917.tar.gz -C relay2-src
-   ls relay2-src/57dd520ccf20b55c7eac662f1e09eae1c5069917/scripts/shellx/relay2/Dockerfile
+   cd ~/phu/shellx && mkdir -p relay2-src && tar -xzf relay2-src-08de0bb35efbd46e3cade25446fdb6ffffac41bc.tar.gz -C relay2-src
+   ls relay2-src/08de0bb35efbd46e3cade25446fdb6ffffac41bc/scripts/shellx/relay2/Dockerfile
    ```
 
    Keep the previous `relay2-src/<sha>` directory until the next good deploy: a rollback restores the

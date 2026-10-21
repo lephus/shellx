@@ -71,13 +71,13 @@ services:
   relay2:
     profiles: ["relay2"]
     # Local tag only, never pushed.
-    image: shellx-relay2:57dd520ccf20b55c7eac662f1e09eae1c5069917
+    image: shellx-relay2:08de0bb35efbd46e3cade25446fdb6ffffac41bc
     pull_policy: never
     build:
-      context: ./relay2-src/57dd520ccf20b55c7eac662f1e09eae1c5069917
+      context: ./relay2-src/08de0bb35efbd46e3cade25446fdb6ffffac41bc
       dockerfile: scripts/shellx/relay2/Dockerfile
       args:
-        REVISION: 57dd520ccf20b55c7eac662f1e09eae1c5069917
+        REVISION: 08de0bb35efbd46e3cade25446fdb6ffffac41bc
     restart: unless-stopped
     mem_limit: 256m
     memswap_limit: 256m
