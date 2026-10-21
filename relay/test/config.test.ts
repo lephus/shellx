@@ -34,6 +34,12 @@ describe("loadConfig", () => {
     });
   });
 
+  it("SHARE_ALLOWED_ORIGIN overrides the default; an empty or blank value falls back to https://shellx.pro", () => {
+    expect(loadConfig({ ...REQUIRED, SHARE_ALLOWED_ORIGIN: "https://share.example.com" }).shareAllowedOrigin).toBe("https://share.example.com");
+    expect(loadConfig({ ...REQUIRED, SHARE_ALLOWED_ORIGIN: "" }).shareAllowedOrigin).toBe("https://shellx.pro");
+    expect(loadConfig({ ...REQUIRED, SHARE_ALLOWED_ORIGIN: "   " }).shareAllowedOrigin).toBe("https://shellx.pro");
+  });
+
   it("reads HOST, PORT, DB_PATH and RATE_LIMITS_ENABLED", () => {
     const config = loadConfig({ ...REQUIRED, HOST: "127.0.0.1", PORT: "8787", DB_PATH: ".data/relay.db", RATE_LIMITS_ENABLED: "false" });
     expect(config).toMatchObject({ host: "127.0.0.1", port: 8787, dbPath: ".data/relay.db", rateLimitsEnabled: false });
