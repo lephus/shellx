@@ -795,6 +795,29 @@ test('keepalive (A2): a ka after welcome changes nothing and is not counted', as
   assert.equal(text(events[0][1].data), 'new');
 });
 
+test('a live session silent for 90 s (no frame, not even ka) ends, so Retry can reconnect', async () => {
+  const ctx = setup();
+  const seen = states(ctx.session);
+  const live = await goLive(ctx);
+  const tick = () => new Promise((r) => setTimeout(r, 20));
+  ctx.clock.advance(89_000);
+  assert.equal(ctx.session.state, 'live');
+  await live.host.send({ t: 'ka' }); // any frame restarts the 90 s
+  await tick();
+  ctx.clock.advance(89_000);
+  assert.equal(ctx.session.state, 'live');
+  await live.host.send({ t: 'out', pane: 'p1', data: b64Encode(utf8('x')) });
+  await tick();
+  ctx.clock.advance(89_999);
+  assert.equal(ctx.session.state, 'live');
+  ctx.clock.advance(1);
+  assert.equal(ctx.session.state, 'ended');
+  assert.deepEqual(ctx.session.detail, { silent: true });
+  assert.ok(live.circuit.closed, 'circuit closed');
+  assert.equal(ctx.clock.pending(), 0, 'no timer left');
+  assert.ok(!seen.includes('error'), `states: ${seen.join(' → ')}`);
+});
+
 test('keepalive (A2): a ka before welcome is dropped and counted', async () => {
   const ctx = setup();
   ctx.session.start();

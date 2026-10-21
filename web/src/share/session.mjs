@@ -10,6 +10,8 @@ import {
 
 export const RELAY_PROTOCOL = 5;
 export const CONNECT_TIMEOUT_MS = 15_000;
+/** A live session with no host frame (ka included) for this long is `ended`; the host sends ka after 60 s idle. */
+export const SILENCE_TIMEOUT_MS = 90_000;
 export const DEFAULT_API_BASE = 'https://relay.shellx.pro';
 
 const MAX_LISTENER_FAILURES = 3;
@@ -57,7 +59,7 @@ function circuitUrl(relayUrl, circuit) {
 export function createSession({
   id, secret, fetch, WebSocket, now = Date.now, setTimeout: setTimer = globalThis.setTimeout,
   clearTimeout: clearTimer = globalThis.clearTimeout, storage, apiBase = DEFAULT_API_BASE, label = 'Browser',
-  timeoutMs = CONNECT_TIMEOUT_MS,
+  timeoutMs = CONNECT_TIMEOUT_MS, silenceMs = SILENCE_TIMEOUT_MS,
 }) {
   const listeners = new Map();
   let state = 'loading';
@@ -175,6 +177,17 @@ export function createSession({
     lastSeq = msg.seq;
     dispatch(msg);
     listenerFailures = 0;
+    if (state === 'live') watchSilence();
+  }
+
+  // Live-traffic watchdog: a sleeping phone or a dead path can leave the circuit open but silent.
+  // Every accepted frame restarts it; `ended` hands over to the page's Retry / visibility reconnect.
+  function watchSilence() {
+    if (timer !== null) clearTimer(timer);
+    timer = setTimer(() => {
+      timer = null;
+      setState('ended', { silent: true });
+    }, silenceMs);
   }
 
   function dispatch(msg) {
