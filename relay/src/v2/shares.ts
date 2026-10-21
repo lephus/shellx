@@ -2,12 +2,12 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { AppEnv } from "../app.js";
+import { requestIp } from "../auth/client-ip.js";
 import { requireAuth } from "../auth/session.js";
 import { jsonBodyLimit } from "../http/body-limit.js";
 import { Errors, readJsonObject } from "../http/errors.js";
 import { logMeta } from "../log.js";
-import { requestIp } from "../routes/auth.js";
-import { newSlot, unixSeconds } from "./encoding.js";
+import { unixSeconds } from "./encoding.js";
 import { requireDesktop } from "./guard.js";
 import { mintTicket, ticketClaims } from "./tickets.js";
 
@@ -106,13 +106,18 @@ shareRoutes.post("/", requireAuth, requireDesktop, jsonBodyLimit, async (c) => {
   const expiresAt = now + LIFETIME_MS[lifetime];
   const claimUntil = oneTime ? now + CLAIM_WINDOW_MS : null;
   const accessHash = sha256Hex(body.access);
-  const slot = newSlot();
 
-  const id = db.transaction(() => {
+  const { id, slot } = db.transaction(() => {
     const live = db.get<{ n: number }>(
       "SELECT COUNT(*) AS n FROM shares WHERE device_id = ? AND revoked_at IS NULL AND expires_at > ?", auth.deviceId, now,
     )!.n;
     if (live >= MAX_LIVE_SHARES_PER_DEVICE) throw Errors.shareLimit();
+    // slot is UNIQUE: on a collision draw one fresh slot, then give up.
+    let slot = c.get("shareSlot")();
+    if (db.get("SELECT 1 FROM shares WHERE slot = ?", slot) !== undefined) {
+      slot = c.get("shareSlot")();
+      if (db.get("SELECT 1 FROM shares WHERE slot = ?", slot) !== undefined) throw new Error("could not allocate a share slot");
+    }
     for (let attempt = 0; attempt < 5; attempt++) {
       const candidate = c.get("shareId")();
       if (db.get("SELECT 1 FROM shares WHERE id = ?", candidate) !== undefined) continue;
@@ -122,7 +127,7 @@ shareRoutes.post("/", requireAuth, requireDesktop, jsonBodyLimit, async (c) => {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`,
         candidate, auth.userId, auth.deviceId, slot, permission, lifetime, oneTime ? 1 : 0, accessHash, now, expiresAt, claimUntil, now,
       );
-      return candidate;
+      return { id: candidate, slot };
     }
     throw new Error("could not allocate a share id");
   });
@@ -181,10 +186,10 @@ shareRoutes.post("/:id/ticket", jsonBodyLimit, async (c) => {
   if (config.relayHmacSecret === null) throw Errors.relayV2Unavailable();
   if (!(await c.get("limiters").shareTicket.limit(requestIp(c)))) throw Errors.rateLimited();
 
+  const body = await readJsonObject(c.req.raw);
+  if ("secret" in body) throw Errors.badRequest(); // checked before the id so a secret is always a 400
   const id = parseShareId(c.req.param("id"));
   if (id === null) throw Errors.shareNotFound();
-  const body = await readJsonObject(c.req.raw);
-  if ("secret" in body) throw Errors.badRequest();
   if (typeof body.access !== "string" || !ACCESS_RE.test(body.access)) throw Errors.badRequest();
   if (typeof body.viewer !== "string" || !VIEWER_RE.test(body.viewer)) throw Errors.badRequest();
 
@@ -206,7 +211,8 @@ shareRoutes.post("/:id/ticket", jsonBodyLimit, async (c) => {
     }
     if (now - row.host_seen_at > HOST_ONLINE_WINDOW_MS) throw Errors.hostOffline();
     if (row.one_time === 1 && row.viewer_hash === null) {
-      db.run("UPDATE shares SET viewer_hash = ? WHERE id = ? AND viewer_hash IS NULL", viewerHash, id);
+      const { changes } = db.run("UPDATE shares SET viewer_hash = ? WHERE id = ? AND viewer_hash IS NULL", viewerHash, id);
+      if (changes !== 1) throw Errors.shareUsed();
     }
     return row;
   });
