@@ -40,6 +40,27 @@ const wire = await import(fileUrl(join(ROOT, 'web/src/share/wire.mjs')));
 const log = (...a) => console.log(...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const cleanups = [];
+/** Every spawned process; killed synchronously on `exit`, whatever ended the run. */
+const children = new Set();
+const relayLog = [];
+let tempDirPath = null;
+
+/** Redacts relay and join tickets from debug output. */
+const redact = (text) => text.replace(/(\\?"(?:join_)?ticket\\?":\\?")[^"\\]+/g, '$1<redacted>');
+const debug = (...a) => { if (process.env.SHARE_E2E_DEBUG) console.log(...a.map((x) => (typeof x === 'string' ? redact(x) : x))); };
+
+function track(child) {
+  children.add(child);
+  child.once('exit', () => children.delete(child));
+  return child;
+}
+
+process.on('exit', () => {
+  for (const child of children) {
+    try { child.kill('SIGKILL'); } catch { /* already gone */ }
+  }
+  if (tempDirPath) rmSync(tempDirPath, { recursive: true, force: true });
+});
 let passed = 0;
 
 function check(name, ok, detail = '') {
@@ -79,11 +100,17 @@ function run(cmd, args, cwd) {
 
 // ---- binaries -----------------------------------------------------------------------------------
 
+/** `cargo` from PATH, else rustup's default location. */
+function cargoBinary() {
+  if (spawnSync('cargo', ['--version'], { stdio: 'ignore' }).status === 0) return 'cargo';
+  return join(process.env.HOME, '.cargo/bin/cargo');
+}
+
 function relayBinary() {
   const bin = process.env.CMUX_RELAY_BIN ?? join(ROOT, 'cmux-tui/target/debug/cmux-relay');
   if (!existsSync(bin)) {
     if (!BUILD || process.env.CMUX_RELAY_BIN) throw new Error(`cmux-relay not found at ${bin}`);
-    run(join(process.env.HOME, '.cargo/bin/cargo'), ['build', '-p', 'cmux-relay'], join(ROOT, 'cmux-tui'));
+    run(cargoBinary(), ['build', '-p', 'cmux-relay'], join(ROOT, 'cmux-tui'));
   }
   return bin;
 }
@@ -101,8 +128,8 @@ function hostBinary() {
 
 async function startCmuxRelay(bin, secretFile, dir) {
   const port = await freePort();
-  const errLog = [];
-  const child = spawn(bin, ['serve'], {
+  const errLog = relayLog;
+  const child = track(spawn(bin, ['serve'], {
     env: {
       CMUX_RELAY_HMAC_SECRET: readFileSync(secretFile, 'utf8').trim(),
       CMUX_RELAY_ISSUER: ISSUER,
@@ -110,7 +137,7 @@ async function startCmuxRelay(bin, secretFile, dir) {
       CMUX_RELAY_ALLOWED_ORIGINS: ORIGIN,
     },
     stdio: ['ignore', 'ignore', 'pipe'],
-  });
+  }));
   child.stderr.on('data', (d) => errLog.push(d.toString()));
   let exited = false;
   child.once('exit', () => { exited = true; });
@@ -214,11 +241,12 @@ function startHost(bin, base, token, share, perm) {
   const args = ['--api', base, '--token', token, '--id', share.dashed, '--slot', share.slot,
     '--secret', share.secret, '--perm', perm];
   if (share.expires_at_unix != null) args.push('--expires-at', String(share.expires_at_unix));
-  const child = spawn(bin, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = track(spawn(bin, args, { stdio: ['pipe', 'pipe', 'pipe'] }));
+  child.stdin.on('error', () => {}); // EPIPE once the host has exited
   const events = [];
   const stderr = [];
   createInterface({ input: child.stdout }).on('line', (line) => {
-    if (process.env.SHARE_E2E_DEBUG) console.log('DBG host', line.slice(0, 200));
+    debug('DBG host', line.slice(0, 300));
     try { events.push({ at: Date.now(), ...JSON.parse(line) }); } catch { stderr.push(line); }
   });
   child.stderr.on('data', (d) => stderr.push(d.toString()));
@@ -269,7 +297,7 @@ function startViewer(base, share, storage = memoryStorage()) {
       };
       this.on('message', (data, isBinary) => {
         if (isBinary) tap.gotBinary.push(new Uint8Array(data));
-        if (process.env.SHARE_E2E_DEBUG) console.log('DBG ws <-', isBinary ? `binary ${data.length ?? data.byteLength}` : data.toString());
+        debug('DBG ws <-', isBinary ? `binary ${data.length ?? data.byteLength}` : data.toString());
       });
       if (process.env.SHARE_E2E_DEBUG) {
         this.on('unexpected-response', (_req, res) => console.log('DBG ws unexpected-response', res.statusCode));
@@ -319,13 +347,13 @@ async function forgeInput(share, viewer, text, seq) {
 // ---- scenarios --------------------------------------------------------------------------------------
 
 async function scenarioTypeShare(ctx) {
-  log('\n== type share: welcome, replay, echo, revoke');
+  log('\n== type share: welcome, replay, echo, revoke (API DELETE, then the host\'s stop(.revoked), as the app\'s controller does)');
   const share = await createShare(ctx.base, ctx.token, { permission: 'type', lifetime: '1h' });
   const host = startHost(ctx.hostBin, ctx.base, ctx.token, share, 'type');
   await host.wait('registered', (e) => e.event === 'registered');
   const v = startViewer(ctx.base, share);
   await v.waitState('live').catch(async (e) => {
-    if (process.env.SHARE_E2E_DEBUG) console.log('DBG stats', JSON.stringify(await host.stats()));
+    if (process.env.SHARE_E2E_DEBUG) debug('DBG stats', JSON.stringify(await host.stats()));
     throw e;
   });
   const welcome = v.events.find((e) => e.type === 'welcome');
@@ -337,14 +365,19 @@ async function scenarioTypeShare(ctx) {
   const replay = v.events.find((e) => e.type === 'replay');
   check('type: replay of p1 follows welcome', v.events.indexOf(replay) > v.events.indexOf(welcome)
     && replay.pane === 'p1' && replay.cols === 80 && replay.rows === 24 && v.replayText().includes('share-e2e scripted pane'));
-  await host.wait('viewer label', (e) => e.event === 'viewers' && e.labels.includes('Node · share-e2e'));
-  check('type: host lists the viewer label', true);
+  const listed = await host.wait('viewer label', (e) => e.event === 'viewers' && e.labels.length > 0);
+  check('type: host lists exactly the viewer label', listed.labels.length === 1 && listed.labels[0] === 'Node · share-e2e',
+    JSON.stringify(listed.labels));
 
   const t0 = Date.now();
   v.session.input(new TextEncoder().encode('echo hi\r'));
   await waitUntil('echo', () => v.output().includes('echo hi\r'));
-  check('type: typed "echo hi\\r" comes back as output', true, `${Date.now() - t0} ms`);
+  const typed = host.events.filter((e) => e.event === 'input');
+  check('type: typed "echo hi\\r" reaches the host pane once and comes back as output',
+    typed.length === 1 && typed[0].pane === 'p1' && typed[0].bytes === 8, `${Date.now() - t0} ms`);
 
+  // Revoke is two steps, like ShellXShareController: the API DELETE, then ShareHost.stop(.revoked).
+  // The API does not notify the host.
   const r0 = Date.now();
   const del = await api(ctx.base, 'DELETE', `/v2/shares/${share.dashed}`, { token: ctx.token });
   host.send('stop revoked');
@@ -399,8 +432,9 @@ async function scenarioExpiry(ctx) {
   const again = startViewer(ctx.base, share);
   await again.waitState('expired');
   check('expiry: a new viewer gets expired from the API', again.session.detail?.api === 'share_expired');
-  await host.wait('stopped', (e) => e.event === 'stopped');
-  check('expiry: host stopped itself', true);
+  const stopped = await host.wait('stopped', (e) => e.event === 'stopped');
+  check('expiry: host stopped itself at expires_at', stopped.at - expiresMs >= -50 && stopped.at - expiresMs < 1500,
+    `${stopped.at - expiresMs} ms after expires_at`);
 }
 
 async function scenarioOneTime(ctx) {
@@ -420,7 +454,8 @@ async function scenarioOneTime(ctx) {
   await again.waitState('live');
   again.session.input(new TextEncoder().encode('echo hi\r'));
   await waitUntil('echo after reconnect', () => again.output().includes('echo hi\r'));
-  check('one-time: the same phone reconnects and types', true);
+  check('one-time: the same phone reconnects and types', again.session.perm === 'type'
+    && host.events.filter((e) => e.event === 'input' && e.bytes === 8).length === 1);
   host.send('stop host_quit');
   await again.waitState('host_offline', 2000);
 }
@@ -442,6 +477,7 @@ async function scenarioOrigins(ctx) {
 
 async function main() {
   const dir = mkdtempSync(join(tmpdir(), 'shellx-share-e2e-'));
+  tempDirPath = dir;
   cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
   const secretFile = join(dir, 'hmac-secret');
   writeFileSync(secretFile, randomBytes(32).toString('hex'), { mode: 0o600 });
@@ -465,15 +501,40 @@ async function main() {
   log(`\nshare-e2e: ${passed} checks passed`);
 }
 
+let cleaning = null;
+function runCleanups() {
+  cleaning ??= (async () => {
+    for (const fn of cleanups.splice(0).reverse()) {
+      try { await fn(); } catch { /* best effort */ }
+    }
+  })();
+  return cleaning;
+}
+
+function printRelayLog() {
+  if (relayLog.length) console.error(`--- cmux-relay log ---\n${redact(relayLog.join('')).trimEnd()}\n---`);
+}
+
+/** Abnormal end (signal, uncaught error): clean up, then exit non-zero; `exit` kills what is left. */
+async function abort(code, why) {
+  console.error(`share-e2e: aborted (${why})`);
+  printRelayLog();
+  await Promise.race([runCleanups(), sleep(3000)]);
+  process.exit(code);
+}
+process.once('SIGINT', () => abort(130, 'SIGINT'));
+process.once('SIGTERM', () => abort(143, 'SIGTERM'));
+process.on('uncaughtException', (err) => abort(1, `uncaught: ${err?.message ?? err}`));
+process.on('unhandledRejection', (err) => abort(1, `unhandled rejection: ${err?.message ?? err}`));
+
 let code = 0;
 try {
   await main();
 } catch (err) {
   console.error(err instanceof Error ? err.message : err);
+  printRelayLog();
   code = 1;
 } finally {
-  for (const fn of cleanups.reverse()) {
-    try { await fn(); } catch { /* best effort */ }
-  }
+  await runCleanups();
 }
 process.exit(code);

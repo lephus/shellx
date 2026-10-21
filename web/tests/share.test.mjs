@@ -565,6 +565,19 @@ test('replayed or reordered frames (non-increasing seq) are dropped and counted'
   assert.deepEqual(outs, ['a', 'b']);
 });
 
+test('a bye queued just before a relay peer-disconnected error still decides the state', async () => {
+  const ctx = setup();
+  const seen = states(ctx.session);
+  const live = await goLive(ctx);
+  // cmux-relay forwards the host's last frame, then reports the peer gone, back to back: the
+  // error text arrives while the bye is still being decrypted.
+  await live.host.send({ t: 'bye', reason: 'revoked' });
+  live.circuit.serverText({ type: 'error', code: 'peer-disconnected', message: 'gone', retryable: true });
+  await settle(() => seen.includes('revoked') || seen.includes('ended'), 'a terminal state');
+  assert.equal(ctx.session.state, 'revoked');
+  assert.ok(!seen.includes('ended'), `states: ${seen.join(' → ')}`);
+});
+
 test('circuit closing while live ends the session', async () => {
   const ctx = setup();
   const live = await goLive(ctx);
