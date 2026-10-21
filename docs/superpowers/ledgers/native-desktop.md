@@ -243,3 +243,18 @@ Local checks on `777cc88244` (and on `ef064b3dba` before L6): `verify-local.py -
 Local build: tagged Release `reload.sh --tag cp1 --release --build-only` on `ef064b3dba` (Xcode 26.6, prebuilt GhosttyKit, `CMUX_SKIP_ZIG_BUILD=1`, `CMUX_WIREGUARD_GO_REQUIRE=0`, `CMUX_DEV_BACKEND_MODE=local`): **BUILD SUCCEEDED**, no `-O` SIL crash on 26.6. Ruling: files.cmux.com has no published cmux-tui client for this history, so the bundle got a stub `cmux-tui` (answers `remote-probe` only) via `CMUX_TUI_CLIENT_LOCAL` — cost if wrong: none for the smoke, but a real build needs ShellX's own cmux-tui build (W1/L5).
 
 **Still owed for checkpoint 1:** L1 CI `shellx-mac` 39233473996 and `shellx-mac-unit` 39233474076 on `a0bb5df41e` (in progress at 10:36Z, result not recorded: GitHub's unauthenticated API rate limit hit); `shellx-mac` (and `shellx-mac-unit`, needs `[unit]` in the head commit message or a dispatch) on the `shellx/sprint` head; `shellx-windows` on the sprint head; the 10-minute smoke (launch, ShellX branding, dark theme, terminal typing, sidebar, settings, `-AppleLanguages '(vi)'`, `nettop` no Manaflow traffic). Smoke was skipped by user scope change. Checkpoint 1 is therefore NOT passed yet.
+
+## L7 share rulings (2026-10-21)
+
+Plan: `docs/superpowers/plans/2026-10-21-native-desktop-w3b-share-links.md` (Part B; supersedes the sidecar design in `plans/2026-10-19-native-desktop-w3-release-share.md`).
+
+- **R1** No Rust sidecar: the Mac app hosts shares itself (CryptoKit + URLSession). Shares need a signed-in account, not `ShellXFeatures.remoteMachines`.
+- **R2** `cmux-relay` admits browser origins via `CMUX_RELAY_ALLOWED_ORIGINS` (exact-match comma list, default empty); `https://shellx.pro` set in `deploy/docker-compose.yml`.
+- **R3** Each share gets its own random slot (`newSlot()`); the machine's slot is never touched.
+- **R4** Access token `HKDF(secret, salt=share_id, info="shellx-share/1 access")`; the API stores only `sha256(access)`; a body with a `secret` field gets 400 `bad_request`.
+- **R5** `15m` and `1h` set `expires_at`; `until_quit` sets `created + 24 h` and the app revokes on quit. QR share: `type`, 2-min claim window, one-time, binds `sha256(viewer)`; other viewers get 410 `share_used`.
+- **R6** `host_seen_at` refreshed on every host-ticket mint; viewer tickets get 503 `host_offline` when it is older than 150 s.
+- **R7** One pane at a time with a pane bar on desktop and phone; Browser and Agent Chat panes show a placeholder; the viewer never resizes the host grid.
+- **C1** `SharePermission` (`view`, `type`) and `ShareLifetime` (`15m`, `1h`, `until_quit`) are public in `Packages/Shared/ShellXBrand/Sources/ShellXRemoteCore/Share/ShareMessage.swift` (Task B3).
+- **C2** API share ids are 8 chars without dash; `xxxx-xxxx` is display/URL only; Swift and the viewer strip the dash before API calls and the HKDF salt; the API accepts both forms.
+- **C3** Viewer API base comes from `web/src/site.config.json` key `shareApiBase` (default `https://relay.shellx.pro`), rendered into the page.
