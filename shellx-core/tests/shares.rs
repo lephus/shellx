@@ -69,7 +69,7 @@ fn ids_use_the_strict_alphabet_and_ignore_case() {
 
 #[test]
 fn revoke_is_idempotent() {
-    let (core, fake, _dir) = support::logged_in();
+    let (core, _fake, _dir) = support::logged_in();
     let id = create(&core)["id"].as_str().unwrap().to_string();
     core.call("shares.revoke", json!({"id": id})).unwrap();
     core.call("shares.revoke", json!({"id": id})).unwrap();
@@ -79,7 +79,7 @@ fn revoke_is_idempotent() {
 
 #[test]
 fn revoked_share_host_ticket_maps_code() {
-    let (core, fake, _dir) = support::logged_in();
+    let (core, _fake, _dir) = support::logged_in();
     let id = create(&core)["id"].as_str().unwrap().to_string();
     core.call("shares.revoke", json!({"id": id})).unwrap();
     let e = core.call("shares.host_ticket", json!({"id": id})).unwrap_err();
@@ -119,6 +119,6 @@ fn invalid_params_do_not_reach_the_server() {
 
 #[test]
 fn shares_need_a_session() {
-    let (core, fake, _dir) = support::logged_out();
+    let (core, _fake, _dir) = support::logged_out();
     assert_eq!(core.call("shares.list", json!({})).unwrap_err().code, "not_logged_in");
 }

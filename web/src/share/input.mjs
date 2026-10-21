@@ -38,7 +38,11 @@ function ctrlByte(ch) {
   return table[c] ?? null;
 }
 
-export function createInput({ onData }) {
+/**
+ * `isMac`: on other systems Ctrl+V / Ctrl+Shift+V is the browser's paste shortcut, so it is left to the
+ * `paste` event instead of sending ^V.
+ */
+export function createInput({ onData, isMac = false }) {
   let composing = false;
   let ctrlArmed = false;
   const emit = (s) => {
@@ -74,6 +78,7 @@ export function createInput({ onData }) {
         if (ev.metaKey) return false;
         const key = ev.key;
         if (ev.ctrlKey && !ev.altKey) {
+          if (!isMac && (key === 'v' || key === 'V')) return false;
           const b = ctrlByte(key);
           if (b !== null) {
             ctrlArmed = false;

@@ -14,7 +14,7 @@ const pick = (t: typeof vi) =>
 const strings = JSON.stringify({ vi: pick(ui.vi), en: pick(ui.en) }).replace(/</g, '\\u003c');
 ---
 
-<Base lang="vi" page={null} title={`${vi.shareTitle} — ShellX`} description={vi.shareDescription}>
+<Base lang="vi" page={null} minimalHeader title={`${vi.shareTitle} — ShellX`} description={vi.shareDescription}>
   <Fragment slot="head">
     <meta name="referrer" content="no-referrer" />
     <script is:inline data-share-boot>

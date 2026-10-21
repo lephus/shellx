@@ -336,7 +336,14 @@ impl RelayCommand {
                 "-V" | "--version" => return Ok(Self::Version),
                 "--allow-open" => config.allow_open = true,
                 "--allowed-origin" => {
-                    config.allowed_origins.push(parse_next_string("--allowed-origin", &mut args)?);
+                    let origin = parse_next_string("--allowed-origin", &mut args)?;
+                    let origin = origin.trim();
+                    if origin.is_empty() {
+                        return Err(ConfigError::new(
+                            "--allowed-origin requires a non-empty value",
+                        ));
+                    }
+                    config.allowed_origins.push(origin.to_owned());
                 }
                 "--bind" => config.bind = parse_next("--bind", &mut args)?,
                 "--lease-seconds" => {
@@ -679,6 +686,26 @@ mod tests {
         .unwrap();
         assert!(matches!(command, RelayCommand::Serve(config)
             if config.allowed_origins.last().map(String::as_str) == Some("https://c.example")));
+    }
+
+    #[test]
+    fn allowed_origin_flag_is_trimmed_and_empty_is_rejected() {
+        let command = RelayCommand::parse(
+            RelayConfig::default(),
+            ["--allowed-origin", "  https://d.example \t"].map(OsString::from),
+        )
+        .unwrap();
+        assert!(matches!(command, RelayCommand::Serve(config)
+            if config.allowed_origins == ["https://d.example"]));
+        for value in ["", "   "] {
+            let error = RelayCommand::parse(
+                RelayConfig::default(),
+                ["--allowed-origin", value].map(OsString::from),
+            )
+            .err()
+            .expect("empty --allowed-origin was accepted");
+            assert!(error.to_string().contains("--allowed-origin"), "{error}");
+        }
     }
 
     #[test]

@@ -251,6 +251,7 @@ final class ShareWireTests: XCTestCase {
                        #"{"t":"hello","seq":1,"nonce":"AAAAAAAAAAAAAAAAAAAAAA==","label":"L"}"#)
         XCTAssertEqual(String(decoding: ShareMessage.bye(.hostQuit).wireJSON(seq: 3), as: UTF8.self),
                        #"{"t":"bye","seq":3,"reason":"host_quit"}"#)
+        XCTAssertEqual(String(decoding: ShareMessage.ka.wireJSON(seq: 4), as: UTF8.self), #"{"t":"ka","seq":4}"#)
     }
 
     func testMessageRoundTripAllKinds() throws {
@@ -260,7 +261,7 @@ final class ShareWireTests: XCTestCase {
             .welcome(nonce: n, perm: .type, expiresAt: 99, panes: panes, active: "p"), .panes(panes, active: "p"),
             .replay(pane: "p", cols: 3, rows: 4, data: Data([0, 255])), .out(pane: "p", data: Data()),
             .size(pane: "p", cols: 5, rows: 6), .bye(.revoked), .bye(.expired), .hello(nonce: n, label: "Safari"),
-            .select(pane: "p"), .input(pane: "p", data: Data("x".utf8)),
+            .select(pane: "p"), .input(pane: "p", data: Data("x".utf8)), .ka,
         ]
         for m in all {
             XCTAssertEqual(try JSONDecoder().decode(ShareEnvelope.self, from: m.wireJSON(seq: 7)).message, m)
