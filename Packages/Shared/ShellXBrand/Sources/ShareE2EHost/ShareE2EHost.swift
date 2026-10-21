@@ -105,7 +105,7 @@ struct ObservedSockets: ShareSocketFactory {
     }
 }
 
-/// A class: ShareHost tells circuits apart by socket identity (`as AnyObject ===`).
+/// A class, like the real socket: ShareHost tells circuits apart by serial number, not socket identity.
 final class ObservedSocket: ShareSocket {
     let inner: any ShareSocket
     init(inner: any ShareSocket) { self.inner = inner }
