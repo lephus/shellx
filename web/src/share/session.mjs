@@ -10,6 +10,8 @@ import {
 
 export const RELAY_PROTOCOL = 5;
 export const CONNECT_TIMEOUT_MS = 15_000;
+/** A live session with no host frame (ka included) for this long is `ended`; the host sends ka after 60 s idle. */
+export const SILENCE_TIMEOUT_MS = 90_000;
 export const DEFAULT_API_BASE = 'https://relay.shellx.pro';
 
 const MAX_LISTENER_FAILURES = 3;
@@ -57,7 +59,7 @@ function circuitUrl(relayUrl, circuit) {
 export function createSession({
   id, secret, fetch, WebSocket, now = Date.now, setTimeout: setTimer = globalThis.setTimeout,
   clearTimeout: clearTimer = globalThis.clearTimeout, storage, apiBase = DEFAULT_API_BASE, label = 'Browser',
-  timeoutMs = CONNECT_TIMEOUT_MS,
+  timeoutMs = CONNECT_TIMEOUT_MS, silenceMs = SILENCE_TIMEOUT_MS,
 }) {
   const listeners = new Map();
   let state = 'loading';
@@ -175,6 +177,17 @@ export function createSession({
     lastSeq = msg.seq;
     dispatch(msg);
     listenerFailures = 0;
+    if (state === 'live') watchSilence();
+  }
+
+  // Live-traffic watchdog: a sleeping phone or a dead path can leave the circuit open but silent.
+  // Every accepted frame restarts it; `ended` hands over to the page's Retry / visibility reconnect.
+  function watchSilence() {
+    if (timer !== null) clearTimer(timer);
+    timer = setTimer(() => {
+      timer = null;
+      setState('ended', { silent: true });
+    }, silenceMs);
   }
 
   function dispatch(msg) {
@@ -204,19 +217,23 @@ export function createSession({
         emit('welcome', { perm, panes, active, expiresAt });
         break;
       case 'panes':
+        // Only the list and titles: `msg.active` is the host's own focus, not the viewer's pane. If
+        // the shown pane vanished, nothing is shown until the host's replay names what it streams.
         panes = msg.panes;
-        active = msg.active;
+        if (!panes.some((p) => p.id === active)) active = null;
         emit('panes', { panes, active });
         break;
       case 'replay':
+        // The host decides what is streamed; its replay sets the shown pane.
+        active = msg.pane;
         emit('replay', { pane: msg.pane, cols: msg.cols, rows: msg.rows, data: msg.data });
         break;
       case 'out':
-        emit('out', { pane: msg.pane, data: msg.data });
+        if (msg.pane === active) emit('out', { pane: msg.pane, data: msg.data });
         break;
       case 'size':
         panes = panes.map((p) => (p.id === msg.pane ? { ...p, cols: msg.cols, rows: msg.rows } : p));
-        emit('size', { pane: msg.pane, cols: msg.cols, rows: msg.rows });
+        if (msg.pane === active) emit('size', { pane: msg.pane, cols: msg.cols, rows: msg.rows });
         break;
       case 'bye':
         setState(BYE[msg.reason], { bye: msg.reason });

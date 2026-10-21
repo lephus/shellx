@@ -249,6 +249,28 @@ final class ShareHostTests: XCTestCase {
         await host.stop(reason: .revoked)
     }
 
+    /// The host streams one pane per circuit; `in` for any other terminal pane (the host's focused
+    /// one included) is dropped and counted, so a viewer never types into a pane it is not shown.
+    func testInputOnlyForTheStreamedPane() async throws {
+        let host = makeHost(permission: .type)
+        let control = try await startRegistered(host)
+        let viewer = try await connectViewer(control, circuit: "c1") // streams p1
+        viewer.send(.input(pane: "p2", data: Data("x".utf8)))
+        try await shareEventually { await host.droppedInputCount == 1 }
+        XCTAssertTrue(source.inputs.isEmpty)
+        viewer.send(.select(pane: "p2"))
+        try await shareEventually { viewer.messages().count >= 3 }
+        XCTAssertEqual(viewer.messages()[2], .replay(pane: "p2", cols: 100, rows: 30, data: Data("\u{1b}[2Jp2-screen".utf8)))
+        viewer.send(.input(pane: "p1", data: Data("y".utf8)))
+        viewer.send(.input(pane: "p2", data: Data("z".utf8)))
+        try await shareEventually { self.source.inputs.count == 1 }
+        XCTAssertEqual(source.inputs.first?.pane, "p2")
+        XCTAssertEqual(source.inputs.first?.bytes, Data("z".utf8))
+        let dropped = await host.droppedInputCount
+        XCTAssertEqual(dropped, 2)
+        await host.stop(reason: .revoked)
+    }
+
     func testSelectSwitchesStream() async throws {
         let host = makeHost()
         let control = try await startRegistered(host)

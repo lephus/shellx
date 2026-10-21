@@ -2,6 +2,7 @@
 //   node --test deploy/tests/*.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -66,7 +67,8 @@ test('admin: nginx-proxy settings for admin.shellx.pro turn the access log off a
 
 // --- relay2 (cmux-relay), built on the VPS from a pinned commit, behind nginx-proxy at /v2/relay ---
 
-const R = '57dd520ccf20b55c7eac662f1e09eae1c5069917';
+// 08de0bb35e: the first commit with the trimmed CMUX_RELAY_ALLOWED_ORIGINS allowlist (aeccf13e95 + 08de0bb35e).
+const R = '08de0bb35efbd46e3cade25446fdb6ffffac41bc';
 const relayEnv = readFileSync(join(deployDir, 'relay.env'), 'utf8');
 
 test('relay2: built locally from relay2-src/<R> (no registry image), only under the relay2 profile', () => {
@@ -80,6 +82,15 @@ test('relay2: built locally from relay2-src/<R> (no registry image), only under 
   assert.match(relay2, new RegExp(`^ {6}context: \\./relay2-src/${sha}$`, 'm'));
   assert.match(relay2, /^ {6}dockerfile: scripts\/shellx\/relay2\/Dockerfile$/m);
   assert.match(relay2, new RegExp(`^ {8}REVISION: ${sha}$`, 'm'));
+});
+
+test('relay2: the pinned commit is on this branch and has the Origin allowlist', () => {
+  const sha = service('relay2').match(/^ {4}image: shellx-relay2:([0-9a-f]{40})$/m)[1];
+  const git = (...args) => execFileSync('git', ['-C', deployDir, ...args], { encoding: 'utf8' });
+  // Throws (exit 1) unless the pin is an ancestor of HEAD: rollouts and rollbacks need it reachable.
+  git('merge-base', '--is-ancestor', sha, 'HEAD');
+  const config = git('show', `${sha}:cmux-tui/crates/cmux-relay/src/config.rs`);
+  assert.ok(config.includes('CMUX_RELAY_ALLOWED_ORIGINS'), 'pinned relay2 has no Origin allowlist: every browser viewer would get 403');
 });
 
 test('relay2: restart, 256 MB ceiling without swap, read-only, no ports, no volumes, proxy network only', () => {

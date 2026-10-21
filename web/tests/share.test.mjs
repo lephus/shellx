@@ -543,12 +543,53 @@ test('live stream: replay, out, size and panes reach the page; stage-3 AAD only'
   assert.equal(text(got[0][1].data), '\x1b[2Jhello');
   assert.equal(text(got[1][1].data), 'chào');
   assert.deepEqual([got[2][1].cols, got[2][1].rows], [120, 40]);
-  assert.equal(got[3][1].active, 'p3');
+  // panes never moves the viewer to the host's pane: the shown pane p1 vanished, so nothing is
+  // shown (and nothing typed) until the host's replay says what it streams now.
+  assert.equal(got[3][1].active, null);
+  assert.equal(ctx.session.active, null);
+  await live.host.send({ t: 'replay', pane: 'p3', cols: 80, rows: 24, data: b64Encode(utf8('logs')) });
+  await settle(() => got.length === 5, 'replay of p3');
   assert.equal(ctx.session.active, 'p3');
   // A frame sealed with the welcome-stage AAD after welcome no longer opens.
   await live.host.send({ t: 'out', pane: 'p3', data: b64Encode(utf8('x')) }, 'welcome');
   await settle(() => ctx.session.dropped === 1);
-  assert.equal(got.length, 4);
+  assert.equal(got.length, 5);
+});
+
+test('the viewer keeps its own pane: a panes update naming the host focus does not move it', async () => {
+  const ctx = setup();
+  const outs = [];
+  ctx.session.on('out', (e) => outs.push([e.pane, text(e.data)]));
+  ctx.session.start();
+  const relay = await relayToReady(ctx);
+  const host = await hostFor(relay.circuit);
+  const twoTerminals = [
+    { id: 'p1', title: 'zsh', kind: 'terminal', cols: 80, rows: 24 },
+    { id: 'p2', title: 'vim', kind: 'terminal', cols: 100, rows: 30 },
+  ];
+  await host.welcome('type', { panes: twoTerminals });
+  await settle(() => ctx.session.state === 'live', 'live');
+  assert.equal(ctx.session.active, 'p1', 'welcome.active is the initial pane');
+  ctx.session.select('p2');
+  await host.send({ t: 'replay', pane: 'p2', cols: 100, rows: 30, data: b64Encode(utf8('vim')) });
+  // The host's title changed and its focus is p1: list and titles update, the selection does not.
+  const renamed = [{ ...twoTerminals[0], title: 'make' }, twoTerminals[1]];
+  await host.send({ t: 'panes', panes: renamed, active: 'p1' });
+  await host.send({ t: 'out', pane: 'p2', data: b64Encode(utf8('still p2')) });
+  await settle(() => outs.length === 1, 'p2 output');
+  assert.equal(ctx.session.active, 'p2');
+  assert.equal(ctx.session.panes[0].title, 'make');
+  assert.deepEqual(outs, [['p2', 'still p2']]);
+  // Output of a pane the viewer does not show never reaches the page.
+  await host.send({ t: 'out', pane: 'p1', data: b64Encode(utf8('p1 noise')) });
+  await host.send({ t: 'out', pane: 'p2', data: b64Encode(utf8('more')) });
+  await settle(() => outs.length === 2, 'second p2 output');
+  assert.deepEqual(outs[1], ['p2', 'more']);
+  // Typing goes to p2, the pane on screen.
+  ctx.session.input(utf8('l'));
+  await settle(() => relay.circuit.binarySent().length === 3, 'in frame');
+  const sent = await host.received();
+  assert.deepEqual(sent.map((m) => [m.t, m.pane]), [['select', 'p2'], ['in', 'p2']]);
 });
 
 test('replayed or reordered frames (non-increasing seq) are dropped and counted', async () => {
@@ -752,6 +793,29 @@ test('keepalive (A2): a ka after welcome changes nothing and is not counted', as
   await live.host.sendRaw({ t: 'out', pane: 'p1', data: b64Encode(utf8('new')) }, 4, aad);
   await settle(() => events.length === 1 && ctx.session.dropped === 1);
   assert.equal(text(events[0][1].data), 'new');
+});
+
+test('a live session silent for 90 s (no frame, not even ka) ends, so Retry can reconnect', async () => {
+  const ctx = setup();
+  const seen = states(ctx.session);
+  const live = await goLive(ctx);
+  const tick = () => new Promise((r) => setTimeout(r, 20));
+  ctx.clock.advance(89_000);
+  assert.equal(ctx.session.state, 'live');
+  await live.host.send({ t: 'ka' }); // any frame restarts the 90 s
+  await tick();
+  ctx.clock.advance(89_000);
+  assert.equal(ctx.session.state, 'live');
+  await live.host.send({ t: 'out', pane: 'p1', data: b64Encode(utf8('x')) });
+  await tick();
+  ctx.clock.advance(89_999);
+  assert.equal(ctx.session.state, 'live');
+  ctx.clock.advance(1);
+  assert.equal(ctx.session.state, 'ended');
+  assert.deepEqual(ctx.session.detail, { silent: true });
+  assert.ok(live.circuit.closed, 'circuit closed');
+  assert.equal(ctx.clock.pending(), 0, 'no timer left');
+  assert.ok(!seen.includes('error'), `states: ${seen.join(' → ')}`);
 });
 
 test('keepalive (A2): a ka before welcome is dropped and counted', async () => {

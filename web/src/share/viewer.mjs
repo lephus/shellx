@@ -253,21 +253,24 @@ function connect() {
     renderPanes(panes, active);
     showPane(active);
   }));
+  // The session keeps the viewer's own pane (a `panes` update never moves it) and only forwards
+  // `out`/`size` of that pane; a `replay` names the pane the host streams from now on.
   s.on('panes', mine(({ panes, active }) => {
-    renderPanes(panes, active);
-    showPane(active);
+    renderPanes(panes, active ?? shownPane);
+    if (active) showPane(active);
   }));
   s.on('replay', mine(({ pane, cols, rows, data }) => {
-    if (pane !== s.active || !term) return;
+    if (!term) return;
+    showPane(pane);
     term.reset();
     resizeTo(cols, rows);
     term.write(data);
   }));
-  s.on('out', mine(({ pane, data }) => {
-    if (pane === s.active && term) term.write(data);
+  s.on('out', mine(({ data }) => {
+    term?.write(data);
   }));
-  s.on('size', mine(({ pane, cols, rows }) => {
-    if (pane === s.active) resizeTo(cols, rows);
+  s.on('size', mine(({ cols, rows }) => {
+    resizeTo(cols, rows);
   }));
   showStatus('loading');
   s.start();
