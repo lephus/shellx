@@ -34,7 +34,7 @@ The relay only matches your two devices and forwards their traffic. It cannot re
 
 ## Set it up in three steps
 
-1. **Install ShellX on the computer** (macOS 12+ or Windows 10 1809+) and create an account.
+1. **Install ShellX on the computer** (macOS 14+ or Windows 10 1809+) and create an account.
 2. **Install the phone app** (iOS 15+ or Android 8.0+) and sign in with the same account.
 3. **Pair them.** Open the tray menu on the computer, choose to pair a phone, and scan the QR code.
 

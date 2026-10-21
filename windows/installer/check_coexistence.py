@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Static check that shellx-native.iss coexists with the Flutter ShellX installer.
 
+The display name and Start-menu shortcut may be "ShellX" like the Flutter app's (the native app
+replaces it); everything that would break the Flutter install stays checked.
+
 The Flutter values are hard-coded from tag `flutter-final`
 (`git show flutter-final:release/windows/shellx.iss`). Stdlib only.
 Usage: check_coexistence.py [path/to/shellx-native.iss]; exit 1 on any problem.
@@ -10,11 +13,9 @@ import re
 import sys
 
 FLUTTER_APP_ID = "{6A3A45BD-0A27-407A-A1FF-3C8D1BE226EE}"
-FLUTTER_APP_NAME = "ShellX"
 FLUTTER_EXE = "ShellX.exe"
 FLUTTER_DIR = r"{autopf}\ShellX"
 FLUTTER_GROUP = "ShellX"
-FLUTTER_SHORTCUTS = {r"{autoprograms}\ShellX", r"{autodesktop}\ShellX"}
 FLUTTER_KILLED = ("shellx.exe", "shellx-mux.exe")
 ALLOWED_DELETE = r"{localappdata}\shellx\native"
 
@@ -58,8 +59,6 @@ def check(text):
     app_id = need("AppId").replace("{{", "{")
     if app_id.lower() == FLUTTER_APP_ID.lower():
         problems.append("AppId equals the Flutter AppId")
-    if need("AppName").lower() == FLUTTER_APP_NAME.lower():
-        problems.append("AppName equals the Flutter AppName")
     if need("DefaultDirName").lower() == FLUTTER_DIR.lower():
         problems.append("DefaultDirName equals the Flutter install dir")
     if need("DefaultGroupName").lower() == FLUTTER_GROUP.lower():
@@ -69,14 +68,6 @@ def check(text):
         problems.append("AppExeName is not defined")
     if exe.lower() == FLUTTER_EXE.lower():
         problems.append("exe name equals the Flutter exe")
-    for line in sections.get("icons", []):
-        m = re.search(r'Name:\s*"([^"]*)"', line)
-        if m:
-            name = resolve(m.group(1), defines)
-            if name.lower() in {s.lower() for s in FLUTTER_SHORTCUTS}:
-                problems.append("shortcut %s equals a Flutter shortcut" % name)
-            if name.rstrip("\\").lower().endswith("\\shellx"):
-                problems.append("shortcut %s is named like the Flutter app" % name)
 
     for raw in text.splitlines():
         low = resolve(raw, defines).lower()

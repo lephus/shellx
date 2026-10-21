@@ -40,11 +40,11 @@ const ld = [
     '@context': 'https://schema.org', '@type': 'SoftwareApplication', '@id': appId,
     name: 'ShellX', alternateName: ['ShellX Terminal', 'shellx.pro'],
     applicationCategory: 'DeveloperApplication', applicationSubCategory: 'Remote terminal',
-    operatingSystem: 'macOS 12+, Windows 10+, iOS 15+, Android 8+',
+    operatingSystem: 'macOS 14+, Windows 10+, iOS 15+, Android 8+',
     softwareVersion: desktopVersion,
     softwareRequirements: lang === 'vi'
-      ? 'App cho máy tính: macOS 12+ hoặc Windows 10 (1809)+. App điện thoại: iOS 15+ hoặc Android 8.0+.'
-      : 'Desktop app: macOS 12+ or Windows 10 (1809)+. Phone app: iOS 15+ or Android 8.0+.',
+      ? 'App cho máy tính: macOS 14+ hoặc Windows 10 (1809)+. App điện thoại: iOS 15+ hoặc Android 8.0+.'
+      : 'Desktop app: macOS 14+ or Windows 10 (1809)+. Phone app: iOS 15+ or Android 8.0+.',
     downloadUrl: [macDownloadUrl(), windowsDownloadUrl()],
     description: t.homeDescription, url, inLanguage: lang,
     image: `${site}/og/og-${lang}.png`, screenshot: `${site}/og/og-${lang}.png`,

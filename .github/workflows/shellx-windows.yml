@@ -270,6 +270,13 @@ jobs:
           # verdict, the log line is informational.
           grep -F "smoke: PASS" smoke.log || echo "::warning::no PASS line captured (exit code was 0)"
 
+      - name: Read the app version (windows/Cargo.toml)
+        shell: bash
+        run: |
+          version="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"$/\1/p' windows/Cargo.toml)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::cannot read the workspace version from windows/Cargo.toml: '$version'"; exit 1; }
+          echo "SHELLX_VERSION=$version" >> "$GITHUB_ENV"
+
       - name: Version flag
         shell: bash
         run: |
@@ -278,7 +285,7 @@ jobs:
           # The release exe is a GUI-subsystem binary, so its stdout may not
           # reach a pipe; the exit code (set -e semantics above) is the
           # verdict and the text check is informational.
-          grep -F "shellx-desktop 2.0.0" version.log || echo "::warning::no version text captured (exit code was 0)"
+          grep -F "shellx-desktop $SHELLX_VERSION" version.log || echo "::warning::no version text captured (exit code was 0)"
 
   installer:
     name: installer (Inno Setup, unsigned)
@@ -299,9 +306,16 @@ jobs:
           name: shellx-desktop
           path: staged
 
+      - name: Read the app version (windows/Cargo.toml)
+        shell: bash
+        run: |
+          version="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"$/\1/p' windows/Cargo.toml)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::cannot read the workspace version from windows/Cargo.toml: '$version'"; exit 1; }
+          echo "SHELLX_VERSION=$version" >> "$GITHUB_ENV"
+
       - name: Build installer
         shell: pwsh
-        run: ./windows/installer/build-installer.ps1 -Version 2.0.0 -SourceDir "$env:GITHUB_WORKSPACE\staged" -OutputDir "$env:GITHUB_WORKSPACE\dist" -AppIcon "$env:GITHUB_WORKSPACE\windows\shellx-app\resources\app_icon.ico"
+        run: ./windows/installer/build-installer.ps1 -Version $env:SHELLX_VERSION -SourceDir "$env:GITHUB_WORKSPACE\staged" -OutputDir "$env:GITHUB_WORKSPACE\dist" -AppIcon "$env:GITHUB_WORKSPACE\windows\shellx-app\resources\app_icon.ico"
 
       - name: Coexistence check
         shell: pwsh
@@ -310,18 +324,15 @@ jobs:
       - name: Smoke install, run, uninstall
         shell: pwsh
         run: |
-          $setup = "$env:GITHUB_WORKSPACE\dist\ShellX-Setup-2.0.0-sprint.exe"
+          $setup = "$env:GITHUB_WORKSPACE\dist\ShellX-Setup-$env:SHELLX_VERSION.exe"
           $i = Start-Process $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/CURRENTUSER',"/LOG=$env:GITHUB_WORKSPACE\install.log" -Wait -PassThru
           if ($i.ExitCode -ne 0) { throw "installer exit $($i.ExitCode)" }
           $dir = "$env:LOCALAPPDATA\Programs\ShellX Native"
           if (-not (Test-Path "$dir\shellx-desktop.exe")) { throw 'exe missing after install' }
-          # The Start-menu shortcut name has non-ASCII letters (needs the BOM in the .iss): match by
-          # prefix and compare the code points, so a mojibake name fails.
-          $lnk = Get-ChildItem "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" -Filter 'ShellX 2*.lnk' | Select-Object -First 1
-          if (-not $lnk) { throw 'Start-menu shortcut missing' }
-          Write-Host "shortcut: $($lnk.Name)"
-          $expected = 'ShellX 2 (th' + [char]0x1EED + ' nghi' + [char]0x1EC7 + 'm).lnk'
-          if ($lnk.Name -ne $expected) { throw "shortcut name is not '$expected': $($lnk.Name)" }
+          $lnk = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\ShellX.lnk"
+          if (-not (Test-Path $lnk)) { throw 'Start-menu shortcut ShellX.lnk missing' }
+          $target = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk).TargetPath
+          if ($target -ne "$dir\shellx-desktop.exe") { throw "ShellX.lnk points at '$target'" }
           $p = Start-Process "$dir\shellx-desktop.exe" -ArgumentList '--smoke-ui-assets' -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "--smoke-ui-assets exit $($p.ExitCode)" }
           $u = Start-Process "$dir\unins000.exe" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES' -Wait -PassThru
@@ -334,7 +345,7 @@ jobs:
       - name: Upload installer
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ShellX-Setup-2.0.0-sprint
-          path: dist/ShellX-Setup-2.0.0-sprint.exe
+          name: ShellX-Setup-${{ env.SHELLX_VERSION }}
+          path: dist/ShellX-Setup-${{ env.SHELLX_VERSION }}.exe
           if-no-files-found: error
           retention-days: 14
