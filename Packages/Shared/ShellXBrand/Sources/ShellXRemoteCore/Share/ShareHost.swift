@@ -402,7 +402,7 @@ public actor ShareHost {
             case (.live, .select(let pane)):
                 await viewerSelect(id, pane: pane)
             case (.live, .input(let pane, let data)):
-                await input(pane: pane, data: data)
+                await input(id, pane: pane, data: data)
             default:
                 droppedFrameCount += 1
             }
@@ -594,8 +594,11 @@ public actor ShareHost {
         scheduleKeepalive(id)
     }
 
-    private func input(pane: String, data: Data) async {
-        guard permission == .type, !isExpired, data.count <= Self.maxInputBytes else { droppedInputCount += 1; return }
+    /// Typed bytes, accepted only for the pane this circuit streams: the viewer types into what it
+    /// sees, never into another pane (the host's focused one included).
+    private func input(_ id: String, pane: String, data: Data) async {
+        guard permission == .type, !isExpired, data.count <= Self.maxInputBytes,
+              let streamed = circuits[id]?.pane, streamed == pane else { droppedInputCount += 1; return }
         let source = self.source
         let written = await MainActor.run { () -> Bool in
             guard source.panes.first(where: { $0.id == pane })?.kind == .terminal else { return false }

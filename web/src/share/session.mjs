@@ -204,19 +204,23 @@ export function createSession({
         emit('welcome', { perm, panes, active, expiresAt });
         break;
       case 'panes':
+        // Only the list and titles: `msg.active` is the host's own focus, not the viewer's pane. If
+        // the shown pane vanished, nothing is shown until the host's replay names what it streams.
         panes = msg.panes;
-        active = msg.active;
+        if (!panes.some((p) => p.id === active)) active = null;
         emit('panes', { panes, active });
         break;
       case 'replay':
+        // The host decides what is streamed; its replay sets the shown pane.
+        active = msg.pane;
         emit('replay', { pane: msg.pane, cols: msg.cols, rows: msg.rows, data: msg.data });
         break;
       case 'out':
-        emit('out', { pane: msg.pane, data: msg.data });
+        if (msg.pane === active) emit('out', { pane: msg.pane, data: msg.data });
         break;
       case 'size':
         panes = panes.map((p) => (p.id === msg.pane ? { ...p, cols: msg.cols, rows: msg.rows } : p));
-        emit('size', { pane: msg.pane, cols: msg.cols, rows: msg.rows });
+        if (msg.pane === active) emit('size', { pane: msg.pane, cols: msg.cols, rows: msg.rows });
         break;
       case 'bye':
         setState(BYE[msg.reason], { bye: msg.reason });
