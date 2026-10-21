@@ -1,0 +1,150 @@
+---
+// Share viewer: https://shellx.pro/s/<id>#<secret>. nginx serves this one file for every
+// /s/xxxx-xxxx path (deploy/web/nginx.conf). The secret lives only in the fragment: the inline boot
+// script reads it and strips it from the address bar before any other script or request runs; the
+// bundled viewer (src/share/viewer.mjs + xterm.js, served from /_astro/) gets it from there.
+import Base from '../../layouts/Base.astro';
+import { ui } from '../../i18n/ui';
+import { shareApiBase } from '../../lib/site';
+
+const vi = ui.vi;
+const pick = (t: typeof vi) =>
+  Object.fromEntries(Object.entries(t).filter(([k]) => k.startsWith('share'))) as Record<string, string>;
+// JSON inside <script>: escape "<" so no string can close the element.
+const strings = JSON.stringify({ vi: pick(ui.vi), en: pick(ui.en) }).replace(/</g, '\\u003c');
+---
+
+<Base lang="vi" page={null} title={`${vi.shareTitle} — ShellX`} description={vi.shareDescription}>
+  <Fragment slot="head">
+    <meta name="referrer" content="no-referrer" />
+    <script is:inline data-share-boot>
+      (function () {
+        var hash = location.hash;
+        var path = location.pathname;
+        history.replaceState(null, '', path);
+        var m = /^\/s\/([0-9a-z]{4}-?[0-9a-z]{4})\/?$/.exec(path);
+        window.__shellxShare = { id: m ? m[1] : '', secret: hash.length > 1 ? hash.slice(1) : '' };
+      })();
+    </script>
+  </Fragment>
+  <section class="share" data-share data-api-base={shareApiBase} data-state="loading">
+    <div class="share-head">
+      <h1 data-t="shareTitle">{vi.shareTitle}</h1>
+      <span class="badge" data-perm hidden></span>
+      <span class="expiry" data-expiry hidden></span>
+    </div>
+    <nav class="panebar" data-panes data-t-label="sharePanes" aria-label={vi.sharePanes} hidden></nav>
+    <div class="status" data-status role="status" aria-live="polite">
+      <p class="status-title" data-status-title>{vi.shareLoading}</p>
+      <p class="status-body" data-status-body></p>
+      <button type="button" class="retry" data-retry data-t="shareRetry" hidden>{vi.shareRetry}</button>
+      <noscript><p class="status-body">{vi.shareNoScript}</p><p class="status-body" lang="en">{ui.en.shareNoScript}</p></noscript>
+    </div>
+    <div class="stage" data-stage hidden>
+      <div class="term-scroll" data-term-scroll>
+        <div class="term" data-term></div>
+      </div>
+      <textarea
+        class="typing"
+        data-input
+        aria-label={vi.shareTapToType}
+        data-t-label="shareTapToType"
+        autocapitalize="off"
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+        enterkeyhint="send"
+        tabindex="-1"></textarea>
+      <p class="placeholder" data-placeholder hidden></p>
+    </div>
+    <div class="keyrow" data-keys data-t-label="shareKeys" role="toolbar" aria-label={vi.shareKeys} hidden>
+      <button type="button" data-key="Escape">Esc</button>
+      <button type="button" data-key="Tab">Tab</button>
+      <button type="button" data-key="Ctrl" aria-pressed="false">Ctrl</button>
+      <button type="button" data-key="ArrowLeft" aria-label="←">←</button>
+      <button type="button" data-key="ArrowUp" aria-label="↑">↑</button>
+      <button type="button" data-key="ArrowDown" aria-label="↓">↓</button>
+      <button type="button" data-key="ArrowRight" aria-label="→">→</button>
+    </div>
+    <p class="e2e" data-t="shareE2E">{vi.shareE2E}</p>
+  </section>
+  <script type="application/json" id="share-strings" set:html={strings} />
+  <script>
+    import '../../share/viewer.mjs';
+  </script>
+</Base>
+
+<style>
+  .share {
+    --s-bg: #0b0716; --s-panel: #100b1d; --s-raise: #171128; --s-line: #211a37; --s-border: #2a2145;
+    --s-text: #cdc7e0; --s-text-hi: #e6e2f2; --s-muted: #8a83a6;
+    --s-primary: #60a5fa; --s-primary-soft: rgba(96, 165, 250, 0.12); --s-primary-line: rgba(96, 165, 250, 0.45);
+    --s-primary-text: #93c5fd; --s-running: #e8c468; --s-done: #6fd49a; --s-error: #e88a8a;
+    max-width: 80rem; margin: 0 auto; padding: 1.25rem 1rem 0; color: var(--s-text);
+  }
+  .share-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.9rem; margin-bottom: 0.9rem; }
+  .share-head h1 { font-size: 1.35rem; margin: 0; color: var(--s-text-hi); }
+  .badge {
+    font-family: var(--mono); font-size: 0.78rem; padding: 0.15rem 0.55rem; border-radius: 999px;
+    border: 1px solid var(--s-primary-line); background: var(--s-primary-soft); color: var(--s-primary-text);
+  }
+  .badge[data-perm-kind='type'] { border-color: var(--s-done); color: var(--s-done); background: transparent; }
+  .expiry { font-size: 0.85rem; color: var(--s-muted); }
+
+  .panebar { display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.6rem; scrollbar-width: thin; }
+  .panebar :global(button) {
+    flex: none; display: inline-flex; align-items: center; gap: 0.4rem; max-width: 16rem;
+    font: inherit; font-size: 0.88rem; color: var(--s-text); background: var(--s-panel);
+    border: 1px solid var(--s-border); border-radius: 8px; padding: 0.35rem 0.75rem; cursor: pointer;
+  }
+  .panebar :global(button span) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .panebar :global(button:hover) { background: var(--s-raise); }
+  .panebar :global(button[aria-pressed='true']) {
+    border-color: var(--s-primary-line); background: var(--s-primary-soft); color: var(--s-primary-text);
+  }
+  .panebar :global(.kind) { font-family: var(--mono); font-size: 0.72rem; color: var(--s-muted); }
+
+  .status {
+    background: var(--s-panel); border: 1px solid var(--s-border); border-radius: 12px;
+    padding: 1.4rem 1.25rem; max-width: 40rem;
+  }
+  .status-title { margin: 0; font-weight: 600; color: var(--s-text-hi); font-size: 1.05rem; }
+  .status-body { margin: 0.4rem 0 0; color: var(--s-muted); }
+  .share[data-state='loading'] .status-title,
+  .share[data-state='connecting'] .status-title { color: var(--s-running); }
+  .share[data-tone='bad'] .status-title { color: var(--s-error); }
+  .retry {
+    margin-top: 1rem; font: inherit; font-weight: 600; color: var(--s-bg); background: var(--s-primary);
+    border: 0; border-radius: 8px; padding: 0.5rem 1.1rem; cursor: pointer;
+  }
+  .retry:hover { background: var(--s-primary-text); }
+
+  .stage { position: relative; }
+  .term-scroll {
+    max-width: 100%; overflow-x: auto; background: var(--s-bg); border: 1px solid var(--s-line); border-radius: 10px; padding: 0.5rem;
+  }
+  .term { display: inline-block; }
+  .term :global(.xterm-viewport) { scrollbar-width: thin; scrollbar-color: #2a2145 transparent; }
+  .typing {
+    position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0;
+    resize: none; font-size: 16px; caret-color: transparent; color: transparent; background: transparent;
+  }
+  .placeholder {
+    margin: 0; padding: 2rem 1.25rem; background: var(--s-panel); border: 1px dashed var(--s-border);
+    border-radius: 10px; color: var(--s-muted);
+  }
+
+  .keyrow {
+    position: sticky; bottom: 0; display: flex; gap: 0.35rem; padding: 0.5rem 0; background: var(--s-bg);
+    overflow-x: auto;
+  }
+  .keyrow button {
+    flex: 1 0 auto; min-width: 2.75rem; min-height: 2.5rem; font-family: var(--mono); font-size: 0.9rem;
+    color: var(--s-text-hi); background: var(--s-raise); border: 1px solid var(--s-border); border-radius: 8px;
+    touch-action: manipulation;
+  }
+  .keyrow button[aria-pressed='true'] { border-color: var(--s-primary); color: var(--s-primary-text); background: var(--s-primary-soft); }
+  .e2e { font-size: 0.82rem; color: var(--s-muted); margin: 0.9rem 0 0; }
+  .share [hidden] { display: none !important; }
+  .share :focus-visible { outline: 2px solid var(--s-primary); outline-offset: 2px; }
+</style>
