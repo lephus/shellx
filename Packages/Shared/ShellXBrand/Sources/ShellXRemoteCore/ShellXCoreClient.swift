@@ -57,3 +57,56 @@ public struct ShellXCoreClient: Sendable {
         throw ShellXCoreError(code: "bad_response", message: "core reply has no result")
     }
 }
+
+/// One row of `shares.list`.
+public struct ShellXShareSummary: Decodable, Equatable, Sendable {
+    public let id: String
+    public let permission: SharePermission
+    public let lifetime: ShareLifetime
+    public let expiresAtUnix: Double
+    public let revoked: Bool
+
+    enum CodingKeys: String, CodingKey { case id, permission, lifetime, revoked; case expiresAtUnix = "expires_at_unix" }
+}
+
+/// `shares.create` reply.
+public struct ShellXCreatedShare: Decodable, Equatable, Sendable {
+    public let id: String
+    public let slot: String
+    public let expiresAtUnix: Double
+    public let claimUntilUnix: Double?
+
+    enum CodingKeys: String, CodingKey { case id, slot; case expiresAtUnix = "expires_at_unix"; case claimUntilUnix = "claim_until_unix" }
+}
+
+/// Typed share methods. Every call blocks on the FFI: call from a background queue, never the main thread.
+extension ShellXCoreClient {
+    /// API share ids are 8 characters; the display dash (`xxxx-xxxx`) is stripped before any call.
+    static func apiShareID(_ id: String) -> String { id.replacingOccurrences(of: "-", with: "") }
+
+    /// `access` is the HKDF access token (base64url); the link secret never reaches the core.
+    public func createShare(permission: SharePermission, lifetime: ShareLifetime, oneTime: Bool, access: String) throws -> ShellXCreatedShare {
+        try call("shares.create", ["permission": .string(permission.rawValue), "lifetime": .string(lifetime.rawValue),
+                                   "one_time": .bool(oneTime), "access": .string(access)], as: ShellXCreatedShare.self)
+    }
+
+    public func listShares() throws -> [ShellXShareSummary] {
+        struct Reply: Decodable { let shares: [ShellXShareSummary] }
+        return try call("shares.list", as: Reply.self).shares
+    }
+
+    /// Idempotent.
+    public func revokeShare(id: String) throws {
+        struct Empty: Decodable {}
+        _ = try call("shares.revoke", ["id": .string(Self.apiShareID(id))], as: Empty.self)
+    }
+
+    public func hostShareTicket(id: String) throws -> (ticket: String, relayURL: URL, expiresAt: Date) {
+        struct Reply: Decodable { let ticket: String; let expires_at_unix: Double; let relay_url: String }
+        let r = try call("shares.host_ticket", ["id": .string(Self.apiShareID(id))], as: Reply.self)
+        guard !r.ticket.isEmpty, let url = URL(string: r.relay_url), url.scheme != nil else {
+            throw ShellXCoreError(code: "bad_response", message: "core reply has no usable ticket or relay_url")
+        }
+        return (r.ticket, url, Date(timeIntervalSince1970: r.expires_at_unix))
+    }
+}

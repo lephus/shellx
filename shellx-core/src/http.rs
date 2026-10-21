@@ -33,6 +33,7 @@ const MAX_RESPONSE_BYTES: u64 = 1 << 20;
 pub enum Method {
     Get,
     Post,
+    Delete,
 }
 
 /// A finished HTTP exchange. `Debug` shows the status and body length only.
@@ -104,6 +105,7 @@ pub fn send(
     }
     let result = match method {
         Method::Get => common!(agent.get(&url)).call(),
+        Method::Delete => common!(agent.delete(&url)).call(),
         Method::Post => {
             let rb = common!(agent.post(&url)).header("Content-Type", "application/json");
             rb.send(json_body.unwrap_or(b"{}"))
