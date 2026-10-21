@@ -97,6 +97,8 @@ services:
       CMUX_RELAY_HMAC_SECRET: ${CMUX_RELAY_HMAC_SECRET:-}
       # Exactly this text, no whitespace, here and in relay.env: Node trims it, cmux-relay does not.
       CMUX_RELAY_ISSUER: shellx-relay
+      # The browser share viewer on https://shellx.pro; any other Origin is still answered 403.
+      CMUX_RELAY_ALLOWED_ORIGINS: https://shellx.pro
     healthcheck:
       # The runtime image (debian bookworm-slim) has bash but no curl or wget.
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8787 && printf 'GET /healthz HTTP/1.1\\r\\nHost: l\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"status\":\"ok\"' <&3"]

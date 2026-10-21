@@ -104,6 +104,10 @@ test('relay2: routed by exact path /v2/relay (so /v2/relay/tickets stays on the 
   assert.match(relay2, /^ {6}CMUX_RELAY_BIND: 0\.0\.0\.0:8787$/m);
 });
 
+test('relay2 admits only the shellx.pro viewer origin (exact match)', () => {
+  assert.match(service('relay2'), /^ {6}CMUX_RELAY_ALLOWED_ORIGINS: https:\/\/shellx\.pro$/m);
+});
+
 test('relay2 drops every capability and cannot gain privileges (uid 10001, port 8787)', () => {
   const relay2 = service('relay2');
   assert.match(relay2, /^ {4}cap_drop: \[ALL\]$/m);
