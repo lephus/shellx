@@ -1721,6 +1721,12 @@ lane = "manual"
 reason = "Focused OpenCode V2 Node bridge harness; it uses a TUI/socket fixture and is run by the OpenCode regression verification command."
 
 [[test]]
+path = "tests/test_shellx_share_e2e.py"
+lane = "manual"
+reason = "Share links end to end on loopback: builds cmux-relay (cargo) and the Swift share-e2e-host, needs npm ci in relay/, and runs the real relay, API, host and viewer; run by the L7 share-links verification."
+serial = true
+
+[[test]]
 path = "tests/test_opencode_server_entry.py"
 lane = "manual"
 reason = "Focused OpenCode server-entry Node harness; no workflow names it yet, so it is run by the OpenCode regression verification command."
