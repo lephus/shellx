@@ -1,0 +1,25 @@
+{
+  "frames" : [
+    {
+      "circuit" : "circuit-b3-vector",
+      "frame_hex" : "a0a1a2a3a4a5a6a7a8a9aaab2c728ba5627a56b0a506315b3f16afbd085a3236e5206b915a8c5345d5429772c909b97de004ca23801901437d39e7a46efdf8652653d529bd50972ccf",
+      "key" : "host_to_viewer",
+      "nonce_hex" : "a0a1a2a3a4a5a6a7a8a9aaab",
+      "plaintext" : "{\"t\":\"out\",\"seq\":1,\"pane\":\"p1\",\"data\":\"aGk=\"}"
+    },
+    {
+      "circuit" : "circuit-b3-vector",
+      "frame_hex" : "b0b1b2b3b4b5b6b7b8b9babb127e587ef8f137908ef01c7ebf5f21caab4d7774da1181c62c5964e12b6b36b929ab04d54e19fdd7e22720a2bf0e252dd862066c6e360ff6a892e23e",
+      "key" : "viewer_to_host",
+      "nonce_hex" : "b0b1b2b3b4b5b6b7b8b9babb",
+      "plaintext" : "{\"t\":\"in\",\"seq\":1,\"pane\":\"p1\",\"data\":\"bHMN\"}"
+    }
+  ],
+  "keys" : {
+    "access" : "CpJ3tmYl_Qc2TTdxBd3B0pHqKnW9wC7pFqgUJocnNW4",
+    "host_to_viewer_hex" : "ecde2da4de6b6fe4c930794043dee0bbacbd4baa458709792fe930dabaea2953",
+    "viewer_to_host_hex" : "995a3204473c2018b62a3e6c2330c4ad2decb77585abfc10052ae6b455e28245"
+  },
+  "secret" : "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+  "share_id" : "k7f29qd1"
+}
