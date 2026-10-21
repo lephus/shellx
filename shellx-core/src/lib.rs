@@ -13,6 +13,7 @@ pub mod http;
 pub mod machines;
 pub mod pairing;
 pub mod seal;
+pub mod shares;
 pub mod store;
 pub mod tickets;
 pub mod version;
@@ -35,6 +36,10 @@ pub const KNOWN_METHODS: &[&str] = &[
     "machines.list",
     "machines.heartbeat",
     "tickets.mint",
+    "shares.create",
+    "shares.list",
+    "shares.revoke",
+    "shares.host_ticket",
     "pair.request",
     "pair.pending",
     "pair.approve",
@@ -45,7 +50,7 @@ pub const KNOWN_METHODS: &[&str] = &[
 
 /// Methods that need `session.json` (Ruling R1: checked before dispatch).
 fn needs_session(method: &str) -> bool {
-    method.starts_with("machines.") || method.starts_with("tickets.") || method.starts_with("pair.")
+    method.starts_with("machines.") || method.starts_with("tickets.") || method.starts_with("pair.") || method.starts_with("shares.")
 }
 
 #[derive(Default)]
@@ -142,6 +147,10 @@ impl Core {
             "machines.list" => machines::list(self.agent(), cfg, store),
             "machines.heartbeat" => machines::heartbeat(self.agent(), cfg, store),
             "tickets.mint" => tickets::mint(self.agent(), cfg, store, params),
+            "shares.create" => shares::create(self.agent(), cfg, store, params),
+            "shares.list" => shares::list(self.agent(), cfg, store),
+            "shares.revoke" => shares::revoke(self.agent(), cfg, store, params),
+            "shares.host_ticket" => shares::host_ticket(self.agent(), cfg, store, params),
             "pair.request" => pairing::request(self.agent(), cfg, store, params),
             "pair.pending" => {
                 let shown = pairing::pending(self.agent(), cfg, store)?;

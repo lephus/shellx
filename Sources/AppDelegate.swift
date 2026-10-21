@@ -1288,8 +1288,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     var didScheduleAgentSessionRecovery = false
     private var didCaptureSessionLaunchState = false
     private var didArmSessionLaunchSentinel = false
-    var didAttemptStartupSessionRestore = false
-    var isApplyingSessionRestore = false
+    var didAttemptStartupSessionRestore = false {
+        didSet { ShellXSessionRestoreSignal.update() } // ShellX: share links resume after restore
+    }
+    var isApplyingSessionRestore = false {
+        didSet { ShellXSessionRestoreSignal.update() } // ShellX: share links resume after restore
+    }
     /// True only when it is safe to enumerate the window/tab tree for the v2
     /// control pre-mint pass (#2751): the initial session-restore decision has
     /// resolved (`didAttemptStartupSessionRestore`) AND no restore pass is
@@ -1722,6 +1726,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         CmuxTuiSurfaceProviderRegistry.shared.start(catalog: .shared)
         let env = ProcessInfo.processInfo.environment
         ShellXRemoteService.shared.startIfEnabled() // ShellX: remote machines (W2 Task 13); gate off returns at once
+        ShellXShareController.resumeIfEnabled() // ShellX: 15 m / 1 h share links resume once signed in (§7.3)
         let telemetryEnabled = TelemetrySettings.enabledForCurrentLaunch
         let sentryStartupPolicy = MacSentryStartupPolicy(
             environment: env,
@@ -2491,6 +2496,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
     func applicationWillTerminate(_ notification: Notification) {
         ShellXRemoteService.shared.stopForTermination() // ShellX: stops links, daemon and bridge (bounded, < 2 s)
+        ShellXShareController.stopAllForTerminationIfStarted() // ShellX: bye host_quit, revokes until-quit/QR shares (bounded)
         cloudWorkspaceOperationController?.cancelAll()
         StartupBreadcrumbLog.append("appDelegate.willTerminate.begin")
         agentChatTranscriptService.shutdown()

@@ -1,0 +1,83 @@
+name: shellx-relay2
+
+on:
+  push:
+    branches: [feat/relay-v2, main]
+    paths:
+      - cmux-tui/crates/cmux-relay/**
+      - cmux-tui/crates/cmux-remote-protocol/**
+      - cmux-tui/Cargo.lock
+      - cmux-tui/Cargo.toml
+      - cmux-tui/rust-toolchain.toml
+      - cmux-tui/vendor/**
+      - cmux-tui/bindings/**
+      - cmux-tui/build-support/**
+      - scripts/shellx/relay2/**
+      - .github/workflows/shellx-relay2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shellx-relay2-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: shellx-relay2:${{ github.sha }}
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Build image from source tarball (same path as the VPS)
+        run: |
+          set -euo pipefail
+          scripts/shellx/relay2/source-tarball.sh "${{ github.sha }}" "$RUNNER_TEMP/relay2" >/dev/null
+          mkdir "$RUNNER_TEMP/relay2/src"
+          tar -xzf "$RUNNER_TEMP/relay2/relay2-src-${{ github.sha }}.tar.gz" -C "$RUNNER_TEMP/relay2/src"
+          src="$RUNNER_TEMP/relay2/src/${{ github.sha }}"
+          docker build \
+            -f "$src/scripts/shellx/relay2/Dockerfile" \
+            --build-arg REVISION="${{ github.sha }}" \
+            --build-arg CARGO_BUILD_JOBS=4 \
+            -t "$IMAGE" \
+            "$src"
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          secret="$(openssl rand -base64 48)"
+          echo "::add-mask::$secret"
+          docker run -d --name relay2-smoke \
+            -e CMUX_RELAY_BIND=0.0.0.0:8787 \
+            -e CMUX_RELAY_HMAC_SECRET="$secret" \
+            "$IMAGE" >/dev/null
+          ok=0
+          for _ in $(seq 1 30); do
+            if docker exec relay2-smoke bash -c \
+              'exec 3<>/dev/tcp/127.0.0.1/8787 && printf "GET /healthz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3 && cat <&3' \
+              2>/dev/null | grep -q '"status":"ok"'; then
+              ok=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ok" != 1 ]; then
+            docker logs relay2-smoke 2>&1 | tail -n 20
+            exit 1
+          fi
+          docker rm -f relay2-smoke >/dev/null
+          # A non-loopback relay without a secret must refuse to start.
+          set +e
+          timeout 20 docker run --rm -e CMUX_RELAY_BIND=0.0.0.0:8787 "$IMAGE" serve >/dev/null 2>relay2-refusal.err
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ] || [ "$status" -eq 124 ]; then
+            echo "expected a refusal exit, got status $status" >&2
+            exit 1
+          fi
+          grep -q "refusing a non-loopback open relay" relay2-refusal.err

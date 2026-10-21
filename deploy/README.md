@@ -261,6 +261,133 @@ password change, `docker compose up -d relay` — signs you out, and you simply 
 restart also drops the apps' WebSockets for a moment; they reconnect on their own. 5 wrong passwords
 from one IP within 15 minutes lock that IP out for the rest of the window.
 
+## Relay v2
+
+`relay2` is `cmux-relay` (Rust), the transport of the native desktop apps' remote feature
+(`wss://relay.shellx.pro/v2/relay`). The Node relay still mints the tickets (`POST /v2/relay/tickets`)
+and serves everything else; nginx-proxy sends only the exact path `/v2/relay` to relay2 (rewritten to
+cmux-relay's own `/v1/relay`), so `/v2/relay/tickets` stays on the Node relay.
+
+**Why it is built on the VPS.** There is no public image of relay2 (the licence question to the
+upstream authors is open), so nothing is pulled or pushed for it: it is built from a pinned commit of
+`lephus/shellx`, whose source you stage by hand. The compose service `relay2` only exists under the
+profile `relay2`; a deploy without `COMPOSE_PROFILES=relay2` in the VPS's `.env` behaves exactly as
+before (relay + web + backup). deploy.yml never syncs `relay2-src/`.
+
+**Merge procedure (read first).** The relay2 pin `08de0bb35efbd46e3cade25446fdb6ffffac41bc` in
+`docker-compose.yml` must stay reachable from `main`, because the rollout stages and the workflow
+rollback checks require it. Merge `feat/relay-v2` with a real merge commit (`git merge --no-ff`;
+never squash, never rebase), or re-pin compose to a commit that is on `main` before enabling relay2.
+The pin is the first commit whose cmux-relay reads `CMUX_RELAY_ALLOWED_ORIGINS` (the browser share
+viewer's Origin allowlist); an older pin answers every viewer 403. It reaches `main` with the share
+links branch (`shellx/l7-share`), so merge that one with `--no-ff` too.
+
+**G2 pre-check, before you push main with migration 0005 (once).** deploy.yml deploys `main`, so the
+push that carries migration 0005 IS the production deploy of it. Migration 0005 rebuilds the
+`devices` table (to allow `kind = 'desktop'`) and fails closed: on any dangling reference it rolls back,
+the relay stays unhealthy and the deploy rolls back. So, before that push, look for dangling references
+on a COPY of the production database, never on the live file `data/relay.db`. On the VPS, with the newest
+nightly backup as the copy (it may be up to 24 h old; 0005 still fails closed on anything newer):
+
+```bash
+cd ~/phu/shellx
+B=$(ls -1t backups/relay-*.db | head -n 1)
+mkdir -p /tmp/fkcheck && cp "$B" /tmp/fkcheck/relay.db
+docker run --rm -v /tmp/fkcheck:/w alpine:3.22 sh -c 'apk add -q sqlite && sqlite3 /w/relay.db "PRAGMA foreign_key_check;"'
+rm -rf /tmp/fkcheck
+```
+
+Any output row means a dangling reference: stop, do not deploy, and report it. No output is the go.
+
+1. **VPS prerequisites** (once). The Rust build needs about 2 GB of RAM including swap and 4 GB of
+   free disk:
+
+   ```bash
+   docker compose version && docker buildx version
+   free -h        # RAM + swap >= 2 GB
+   df -h ~        # >= 4 GB free
+   ```
+
+2. **Stage the source** (for every new pinned commit; it is `08de0bb35efbd46e3cade25446fdb6ffffac41bc` today, the sha in
+   `docker-compose.yml`). On your Mac, in any checkout of `lephus/shellx` that has that commit:
+
+   ```bash
+   scripts/shellx/relay2/source-tarball.sh 08de0bb35efbd46e3cade25446fdb6ffffac41bc /tmp   # prints the path, its sha256 and the sha
+   scp /tmp/relay2-src-08de0bb35efbd46e3cade25446fdb6ffffac41bc.tar.gz <deploy-user>@<vps>:phu/shellx/
+   ```
+
+   On the VPS, compare `sha256sum relay2-src-08de0bb35efbd46e3cade25446fdb6ffffac41bc.tar.gz` with the value the script printed, then:
+
+   ```bash
+   cd ~/phu/shellx && mkdir -p relay2-src && tar -xzf relay2-src-08de0bb35efbd46e3cade25446fdb6ffffac41bc.tar.gz -C relay2-src
+   ls relay2-src/08de0bb35efbd46e3cade25446fdb6ffffac41bc/scripts/shellx/relay2/Dockerfile
+   ```
+
+   Keep the previous `relay2-src/<sha>` directory until the next good deploy: a rollback restores the
+   previous `docker-compose.yml`, which builds from that directory. Nothing deletes these directories.
+3. **Secret, by hand** (never in the repository, `relay.env`, a chat or a log). One value shared by the
+   Node relay (signs tickets) and relay2 (verifies them); the Node relay uses its bytes verbatim, so no
+   trailing spaces or quotes:
+
+   ```bash
+   cd ~/phu/shellx
+   grep -q '^CMUX_RELAY_HMAC_SECRET=' .env || printf 'CMUX_RELAY_HMAC_SECRET=%s\n' "$(openssl rand -hex 32)" >> .env
+   chmod 600 .env
+   ```
+
+   Without it `/v2` tickets answer 503 and v1 is untouched. `CMUX_RELAY_ISSUER=shellx-relay` is already
+   in `relay.env` and in the compose file; keep both exactly that text.
+4. **nginx-proxy settings.** `nginx-proxy/relay.shellx.pro` now has 330 s timeouts (above cmux-relay's
+   300 s idle timeout). step 5's loop leaves an existing file alone, so edit the copy in `vhost.d` by
+   hand (keep the letsencrypt companion's block): set `proxy_read_timeout 330s;` and
+   `proxy_send_timeout 330s;`. After the first deploy with relay2, check that nginx-proxy generated the
+   exact-match location and the rewrite:
+
+   ```bash
+   PROXY=$(docker ps --format '{{.Names}}' | grep -m1 nginx-proxy)
+   docker exec "$PROXY" nginx -T 2>/dev/null | grep -B2 -A8 'location = /v2/relay'
+   ```
+
+   It must show a `location = /v2/relay` block that proxies to relay2 with `/v1/relay`, and the
+   `/` location still going to the relay. If your nginx-proxy version ignores `VIRTUAL_PATH` with `=`
+   or `VIRTUAL_DEST`, use the fallback below.
+5. **Enable.** First build relay2 once by hand, so the first deploy does not run a cold Rust build
+   inside the 30-minute deploy job, then add the profile and deploy (push `main` or run the workflow):
+
+   ```bash
+   cd ~/phu/shellx && docker compose --profile relay2 build relay2
+   grep -q '^COMPOSE_PROFILES=' .env || echo 'COMPOSE_PROFILES=relay2' >> .env
+   ```
+
+   If `.env` already has a `COMPOSE_PROFILES` line, add `relay2` to it by hand. rollout.sh then
+   requires `relay2-src/<sha>/scripts/shellx/relay2/Dockerfile`, runs `docker compose build relay2`,
+   pulls only `relay web backup` and waits for relay, relay2 and web (`relay, relay2 and web are
+   healthy on <tag>`). A missing source or a failed build ends like a failed pull: config and
+   `IMAGE_TAG` stay as they were. Then set the repository variable `RELAY2_ENABLED` to `true`
+   (Settings, Environments, production, Variables) so deploy.yml also checks that
+   `GET https://relay.shellx.pro/v2/relay` answers 400 or 426; the `/v2/relay/tickets` check (401
+   `unauthorized`, served by the Node relay) always runs. Note: a workflow_dispatch rollback to a
+   pre-v2 commit makes that `/v2/relay/tickets` check red although the rollout worked (expected; check
+   the relay logs instead).
+6. **Fallback: own subdomain.** If the path routing does not work on your nginx-proxy, branch
+   `feat/relay-v2-subdomain` serves relay2 at `wss://relay2.shellx.pro/v1/relay` (own hostname and
+   certificate, `nginx-proxy/relay2.shellx.pro`, DNS A record for `relay2.shellx.pro` first, and add
+   that file to step 5's loop).
+7. **Roll back / switch off.** On the VPS, first remove the container, then drop the profile:
+
+   ```bash
+   cd ~/phu/shellx
+   docker compose --profile relay2 rm -sf relay2   # stops and removes it; v1 is untouched
+   sed -i '/^COMPOSE_PROFILES=/d' .env             # or remove only `relay2` from the line by hand
+   ```
+
+   and set `RELAY2_ENABLED` to `false`. Order matters: Compose does not treat a service of an
+   inactive profile as an orphan, so neither an `up` with orphan removal nor later deploys touch a relay2
+   container that already runs (`restart: unless-stopped`), and nginx-proxy would keep sending
+   `/v2/relay` to it. A bad deploy rolls back automatically as described above; the images of the
+   previous relay2 commit are rebuilt from its kept `relay2-src/<sha>` directory if the local cache
+   was pruned.
+
 ## Operations
 
 All commands run in `~/phu/shellx`.
@@ -328,8 +455,7 @@ All commands run in `~/phu/shellx`.
 
 ## Tests of the deploy scripts
 
-`node --test deploy/tests/*.test.mjs` runs `rollout.sh` against a fake `docker` (health of both
-relay and web, rollback, pull failure, missing `PROXY_NETWORK`, wrong `data/` owner, staging and
+`node --test deploy/tests/*.test.mjs` runs `rollout.sh` against a fake `docker` (health of relay and web, and of relay2 plus its build/source staging when the profile is on, rollback, pull failure, missing `PROXY_NETWORK`, wrong `data/` owner, staging and
 restoring `.incoming/`/`.prev/` config, restoring only a config this run swapped in, recreating
 `backup` after a restore, `--force-recreate` on the rollback too, skipping a no-op restage,
 recovering from a crash mid-swap, pruning images only after success) and `backup/backup-once.sh`

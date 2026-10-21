@@ -1,9 +1,9 @@
 import { base64UrlDecode } from "./tokens.js";
 
-export type DeviceKind = "agent" | "mobile";
+export type DeviceKind = "agent" | "mobile" | "desktop";
 export type DevicePlatform = "macos" | "windows" | "ios" | "android";
 
-export const DEVICE_KINDS: readonly DeviceKind[] = ["agent", "mobile"];
+export const DEVICE_KINDS: readonly DeviceKind[] = ["agent", "mobile", "desktop"];
 export const DEVICE_PLATFORMS: readonly DevicePlatform[] = ["macos", "windows", "ios", "android"];
 export const DEVICE_NAME_MAX_CHARS = 100;
 
@@ -24,6 +24,7 @@ export function parseDevice(value: unknown): DeviceInput | null {
   const v = value as Record<string, unknown>;
   if (!isDeviceKind(v.kind)) return null;
   if (typeof v.platform !== "string" || !(DEVICE_PLATFORMS as readonly string[]).includes(v.platform)) return null;
+  if (v.kind === "desktop" && v.platform !== "macos" && v.platform !== "windows") return null;
   if (typeof v.name !== "string") return null;
   const name = v.name.trim();
   const nameLength = [...name].length;

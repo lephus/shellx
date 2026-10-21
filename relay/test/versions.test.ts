@@ -1,10 +1,10 @@
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Db } from "../src/db/db.js";
 import { migrate, MIGRATIONS_DIR } from "../src/db/migrate.js";
 import { setMinVersionOverride } from "../src/settings.js";
-import { compareVersions, isSettableVersion, recordAppVersion } from "../src/versions.js";
+import { audienceOf, compareVersions, isSettableVersion, recordAppVersion } from "../src/versions.js";
 import {
   call, connect, db, deviceBody, loginDevice, makeApp, PASSWORD, randomEmail, registerAccount, tempDir, type TestApp, waitFor,
 } from "./helpers.js";
@@ -132,7 +132,7 @@ describe("migration 0004_admin", () => {
       expect(migrate(old, dir)).toHaveLength(3);
       old.run("INSERT INTO users VALUES ('u1', 'a@example.com', 'x', 1, 1)");
       old.run("INSERT INTO devices (id, user_id, kind, name, platform, public_key, created_at) VALUES ('d1', 'u1', 'agent', 'n', 'macos', x'00', 1)");
-      expect(migrate(old)).toEqual(["0004_admin.sql"]);
+      expect(migrate(old)).toEqual(["0004_admin.sql", "0005_relay_v2.sql", "0006_shares.sql"]);
       expect(old.get("SELECT id, app_version FROM devices")).toEqual({ id: "d1", app_version: null });
     } finally {
       old.close();
@@ -152,5 +152,113 @@ describe("version helpers", () => {
     expect(compareVersions("1.10.0", "1.9.0")).toBeGreaterThan(0);
     expect(compareVersions("1.0.0", "1.0.1")).toBeLessThan(0);
     expect(compareVersions("2.0.0", "2.0.0")).toBe(0);
+  });
+});
+
+describe("audienceOf", () => {
+  const rows: [string | undefined, string | undefined, string][] = [
+    ["flutter-macos", "14.0", "flutter-macos-14"],
+    ["flutter-macos", "15.1.2", "flutter-macos-14"],
+    ["flutter-macos", "13.6", "legacy"],
+    ["flutter-macos", "abc", "legacy"],
+    ["flutter-macos", undefined, "legacy"],
+    ["flutter-windows", "10.0.22631", "flutter-windows"],
+    ["macos", "14.5", "native-macos"],
+    ["windows", undefined, "native-windows"],
+    [undefined, undefined, "legacy"],
+    ["FLUTTER-MACOS", "14.0", "legacy"],
+    ["Macos", "14.0", "legacy"],
+  ];
+  for (const [platform, os, expected] of rows) {
+    it(`(${platform}, ${os}) is ${expected}`, () => expect(audienceOf(platform, os)).toBe(expected));
+  }
+});
+
+describe("legacy audiences keep today's body", () => {
+  const TODAY = {
+    min_agent: "1.0.0",
+    min_mobile: "1.0.0",
+    latest_agent: {
+      version: "1.0.0",
+      mac_url: "https://download.shellx.pro/desktop/1.0.0/ShellX-1.0.0.dmg",
+      win_url: "https://download.shellx.pro/desktop/1.0.0/ShellX-Setup-1.0.0.exe",
+    },
+  };
+  const MAC_MANIFEST = {
+    version: "2.0.0",
+    url: "https://download.shellx.pro/desktop/2.0.0/ShellX-2.0.0.dmg",
+    sha256: "b".repeat(64),
+    min_os: "14.0",
+    published_at_unix: 1790000000,
+  };
+
+  function get(app: TestApp, headers: Record<string, string>) {
+    return call(app, "GET", "/v1/version", { headers });
+  }
+  function writeManifest(file: string, body: unknown): void {
+    const dir = join(tempDir(), "desktop");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, file), JSON.stringify(body));
+  }
+
+  const legacyClients: [string, Record<string, string>][] = [
+    ["no headers", {}],
+    ["flutter-macos 13.6", { "X-ShellX-Platform": "flutter-macos", "X-ShellX-OS-Version": "13.6" }],
+    ["flutter-macos with an unparsable OS", { "X-ShellX-Platform": "flutter-macos", "X-ShellX-OS-Version": "abc" }],
+    ["flutter-windows", { "X-ShellX-Platform": "flutter-windows", "X-ShellX-OS-Version": "10.0.22631" }],
+  ];
+  for (const [name, headers] of legacyClients) {
+    it(`${name}: the body is byte-for-byte today's, even with new settings and manifests present`, async () => {
+      writeManifest("latest-macos.json", MAC_MANIFEST);
+      setMinVersionOverride(db(), "min_agent", "1.0.0", Date.now());
+      db().run("INSERT INTO app_settings (key, value, updated_at) VALUES ('min_flutter_macos14', '2.0.0', 0)");
+      const app = makeApp();
+      const res = await get(app, headers);
+      const body = await res.json();
+      expect(body).toEqual(TODAY);
+      expect(Object.keys(body)).toEqual(["min_agent", "min_mobile", "latest_agent"]);
+      expect(Object.keys(body.latest_agent)).toEqual(["version", "mac_url", "win_url"]);
+    });
+  }
+
+  it("native macos 14.5 gets the 2.0.0 default minimum", async () => {
+    const body = await (await get(makeApp(), { "X-ShellX-Platform": "macos", "X-ShellX-OS-Version": "14.5" })).json();
+    expect(body).toMatchObject({ min_agent: "2.0.0", min_mobile: "1.0.0" });
+    expect(body.latest_agent).toEqual(TODAY.latest_agent);
+  });
+
+  it("native windows uses MIN_WINDOWS, the min_windows setting and the windows manifest", async () => {
+    writeManifest("latest-windows.json", {
+      ...MAC_MANIFEST, url: "https://download.shellx.pro/desktop/2.0.0/ShellX-Setup-2.0.0.exe", min_os: "10.0.17763",
+    });
+    db().run("INSERT INTO app_settings (key, value, updated_at) VALUES ('min_windows', '2.1.0', 0)");
+    const body = await (await get(makeApp(), { "X-ShellX-Platform": "windows" })).json();
+    expect(body).toEqual({
+      min_agent: "2.1.0",
+      min_mobile: "1.0.0",
+      latest_agent: { version: "2.0.0", mac_url: TODAY.latest_agent.mac_url, win_url: "https://download.shellx.pro/desktop/2.0.0/ShellX-Setup-2.0.0.exe" },
+    });
+  });
+
+  it("flutter-macos 15.0 follows min_flutter_macos14 and the macos manifest", async () => {
+    writeManifest("latest-macos.json", MAC_MANIFEST);
+    db().run("INSERT INTO app_settings (key, value, updated_at) VALUES ('min_flutter_macos14', '2.0.0', 0)");
+    const body = await (await get(makeApp(), { "X-ShellX-Platform": "flutter-macos", "X-ShellX-OS-Version": "15.0" })).json();
+    expect(body).toMatchObject({
+      min_agent: "2.0.0",
+      latest_agent: { version: "2.0.0", mac_url: "https://download.shellx.pro/desktop/2.0.0/ShellX-2.0.0.dmg" },
+    });
+  });
+
+  it("flutter-macos 15.0 without a manifest keeps the legacy latest_agent and min_agent follows the setting", async () => {
+    db().run("INSERT INTO app_settings (key, value, updated_at) VALUES ('min_flutter_macos14', '2.0.0', 0)");
+    const body = await (await get(makeApp(), { "X-ShellX-Platform": "flutter-macos", "X-ShellX-OS-Version": "15.0" })).json();
+    expect(body).toEqual({ ...TODAY, min_agent: "2.0.0" });
+  });
+
+  it("flutter-windows follows min_flutter_windows but keeps the legacy latest_agent", async () => {
+    db().run("INSERT INTO app_settings (key, value, updated_at) VALUES ('min_flutter_windows', '1.5.0', 0)");
+    const body = await (await get(makeApp(), { "X-ShellX-Platform": "flutter-windows" })).json();
+    expect(body).toEqual({ ...TODAY, min_agent: "1.5.0" });
   });
 });

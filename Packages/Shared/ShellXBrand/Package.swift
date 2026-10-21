@@ -10,7 +10,9 @@ let package = Package(
         // product so resource-free clients (cmux-cli) never link the icons.
         .library(name: "ShellXIcons", targets: ["ShellXIcons"]),
         .library(name: "ShellXRemoteCore", targets: ["ShellXRemoteCore"]),
-        .library(name: "ShellXRemoteUI", targets: ["ShellXRemoteUI"])
+        .library(name: "ShellXRemoteUI", targets: ["ShellXRemoteUI"]),
+        // Test-only: the scripted share host driven by scripts/shellx/share-e2e.mjs. The app never links it.
+        .executable(name: "share-e2e-host", targets: ["ShareE2EHost"])
     ],
     targets: [
         .target(name: "ShellXBrand"),
@@ -18,6 +20,7 @@ let package = Package(
         .testTarget(name: "ShellXBrandTests", dependencies: ["ShellXBrand", "ShellXIcons"]),
         .target(name: "ShellXRemoteCore"),
         .testTarget(name: "ShellXRemoteCoreTests", dependencies: ["ShellXRemoteCore"]),
+        .executableTarget(name: "ShareE2EHost", dependencies: ["ShellXRemoteCore"]),
         .target(name: "ShellXRemoteUI", dependencies: ["ShellXBrand", "ShellXRemoteCore"]),
         .testTarget(name: "ShellXRemoteUITests", dependencies: ["ShellXRemoteUI", "ShellXBrand", "ShellXRemoteCore"])
     ],

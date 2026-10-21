@@ -39,12 +39,18 @@ services:
       # Password of admin.shellx.pro, set once by hand in the VPS's .env (deploy/README.md, "Admin"),
       # never in this repository. Empty or under 16 characters → the dashboard stays disabled.
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # Raw key of the v2 tickets the relay mints for cmux-relay (relay2), set once by hand in the VPS's
+      # .env (deploy/README.md, "Relay v2"), never in this repository. Empty → /v2 tickets answer 503
+      # and v1 is untouched.
+      CMUX_RELAY_HMAC_SECRET: ${CMUX_RELAY_HMAC_SECRET:-}
     volumes:
       # SQLite database; the directory must belong to uid 1000 (the image's `node` user).
       - ./data:/data
       # Secrets kept on the VPS only (never synced by deploy.yml), read-only; fcm.json must be
       # readable by uid 1000.
       - ./secrets:/secrets:ro
+      # Native desktop latest manifests (latest-macos.json / latest-windows.json), read-only.
+      - ./downloads/desktop:/srv/downloads/desktop:ro
     healthcheck:
       # dist/scripts/healthcheck.js (relay/src/scripts/healthcheck.ts) checks both the HTTP endpoint
       # and that the SQLite database opens read-only, and prints nothing on success.
@@ -55,6 +61,51 @@ services:
       start_period: 20s
     # SIGTERM → sockets closed with 1001, requests drained (≤ 5 s), database closed (spec §4.3).
     stop_grace_period: 10s
+    logging: *logging
+    networks: [proxy]
+
+  # cmux-relay (Rust), the v2 transport for the native desktop apps. Built ON THE VPS from the pinned
+  # commit staged in relay2-src/<sha> (no registry image: nothing is pulled or pushed for it), and only
+  # started when .env has COMPOSE_PROFILES=relay2 (deploy/README.md, "Relay v2"). Bump the sha in all
+  # three places (image tag, context, REVISION) to move to a new commit.
+  relay2:
+    profiles: ["relay2"]
+    # Local tag only, never pushed.
+    image: shellx-relay2:08de0bb35efbd46e3cade25446fdb6ffffac41bc
+    pull_policy: never
+    build:
+      context: ./relay2-src/08de0bb35efbd46e3cade25446fdb6ffffac41bc
+      dockerfile: scripts/shellx/relay2/Dockerfile
+      args:
+        REVISION: 08de0bb35efbd46e3cade25446fdb6ffffac41bc
+    restart: unless-stopped
+    mem_limit: 256m
+    memswap_limit: 256m
+    read_only: true
+    # Listens on 8787 as uid 10001: no capability needed, and no setuid escalation.
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      # Same host as the relay, exact path match: a prefix location would also swallow
+      # POST /v2/relay/tickets, which the Node relay serves. VIRTUAL_DEST rewrites to cmux-relay's only
+      # WebSocket path. No certificate settings of its own: the relay service owns relay.shellx.pro's certificate.
+      VIRTUAL_HOST: relay.shellx.pro
+      VIRTUAL_PATH: "= /v2/relay"
+      VIRTUAL_DEST: /v1/relay
+      VIRTUAL_PORT: "8787"
+      CMUX_RELAY_BIND: 0.0.0.0:8787
+      CMUX_RELAY_HMAC_SECRET: ${CMUX_RELAY_HMAC_SECRET:-}
+      # Exactly this text, no whitespace, here and in relay.env: Node trims it, cmux-relay does not.
+      CMUX_RELAY_ISSUER: shellx-relay
+      # The browser share viewer on https://shellx.pro; any other Origin is still answered 403.
+      CMUX_RELAY_ALLOWED_ORIGINS: https://shellx.pro
+    healthcheck:
+      # The runtime image (debian bookworm-slim) has bash but no curl or wget.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8787 && printf 'GET /healthz HTTP/1.1\\r\\nHost: l\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"status\":\"ok\"' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     logging: *logging
     networks: [proxy]
 

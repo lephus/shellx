@@ -12,9 +12,13 @@ struct ShellXTitlebarView: View {
     let shortcutText: String
     let onSearch: () -> Void
     let onSettings: () -> Void
+    /// "Chia sẻ phiên" (L7); hidden while `ShellXShareGate` is off.
+    var showsShare: Bool = false
+    var onShare: () -> Void = {}
 
     @State private var searchHover = false
     @State private var settingsHover = false
+    @State private var shareHover = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -56,6 +60,26 @@ struct ShellXTitlebarView: View {
             .accessibilityIdentifier("titlebarControl.shellxSearch")
             .accessibilityLabel(ShellXTitlebarModel(unreadCount: 0).localizedSearchPlaceholder)
             .help(ShellXTitlebarModel(unreadCount: 0).localizedSearchPlaceholder)
+
+            if showsShare {
+                Button(action: onShare) {
+                    ShellXIcon.image("link")
+                        .font(.system(size: 14))
+                        .foregroundColor(shareHover ? ShellXPalette.textHi.color : ShellXPalette.text.color)
+                        .frame(width: 24, height: 24)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(shareHover ? ShellXPalette.raise.color : Color.clear)
+                        )
+                        .background(ShellXShareAnchor())
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { shareHover = $0 }
+                .accessibilityIdentifier("titlebarControl.shellxShare")
+                .accessibilityLabel(ShellXShareStrings.title)
+                .help(ShellXShareStrings.title)
+            }
 
             Button(action: onSettings) {
                 ShellXIcon.image("gearshape")
@@ -109,6 +133,10 @@ final class ShellXTitlebarAccessoryViewController: NSTitlebarAccessoryViewContro
             },
             onSettings: {
                 AppDelegate.shared?.openPreferencesWindow(debugSource: "titlebar.shellxSettings")
+            },
+            showsShare: ShellXShareGate.isEnabled,
+            onShare: { [weak containerView] in
+                ShellXShareActions.shareSelectedWorkspace(in: containerView?.window)
             }
         ))
         hostingView = host
@@ -126,6 +154,9 @@ final class ShellXTitlebarAccessoryViewController: NSTitlebarAccessoryViewContro
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    /// The hosted view (tests read which buttons it shows).
+    var rootView: ShellXTitlebarView { hostingView.rootView }
 
     /// The command palette's current shortcut (the user may rebind it).
     private static func paletteShortcutText() -> String {

@@ -2,6 +2,10 @@
 public enum ShellXFeatures {
     public static let remoteMachines = false
 
+    /// Share a workspace as a browser link or a phone QR (L7, spec §7.2/§7.3). Independent of
+    /// `remoteMachines`: shares need a signed-in account, not the remote machines feature (ruling R1).
+    public static let shareLinks = false
+
     /// CodeRouter is a Manaflow service that no ShellX wave replaces, so it
     /// stays off for good and does not follow `remoteMachines`: `cmux cr` and
     /// the CodeRouter passthrough never download, install or run a CodeRouter

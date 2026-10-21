@@ -141,6 +141,8 @@ struct State {
     pairings: HashMap<String, Pairing>,
     /// Creation counter (newest first ordering).
     pairing_seq: u64,
+    /// id → owner share (K1 owner routes of `/v2/shares`).
+    shares: HashMap<String, Share>,
     /// Test hook: `GET /v2/pairings` returns every pairing of the account, ignoring `role`.
     list_all_pairings: bool,
 }
@@ -169,6 +171,17 @@ impl Pairing {
             &self.status
         }
     }
+}
+
+#[derive(Debug, Clone)]
+struct Share {
+    device_id: String,
+    slot: String,
+    permission: String,
+    lifetime: String,
+    created_at: u64,
+    expires_at: u64,
+    revoked: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -256,6 +269,15 @@ impl FakeApi {
     pub fn set_last_heartbeat(&self, machine_id: &str, unix: u64) {
         if let Some(m) = self.shared.lock().machines.get_mut(machine_id) {
             m.last_heartbeat = Some(unix);
+        }
+    }
+
+    /// Overwrite a share's `created_at` and `expires_at` (unix seconds). Test hook (list
+    /// ordering and expiry without waiting).
+    pub fn set_share_times(&self, id: &str, created_at: u64, expires_at: u64) {
+        if let Some(s) = self.shared.lock().shares.get_mut(id) {
+            s.created_at = created_at;
+            s.expires_at = expires_at;
         }
     }
 
@@ -447,6 +469,13 @@ fn route(rec: &Recorded, raw: &[u8], opts: &FakeOptions, st: &mut State) -> Repl
         ("POST", "/v2/machines") => register_machine(rec, raw, st),
         ("GET", "/v2/machines") => list_machines(rec, st),
         ("POST", "/v2/relay/tickets") => mint_ticket(rec, opts, st),
+        ("POST", "/v2/shares") => create_share(rec, st),
+        ("GET", "/v2/shares") => list_shares(rec, st),
+        ("DELETE", p) if p.starts_with("/v2/shares/") => revoke_share(rec, &p["/v2/shares/".len()..], st),
+        ("POST", p) if p.starts_with("/v2/shares/") && p.ends_with("/host-ticket") => {
+            let id = &p["/v2/shares/".len()..p.len() - "/host-ticket".len()];
+            share_host_ticket(rec, id, opts, st)
+        }
         ("POST", "/v2/pairings") => create_pairing(rec, st),
         ("GET", "/v2/pairings") => list_pairings(rec, st),
         ("POST", p) if p.starts_with("/v2/pairings/") && p.ends_with("/approve") => {
@@ -593,6 +622,10 @@ fn mint_ticket(rec: &Recorded, opts: &FakeOptions, st: &mut State) -> Reply {
         }
         _ => return Reply::error(400, "bad_request", "permission must be register or connect"),
     };
+    signed_ticket(opts, permission, role, &slot)
+}
+
+fn signed_ticket(opts: &FakeOptions, permission: &str, role: &str, slot: &str) -> Reply {
     let iat = now_unix();
     let exp = iat + opts.ticket_ttl_secs;
     let claims = json!({
@@ -612,6 +645,116 @@ fn mint_ticket(rec: &Recorded, opts: &FakeOptions, st: &mut State) -> Reply {
         URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes())
     );
     Reply::json(200, json!({"ticket": ticket, "expires_at_unix": exp, "relay_url": opts.relay_url}))
+}
+
+const SHARE_ALPHABET: &[u8] = b"0123456789abcdefghjkmnpqrstvwxyz";
+
+fn lifetime_secs(l: &str) -> Option<u64> {
+    match l {
+        "15m" => Some(900),
+        "1h" => Some(3600),
+        "until_quit" => Some(86400),
+        _ => None,
+    }
+}
+
+fn create_share(rec: &Recorded, st: &mut State) -> Reply {
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    let Some(b) = rec.body.as_object() else { return Reply::error(400, "bad_request", "body must be an object") };
+    if b.contains_key("secret") {
+        return Reply::error(400, "bad_request", "secret must never be sent");
+    }
+    let id = b.get("id").and_then(Value::as_str).unwrap_or_default();
+    if id.len() != 8 || !id.bytes().all(|c| SHARE_ALPHABET.contains(&c)) {
+        return Reply::error(400, "bad_request", "id must be 8 characters of the share alphabet");
+    }
+    let (Some(permission), Some(lifetime)) = (b.get("permission").and_then(Value::as_str), b.get("lifetime").and_then(Value::as_str)) else {
+        return Reply::error(400, "bad_request", "permission and lifetime are required");
+    };
+    if !matches!(permission, "view" | "type") {
+        return Reply::error(400, "bad_request", "permission must be view or type");
+    }
+    if lifetime_secs(lifetime).is_none() {
+        return Reply::error(400, "bad_request", "bad lifetime");
+    }
+    if b.get("access").and_then(Value::as_str).is_none_or(|a| a.len() != 43) {
+        return Reply::error(400, "bad_request", "access must be 43 characters");
+    }
+    let one_time = match b.get("one_time") {
+        None | Some(Value::Null) => false,
+        Some(Value::Bool(v)) => *v,
+        Some(_) => return Reply::error(400, "bad_request", "one_time must be a boolean"),
+    };
+    // R5: a one-time share is a typing share until quit with a 2-minute claim window.
+    let (permission, lifetime) = if one_time { ("type", "until_quit") } else { (permission, lifetime) };
+    let life = lifetime_secs(lifetime).expect("validated lifetime");
+    let live = st.shares.values().filter(|s| s.device_id == who.device_id && !s.revoked && s.expires_at > now_unix()).count();
+    if live >= 20 {
+        return Reply::error(409, "share_limit", "Too many active shares");
+    }
+    if st.shares.contains_key(id) {
+        return Reply::error(409, "share_id_taken", "That share id is already in use");
+    }
+    let now = now_unix();
+    let (expires_at, claim_until) = (now + life, one_time.then_some(now + 120));
+    let slot = random_b64url(16);
+    let id = id.to_string();
+    st.shares.insert(
+        id.clone(),
+        Share {
+            device_id: who.device_id,
+            slot: slot.clone(),
+            permission: permission.to_string(),
+            lifetime: lifetime.to_string(),
+            created_at: now,
+            expires_at,
+            revoked: false,
+        },
+    );
+    Reply::json(201, json!({"id": id, "slot": slot, "expires_at_unix": expires_at, "claim_until_unix": claim_until}))
+}
+
+fn list_shares(rec: &Recorded, st: &State) -> Reply {
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    let now = now_unix();
+    let mut items: Vec<(&String, &Share)> =
+        st.shares.iter().filter(|(_, s)| s.device_id == who.device_id && s.expires_at > now).collect();
+    items.sort_by(|a, b| (a.1.created_at, a.0).cmp(&(b.1.created_at, b.0)));
+    let shares: Vec<Value> = items
+        .into_iter()
+        .map(|(id, s)| {
+            json!({"id": id, "permission": s.permission, "lifetime": s.lifetime, "expires_at_unix": s.expires_at, "revoked": s.revoked})
+        })
+        .collect();
+    Reply::json(200, json!({"shares": shares}))
+}
+
+fn owned_share<'a>(who: &TokenInfo, id: &str, st: &'a mut State) -> Option<&'a mut Share> {
+    st.shares.get_mut(id).filter(|s| s.device_id == who.device_id)
+}
+
+fn revoke_share(rec: &Recorded, id: &str, st: &mut State) -> Reply {
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    match owned_share(&who, id, st) {
+        Some(s) => {
+            s.revoked = true;
+            Reply::empty(204)
+        }
+        None => Reply::error(404, "share_not_found", "Share not found"),
+    }
+}
+
+fn share_host_ticket(rec: &Recorded, id: &str, opts: &FakeOptions, st: &mut State) -> Reply {
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    let Some(s) = owned_share(&who, id, st) else { return Reply::error(404, "share_not_found", "Share not found") };
+    if s.revoked {
+        return Reply::error(410, "share_revoked", "Share revoked");
+    }
+    if s.expires_at <= now_unix() {
+        return Reply::error(410, "share_expired", "Share expired");
+    }
+    let slot = s.slot.clone();
+    signed_ticket(opts, "register", "daemon", &slot)
 }
 
 /// Standard or URL alphabet, padded or not (K1 `*_b64` inputs).

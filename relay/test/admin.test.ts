@@ -5,7 +5,7 @@ import { ADMIN_SECURITY_HEADERS, hostName } from "../src/admin/app.js";
 import { ADMIN_SESSION_TTL_MS, AdminSessions, MAX_ADMIN_SESSIONS } from "../src/admin/sessions.js";
 import type { AppDeps } from "../src/app.js";
 import {
-  call, type CallOptions, connect, errorCode, hubs, makeApp, registerAccount, TEST_CONFIG, tempDir, type TestApp,
+  call, type CallOptions, connect, db, errorCode, hubs, makeApp, registerAccount, TEST_CONFIG, tempDir, type TestApp,
   type TestResponse, upgradeStatus,
 } from "./helpers.js";
 
@@ -287,6 +287,17 @@ describe("admin settings", () => {
     latest_agent: { version: TEST_CONFIG.latestAgentVersion, mac_url: TEST_CONFIG.macUrl, win_url: TEST_CONFIG.winUrl },
   };
 
+  it("the per-platform minimums (min_macos, ...) stay unknown to the admin: PUT is refused and nothing is stored", async () => {
+    const app = adminApp();
+    const cookie = await signIn(app);
+    for (const key of ["min_macos", "min_windows", "min_flutter_macos14", "min_flutter_windows"]) {
+      const res = await admin(app, "PUT", "/api/settings", { cookie, body: { [key]: "2.0.0" } });
+      expect(res.status, key).toBe(400);
+    }
+    expect(db().get<{ n: number }>("SELECT COUNT(*) AS n FROM app_settings")!.n).toBe(0);
+    expect(await (await admin(app, "GET", "/api/settings", { cookie })).json()).toEqual(envSettings);
+  });
+
   it("GET shows env values; PUT overrides what /v1/version serves on the relay host; null goes back to env", async () => {
     const app = adminApp();
     const cookie = await signIn(app);
@@ -346,7 +357,7 @@ describe("admin stats endpoint", () => {
     const stats = await res.json();
     expect(stats.devices.agent).toEqual({ total: 1, online: 1, by_platform: { macos: 1, windows: 0 } });
     expect(stats.devices.mobile).toEqual({ total: 0, online: 0, by_platform: { ios: 0, android: 0 } });
-    expect(stats.versions).toEqual({ agent: [{ version: "1.2.3", count: 1 }], mobile: [] });
+    expect(stats.versions).toEqual({ agent: [{ version: "1.2.3", count: 1 }], mobile: [], desktop: [] });
     expect(stats.users).toMatchObject({ total: 1, new_24h: 1, active_7d: 1, active_30d: 1 });
     expect(stats.signups_by_day).toHaveLength(30);
     expectSecurityHeaders(res);

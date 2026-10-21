@@ -272,6 +272,7 @@ function render() {
   $('k-active30').textContent = `30 ngày: ${num(u.active_30d)}`;
 
   renderDevices('agent', st.devices?.agent, [['macos', 'macOS'], ['windows', 'Windows']]);
+  renderDevices('desktop', st.devices?.desktop, [['macos', 'macOS'], ['windows', 'Windows']]);
   renderDevices('mobile', st.devices?.mobile, [['ios', 'iOS'], ['android', 'Android']]);
   renderChart(Array.isArray(st.signups_by_day) ? st.signups_by_day : []);
 

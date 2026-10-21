@@ -8,6 +8,8 @@ export const desktopVersion: string = config.desktopVersion;
 export const supportEmail: string = config.supportEmail;
 export const appStoreUrl: string | null = config.appStoreUrl;
 export const googlePlayUrl: string | null = config.googlePlayUrl;
+/** Origin of the ShellX API that mints share-viewer tickets (`POST /v2/shares/:id/ticket`). */
+export const shareApiBase: string = config.shareApiBase;
 
 export function macDownloadUrl(version: string = desktopVersion): string {
   return `${config.downloadBaseUrl}/${version}/ShellX-${version}.dmg`;

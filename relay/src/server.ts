@@ -44,6 +44,10 @@ const admin = adminStatus(config);
 if (admin === "enabled") logMeta("admin_enabled", { host: config.adminHost });
 else logMeta("admin_disabled", { reason: admin });
 
+// Relay v2 tickets need CMUX_RELAY_HMAC_SECRET (at least 32 bytes); without it they answer 503.
+if (config.relayV2DisabledReason === null) logMeta("relay_v2_enabled");
+else logMeta("relay_v2_disabled", { reason: config.relayV2DisabledReason });
+
 const hubs = new HubRegistry({ db });
 const relay = await startRelay(
   { config, db, hubs, limiters: createRateLimiters(config), push: push.gateway },

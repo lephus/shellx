@@ -3,5 +3,6 @@
   "downloadBaseUrl": "https://download.shellx.pro/desktop",
   "appStoreUrl": null,
   "googlePlayUrl": null,
-  "supportEmail": "phule9225@gmail.com"
+  "supportEmail": "phule9225@gmail.com",
+  "shareApiBase": "https://relay.shellx.pro"
 }

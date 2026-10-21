@@ -1,0 +1,10 @@
+# Allowlist for a fork-repo-root build context. The BUSL-licensed relay
+# worker directory never enters the context.
+*
+!cmux-tui/Cargo.toml
+!cmux-tui/Cargo.lock
+!cmux-tui/rust-toolchain.toml
+!cmux-tui/crates
+!cmux-tui/bindings
+!cmux-tui/vendor
+!cmux-tui/build-support

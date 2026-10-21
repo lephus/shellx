@@ -154,6 +154,19 @@ extension TabItemView {
             .disabled(context.allRemoteTargetsDisconnected)
         }
 
+        // ShellX: share entries (L7), same action path as the AppKit menu and the titlebar.
+        let shareEntries = isMulti ? [] : ShellXShareActions.menuEntries
+        if !shareEntries.isEmpty {
+            Divider()
+            ForEach(shareEntries, id: \.self) { entry in
+                Button {
+                    ShellXShareActions.perform(entry, workspaceID: workspaceId)
+                } label: {
+                    ShellXLabel(ShellXShareActions.title(entry), icon: ShellXShareActions.icon(entry))
+                }
+            }
+        }
+
         Menu(String(localized: "contextMenu.workspaceColor", defaultValue: "Workspace Color")) {
             let tabColorPalette = WorkspaceTabColorSettings.palette()
             // The menu edits persisted manual colors. An origin tint is only a

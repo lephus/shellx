@@ -12,9 +12,11 @@ interface Props {
   paths?: Record<Lang, string>;
   /** og:type: `article` for guides. */
   ogType?: 'website' | 'article';
+  /** Header with the brand only: no marketing nav, language switch or download CTA (share viewer). */
+  minimalHeader?: boolean;
 }
 
-const { lang, page, title, description, paths: given, ogType = 'website' } = Astro.props;
+const { lang, page, title, description, paths: given, ogType = 'website', minimalHeader = false } = Astro.props;
 const t = ui[lang];
 const other = otherLang(lang);
 const paths: Record<Lang, string> | null =
@@ -78,15 +80,17 @@ const home = pathFor(lang, 'home');
     <header class="top">
       <div class="wrap top-inner">
         <a class="brand" href={home}><img class="brand-mark" src="/favicon.svg" alt="" width="28" height="28" />shellx</a>
-        <nav class="top-nav" aria-label={t.mainNav}>
-          <a href={`${home}#features`}>{t.featuresHeading}</a>
-          <a href={`${home}#security`}>{t.securityHeading}</a>
-          <a href={pathFor(lang, 'guides')}>{t.guidesNav}</a>
-          <a href={`${home}#faq`}>FAQ</a>
-          <a class="nav-wide" href={`${home}#contact`}>{t.contactHeading}</a>
-        </nav>
-        <a class="lang-switch" href={switchHref} hreflang={other} lang={other}>{other.toUpperCase()}</a>
-        <a class="btn btn-primary btn-sm" href={`${home}#download`}>{t.download}</a>
+        {!minimalHeader && (
+          <nav class="top-nav" aria-label={t.mainNav}>
+            <a href={`${home}#features`}>{t.featuresHeading}</a>
+            <a href={`${home}#security`}>{t.securityHeading}</a>
+            <a href={pathFor(lang, 'guides')}>{t.guidesNav}</a>
+            <a href={`${home}#faq`}>FAQ</a>
+            <a class="nav-wide" href={`${home}#contact`}>{t.contactHeading}</a>
+          </nav>
+        )}
+        {!minimalHeader && <a class="lang-switch" href={switchHref} hreflang={other} lang={other}>{other.toUpperCase()}</a>}
+        {!minimalHeader && <a class="btn btn-primary btn-sm" href={`${home}#download`}>{t.download}</a>}
       </div>
     </header>
     <main>

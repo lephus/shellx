@@ -129,6 +129,10 @@ public final class ShellXRemoteService: ObservableObject {
 
     // MARK: - Account
 
+    /// The user id of the account this Mac last signed in as (`links-owner`), or nil. Share links are kept
+    /// per account under it.
+    public var accountOwnerID: String? { try? env.store.loadOwner() }
+
     /// `auth.login` (the password goes straight into the core's JSON), then starts the session. Signing in as
     /// another account than the one `links.json` was saved under drops its link records and invite files.
     public func signIn(email: String, password: String) async throws {

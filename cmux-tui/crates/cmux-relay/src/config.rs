@@ -60,6 +60,8 @@ pub struct RelayConfig {
     pub ticket_secret: Option<Vec<u8>>,
     pub ticket_issuer: String,
     pub allow_open: bool,
+    /// Browser `Origin` values admitted to the WebSocket upgrade, compared byte for byte.
+    pub allowed_origins: Vec<String>,
 }
 
 impl Default for RelayConfig {
@@ -90,6 +92,7 @@ impl Default for RelayConfig {
             ticket_secret: None,
             ticket_issuer: DEFAULT_TICKET_ISSUER.into(),
             allow_open: false,
+            allowed_origins: Vec::new(),
         }
     }
 }
@@ -187,6 +190,14 @@ impl RelayConfig {
         }
         if let Some(value) = lookup("CMUX_RELAY_ALLOW_OPEN") {
             self.allow_open = parse_bool("CMUX_RELAY_ALLOW_OPEN", &value)?;
+        }
+        if let Some(value) = lookup("CMUX_RELAY_ALLOWED_ORIGINS") {
+            self.allowed_origins = value
+                .split(',')
+                .map(str::trim)
+                .filter(|origin| !origin.is_empty())
+                .map(str::to_owned)
+                .collect();
         }
         Ok(())
     }
@@ -324,6 +335,16 @@ impl RelayCommand {
                 "-h" | "--help" => return Ok(Self::Help),
                 "-V" | "--version" => return Ok(Self::Version),
                 "--allow-open" => config.allow_open = true,
+                "--allowed-origin" => {
+                    let origin = parse_next_string("--allowed-origin", &mut args)?;
+                    let origin = origin.trim();
+                    if origin.is_empty() {
+                        return Err(ConfigError::new(
+                            "--allowed-origin requires a non-empty value",
+                        ));
+                    }
+                    config.allowed_origins.push(origin.to_owned());
+                }
                 "--bind" => config.bind = parse_next("--bind", &mut args)?,
                 "--lease-seconds" => {
                     config.lease_duration =
@@ -519,7 +540,8 @@ impl RelayCommand {
            --max-active-circuits-per-slot N   Paired circuits per slot\n\
            --max-allocations-per-second-per-slot N  Sliding one-second allocation limit\n\
            --issuer NAME                     HMAC ticket issuer (CMUX_RELAY_ISSUER)\n\
-           --allow-open                      Permit an unauthenticated non-loopback relay\n\n\
+           --allow-open                      Permit an unauthenticated non-loopback relay\n\
+           --allowed-origin ORIGIN           Admit this exact browser Origin (repeatable; CMUX_RELAY_ALLOWED_ORIGINS, comma list)\n\n\
          Ticket options: --lane TOKEN, --generation N, --ttl-seconds N (maximum 300).\n\
          Set CMUX_RELAY_HMAC_SECRET to validate provider tickets and mint join tickets.\n\
          Endpoints: /healthz, /v1/relay, and /ws\n"
@@ -644,6 +666,46 @@ mod tests {
             RelayConfig { bind: "0.0.0.0:8787".parse().unwrap(), ..RelayConfig::default() };
         let command = RelayCommand::parse(config, [OsString::from("--allow-open")]).unwrap();
         assert!(matches!(command, RelayCommand::Serve(config) if config.allow_open));
+    }
+
+    #[test]
+    fn allowed_origins_come_from_environment_and_repeatable_flag() {
+        let mut config = RelayConfig::default();
+        assert!(config.allowed_origins.is_empty());
+        config
+            .apply_environment(|name| {
+                (name == "CMUX_RELAY_ALLOWED_ORIGINS")
+                    .then(|| "https://a.example, https://b.example,,".to_owned())
+            })
+            .unwrap();
+        assert_eq!(config.allowed_origins, ["https://a.example", "https://b.example"]);
+        let command = RelayCommand::parse(
+            config,
+            ["--allowed-origin", "https://c.example"].map(OsString::from),
+        )
+        .unwrap();
+        assert!(matches!(command, RelayCommand::Serve(config)
+            if config.allowed_origins.last().map(String::as_str) == Some("https://c.example")));
+    }
+
+    #[test]
+    fn allowed_origin_flag_is_trimmed_and_empty_is_rejected() {
+        let command = RelayCommand::parse(
+            RelayConfig::default(),
+            ["--allowed-origin", "  https://d.example \t"].map(OsString::from),
+        )
+        .unwrap();
+        assert!(matches!(command, RelayCommand::Serve(config)
+            if config.allowed_origins == ["https://d.example"]));
+        for value in ["", "   "] {
+            let error = RelayCommand::parse(
+                RelayConfig::default(),
+                ["--allowed-origin", value].map(OsString::from),
+            )
+            .err()
+            .expect("empty --allowed-origin was accepted");
+            assert!(error.to_string().contains("--allowed-origin"), "{error}");
+        }
     }
 
     #[test]

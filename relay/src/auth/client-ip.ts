@@ -1,4 +1,6 @@
 import { BlockList, isIP } from "node:net";
+import type { Context } from "hono";
+import type { AppEnv } from "../app.js";
 
 /**
  * Peers allowed to tell us the client address in `X-Real-IP`: loopback and private networks, which
@@ -64,4 +66,9 @@ export function clientIp(realIpHeader: string | undefined, remoteAddress: string
     if (forwarded !== undefined && isIP(forwarded) !== 0) return limitKey(forwarded);
   }
   return peer === undefined ? "unknown" : isIP(peer) === 0 ? peer : limitKey(peer);
+}
+
+/** Rate-limit key: X-Real-IP from nginx-proxy, else the socket address (see `clientIp`). */
+export function requestIp(c: Context<AppEnv>): string {
+  return clientIp(c.req.header("X-Real-IP"), c.env.incoming.socket.remoteAddress);
 }

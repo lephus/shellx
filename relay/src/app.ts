@@ -15,9 +15,16 @@ import { authRoutes } from "./routes/auth.js";
 import { deviceRoutes } from "./routes/devices.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { pairingRoutes } from "./routes/pairings.js";
+import { machineRoutes } from "./v2/machines.js";
+import { newSlot } from "./v2/encoding.js";
+import { shareRoutes } from "./v2/shares.js";
+import { relayTicketRoutes } from "./v2/relay-tickets.js";
+import { machinePairingRoutes, randomPairingCode } from "./v2/pairings.js";
 import type { PushGateway } from "./push/fcm.js";
 import { webSocketAuth, webSocketUpgrade } from "./routes/ws.js";
-import { minVersions } from "./settings.js";
+import { readNativeLatest } from "./native-latest.js";
+import { versionAnswer } from "./settings.js";
+import { audienceOf, OS_VERSION_HEADER, PLATFORM_HEADER } from "./versions.js";
 
 export interface AppDeps {
   config: Config;
@@ -32,6 +39,10 @@ export interface AppDeps {
   push?: PushGateway | null;
   /** Directory of the admin UI (index.html, admin.css, admin.js); defaults to `relay/admin/`. */
   adminStaticDir?: string;
+  /** The 6-digit code of a new /v2 pairing; defaults to `randomInt(0, 1_000_000)` zero-padded. Injectable for tests. */
+  pairingCode?: () => string;
+  /** The relay slot of a new share; defaults to 16 random bytes. Injectable for tests. */
+  shareSlot?: () => string;
 }
 
 export interface AppVariables {
@@ -42,6 +53,8 @@ export interface AppVariables {
   passwords: PasswordHasher;
   now: () => number;
   push: PushGateway | null;
+  pairingCode: () => string;
+  shareSlot: () => string;
   /** Set by `requireAuth` / `webSocketAuth` on authenticated routes only. */
   auth: AuthContext;
 }
@@ -79,19 +92,22 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     c.set("passwords", deps.passwords ?? defaultPasswords);
     c.set("now", deps.now ?? Date.now);
     c.set("push", deps.push ?? null);
+    c.set("pairingCode", deps.pairingCode ?? randomPairingCode);
+    c.set("shareSlot", deps.shareSlot ?? newSlot);
     await next();
   });
 
   app.get("/v1/version", (c) => {
     const config = c.get("config");
-    // The admin's override from the dashboard when set, else MIN_AGENT / MIN_MOBILE; latest_agent is
-    // env only (the desktop release pipeline commits it to deploy/relay.env).
-    const min = minVersions(c.get("db"), config);
-    return c.json({
-      min_agent: min.min_agent,
-      min_mobile: min.min_mobile,
-      latest_agent: { version: config.latestAgentVersion, mac_url: config.macUrl, win_url: config.winUrl },
-    });
+    // Per audience (X-ShellX-Platform / X-ShellX-OS-Version, K6); no header, flutter-macos < 14 and
+    // an unparsable OS get today's body: the admin's override or MIN_AGENT / MIN_MOBILE, latest_agent from env.
+    const audience = audienceOf(c.req.header(PLATFORM_HEADER), c.req.header(OS_VERSION_HEADER));
+    const now = c.get("now")();
+    const latest = {
+      macos: audience === "native-macos" || audience === "flutter-macos-14" ? readNativeLatest(config.nativeManifestDir, "macos", now) : null,
+      windows: audience === "native-windows" ? readNativeLatest(config.nativeManifestDir, "windows", now) : null,
+    };
+    return c.json(versionAnswer(c.get("db"), config, audience, latest));
   });
 
   app.route("/v1/auth", authRoutes);
@@ -99,6 +115,10 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   app.route("/v1/devices", deviceRoutes);
   app.route("/v1/pairings", pairingRoutes);
   app.route("/v1/notifications", notificationRoutes);
+  app.route("/v2/machines", machineRoutes);
+  app.route("/v2/pairings", machinePairingRoutes);
+  app.route("/v2/relay/tickets", relayTicketRoutes);
+  app.route("/v2/shares", shareRoutes);
   app.get("/v1/ws", webSocketAuth, webSocketUpgrade);
 
   app.notFound((c) => {

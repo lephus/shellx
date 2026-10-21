@@ -18,11 +18,14 @@ const script = join(dirname(fileURLToPath(import.meta.url)), '..', 'rollout.sh')
 const FAKE_DOCKER = `#!/usr/bin/env bash
 echo "docker $* [IMAGE_TAG=\${IMAGE_TAG:-}]" >> "$CALLS"
 if [[ "$1 $2" == "compose pull" && "\${IMAGE_TAG:-}" == unpullable ]]; then exit 1; fi
+if [[ "$1 $2" == "compose build" && -e relay2-build-broken ]]; then exit 1; fi
 if [[ "$1 $2" == "compose up" ]] && grep -q '^IMAGE_TAG=crash' .env; then exit 17; fi
 if [[ "$1 $2" == "compose ps" ]]; then echo "\${@: -1}-container-id"; exit 0; fi
 if [[ "$1" == inspect ]]; then
   id="\${@: -1}"
   if [[ "$id" == relay-container-id ]] && grep -q '^IMAGE_TAG=broken$' .env; then
+    echo unhealthy
+  elif [[ "$id" == relay2-container-id && -e relay2-broken ]]; then
     echo unhealthy
   elif [[ "$id" == web-container-id ]] && grep -q '^IMAGE_TAG=webbroken$' .env; then
     echo unhealthy
@@ -394,4 +397,85 @@ test('heals a live item left missing by a crash between removing it and moving i
   assert.equal(s.read('nginx-proxy/marker'), NEW_CONFIG.nginxMarker);
   assert.equal(s.read('backup/marker'), NEW_CONFIG.backupMarker);
   assert.throws(() => statSync(join(s.app, '.incoming')));
+});
+
+// --- relay2: built on the VPS from relay2-src/<R> when .env has COMPOSE_PROFILES=relay2 ---
+
+const R = '08de0bb35efbd46e3cade25446fdb6ffffac41bc';
+const RELAY2_COMPOSE = `services:\n  relay2:\n    build:\n      context: ./relay2-src/${R}\n`;
+const RELAY2_ENV = 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\nCOMPOSE_PROFILES=relay2\n';
+
+function relay2Setup({ stageSource = true, env = RELAY2_ENV } = {}) {
+  const s = setup({ env, live: { ...OLD_CONFIG, compose: RELAY2_COMPOSE } });
+  if (stageSource) {
+    const dir = join(s.app, 'relay2-src', R, 'scripts', 'shellx', 'relay2');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'Dockerfile'), 'FROM scratch\n');
+  }
+  return s;
+}
+
+test('relay2 enabled, healthy: builds relay2, pulls only registry services, waits for all three, new success line, one prune', () => {
+  const s = relay2Setup();
+  const result = s.run('abc123');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /relay, relay2 and web are healthy on abc123/);
+  const calls = s.calls();
+  assert.match(calls, /^docker compose build relay2 \[IMAGE_TAG=abc123\]$/m);
+  // relay2 has no registry image: pull_policy never would make a bare `compose pull` skip or fail on it.
+  assert.match(calls, /^docker compose pull relay web backup \[IMAGE_TAG=abc123\]$/m);
+  assert.ok(calls.indexOf('compose build relay2') < calls.indexOf('compose up'));
+  assert.match(calls, /compose ps -q relay2/);
+  assert.equal(calls.match(/image prune/g).length, 1);
+  assert.match(calls, /image prune -af --filter label=org\.opencontainers\.image\.source=https:\/\/github\.com\/lephus\/shellx --filter until=168h/);
+  // relay2-src/ is user-managed and never deleted.
+  assert.ok(statSync(join(s.app, 'relay2-src', R)).isDirectory());
+});
+
+test('relay2 enabled, unhealthy relay2: rolls back and hints the logs of all three services', () => {
+  const s = relay2Setup();
+  writeFileSync(join(s.app, 'relay2-broken'), '');
+  const result = s.run('abc123');
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /not healthy within 3s on abc123; rolling back to old/);
+  assert.match(result.stderr, /docker compose logs --tail 50 relay relay2 web/);
+  // set_tag rewrites IMAGE_TAG to the end of .env; COMPOSE_PROFILES stays.
+  assert.equal(s.env(), 'PROXY_NETWORK=proxy-net\nCOMPOSE_PROFILES=relay2\nIMAGE_TAG=old\n');
+  assert.equal(s.calls().match(/compose up -d --remove-orphans/g).length, 2);
+  assert.doesNotMatch(s.calls(), /image prune/);
+});
+
+test('relay2 enabled but the source is not staged: clear error naming the tar command, nothing pulled or restarted, config restored', () => {
+  const s = relay2Setup({ stageSource: false });
+  mkdirSync(join(s.app, '.incoming'));
+  writeConfigAt(join(s.app, '.incoming'), { ...NEW_CONFIG, compose: RELAY2_COMPOSE + '# new\n' });
+  const result = s.run('abc123');
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, new RegExp(`::error::.*relay2-src/${R}/scripts/shellx/relay2/Dockerfile`));
+  assert.match(result.stderr, new RegExp(`tar -xzf relay2-src-${R}\\.tar\\.gz -C relay2-src`));
+  assert.doesNotMatch(s.calls(), /compose (pull|build)/);
+  assert.equal(s.read('docker-compose.yml'), RELAY2_COMPOSE);
+  assert.equal(s.env(), RELAY2_ENV);
+  const ups = s.calls().split('\n').filter((line) => line.includes('compose up'));
+  assert.deepEqual(ups, ['docker compose up -d --no-deps --force-recreate backup [IMAGE_TAG=]']);
+});
+
+test('relay2 enabled, build fails: same path as a failed pull (env untouched, no restart)', () => {
+  const s = relay2Setup();
+  writeFileSync(join(s.app, 'relay2-build-broken'), '');
+  const result = s.run('abc123');
+  assert.equal(result.status, 1);
+  assert.equal(s.env(), RELAY2_ENV);
+  assert.doesNotMatch(s.calls(), /compose up/);
+});
+
+test('relay2 profile off (or a different profile): no build, bare pull, old success line', () => {
+  for (const env of ['PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\n', 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\nCOMPOSE_PROFILES=other\n']) {
+    const s = relay2Setup({ env });
+    const result = s.run('abc123');
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /^relay and web are healthy on abc123$/m);
+    assert.doesNotMatch(s.calls(), /compose build|relay2/);
+    assert.match(s.calls(), /^docker compose pull \[IMAGE_TAG=abc123\]$/m);
+  }
 });

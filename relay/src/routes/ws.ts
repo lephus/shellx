@@ -79,6 +79,7 @@ export const webSocketAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (!(await c.get("limiters").upgradeIp.limit(ip))) throw Errors.rateLimited();
   const auth = await authenticate(c.get("db"), parseBearer(c.req.header("Authorization")), c.get("now")());
   if (auth === null) throw Errors.unauthorized();
+  if (auth.kind === "desktop") throw Errors.forbidden();
   if (!hasUpgradeToken(c.req.header("Connection"))) throw Errors.upgradeRequired();
   recordAppVersion(c.get("db"), auth.deviceId, c.req.header(CLIENT_VERSION_HEADER));
   c.set("auth", auth);

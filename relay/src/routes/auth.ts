@@ -1,6 +1,6 @@
-import { Hono, type Context } from "hono";
+import { Hono } from "hono";
 import type { AppEnv } from "../app.js";
-import { clientIp } from "../auth/client-ip.js";
+import { requestIp } from "../auth/client-ip.js";
 import { parseDevice } from "../auth/device.js";
 import { checkEmail, normalizeEmail } from "../auth/email.js";
 import type { PasswordHasher } from "../auth/password.js";
@@ -14,11 +14,6 @@ import { CloseCode } from "../protocol/frames.js";
 import { CLIENT_VERSION_HEADER, recordAppVersion } from "../versions.js";
 
 export const authRoutes = new Hono<AppEnv>();
-
-/** Rate-limit key: X-Real-IP from nginx-proxy, else the socket address (see auth/client-ip.ts). */
-function requestIp(c: Context<AppEnv>): string {
-  return clientIp(c.req.header("X-Real-IP"), c.env.incoming.socket.remoteAddress);
-}
 
 let dummyPhc: Promise<string> | undefined;
 /**
@@ -157,10 +152,12 @@ authRoutes.post("/logout", requireAuth, async (c) => {
       logMeta("agent_purge_failed", { device_id: auth.deviceId });
     }
   } else {
-    // A signed-out phone must stop getting notifications (push spec §5).
+    // A signed-out phone must stop getting notifications (push spec §5); a signed-out desktop
+    // leaves the machine list (its grants and pairings go by cascade).
     db.transaction(() => {
       db.run("DELETE FROM tokens WHERE token_hash = ?", tokenHash);
       db.run("DELETE FROM push_tokens WHERE device_id = ?", auth.deviceId);
+      if (auth.kind === "desktop") db.run("DELETE FROM machines WHERE device_id = ?", auth.deviceId);
     });
   }
   logMeta("logout", { device_id: auth.deviceId });
