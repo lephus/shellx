@@ -248,7 +248,7 @@ export function createSession({
         } else if (msg.type === 'ping') {
           sendText(ws, { type: 'pong', nonce: msg.nonce });
         } else if (msg.type === 'error') {
-          relayError(msg);
+          inbound.then(() => relayError(msg)); // after queued frames (a bye just before the peer-disconnected error)
         }
         return;
       }

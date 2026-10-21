@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { AppEnv } from "../app.js";
@@ -11,8 +11,7 @@ import { unixSeconds } from "./encoding.js";
 import { requireDesktop } from "./guard.js";
 import { mintTicket, ticketClaims } from "./tickets.js";
 
-/** Crockford-style base32 without i, l, o, u: the alphabet of share ids. */
-const ID_ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
+/** Share ids are 8 characters of the Crockford-style base32 alphabet without i, l, o, u. */
 const ID_PLAIN = /^[0-9a-hjkmnp-tv-z]{8}$/;
 const ID_DASHED = /^[0-9a-hjkmnp-tv-z]{4}-[0-9a-hjkmnp-tv-z]{4}$/;
 const ACCESS_RE = /^[A-Za-z0-9_-]{43}$/;
@@ -44,16 +43,17 @@ interface ShareRow {
   host_seen_at: number;
 }
 
-/** 8 random characters of the share alphabet (256 is a multiple of 32, so the mask is unbiased). */
-export function randomShareId(): string {
-  return Array.from(randomBytes(8), (b) => ID_ALPHABET[b & 31]).join("");
-}
-
 /** The 8-character id of `raw` (lower-cased, `xxxx-xxxx` accepted), or null when it is not an id. */
 function parseShareId(raw: string): string | null {
   const id = raw.toLowerCase();
   if (ID_PLAIN.test(id)) return id;
   return ID_DASHED.test(id) ? id.replace("-", "") : null;
+}
+
+/** True when `err` is the primary-key violation of `shares.id` (a racing insert of the same id). */
+export function isShareIdCollision(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  return code === "SQLITE_CONSTRAINT_PRIMARYKEY" || String(err).includes("UNIQUE constraint failed: shares.id");
 }
 
 const sha256Hex = (value: string): string => createHash("sha256").update(value, "utf8").digest("hex");
@@ -85,7 +85,7 @@ shareRoutes.use(
   }),
 );
 
-/** POST /v2/shares {permission, lifetime, one_time?, access} — a new share on its own relay slot. */
+/** POST /v2/shares {id, permission, lifetime, one_time?, access} — a new share on its own relay slot. */
 shareRoutes.post("/", requireAuth, requireDesktop, jsonBodyLimit, async (c) => {
   const auth = c.get("auth");
   const db = c.get("db");
@@ -98,6 +98,8 @@ shareRoutes.post("/", requireAuth, requireDesktop, jsonBodyLimit, async (c) => {
   if (body.permission !== "view" && body.permission !== "type") throw Errors.badRequest();
   if (body.lifetime !== "15m" && body.lifetime !== "1h" && body.lifetime !== "until_quit") throw Errors.badRequest();
   if (typeof body.access !== "string" || !ACCESS_RE.test(body.access)) throw Errors.badRequest();
+  const id = typeof body.id === "string" ? parseShareId(body.id) : null;
+  if (id === null) throw Errors.badRequest();
 
   // R5: the QR share is `type`, until_quit (24 h cap), claimed within 2 minutes by the first viewer.
   const permission: Permission = oneTime ? "type" : body.permission;
@@ -107,7 +109,7 @@ shareRoutes.post("/", requireAuth, requireDesktop, jsonBodyLimit, async (c) => {
   const claimUntil = oneTime ? now + CLAIM_WINDOW_MS : null;
   const accessHash = sha256Hex(body.access);
 
-  const { id, slot } = db.transaction(() => {
+  const { slot } = db.transaction(() => {
     const live = db.get<{ n: number }>(
       "SELECT COUNT(*) AS n FROM shares WHERE device_id = ? AND revoked_at IS NULL AND expires_at > ?", auth.deviceId, now,
     )!.n;
@@ -118,18 +120,20 @@ shareRoutes.post("/", requireAuth, requireDesktop, jsonBodyLimit, async (c) => {
       slot = c.get("shareSlot")();
       if (db.get("SELECT 1 FROM shares WHERE slot = ?", slot) !== undefined) throw new Error("could not allocate a share slot");
     }
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const candidate = c.get("shareId")();
-      if (db.get("SELECT 1 FROM shares WHERE id = ?", candidate) !== undefined) continue;
+    // Any state, any owner: the answer reveals only that the id is taken.
+    if (db.get("SELECT 1 FROM shares WHERE id = ?", id) !== undefined) throw Errors.shareIdTaken();
+    try {
       db.run(
         `INSERT INTO shares (id, user_id, device_id, slot, permission, lifetime, one_time, access_hash,
                              created_at, expires_at, claim_until, viewer_hash, revoked_at, host_seen_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`,
-        candidate, auth.userId, auth.deviceId, slot, permission, lifetime, oneTime ? 1 : 0, accessHash, now, expiresAt, claimUntil, now,
+        id, auth.userId, auth.deviceId, slot, permission, lifetime, oneTime ? 1 : 0, accessHash, now, expiresAt, claimUntil, now,
       );
-      return { id: candidate, slot };
+    } catch (err) {
+      if (isShareIdCollision(err)) throw Errors.shareIdTaken();
+      throw err;
     }
-    throw new Error("could not allocate a share id");
+    return { slot };
   });
 
   logMeta("share_created", { device_id: auth.deviceId, permission, lifetime, one_time: oneTime });

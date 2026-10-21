@@ -4,6 +4,7 @@ use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
+use std::sync::atomic::{AtomicU32, Ordering};
 use support::requests_to;
 
 const ACCESS: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"; // 43 chars
@@ -13,8 +14,18 @@ fn claims(ticket: &str) -> Value {
     serde_json::from_slice(&URL_SAFE_NO_PAD.decode(part).unwrap()).unwrap()
 }
 
+static NEXT_ID: AtomicU32 = AtomicU32::new(0);
+
+/// A fresh valid id per call (digits only, so always inside the alphabet).
+fn fresh_id() -> String {
+    format!("{:08}", 10_000_000 + NEXT_ID.fetch_add(1, Ordering::Relaxed))
+}
+
 fn create(core: &shellx_core::Core) -> Value {
-    core.call("shares.create", json!({"permission":"view","lifetime":"1h","one_time":false,"access":ACCESS})).unwrap()
+    let id = fresh_id();
+    let s = core.call("shares.create", json!({"id": id, "permission":"view","lifetime":"1h","one_time":false,"access":ACCESS})).unwrap();
+    assert_eq!(s["id"], id, "the API echoes the client's id");
+    s
 }
 
 #[test]
@@ -47,7 +58,7 @@ fn create_then_host_ticket() {
 #[test]
 fn one_time_create_forces_type_until_quit_and_claim_window() {
     let (core, _fake, _dir) = support::logged_in();
-    let s = core.call("shares.create", json!({"permission":"view","lifetime":"15m","one_time":true,"access":ACCESS})).unwrap();
+    let s = core.call("shares.create", json!({"id": fresh_id(), "permission":"view","lifetime":"15m","one_time":true,"access":ACCESS})).unwrap();
     let claim = s["claim_until_unix"].as_u64().unwrap();
     let exp = s["expires_at_unix"].as_u64().unwrap();
     assert_eq!(exp - claim, 86400 - 120);
@@ -91,10 +102,10 @@ fn revoked_share_host_ticket_maps_code() {
 #[test]
 fn create_never_sends_secret() {
     let (core, fake, _dir) = support::logged_in();
-    core.call("shares.create", json!({"permission":"type","lifetime":"until_quit","one_time":true,"access":ACCESS, "secret":"x"})).unwrap();
+    core.call("shares.create", json!({"id": fresh_id(), "permission":"type","lifetime":"until_quit","one_time":true,"access":ACCESS, "secret":"x"})).unwrap();
     let req = &requests_to(&fake, "/v2/shares")[0];
     let keys: BTreeSet<&str> = req.body.as_object().unwrap().keys().map(String::as_str).collect();
-    assert_eq!(keys, BTreeSet::from(["permission", "lifetime", "one_time", "access"]));
+    assert_eq!(keys, BTreeSet::from(["id", "permission", "lifetime", "one_time", "access"]));
     assert_eq!(req.body["one_time"], true);
 }
 
@@ -102,11 +113,15 @@ fn create_never_sends_secret() {
 fn invalid_params_do_not_reach_the_server() {
     let (core, fake, _dir) = support::logged_in();
     for p in [
-        json!({"permission":"admin","lifetime":"1h","access":ACCESS}),
-        json!({"permission":"view","lifetime":"2h","access":ACCESS}),
-        json!({"permission":"view","lifetime":"1h","access":"short"}),
-        json!({"permission":"view","lifetime":"1h"}),
-        json!({"permission":"view","lifetime":"1h","access":ACCESS,"one_time":"yes"}),
+        json!({"permission":"view","lifetime":"1h","access":ACCESS}),
+        json!({"id":"abc","permission":"view","lifetime":"1h","access":ACCESS}),
+        json!({"id":"ilou0000","permission":"view","lifetime":"1h","access":ACCESS}),
+        json!({"id":5,"permission":"view","lifetime":"1h","access":ACCESS}),
+        json!({"id":"k7f29qd1","permission":"admin","lifetime":"1h","access":ACCESS}),
+        json!({"id":"k7f29qd1","permission":"view","lifetime":"2h","access":ACCESS}),
+        json!({"id":"k7f29qd1","permission":"view","lifetime":"1h","access":"short"}),
+        json!({"id":"k7f29qd1","permission":"view","lifetime":"1h"}),
+        json!({"id":"k7f29qd1","permission":"view","lifetime":"1h","access":ACCESS,"one_time":"yes"}),
     ] {
         assert_eq!(core.call("shares.create", p.clone()).unwrap_err().code, "invalid_params", "{p}");
     }
@@ -121,4 +136,23 @@ fn invalid_params_do_not_reach_the_server() {
 fn shares_need_a_session() {
     let (core, _fake, _dir) = support::logged_out();
     assert_eq!(core.call("shares.list", json!({})).unwrap_err().code, "not_logged_in");
+}
+
+#[test]
+fn create_sends_the_client_id_stripped_of_dash_and_case() {
+    let (core, fake, _dir) = support::logged_in();
+    let s = core.call("shares.create", json!({"id":"K7F2-9QD1","permission":"view","lifetime":"1h","access":ACCESS})).unwrap();
+    assert_eq!(s["id"], "k7f29qd1");
+    assert_eq!(requests_to(&fake, "/v2/shares")[0].body["id"], "k7f29qd1");
+}
+
+#[test]
+fn a_taken_id_is_returned_as_is_and_not_retried() {
+    let (core, fake, _dir) = support::logged_in();
+    let p = json!({"id":"k7f29qd1","permission":"view","lifetime":"1h","access":ACCESS});
+    core.call("shares.create", p.clone()).unwrap();
+    let e = core.call("shares.create", p).unwrap_err();
+    assert_eq!(e.code, "share_id_taken");
+    // One request for the first create, exactly one for the refused one: no retry.
+    assert_eq!(requests_to(&fake, "/v2/shares").iter().filter(|r| r.method == "POST").count(), 2);
 }
