@@ -1288,8 +1288,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     var didScheduleAgentSessionRecovery = false
     private var didCaptureSessionLaunchState = false
     private var didArmSessionLaunchSentinel = false
-    var didAttemptStartupSessionRestore = false
-    var isApplyingSessionRestore = false
+    var didAttemptStartupSessionRestore = false {
+        didSet { ShellXSessionRestoreSignal.update() } // ShellX: share links resume after restore
+    }
+    var isApplyingSessionRestore = false {
+        didSet { ShellXSessionRestoreSignal.update() } // ShellX: share links resume after restore
+    }
     /// True only when it is safe to enumerate the window/tab tree for the v2
     /// control pre-mint pass (#2751): the initial session-restore decision has
     /// resolved (`didAttemptStartupSessionRestore`) AND no restore pass is

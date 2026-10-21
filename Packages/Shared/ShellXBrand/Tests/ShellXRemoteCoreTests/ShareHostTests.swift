@@ -325,6 +325,42 @@ final class ShareHostTests: XCTestCase {
         XCTAssertTrue(control.isClosed)
     }
 
+    /// The API answers that the share is gone: the host stops with that reason and never retries.
+    func testTerminalTicketErrorStopsHostWithoutRetry() async throws {
+        for reason in [ShareByeReason.revoked, .expired] {
+            try await setUp()
+            tickets.fail(with: ShareTicketError.terminal(reason))
+            let host = makeHost()
+            let finished = ShareFlag()
+            let stream = host.viewerStream
+            Task { for await _ in stream {}; finished.set() }
+            await host.start()
+            try await shareEventually { finished.isSet }
+            clock.advance(by: 120)
+            try await Task.sleep(for: .milliseconds(50))
+            XCTAssertEqual(tickets.requested.count, 1, "no retry after a terminal ticket error")
+            XCTAssertEqual(relay.count, 0)
+        }
+    }
+
+    /// A transient ticket error still backs off and retries.
+    func testTransientTicketErrorRetries() async throws {
+        tickets.fail(with: URLError(.notConnectedToInternet))
+        let host = makeHost()
+        await host.start()
+        try await shareEventually { self.tickets.requested.count == 1 && self.clock.pendingCount > 0 }
+        clock.advance(by: 2)
+        try await shareEventually { self.tickets.requested.count >= 2 }
+        await host.stop(reason: .revoked)
+    }
+
+    func testCoreTicketCodesMapToTerminalReasons() {
+        XCTAssertEqual(ShareTicketError.terminalReason(forCode: "share_revoked"), .revoked)
+        XCTAssertEqual(ShareTicketError.terminalReason(forCode: "share_expired"), .expired)
+        XCTAssertEqual(ShareTicketError.terminalReason(forCode: "share_not_found"), .revoked)
+        XCTAssertNil(ShareTicketError.terminalReason(forCode: "network"))
+    }
+
     /// Quit runs with the main thread blocked in `applicationWillTerminate`: the bye must go out anyway.
     func testStopForTerminationSendsByeWhileMainIsBlocked() async throws {
         let host = makeHost()
@@ -746,11 +782,15 @@ final class FakeTickets: ShareTicketProvider, @unchecked Sendable {
     private let lock = NSLock()
     private var ids: [String] = []
     private let clock: ManualShareClock
+    private var failure: (any Error)?
     init(clock: ManualShareClock) { self.clock = clock }
     var requested: [String] { lock.withLock { ids } }
+    /// Every later `hostTicket` throws this.
+    func fail(with error: any Error) { lock.withLock { failure = error } }
 
     func hostTicket(shareID: String) async throws -> (ticket: String, relayURL: URL, expiresAt: Date) {
-        let n = lock.withLock { ids.append(shareID); return ids.count }
+        let (n, failure) = lock.withLock { ids.append(shareID); return (ids.count, self.failure) }
+        if let failure { throw failure }
         return ("ticket-\(n)", ShareHostTests.relayURL, clock.now.addingTimeInterval(120))
     }
 }
@@ -927,4 +967,11 @@ extension ShareHostTests {
         XCTAssertFalse(viewer.messages().contains(.ka))
         await host.stop(reason: .revoked)
     }
+}
+
+final class ShareFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+    var isSet: Bool { lock.withLock { value } }
+    func set() { lock.withLock { value = true } }
 }

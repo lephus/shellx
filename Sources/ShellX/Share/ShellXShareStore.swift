@@ -16,33 +16,32 @@ struct PersistedShare: Codable, Equatable, Sendable {
     let workspaceID: UUID
 }
 
-/// The whole list is read and written at once; it holds at most a few entries.
+/// The whole list of one account is read and written at once; it holds at most a few entries.
 @MainActor
 protocol ShellXShareStore: AnyObject {
-    func load() -> [PersistedShare]
-    func save(_ shares: [PersistedShare])
+    func load(account: String) -> [PersistedShare]
+    func save(_ shares: [PersistedShare], account: String)
 }
 
-/// One generic-password item in the data-protection Keychain (like the session-persistence secret),
-/// readable after first unlock on this device only.
+/// One generic-password item per account in the data-protection Keychain (like the session-persistence
+/// secret), readable after first unlock on this device only.
 @MainActor
 final class KeychainShellXShareStore: ShellXShareStore {
     private let service: String
-    private let account = "active-share-links"
 
     init(service: String = (Bundle.main.bundleIdentifier ?? "pro.shellx.desktop") + ".share-links") {
         self.service = service
     }
 
-    private var baseQuery: [String: Any] {
+    private func baseQuery(_ account: String) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
          kSecAttrService as String: service,
-         kSecAttrAccount as String: account,
+         kSecAttrAccount as String: "share-links." + account,
          kSecUseDataProtectionKeychain as String: true]
     }
 
-    func load() -> [PersistedShare] {
-        var query = baseQuery
+    func load(account: String) -> [PersistedShare] {
+        var query = baseQuery(account)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
@@ -52,7 +51,8 @@ final class KeychainShellXShareStore: ShellXShareStore {
         return (try? JSONDecoder().decode([PersistedShare].self, from: data)) ?? []
     }
 
-    func save(_ shares: [PersistedShare]) {
+    func save(_ shares: [PersistedShare], account: String) {
+        let baseQuery = baseQuery(account)
         guard !shares.isEmpty else {
             SecItemDelete(baseQuery as CFDictionary)
             return

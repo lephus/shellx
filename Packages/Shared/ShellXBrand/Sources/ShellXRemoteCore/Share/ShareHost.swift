@@ -253,6 +253,10 @@ public actor ShareHost {
             registerTimer = schedule(.registerTimeout(generation), at: clock() + Self.registerTimeout)
             try await socket.send(text: ShareRelayControl.register(protocol: ShareRelayControl.protocolVersion,
                                                                    slot: slot, ticket: ticket.ticket).encoded())
+        } catch ShareTicketError.terminal(let reason) {
+            // The API says the share is gone (revoked, expired, unknown): stop for good, no retry.
+            guard running else { return }
+            await stop(reason: reason)
         } catch {
             controlFailed(generation)
         }

@@ -130,6 +130,11 @@ struct ShellXShareEnvironment {
     var sockets: any ShareSocketFactory
     /// The account's sign-in state, delivered on the main thread (sends its current value on subscribe).
     var signedIn: AnyPublisher<Bool, Never>
+    /// True once the launch's session restore finished (or was skipped), on the main thread. Resume
+    /// waits for it so a workspace still being restored is not taken for gone.
+    var sessionRestored: AnyPublisher<Bool, Never>
+    /// The signed-in account (user id): stored links are kept per account.
+    var accountID: @MainActor () -> String?
     var presentSignIn: @MainActor () -> Void
     var source: @MainActor (UUID) -> (any ShareSource)?
     /// Where 15 m / 1 h links wait for the next launch (the Keychain in the app).
@@ -198,14 +203,22 @@ final class ShellXShareController: ObservableObject {
 
     private let env: ShellXShareEnvironment
     private var entries: [String: Entry] = [:]
-    private var signedInObserver: AnyCancellable?
+    private var observers: [AnyCancellable] = []
     private var resumed = false
+    private var sessionRestored = false
+    /// The account whose links `entries` hold (set at resume).
+    private var account: String?
+    /// API ids whose revoke is in flight: quit revokes them too.
+    private var pendingRevokes: Set<String> = []
 
     init(environment: ShellXShareEnvironment) {
         env = environment
-        signedInObserver = environment.signedIn.sink { [weak self] signedIn in
+        observers.append(environment.sessionRestored.sink { [weak self] restored in
+            MainActor.assumeIsolated { self?.sessionRestoredChanged(restored) }
+        })
+        observers.append(environment.signedIn.sink { [weak self] signedIn in
             MainActor.assumeIsolated { self?.signedInChanged(signedIn) }
-        }
+        })
     }
 
     func presentSignIn() { env.presentSignIn() }
@@ -215,8 +228,28 @@ final class ShellXShareController: ObservableObject {
     }
 
     private func signedInChanged(_ signedIn: Bool) {
+        let wasSignedIn = isSignedIn
         if isSignedIn != signedIn { isSignedIn = signedIn }
-        if signedIn { resumePersisted() }
+        if signedIn {
+            resumePersisted()
+        } else if wasSignedIn {
+            signedOut()
+        }
+    }
+
+    private func sessionRestoredChanged(_ restored: Bool) {
+        guard restored, !sessionRestored else { return }
+        sessionRestored = true
+        resumePersisted()
+    }
+
+    /// Another account may sign in next: stop every host (`bye(host_quit)`) and forget this account's
+    /// list. Its stored links stay under its own account for its next sign-in.
+    private func signedOut() {
+        let (hosts, _) = takeAllForQuit()
+        for host in hosts { Task { await host.stop(reason: .hostQuit) } }
+        resumed = false
+        account = nil
     }
 
     // MARK: Create
@@ -330,11 +363,16 @@ final class ShellXShareController: ObservableObject {
     /// Once signed in, re-hosts every persisted 15 m / 1 h link that has not expired and whose workspace
     /// still exists. The rest are forgotten; an unexpired one whose workspace is gone is revoked.
     private func resumePersisted() {
-        guard !resumed else { return }
+        guard !resumed, isSignedIn, sessionRestored else { return }
         resumed = true
+        account = env.accountID()
+        guard let account else {
+            Self.log.error("share resume skipped: no account id")
+            return
+        }
         let now = env.clock()
         var orphaned: [String] = []
-        for saved in env.store.load() {
+        for saved in env.store.load(account: account) {
             let id = ShellXShareLink.displayID(saved.id)
             guard saved.expiresAt > now, entries[id] == nil, let secret = ShareSecret(base64url: saved.secret)
             else { continue }
@@ -353,7 +391,9 @@ final class ShellXShareController: ObservableObject {
     }
 
     private func persist() {
-        env.store.save(entries.values.compactMap(\.persisted).sorted { $0.id < $1.id })
+        guard let account = account ?? (isSignedIn ? env.accountID() : nil) else { return }
+        self.account = account
+        env.store.save(entries.values.compactMap(\.persisted).sorted { $0.id < $1.id }, account: account)
     }
 
     // MARK: Stop
@@ -363,8 +403,12 @@ final class ShellXShareController: ObservableObject {
     @discardableResult
     func revoke(_ id: String) async -> Bool {
         guard let entry = take(id) else { return true }
+        let apiID = ShellXShareLink.apiID(id)
+        pendingRevokes.insert(apiID)
+        defer { pendingRevokes.remove(apiID) }
         await entry.host.stop(reason: .revoked)
-        return await Self.revokeOnCore(core: env.core, ids: [ShellXShareLink.apiID(id)])
+        // Quit may have revoked it meanwhile (it takes `pendingRevokes`); revoking twice is harmless.
+        return await Self.revokeOnCore(core: env.core, ids: [apiID])
     }
 
     /// The host ended (its stream finished) or `expiresAt` passed.
@@ -415,6 +459,7 @@ final class ShellXShareController: ObservableObject {
     private func takeAllForQuit() -> (hosts: [any ShellXShareHosting], revokeIDs: [String]) {
         let shares = active
         let revokeIDs = shares.filter { !$0.resumesAfterRelaunch }.map { ShellXShareLink.apiID($0.id) }
+            + pendingRevokes.sorted()
         var hosts: [any ShellXShareHosting] = []
         for share in shares {
             guard let entry = entries.removeValue(forKey: share.id) else { continue }
@@ -476,11 +521,31 @@ extension ShellXShareEnvironment {
             core: ShellXCoreClient(ShellXCoreFFI.shared),
             sockets: URLSessionShareSocketFactory(),
             signedIn: ShellXRemoteService.shared.$isSignedIn.removeDuplicates().eraseToAnyPublisher(),
+            sessionRestored: ShellXSessionRestoreSignal.completed.eraseToAnyPublisher(),
+            accountID: { ShellXRemoteService.shared.accountOwnerID },
             presentSignIn: { ShellXRemoteUIActions.presentSignIn() },
             source: { workspaceID in
                 guard let workspace = ShellXShareActions.workspace(id: workspaceID) else { return nil }
                 return WorkspaceShareSource(workspace: workspace)
             },
             store: KeychainShellXShareStore())
+    }
+}
+
+/// ShellX: tells the share controller when the launch's session restore has finished (or was skipped).
+/// `AppDelegate` calls `update()` whenever its restore flags change; the check runs on the next turn,
+/// because a restore pass sets `didAttemptStartupSessionRestore` just before `isApplyingSessionRestore`.
+@MainActor
+enum ShellXSessionRestoreSignal {
+    static let completed = CurrentValueSubject<Bool, Never>(false)
+
+    static func update() {
+        guard !completed.value else { return }
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                guard !completed.value, AppDelegate.shared?.didCompleteInitialSessionRestore == true else { return }
+                completed.send(true)
+            }
+        }
     }
 }

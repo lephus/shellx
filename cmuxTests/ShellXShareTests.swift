@@ -22,6 +22,8 @@ final class ShareFakeCore: ShellXCoreCalling, @unchecked Sendable {
     private var recorded: [Call] = []
     private var issued = 0
     var takenIDs: Set<String> = []
+    /// `shares.host_ticket` answers this error code instead of a ticket.
+    var hostTicketError: String?
 
     var calls: [Call] { lock.lock(); defer { lock.unlock() }; return recorded }
 
@@ -50,6 +52,9 @@ final class ShareFakeCore: ShellXCoreCalling, @unchecked Sendable {
             let claim = (params["one_time"] as? Bool) == true ? "\(now + 120)" : "null"
             reply = #"{"ok":{"id":"\#(id)","slot":"slot-\#(id)","expires_at_unix":\#(now + 3600),"claim_until_unix":\#(claim)}}"#
         case "shares.host_ticket":
+            if let hostTicketError {
+                return Data(#"{"error":{"code":"\#(hostTicketError)","message":"gone"}}"#.utf8)
+            }
             reply = #"{"ok":{"ticket":"tkt","expires_at_unix":\#(now + 120),"relay_url":"wss://relay.invalid/v2/relay"}}"#
         case "shares.revoke":
             reply = #"{"ok":{}}"#
@@ -137,8 +142,15 @@ final class ShareFakeHost: ShellXShareHosting, @unchecked Sendable {
     /// "stop:revoked", "terminate:host_quit", …
     var stopCalls: [String] { lock.withLock { stops } }
 
+    /// When set, `stop` waits until the gate opens.
+    var stopGate: ShareStopGate?
+
     func start() async {}
-    func stop(reason: ShareByeReason) async { lock.withLock { stops.append("stop:\(reason.rawValue)") }; continuation.finish() }
+    func stop(reason: ShareByeReason) async {
+        lock.withLock { stops.append("stop:\(reason.rawValue)") }
+        if let stopGate { await stopGate.wait() }
+        continuation.finish()
+    }
     func stopForTermination(reason: ShareByeReason) async {
         lock.withLock { stops.append("terminate:\(reason.rawValue)") }
         continuation.finish()
@@ -161,9 +173,56 @@ final class ShareFakeHosts {
 
 @MainActor
 final class ShareMemoryStore: ShellXShareStore {
-    var shares: [PersistedShare] = []
-    func load() -> [PersistedShare] { shares }
-    func save(_ shares: [PersistedShare]) { self.shares = shares }
+    var byAccount: [String: [PersistedShare]] = [:]
+    /// The default test account's list.
+    var shares: [PersistedShare] {
+        get { byAccount[ShellXShareTests.accountA] ?? [] }
+        set { byAccount[ShellXShareTests.accountA] = newValue }
+    }
+    func load(account: String) -> [PersistedShare] { byAccount[account] ?? [] }
+    func save(_ shares: [PersistedShare], account: String) { byAccount[account] = shares }
+}
+
+/// Test-driven sign-in, restore and account state.
+@MainActor
+final class ShareSession {
+    let signedIn: CurrentValueSubject<Bool, Never>
+    let restored: CurrentValueSubject<Bool, Never>
+    var account: String? = ShellXShareTests.accountA
+    /// Workspaces that exist (nil: the fixture's workspace exists).
+    var workspaceExists = true
+
+    init(signedIn: Bool = true, restored: Bool = true) {
+        self.signedIn = CurrentValueSubject(signedIn)
+        self.restored = CurrentValueSubject(restored)
+    }
+}
+
+final class ShareStopGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var waiter: CheckedContinuation<Void, Never>?
+    private var opened = false
+    var isWaiting: Bool { lock.withLock { waiter != nil } }
+
+    func wait() async {
+        await withCheckedContinuation { cont in
+            let resumeNow = lock.withLock { () -> Bool in
+                if opened { return true }
+                waiter = cont
+                return false
+            }
+            if resumeNow { cont.resume() }
+        }
+    }
+
+    func open() {
+        let pending = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+            opened = true
+            defer { waiter = nil }
+            return waiter
+        }
+        pending?.resume()
+    }
 }
 
 /// Sleeps until `fireAll`.
@@ -188,6 +247,7 @@ final class ShareManualSleeper: ShareSleeper, @unchecked Sendable {
 @MainActor
 @Suite(.serialized)
 struct ShellXShareTests {
+    nonisolated static let accountA = "user-a"
     struct Fixture {
         let manager: TabManager
         let workspace: Workspace
@@ -214,12 +274,17 @@ struct ShellXShareTests {
                                 workspace: Workspace?, signedIn: Bool = true,
                                 store: ShareMemoryStore? = nil,
                                 sleeper: (any ShareSleeper)? = nil,
-                                hosts: ShareFakeHosts? = nil) -> ShellXShareController {
+                                hosts: ShareFakeHosts? = nil,
+                                session: ShareSession? = nil) -> ShellXShareController {
+        let session = session ?? ShareSession(signedIn: signedIn)
         var env = ShellXShareEnvironment(
             core: ShellXCoreClient(core), sockets: sockets,
-            signedIn: Just(signedIn).eraseToAnyPublisher(), presentSignIn: {},
+            signedIn: session.signedIn.eraseToAnyPublisher(),
+            sessionRestored: session.restored.eraseToAnyPublisher(),
+            accountID: { session.account },
+            presentSignIn: {},
             source: { [weak workspace] id in
-                guard let workspace, workspace.id == id else { return nil }
+                guard session.workspaceExists, let workspace, workspace.id == id else { return nil }
                 return WorkspaceShareSource(workspace: workspace, io: ShareFakeTerminalIO())
             },
             store: store ?? ShareMemoryStore(),
@@ -487,6 +552,85 @@ struct ShellXShareTests {
         #expect(hosts.host("k7f29q01")?.stopCalls == ["stop:revoked"])
         model.close()
         #expect(try await eventually { core.revokedIDs() == ["k7f29q01", "k7f29q02"] }, "closing revokes the unclaimed code")
+    }
+
+    @Test func testResumedShareStopsWhenServerRevokedIt() async throws {
+        let f = try makeFixture()
+        defer { f.browser.close() }
+        let core = ShareFakeCore(), store = ShareMemoryStore()
+        core.hostTicketError = "share_revoked"
+        store.shares = [PersistedShare(id: "aaaabbbb", slot: "s1", secret: ShareSecret.random().base64url,
+                                       permission: .view, lifetime: .oneHour,
+                                       expiresAt: Date().addingTimeInterval(600), workspaceID: f.workspace.id)]
+        // A real ShareHost: its host ticket is refused for good, so it stops instead of retrying.
+        let controller = makeController(core: core, workspace: f.workspace, store: store)
+        #expect(controller.active.map(\.id) == ["aaaa-bbbb"])
+        #expect(try await eventually { controller.active.isEmpty }, "the ghost leaves the list")
+        #expect(store.shares.isEmpty, "and the store")
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(core.calls.filter { $0.method == "shares.host_ticket" }.count == 1, "no retry")
+    }
+
+    @Test func testResumeWaitsForSessionRestore() async throws {
+        let f = try makeFixture()
+        defer { f.browser.close() }
+        let core = ShareFakeCore(), store = ShareMemoryStore(), hosts = ShareFakeHosts()
+        let saved = PersistedShare(id: "aaaabbbb", slot: "s1", secret: ShareSecret.random().base64url,
+                                   permission: .view, lifetime: .oneHour,
+                                   expiresAt: Date().addingTimeInterval(600), workspaceID: f.workspace.id)
+        store.shares = [saved]
+        let session = ShareSession(signedIn: true, restored: false)
+        session.workspaceExists = false // not restored yet
+        let controller = makeController(core: core, workspace: f.workspace, store: store, hosts: hosts, session: session)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(controller.active.isEmpty && hosts.made.isEmpty)
+        #expect(core.revokedIDs().isEmpty, "signed in before restore: nothing is revoked")
+        #expect(store.shares == [saved])
+        // Restore brings the workspace back, then reports done.
+        session.workspaceExists = true
+        session.restored.send(true)
+        #expect(controller.active.map(\.id) == ["aaaa-bbbb"])
+        #expect(hosts.made.first?.spec.slot == "s1")
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(core.revokedIDs().isEmpty)
+        controller.stopAllForTermination()
+    }
+
+    @Test func testSignOutStopsSharesAndKeepsAccountsApart() async throws {
+        let f = try makeFixture()
+        defer { f.browser.close() }
+        let core = ShareFakeCore(), store = ShareMemoryStore(), hosts = ShareFakeHosts()
+        let session = ShareSession()
+        let controller = makeController(core: core, workspace: f.workspace, store: store, hosts: hosts, session: session)
+        _ = try await controller.share(workspaceID: f.workspace.id)
+        session.signedIn.send(false)
+        #expect(controller.active.isEmpty)
+        #expect(try await eventually { hosts.made.first?.stopCalls == ["stop:host_quit"] })
+        #expect(store.shares.count == 1, "account A's link stays under account A")
+        // Account B signs in: A's links are not touched.
+        session.account = "user-b"
+        session.signedIn.send(true)
+        #expect(controller.active.isEmpty)
+        #expect(hosts.made.count == 1)
+        #expect(store.byAccount["user-b"] ?? [] == [])
+        controller.stopAllForTermination()
+        #expect(store.shares.count == 1)
+    }
+
+    @Test func testQuitDuringRevokeStillRevokes() async throws {
+        let f = try makeFixture()
+        defer { f.browser.close() }
+        let core = ShareFakeCore(), hosts = ShareFakeHosts()
+        let controller = makeController(core: core, workspace: f.workspace, hosts: hosts)
+        _ = try await controller.share(workspaceID: f.workspace.id)
+        let gate = ShareStopGate()
+        hosts.made.first?.stopGate = gate
+        let revoking = Task { await controller.revoke("k7f2-9q01") }
+        #expect(try await eventually { gate.isWaiting })
+        controller.stopAllForTermination() // quit while the host is still sending its bye
+        #expect(core.revokedIDs() == ["k7f29q01"], "the in-flight revoke is done by the quit path")
+        gate.open()
+        _ = await revoking.value
     }
 
     @Test func testSignedOutShareMakesNoCoreCall() async throws {
