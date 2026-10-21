@@ -2491,6 +2491,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
     func applicationWillTerminate(_ notification: Notification) {
         ShellXRemoteService.shared.stopForTermination() // ShellX: stops links, daemon and bridge (bounded, < 2 s)
+        ShellXShareController.stopAllForTerminationIfStarted() // ShellX: bye host_quit, revokes until-quit/QR shares (bounded)
         cloudWorkspaceOperationController?.cancelAll()
         StartupBreadcrumbLog.append("appDelegate.willTerminate.begin")
         agentChatTranscriptService.shutdown()

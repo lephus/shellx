@@ -13,24 +13,21 @@ import Testing
 // L7 Task B6: the workspace share source, the share controller and the share entrypoints, against a
 // fake shellx-core and a fake relay socket factory (no network).
 
-/// Records every core call and answers the share methods like the fake API.
+/// Records every core call and answers the share methods like the fake API (ruling 6: the client
+/// proposes the id; `takenIDs` answer 409 `share_id_taken`).
 final class ShareFakeCore: ShellXCoreCalling, @unchecked Sendable {
     struct Call { let method: String; let json: String; let params: [String: Any] }
     private let lock = NSLock()
     private var recorded: [Call] = []
     private var issued = 0
+    var takenIDs: Set<String> = []
 
     var calls: [Call] { lock.lock(); defer { lock.unlock() }; return recorded }
 
-    /// The id the next `shares.create` assigns; `newShareID` proposes the same one.
+    /// Deterministic proposals for `newShareID`.
     func nextID() -> String {
         lock.lock(); defer { lock.unlock() }
         issued += 1
-        return String(format: "k7f29q%02d", issued)
-    }
-
-    private var lastIssued: String {
-        lock.lock(); defer { lock.unlock() }
         return String(format: "k7f29q%02d", issued)
     }
 
@@ -43,8 +40,14 @@ final class ShareFakeCore: ShellXCoreCalling, @unchecked Sendable {
         let reply: String
         switch method {
         case "shares.create":
+            guard let id = params["id"] as? String else {
+                return Data(#"{"error":{"code":"bad_request","message":"no id"}}"#.utf8)
+            }
+            if takenIDs.contains(id) {
+                return Data(#"{"error":{"code":"share_id_taken","message":"taken"}}"#.utf8)
+            }
             let claim = (params["one_time"] as? Bool) == true ? "\(now + 120)" : "null"
-            reply = #"{"ok":{"id":"\#(lastIssued)","slot":"slot-\#(lastIssued)","expires_at_unix":\#(now + 3600),"claim_until_unix":\#(claim)}}"#
+            reply = #"{"ok":{"id":"\#(id)","slot":"slot-\#(id)","expires_at_unix":\#(now + 3600),"claim_until_unix":\#(claim)}}"#
         case "shares.host_ticket":
             reply = #"{"ok":{"ticket":"tkt","expires_at_unix":\#(now + 120),"relay_url":"wss://relay.invalid/v2/relay"}}"#
         case "shares.revoke":
@@ -67,7 +70,7 @@ final class ShareFakeSocket: ShareSocket, @unchecked Sendable {
     private var closed = false
     private(set) var sentText: [String] = []
 
-    func send(text: String) async throws { lock.lock(); sentText.append(text); lock.unlock() }
+    func send(text: String) async throws { lock.withLock { sentText.append(text) } }
     func send(data: Data) async throws {}
 
     func receive() async throws -> ShareSocketMessage {
@@ -94,7 +97,7 @@ final class ShareFakeSocketFactory: ShareSocketFactory, @unchecked Sendable {
     private(set) var opened: [URL] = []
 
     func open(_ url: URL) async throws -> any ShareSocket {
-        lock.lock(); opened.append(url); lock.unlock()
+        lock.withLock { opened.append(url) }
         return ShareFakeSocket()
     }
 }
@@ -245,7 +248,8 @@ struct ShellXShareTests {
             #expect(call.params["secret"] == nil)
         }
         let access = try #require(core.calls.first { $0.method == "shares.create" }?.params["access"] as? String)
-        #expect(access == ShareSecret(base64url: secret)?.keys(shareID: "k7f29q01").access)
+        #expect(access == ShareSecret(base64url: secret)?.keys(shareID: "k7f29q01").access,
+                "access is derived from the secret and the proposed id")
         await controller.stopAll()
     }
 
@@ -263,6 +267,24 @@ struct ShellXShareTests {
         await controller.stopAll()
         #expect(controller.active.isEmpty)
         #expect(Set(core.revokedIDs()) == ["k7f29q02", "k7f29q03"], "1 h link stays valid; until-quit and QR are revoked")
+    }
+
+    @Test func testTakenShareIDRetriesWithFreshID() async throws {
+        let f = try makeFixture()
+        defer { f.browser.close() }
+        let core = ShareFakeCore()
+        core.takenIDs = ["k7f29q01"]
+        let controller = makeController(core: core, workspace: f.workspace)
+        let url = try await controller.share(workspaceID: f.workspace.id)
+        let creates = core.calls.filter { $0.method == "shares.create" }
+        #expect(creates.compactMap { $0.params["id"] as? String } == ["k7f29q01", "k7f29q02"])
+        let fragment = try #require(url.fragment)
+        let secret = try #require(ShareSecret(base64url: fragment))
+        #expect(creates.map { $0.params["access"] as? String }
+            == [secret.keys(shareID: "k7f29q01").access, secret.keys(shareID: "k7f29q02").access],
+            "same secret, access re-derived for the fresh id")
+        #expect(url.path == "/s/k7f2-9q02")
+        await controller.stopAll()
     }
 
     @Test func testSignedOutShareMakesNoCoreCall() async throws {
