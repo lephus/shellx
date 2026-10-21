@@ -410,4 +410,25 @@ private func sizeOf(_ frame: BridgeFrame?) -> [UInt16]? {
         bytes.withUnsafeBufferPointer { ShellXBridgeTee.consume(surfaceID: UUID(), buffer: $0) }
         #expect(!ShellXBridgeTee.isBound(surfaceID: UUID()))
     }
+
+    @Test func teeDeliversToAnySinkOnlyWhileRegistered() {
+        final class Sink: ShellXTeeSink, @unchecked Sendable {
+            let lock = NSLock()
+            var received = Data()
+            func teeOutput(_ bytes: Data) { lock.lock(); received.append(bytes); lock.unlock() }
+        }
+        let sink = Sink(), surface = UUID()
+        let send: ([UInt8]) -> Void = { bytes in
+            bytes.withUnsafeBufferPointer { ShellXBridgeTee.consume(surfaceID: surface, buffer: $0) }
+        }
+        send([0x61])
+        ShellXBridgeTee.register(sink, surfaceID: surface)
+        ShellXBridgeTee.register(sink, surfaceID: surface)   // idempotent
+        #expect(ShellXBridgeTee.isBound(surfaceID: surface))
+        send([0x62, 0x63])
+        ShellXBridgeTee.unregister(sink, surfaceID: surface)
+        send([0x64])
+        #expect(sink.received == Data([0x62, 0x63]))
+        #expect(!ShellXBridgeTee.isBound(surfaceID: surface))
+    }
 }
