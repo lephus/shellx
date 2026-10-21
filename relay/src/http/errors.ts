@@ -38,6 +38,7 @@ export const Errors = {
   shareExpired: () => new ApiError(410, "share_expired", "This share has expired"),
   shareUsed: () => new ApiError(410, "share_used", "This share is bound to another viewer"),
   shareLimit: () => new ApiError(409, "share_limit", "Too many active shares on this device"),
+  shareIdTaken: () => new ApiError(409, "share_id_taken", "That share id is already in use"),
   hostOffline: () => new ApiError(503, "host_offline", "The host is not online"),
   emailTaken: () => new ApiError(409, "email_taken", "Email is already registered"),
   pairingRemoved: () => new ApiError(410, "pairing_removed", "This pairing has already been removed"),

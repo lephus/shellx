@@ -10,6 +10,8 @@ const VIEWER_A = "viewer-a-0123456789abcdef";
 const VIEWER_B = "viewer-b-0123456789abcdef";
 
 const newAccess = () => randomBytes(32).toString("base64url");
+const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
+const newId = () => Array.from(randomBytes(8), (b) => ALPHABET[b & 31]).join("");
 
 interface Created { id: string; slot: string; expires_at_unix: number; claim_until_unix: number | null }
 
@@ -30,7 +32,7 @@ async function desk(app: TestApp) {
 
 async function create(app: TestApp, session: Session, overrides: Record<string, unknown> = {}) {
   const access = newAccess();
-  const res = await call(app, "POST", "/v2/shares", { token: session.token, body: { permission: "view", lifetime: "1h", access, ...overrides } });
+  const res = await call(app, "POST", "/v2/shares", { token: session.token, body: { id: newId(), permission: "view", lifetime: "1h", access, ...overrides } });
   return { res, access, share: res.status === 201 ? await res.json<Created>() : (undefined as unknown as Created) };
 }
 
@@ -81,7 +83,7 @@ describe("create", () => {
   it("validates the body", async () => {
     const app = makeApp({ now: () => T0 });
     const { session } = await desk(app);
-    for (const bad of [{ permission: "admin" }, { lifetime: "2h" }, { access: "short" }, { access: "!".repeat(43) }, { one_time: "yes" }]) {
+    for (const bad of [{ permission: "admin" }, { lifetime: "2h" }, { access: "short" }, { access: "!".repeat(43) }, { one_time: "yes" }, { id: undefined }, { id: "short" }, { id: "k7f29qdi" }, { id: "k7f29qd1x" }, { id: 12345678 }, { id: "k7f2--9qd1" }]) {
       expect((await create(app, session, bad)).res.status).toBe(400);
     }
   });
@@ -114,19 +116,40 @@ describe("create", () => {
     const { account, session } = await desk(app);
     expect((await call(app, "POST", "/v2/shares", { body: {} })).status).toBe(401);
     expect(account.agent.token).not.toBe(session.token);
-    const res = await call(app, "POST", "/v2/shares", { token: account.agent.token, body: { permission: "view", lifetime: "1h", access: newAccess() } });
+    const res = await call(app, "POST", "/v2/shares", { token: account.agent.token, body: { id: newId(), permission: "view", lifetime: "1h", access: newAccess() } });
     expect(res.status).toBe(403);
     expect(await errorCode(res)).toBe("desktop_only");
   });
 
-  it("uses the injected share id and accepts the dashed form on routes", async () => {
-    const app = makeApp({ now: () => T0, shareId: () => "k7f29qd1" });
+  it("creates with the client's id, normalising dashes and case", async () => {
+    const app = makeApp({ now: () => T0 });
     const { session } = await desk(app);
-    const { share, access } = await create(app, session);
-    expect(share.id).toBe("k7f29qd1");
-    expect((await viewerTicket(app, "k7f2-9qd1", access)).status).toBe(200);
-    expect((await viewerTicket(app, "K7F2-9QD1", access)).status).toBe(200);
+    const plain = await create(app, session, { id: "k7f29qd1" });
+    expect(plain.res.status).toBe(201);
+    expect(plain.share.id).toBe("k7f29qd1");
+    expect((await viewerTicket(app, "k7f2-9qd1", plain.access)).status).toBe(200);
+    expect((await viewerTicket(app, "K7F2-9QD1", plain.access)).status).toBe(200);
     expect((await call(app, "GET", "/v2/shares", { token: session.token })).status).toBe(200);
+    expect((await create(app, session, { id: "ABCD-2345" })).share.id).toBe("abcd2345");
+    expect((await create(app, session, { id: "pq7r-s8tvv" })).res.status).toBe(400);
+    expect((await create(app, session, { id: "wxyz-0123" })).share.id).toBe("wxyz0123");
+  });
+
+  it("answers 409 share_id_taken for an existing id: own, revoked, or another account's", async () => {
+    const app = makeApp({ now: () => T0 });
+    const a = await desk(app);
+    const b = await desk(app);
+    const first = await create(app, a.session, { id: "k7f29qd1" });
+    for (const [session, id] of [[a.session, "k7f29qd1"], [a.session, "K7F2-9QD1"], [b.session, "k7f29qd1"]] as const) {
+      const dup = await create(app, session, { id });
+      expect(dup.res.status).toBe(409);
+      expect(await errorCode(dup.res)).toBe("share_id_taken");
+    }
+    // The id stays taken after revocation.
+    expect((await call(app, "DELETE", `/v2/shares/${first.share.id}`, { token: a.session.token })).status).toBe(204);
+    expect(await errorCode((await create(app, b.session, { id: "k7f29qd1" })).res)).toBe("share_id_taken");
+    // The original share still works for its own access token.
+    expect(db().get<{ n: number }>("SELECT COUNT(*) AS n FROM shares WHERE id = 'k7f29qd1'")!.n).toBe(1);
   });
 });
 
@@ -381,7 +404,7 @@ describe("CORS", () => {
     }
     const created = await call(app, "POST", "/v2/shares", {
       token: session.token, headers: { Origin: "https://shellx.pro" },
-      body: { permission: "view", lifetime: "1h", access: newAccess() },
+      body: { id: newId(), permission: "view", lifetime: "1h", access: newAccess() },
     });
     expect(created.status).toBe(201);
     expect(created.headers.get("access-control-allow-origin")).toBeNull();

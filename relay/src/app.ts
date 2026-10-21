@@ -17,7 +17,7 @@ import { notificationRoutes } from "./routes/notifications.js";
 import { pairingRoutes } from "./routes/pairings.js";
 import { machineRoutes } from "./v2/machines.js";
 import { newSlot } from "./v2/encoding.js";
-import { randomShareId, shareRoutes } from "./v2/shares.js";
+import { shareRoutes } from "./v2/shares.js";
 import { relayTicketRoutes } from "./v2/relay-tickets.js";
 import { machinePairingRoutes, randomPairingCode } from "./v2/pairings.js";
 import type { PushGateway } from "./push/fcm.js";
@@ -41,8 +41,6 @@ export interface AppDeps {
   adminStaticDir?: string;
   /** The 6-digit code of a new /v2 pairing; defaults to `randomInt(0, 1_000_000)` zero-padded. Injectable for tests. */
   pairingCode?: () => string;
-  /** The 8-character id of a new share; defaults to random characters of the share alphabet. Injectable for tests. */
-  shareId?: () => string;
   /** The relay slot of a new share; defaults to 16 random bytes. Injectable for tests. */
   shareSlot?: () => string;
 }
@@ -56,7 +54,6 @@ export interface AppVariables {
   now: () => number;
   push: PushGateway | null;
   pairingCode: () => string;
-  shareId: () => string;
   shareSlot: () => string;
   /** Set by `requireAuth` / `webSocketAuth` on authenticated routes only. */
   auth: AuthContext;
@@ -96,7 +93,6 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     c.set("now", deps.now ?? Date.now);
     c.set("push", deps.push ?? null);
     c.set("pairingCode", deps.pairingCode ?? randomPairingCode);
-    c.set("shareId", deps.shareId ?? randomShareId);
     c.set("shareSlot", deps.shareSlot ?? newSlot);
     await next();
   });
