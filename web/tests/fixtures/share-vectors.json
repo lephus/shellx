@@ -1,25 +1,45 @@
 {
   "frames" : [
     {
+      "aad" : "shellx-share/1|circuit-b3-vector",
       "circuit" : "circuit-b3-vector",
-      "frame_hex" : "a0a1a2a3a4a5a6a7a8a9aaab2c728ba5627a56b0a506315b3f16afbd085a3236e5206b915a8c5345d5429772c909b97de004ca23801901437d39e7a46efdf8652653d529bd50972ccf",
-      "key" : "host_to_viewer",
-      "nonce_hex" : "a0a1a2a3a4a5a6a7a8a9aaab",
-      "plaintext" : "{\"t\":\"out\",\"seq\":1,\"pane\":\"p1\",\"data\":\"aGk=\"}"
-    },
-    {
-      "circuit" : "circuit-b3-vector",
-      "frame_hex" : "b0b1b2b3b4b5b6b7b8b9babb127e587ef8f137908ef01c7ebf5f21caab4d7774da1181c62c5964e12b6b36b929ab04d54e19fdd7e22720a2bf0e252dd862066c6e360ff6a892e23e",
+      "frame_hex" : "b0b1b2b3b4b5b6b7b8b9babb127e587ef8f1369bc0b0512ff60c7095eb436f35975d8a8b781871f23365519f0d8c208f256dd9f7cc30458dbc99002c5be35bb6d3f5eec99f6ce09af5477e4cd4d9a1761beb41e39fa8f2f1c08fb030bdd42efda6be8a45e794637b75121d8d87e8d6",
       "key" : "viewer_to_host",
       "nonce_hex" : "b0b1b2b3b4b5b6b7b8b9babb",
-      "plaintext" : "{\"t\":\"in\",\"seq\":1,\"pane\":\"p1\",\"data\":\"bHMN\"}"
+      "plaintext" : "{\"t\":\"hello\",\"seq\":1,\"nonce\":\"EBESExQVFhcYGRobHB0eHw==\",\"label\":\"Safari · iPhone\"}"
+    },
+    {
+      "aad" : "shellx-share/1|circuit-b3-vector|EBESExQVFhcYGRobHB0eHw==",
+      "circuit" : "circuit-b3-vector",
+      "frame_hex" : "a0a1a2a3a4a5a6a7a8a9aaab2c728ba5627a4ea0bd4772142951f2bd410e6f36af7029d616d91f5681428172e02c88658f44b97389185f554fc05f2bd48d7fe742f461d1058daa760d55ff3b2adf274d2d5f3e8b77383c86204736a64002697b074951521c98a68ba2035bb33ca7224f42b22e25ce607be8884bdccaff5fce89192554a975c4645ff4176155b0d259e0faead05664380eaeb50e671cdb07ae6d37bfd6d803eff549e034b494e298c082ae683952cc58ccab0880435ce84fe4976ac76a75eb91e87fa035798c721b364c3833ae2fac822a82ef",
+      "key" : "host_to_viewer",
+      "nonce_hex" : "a0a1a2a3a4a5a6a7a8a9aaab",
+      "plaintext" : "{\"t\":\"welcome\",\"seq\":1,\"nonce\":\"MDEyMzQ1Njc4OTo7PD0+Pw==\",\"perm\":\"type\",\"expires_at_unix\":1800000000,\"panes\":[{\"id\":\"p1\",\"title\":\"zsh\",\"kind\":\"terminal\",\"cols\":80,\"rows\":24}],\"active\":\"p1\"}"
+    },
+    {
+      "aad" : "shellx-share/1|circuit-b3-vector|EBESExQVFhcYGRobHB0eHw==|MDEyMzQ1Njc4OTo7PD0+Pw==",
+      "circuit" : "circuit-b3-vector",
+      "frame_hex" : "a1a2a3a4a5a6a7a8a9aaabac4f463c322339cc199388316f90fc5cfc3723cd08a59c08d75f5758d0ff421b0c96e98ba33cc074d3feeef61adf418ad57b3c7d24aa7b3f998302341359",
+      "key" : "host_to_viewer",
+      "nonce_hex" : "a1a2a3a4a5a6a7a8a9aaabac",
+      "plaintext" : "{\"t\":\"out\",\"seq\":2,\"pane\":\"p1\",\"data\":\"aGk=\"}"
+    },
+    {
+      "aad" : "shellx-share/1|circuit-b3-vector|EBESExQVFhcYGRobHB0eHw==|MDEyMzQ1Njc4OTo7PD0+Pw==",
+      "circuit" : "circuit-b3-vector",
+      "frame_hex" : "b1b2b3b4b5b6b7b8b9babbbc6d562347e28a4d89be00f6d2265081b5bb42009df82e491543ace1a5ac681575146fa6ae12d4a0c2e175eabdfc04c7595834148c1f18f55aaad67084",
+      "key" : "viewer_to_host",
+      "nonce_hex" : "b1b2b3b4b5b6b7b8b9babbbc",
+      "plaintext" : "{\"t\":\"in\",\"seq\":2,\"pane\":\"p1\",\"data\":\"bHMN\"}"
     }
   ],
+  "host_nonce_b64" : "MDEyMzQ1Njc4OTo7PD0+Pw==",
   "keys" : {
     "access" : "CpJ3tmYl_Qc2TTdxBd3B0pHqKnW9wC7pFqgUJocnNW4",
     "host_to_viewer_hex" : "ecde2da4de6b6fe4c930794043dee0bbacbd4baa458709792fe930dabaea2953",
     "viewer_to_host_hex" : "995a3204473c2018b62a3e6c2330c4ad2decb77585abfc10052ae6b455e28245"
   },
   "secret" : "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
-  "share_id" : "k7f29qd1"
+  "share_id" : "k7f29qd1",
+  "viewer_nonce_b64" : "EBESExQVFhcYGRobHB0eHw=="
 }

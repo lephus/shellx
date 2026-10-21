@@ -11,9 +11,13 @@ public struct ShareSecret: Sendable, Equatable {
 
     private init(bytes: Data) { self.bytes = bytes }
 
-    /// Parses base64url without padding; nil unless it decodes to exactly 32 bytes.
+    /// Parses base64url without padding; nil unless exactly 43 canonical base64url characters (32 bytes).
     public init?(base64url: String) {
-        guard let data = Data(shareBase64URL: base64url), data.count == 32 else { return nil }
+        guard base64url.utf8.count == 43,
+              !base64url.contains(where: { $0 == "+" || $0 == "/" || $0 == "=" }),
+              let data = Data(shareBase64URL: base64url), data.count == 32,
+              data.shareBase64URLString == base64url   // canonical trailing bits
+        else { return nil }
         self.bytes = data
     }
 
