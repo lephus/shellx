@@ -15,12 +15,28 @@ from __future__ import annotations
 
 import os
 import shutil
+import signal
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/shellx/share-e2e.mjs"
+TIMEOUT_S = 900
+
+
+def stop_group(proc: subprocess.Popen[bytes]) -> None:
+    """SIGTERM node's process group (its handlers clean up), then SIGKILL whatever is left."""
+    for sig, grace in ((signal.SIGTERM, 10), (signal.SIGKILL, 5)):
+        try:
+            os.killpg(proc.pid, sig)
+        except ProcessLookupError:
+            return
+        try:
+            proc.wait(timeout=grace)
+            return
+        except subprocess.TimeoutExpired:
+            continue
 
 
 def main() -> int:
@@ -28,8 +44,18 @@ def main() -> int:
     if not (ROOT / "relay/node_modules/tsx").is_dir():
         print("FAIL: run `npm ci` in relay/ first (tsx, ws)", file=sys.stderr)
         return 1
-    result = subprocess.run([node, str(SCRIPT)], cwd=ROOT, timeout=900)
-    if result.returncode != 0:
+    # Own process group, so a timeout or Ctrl-C reaches node and the relay/host it spawned.
+    proc = subprocess.Popen([node, str(SCRIPT)], cwd=ROOT, start_new_session=True)
+    try:
+        returncode = proc.wait(timeout=TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        print(f"FAIL: share-e2e.mjs timed out after {TIMEOUT_S} s", file=sys.stderr)
+        stop_group(proc)
+        return 1
+    except KeyboardInterrupt:
+        stop_group(proc)
+        raise
+    if returncode != 0:
         print("FAIL: share-e2e.mjs failed", file=sys.stderr)
         return 1
     print("PASS: share links end to end")
