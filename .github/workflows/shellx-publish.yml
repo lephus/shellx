@@ -1,0 +1,171 @@
+name: ShellX publish desktop
+
+# Puts one native ShellX desktop release on download.shellx.pro. The files come from the GitHub
+# release shellx-v<version>: ShellX-<v>.dmg (signed, notarized and stapled on the dev Mac with
+# scripts/shellx/sign-and-notarize.sh), ShellX-Setup-<v>.exe (the shellx-windows.yml installer
+# artifact), appcast.xml (Sparkle feed, EdDSA-signed), latest-macos.json, latest-windows.json and
+# SHA256SUMS. Publishing that GitHub release starts this workflow; workflow_dispatch reruns it.
+#
+# Installers are immutable: a version download.shellx.pro already serves is never overwritten
+# (release X.Y.(Z+1) instead). The feeds are uploaded only after both installers answer over HTTPS
+# with the right size, so Sparkle and the relay never point at a file that is not served yet.
+# The website and deploy/relay.env are pointed at the new version afterwards by a push to main
+# (deploy.yml).
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (X.Y.Z); the GitHub release shellx-v<version> holds the files'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shellx-publish
+  cancel-in-progress: false
+
+env:
+  DOWNLOAD_BASE_URL: https://download.shellx.pro
+
+jobs:
+  publish:
+    name: Upload to download.shellx.pro
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'shellx-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The VPS_* secrets deploy.yml uses; this job only writes into $APP_DIR/downloads/desktop.
+    environment: production
+    env:
+      APP_DIR: ${{ vars.VPS_APP_DIR || 'phu/shellx' }}
+      VPS_SSH_PORT: ${{ vars.VPS_SSH_PORT || '22' }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Resolve the version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == release ]]; then version="${TAG_NAME#shellx-v}"; else version="$INPUT_VERSION"; fi
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::version '$version' is not X.Y.Z"; exit 1; }
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Download the release files
+        run: |
+          gh release download "shellx-v$VERSION" -R "$GITHUB_REPOSITORY" -D dist \
+            -p "ShellX-$VERSION.dmg" -p "ShellX-Setup-$VERSION.exe" \
+            -p appcast.xml -p latest-macos.json -p latest-windows.json -p SHA256SUMS
+          ls -la dist
+
+      - name: Check checksums and feeds
+        working-directory: dist
+        run: |
+          sha256sum --strict -c SHA256SUMS
+          for name in "ShellX-$VERSION.dmg" "ShellX-Setup-$VERSION.exe" appcast.xml latest-macos.json latest-windows.json; do
+            grep -q "  $name\$" SHA256SUMS || { echo "::error::SHA256SUMS does not list $name"; exit 1; }
+          done
+          python3 - <<'EOF'
+          import hashlib, json, os, re
+          v = os.environ["VERSION"]
+          base = f"https://download.shellx.pro/desktop/{v}/"
+          for platform, name in (("macos", f"ShellX-{v}.dmg"), ("windows", f"ShellX-Setup-{v}.exe")):
+              m = json.load(open(f"latest-{platform}.json"))
+              assert m["version"] == v, (platform, m["version"])
+              assert m["url"] == base + name, (platform, m["url"])
+              assert m["sha256"] == hashlib.sha256(open(name, "rb").read()).hexdigest(), platform
+          feed = open("appcast.xml").read()
+          assert f'url="{base}ShellX-{v}.dmg"' in feed, "appcast enclosure url"
+          assert "sparkle:edSignature=" in feed, "appcast signature"
+          assert re.search(r"<sparkle:shortVersionString>" + re.escape(v) + "<", feed), "appcast version"
+          print("feeds ok")
+          EOF
+
+      - name: Refuse to overwrite a published version
+        run: |
+          for name in "ShellX-$VERSION.dmg" "ShellX-Setup-$VERSION.exe"; do
+            url="$DOWNLOAD_BASE_URL/desktop/$VERSION/$name"
+            # Unique query string: never read (or seed) a cached 404 for the real URL.
+            code="$(curl -s -o /dev/null -w '%{http_code}' "$url?precheck=$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" || true)"
+            case "$code" in
+              404) echo "$url is free" ;;
+              000) echo "::error::cannot reach $DOWNLOAD_BASE_URL (is the web container on the VPS running?)"; exit 1 ;;
+              *) echo "::error::$url already answers HTTP $code; bump the version instead of overwriting"; exit 1 ;;
+            esac
+          done
+
+      - name: Install the deploy SSH key (host key pinned by VPS_KNOWN_HOSTS)
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          # Relative, no leading '-' and no '.'/'..' path segment (same check as deploy.yml).
+          dotdot_re='(^|/)\.\.?(/|$)'
+          if [[ ! "$APP_DIR" =~ ^[A-Za-z0-9._/-]+$ ]] || [[ "$APP_DIR" == /* ]] || [[ "$APP_DIR" == -* ]] || [[ "$APP_DIR" =~ $dotdot_re ]]; then
+            echo "::error::VPS_APP_DIR may contain only letters, digits and . _ - /, must be relative, must not start with '-', and must not contain a '.' or '..' path segment"
+            exit 1
+          fi
+          if [[ ! "$VPS_SSH_PORT" =~ ^[0-9]+$ ]]; then
+            echo "::error::VPS_SSH_PORT must contain only digits"
+            exit 1
+          fi
+          umask 077
+          printf '%s\n' "$VPS_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$RUNNER_TEMP/known_hosts"
+          {
+            echo "Host vps"
+            echo "  HostName $VPS_HOST"
+            echo "  User $VPS_USER"
+            echo "  IdentityFile $RUNNER_TEMP/deploy_key"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking yes"
+            echo "  UserKnownHostsFile $RUNNER_TEMP/known_hosts"
+            echo "  BatchMode yes"
+            echo "  Port $VPS_SSH_PORT"
+          } > "$RUNNER_TEMP/ssh_config"
+          echo "SSH_CONFIG=$RUNNER_TEMP/ssh_config" >> "$GITHUB_ENV"
+
+      - name: Upload installers (rsync into VPS_APP_DIR/downloads/desktop/<version>/)
+        run: |
+          # Mode 755 on every level: nginx (uid 101, in the web image) must traverse
+          # downloads/, desktop/ and the version folder to serve the files inside it.
+          ssh -F "$SSH_CONFIG" vps "mkdir -p '$APP_DIR/downloads/desktop/$VERSION' && chmod 755 '$APP_DIR/downloads' '$APP_DIR/downloads/desktop' '$APP_DIR/downloads/desktop/$VERSION'"
+          rsync -t -e "ssh -F $SSH_CONFIG" --chmod=F644 "dist/ShellX-$VERSION.dmg" "dist/ShellX-Setup-$VERSION.exe" \
+            "vps:$APP_DIR/downloads/desktop/$VERSION/"
+
+      - name: Verify the installers over HTTPS
+        run: |
+          for name in "ShellX-$VERSION.dmg" "ShellX-Setup-$VERSION.exe"; do
+            url="$DOWNLOAD_BASE_URL/desktop/$VERSION/$name"
+            remote_size="$(curl -sfIL "$url?verify=$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" | tr -d '\r' | awk 'tolower($1) == "content-length:" { size = $2 } END { print size }')"
+            local_size="$(stat -c %s "dist/$name")"
+            if [[ "$remote_size" != "$local_size" ]]; then
+              echo "::error::$url has size '$remote_size', expected $local_size"
+              exit 1
+            fi
+          done
+
+      - name: Upload the feeds (appcast.xml, latest-macos.json, latest-windows.json)
+        run: |
+          # rsync writes a temporary name and renames it: readers see the old or the new file.
+          rsync -t -e "ssh -F $SSH_CONFIG" --chmod=F644 dist/appcast.xml dist/latest-macos.json dist/latest-windows.json \
+            "vps:$APP_DIR/downloads/desktop/"
+          curl -sf "$DOWNLOAD_BASE_URL/desktop/appcast.xml?verify=$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" | grep -qF "ShellX-$VERSION.dmg" \
+            || { echo "::error::$DOWNLOAD_BASE_URL/desktop/appcast.xml does not serve $VERSION"; exit 1; }
+          {
+            echo "## ShellX desktop $VERSION"
+            echo
+            echo "| File | URL | SHA-256 |"
+            echo "|---|---|---|"
+            for name in "ShellX-$VERSION.dmg" "ShellX-Setup-$VERSION.exe"; do
+              echo "| $name | $DOWNLOAD_BASE_URL/desktop/$VERSION/$name | $(sha256sum "dist/$name" | cut -d' ' -f1) |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the SSH key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/deploy_key" "$RUNNER_TEMP/known_hosts" "$RUNNER_TEMP/ssh_config"
