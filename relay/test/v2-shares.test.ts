@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { isShareIdCollision } from "../src/v2/shares.js";
 import {
   call, CountingLimiter, db, errorCode, loginDesktop, makeApp, registerAccount, registerMachine, unlimited, type Session, type TestApp,
 } from "./helpers.js";
@@ -148,8 +149,32 @@ describe("create", () => {
     // The id stays taken after revocation.
     expect((await call(app, "DELETE", `/v2/shares/${first.share.id}`, { token: a.session.token })).status).toBe(204);
     expect(await errorCode((await create(app, b.session, { id: "k7f29qd1" })).res)).toBe("share_id_taken");
-    // The original share still works for its own access token.
+    // The refused attempts left the original row alone: its own access token still reaches it (revoked, so 410).
+    const ticket = await viewerTicket(app, "k7f29qd1", first.access);
+    expect(ticket.status).toBe(410);
+    expect(await errorCode(ticket)).toBe("share_revoked");
     expect(db().get<{ n: number }>("SELECT COUNT(*) AS n FROM shares WHERE id = 'k7f29qd1'")!.n).toBe(1);
+  });
+
+  it("recognises a real primary-key collision on shares.id (the race the existence check cannot cover)", async () => {
+    const app = makeApp({ now: () => T0 });
+    const { session } = await desk(app);
+    const { share } = await create(app, session);
+    let collision: unknown;
+    try {
+      db().run(
+        `INSERT INTO shares (id, user_id, device_id, slot, permission, lifetime, one_time, access_hash,
+                             created_at, expires_at, claim_until, viewer_hash, revoked_at, host_seen_at)
+         SELECT id, user_id, device_id, 'another-slot', permission, lifetime, one_time, access_hash,
+                created_at, expires_at, claim_until, viewer_hash, revoked_at, host_seen_at FROM shares WHERE id = ?`, share.id,
+      );
+    } catch (err) { collision = err; }
+    expect(collision).toBeDefined();
+    expect(isShareIdCollision(collision)).toBe(true);
+    expect(isShareIdCollision(new Error("UNIQUE constraint failed: shares.slot"))).toBe(false);
+    expect(isShareIdCollision(Object.assign(new Error("x"), { code: "SQLITE_CONSTRAINT_PRIMARYKEY" }))).toBe(true);
+    expect(isShareIdCollision(new Error("UNIQUE constraint failed: shares.id"))).toBe(true);
+    expect(isShareIdCollision(undefined)).toBe(false);
   });
 });
 

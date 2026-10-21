@@ -115,10 +115,20 @@ private struct TakenIDCore: ShellXCoreCalling {
     #expect(script.calls.count == 3)
 }
 
+private final class CallCount: @unchecked Sendable { var n = 0 }
+private struct CountingErrorCore: ShellXCoreCalling {
+    let count: CallCount
+    func call(method: String, json: Data) throws -> Data {
+        count.n += 1
+        return Data(#"{"error":{"code":"share_limit","message":"m"}}"#.utf8)
+    }
+}
+
 @Test func createShareRetryingIDDoesNotRetryOtherErrors() {
-    let (core, cap) = client(#"{"error":{"code":"share_limit","message":"m"}}"#)
+    let count = CallCount()
+    let core = ShellXCoreClient(CountingErrorCore(count: count))
     #expect(throws: ShellXCoreError(code: "share_limit", message: "m")) {
         try core.createShareRetryingID(permission: .view, lifetime: .oneHour, oneTime: false)
     }
-    #expect(cap.method == "shares.create")
+    #expect(count.n == 1)
 }

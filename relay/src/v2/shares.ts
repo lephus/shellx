@@ -50,6 +50,12 @@ function parseShareId(raw: string): string | null {
   return ID_DASHED.test(id) ? id.replace("-", "") : null;
 }
 
+/** True when `err` is the primary-key violation of `shares.id` (a racing insert of the same id). */
+export function isShareIdCollision(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  return code === "SQLITE_CONSTRAINT_PRIMARYKEY" || String(err).includes("UNIQUE constraint failed: shares.id");
+}
+
 const sha256Hex = (value: string): string => createHash("sha256").update(value, "utf8").digest("hex");
 
 function sameHash(a: string, b: string): boolean {
@@ -114,17 +120,20 @@ shareRoutes.post("/", requireAuth, requireDesktop, jsonBodyLimit, async (c) => {
       slot = c.get("shareSlot")();
       if (db.get("SELECT 1 FROM shares WHERE slot = ?", slot) !== undefined) throw new Error("could not allocate a share slot");
     }
-    {
-      // Any state, any owner: the answer reveals only that the id is taken.
-      if (db.get("SELECT 1 FROM shares WHERE id = ?", id) !== undefined) throw Errors.shareIdTaken();
+    // Any state, any owner: the answer reveals only that the id is taken.
+    if (db.get("SELECT 1 FROM shares WHERE id = ?", id) !== undefined) throw Errors.shareIdTaken();
+    try {
       db.run(
         `INSERT INTO shares (id, user_id, device_id, slot, permission, lifetime, one_time, access_hash,
                              created_at, expires_at, claim_until, viewer_hash, revoked_at, host_seen_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`,
         id, auth.userId, auth.deviceId, slot, permission, lifetime, oneTime ? 1 : 0, accessHash, now, expiresAt, claimUntil, now,
       );
-      return { slot };
+    } catch (err) {
+      if (isShareIdCollision(err)) throw Errors.shareIdTaken();
+      throw err;
     }
+    return { slot };
   });
 
   logMeta("share_created", { device_id: auth.deviceId, permission, lifetime, one_time: oneTime });

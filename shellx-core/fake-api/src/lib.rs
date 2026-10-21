@@ -688,12 +688,12 @@ fn create_share(rec: &Recorded, st: &mut State) -> Reply {
     // R5: a one-time share is a typing share until quit with a 2-minute claim window.
     let (permission, lifetime) = if one_time { ("type", "until_quit") } else { (permission, lifetime) };
     let life = lifetime_secs(lifetime).expect("validated lifetime");
-    if st.shares.contains_key(id) {
-        return Reply::error(409, "share_id_taken", "That share id is already in use");
-    }
     let live = st.shares.values().filter(|s| s.device_id == who.device_id && !s.revoked && s.expires_at > now_unix()).count();
     if live >= 20 {
         return Reply::error(409, "share_limit", "Too many active shares");
+    }
+    if st.shares.contains_key(id) {
+        return Reply::error(409, "share_id_taken", "That share id is already in use");
     }
     let now = now_unix();
     let (expires_at, claim_until) = (now + life, one_time.then_some(now + 120));
