@@ -16,7 +16,7 @@ import { CLIENT_VERSION_HEADER, recordAppVersion } from "../versions.js";
 export const authRoutes = new Hono<AppEnv>();
 
 /** Rate-limit key: X-Real-IP from nginx-proxy, else the socket address (see auth/client-ip.ts). */
-function requestIp(c: Context<AppEnv>): string {
+export function requestIp(c: Context<AppEnv>): string {
   return clientIp(c.req.header("X-Real-IP"), c.env.incoming.socket.remoteAddress);
 }
 

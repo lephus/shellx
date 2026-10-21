@@ -30,6 +30,7 @@ describe("loadConfig", () => {
       relayV2DisabledReason: "missing_secret",
       relayIssuer: "shellx-relay",
       relayV2Url: "wss://relay.shellx.pro/v2/relay",
+      shareAllowedOrigin: "https://shellx.pro",
     });
   });
 

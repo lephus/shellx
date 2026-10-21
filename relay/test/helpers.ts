@@ -36,12 +36,13 @@ export const TEST_CONFIG: Config = {
   relayV2DisabledReason: null,
   relayIssuer: "shellx-relay",
   relayV2Url: "ws://127.0.0.1:1/v1/relay",
+  shareAllowedOrigin: "https://shellx.pro",
 };
 
 export const allowAll: RateLimiter = { limit: async () => true };
 export const unlimited: RateLimiters = {
   loginIp: allowAll, loginEmail: allowAll, registerIp: allowAll, upgradeIp: allowAll, notifyAgent: allowAll,
-  ticketMint: allowAll, pairingCreate: allowAll,
+  ticketMint: allowAll, pairingCreate: allowAll, shareCreate: allowAll, shareTicket: allowAll,
 };
 
 /** Fake limiter: allows `max` calls per key, then refuses; records every key it saw. */
