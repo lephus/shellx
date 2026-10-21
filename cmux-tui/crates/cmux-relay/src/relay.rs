@@ -2339,6 +2339,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn origin_null_is_rejected_unless_explicitly_listed() {
+        let config = RelayConfig {
+            allowed_origins: vec!["https://shellx.pro".into()],
+            ..RelayConfig::default()
+        };
+        let server = TestServer::start(config).await;
+        let error =
+            connect_with_origin(&server, "null").await.err().expect("Origin: null was upgraded");
+        let tokio_tungstenite::tungstenite::Error::Http(response) = error else {
+            panic!("origin rejection was not an HTTP response");
+        };
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+        let config = RelayConfig { allowed_origins: vec!["null".into()], ..RelayConfig::default() };
+        let server = TestServer::start(config).await;
+        assert!(connect_with_origin(&server, "null").await.is_ok());
+    }
+
+    #[tokio::test]
     async fn partial_http_headers_expire_and_raw_admission_remains_bounded() {
         let config = RelayConfig {
             http_header_timeout: Duration::from_millis(120),
