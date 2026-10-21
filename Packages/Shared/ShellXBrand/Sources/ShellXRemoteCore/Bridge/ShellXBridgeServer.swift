@@ -263,7 +263,7 @@ public final class ShellXBridgeServer: @unchecked Sendable {
 /// One daemon connection. Reads run on `readQueue` (a read source), writes on the serial
 /// `writeQueue`, so the two never wait on each other. The tee calls `teeOutput` from the
 /// libghostty IO thread.
-final class BridgeConnection: @unchecked Sendable {
+final class BridgeConnection: ShellXTeeSink, @unchecked Sendable {
     /// Queued-but-unwritten bytes (held tee output included) above which the connection is dropped,
     /// so a daemon that stops reading cannot grow app memory without bound.
     static let maxPendingBytes = 64 << 20

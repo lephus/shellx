@@ -2,6 +2,7 @@ import AppKit
 import CmuxFoundation
 import CmuxWorkspaces
 import Foundation
+import ShellXIcons
 import SwiftUI
 
 /// Action surface for one pure-AppKit sidebar workspace row.
@@ -281,6 +282,7 @@ struct SidebarWorkspaceRowMenuBuilder {
             beginInlineRename: beginInlineRename
         )
         addRemoteSection(to: menu, tabManager: tabManager)
+        addShellXShareSection(to: menu)
         addColorMenu(to: menu)
         addSSHErrorItem(to: menu)
         menu.addItem(.separator())
@@ -536,6 +538,21 @@ struct SidebarWorkspaceRowMenuBuilder {
                 workspace.disconnectRemoteConnection(clearConfiguration: false)
             }
         })
+    }
+
+    /// ShellX: "Chia sẻ phiên…" and "Tiếp tục trên điện thoại" (L7), one workspace at a time; the
+    /// same `ShellXShareActions` path as the titlebar button and the SwiftUI menu.
+    private func addShellXShareSection(to menu: NSMenu) {
+        let entries = ShellXShareActions.menuEntries
+        guard !entries.isEmpty, !isMulti else { return }
+        menu.addItem(.separator())
+        for entry in entries {
+            let menuItem = item(ShellXShareActions.title(entry)) { [tab] in
+                ShellXShareActions.perform(entry, workspaceID: tab.id)
+            }
+            menuItem.image = ShellXIcon.nsImage(ShellXShareActions.icon(entry), accessibilityDescription: nil)
+            menu.addItem(menuItem)
+        }
     }
 
     private func addColorMenu(to menu: NSMenu) {

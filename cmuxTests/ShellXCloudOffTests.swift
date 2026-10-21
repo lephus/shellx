@@ -53,13 +53,10 @@ struct ShellXCloudOffTests {
     }
 
     @Test func noCloudShortcutsOrPaletteCommands() {
-        func isCommandY(_ stroke: ShortcutStroke) -> Bool {
-            stroke.key.lowercased() == "y" && stroke.command && !stroke.option && !stroke.control
-        }
         let packageDefaults = ShortcutAction.allCases.compactMap(\.defaultStroke)
-        #expect(!packageDefaults.contains(where: isCommandY))
-        let appDefaults = KeyboardShortcutSettings.Action.allCases.map(\.defaultShortcut.first)
-        #expect(!appDefaults.contains(where: isCommandY))
+        #expect(!packageDefaults.contains { $0.key.lowercased() == "y" && $0.command && !$0.option && !$0.control })
+        let appDefaults = KeyboardShortcutSettings.Action.allCases.map(\.defaultShortcut)
+        #expect(!appDefaults.contains { $0.key.lowercased() == "y" && $0.command && !$0.option && !$0.control })
         let actionIDs = Set(KeyboardShortcutSettings.Action.allCases.map(\.rawValue))
             .union(ShortcutAction.allCases.map(\.rawValue))
         #expect(!actionIDs.contains("newCloudWorkspace"))

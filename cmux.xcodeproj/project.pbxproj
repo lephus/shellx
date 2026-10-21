@@ -3336,6 +3336,8 @@
 		5E11A00000000000000000B2 /* ShellXIcons in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000B1 /* ShellXIcons */; };
 		068517128CB0B3002C263E47 /* ShellXNoPhoneHomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 670CA928F698AA3B4424ED2D /* ShellXNoPhoneHomeTests.swift */; };
 		7413037583554EAA6E41D32F /* ShellXPathsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A657627F06A42A092E1F085 /* ShellXPathsTests.swift */; };
+		067A3A09F525B237CBC042CE /* ShellXPhoneHandoffPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ED77518C2AC614A20D35B29 /* ShellXPhoneHandoffPopover.swift */; };
+		1EA4DF7B949BB6F40EA075E6 /* ShellXQRCode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC34B858D6B69D34AAAF485 /* ShellXQRCode.swift */; };
 		5E11A00000000000000000A5 /* ShellXRemoteCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000A4 /* ShellXRemoteCore */; };
 		15974A84E1E2593C56ABB928 /* ShellXRemoteFixtureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2612802F161E87745147239E /* ShellXRemoteFixtureService.swift */; };
 		6AADF75FAAE770FAC4225327 /* ShellXRemoteGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE1509AB05C54F55B6FBCBA9 /* ShellXRemoteGate.swift */; };
@@ -3344,6 +3346,10 @@
 		5E13C3000000000000000011 /* ShellXRemoteUI in Frameworks */ = {isa = PBXBuildFile; productRef = 5E13C3000000000000000010 /* ShellXRemoteUI */; };
 		1DD66080021B6033F57D2308 /* ShellXRemoteUIActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2BD91002A2294345F3973E1 /* ShellXRemoteUIActions.swift */; };
 		6CDDB319FED107C3EB57AE87 /* ShellXRemoteUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0766083F21AAC8FF1BDCB01C /* ShellXRemoteUITests.swift */; };
+		7FE3DBDC782F741D0908C14A /* ShellXShareController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28727A245A45CE6FF2F3B847 /* ShellXShareController.swift */; };
+		0EBF253D2B12A5B1950B96F2 /* ShellXSharePopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F87374CBE57AAC30DC9F08 /* ShellXSharePopover.swift */; };
+		3E00FDBF8A15A3810B29B565 /* ShellXShareStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 510EA0A2A7CAF653E3E7D26E /* ShellXShareStore.swift */; };
+		FA7DD6E004CD07E9E7CE313D /* ShellXShareTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABEC2C3533141A19CA114B71 /* ShellXShareTests.swift */; };
 		0C0CF1B5A6F9AF1DFDC29B01 /* ShellXSidebarHeaderRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1123DE0D564CD722CC853FA0 /* ShellXSidebarHeaderRow.swift */; };
 		E4A2B0CAB6AAA1AC7127FD53 /* ShellXSidebarIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82421054CBFF9ECFC3CA2E2B /* ShellXSidebarIcon.swift */; };
 		9CBA983FD767551CAFB913EA /* ShellXSwitches.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE04344F1F44FBBC99583161 /* ShellXSwitches.swift */; };
@@ -4577,6 +4583,7 @@
 		EE30D6000000000000000002 /* WorkspaceRemoteSessionHostAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE30D6000000000000000001 /* WorkspaceRemoteSessionHostAdapter.swift */; };
 		44FF9EFEEF762BE6CF158E42 /* WorkspaceRemoteTmuxNonInteractiveCloseRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92CA6F2F239631988B2FB0C8 /* WorkspaceRemoteTmuxNonInteractiveCloseRoute.swift */; };
 		619D509BC9B1EA946CBD6A8A /* WorkspaceRuntimeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9960CC3992F3C44489E7627C /* WorkspaceRuntimeSettings.swift */; };
+		0A5EE54ECA44E4E6FE696B0C /* WorkspaceShareSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1AB2A2159DE90CD845C988 /* WorkspaceShareSource.swift */; };
 		6799A0016799A0016799A001 /* WorkspaceSidebarAgentRuntimeObservationModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6799A0026799A0026799A002 /* WorkspaceSidebarAgentRuntimeObservationModel.swift */; };
 		5659B0015659B0015659B001 /* WorkspaceSidebarLogEntryLimitProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5659B0025659B0025659B002 /* WorkspaceSidebarLogEntryLimitProvider.swift */; };
 		5659A0015659A0015659A001 /* WorkspaceSidebarObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5659A0025659A0025659A002 /* WorkspaceSidebarObservation.swift */; };
@@ -7903,12 +7910,18 @@
 		B9FE6EA47AFDBBF1DED049CD /* ShellXCoreFFITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXCoreFFITests.swift"; sourceTree = "<group>"; };
 		670CA928F698AA3B4424ED2D /* ShellXNoPhoneHomeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXNoPhoneHomeTests.swift"; sourceTree = "<group>"; };
 		8A657627F06A42A092E1F085 /* ShellXPathsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXPathsTests.swift"; sourceTree = "<group>"; };
+		7ED77518C2AC614A20D35B29 /* ShellXPhoneHandoffPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Share/ShellXPhoneHandoffPopover.swift; sourceTree = "<group>"; };
+		0FC34B858D6B69D34AAAF485 /* ShellXQRCode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Share/ShellXQRCode.swift; sourceTree = "<group>"; };
 		2612802F161E87745147239E /* ShellXRemoteFixtureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/UI/ShellXRemoteFixtureService.swift; sourceTree = "<group>"; };
 		CE1509AB05C54F55B6FBCBA9 /* ShellXRemoteGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/ShellXRemoteGate.swift; sourceTree = "<group>"; };
 		D6F0FD302DAE7B0036569F1C /* ShellXRemoteService+App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellX/Remote/ShellXRemoteService+App.swift"; sourceTree = "<group>"; };
 		5223C753F4D56F05A0A0B6B0 /* ShellXRemoteServicing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/UI/ShellXRemoteServicing.swift; sourceTree = "<group>"; };
 		A2BD91002A2294345F3973E1 /* ShellXRemoteUIActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/UI/ShellXRemoteUIActions.swift; sourceTree = "<group>"; };
 		0766083F21AAC8FF1BDCB01C /* ShellXRemoteUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXRemoteUITests.swift"; sourceTree = "<group>"; };
+		28727A245A45CE6FF2F3B847 /* ShellXShareController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Share/ShellXShareController.swift; sourceTree = "<group>"; };
+		86F87374CBE57AAC30DC9F08 /* ShellXSharePopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Share/ShellXSharePopover.swift; sourceTree = "<group>"; };
+		510EA0A2A7CAF653E3E7D26E /* ShellXShareStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Share/ShellXShareStore.swift; sourceTree = "<group>"; };
+		ABEC2C3533141A19CA114B71 /* ShellXShareTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXShareTests.swift"; sourceTree = "<group>"; };
 		1123DE0D564CD722CC853FA0 /* ShellXSidebarHeaderRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Sidebar/ShellXSidebarHeaderRow.swift; sourceTree = "<group>"; };
 		82421054CBFF9ECFC3CA2E2B /* ShellXSidebarIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Sidebar/ShellXSidebarIcon.swift; sourceTree = "<group>"; };
 		AE04344F1F44FBBC99583161 /* ShellXSwitches.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/ShellXSwitches.swift; sourceTree = "<group>"; };
@@ -9130,6 +9143,7 @@
 		EE30D6000000000000000001 /* WorkspaceRemoteSessionHostAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceRemoteSessionHostAdapter.swift; sourceTree = "<group>"; };
 		92CA6F2F239631988B2FB0C8 /* WorkspaceRemoteTmuxNonInteractiveCloseRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceRemoteTmuxNonInteractiveCloseRoute.swift; sourceTree = "<group>"; };
 		9960CC3992F3C44489E7627C /* WorkspaceRuntimeSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/WorkspaceRuntimeSettings.swift; sourceTree = "<group>"; };
+		BB1AB2A2159DE90CD845C988 /* WorkspaceShareSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Share/WorkspaceShareSource.swift; sourceTree = "<group>"; };
 		6799A0026799A0026799A002 /* WorkspaceSidebarAgentRuntimeObservationModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSidebarAgentRuntimeObservationModel.swift; sourceTree = "<group>"; };
 		5659B0025659B0025659B002 /* WorkspaceSidebarLogEntryLimitProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSidebarLogEntryLimitProvider.swift; sourceTree = "<group>"; };
 		5659A0025659A0025659A002 /* WorkspaceSidebarObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceSidebarObservation.swift; sourceTree = "<group>"; };
@@ -12405,6 +12419,12 @@
 				3FC894AF0E3291551B1DF00A /* TerminalControllerBridgeHost.swift */,
 				D6F0FD302DAE7B0036569F1C /* ShellXRemoteService+App.swift */,
 				CE1509AB05C54F55B6FBCBA9 /* ShellXRemoteGate.swift */,
+				7ED77518C2AC614A20D35B29 /* ShellXPhoneHandoffPopover.swift */,
+				0FC34B858D6B69D34AAAF485 /* ShellXQRCode.swift */,
+				28727A245A45CE6FF2F3B847 /* ShellXShareController.swift */,
+				86F87374CBE57AAC30DC9F08 /* ShellXSharePopover.swift */,
+				BB1AB2A2159DE90CD845C988 /* WorkspaceShareSource.swift */,
+				510EA0A2A7CAF653E3E7D26E /* ShellXShareStore.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -13989,6 +14009,7 @@
 				CCFD07260C4FCB7D87552C48 /* SidebarStatusPillTests.swift */,
 				0766083F21AAC8FF1BDCB01C /* ShellXRemoteUITests.swift */,
 				B9FE6EA47AFDBBF1DED049CD /* ShellXCoreFFITests.swift */,
+				ABEC2C3533141A19CA114B71 /* ShellXShareTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -14334,6 +14355,7 @@
 				C4B1E0000000000000000002 /* CmuxMobileHost */,
 				D0F7A0000000000000000003 /* CmuxMemoryPressure */,
 				5E13C3000000000000000001 /* ShellXBrand */,
+				5E13C3000000000000000002 /* ShellXIcons */,
 			);
 			productName = cmuxTests;
 			productReference = F1000002A1B2C3D4E5F60718 /* cmuxTests.xctest */;
@@ -16618,11 +16640,16 @@
 				F0ACC0DE0000000000000007 /* SharedLiveAgentIndexLoader.swift in Sources */,
 				121580061215800612158006 /* SharedLiveAgentIndexRefreshOutcome.swift in Sources */,
 				8825E0A1CFB96235256FD162 /* ShellXCoreFFI.swift in Sources */,
+				067A3A09F525B237CBC042CE /* ShellXPhoneHandoffPopover.swift in Sources */,
+				1EA4DF7B949BB6F40EA075E6 /* ShellXQRCode.swift in Sources */,
 				15974A84E1E2593C56ABB928 /* ShellXRemoteFixtureService.swift in Sources */,
 				6AADF75FAAE770FAC4225327 /* ShellXRemoteGate.swift in Sources */,
 				506D3B28A199B87AE7D9FB1C /* ShellXRemoteService+App.swift in Sources */,
 				4B8B64A3E7AC76B5D2FF9F2D /* ShellXRemoteServicing.swift in Sources */,
 				1DD66080021B6033F57D2308 /* ShellXRemoteUIActions.swift in Sources */,
+				7FE3DBDC782F741D0908C14A /* ShellXShareController.swift in Sources */,
+				0EBF253D2B12A5B1950B96F2 /* ShellXSharePopover.swift in Sources */,
+				3E00FDBF8A15A3810B29B565 /* ShellXShareStore.swift in Sources */,
 				0C0CF1B5A6F9AF1DFDC29B01 /* ShellXSidebarHeaderRow.swift in Sources */,
 				E4A2B0CAB6AAA1AC7127FD53 /* ShellXSidebarIcon.swift in Sources */,
 				9CBA983FD767551CAFB913EA /* ShellXSwitches.swift in Sources */,
@@ -17521,6 +17548,7 @@
 				EE30D6000000000000000002 /* WorkspaceRemoteSessionHostAdapter.swift in Sources */,
 				44FF9EFEEF762BE6CF158E42 /* WorkspaceRemoteTmuxNonInteractiveCloseRoute.swift in Sources */,
 				619D509BC9B1EA946CBD6A8A /* WorkspaceRuntimeSettings.swift in Sources */,
+				0A5EE54ECA44E4E6FE696B0C /* WorkspaceShareSource.swift in Sources */,
 				6799A0016799A0016799A001 /* WorkspaceSidebarAgentRuntimeObservationModel.swift in Sources */,
 				5659B0015659B0015659B001 /* WorkspaceSidebarLogEntryLimitProvider.swift in Sources */,
 				5659A0015659A0015659A001 /* WorkspaceSidebarObservation.swift in Sources */,
@@ -18960,6 +18988,7 @@
 				068517128CB0B3002C263E47 /* ShellXNoPhoneHomeTests.swift in Sources */,
 				7413037583554EAA6E41D32F /* ShellXPathsTests.swift in Sources */,
 				6CDDB319FED107C3EB57AE87 /* ShellXRemoteUITests.swift in Sources */,
+				FA7DD6E004CD07E9E7CE313D /* ShellXShareTests.swift in Sources */,
 				B2C68350F29BD5759B40BE98 /* ShellXThemeTests.swift in Sources */,
 				1662FA327314C2564AB40E33 /* ShellXTitlebarModelTests.swift in Sources */,
 				1521D55DC63D5E5FC4955E31 /* ShortcutAndCommandPaletteTests.swift in Sources */,
@@ -20631,6 +20660,7 @@
 		5E11A00000000000000000A1 /* ShellXBrand */ = {isa = XCSwiftPackageProductDependency; package = 5E11A00000000000000000A0 /* XCLocalSwiftPackageReference "ShellXBrand" */; productName = ShellXBrand; };
 		5E11A00000000000000000B1 /* ShellXIcons */ = {isa = XCSwiftPackageProductDependency; package = 5E11A00000000000000000A0 /* XCLocalSwiftPackageReference "ShellXBrand" */; productName = ShellXIcons; };
 		5E13C3000000000000000001 /* ShellXBrand */ = {isa = XCSwiftPackageProductDependency; package = 5E11A00000000000000000A0 /* XCLocalSwiftPackageReference "ShellXBrand" */; productName = ShellXBrand; };
+		5E13C3000000000000000002 /* ShellXIcons */ = {isa = XCSwiftPackageProductDependency; package = 5E11A00000000000000000A0 /* XCLocalSwiftPackageReference "ShellXBrand" */; productName = ShellXIcons; };
 		5E11A00000000000000000A4 /* ShellXRemoteCore */ = {isa = XCSwiftPackageProductDependency; package = 5E11A00000000000000000A0 /* XCLocalSwiftPackageReference "ShellXBrand" */; productName = ShellXRemoteCore; };
 		5E13C3000000000000000010 /* ShellXRemoteUI */ = {isa = XCSwiftPackageProductDependency; package = 5E11A00000000000000000A0 /* XCLocalSwiftPackageReference "ShellXBrand" */; productName = ShellXRemoteUI; };
 		A1329B000000000000000101 /* CmuxTerminalSharing */ = {isa = XCSwiftPackageProductDependency; package = A1329B000000000000000100 /* XCLocalSwiftPackageReference "CmuxTerminalSharing" */; productName = CmuxTerminalSharing; };
