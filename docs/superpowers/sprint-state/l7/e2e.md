@@ -5,8 +5,8 @@ Harness: `scripts/shellx/share-e2e.mjs`, wrapped by `tests/test_shellx_share_e2e
 
 - `cmux-relay serve` (`cargo build -p cmux-relay`), HMAC secret from a 0600 temp file,
   issuer `shellx-relay`, `CMUX_RELAY_ALLOWED_ORIGINS=https://shellx.pro`.
-- The Node API (`relay/src`) in process, rate limits off. It uses two hooks the API already
-  has: `now` (shifted only for the POST of the expiry share) and `shareId` (see finding 1).
+- The Node API (`relay/src`) in process, rate limits off. It uses one hook the API already
+  has: `now` (shifted only for the POST of the expiry share). Share ids are proposed by the client.
 - The Swift `ShareHost` through the test-only executable `share-e2e-host`
   (`Packages/Shared/ShellXBrand/Sources/ShareE2EHost`). It has a scripted `ShareSource`
   (terminal `p1` 80x24 that echoes typed input, browser placeholder `b1`) and a ticket provider
@@ -93,13 +93,7 @@ and no `shellx-share-e2e-*` temp dir remain. With `SHARE_E2E_DEBUG=1`, debug out
 
 ## Interop findings
 
-1. **`access` cannot be computed before the share id exists (blocking for the app).**
-   R4 sets `access = HKDF(secret, salt = share_id, ...)`, but `POST /v2/shares` requires `access` in
-   its body and only returns the id in its response (`relay/src/v2/shares.ts`, create route:
-   `ACCESS_RE.test(body.access)` before `c.get("shareId")()`). The desktop cannot derive a valid
-   `access` without the id. The harness works around it with the API's `shareId` test hook,
-   choosing the id before the POST. Possible fixes: the client proposes the id (409 on collision),
-   or a second call sets `access` after creation, or the access salt does not depend on the id.
+1. **`access` could not be computed before the share id existed (resolved by B1b).** The client now proposes the id in `POST /v2/shares` (409 `share_id_taken` on a duplicate); the harness no longer uses a `shareId` hook.
 2. **Viewer lost `bye` to a racing relay error (fixed here, one line).** `web/src/share/session.mjs`
    circuit `onmessage` handled a text `error` (`peer-disconnected`) at once, while the `bye`
    that arrived before it was still in the async `inbound` decrypt chain. The viewer ended as

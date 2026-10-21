@@ -1,9 +1,11 @@
 //! `shares.*`: owner side of share links (`/v2/shares`).
 //!
-//! `shares.create` sends only `{permission, lifetime, one_time, access}`. The
+//! `shares.create` sends only `{id, permission, lifetime, one_time, access}`. The
 //! link secret never reaches the core; `access` is the HKDF-derived token and
 //! any other param (a stray `secret` included) is dropped, not forwarded.
-//! Ids are 8 chars; a display dash (`xxxx-xxxx`) is stripped before any call.
+//! The caller proposes the id (it salts the `access` derivation); on 409
+//! `share_id_taken` the core does not retry: the caller derives `access` again
+//! for a new id. Ids are 8 chars; a display dash (`xxxx-xxxx`) is stripped before any call.
 
 use crate::auth;
 use crate::config::Config;
@@ -21,6 +23,7 @@ const ACCESS_LEN: usize = 43;
 
 #[derive(Serialize)]
 struct CreateBody<'a> {
+    id: &'a str,
     permission: &'a str,
     lifetime: &'a str,
     one_time: bool,
@@ -51,6 +54,7 @@ pub fn create(agent: &ureq::Agent, cfg: &Config, store: &StateStore, params: &Va
     if !params.is_object() {
         return Err(CoreError::invalid_params("params must be an object"));
     }
+    let id = share_id(params)?;
     let permission = match params.get("permission").and_then(Value::as_str) {
         Some(p @ ("view" | "type")) => p,
         _ => return Err(CoreError::invalid_params("permission must be \"view\" or \"type\"")),
@@ -71,7 +75,7 @@ pub fn create(agent: &ureq::Agent, cfg: &Config, store: &StateStore, params: &Va
         return Err(CoreError::invalid_params("access must be a 43-character base64url token"));
     };
     let body = Zeroizing::new(
-        serde_json::to_vec(&CreateBody { permission, lifetime, one_time, access })
+        serde_json::to_vec(&CreateBody { id: &id, permission, lifetime, one_time, access })
             .map_err(|_| CoreError::invalid_params("share body is not serializable"))?,
     );
     let tok = bearer(store)?;

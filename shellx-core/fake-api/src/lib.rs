@@ -664,6 +664,10 @@ fn create_share(rec: &Recorded, st: &mut State) -> Reply {
     if b.contains_key("secret") {
         return Reply::error(400, "bad_request", "secret must never be sent");
     }
+    let id = b.get("id").and_then(Value::as_str).unwrap_or_default();
+    if id.len() != 8 || !id.bytes().all(|c| SHARE_ALPHABET.contains(&c)) {
+        return Reply::error(400, "bad_request", "id must be 8 characters of the share alphabet");
+    }
     let (Some(permission), Some(lifetime)) = (b.get("permission").and_then(Value::as_str), b.get("lifetime").and_then(Value::as_str)) else {
         return Reply::error(400, "bad_request", "permission and lifetime are required");
     };
@@ -688,12 +692,13 @@ fn create_share(rec: &Recorded, st: &mut State) -> Reply {
     if live >= 20 {
         return Reply::error(409, "share_limit", "Too many active shares");
     }
-    let mut raw = [0u8; 8];
-    getrandom::fill(&mut raw).expect("random source");
-    let id: String = raw.iter().map(|x| SHARE_ALPHABET[(*x as usize) % 32] as char).collect();
+    if st.shares.contains_key(id) {
+        return Reply::error(409, "share_id_taken", "That share id is already in use");
+    }
     let now = now_unix();
     let (expires_at, claim_until) = (now + life, one_time.then_some(now + 120));
     let slot = random_b64url(16);
+    let id = id.to_string();
     st.shares.insert(
         id.clone(),
         Share {

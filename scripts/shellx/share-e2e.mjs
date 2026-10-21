@@ -33,7 +33,6 @@ const { startRelay } = await import(fileUrl(join(RELAY_DIR, 'src/relay.ts')));
 const { Db } = await import(fileUrl(join(RELAY_DIR, 'src/db/db.ts')));
 const { migrate } = await import(fileUrl(join(RELAY_DIR, 'src/db/migrate.ts')));
 const { HubRegistry } = await import(fileUrl(join(RELAY_DIR, 'src/hub/registry.ts')));
-const { randomShareId } = await import(fileUrl(join(RELAY_DIR, 'src/v2/shares.ts')));
 const { createSession } = await import(fileUrl(join(ROOT, 'web/src/share/session.mjs')));
 const wire = await import(fileUrl(join(ROOT, 'web/src/share/wire.mjs')));
 
@@ -157,7 +156,10 @@ async function startCmuxRelay(bin, secretFile, dir) {
 }
 
 const clock = { offsetMs: 0 };
-let nextShareId = null;
+
+/** A client-proposed share id: 8 characters of the share alphabet (256 is a multiple of 32, so unbiased). */
+const SHARE_ALPHABET = '0123456789abcdefghjkmnpqrstvwxyz';
+const randomShareId = () => Array.from(randomBytes(8), (b) => SHARE_ALPHABET[b & 31]).join('');
 
 async function startApi(secretFile, relayPort, dir) {
   const db = Db.open(join(dir, 'api.db'));
@@ -182,9 +184,8 @@ async function startApi(secretFile, relayPort, dir) {
   const relay = await startRelay(
     {
       config, db, hubs, limiters,
-      // Test hooks the API already offers: a shiftable clock (expiry) and the next share id.
+      // The one test hook: a shiftable clock (expiry). Share ids are proposed by the client, as in the app.
       now: () => Date.now() + clock.offsetMs,
-      shareId: () => { const id = nextShareId ?? randomShareId(); nextShareId = null; return id; },
     },
     { host: '127.0.0.1', port: 0 },
   );
@@ -221,18 +222,23 @@ async function desktopAccount(base) {
 }
 
 /**
- * Creates a share like the app does, except that the id is chosen before the POST: `access` is salted
- * with the id, so it cannot be computed from the API's answer (see e2e.md, interop finding 1).
+ * Creates a share like the app does: the client proposes the id (sent in its dashed display form),
+ * derives `access` from the secret salted with that id, and on 409 `share_id_taken` retries with a new id
+ * and a re-derived `access`.
  */
 async function createShare(base, token, body, shiftMs = 0) {
-  const id = randomShareId();
   const secret = randomBytes(32).toString('base64url');
-  const { access } = await wire.deriveKeyBytes(new Uint8Array(Buffer.from(secret, 'base64url')), id);
-  nextShareId = id;
-  clock.offsetMs = shiftMs;
-  const res = await api(base, 'POST', '/v2/shares', { token, body: { ...body, access } }).finally(() => { clock.offsetMs = 0; });
-  if (res.status !== 201 || res.body.id !== id) throw new Error(`create share: ${res.status} ${JSON.stringify(res.body)}`);
-  return { ...res.body, secret, dashed: `${id.slice(0, 4)}-${id.slice(4)}` };
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const id = randomShareId();
+    const { access } = await wire.deriveKeyBytes(new Uint8Array(Buffer.from(secret, 'base64url')), id);
+    const dashed = `${id.slice(0, 4)}-${id.slice(4)}`;
+    clock.offsetMs = shiftMs;
+    const res = await api(base, 'POST', '/v2/shares', { token, body: { ...body, id: dashed, access } }).finally(() => { clock.offsetMs = 0; });
+    if (res.status === 409 && res.body?.error?.code === 'share_id_taken') continue;
+    if (res.status !== 201 || res.body.id !== id) throw new Error(`create share: ${res.status} ${JSON.stringify(res.body)}`);
+    return { ...res.body, secret, dashed };
+  }
+  throw new Error('create share: share_id_taken three times');
 }
 
 // ---- the Swift host -------------------------------------------------------------------------------

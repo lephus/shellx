@@ -58,11 +58,11 @@
 
 **Files:**
 - Create: `relay/migrations/0006_shares.sql`, `relay/src/v2/shares.ts`, `relay/test/v2-shares.test.ts`
-- Modify: `relay/src/app.ts` (route `/v2/shares`, injectable `shareId: () => string` in `AppDeps` like `pairingCode`), `relay/src/http/errors.ts` (codes below), `relay/src/auth/rate-limit.ts` + `relay/test/helpers.ts` (`shareCreate` 10/min per device, `shareTicket` 30/min per IP), `relay/test/db.test.ts:104` (migration list), `relay/src/config.ts` (`SHARE_ALLOWED_ORIGIN`, default `https://shellx.pro`)
+- Modify: `relay/src/app.ts` (route `/v2/shares`; no injectable `shareId` (the client proposes the id)), `relay/src/http/errors.ts` (codes below), `relay/src/auth/rate-limit.ts` + `relay/test/helpers.ts` (`shareCreate` 10/min per device, `shareTicket` 30/min per IP), `relay/test/db.test.ts:104` (migration list), `relay/src/config.ts` (`SHARE_ALLOWED_ORIGIN`, default `https://shellx.pro`)
 
 **Interfaces:**
 - Table `shares(id TEXT PK, user_id, device_id, slot TEXT UNIQUE, permission CHECK(view|type), lifetime CHECK(15m|1h|until_quit), one_time INT, access_hash TEXT, created_at, expires_at, claim_until NULL, viewer_hash NULL, revoked_at NULL, host_seen_at)` (ms timestamps, FKs to users/devices with `ON DELETE CASCADE`).
-- `POST /v2/shares` (requireAuth, requireDesktop, body `{permission, lifetime, one_time?, access}`; `access` = 43-char base64url) → 201 `{id, slot, expires_at_unix, claim_until_unix|null}`. `one_time: true` forces R5 values. Max 20 unrevoked unexpired shares per device (409 `share_limit`).
+- `POST /v2/shares` (requireAuth, requireDesktop, body `{id, permission, lifetime, one_time?, access}`; `id` = client-proposed 8 chars (dash and case normalised), a duplicate gives 409 `share_id_taken`; `access` = 43-char base64url) → 201 `{id, slot, expires_at_unix, claim_until_unix|null}`. `one_time: true` forces R5 values. Max 20 unrevoked unexpired shares per device (409 `share_limit`).
 - `GET /v2/shares` (owner) → `{shares:[{id, permission, lifetime, expires_at_unix, revoked}]}` of the caller's device.
 - `DELETE /v2/shares/:id` (owner) → 204; idempotent; another device's share → 404.
 - `POST /v2/shares/:id/host-ticket` (owner) → `{ticket, expires_at_unix, relay_url}`, `register` claims on `shares.slot` (reuse `ticketClaims`/`mintTicket`), sets `host_seen_at`; revoked/expired → 410 code.
