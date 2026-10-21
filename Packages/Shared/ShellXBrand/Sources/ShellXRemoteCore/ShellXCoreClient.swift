@@ -84,10 +84,34 @@ extension ShellXCoreClient {
     /// API share ids are 8 characters; the display dash (`xxxx-xxxx`) is stripped before any call.
     static func apiShareID(_ id: String) -> String { id.replacingOccurrences(of: "-", with: "") }
 
-    /// `access` is the HKDF access token (base64url); the link secret never reaches the core.
-    public func createShare(permission: SharePermission, lifetime: ShareLifetime, oneTime: Bool, access: String) throws -> ShellXCreatedShare {
-        try call("shares.create", ["permission": .string(permission.rawValue), "lifetime": .string(lifetime.rawValue),
-                                   "one_time": .bool(oneTime), "access": .string(access)], as: ShellXCreatedShare.self)
+    /// `id` is proposed by the caller (see `ShareID.random()`); `access` is the HKDF access token derived with
+    /// that id as salt (base64url); the link secret never reaches the core. A taken id throws code `share_id_taken`:
+    /// the core does not retry, because `access` depends on the id (see `createShareRetryingID`).
+    public func createShare(id: String, permission: SharePermission, lifetime: ShareLifetime, oneTime: Bool, access: String) throws -> ShellXCreatedShare {
+        try call("shares.create", ["id": .string(Self.apiShareID(id)), "permission": .string(permission.rawValue),
+                                   "lifetime": .string(lifetime.rawValue), "one_time": .bool(oneTime), "access": .string(access)],
+                 as: ShellXCreatedShare.self)
+    }
+
+    /// Creates a share with a fresh client id and derives `access` from the one `secret` for that id. On
+    /// `share_id_taken` it draws a new id and derives `access` again, up to `maxAttempts` attempts in all (default 3);
+    /// any other error, or the last `share_id_taken`, is thrown. The secret is never regenerated.
+    public func createShareRetryingID(
+        permission: SharePermission, lifetime: ShareLifetime, oneTime: Bool,
+        secret: ShareSecret = .random(), maxAttempts: Int = 3, makeID: () -> String = ShareID.random
+    ) throws -> (share: ShellXCreatedShare, secret: ShareSecret) {
+        var attempt = 0
+        while true {
+            attempt += 1
+            let id = makeID()
+            do {
+                let share = try createShare(id: id, permission: permission, lifetime: lifetime, oneTime: oneTime,
+                                            access: secret.keys(shareID: id).access)
+                return (share, secret)
+            } catch let error as ShellXCoreError where error.code == "share_id_taken" && attempt < maxAttempts {
+                continue
+            }
+        }
     }
 
     public func listShares() throws -> [ShellXShareSummary] {
