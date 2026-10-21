@@ -12,6 +12,14 @@ Read this first on a new machine or in a new agent session. It replaces the lead
 
 ShellX is cmux (Manaflow, GPL-3.0) with ShellX changes, on `main` of `lephus/shellx`: the cmux tree with full history at the repo root, plus ShellX's `relay/` (API + relay, Node), `web/` (shellx.pro, Astro), `deploy/` (VPS, Docker + nginx-proxy). The Flutter apps (desktop + mobile 1.0.0) were deleted; they live at tag `flutter-final`. `lephus/shellx-pro` (the earlier mirror of cmux) is frozen: never code there. macOS = cmux app rebranded; Windows = GPUI app on `cmux-tui`; remote = cmux-tui remote protocol through a self-hosted `cmux-relay` ("relay2") with tickets minted by the ShellX API.
 
+## Update 2026-10-21: L7 share links merged into local `main`, NOT pushed
+
+- Plan `docs/superpowers/plans/2026-10-21-native-desktop-w3b-share-links.md` (W3 Part B; R1: no Rust sidecar, the Mac app hosts shares). Ledger with every ruling and deferred minor: `docs/superpowers/sprint-state/l7/progress.md`; wire format + amendments A1/A2: `.../l7/constraints.md`; e2e results: `.../l7/e2e.md`.
+- `shellx/l7-share` (pushed) = `main` + L4 `feat/relay-v2` + L7 tasks B0–B9, B1b, minors sweep, final-review fixes. Local `main` merge `6fb2cdbc16` (84 commits ahead of `origin/main`) is **not pushed**: pushing deploys API v2 + shares + `/s/` to production.
+- Local checks on the merged tree: verify-local 16/16, ShellXBrand `swift test` (52 XCTest + 309 Swift Testing), app `ShellXShareTests` 20/20, relay 577 pass, web build 107 pass, shellx-core 131, cmux-relay 39, share e2e 23/23. `deploy/tests/backup.test.mjs` "keeps only the 14 newest" fails on the base too (not L7).
+- **User before pushing `main` (G2 + G-L7):** FK pre-check on a copy of `relay.db` (deploy/README.md "Relay v2"); stage relay2 source at the NEW pin `08de0bb35efbd46e3cade25446fdb6ffffac41bc` (`scripts/shellx/relay2/source-tarball.sh <sha> <dir>`, scp, check sha256) and pre-build; set `CMUX_RELAY_HMAC_SECRET`; then push `main`.
+- **Still owed:** phone dogfood (Safari iOS, Chrome Android, Telex) on a tagged build with `SHELLX_REMOTE_MACHINES=1 SHELLX_SHARE_LINKS=1` (R1b: shares need the remote gate until sign-in moves out of `ShellXRemoteService`); check App Nap vs the viewer's 90 s silence watchdog; flip `ShellXFeatures.shareLinks` (and `remoteMachines`) in a Mac release.
+
 ## Update 2026-10-19 evening (richard's Mac): lanes merged into `main`
 
 The sprint resumed on another Mac and stopped again on the user's "làm xong, commit và push tất cả lên main; sau đó dừng".
