@@ -26,6 +26,7 @@ name: shellx-mac
 on:
   push:
     branches:
+      - develop
       - "shellx/**"
     paths-ignore:
       - "relay/**"

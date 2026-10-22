@@ -15,6 +15,7 @@ name: shellx-remote
 on:
   push:
     branches:
+      - develop
       - "shellx/**"
     paths:
       - "shellx-core/**"
