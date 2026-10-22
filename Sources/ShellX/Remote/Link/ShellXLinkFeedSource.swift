@@ -27,6 +27,10 @@ final class ShellXLinkFeedSource: AgentFeedSource {
     /// Streams that ended before their subscription ran; never subscribed afterwards.
     private var endedEarly: Set<UUID> = []
     private var revisionObserver: UUID?
+    /// Workspace lookups by `workstreamId`, kept while that workstream has a pending item: the default
+    /// lookup reads hook-session files on the main actor. A miss is not cached, so a session file written
+    /// later is still found.
+    private var workspaces: [String: (id: String, title: String)] = [:]
     /// The pending set as last published, in Feed order.
     private var published: [PendingItem] = []
     private var revision: Int?
@@ -84,10 +88,13 @@ final class ShellXLinkFeedSource: AgentFeedSource {
               Self.allows(decision, source: item.source, toolInputJSON: toolInputJSON) else {
             return .unknown
         }
+        // No hook waits (a card restored from the Feed log): nothing would receive the decision.
+        guard coordinator.waiterRegistry.isAwaiting(requestId) else { return .alreadyHandled }
         // On the main actor `deliverReply` marks the item resolved synchronously, so subscribers see the
-        // change before this returns. It never waits on the hook.
-        coordinator.deliverReply(requestId: requestId, decision: .permission(decision))
-        return .delivered
+        // change before this returns. It never waits on the hook. It is first-wins: when another entry point
+        // took the waiter since the checks above, the phone hears `already_handled`.
+        return coordinator.deliverReply(requestId: requestId, decision: .permission(decision))
+            ? .delivered : .alreadyHandled
     }
 
     // MARK: - Subscriptions
@@ -132,6 +139,8 @@ final class ShellXLinkFeedSource: AgentFeedSource {
                 added.append(pending)
             }
         }
+        let pendingWorkstreams = Set(items.lazy.filter { $0.status.isPending }.map(\.workstreamId))
+        workspaces = workspaces.filter { pendingWorkstreams.contains($0.key) }
         let resolved = published.map(\.requestId).filter { !seen.contains($0) }
         guard !added.isEmpty || !resolved.isEmpty else { return }
         let next = (revision ?? 0) + 1
@@ -144,7 +153,8 @@ final class ShellXLinkFeedSource: AgentFeedSource {
 
     private func makePendingItem(_ item: WorkstreamItem, requestId: String, toolName: String,
                                  toolInputJSON: String) -> PendingItem {
-        let workspace = workspaceLookup(item)
+        let workspace = workspaces[item.workstreamId] ?? workspaceLookup(item)
+        if let workspace { workspaces[item.workstreamId] = workspace }
         let fallbackTitle = item.title ?? item.cwd.map { ($0 as NSString).lastPathComponent } ?? ""
         return PendingItem(
             requestId: requestId,

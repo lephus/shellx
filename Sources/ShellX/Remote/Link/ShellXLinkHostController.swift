@@ -102,17 +102,24 @@ final class ShellXLinkHostController: RemoteLinkHosting {
     // MARK: - Serving
 
     /// Registers and serves until cancelled; a failed registration is retried on the reconnect backoff.
-    /// A ticket for another slot (an old relay) ends it: retrying cannot fix that.
+    /// A ticket for another slot (an old relay) ends it: retrying cannot fix that. So does an unreadable host
+    /// key or trusted list: the host fails closed and never replaces the key.
     private nonisolated static func serve(linkSlot: String, core: ShellXCoreClient, keys: ShellXLinkKeyStore,
                                           feed: any AgentFeedSource, hostVersion: String,
                                           machineName: String) async {
+        let hostKey: NoiseStaticKey
+        do {
+            hostKey = try await offMain { () -> NoiseStaticKey in
+                try keys.load()
+                return try keys.hostKey()
+            }
+        } catch {
+            log.error("link host stopped: link_keys_corrupt (\(keyErrorKind(error), privacy: .public))")
+            return
+        }
         var attempt = 0
         while !Task.isCancelled {
             do {
-                let hostKey = try await offMain { () -> NoiseStaticKey in
-                    try keys.load()
-                    return try keys.hostKey()
-                }
                 let first = try await offMain { try core.mintLinkTicket(.register, expectedSlot: linkSlot) }
                 let prefetched = PrefetchedTicket(RelayTicket(ticket: first.ticket, expiresAtUnix: first.expiresAtUnix))
                 let registration = RelayHostRegistration(relayURL: first.relayURL, slot: linkSlot) {
@@ -138,6 +145,23 @@ final class ShellXLinkHostController: RemoteLinkHosting {
             let delay = ReconnectBackoff.delay(attempt: attempt)
             attempt += 1
             do { try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) } catch { return }
+        }
+    }
+
+    /// A secret-free kind for a host key or trusted list failure (never file bytes).
+    nonisolated static func keyErrorKind(_ error: any Error) -> String {
+        switch error {
+        case let file as OwnerOnlyFileError:
+            switch file {
+            case .insecureDirectory: return "insecure_directory"
+            case .insecureFile: return "insecure_file"
+            case .io(let operation, _, let errno): return "io_\(operation.replacingOccurrences(of: " ", with: "_"))_\(errno)"
+            case .tooLarge: return "too_large"
+            case .invalidName: return "invalid_name"
+            }
+        case is DecodingError: return "trusted_list_unreadable"
+        case is NoiseError: return "host_key_invalid"
+        default: return String(describing: type(of: error))
         }
     }
 

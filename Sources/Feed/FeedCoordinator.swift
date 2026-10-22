@@ -551,9 +551,13 @@ final class FeedCoordinator: @unchecked Sendable {
     @discardableResult
     func deliverReply(requestId: String, decision: WorkstreamDecision) -> Bool {
         let reply = waiterRegistry.resolve(requestID: requestId, decision: decision)
+        // Another reply already won the waiter (first-wins). Its own main hop
+        // records the decision the hook received; this one must not overwrite
+        // it, which it would when it runs on main before the winner's hop.
+        let lostToEarlierDecision = reply == nil && waiterRegistry.hasDecision(requestId)
         concludeAttentionOnMain(reply?.target)
 
-        let resolve: @Sendable () -> Void = { [requestId, decision, reply] in
+        let resolve: @Sendable () -> Void = { [requestId, decision, reply, lostToEarlierDecision] in
             MainActor.assumeIsolated {
                 if let event = reply?.event {
                     FeedCoordinator.shared.notificationJournal.observeFeed(AgentFeedSemanticInput(event: event,
@@ -567,7 +571,8 @@ final class FeedCoordinator: @unchecked Sendable {
                     workspaceId: reply?.event.workspaceId.flatMap(UUID.init(uuidString:)),
                     surfaceId: reply?.event.surfaceId.flatMap(UUID.init(uuidString:))
                 )
-                if let store = FeedCoordinator.shared.store,
+                if !lostToEarlierDecision,
+                   let store = FeedCoordinator.shared.store,
                    let itemId = Self.findItemId(for: requestId, in: store.items) {
                     store.markResolved(itemId, decision: decision)
                 }
