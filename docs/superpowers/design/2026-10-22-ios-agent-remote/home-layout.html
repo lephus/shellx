@@ -1,0 +1,119 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>home-layout</title><style>:root{--bg-secondary:#1a1d23;--border:#2a2e35}body{background:#0b0d10;color:#e6e8ec;font-family:-apple-system,system-ui,sans-serif;padding:24px}.subtitle{color:#8b919c}</style></head><body>
+<style>
+  .phones { display:flex; gap:28px; flex-wrap:wrap; justify-content:center; margin-top:16px; }
+  .ph-wrap { display:flex; flex-direction:column; align-items:center; gap:10px; cursor:pointer; }
+  .ph-wrap.selected .phone { outline:3px solid #60a5fa; outline-offset:4px; }
+  .phone { width:300px; height:620px; border-radius:42px; background:#0f1115; border:10px solid #22252b; color:#e6e8ec;
+           font:13px -apple-system, system-ui, sans-serif; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+  .notch { width:110px; height:26px; background:#22252b; border-radius:0 0 16px 16px; margin:0 auto; flex:none; }
+  .scr { padding:10px 14px; flex:1; overflow:hidden; display:flex; flex-direction:column; gap:10px; }
+  .ttl { font-size:22px; font-weight:700; }
+  .sub { color:#8b919c; font-size:11px; }
+  .sec { color:#8b919c; font-size:10px; letter-spacing:.06em; text-transform:uppercase; margin-top:4px; }
+  .card { background:#1a1d23; border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; gap:4px; }
+  .row { display:flex; align-items:center; gap:8px; }
+  .dot { width:8px; height:8px; border-radius:50%; flex:none; }
+  .y { background:#facc15; } .g { background:#4ade80; } .b { background:#60a5fa; } .r { background:#f87171; }
+  .pill { font-size:10px; padding:2px 8px; border-radius:99px; background:#262a31; color:#c9cdd4; }
+  .need { border:1px solid rgba(96,165,250,.45); }
+  .btns { display:flex; gap:6px; margin-top:4px; }
+  .btn { flex:1; text-align:center; padding:7px 0; border-radius:10px; background:#262a31; font-weight:600; font-size:12px; }
+  .btn.p { background:#60a5fa; color:#0b1220; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .sk { background:#1a1d23; border-radius:14px; padding:10px; font-weight:600; font-size:12px; display:flex; flex-direction:column; gap:6px; }
+  .sk i { font-style:normal; font-size:18px; }
+  .micbar { flex:none; padding:10px 14px 18px; display:flex; align-items:center; gap:10px; background:#0f1115; border-top:1px solid #1e2127; }
+  .mic { width:58px; height:58px; border-radius:50%; background:#60a5fa; display:flex; align-items:center; justify-content:center; font-size:24px; color:#0b1220; margin:0 auto; }
+  .hint { color:#8b919c; font-size:11px; text-align:center; }
+  .tabs { flex:none; display:flex; justify-content:space-around; padding:8px 0 16px; border-top:1px solid #1e2127; color:#8b919c; font-size:10px; }
+  .tabs b { color:#60a5fa; font-weight:600; }
+  .bubble { background:#1a1d23; border-radius:14px 14px 14px 4px; padding:9px 11px; max-width:88%; }
+  .bubble.me { background:#24364f; border-radius:14px 14px 4px 14px; align-self:flex-end; }
+  .chips { display:flex; gap:6px; overflow:hidden; }
+  .chip { flex:none; background:#1a1d23; border-radius:99px; padding:6px 10px; font-size:11px; }
+  .lbl { font-weight:700; font-size:15px; }
+  .desc { color:#8b919c; font-size:12px; max-width:300px; text-align:center; line-height:1.45; }
+</style>
+
+<h2>Màn hình chính: bạn thích kiểu nào?</h2>
+<p class="subtitle">Bối cảnh: ngồi cafe, rảnh một chút, nhìn được màn hình. Cả 3 kiểu đều dùng mic là chính, chỉ khác cách sắp xếp. Bấm vào một kiểu để chọn, rồi trả lời trong terminal.</p>
+
+<div class="phones">
+
+  <!-- A: Dashboard -->
+  <div class="ph-wrap" data-choice="a" >
+    <div class="phone"><div class="notch"></div>
+      <div class="scr">
+        <div><div class="ttl">ShellX</div><div class="sub">MacBook Pro · đang kết nối</div></div>
+        <div class="sec">Cần bạn · 1</div>
+        <div class="card need">
+          <div class="row"><span class="dot b"></span><b>shellx</b><span class="pill">Claude</span></div>
+          <div class="sub">Muốn chạy: <code>git push origin fix/…</code></div>
+          <div class="btns"><div class="btn">Từ chối</div><div class="btn p">Cho phép</div></div>
+        </div>
+        <div class="sec">Đang chạy · 2</div>
+        <div class="card"><div class="row"><span class="dot y"></span><b>Sửa CI đỏ</b><span class="sub" style="margin-left:auto">4 phút</span></div><div class="sub">Đang chạy test cmuxTests…</div></div>
+        <div class="card"><div class="row"><span class="dot g"></span><b>web redesign</b><span class="sub" style="margin-left:auto">xong</span></div><div class="sub">PR #128 đã tạo, test xanh</div></div>
+        <div class="sec">Skill</div>
+        <div class="grid">
+          <div class="sk"><i>☕</i>Hôm nay thế nào?</div>
+          <div class="sk"><i>🛠</i>Sửa CI đỏ</div>
+          <div class="sk"><i>📝</i>Làm issue…</div>
+          <div class="sk"><i>👀</i>Review PR</div>
+        </div>
+      </div>
+      <div class="micbar" style="flex-direction:column;gap:4px"><div class="mic">🎙</div><div class="hint">Giữ để nói</div></div>
+    </div>
+    <div class="lbl">A · Bảng điều khiển</div>
+    <div class="desc">Mọi thứ trên một màn: việc cần bạn ở trên cùng, rồi agent đang chạy, rồi lưới skill. Mic lớn ở dưới.</div>
+  </div>
+
+  <!-- B: Inbox -->
+  <div class="ph-wrap" data-choice="b" >
+    <div class="phone"><div class="notch"></div>
+      <div class="scr">
+        <div><div class="ttl">Cần bạn</div><div class="sub">2 việc · 3 agent đang chạy</div></div>
+        <div class="card need">
+          <div class="row"><span class="dot b"></span><b>shellx</b><span class="pill">Claude · xin phép</span></div>
+          <div class="sub">Muốn chạy: <code>git push origin fix/…</code></div>
+          <div class="btns"><div class="btn">Từ chối</div><div class="btn p">Cho phép</div></div>
+        </div>
+        <div class="card need">
+          <div class="row"><span class="dot b"></span><b>relay</b><span class="pill">Codex · hỏi</span></div>
+          <div class="sub">"Giữ route v1 hay xoá luôn?"</div>
+          <div class="btns"><div class="btn">🎙 Trả lời</div></div>
+        </div>
+        <div class="sec">Vừa xong</div>
+        <div class="card"><div class="row"><span class="dot g"></span><b>web redesign</b></div><div class="sub">PR #128 đã tạo, test xanh</div></div>
+        <div style="flex:1"></div>
+      </div>
+      <div class="micbar"><div class="chip" style="flex:1;padding:12px">⚡ Skill</div><div class="mic" style="width:52px;height:52px;margin:0">🎙</div><div class="chip" style="flex:1;padding:12px;text-align:right">Agent ›</div></div>
+      <div class="tabs"><b>Cần bạn</b><span>Agent</span><span>Skill</span><span>Mac</span></div>
+    </div>
+    <div class="lbl">B · Hộp thư "Cần bạn"</div>
+    <div class="desc">Mở app ra là thấy ngay việc chờ bạn, như hộp thư. Agent và skill nằm ở tab riêng. Hết việc thì màn hình trống, chỉ còn mic.</div>
+  </div>
+
+  <!-- C: Chat-first -->
+  <div class="ph-wrap" data-choice="c" >
+    <div class="phone"><div class="notch"></div>
+      <div class="scr">
+        <div><div class="ttl">ShellX</div><div class="sub">Nói chuyện với mọi agent ở một chỗ</div></div>
+        <div class="bubble me">Chạy sửa CI cho shellx đi</div>
+        <div class="bubble">Đã chạy skill <b>Sửa CI đỏ</b> trên MacBook Pro.
+          <div class="card" style="margin-top:6px;background:#22262d"><div class="row"><span class="dot y"></span><b>Sửa CI đỏ</b><span class="sub" style="margin-left:auto">đang chạy</span></div></div></div>
+        <div class="bubble">Claude ở <b>shellx</b> muốn chạy <code>git push</code>.
+          <div class="btns"><div class="btn">Từ chối</div><div class="btn p">Cho phép</div></div></div>
+        <div class="bubble me">Ok, xong thì báo mình</div>
+        <div style="flex:1"></div>
+        <div class="chips"><div class="chip">☕ Hôm nay thế nào?</div><div class="chip">👀 Review PR</div><div class="chip">📝 Làm issue…</div></div>
+      </div>
+      <div class="micbar" style="flex-direction:column;gap:4px"><div class="mic">🎙</div><div class="hint">Giữ để nói · vuốt lên để gõ</div></div>
+    </div>
+    <div class="lbl">C · Trò chuyện</div>
+    <div class="desc">Một cuộc trò chuyện duy nhất với "ShellX". Bạn nói việc cần làm, nó tự chọn skill hoặc agent. Thẻ trạng thái và nút duyệt hiện ngay trong chat. Skill là chip phía trên mic.</div>
+  </div>
+
+</div>
+
+</body></html>
