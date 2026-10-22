@@ -33,7 +33,7 @@ describe("migration 0005", () => {
       const before = TABLES.map((t) => db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM ${t}`)!.n);
       expect(before).toEqual([1, 2, 2, 1, 1, 1]);
 
-      expect(migrate(db)).toEqual(["0005_relay_v2.sql", "0006_shares.sql"]);
+      expect(migrate(db)).toEqual(["0005_relay_v2.sql", "0006_shares.sql", "0007_link_slot.sql"]);
 
       expect(TABLES.map((t) => db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM ${t}`)!.n)).toEqual(before);
       expect(db.get<{ app_version: string }>("SELECT app_version FROM devices WHERE id = 'da'")).toEqual({ app_version: "1.2.3" });

@@ -50,15 +50,16 @@ machineRoutes.post("/", requireAuth, requireDesktop, jsonBodyLimit, async (c) =>
   if (existing === undefined) {
     const id = crypto.randomUUID();
     const slot = newSlot();
+    const linkSlot = newSlot();
     db.run(
       `INSERT INTO machines (id, user_id, device_id, name, platform, os_version, app_version,
-                             noise_public_key, fingerprint, slot, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                             noise_public_key, fingerprint, slot, link_slot, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       id, auth.userId, auth.deviceId, input.name, input.platform, input.osVersion, input.appVersion,
-      key, fingerprint(input.key), slot, c.get("now")(),
+      key, fingerprint(input.key), slot, linkSlot, c.get("now")(),
     );
     logMeta("machine_registered", { device_id: auth.deviceId, machine_id: id });
-    return c.json({ machine_id: id, slot }, 201);
+    return c.json({ machine_id: id, slot, link_slot: linkSlot }, 201);
   }
 
   db.transaction(() => {
@@ -76,7 +77,7 @@ machineRoutes.post("/", requireAuth, requireDesktop, jsonBodyLimit, async (c) =>
     }
   });
   logMeta("machine_registered", { device_id: auth.deviceId, machine_id: existing.id });
-  return c.json({ machine_id: existing.id, slot: existing.slot }, 200);
+  return c.json({ machine_id: existing.id, slot: existing.slot, link_slot: existing.link_slot }, 200);
 });
 
 /** GET /v2/machines — machines of the account whose device is signed in, own included. */

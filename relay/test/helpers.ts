@@ -302,7 +302,7 @@ export async function loginDesktop(app: TestApp, account: Account, overrides: Re
 /** Registers the desktop's machine (valid defaults, a fresh noise key unless `overrides` say otherwise). */
 export async function registerMachine(
   app: TestApp, token: string, overrides: Record<string, unknown> = {},
-): Promise<{ machine_id: string; slot: string; noiseKey: string }> {
+): Promise<{ machine_id: string; slot: string; link_slot: string; noiseKey: string }> {
   const noiseKey = (overrides.noise_public_key_b64 as string | undefined) ?? randomPublicKey();
   const res = await call(app, "POST", "/v2/machines", {
     token,
@@ -312,7 +312,7 @@ export async function registerMachine(
     },
   });
   if (res.status !== 201 && res.status !== 200) throw new Error(`register machine failed: ${res.status} ${await res.text()}`);
-  const body = await res.json<{ machine_id: string; slot: string }>();
+  const body = await res.json<{ machine_id: string; slot: string; link_slot: string }>();
   return { ...body, noiseKey };
 }
 

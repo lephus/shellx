@@ -10,7 +10,7 @@ import { mintTicket, ticketClaims } from "./tickets.js";
 
 export const relayTicketRoutes = new Hono<AppEnv>();
 
-/** POST /v2/relay/tickets {machine_id, permission, target_machine_id?} — a 120 s cmux-relay ticket. */
+/** POST /v2/relay/tickets {machine_id, permission, target_machine_id?, lane?: "link"} — a 120 s cmux-relay ticket. */
 relayTicketRoutes.post("/", requireAuth, requireDesktop, jsonBodyLimit, async (c) => {
   const auth = c.get("auth");
   const db = c.get("db");
@@ -22,12 +22,17 @@ relayTicketRoutes.post("/", requireAuth, requireDesktop, jsonBodyLimit, async (c
   const permission = body.permission;
   if (permission !== "register" && permission !== "connect") throw Errors.badRequest();
 
+  // `link` selects the machine's ShellX Link slot; no lane is the cmux-tui slot. Nothing else is valid.
+  const lane = body.lane;
+  if (lane !== undefined && lane !== "link") throw Errors.badRequest();
+  const slotOf = (m: { slot: string; link_slot: string }) => (lane === "link" ? m.link_slot : m.slot);
+
   const machine = accountMachine(db, auth.userId, body.machine_id);
   if (machine === undefined) throw Errors.machineNotFound();
   const own = ownMachine(db, auth.deviceId);
   if (own === undefined || own.id !== machine.id) throw Errors.forbidden();
 
-  let slot = own.slot;
+  let slot = slotOf(own);
   if (permission === "connect") {
     const target = accountMachine(db, auth.userId, body.target_machine_id);
     if (body.target_machine_id === undefined) throw Errors.badRequest();
@@ -35,7 +40,7 @@ relayTicketRoutes.post("/", requireAuth, requireDesktop, jsonBodyLimit, async (c
     // D3: a machine may connect to itself without a grant (enrollment invites); others need an approved pairing.
     if (target.id !== own.id) {
       if (!hasGrant(db, own.id, target.id)) throw Errors.notGranted();
-      slot = target.slot;
+      slot = slotOf(target);
     }
   }
 
