@@ -270,6 +270,10 @@ public enum ControlCommandExecutionPolicy: Sendable, Equatable {
         // Keep that wait off the main actor.
         "debug.mobile.transport.disconnect",
         "debug.mobile.transport.reconnect_loop",
+        // ShellX Link spike pairing (DEBUG only): writes the trusted-phone
+        // file and mints a relay ticket through shellx-core (blocking HTTP),
+        // so it waits on the socket worker, never on the main actor.
+        "shellx.link.debug_invite",
         // Presents the Cloud tree style gallery window: one v2MainSync hop for
         // the presentation, like debug.window.screenshot's capture wait.
         "debug.cloudtree.gallery",

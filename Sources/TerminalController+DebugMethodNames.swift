@@ -56,6 +56,7 @@ extension TerminalController {
         "debug.sidebar.simulate_drag",
         "debug.mobile.transport.disconnect",
         "debug.mobile.transport.reconnect_loop",
+        "shellx.link.debug_invite",
         "mobile.dev_stack_auth.configure",
     ]
 }

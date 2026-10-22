@@ -48,8 +48,18 @@ extension ShellXRemoteEnvironment {
             machineName: ShellXRemoteDevice.machineName(base: hostName, bundleID: bundleID),
             appVersion: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0",
             osVersion: "\(system.majorVersion).\(system.minorVersion).\(system.patchVersion)")
+        let core = ShellXCoreClient(ShellXCoreFFI.shared)
+        // ShellX Link (P1 spike): the agent Feed for phones. The service starts it only with the gate on and
+        // a `link_slot` from `machines.register`.
+        let linkHost = ShellXLinkHostController(
+            core: core,
+            keys: ShellXLinkKeyStore(directory: ShellXLinkKeyStore.defaultDirectory(
+                home: FileManager.default.homeDirectoryForCurrentUser)),
+            feed: ShellXLinkFeedSource(coordinator: .shared),
+            hostVersion: device.appVersion,
+            machineName: device.machineName)
         return ShellXRemoteEnvironment(
-            core: ShellXCoreClient(ShellXCoreFFI.shared),
+            core: core,
             launcher: ShellXSidecarProcess(),
             clock: SystemRemoteClock(),
             paths: RemotePaths(bundleID: bundleID, home: FileManager.default.homeDirectoryForCurrentUser,
@@ -60,7 +70,8 @@ extension ShellXRemoteEnvironment {
             gateEnabled: { ShellXRemoteGate.isEnabled },
             devCredentials: devCredentials,
             bridge: ShellXAppBridgeController(),
-            workspaceOpener: ShellXTabWorkspaceOpener())
+            workspaceOpener: ShellXTabWorkspaceOpener(),
+            linkHost: linkHost)
     }
 }
 

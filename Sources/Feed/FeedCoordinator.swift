@@ -85,6 +85,10 @@ final class FeedCoordinator: @unchecked Sendable {
     /// appends here so round trips never interleave.
     @MainActor private var questionCategoryUpdates: Task<Void, Never>?
 
+    /// Handlers fanned out from the store's single `onRevisionChange`, in
+    /// insertion order.
+    @MainActor private var revisionObservers: [(token: UUID, handler: @MainActor (Int) -> Void)] = []
+
     private init() {}
 
     /// Preserves the historical mobile Feed revision namespace. The Agent Feed
@@ -115,20 +119,11 @@ final class FeedCoordinator: @unchecked Sendable {
         // expressions evaluate outside the method's main-actor isolation.
         self.userNotificationCenter = userNotificationCenter
             ?? TerminalNotificationStore.shared.userNotificationCenter
-        // A revision-only invalidation tells subscribed phones to re-list the
-        // workstream feed (`feed.list`). Keep the historical revision namespace
-        // so older phones do not reject the first post-upgrade snapshot.
-        store.onRevisionChange = { revision in
-            MobileHostService.emitEvent(
-                topic: "feed.changed",
-                payload: [
-                    "revision": Self.combinedMobileFeedRevision(
-                        workstream: revision,
-                        notifications: TerminalNotificationStore.shared
-                            .notificationFeedHistory.revision
-                    )
-                ]
-            )
+        // The store holds one revision closure; the coordinator fans it out:
+        // the mobile `feed.changed` invalidation first, then every observer
+        // added with `addRevisionObserver` (ShellX Link).
+        store.onRevisionChange = { [weak self] revision in
+            self?.publishRevisionChange(revision)
         }
         NotificationCenter.default.post(name: Self.storeInstalledNotification, object: self)
         // Catch any pending items that were restored from disk whose
@@ -138,6 +133,46 @@ final class FeedCoordinator: @unchecked Sendable {
         for ppid in store.pending.compactMap(\.ppid) {
             armPidWatcher(ppid: ppid)
         }
+    }
+
+    /// Adds a handler that runs on the main actor after every revision bump of
+    /// the installed store, after the mobile `feed.changed` invalidation.
+    /// Observers survive `install(store:)`. Returns the token for
+    /// ``removeRevisionObserver(_:)``.
+    @MainActor
+    func addRevisionObserver(_ handler: @escaping @MainActor (Int) -> Void) -> UUID {
+        let token = UUID()
+        revisionObservers.append((token, handler))
+        return token
+    }
+
+    @MainActor
+    func removeRevisionObserver(_ token: UUID) {
+        revisionObservers.removeAll { $0.token == token }
+    }
+
+    @MainActor
+    private func publishRevisionChange(_ revision: Int) {
+        Self.emitMobileFeedChanged(workstreamRevision: revision)
+        // A copy: an observer may add or remove observers while it runs.
+        for observer in revisionObservers {
+            observer.handler(revision)
+        }
+    }
+
+    /// A revision-only invalidation tells subscribed phones to re-list the
+    /// workstream feed (`feed.list`). Keep the historical revision namespace
+    /// so older phones do not reject the first post-upgrade snapshot.
+    @MainActor
+    private static func emitMobileFeedChanged(workstreamRevision revision: Int) {
+        let combined = combinedMobileFeedRevision(
+            workstream: revision,
+            notifications: TerminalNotificationStore.shared.notificationFeedHistory.revision
+        )
+        #if DEBUG
+        FeedCoordinatorTestHooks.mobileFeedChangedObserver?(combined)
+        #endif
+        MobileHostService.emitEvent(topic: "feed.changed", payload: ["revision": combined])
     }
 
     /// Installs a one-shot kqueue watcher for `ppid`. The handler
@@ -1178,6 +1213,9 @@ enum FeedCoordinatorTestHooks {
     /// production surfacing is short-circuited so tests can assert the
     /// request without a live `TabManager`.
     static var attentionSurfaceObserver: (@Sendable (WorkstreamEvent) -> Void)?
+    /// Fires with the combined revision each time the mobile `feed.changed`
+    /// invalidation is emitted.
+    static var mobileFeedChangedObserver: ((Int) -> Void)?
 }
 #endif
 
