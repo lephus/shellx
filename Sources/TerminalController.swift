@@ -2247,6 +2247,8 @@ class TerminalController {
                 code: "invalid_dispatch",
                 message: "debug.global_search.query requires asynchronous socket dispatch"
             )
+        case "shellx.link.debug_invite":
+            return v2ShellXLinkDebugInvite(id: request.id, params: request.params)
         case "debug.mobile.transport.disconnect":
             let selectedConnectionID: UUID?
             if let rawConnectionID = request.params["connection_id"] {
@@ -2364,6 +2366,7 @@ class TerminalController {
                 || request.method == "debug.global_search.query"
                 || request.method == "debug.window.screenshot"
                 || request.method == "debug.mobile.transport.disconnect"
+                || request.method == "shellx.link.debug_invite"
                 || request.method == "debug.cloudtree.gallery"
                 || request.method == "debug.window_hints" {
                 return v2Error(id: request.id, code: "method_not_found", message: "Unknown method")

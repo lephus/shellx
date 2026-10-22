@@ -222,3 +222,30 @@ fn unauthorized_reply_forgets_the_session_but_keeps_the_machine() {
     assert_eq!(req.path, "/v1/auth/login");
     assert_eq!(support::header(req, "Authorization"), None, "no stale bearer on the next login");
 }
+
+#[test]
+fn register_returns_link_slot() {
+    let (core, _fake, dir) = support::logged_in();
+    let r = core.call("machines.register", reg_params()).unwrap();
+    let link = r["link_slot"].as_str().unwrap();
+    assert_eq!(link.len(), 22);
+    assert_ne!(link, r["slot"].as_str().unwrap());
+    let file: Value = serde_json::from_slice(&std::fs::read(dir.join("machine.json")).unwrap()).unwrap();
+    assert_eq!(file["link_slot"], r["link_slot"]);
+    // Registering again keeps it.
+    assert_eq!(core.call("machines.register", reg_params()).unwrap()["link_slot"], r["link_slot"]);
+}
+
+#[test]
+fn machine_json_without_link_slot_still_loads_and_register_refreshes_it() {
+    let (core, _fake, dir) = support::logged_in();
+    let r = core.call("machines.register", reg_params()).unwrap();
+    // A file written before link_slot existed.
+    let old = json!({"machine_id": r["machine_id"], "slot": r["slot"]});
+    std::fs::write(dir.join("machine.json"), old.to_string()).unwrap();
+    assert_eq!(core.call("machines.heartbeat", json!({})).unwrap(), json!({}));
+    let again = core.call("machines.register", reg_params()).unwrap();
+    assert_eq!(again["link_slot"], r["link_slot"]);
+    let file: Value = serde_json::from_slice(&std::fs::read(dir.join("machine.json")).unwrap()).unwrap();
+    assert_eq!(file["link_slot"], r["link_slot"]);
+}

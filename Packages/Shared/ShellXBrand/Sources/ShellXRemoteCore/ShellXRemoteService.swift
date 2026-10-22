@@ -65,6 +65,8 @@ public final class ShellXRemoteService: ObservableObject {
     var listed: [MachineListReply.Item] = []
     var thisMachineID: RemoteMachine.ID?
     var hostSlot: String?
+    /// This machine's ShellX Link slot (`machines.register link_slot`); nil from a relay without the link lane.
+    var hostLinkSlot: String?
     var hostRoute: String?
     var daemon: ShellXDaemonSupervisor?
     var clients: [RemoteMachine.ID: ShellXClientLinkSupervisor] = [:]
@@ -84,6 +86,9 @@ public final class ShellXRemoteService: ObservableObject {
         env = environment
         refresher = ShellXTicketRefresher(core: environment.core, clock: environment.clock)
     }
+
+    /// The ShellX Link host this service starts and stops, for the app's DEBUG pairing method.
+    public var linkHost: (any RemoteLinkHosting)? { env.linkHost }
 
     // MARK: - App lifecycle
 
@@ -110,6 +115,7 @@ public final class ShellXRemoteService: ObservableObject {
         let clients = Array(self.clients.values), daemon = self.daemon, bridge = env.bridge, teardown = self.teardown
         self.clients = [:]
         self.daemon = nil
+        env.linkHost?.stop()
         let done = DispatchSemaphore(value: 0)
         // Nothing in here needs the main actor, which stays blocked below.
         Task.detached {
@@ -307,6 +313,7 @@ public final class ShellXRemoteService: ObservableObject {
         guard isCurrent(gen) else { return }
         hostState = .connecting
         guard let (route, slot) = await registerHost(gen) else { return }
+        startLinkHost()
         hostRoute = route
         let bridge = env.bridge, socket = env.paths.bridgeSocket
         do {
@@ -345,6 +352,7 @@ public final class ShellXRemoteService: ObservableObject {
                 guard isCurrent(gen) else { return nil }
                 thisMachineID = registered.machine_id
                 hostSlot = registered.slot
+                hostLinkSlot = registered.link_slot
                 rebuildMachines()
                 startRegisteredTimers(gen)
                 let mint = try await call("tickets.mint", ["permission": .string("register"),
@@ -368,6 +376,17 @@ public final class ShellXRemoteService: ObservableObject {
             }
         }
         return nil
+    }
+
+    /// Serves the ShellX Link lane once `machines.register` gave this machine a link slot. A relay that predates
+    /// the lane gives none: one line is logged and everything else runs as before.
+    func startLinkHost() {
+        guard let linkHost = env.linkHost, let machineID = thisMachineID else { return }
+        guard let linkSlot = hostLinkSlot, !linkSlot.isEmpty else {
+            RemoteLog.service.notice("link host not started: the relay gave no link slot")
+            return
+        }
+        linkHost.start(machineID: machineID, linkSlot: linkSlot)
     }
 
     func hostChanged(_ state: LinkState, _ gen: Int) {
@@ -398,7 +417,8 @@ public final class ShellXRemoteService: ObservableObject {
         self.clients = [:]
         self.daemon = nil
         linkStates = [:]; records = [:]; listed = []
-        thisMachineID = nil; hostRoute = nil; hostSlot = nil
+        thisMachineID = nil; hostRoute = nil; hostSlot = nil; hostLinkSlot = nil
+        env.linkHost?.stop()
         gate = ApprovalGate(); handledPairings = []; pairingMemory = [:]
         isSignedIn = false
         machines = []; pendingApprovals = []; outgoing = []; remoteWorkspaces = [:]

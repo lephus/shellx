@@ -25,6 +25,10 @@ final class FakeRemoteCore: ShellXCoreCalling, @unchecked Sendable {
                                         FakeRemoteCore.machine("m_1", "Mac mini", online: true)])
     /// `pair.pending` items.
     let pending = Locked<[JSONValue]>([])
+    /// `machines.register`'s `link_slot`; nil answers like a relay that predates the link lane (no field).
+    let linkSlot = Locked<String?>("link-self")
+    /// The slot claim of link-lane tickets; nil means "the registered link slot".
+    let linkTicketSlot = Locked<String?>(nil)
     /// `pair.poll` status per pairing id (default `pending`).
     let pollStatus = Locked<[String: String]>([:])
     /// Error codes returned by the next calls of a method, first in first out.
@@ -89,9 +93,16 @@ final class FakeRemoteCore: ShellXCoreCalling, @unchecked Sendable {
             signedIn.with { $0 = false }
             return Self.ok(.object([:]))
         case "machines.register":
-            return Self.ok(.object(["machine_id": .string("m_self"), "slot": .string("slot-self")]))
+            var reply: [String: JSONValue] = ["machine_id": .string("m_self"), "slot": .string("slot-self")]
+            if let link = linkSlot.get() { reply["link_slot"] = .string(link) }
+            return Self.ok(.object(reply))
         case "machines.list":
             return Self.ok(.object(["machines": .array(machines.get())]))
+        case "tickets.mint" where params["lane"] == .string("link"):
+            guard let slot = linkTicketSlot.get() ?? linkSlot.get() else { return Self.error("not_registered") }
+            return Self.ok(.object(["ticket": .string(Self.ticket(slot: slot)),
+                                    "expires_at_unix": .number(clock.now.timeIntervalSince1970 + 120),
+                                    "relay_url": .string(Self.relayURL)]))
         case "tickets.mint":
             guard case .string(let name)? = params["write_to"] else { return Self.error("invalid_params") }
             return Self.ok(.object(["path": .string(coreStateDir.appendingPathComponent("tickets/" + name).path),
@@ -117,6 +128,13 @@ final class FakeRemoteCore: ShellXCoreCalling, @unchecked Sendable {
         }
     }
 
+    /// A relay v2 ticket whose claims name `slot` (`v2.<base64url claims>.<signature>`).
+    static func ticket(slot: String) -> String {
+        let claims = Data(#"{"slot":"\#(slot)","permission":"register"}"#.utf8).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        return "v2.\(claims).c2ln"
+    }
+
     private static func ok(_ value: JSONValue) -> Data { (try? JSONEncoder().encode(["ok": value])) ?? Data() }
     private static func error(_ code: String) -> Data {
         Data(#"{"error":{"code":"\#(code)","message":"scripted"}}"#.utf8)
@@ -131,6 +149,21 @@ final class FakeBridge: RemoteBridgeControlling, @unchecked Sendable {
     init(log: EventLog) { self.log = log }
     func start(socket: URL) throws { log.add("bridge:start"); starts.with { $0.append(socket) } }
     func stop() { log.add("bridge:stop"); stops.with { $0 += 1 } }
+}
+
+/// Records the link host's starts and stops (in the shared event log too, for ordering checks).
+@MainActor
+final class FakeLinkHost: RemoteLinkHosting {
+    struct Start: Equatable { let machineID: String; let linkSlot: String }
+    let log: EventLog
+    private(set) var starts: [Start] = []
+    private(set) var stops = 0
+    init(log: EventLog) { self.log = log }
+    func start(machineID: String, linkSlot: String) {
+        log.add("link:start")
+        starts.append(Start(machineID: machineID, linkSlot: linkSlot))
+    }
+    func stop() { log.add("link:stop"); stops += 1 }
 }
 
 @MainActor
@@ -156,6 +189,7 @@ final class ServiceRig {
     let core: FakeRemoteCore
     let bridge: FakeBridge
     let opener = FakeOpener()
+    let linkHost: FakeLinkHost
     let gate: Locked<Bool>
     let cmuxTui: URL
     let stubs = Locked<[Stub]>([])
@@ -173,6 +207,7 @@ final class ServiceRig {
         core = FakeRemoteCore(clock: base.clock, log: base.log, coreStateDir: base.paths.coreStateDir)
         core.signedIn.with { $0 = signedIn }
         bridge = FakeBridge(log: base.log)
+        linkHost = FakeLinkHost(log: base.log)
         gate = Locked(gateOn)
         cmuxTui = base.dir.appendingPathComponent("bin/cmux-tui")
         if cmuxTuiPresent {
@@ -193,7 +228,7 @@ final class ServiceRig {
         service = ShellXRemoteService(environment: ShellXRemoteEnvironment(
             core: ShellXCoreClient(core), launcher: base.launcher, clock: base.clock, paths: base.paths, cmuxTui: cmuxTui,
             apiBase: URL(string: "http://127.0.0.1:8787")!, device: Self.device, gateEnabled: { gate.get() },
-            devCredentials: devCredentials, bridge: bridge, workspaceOpener: opener))
+            devCredentials: devCredentials, bridge: bridge, workspaceOpener: opener, linkHost: linkHost))
         stub(["remote", "enroll", "status"], stdout: Self.statusUp)
         stub(["remote", "enroll", "pending"], stdout: "[]")
     }

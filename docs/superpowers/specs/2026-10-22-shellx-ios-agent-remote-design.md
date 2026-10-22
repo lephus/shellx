@@ -71,7 +71,7 @@ Người dùng đã chọn **kiểu C · Trò chuyện**, xem mockup `home-layou
 Bấm vào thẻ trạng thái thì mở trang của agent đó:
 
 - cuộc trò chuyện riêng với agent (nhắn thêm bằng giọng nói hoặc gõ);
-- nút chuyển sang **xem terminal** của workspace đó: xem và gõ được, vẽ bằng libghostty, dữ liệu qua cmux-tui (§7.2);
+- nút chuyển sang **xem terminal** của workspace đó: xem và gõ được, vẽ bằng thư viện MIT, dữ liệu qua kênh `terminal` của ShellX Link (§7.2);
 - nút **Dừng** (interrupt).
 
 Thứ tự ưu tiên là chat trước, terminal sau [người viết].
@@ -177,13 +177,11 @@ Người dùng muốn phát hành công khai trên App Store (G6). Điều kho�
   - lưu trữ cục bộ;
   - thông báo đẩy và Notification Service Extension.
 - **Được dùng:**
-  - thư viện có giấy phép dễ dãi: libghostty / GhosttyKit (MIT), crate `cmux-tui` (Cargo khai báo MIT);
+  - thư viện có giấy phép dễ dãi: libghostty / GhosttyKit (MIT), SwiftTerm (MIT);
   - SDK của Apple;
   - code do ShellX tự viết.
 - **Phải xác nhận trước khi dùng:**
   - phần vá của cmux trong fork ghostty còn MIT không;
-  - `cmux-tui` có thật là MIT không. Ledger native-desktop ghi đây là câu hỏi còn mở với Manaflow;
-  - `shellx-core` có chứa code chép từ cmux không. Nếu không thì ShellX là chủ bản quyền và được tự chọn giấy phép khi nhúng vào app iOS.
 - **Chỗ đặt code:** một thư mục riêng, ví dụ `shellx-ios/`, có file LICENSE riêng do người dùng chọn. Lý do: `LICENSE` ở gốc repo mặc định mọi thứ là GPL. Builder chọn tên thư mục, nhưng ranh giới giấy phép phải rõ ràng và có kiểm tra tự động: một test hoặc script chặn import package GPL vào target iOS.
 - **Đọc app cmux iOS để tham khảo cách giải bài toán thì được, nhưng không chép code.** Nếu có nghi ngờ thì viết lại từ mô tả hành vi.
 - **Thương hiệu** [người viết]:
@@ -213,15 +211,19 @@ Người dùng muốn phát hành công khai trên App Store (G6). Điều kho�
   - AI điều phối;
   - tín hiệu gỡ thông báo;
   - thông tin máy.
-- **Terminal tạm dùng cmux-tui-remote** [người dùng], đúng D-W0-1, đã chạy thử được trên Mac. Sau này có thể thay bằng kênh terminal của ShellX Link mà không đổi giao diện app. Nếu giấy phép của `cmux-tui` không xác nhận được (§7.1) thì việc thay này phải làm ngay ở bản đầu.
+- **Terminal đi qua kênh `terminal` của ShellX Link ngay từ bản đầu** [người dùng, 2026-10-22, thay quyết định "tạm dùng cmux-tui"]. Giấy phép của `cmux-tui` đang mơ hồ, và người dùng không muốn phải chờ Manaflow xác nhận.
+  - **Mac:** lấy dữ liệu ra/vào của terminal qua các điểm móc Ghostty mà cmux có sẵn (ví dụ `ghostty_surface_set_pty_tee_cb`, `TerminalOutputTeeCallback`). Kênh gồm ảnh chụp màn hình ban đầu, luồng byte, phím gõ và đổi kích thước.
+  - **iPhone:** vẽ bằng thư viện MIT, như SwiftTerm hoặc libghostty. Builder chọn.
+  - App iOS **không nhúng** `cmux-tui` (kể cả `cmux-terminal-client`) và **không nhúng** `shellx-core`. Đăng nhập, ghép cặp và vé relay được viết lại bằng Swift, gọi thẳng API HTTP của relay v2.
+  - Phần cmux-tui trên desktop (máy ở xa Mac↔Mac) và `cmux-relay` trên VPS giữ nguyên. Cả hai chạy ngoài app iOS.
 - **ShellX Link có phiên Noise riêng, không đi chung phiên của cmux-tui** [người viết, sửa sau khi đọc code ngày 2026-10-22]. Có ba lý do:
   - enum `Service` của cmux-remote là enum đóng. Muốn thêm kênh ShellX vào thì phải vá fork;
   - client C ABI `cmux-terminal-client` không có API kênh hay tunnel nào;
   - giấy phép của cmux-tui đang mơ hồ: Cargo ghi MIT, nhưng `LICENSE` ở gốc ngầm hiểu là GPL.
 
-  Vì vậy ShellX Link dùng **slot riêng trên cùng relay** (`cmux-relay` chỉ là ống chuyển byte, phía server). Mỗi máy có thêm một `link_slot`. Code Noise và code client relay của ShellX Link là code ShellX tự viết. Điện thoại giữ kết nối ShellX Link thường trực, và chỉ mở kết nối cmux-tui khi đang xem terminal.
+  Vì vậy ShellX Link dùng **slot riêng trên cùng relay** (`cmux-relay` chỉ là ống chuyển byte, phía server). Mỗi máy có thêm một `link_slot`. Code Noise và code client relay của ShellX Link là code ShellX tự viết. Điện thoại chỉ cần một kết nối ShellX Link cho mọi thứ, kể cả terminal.
 - **Ràng buộc thiết kế ShellX Link:**
-  - **Một kết nối ShellX Link E2E cho mỗi Mac,** dồn mọi kênh của ShellX Link vào đó. Terminal là kết nối cmux-tui riêng, chỉ mở khi xem.
+  - **Một kết nối ShellX Link E2E cho mỗi Mac,** dồn mọi kênh vào đó, kể cả terminal.
   - **Mô tả độc lập với nền tảng:** đặc tả giao thức viết thành tài liệu, có test vector, để Windows (Rust) và Android sau này cài đặt theo. Giống cách `term/protocol/vectors.txt` từng làm cho P2a.
   - **Trung lập với agent:** Claude Code trước, Codex sau (G6).
   - **Có phiên bản giao thức:** điện thoại và Mac khác phiên bản thì báo lỗi rõ ràng, không treo.
@@ -293,7 +295,7 @@ Nếu kênh mới cho phép điện thoại gọi lệnh trên Mac (chạy skill
 
 ## 9. Rủi ro còn mở
 
-- **Giấy phép thư viện (§7.1).** Phải xác nhận được giấy phép của `cmux-tui`, phần vá ghostty của cmux và `shellx-core`. Nếu một trong số đó không dùng được trên App Store thì phải thay. Với `cmux-tui`, thay nghĩa là tự làm kênh terminal của ShellX Link ngay ở bản đầu (thêm vài tuần).
+- **Giấy phép thư viện (§7.1).** App iOS không dùng `cmux-tui` và `shellx-core`, nên chỉ còn phải xác nhận phần vá ghostty của cmux, và chỉ khi builder chọn libghostty thay vì SwiftTerm. Nếu một trong số đó không dùng được trên App Store thì phải thay. Với `cmux-tui`, thay nghĩa là tự làm kênh terminal của ShellX Link ngay ở bản đầu (thêm vài tuần).
 - **Viết mới app iOS** tốn công hơn nhiều so với dùng lại app cmux. Đó là cái giá của G6.
 - **Tiếng Việt chạy trên máy:** có thể không có (§4).
 - **Spike ShellX Link (§7.2)** có thể làm thay đổi lớn ước lượng.
@@ -303,7 +305,7 @@ Nếu kênh mới cho phép điện thoại gọi lệnh trên Mac (chạy skill
 
 1. Xác nhận giấy phép (§7.1). Viết đặc tả ShellX Link và làm spike (§7.2). Ghi kết quả vào ledger.
 2. Mac: phía máy chủ ShellX Link cho Claude Code (trạng thái, việc đang chờ, chat), relay v2 nhận điện thoại, ghép cặp.
-3. iOS (viết mới): khung app và ranh giới giấy phép, đăng nhập và ghép cặp, màn Trò chuyện cùng thẻ trạng thái và nút duyệt, giọng nói tiếng Việt, xem terminal qua cmux-tui.
+3. iOS (viết mới): khung app và ranh giới giấy phép, đăng nhập và ghép cặp, màn Trò chuyện cùng thẻ trạng thái và nút duyệt, giọng nói tiếng Việt. Kênh `terminal` của ShellX Link (Mac + iPhone) nằm trong P2/P3.
 4. Thông báo đẩy và đồng bộ gỡ thông báo (A1).
 5. Skill: cửa sổ tạo skill trên desktop, thẻ skill, đồng bộ, chip trên điện thoại.
 6. AI điều phối.

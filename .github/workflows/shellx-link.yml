@@ -1,0 +1,108 @@
+name: shellx-link
+
+# ShellX Link (shellx-link/, MIT): the license-boundary check, then the package
+# tests: Noise against the snow vectors, the golden message vectors, the
+# in-memory sessions, and RelayIntegrationTests against a cmux-relay built from
+# this checkout. Without CMUX_RELAY_BIN those relay tests would skip, so the job
+# fails when the binary is missing instead.
+#
+# cmux-relay needs only the cmux-tui Cargo workspace, not the ghostty submodule
+# or zig (scripts/shellx/relay2/Dockerfile builds it the same way). The pinned
+# Rust step and the action pins are the ones shellx-remote.yml uses.
+
+on:
+  push:
+    branches:
+      - main
+      - "shellx/**"
+    paths:
+      - "shellx-link/**"
+      - "scripts/shellx/check-link-license.sh"
+      - "cmux-tui/crates/cmux-relay/**"
+      # The relay's wire types, and the workspace manifests its build reads.
+      - "cmux-tui/crates/cmux-remote-protocol/**"
+      - "cmux-tui/Cargo.toml"
+      - "cmux-tui/Cargo.lock"
+      - "cmux-tui/rust-toolchain.toml"
+      - ".github/workflows/shellx-link.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shellx-link-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: shellx-link package tests (macOS)
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      CMUX_CI_REQUIRED_MACOS_SDK_MAJOR: "26"
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: License boundary (scripts/shellx/check-link-license.sh)
+        run: bash scripts/shellx/check-link-license.sh
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          ./scripts/select-ci-xcode.sh
+          xcodebuild -version
+
+      - name: Set up pinned Rust (cmux-tui/rust-toolchain.toml)
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --profile minimal --default-toolchain none --no-modify-path
+          fi
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          TOOLCHAIN_FILE=cmux-tui/rust-toolchain.toml python3 - <<'PY'
+          import os, pathlib, re, subprocess
+          contents = pathlib.Path(os.environ["TOOLCHAIN_FILE"]).read_text(encoding="utf-8")
+          def value(name):
+              match = re.search(rf'^\s*{name}\s*=\s*"([^"]+)"', contents, re.MULTILINE)
+              if match is None:
+                  raise SystemExit(f"missing {name} in cmux-tui/rust-toolchain.toml")
+              return match.group(1)
+          channel, profile = value("channel"), value("profile")
+          components = re.search(r"^\s*components\s*=\s*\[([^]]*)\]", contents, re.MULTILINE)
+          if components is None:
+              raise SystemExit("missing components in cmux-tui/rust-toolchain.toml")
+          command = ["rustup", "toolchain", "install", channel, "--profile", profile]
+          for component in re.findall(r'"([^"]+)"', components.group(1)):
+              command.extend(["--component", component])
+          subprocess.run(command, check=True)
+          subprocess.run(["rustup", "default", channel], check=True)
+          PY
+          cargo --version
+          rustc --version
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: cmux-tui -> target
+
+      - name: Build cmux-relay
+        working-directory: cmux-tui
+        run: cargo build -p cmux-relay --locked --release
+
+      - name: swift test (relay integration tests included)
+        run: |
+          set -euo pipefail
+          relay="$GITHUB_WORKSPACE/cmux-tui/target/release/cmux-relay"
+          if [ ! -x "$relay" ]; then
+            echo "::error::cmux-relay is missing at cmux-tui/target/release/cmux-relay; RelayIntegrationTests would skip"
+            exit 1
+          fi
+          CMUX_RELAY_BIN="$relay" swift test --package-path shellx-link

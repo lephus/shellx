@@ -65,15 +65,19 @@ public struct ShellXRemoteEnvironment: Sendable {
     public var bridge: any RemoteBridgeControlling
     public var workspaceOpener: any RemoteWorkspaceOpening
     public var store: RemoteLinkStore
+    /// The ShellX Link host (agent Feed for phones), or nil when the app does not serve one.
+    public var linkHost: (any RemoteLinkHosting)?
 
     public init(core: ShellXCoreClient, launcher: any SidecarLaunching, clock: any RemoteClock, paths: RemotePaths,
                 cmuxTui: URL, apiBase: URL, device: ShellXRemoteDevice, gateEnabled: @escaping @Sendable () -> Bool,
                 devCredentials: ShellXRemoteDevCredentials? = nil, bridge: any RemoteBridgeControlling,
-                workspaceOpener: any RemoteWorkspaceOpening, store: RemoteLinkStore? = nil) {
+                workspaceOpener: any RemoteWorkspaceOpening, store: RemoteLinkStore? = nil,
+                linkHost: (any RemoteLinkHosting)? = nil) {
         self.core = core; self.launcher = launcher; self.clock = clock; self.paths = paths
         self.cmuxTui = cmuxTui; self.apiBase = apiBase; self.device = device; self.gateEnabled = gateEnabled
         self.devCredentials = devCredentials; self.bridge = bridge; self.workspaceOpener = workspaceOpener
         self.store = store ?? RemoteLinkStore(paths: paths)
+        self.linkHost = linkHost
     }
 }
 
