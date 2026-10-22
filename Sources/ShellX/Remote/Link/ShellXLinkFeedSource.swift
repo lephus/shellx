@@ -65,6 +65,11 @@ final class ShellXLinkFeedSource: AgentFeedSource {
     }
 
     func reply(requestId: String, mode: PermissionMode) async -> ReplyOutcome {
+        resolveReply(requestId: requestId, mode: mode)
+    }
+
+    /// ``reply(requestId:mode:)`` without the suspension: decides and resolves in one main-actor turn.
+    func resolveReply(requestId: String, mode: PermissionMode) -> ReplyOutcome {
         guard let store = coordinator.store,
               let item = store.items.last(where: { $0.payload.requestID == requestId }) else {
             return .unknown

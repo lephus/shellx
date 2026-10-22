@@ -146,6 +146,9 @@ final class FeedCoordinator: @unchecked Sendable {
         return token
     }
 
+    /// Registered revision observers (tests).
+    @MainActor var revisionObserverCount: Int { revisionObservers.count }
+
     @MainActor
     func removeRevisionObserver(_ token: UUID) {
         revisionObservers.removeAll { $0.token == token }
@@ -543,7 +546,10 @@ final class FeedCoordinator: @unchecked Sendable {
 
     /// Called by the `feed.*.reply` handlers. Marks the corresponding
     /// item resolved on the main-actor store and wakes any waiter.
-    func deliverReply(requestId: String, decision: WorkstreamDecision) {
+    /// - Returns: Whether a waiting hook took this decision (the registry is
+    ///   first-wins; false when another reply won or no hook waits).
+    @discardableResult
+    func deliverReply(requestId: String, decision: WorkstreamDecision) -> Bool {
         let reply = waiterRegistry.resolve(requestID: requestId, decision: decision)
         concludeAttentionOnMain(reply?.target)
 
@@ -575,6 +581,7 @@ final class FeedCoordinator: @unchecked Sendable {
         }
 
         cancelNotification(requestId: requestId)
+        return reply != nil
     }
 
     func isAwaitingDecision(requestId: String) -> Bool { waiterRegistry.isAwaiting(requestId) }

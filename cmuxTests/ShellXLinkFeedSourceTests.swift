@@ -18,17 +18,19 @@ struct ShellXLinkFeedSourceTests {
 
     /// A fresh store and a source whose workspace lookup needs no live window.
     @MainActor
-    private static func makeSource() -> (WorkstreamStore, ShellXLinkFeedSource) {
+    private static func makeSource(
+        workspaceLookup: @escaping ShellXLinkFeedSource.WorkspaceLookup = { _ in workspace }
+    ) -> (WorkstreamStore, ShellXLinkFeedSource) {
         let store = WorkstreamStore(ringCapacity: 50)
         FeedCoordinator.shared.install(store: store)
-        let source = ShellXLinkFeedSource(coordinator: .shared, workspaceLookup: { _ in workspace })
+        let source = ShellXLinkFeedSource(coordinator: .shared, workspaceLookup: workspaceLookup)
         return (store, source)
     }
 
     private static func permission(_ requestId: String, toolInputJSON: String = #"{"command":"git status"}"#,
-                                   source: String = "claude") -> WorkstreamEvent {
+                                   source: String = "claude", sessionId: String? = nil) -> WorkstreamEvent {
         WorkstreamEvent(
-            sessionId: "link-\(requestId)",
+            sessionId: sessionId ?? "link-\(requestId)",
             hookEventName: .permissionRequest,
             source: source,
             cwd: "/tmp/shellx",
@@ -196,6 +198,7 @@ struct ShellXLinkFeedSourceTests {
 
     @Test func testEndedSubscriberIsDropped() async {
         let (store, source) = await MainActor.run { Self.makeSource() }
+        let observersBefore = await MainActor.run { FeedCoordinator.shared.revisionObserverCount }
         let first = Task { () -> Int in
             var count = 0
             for await _ in source.changes() { count += 1 }
@@ -203,12 +206,86 @@ struct ShellXLinkFeedSourceTests {
         }
         _ = await source.snapshot()
         #expect(await MainActor.run { source.subscriberCount } == 1)
+        #expect(await MainActor.run { FeedCoordinator.shared.revisionObserverCount } == observersBefore + 1)
         first.cancel()
         _ = await first.value
         #expect(await Self.waitUntil { source.subscriberCount == 0 })
+        // The last subscriber gone, the Feed no longer calls back into the source.
+        #expect(await Self.waitUntil { FeedCoordinator.shared.revisionObserverCount == observersBefore })
         // Nothing is yielded to the ended stream, and nobody deadlocks.
         await MainActor.run { store.ingest(Self.permission("after-cancel")) }
         #expect(await source.snapshot().pending.map(\.requestId) == ["after-cancel"])
+    }
+}
+
+extension ShellXLinkFeedSourceTests {
+    /// A pending card with no hook waiting (restored from the Feed log after a relaunch): nothing would
+    /// receive the phone's decision, so the phone hears `already_handled` and the card keeps its state.
+    @Test func testReplyWithoutWaiterIsAlreadyHandled() async {
+        let (store, source) = await MainActor.run { Self.makeSource() }
+        await MainActor.run { store.ingest(Self.permission("orphan-1")) }
+
+        #expect(await source.reply(requestId: "orphan-1", mode: .deny) == .alreadyHandled)
+
+        let status = await MainActor.run { store.items.first { $0.payload.requestID == "orphan-1" }?.status }
+        #expect(status == .pending)
+    }
+
+    /// Another entry point (`feed.permission.reply` on a socket thread, a notification action) wins the
+    /// waiter while the main actor is busy, so its store update is still queued when the phone's reply runs.
+    @Test func testLosingReplyKeepsTheWinnersDecision() async {
+        let (store, source) = await MainActor.run { Self.makeSource() }
+        let hook = Self.startBlockingHook(Self.permission("race-1"))
+        #expect(await Self.waitUntil { store.pending.contains { $0.payload.requestID == "race-1" } })
+
+        let (phone, lateMacReply) = await MainActor.run { () -> (ReplyOutcome, Bool) in
+            let winnerReturned = DispatchSemaphore(value: 0)
+            DispatchQueue.global(qos: .userInitiated).async {
+                FeedCoordinator.shared.deliverReply(requestId: "race-1", decision: .permission(.deny))
+                winnerReturned.signal()
+            }
+            _ = winnerReturned.wait(timeout: .now() + 5)
+            return (
+                source.resolveReply(requestId: "race-1", mode: .once),
+                FeedCoordinator.shared.deliverReply(requestId: "race-1", decision: .permission(.always))
+            )
+        }
+
+        #expect(phone == .alreadyHandled)
+        #expect(lateMacReply == false)
+        #expect(hook.wait())
+        guard case .resolved(_, .permission(.deny))? = hook.result else {
+            Issue.record("the hook must get the winner's decision: \(String(describing: hook.result))")
+            return
+        }
+        let recordsWinner = await Self.waitUntil {
+            guard case .resolved(.permission(.deny), _)? = store.items.first(where: {
+                $0.payload.requestID == "race-1"
+            })?.status else { return false }
+            return true
+        }
+        #expect(recordsWinner, "the store must record the decision the hook received")
+    }
+
+    /// Workspace lookup reads hook-session files; it runs once per workstream, not once per request.
+    @Test func testWorkspaceLookupIsCachedPerWorkstream() async {
+        let lookups = RevisionRecorder()
+        let (store, source) = await MainActor.run {
+            Self.makeSource(workspaceLookup: { _ in
+                lookups.record(1)
+                return Self.workspace
+            })
+        }
+        await MainActor.run {
+            store.ingest(Self.permission("same-ws-1", sessionId: "link-shared-session"))
+            store.ingest(Self.permission("same-ws-2", sessionId: "link-shared-session"))
+        }
+
+        let pending = await source.snapshot().pending
+
+        #expect(pending.map(\.requestId) == ["same-ws-1", "same-ws-2"])
+        #expect(pending.allSatisfy { $0.workspaceTitle == Self.workspace.title })
+        #expect(lookups.values.count == 1)
     }
 }
 
