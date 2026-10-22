@@ -6,7 +6,8 @@ import ShellXLinkSession
 /// ShellX: ShellX Link's view of the agent Feed: the pending permission requests in `FeedCoordinator`'s
 /// store, their changes, and replies that resolve them through `FeedCoordinator.deliverReply`.
 ///
-/// * The pending set is every `.pending` `.permissionRequest` item (P1 answers permissions only).
+/// * The pending set is every `.pending` `.permissionRequest` item (P1 answers permissions only). A reply
+///   to an item no hook waits for expires it (PROTOCOL.md 5), so no card stays pending without an agent.
 /// * `revision` counts changes of that set: it rises by exactly 1 per `agent.changed` (PROTOCOL.md 4), so a
 ///   phone resyncs only when it really missed one. It starts at the store's revision, which never runs
 ///   behind an earlier session's count after a relaunch.
@@ -88,8 +89,13 @@ final class ShellXLinkFeedSource: AgentFeedSource {
               Self.allows(decision, source: item.source, toolInputJSON: toolInputJSON) else {
             return .unknown
         }
-        // No hook waits (a card restored from the Feed log): nothing would receive the decision.
-        guard coordinator.waiterRegistry.isAwaiting(requestId) else { return .alreadyHandled }
+        // No hook waits (a card restored from the Feed log, or pushed without a wait): nothing would receive
+        // the decision. The card expires instead of recording a decision no agent got; on the main actor that
+        // publishes its removal (in `resolved`) before this returns, so it leaves every phone's pending set.
+        guard coordinator.waiterRegistry.isAwaiting(requestId) else {
+            store.markExpired(item.id)
+            return .alreadyHandled
+        }
         // On the main actor `deliverReply` marks the item resolved synchronously, so subscribers see the
         // change before this returns. It never waits on the hook. It is first-wins: when another entry point
         // took the waiter since the checks above, the phone hears `already_handled`.
