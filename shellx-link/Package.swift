@@ -19,6 +19,11 @@ let package = Package(
             name: "ShellXLinkSessionTests",
             dependencies: ["ShellXLinkSession", "ShellXLinkCore", "ShellXLinkRelay"]
         ),
+        // Plays the phone in the P1 spike; see Sources/shellx-link-probe/main.swift.
+        .executableTarget(
+            name: "shellx-link-probe",
+            dependencies: ["ShellXLinkSession", "ShellXLinkCore", "ShellXLinkRelay"]
+        ),
     ],
     swiftLanguageModes: [.v6]
 )
