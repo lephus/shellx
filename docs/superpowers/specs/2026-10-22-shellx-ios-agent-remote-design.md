@@ -199,7 +199,7 @@ Người dùng muốn phát hành công khai trên App Store (G6). Điều kho�
 - ShellX Mac 1.2.0 **chưa phục vụ điện thoại nào**:
   - `ShellXFeatures.remoteMachines`, `shareLinks` và `upstreamDeviceMirroring` đều là `false`;
   - mobile host của cmux (`Sources/Mobile/MobileHostService*`) bị chặn ở `MobileHostService.swift:761`.
-- Kết nối riêng của ShellX là quyết định **D-W0-1 = (b) cmux-tui-remote** (`docs/superpowers/ledgers/native-desktop.md`): Noise `XXpsk3`, mã hoá đầu-cuối, qua `relay+wss://relay.shellx.pro/v2/relay`. Ghép cặp và vé kết nối do relay v2 (`relay/src/v2/`) và `shellx-core` cấp. Hướng này hiện **chỉ mang terminal**.
+- Kết nối riêng của ShellX là quyết định **D-W0-1 = (b) cmux-tui-remote** (`docs/superpowers/ledgers/native-desktop.md`): Noise `XXpsk3`, mã hoá đầu-cuối, qua `relay+wss://relay.shellx.pro/v2/relay`. Ghép cặp và vé kết nối do relay v2 (`relay/src/v2/`) và `shellx-core` cấp. Noise nằm trong crate `cmux-remote` của cmux-tui, **không** nằm trong `shellx-core`. Hướng này hiện **chỉ mang terminal**.
 - Các route v2 đều có `requireDesktop`, nên relay đang từ chối thiết bị điện thoại.
 - Trạng thái agent và việc trả lời agent (`feed.permission.reply`, `feed.question.reply`, `feed.exit_plan.reply`, `mobile.chat.*`) hiện chỉ có trên **mobile RPC của cmux**, là thứ đang tắt.
 
@@ -213,9 +213,15 @@ Người dùng muốn phát hành công khai trên App Store (G6). Điều kho�
   - AI điều phối;
   - tín hiệu gỡ thông báo;
   - thông tin máy.
-- **Terminal tạm dùng cmux-tui-remote** [người dùng], đúng D-W0-1, đã chạy thử được trên Mac. Dòng terminal đi **bên trong cùng kết nối ShellX**, cạnh các kênh của ShellX Link. Sau này có thể thay bằng kênh terminal của ShellX Link mà không đổi giao diện app. Nếu giấy phép của `cmux-tui` không xác nhận được (§7.1) thì việc thay này phải làm ngay ở bản đầu.
+- **Terminal tạm dùng cmux-tui-remote** [người dùng], đúng D-W0-1, đã chạy thử được trên Mac. Sau này có thể thay bằng kênh terminal của ShellX Link mà không đổi giao diện app. Nếu giấy phép của `cmux-tui` không xác nhận được (§7.1) thì việc thay này phải làm ngay ở bản đầu.
+- **ShellX Link có phiên Noise riêng, không đi chung phiên của cmux-tui** [người viết, sửa sau khi đọc code ngày 2026-10-22]. Có ba lý do:
+  - enum `Service` của cmux-remote là enum đóng. Muốn thêm kênh ShellX vào thì phải vá fork;
+  - client C ABI `cmux-terminal-client` không có API kênh hay tunnel nào;
+  - giấy phép của cmux-tui đang mơ hồ: Cargo ghi MIT, nhưng `LICENSE` ở gốc ngầm hiểu là GPL.
+
+  Vì vậy ShellX Link dùng **slot riêng trên cùng relay** (`cmux-relay` chỉ là ống chuyển byte, phía server). Mỗi máy có thêm một `link_slot`. Code Noise và code client relay của ShellX Link là code ShellX tự viết. Điện thoại giữ kết nối ShellX Link thường trực, và chỉ mở kết nối cmux-tui khi đang xem terminal.
 - **Ràng buộc thiết kế ShellX Link:**
-  - **Một kết nối E2E cho mỗi Mac:** chạy trên relay v2 và Noise `XXpsk3` có sẵn (`shellx-core`), dồn nhiều kênh vào một kết nối.
+  - **Một kết nối ShellX Link E2E cho mỗi Mac,** dồn mọi kênh của ShellX Link vào đó. Terminal là kết nối cmux-tui riêng, chỉ mở khi xem.
   - **Mô tả độc lập với nền tảng:** đặc tả giao thức viết thành tài liệu, có test vector, để Windows (Rust) và Android sau này cài đặt theo. Giống cách `term/protocol/vectors.txt` từng làm cho P2a.
   - **Trung lập với agent:** Claude Code trước, Codex sau (G6).
   - **Có phiên bản giao thức:** điện thoại và Mac khác phiên bản thì báo lỗi rõ ràng, không treo.
@@ -224,7 +230,7 @@ Người dùng muốn phát hành công khai trên App Store (G6). Điều kho�
   - **Không có dịch vụ Manaflow nào.** Đăng nhập bằng tài khoản ShellX, và Mac đồng ý tại chỗ khi ghép cặp.
   - **Đáp ứng §7.4.**
   - **Relay v2 nhận điện thoại:** hiện các route chỉ cho desktop (`requireDesktop`). Phải cho thiết bị loại điện thoại ghép cặp và nhận vé kết nối, có test cho quyền: điện thoại chỉ thấy máy của tài khoản mình và đã ghép cặp.
-- **Bước đầu tiên của dự án** (rủi ro cao nhất): viết đặc tả ShellX Link, rồi làm một spike. Spike chứng minh được ba điều thì đạt: Mac và một client thử nói ShellX Link qua relay thật; luồng terminal cmux-tui chạy chung một kết nối; một quyết định duyệt quyền đi từ client tới hook Claude Code trong mục tiêu < 500 ms.
+- **Bước đầu tiên của dự án** (rủi ro cao nhất): viết đặc tả ShellX Link, rồi làm một spike. Spike chứng minh được hai điều thì đạt: Mac và một client thử nói ShellX Link qua relay thật; một quyết định duyệt quyền đi từ client tới hook Claude Code trong mục tiêu < 500 ms. Kế hoạch: `docs/superpowers/plans/2026-10-22-shellx-link-p1-spike.md`.
 
 Nếu kênh mới cho phép điện thoại gọi lệnh trên Mac (chạy skill, mở workspace, gửi chữ vào agent) thì phải viết phần phân tích an toàn theo tinh thần `skills/cmux-socket-policy/references/remote-relay-authorization.md`:
 
