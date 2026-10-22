@@ -578,7 +578,9 @@ private let statusUp = Data(#"{"daemon_name":"Phu's Mac","daemon_fingerprint":"f
                 } else {
                     DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) { handle.terminate() }
                 }
-                DispatchQueue.global().asyncAfter(deadline: .now() + 10) { finish(-1) }
+                // Far past the 0.2 s grace: CI runs of this suite stall for 15-20 s, after which an overdue
+                // fallback at the default QoS fired before the overdue utility-QoS SIGKILL timer.
+                DispatchQueue.global().asyncAfter(deadline: .now() + 60) { finish(-1) }
             } catch { cont.resume(throwing: error) }
         }
     }
@@ -586,7 +588,7 @@ private let statusUp = Data(#"{"daemon_name":"Phu's Mac","daemon_fingerprint":"f
     // `ready` once its trap is set, so a slow machine cannot deliver the SIGTERM before the trap exists.
     let started = ContinuousClock.now
     let killed = try await exitStatus(["-c", "trap '' TERM; echo ready; exec /bin/sleep 30"], "/bin/sh", untilReady: true)
-    #expect(killed == SIGKILL, "exit status \(killed) after \(ContinuousClock.now - started) (SIGTERM is \(SIGTERM); -1: no exit within 10 s)")
+    #expect(killed == SIGKILL, "exit status \(killed) after \(ContinuousClock.now - started) (SIGTERM is \(SIGTERM); -1: no exit within 60 s)")
     // A normal child dies by SIGTERM.
     let termed = try await exitStatus(["30"], "/bin/sleep")
     #expect(termed == SIGTERM, "exit status \(termed)")
