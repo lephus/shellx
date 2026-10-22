@@ -50,7 +50,8 @@ enum Probe {
         case "help", "-h", "--help":
             print(usage)
         default:
-            throw ProbeError("unknown command \(command)\n\(usage)")
+            // Never echoed: a pasted invite would print its ticket.
+            throw ProbeError("unknown command\n\(usage)")
         }
     }
 
@@ -149,15 +150,19 @@ struct Invite {
     let hostKey: Data
 
     /// Reads the reply from `source` (a path, or `-` for stdin). Accepts the bare result object or
-    /// the socket envelope `{"ok":true,"result":{...}}`.
+    /// the socket envelope `{"ok":true,"result":{...}}`. Errors name the flag, never its value.
     static func read(_ source: String) throws -> Invite {
+        // The invite itself on the command line: its ticket would sit in the shell history and `ps`.
+        guard source.drop(while: { $0.isWhitespace }).first != "{" else {
+            throw ProbeError("--invite takes a file path or -, not the invite itself; save the reply to a 0600 file")
+        }
         let data: Data
         if source == "-" {
             data = FileHandle.standardInput.readDataToEndOfFile()
         } else {
-            try PrivateFile.checkOwnerOnly(source, what: "invite")
+            try PrivateFile.checkOwnerOnly(source, flag: "invite")
             guard let contents = FileManager.default.contents(atPath: source) else {
-                throw ProbeError("cannot read the invite file \(source)")
+                throw ProbeError("cannot read the --invite file")
             }
             data = contents
         }
@@ -185,37 +190,40 @@ struct Invite {
 
 /// The phone's Noise static key, stored as its 32 raw private bytes in an owner-only file.
 enum KeyFile {
-    /// Creates a new key at `path`. Refuses to overwrite an existing file.
+    /// Creates a new key at `path` (`--out`). Refuses to overwrite an existing file, and removes the
+    /// file again when the key cannot be written in full.
     static func create(at path: String) throws -> NoiseStaticKey {
         let key = NoiseStaticKey()
         let fd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0o600)
-        guard fd >= 0 else { throw ProbeError("cannot create \(path): \(PrivateFile.errnoText())") }
+        guard fd >= 0 else { throw ProbeError("cannot create the --out file: \(PrivateFile.errnoText())") }
         defer { close(fd) }
         let written = key.rawPrivate.withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
         guard written == key.rawPrivate.count else {
-            throw ProbeError("cannot write \(path): \(PrivateFile.errnoText())")
+            let reason = written < 0 ? PrivateFile.errnoText() : "short write"
+            unlink(path)   // a partial key file would only fail `load` later
+            throw ProbeError("cannot write the --out file: \(reason)")
         }
         return key
     }
 
     static func load(_ path: String) throws -> NoiseStaticKey {
-        try PrivateFile.checkOwnerOnly(path, what: "key")
+        try PrivateFile.checkOwnerOnly(path, flag: "key")
         guard let data = FileManager.default.contents(atPath: path), data.count == 32,
               let key = try? NoiseStaticKey(rawPrivate: data)
         else {
-            throw ProbeError("\(path) is not a key file written by `shellx-link-probe keygen`")
+            throw ProbeError("the --key file is not a key file written by `shellx-link-probe keygen`")
         }
         return key
     }
 }
 
 enum PrivateFile {
-    /// Refuses a secret file that its group or others can read.
-    static func checkOwnerOnly(_ path: String, what: String) throws {
+    /// Refuses a secret file that its group or others can read. Errors name `--<flag>`, not the path.
+    static func checkOwnerOnly(_ path: String, flag: String) throws {
         var info = stat()
-        guard stat(path, &info) == 0 else { throw ProbeError("cannot read the \(what) file \(path): \(errnoText())") }
+        guard stat(path, &info) == 0 else { throw ProbeError("cannot read the --\(flag) file: \(errnoText())") }
         guard info.st_mode & 0o077 == 0 else {
-            throw ProbeError("the \(what) file \(path) is readable by others; chmod 600 it")
+            throw ProbeError("the --\(flag) file is readable by others; chmod 600 it")
         }
     }
 
@@ -284,13 +292,17 @@ struct Bench {
                 continue
             }
             let ok = outcome == .delivered && result.status == "resolved" && result.mode == mode.rawValue
-            if !ok { failures += 1 }
             let changedMs = Stats.ms(seenAt - sentAt)
             let rttMs = Stats.ms(replyAnswered - replyStarted)
             let hookMs = Stats.ms(answeredAt - replyStarted)
-            changed.append(changedMs)
-            replyRTT.append(rttMs)
-            replyToHook.append(hookMs)
+            // Only requests that worked count towards the latency figures; the rest are failures.
+            if ok {
+                changed.append(changedMs)
+                replyRTT.append(rttMs)
+                replyToHook.append(hookMs)
+            } else {
+                failures += 1
+            }
             Log.line(
                 "#\(index) \(ok ? "ok" : "FAIL") changed=\(Stats.format(changedMs)) ms"
                     + " reply_rtt=\(Stats.format(rttMs)) ms reply_to_hook=\(Stats.format(hookMs)) ms"
@@ -321,8 +333,10 @@ actor Arrivals {
     private var revision: Int?
     private(set) var revisionGaps = 0
 
+    /// The snapshot's revision. Never lowers the tracked one: the consumer, subscribed first, may
+    /// already have recorded a later change.
     func setRevision(_ value: Int) {
-        revision = value
+        revision = max(revision ?? value, value)
     }
 
     func record(change: (revision: Int, added: [PendingItem], resolved: [String]), at instant: ContinuousClock.Instant) {
@@ -477,13 +491,25 @@ struct Arguments {
         while index < raw.count {
             let word = raw[index]
             if word.hasPrefix("--") {
-                guard index + 1 < raw.count else { throw ProbeError("\(word) needs a value") }
-                options[String(word.dropFirst(2))] = raw[index + 1]
+                let name = String(word.dropFirst(2))
+                // Errors echo only a plain option name: `--invite={...}` must not print the invite.
+                guard Self.isPlainName(name) else {
+                    throw ProbeError("malformed option: write --<name> <value>\n\(Probe.usage)")
+                }
+                guard index + 1 < raw.count else { throw ProbeError("--\(name) needs a value") }
+                options[name] = raw[index + 1]
                 index += 2
             } else {
                 positional.append(word)
                 index += 1
             }
+        }
+    }
+
+    /// Lowercase ASCII letters, digits and `-`, like every option the probe takes.
+    private static func isPlainName(_ name: String) -> Bool {
+        !name.isEmpty && name.unicodeScalars.allSatisfy { scalar in
+            ("a"..."z").contains(scalar) || ("0"..."9").contains(scalar) || scalar == "-"
         }
     }
 
@@ -541,20 +567,41 @@ enum Stats {
 enum Log {
     static let started = ContinuousClock.now
 
+    /// One log line. Its text may carry request ids from the Mac or relay error codes, so it is
+    /// printed through ``shown(_:)`` too.
     static func line(_ text: String) {
         let elapsed = Stats.ms(ContinuousClock.now - started) / 1000
-        print("[+\(String(format: "%7.3f", elapsed))s] \(text)")
+        print("[+\(String(format: "%7.3f", elapsed))s] \(shown(text))")
     }
 
+    /// Every field comes from the Mac and, through it, from the agent's tool input.
     static func item(_ item: PendingItem) {
         let preview = item.toolInputPreview.map { short($0) } ?? "-"
         print(
-            "    pending \(item.requestId) kind=\(item.kind.rawValue) agent=\(item.agent)"
-                + " tool=\(item.toolName ?? "-") workspace=\"\(short(item.workspaceTitle))\" preview=\(preview)")
+            "    pending \(shown(item.requestId)) kind=\(item.kind.rawValue) agent=\(shown(item.agent))"
+                + " tool=\(item.toolName.map { shown($0) } ?? "-") workspace=\"\(short(item.workspaceTitle))\""
+                + " preview=\(preview)")
+    }
+
+    /// `text` with every control character escaped: C0 (`\n`, `\r` and `\t` by name, the rest as
+    /// `\u{..}`), DEL and C1, ESC and CSI among them. Text from the Mac, an agent or the relay
+    /// therefore cannot move the cursor, recolor or retitle the terminal, or fake a log line.
+    static func shown(_ text: String) -> String {
+        var result = ""
+        for scalar in text.unicodeScalars {
+            switch scalar.value {
+            case 0x0A: result += "\\n"
+            case 0x0D: result += "\\r"
+            case 0x09: result += "\\t"
+            case 0x00...0x1F, 0x7F...0x9F: result += "\\u{\(String(scalar.value, radix: 16, uppercase: true))}"
+            default: result.unicodeScalars.append(scalar)
+            }
+        }
+        return result
     }
 
     private static func short(_ text: String) -> String {
-        let flat = text.replacingOccurrences(of: "\n", with: "\\n")
+        let flat = shown(text)
         return flat.count > 160 ? String(flat.prefix(160)) + "…" : flat
     }
 }
@@ -569,18 +616,20 @@ struct ExitStatus: Error {
 }
 
 enum ErrorText {
-    /// A message safe to print: names the failure, never a ticket or key.
+    /// A message safe to print: names the failure, never a ticket or key. Text the relay or the Mac
+    /// sent goes through `Log.shown`.
     static func describe(_ error: any Error) -> String {
         if let probe = error as? ProbeError { return probe.description }
         if let relay = error as? RelayError {
             switch relay {
             case .closed: return "the relay circuit closed (does the Mac trust this key?)"
-            case let .server(code, retryable): return "the relay refused: \(code)\(retryable ? " (retryable)" : "")"
+            case let .server(code, retryable):
+                return "the relay refused: \(Log.shown(code))\(retryable ? " (retryable)" : "")"
             case let .protocolViolation(text): return "relay protocol violation: \(text)"
             }
         }
         if let noise = error as? NoiseError { return "Noise handshake failed: \(noise)" }
-        if let link = error as? LinkClientError { return "link session: \(link)" }
+        if let link = error as? LinkClientError { return "link session: \(Log.shown(String(describing: link)))" }
         if let url = error as? URLError { return "network error \(url.code.rawValue)" }
         return "\(type(of: error))"
     }
