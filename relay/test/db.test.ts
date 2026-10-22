@@ -101,7 +101,7 @@ describe("migrate", () => {
   it("applies every migration once, in file-name order, and records them", () => {
     const db = openFresh();
     try {
-      const all = ["0001_init.sql", "0002_hub_state.sql", "0003_push_tokens.sql", "0004_admin.sql", "0005_relay_v2.sql", "0006_shares.sql"];
+      const all = ["0001_init.sql", "0002_hub_state.sql", "0003_push_tokens.sql", "0004_admin.sql", "0005_relay_v2.sql", "0006_shares.sql", "0007_link_slot.sql"];
       expect(migrate(db)).toEqual(all);
       const rows = db.all<{ name: string; applied_at: number }>("SELECT name, applied_at FROM schema_migrations ORDER BY name");
       expect(rows.map((r) => r.name)).toEqual(all);

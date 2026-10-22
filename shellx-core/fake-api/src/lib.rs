@@ -195,6 +195,7 @@ struct Machine {
     app_version: String,
     noise_public_key_b64: String,
     slot: String,
+    link_slot: String,
     last_heartbeat: Option<u64>,
 }
 
@@ -536,6 +537,7 @@ fn register_machine(rec: &Recorded, raw: &[u8], st: &mut State) -> Reply {
         .map(|(id, _)| id.clone());
     let id = existing.unwrap_or_else(random_id);
     let slot = st.machines.get(&id).map(|m| m.slot.clone()).unwrap_or_else(|| random_b64url(16));
+    let link_slot = st.machines.get(&id).map(|m| m.link_slot.clone()).unwrap_or_else(|| random_b64url(16));
     let last = st.machines.get(&id).and_then(|m| m.last_heartbeat);
     st.machines.insert(
         id.clone(),
@@ -548,10 +550,11 @@ fn register_machine(rec: &Recorded, raw: &[u8], st: &mut State) -> Reply {
             app_version: app.to_string(),
             noise_public_key_b64: key.to_string(),
             slot: slot.clone(),
+            link_slot: link_slot.clone(),
             last_heartbeat: last,
         },
     );
-    Reply::json(200, json!({"machine_id": id, "slot": slot}))
+    Reply::json(200, json!({"machine_id": id, "slot": slot, "link_slot": link_slot}))
 }
 
 fn list_machines(rec: &Recorded, st: &State) -> Reply {
@@ -599,13 +602,18 @@ fn mint_ticket(rec: &Recorded, opts: &FakeOptions, st: &mut State) -> Reply {
         return Reply::error(404, "machine_not_found", "Machine not found");
     };
     let target = b["target_machine_id"].as_str();
+    let link = match b.get("lane") {
+        None => false,
+        Some(l) if l == "link" => true,
+        Some(_) => return Reply::error(400, "bad_request", "lane must be link"),
+    };
     let (permission, role, slot) = match b["permission"].as_str() {
         Some("register") => {
             // Only ever for the caller's own machine.
             if target.is_some_and(|t| t != machine_id) {
                 return Reply::error(400, "bad_request", "register tickets are for the caller's own machine");
             }
-            ("register", "daemon", own.slot.clone())
+            ("register", "daemon", if link { own.link_slot.clone() } else { own.slot.clone() })
         }
         Some("connect") => {
             let Some(target) = target else {
@@ -618,7 +626,7 @@ fn mint_ticket(rec: &Recorded, opts: &FakeOptions, st: &mut State) -> Reply {
             if target != machine_id && !st.grants.contains(&(machine_id.to_string(), target.to_string())) {
                 return Reply::error(403, "not_granted", "No approved pairing for that machine");
             }
-            ("connect", "client", t.slot.clone())
+            ("connect", "client", if link { t.link_slot.clone() } else { t.slot.clone() })
         }
         _ => return Reply::error(400, "bad_request", "permission must be register or connect"),
     };

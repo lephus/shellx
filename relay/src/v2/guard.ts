@@ -18,6 +18,7 @@ export interface MachineRow {
   noise_public_key: Buffer;
   fingerprint: string;
   slot: string;
+  link_slot: string;
   created_at: number;
   last_seen_at: number | null;
 }

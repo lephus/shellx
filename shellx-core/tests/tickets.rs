@@ -120,3 +120,45 @@ fn error_messages_never_contain_tickets() {
     assert!(!format!("{e:?}").contains(&t));
     let _ = dir;
 }
+
+#[test]
+fn mint_passes_lane() {
+    let (core, fake, _dir) = support::logged_in();
+    let m = reg(&core, "Mac A");
+    let r = core.call("tickets.mint", json!({"permission":"register","lane":"link"})).unwrap();
+    assert_eq!(claims(r["ticket"].as_str().unwrap())["slot"], m["link_slot"]);
+    let reqs = requests_to(&fake, "/v2/relay/tickets");
+    assert_eq!(reqs[0].body["lane"], "link");
+    // Without a lane the body has none and the cmux slot is used.
+    let plain = core.call("tickets.mint", json!({"permission":"register"})).unwrap();
+    assert_eq!(claims(plain["ticket"].as_str().unwrap())["slot"], m["slot"]);
+    assert!(requests_to(&fake, "/v2/relay/tickets")[1].body.get("lane").is_none());
+    // Connecting to itself on the link lane.
+    let me = core
+        .call("tickets.mint", json!({"permission":"connect","target_machine_id":m["machine_id"],"lane":"link"}))
+        .unwrap();
+    assert_eq!(claims(me["ticket"].as_str().unwrap())["slot"], m["link_slot"]);
+}
+
+#[test]
+fn mint_rejects_other_lanes_before_any_request() {
+    let (core, fake, _dir) = support::logged_in();
+    reg(&core, "Mac A");
+    let before = requests_to(&fake, "/v2/relay/tickets").len();
+    for lane in [json!("terminal"), json!(""), json!(3)] {
+        let e = core.call("tickets.mint", json!({"permission":"register","lane":lane})).unwrap_err();
+        assert_eq!(e.code, "invalid_params");
+    }
+    assert_eq!(requests_to(&fake, "/v2/relay/tickets").len(), before);
+}
+
+#[test]
+fn mint_link_lane_needs_a_link_slot_from_register() {
+    let (core, fake, dir) = support::logged_in();
+    let m = reg(&core, "Mac A");
+    std::fs::write(dir.join("machine.json"), json!({"machine_id": m["machine_id"], "slot": m["slot"]}).to_string()).unwrap();
+    let before = requests_to(&fake, "/v2/relay/tickets").len();
+    let e = core.call("tickets.mint", json!({"permission":"register","lane":"link"})).unwrap_err();
+    assert_eq!(e.code, "not_registered");
+    assert_eq!(requests_to(&fake, "/v2/relay/tickets").len(), before);
+}
