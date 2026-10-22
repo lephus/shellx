@@ -1,30 +1,73 @@
 {
-  "comment": "ShellX Link v1 golden vectors. For each entry: decoding `json` must yield `message`; encoding `message` must yield JSON that is semantically equal to `json` (key order and whitespace do not matter; absent optional keys are omitted, never null). `message.case` names the message; all other `message` keys carry the field values using the JSON key names.",
+  "comment": "ShellX Link v1 golden vectors. For each entry: decoding `json` must yield `message`; encoding `message` must yield JSON that is semantically equal to `json` (key order and whitespace do not matter; absent optional keys are omitted, never null). `message.case` names the message; all other `message` keys carry the field values using the JSON key names. `nonce` is a plain JSON number; 18446744073709551615 must be parsed as an unsigned 64-bit integer, never through a double.",
   "vectors": [
     {
       "name": "hello",
-      "message": {"case": "hello", "client_version": "1.0.0", "device_name": "Phu's iPhone"},
-      "json": {"v": 1, "t": "hello", "client_version": "1.0.0", "device_name": "Phu's iPhone"}
+      "message": {
+        "case": "hello",
+        "client_version": "1.0.0",
+        "device_name": "Phu's iPhone"
+      },
+      "json": {
+        "v": 1,
+        "t": "hello",
+        "client_version": "1.0.0",
+        "device_name": "Phu's iPhone"
+      }
     },
     {
       "name": "welcome",
-      "message": {"case": "welcome", "protocol_version": 1, "host_version": "1.3.0", "machine_name": "Phu's MacBook"},
-      "json": {"v": 1, "t": "welcome", "protocol_version": 1, "host_version": "1.3.0", "machine_name": "Phu's MacBook"}
+      "message": {
+        "case": "welcome",
+        "protocol_version": 1,
+        "host_version": "1.3.0",
+        "machine_name": "Phu's MacBook"
+      },
+      "json": {
+        "v": 1,
+        "t": "welcome",
+        "protocol_version": 1,
+        "host_version": "1.3.0",
+        "machine_name": "Phu's MacBook"
+      }
     },
     {
       "name": "error",
-      "message": {"case": "error", "code": "protocol_mismatch", "message": "unsupported protocol version 2"},
-      "json": {"v": 1, "t": "error", "code": "protocol_mismatch", "message": "unsupported protocol version 2"}
+      "message": {
+        "case": "error",
+        "code": "protocol_mismatch",
+        "message": "unsupported protocol version 2"
+      },
+      "json": {
+        "v": 1,
+        "t": "error",
+        "code": "protocol_mismatch",
+        "message": "unsupported protocol version 2"
+      }
     },
     {
       "name": "snapshot_get",
-      "message": {"case": "snapshot_get"},
-      "json": {"v": 1, "t": "agent.snapshot.get"}
+      "message": {
+        "case": "snapshot_get"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.snapshot.get"
+      }
     },
     {
       "name": "snapshot_empty",
-      "message": {"case": "snapshot", "revision": 0, "pending": []},
-      "json": {"v": 1, "t": "agent.snapshot", "revision": 0, "pending": []}
+      "message": {
+        "case": "snapshot",
+        "revision": 0,
+        "pending": []
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.snapshot",
+        "revision": 0,
+        "pending": []
+      }
     },
     {
       "name": "snapshot_with_items",
@@ -93,7 +136,10 @@
             "created_at_ms": 1789000002000
           }
         ],
-        "resolved": ["req-1", "req-2"]
+        "resolved": [
+          "req-1",
+          "req-2"
+        ]
       },
       "json": {
         "v": 1,
@@ -109,73 +155,296 @@
             "created_at_ms": 1789000002000
           }
         ],
-        "resolved": ["req-1", "req-2"]
+        "resolved": [
+          "req-1",
+          "req-2"
+        ]
       }
     },
     {
       "name": "reply_once",
-      "message": {"case": "reply", "request_id": "req-1", "mode": "once"},
-      "json": {"v": 1, "t": "agent.reply", "request_id": "req-1", "mode": "once"}
+      "message": {
+        "case": "reply",
+        "request_id": "req-1",
+        "mode": "once"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "request_id": "req-1",
+        "mode": "once"
+      }
     },
     {
       "name": "reply_always",
-      "message": {"case": "reply", "request_id": "req-1", "mode": "always"},
-      "json": {"v": 1, "t": "agent.reply", "request_id": "req-1", "mode": "always"}
+      "message": {
+        "case": "reply",
+        "request_id": "req-1",
+        "mode": "always"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "request_id": "req-1",
+        "mode": "always"
+      }
     },
     {
       "name": "reply_all",
-      "message": {"case": "reply", "request_id": "req-1", "mode": "all"},
-      "json": {"v": 1, "t": "agent.reply", "request_id": "req-1", "mode": "all"}
+      "message": {
+        "case": "reply",
+        "request_id": "req-1",
+        "mode": "all"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "request_id": "req-1",
+        "mode": "all"
+      }
     },
     {
       "name": "reply_deny",
-      "message": {"case": "reply", "request_id": "req-1", "mode": "deny"},
-      "json": {"v": 1, "t": "agent.reply", "request_id": "req-1", "mode": "deny"}
+      "message": {
+        "case": "reply",
+        "request_id": "req-1",
+        "mode": "deny"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "request_id": "req-1",
+        "mode": "deny"
+      }
     },
     {
       "name": "reply_result_delivered",
-      "message": {"case": "reply_result", "request_id": "req-1", "outcome": "delivered"},
-      "json": {"v": 1, "t": "agent.reply.result", "request_id": "req-1", "outcome": "delivered"}
+      "message": {
+        "case": "reply_result",
+        "request_id": "req-1",
+        "outcome": "delivered"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply.result",
+        "request_id": "req-1",
+        "outcome": "delivered"
+      }
     },
     {
       "name": "reply_result_already_handled",
-      "message": {"case": "reply_result", "request_id": "req-1", "outcome": "already_handled"},
-      "json": {"v": 1, "t": "agent.reply.result", "request_id": "req-1", "outcome": "already_handled"}
+      "message": {
+        "case": "reply_result",
+        "request_id": "req-1",
+        "outcome": "already_handled"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply.result",
+        "request_id": "req-1",
+        "outcome": "already_handled"
+      }
     },
     {
       "name": "reply_result_unknown",
-      "message": {"case": "reply_result", "request_id": "req-9", "outcome": "unknown"},
-      "json": {"v": 1, "t": "agent.reply.result", "request_id": "req-9", "outcome": "unknown"}
+      "message": {
+        "case": "reply_result",
+        "request_id": "req-9",
+        "outcome": "unknown"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply.result",
+        "request_id": "req-9",
+        "outcome": "unknown"
+      }
     },
     {
       "name": "ping",
-      "message": {"case": "ping", "nonce": 42},
-      "json": {"v": 1, "t": "ping", "nonce": 42}
+      "message": {
+        "case": "ping",
+        "nonce": 42
+      },
+      "json": {
+        "v": 1,
+        "t": "ping",
+        "nonce": 42
+      }
     },
     {
       "name": "pong_max_nonce",
-      "message": {"case": "pong", "nonce": 18446744073709551615},
-      "json": {"v": 1, "t": "pong", "nonce": 18446744073709551615}
+      "message": {
+        "case": "pong",
+        "nonce": 18446744073709551615
+      },
+      "json": {
+        "v": 1,
+        "t": "pong",
+        "nonce": 18446744073709551615
+      }
     }
   ],
   "decode_only": [
     {
       "name": "unknown_type_is_forward_compatible",
-      "json": {"v": 1, "t": "future.thing", "anything": [1, 2, 3]},
-      "message": {"case": "unknown", "type": "future.thing"}
+      "json": {
+        "v": 1,
+        "t": "future.thing",
+        "anything": [
+          1,
+          2,
+          3
+        ]
+      },
+      "message": {
+        "case": "unknown",
+        "type": "future.thing"
+      }
     },
     {
       "name": "unknown_fields_ignored",
-      "json": {"v": 1, "t": "ping", "nonce": 5, "extra": true},
-      "message": {"case": "ping", "nonce": 5}
+      "json": {
+        "v": 1,
+        "t": "ping",
+        "nonce": 5,
+        "extra": true
+      },
+      "message": {
+        "case": "ping",
+        "nonce": 5
+      }
     }
   ],
   "decode_errors": [
-    {"name": "wrong_version", "json": {"v": 2, "t": "ping", "nonce": 1}, "error": "wrong_version"},
-    {"name": "wrong_version_unknown_type", "json": {"v": 2, "t": "future.thing"}, "error": "wrong_version"},
-    {"name": "missing_version", "json": {"t": "ping", "nonce": 1}, "error": "bad_json"},
-    {"name": "missing_type", "json": {"v": 1}, "error": "bad_json"},
-    {"name": "known_type_missing_field", "json": {"v": 1, "t": "ping"}, "error": "bad_json"},
-    {"name": "known_type_bad_enum", "json": {"v": 1, "t": "agent.reply", "request_id": "r", "mode": "sometimes"}, "error": "bad_json"}
-  ]
+    {
+      "name": "wrong_version",
+      "json": {
+        "v": 2,
+        "t": "ping",
+        "nonce": 1
+      },
+      "error": "wrong_version"
+    },
+    {
+      "name": "wrong_version_unknown_type",
+      "json": {
+        "v": 2,
+        "t": "future.thing"
+      },
+      "error": "wrong_version"
+    },
+    {
+      "name": "missing_version",
+      "json": {
+        "t": "ping",
+        "nonce": 1
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "missing_type",
+      "json": {
+        "v": 1
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "known_type_missing_field",
+      "json": {
+        "v": 1,
+        "t": "ping"
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "known_type_bad_enum",
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "request_id": "r",
+        "mode": "sometimes"
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "version_float",
+      "json_text": "{\"v\":1.0,\"t\":\"ping\",\"nonce\":1}",
+      "error": "bad_json"
+    },
+    {
+      "name": "version_exponent",
+      "json_text": "{\"v\":1e0,\"t\":\"ping\",\"nonce\":1}",
+      "error": "bad_json"
+    },
+    {
+      "name": "version_string",
+      "json_text": "{\"v\":\"1\",\"t\":\"ping\",\"nonce\":1}",
+      "error": "bad_json"
+    },
+    {
+      "name": "version_bool",
+      "json_text": "{\"v\":true,\"t\":\"ping\",\"nonce\":1}",
+      "error": "bad_json"
+    }
+  ],
+  "boundary_frames": {
+    "comment": "Frame text = prefix + filler + suffix, filler = concatenation of text repeated count times. Size limit 65519 counts UTF-8 BYTES, not characters. Decoding must give the message in `ok` entries, and error `frame_too_large` otherwise; encoding the same `error` message must succeed / fail identically.",
+    "prefix": "{\"v\":1,\"t\":\"error\",\"code\":\"x\",\"message\":\"",
+    "suffix": "\"}",
+    "cases": [
+      {
+        "name": "exactly_65519_bytes",
+        "filler": [
+          {
+            "text": "a",
+            "count": 65476
+          }
+        ],
+        "bytes": 65519,
+        "result": "ok"
+      },
+      {
+        "name": "65520_bytes",
+        "filler": [
+          {
+            "text": "a",
+            "count": 65477
+          }
+        ],
+        "bytes": 65520,
+        "result": "frame_too_large"
+      },
+      {
+        "name": "multibyte_bytes_over_limit_chars_under",
+        "filler": [
+          {
+            "text": "a",
+            "count": 1
+          },
+          {
+            "text": "é",
+            "count": 32738
+          }
+        ],
+        "bytes": 65520,
+        "chars": 32782,
+        "result": "frame_too_large"
+      },
+      {
+        "name": "multibyte_exactly_65519_bytes",
+        "filler": [
+          {
+            "text": "a",
+            "count": 2
+          },
+          {
+            "text": "é",
+            "count": 32737
+          }
+        ],
+        "bytes": 65519,
+        "result": "ok"
+      }
+    ]
+  }
 }

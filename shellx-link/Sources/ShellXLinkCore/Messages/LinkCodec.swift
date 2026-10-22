@@ -30,7 +30,16 @@ public enum LinkCodec {
     private struct ReplyResult: Codable { var requestId: String; var outcome: ReplyOutcome }
     private struct Nonce: Codable { var nonce: UInt64 }
 
-    private struct Envelope: Decodable { var v: Int; var t: String }
+    private struct Envelope { var v: Int; var t: String }
+
+    /// Strict envelope: `v` must be a JSON integer token (`1.0`, `1e0`, `"1"`, `true` are `badJSON`).
+    private static func parseEnvelope(_ d: Data) throws -> Envelope {
+        guard let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+              let vn = obj["v"] as? NSNumber, String(cString: vn.objCType) == "q",
+              let t = obj["t"] as? String
+        else { throw LinkCodecError.badJSON }
+        return Envelope(v: vn.intValue, t: t)
+    }
 
     private struct Frame<Body: Encodable>: Encodable {
         var t: String
@@ -73,8 +82,7 @@ public enum LinkCodec {
         guard d.count <= maxFrameBytes else { throw LinkCodecError.frameTooLarge }
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let env: Envelope
-        do { env = try decoder.decode(Envelope.self, from: d) } catch { throw LinkCodecError.badJSON }
+        let env = try parseEnvelope(d)
         guard env.v == ShellXLink.protocolVersion else { throw LinkCodecError.wrongVersion }
         func body<B: Decodable>(_ type: B.Type) throws -> B {
             do { return try decoder.decode(type, from: d) } catch { throw LinkCodecError.badJSON }

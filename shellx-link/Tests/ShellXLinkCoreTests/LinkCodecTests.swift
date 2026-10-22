@@ -29,10 +29,65 @@ final class LinkCodecTests: XCTestCase {
         }
         for v in try XCTUnwrap(file["decode_errors"] as? [[String: Any]]) {
             let name = v["name"] as? String ?? "?"
-            let json = try JSONSerialization.data(withJSONObject: try XCTUnwrap(v["json"]))
-            let expected: LinkCodecError = (v["error"] as? String) == "wrong_version" ? .wrongVersion : .badJSON
+            let json: Data
+            if let text = v["json_text"] as? String {
+                json = Data(text.utf8)
+            } else {
+                json = try JSONSerialization.data(withJSONObject: try XCTUnwrap(v["json"]))
+            }
+            let expected: LinkCodecError
+            switch v["error"] as? String {
+            case "wrong_version": expected = .wrongVersion
+            case "bad_json": expected = .badJSON
+            case "frame_too_large": expected = .frameTooLarge
+            default: XCTFail("unknown error name in vector \(name)"); continue
+            }
             XCTAssertThrowsError(try LinkCodec.decode(json), name) { XCTAssertEqual($0 as? LinkCodecError, expected, name) }
         }
+    }
+
+    func testBoundaryFrames() throws {
+        let b = try XCTUnwrap(try Self.loadVectors()["boundary_frames"] as? [String: Any])
+        let prefix = try XCTUnwrap(b["prefix"] as? String), suffix = try XCTUnwrap(b["suffix"] as? String)
+        let cases = try XCTUnwrap(b["cases"] as? [[String: Any]])
+        XCTAssertGreaterThanOrEqual(cases.count, 4)
+        for c in cases {
+            let name = c["name"] as? String ?? "?"
+            var filler = ""
+            var message = ""
+            for f in try XCTUnwrap(c["filler"] as? [[String: Any]]) {
+                let piece = String(repeating: try XCTUnwrap(f["text"] as? String), count: try XCTUnwrap(f["count"] as? Int))
+                filler += piece; message += piece
+            }
+            let text = prefix + filler + suffix
+            XCTAssertEqual(text.utf8.count, c["bytes"] as? Int, name)
+            if let chars = c["chars"] as? Int { XCTAssertEqual(text.count, chars, name); XCTAssertLessThan(chars, LinkCodec.maxFrameBytes, name) }
+            switch c["result"] as? String {
+            case "ok":
+                XCTAssertEqual(try LinkCodec.decode(Data(text.utf8)), .error(code: "x", message: message), name)
+                XCTAssertEqual(try LinkCodec.encode(.error(code: "x", message: message)).count, text.utf8.count, name)
+            case "frame_too_large":
+                XCTAssertThrowsError(try LinkCodec.decode(Data(text.utf8)), name) { XCTAssertEqual($0 as? LinkCodecError, .frameTooLarge, name) }
+                XCTAssertThrowsError(try LinkCodec.encode(.error(code: "x", message: message)), name) { XCTAssertEqual($0 as? LinkCodecError, .frameTooLarge, name) }
+            default: XCTFail("unknown result in \(name)")
+            }
+        }
+    }
+
+    func testMultiByteCountsBytesNotCharacters() {
+        // 40_000 two-byte characters: 40_000 characters < limit, 80_000 bytes > limit.
+        let m = LinkMessage.error(code: "x", message: String(repeating: "\u{00E9}", count: 40_000))
+        XCTAssertThrowsError(try LinkCodec.encode(m)) { XCTAssertEqual($0 as? LinkCodecError, .frameTooLarge) }
+    }
+
+    func testWithPreviewLimit() {
+        let item = Self.item(preview: String(repeating: "\u{1F680}", count: 1_000)) // 4000 bytes
+        XCTAssertEqual(item.withPreviewLimit(8192), item)
+        let cut = item.withPreviewLimit(1022)
+        XCTAssertEqual(cut.toolInputPreview?.utf8.count, 1020) // scalar boundary
+        XCTAssertNil(item.withPreviewLimit(nil).toolInputPreview)
+        XCTAssertEqual(item.withPreviewLimit(nil).requestId, item.requestId)
+        XCTAssertNil(Self.item(preview: "x").withPreviewLimit(nil).toolInputPreview)
     }
 
     func testUnknownTypeDecodesAsUnknown() throws {
@@ -147,7 +202,9 @@ final class LinkCodecTests: XCTestCase {
         case "ping": return .ping(nonce: try n("nonce").uint64Value)
         case "pong": return .pong(nonce: try n("nonce").uint64Value)
         case "unknown": return .unknown(type: try s("type"))
-        default: throw XCTSkip("unknown vector case in \(name)")
+        default:
+            XCTFail("unknown vector case in \(name)")
+            throw LinkCodecError.badJSON
         }
     }
 }

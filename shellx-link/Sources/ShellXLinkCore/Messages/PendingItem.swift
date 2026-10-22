@@ -35,18 +35,27 @@ public struct PendingItem: Codable, Equatable, Sendable {
         self.createdAtMs = createdAtMs
     }
 
-    /// Cuts `text` to at most `maxPreviewBytes` UTF-8 bytes, on a Unicode scalar boundary.
-    public static func truncatedPreview(_ text: String) -> String {
-        guard text.utf8.count > maxPreviewBytes else { return text }
+    /// Cuts `text` to at most `maxBytes` UTF-8 bytes (default `maxPreviewBytes`), on a Unicode scalar boundary.
+    public static func truncatedPreview(_ text: String, maxBytes: Int = maxPreviewBytes) -> String {
+        guard text.utf8.count > maxBytes else { return text }
         var used = 0
         var out = String.UnicodeScalarView()
         for scalar in text.unicodeScalars {
             let n = String(scalar).utf8.count
-            if used + n > maxPreviewBytes { break }
+            if used + n > maxBytes { break }
             used += n
             out.append(scalar)
         }
         return String(out)
+    }
+
+    /// Pure helper for the host's oversize rule (PROTOCOL.md section 6): returns a copy whose preview is cut to
+    /// `maxBytes`, or omitted when `maxBytes` is nil.
+    public func withPreviewLimit(_ maxBytes: Int?) -> PendingItem {
+        var copy = self
+        guard let maxBytes else { copy.toolInputPreview = nil; return copy }
+        copy.toolInputPreview = toolInputPreview.map { Self.truncatedPreview($0, maxBytes: maxBytes) }
+        return copy
     }
 }
 

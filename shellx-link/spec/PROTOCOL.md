@@ -40,12 +40,16 @@ A frame is one UTF-8 JSON object:
 - `v` is the integer protocol version (1). `t` is the message type string.
 - Field names are `snake_case`. Optional fields that have no value are omitted, never `null`.
 - Receivers MUST ignore unknown fields. Senders MUST NOT rely on key order or whitespace.
-- Integers are JSON numbers without fraction or exponent. `nonce` is an unsigned 64-bit
-  integer (0 to 18446744073709551615); implementations MUST NOT parse it through a double.
-- Maximum frame size is 65 519 bytes: the UTF-8 byte length of the JSON text (65 535, the
-  Noise maximum, minus the 16-byte tag). A larger frame MUST be rejected on encode and on
-  decode (`frameTooLarge`). A sender whose content does not fit MUST shrink the content.
-- Decoding order: (1) size check, (2) parse as an object with integer `v` and string `t`,
+- Integers are JSON numbers without fraction or exponent. `nonce` is a plain JSON number holding an
+  unsigned 64-bit integer (0 to 18446744073709551615); implementations MUST parse it as an
+  integer and MUST NOT parse it through a double. (It is not carried as a string.)
+- `v` MUST be a JSON integer token. `1.0`, `1e0`, `"1"`, `true` and any other non-integer are
+  `bad_json` (not `wrong_version`); only a well-formed integer other than 1 is `wrong_version`.
+  `welcome.protocol_version` is always equal to the frame `v`, which is 1 in this version.
+- Maximum frame size is 65 519 bytes: the UTF-8 byte length (not the character count) of the JSON text (65 535, the
+  Noise maximum, minus the 16-byte tag). A frame of exactly 65 519 bytes is valid, 65 520 is not. A larger frame MUST be rejected on encode and on
+  decode (`frame_too_large`). A sender whose content does not fit MUST shrink the content.
+- Decoding order: (1) size check, (2) parse as an object with integer-token `v` and string `t`,
   else `bad_json`; (3) `v` != 1 gives `wrong_version`; (4) if `t` is unknown, the frame is
   `unknown` and is ignored (forward compatibility); (5) if `t` is known but a field is
   missing or has the wrong type or an unlisted enum value, `bad_json`. A known `t` never
@@ -112,20 +116,77 @@ A request is resolved at most once. For an `agent.reply`:
 Resending the same reply is therefore always safe. After `delivered` or `already_handled`
 the item is no longer pending, which clients also learn through `agent.changed`.
 
-## 6. Preview truncation
+## 6. Preview truncation and oversize frames
 
-`tool_input_preview` is cut by the host to at most 8192 UTF-8 bytes. The cut falls on a
+`tool_input_preview` is cut by the host to at most 8192 UTF-8 bytes. Every cut falls on a
 Unicode scalar boundary: the result is valid UTF-8, never a split character. The client treats
 the preview as display text only, not as the complete tool input.
 
-## 7. Golden vectors
+Several items of 8 KiB previews can overflow the frame limit (eight already do). If an
+`agent.snapshot` or `agent.changed` frame would exceed 65 519 bytes, the host shrinks the
+previews in steps and re-encodes after each step, stopping at the first that fits:
+
+1. every `tool_input_preview` truncated to at most 8192 bytes;
+2. every `tool_input_preview` truncated to at most 1024 bytes;
+3. `tool_input_preview` omitted on every item.
+
+If the frame still does not fit after step 3, the host MUST NOT send it; it logs the failure
+(a client recovers through `agent.snapshot.get`, which the host answers with the same rule).
+Splitting one logical message into several frames is not defined in v1.
+
+## 7. Error handling and session phases
+
+Phases: after the handshake the session is *pre-hello*; it becomes *established* when the host
+sends `welcome`.
+
+| Phase | Client may send | Host may send |
+| --- | --- | --- |
+| pre-hello | `hello` only | `error` only |
+| established | everything except `hello` | everything except `welcome` |
+
+`ping`/`pong` are valid only when established. A `hello` or `welcome` received in the wrong
+phase is a protocol violation, handled like any other unexpected frame below.
+
+Rules:
+
+- **Undecodable frame** (`bad_json` or `frame_too_large`): received by the host, it replies
+  `error` with code `bad_request` and keeps the session. Received by the client, it drops the
+  frame and logs it.
+- **`wrong_version`**: the host sends `error` code `protocol_mismatch` and then closes the
+  connection. A client that receives `error` `protocol_mismatch` closes the connection and tells
+  the user to update the app.
+- **First frame is not `hello`**: the host sends `error` code `bad_request` and then closes.
+- **Unknown `t`**: ignored by both sides, session kept.
+- A frame that decodes but is not allowed in the current phase or direction (for example a
+  client sending `welcome`) is ignored; the host MAY answer `error` `bad_request`.
+
+## 8. Golden vectors
 
 `spec/vectors/messages.json` holds:
 
 - `vectors`: `{name, message, json}`. Decoding `json` MUST give `message`; encoding `message`
   MUST give JSON semantically equal to `json`.
 - `decode_only`: decoding `json` MUST give `message` (unknown type, unknown fields).
-- `decode_errors`: decoding `json` MUST fail with the named error (`wrong_version`, `bad_json`).
+- `decode_errors`: decoding `json` (or the raw text `json_text`, used where the exact number or
+  string token matters) MUST fail with the named error (`wrong_version`, `bad_json`, `frame_too_large`).
+- `boundary_frames`: generated frames. Frame text = `prefix` + filler + `suffix`, where filler is
+  each `{text, count}` repeated and concatenated. Entries check exactly 65 519 bytes (accepted),
+  65 520 bytes (`frame_too_large`) and multi-byte content whose byte count exceeds the limit while
+  its character count does not. Encoding the `error` message with that filler as `message` must
+  succeed or fail the same way.
 
-`message.case` names the message (`snapshot_get`, `reply_result`, ... in snake_case); the other
-`message` keys use the JSON field names.
+`message.case` names the message; the other `message` keys use the JSON field names. All 11 cases:
+
+| `message.case` | Wire `t` | Other keys |
+| --- | --- | --- |
+| `hello` | `hello` | `client_version`, `device_name` |
+| `welcome` | `welcome` | `protocol_version`, `host_version`, `machine_name` |
+| `error` | `error` | `code`, `message` |
+| `snapshot_get` | `agent.snapshot.get` | none |
+| `snapshot` | `agent.snapshot` | `revision`, `pending` |
+| `changed` | `agent.changed` | `revision`, `added`, `resolved` |
+| `reply` | `agent.reply` | `request_id`, `mode` |
+| `reply_result` | `agent.reply.result` | `request_id`, `outcome` |
+| `ping` | `ping` | `nonce` |
+| `pong` | `pong` | `nonce` |
+| `unknown` | any unrecognized `t` | `type` (the `t` value); decode-only |
