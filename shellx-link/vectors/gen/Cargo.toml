@@ -1,0 +1,14 @@
+[package]
+name = "shellx-link-noise-vectors"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "MIT"
+description = "Generates shellx-link/vectors/noise_xx.json with snow, the reference the Swift Noise code is checked against."
+
+# Standalone crate: not a member of any parent workspace.
+[workspace]
+
+[dependencies]
+# Pinned to the version cmux-tui/Cargo.lock uses; Cargo.lock in this directory locks it.
+snow = "=0.10.0"
