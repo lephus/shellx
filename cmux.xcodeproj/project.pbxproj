@@ -3328,6 +3328,7 @@
 		C1ADE50002A1B2C3D4E5F719 /* shellx-hermes-python-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE50001A1B2C3D4E5F719 /* shellx-hermes-python-wrapper */; };
 		C1ADE70002A1B2C3D4E5F719 /* shellx-pi-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE70001A1B2C3D4E5F719 /* shellx-pi-wrapper */; };
 		96351C316291EC669B8DF2DC /* ShellXAboutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157337FA38DA052318228A89 /* ShellXAboutTests.swift */; };
+		96EE12720D113E7977F5F9EA /* ShellXAccountFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295A85AF91308E67CE53B162 /* ShellXAccountFlow.swift */; };
 		5E11A00000000000000000A2 /* ShellXBrand in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000A1 /* ShellXBrand */; };
 		5E11A00000000000000000A3 /* ShellXBrand in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000A1 /* ShellXBrand */; };
 		1A8C19D1252050EBAB35B5D1 /* ShellXCloudOffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71099E791FDFEEBC0898FEAB /* ShellXCloudOffTests.swift */; };
@@ -7905,6 +7906,7 @@
 		C1ADE50001A1B2C3D4E5F719 /* shellx-hermes-python-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-hermes-python-wrapper"; sourceTree = SOURCE_ROOT; };
 		C1ADE70001A1B2C3D4E5F719 /* shellx-pi-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-pi-wrapper"; sourceTree = SOURCE_ROOT; };
 		157337FA38DA052318228A89 /* ShellXAboutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXAboutTests.swift"; sourceTree = "<group>"; };
+		295A85AF91308E67CE53B162 /* ShellXAccountFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/ShellXAccountFlow.swift; sourceTree = "<group>"; };
 		71099E791FDFEEBC0898FEAB /* ShellXCloudOffTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXCloudOffTests.swift"; sourceTree = "<group>"; };
 		26ED4CBA5E356DC862332C80 /* ShellXCoreFFI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/ShellXCoreFFI.swift; sourceTree = "<group>"; };
 		B9FE6EA47AFDBBF1DED049CD /* ShellXCoreFFITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXCoreFFITests.swift"; sourceTree = "<group>"; };
@@ -12398,6 +12400,7 @@
 				899EDFB4688088904AEC67B4 /* RightSidebarMode+ProductFeature.swift */,
 				34F76A7191862A9BFADE3869 /* PostHogContextCalls.swift */,
 				30AA2D44945B6C4A24A6D837 /* TerminalController+BrowserEmulation.swift */,
+				295A85AF91308E67CE53B162 /* ShellXAccountFlow.swift */,
 				AE04344F1F44FBBC99583161 /* ShellXSwitches.swift */,
 				1123DE0D564CD722CC853FA0 /* ShellXSidebarHeaderRow.swift */,
 				82421054CBFF9ECFC3CA2E2B /* ShellXSidebarIcon.swift */,
@@ -16639,6 +16642,7 @@
 				F0ACC0DE0000000000000011 /* SharedLiveAgentIndex.swift in Sources */,
 				F0ACC0DE0000000000000007 /* SharedLiveAgentIndexLoader.swift in Sources */,
 				121580061215800612158006 /* SharedLiveAgentIndexRefreshOutcome.swift in Sources */,
+				96EE12720D113E7977F5F9EA /* ShellXAccountFlow.swift in Sources */,
 				8825E0A1CFB96235256FD162 /* ShellXCoreFFI.swift in Sources */,
 				067A3A09F525B237CBC042CE /* ShellXPhoneHandoffPopover.swift in Sources */,
 				1EA4DF7B949BB6F40EA075E6 /* ShellXQRCode.swift in Sources */,
