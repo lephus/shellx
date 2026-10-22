@@ -9,7 +9,9 @@ every implementation (Swift, Rust, Kotlin). Key words MUST / MUST NOT / MAY are 
 - The peers share a `cmux-relay` circuit using the `Single` framing. The relay forwards bytes
   and is not trusted.
 - Every binary WebSocket message carries exactly one Noise message (handshake or transport).
-  Text WebSocket messages MUST NOT be used.
+  The two Link peers MUST NOT send each other text WebSocket messages. Text messages on the
+  circuit are the relay's own control messages (`ping`, answered with `pong`, and `error`);
+  they are not Link frames and are outside this protocol.
 - A Noise transport message holds exactly one JSON frame (section 3). Frames are never split
   across, or batched into, Noise messages.
 
@@ -74,9 +76,15 @@ A frame is one UTF-8 JSON object:
 Error codes in use: `protocol_mismatch`, `bad_request`. Others MAY be added; receivers treat
 an unrecognized code as a generic error.
 
-`revision` increases by at least 1 on every change of the pending set. A client applying
-`agent.changed` whose `revision` is not exactly the previous revision + 1 MUST send
-`agent.snapshot.get`.
+`revision` counts changes of the pending set. A host MUST raise it by exactly 1 with each
+`agent.changed`, and an `agent.snapshot` at revision r includes every change up to r. A client
+keeps the revision of the last snapshot or change it applied (its current revision), and for
+each `agent.changed`:
+
+- `revision` at or below the current one: it ignores the change, which it already has (for
+  example from a snapshot taken after the change);
+- `revision` exactly current + 1: it applies the change;
+- `revision` above current + 1: it missed a change and MUST send `agent.snapshot.get`.
 
 ### PendingItem
 
@@ -106,15 +114,28 @@ connection. The host's `error` frame always uses `v` 1.
 
 ### Idempotent `agent.reply`
 
-A request is resolved at most once. For an `agent.reply`:
+A request is resolved at most once. For an `agent.reply`, the first rule that matches applies:
 
-- `request_id` pending: the host resolves it and answers `delivered`.
-- `request_id` already resolved (by this or another client, or on the Mac): the host MUST NOT
-  resolve it again and answers `already_handled`.
-- `request_id` never seen (or forgotten): the host answers `unknown`.
+1. `request_id` never seen (or forgotten): the host answers `unknown`.
+2. `request_id` no longer pending (resolved by this or another client or on the Mac, or
+   expired): the host MUST NOT resolve it again and answers `already_handled`.
+3. A request that is not a permission, or a `mode` this agent does not offer for the request:
+   the host answers `unknown` and leaves the item as it was.
+4. No agent is waiting for the request any more (the agent stopped waiting, or the host
+   restarted since the request arrived): nothing can take the decision. The host marks the
+   item expired, not resolved, and answers `already_handled`.
+5. Otherwise the host gives the waiting agent this decision and answers `delivered`, which
+   means a waiting agent took this decision. When another client or the Mac took the agent's
+   decision first, the host answers `already_handled` instead.
 
-Resending the same reply is therefore always safe. After `delivered` or `already_handled`
-the item is no longer pending, which clients also learn through `agent.changed`.
+A host MUST answer the `agent.reply` messages for one `request_id` in the order they arrived.
+Replies to different requests may be answered in any order.
+
+Resending the same reply is therefore always safe. After `delivered` or `already_handled` the
+item is no longer pending: in every case it leaves the pending set, and clients learn that
+through an `agent.changed` that lists its `request_id` in `resolved` (or from a later
+snapshot). The host does not order that change against the `agent.reply.result`: either may
+arrive first.
 
 ## 6. Preview truncation and oversize frames
 
