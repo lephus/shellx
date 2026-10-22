@@ -2,13 +2,21 @@ import Foundation
 
 /// A relay ticket minted for one slot by the ShellX API: a register ticket for the host, a
 /// connect ticket for a client. The relay checks the signature, scope and expiry.
-public struct RelayTicket: Sendable {
+///
+/// The ticket is a bearer secret: its descriptions and its mirror (what `dump` prints) leave it out.
+public struct RelayTicket: Sendable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     public var ticket: String
     public var expiresAtUnix: Int64
 
     public init(ticket: String, expiresAtUnix: Int64) {
         self.ticket = ticket
         self.expiresAtUnix = expiresAtUnix
+    }
+
+    public var description: String { "RelayTicket(expires: \(expiresAtUnix), <redacted>)" }
+    public var debugDescription: String { description }
+    public var customMirror: Mirror {
+        Mirror(self, children: ["ticket": "<redacted>", "expiresAtUnix": expiresAtUnix], displayStyle: .struct)
     }
 }
 
