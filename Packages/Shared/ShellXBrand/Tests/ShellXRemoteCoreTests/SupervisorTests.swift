@@ -584,7 +584,10 @@ private let statusUp = Data(#"{"daemon_name":"Phu's Mac","daemon_fingerprint":"f
     }
     // A child that ignores SIGTERM (the ignore survives exec) dies by SIGKILL after the grace period. It says
     // `ready` once its trap is set, so a slow machine cannot deliver the SIGTERM before the trap exists.
-    #expect(try await exitStatus(["-c", "trap '' TERM; echo ready; exec /bin/sleep 30"], "/bin/sh", untilReady: true) == SIGKILL)
+    let started = ContinuousClock.now
+    let killed = try await exitStatus(["-c", "trap '' TERM; echo ready; exec /bin/sleep 30"], "/bin/sh", untilReady: true)
+    #expect(killed == SIGKILL, "exit status \(killed) after \(ContinuousClock.now - started) (SIGTERM is \(SIGTERM); -1: no exit within 10 s)")
     // A normal child dies by SIGTERM.
-    #expect(try await exitStatus(["30"], "/bin/sleep") == SIGTERM)
+    let termed = try await exitStatus(["30"], "/bin/sleep")
+    #expect(termed == SIGTERM, "exit status \(termed)")
 }
