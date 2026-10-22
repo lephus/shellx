@@ -105,6 +105,7 @@ final class NoiseTests: XCTestCase {
         }
         XCTAssertEqual(seenByInitiator.keys, [rKey.publicKey])
         XCTAssertFalse(initiator.isComplete)
+        XCTAssertNil(initiator.remoteStatic, "a rejected key is not kept")
         XCTAssertThrowsError(try initiator.writeMessage(payload: Data()), "failed handshake stays dead")
 
         // Responder distrusts the initiator: rejected while reading message 3.
@@ -117,6 +118,7 @@ final class NoiseTests: XCTestCase {
             XCTAssertEqual(error as? NoiseError, .untrustedPeer)
         }
         XCTAssertFalse(responder2.isComplete)
+        XCTAssertNil(responder2.remoteStatic, "a rejected key is not kept")
         XCTAssertThrowsError(try responder2.split())
     }
 
@@ -145,8 +147,25 @@ final class NoiseTests: XCTestCase {
         XCTAssertThrowsError(try initiator.readMessage(message2)) { error in
             XCTAssertEqual(error as? NoiseError, .decryptFailed)
         }
+        XCTAssertNil(initiator.remoteStatic)
+
+        // Handshake: `s` decrypts and is trusted, but the payload tag fails. The key in `s` was never
+        // proven (an active attacker who completed `ee` can put any trusted key there), so it is dropped.
+        let trustedKey = NoiseStaticKey()
+        var initiator2 = NoiseHandshake(role: .initiator, local: NoiseStaticKey(), trusts: { _ in true })
+        var responder2 = NoiseHandshake(role: .responder, local: trustedKey, trusts: { _ in true })
+        _ = try responder2.readMessage(initiator2.writeMessage(payload: Data()))
+        var message2b = try responder2.writeMessage(payload: Data("hello-r".utf8))
+        message2b[message2b.count - 1] ^= 0x01
+        XCTAssertThrowsError(try initiator2.readMessage(message2b)) { error in
+            XCTAssertEqual(error as? NoiseError, .decryptFailed)
+        }
+        XCTAssertNil(initiator2.remoteStatic)
+        XCTAssertFalse(initiator2.isComplete)
     }
 
+    /// Checks that the counter advances per frame and gates ordering. The little-endian byte order
+    /// itself is pinned by `testMatchesSnowVectors` (frames at nonce 1 differ under big-endian).
     func testNonceIncrementsLittleEndianCounter() throws {
         var pair = try Pair.handshake(initiator: NoiseStaticKey(), responder: NoiseStaticKey())
         var iTransport = try pair.initiator.split()

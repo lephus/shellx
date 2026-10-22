@@ -36,10 +36,17 @@ public struct NoiseHandshake: Sendable {
     private var failed = false
     private var didSplit = false
 
-    /// The peer's static public key, once its handshake message carrying `s` has been read.
+    /// The peer's static public key.
+    ///
+    /// Authenticated only once `isComplete` is true. Before that it is the value decrypted from `s`,
+    /// which the peer has not yet proven it owns (that proof is `es`/`se` plus the payload tag).
+    /// It is cleared when the handshake fails, so a rejected or forged key is never reported.
     public private(set) var remoteStatic: Data?
 
-    /// - Parameter ephemeralForTesting: a fixed ephemeral key, for test vectors only.
+    /// - Parameter ephemeralForTesting: a fixed ephemeral key, for known-answer test vectors only.
+    ///   **Never pass this in production.** A fixed ephemeral makes every session with the same
+    ///   peer derive the same transport keys, so nonces repeat under one key and ChaChaPoly's
+    ///   confidentiality and integrity are lost; it also removes forward secrecy.
     public init(
         role: NoiseRole,
         local: NoiseStaticKey,
@@ -138,6 +145,8 @@ public struct NoiseHandshake: Sendable {
         } catch {
             failed = true
             localEphemeral = nil
+            // `s` may have decrypted before the failure without the peer proving ownership.
+            remoteStatic = nil
             throw (error as? NoiseError) ?? NoiseError.badMessage
         }
     }
