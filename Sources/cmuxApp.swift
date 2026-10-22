@@ -209,7 +209,8 @@ struct cmuxApp: App {
             jsonStore: JSONConfigStore(fileURL: configFileURL),
             secretStore: secretStore,
             errorLog: SettingsErrorLog(),
-            accountFlow: authComposition.accountFlow,
+            // ShellX: the ShellX account, not the Manaflow sign-in (off for good).
+            accountFlow: ShellXAccountFlow.shared,
             hostActions: hostSettingsActions,
             shortcutDefaultResolver: Self.makeShortcutDefaultResolver()
         )

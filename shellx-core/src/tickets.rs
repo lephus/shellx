@@ -32,6 +32,11 @@ pub fn mint(agent: &ureq::Agent, cfg: &Config, store: &StateStore, params: &Valu
     if permission == "connect" && target.is_none() {
         return Err(CoreError::invalid_params("target_machine_id is required for connect"));
     }
+    let lane = match params.get("lane") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(l)) if l == "link" => Some("link"),
+        Some(_) => return Err(CoreError::invalid_params("lane must be \"link\" or absent")),
+    };
     let write_to = match params.get("write_to") {
         None | Some(Value::Null) => None,
         Some(Value::String(w)) => Some(w.as_str()),
@@ -43,7 +48,11 @@ pub fn mint(agent: &ureq::Agent, cfg: &Config, store: &StateStore, params: &Valu
     }
     let target_name = write_to.map(|w| format!("tickets/{w}"));
     let m = require_machine(store)?;
-    let body = serde_json::to_vec(&MintRequest { machine_id: &m.machine_id, permission, target_machine_id: target })
+    // A relay that predates ShellX Link ignores `lane` and would mint a cmux-slot ticket: never ask it.
+    if lane.is_some() && m.link_slot.is_none() {
+        return Err(CoreError::new("not_registered", "machines.register must be called again to get a link_slot"));
+    }
+    let body = serde_json::to_vec(&MintRequest { machine_id: &m.machine_id, permission, target_machine_id: target, lane })
         .map_err(|_| CoreError::invalid_params("mint body is not serializable"))?;
     let session = auth::load_session(store)?
         .ok_or_else(|| CoreError::new("not_logged_in", "auth.login has not been called"))?;

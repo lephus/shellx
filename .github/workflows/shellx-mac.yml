@@ -26,6 +26,7 @@ name: shellx-mac
 on:
   push:
     branches:
+      - develop
       - "shellx/**"
     paths-ignore:
       - "relay/**"
@@ -70,7 +71,14 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
+          # Tests in the `manual` lane of tests/test-execution.toml are end-to-end harnesses (share links,
+          # remote) that need toolchains this step does not set up; their own verification runs them.
+          manual="$(python3 -c 'import sys; sys.path.insert(0, "scripts/ci"); from pathlib import Path; from test_execution_registry import load_registry; print("\n".join(str(t["path"]) for t in load_registry(Path("tests/test-execution.toml")) if t.get("lane") == "manual"))')"
           for test in tests/test_shellx_*.py; do
+            if grep -qxF "$test" <<< "$manual"; then
+              echo "skip $test (manual lane in tests/test-execution.toml)"
+              continue
+            fi
             echo "::group::$test"
             python3 "$test"
             echo "::endgroup::"

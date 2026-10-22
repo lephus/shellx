@@ -1,4 +1,5 @@
 import Foundation
+import SystemConfiguration
 import ShellXBrand
 import ShellXRemoteCore
 
@@ -37,15 +38,28 @@ extension ShellXRemoteEnvironment {
             #endif
             return nil
         }()
-        // The host name is only looked up when the feature can run.
-        let hostName = ShellXRemoteGate.isEnabled ? (Host.current().localizedName ?? processInfo.hostName) : ShellXBrand.appName
+        // The host name is only looked up when the feature can run. With it off, Settings → Account can still
+        // sign in, so the device gets the Mac's computer name (a local read, unlike `Host.current()`).
+        let hostName = ShellXRemoteGate.isEnabled
+            ? (Host.current().localizedName ?? processInfo.hostName)
+            : (SCDynamicStoreCopyComputerName(nil, nil) as String? ?? ShellXBrand.appName)
         let system = processInfo.operatingSystemVersion
         let device = ShellXRemoteDevice(
             machineName: ShellXRemoteDevice.machineName(base: hostName, bundleID: bundleID),
             appVersion: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0",
             osVersion: "\(system.majorVersion).\(system.minorVersion).\(system.patchVersion)")
+        let core = ShellXCoreClient(ShellXCoreFFI.shared)
+        // ShellX Link (P1 spike): the agent Feed for phones. The service starts it only with the gate on and
+        // a `link_slot` from `machines.register`.
+        let linkHost = ShellXLinkHostController(
+            core: core,
+            keys: ShellXLinkKeyStore(directory: ShellXLinkKeyStore.defaultDirectory(
+                home: FileManager.default.homeDirectoryForCurrentUser)),
+            feed: ShellXLinkFeedSource(coordinator: .shared),
+            hostVersion: device.appVersion,
+            machineName: device.machineName)
         return ShellXRemoteEnvironment(
-            core: ShellXCoreClient(ShellXCoreFFI.shared),
+            core: core,
             launcher: ShellXSidecarProcess(),
             clock: SystemRemoteClock(),
             paths: RemotePaths(bundleID: bundleID, home: FileManager.default.homeDirectoryForCurrentUser,
@@ -56,7 +70,8 @@ extension ShellXRemoteEnvironment {
             gateEnabled: { ShellXRemoteGate.isEnabled },
             devCredentials: devCredentials,
             bridge: ShellXAppBridgeController(),
-            workspaceOpener: ShellXTabWorkspaceOpener())
+            workspaceOpener: ShellXTabWorkspaceOpener(),
+            linkHost: linkHost)
     }
 }
 

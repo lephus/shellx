@@ -4,13 +4,14 @@ name: shellx-mac-unit
 # (ShellX*.swift). They need the `cmux-unit` scheme, a full app plus test-host
 # compile that takes about an hour cold, so it is too heavy to run on every push
 # (and never runs on the maintainer's Mac). Run it by hand with workflow_dispatch
-# (input `suites`), or push to shellx/** with `[unit]` in the head commit message.
+# (input `suites`), or push to develop or shellx/** with `[unit]` in the head commit message.
 # Setup mirrors shellx-mac.yml; DerivedData uses its own cache key prefix because
 # test builds differ from app builds.
 
 on:
   push:
     branches:
+      - develop
       - "shellx/**"
     paths-ignore:
       - "relay/**"

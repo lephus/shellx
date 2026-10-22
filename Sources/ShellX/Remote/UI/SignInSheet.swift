@@ -155,13 +155,21 @@ final class SignInSheetPresenter {
     private init() {}
 
     func present(service: any ShellXRemoteServicing, preferredWindow: NSWindow? = nil) {
+        present(preferredWindow: preferredWindow) { email, password in
+            try await service.signIn(email: email, password: password)
+        }
+    }
+
+    /// The same sheet for any sign-in, such as Settings → Account's `ShellXAccount`.
+    func present(
+        preferredWindow: NSWindow? = nil,
+        signIn: @escaping @MainActor (String, String) async throws -> Void
+    ) {
         if let window = sheet?.window {
             (hostWindow ?? window).makeKeyAndOrderFront(nil)
             return
         }
-        let model = SignInSheetModel { email, password in
-            try await service.signIn(email: email, password: password)
-        }
+        let model = SignInSheetModel(signIn: signIn)
         model.onFinished = { [weak self] _ in self?.dismiss() }
         let sheet = CloudSheetWindow(rootView: SignInSheet(model: model))
         let window = sheet.window
