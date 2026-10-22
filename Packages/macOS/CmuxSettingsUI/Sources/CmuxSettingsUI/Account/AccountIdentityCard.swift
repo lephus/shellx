@@ -90,6 +90,9 @@ struct AccountIdentityCard: View {
 
     private var subtitleText: String? {
         if let identity = flow?.currentIdentity {
+            if identity.displayName.isEmpty, let detail = identity.detail {
+                return detail
+            }
             // Legacy AuthSettingsRow returns authManager.currentUser?.displayName
             // directly. Pass the raw value through (including empty strings) so
             // the row shape matches when displayName is set to "".

@@ -18,7 +18,21 @@ final class ShellXAccountFlow: AccountFlow {
     }
 
     var currentIdentity: AccountIdentity? {
-        account.identity.map { AccountIdentity(id: $0.userID, displayName: "", email: $0.email) }
+        account.identity.map { identity in
+            AccountIdentity(
+                id: identity.userID,
+                displayName: "",
+                email: identity.email,
+                detail: identity.signedInAt.map(Self.lastSignInText)
+            )
+        }
+    }
+
+    private static func lastSignInText(_ date: Date) -> String {
+        String(
+            format: String(localized: "settings.account.lastSignIn", defaultValue: "Last signed in %@"),
+            date.formatted(date: .abbreviated, time: .shortened)
+        )
     }
 
     var isWorkingOnAuth: Bool { account.isWorking }

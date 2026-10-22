@@ -12,7 +12,9 @@ import Testing
     try await account.signIn(email: "dev@shellx.test", password: "pw")
     #expect(rig.core.methods == ["config.set", "auth.login"])
     #expect(rig.core.lastParams("auth.login") == ["email": .string("dev@shellx.test"), "password": .string("pw")])
-    #expect(account.identity == ShellXAccount.Identity(userID: "u_1", email: "dev@shellx.test"))
+    #expect(account.identity?.userID == "u_1")
+    #expect(account.identity?.email == "dev@shellx.test")
+    #expect(account.identity?.signedInAt != nil)
     // Only the account: no host, bridge or remote session starts.
     #expect(rig.launcher.calls.isEmpty)
     #expect(rig.bridge.starts.get().isEmpty)
@@ -30,9 +32,11 @@ import Testing
 
 @MainActor @Test func accountIdentitySurvivesRelaunch() async throws {
     let rig = ServiceRig(gate: false, signedIn: false)
-    try await ShellXAccount(service: rig.service).signIn(email: "dev@shellx.test", password: "pw")
+    let account = ShellXAccount(service: rig.service)
+    try await account.signIn(email: "dev@shellx.test", password: "pw")
     let relaunched = ShellXAccount(service: rig.service)
-    #expect(relaunched.identity == ShellXAccount.Identity(userID: "u_1", email: "dev@shellx.test"))
+    #expect(relaunched.identity == account.identity)
+    #expect(relaunched.identity?.signedInAt != nil)
 }
 
 @MainActor @Test func accountSignOutLogsOutEvenAfterRelaunch() async throws {
@@ -57,7 +61,8 @@ import Testing
     let rig = ServiceRig(signedIn: false)
     let account = ShellXAccount(service: rig.service)
     try await account.signIn(email: "dev@shellx.test", password: "pw")
-    #expect(account.identity == ShellXAccount.Identity(userID: "u_1", email: "dev@shellx.test"))
+    #expect(account.identity?.userID == "u_1")
+    #expect(account.identity?.email == "dev@shellx.test")
     #expect(rig.service.isSignedIn)
     #expect(await until { rig.service.hostState == rig.hostConnected })
 
