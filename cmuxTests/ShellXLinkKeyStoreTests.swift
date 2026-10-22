@@ -32,6 +32,8 @@ struct ShellXLinkKeyStoreTests {
         #expect(again.publicKey == first.publicKey)
         #expect(try Self.mode(directory.appendingPathComponent("host-key")) == 0o600)
         #expect(try Self.mode(directory) == 0o700)
+        // The private temporary file the key was written through is gone.
+        #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["host-key"])
     }
 
     @Test func trustedClientsPersistAcrossInstances() throws {

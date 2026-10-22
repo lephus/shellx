@@ -72,8 +72,9 @@ final class ShellXLinkKeyStore: Sendable {
     private func createHostKey() throws -> NoiseStaticKey {
         let candidate = NoiseStaticKey()
         let temporary = directory.appendingPathComponent("host-key.\(UUID().uuidString).tmp", isDirectory: false)
-        try OwnerOnlyFile.write(candidate.rawPrivate, to: temporary)
+        // Registered first: `write` can throw after its rename (the directory fsync) and leave this file.
         defer { unlink(temporary.path) }
+        try OwnerOnlyFile.write(candidate.rawPrivate, to: temporary)
         if link(temporary.path, hostKeyURL.path) == 0 { return candidate }
         let code = errno
         guard code == EEXIST, let existing = try readHostKey() else {
