@@ -219,16 +219,45 @@ struct ShellXLinkFeedSourceTests {
 }
 
 extension ShellXLinkFeedSourceTests {
-    /// A pending card with no hook waiting (restored from the Feed log after a relaunch): nothing would
-    /// receive the phone's decision, so the phone hears `already_handled` and the card keeps its state.
-    @Test func testReplyWithoutWaiterIsAlreadyHandled() async {
+    /// A pending card with no hook waiting (restored from the Feed log after a relaunch, or pushed without
+    /// a wait): nothing would receive the phone's decision. The phone hears `already_handled`, and the card
+    /// expires instead of recording a decision no agent got, so it leaves every phone's pending set.
+    @Test func testReplyWithoutWaiterIsAlreadyHandled() async throws {
         let (store, source) = await MainActor.run { Self.makeSource() }
+        let seen = ChangeRecorder()
+        let stream = source.changes()
+        let consumer = Task { for await change in stream { seen.record(change) } }
+        defer { consumer.cancel() }
+        // The subscription registers on the main actor; a snapshot hop orders it before the ingest.
+        _ = await source.snapshot()
         await MainActor.run { store.ingest(Self.permission("orphan-1")) }
+        #expect(await Self.waitUntil { seen.added.contains("orphan-1") })
+        let addedRevision = try #require(seen.changes.last?.revision)
 
-        #expect(await source.reply(requestId: "orphan-1", mode: .deny) == .alreadyHandled)
+        // One main-actor turn: the reply, then the state it left before any other code ran.
+        let (outcome, statusAtReturn) = await MainActor.run { () -> (ReplyOutcome, WorkstreamStatus?) in
+            let outcome = source.resolveReply(requestId: "orphan-1", mode: .deny)
+            return (outcome, store.items.first { $0.payload.requestID == "orphan-1" }?.status)
+        }
 
+        #expect(outcome == .alreadyHandled)
+        guard case .expired? = statusAtReturn else {
+            Issue.record("no agent received a decision, so the card must expire: \(String(describing: statusAtReturn))")
+            return
+        }
+        // Published by the reply itself: no snapshot runs before the phone hears the card left.
+        #expect(await Self.waitUntil { seen.resolved.contains("orphan-1") })
+        let change = seen.changes.first { $0.resolved.contains("orphan-1") }
+        #expect(change?.revision == addedRevision + 1)
+        #expect(change?.added.isEmpty == true)
+        #expect(await source.snapshot().pending.map(\.requestId).contains("orphan-1") == false)
+        // A resend is answered and changes nothing.
+        #expect(await source.reply(requestId: "orphan-1", mode: .once) == .alreadyHandled)
         let status = await MainActor.run { store.items.first { $0.payload.requestID == "orphan-1" }?.status }
-        #expect(status == .pending)
+        guard case .expired? = status else {
+            Issue.record("a resend must not resolve the expired card: \(String(describing: status))")
+            return
+        }
     }
 
     /// Another entry point (`feed.permission.reply` on a socket thread, a notification action) wins the
@@ -318,4 +347,25 @@ private final class RevisionRecorder: @unchecked Sendable {
     private var recorded: [Int] = []
     func record(_ value: Int) { lock.lock(); recorded.append(value); lock.unlock() }
     var values: [Int] { lock.lock(); defer { lock.unlock() }; return recorded }
+}
+
+/// The changes one subscriber received, by request id, filled by its consumer task.
+private final class ChangeRecorder: @unchecked Sendable {
+    struct Change {
+        let revision: Int
+        let added: [String]
+        let resolved: [String]
+    }
+
+    private let lock = NSLock()
+    private var recorded: [Change] = []
+
+    func record(_ change: ShellXLinkFeedSource.Change) {
+        let entry = Change(revision: change.revision, added: change.added.map(\.requestId), resolved: change.resolved)
+        lock.lock(); recorded.append(entry); lock.unlock()
+    }
+
+    var changes: [Change] { lock.lock(); defer { lock.unlock() }; return recorded }
+    var added: [String] { changes.flatMap(\.added) }
+    var resolved: [String] { changes.flatMap(\.resolved) }
 }
