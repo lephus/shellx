@@ -126,6 +126,7 @@ Giao thức (bản sửa `PROTOCOL.md` của P2), ngoài các mục ở trên:
   - lỗi đăng ký sau lần đầu hiện bị nuốt và thử lại mãi, không log, nên cần có mã lỗi và điểm dừng.
 
 Nhỏ, làm khi đụng tới:
+- Tập đang chờ của ShellX Link chưa lọc theo agent. Thẻ xin quyền của Codex (đẩy lên không chờ) cũng hiện trên điện thoại, và khi điện thoại trả lời thì thẻ đó hết hạn trên Mac, dù Codex vẫn chờ ở terminal. P2: lọc theo `agent` (v1 chỉ Claude Code) hoặc ẩn thẻ không có hook chờ.
 - `TerminalController` `feed.*.reply` vẫn trả `delivered:true` khi không hook nào nhận. Dùng giá trị Bool mới của `deliverReply`.
 - Thẻ khôi phục từ log mà không hook nào còn chờ được: cân nhắc cho hết hạn ngay lúc khởi động. Việc này đổi hành vi Feed của Mac.
 - Key store:

@@ -121,8 +121,9 @@ A request is resolved at most once. For an `agent.reply`, the first rule that ma
    expired): the host MUST NOT resolve it again and answers `already_handled`.
 3. A request that is not a permission, or a `mode` this agent does not offer for the request:
    the host answers `unknown` and leaves the item as it was.
-4. No agent is waiting for the request any more (the agent stopped waiting, or the host
-   restarted since the request arrived): nothing can take the decision. The host marks the
+4. No agent is waiting for the request any more (the agent stopped waiting, it never waited
+   because it sent the request without waiting, or the host restarted since the request
+   arrived): nothing can take the decision. The host marks the
    item expired, not resolved, and answers `already_handled`.
 5. Otherwise the host gives the waiting agent this decision and answers `delivered`, which
    means a waiting agent took this decision. When another client or the Mac took the agent's

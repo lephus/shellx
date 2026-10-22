@@ -22,9 +22,10 @@ public actor LinkClient {
     /// Every `agent.changed` from the host, in order. Single consumer. It finishes when the
     /// session ends.
     ///
-    /// Each change carries the host's `revision`. When it is not exactly the previous revision
-    /// + 1 (the previous one being the last change or snapshot the caller applied), the caller
-    /// must resync with `snapshot()` (PROTOCOL.md section 4).
+    /// Each change carries the host's `revision`. Compared with the revision of the last change or
+    /// snapshot the caller applied: at or below it, the caller already has the change and skips
+    /// it; exactly one above, it applies it; further above, it missed one and must resync with
+    /// `snapshot()` (PROTOCOL.md section 4).
     public nonisolated let changes: AsyncStream<(revision: Int, added: [PendingItem], resolved: [String])>
 
     private let changesContinuation: AsyncStream<Change>.Continuation
