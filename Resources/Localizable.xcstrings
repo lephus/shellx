@@ -316601,6 +316601,77 @@
         }
       }
     },
+    "settings.account.lastSignIn": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last signed in %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最終サインイン: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "마지막 로그인: %@"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Останній вхід: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次登录：%@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zuletzt angemeldet: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dernière connexion : %@"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "آخر تسجيل دخول: %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Último inicio de sesión: %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次登入：%@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đăng nhập gần nhất: %@"
+          }
+        }
+      }
+    },
     "settings.account.pro.activeSubtitle": {
       "extractionState": "manual",
       "localizations": {
@@ -317376,67 +317447,67 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sign in with your ShellX account to enable sync across devices."
+            "value": "Sign in with your ShellX account."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "ShellX アカウントでサインインするとデバイス間で同期できます。"
+            "value": "ShellX アカウントでサインインします。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "ShellX 계정으로 로그인하여 디바이스 간 동기화를 활성화하세요."
+            "value": "ShellX 계정으로 로그인하세요."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Увійдіть у свій обліковий запис ShellX, щоб синхронізувати пристрої."
+            "value": "Увійдіть у свій обліковий запис ShellX."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用 ShellX 账户登录，即可在多设备间同步。"
+            "value": "使用 ShellX 账户登录。"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Melden Sie sich mit Ihrem ShellX-Konto an, um die geräteübergreifende Synchronisierung zu aktivieren."
+            "value": "Melden Sie sich mit Ihrem ShellX-Konto an."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Connectez-vous avec votre compte ShellX pour activer la synchronisation entre vos appareils."
+            "value": "Connectez-vous avec votre compte ShellX."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "سجل الدخول بحساب ShellX الخاص بك لتمكين المزامنة عبر الأجهزة."
+            "value": "سجل الدخول بحساب ShellX الخاص بك."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Inicia sesión con tu cuenta de ShellX para habilitar la sincronización entre dispositivos."
+            "value": "Inicia sesión con tu cuenta de ShellX."
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "登入您的 ShellX 帳戶以啟用跨裝置同步。"
+            "value": "登入您的 ShellX 帳戶。"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Đăng nhập bằng tài khoản ShellX của bạn để bật đồng bộ giữa các thiết bị."
+            "value": "Đăng nhập bằng tài khoản ShellX của bạn."
           }
         }
       }

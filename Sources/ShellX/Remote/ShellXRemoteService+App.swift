@@ -1,4 +1,5 @@
 import Foundation
+import SystemConfiguration
 import ShellXBrand
 import ShellXRemoteCore
 
@@ -37,8 +38,11 @@ extension ShellXRemoteEnvironment {
             #endif
             return nil
         }()
-        // The host name is only looked up when the feature can run.
-        let hostName = ShellXRemoteGate.isEnabled ? (Host.current().localizedName ?? processInfo.hostName) : ShellXBrand.appName
+        // The host name is only looked up when the feature can run. With it off, Settings → Account can still
+        // sign in, so the device gets the Mac's computer name (a local read, unlike `Host.current()`).
+        let hostName = ShellXRemoteGate.isEnabled
+            ? (Host.current().localizedName ?? processInfo.hostName)
+            : (SCDynamicStoreCopyComputerName(nil, nil) as String? ?? ShellXBrand.appName)
         let system = processInfo.operatingSystemVersion
         let device = ShellXRemoteDevice(
             machineName: ShellXRemoteDevice.machineName(base: hostName, bundleID: bundleID),
