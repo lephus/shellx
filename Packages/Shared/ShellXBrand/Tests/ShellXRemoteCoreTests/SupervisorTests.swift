@@ -558,21 +558,33 @@ private let statusUp = Data(#"{"daemon_name":"Phu's Mac","daemon_fingerprint":"f
 
 @Test func terminateEscalatesToSigkill() async throws {
     let process = ShellXSidecarProcess(killGrace: 0.2)
-    func exitStatus(_ args: [String], _ executable: String) async throws -> Int32 {
+    /// Terminates the child once it prints `ready` when `untilReady`, otherwise 0.1 s after launch.
+    func exitStatus(_ args: [String], _ executable: String, untilReady: Bool = false) async throws -> Int32 {
         let once = Locked(false)
+        // `ready` can arrive before `launch` returns the handle; whichever of the two comes second terminates.
+        let start = Locked<(handle: (any SidecarHandle)?, ready: Bool)>((nil, false))
         return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Int32, any Error>) in
             let finish: @Sendable (Int32) -> Void = { status in
                 if once.with({ done in let was = done; done = true; return !was }) { cont.resume(returning: status) }
             }
+            let onLine: @Sendable (String) -> Void = { line in
+                guard untilReady, line == "ready" else { return }
+                start.with { state in state.ready = true; return state.handle }?.terminate()
+            }
             do {
-                let handle = try process.launch(URL(fileURLWithPath: executable), args, env: [:], onLine: { _ in }, onExit: finish)
-                DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) { handle.terminate() }
+                let handle = try process.launch(URL(fileURLWithPath: executable), args, env: [:], onLine: onLine, onExit: finish)
+                if untilReady {
+                    start.with { state in state.handle = handle; return state.ready ? handle : nil }?.terminate()
+                } else {
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) { handle.terminate() }
+                }
                 DispatchQueue.global().asyncAfter(deadline: .now() + 10) { finish(-1) }
             } catch { cont.resume(throwing: error) }
         }
     }
-    // A child that ignores SIGTERM (the ignore survives exec) dies by SIGKILL after the grace period.
-    #expect(try await exitStatus(["-c", "trap '' TERM; exec /bin/sleep 30"], "/bin/sh") == SIGKILL)
+    // A child that ignores SIGTERM (the ignore survives exec) dies by SIGKILL after the grace period. It says
+    // `ready` once its trap is set, so a slow machine cannot deliver the SIGTERM before the trap exists.
+    #expect(try await exitStatus(["-c", "trap '' TERM; echo ready; exec /bin/sleep 30"], "/bin/sh", untilReady: true) == SIGKILL)
     // A normal child dies by SIGTERM.
     #expect(try await exitStatus(["30"], "/bin/sleep") == SIGTERM)
 }
