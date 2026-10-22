@@ -10,7 +10,13 @@ public protocol AgentFeedSource: Sendable {
     ///
     /// Multicast: each call is a new subscriber. The subscription ends when the stream's consumer
     /// stops iterating (its task is cancelled), and the source must then drop it.
+    ///
+    /// The stream's `onTermination` runs synchronously inside the runtime's task cancellation.
+    /// It must not take a lock that the source holds while calling `yield`, or the two deadlock.
     func changes() -> AsyncStream<(revision: Int, added: [PendingItem], resolved: [String])>
     /// Resolves `requestId` at most once (PROTOCOL.md section 5).
+    ///
+    /// Must return promptly or honor task cancellation: `LinkHost.serve` waits for in-flight
+    /// replies before it returns, and the phone stops waiting after 10 s.
     func reply(requestId: String, mode: PermissionMode) async -> ReplyOutcome
 }

@@ -14,6 +14,12 @@ final class FakeFeedSource: AgentFeedSource, @unchecked Sendable {
     private var _snapshotCalls = 0
     private var _changesCalls = 0
     private var _replies: [(requestId: String, mode: PermissionMode)] = []
+    private var _changeOnSubscribe = false
+    /// Subscribers whose stream has terminated. Kept under its own lock: `onTermination` runs
+    /// inside the runtime's cancellation path while `broadcastLocked` holds `lock` and yields,
+    /// so taking `lock` there would invert lock order and deadlock.
+    private let terminationLock = NSLock()
+    private var terminated: Set<UUID> = []
 
     init(_ items: [PendingItem] = []) {
         for item in items { pending[item.requestId] = item }
@@ -22,7 +28,16 @@ final class FakeFeedSource: AgentFeedSource, @unchecked Sendable {
     var snapshotCalls: Int { lock.withLock { _snapshotCalls } }
     var changesCalls: Int { lock.withLock { _changesCalls } }
     var replies: [(requestId: String, mode: PermissionMode)] { lock.withLock { _replies } }
-    var activeSubscribers: Int { lock.withLock { subscribers.count } }
+    var activeSubscribers: Int {
+        let ids = lock.withLock { Set(subscribers.keys) }
+        return ids.subtracting(terminationLock.withLock { terminated }).count
+    }
+    /// When true, every new subscriber at once gets a change adding one fresh item, as if the
+    /// pending set changed at the moment of subscription.
+    var changeOnSubscribe: Bool {
+        get { lock.withLock { _changeOnSubscribe } }
+        set { lock.withLock { _changeOnSubscribe = newValue } }
+    }
     /// True when nothing has called the feed at all.
     var untouched: Bool { lock.withLock { _snapshotCalls == 0 && _changesCalls == 0 && _replies.isEmpty } }
 
@@ -58,10 +73,15 @@ final class FakeFeedSource: AgentFeedSource, @unchecked Sendable {
         lock.withLock {
             _changesCalls += 1
             subscribers[id] = continuation
+            if _changeOnSubscribe {
+                let item = permissionItem("sub-\(_changesCalls)")
+                pending[item.requestId] = item
+                broadcastLocked(added: [item], resolved: [])
+            }
         }
         continuation.onTermination = { [weak self] _ in
             guard let self else { return }
-            _ = self.lock.withLock { self.subscribers.removeValue(forKey: id) }
+            _ = self.terminationLock.withLock { self.terminated.insert(id) }
         }
         return stream
     }
@@ -80,8 +100,10 @@ final class FakeFeedSource: AgentFeedSource, @unchecked Sendable {
 
     private func broadcastLocked(added: [PendingItem], resolved: [String]) {
         revision += 1
-        for continuation in subscribers.values {
-            continuation.yield((revision, added, resolved))
+        for (id, continuation) in subscribers {
+            if case .terminated = continuation.yield((revision, added, resolved)) {
+                subscribers[id] = nil
+            }
         }
     }
 }

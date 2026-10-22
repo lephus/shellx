@@ -9,6 +9,8 @@ struct LinkTimings: Sendable {
     var pingInterval: Duration
     /// A session that has received nothing for this long is dead and its circuit is closed.
     var idleTimeout: Duration
+    /// How long `LinkClient.snapshot()` and `reply()` wait for their answer.
+    var requestTimeout: Duration = .seconds(10)
 
     static let standard = LinkTimings(pingInterval: .seconds(20), idleTimeout: .seconds(45))
 }

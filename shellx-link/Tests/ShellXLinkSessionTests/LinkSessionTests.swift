@@ -67,11 +67,21 @@ final class LinkSessionTests: XCTestCase {
         let rig = makeHost(feed, clientCount: 2)
         let clientA = try await connect(rig, clientIndex: 0)
         let clientB = try await connect(rig, clientIndex: 1)
+        let seenByA = collect(clientA.changes)
         let seenByB = collect(clientB.changes)
+
+        feed.add(permissionItem("r2"))
+        for (name, seen) in [("A", seenByA), ("B", seenByB)] {
+            let added = await eventually { seen.items.contains { $0.added.map(\.requestId) == ["r2"] } }
+            XCTAssertTrue(added, "client \(name) did not learn that r2 was added")
+        }
+
         let outcome = try await within { try await clientA.reply(requestId: "r1", mode: .always) }
         XCTAssertEqual(outcome, .delivered)
-        let resolved = await eventually { seenByB.items.contains { $0.resolved == ["r1"] } }
-        XCTAssertTrue(resolved, "client B did not learn that r1 was resolved")
+        for (name, seen) in [("A", seenByA), ("B", seenByB)] {
+            let resolved = await eventually { seen.items.contains { $0.resolved == ["r1"] } }
+            XCTAssertTrue(resolved, "client \(name) did not learn that r1 was resolved")
+        }
     }
 
     func testUntrustedClientDropped() async throws {
@@ -80,7 +90,10 @@ final class LinkSessionTests: XCTestCase {
         do {
             _ = try await connect(rig)
             XCTFail("connect succeeded for an untrusted client")
-        } catch {}
+        } catch {
+            // The client finishes its side of the handshake; the host then drops the circuit.
+            XCTAssertEqual(error as? RelayError, .closed, "unexpected error \(error)")
+        }
         XCTAssertTrue(feed.untouched, "host called the feed for an untrusted client")
     }
 
@@ -103,7 +116,72 @@ final class LinkSessionTests: XCTestCase {
         XCTAssertEqual(second.pending.map(\.requestId), ["r2"])
     }
 
+    func testClientRejectsWrongHostKeyBeforeMessage3() async throws {
+        let impostorKey = NoiseStaticKey()
+        let expectedHostKey = NoiseStaticKey()
+        let (clientEnd, hostEnd) = makeInMemoryCircuitPair()
+        let responder = Task { () -> String in
+            var handshake = NoiseHandshake(role: .responder, local: impostorKey, trusts: { _ in true })
+            let message1 = try await hostEnd.receive()
+            _ = try handshake.readMessage(message1)
+            try await hostEnd.send(try handshake.writeMessage(payload: Data()))
+            do {
+                _ = try await hostEnd.receive()
+                return "received message 3"
+            } catch {
+                return "\(error)"
+            }
+        }
+        do {
+            _ = try await LinkClient.connect(
+                clientEnd, key: NoiseStaticKey(), hostKey: expectedHostKey.publicKey, clientVersion: "1",
+                deviceName: "phone")
+            XCTFail("connect succeeded against the wrong host key")
+        } catch {
+            XCTAssertEqual(error as? NoiseError, .untrustedPeer, "unexpected error \(error)")
+        }
+        // Message 3 would reveal the phone's static key to the impostor; it must never be sent.
+        let responderSaw = try await responder.value
+        XCTAssertEqual(responderSaw, "\(RelayError.closed)")
+    }
+
     // MARK: - PROTOCOL.md section 7: errors and phases
+
+    func testWelcomeIsFirstFrameWhileFeedChanges() async throws {
+        let feed = FakeFeedSource()
+        // A change lands the moment the host subscribes, so a pusher started before `welcome`
+        // would have an `agent.changed` ready to race it.
+        feed.changeOnSubscribe = true
+        let churn = Task {
+            var n = 0
+            while !Task.isCancelled {
+                n += 1
+                feed.add(permissionItem("c\(n)"))
+                await Task.yield()
+            }
+        }
+        defer { churn.cancel() }
+        // A long machine name makes `welcome` slow to encode, giving a racing pusher a head start.
+        let machineName = String(repeating: "m", count: 60_000)
+        let rig = makeHost(feed, machineName: machineName)
+        for _ in 0..<100 {
+            let (end, _) = startServe(rig.host)
+            let raw = try await rawChannel(end, rig)
+            try await raw.send(.hello(clientVersion: "raw", deviceName: "raw"))
+            let first = try await raw.receive()
+            guard case let .welcome(_, _, name) = first, name == machineName else {
+                XCTFail("the first frame after hello was \(String(describing: first).prefix(80)), not welcome")
+                return
+            }
+            // The change from the subscription still arrives after `welcome`: nothing was lost.
+            var sawSubscribeChange = false
+            while !sawSubscribeChange {
+                guard case let .changed(_, added, _) = try await raw.receive() else { continue }
+                sawSubscribeChange = added.contains { $0.requestId.hasPrefix("sub-") }
+            }
+            await raw.close()
+        }
+    }
 
     func testFirstFrameNotHelloGetsBadRequestAndClose() async throws {
         let feed = FakeFeedSource([permissionItem("r1")])
@@ -246,6 +324,73 @@ final class LinkSessionTests: XCTestCase {
         } catch {}
     }
 
+    // MARK: - Request timeout
+
+    func testDroppedSnapshotTimesOutAndSessionStaysUsable() async throws {
+        // One item that does not fit in a frame even without its preview: the host must drop the
+        // snapshot (PROTOCOL.md section 6) and the client must not wait forever.
+        let huge = PendingItem(
+            requestId: "huge", kind: .permission, agent: "claude", workspaceId: "ws-1",
+            workspaceTitle: String(repeating: "w", count: 70_000), createdAtMs: 1)
+        let feed = FakeFeedSource([huge])
+        let quickRequests = LinkTimings(
+            pingInterval: .seconds(20), idleTimeout: .seconds(45), requestTimeout: .milliseconds(200))
+        let rig = makeHost(feed)
+        let (end, served) = startServe(rig.host)
+        let client = try await connectClient(end, rig, timings: quickRequests)
+
+        let start = ContinuousClock.now
+        do {
+            _ = try await within { try await client.snapshot() }
+            XCTFail("a dropped snapshot was answered")
+        } catch {
+            XCTAssertEqual(error as? LinkClientError, .timedOut, "unexpected error \(error)")
+        }
+        let waited = ContinuousClock.now - start
+        XCTAssertGreaterThanOrEqual(waited, .milliseconds(150))
+        XCTAssertLessThan(waited, .seconds(1))
+
+        feed.resolveLocally(requestId: "huge")
+        feed.add(permissionItem("r1"))
+        let snap = try await within { try await client.snapshot() }
+        XCTAssertEqual(snap.pending.map(\.requestId), ["r1"])
+        let outcome = try await within { try await client.reply(requestId: "r1", mode: .once) }
+        XCTAssertEqual(outcome, .delivered)
+        XCTAssertFalse(served.isSet)
+    }
+
+    func testLateReplyResultIsNotGivenToNewerReply() async throws {
+        let hostKey = NoiseStaticKey()
+        let clientKey = NoiseStaticKey()
+        let (clientEnd, hostEnd) = makeInMemoryCircuitPair()
+        // A slow host: it answers the first reply only after the client gave up on it.
+        let rawHost = Task {
+            let ch = try await SecureChannel.open(hostEnd, role: .responder, key: hostKey, trusts: { _ in true })
+            _ = try await ch.receive()
+            try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac"))
+            guard case .reply = try await ch.receive() else { throw RelayError.closed }
+            // After the first call's 300 ms timeout, well before the retry's.
+            try await Task.sleep(for: .milliseconds(450))
+            try await ch.send(.replyResult(requestId: "r1", outcome: .delivered))
+            guard case .reply = try await ch.receive() else { throw RelayError.closed }
+            try await ch.send(.replyResult(requestId: "r1", outcome: .alreadyHandled))
+        }
+        let client = try await LinkClient.connect(
+            clientEnd, key: clientKey, hostKey: hostKey.publicKey, clientVersion: "1", deviceName: "phone",
+            timings: LinkTimings(pingInterval: .seconds(20), idleTimeout: .seconds(45), requestTimeout: .milliseconds(300)))
+        clients.append(client)
+
+        do {
+            _ = try await within { try await client.reply(requestId: "r1", mode: .deny) }
+            XCTFail("the slow reply did not time out")
+        } catch {
+            XCTAssertEqual(error as? LinkClientError, .timedOut, "unexpected error \(error)")
+        }
+        let retry = try await within { try await client.reply(requestId: "r1", mode: .once) }
+        XCTAssertEqual(retry, .alreadyHandled, "the late result of the first reply reached the retry")
+        try await rawHost.value
+    }
+
     // MARK: - Liveness
 
     func testWatchdogClosesSilentSession() async throws {
@@ -298,13 +443,14 @@ final class LinkSessionTests: XCTestCase {
     }
 
     private func makeHost(
-        _ feed: FakeFeedSource, clientCount: Int = 1, trustClients: Bool = true, timings: LinkTimings = .standard
+        _ feed: FakeFeedSource, clientCount: Int = 1, trustClients: Bool = true, timings: LinkTimings = .standard,
+        machineName: String = "Test Mac"
     ) -> Rig {
         let hostKey = NoiseStaticKey()
         let clientKeys = (0..<clientCount).map { _ in NoiseStaticKey() }
         let trusted: Set<Data> = trustClients ? Set(clientKeys.map(\.publicKey)) : []
         let host = LinkHost(
-            key: hostKey, trustedClients: { trusted }, feed: feed, hostVersion: "test-host", machineName: "Test Mac",
+            key: hostKey, trustedClients: { trusted }, feed: feed, hostVersion: "test-host", machineName: machineName,
             timings: timings)
         return Rig(host: host, hostKey: hostKey, clientKeys: clientKeys)
     }

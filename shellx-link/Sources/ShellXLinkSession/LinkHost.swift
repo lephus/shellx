@@ -86,21 +86,23 @@ public actor LinkHost {
             return
         }
 
-        // Subscribe before `welcome`, so no change after it is missed. The subscription ends when
-        // the group cancels this task at the end of the session.
+        // Subscribe before `welcome`, so no change after it is missed: the stream buffers until the
+        // pusher starts. Leaving the scope without iterating it drops the subscription.
         let changes = feed.changes()
+        do {
+            try await channel.send(.welcome(
+                protocolVersion: ShellXLink.protocolVersion, hostVersion: hostVersion, machineName: machineName))
+        } catch {
+            return
+        }
+        // Only now: nothing but `welcome` (or `error`) may precede establishment (PROTOCOL.md 7).
+        // The subscription ends when the group cancels this task at the end of the session.
         group.addTask {
             for await change in changes {
                 await Self.sendShrinking(on: channel, items: change.added) {
                     .changed(revision: change.revision, added: $0, resolved: change.resolved)
                 }
             }
-        }
-        do {
-            try await channel.send(.welcome(
-                protocolVersion: ShellXLink.protocolVersion, hostVersion: hostVersion, machineName: machineName))
-        } catch {
-            return
         }
         let pingInterval = timings.pingInterval
         group.addTask { await runPings(on: channel, every: pingInterval) }
