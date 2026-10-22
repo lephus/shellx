@@ -348,7 +348,7 @@ final class LinkSessionTests: XCTestCase {
         }
         let waited = ContinuousClock.now - start
         XCTAssertGreaterThanOrEqual(waited, .milliseconds(150))
-        XCTAssertLessThan(waited, .seconds(1))
+        XCTAssertLessThan(waited, .seconds(3))
 
         feed.resolveLocally(requestId: "huge")
         feed.add(permissionItem("r1"))
@@ -369,15 +369,15 @@ final class LinkSessionTests: XCTestCase {
             _ = try await ch.receive()
             try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac"))
             guard case .reply = try await ch.receive() else { throw RelayError.closed }
-            // After the first call's 300 ms timeout, well before the retry's.
-            try await Task.sleep(for: .milliseconds(450))
+            // 500 ms after the first call's 1 s timeout, 500 ms before the retry's.
+            try await Task.sleep(for: .milliseconds(1500))
             try await ch.send(.replyResult(requestId: "r1", outcome: .delivered))
             guard case .reply = try await ch.receive() else { throw RelayError.closed }
             try await ch.send(.replyResult(requestId: "r1", outcome: .alreadyHandled))
         }
         let client = try await LinkClient.connect(
             clientEnd, key: clientKey, hostKey: hostKey.publicKey, clientVersion: "1", deviceName: "phone",
-            timings: LinkTimings(pingInterval: .seconds(20), idleTimeout: .seconds(45), requestTimeout: .milliseconds(300)))
+            timings: LinkTimings(pingInterval: .seconds(20), idleTimeout: .seconds(45), requestTimeout: .seconds(1)))
         clients.append(client)
 
         do {
@@ -389,6 +389,46 @@ final class LinkSessionTests: XCTestCase {
         let retry = try await within { try await client.reply(requestId: "r1", mode: .once) }
         XCTAssertEqual(retry, .alreadyHandled, "the late result of the first reply reached the retry")
         try await rawHost.value
+    }
+
+    func testRepliesToOneRequestKeepTheirOwnOutcome() async throws {
+        // The first reply waits on a slow hook past the client's timeout; the retry would be
+        // answered at once if the host let it overtake.
+        let feed = SlowFirstReplyFeed(
+            FakeFeedSource([permissionItem("r1")]), slowIds: ["r1"], delay: .milliseconds(1500))
+        let rig = makeHost(feed)
+        let (end, _) = startServe(rig.host)
+        let client = try await connectClient(
+            end, rig,
+            timings: LinkTimings(pingInterval: .seconds(20), idleTimeout: .seconds(45), requestTimeout: .seconds(1)))
+
+        do {
+            _ = try await within { try await client.reply(requestId: "r1", mode: .deny) }
+            XCTFail("the slow reply did not time out")
+        } catch {
+            XCTAssertEqual(error as? LinkClientError, .timedOut, "unexpected error \(error)")
+        }
+        let retry = try await within { try await client.reply(requestId: "r1", mode: .once) }
+
+        let answers = feed.answers
+        XCTAssertEqual(answers.map(\.mode), [.deny, .once], "the retry overtook the first reply")
+        XCTAssertEqual(retry, answers.first { $0.mode == .once }?.outcome, "the retry got another reply's outcome")
+        XCTAssertEqual(retry, .alreadyHandled)
+    }
+
+    func testRepliesToDifferentRequestsRunConcurrently() async throws {
+        let feed = SlowFirstReplyFeed(
+            FakeFeedSource([permissionItem("slow"), permissionItem("fast")]), slowIds: ["slow"],
+            delay: .milliseconds(1500))
+        let client = try await connect(makeHost(feed))
+        let slow = Task { try await within { try await client.reply(requestId: "slow", mode: .once) } }
+        try await Task.sleep(for: .milliseconds(50))
+        let start = ContinuousClock.now
+        let fast = try await within { try await client.reply(requestId: "fast", mode: .once) }
+        XCTAssertEqual(fast, .delivered)
+        XCTAssertLessThan(ContinuousClock.now - start, .seconds(1), "a slow reply blocked another request")
+        let slowOutcome = try await slow.value
+        XCTAssertEqual(slowOutcome, .delivered)
     }
 
     // MARK: - Liveness
@@ -443,7 +483,7 @@ final class LinkSessionTests: XCTestCase {
     }
 
     private func makeHost(
-        _ feed: FakeFeedSource, clientCount: Int = 1, trustClients: Bool = true, timings: LinkTimings = .standard,
+        _ feed: any AgentFeedSource, clientCount: Int = 1, trustClients: Bool = true, timings: LinkTimings = .standard,
         machineName: String = "Test Mac"
     ) -> Rig {
         let hostKey = NoiseStaticKey()

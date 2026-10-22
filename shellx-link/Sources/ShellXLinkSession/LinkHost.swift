@@ -109,6 +109,7 @@ public actor LinkHost {
 
         // Established.
         let feed = self.feed
+        let replyOrder = ReplyOrder()
         while true {
             let message: LinkMessage
             do {
@@ -130,10 +131,16 @@ public actor LinkHost {
                     .snapshot(revision: snapshot.revision, pending: $0)
                 }
             case let .reply(requestId, mode):
-                // Resolving may wait on the agent hook; keep reading meanwhile.
+                // Resolving may wait on the agent hook; keep reading meanwhile. Replies to one
+                // request run one after another in arrival order, so their results leave in the
+                // order the client sent them (it matches a result to the oldest reply for that
+                // id). Replies to different requests run concurrently.
+                let turn = await replyOrder.reserve(requestId)
                 group.addTask {
+                    await replyOrder.wait(for: turn, of: requestId)
                     let outcome = await feed.reply(requestId: requestId, mode: mode)
                     try? await channel.send(.replyResult(requestId: requestId, outcome: outcome))
+                    await replyOrder.finish(turn, of: requestId)
                 }
             case let .ping(nonce):
                 try? await channel.send(.pong(nonce: nonce))
@@ -176,5 +183,43 @@ public actor LinkHost {
             }
         }
         return nil
+    }
+}
+
+/// Per-`request_id` FIFO turns for one session's `agent.reply` handlers.
+///
+/// The receive loop reserves a turn when the frame arrives; the handler waits for that turn,
+/// and finishing it (after its result was sent) lets the next reply for the same id run.
+private actor ReplyOrder {
+    /// The next turn to hand out, per id. Absent when no reply for that id is in flight.
+    private var nextTurn: [String: Int] = [:]
+    /// The turn that may run now, per id.
+    private var current: [String: Int] = [:]
+    private var waiting: [String: [Int: CheckedContinuation<Void, Never>]] = [:]
+
+    func reserve(_ requestId: String) -> Int {
+        let turn = nextTurn[requestId, default: 0]
+        nextTurn[requestId] = turn + 1
+        return turn
+    }
+
+    func wait(for turn: Int, of requestId: String) async {
+        guard current[requestId, default: 0] != turn else { return }
+        await withCheckedContinuation { waiting[requestId, default: [:]][turn] = $0 }
+    }
+
+    func finish(_ turn: Int, of requestId: String) {
+        let following = turn + 1
+        guard nextTurn[requestId] != following else {
+            // Nothing else queued for this id.
+            nextTurn[requestId] = nil
+            current[requestId] = nil
+            waiting[requestId] = nil
+            return
+        }
+        current[requestId] = following
+        if let next = waiting[requestId]?.removeValue(forKey: following) {
+            next.resume()
+        }
     }
 }

@@ -113,3 +113,34 @@ func permissionItem(_ id: String, tool: String = "Bash", preview: String? = "ls 
         requestId: id, kind: .permission, agent: "claude", workspaceId: "ws-1", workspaceTitle: "shellx",
         toolName: tool, toolInputPreview: preview, createdAtMs: 1_700_000_000_000)
 }
+
+/// Delegates to a `FakeFeedSource`, but the first `reply` to each id in `slowIds` waits `delay`
+/// first (a hook that is slow to resolve). Records what the feed answered to every call.
+final class SlowFirstReplyFeed: AgentFeedSource, @unchecked Sendable {
+    let base: FakeFeedSource
+    private let slowIds: Set<String>
+    private let delay: Duration
+    private let lock = NSLock()
+    private var seen: Set<String> = []
+    private var _answers: [(requestId: String, mode: PermissionMode, outcome: ReplyOutcome)] = []
+
+    init(_ base: FakeFeedSource, slowIds: Set<String>, delay: Duration) {
+        self.base = base
+        self.slowIds = slowIds
+        self.delay = delay
+    }
+
+    var answers: [(requestId: String, mode: PermissionMode, outcome: ReplyOutcome)] { lock.withLock { _answers } }
+
+    func snapshot() async -> (revision: Int, pending: [PendingItem]) { await base.snapshot() }
+
+    func changes() -> AsyncStream<FeedChange> { base.changes() }
+
+    func reply(requestId: String, mode: PermissionMode) async -> ReplyOutcome {
+        let slow = lock.withLock { slowIds.contains(requestId) && seen.insert(requestId).inserted }
+        if slow { try? await Task.sleep(for: delay) }
+        let outcome = await base.reply(requestId: requestId, mode: mode)
+        lock.withLock { _answers.append((requestId, mode, outcome)) }
+        return outcome
+    }
+}
