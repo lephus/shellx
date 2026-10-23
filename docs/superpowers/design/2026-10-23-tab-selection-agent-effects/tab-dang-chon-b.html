@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tab đang chọn: phương án B chi tiết</title>
+<style>
+  :root { --bg-primary:#f5f5f7; --bg-secondary:#fff; --text-primary:#1d1d1f; --text-secondary:#6e6e73; --border:#d1d1d6; --accent:#0071e3; }
+  @media (prefers-color-scheme: dark) { :root { --bg-primary:#1d1d1f; --bg-secondary:#2d2d2f; --text-primary:#f5f5f7; --text-secondary:#98989d; --border:#424245; --accent:#0a84ff; } }
+  body { margin:0; padding:2rem; font-family:system-ui,-apple-system,sans-serif; background:var(--bg-primary); color:var(--text-primary); line-height:1.5; }
+  h2 { font-size:1.5rem; margin:0 0 .5rem; } h3 { font-size:1.05rem; margin:0 0 .25rem; }
+  .subtitle { color:var(--text-secondary); margin:0 0 1.5rem; }
+  .label { font-size:.7rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.05em; }
+  .cards { display:grid; gap:1rem; }
+  .card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+  .card.selected { outline:2px solid var(--accent); }
+  .chosen { display:inline-block; margin:0 0 1rem; padding:.2rem .6rem; border-radius:6px; background:rgba(10,132,255,.12); color:var(--accent); font-size:.85rem; }
+</style>
+<script>function toggleSelect(el){var c=el.closest('.cards');if(c)c.querySelectorAll('.card').forEach(function(o){o.classList.remove('selected')});el.classList.add('selected');}</script>
+</head><body>
+<div class="chosen">Phương án đã chọn, kèm các quy tắc người viết spec đề xuất và người dùng đồng ý</div>
+<style>
+  .sx { --bg:#0b0716; --panel:#100b1d; --raise:#171128; --line:#211a37; --border:#2a2145;
+        --tx:#cdc7e0; --hi:#e6e2f2; --mu:#8a83a6; --pri:#60a5fa; --pri-soft:rgba(96,165,250,.12);
+        --pri-line:rgba(96,165,250,.45); --pri-tx:#93c5fd; --run:#e8c468; --ok:#6fd49a; }
+  .sx .win { display:flex; height:300px; background:var(--bg); border:1px solid var(--border); border-radius:10px; overflow:hidden;
+             font:12px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif; color:var(--tx); text-align:left; }
+  .sx .side { width:230px; flex:none; background:var(--panel); border-right:1px solid var(--line); padding:8px 0; }
+  .sx .sh { color:var(--mu); font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; padding:2px 14px 6px; }
+  .sx .mach { display:flex; align-items:center; gap:6px; padding:2px 14px 5px; color:var(--hi); font-weight:600; font-size:11.5px; }
+  .sx .mach i { width:6px; height:6px; border-radius:50%; background:var(--ok); margin-left:auto; }
+  .sx .row { position:relative; margin:2px 7px; padding:5px 9px 5px 12px; border-radius:7px; }
+  .sx .row .n { display:flex; align-items:center; gap:6px; color:var(--hi); }
+  .sx .row .m { color:var(--mu); font-size:10.5px; }
+  .sx .pill { margin-left:auto; font-size:9.5px; line-height:15px; padding:0 6px; border-radius:8px; }
+  .sx .p-run { background:rgba(232,196,104,.12); color:var(--run); }
+  .sx .p-wait { background:var(--pri-soft); color:var(--pri-tx); box-shadow:inset 0 0 0 1px var(--pri-line); }
+  .sx .p-ok { background:rgba(111,212,154,.12); color:var(--ok); }
+  .sx .row.sel { background:rgba(96,165,250,.22); }
+  .sx .row.sel .n { font-weight:600; color:#f1f5ff; }
+  .sx .row.sel .m { color:#b4c6e6; }
+  .sx .row.sel .p-run { background:rgba(11,7,22,.55); }
+  .sx .row.sel .p-wait { background:rgba(11,7,22,.55); box-shadow:inset 0 0 0 1px rgba(147,197,253,.8); }
+  .sx .row.hov { background:#1b1530; }
+  .sx .row.multi { background:rgba(96,165,250,.10); }
+  .sx .tag { position:absolute; right:-6px; top:50%; transform:translate(100%,-50%); font-size:10px; color:var(--text-secondary); white-space:nowrap; }
+
+  .sx .panes { flex:1; display:flex; min-width:0; }
+  .sx .pane { flex:1; display:flex; flex-direction:column; min-width:0; border-right:1px solid var(--line); }
+  .sx .pane:last-child { border-right:0; }
+  .sx .tabs { display:flex; height:30px; background:var(--panel); border-bottom:1px solid var(--line); }
+  .sx .tab { position:relative; display:flex; align-items:center; padding:0 14px; color:var(--mu); border-right:1px solid var(--line); white-space:nowrap; }
+  .sx .focus .tab.on { background:rgba(96,165,250,.16); color:#f1f5ff; font-weight:600; }
+  .sx .focus .tab.on::after { content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--pri); }
+  .sx .unfocus .tab.on { background:rgba(230,226,242,.07); color:var(--tx); font-weight:600; }
+  .sx .unfocus .tab.on::after { content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:#5b5478; }
+  .sx .term { flex:1; padding:10px 12px; font:11.5px/1.5 "JetBrains Mono",ui-monospace,Menlo,monospace; overflow:hidden; }
+  .sx .term .c { color:var(--pri); } .sx .term .mu { color:var(--mu); } .sx .term .w { color:var(--hi); } .sx .term .y { color:var(--run); } .sx .term .ok { color:var(--ok); }
+  .sx .unfocus .term { opacity:.78; }
+
+  .sx .notes { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px; margin-top:18px; }
+  .sx .note { background:var(--bg-secondary); border:1px solid var(--border-color, rgba(128,128,128,.25)); border-radius:10px; padding:12px; }
+  .sx .note h4 { margin:0 0 8px; font-size:.9rem; }
+  .sx .note p { margin:8px 0 0; color:var(--text-secondary); font-size:.8rem; }
+  .sx .chip-side { background:var(--panel); border-radius:8px; padding:6px 0; font:12px/1.45 -apple-system,system-ui,sans-serif; color:var(--tx); text-align:left; }
+</style>
+
+<h2>Phương án B: nền xanh dịu</h2>
+<p class="subtitle">Bên trái màn hình chia hai pane. Pane trái đang có con trỏ gõ phím nên tab "claude" có màu xanh. Pane phải không có con trỏ nên tab đang chọn của nó ("pnpm dev") chỉ có màu xám. Cả màn hình luôn chỉ có <b>một</b> tab xanh, và đó là chỗ phím bạn gõ sẽ đi vào.</p>
+
+<div class="sx">
+  <div class="win">
+    <div class="side">
+      <div class="sh">Máy của bạn</div>
+      <div class="mach">MacBook Pro <span style="color:var(--mu);font-weight:400">· máy này</span><i></i></div>
+      <div class="row sel"><div class="n"><span>api-server</span><span class="pill p-run">chạy</span></div><div class="m">feat/auth · ~/api</div></div>
+      <div class="row"><div class="n"><span>web</span><span class="pill p-wait">chờ bạn</span></div><div class="m">main · pnpm dev</div></div>
+      <div class="row hov"><div class="n"><span>docs</span><span class="pill p-ok">xong</span></div><div class="m">main · ~/docs · <i>chuột đang trỏ</i></div></div>
+      <div class="row"><div class="n"><span>infra</span></div><div class="m">~/infra</div></div>
+    </div>
+    <div class="panes">
+      <div class="pane focus">
+        <div class="tabs"><div class="tab on">claude</div><div class="tab">zsh</div></div>
+        <div class="term"><span class="mu">~/api</span> <span class="c">❯</span> claude<br><br><span class="w">● Sửa middleware xác thực</span><br><span class="mu">&nbsp; src/auth.ts +24 −6</span><br><span class="mu">&nbsp; src/session.ts +8</span><br><br><span class="y">✻ Đang suy nghĩ…</span></div>
+      </div>
+      <div class="pane unfocus">
+        <div class="tabs"><div class="tab on">pnpm dev</div><div class="tab">logs</div></div>
+        <div class="term"><span class="mu">~/api</span> <span class="c">❯</span> pnpm dev<br><span class="ok">✓ ready</span> <span class="mu">in 412ms</span><br><span class="mu">➜ Local: http://localhost:3000</span><br><br><span class="mu">GET  /health 200 · 2ms</span><br><span class="mu">POST /login  200 · 9ms</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note">
+      <h4>Phiên đang chọn cũng đang chờ bạn</h4>
+      <div class="chip-side"><div class="row sel"><div class="n"><span>web</span><span class="pill p-wait">chờ bạn</span></div><div class="m">main · pnpm dev</div></div></div>
+      <p>Nhãn trạng thái có nền tối riêng để vẫn đọc được trên nền xanh.</p>
+    </div>
+    <div class="note">
+      <h4>Chọn nhiều phiên (⌘-click)</h4>
+      <div class="chip-side">
+        <div class="row sel"><div class="n"><span>api-server</span><span class="pill p-run">chạy</span></div><div class="m">feat/auth · ~/api</div></div>
+        <div class="row multi"><div class="n"><span>docs</span></div><div class="m">main · ~/docs</div></div>
+      </div>
+      <p>Phiên chọn thêm chỉ phủ xanh rất nhạt, chữ không đậm, nên vẫn biết phiên nào đang mở.</p>
+    </div>
+    <div class="note">
+      <h4>Chuột trỏ vào phiên khác</h4>
+      <div class="chip-side"><div class="row hov"><div class="n"><span>docs</span><span class="pill p-ok">xong</span></div><div class="m">main · ~/docs</div></div></div>
+      <p>Chỉ sáng lên màu xám tím, không dùng màu xanh, để không lẫn với phiên đang chọn.</p>
+    </div>
+  </div>
+</div>
+
+</body></html>
