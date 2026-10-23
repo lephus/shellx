@@ -3329,6 +3329,8 @@
 		C1ADE70002A1B2C3D4E5F719 /* shellx-pi-wrapper in Copy CLI */ = {isa = PBXBuildFile; fileRef = C1ADE70001A1B2C3D4E5F719 /* shellx-pi-wrapper */; };
 		96351C316291EC669B8DF2DC /* ShellXAboutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157337FA38DA052318228A89 /* ShellXAboutTests.swift */; };
 		96EE12720D113E7977F5F9EA /* ShellXAccountFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295A85AF91308E67CE53B162 /* ShellXAccountFlow.swift */; };
+		642F735E1D470D3C1F4B8DAB /* ShellXBonsplitStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2279385AFDBFDAEE17F61EA3 /* ShellXBonsplitStyles.swift */; };
+		9843B79AC550EC9EB196BDAB /* ShellXBonsplitStylesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28C7C66EB183FEC0A6ADC04B /* ShellXBonsplitStylesTests.swift */; };
 		5E11A00000000000000000A2 /* ShellXBrand in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000A1 /* ShellXBrand */; };
 		5E11A00000000000000000A3 /* ShellXBrand in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000A1 /* ShellXBrand */; };
 		1A8C19D1252050EBAB35B5D1 /* ShellXCloudOffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71099E791FDFEEBC0898FEAB /* ShellXCloudOffTests.swift */; };
@@ -7922,6 +7924,8 @@
 		C1ADE70001A1B2C3D4E5F719 /* shellx-pi-wrapper */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = "Resources/bin/shellx-pi-wrapper"; sourceTree = SOURCE_ROOT; };
 		157337FA38DA052318228A89 /* ShellXAboutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXAboutTests.swift"; sourceTree = "<group>"; };
 		295A85AF91308E67CE53B162 /* ShellXAccountFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/ShellXAccountFlow.swift; sourceTree = "<group>"; };
+		2279385AFDBFDAEE17F61EA3 /* ShellXBonsplitStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Tabs/ShellXBonsplitStyles.swift; sourceTree = "<group>"; };
+		28C7C66EB183FEC0A6ADC04B /* ShellXBonsplitStylesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXBonsplitStylesTests.swift"; sourceTree = "<group>"; };
 		71099E791FDFEEBC0898FEAB /* ShellXCloudOffTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXCloudOffTests.swift"; sourceTree = "<group>"; };
 		26ED4CBA5E356DC862332C80 /* ShellXCoreFFI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/ShellXCoreFFI.swift; sourceTree = "<group>"; };
 		B9FE6EA47AFDBBF1DED049CD /* ShellXCoreFFITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXCoreFFITests.swift"; sourceTree = "<group>"; };
@@ -12465,6 +12469,7 @@
 				D84FD59BA8F213CAA448E0D4 /* SidebarGroupHeaderPalette.swift */,
 				12B4554514B5F90C4DA750E3 /* ShellXSelectionTint+Sidebar.swift */,
 				87C6827AF5393A62D1561566 /* SidebarSelectionChromeObserver.swift */,
+				2279385AFDBFDAEE17F61EA3 /* ShellXBonsplitStyles.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -14053,6 +14058,7 @@
 				8C1A5BADF27E5C2E5499B0C6 /* ShellXLinkFeedSourceTests.swift */,
 				E62DE980C7E9E4A1D8E54437 /* ShellXLinkKeyStoreTests.swift */,
 				E81EF0707F741B6C620A647A /* ShellXSidebarSelectionTests.swift */,
+				28C7C66EB183FEC0A6ADC04B /* ShellXBonsplitStylesTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -16689,6 +16695,7 @@
 				F0ACC0DE0000000000000007 /* SharedLiveAgentIndexLoader.swift in Sources */,
 				121580061215800612158006 /* SharedLiveAgentIndexRefreshOutcome.swift in Sources */,
 				96EE12720D113E7977F5F9EA /* ShellXAccountFlow.swift in Sources */,
+				642F735E1D470D3C1F4B8DAB /* ShellXBonsplitStyles.swift in Sources */,
 				8825E0A1CFB96235256FD162 /* ShellXCoreFFI.swift in Sources */,
 				7C1D04B9E485BA999F349B85 /* ShellXLinkFeedSource.swift in Sources */,
 				1094273B6145F185A8C8368E /* ShellXLinkHostController.swift in Sources */,
@@ -19040,6 +19047,7 @@
 				C0F16A000000000000000001 /* ShellStartupMatrixTests.swift in Sources */,
 				C0F16C000000000000000001 /* ShellStartupMissingBundleTests.swift in Sources */,
 				96351C316291EC669B8DF2DC /* ShellXAboutTests.swift in Sources */,
+				9843B79AC550EC9EB196BDAB /* ShellXBonsplitStylesTests.swift in Sources */,
 				1A8C19D1252050EBAB35B5D1 /* ShellXCloudOffTests.swift in Sources */,
 				E42EC94C29109FA8A189FE34 /* ShellXCoreFFITests.swift in Sources */,
 				2A7D98BF041DCE78F7E67C20 /* ShellXLinkFeedSourceTests.swift in Sources */,

@@ -1,6 +1,7 @@
 import AppKit
 import Bonsplit
 import CmuxAppKitSupportUI
+import CmuxFoundation
 import CmuxNotifications
 import CmuxTerminal
 import SwiftUI
@@ -104,6 +105,10 @@ struct DockPanelView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: PaneChromeSettings.didChangeNotification)) { _ in
             refreshAppearance(reason: "paneChromeSettingsDidChange")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: CmuxAccentColor.didChangeNotification)) { _ in
+            // The focused pane's selected tab is drawn from the accent.
+            refreshAppearance(reason: "accentColorDidChange")
         }
         .onDisplayAccessibilityOptionsChange { _ in
             refreshAppearance(reason: "displayAccessibilityOptionsDidChange")

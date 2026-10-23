@@ -432,6 +432,10 @@ struct WorkspaceContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: PaneChromeSettings.didChangeNotification)) { _ in
             workspace.applyGhosttyChrome(from: config, reason: "paneChromeSettingsDidChange")
         }
+        .onReceive(NotificationCenter.default.publisher(for: CmuxAccentColor.didChangeNotification)) { _ in
+            // The focused pane's selected tab is drawn from the accent.
+            workspace.applyGhosttyChrome(from: config, reason: "accentColorDidChange")
+        }
         .onDisplayAccessibilityOptionsChange { _ in
             // Increase Contrast changes the separator color the chrome resolves.
             workspace.applyGhosttyChrome(from: config, reason: "displayAccessibilityOptionsDidChange")

@@ -108,7 +108,8 @@ extension DockSplitStore {
                 chromeHost: windowAppearance == nil ? .workspace : .dock,
                 increaseContrast: DisplayAccessibilityOptions.current.increaseContrast
             ),
-            usesSharedBackdrop: sharesWindowBackdrop
+            usesSharedBackdrop: sharesWindowBackdrop,
+            selectedTabStyle: ShellXBonsplitStyles.current(overChromeBackground: chromeBackgroundColor)?.selectedTabStyle
         )
     }
 }
