@@ -3,7 +3,8 @@ import ShellXBrand
 
 /// Direct-draw status capsule ("waiting", "running", "done", "error"): the
 /// status color at 12% as fill, the status color as text. No border,
-/// gradient or shadow.
+/// gradient or shadow. On ShellX's tinted selection the fill sits on a dark
+/// `selection-pill-backing` and the waiting ring brightens (spec §6.1).
 @MainActor
 final class SidebarStatusPillView: NSView {
     private static let horizontalPadding: CGFloat = 6
@@ -11,6 +12,8 @@ final class SidebarStatusPillView: NSView {
     private static let baseHeight: CGFloat = 15
 
     private(set) var pill: SidebarStatusPill?
+    /// Whether the pill sits on ShellX's tinted selection fill.
+    private(set) var isOnSelection = false
     private var fontScale: CGFloat = 1
 
     override var isFlipped: Bool { true }
@@ -29,11 +32,14 @@ final class SidebarStatusPillView: NSView {
 
     /// Hides the view for a nil pill. Returns whether anything changed.
     @discardableResult
-    func configure(_ pill: SidebarStatusPill?, fontScale: CGFloat) -> Bool {
+    func configure(_ pill: SidebarStatusPill?, fontScale: CGFloat, isOnSelection: Bool = false) -> Bool {
         let scale = max(0.5, fontScale)
-        guard pill != self.pill || scale != self.fontScale else { return false }
+        guard pill != self.pill || scale != self.fontScale || isOnSelection != self.isOnSelection else {
+            return false
+        }
         self.pill = pill
         self.fontScale = scale
+        self.isOnSelection = isOnSelection
         isHidden = pill == nil
         setAccessibilityLabel(pill?.title)
         needsDisplay = true
@@ -42,8 +48,12 @@ final class SidebarStatusPillView: NSView {
 
     /// Shows the pill for a row's compact status glyph kind (none for nil).
     @discardableResult
-    func configure(glyphKind: SidebarCompactStatusGlyph.Kind?, fontScale: CGFloat) -> Bool {
-        configure(glyphKind.flatMap { SidebarStatusPill.from($0) }, fontScale: fontScale)
+    func configure(
+        glyphKind: SidebarCompactStatusGlyph.Kind?,
+        fontScale: CGFloat,
+        isOnSelection: Bool = false
+    ) -> Bool {
+        configure(glyphKind.flatMap { SidebarStatusPill.from($0) }, fontScale: fontScale, isOnSelection: isOnSelection)
     }
 
     /// Size for the current pill; zero when there is none.
@@ -60,15 +70,22 @@ final class SidebarStatusPillView: NSView {
         guard let pill else { return }
         let radius = bounds.height / 2
         let path = NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius)
+        if isOnSelection {
+            // The 12% fill was tuned over the plain sidebar; a dark backing
+            // keeps the pill and its label reading the same on the selection.
+            ShellXPalette.selectionPillBacking.nsColor.setFill()
+            path.fill()
+        }
         pill.color.nsColor.withAlphaComponent(CGFloat(SidebarStatusPill.fillAlpha)).setFill()
         path.fill()
         if pill == .waiting {
-            // Waiting for you = primary + ring: a 1 px primaryLine stroke inside the bounds.
+            // Waiting for you = primary + ring: a 1 px stroke inside the bounds,
+            // brighter on the selection so it does not dissolve into the accent.
             let ringRect = bounds.insetBy(dx: 0.5, dy: 0.5)
             let ringRadius = ringRect.height / 2
             let ring = NSBezierPath(roundedRect: ringRect, xRadius: ringRadius, yRadius: ringRadius)
             ring.lineWidth = 1
-            ShellXPalette.primaryLine.nsColor.setStroke()
+            (isOnSelection ? ShellXPalette.selectionWaitingRing : ShellXPalette.primaryLine).nsColor.setStroke()
             ring.stroke()
         }
         let title = Self.attributedTitle(pill, fontScale: fontScale)

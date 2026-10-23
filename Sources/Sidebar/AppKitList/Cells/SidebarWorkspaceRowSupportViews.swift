@@ -33,18 +33,36 @@ struct SidebarRowPalette {
         )
     }
 
+    /// ShellX's selection tint for this row's settings (spec §6.1); nil where
+    /// the user's selection settings or a light sidebar keep their own paint.
+    var selectionTint: ShellXSelectionTint? {
+        ShellXSelectionTint(
+            sidebarColorScheme: colorScheme,
+            sidebarSelectionColorHex: model.settings.selectionColorHex,
+            activeTabIndicatorStyle: model.settings.activeTabIndicatorStyle,
+            subtleSelection: model.settings.subtleSelection,
+            accent: accent
+        )
+    }
+
     func selectedForeground(_ opacity: CGFloat) -> NSColor {
-        sidebarSelectedWorkspaceForegroundNSColor(on: selectedBackground, opacity: opacity)
+        sidebarSelectedWorkspaceForegroundNSColor(on: selectedBackground, opacity: opacity, accent: accent)
     }
 
     /// ShellX text tokens (spec §7.4) apply in a dark sidebar. A light
     /// sidebar (a matched light terminal theme) keeps the semantic colors.
     var usesShellXTextTokens: Bool { colorScheme == .dark }
 
-    /// Whether this active row sits on ShellX's default `raise` selection,
-    /// where status and metadata colors stay readable and need no flattening.
+    /// Whether this active row sits on ShellX's tinted selection, where
+    /// status and metadata colors stay readable and need no flattening.
     var usesShellXSelection: Bool {
-        model.isActive && sidebarIsShellXSelectionFill(selectedBackground)
+        model.isActive && selectionTint != nil
+    }
+
+    /// Fill behind an unselected row under the pointer: `row-hover` in
+    /// ShellX's dark sidebar, nil where the sidebar keeps its own paint.
+    var hoverBackground: NSColor? {
+        selectionTint == nil ? nil : ShellXPalette.rowHover.nsColor
     }
 
     /// Resolves semantic colors against the row's concrete cmux scheme.
@@ -56,23 +74,28 @@ struct SidebarRowPalette {
         )
     }
 
-    /// Session names: `text-hi` in a dark sidebar.
+    /// Session names: `selection-title` on ShellX's tinted selection,
+    /// `text-hi` on other rows in a dark sidebar.
     var primaryText: NSColor {
         if model.isActive { return selectedForeground(1.0) }
         return usesShellXTextTokens ? ShellXPalette.textHi.nsColor : semantic(.labelColor)
     }
 
-    /// Metadata: `muted` in a dark sidebar (also on the `raise` selection),
-    /// raised to the contrast floor over a known backdrop.
+    /// Metadata: `selection-secondary` on ShellX's tinted selection, and
+    /// `muted` on other rows in a dark sidebar, raised to the contrast floor
+    /// over a known backdrop.
     func secondary(
         _ selectedOpacity: CGFloat = 0.75,
         inactiveOpacity: CGFloat? = nil
     ) -> NSColor {
-        if usesShellXTextTokens, !model.isActive || usesShellXSelection {
+        if usesShellXSelection {
+            return ShellXPalette.selectionSecondary.nsColor
+        }
+        if usesShellXTextTokens, !model.isActive {
             return SidebarAppearanceColorResolver().readableSecondaryColor(
                 ShellXPalette.muted.nsColor,
                 for: colorScheme,
-                opacity: model.isActive ? nil : inactiveOpacity,
+                opacity: inactiveOpacity,
                 over: model.readabilityBackdropHex.flatMap { NSColor(hex: $0) }
             )
         }

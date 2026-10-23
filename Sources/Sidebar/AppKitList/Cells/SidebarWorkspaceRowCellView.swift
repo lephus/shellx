@@ -64,8 +64,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     private var lastStatusPopoverModel: SidebarWorkspaceStatusPopoverModel?
 
     private var model: SidebarWorkspaceRowModel?
-    private var selectionChromeObservers: [NSObjectProtocol] = []
-    private var workspaceSelectionChromeObserver: NSObjectProtocol?
+    private let selectionChromeObserver = SidebarSelectionChromeObserver()
     private var actions: SidebarAppKitRowActions?
     private var isPointerHovering = false
     private var contextMenuVisible = false
@@ -214,11 +213,12 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             .withAlphaComponent((style.color == nil ? 0 : style.opacity) * ((style.color?.alphaComponent) ?? 1)).cgColor
     }
 
-    /// Paints the selection fill and edge for `model`.
+    /// Paints the selection fill and edge for `model`, or ShellX's hover fill
+    /// behind an unselected row under the pointer.
     private func applySelectionChrome(_ model: SidebarWorkspaceRowModel) {
         let palette = palette(model)
         let settings = model.settings
-        let style = sidebarWorkspaceRowBackgroundStyle(
+        var style = sidebarWorkspaceRowBackgroundStyle(
             activeTabIndicatorStyle: settings.activeTabIndicatorStyle,
             isActive: model.isActive,
             isMultiSelected: model.isMultiSelected,
@@ -232,6 +232,10 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             increaseContrast: palette.increasesSelectionContrast,
             accent: palette.accent
         )
+        if isPointerHovering, !model.isActive, !model.isMultiSelected,
+           let hoverBackground = palette.hoverBackground {
+            style = SidebarWorkspaceRowBackgroundStyle(color: hoverBackground, opacity: 1)
+        }
         applyBackgroundStyle(style)
         if let edgeColor = style.edgeColor {
             backgroundView.layer?.borderWidth = 1
@@ -251,14 +255,16 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         guard let model else { return }
         let painted = paintedModel(model)
         guard painted.isActive || painted.isMultiSelected else { return }
-        // Only the subtle left-rail treatment depends on window activation and
-        // Increase Contrast; the default solid fill never changes here.
+        // The subtle left-rail treatment (window activation and Increase
+        // Contrast) and ShellX's tinted selection (window activation) change
+        // here; explicit selection fills never do.
         let settings = painted.settings
-        guard sidebarUsesSubtleSelection(
+        let followsWindowState = sidebarUsesSubtleSelection(
             activeTabIndicatorStyle: settings.activeTabIndicatorStyle,
             subtleSelection: settings.subtleSelection,
             sidebarSelectionColorHex: settings.selectionColorHex
-        ) else { return }
+        ) || palette(painted).usesShellXSelection
+        guard followsWindowState else { return }
         // Selection-derived foregrounds must resolve from the same window and
         // accessibility state as the fill. These notifications are rare, so
         // repaint the row from its existing model instead of leaving text
@@ -268,43 +274,10 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        selectionChromeObservers.forEach { NotificationCenter.default.removeObserver($0) }
-        selectionChromeObservers.removeAll()
-        workspaceSelectionChromeObserver.map { NSWorkspace.shared.notificationCenter.removeObserver($0) }
-        workspaceSelectionChromeObserver = nil
-        guard let window else { return }
-        let repaint: @Sendable (Notification) -> Void = { [weak self] _ in
+        selectionChromeObserver.observe(window) { [weak self] _ in
             MainActor.assumeIsolated { self?.repaintSelectionChrome() }
         }
-        selectionChromeObservers = [
-            NotificationCenter.default.addObserver(
-                forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main, using: repaint
-            ),
-            NotificationCenter.default.addObserver(
-                forName: NSWindow.didResignKeyNotification, object: window, queue: .main, using: repaint
-            ),
-            NotificationCenter.default.addObserver(
-                forName: NSWindow.didBecomeMainNotification, object: window, queue: .main, using: repaint
-            ),
-            NotificationCenter.default.addObserver(
-                forName: NSWindow.didResignMainNotification, object: window, queue: .main, using: repaint
-            ),
-            NotificationCenter.default.addObserver(
-                forName: NSColor.systemColorsDidChangeNotification, object: nil, queue: .main, using: repaint
-            ),
-            NotificationCenter.default.addObserver(
-                forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main, using: repaint
-            ),
-            NotificationCenter.default.addObserver(
-                forName: NSApplication.didResignActiveNotification, object: nil, queue: .main, using: repaint
-            ),
-        ]
-        workspaceSelectionChromeObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
-            object: nil,
-            queue: .main,
-            using: repaint
-        )
+        guard window != nil else { return }
         repaintSelectionChrome()
     }
 
@@ -511,7 +484,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     private func palette(_ model: SidebarWorkspaceRowModel) -> SidebarRowPalette {
         SidebarRowPalette(
             model: model,
-            isSelectionEmphasized: NSApp.isActive && (window.map { $0.isKeyWindow || $0.isMainWindow } ?? true),
+            isSelectionEmphasized: SidebarSelectionChromeObserver.isSelectionEmphasized(in: window),
             increasesSelectionContrast: model.displayAccessibility.increaseContrast
         )
     }
@@ -777,6 +750,11 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     var closeButtonPaintForTesting: (isHidden: Bool, alpha: CGFloat) {
         (closeButton.isHidden, closeButton.alphaValue)
     }
+
+    /// The fill painted behind the row's content (selection or hover).
+    var backgroundPaintForTesting: CGColor? {
+        backgroundView.layer?.backgroundColor
+    }
 #endif
 
     private func configureStatusSlot(
@@ -903,13 +881,17 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             kind: model.snapshot.statusPillGlyphKind ?? .terminal,
             tooltip: ""
         ).applyingUnread(model.unreadCount, latestNotificationText: nil)
-        statusPillView.configure(glyphKind: pillGlyph.kind, fontScale: model.fontScale)
+        statusPillView.configure(
+            glyphKind: pillGlyph.kind,
+            fontScale: model.fontScale,
+            isOnSelection: palette.usesShellXSelection
+        )
         guard let glyph, glyph.isDrawn else { return }
         compactStatusGlyphView.configure(
             glyph,
             pointSize: model.scaled(11),
-            // The ShellX `raise` selection keeps status colors readable, so
-            // only other selection fills flatten the glyph.
+            // ShellX's tinted selection keeps status colors readable, so only
+            // other selection fills flatten the glyph.
             color: glyph.color(
                 isActive: model.isActive && !palette.usesShellXSelection,
                 selected: palette.selectedForeground(0.95),

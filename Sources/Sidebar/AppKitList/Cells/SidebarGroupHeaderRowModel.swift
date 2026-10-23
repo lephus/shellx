@@ -2,6 +2,7 @@ import AppKit
 import CoreGraphics
 import CmuxFoundation
 import Foundation
+import ShellXBrand
 import SwiftUI
 
 /// Value-snapshot render input for one pure-AppKit sidebar group header row.
@@ -23,6 +24,10 @@ struct SidebarGroupHeaderRowModel: Equatable, Hashable {
     /// Hairline painted while this header is anchor-active; nil when subtle
     /// selection is off.
     var anchorActiveEdgeColor: NSColor? = nil
+    /// ShellX's selection tint an anchor-active header paints, the same fill
+    /// as a selected workspace row; nil keeps the neutral wash (explicit
+    /// selection settings or a light sidebar).
+    var anchorActiveSelectionTint: ShellXSelectionTint? = nil
     let memberCount: Int
     var anchorUnreadCount: Int
     var canMarkRead: Bool
