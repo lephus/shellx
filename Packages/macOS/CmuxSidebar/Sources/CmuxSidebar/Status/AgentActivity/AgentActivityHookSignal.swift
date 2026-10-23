@@ -67,13 +67,14 @@ public enum AgentActivityHookSignal: Sendable, Equatable {
     public init?(claudeSubcommand: String, payload: String) {
         switch claudeSubcommand {
         case "prompt-submit":
-            guard let object = Self.jsonObject(in: payload) else { return nil }
+            guard let object = Self.jsonObject(in: Data(payload.utf8)) else { return nil }
             self = .turnStarted(slashCommandName: Self.slashCommandName(in: object["prompt"] as? String))
         case "pre-tool-use":
-            // Every tool call passes through here, so skip the JSON parse unless the
-            // payload can name one of the two tools.
-            guard payload.contains("Skill") || payload.contains("Workflow"),
-                  let object = Self.jsonObject(in: payload),
+            // Every tool call passes through here, so skip the JSON parse unless the payload
+            // text can name one of the two tools. The check and the parse share one UTF-8 copy.
+            let bytes = Data(payload.utf8)
+            guard Self.mentionsSkillOrWorkflow(bytes),
+                  let object = Self.jsonObject(in: bytes),
                   let toolName = object["tool_name"] as? String else { return nil }
             let toolInput = object["tool_input"] as? [String: Any]
             switch toolName {
@@ -85,7 +86,7 @@ public enum AgentActivityHookSignal: Sendable, Equatable {
                 return nil
             }
         case "stop", "stop-failure":
-            guard let object = Self.jsonObject(in: payload) else { return nil }
+            guard let object = Self.jsonObject(in: Data(payload.utf8)) else { return nil }
             self = .turnEnded(hasBackgroundWork: Self.hasRunningBackgroundTask(in: object))
         case "session-end":
             self = .sessionEnded
@@ -122,18 +123,37 @@ extension AgentActivityHookSignal {
         pattern: #"(?:\bname|'name'|"name")\s*:\s*['"]([^'"]+)['"]"#
     )
 
+    /// The `Skill` and `Workflow` tool names, as the UTF-8 bytes to look for in a payload.
+    private static let toolWords: [[UInt8]] = [Array("Skill".utf8), Array("Workflow".utf8)]
+
     /// The payload as a JSON object, or `nil` when it is anything else.
-    private static func jsonObject(in payload: String) -> [String: Any]? {
-        try? JSONSerialization.jsonObject(with: Data(payload.utf8)) as? [String: Any]
+    private static func jsonObject(in payload: Data) -> [String: Any]? {
+        try? JSONSerialization.jsonObject(with: payload) as? [String: Any]
+    }
+
+    /// Whether the payload's text contains `Skill` or `Workflow`.
+    ///
+    /// A byte search, not `String.contains`: that is Unicode-aware and takes milliseconds
+    /// on a large payload, many times the cost of the JSON parse this check exists to spare.
+    /// The bytes are matched as they are, and the parse that follows decides what the
+    /// payload means.
+    private static func mentionsSkillOrWorkflow(_ payload: Data) -> Bool {
+        payload.withUnsafeBytes { bytes in
+            guard let base = bytes.baseAddress else { return false }
+            return toolWords.contains { word in
+                word.withUnsafeBytes { memmem(base, bytes.count, $0.baseAddress, word.count) != nil }
+            }
+        }
     }
 
     /// The command a prompt runs: a leading `/name`, else a `<command-name>` tag.
+    ///
+    /// The tag pattern runs over the whole prompt without a guard: the regex scans a large
+    /// prompt faster than `String.contains` would, so a guard would only add cost.
     private static func slashCommandName(in prompt: String?) -> String? {
         guard let prompt else { return nil }
-        if let name = firstCapture(of: slashCommandPattern, in: prompt) { return name }
-        // Scanning the whole prompt is only worth it when it can hold the tag.
-        guard prompt.contains("<command-name>") else { return nil }
-        return firstCapture(of: commandNameTagPattern, in: prompt)
+        return firstCapture(of: slashCommandPattern, in: prompt)
+            ?? firstCapture(of: commandNameTagPattern, in: prompt)
     }
 
     /// The workflow's `name` input, else the name in its script's `meta` literal.
@@ -183,7 +203,10 @@ extension AgentActivityHookSignal {
                 case "/" where script[next...].hasPrefix("/"):
                     next = script[next...].firstIndex(where: \.isNewline) ?? script.endIndex
                 case "/" where script[next...].hasPrefix("*"):
-                    next = script[script.index(after: next)...].range(of: "*/")?.upperBound ?? script.endIndex
+                    // `firstRange(of:)` stops at the first match. Foundation's `range(of:)` would
+                    // copy the rest of a bridged script on every call, which is quadratic in the
+                    // number of comments.
+                    next = script[script.index(after: next)...].firstRange(of: "*/")?.upperBound ?? script.endIndex
                 default:
                     break
                 }

@@ -19,6 +19,23 @@ struct AgentActivityHookSignalTests {
         try json(["tool_name": "Workflow", "tool_input": ["script": script]])
     }
 
+    /// The text the way the app receives it: pulled back out of parsed JSON. With
+    /// non-ASCII characters that is a string bridged from Foundation, which has no
+    /// contiguous UTF-8 storage, rather than a native Swift string.
+    private func asReceived(_ text: String) throws -> String {
+        let data = try JSONSerialization.data(withJSONObject: ["text": text])
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        return try #require(object?["text"] as? String)
+    }
+
+    /// About 72 KiB of ASCII text that contains neither `Skill` nor `Workflow`.
+    private static let asciiFiller = String(repeating: "abcdefghij ", count: 6_600)
+
+    /// About 95 KiB of non-ASCII text that contains neither `Skill` nor `Workflow`.
+    private static let vietnameseFiller = String(repeating: "Đã xong việc rồi nhé ", count: 3_400)
+
+    private static let largePayloadSize = 64 * 1_024
+
     // MARK: prompt-submit
 
     @Test func promptSubmitPlainResets() {
@@ -77,6 +94,28 @@ struct AgentActivityHookSignalTests {
         )
         // Built-in commands parse like any other.
         #expect(signal("prompt-submit", #"{"prompt":"/clear"}"#) == .turnStarted(slashCommandName: "clear"))
+    }
+
+    @Test func promptCommandMustOpenThePrompt() throws {
+        // The match is anchored to the start of the prompt, not to each of its lines.
+        #expect(signal("prompt-submit", #"{"prompt":"hello\n/commit"}"#) == .turnStarted(slashCommandName: nil))
+        #expect(signal("prompt-submit", #"{"prompt":"hello /commit"}"#) == .turnStarted(slashCommandName: nil))
+
+        // Large prompts read the same way, with or without a command tag at the very end.
+        let plain = try json(["prompt": Self.asciiFiller])
+        #expect(plain.utf8.count >= Self.largePayloadSize)
+        #expect(signal("prompt-submit", plain) == .turnStarted(slashCommandName: nil))
+        let tagged = try json(["prompt": Self.asciiFiller + "<command-name>/deploy</command-name>"])
+        #expect(signal("prompt-submit", tagged) == .turnStarted(slashCommandName: "deploy"))
+
+        // The same when the text arrives bridged from Foundation.
+        let receivedPlain = try asReceived(json(["prompt": Self.vietnameseFiller]))
+        #expect(receivedPlain.utf8.count >= Self.largePayloadSize)
+        #expect(signal("prompt-submit", receivedPlain) == .turnStarted(slashCommandName: nil))
+        let receivedTagged = try asReceived(
+            json(["prompt": Self.vietnameseFiller + "<command-name>/triển-khai</command-name>"])
+        )
+        #expect(signal("prompt-submit", receivedTagged) == .turnStarted(slashCommandName: "triển-khai"))
     }
 
     @Test func promptSubmitCommandNameTag() {
@@ -241,6 +280,72 @@ struct AgentActivityHookSignalTests {
         #expect(signal("pre-tool-use", lookalike) == .workflowLaunched(name: nil))
     }
 
+    @Test func preToolUseWorkflowReadsNameAfterManyBlockComments() throws {
+        // Thousands of comments inside the literal are skipped in one pass, and the name after them is found.
+        let comments = String(repeating: "/* a */", count: 8_000)
+        let ascii = try workflowPayload(script: "export const meta = {\n\(comments)\n  name: 'after-comments',\n}")
+        #expect(signal("pre-tool-use", ascii) == .workflowLaunched(name: "after-comments"))
+
+        // Empty comments are comments too.
+        let empty = String(repeating: "/**/", count: 16_000)
+        let emptyPayload = try workflowPayload(script: "export const meta = {\n\(empty)\n  name: 'after-empty',\n}")
+        #expect(signal("pre-tool-use", emptyPayload) == .workflowLaunched(name: "after-empty"))
+
+        // With a non-ASCII character in the script, which reaches the scanner as a string
+        // bridged from Foundation.
+        let nonASCII = try workflowPayload(
+            script: "export const meta = {\n  /* café */\n\(comments)\n  name: 'après-commentaires',\n}"
+        )
+        #expect(signal("pre-tool-use", nonASCII) == .workflowLaunched(name: "après-commentaires"))
+
+        // The `*` that opens a comment cannot also close it: `/*/` is not a whole comment.
+        let tricky = try workflowPayload(script: "export const meta = {\n  /*/ } */\n  name: 'tricky-comment',\n}")
+        #expect(signal("pre-tool-use", tricky) == .workflowLaunched(name: "tricky-comment"))
+    }
+
+    @Test func preToolUseWorkflowWithUnterminatedBlockCommentReadsEarlierName() throws {
+        // A comment that never closes swallows the rest of the script, however long it is,
+        // and the name written before it still counts.
+        let filler = String(repeating: "z", count: 60_000)
+        let named = try workflowPayload(
+            script: "export const meta = { name: 'before-comment', description: 'd' /* never closed " + filler
+        )
+        #expect(signal("pre-tool-use", named) == .workflowLaunched(name: "before-comment"))
+
+        let namedNonASCII = try workflowPayload(
+            script: "export const meta = { name: 'trước-bình-luận', description: 'café' /* never closed " + filler
+        )
+        #expect(signal("pre-tool-use", namedNonASCII) == .workflowLaunched(name: "trước-bình-luận"))
+
+        // With no name before it, none is invented.
+        let nameless = try workflowPayload(script: "export const meta = { description: 'd' /* never closed " + filler)
+        #expect(signal("pre-tool-use", nameless) == .workflowLaunched(name: nil))
+    }
+
+    @Test func preToolUseWorkflowReadsNameAfterEscapedQuotesAndTemplateLiterals() throws {
+        // An escaped quote, an escaped backslash before a closing quote, and a template literal
+        // holding quotes, braces and an escaped backtick all sit in front of the name.
+        let script = #"""
+        export const meta = {
+          description: 'it\'s a "quoted" } brace',
+          whenToUse: `template with 'single' and "double" quotes, a { and an escaped \` backtick`,
+          path: 'C:\\temp\\',
+          name: 'after-escapes',
+        }
+        """#
+        let payload = try workflowPayload(script: script)
+        #expect(signal("pre-tool-use", payload) == .workflowLaunched(name: "after-escapes"))
+
+        let double = #"""
+        export const meta = {
+          description: "she said \"hi\" and left {",
+          name: "after-double-quotes",
+        }
+        """#
+        let doublePayload = try workflowPayload(script: double)
+        #expect(signal("pre-tool-use", doublePayload) == .workflowLaunched(name: "after-double-quotes"))
+    }
+
     @Test func preToolUseWorkflowWithoutNameIsUnnamed() throws {
         #expect(signal("pre-tool-use", #"{"tool_name":"Workflow"}"#) == .workflowLaunched(name: nil))
         #expect(
@@ -281,6 +386,64 @@ struct AgentActivityHookSignalTests {
         // The word appears, but there is no tool name to read.
         #expect(signal("pre-tool-use", #"{"tool_input":{"skill":"pdf"}}"#) == nil)
         #expect(signal("pre-tool-use", #"{"tool_name":42,"tool_input":{"skill":"Skill"}}"#) == nil)
+    }
+
+    @Test func preToolUseSkipsLargePayloadsWithoutToolWords() throws {
+        // Neither word appears, so the payload is not even parsed; the answer is the one parsing would give.
+        let bash = try json(["tool_name": "Bash", "tool_input": ["command": "echo " + Self.asciiFiller]])
+        #expect(bash.utf8.count >= Self.largePayloadSize)
+        #expect(signal("pre-tool-use", bash) == nil)
+
+        let bashNonASCII = try asReceived(
+            json(["tool_name": "Bash", "tool_input": ["command": "echo " + Self.vietnameseFiller]])
+        )
+        #expect(bashNonASCII.utf8.count >= Self.largePayloadSize)
+        #expect(signal("pre-tool-use", bashNonASCII) == nil)
+
+        // The check reads the payload text itself, so a tool name spelled only through a JSON
+        // escape (a backslash and `u0053` for the `S`) never reaches the parser.
+        let escapedS = "\\" + "u0053"
+        let escaped = #"{"tool_name":"\#(escapedS)kill","tool_input":{"skill":"pdf"}}"#
+        #expect(escaped.contains(escapedS) && !escaped.contains("Skill") && !escaped.contains("Workflow"))
+        #expect(signal("pre-tool-use", escaped) == nil)
+    }
+
+    @Test func preToolUseFindsToolWordsAnywhereInLargePayloads() throws {
+        let half = String(Self.asciiFiller.prefix(Self.asciiFiller.count / 2))
+        let halfNonASCII = String(Self.vietnameseFiller.prefix(Self.vietnameseFiller.count / 2))
+        let skills = [
+            // The word at the start, in the middle and at the very end of the payload.
+            #"{"tool_name":"Skill","tool_input":{"skill":"pdf"},"padding":"\#(Self.asciiFiller)"}"#,
+            #"{"padding":"\#(half)","tool_name":"Skill","tool_input":{"skill":"pdf"},"more":"\#(half)"}"#,
+            #"{"padding":"\#(Self.asciiFiller)","tool_input":{"skill":"pdf"},"tool_name":"Skill"}"#,
+            #"{"tool_name":"Skill","tool_input":{"skill":"pdf"},"padding":"\#(Self.vietnameseFiller)"}"#,
+            #"{"padding":"\#(halfNonASCII)","tool_name":"Skill","tool_input":{"skill":"pdf"},"more":"\#(halfNonASCII)"}"#,
+            #"{"padding":"\#(Self.vietnameseFiller)","tool_input":{"skill":"pdf"},"tool_name":"Skill"}"#,
+        ]
+        for payload in skills {
+            #expect(payload.utf8.count >= Self.largePayloadSize)
+            #expect(signal("pre-tool-use", payload) == .skillInvoked(name: "pdf"))
+            // And as the app receives it, bridged from Foundation when the text is not ASCII.
+            #expect(signal("pre-tool-use", try asReceived(payload)) == .skillInvoked(name: "pdf"))
+        }
+
+        let workflows = [
+            #"{"tool_name":"Workflow","tool_input":{"name":"deep-review"},"padding":"\#(Self.asciiFiller)"}"#,
+            #"{"padding":"\#(Self.asciiFiller)","tool_input":{"name":"deep-review"},"tool_name":"Workflow"}"#,
+            #"{"padding":"\#(Self.vietnameseFiller)","tool_input":{"name":"deep-review"},"tool_name":"Workflow"}"#,
+        ]
+        for payload in workflows {
+            #expect(payload.utf8.count >= Self.largePayloadSize)
+            #expect(signal("pre-tool-use", payload) == .workflowLaunched(name: "deep-review"))
+            #expect(signal("pre-tool-use", try asReceived(payload)) == .workflowLaunched(name: "deep-review"))
+        }
+
+        // A word that only appears inside another tool's large input passes the check, and the tool decides.
+        let bashMentioningSkill = try json([
+            "tool_name": "Bash",
+            "tool_input": ["command": Self.asciiFiller + "Skill"],
+        ])
+        #expect(signal("pre-tool-use", bashMentioningSkill) == nil)
     }
 
     // MARK: stop
