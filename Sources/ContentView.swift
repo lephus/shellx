@@ -11504,6 +11504,8 @@ struct VerticalTabsSidebar: View, Equatable {
     @Environment(\.sidebarLazyContractProbe) private var sidebarLazyContractProbe
 #endif
     @Environment(\.colorScheme) private var sidebarColorScheme
+    /// Read by snapshot refreshes: observation tasks hold an older copy of this view.
+    @State private var snapshotSidebarColorScheme = ColorScheme.dark
     @Environment(\.sidebarReadabilityBackdrop) private var sidebarReadabilityBackdrop
     @Environment(\.cmuxGlobalFontMagnificationPercent) private var sidebarGlobalFontMagnificationPercent
     @State private var sidebarDisplayAccessibility = DisplayAccessibilityOptions.current
@@ -12146,6 +12148,13 @@ struct VerticalTabsSidebar: View, Equatable {
             }
         }
         .onChange(of: renderContext.showsAgentActivity) { _, _ in
+            if isPresented {
+                refreshWorkspaceSnapshots()
+            }
+        }
+        .onChange(of: sidebarColorScheme, initial: true) { _, colorScheme in
+            // Agent name effects play only in a dark sidebar (snapshot presentation key).
+            snapshotSidebarColorScheme = colorScheme
             if isPresented {
                 refreshWorkspaceSnapshots()
             }
@@ -13247,6 +13256,7 @@ struct VerticalTabsSidebar: View, Equatable {
                 SidebarWorkspaceSnapshotFactory.presentationKey(
                     settings: settings,
                     showsAgentActivity: showsAgentActivity,
+                    sidebarColorScheme: snapshotSidebarColorScheme,
                     customColorHex: workspaceById[workspaceId].flatMap { workspace in
                         workspace.customColor
                             ?? originColorHex(for: workspace, mirrorDestinations: mirrorDestinations)
@@ -13281,6 +13291,7 @@ struct VerticalTabsSidebar: View, Equatable {
             workspace: workspace,
             settings: settings,
             showsAgentActivity: showsAgentActivity,
+            sidebarColorScheme: snapshotSidebarColorScheme,
             originColorHex: originColorHex(for: workspace, mirrorDestinations: mirrorDestinations),
             hostTitleSuffix: hostTitleSuffixes[workspace.id]
         ).makeSnapshot()

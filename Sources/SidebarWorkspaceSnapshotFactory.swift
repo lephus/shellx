@@ -1,6 +1,7 @@
 import CmuxSidebar
 import CmuxWorkspaces
 import Foundation
+import SwiftUI
 
 /// Builds the immutable value passed across the workspace sidebar's
 /// `LazyVStack` boundary.
@@ -15,6 +16,9 @@ struct SidebarWorkspaceSnapshotFactory {
     let workspace: Workspace
     let settings: SidebarTabItemSettingsSnapshot
     let showsAgentActivity: Bool
+    /// The color scheme the sidebar draws in. Agent name effects play only in a
+    /// dark sidebar; the default keeps them off for callers that do not say.
+    var sidebarColorScheme: ColorScheme = .light
     /// Resolved per-host origin color (hex), or nil when the beta flag is off or
     /// the workspace has no host. Resolved by the caller above the row boundary
     /// and passed in as a plain value; a manual `workspace.customColor` still wins.
@@ -30,6 +34,7 @@ struct SidebarWorkspaceSnapshotFactory {
         workspace: Workspace,
         settings: SidebarTabItemSettingsSnapshot,
         showsAgentActivity: Bool,
+        sidebarColorScheme: ColorScheme = .light,
         originColorHex: String? = nil,
         hostTitleSuffix: String? = nil
     ) {
@@ -37,6 +42,7 @@ struct SidebarWorkspaceSnapshotFactory {
             workspace: workspace,
             settings: settings,
             showsAgentActivity: showsAgentActivity,
+            sidebarColorScheme: sidebarColorScheme,
             originColorHex: originColorHex,
             hostTitleSuffix: hostTitleSuffix,
             catalog: SurfaceCatalog.shared
@@ -49,6 +55,7 @@ struct SidebarWorkspaceSnapshotFactory {
         workspace: Workspace,
         settings: SidebarTabItemSettingsSnapshot,
         showsAgentActivity: Bool,
+        sidebarColorScheme: ColorScheme = .light,
         originColorHex: String? = nil,
         hostTitleSuffix: String? = nil,
         catalog: SurfaceCatalog
@@ -56,6 +63,7 @@ struct SidebarWorkspaceSnapshotFactory {
         self.workspace = workspace
         self.settings = settings
         self.showsAgentActivity = showsAgentActivity
+        self.sidebarColorScheme = sidebarColorScheme
         self.originColorHex = originColorHex
         self.hostTitleSuffix = hostTitleSuffix
         self.catalog = catalog
@@ -170,6 +178,9 @@ struct SidebarWorkspaceSnapshotFactory {
                 },
                 hasActiveAgent: activeCodingAgentCount > 0
             )).kind
+        let nameEffect = Self.showsAgentNameEffects(settings: settings, sidebarColorScheme: sidebarColorScheme)
+            ? workspace.strongestAgentNameEffect
+            : nil
         return SidebarWorkspaceSnapshotBuilder.Snapshot(
             presentationKey: presentationKey,
             title: workspace.title,
@@ -230,6 +241,8 @@ struct SidebarWorkspaceSnapshotFactory {
             deviceWorkspaceLabel: cloud?.deviceLabel,
             compactStatusGlyph: compactStatusGlyph,
             statusPillGlyphKind: statusPillGlyphKind, // ShellX
+            nameEffect: nameEffect,
+            agentActivityText: nameEffect.map { AgentActivityText().text(for: $0) },
             hostTitleSuffix: hostTitleSuffix
         )
     }
@@ -238,6 +251,7 @@ struct SidebarWorkspaceSnapshotFactory {
         Self.presentationKey(
             settings: settings,
             showsAgentActivity: showsAgentActivity,
+            sidebarColorScheme: sidebarColorScheme,
             customColorHex: workspace.customColor ?? originColorHex,
             hasManualCustomColor: workspace.customColor != nil,
             hostTitleSuffix: hostTitleSuffix
@@ -247,6 +261,7 @@ struct SidebarWorkspaceSnapshotFactory {
     static func presentationKey(
         settings: SidebarTabItemSettingsSnapshot,
         showsAgentActivity: Bool,
+        sidebarColorScheme: ColorScheme = .light,
         customColorHex: String?,
         hasManualCustomColor: Bool = false,
         hostTitleSuffix: String? = nil
@@ -257,6 +272,7 @@ struct SidebarWorkspaceSnapshotFactory {
             showsGitBranch: settings.showsGitBranch,
             usesViewportAwarePath: settings.usesLastSegmentPath,
             showsAgentActivity: showsAgentActivity,
+            showsAgentNameEffects: showsAgentNameEffects(settings: settings, sidebarColorScheme: sidebarColorScheme),
             compactsAgentStatus: settings.compactsAgentStatus,
             compactStatusIcons: settings.compactStatusIcons,
             visibleAuxiliaryDetails: settings.visibleAuxiliaryDetails,
@@ -264,6 +280,17 @@ struct SidebarWorkspaceSnapshotFactory {
             hasManualCustomColor: hasManualCustomColor,
             hostTitleSuffix: hostTitleSuffix
         )
+    }
+
+    /// Whether rows play agent name effects: "Show Loading Spinner"
+    /// (`sidebar.showAgentActivity`) is on and the sidebar is dark. The spinner
+    /// itself also waits on an experiment flag (`showsAgentActivity`); the
+    /// effects follow the setting alone.
+    static func showsAgentNameEffects(
+        settings: SidebarTabItemSettingsSnapshot,
+        sidebarColorScheme: ColorScheme
+    ) -> Bool {
+        settings.details.showAgentActivity && sidebarColorScheme == .dark
     }
 
     private var visibleCustomDescription: String? {

@@ -3227,6 +3227,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     let sidebarMetadata = WorkspaceSidebarMetadataModel(
         limitProvider: WorkspaceSidebarLogEntryLimitProvider()
     )
+    let agentActivity = WorkspaceAgentActivityModel()
     var statusEntries: [String: SidebarStatusEntry] {
         get { sidebarMetadata.statusEntries }
         set { sidebarMetadata.statusEntries = newValue }

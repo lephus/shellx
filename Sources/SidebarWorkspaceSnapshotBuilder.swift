@@ -10,6 +10,9 @@ struct SidebarWorkspaceSnapshotBuilder {
         let showsGitBranch: Bool
         let usesViewportAwarePath: Bool
         let showsAgentActivity: Bool
+        // ShellX: rows play agent name effects ("Show Loading Spinner" on and a
+        // dark sidebar). In the key so cached rows rebuild when that flips.
+        var showsAgentNameEffects = false
         var compactsAgentStatus = false
         var compactStatusIcons: [String: String] = [:]
         let visibleAuxiliaryDetails: SidebarWorkspaceAuxiliaryDetailVisibility
@@ -98,6 +101,14 @@ struct SidebarWorkspaceSnapshotBuilder {
         /// ShellX: the agent state behind the row's status pill, resolved
         /// whether or not `sidebar.compactAgentStatus` is on (W1 Task 10).
         var statusPillGlyphKind: SidebarCompactStatusGlyph.Kind? = nil
+        /// ShellX: the effect the row's name plays, the strongest among the
+        /// workspace's panes. Nil when no agent works, when "Show Loading
+        /// Spinner" (`sidebar.showAgentActivity`) is off, and in a light sidebar.
+        var nameEffect: AgentNameEffect? = nil
+        /// ShellX: what the agent behind ``nameEffect`` is doing, such as
+        /// "Skill · brainstorming", for the row's agent status line. Nil
+        /// exactly when ``nameEffect`` is.
+        var agentActivityText: String? = nil
 
         var remoteWorkspaceBadgeLabel: String? { deviceWorkspaceLabel ?? cloudWorkspaceLabel }
         var remoteWorkspaceBadgeSymbol: String { deviceWorkspaceLabel == nil ? "cloud" : "desktopcomputer" }
