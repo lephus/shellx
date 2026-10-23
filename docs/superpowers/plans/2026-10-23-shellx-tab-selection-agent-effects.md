@@ -331,7 +331,7 @@ git commit -m "feat(shellx): the app tracks each pane's skill and workflow activ
   - `struct SystemTitleEffectEnvironment: TitleEffectEnvironment`: cửa sổ có `.visible`, view không ẩn, và đọc Reduce Motion từ `NSWorkspace`.
   - `final class TitleEffectView: NSView`:
     - `init(environment: any TitleEffectEnvironment = SystemTitleEffectEnvironment())`;
-    - `func configure(text: NSAttributedString, maximumNumberOfLines: Int, kind: TabActivity.Kind?, generation: UInt64, style: TitleEffectStyle)`;
+    - `func configure(text: NSAttributedString, maximumNumberOfLines: Int, kind: TabActivity.Kind?, style: TitleEffectStyle)` (đã đổi khi làm 6a: bỏ `generation`, việc lóe sáng chuyển sang `ActivityFlashView`);
     - `var isPresentationActive: Bool`.
     - Bên trong: một `CAGradientLayer`, mask là ảnh chữ vẽ đúng cách cắt "…" và số dòng. Các khoá animation: `titleEffect.sweep` (working), `titleEffect.flow` (highlight), `titleEffect.flash` (một lần khi `generation` đổi lúc đang highlight).
     - Khi không được chạy thì gỡ animation và vẽ màu đứng yên (spec §6.4, Giảm chuyển động). Lắng nghe che cửa sổ và Reduce Motion như `GPUSpinnerNSView`.
@@ -387,7 +387,7 @@ git commit -m "feat(shellx): pane tabs shimmer while their agent works and light
 - Test: thêm vào `cmuxTests/SidebarAppKitRowCellTests.swift`, hoặc file mới `cmuxTests/ShellXSidebarNameEffectTests.swift`
 
 **Interfaces:**
-- Consumes: `TitleEffectView`, `ActivityGlyphView`, `TitleEffectStyle`, `TabActivity.Kind` (Task 6); `Snapshot.nameEffect`, `Snapshot.agentActivityText` (Task 5); `ShellXBonsplitStyles.titleEffectStyle` (Task 6).
+- Consumes: `TitleEffectView.configure(text:maximumNumberOfLines:kind:style:)`, `ActivityGlyphView`, `ActivityFlashView.configure(kind:generation:style:)` cùng `flashedGeneration` và `cornerRadius` (lóe sáng phủ cả dòng; ô dùng lại thì đặt `flashedGeneration` trước để không lóe lại), `TitleEffectStyle`, `TabActivity.Kind` (Task 6); `Snapshot.nameEffect`, `Snapshot.agentActivityText` (Task 5); `ShellXBonsplitStyles.titleEffectStyle` (Task 6). Lớp hiệu ứng phủ đúng vùng chữ của `NSTextField` (lùi vào 2 pt so với khung field).
 - Produces: `final class SidebarRowNameEffectPresenter` với `init(titleView: NSTextField, host: NSView)`, `func apply(effect: AgentNameEffect?, isRenaming: Bool, style: TitleEffectStyle)`, `func layout()` và `var isPresentationActive: Bool`.
 
 - [ ] **Step 1: Viết test fail** (cấu hình ô bằng model giống các test sẵn có trong `SidebarAppKitRowCellTests`):
