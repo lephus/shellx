@@ -32,6 +32,9 @@
   - Ký hiệu `· ✢ ✳ ✶ ✻ ✽`, mỗi hình 0.18 s, màu `#e8c468` khi đang làm việc.
 - "Màu nhấn" là `CmuxAccentColor` của app (mặc định `ShellXPalette.primary` `#60a5fa`), không phải `NSColor.controlAccentColor`.
 - Chỉ đổi giao diện tối. Nếu người dùng đã đặt `sidebarSelectionColorHex`, chọn kiểu `solidFill`, bật subtle selection, hoặc sidebar đang sáng, thì giữ nguyên hành vi hiện tại.
+- Thanh tab sáng (theme terminal sáng): app không đặt `selectedTabStyle` và `titleEffectStyle`, nên thanh tab trông như hiện nay và không có hiệu ứng. Sidebar sáng cũng không có hiệu ứng tên.
+- Hiệu ứng tên, ở sidebar lẫn thanh tab, chỉ có khi cài đặt `sidebar.showAgentActivity` ("Show Loading Spinner", mặc định bật) đang bật. Trong lúc có hiệu ứng, dòng sidebar ẩn spinner và ẩn nhãn "chạy"; các nhãn khác giữ nguyên.
+- Mức tương phản 4.5:1 chỉ bảo đảm, và chỉ test, với màu nhấn mặc định `#60a5fa`.
 - Chữ mới qua `String(localized:defaultValue:)`, đủ 10 ngôn ngữ (`en de fr ar es zh-Hant zh-Hans ko ja vi`). Chạy `./scripts/localize-changes` và `python3 scripts/localization_catalog.py check`.
 - Thêm file vào `cmuxTests/` thì chạy `./scripts/sync-test-wiring`. Thêm file vào `Sources/` thì chạy `./scripts/wire-app-sources.py`.
 - Chỉ chạy thử bằng bản build có tag. Không mở, tắt hay thay `/Applications/ShellX.app`.
@@ -128,6 +131,7 @@ git -C vendor/bonsplit commit -m "Selected tab style: tinted fill, bold title an
 - [ ] **Step 8: Rê chuột và nhãn trạng thái.**
   - Dòng chưa chọn, đang rê chuột, ở sidebar tối mặc định thì nền là `rowHover`. Bộ điều khiển đã có trạng thái hover (`SidebarWorkspaceTableController.swift` khoảng 2158-2170).
   - `SidebarStatusPillView` có thêm `isOnSelection: Bool`. Khi bật, vẽ `selectionPillBacking` dưới lớp 12%, và nhãn "chờ bạn" dùng viền `selectionWaitingRing`.
+- [ ] **Step 8b: Đầu nhóm workspace.** Khi workspace neo của nhóm đang được chọn, `SidebarGroupHeaderRowView` (nền ở `headerBackgroundColor`, khoảng dòng 205-207 và 374-388) dùng cùng nền `sidebarFill(isEmphasized:)` và màu chữ `selectionTitle`, với cùng điều kiện như dòng phiên (sidebar tối, không có cài đặt chọn riêng). Test `groupHeaderOfSelectedAnchorUsesSelectionFill` đặt trong `ShellXSidebarSelectionTests`, kiểm qua hàm tính màu của đầu nhóm.
 - [ ] **Step 9: Chạy lại test app, phải pass.** Lệnh như Step 6, thêm `SidebarRowPaletteTests SidebarWorkspaceSelectionColorTests SidebarAppKitRowCellTests`.
 - [ ] **Step 10: Commit.**
 ```bash
@@ -157,8 +161,9 @@ git commit -m "feat(shellx): the selected session row is a soft accent fill that
 - [ ] **Step 3: Viết test fail** `ShellXBonsplitStylesTests`:
   - `defaultAccentTabStyle`: với `ShellXPalette.primary`, `selectedTabStyle.fillHex` ứng với `#60a5fa` alpha 0.16, `inactiveWindowFillHex` alpha 0.12, `unfocusedPaneFillHex` ứng với `#e6e2f2` alpha 0.07, `titleHex == "#f1f5ff"`, `indicatorHex` ứng với `#60a5fa`, `unfocusedPaneIndicatorHex == "#5b5478"`, `indicatorThickness == 2`.
   - `customAccentKeepsItsHue`: accent `#ff8800` thì `fillHex` mang màu đó.
+  - `lightTabBarGetsNoStyle`: hàm quyết định có gắn style hay không trả "không" khi nền terminal sáng (ví dụ `#ffffff`), và trả "có" với `#0b0716`. Dùng hàm đo độ sáng có sẵn trong app; không viết hàm mới nếu đã có.
 - [ ] **Step 4: Chạy, phải fail.** Lệnh: `scripts/shellx/test-app.sh ShellXBonsplitStylesTests`.
-- [ ] **Step 5: Thêm `ShellXBonsplitStyles` và truyền `selectedTabStyle` vào `Appearance`** ở `Workspace.bonsplitAppearance` và trong `DockSplitStore+Appearance.swift`.
+- [ ] **Step 5: Thêm `ShellXBonsplitStyles` và truyền `selectedTabStyle` vào `Appearance`** ở `Workspace.bonsplitAppearance` và trong `DockSplitStore+Appearance.swift`. Khi nền terminal sáng thì truyền `nil`.
   - Màu nhấn lấy từ cùng nguồn với `SidebarTabItemSettingsSnapshot.accentColor` (khoá `appAccentColor`, `appAccentColorCustomHex`), đổi sang scheme tối.
   - Khi người dùng đổi màu nhấn thì dựng lại appearance qua đường làm mới chrome hiện có (`CmuxAccentColorObserver`).
 - [ ] **Step 6: Chạy test, phải pass,** rồi build app: `CMUX_DEV_BACKEND_MODE=local ./scripts/reload.sh --tag tabfx --build-only`. Kết quả mong đợi: build thành công.
@@ -209,11 +214,12 @@ Quy tắc của `AgentActivityHookSignal.init?` (spec §6.6). Trả `nil` với 
 
 Với `pre-tool-use`, kiểm tra rẻ trước khi parse JSON: payload phải chứa `Skill` hoặc `Workflow`.
 
-Bảng chuyển trạng thái của `AgentActivityMarkerTable.apply`:
-- `turnStarted(nil)` xoá dấu. `turnStarted("x")` đặt dấu skill `x`.
+Bảng chuyển trạng thái của `AgentActivityMarkerTable.apply` (đã sửa theo builder check, xem sổ SDD):
+- `turnStarted(nil)` xoá dấu skill, giữ dấu workflow. `turnStarted("x")` đặt dấu skill `x`, thay mọi dấu cũ.
 - `skillInvoked` và `workflowLaunched` đặt dấu tương ứng.
 - `turnEnded(false)` xoá mọi dấu. `turnEnded(true)` chỉ giữ dấu workflow.
 - `sessionEnded` xoá.
+- `stop` mang cả StopFailure. `hasBackgroundWork` chỉ tính `background_tasks[].status == "running"`, không tính `session_crons`.
 - Mỗi lần đặt dấu thì `generation` lấy giá trị tiếp theo của một bộ đếm tăng dần của cả bảng.
 
 Bảng của `AgentNameEffectResolution.effect`:
@@ -285,6 +291,7 @@ git commit -m "feat(shellx): agent activity markers and name effects derived fro
   - `runningPanelWithSkillMarkerShowsSkill`: đặt lifecycle `running` cho panel (qua đường app vẫn dùng khi nhận `set_status`) cùng dấu skill, thì `agentNameEffect(forPanel:)` ra `.skill`.
   - `workspaceEffectPrefersNewestHighlight`: hai panel, một working, một workflow, thì `strongestAgentNameEffect` ra `.workflow`.
   - `snapshotCarriesNameEffectAndText`: snapshot của workspace có `nameEffect` và `agentActivityText == "Skill · brainstorming"` (locale `en`).
+  - `effectsFollowShowAgentActivity`: khi `showsAgentActivity == false` thì snapshot có `nameEffect == nil` và `agentActivityText == nil`. Sidebar sáng cũng cho `nil`.
 - [ ] **Step 2: Chạy, phải fail.** Lệnh: `scripts/shellx/test-app.sh ShellXAgentActivityTests`.
 - [ ] **Step 3: Viết model, observer và phần mở rộng `Workspace`.**
   - Trong `TerminalController`, quan sát sự kiện trên luồng socket, rồi chuyển sang main bằng `Task { @MainActor in … }`. Không dùng `v2MainSync` và không chặn luồng socket.
@@ -358,9 +365,10 @@ git -C vendor/bonsplit add -A
 git -C vendor/bonsplit commit -m "Tab activity: Core Animation title shimmer, highlight flow, flash and a cycling glyph, opt-in through Appearance"
 git -C vendor/bonsplit push fork shellx/tab-agent-effects
 ```
-- [ ] **Step 7: Thêm `titleEffectStyle` vào `ShellXBonsplitStyles`** từ token Task 2. Test thêm `effectStyleUsesShellXTokens` trong `ShellXBonsplitStylesTests`: `workingBaseHex == "#b39550"`, `highlightStopHexes.count == 7`, `workingSweepDuration == 2.2`. Truyền vào `Appearance`. Chạy `scripts/shellx/test-app.sh ShellXBonsplitStylesTests`, phải pass.
+- [ ] **Step 7: Thêm `titleEffectStyle` vào `ShellXBonsplitStyles`** từ token Task 2. Test thêm `effectStyleUsesShellXTokens` trong `ShellXBonsplitStylesTests`: `workingBaseHex == "#b39550"`, `highlightStopHexes.count == 7`, `workingSweepDuration == 2.2`. Truyền vào `Appearance`; khi nền terminal sáng thì truyền `nil`, cùng điều kiện như Task 3. Chạy `scripts/shellx/test-app.sh ShellXBonsplitStylesTests`, phải pass.
 - [ ] **Step 8: Đồng bộ `activity` cho tab.**
   - Tạo `Sources/ShellX/AgentActivity/WorkspaceContentView+AgentActivitySync.swift` với `func syncBonsplitAgentActivity()`. Hàm này chạy theo cùng các lần kích hoạt với `syncBonsplitNotificationBadges()` (`Sources/WorkspaceContentView.swift` khoảng 545), và thêm một lần khi `WorkspaceAgentActivityModel` đổi.
+  - Khi `sidebar.showAgentActivity` tắt thì mọi tab mang `activity = nil`. Khi thanh tab sáng thì `titleEffectStyle` là `nil` (Step 7), nên Bonsplit không vẽ hiệu ứng.
   - Mỗi tab: id panel → `workspace.agentNameEffect(forPanel:)` → `TabActivity`. `.working` ra `kind: .working, generation: 0`; `.skill` và `.workflow` ra `kind: .highlight` cùng `generation` của dấu. `accessibilityLabel` lấy từ `AgentActivityText`.
   - Chỉ gọi `updateTab` khi giá trị đổi.
 - [ ] **Step 9: Build app có tag, phải thành công.** Lệnh: `CMUX_DEV_BACKEND_MODE=local ./scripts/reload.sh --tag tabfx --build-only`. Sau đó commit ở repo chính, gồm cả con trỏ submodule.
@@ -389,6 +397,7 @@ git commit -m "feat(shellx): pane tabs shimmer while their agent works and light
   - `nameEffectHidesDuringInlineRename`: đang đổi tên thì view hiệu ứng ẩn.
   - `activityTextReplacesAgentStatusRow`: snapshot có metadata entry `claude_code` "Running" và `agentActivityText = "Thinking…"` thì dòng đó hiện "Thinking…".
   - `noNewRowWhenMetadataHidden`: không có metadata entry thì số dòng và chiều cao đo được giữ như khi không có hiệu ứng.
+  - `effectHidesSpinnerAndRunningPill`: có hiệu ứng thì spinner ẩn, và nhãn "chạy" ẩn. Nếu nhãn của dòng là "chờ bạn", "xong" hay "lỗi" thì nhãn vẫn hiện.
 - [ ] **Step 2: Chạy, phải fail.** Lệnh: `scripts/shellx/test-app.sh SidebarAppKitRowCellTests ShellXSidebarNameEffectTests`.
 - [ ] **Step 3: Viết `SidebarRowNameEffectPresenter` và nối vào ô.**
   - Khi có hiệu ứng: `titleView.textColor = .clear`, presenter vẽ chữ bằng mask.

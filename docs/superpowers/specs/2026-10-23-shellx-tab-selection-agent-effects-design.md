@@ -22,13 +22,14 @@ Người dùng cũng muốn app "nhìn đẹp và có vẻ chuyên nghiệp", gi
 
 - Nền phiên đang chọn tương phản ít nhất 1.4:1 với nền sidebar, và tên phiên in đậm.
 - Mỗi cửa sổ có đúng một tab màu xanh: tab đang chọn của pane đang focus.
-- Mọi màu dùng cho tên đang chạy hiệu ứng đạt tương phản ít nhất 4.5:1 với nền của dòng đó, kể cả nền xanh của phiên đang chọn.
+- Với màu nhấn mặc định `#60a5fa`, mọi màu dùng cho tên đang chạy hiệu ứng đạt tương phản ít nhất 4.5:1 với nền của dòng đó, kể cả nền xanh của phiên đang chọn. Với màu nhấn người dùng tự chọn thì không bảo đảm mức này.
 - Có 8 phiên cùng chạy hiệu ứng mà độ trễ gõ phím không tăng so với trước khi đổi (sai khác nằm trong nhiễu đo), và main thread không phải vẽ lại theo từng khung hình của hiệu ứng.
 
 ## 3. Không làm
 
 - App Windows (Rust, `windows/`) và app iOS. Hai app này làm sau, mỗi app là một việc riêng.
-- Giao diện sáng. Spec gốc chỉ có giao diện tối; khi sidebar sáng (theme terminal sáng) thì giữ nguyên cách tô hiện nay.
+- Giao diện sáng. Spec gốc chỉ có giao diện tối. Khi sidebar sáng, hoặc thanh tab sáng vì theme terminal sáng, thì giữ nguyên cách tô hiện nay và tắt hiệu ứng tên trên bề mặt đó.
+- Chế độ bố cục Canvas (`CmuxCanvasUI`). Thanh tiêu đề pane của Canvas là một thanh tab riêng, không qua Bonsplit; bản này không đổi nó.
 - Đổi màu hay chữ của nhãn trạng thái (chờ bạn, chạy, xong, lỗi).
 - Tiến độ workflow kiểu "3/8 agent". Bản phác có dòng này để minh hoạ, nhưng hiện app không có dữ liệu đó.
 - Thêm mục cài đặt bật/tắt hiệu ứng. Ai cần tắt thì dùng "Giảm chuyển động" của macOS (§6.4). Đây là lựa chọn của người viết spec.
@@ -72,6 +73,8 @@ Nhãn trạng thái trên dòng đang chọn có thêm một lớp nền tối (
 
 "Màu nhấn" ở đây là màu nhấn của ShellX: mặc định `primary` `#60a5fa`, đổi theo màu nhấn người dùng chọn trong Cài đặt.
 
+Đầu nhóm workspace có thể đại diện cho workspace neo của nhóm. Khi workspace neo đang được chọn, đầu nhóm cũng được tô nền chọn như trên, nhưng không có hiệu ứng tên.
+
 ### 6.2 Tab đang chọn trên thanh tab của pane
 
 | Tab | Nền | Tên | Vạch dưới |
@@ -112,6 +115,8 @@ Agent không phải Claude Code (Codex, v.v.) chỉ có trạng thái đang làm
 
 **Dòng hoạt động** (chỉ ở sidebar). Dòng nhỏ dưới tên phiên ghi "Đang nghĩ…", "Skill · ‹tên skill›" hoặc "Workflow · ‹tên workflow›". Chữ dòng này đứng yên, màu chữ phụ; chỉ ký hiệu ✻ chuyển động. Dòng này không được làm sidebar nhảy chiều cao mỗi lượt (§4); người làm chọn cách giữ chỗ.
 
+**Dấu hiệu "đang chạy" cũ.** Trong lúc tên phiên chạy hiệu ứng, dòng đó ẩn spinner bên trái tên và ẩn nhãn "chạy". Hiệu ứng thay cho hai dấu hiệu này, đúng như bản phác C. Các nhãn khác vẫn hiện như cũ. Hiệu ứng tên, ở cả sidebar lẫn thanh tab, đi theo cài đặt có sẵn "Show Loading Spinner" (`sidebar.showAgentActivity`, mặc định bật). Tắt cài đặt đó thì không có hiệu ứng tên, không có dòng hoạt động; sidebar trở lại như hiện nay.
+
 **Giảm chuyển động.** Khi bật "Giảm chuyển động" (Reduce Motion) trong macOS thì không có gì chuyển động. Đang làm việc: tên màu `running`. Skill hoặc workflow: tên tô dải pastel đứng yên. Không lóe sáng. Ký hiệu đứng yên ở hình ✻.
 
 **Chỉ chạy khi nhìn thấy.** Hiệu ứng tạm dừng khi cửa sổ bị thu nhỏ, bị che hoàn toàn, hoặc dòng và tab nằm ngoài vùng nhìn thấy. App không ở phía trước nhưng cửa sổ vẫn hiện thì hiệu ứng vẫn chạy.
@@ -131,15 +136,15 @@ Có ba chuỗi mới: "Đang nghĩ…", "Skill · %@" và "Workflow · %@". Bả
 
 **Skill và workflow** cần thêm một "dấu hoạt động" cho từng pane. Hiện app không lưu tên tool nào, và không có chỗ nào xét riêng tool `Skill` hay `Workflow`. Cách lấy dấu:
 
-- App đọc sự kiện hook thô ngay lúc nhận, ở nhánh `agent.hook.enqueue` của `Sources/TerminalController.swift`. Phải đọc trước khi sự kiện vào hàng đợi giao, vì hàng đợi chỉ giữ một chỗ cho sự kiện tool của mỗi pane và có thể bỏ PreToolUse (`Sources/AgentHookDeliveryQueue.swift`). Mỗi sự kiện mang `subcommand`, `payload` là JSON thô (tối đa 256 KiB), cùng `CMUX_WORKSPACE_ID` và `CMUX_SURFACE_ID` trong `environment` (`Sources/AgentHookDeliveryEvent.swift`).
+- App đọc sự kiện hook thô ngay lúc nhận, ở nhánh `agent.hook.enqueue` của `Sources/TerminalController.swift`. Phải đọc trước khi sự kiện vào hàng đợi giao, vì hàng đợi chỉ giữ một chỗ cho sự kiện tool của mỗi pane và có thể bỏ PreToolUse (`Sources/AgentHookDeliveryQueue.swift`). Mỗi sự kiện mang `subcommand`, `payload` là JSON thô (tối đa 64 KiB, phiên từ xa 4 KiB; quá cỡ thì bộ chuyển tiếp chỉ giữ `tool_name` và một khoá của `tool_input`), cùng `CMUX_WORKSPACE_ID` và `CMUX_SURFACE_ID` trong `environment` (`Sources/AgentHookDeliveryEvent.swift`).
 - Không lấy tên từ CLI: bản rút gọn trong `CLI/CMUXCLI+AgentHookPayload.swift` bỏ mất `tool_input.skill`.
 
 | Sự kiện Claude (`subcommand`) | Dấu của pane sau sự kiện |
 |---|---|
-| `prompt-submit` | xoá dấu; nếu lời nhắn là một lệnh `/tên` (lời nhắn bắt đầu bằng `/tên`, hoặc có `<command-name>/tên</command-name>`) thì đặt dấu skill `tên` |
+| `prompt-submit` | xoá dấu skill, giữ dấu workflow (workflow có thể vẫn chạy nền trong lúc người dùng nhắn tiếp); nếu lời nhắn là một lệnh `/tên` (lời nhắn bắt đầu bằng `/tên`, hoặc có `<command-name>/tên</command-name>`) thì đặt dấu skill `tên`, thay mọi dấu cũ |
 | `pre-tool-use`, `tool_name` = `Skill` | dấu skill, tên lấy từ `tool_input.skill` |
 | `pre-tool-use`, `tool_name` = `Workflow` | dấu workflow, tên lấy từ `tool_input.name`; nếu không có thì lấy `name` trong khối `meta` của `tool_input.script`; nếu vẫn không có thì để trống tên |
-| `stop`, `stop-failure` | dấu skill: xoá. Dấu workflow: giữ nếu payload còn việc chạy nền, theo đúng quy tắc của `hasActiveClaudeBackgroundWork` (`CLI/CMUXCLI+NotificationFormatting.swift`); nếu không thì xoá |
+| `stop` (StopFailure cũng đến dưới tên này) | dấu skill: xoá. Dấu workflow: giữ nếu payload còn một mục `background_tasks` có `status == "running"`; nếu không thì xoá. Khác `hasActiveClaudeBackgroundWork` (`CLI/CMUXCLI+NotificationFormatting.swift`) ở chỗ không tính `session_crons`, vì một cron sẽ giữ cầu vồng sáng mãi |
 | `session-end` | xoá |
 
 Mỗi lần đặt dấu mới thì tăng một bộ đếm của pane. Giao diện lóe sáng khi bộ đếm đổi.
