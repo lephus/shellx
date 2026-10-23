@@ -56,6 +56,29 @@ struct AgentActivityHookSignalTests {
         )
     }
 
+    @Test func promptStartingWithPathIsNotASkill() {
+        // A command name ends at whitespace or at the end of the prompt, so a path is no command.
+        #expect(signal("prompt-submit", #"{"prompt":"/Users/me/notes.md please"}"#) == .turnStarted(slashCommandName: nil))
+        #expect(signal("prompt-submit", #"{"prompt":"/a/b"}"#) == .turnStarted(slashCommandName: nil))
+        #expect(signal("prompt-submit", #"{"prompt":"  \n/usr/local/bin/swift --version"}"#) == .turnStarted(slashCommandName: nil))
+        #expect(signal("prompt-submit", #"{"prompt":"/tmp/build.log"}"#) == .turnStarted(slashCommandName: nil))
+        // A name cut short by punctuation that cannot be part of it is not a command either.
+        #expect(signal("prompt-submit", #"{"prompt":"/commit,please"}"#) == .turnStarted(slashCommandName: nil))
+
+        // Real commands still read, with arguments, with a newline after them, or alone.
+        #expect(signal("prompt-submit", #"{"prompt":"/brainstorming"}"#) == .turnStarted(slashCommandName: "brainstorming"))
+        #expect(
+            signal("prompt-submit", #"{"prompt":"/brainstorming some args"}"#)
+                == .turnStarted(slashCommandName: "brainstorming")
+        )
+        #expect(
+            signal("prompt-submit", #"{"prompt":"/brainstorming\nsome args"}"#)
+                == .turnStarted(slashCommandName: "brainstorming")
+        )
+        // Built-in commands parse like any other.
+        #expect(signal("prompt-submit", #"{"prompt":"/clear"}"#) == .turnStarted(slashCommandName: "clear"))
+    }
+
     @Test func promptSubmitCommandNameTag() {
         let expanded = #"{"prompt":"<command-message>commit</command-message>\n<command-name>/commit</command-name>\n<command-args>-m fix</command-args>"}"#
         #expect(signal("prompt-submit", expanded) == .turnStarted(slashCommandName: "commit"))
@@ -179,6 +202,43 @@ struct AgentActivityHookSignalTests {
             script: "export const meta = {\r\n  // it's a Windows file\r\n  name: 'crlf-name',\r\n}\r\n"
         )
         #expect(signal("pre-tool-use", crlf) == .workflowLaunched(name: "crlf-name"))
+    }
+
+    @Test func preToolUseWorkflowReadsQuotedMetaName() throws {
+        // JSON-style keys, double or single quoted, name the workflow like bare keys do.
+        let doubleQuoted = try workflowPayload(
+            script: #"export const meta = { "name": "quoted-flow", "description": "d" }"#
+        )
+        #expect(signal("pre-tool-use", doubleQuoted) == .workflowLaunched(name: "quoted-flow"))
+
+        let singleQuoted = try workflowPayload(
+            script: "export const meta = { 'name': 'single-quoted', 'description': 'd' }"
+        )
+        #expect(signal("pre-tool-use", singleQuoted) == .workflowLaunched(name: "single-quoted"))
+
+        // The quoted key need not be first, may have space before its colon, and its value
+        // may use the other kind of quote.
+        let later = """
+        export const meta = {
+          "description": "Review the diff",
+          "phases": [{ "title": "Review", "detail": "x" }],
+          "name" : 'late-quoted',
+        }
+        """
+        let laterPayload = try workflowPayload(script: later)
+        #expect(signal("pre-tool-use", laterPayload) == .workflowLaunched(name: "late-quoted"))
+
+        // A quoted key outside the meta literal still names nothing.
+        let outside = try workflowPayload(
+            script: #"export const meta = { "description": "no name" }"# + "\n" + #"const other = { "name": "beta" }"#
+        )
+        #expect(signal("pre-tool-use", outside) == .workflowLaunched(name: nil))
+
+        // A key that merely ends in `name` is not the name, quoted or not.
+        let lookalike = try workflowPayload(
+            script: #"export const meta = { username: 'someone', "filename": "f.js", description: 'd' }"#
+        )
+        #expect(signal("pre-tool-use", lookalike) == .workflowLaunched(name: nil))
     }
 
     @Test func preToolUseWorkflowWithoutNameIsUnnamed() throws {

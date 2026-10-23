@@ -25,6 +25,10 @@ import Foundation
 public enum AgentActivityHookSignal: Sendable, Equatable {
     /// The user submitted a prompt, so a new turn started.
     ///
+    /// A prompt runs a command when it opens with `/name` followed by whitespace or
+    /// the end of the prompt, or when it carries a `<command-name>` tag. A prompt
+    /// that opens with a path, such as `/Users/me/notes.md`, is an ordinary prompt.
+    ///
     /// - Parameter slashCommandName: The name of the `/command` the prompt runs,
     ///   without the slash, or `nil` for an ordinary prompt.
     case turnStarted(slashCommandName: String?)
@@ -95,8 +99,11 @@ public enum AgentActivityHookSignal: Sendable, Equatable {
 
 extension AgentActivityHookSignal {
     /// A prompt that opens with a slash command, such as `/commit -m fix`.
+    ///
+    /// The name must end at whitespace or at the end of the prompt, which keeps a
+    /// prompt that opens with a path, such as `/Users/me/notes.md`, from reading as a command.
     private static let slashCommandPattern = try! NSRegularExpression(
-        pattern: #"^\s*/([A-Za-z0-9][A-Za-z0-9_.:-]*)"#
+        pattern: #"^\s*/([A-Za-z0-9][A-Za-z0-9_.:-]*)(?=\s|$)"#
     )
 
     /// The tag Claude Code writes around a slash command it expanded into the prompt.
@@ -109,9 +116,10 @@ extension AgentActivityHookSignal {
         pattern: #"\bmeta\s*=\s*\{"#
     )
 
-    /// The `name` entry of a `meta` literal, with a quoted string value.
+    /// The `name` entry of a `meta` literal: a bare, single-quoted or double-quoted
+    /// key with a quoted string value.
     private static let nameEntryPattern = try! NSRegularExpression(
-        pattern: #"\bname\s*:\s*['"]([^'"]+)['"]"#
+        pattern: #"(?:\bname|'name'|"name")\s*:\s*['"]([^'"]+)['"]"#
     )
 
     /// The payload as a JSON object, or `nil` when it is anything else.
