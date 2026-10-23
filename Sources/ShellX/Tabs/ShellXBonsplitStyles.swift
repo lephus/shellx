@@ -15,6 +15,10 @@ import SwiftUI
 /// A tab bar over a light terminal theme gets no styles (ruling R6): the palette is made for dark
 /// bars, so Bonsplit keeps drawing its default selected tab there.
 ///
+/// A window has exactly one accent tab, so only a workspace's own split tree gets these styles.
+/// The Dock and the remote-tmux trees nested in a workspace have focused panes of their own and
+/// keep Bonsplit's default selected tab.
+///
 /// ```swift
 /// let styles = ShellXBonsplitStyles(accent: ShellXPalette.primary)
 /// styles.selectedTabStyle.fillHex // "#60a5fa29"

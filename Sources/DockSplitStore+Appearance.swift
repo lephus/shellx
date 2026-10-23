@@ -109,7 +109,10 @@ extension DockSplitStore {
                 increaseContrast: DisplayAccessibilityOptions.current.increaseContrast
             ),
             usesSharedBackdrop: sharesWindowBackdrop,
-            selectedTabStyle: ShellXBonsplitStyles.current(overChromeBackground: chromeBackgroundColor)?.selectedTabStyle
+            // A window has exactly one accent tab, the focused pane's of its
+            // workspace (spec §6.2). The Dock's own focused pane keeps
+            // Bonsplit's default selected tab.
+            selectedTabStyle: nil
         )
     }
 }
