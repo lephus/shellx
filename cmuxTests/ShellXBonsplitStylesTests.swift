@@ -1,6 +1,7 @@
 import AppKit
 import Bonsplit
 import CmuxFoundation
+import CmuxRemoteSession
 import CmuxTerminalCore
 import ShellXBrand
 import Testing
@@ -15,9 +16,10 @@ import Testing
 /// selected tab of the focused pane is the app accent at a low alpha behind a
 /// near-white bold title and a 2 pt accent indicator, the selected tab of any
 /// other pane is a neutral wash with a violet-grey indicator, and a tab bar
-/// over a light terminal theme keeps Bonsplit's default selected tab. Both
-/// Bonsplit hosts, a workspace and the Dock, build their appearance from the
-/// same decision.
+/// over a light terminal theme keeps Bonsplit's default selected tab. Only the
+/// workspace's own split tree gets the style: the window has exactly one
+/// accent tab, so the Dock and the remote-tmux trees nested in a workspace
+/// keep Bonsplit's default selected tab.
 @Suite(.serialized)
 @MainActor
 struct ShellXBonsplitStylesTests {
@@ -127,15 +129,65 @@ struct ShellXBonsplitStylesTests {
         #expect(appliedStyle() == expected)
     }
 
-    @Test func dockChromeFollowsTheTerminalBackground() throws {
-        let expected = try #require(
-            ShellXBonsplitStyles(accent: Self.appAccent, chromeBackground: Self.darkBar)
-        ).selectedTabStyle
-
+    /// The Dock is a second Bonsplit tree with a focused pane of its own, so a
+    /// style there would put a second accent tab in the window.
+    @Test func dockKeepsTheUpstreamSelectedTab() {
         let dark = DockSplitStore.makeAppearance(from: Self.config(background: Self.darkBar))
-        #expect(dark.selectedTabStyle == expected)
+        #expect(dark.chromeColors.backgroundHex == "#0B0716")
+        #expect(dark.selectedTabStyle == nil)
 
         let light = DockSplitStore.makeAppearance(from: Self.config(background: Self.lightBar))
+        #expect(light.chromeColors.backgroundHex == "#FFFFFF")
         #expect(light.selectedTabStyle == nil)
+    }
+
+    @Test func embeddedRemoteTmuxConfigurationDropsTheSelectedTabStyle() {
+        var appearance = BonsplitConfiguration.Appearance.default
+        appearance.selectedTabStyle = ShellXBonsplitStyles(accent: ShellXPalette.primary).selectedTabStyle
+        appearance.tabBarHeight = 36
+        let workspaceConfiguration = BonsplitConfiguration(appearance: appearance)
+
+        let embedded = workspaceConfiguration.remoteTmuxEmbedded
+
+        #expect(embedded.appearance.selectedTabStyle == nil)
+        // Only the style goes; the rest of the appearance still follows the workspace.
+        #expect(embedded.appearance.tabBarHeight == 36)
+    }
+
+    /// A mirrored tmux window nests its own Bonsplit tree in a workspace tab,
+    /// built from the workspace's configuration and updated from it later. Its
+    /// focused pane must not draw a second accent tab next to the workspace's.
+    @Test func remoteTmuxMirrorKeepsTheUpstreamSelectedTab() {
+        let workspace = Workspace(title: "Tests")
+        defer { workspace.teardownAllPanels() }
+        workspace.applyGhosttyChrome(from: Self.config(background: Self.darkBar), reason: "test-dark")
+        let workspaceConfiguration = workspace.bonsplitController.configuration
+        #expect(workspaceConfiguration.appearance.selectedTabStyle != nil)
+
+        let connection = RemoteTmuxControlConnection(
+            host: RemoteTmuxHost(destination: "user@host"),
+            sessionName: "work"
+        )
+        let mirror = RemoteTmuxWindowMirror(
+            windowId: 1,
+            panelId: UUID(),
+            connection: connection,
+            layout: RemoteTmuxLayoutNode(
+                width: 80,
+                height: 24,
+                x: 0,
+                y: 0,
+                content: .pane(7)
+            ),
+            appearance: workspaceConfiguration.appearance,
+            workspaceBonsplitController: workspace.bonsplitController,
+            makePanel: { _ in nil }
+        )
+        #expect(mirror.bonsplitController.configuration.appearance.selectedTabStyle == nil)
+
+        mirror.applyWorkspaceBonsplitConfiguration(workspaceConfiguration)
+        let mirrored = mirror.bonsplitController.configuration.appearance
+        #expect(mirrored.selectedTabStyle == nil)
+        #expect(mirrored.tabBarHeight == workspaceConfiguration.appearance.tabBarHeight)
     }
 }
