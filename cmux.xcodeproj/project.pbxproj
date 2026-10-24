@@ -3482,6 +3482,7 @@
 		B804A0380000000000000038 /* SidebarRowContentContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B804B0380000000000000038 /* SidebarRowContentContainerView.swift */; };
 		AABBCC00000000000000020A /* SidebarRowDragGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC000000000000000209 /* SidebarRowDragGate.swift */; };
 		B804A03794950000000000B1 /* SidebarRowInlineRenameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B804B03794950000000000B1 /* SidebarRowInlineRenameSession.swift */; };
+		72E2AACA0F60DAC40D79CA9A /* SidebarRowNameEffectPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DEC713FB4C2B0E10B69BEBA /* SidebarRowNameEffectPresenter.swift */; };
 		3D0EDA5CB6EA473DB4DB9464 /* SidebarRowPaletteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59BA833A044542BD9A96F3E1 /* SidebarRowPaletteTests.swift */; };
 		B804A0370000000000000037 /* SidebarRowPressedDim.swift in Sources */ = {isa = PBXBuildFile; fileRef = B804B0370000000000000037 /* SidebarRowPressedDim.swift */; };
 		C12791000000000000000003 /* SidebarRowSnapshotCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = C12791000000000000000004 /* SidebarRowSnapshotCache.swift */; };
@@ -8077,6 +8078,7 @@
 		B804B0380000000000000038 /* SidebarRowContentContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar/AppKitList/Cells/SidebarRowContentContainerView.swift; sourceTree = "<group>"; };
 		AABBCC000000000000000209 /* SidebarRowDragGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar/SidebarRowDragGate.swift; sourceTree = "<group>"; };
 		B804B03794950000000000B1 /* SidebarRowInlineRenameSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar/AppKitList/Cells/SidebarRowInlineRenameSession.swift; sourceTree = "<group>"; };
+		1DEC713FB4C2B0E10B69BEBA /* SidebarRowNameEffectPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar/AppKitList/Cells/SidebarRowNameEffectPresenter.swift; sourceTree = "<group>"; };
 		59BA833A044542BD9A96F3E1 /* SidebarRowPaletteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SidebarRowPaletteTests.swift"; sourceTree = "<group>"; };
 		B804B0370000000000000037 /* SidebarRowPressedDim.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sidebar/AppKitList/Cells/SidebarRowPressedDim.swift; sourceTree = "<group>"; };
 		C12791000000000000000006 /* SidebarRowSnapshotCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarRowSnapshotCacheTests.swift; sourceTree = "<group>"; };
@@ -12494,6 +12496,7 @@
 				9C33B24CC10A0FD1477469AA /* WorkspaceAgentActivityModel.swift */,
 				4EE87BDF56BF6B65F9D6FC34 /* WorkspaceContentView+AgentActivitySync.swift */,
 				367B89702C359CACD7693664 /* BonsplitConfiguration+ShellXStyles.swift */,
+				1DEC713FB4C2B0E10B69BEBA /* SidebarRowNameEffectPresenter.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -16814,6 +16817,7 @@
 				B804A0380000000000000038 /* SidebarRowContentContainerView.swift in Sources */,
 				AABBCC00000000000000020A /* SidebarRowDragGate.swift in Sources */,
 				B804A03794950000000000B1 /* SidebarRowInlineRenameSession.swift in Sources */,
+				72E2AACA0F60DAC40D79CA9A /* SidebarRowNameEffectPresenter.swift in Sources */,
 				B804A0370000000000000037 /* SidebarRowPressedDim.swift in Sources */,
 				C12791000000000000000003 /* SidebarRowSnapshotCache.swift in Sources */,
 				B804A0310000000000000031 /* SidebarRowSwiftUIPopoverPresenter.swift in Sources */,

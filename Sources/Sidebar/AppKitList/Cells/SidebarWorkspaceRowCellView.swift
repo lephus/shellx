@@ -1,9 +1,11 @@
 import AppKit
+import Bonsplit
 import CmuxAppKitSupportUI
 import Combine
 import CmuxFoundation
 import CmuxSidebar
 import CmuxWorkspaces
+import ShellXBrand
 import SwiftUI
 
 /// Pure-AppKit workspace row cell: renders every TabItemView slot without
@@ -37,6 +39,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
     private let compactStatusGlyphView = SidebarCompactStatusGlyphImageView()
     private let statusPillView = SidebarStatusPillView() // ShellX: status pill (W1 Task 10)
     private let titleView = SidebarRowTextView(lines: 1)
+    /// ShellX: the agent's effect on the name, and its one-time flash over the row.
+    private lazy var nameEffect = SidebarRowNameEffectPresenter(titleView: titleView, host: contentContainer)
     private let cloudImageView = NSImageView()
     private let trailingBadge = SidebarRowUnreadBadgeView()
     private var trailingSpinner: GPUSpinnerNSView?
@@ -310,6 +314,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         contentContainer.addSubview(statusGlyphButton)
         contentContainer.addSubview(leadingBadge)
         contentContainer.addSubview(titleView)
+        nameEffect.flashView.cornerRadius = backgroundView.layer?.cornerRadius ?? 0
+        addSubview(nameEffect.flashView, positioned: .below, relativeTo: contentContainer)
         cloudImageView.setAccessibilityIdentifier("sidebarCloudBadge")
         cloudImageView.setAccessibilityElement(false)
         contentContainer.addSubview(trailingBadge)
@@ -377,6 +383,10 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         leadingSpinner?.isPresentationActive = isActive
         trailingSpinner?.isPresentationActive = isActive
         compactStatusGlyphView.isPresentationActive = isActive
+        nameEffect.isPresentationActive = isActive
+        for row in metadataRows {
+            row.isPresentationActive = isActive
+        }
     }
 
     func suspendPresentation(commitEdits: Bool = false) {
@@ -489,6 +499,20 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         )
     }
 
+    /// ShellX: plays the row's agent effect on the name (none in a light sidebar or while
+    /// renaming) and gives the name its palette color back when the effect ends.
+    private func applyNameEffect(_ model: SidebarWorkspaceRowModel) {
+        nameEffect.apply(
+            effect: SidebarRowNameEffectPresenter.shownEffect(for: model),
+            isRenaming: renameSession != nil,
+            style: SidebarRowNameEffectPresenter.style(for: model),
+            rowIdentity: model.workspaceId
+        )
+        if !nameEffect.isDrawingName {
+            titleView.textColor = palette(model).primaryText
+        }
+    }
+
     private func applyModel(_ model: SidebarWorkspaceRowModel) {
 #if DEBUG
         applyModelProbeForTesting?(model)
@@ -597,19 +621,21 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
 #endif
         titleView.stringValue = boundedTitle
         titleView.font = .systemFont(ofSize: model.scaled(12.5), weight: .semibold)
-        titleView.textColor = palette.primaryText
         titleView.alphaValue = snapshot.isMuted ? 0.6 : 1
+        applyNameEffect(model)
 
         // Badges / spinner / close
         // Compact status draws running and unread as its one glyph instead.
         let compacts = snapshot.compactStatusGlyph != nil
-        let showsSpinner = !compacts && model.showsAgentActivity && snapshot.activeCodingAgentCount > 0
+        // ShellX (R5): a name effect stands in for the spinner; a wrapped name keeps its space.
+        let agentIsActive = !compacts && model.showsAgentActivity && snapshot.activeCodingAgentCount > 0
         let badgeVisible = !compacts && model.unreadCount > 0
         configureStatusSlot(
             model: model,
             palette: palette,
             badgeVisible: badgeVisible,
-            spinnerVisible: showsSpinner
+            spinnerVisible: agentIsActive && SidebarRowNameEffectPresenter.shownEffect(for: model) == nil,
+            spinnerSpaceKept: agentIsActive && SidebarRowNameEffectPresenter.keepsStatusSpace(for: model)
         )
         closeButton.glyphImage = RenderableSystemSymbol.configuredAppKitImage(
             systemName: "xmark", pointSize: model.scaled(9), weight: .medium
@@ -761,7 +787,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         model: SidebarWorkspaceRowModel,
         palette: SidebarRowPalette,
         badgeVisible: Bool,
-        spinnerVisible: Bool
+        spinnerVisible: Bool,
+        spinnerSpaceKept: Bool
     ) {
         let badgeFill = cmuxNotificationBadgeNSColor(
             hex: model.settings.notificationBadgeColorHex,
@@ -776,9 +803,13 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let trailingBadgeVisible = badgeVisible && model.settings.notificationBadgePosition == .trailing
         let leadingSpinnerVisible = spinnerVisible && model.settings.loadingSpinnerPosition == .leading
         let trailingSpinnerVisible = spinnerVisible && model.settings.loadingSpinnerPosition == .trailing
+        // ShellX: the spinner's slot stays taken while a wrapped name's effect keeps its space.
+        let spinnerSlotTaken = spinnerVisible || spinnerSpaceKept
+        let leadingSpinnerSlot = spinnerSlotTaken && model.settings.loadingSpinnerPosition == .leading
+        let trailingSpinnerSlot = spinnerSlotTaken && model.settings.loadingSpinnerPosition == .trailing
 
-        leadingBadge.isHidden = !leadingBadgeVisible || leadingSpinnerVisible
-        trailingBadge.isHidden = !trailingBadgeVisible || trailingSpinnerVisible || showsCloseNow
+        leadingBadge.isHidden = !leadingBadgeVisible || leadingSpinnerSlot
+        trailingBadge.isHidden = !trailingBadgeVisible || trailingSpinnerSlot || showsCloseNow
         if !leadingBadge.isHidden {
             leadingBadge.configure(count: model.unreadCount, fillColor: badgeFill, textColor: badgeText, font: badgeFont)
         }
@@ -881,11 +912,12 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             kind: model.snapshot.statusPillGlyphKind ?? .terminal,
             tooltip: ""
         ).applyingUnread(model.unreadCount, latestNotificationText: nil)
-        statusPillView.configure(
-            glyphKind: pillGlyph.kind,
-            fontScale: model.fontScale,
-            isOnSelection: palette.usesShellXSelection
-        )
+        // R5: a name effect stands in for the "running" pill; the other pills stay. The hidden pill
+        // keeps its size for a wrapped name, whose layout keeps the pill's space.
+        let pill = SidebarStatusPill.from(pillGlyph.kind)
+        statusPillView.configure(pill, fontScale: model.fontScale, isOnSelection: palette.usesShellXSelection)
+        statusPillView.isHidden = pill == nil
+            || (pill == .running && SidebarRowNameEffectPresenter.shownEffect(for: model) != nil)
         guard let glyph, glyph.isDrawn else { return }
         compactStatusGlyphView.configure(
             glyph,
@@ -905,7 +937,20 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             ? model.snapshot.metadataEntries : []
         let visible = model.isMetadataExpanded ? allEntries : Array(allEntries.prefix(3))
         Self.pool(&metadataRows, count: visible.count, parent: contentContainer) { SidebarRowIconTextLine() }
+        let activity = SidebarRowNameEffectPresenter.activity(for: model)
         for (index, entry) in visible.enumerated() {
+            if let activity, entry.key == SidebarRowNameEffectPresenter.activityStatusKey {
+                // ShellX: the agent's line says what it does, in the secondary color (spec §6.5).
+                metadataRows[index].isPresentationActive = isPresentationActive
+                metadataRows[index].configureAgentActivity(
+                    activity.text,
+                    kind: activity.kind,
+                    style: activity.style,
+                    model: model,
+                    color: model.isActive ? palette.secondary(0.95).withAlphaComponent(0.84) : palette.secondary()
+                )
+                continue
+            }
             // Legacy parity: on the selected row an explicit entry color
             // yields to the selected foreground — otherwise agent-status
             // tints (blue "Running") vanish into the blue selection
@@ -1181,6 +1226,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         session.field.inlineRenameTextColor = palette(model).selectedForeground(1.0)
         renameSession = session
         titleView.isHidden = true
+        applyNameEffect(paintedModel(model))
         // Give the field its title-slot frame BEFORE it enters the window:
         // the attach-time focus grab sizes the field editor from the current
         // frame, and a zero-frame grab mis-sizes the editor's dark box (same
@@ -1215,6 +1261,9 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         renameSession = nil
         session.field.removeFromSuperview()
         titleView.isHidden = false
+        if let model {
+            applyNameEffect(paintedModel(model))
+        }
         needsLayout = true
     }
 
@@ -1268,8 +1317,14 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let spacing: CGFloat = 4
 
         // Title line
+        // ShellX: a wrapped name's effect keeps the space of the spinner and the pill it hides, so
+        // the name wraps the same way and the row keeps its height while an effect starts and ends.
+        let keepsStatusSpace = SidebarRowNameEffectPresenter.keepsStatusSpace(for: model)
+        let keepsSpinnerSpace = keepsStatusSpace
+            && model.showsAgentActivity && model.snapshot.activeCodingAgentCount > 0
         let titleRowSpacing: CGFloat = (model.settings.loadingSpinnerPosition == .leading
-            && model.showsAgentActivity && model.snapshot.activeCodingAgentCount > 0) ? 6 : 8
+            && model.showsAgentActivity && model.snapshot.activeCodingAgentCount > 0
+            && (SidebarRowNameEffectPresenter.shownEffect(for: model) == nil || keepsStatusSpace)) ? 6 : 8
         var x = leading
         let badgeSide = 16 * model.fontScale
         let spinnerSide = max(10, 12 * model.fontScale)
@@ -1284,6 +1339,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         }
 
         let leadingSlotActive = (!leadingBadge.isHidden) || (leadingSpinner?.isHidden == false)
+            || (keepsSpinnerSpace && model.settings.loadingSpinnerPosition == .leading)
         if leadingSlotActive {
             let side = !leadingBadge.isHidden ? badgeSide : spinnerSide
             if !leadingBadge.isHidden {
@@ -1330,9 +1386,10 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         let closeHit = max(16, 16 * model.fontScale)
         let closeWidth = max(16, closeHit)
         let trailingSlotActive = !trailingBadge.isHidden || (trailingSpinner?.isHidden == false) || model.canCloseWorkspace
+            || (keepsSpinnerSpace && model.settings.loadingSpinnerPosition == .trailing)
         let titleSlotMaxX = trailingSlotActive ? (trailing - closeWidth - titleRowSpacing) : trailing
         // ShellX: the status pill takes the title line's trailing edge, before the trailing slot.
-        let pillSize = statusPillView.isHidden ? NSSize.zero : statusPillView.preferredSize
+        let pillSize = statusPillView.isHidden && !keepsStatusSpace ? NSSize.zero : statusPillView.preferredSize
         let titleMaxX = pillSize.width > 0 ? titleSlotMaxX - pillSize.width - 6 : titleSlotMaxX
         let titleWidth = max(10, titleMaxX - x)
         let renameField = renameSession?.field
@@ -1351,6 +1408,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             } else {
                 titleView.frame = frame
             }
+            nameEffect.layout()
             if trailingSlotActive {
                 let slotX = trailing - closeWidth
                 closeButton.frame = NSRect(
@@ -1536,6 +1594,7 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
             // nesting ("can't tell when a workspace is in a group").
             let bgX = outerPad + (model.isGrouped ? SidebarWorkspaceGroupingMetrics.memberIndent : 0)
             backgroundView.frame = NSRect(x: bgX, y: 0, width: max(0, width - outerPad - bgX), height: y)
+            nameEffect.flashView.frame = backgroundView.frame
             railView.frame = NSRect(x: bgX + 4 - 1, y: 5, width: 3, height: max(0, y - 10))
             railView.layer?.cornerRadius = 1.5
             let indicatorBounds = NSRect(x: 0, y: 0, width: width, height: y)

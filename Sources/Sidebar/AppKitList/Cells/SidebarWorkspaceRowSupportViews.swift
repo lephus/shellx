@@ -1,4 +1,5 @@
 import AppKit
+import Bonsplit
 import CmuxFoundation
 import CmuxSidebar
 import CmuxWorkspaces
@@ -312,8 +313,15 @@ final class SidebarRowIconTextLine: NSView {
     private let metadataButton = SidebarRowLinkButton()
     private let markdownTextView = SidebarRowMarkdownTextView()
     private let secondTextView = SidebarRowTextView(lines: 1)
+    /// ShellX: the agent's ✻ glyph, in the icon slot while the line says what the agent does.
+    private var activityGlyph: ActivityGlyphView?
     private var iconSize: CGFloat = 0
     private var stacked = false
+
+    /// Whether the activity glyph may move: off for rows that are scrolled away or not presented.
+    var isPresentationActive = true {
+        didSet { activityGlyph?.isPresentationActive = isPresentationActive }
+    }
 
     override var isFlipped: Bool { true }
 
@@ -400,6 +408,40 @@ final class SidebarRowIconTextLine: NSView {
             textView.configurePlainText(entry.sidebarDisplayText, font: font, color: color, toolTip: entry.sidebarToolTip(linkURL: nil))
         }
         needsLayout = true
+    }
+
+    /// ShellX: the agent status line while the session name plays an effect (spec 2026-10-23,
+    /// §6.5): the activity text, still and in `color`, after the agent's cycling ✻ glyph in place
+    /// of the line's icon.
+    func configureAgentActivity(
+        _ text: String,
+        kind: TabActivity.Kind,
+        style: TitleEffectStyle,
+        model: SidebarWorkspaceRowModel,
+        color: NSColor
+    ) {
+        // The glyph stays shown across updates: hiding it, even for a moment, restarts its cycle.
+        resetPrimaryContent(keepingActivityGlyph: true)
+        stacked = false
+        secondTextView.isHidden = true
+        iconLabel.isHidden = true
+        iconView.isHidden = true
+        let glyph = activityGlyph ?? makeActivityGlyph()
+        glyph.isHidden = false
+        glyph.configure(kind: kind, style: style, pointSize: model.scaled(9))
+        // The slot of an SF icon, so the text does not move when the activity starts or ends.
+        iconSize = model.scaled(8) + 3
+        textView.isHidden = false
+        textView.configurePlainText(text, font: .systemFont(ofSize: model.scaled(10)), color: color, toolTip: nil)
+        needsLayout = true
+    }
+
+    private func makeActivityGlyph() -> ActivityGlyphView {
+        let glyph = ActivityGlyphView()
+        glyph.isPresentationActive = isPresentationActive
+        addSubview(glyph)
+        activityGlyph = glyph
+        return glyph
     }
 
     func configureLog(
@@ -506,7 +548,7 @@ final class SidebarRowIconTextLine: NSView {
         return first + second
     }
 
-    private func resetPrimaryContent() {
+    private func resetPrimaryContent(keepingActivityGlyph: Bool = false) {
         textView.isHidden = true
         textView.toolTip = nil
         textView.stringValue = ""
@@ -515,6 +557,9 @@ final class SidebarRowIconTextLine: NSView {
         metadataButton.reset()
         markdownTextView.isHidden = true
         markdownTextView.reset()
+        if !keepingActivityGlyph {
+            activityGlyph?.isHidden = true
+        }
     }
 
     private func primaryMeasuredHeight(width: CGFloat) -> CGFloat {
@@ -525,6 +570,12 @@ final class SidebarRowIconTextLine: NSView {
             return ceil(metadataButton.intrinsicContentSize.height)
         }
         return textView.measuredHeight(width: width)
+    }
+
+    private var visibleIcon: NSView? {
+        if let activityGlyph, !activityGlyph.isHidden { return activityGlyph }
+        if !iconView.isHidden { return iconView }
+        return iconLabel.isHidden ? nil : iconLabel
     }
 
     private var primaryView: NSView {
@@ -556,9 +607,8 @@ final class SidebarRowIconTextLine: NSView {
         super.layout()
         resolveCandidates(width: bounds.width)
         var x: CGFloat = 0
-        if !iconView.isHidden || !iconLabel.isHidden {
+        if let icon = visibleIcon {
             let side = iconSize
-            let icon: NSView = iconView.isHidden ? iconLabel : iconView
             icon.frame = NSRect(x: 0, y: 1, width: side, height: side)
             x = side + 4
         }

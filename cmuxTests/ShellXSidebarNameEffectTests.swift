@@ -106,6 +106,69 @@ struct ShellXSidebarNameEffectTests {
         #expect(shown != oneLine)
     }
 
+    @Test func wrappedTitleKeepsItsWidthAndRowHeightWhenTheEffectStartsAndEnds() throws {
+        let defaults = Self.makeDefaults()
+        defaults.set(true, forKey: "sidebarWrapWorkspaceTitles")
+        let longTitle = "A long session name that wraps over several lines in a narrow sidebar"
+        let workspaceId = UUID()
+        func model(_ effect: AgentNameEffect?) -> SidebarWorkspaceRowModel {
+            Self.makeModel(
+                workspaceId: workspaceId,
+                title: longTitle,
+                nameEffect: effect,
+                agentActivityText: effect == nil ? nil : "Thinking…",
+                metadataEntries: [Self.agentRunningEntry],
+                activeCodingAgentCount: 1,
+                statusPillGlyphKind: .running,
+                defaults: defaults
+            )
+        }
+        let width: CGFloat = 220
+        let running = model(nil)
+        let cell = SidebarAppKitRowCellTests.configuredCell(model: running)
+        let window = Self.layoutCell(cell, model: running, width: width)
+        defer { window.close() }
+        let titleView = try #require(
+            SidebarAppKitRowCellTests.descendants(of: cell)
+                .compactMap { $0 as? SidebarRowTextView }
+                .first { !$0.isHidden && $0.stringValue == longTitle }
+        )
+        #expect(Self.visibleSpinners(in: cell).count == 1)
+        #expect(Self.pill(in: cell) == .running)
+        let runningFrame = titleView.frame
+        let runningHeight = cell.layoutContent(model: running, width: width, apply: false)
+
+        let effects: [AgentNameEffect?] = [.working, .skill(name: "review", generation: 5), nil]
+        for effect in effects {
+            let next = model(effect)
+            Self.reconfigure(cell, with: next)
+            // The spinner and the pill hide, but the name keeps their space.
+            #expect(titleView.frame == runningFrame)
+            #expect(cell.layoutContent(model: next, width: width, apply: false) == runningHeight)
+            #expect(Self.visibleSpinners(in: cell).count == (effect == nil ? 1 : 0))
+            #expect(Self.pill(in: cell) == (effect == nil ? SidebarStatusPill.running : nil))
+        }
+
+        // A one-line name takes the space back.
+        let oneLineRunning = Self.makeModel(activeCodingAgentCount: 1, statusPillGlyphKind: .running)
+        let oneLine = SidebarAppKitRowCellTests.configuredCell(model: oneLineRunning)
+        let oneLineWindow = Self.layoutCell(oneLine, model: oneLineRunning, width: width)
+        defer { oneLineWindow.close() }
+        let oneLineTitle = try Self.titleView(in: oneLine)
+        let oneLineWidth = oneLineTitle.frame.width
+        Self.reconfigure(
+            oneLine,
+            with: Self.makeModel(
+                workspaceId: oneLineRunning.workspaceId,
+                nameEffect: .working,
+                agentActivityText: "Thinking…",
+                activeCodingAgentCount: 1,
+                statusPillGlyphKind: .running
+            )
+        )
+        #expect(oneLineTitle.frame.width > oneLineWidth)
+    }
+
     @Test func nameEffectHidesDuringInlineRename() throws {
         let model = Self.makeModel(
             nameEffect: .workflow(name: "release", generation: 2),
@@ -180,6 +243,80 @@ struct ShellXSidebarNameEffectTests {
         let contentIndex = try #require(cell.subviews.firstIndex { $0 is SidebarRowContentContainerView })
         #expect(flashIndex < contentIndex)
         #expect(flash.flashedGeneration == 3)
+    }
+
+    @Test func flashPlaysOnceForANewSkillAndNeverForAReusedRow() throws {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 280, height: 40),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let host = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 40))
+        window.contentView = host
+        let titleView = SidebarRowTextView(lines: 1)
+        titleView.stringValue = Self.title
+        titleView.font = .systemFont(ofSize: 12.5, weight: .semibold)
+        titleView.frame = NSRect(x: 10, y: 8, width: 200, height: 16)
+        host.addSubview(titleView)
+        let presenter = SidebarRowNameEffectPresenter(
+            titleView: titleView,
+            host: host,
+            environment: VisibleEnvironment()
+        )
+        let flash = presenter.flashView
+        host.addSubview(flash, positioned: .below, relativeTo: titleView)
+        flash.frame = host.bounds
+        let row = UUID()
+
+        // The skill started before the row showed it: that moment has passed.
+        presenter.apply(effect: .skill(name: "review", generation: 3), isRenaming: false, style: Self.style, rowIdentity: row)
+        #expect(!Self.isFlashing(flash))
+
+        // A new skill on the same row flashes once.
+        presenter.apply(effect: .skill(name: "review", generation: 4), isRenaming: false, style: Self.style, rowIdentity: row)
+        #expect(Self.isFlashing(flash))
+        Self.stopFlash(flash)
+        presenter.apply(effect: .skill(name: "review", generation: 4), isRenaming: false, style: Self.style, rowIdentity: row)
+        presenter.apply(effect: .working, isRenaming: false, style: Self.style, rowIdentity: row)
+        presenter.apply(effect: .skill(name: "review", generation: 4), isRenaming: false, style: Self.style, rowIdentity: row)
+        #expect(!Self.isFlashing(flash))
+
+        // Reused for another workspace, the row does not flash for the workflow that already runs there.
+        presenter.apply(
+            effect: .workflow(name: "release", generation: 9),
+            isRenaming: false,
+            style: Self.style,
+            rowIdentity: UUID()
+        )
+        #expect(!Self.isFlashing(flash))
+        #expect(flash.flashedGeneration == 9)
+    }
+
+    @Test func presentationFlagReachesEveryEffectView() throws {
+        let model = Self.makeModel(
+            nameEffect: .working,
+            agentActivityText: "Thinking…",
+            metadataEntries: [Self.agentRunningEntry]
+        )
+        let cell = SidebarAppKitRowCellTests.configuredCell(model: model)
+        let effect = try #require(Self.effectViews(in: cell).first)
+        let flash = try #require(cell.subviews.compactMap { $0 as? ActivityFlashView }.first)
+        let glyph = try #require(
+            SidebarAppKitRowCellTests.descendants(of: cell).compactMap { $0 as? ActivityGlyphView }.first
+        )
+
+        cell.setPresentationActive(false)
+        #expect(!effect.isPresentationActive)
+        #expect(!flash.isPresentationActive)
+        #expect(!glyph.isPresentationActive)
+
+        cell.setPresentationActive(true)
+        #expect(effect.isPresentationActive)
+        #expect(flash.isPresentationActive)
+        #expect(glyph.isPresentationActive)
     }
 
     // MARK: - The agent status line
@@ -436,6 +573,19 @@ struct ShellXSidebarNameEffectTests {
         return window
     }
 
+    /// Applies `model` the way the table updates a mounted row, then lays the row out again.
+    private static func reconfigure(_ cell: SidebarWorkspaceRowTableCellView, with model: SidebarWorkspaceRowModel) {
+        cell.configure(
+            model: model,
+            actions: SidebarAppKitRowCellTests.makeActions(model: model),
+            isPointerHovering: false,
+            contextMenuDidOpen: {},
+            contextMenuDidClose: {}
+        )
+        cell.needsLayout = true
+        cell.layoutSubtreeIfNeeded()
+    }
+
     private static func titleView(in cell: SidebarWorkspaceRowTableCellView) throws -> SidebarRowTextView {
         try #require(
             SidebarAppKitRowCellTests.descendants(of: cell)
@@ -485,6 +635,22 @@ struct ShellXSidebarNameEffectTests {
             && abs(left.greenComponent - right.greenComponent) < 0.001
             && abs(left.blueComponent - right.blueComponent) < 0.001
             && abs(left.alphaComponent - right.alphaComponent) < 0.001
+    }
+
+    /// An environment where the effect views can be seen and may move.
+    private struct VisibleEnvironment: TitleEffectEnvironment {
+        var reducesMotion: Bool { false }
+
+        func isVisible(_ view: NSView) -> Bool { true }
+    }
+
+    /// Whether the flash view's wash is animating.
+    private static func isFlashing(_ flash: ActivityFlashView) -> Bool {
+        (flash.layer?.sublayers ?? []).contains { !($0.animationKeys() ?? []).isEmpty }
+    }
+
+    private static func stopFlash(_ flash: ActivityFlashView) {
+        flash.layer?.sublayers?.forEach { $0.removeAllAnimations() }
     }
 
     /// The pixels of an effect's text mask, which depend on its text, font, line limit and size only.
