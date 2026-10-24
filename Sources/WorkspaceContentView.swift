@@ -217,6 +217,9 @@ struct WorkspaceContentView: View {
     ) -> Void)?
     @State private var config = WorkspaceContentView.resolveGhosttyAppearanceConfig(reason: "stateInit")
     @State private var lastAppliedUsesHostLayerBackground = GhosttyApp.shared.usesHostLayerBackground
+    /// "Show Loading Spinner" (`sidebar.showAgentActivity`), which also turns pane tab effects off.
+    @AppStorage(SidebarWorkspaceDetailDefaults.showAgentActivityKey)
+    var showsAgentActivity = SidebarWorkspaceDetailDefaults.showAgentActivity
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.tmuxOverlayExperimentTarget) private var overlayTarget
     @EnvironmentObject var notificationStore: TerminalNotificationStore
@@ -386,12 +389,15 @@ struct WorkspaceContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             syncBonsplitInteractivity()
+            syncBonsplitPresentation()
             installBonsplitFileDropHandler()
             updateAgentHibernationPresentationVisibility()
             syncBonsplitNotificationBadges()
+            syncBonsplitAgentActivity()
             refreshGhosttyAppearanceConfig(reason: "onAppear")
         }
         .onChange(of: isWorkspaceVisible) { _, isVisible in
+            syncBonsplitPresentation()
             updateAgentHibernationPresentationVisibility()
             guard isVisible else { return }
             refreshGhosttyAppearanceConfig(
@@ -409,10 +415,18 @@ struct WorkspaceContentView: View {
             // that happens instead of leaving the old instance captured by the
             // drop callback.
             syncBonsplitInteractivity()
+            syncBonsplitPresentation()
             installBonsplitFileDropHandler()
+            syncBonsplitAgentActivity()
         }
         .onDisappear {
             workspace.setAgentHibernationAutoResumePresentationVisible(false)
+        }
+        .task(id: ObjectIdentifier(workspace)) {
+            await observeAgentActivityChanges()
+        }
+        .onChange(of: showsAgentActivity) { _, _ in
+            syncBonsplitAgentActivity()
         }
         .onChange(of: notificationStore.notifications) { _, _ in
             syncBonsplitNotificationBadges()

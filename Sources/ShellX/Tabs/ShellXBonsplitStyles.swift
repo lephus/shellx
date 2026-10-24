@@ -15,13 +15,17 @@ import SwiftUI
 /// A tab bar over a light terminal theme gets no styles (ruling R6): the palette is made for dark
 /// bars, so Bonsplit keeps drawing its default selected tab there.
 ///
-/// A window has exactly one accent tab, so only a workspace's own split tree gets these styles.
-/// The Dock and the remote-tmux trees nested in a workspace have focused panes of their own and
-/// keep Bonsplit's default selected tab.
+/// A window has exactly one accent tab, so only a workspace's own split tree gets the selected
+/// tab style. The Dock and the remote-tmux trees nested in a workspace have focused panes of
+/// their own and keep Bonsplit's default selected tab.
+///
+/// The agent activity effects (spec §6.4) are the same on every dark tab bar, the Dock and the
+/// nested trees included, and on the dark sidebar's rows; they never follow the accent.
 ///
 /// ```swift
 /// let styles = ShellXBonsplitStyles(accent: ShellXPalette.primary)
 /// styles.selectedTabStyle.fillHex // "#60a5fa29"
+/// styles.titleEffectStyle.flashHex // "#d6c4ff42"
 /// ```
 struct ShellXBonsplitStyles: Equatable {
     /// The accent and the alphas ShellX washes it with.
@@ -77,4 +81,29 @@ struct ShellXBonsplitStyles: Equatable {
             boldsSelectedTitle: true
         )
     }
+
+    /// The agent activity effects, given to Bonsplit through `Appearance.titleEffectStyle`.
+    var titleEffectStyle: TitleEffectStyle {
+        Self.darkTitleEffectStyle
+    }
+
+    /// The agent activity effects for a tab bar or sidebar drawn in a color scheme.
+    ///
+    /// The effect colors are made for dark chrome, so a light tab bar or sidebar plays none.
+    ///
+    /// - Parameter colorScheme: The scheme the tab bar or sidebar is drawn in.
+    /// - Returns: The effects, or `nil` for a light scheme.
+    static func titleEffectStyle(for colorScheme: ColorScheme) -> TitleEffectStyle? {
+        colorScheme == .dark ? darkTitleEffectStyle : nil
+    }
+
+    /// The effect colors from the palette. The flash keeps its alpha; the durations are
+    /// Bonsplit's defaults, which are the spec's timing.
+    private static let darkTitleEffectStyle = TitleEffectStyle(
+        workingBaseHex: ShellXPalette.effectWorkingBase.hexString,
+        workingHighlightHex: ShellXPalette.effectWorkingHighlight.hexString,
+        glyphWorkingHex: ShellXPalette.running.hexString,
+        flashHex: ShellXPalette.effectFlash.hexStringWithAlpha,
+        highlightStopHexes: ShellXPalette.effectHighlightStops.map(\.hexString)
+    )
 }

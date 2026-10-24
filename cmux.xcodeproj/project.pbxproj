@@ -401,6 +401,7 @@
 		A50012F1 /* Backport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50012F0 /* Backport.swift */; };
 		B057B0017E57B0017E57B001 /* Bonsplit in Frameworks */ = {isa = PBXBuildFile; productRef = A5001262 /* Bonsplit */; };
 		74060000000000000000001B /* BonsplitConfiguration+RemoteTmuxEmbedded.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74060000000000000000001A /* BonsplitConfiguration+RemoteTmuxEmbedded.swift */; };
+		B272CBD735AF6212E4EC706A /* BonsplitConfiguration+ShellXStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 367B89702C359CACD7693664 /* BonsplitConfiguration+ShellXStyles.swift */; };
 		D0B10010A1B2C3D4E5F60001 /* BonsplitTabBarDebug.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0B10011A1B2C3D4E5F60001 /* BonsplitTabBarDebug.swift */; };
 		D0B10002A1B2C3D4E5F60001 /* BonsplitTabBarPassThrough.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0B10003A1B2C3D4E5F60001 /* BonsplitTabBarPassThrough.swift */; };
 		AA1B2C3D4E5F60718 /* BonsplitTabDragUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1B2C3D4E5F60719 /* BonsplitTabDragUITests.swift */; };
@@ -3371,6 +3372,7 @@
 		E4A2B0CAB6AAA1AC7127FD53 /* ShellXSidebarIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82421054CBFF9ECFC3CA2E2B /* ShellXSidebarIcon.swift */; };
 		60C4D402ECE7067826019E69 /* ShellXSidebarSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E81EF0707F741B6C620A647A /* ShellXSidebarSelectionTests.swift */; };
 		9CBA983FD767551CAFB913EA /* ShellXSwitches.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE04344F1F44FBBC99583161 /* ShellXSwitches.swift */; };
+		D970853DB80E245B62638483 /* ShellXTabActivitySyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0086129B06987F4A5CC88A52 /* ShellXTabActivitySyncTests.swift */; };
 		B2C68350F29BD5759B40BE98 /* ShellXThemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B157E03C649BE0CB191F7C8 /* ShellXThemeTests.swift */; };
 		F6A0110000000000000000B1 /* ShellXTitlebarAccessory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A0110000000000000000B2 /* ShellXTitlebarAccessory.swift */; };
 		1662FA327314C2564AB40E33 /* ShellXTitlebarModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 347A52EFB5026BEDC76A672B /* ShellXTitlebarModelTests.swift */; };
@@ -4541,6 +4543,7 @@
 		970900030000000000000001 /* WorkspaceColorMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 970900030000000000000002 /* WorkspaceColorMenuTests.swift */; };
 		A5FB1203 /* WorkspaceConfigActionCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5FB1204 /* WorkspaceConfigActionCapture.swift */; };
 		5732A0045732A0045732A004 /* WorkspaceContentMinimalModeSafeAreaModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5732B0045732B0045732B004 /* WorkspaceContentMinimalModeSafeAreaModifier.swift */; };
+		8647F85BACC5115D7F0D1523 /* WorkspaceContentView+AgentActivitySync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EE87BDF56BF6B65F9D6FC34 /* WorkspaceContentView+AgentActivitySync.swift */; };
 		DFAAE6D5B2C449C4BC3AC238 /* WorkspaceContentView+PanelVisibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 043F767DF75A4170B35210E7 /* WorkspaceContentView+PanelVisibility.swift */; };
 		A5001407 /* WorkspaceContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001417 /* WorkspaceContentView.swift */; };
 		F7000000A1B2C3D4E5F60718 /* WorkspaceContentViewVisibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7000001A1B2C3D4E5F60718 /* WorkspaceContentViewVisibilityTests.swift */; };
@@ -5172,6 +5175,7 @@
 		C0DE35860000000000000002 /* BackgroundWorkspacePrimeCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundWorkspacePrimeCoordinator.swift; sourceTree = "<group>"; };
 		A50012F0 /* Backport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backport.swift; sourceTree = "<group>"; };
 		74060000000000000000001A /* BonsplitConfiguration+RemoteTmuxEmbedded.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BonsplitConfiguration+RemoteTmuxEmbedded.swift"; sourceTree = "<group>"; };
+		367B89702C359CACD7693664 /* BonsplitConfiguration+ShellXStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellX/Tabs/BonsplitConfiguration+ShellXStyles.swift"; sourceTree = "<group>"; };
 		D0B10011A1B2C3D4E5F60001 /* BonsplitTabBarDebug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BonsplitTabBarDebug.swift; sourceTree = "<group>"; };
 		D0B10003A1B2C3D4E5F60001 /* BonsplitTabBarPassThrough.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BonsplitTabBarPassThrough.swift; sourceTree = "<group>"; };
 		AA1B2C3D4E5F60719 /* BonsplitTabDragUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BonsplitTabDragUITests.swift; sourceTree = "<group>"; };
@@ -7961,6 +7965,7 @@
 		82421054CBFF9ECFC3CA2E2B /* ShellXSidebarIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Sidebar/ShellXSidebarIcon.swift; sourceTree = "<group>"; };
 		E81EF0707F741B6C620A647A /* ShellXSidebarSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXSidebarSelectionTests.swift"; sourceTree = "<group>"; };
 		AE04344F1F44FBBC99583161 /* ShellXSwitches.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/ShellXSwitches.swift; sourceTree = "<group>"; };
+		0086129B06987F4A5CC88A52 /* ShellXTabActivitySyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXTabActivitySyncTests.swift"; sourceTree = "<group>"; };
 		0B157E03C649BE0CB191F7C8 /* ShellXThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXThemeTests.swift"; sourceTree = "<group>"; };
 		F6A0110000000000000000B2 /* ShellXTitlebarAccessory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Titlebar/ShellXTitlebarAccessory.swift; sourceTree = "<group>"; };
 		347A52EFB5026BEDC76A672B /* ShellXTitlebarModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXTitlebarModelTests.swift"; sourceTree = "<group>"; };
@@ -9119,6 +9124,7 @@
 		970900030000000000000002 /* WorkspaceColorMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceColorMenuTests.swift; sourceTree = "<group>"; };
 		A5FB1204 /* WorkspaceConfigActionCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceConfigActionCapture.swift; sourceTree = "<group>"; };
 		5732B0045732B0045732B004 /* WorkspaceContentMinimalModeSafeAreaModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceContentMinimalModeSafeAreaModifier.swift; sourceTree = "<group>"; };
+		4EE87BDF56BF6B65F9D6FC34 /* WorkspaceContentView+AgentActivitySync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellX/AgentActivity/WorkspaceContentView+AgentActivitySync.swift"; sourceTree = "<group>"; };
 		043F767DF75A4170B35210E7 /* WorkspaceContentView+PanelVisibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceContentView+PanelVisibility.swift"; sourceTree = "<group>"; };
 		A5001417 /* WorkspaceContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceContentView.swift; sourceTree = "<group>"; };
 		F7000001A1B2C3D4E5F60718 /* WorkspaceContentViewVisibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceContentViewVisibilityTests.swift; sourceTree = "<group>"; };
@@ -12484,6 +12490,8 @@
 				60D12CD36600479FC812D1CB /* AgentActivityText.swift */,
 				EDEA50D6001714B8FF4543BA /* Workspace+AgentNameEffects.swift */,
 				9C33B24CC10A0FD1477469AA /* WorkspaceAgentActivityModel.swift */,
+				4EE87BDF56BF6B65F9D6FC34 /* WorkspaceContentView+AgentActivitySync.swift */,
+				367B89702C359CACD7693664 /* BonsplitConfiguration+ShellXStyles.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -14074,6 +14082,7 @@
 				E81EF0707F741B6C620A647A /* ShellXSidebarSelectionTests.swift */,
 				28C7C66EB183FEC0A6ADC04B /* ShellXBonsplitStylesTests.swift */,
 				1575D951D11F58C68DA2F2A8 /* ShellXAgentActivityTests.swift */,
+				0086129B06987F4A5CC88A52 /* ShellXTabActivitySyncTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -15192,6 +15201,7 @@
 					C0DE35860000000000000001 /* BackgroundWorkspacePrimeCoordinator.swift in Sources */,
 					A50012F1 /* Backport.swift in Sources */,
 				74060000000000000000001B /* BonsplitConfiguration+RemoteTmuxEmbedded.swift in Sources */,
+				B272CBD735AF6212E4EC706A /* BonsplitConfiguration+ShellXStyles.swift in Sources */,
 					D0B10010A1B2C3D4E5F60001 /* BonsplitTabBarDebug.swift in Sources */,
 				D0B10002A1B2C3D4E5F60001 /* BonsplitTabBarPassThrough.swift in Sources */,
 				986900080000000000000001 /* BrowserAction.swift in Sources */,
@@ -17602,6 +17612,7 @@
 				266DFDCC29A6299F0CC1091D /* WorkspaceCloudVMBinding.swift in Sources */,
 				A5FB1203 /* WorkspaceConfigActionCapture.swift in Sources */,
 					5732A0045732A0045732A004 /* WorkspaceContentMinimalModeSafeAreaModifier.swift in Sources */,
+				8647F85BACC5115D7F0D1523 /* WorkspaceContentView+AgentActivitySync.swift in Sources */,
 				DFAAE6D5B2C449C4BC3AC238 /* WorkspaceContentView+PanelVisibility.swift in Sources */,
 				A5001407 /* WorkspaceContentView.swift in Sources */,
 				C4F0C0100000000000000A01 /* WorkspaceCustomColorPrompt.swift in Sources */,
@@ -19077,6 +19088,7 @@
 				6CDDB319FED107C3EB57AE87 /* ShellXRemoteUITests.swift in Sources */,
 				FA7DD6E004CD07E9E7CE313D /* ShellXShareTests.swift in Sources */,
 				60C4D402ECE7067826019E69 /* ShellXSidebarSelectionTests.swift in Sources */,
+				D970853DB80E245B62638483 /* ShellXTabActivitySyncTests.swift in Sources */,
 				B2C68350F29BD5759B40BE98 /* ShellXThemeTests.swift in Sources */,
 				1662FA327314C2564AB40E33 /* ShellXTitlebarModelTests.swift in Sources */,
 				1521D55DC63D5E5FC4955E31 /* ShortcutAndCommandPaletteTests.swift in Sources */,

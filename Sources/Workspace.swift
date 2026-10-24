@@ -4114,9 +4114,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             splitButtonTooltips: Self.currentSplitButtonTooltips(),
             enableAnimations: false,
             chromeColors: chromeColors,
-            usesSharedBackdrop: sharesWindowBackdrop,
-            selectedTabStyle: ShellXBonsplitStyles.current(overChromeBackground: chromeBackgroundColor)?.selectedTabStyle
-        )
+            usesSharedBackdrop: sharesWindowBackdrop
+        ).applyingShellXStyles(ShellXBonsplitStyles.current(overChromeBackground: chromeBackgroundColor))
     }
 
     func applyGhosttyChrome(from config: GhosttyConfig, reason: String = "unspecified") {
@@ -4139,7 +4138,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             increaseContrast: DisplayAccessibilityOptions.current.increaseContrast
         )
         let nextTabTitleFontSize = config.surfaceTabBarFontSize
-        let nextSelectedTabStyle = ShellXBonsplitStyles.current(overChromeBackground: chromeBackgroundColor)?.selectedTabStyle
+        let nextShellXStyles = ShellXBonsplitStyles.current(overChromeBackground: chromeBackgroundColor)
         let currentAppearance = bonsplitController.configuration.appearance
         let currentTabTitleFontSize = currentAppearance.tabTitleFontSize
         let colorsChanged = !Self.bonsplitChromeColorsEqual(
@@ -4148,8 +4147,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         )
         let sharedBackdropChanged = currentAppearance.usesSharedBackdrop != sharesWindowBackdrop
         let fontSizeChanged = abs(currentTabTitleFontSize - nextTabTitleFontSize) > 0.0001
-        let selectedTabStyleChanged = currentAppearance.selectedTabStyle != nextSelectedTabStyle
-        let isNoOp = !colorsChanged && !sharedBackdropChanged && !fontSizeChanged && !selectedTabStyleChanged
+        let shellXStylesChanged = !currentAppearance.carriesShellXStyles(nextShellXStyles)
+        let isNoOp = !colorsChanged && !sharedBackdropChanged && !fontSizeChanged && !shellXStylesChanged
 
         if GhosttyApp.shared.backgroundLogEnabled {
             GhosttyApp.shared.logBackground(
@@ -4176,8 +4175,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         if fontSizeChanged {
             bonsplitController.configuration.appearance.tabTitleFontSize = nextTabTitleFontSize
         }
-        if selectedTabStyleChanged {
-            bonsplitController.configuration.appearance.selectedTabStyle = nextSelectedTabStyle
+        if shellXStylesChanged {
+            bonsplitController.configuration.appearance.applyShellXStyles(nextShellXStyles)
         }
 
         if GhosttyApp.shared.backgroundLogEnabled {
@@ -4208,13 +4207,13 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
             chromeBackgroundColor: chromeBackgroundColor,
             increaseContrast: DisplayAccessibilityOptions.current.increaseContrast
         )
-        let nextSelectedTabStyle = ShellXBonsplitStyles.current(overChromeBackground: chromeBackgroundColor)?.selectedTabStyle
+        let nextShellXStyles = ShellXBonsplitStyles.current(overChromeBackground: chromeBackgroundColor)
         let currentChromeColors = bonsplitController.configuration.appearance.chromeColors
         let currentUsesSharedBackdrop = bonsplitController.configuration.appearance.usesSharedBackdrop
         let colorsChanged = !Self.bonsplitChromeColorsEqual(currentChromeColors, nextChromeColors)
         let sharedBackdropChanged = currentUsesSharedBackdrop != sharesWindowBackdrop
-        let selectedTabStyleChanged = bonsplitController.configuration.appearance.selectedTabStyle != nextSelectedTabStyle
-        let isNoOp = !colorsChanged && !sharedBackdropChanged && !selectedTabStyleChanged
+        let shellXStylesChanged = !bonsplitController.configuration.appearance.carriesShellXStyles(nextShellXStyles)
+        let isNoOp = !colorsChanged && !sharedBackdropChanged && !shellXStylesChanged
 
         if GhosttyApp.shared.backgroundLogEnabled {
             GhosttyApp.shared.logBackground(
@@ -4237,8 +4236,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         if sharedBackdropChanged {
             bonsplitController.configuration.appearance.usesSharedBackdrop = sharesWindowBackdrop
         }
-        if selectedTabStyleChanged {
-            bonsplitController.configuration.appearance.selectedTabStyle = nextSelectedTabStyle
+        if shellXStylesChanged {
+            bonsplitController.configuration.appearance.applyShellXStyles(nextShellXStyles)
         }
         if GhosttyApp.shared.backgroundLogEnabled {
             GhosttyApp.shared.logBackground(

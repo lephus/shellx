@@ -19,7 +19,8 @@ import Testing
 /// over a light terminal theme keeps Bonsplit's default selected tab. Only the
 /// workspace's own split tree gets the style: the window has exactly one
 /// accent tab, so the Dock and the remote-tmux trees nested in a workspace
-/// keep Bonsplit's default selected tab.
+/// keep Bonsplit's default selected tab. The agent activity effects (spec
+/// §6.4) play on every dark bar, those two included, and on no light bar.
 @Suite(.serialized)
 @MainActor
 struct ShellXBonsplitStylesTests {
@@ -73,6 +74,55 @@ struct ShellXBonsplitStylesTests {
         #expect(style.unfocusedPaneIndicatorHex == "#5b5478")
     }
 
+    @Test func effectStyleUsesShellXTokens() {
+        let style = ShellXBonsplitStyles(accent: ShellXPalette.primary).titleEffectStyle
+
+        #expect(style.workingBaseHex == "#b39550")
+        #expect(style.workingHighlightHex == "#fff3cf")
+        #expect(style.glyphWorkingHex == "#e8c468")
+        // The flash is `#d6c4ff` at 26%: the hex carries the alpha.
+        #expect(style.flashHex == "#d6c4ff42")
+        #expect(style.flashHex == ShellXPalette.effectFlash.hexStringWithAlpha)
+        #expect(style.highlightStopHexes.count == 7)
+        #expect(style.highlightStopHexes == ShellXPalette.effectHighlightStops.map(\.hexString))
+        #expect(style.workingSweepDuration == 2.2)
+        #expect(style.highlightCycleDuration == 3.0)
+        #expect(style.glyphFrameDuration == 0.18)
+        #expect(style.flashRiseDuration == 0.15)
+        #expect(style.flashFadeDuration == 0.8)
+
+        // The effects never follow the accent, and only dark chrome plays them.
+        #expect(ShellXBonsplitStyles(accent: ShellXColor(hex: 0xff8800)).titleEffectStyle == style)
+        #expect(ShellXBonsplitStyles.titleEffectStyle(for: .dark) == style)
+        #expect(ShellXBonsplitStyles.titleEffectStyle(for: .light) == nil)
+        #expect(ShellXBonsplitStyles(accent: CmuxAccentColor(), chromeBackground: Self.lightBar)?.titleEffectStyle == nil)
+    }
+
+    /// The extension the workspace's appearance goes through: a dark bar gets
+    /// both ShellX styles, a light bar gets both back to Bonsplit's defaults.
+    @Test func appearanceTakesBothShellXStylesOrNeither() throws {
+        let dark = try #require(ShellXBonsplitStyles(accent: CmuxAccentColor(), chromeBackground: Self.darkBar))
+        let light = ShellXBonsplitStyles(accent: CmuxAccentColor(), chromeBackground: Self.lightBar)
+        #expect(light == nil)
+        var appearance = BonsplitConfiguration.Appearance.default
+        #expect(!appearance.carriesShellXStyles(dark))
+
+        appearance.applyShellXStyles(dark)
+        #expect(appearance.selectedTabStyle == dark.selectedTabStyle)
+        #expect(appearance.titleEffectStyle == dark.titleEffectStyle)
+        #expect(appearance.carriesShellXStyles(dark))
+        #expect(!appearance.carriesShellXStyles(light))
+
+        appearance.applyShellXStyles(light)
+        #expect(appearance.selectedTabStyle == nil)
+        #expect(appearance.titleEffectStyle == nil)
+        #expect(appearance.carriesShellXStyles(light))
+
+        let copy = BonsplitConfiguration.Appearance.default.applyingShellXStyles(dark)
+        #expect(copy.selectedTabStyle == dark.selectedTabStyle)
+        #expect(copy.titleEffectStyle == dark.titleEffectStyle)
+    }
+
     @Test func lightTabBarGetsNoStyle() {
         let accent = CmuxAccentColor()
 
@@ -111,47 +161,60 @@ struct ShellXBonsplitStylesTests {
     }
 
     @Test func workspaceChromeFollowsTheTerminalBackground() throws {
-        let expected = try #require(
+        let darkStyles = try #require(
             ShellXBonsplitStyles(accent: Self.appAccent, chromeBackground: Self.darkBar)
-        ).selectedTabStyle
+        )
+        let expected = darkStyles.selectedTabStyle
         let workspace = Workspace(title: "Tests")
         defer { workspace.teardownAllPanels() }
         let appliedStyle = { workspace.bonsplitController.configuration.appearance.selectedTabStyle }
+        let appliedEffects = { workspace.bonsplitController.configuration.appearance.titleEffectStyle }
 
         workspace.applyGhosttyChrome(from: Self.config(background: Self.darkBar), reason: "test-dark")
         #expect(appliedStyle() == expected)
+        #expect(appliedEffects() == darkStyles.titleEffectStyle)
 
-        // A light theme gives the bar back to Bonsplit's default selected tab.
+        // A light theme gives the bar back to Bonsplit's default selected tab
+        // and plays no agent effects.
         workspace.applyGhosttyChrome(from: Self.config(background: Self.lightBar), reason: "test-light")
         #expect(appliedStyle() == nil)
+        #expect(appliedEffects() == nil)
 
         workspace.applyGhosttyChrome(from: Self.config(background: Self.darkBar), reason: "test-dark-again")
         #expect(appliedStyle() == expected)
+        #expect(appliedEffects() == darkStyles.titleEffectStyle)
     }
 
     /// The Dock is a second Bonsplit tree with a focused pane of its own, so a
-    /// style there would put a second accent tab in the window.
+    /// style there would put a second accent tab in the window. Its dark tab
+    /// bar still plays the agent effects.
     @Test func dockKeepsTheUpstreamSelectedTab() {
         let dark = DockSplitStore.makeAppearance(from: Self.config(background: Self.darkBar))
         #expect(dark.chromeColors.backgroundHex == "#0B0716")
         #expect(dark.selectedTabStyle == nil)
+        #expect(dark.titleEffectStyle?.workingBaseHex == "#b39550")
+        #expect(dark.titleEffectStyle == ShellXBonsplitStyles(accent: ShellXPalette.primary).titleEffectStyle)
 
         let light = DockSplitStore.makeAppearance(from: Self.config(background: Self.lightBar))
         #expect(light.chromeColors.backgroundHex == "#FFFFFF")
         #expect(light.selectedTabStyle == nil)
+        #expect(light.titleEffectStyle == nil)
     }
 
     @Test func embeddedRemoteTmuxConfigurationDropsTheSelectedTabStyle() {
         var appearance = BonsplitConfiguration.Appearance.default
-        appearance.selectedTabStyle = ShellXBonsplitStyles(accent: ShellXPalette.primary).selectedTabStyle
+        appearance.applyShellXStyles(ShellXBonsplitStyles(accent: ShellXPalette.primary))
         appearance.tabBarHeight = 36
         let workspaceConfiguration = BonsplitConfiguration(appearance: appearance)
 
         let embedded = workspaceConfiguration.remoteTmuxEmbedded
 
         #expect(embedded.appearance.selectedTabStyle == nil)
-        // Only the style goes; the rest of the appearance still follows the workspace.
+        // Only the style goes; the rest of the appearance still follows the
+        // workspace, the agent effects included.
         #expect(embedded.appearance.tabBarHeight == 36)
+        #expect(embedded.appearance.titleEffectStyle?.workingBaseHex == "#b39550")
+        #expect(embedded.appearance.titleEffectStyle == appearance.titleEffectStyle)
     }
 
     /// A mirrored tmux window nests its own Bonsplit tree in a workspace tab,
