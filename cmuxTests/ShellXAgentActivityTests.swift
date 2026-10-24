@@ -73,6 +73,50 @@ import Testing
         #expect(workspace.agentActivity.marker(forPanel: closing) == nil)
     }
 
+    /// `reset_sidebar` clears every agent lifecycle; the markers go with them,
+    /// or the pane's next Claude turn would replay an old workflow.
+    @Test func resettingTheSidebarClearsMarkers() throws {
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let first = try #require(workspace.focusedPanelId)
+        let second = try #require(
+            workspace.newTerminalSplit(from: first, orientation: .horizontal, focus: false)?.id
+        )
+        Self.reportClaudeRunning(in: workspace, panelId: first)
+        workspace.applyAgentActivity(.workflowLaunched(name: "release"), surfaceId: first)
+        workspace.applyAgentActivity(.skillInvoked(name: "brainstorming"), surfaceId: second)
+        let revision = workspace.agentActivity.revision
+
+        workspace.resetSidebarContext(reason: "reset_sidebar")
+
+        #expect(workspace.agentActivity.table.markersByPanelId.isEmpty)
+        #expect(workspace.agentActivity.revision == revision + 1, "One row refresh for the whole reset")
+
+        // A new turn without a slash command keeps a workflow marker, so a kept
+        // one would show again here.
+        Self.reportClaudeRunning(in: workspace, panelId: first)
+        workspace.applyAgentActivity(.turnStarted(slashCommandName: nil), surfaceId: first)
+        #expect(workspace.agentNameEffect(forPanel: first) == .working)
+    }
+
+    @Test func removingAllMarkersNotifiesOnlyWhenThereWereMarkers() {
+        let model = WorkspaceAgentActivityModel()
+        model.removeAll()
+        #expect(model.revision == 0)
+
+        model.apply(.workflowLaunched(name: "release"), panelId: UUID())
+        model.apply(.skillInvoked(name: "brainstorming"), panelId: UUID())
+        let lastGeneration = model.table.markersByPanelId.values.map(\.generation).max() ?? 0
+        model.removeAll()
+        #expect(model.table.markersByPanelId.isEmpty)
+        #expect(model.revision == 3)
+
+        // Generations keep counting, so a view never mistakes a new marker for one it flashed.
+        let panelId = UUID()
+        model.apply(.skillInvoked(name: "review"), panelId: panelId)
+        #expect((model.marker(forPanel: panelId)?.generation ?? 0) > lastGeneration)
+    }
+
     // MARK: - Pane and workspace effects
 
     @Test func runningPanelWithSkillMarkerShowsSkill() throws {
@@ -146,8 +190,10 @@ import Testing
 
         let snapshot = Self.snapshot(of: workspace, colorScheme: .dark)
 
-        #expect(snapshot.nameEffect == .skill(name: "brainstorming", generation: marker.generation))
-        #expect(snapshot.agentActivityText == "Skill · brainstorming")
+        let effect = AgentNameEffect.skill(name: "brainstorming", generation: marker.generation)
+        #expect(snapshot.nameEffect == effect)
+        // The words themselves are pinned in English by `activityTextNamesEachEffect`.
+        #expect(snapshot.agentActivityText == AgentActivityText().text(for: effect))
     }
 
     @Test func effectsFollowShowAgentActivity() throws {
@@ -158,7 +204,7 @@ import Testing
 
         let shown = Self.snapshot(of: workspace, colorScheme: .dark)
         #expect(shown.nameEffect == .working)
-        #expect(shown.agentActivityText == "Thinking…")
+        #expect(shown.agentActivityText == AgentActivityText().text(for: .working))
 
         let settingOff = Self.snapshot(of: workspace, colorScheme: .dark, showAgentActivity: false)
         #expect(settingOff.nameEffect == nil)
@@ -173,8 +219,8 @@ import Testing
         #expect(shown.presentationKey != lightSidebar.presentationKey)
     }
 
-    @Test func activityTextNamesEachEffect() {
-        let text = AgentActivityText()
+    @Test func activityTextNamesEachEffect() throws {
+        let text = try AgentActivityText.english()
 
         #expect(text.text(for: .working) == "Thinking…")
         #expect(text.text(for: .skill(name: "brainstorming", generation: 1)) == "Skill · brainstorming")
@@ -185,7 +231,8 @@ import Testing
 
     // MARK: - Refresh
 
-    @Test func markerChangesNotifySidebarObservers() async {
+    @Test(.timeLimit(.minutes(1)))
+    func markerChangesNotifySidebarObservers() async {
         let model = WorkspaceAgentActivityModel()
         var changes = model.changes().makeAsyncIterator()
         // A subscriber first re-reads the current table.
@@ -273,6 +320,14 @@ import Testing
             showsAgentActivity: false,
             sidebarColorScheme: colorScheme
         ).makeSnapshot()
+    }
+}
+
+extension AgentActivityText {
+    /// The activity words in English, whatever language the test host runs in.
+    static func english() throws -> AgentActivityText {
+        let url = try #require(Bundle.main.url(forResource: "en", withExtension: "lproj"))
+        return AgentActivityText(bundle: try #require(Bundle(url: url)))
     }
 }
 

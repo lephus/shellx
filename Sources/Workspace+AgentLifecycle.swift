@@ -570,6 +570,9 @@ extension Workspace {
     }
 
     func clearAllAgentLifecycleStates() {
+        // Skill and workflow markers belong to the agent state being cleared:
+        // a kept workflow marker would replay on the pane's next Claude turn.
+        agentActivity.removeAll()
         let panelIds = Array(agentLifecycleStatesByPanelId.keys)
         guard !panelIds.isEmpty else { return }
         agentLifecycleStatesByPanelId.removeAll()

@@ -42,6 +42,20 @@ final class WorkspaceAgentActivityModel {
         tableDidChange()
     }
 
+    /// Drops every pane's marker because the workspace's agent state was reset.
+    ///
+    /// Observers hear one change for the whole reset, and none when there was
+    /// no marker. Generations keep counting up, so a marker placed afterwards
+    /// is still newer than any a view already flashed for.
+    func removeAll() {
+        var didChange = false
+        for panelId in Array(table.markersByPanelId.keys) {
+            didChange = table.removePanel(panelId) || didChange
+        }
+        guard didChange else { return }
+        tableDidChange()
+    }
+
     /// The pane's marker, or `nil` when it has none.
     func marker(forPanel panelId: UUID) -> AgentActivityMarker? {
         table.markersByPanelId[panelId]

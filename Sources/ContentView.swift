@@ -11505,7 +11505,7 @@ struct VerticalTabsSidebar: View, Equatable {
 #endif
     @Environment(\.colorScheme) private var sidebarColorScheme
     /// Read by snapshot refreshes: observation tasks hold an older copy of this view.
-    @State private var snapshotSidebarColorScheme = ColorScheme.dark
+    @State private var snapshotSidebarColorScheme = ColorScheme.light
     @Environment(\.sidebarReadabilityBackdrop) private var sidebarReadabilityBackdrop
     @Environment(\.cmuxGlobalFontMagnificationPercent) private var sidebarGlobalFontMagnificationPercent
     @State private var sidebarDisplayAccessibility = DisplayAccessibilityOptions.current
