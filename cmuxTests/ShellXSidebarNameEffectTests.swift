@@ -1,6 +1,7 @@
 import AppKit
 import Bonsplit
 import CmuxFoundation
+import CmuxSettings
 import CmuxSidebar
 import ShellXBrand
 import Testing
@@ -246,29 +247,9 @@ struct ShellXSidebarNameEffectTests {
     }
 
     @Test func flashPlaysOnceForANewSkillAndNeverForAReusedRow() throws {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 280, height: 40),
-            styleMask: [.borderless],
-            backing: .buffered,
-            defer: false
-        )
-        window.isReleasedWhenClosed = false
+        let (presenter, window) = Self.makePresenter()
         defer { window.close() }
-        let host = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 40))
-        window.contentView = host
-        let titleView = SidebarRowTextView(lines: 1)
-        titleView.stringValue = Self.title
-        titleView.font = .systemFont(ofSize: 12.5, weight: .semibold)
-        titleView.frame = NSRect(x: 10, y: 8, width: 200, height: 16)
-        host.addSubview(titleView)
-        let presenter = SidebarRowNameEffectPresenter(
-            titleView: titleView,
-            host: host,
-            environment: VisibleEnvironment()
-        )
         let flash = presenter.flashView
-        host.addSubview(flash, positioned: .below, relativeTo: titleView)
-        flash.frame = host.bounds
         let row = UUID()
 
         // The skill started before the row showed it: that moment has passed.
@@ -293,6 +274,56 @@ struct ShellXSidebarNameEffectTests {
         )
         #expect(!Self.isFlashing(flash))
         #expect(flash.flashedGeneration == 9)
+    }
+
+    /// A row shows its workspace's strongest effect, which can fall back to an older skill or
+    /// workflow from another pane (spec §6.3). The flash belongs to the start of a skill or workflow
+    /// (§6.4), so a generation the row already showed, or one older than it, never flashes again.
+    @Test func flashNeverReplaysAnOlderGeneration() throws {
+        let (presenter, window) = Self.makePresenter()
+        defer { window.close() }
+        let flash = presenter.flashView
+        let row = UUID()
+        presenter.apply(effect: .working, isRenaming: false, style: Self.style, rowIdentity: row)
+
+        // Pane B starts a skill: new, so it flashes.
+        presenter.apply(effect: .skill(name: "review", generation: 4), isRenaming: false, style: Self.style, rowIdentity: row)
+        #expect(Self.isFlashing(flash))
+        Self.stopFlash(flash)
+
+        // B stops to ask for permission: the row falls back to pane A's older background workflow.
+        presenter.apply(
+            effect: .workflow(name: "release", generation: 3),
+            isRenaming: false,
+            style: Self.style,
+            rowIdentity: row
+        )
+        #expect(!Self.isFlashing(flash))
+
+        // B resumes the same skill.
+        presenter.apply(effect: .skill(name: "review", generation: 4), isRenaming: false, style: Self.style, rowIdentity: row)
+        #expect(!Self.isFlashing(flash))
+
+        // A skill that really starts now still flashes.
+        presenter.apply(effect: .skill(name: "review", generation: 5), isRenaming: false, style: Self.style, rowIdentity: row)
+        #expect(Self.isFlashing(flash))
+    }
+
+    /// A light sidebar plays no effect (R6): its cell gives the presenter neither effect nor style.
+    /// A skill that started meanwhile does not flash when the sidebar turns dark again.
+    @Test func switchingToADarkSidebarMidSkillDoesNotFlash() throws {
+        let (presenter, window) = Self.makePresenter()
+        defer { window.close() }
+        let flash = presenter.flashView
+        let row = UUID()
+        presenter.apply(effect: .working, isRenaming: false, style: Self.style, rowIdentity: row)
+        presenter.apply(effect: nil, isRenaming: false, style: nil, rowIdentity: row)
+
+        presenter.apply(effect: .skill(name: "review", generation: 6), isRenaming: false, style: Self.style, rowIdentity: row)
+        #expect(!Self.isFlashing(flash))
+
+        presenter.apply(effect: .skill(name: "review", generation: 7), isRenaming: false, style: Self.style, rowIdentity: row)
+        #expect(Self.isFlashing(flash))
     }
 
     @Test func presentationFlagReachesEveryEffectView() throws {
@@ -357,6 +388,96 @@ struct ShellXSidebarNameEffectTests {
         #expect(Self.visibleTexts(in: restored) == ["Running"])
         #expect(Self.visibleGlyphs(in: restored).isEmpty)
         #expect(Self.visibleImages(in: restored).count == 1)
+    }
+
+    /// The activity goes on the row of the agent whose work drives the effect (spec §6.5): Codex
+    /// has no skills or workflows, but its turns work like Claude's (§6.3).
+    @Test func codexSessionSaysWhatItDoesOnItsOwnRow() throws {
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let panelId = try #require(workspace.focusedPanelId)
+        Self.reportAgent("codex", status: "Running", lifecycle: .running, in: workspace, panelId: panelId)
+
+        let model = Self.rowModel(for: workspace)
+        #expect(model.snapshot.nameEffect == .working)
+        let cell = SidebarAppKitRowCellTests.configuredCell(model: model)
+        let window = Self.layoutCell(cell, model: model)
+        defer { window.close() }
+
+        let rows = Self.visibleMetadataRows(in: cell)
+        #expect(rows.map { Self.visibleTexts(in: $0) } == [[AgentActivityText().text(for: .working)]])
+        #expect(rows.map { Self.visibleGlyphs(in: $0).count } == [1])
+    }
+
+    /// Claude waits for the person while Codex works: Codex drives the effect, so its row says what
+    /// it does, and Claude's row keeps saying that it waits.
+    @Test func mixedSessionKeepsEachAgentOnItsOwnRow() throws {
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let claude = try #require(workspace.focusedPanelId)
+        let codex = try #require(workspace.newTerminalSplit(from: claude, orientation: .horizontal, focus: false)?.id)
+        Self.reportAgent(
+            "claude_code",
+            status: "Needs input",
+            icon: "bell.fill",
+            workState: nil,
+            lifecycle: .needsInput,
+            in: workspace,
+            panelId: claude
+        )
+        Self.reportAgent("codex", status: "Running", lifecycle: .running, in: workspace, panelId: codex)
+
+        let model = Self.rowModel(for: workspace)
+        #expect(model.snapshot.nameEffect == .working)
+        let cell = SidebarAppKitRowCellTests.configuredCell(model: model)
+        let window = Self.layoutCell(cell, model: model)
+        defer { window.close() }
+
+        let rows = Self.visibleMetadataRows(in: cell)
+        #expect(rows.count == 2)
+        let waiting = try #require(rows.first { Self.visibleTexts(in: $0) == ["Needs input"] })
+        #expect(Self.visibleGlyphs(in: waiting).isEmpty)
+        let working = try #require(rows.first { Self.visibleTexts(in: $0) == [AgentActivityText().text(for: .working)] })
+        #expect(Self.visibleGlyphs(in: working).count == 1)
+    }
+
+    /// Claude Code also reports its turn over OSC 7501 ("claude-code · Working"). That row and the
+    /// hook's `claude_code` row both show Claude's status, so while the effect plays one row says what
+    /// Claude does and the other leaves: no second status line, and no extra line on the first turn
+    /// (spec §6.5, R5).
+    @Test func claudeStatusShowsOnOneRowDuringATurn() throws {
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let panelId = try #require(workspace.focusedPanelId)
+        Self.reportAgent(
+            "claude_code",
+            status: "Idle",
+            icon: "pause.circle.fill",
+            workState: nil,
+            lifecycle: .idle,
+            in: workspace,
+            panelId: panelId
+        )
+        let idle = Self.rowModel(for: workspace)
+        let idleCell = SidebarAppKitRowCellTests.configuredCell(model: idle)
+        let idleWindow = Self.layoutCell(idleCell, model: idle)
+        defer { idleWindow.close() }
+        #expect(Self.visibleMetadataRows(in: idleCell).map { Self.visibleTexts(in: $0) } == [["Idle"]])
+        let idleHeight = idleCell.layoutContent(model: idle, width: 280, apply: false)
+
+        // The first turn: Claude Code reports its own status, and its hook reports the turn.
+        workspace.applyProgramStatus(ProgramStatusReport(state: .working, app: "claude-code"), panelId: panelId)
+        Self.reportAgent("claude_code", status: "Running", lifecycle: .running, in: workspace, panelId: panelId)
+
+        let turn = Self.rowModel(for: workspace)
+        #expect(turn.snapshot.nameEffect == .working)
+        let cell = SidebarAppKitRowCellTests.configuredCell(model: turn)
+        let window = Self.layoutCell(cell, model: turn)
+        defer { window.close() }
+        let rows = Self.visibleMetadataRows(in: cell)
+        #expect(rows.map { Self.visibleTexts(in: $0) } == [[AgentActivityText().text(for: .working)]])
+        #expect(rows.map { Self.visibleGlyphs(in: $0).count } == [1])
+        #expect(cell.layoutContent(model: turn, width: 280, apply: false) == idleHeight)
     }
 
     @Test func noNewRowWhenMetadataHidden() throws {
@@ -517,7 +638,39 @@ struct ShellXSidebarNameEffectTests {
             nameEffect: nameEffect,
             agentActivityText: agentActivityText
         )
-        return SidebarWorkspaceRowModel(
+        return rowModel(
+            snapshot: snapshot,
+            settings: settings,
+            workspaceId: workspaceId,
+            colorSchemeIsDark: colorSchemeIsDark
+        )
+    }
+
+    /// The row a dark sidebar shows for `workspace`, with its snapshot built the way the sidebar builds it.
+    private static func rowModel(for workspace: Workspace) -> SidebarWorkspaceRowModel {
+        let defaults = makeDefaults()
+        defaults.set(true, forKey: SidebarCatalogSection().showAgentActivity.userDefaultsKey)
+        // Only status rows: the working directory line is a row of the same kind.
+        defaults.set(false, forKey: SidebarCatalogSection().showBranchDirectory.userDefaultsKey)
+        let settings = SidebarTabItemSettingsSnapshot(defaults: defaults)
+        // `showsAgentActivity` stays off: in ShellX the spinner also needs an experiment flag that
+        // is off, and name effects follow the setting alone.
+        let snapshot = SidebarWorkspaceSnapshotFactory(
+            workspace: workspace,
+            settings: settings,
+            showsAgentActivity: false,
+            sidebarColorScheme: .dark
+        ).makeSnapshot()
+        return rowModel(snapshot: snapshot, settings: settings, workspaceId: workspace.id, colorSchemeIsDark: true)
+    }
+
+    private static func rowModel(
+        snapshot: SidebarWorkspaceSnapshotBuilder.Snapshot,
+        settings: SidebarTabItemSettingsSnapshot,
+        workspaceId: UUID,
+        colorSchemeIsDark: Bool
+    ) -> SidebarWorkspaceRowModel {
+        SidebarWorkspaceRowModel(
             workspaceId: workspaceId,
             index: 0,
             snapshot: snapshot,
@@ -548,6 +701,56 @@ struct ShellXSidebarNameEffectTests {
             isMetadataExpanded: false,
             isMarkdownExpanded: false
         )
+    }
+
+    /// Reports an agent's turn for the pane the way its hook CLI does: a `set_status` row and a
+    /// lifecycle. A structured agent row shows only while something proves an agent owns it; a PID
+    /// is the smallest such proof.
+    private static func reportAgent(
+        _ key: String,
+        status: String,
+        icon: String = "bolt.fill",
+        workState: SidebarAgentWorkState? = .running,
+        lifecycle: AgentHibernationLifecycleState,
+        in workspace: Workspace,
+        panelId: UUID
+    ) {
+        let owner = ControlSidebarPanelOwner.workspace(workspace)
+        owner.setStatusEntry(
+            SidebarStatusEntry(key: key, value: status, icon: icon, workState: workState),
+            key: key,
+            panelId: panelId
+        )
+        owner.setAgentLifecycle(key: key, panelId: panelId, lifecycle: lifecycle)
+        if workspace.agentPIDs[key] == nil {
+            workspace.agentPIDs[key] = pid_t(4_000 + workspace.agentPIDs.count)
+        }
+    }
+
+    /// A presenter over a session name in a borderless window, where its flash can play.
+    private static func makePresenter() -> (presenter: SidebarRowNameEffectPresenter, window: NSWindow) {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 280, height: 40),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        let host = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 40))
+        window.contentView = host
+        let titleView = SidebarRowTextView(lines: 1)
+        titleView.stringValue = title
+        titleView.font = .systemFont(ofSize: 12.5, weight: .semibold)
+        titleView.frame = NSRect(x: 10, y: 8, width: 200, height: 16)
+        host.addSubview(titleView)
+        let presenter = SidebarRowNameEffectPresenter(
+            titleView: titleView,
+            host: host,
+            environment: VisibleEnvironment()
+        )
+        host.addSubview(presenter.flashView, positioned: .below, relativeTo: titleView)
+        presenter.flashView.frame = host.bounds
+        return (presenter, window)
     }
 
     /// Lays the cell out at its measured height in a borderless window, the way the table shows it.

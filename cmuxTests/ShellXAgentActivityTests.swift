@@ -99,6 +99,29 @@ import Testing
         #expect(workspace.agentNameEffect(forPanel: first) == .working)
     }
 
+    /// Resuming a hibernated agent clears its pane's agent state
+    /// (`resumeAgentHibernation` calls `clearAgentLifecycleStates(panelId:)`);
+    /// the pane's marker goes with it, or the resumed session's next turn
+    /// replays an old workflow.
+    @Test func clearingAPaneAgentStateClearsItsMarker() throws {
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let panelId = try #require(workspace.focusedPanelId)
+        Self.reportClaudeRunning(in: workspace, panelId: panelId)
+        workspace.applyAgentActivity(.workflowLaunched(name: "release"), surfaceId: panelId)
+        // A turn that ends with a background task running keeps the workflow marker.
+        workspace.applyAgentActivity(.turnEnded(hasBackgroundWork: true), surfaceId: panelId)
+        #expect(workspace.agentActivity.marker(forPanel: panelId)?.kind == .workflow)
+
+        workspace.clearAgentLifecycleStates(panelId: panelId)
+
+        #expect(workspace.agentActivity.marker(forPanel: panelId) == nil)
+        // The resumed session's first turn keeps a workflow marker, so a kept one would show here.
+        Self.reportClaudeRunning(in: workspace, panelId: panelId)
+        workspace.applyAgentActivity(.turnStarted(slashCommandName: nil), surfaceId: panelId)
+        #expect(workspace.agentNameEffect(forPanel: panelId) == .working)
+    }
+
     @Test func removingAllMarkersNotifiesOnlyWhenThereWereMarkers() {
         let model = WorkspaceAgentActivityModel()
         model.removeAll()
@@ -176,6 +199,93 @@ import Testing
         }
 
         #expect(workspace.agentNameEffect(forPanel: panelId).map(AgentActivityEffectKind.init) == paneCase.expected)
+    }
+
+    // MARK: - Turn end
+
+    // A turn's `Stop` and `SessionEnd` hooks are read the moment they arrive,
+    // but the pane's lifecycle leaves running only when the delivery queue has
+    // run the hook CLI for the same event, which can take seconds. In between,
+    // a skill or workflow must not fall back to "Thinking…" and a plain turn
+    // must not keep shimmering (spec §4, §6.3).
+
+    @Test func skillTurnEndsWithoutFallingBackToWorking() throws {
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let panelId = try #require(workspace.focusedPanelId)
+        let owner = ControlSidebarPanelOwner.workspace(workspace)
+        Self.reportClaudeRunning(in: workspace, panelId: panelId)
+        workspace.applyAgentActivity(.skillInvoked(name: "brainstorming"), surfaceId: panelId)
+        #expect(workspace.agentNameEffect(forPanel: panelId).map(AgentActivityEffectKind.init) == .skill)
+
+        workspace.applyAgentActivity(.turnEnded(hasBackgroundWork: false), surfaceId: panelId)
+
+        // The lifecycle still says running, but the turn is over.
+        #expect(workspace.agentNameEffect(forPanel: panelId) == nil)
+        let snapshot = Self.snapshot(of: workspace, colorScheme: .dark)
+        #expect(snapshot.nameEffect == nil)
+        #expect(snapshot.agentActivityText == nil)
+
+        // The Stop's delivery settles the lifecycle.
+        owner.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .idle)
+        #expect(workspace.agentNameEffect(forPanel: panelId) == nil)
+
+        // A turn that starts without a prompt, such as one woken by a background
+        // task, reports only its lifecycle; it works again.
+        owner.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .running)
+        #expect(workspace.agentNameEffect(forPanel: panelId) == .working)
+    }
+
+    @Test func plainTurnStopsWorkingAtItsStop() throws {
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let panelId = try #require(workspace.focusedPanelId)
+        Self.reportClaudeRunning(in: workspace, panelId: panelId)
+        #expect(workspace.agentNameEffect(forPanel: panelId) == .working)
+
+        workspace.applyAgentActivity(.turnEnded(hasBackgroundWork: false), surfaceId: panelId)
+
+        #expect(workspace.agentNameEffect(forPanel: panelId) == nil)
+        #expect(Self.snapshot(of: workspace, colorScheme: .dark).agentActivityText == nil)
+
+        // The next prompt starts a turn before any lifecycle report.
+        workspace.applyAgentActivity(.turnStarted(slashCommandName: nil), surfaceId: panelId)
+        #expect(workspace.agentNameEffect(forPanel: panelId) == .working)
+    }
+
+    @Test func sessionEndStopsTheEffectAtOnce() throws {
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let panelId = try #require(workspace.focusedPanelId)
+        Self.reportClaudeRunning(in: workspace, panelId: panelId)
+        workspace.applyAgentActivity(.workflowLaunched(name: "release"), surfaceId: panelId)
+
+        workspace.applyAgentActivity(.sessionEnded, surfaceId: panelId)
+
+        #expect(workspace.agentNameEffect(forPanel: panelId) == nil)
+    }
+
+    @Test func workflowKeptByBackgroundWorkEndsWithItsLastTurn() throws {
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let panelId = try #require(workspace.focusedPanelId)
+        let owner = ControlSidebarPanelOwner.workspace(workspace)
+        Self.reportClaudeRunning(in: workspace, panelId: panelId)
+        workspace.applyAgentActivity(.workflowLaunched(name: "release"), surfaceId: panelId)
+        let workflow = try #require(workspace.agentActivity.marker(forPanel: panelId))
+        let rainbow = AgentNameEffect.workflow(name: "release", generation: workflow.generation)
+
+        // The turn ends while the workflow keeps running in the background.
+        workspace.applyAgentActivity(.turnEnded(hasBackgroundWork: true), surfaceId: panelId)
+        #expect(workspace.agentNameEffect(forPanel: panelId) == rainbow)
+        owner.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .backgroundWorkPending)
+        #expect(workspace.agentNameEffect(forPanel: panelId) == rainbow)
+
+        // The workflow finishes and wakes the agent for one more turn, which then ends.
+        owner.setAgentLifecycle(key: "claude_code", panelId: panelId, lifecycle: .running)
+        #expect(workspace.agentNameEffect(forPanel: panelId) == rainbow)
+        workspace.applyAgentActivity(.turnEnded(hasBackgroundWork: false), surfaceId: panelId)
+        #expect(workspace.agentNameEffect(forPanel: panelId) == nil)
     }
 
     // MARK: - Sidebar snapshot
