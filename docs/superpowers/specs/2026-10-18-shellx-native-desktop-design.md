@@ -182,6 +182,7 @@ Bản phác: `docs/superpowers/design/2026-10-18-native-desktop/huong-d-mockup.h
 **Quy tắc:**
 
 - **Không dùng gradient, quầng sáng hay bóng màu** trên mọi thành phần giao diện. Logo là ngoại lệ duy nhất, vì nó giữ nguyên gradient của chính nó.
+- Ngoại lệ (23/10/2026): khi agent hoạt động, chữ tên phiên và tên tab được chạy màu (vàng lướt, hoặc cầu vồng dịu khi gọi skill/workflow); xem `2026-10-23-shellx-tab-selection-agent-effects-design.md`.
 - **Nút chính:** nền `primary-soft`, viền 1 px `primary-line`, chữ `primary-text`. **Nút phụ:** nền `raise`, viền `border`, chữ `text`. Cả hai đều là màu đặc.
 - **Nhãn trạng thái:** nền là màu trạng thái với độ đậm khoảng 12%, chữ là màu trạng thái.
 

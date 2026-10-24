@@ -160,10 +160,10 @@ final class SidebarSelectedWorkspaceColorTests: XCTestCase {
                 colorScheme: scheme,
                 sidebarSelectionColorHex: nil
             )
-            // ShellX: a dark sidebar selects with the flat `raise` token.
+            // ShellX: a dark sidebar selects with the accent tinted over `panel`.
             XCTAssertEqual(
                 solid.color?.hexString(),
-                scheme == .dark ? "#171128" : CmuxAccentColor().nsColor(for: scheme).hexString()
+                scheme == .dark ? "#222D4E" : CmuxAccentColor().nsColor(for: scheme).hexString()
             )
             XCTAssertEqual(solid.opacity, 1.0, accuracy: 0.001)
             XCTAssertNil(solid.edgeColor)

@@ -6230,5 +6230,33 @@
     "identityLocales": {
       "vi": "English UI or developer term Vietnamese ShellX keeps as-is (glossary: terminal, tab, agent, prompt, commit, branch, fork, log, OK, Cloud VM); the translated entry is still required."
     }
+  },
+  "sidebar.agentActivity.skill": {
+    "source": "Skill · %@",
+    "identityLocales": {
+      "de": "Skill and Workflow are Claude Code feature names, kept in English in this locale. The translated entry is still required.",
+      "vi": "Skill and Workflow are Claude Code feature names, kept in English in this locale. The translated entry is still required."
+    }
+  },
+  "sidebar.agentActivity.skillUnnamed": {
+    "source": "Skill",
+    "identityLocales": {
+      "de": "Skill and Workflow are Claude Code feature names, kept in English in this locale. The translated entry is still required.",
+      "vi": "Skill and Workflow are Claude Code feature names, kept in English in this locale. The translated entry is still required."
+    }
+  },
+  "sidebar.agentActivity.workflow": {
+    "source": "Workflow · %@",
+    "identityLocales": {
+      "de": "Skill and Workflow are Claude Code feature names, kept in English in this locale. The translated entry is still required.",
+      "vi": "Skill and Workflow are Claude Code feature names, kept in English in this locale. The translated entry is still required."
+    }
+  },
+  "sidebar.agentActivity.workflowUnnamed": {
+    "source": "Workflow",
+    "identityLocales": {
+      "de": "Skill and Workflow are Claude Code feature names, kept in English in this locale. The translated entry is still required.",
+      "vi": "Skill and Workflow are Claude Code feature names, kept in English in this locale. The translated entry is still required."
+    }
   }
 }

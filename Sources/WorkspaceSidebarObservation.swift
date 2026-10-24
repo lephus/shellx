@@ -21,7 +21,8 @@ extension View {
     /// instead of walking every workspace. The initial CombineLatest value is
     /// intentionally delivered: it closes the gap between the owner's first
     /// snapshot and subscription setup, while the snapshot equality guard makes
-    /// an unchanged initial value a no-op.
+    /// an unchanged initial value a no-op. A change to the workspace's skill
+    /// and workflow markers (`Workspace.agentActivity`) refreshes the row too.
     func sidebarWorkspaceObservations(
         ids: [UUID],
         workspaces: [Workspace],
@@ -33,6 +34,7 @@ extension View {
             await withTaskGroup(of: Void.self) { group in
                 for (id, workspace) in zip(ids, workspaces) {
                     let cloudChanges = workspace.cloudBindingState.changes()
+                    let agentActivityChanges = workspace.agentActivity.changes()
                     let immediateChanges = workspace.sidebarImmediateObservationPublisher
                         .values
                     let debouncedChanges = workspace.sidebarObservationPublisher
@@ -47,6 +49,15 @@ extension View {
                     group.addTask { @MainActor in
                         var first = true
                         for await _ in cloudChanges {
+                            if Task.isCancelled { break }
+                            if first && !deliverInitialValue { first = false; continue }
+                            first = false
+                            onChange(id)
+                        }
+                    }
+                    group.addTask { @MainActor in
+                        var first = true
+                        for await _ in agentActivityChanges {
                             if Task.isCancelled { break }
                             if first && !deliverInitialValue { first = false; continue }
                             first = false

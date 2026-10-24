@@ -1896,6 +1896,19 @@ class TerminalController {
                     )
                 )
             }
+            // Skill and workflow markers are read here, before the queue, which
+            // can drop a best-effort tool event such as a Skill or Workflow call.
+            if let activity = AgentActivityHookObserver().observation(for: event) {
+                Task { @MainActor in
+                    AppDelegate.shared?
+                        .workspaceContainingPanel(
+                            panelId: activity.surfaceId,
+                            preferredWorkspaceId: activity.workspaceId
+                        )?
+                        .workspace
+                        .applyAgentActivity(activity.signal, surfaceId: activity.surfaceId)
+                }
+            }
             guard agentHookDeliveryQueue.enqueue(event) else {
                 return v2Error(
                     id: request.id,
