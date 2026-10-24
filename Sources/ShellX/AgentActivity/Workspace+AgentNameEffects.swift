@@ -48,10 +48,7 @@ extension Workspace {
             : driving.map(\.statusKey).min() ?? Self.claudeAgentStatusKey
         return AgentNameEffectSource(
             effect: effect,
-            statusKey: statusKey,
-            ownsProgramStatusRow: programStatusRowReportsWork(
-                fromAnyOf: driving.filter { $0.statusKey == statusKey }.map(\.panelId)
-            )
+            statusKey: statusKey
         )
     }
 
@@ -118,17 +115,5 @@ extension Workspace {
             return .backgroundWaiting
         }
         return .idle
-    }
-
-    /// Whether the workspace's program-status row comes from one of `panelIds` and says its program works.
-    ///
-    /// Claude Code reports its turn over OSC 7501 as well as through its hooks, so in a pane where
-    /// it plays the effect that row shows the same status as its own agent row.
-    private func programStatusRowReportsWork(fromAnyOf panelIds: [UUID]) -> Bool {
-        guard let row = mostUrgentPanelStatusEntry(forKey: Self.programStatusKey) else { return false }
-        return panelIds.contains { panelId in
-            agentStatusEntriesByPanelId[panelId]?[Self.programStatusKey] == row
-                && programStatusStoresByPanelId[panelId]?.mostUrgentRecord()?.state == .working
-        }
     }
 }
