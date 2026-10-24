@@ -32,7 +32,14 @@ extension Workspace {
 
     var agentLifecycleStatesByPanelId: [UUID: [String: AgentHibernationLifecycleState]] {
         get { sidebarAgentRuntimeObservation.agentLifecycleStatesByPanelId }
-        set { sidebarAgentRuntimeObservation.setAgentLifecycleStatesByPanelId(newValue) }
+        set {
+            // ShellX: a Claude turn that ended stops waiting for its lifecycle once that changes.
+            agentActivity.agentLifecyclesWillChange(
+                from: sidebarAgentRuntimeObservation.agentLifecycleStatesByPanelId,
+                to: newValue
+            )
+            sidebarAgentRuntimeObservation.setAgentLifecycleStatesByPanelId(newValue)
+        }
     }
 
     /// Returns exact-session runtime identities that still match their recorded process generation.
@@ -564,7 +571,6 @@ extension Workspace {
         panelShellActivityStates.removeValue(forKey: panelId)
         clearProgramStatusPanel(panelId: panelId)
         agentStatusEntriesByPanelId.removeValue(forKey: panelId)
-        agentActivity.removePanel(panelId)
         restoredPanelTitleBoundariesByPanelId.removeValue(forKey: panelId)
         clearAgentLifecycleStates(panelId: panelId)
         discardAgentWakeVerification(

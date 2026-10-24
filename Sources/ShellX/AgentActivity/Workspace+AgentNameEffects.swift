@@ -15,7 +15,9 @@ extension Workspace {
     /// The effect the pane's name plays for its agent, or `nil` when it plays none.
     ///
     /// A pane whose agents do not include Claude Code never shows a marker, only
-    /// the working effect: other agents report no skills or workflows.
+    /// the working effect: other agents report no skills or workflows. A pane whose
+    /// Claude turn just ended does not work, even while its lifecycle still says
+    /// running; a workflow kept by background work still plays.
     ///
     /// - Parameter panelId: A pane of this workspace.
     func agentNameEffect(forPanel panelId: UUID) -> AgentNameEffect? {
@@ -27,10 +29,13 @@ extension Workspace {
         let marker = lifecycles[Self.claudeAgentStatusKey] == nil
             ? nil
             : agentActivity.marker(forPanel: panelId)
-        return AgentNameEffectResolution().effect(for: AgentNameEffectInput(
+        let effect = AgentNameEffectResolution().effect(for: AgentNameEffectInput(
             phase: agentNamePhase(forPanel: panelId, lifecycles: lifecycles),
             marker: marker
         ))
+        // The turn's Stop came before its lifecycle report: the agent no longer works.
+        if effect == .working, agentActivity.turnHasEnded(forPanel: panelId) { return nil }
+        return effect
     }
 
     /// The strongest effect among the workspace's panes, for its sidebar row.

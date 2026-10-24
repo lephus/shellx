@@ -349,13 +349,27 @@ import Testing
         #expect(await changes.next() != nil)
 
         let panelId = UUID()
+        // Ending a turn changes the pane's effect even without a marker: its name stops working.
         model.apply(.turnEnded(hasBackgroundWork: false), panelId: panelId)
-        #expect(model.revision == 0, "Clearing a pane that has no marker must not refresh rows")
+        #expect(model.revision == 1)
+        model.apply(.turnEnded(hasBackgroundWork: false), panelId: panelId)
+        #expect(model.revision == 1, "Ending a turn that already ended must not refresh rows")
+        #expect(await changes.next() != nil)
 
         model.apply(.workflowLaunched(name: "release"), panelId: panelId)
-        #expect(model.revision == 1)
-        guard model.revision == 1 else { return }
+        #expect(model.revision == 2)
+        guard model.revision == 2 else { return }
         #expect(await changes.next() != nil)
+
+        // The pane's next lifecycle change clears its ended turn once, and only a change does.
+        model.apply(.turnEnded(hasBackgroundWork: true), panelId: panelId)
+        #expect(model.revision == 3)
+        let running: [UUID: [String: AgentHibernationLifecycleState]] = [panelId: ["claude_code": .running]]
+        model.agentLifecyclesWillChange(from: running, to: running)
+        #expect(model.turnHasEnded(forPanel: panelId))
+        model.agentLifecyclesWillChange(from: running, to: [panelId: ["claude_code": .backgroundWorkPending]])
+        #expect(!model.turnHasEnded(forPanel: panelId))
+        #expect(model.revision == 4)
     }
 
     @Test func contextMenuKeepsTheNameEffectLive() {
