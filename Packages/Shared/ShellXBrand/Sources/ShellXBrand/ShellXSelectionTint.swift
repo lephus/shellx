@@ -4,8 +4,9 @@
 /// with a soft wash of the accent rather than a neutral block, so the eye
 /// finds them at a glance. The sidebar composites the accent over
 /// ``ShellXPalette/panel`` into an opaque fill; the tab bar draws the accent
-/// at a low alpha over whatever the bar shows. Both soften while the window
-/// is not key or the app is in the background.
+/// at a low alpha over whatever the bar shows. Both are at full strength
+/// while the app is active and their window is key or main, and soften
+/// otherwise, for example while the app is in the background.
 ///
 /// ```swift
 /// let tint = ShellXSelectionTint(accent: ShellXPalette.primary)
@@ -36,7 +37,7 @@ public struct ShellXSelectionTint: Hashable, Sendable {
     /// (about 1.4:1 against the sidebar) and `#1d2440`.
     ///
     /// - Parameter isEmphasized: Whether the app is active and the sidebar's
-    ///   window is key; false gives the softer fill.
+    ///   window is key or main; false gives the softer fill.
     /// - Returns: An opaque color.
     public func sidebarFill(isEmphasized: Bool) -> ShellXColor {
         accent.withAlpha(isEmphasized ? 0.22 : 0.16).composited(over: ShellXPalette.panel)
@@ -57,10 +58,12 @@ public struct ShellXSelectionTint: Hashable, Sendable {
 
     /// The fill of the focused pane's selected tab.
     ///
-    /// The accent at 16% alpha, or 12% while the window is not key. It is
-    /// not composited, so the tab bar's own background shows through.
+    /// The accent at 16% alpha while the app is active and the tab bar's
+    /// window is key or main, and 12% otherwise. It is not composited, so the
+    /// tab bar's own background shows through.
     ///
-    /// - Parameter isWindowKey: Whether the tab bar's window is key.
+    /// - Parameter isWindowKey: Whether the app is active and the tab bar's
+    ///   window is key or main, as for ``sidebarFill(isEmphasized:)``.
     /// - Returns: The accent with the tab alpha.
     public func tabFill(isWindowKey: Bool) -> ShellXColor {
         accent.withAlpha(isWindowKey ? 0.16 : 0.12)

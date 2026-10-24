@@ -15,8 +15,10 @@ import Foundation
 ///
 /// A sync runs when the view appears or gets a new workspace instance, when the setting flips,
 /// and on every change to the workspace's skill and workflow markers, its panes' agent
-/// lifecycles or their status entries; never per frame, terminal output or keystroke. The effects
-/// animate on the render server, so the app adds no timers.
+/// lifecycles or their status entries; never per frame or keystroke. A program in a terminal can
+/// write a status entry with an OSC 7501 program-status report, so terminal output can trigger a
+/// sync; each sync is cheap, comparing every tab's activity and updating only the tabs whose
+/// activity changed. The effects animate on the render server, so the app adds no timers.
 extension WorkspaceContentView {
     /// Gives each tab the activity its pane's agent plays now.
     func syncBonsplitAgentActivity() {
