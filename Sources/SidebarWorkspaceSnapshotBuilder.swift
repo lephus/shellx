@@ -109,6 +109,11 @@ struct SidebarWorkspaceSnapshotBuilder {
         /// "Skill · brainstorming", for the row's agent status line. Nil
         /// exactly when ``nameEffect`` is.
         var agentActivityText: String? = nil
+        /// ShellX: the key of the row in ``metadataEntries`` that shows the
+        /// agent behind ``nameEffect`` and says ``agentActivityText`` instead
+        /// of its status. Nil when no row shows that agent, with metadata
+        /// hidden or compact status on.
+        var agentActivityStatusKey: String? = nil
 
         var remoteWorkspaceBadgeLabel: String? { deviceWorkspaceLabel ?? cloudWorkspaceLabel }
         var remoteWorkspaceBadgeSymbol: String { deviceWorkspaceLabel == nil ? "cloud" : "desktopcomputer" }

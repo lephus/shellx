@@ -326,6 +326,48 @@ struct ShellXSidebarNameEffectTests {
         #expect(Self.isFlashing(flash))
     }
 
+    /// A reused cell can come back for the same workspace after a skill started there while the
+    /// row was away; that start already passed, so it does not flash late (the cell calls
+    /// `forgetRow()` from `prepareForReuse`).
+    @Test func reusedRowDoesNotFlashForAStartItNeverShowed() throws {
+        let (presenter, window) = Self.makePresenter()
+        defer { window.close() }
+        let flash = presenter.flashView
+        let row = UUID()
+        presenter.apply(effect: .skill(name: "review", generation: 4), isRenaming: false, style: Self.style, rowIdentity: row)
+
+        presenter.forgetRow()
+        presenter.apply(effect: .skill(name: "review", generation: 5), isRenaming: false, style: Self.style, rowIdentity: row)
+        #expect(!Self.isFlashing(flash))
+        #expect(flash.flashedGeneration == 5)
+
+        // Once shown again, the row flashes for the next start.
+        presenter.apply(effect: .workflow(name: "release", generation: 6), isRenaming: false, style: Self.style, rowIdentity: row)
+        #expect(Self.isFlashing(flash))
+    }
+
+    /// A flash still waiting for the window belongs to the workspace that started it. Generations
+    /// count per workspace, so the row's next workspace can play the same number; reused for it,
+    /// the row must not play the old workspace's flash.
+    @Test func reusedRowDropsTheOldWorkspacesWaitingFlash() throws {
+        let (presenter, window) = Self.makePresenter()
+        defer { window.close() }
+        let flash = presenter.flashView
+        let host = try #require(flash.superview)
+        let first = UUID()
+        presenter.apply(effect: .working, isRenaming: false, style: Self.style, rowIdentity: first)
+        // Off screen, a new skill's flash waits for the window.
+        flash.removeFromSuperview()
+        presenter.apply(effect: .skill(name: "review", generation: 4), isRenaming: false, style: Self.style, rowIdentity: first)
+
+        presenter.forgetRow()
+        presenter.apply(effect: .skill(name: "ship", generation: 4), isRenaming: false, style: Self.style, rowIdentity: UUID())
+        host.addSubview(flash, positioned: .below, relativeTo: nil)
+        flash.frame = host.bounds
+
+        #expect(!Self.isFlashing(flash))
+    }
+
     @Test func presentationFlagReachesEveryEffectView() throws {
         let model = Self.makeModel(
             nameEffect: .working,
@@ -480,6 +522,30 @@ struct ShellXSidebarNameEffectTests {
         #expect(cell.layoutContent(model: turn, width: 280, apply: false) == idleHeight)
     }
 
+    /// With metadata hidden or compact status on there is no activity row, only the name plays
+    /// (spec §6.5); the rows the person sees stay as they were.
+    @Test func noActivityRowWithoutAgentRows() throws {
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let panelId = try #require(workspace.focusedPanelId)
+        workspace.applyProgramStatus(ProgramStatusReport(state: .working, app: "claude-code"), panelId: panelId)
+        Self.reportAgent("claude_code", status: "Running", lifecycle: .running, in: workspace, panelId: panelId)
+
+        let shown = Self.rowModel(for: workspace).snapshot
+        #expect(shown.agentActivityStatusKey == Workspace.programStatusKey)
+        #expect(shown.metadataEntries.map(\.key) == [Workspace.programStatusKey])
+
+        let compact = Self.rowModel(for: workspace) { $0.set(true, forKey: "sidebarCompactAgentStatus") }.snapshot
+        #expect(compact.nameEffect == .working)
+        #expect(compact.agentActivityStatusKey == nil)
+        #expect(compact.metadataEntries.map(\.key) == [Workspace.programStatusKey])
+
+        let hidden = Self.rowModel(for: workspace) { $0.set(false, forKey: "sidebarShowStatusPills") }.snapshot
+        #expect(hidden.nameEffect == .working)
+        #expect(hidden.agentActivityStatusKey == nil)
+        #expect(hidden.metadataEntries.isEmpty)
+    }
+
     @Test func noNewRowWhenMetadataHidden() throws {
         let metadataOff = Self.makeDefaults()
         metadataOff.set(false, forKey: "sidebarShowStatusPills")
@@ -587,6 +653,7 @@ struct ShellXSidebarNameEffectTests {
         title: String = ShellXSidebarNameEffectTests.title,
         nameEffect: AgentNameEffect? = nil,
         agentActivityText: String? = nil,
+        agentActivityStatusKey: String? = ShellXSidebarNameEffectTests.agentStatusKey,
         metadataEntries: [SidebarStatusEntry] = [],
         activeCodingAgentCount: Int = 0,
         statusPillGlyphKind: SidebarCompactStatusGlyph.Kind? = nil,
@@ -636,7 +703,9 @@ struct ShellXSidebarNameEffectTests {
             checklistFirstUncheckedText: nil,
             statusPillGlyphKind: statusPillGlyphKind,
             nameEffect: nameEffect,
-            agentActivityText: agentActivityText
+            agentActivityText: agentActivityText,
+            // As the snapshot factory does: the agent's row says what it does only while there is an effect.
+            agentActivityStatusKey: nameEffect == nil ? nil : agentActivityStatusKey
         )
         return rowModel(
             snapshot: snapshot,
@@ -647,11 +716,15 @@ struct ShellXSidebarNameEffectTests {
     }
 
     /// The row a dark sidebar shows for `workspace`, with its snapshot built the way the sidebar builds it.
-    private static func rowModel(for workspace: Workspace) -> SidebarWorkspaceRowModel {
+    private static func rowModel(
+        for workspace: Workspace,
+        configure: (UserDefaults) -> Void = { _ in }
+    ) -> SidebarWorkspaceRowModel {
         let defaults = makeDefaults()
         defaults.set(true, forKey: SidebarCatalogSection().showAgentActivity.userDefaultsKey)
         // Only status rows: the working directory line is a row of the same kind.
         defaults.set(false, forKey: SidebarCatalogSection().showBranchDirectory.userDefaultsKey)
+        configure(defaults)
         let settings = SidebarTabItemSettingsSnapshot(defaults: defaults)
         // `showsAgentActivity` stays off: in ShellX the spinner also needs an experiment flag that
         // is off, and name effects follow the setting alone.

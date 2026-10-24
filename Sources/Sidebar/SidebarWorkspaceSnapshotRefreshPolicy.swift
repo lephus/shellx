@@ -110,6 +110,8 @@ extension SidebarWorkspaceSnapshotBuilder.Snapshot {
             // text names it, so both update with the spinner while the menu is open.
             nameEffect: snapshot.nameEffect,
             agentActivityText: snapshot.agentActivityText,
+            // Names a row of the metadata entries above, so it stays with them.
+            agentActivityStatusKey: agentActivityStatusKey,
             // The host after a colliding title is part of the title the row shows, so it updates with it.
             hostTitleSuffix: snapshot.hostTitleSuffix
         )

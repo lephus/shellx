@@ -178,9 +178,16 @@ struct SidebarWorkspaceSnapshotFactory {
                 },
                 hasActiveAgent: activeCodingAgentCount > 0
             )).kind
-        let nameEffect = Self.showsAgentNameEffects(settings: settings, sidebarColorScheme: sidebarColorScheme)
-            ? workspace.strongestAgentNameEffect
+        let nameEffectSource = Self.showsAgentNameEffects(settings: settings, sidebarColorScheme: sidebarColorScheme)
+            ? workspace.strongestAgentNameEffectSource
             : nil
+        let nameEffect = nameEffectSource?.effect
+        // ShellX (spec §6.5): one row says what the agent behind the effect does, and that agent's
+        // other status rows leave. Compact status folds agent rows into its glyph: no activity row.
+        let agentStatus = settings.compactsAgentStatus || !detailVisibility.showsMetadata
+            ? nil
+            : nameEffectSource?.foldingAgentStatus(of: statusEntries.rows)
+        let metadataRows = agentStatus?.rows ?? statusEntries.rows
         return SidebarWorkspaceSnapshotBuilder.Snapshot(
             presentationKey: presentationKey,
             title: workspace.title,
@@ -209,10 +216,10 @@ struct SidebarWorkspaceSnapshotFactory {
             metadataEntries: detailVisibility.showsMetadata
                 ? (detailVisibility.showsAgentUsage
                     ? SidebarAgentUsageFormatter().decorate(
-                        statusEntries.rows,
+                        metadataRows,
                         usageByStatusKey: workspace.sidebarMetadata.agentUsageByStatusKey
                     )
-                    : statusEntries.rows)
+                    : metadataRows)
                 : [],
             metadataBlocks: detailVisibility.showsMetadata
                 ? workspace.sidebarMetadataBlocksInDisplayOrder()
@@ -243,6 +250,7 @@ struct SidebarWorkspaceSnapshotFactory {
             statusPillGlyphKind: statusPillGlyphKind, // ShellX
             nameEffect: nameEffect,
             agentActivityText: nameEffect.map { AgentActivityText().text(for: $0) },
+            agentActivityStatusKey: agentStatus?.activityStatusKey,
             hostTitleSuffix: hostTitleSuffix
         )
     }

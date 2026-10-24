@@ -167,6 +167,8 @@
 		F91571A81F2DEBDD19FA6A79 /* AgentMessageCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D8C93336B3DC2F9B4299AA /* AgentMessageCenter.swift */; };
 		394797E69DC05B736C321BA5 /* AgentMessageHookClaimTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE9E0374E48A69A913AF07CE /* AgentMessageHookClaimTests.swift */; };
 		0B9B54FBC4F34942CE424D74 /* AgentMessageOffSwitchSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE3A25C746823752FEDCE827 /* AgentMessageOffSwitchSettingsTests.swift */; };
+		57654FD967A97B0135FB5350 /* AgentNameEffect+TabActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7612DBD8DEC65587094FBA8 /* AgentNameEffect+TabActivity.swift */; };
+		DD1FB5A03B353BF395B76F99 /* AgentNameEffectSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1873422115023A417824115F /* AgentNameEffectSource.swift */; };
 		E506942F7E8A3C80F94EA4EB /* AgentNotificationAdmissionWaiters.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F23A5D074809C236E5C607 /* AgentNotificationAdmissionWaiters.swift */; };
 		0A1107110000000000000010 /* AgentNotificationDelivery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1107110000000000000011 /* AgentNotificationDelivery.swift */; };
 		A5D41234A1B2C3D4E5F60718 /* AgentNotificationGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5D41235A1B2C3D4E5F60718 /* AgentNotificationGate.swift */; };
@@ -4952,6 +4954,8 @@
 		B4D8C93336B3DC2F9B4299AA /* AgentMessageCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentMessageCenter.swift; sourceTree = "<group>"; };
 		AE9E0374E48A69A913AF07CE /* AgentMessageHookClaimTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentMessageHookClaimTests.swift"; sourceTree = "<group>"; };
 		EE3A25C746823752FEDCE827 /* AgentMessageOffSwitchSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AgentMessageOffSwitchSettingsTests.swift"; sourceTree = "<group>"; };
+		E7612DBD8DEC65587094FBA8 /* AgentNameEffect+TabActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellX/AgentActivity/AgentNameEffect+TabActivity.swift"; sourceTree = "<group>"; };
+		1873422115023A417824115F /* AgentNameEffectSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/AgentActivity/AgentNameEffectSource.swift; sourceTree = "<group>"; };
 		A0F23A5D074809C236E5C607 /* AgentNotificationAdmissionWaiters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentNotificationAdmissionWaiters.swift; sourceTree = "<group>"; };
 		0A1107110000000000000011 /* AgentNotificationDelivery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentNotificationDelivery.swift; sourceTree = "<group>"; };
 		A5D41235A1B2C3D4E5F60718 /* AgentNotificationGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentNotificationGate.swift; sourceTree = "<group>"; };
@@ -12497,6 +12501,8 @@
 				4EE87BDF56BF6B65F9D6FC34 /* WorkspaceContentView+AgentActivitySync.swift */,
 				367B89702C359CACD7693664 /* BonsplitConfiguration+ShellXStyles.swift */,
 				1DEC713FB4C2B0E10B69BEBA /* SidebarRowNameEffectPresenter.swift */,
+				E7612DBD8DEC65587094FBA8 /* AgentNameEffect+TabActivity.swift */,
+				1873422115023A417824115F /* AgentNameEffectSource.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -15048,6 +15054,8 @@
 				009E54A15EB3D846E02D2650 /* AgentJournalLifecycleCenter+Projection.swift in Sources */,
 				A77A0005A1B2C3D4E5F60001 /* AgentJournalLifecycleCenter.swift in Sources */,
 				F91571A81F2DEBDD19FA6A79 /* AgentMessageCenter.swift in Sources */,
+				57654FD967A97B0135FB5350 /* AgentNameEffect+TabActivity.swift in Sources */,
+				DD1FB5A03B353BF395B76F99 /* AgentNameEffectSource.swift in Sources */,
 				E506942F7E8A3C80F94EA4EB /* AgentNotificationAdmissionWaiters.swift in Sources */,
 				0A1107110000000000000010 /* AgentNotificationDelivery.swift in Sources */,
 				A5D41234A1B2C3D4E5F60718 /* AgentNotificationGate.swift in Sources */,

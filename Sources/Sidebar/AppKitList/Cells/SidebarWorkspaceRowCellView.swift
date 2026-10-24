@@ -369,6 +369,8 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         }
         model = nil
         optimisticSelection = nil
+        // ShellX: a reused row does not flash for a skill that started while it was away.
+        nameEffect.forgetRow()
         // The recycled cell may have been the hovered row (often the one just
         // closed). Snap its close button hidden so it cannot fade out on
         // whichever row AppKit hands this cell to next.
@@ -939,8 +941,9 @@ final class SidebarWorkspaceRowTableCellView: NSTableCellView {
         Self.pool(&metadataRows, count: visible.count, parent: contentContainer) { SidebarRowIconTextLine() }
         let activity = SidebarRowNameEffectPresenter.activity(for: model)
         for (index, entry) in visible.enumerated() {
-            if let activity, entry.key == SidebarRowNameEffectPresenter.activityStatusKey {
-                // ShellX: the agent's line says what it does, in the secondary color (spec §6.5).
+            if let activity, entry.key == activity.statusKey {
+                // ShellX: the line of the agent behind the effect says what it does, in the
+                // secondary color (spec §6.5).
                 metadataRows[index].isPresentationActive = isPresentationActive
                 metadataRows[index].configureAgentActivity(
                     activity.text,

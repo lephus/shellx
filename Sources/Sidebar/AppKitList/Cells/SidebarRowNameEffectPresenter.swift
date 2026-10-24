@@ -13,9 +13,10 @@ import SwiftUI
 /// it, framed on the field's text 2 pt in from its frame. The effect hides while the name is being
 /// renamed in place. The flash is a separate ``flashView`` that the row lays over its whole fill.
 ///
-/// Both views move only on the render server; the presenter adds no timers. A row reused for
-/// another workspace, or one that appears while a skill already runs, does not flash for a start
-/// that already happened.
+/// Both views move only on the render server; the presenter adds no timers. The flash belongs to
+/// the start of a skill or workflow, so the row never flashes for one that started earlier: not
+/// when it starts showing a workspace (a new or reused row, or a sidebar that turns dark), and not
+/// when it falls back to an older skill or workflow of another pane.
 ///
 /// ```swift
 /// let presenter = SidebarRowNameEffectPresenter(titleView: titleView, host: contentView)
@@ -31,11 +32,6 @@ import SwiftUI
 final class SidebarRowNameEffectPresenter {
     /// Points between an `NSTextField`'s frame and its text on the left and the right.
     static let titleTextInset: CGFloat = 2
-
-    /// The agent status line that says what the agent does while the name plays an effect.
-    ///
-    /// Only Claude Code reports skills and workflows, so only its line carries the activity.
-    static let activityStatusKey = "claude_code"
 
     /// The colors and timing of the row's effects, or `nil` in a light sidebar, where rows keep
     /// today's look and play no effect (ruling R6).
@@ -65,33 +61,20 @@ final class SidebarRowNameEffectPresenter {
             && shownEffect(for: model) != nil
     }
 
-    /// What the row's agent status line says, and how its glyph moves, while the name plays an effect.
+    /// The status row that says what the agent behind the name's effect does, and what it says.
     ///
     /// - Parameter model: The row's model.
-    /// - Returns: The activity text, the glyph's kind and the effect colors, or `nil` when the line
-    ///   keeps its own status.
+    /// - Returns: The key of that row (the agent's, from the snapshot), the activity text, the
+    ///   glyph's kind and the effect colors, or `nil` when every row keeps its own status.
     static func activity(
         for model: SidebarWorkspaceRowModel
-    ) -> (text: String, kind: TabActivity.Kind, style: TitleEffectStyle)? {
+    ) -> (statusKey: String, text: String, kind: TabActivity.Kind, style: TitleEffectStyle)? {
         guard let effectStyle = Self.style(for: model),
               let effect = model.snapshot.nameEffect,
-              let text = model.snapshot.agentActivityText
+              let text = model.snapshot.agentActivityText,
+              let statusKey = model.snapshot.agentActivityStatusKey
         else { return nil }
-        return (text, Self.kind(of: effect), effectStyle)
-    }
-
-    /// The Bonsplit effect that draws an agent name effect.
-    ///
-    /// - Parameter effect: The agent's effect.
-    /// - Returns: ``TabActivity/Kind/working`` while the agent works, ``TabActivity/Kind/highlight``
-    ///   for a skill or a workflow.
-    static func kind(of effect: AgentNameEffect) -> TabActivity.Kind {
-        switch effect {
-        case .working:
-            return .working
-        case .skill, .workflow:
-            return .highlight
-        }
+        return (statusKey, text, effect.tabActivityKind, effectStyle)
     }
 
     /// The colored name, laid over the field's text.
@@ -109,14 +92,21 @@ final class SidebarRowNameEffectPresenter {
     var isPresentationActive = true {
         didSet {
             effectView.isPresentationActive = isPresentationActive
-            flashView.isPresentationActive = isPresentationActive
+            flashView.isPresentationActive = isPresentationActive && playsEffects
         }
     }
 
     private let titleView: NSTextField
 
-    /// The row the flash last showed, so a reused row starts from its new workspace's generation.
+    /// The workspace whose effects the row shows, or `nil` before the first and after reuse.
     private var flashRowIdentity: UUID?
+
+    /// The newest skill or workflow generation the row has shown for ``flashRowIdentity``.
+    private var shownGeneration: UInt64 = 0
+
+    /// Whether the row had effect colors at the last ``apply(effect:isRenaming:style:rowIdentity:)``;
+    /// a light sidebar plays nothing, so it shows no generation either.
+    private var playsEffects = false
 
     /// Creates the effect views and lays the name effect over `titleView` in `host`.
     ///
@@ -133,6 +123,7 @@ final class SidebarRowNameEffectPresenter {
         effectView = TitleEffectView(environment: environment)
         flashView = ActivityFlashView(environment: environment)
         effectView.isHidden = true
+        flashView.isPresentationActive = false
         host.addSubview(effectView, positioned: .above, relativeTo: titleView)
     }
 
@@ -140,28 +131,21 @@ final class SidebarRowNameEffectPresenter {
     ///
     /// Call it after the field has its text, font, line limit and opacity, which an effect copies.
     /// While an effect plays, the field's text is clear; afterwards ``isDrawingName`` is false and
-    /// the row gives the field its color back. A skill or workflow whose generation
-    /// this row has not shown flashes once, even while renaming; the name effect itself hides while
-    /// renaming. Calling it again with the same values changes nothing.
+    /// the row gives the field its color back. A skill or workflow newer than any this row has
+    /// shown for the workspace flashes once, even while renaming; the name effect itself hides
+    /// while renaming. Calling it again with the same values changes nothing.
     ///
     /// - Parameters:
     ///   - effect: The agent's effect, or `nil` for none.
     ///   - isRenaming: Whether the name is being renamed in place.
     ///   - style: The effects' colors and timing, or `nil` for a row that plays no effect (a light
-    ///     sidebar): the name then draws itself whatever `effect` is.
-    ///   - rowIdentity: The workspace the row shows. When it changes, the flash takes the new
-    ///     workspace's current generation as already shown.
+    ///     sidebar): the name then draws itself whatever `effect` is, and nothing flashes.
+    ///   - rowIdentity: The workspace the row shows. When the row starts showing a workspace's
+    ///     effects, whatever that workspace already plays counts as shown.
     func apply(effect: AgentNameEffect?, isRenaming: Bool, style: TitleEffectStyle?, rowIdentity: UUID) {
-        var kind: TabActivity.Kind?
-        var generation: UInt64?
-        if let effect, style != nil {
-            kind = Self.kind(of: effect)
-            generation = Self.highlightGeneration(of: effect)
-        }
-        if rowIdentity != flashRowIdentity {
-            flashRowIdentity = rowIdentity
-            flashView.flashedGeneration = generation
-        }
+        let kind = style == nil ? nil : effect?.tabActivityKind
+        let generation = style == nil ? nil : effect?.highlightGeneration
+        markShownGenerations(generation, rowIdentity: rowIdentity, playsEffects: style != nil)
         let nameKind = isRenaming ? nil : kind
         if let style {
             flashView.configure(kind: kind, generation: generation ?? 0, style: style)
@@ -183,6 +167,14 @@ final class SidebarRowNameEffectPresenter {
         layout()
     }
 
+    /// Forgets the workspace the row showed; call it when the row is reused.
+    ///
+    /// A reused row starts again from what its workspace plays when it is next configured, so a
+    /// skill that started while the row was away does not flash late, even for the same workspace.
+    func forgetRow() {
+        flashRowIdentity = nil
+    }
+
     /// Lays the name effect over the field's text; call it whenever the field moves.
     func layout() {
         // Not `insetBy`: a field narrower than the insets, or not laid out yet, would give a null rect.
@@ -195,13 +187,29 @@ final class SidebarRowNameEffectPresenter {
         )
     }
 
-    /// The generation of a skill or workflow, the only effects that flash.
-    private static func highlightGeneration(of effect: AgentNameEffect) -> UInt64? {
-        switch effect {
-        case .working:
-            return nil
-        case .skill(_, let generation), .workflow(_, let generation):
-            return generation
+    /// Tells the flash which skill or workflow generations already passed, before it is configured.
+    ///
+    /// When the row starts showing a workspace's effects (a new identity, a reused row, or the
+    /// first update with effect colors after a light sidebar), the generation it shows started
+    /// earlier. Later, any generation up to the newest the row has shown started earlier too, such
+    /// as an older workflow the row falls back to when a newer skill pauses. Generations only grow,
+    /// so a larger one is a new start and flashes. A row without effect colors keeps its flash
+    /// paused, so a flash left waiting from a dark sidebar never plays in a light one.
+    private func markShownGenerations(_ generation: UInt64?, rowIdentity: UUID, playsEffects: Bool) {
+        if rowIdentity != flashRowIdentity || !self.playsEffects {
+            flashRowIdentity = rowIdentity
+            shownGeneration = 0
+            // Changing the value cancels a flash still waiting for the window. Generations count
+            // per workspace, so the new one can equal the old one: clear it first.
+            flashView.flashedGeneration = nil
+            flashView.flashedGeneration = generation
+        } else if let generation, generation <= shownGeneration {
+            flashView.flashedGeneration = generation
         }
+        if let generation {
+            shownGeneration = max(shownGeneration, generation)
+        }
+        self.playsEffects = playsEffects
+        flashView.isPresentationActive = isPresentationActive && playsEffects
     }
 }

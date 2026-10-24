@@ -69,14 +69,9 @@ extension WorkspaceContentView {
     /// The tab activity for an agent name effect.
     ///
     /// Working shimmers; a skill or a workflow is a highlight that flashes once per marker
-    /// generation.
+    /// generation. The sidebar row maps its effect the same way (`AgentNameEffect.tabActivity`).
     static func tabActivity(for effect: AgentNameEffect, text: AgentActivityText) -> TabActivity {
-        switch effect {
-        case .working:
-            return TabActivity(kind: .working, generation: 0, accessibilityLabel: text.text(for: effect))
-        case .skill(_, let generation), .workflow(_, let generation):
-            return TabActivity(kind: .highlight, generation: generation, accessibilityLabel: text.text(for: effect))
-        }
+        effect.tabActivity(accessibilityLabel: text.text(for: effect))
     }
 
     /// Lets a workspace's tab effects animate only while the workspace is visible.
