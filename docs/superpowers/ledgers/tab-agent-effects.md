@@ -18,3 +18,12 @@ Spec: `docs/superpowers/specs/2026-10-23-shellx-tab-selection-agent-effects-desi
 - **R7. Độ chính xác của dấu workflow** (builder check, câu 3). `prompt-submit` giữ dấu workflow. `stop` chỉ giữ dấu khi còn một `background_tasks` đang `running`; không tính `session_crons`. Không bám theo id của từng tác vụ nền. Nếu sai: cầu vồng có thể còn sáng khi workflow đã xong nhưng còn một tác vụ nền khác.
 - **R8. Ngoài Bonsplit** (builder check, câu 4). Canvas nằm ngoài phạm vi bản này. Đầu nhóm workspace đại diện cho workspace neo đang chọn thì được tô nền chọn, nhưng không có hiệu ứng tên. Nếu sai: ở chế độ Canvas vẫn chưa có tab xanh; đó là một việc riêng.
 - **R9. Màu nhấn tự chọn** (builder check, câu 5). Mức tương phản 4.5:1 chỉ bảo đảm và chỉ test với màu nhấn mặc định. Màu nhấn khác thì không chỉnh riêng. Nếu sai: với màu nhấn vàng hoặc trắng, vệt vàng trên dòng đang chọn đạt khoảng 3.5-3.9:1.
+
+## Kết quả chạy thử (Task 9, 24/10/2026)
+
+- 24/10/2026: `reload.sh --tag tabfx --launch` từ chối vì máy chưa có thông tin đăng nhập dev. Người dùng cho phép, chỉ cho lần chạy thử này: chạy bản DEV tag `tabfx` bằng launchd theo đúng cách của `reload.sh`, bỏ qua riêng bước kiểm tra đăng nhập, dùng backend local.
+- Lần 1 (commit 2d04b044c4) đạt các mục: màu dòng chọn và tab chọn, một tab xanh mỗi cửa sổ, vệt vàng, thời điểm lóe sáng, dòng skill và workflow, workspace nền, chữ khớp đúng vị trí. Tìm ra 4 lỗi: tab lóe sáng trễ khoảng 4,5 giây khi quay lại workspace đã gọi skill lúc ẩn; một khung vàng "Thinking…" lúc Stop; dòng "claude-code · Working" trùng với dòng hoạt động; cầu vồng trên tên ngắn chỉ hiện khoảng 2 màu.
+- Đo độ trễ gõ phím khi 8 tab cùng có hiệu ứng: main thread rảnh 90%, không có khung nào của view hiệu ứng; gửi phím p50 47 ms so với 48 ms khi không có hiệu ứng.
+- Lần 2 (commit f66b731a05, sau đợt sửa) đạt cả 4 lỗi trên. Thêm: dòng phiên không lóe sáng lại khi quay về workflow cũ của pane khác; chiều cao dòng trong lượt bằng lúc rảnh. Còn lại một lỗi nhỏ: đúng lúc Stop hoặc lúc lượt bắt đầu, nhãn "chạy" và dòng "claude-code · Working" có thể hiện 1–2 khung hình.
+- Cần người kiểm tay: Giảm chuyển động, đổi màu nhấn hệ thống, bề mặt sáng, hover và ⌘-click, tắt cài đặt "Show Loading Spinner", cửa sổ thu nhỏ, agent không phải Claude.
+- Ảnh chụp và GIF nằm trong `docs/superpowers/design/2026-10-23-tab-selection-agent-effects/dogfood/` trên máy người chạy, không commit vì có tên máy và tên người dùng.
