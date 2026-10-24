@@ -404,7 +404,7 @@ struct ShellXSidebarSelectionTests {
         return (body, ring)
     }
 
-    private static func groupHeaderModel(
+    static func groupHeaderModel(
         isAnchorActive: Bool,
         anchorActiveSelectionTint: ShellXSelectionTint?
     ) -> SidebarGroupHeaderRowModel {
