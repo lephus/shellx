@@ -483,14 +483,36 @@ struct ShellXSidebarNameEffectTests {
         #expect(Self.visibleGlyphs(in: working).count == 1)
     }
 
-    /// Claude Code also reports its turn over OSC 7501 ("claude-code · Working"). That row and the
-    /// hook's `claude_code` row both show Claude's status, so while the effect plays one row says what
-    /// Claude does and the other leaves: no second status line, and no extra line on the first turn
-    /// (spec §6.5, R5).
-    @Test func claudeStatusShowsOnOneRowDuringATurn() throws {
+    /// Claude Code also reports its turn over OSC 7501 ("claude-code · Working"). That row stays its
+    /// own line, next to the hook's `claude_code` row, which says what Claude does: the effect adds
+    /// and removes no line.
+    @Test func claudeProgramStatusStaysItsOwnRowDuringATurn() throws {
         let workspace = Workspace()
         defer { workspace.teardownAllPanels() }
         let panelId = try #require(workspace.focusedPanelId)
+        workspace.applyProgramStatus(ProgramStatusReport(state: .working, app: "claude-code"), panelId: panelId)
+        Self.reportAgent("claude_code", status: "Running", lifecycle: .running, in: workspace, panelId: panelId)
+
+        let turn = Self.rowModel(for: workspace)
+        #expect(turn.snapshot.nameEffect == .working)
+        #expect(turn.snapshot.agentActivityStatusKey == "claude_code")
+        let cell = SidebarAppKitRowCellTests.configuredCell(model: turn)
+        let window = Self.layoutCell(cell, model: turn)
+        defer { window.close() }
+        let rows = Self.visibleMetadataRows(in: cell).map { Self.visibleTexts(in: $0) }
+        #expect(rows.count == 2)
+        #expect(rows.contains([AgentActivityText().text(for: .working)]))
+        #expect(rows.contains { $0.joined(separator: " ").contains("claude-code") })
+    }
+
+    /// Claude Code leaves a "claude-code · Done" record after each turn. The session row has the
+    /// same lines before a turn, during it, under a skill, after Stop and in the next turn, so it
+    /// never changes height (the review's N1).
+    @Test func rowKeepsItsHeightAcrossClaudeTurns() throws {
+        let workspace = Workspace()
+        defer { workspace.teardownAllPanels() }
+        let panelId = try #require(workspace.focusedPanelId)
+        workspace.applyProgramStatus(ProgramStatusReport(state: .done, app: "claude-code"), panelId: panelId)
         Self.reportAgent(
             "claude_code",
             status: "Idle",
@@ -500,26 +522,51 @@ struct ShellXSidebarNameEffectTests {
             in: workspace,
             panelId: panelId
         )
-        let idle = Self.rowModel(for: workspace)
-        let idleCell = SidebarAppKitRowCellTests.configuredCell(model: idle)
-        let idleWindow = Self.layoutCell(idleCell, model: idle)
-        defer { idleWindow.close() }
-        #expect(Self.visibleMetadataRows(in: idleCell).map { Self.visibleTexts(in: $0) } == [["Idle"]])
-        let idleHeight = idleCell.layoutContent(model: idle, width: 280, apply: false)
 
-        // The first turn: Claude Code reports its own status, and its hook reports the turn.
-        workspace.applyProgramStatus(ProgramStatusReport(state: .working, app: "claude-code"), panelId: panelId)
-        Self.reportAgent("claude_code", status: "Running", lifecycle: .running, in: workspace, panelId: panelId)
+        func measure(_ step: String) -> (lines: Int, height: CGFloat) {
+            let model = Self.rowModel(for: workspace)
+            let cell = SidebarAppKitRowCellTests.configuredCell(model: model)
+            let window = Self.layoutCell(cell, model: model)
+            defer { window.close() }
+            return (Self.visibleMetadataRows(in: cell).count, cell.layoutContent(model: model, width: 280, apply: false))
+        }
 
-        let turn = Self.rowModel(for: workspace)
-        #expect(turn.snapshot.nameEffect == .working)
-        let cell = SidebarAppKitRowCellTests.configuredCell(model: turn)
-        let window = Self.layoutCell(cell, model: turn)
-        defer { window.close() }
-        let rows = Self.visibleMetadataRows(in: cell)
-        #expect(rows.map { Self.visibleTexts(in: $0) } == [[AgentActivityText().text(for: .working)]])
-        #expect(rows.map { Self.visibleGlyphs(in: $0).count } == [1])
-        #expect(cell.layoutContent(model: turn, width: 280, apply: false) == idleHeight)
+        let before = measure("before")
+        #expect(before.lines == 2)
+        var seen: [(String, (lines: Int, height: CGFloat))] = []
+
+        func startTurn() {
+            workspace.applyProgramStatus(ProgramStatusReport(state: .working, app: "claude-code"), panelId: panelId)
+            Self.reportAgent("claude_code", status: "Running", lifecycle: .running, in: workspace, panelId: panelId)
+            workspace.applyAgentActivity(.turnStarted(slashCommandName: nil), surfaceId: panelId)
+        }
+        func stopTurn() {
+            workspace.applyAgentActivity(.turnEnded(hasBackgroundWork: false), surfaceId: panelId)
+            workspace.applyProgramStatus(ProgramStatusReport(state: .done, app: "claude-code"), panelId: panelId)
+            Self.reportAgent(
+                "claude_code",
+                status: "Idle",
+                icon: "pause.circle.fill",
+                workState: nil,
+                lifecycle: .idle,
+                in: workspace,
+                panelId: panelId
+            )
+        }
+
+        startTurn()
+        seen.append(("turn start", measure("turn start")))
+        workspace.applyAgentActivity(.skillInvoked(name: "review"), surfaceId: panelId)
+        seen.append(("skill", measure("skill")))
+        stopTurn()
+        seen.append(("stop", measure("stop")))
+        startTurn()
+        seen.append(("next turn", measure("next turn")))
+
+        for (step, measured) in seen {
+            #expect(measured.lines == before.lines, "\(step): line count")
+            #expect(measured.height == before.height, "\(step): height")
+        }
     }
 
     /// With metadata hidden or compact status on there is no activity row, only the name plays
@@ -532,13 +579,13 @@ struct ShellXSidebarNameEffectTests {
         Self.reportAgent("claude_code", status: "Running", lifecycle: .running, in: workspace, panelId: panelId)
 
         let shown = Self.rowModel(for: workspace).snapshot
-        #expect(shown.agentActivityStatusKey == Workspace.programStatusKey)
-        #expect(shown.metadataEntries.map(\.key) == [Workspace.programStatusKey])
+        #expect(shown.agentActivityStatusKey == "claude_code")
+        #expect(Set(shown.metadataEntries.map(\.key)) == [Workspace.programStatusKey, "claude_code"])
 
         let compact = Self.rowModel(for: workspace) { $0.set(true, forKey: "sidebarCompactAgentStatus") }.snapshot
         #expect(compact.nameEffect == .working)
         #expect(compact.agentActivityStatusKey == nil)
-        #expect(compact.metadataEntries.map(\.key) == [Workspace.programStatusKey])
+        #expect(compact.metadataEntries.map(\.key).contains(Workspace.programStatusKey))
 
         let hidden = Self.rowModel(for: workspace) { $0.set(false, forKey: "sidebarShowStatusPills") }.snapshot
         #expect(hidden.nameEffect == .working)
