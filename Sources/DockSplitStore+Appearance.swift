@@ -108,7 +108,13 @@ extension DockSplitStore {
                 chromeHost: windowAppearance == nil ? .workspace : .dock,
                 increaseContrast: DisplayAccessibilityOptions.current.increaseContrast
             ),
-            usesSharedBackdrop: sharesWindowBackdrop
+            usesSharedBackdrop: sharesWindowBackdrop,
+            // A window has exactly one accent tab, the focused pane's of its
+            // workspace (spec §6.2). The Dock's own focused pane keeps
+            // Bonsplit's default selected tab.
+            selectedTabStyle: nil,
+            // Agent activity effects play on every dark tab bar (spec §6.4).
+            titleEffectStyle: ShellXBonsplitStyles.current(overChromeBackground: chromeBackgroundColor)?.titleEffectStyle
         )
     }
 }

@@ -1,4 +1,5 @@
 import AppKit
+import Bonsplit
 import CmuxFoundation
 import CmuxSidebar
 import CmuxWorkspaces
@@ -33,18 +34,36 @@ struct SidebarRowPalette {
         )
     }
 
+    /// ShellX's selection tint for this row's settings (spec §6.1); nil where
+    /// the user's selection settings or a light sidebar keep their own paint.
+    var selectionTint: ShellXSelectionTint? {
+        ShellXSelectionTint(
+            sidebarColorScheme: colorScheme,
+            sidebarSelectionColorHex: model.settings.selectionColorHex,
+            activeTabIndicatorStyle: model.settings.activeTabIndicatorStyle,
+            subtleSelection: model.settings.subtleSelection,
+            accent: accent
+        )
+    }
+
     func selectedForeground(_ opacity: CGFloat) -> NSColor {
-        sidebarSelectedWorkspaceForegroundNSColor(on: selectedBackground, opacity: opacity)
+        sidebarSelectedWorkspaceForegroundNSColor(on: selectedBackground, opacity: opacity, accent: accent)
     }
 
     /// ShellX text tokens (spec §7.4) apply in a dark sidebar. A light
     /// sidebar (a matched light terminal theme) keeps the semantic colors.
     var usesShellXTextTokens: Bool { colorScheme == .dark }
 
-    /// Whether this active row sits on ShellX's default `raise` selection,
-    /// where status and metadata colors stay readable and need no flattening.
+    /// Whether this active row sits on ShellX's tinted selection, where
+    /// status and metadata colors stay readable and need no flattening.
     var usesShellXSelection: Bool {
-        model.isActive && sidebarIsShellXSelectionFill(selectedBackground)
+        model.isActive && selectionTint != nil
+    }
+
+    /// Fill behind an unselected row under the pointer: `row-hover` in
+    /// ShellX's dark sidebar, nil where the sidebar keeps its own paint.
+    var hoverBackground: NSColor? {
+        selectionTint == nil ? nil : ShellXPalette.rowHover.nsColor
     }
 
     /// Resolves semantic colors against the row's concrete cmux scheme.
@@ -56,23 +75,28 @@ struct SidebarRowPalette {
         )
     }
 
-    /// Session names: `text-hi` in a dark sidebar.
+    /// Session names: `selection-title` on ShellX's tinted selection,
+    /// `text-hi` on other rows in a dark sidebar.
     var primaryText: NSColor {
         if model.isActive { return selectedForeground(1.0) }
         return usesShellXTextTokens ? ShellXPalette.textHi.nsColor : semantic(.labelColor)
     }
 
-    /// Metadata: `muted` in a dark sidebar (also on the `raise` selection),
-    /// raised to the contrast floor over a known backdrop.
+    /// Metadata: `selection-secondary` on ShellX's tinted selection, and
+    /// `muted` on other rows in a dark sidebar, raised to the contrast floor
+    /// over a known backdrop.
     func secondary(
         _ selectedOpacity: CGFloat = 0.75,
         inactiveOpacity: CGFloat? = nil
     ) -> NSColor {
-        if usesShellXTextTokens, !model.isActive || usesShellXSelection {
+        if usesShellXSelection {
+            return ShellXPalette.selectionSecondary.nsColor
+        }
+        if usesShellXTextTokens, !model.isActive {
             return SidebarAppearanceColorResolver().readableSecondaryColor(
                 ShellXPalette.muted.nsColor,
                 for: colorScheme,
-                opacity: model.isActive ? nil : inactiveOpacity,
+                opacity: inactiveOpacity,
                 over: model.readabilityBackdropHex.flatMap { NSColor(hex: $0) }
             )
         }
@@ -289,8 +313,15 @@ final class SidebarRowIconTextLine: NSView {
     private let metadataButton = SidebarRowLinkButton()
     private let markdownTextView = SidebarRowMarkdownTextView()
     private let secondTextView = SidebarRowTextView(lines: 1)
+    /// ShellX: the agent's ✻ glyph, in the icon slot while the line says what the agent does.
+    private var activityGlyph: ActivityGlyphView?
     private var iconSize: CGFloat = 0
     private var stacked = false
+
+    /// Whether the activity glyph may move: off for rows that are scrolled away or not presented.
+    var isPresentationActive = true {
+        didSet { activityGlyph?.isPresentationActive = isPresentationActive }
+    }
 
     override var isFlipped: Bool { true }
 
@@ -377,6 +408,40 @@ final class SidebarRowIconTextLine: NSView {
             textView.configurePlainText(entry.sidebarDisplayText, font: font, color: color, toolTip: entry.sidebarToolTip(linkURL: nil))
         }
         needsLayout = true
+    }
+
+    /// ShellX: the agent status line while the session name plays an effect (spec 2026-10-23,
+    /// §6.5): the activity text, still and in `color`, after the agent's cycling ✻ glyph in place
+    /// of the line's icon.
+    func configureAgentActivity(
+        _ text: String,
+        kind: TabActivity.Kind,
+        style: TitleEffectStyle,
+        model: SidebarWorkspaceRowModel,
+        color: NSColor
+    ) {
+        // The glyph stays shown across updates: hiding it, even for a moment, restarts its cycle.
+        resetPrimaryContent(keepingActivityGlyph: true)
+        stacked = false
+        secondTextView.isHidden = true
+        iconLabel.isHidden = true
+        iconView.isHidden = true
+        let glyph = activityGlyph ?? makeActivityGlyph()
+        glyph.isHidden = false
+        glyph.configure(kind: kind, style: style, pointSize: model.scaled(9))
+        // The slot of an SF icon, so the text does not move when the activity starts or ends.
+        iconSize = model.scaled(8) + 3
+        textView.isHidden = false
+        textView.configurePlainText(text, font: .systemFont(ofSize: model.scaled(10)), color: color, toolTip: nil)
+        needsLayout = true
+    }
+
+    private func makeActivityGlyph() -> ActivityGlyphView {
+        let glyph = ActivityGlyphView()
+        glyph.isPresentationActive = isPresentationActive
+        addSubview(glyph)
+        activityGlyph = glyph
+        return glyph
     }
 
     func configureLog(
@@ -483,7 +548,7 @@ final class SidebarRowIconTextLine: NSView {
         return first + second
     }
 
-    private func resetPrimaryContent() {
+    private func resetPrimaryContent(keepingActivityGlyph: Bool = false) {
         textView.isHidden = true
         textView.toolTip = nil
         textView.stringValue = ""
@@ -492,6 +557,9 @@ final class SidebarRowIconTextLine: NSView {
         metadataButton.reset()
         markdownTextView.isHidden = true
         markdownTextView.reset()
+        if !keepingActivityGlyph {
+            activityGlyph?.isHidden = true
+        }
     }
 
     private func primaryMeasuredHeight(width: CGFloat) -> CGFloat {
@@ -502,6 +570,12 @@ final class SidebarRowIconTextLine: NSView {
             return ceil(metadataButton.intrinsicContentSize.height)
         }
         return textView.measuredHeight(width: width)
+    }
+
+    private var visibleIcon: NSView? {
+        if let activityGlyph, !activityGlyph.isHidden { return activityGlyph }
+        if !iconView.isHidden { return iconView }
+        return iconLabel.isHidden ? nil : iconLabel
     }
 
     private var primaryView: NSView {
@@ -533,9 +607,8 @@ final class SidebarRowIconTextLine: NSView {
         super.layout()
         resolveCandidates(width: bounds.width)
         var x: CGFloat = 0
-        if !iconView.isHidden || !iconLabel.isHidden {
+        if let icon = visibleIcon {
             let side = iconSize
-            let icon: NSView = iconView.isHidden ? iconLabel : iconView
             icon.frame = NSRect(x: 0, y: 1, width: side, height: side)
             x = side + 4
         }

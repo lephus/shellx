@@ -6,6 +6,7 @@ import CmuxNotifications
 import SwiftUI
 import CmuxSettings
 import CmuxWorkspaces
+import ShellXBrand
 
 extension VerticalTabsSidebar {
     func sidebarWorkspaceGroupTableConfiguration(
@@ -50,6 +51,13 @@ extension VerticalTabsSidebar {
             sidebarSelectionColorHex: settings.selectionColorHex,
             colorScheme: renderContext.environment.colorScheme,
             increaseContrast: renderContext.environment.displayAccessibility.increaseContrast
+        )
+        let anchorActiveSelectionTint = ShellXSelectionTint(
+            sidebarColorScheme: renderContext.environment.colorScheme,
+            sidebarSelectionColorHex: settings.selectionColorHex,
+            activeTabIndicatorStyle: settings.activeTabIndicatorStyle,
+            subtleSelection: settings.subtleSelection,
+            accent: settings.accentColor
         )
         let cwdContextMenuItems = resolvedConfig?.contextMenuItems ?? []
         let newWorkspacePlacement = resolvedConfig?.newWorkspacePlacement
@@ -116,6 +124,7 @@ extension VerticalTabsSidebar {
             isMultiSelected: isMultiSelected,
             multiSelectionBackgroundStyle: multiSelectionBackgroundStyle,
             anchorActiveEdgeColor: anchorActiveEdgeColor,
+            anchorActiveSelectionTint: anchorActiveSelectionTint,
             memberCount: memberWorkspaceIds.count,
             anchorUnreadCount: anchorUnreadCount,
             canMarkRead: canMarkAnchorRead,

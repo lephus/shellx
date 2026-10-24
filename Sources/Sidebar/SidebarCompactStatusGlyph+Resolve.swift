@@ -88,8 +88,9 @@ extension SidebarCompactStatusGlyph {
         return SidebarCompactStatusGlyph(kind: kind, tooltip: tooltip(for: input), iconOverrides: input.iconOverrides)
     }
 
-    /// Agent hooks mark failures with the warning-triangle icon.
-    private static func reportsError(_ entry: SidebarStatusEntry) -> Bool {
+    /// Agent hooks mark failures with the warning-triangle icon. Pane name
+    /// effects read the same rule (`Workspace+AgentNameEffects.swift`).
+    static func reportsError(_ entry: SidebarStatusEntry) -> Bool {
         entry.icon?.contains("exclamationmark.triangle") == true
     }
 

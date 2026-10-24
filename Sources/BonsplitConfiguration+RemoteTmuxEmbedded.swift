@@ -19,6 +19,10 @@ extension BonsplitConfiguration {
         configuration.appearance.minimumPaneHeight = 1
         configuration.appearance.tabBarLeadingInset = 0
         configuration.appearance.enableAnimations = false
+        // A window has exactly one accent tab, the focused pane's of its
+        // workspace (spec §6.2). The nested tree's own focused pane keeps
+        // Bonsplit's default selected tab.
+        configuration.appearance.selectedTabStyle = nil
         configuration.appearance.splitButtons = configuration.appearance.splitButtons.filter {
             switch $0.action {
             case .splitRight, .splitDown:
