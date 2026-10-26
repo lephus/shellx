@@ -2,6 +2,24 @@ import AppKit
 import SwiftUI
 import WebKit
 
+/// How often the page may reload after its web content process dies: at most
+/// ``maximumReloads`` within ``window``. A page that keeps crashing then stays as
+/// it is instead of reloading forever.
+struct GitGraphReloadBudget {
+    var maximumReloads = 3
+    var window: Duration = .seconds(60)
+    private var reloads: [ContinuousClock.Instant] = []
+
+    /// Records a reload at `now` and returns true, or returns false once the
+    /// window already holds ``maximumReloads`` reloads.
+    mutating func allowsReload(at now: ContinuousClock.Instant) -> Bool {
+        reloads.removeAll { $0.duration(to: now) >= window }
+        guard reloads.count < maximumReloads else { return false }
+        reloads.append(now)
+        return true
+    }
+}
+
 /// Hosts the bundled Git Graph page and connects its `shellxGitGraph` bridge to a
 /// ``GitGraphController``.
 struct GitGraphWebView: NSViewRepresentable {
@@ -27,6 +45,7 @@ struct GitGraphWebView: NSViewRepresentable {
     final class Coordinator: NSObject, WKScriptMessageHandlerWithReply, WKNavigationDelegate {
         private(set) var controller: GitGraphController
         private weak var webView: WKWebView?
+        private var reloadBudget = GitGraphReloadBudget()
 
         init(controller: GitGraphController) {
             self.controller = controller
@@ -114,6 +133,12 @@ struct GitGraphWebView: NSViewRepresentable {
         }
 
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            guard reloadBudget.allowsReload(at: .now) else {
+#if DEBUG
+                cmuxDebugLog("gitGraph.web.processTerminated reloadBudgetSpent")
+#endif
+                return
+            }
             loadShell()
         }
 

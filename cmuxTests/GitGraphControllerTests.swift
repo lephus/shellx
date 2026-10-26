@@ -324,6 +324,16 @@ final class GitGraphControllerTests: XCTestCase {
         }
     }
 
+    func testCrashReloadsStopAfterThreeInAMinute() {
+        var budget = GitGraphReloadBudget()
+        let start = ContinuousClock.now
+
+        XCTAssertEqual((0..<4).map { budget.allowsReload(at: start + .seconds($0)) }, [true, true, true, false])
+        XCTAssertFalse(budget.allowsReload(at: start + .seconds(59)))
+        XCTAssertTrue(budget.allowsReload(at: start + .seconds(60)), "the first reload has left the window")
+        XCTAssertFalse(budget.allowsReload(at: start + .seconds(60.5)))
+    }
+
     func testShellDocumentCheckAllowsOnlyThePageAndItsFragments() throws {
         let shell = GitGraphURLSchemeHandler.shellURL
         let isShell = GitGraphURLSchemeHandler.isShellDocument
