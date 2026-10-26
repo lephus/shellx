@@ -40,6 +40,10 @@ struct GitGraphWebView: NSViewRepresentable {
                 contentWorld: .page,
                 name: GitGraphBridgeContract.handlerName
             )
+            // The bundled page is a module script loaded from a file URL. WebKit blocks
+            // those as cross-origin unless file-to-file access is allowed. Navigation is
+            // limited to the trusted shell, and the page renders repository text as text.
+            configuration.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
             let webView = WKWebView(frame: .zero, configuration: configuration)
             webView.setValue(false, forKey: "drawsBackground")
             webView.allowsBackForwardNavigationGestures = false
