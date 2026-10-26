@@ -63,6 +63,8 @@ extension RightSidebarMode {
 /// Right sidebar root view. Hosts a segmented mode picker plus the active panel.
 struct RightSidebarPanelView: View {
     var devicesModel: DevicesPanelViewModel? = nil
+    /// The window's Git Graph, which follows the focused terminal.
+    var gitGraphController: GitGraphController? = nil
     @ObservedObject var tabManager: TabManager
     @ObservedObject var fileExplorerStore: FileExplorerStore
     @ObservedObject var fileExplorerState: FileExplorerState
@@ -490,8 +492,11 @@ struct RightSidebarPanelView: View {
                     coderouterStore: tabManager.coderouterAccountStore
                 )
             case .git:
-                // Task 7 mounts the Git Graph surface here.
-                Color.clear
+                if let gitGraphController {
+                    GitGraphPanelView(controller: gitGraphController, isVisible: fileExplorerState.isVisible)
+                } else {
+                    Color.clear
+                }
             case .customSidebar:
                 customSidebarPanel
             }

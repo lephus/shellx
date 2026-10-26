@@ -16,6 +16,9 @@ final class RightSidebarToolPanel: Panel, ObservableObject {
     let coderouterStore: CoderouterAccountStore
 
     @Published private(set) var focusFlashToken: Int = 0
+    /// The repository a Git Graph tab shows. A tab opened without one follows the
+    /// workspace until that resolves to a repository, then pins it.
+    private(set) var pinnedGitRepositoryRoot: String?
 
     private weak var workspace: Workspace?
     private weak var fileExplorerContainerView: FileExplorerContainerView?
@@ -23,6 +26,7 @@ final class RightSidebarToolPanel: Panel, ObservableObject {
     private var fileExplorerStoreStorage: FileExplorerStore?
     private var fileExplorerStateStorage: FileExplorerState?
     private var sessionIndexStoreStorage: SessionIndexStore?
+    private var gitGraphControllerStorage: GitGraphController?
     private var workspaceObservationCancellable: AnyCancellable?
     private var rootSyncTask: Task<Void, Never>?
     private var rootSyncGeneration: UInt64 = 0
@@ -67,7 +71,26 @@ final class RightSidebarToolPanel: Panel, ObservableObject {
         return store
     }
 
-    var displayTitle: String { mode.label }
+    var gitGraphController: GitGraphController {
+        if let controller = gitGraphControllerStorage { return controller }
+        let controller = GitGraphController(placement: .tab, diffOpener: nil)
+        gitGraphControllerStorage = controller
+        controller.tracker.onResolveRoot = { [weak self] root in
+            self?.adoptGitRepositoryRoot(root)
+        }
+        if let root = pinnedGitRepositoryRoot {
+            controller.tracker.pin(repositoryRoot: root)
+        } else if let workspace {
+            syncGitGraphTarget(from: workspace, controller: controller)
+        }
+        return controller
+    }
+
+    var displayTitle: String {
+        guard mode == .git, let root = pinnedGitRepositoryRoot else { return mode.label }
+        let name = URL(fileURLWithPath: root).lastPathComponent
+        return String(localized: "gitGraph.tab.title", defaultValue: "Git Graph: \(name)")
+    }
     var displayIcon: String? { mode.symbolName }
 
     func reattach(to workspace: Workspace) {
@@ -95,9 +118,21 @@ final class RightSidebarToolPanel: Panel, ObservableObject {
         case .sessions:
             guard let store = sessionIndexStoreStorage else { return }
             syncSessionIndexRoot(from: workspace, store: store)
-        case .feed, .dock, .machines, .git, .customSidebar:
+        case .git:
+            guard let controller = gitGraphControllerStorage else { return }
+            syncGitGraphTarget(from: workspace, controller: controller)
+        case .feed, .dock, .machines, .customSidebar:
             break
         }
+    }
+
+    /// Pins this Git Graph tab to the work tree holding `repositoryRoot`. With nil,
+    /// the tab stays as it is.
+    func retargetGit(repositoryRoot: String?) {
+        guard mode == .git, let repositoryRoot, repositoryRoot != pinnedGitRepositoryRoot else { return }
+        pinnedGitRepositoryRoot = repositoryRoot
+        gitGraphControllerStorage?.tracker.pin(repositoryRoot: repositoryRoot)
+        workspace?.rightSidebarToolTitleDidChange(self)
     }
 
     func openFilePreview(_ filePath: String) {
@@ -191,6 +226,24 @@ final class RightSidebarToolPanel: Panel, ObservableObject {
         }
     }
 
+    /// Follows the workspace's focused terminal only until a repository is pinned.
+    private func syncGitGraphTarget(from workspace: Workspace, controller: GitGraphController) {
+        guard pinnedGitRepositoryRoot == nil else { return }
+        controller.tracker.setTarget(GitGraphTargetPolicy.target(for: workspace))
+    }
+
+    /// Takes the root a resolution found: the first one pins an unpinned tab, and a
+    /// pinned path that was a subdirectory becomes its work tree's top level.
+    private func adoptGitRepositoryRoot(_ root: String) {
+        guard root != pinnedGitRepositoryRoot else { return }
+        let wasPinned = pinnedGitRepositoryRoot != nil
+        pinnedGitRepositoryRoot = root
+        if !wasPinned {
+            gitGraphControllerStorage?.tracker.pin(repositoryRoot: root)
+        }
+        workspace?.rightSidebarToolTitleDidChange(self)
+    }
+
     private func syncFileExplorerRoot(from workspace: Workspace, store: FileExplorerStore) {
         store.showHiddenFiles = true
         store.syncWorkspaceRoot(from: workspace)
@@ -272,6 +325,8 @@ struct RightSidebarToolPanelView: View {
                 RightSidebarToolFocusAnchor(onViewChange: panel.attachSessionIndexFocusAnchor)
                     .frame(width: 0, height: 0)
             )
+        case .git:
+            GitGraphPanelView(controller: panel.gitGraphController, isVisible: isVisibleInUI)
         case .machines:
             if isVisibleInUI, RightSidebarMode.machines.isAvailable() {
                 MachinesPanelView(
@@ -283,7 +338,7 @@ struct RightSidebarToolPanelView: View {
                     coderouterStore: panel.coderouterStore
                 )
             }
-        case .feed, .dock, .git, .customSidebar:
+        case .feed, .dock, .customSidebar:
             EmptyView()
         }
     }

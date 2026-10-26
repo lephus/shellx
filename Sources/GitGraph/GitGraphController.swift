@@ -78,6 +78,9 @@ final class GitGraphController: ObservableObject {
     var onOpenAsTab: ((_ repositoryRoot: String?) -> Void)?
     /// The appearance `app.context` reports. ``GitGraphWebView`` points it at its web view.
     var effectiveAppearance: @MainActor () -> NSAppearance = { NSApplication.shared.effectiveAppearance }
+    /// Resolves the target this controller shows and watches its files. It holds the
+    /// controller weakly.
+    private(set) lazy var tracker = GitGraphRepositoryTracker(controller: self)
 
     private let history: any GitGraphHistoryProviding
     /// The status the caller last passed to ``showRepository(root:status:)``.

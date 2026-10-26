@@ -251,7 +251,7 @@ extension ContentView {
     }
 
     func handleCommandPaletteRightSidebarToolPane(_ mode: RightSidebarMode) {
-        openRightSidebarToolPane(mode)
+        openRightSidebarToolPane(mode, gitRepositoryRoot: mode == .git ? gitGraphSidebarRepositoryRoot : nil)
     }
 
     func openCustomSidebarPane(_ name: String) {

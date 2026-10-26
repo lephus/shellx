@@ -1004,6 +1004,9 @@ struct ContentView: View {
     @StateObject private var fileExplorerStore = FileExplorerStore()
     @StateObject private var sessionIndexStore = SessionIndexStore()
     @StateObject private var selectedWorkspaceDirectoryObserver = SelectedWorkspaceDirectoryObserver()
+    /// `@State`, not `@StateObject`: nothing here reads it, and observing it would
+    /// re-render this view on every `repo.state` the page asks for.
+    @State private var gitGraphSidebarController = GitGraphController(placement: .sidebar, diffOpener: nil)
     @State private var commandPaletteOverlayRenderModel = CommandPaletteOverlayRenderModel()
     @State private var tmuxOverlayExperiment = TmuxOverlayExperimentTargetObserver()
     @State private var tmuxOverlayCoordinator = TmuxWorkspacePaneOverlayCoordinator()
@@ -1952,6 +1955,7 @@ struct ContentView: View {
     private func rightSidebarPanel(appearance: WindowAppearanceSnapshot) -> some View {
         return RightSidebarPanelView(
             devicesModel: devicesModel,
+            gitGraphController: gitGraphSidebarController,
             tabManager: tabManager,
             fileExplorerStore: fileExplorerStore,
             fileExplorerState: fileExplorerState,
@@ -2392,7 +2396,9 @@ struct ContentView: View {
         SessionEntryResumeCoordinator.open(entry, tabManager: tabManager)
     }
 
-    func openRightSidebarToolPane(_ mode: RightSidebarMode) {
+    /// Opens `mode` as a workspace tab. A Git Graph tab pins `gitRepositoryRoot`;
+    /// without one it pins the repository the workspace is in.
+    func openRightSidebarToolPane(_ mode: RightSidebarMode, gitRepositoryRoot: String? = nil) {
         guard mode.canOpenAsPane, mode.isAvailable(),
               let workspace = tabManager.selectedWorkspace,
               let paneId = workspace.bonsplitController.focusedPaneId ?? workspace.bonsplitController.allPaneIds.first else {
@@ -2402,7 +2408,17 @@ struct ContentView: View {
 
         sidebarSelectionState.selection = .tabs
         workspace.clearSplitZoom()
-        _ = workspace.openOrFocusRightSidebarToolSurface(inPane: paneId, mode: mode, focus: true)
+        _ = workspace.openOrFocusRightSidebarToolSurface(
+            inPane: paneId,
+            mode: mode,
+            focus: true,
+            gitRepositoryRoot: gitRepositoryRoot
+        )
+    }
+
+    /// The repository the sidebar Git Graph shows, for opening it as a tab.
+    var gitGraphSidebarRepositoryRoot: String? {
+        gitGraphSidebarController.repositoryRoot
     }
 
     private func openFilePreviewFromSidebar(filePath: String) {
@@ -2417,6 +2433,7 @@ struct ContentView: View {
     }
 
     private func syncFileExplorerDirectory() {
+        syncGitGraphSidebarTarget()
         guard let selectedId = tabManager.selectedTabId,
               let tab = tabManager.tabs.first(where: { $0.id == selectedId }) else {
             // No selection means we have no local cwd to scope by; clear so the
@@ -2437,6 +2454,13 @@ struct ContentView: View {
             return
         }
         fileExplorerStore.syncWorkspaceRoot(from: tab)
+    }
+
+    /// Points the sidebar Git Graph at the selected workspace's focused terminal. The
+    /// tracker ignores an unchanged target, and resolves a new one off the main actor.
+    private func syncGitGraphSidebarTarget() {
+        let target = tabManager.selectedWorkspace.map { GitGraphTargetPolicy.target(for: $0) } ?? .none
+        gitGraphSidebarController.tracker.setTarget(target)
     }
 
     private var shouldSyncFileExplorerStore: Bool {
@@ -2641,6 +2665,9 @@ struct ContentView: View {
                 }
             }
             selectedWorkspaceDirectoryObserver.wire(tabManager: tabManager)
+            gitGraphSidebarController.onOpenAsTab = { repositoryRoot in
+                openRightSidebarToolPane(.git, gitRepositoryRoot: repositoryRoot)
+            }
             tabManager.applyWindowBackgroundForSelectedTab()
             reconcileMountedWorkspaceIds()
             previousSelectedWorkspaceId = tabManager.selectedTabId
@@ -2853,6 +2880,9 @@ struct ContentView: View {
             let focusTransactionId = notification.userInfo?[GhosttyNotificationKey.focusTransactionId] as? UUID
             attemptCommandPaletteFocusRestoreIfNeeded(focusTransactionId: focusTransactionId)
             scheduleTitlebarTextRefresh()
+            // The directory observer misses a focus move that leaves the workspace
+            // directory unchanged, such as onto a remote terminal.
+            syncGitGraphSidebarTarget()
         })
 
         view = AnyView(view.background {
