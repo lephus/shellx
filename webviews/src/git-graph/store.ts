@@ -134,7 +134,12 @@ export class GitGraphStore {
   private readonly gate = createGenerationGate();
   /** Bumped by every history (re)load; older page replies are ignored. */
   private historyEpoch = 0;
-  private historyInFlight = false;
+  /** The newest (re)load: a repository load, a filter change or a refresh. Null when idle. */
+  private activeLoad: Promise<void> | null = null;
+  /** A refresh was asked for while a load ran; it runs once that load finishes. */
+  private refreshQueued = false;
+  /** Callers of a queued refresh, resolved when no load is left to run. */
+  private idleWaiters: Array<() => void> = [];
   /** Bumped by every selection change; older file lists are ignored. */
   private selectionEpoch = 0;
   private offEvent: (() => void) | null = null;
@@ -191,6 +196,8 @@ export class GitGraphStore {
       const { context, includeRemotes, logKey } = this.state;
       this.state = { ...initialState(), context, includeRemotes, logKey: logKey + 1 };
       this.set({});
+      // The new repository's first load reads everything afresh.
+      this.refreshQueued = false;
       void this.loadRepo();
     } else {
       void this.refresh();
@@ -198,9 +205,34 @@ export class GitGraphStore {
   }
 
   /** Reads `repo.state` and, when the repository is ready, its history. */
-  async loadRepo(): Promise<void> {
+  loadRepo(): Promise<void> {
+    return this.runLoad(() => this.readRepo());
+  }
+
+  /**
+   * Makes `load` the load in flight. A newer load supersedes it: each one bumps
+   * `historyEpoch`, so an older one applies nothing. When the newest load
+   * finishes, a refresh queued meanwhile runs once.
+   */
+  private runLoad(load: () => Promise<void>): Promise<void> {
+    const run: Promise<void> = load().finally(() => this.settle(run));
+    this.activeLoad = run;
+    return run;
+  }
+
+  private settle(run: Promise<void>): void {
+    if (this.activeLoad !== run) return;
+    this.activeLoad = null;
+    if (this.refreshQueued) {
+      this.refreshQueued = false;
+      void this.refresh();
+      return;
+    }
+    for (const resolve of this.idleWaiters.splice(0)) resolve();
+  }
+
+  private async readRepo(): Promise<void> {
     const epoch = ++this.historyEpoch;
-    this.historyInFlight = false;
     this.set({ view: { kind: "loading" } });
     const reply = await this.call<GitGraphRepoState>("repo.state");
     if (!reply || epoch !== this.historyEpoch) return;
@@ -221,21 +253,30 @@ export class GitGraphStore {
     return this.loadRepo();
   }
 
+  /**
+   * Re-reads the shown history (the refresh button and `history.invalidated`).
+   * It never aborts a load in flight: it queues one more refresh after it, and
+   * further requests meanwhile fold into that one. Resolves after the refresh it
+   * started, or once the queued one it joined (and any queued after it) has run.
+   */
   refresh(): Promise<void> {
-    if (this.state.view.kind !== "ready") return this.loadRepo();
-    return this.loadHistory("refresh");
+    if (this.activeLoad) {
+      this.refreshQueued = true;
+      return new Promise((resolve) => this.idleWaiters.push(resolve));
+    }
+    return this.runLoad(() => (this.state.view.kind === "ready" ? this.loadHistory("refresh") : this.readRepo()));
   }
 
   setBranch(branch: string | null): Promise<void> {
     this.set({ branch });
-    return this.loadHistory("filter");
+    return this.runLoad(() => this.loadHistory("filter"));
   }
 
   setIncludeRemotes(includeRemotes: boolean): Promise<void> {
     const { branch, refs } = this.state;
     const branchIsRemote = refs.some((ref) => ref.fullName === branch && ref.kind === "remoteBranch");
     this.set({ includeRemotes, branch: !includeRemotes && branchIsRemote ? null : branch });
-    return this.loadHistory("filter");
+    return this.runLoad(() => this.loadHistory("filter"));
   }
 
   private pageParams(skip: number): object {
@@ -245,40 +286,35 @@ export class GitGraphStore {
 
   private async loadHistory(mode: LoadMode): Promise<void> {
     const epoch = ++this.historyEpoch;
-    this.historyInFlight = true;
     // A page still in flight belongs to the old list and will be ignored.
     if (this.state.loadingMore) this.set({ loadingMore: false });
     // A refresh reads back as many commits as are loaded now (spec §6.8), so a
     // selection past the first page and the scroll position survive it.
     const target = mode === "refresh" ? this.state.loadedCount : 0;
-    try {
-      const [repo, refs, workingTree, page] = await Promise.all([
-        mode === "refresh" ? this.call<GitGraphRepoState>("repo.state") : Promise.resolve(null),
-        this.call<GitGraphRef[]>("history.refs"),
-        this.call<GitGraphWorkingTree>("history.workingTree"),
-        this.call<GitGraphPage>("history.page", this.pageParams(0)),
-      ]);
-      if (epoch !== this.historyEpoch) return;
-      if (repo) {
-        if (!repo.ok) return this.set({ view: viewForError(repo.error.code) });
-        const view = viewForRepoState(repo.result);
-        if (view.kind !== "ready") return this.set({ view });
-      }
-      if (!refs || !page) return;
-      if (!refs.ok) return this.set({ view: viewForError(refs.error.code) });
-      const { branch } = this.state;
-      if (branch && !refs.result.some((ref) => ref.fullName === branch)) {
-        // The filtered branch is gone; fall back to all branches.
-        this.set({ branch: null });
-        return this.loadHistory(mode);
-      }
-      if (!page.ok) return this.set({ view: viewForError(page.error.code) });
-      const history = await this.readRemainingPages(epoch, page.generation, page.result, target);
-      if (!history) return;
-      this.applyHistory(mode, refs.result, workingTree?.ok ? workingTree.result : null, history, repo);
-    } finally {
-      if (epoch === this.historyEpoch) this.historyInFlight = false;
+    const [repo, refs, workingTree, page] = await Promise.all([
+      mode === "refresh" ? this.call<GitGraphRepoState>("repo.state") : Promise.resolve(null),
+      this.call<GitGraphRef[]>("history.refs"),
+      this.call<GitGraphWorkingTree>("history.workingTree"),
+      this.call<GitGraphPage>("history.page", this.pageParams(0)),
+    ]);
+    if (epoch !== this.historyEpoch) return;
+    if (repo) {
+      if (!repo.ok) return this.set({ view: viewForError(repo.error.code) });
+      const view = viewForRepoState(repo.result);
+      if (view.kind !== "ready") return this.set({ view });
     }
+    if (!refs || !page) return;
+    if (!refs.ok) return this.set({ view: viewForError(refs.error.code) });
+    const { branch } = this.state;
+    if (branch && !refs.result.some((ref) => ref.fullName === branch)) {
+      // The filtered branch is gone; fall back to all branches.
+      this.set({ branch: null });
+      return this.loadHistory(mode);
+    }
+    if (!page.ok) return this.set({ view: viewForError(page.error.code) });
+    const history = await this.readRemainingPages(epoch, page.generation, page.result, target);
+    if (!history) return;
+    this.applyHistory(mode, refs.result, workingTree?.ok ? workingTree.result : null, history, repo);
   }
 
   /**
@@ -350,7 +386,7 @@ export class GitGraphStore {
   /** Loads the next page; no-op while another load runs or paging is done. */
   async loadMore(): Promise<void> {
     const s = this.state;
-    if (s.view.kind !== "ready" || this.historyInFlight || s.loadingMore || s.pagingFailed) return;
+    if (s.view.kind !== "ready" || this.activeLoad || s.loadingMore || s.pagingFailed) return;
     if (!s.hasMore || s.reachedLimit) return;
     const epoch = this.historyEpoch;
     const skip = s.loadedCount;

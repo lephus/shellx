@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Shows a Git Graph page and tells its controller's tracker whether the page is on
-/// screen, so file changes made while it was hidden reload it once when it shows.
+/// screen: the tracker watches the repository only then, and refreshes the page
+/// once each time it shows again.
 struct GitGraphPanelView: View {
     let controller: GitGraphController
     let isVisible: Bool

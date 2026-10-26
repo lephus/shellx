@@ -1,3 +1,4 @@
+import CmuxFoundation
 import CmuxGit
 import Foundation
 import XCTest
@@ -41,6 +42,7 @@ final class GitGraphTargetingTests: XCTestCase {
         let controller = GitGraphController(placement: .sidebar, diffOpener: nil)
         let recorder = EventRecorder(controller)
         let tracker = controller.tracker
+        tracker.setVisible(true)
 
         tracker.setTarget(.directory(a))
         tracker.setTarget(.directory(b))
@@ -57,6 +59,7 @@ final class GitGraphTargetingTests: XCTestCase {
         let controller = GitGraphController(placement: .sidebar, diffOpener: nil)
         let recorder = EventRecorder(controller)
         let tracker = GitGraphRepositoryTracker(controller: controller, workTreeRoot: { await script.lookup($0) })
+        tracker.setVisible(true)
 
         tracker.setTarget(.directory(a))
         await script.waitUntilHeld()
@@ -171,23 +174,101 @@ final class GitGraphTargetingTests: XCTestCase {
         XCTAssertEqual(resolvedRoots, [a])
     }
 
-    func testChangesWhileHiddenInvalidateOnceWhenShown() {
+    func testBecomingVisibleRefreshesOnceAndHiddenChangesAreIgnored() async throws {
+        // A scripted root on a plain folder: the tracker treats it as a repository,
+        // and no real watcher can add events of its own.
+        let a = try makeDirectory("A")
+        let script = ScriptedWorkTreeRoots([a: [.root(a)]])
         let controller = GitGraphController(placement: .sidebar, diffOpener: nil)
         let recorder = EventRecorder(controller)
-        let tracker = controller.tracker
+        let tracker = GitGraphRepositoryTracker(controller: controller, workTreeRoot: { await script.lookup($0) })
+        tracker.setTarget(.directory(a))
+        await tracker.resolutionTask?.value
 
         tracker.repositoryFilesChanged()
         tracker.repositoryFilesChanged()
-        XCTAssertEqual(recorder.invalidations, 0)
+        XCTAssertEqual(recorder.invalidations, 0, "no refresh while hidden")
 
         tracker.setVisible(true)
-        XCTAssertEqual(recorder.invalidations, 1)
+        tracker.setVisible(true)
+        XCTAssertEqual(recorder.invalidations, 1, "becoming visible refreshes once")
+
+        // Nothing is tracked while hidden, so every return to view refreshes once.
         tracker.setVisible(false)
         tracker.setVisible(true)
+        XCTAssertEqual(recorder.invalidations, 2)
+    }
+
+    func testHiddenTrackerResolvesButStartsNoWatcher() async throws {
+        let (a, _) = try makeRepositories()
+        let controller = GitGraphController(placement: .sidebar, diffOpener: nil)
+        let tracker = controller.tracker
+
+        tracker.setTarget(.directory(a))
+        await tracker.resolutionTask?.value
+        XCTAssertEqual(controller.readyRepositoryRoot, a, "the root still resolves while hidden")
+        XCTAssertNil(tracker.watchedRoot, "a Git tab that was never shown watches nothing")
+
+        tracker.setVisible(true)
+        XCTAssertEqual(tracker.watchedRoot, a)
+        tracker.setVisible(false)
+        XCTAssertNil(tracker.watchedRoot)
+    }
+
+    func testWatcherBurstWaitsForTheQuietPeriod() async throws {
+        let a = try makeDirectory("A")
+        let script = ScriptedWorkTreeRoots([a: [.root(a)]])
+        let clock = GateClock()
+        let controller = GitGraphController(placement: .sidebar, diffOpener: nil)
+        let recorder = EventRecorder(controller)
+        let tracker = GitGraphRepositoryTracker(
+            controller: controller,
+            workTreeRoot: { await script.lookup($0) },
+            refreshClock: clock
+        )
+        tracker.setVisible(true)
+        tracker.setTarget(.directory(a))
+        await tracker.resolutionTask?.value
+        XCTAssertEqual(recorder.invalidations, 0)
+
+        // Each change restarts the wait, so only the last one's wait refreshes.
+        for _ in 0..<5 {
+            tracker.repositoryFilesChanged()
+        }
+        XCTAssertEqual(recorder.invalidations, 0, "a burst refreshes only after a quiet period")
+        let last = try XCTUnwrap(tracker.pendingInvalidation)
+        await clock.open()
+        await last.value
         XCTAssertEqual(recorder.invalidations, 1)
+        XCTAssertNil(tracker.pendingInvalidation)
+        let durations = await clock.requestedDurations
+        XCTAssertEqual(Set(durations), [.milliseconds(500)])
+    }
+
+    func testHidingDropsAPendingRefreshAndHiddenChangesScheduleNone() async throws {
+        let a = try makeDirectory("A")
+        let script = ScriptedWorkTreeRoots([a: [.root(a)]])
+        let clock = GateClock()
+        let controller = GitGraphController(placement: .sidebar, diffOpener: nil)
+        let recorder = EventRecorder(controller)
+        let tracker = GitGraphRepositoryTracker(
+            controller: controller,
+            workTreeRoot: { await script.lookup($0) },
+            refreshClock: clock
+        )
+        tracker.setVisible(true)
+        tracker.setTarget(.directory(a))
+        await tracker.resolutionTask?.value
 
         tracker.repositoryFilesChanged()
-        XCTAssertEqual(recorder.invalidations, 2)
+        let pending = try XCTUnwrap(tracker.pendingInvalidation)
+        tracker.setVisible(false)
+        XCTAssertNil(tracker.pendingInvalidation)
+        tracker.repositoryFilesChanged()
+        XCTAssertNil(tracker.pendingInvalidation, "no refresh is scheduled while hidden")
+        await clock.open()
+        await pending.value
+        XCTAssertEqual(recorder.invalidations, 0)
     }
 
     func testSnapshotDecodesOldFormatAndRoundTripsRepositoryRoot() throws {
@@ -304,6 +385,29 @@ private actor ScriptedWorkTreeRoots {
     func release() {
         held?.resume()
         held = nil
+    }
+}
+
+/// A refresh clock whose sleeps wait until ``open()``; from then on every sleep
+/// returns at once. A cancelled sleeper still waits, as the tracker re-checks
+/// cancellation after its sleep.
+private actor GateClock: FileWatchClock {
+    private(set) var requestedDurations: [Duration] = []
+    private var isOpen = false
+    private var sleepers: [CheckedContinuation<Void, Never>] = []
+
+    func sleep(for duration: Duration) async throws {
+        requestedDurations.append(duration)
+        guard !isOpen else { return }
+        await withCheckedContinuation { sleepers.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        for sleeper in sleepers {
+            sleeper.resume()
+        }
+        sleepers.removeAll()
     }
 }
 

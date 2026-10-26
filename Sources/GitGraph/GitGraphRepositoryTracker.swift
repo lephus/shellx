@@ -3,7 +3,7 @@ import CmuxGit
 import Foundation
 
 /// Points a ``GitGraphController`` at the work tree that holds a target directory,
-/// and tells it when that work tree's files change.
+/// and tells it when that repository's Git metadata changes.
 ///
 /// The sidebar's tracker follows the focused terminal through ``setTarget(_:)``. A
 /// tab's tracker is pinned to one repository by ``pin(repositoryRoot:)`` and ignores
@@ -15,8 +15,12 @@ import Foundation
 ///
 /// An unchanged target is resolved again only when the last walk failed
 /// (`.gitUnavailable`, usually because another walk held the shared runner), and on
-/// becoming visible also after `.notRepository` (`git init` in place). There are no
-/// timers: a repeated answer stays silent.
+/// becoming visible also after `.notRepository` (`git init` in place). A repeated
+/// answer stays silent.
+///
+/// Targets resolve whether or not the page is on screen, because ⤢ and the command
+/// palette need the root. Watching runs only while it is: there is no refresh while
+/// hidden, and becoming visible refreshes once.
 @MainActor
 final class GitGraphRepositoryTracker {
     /// Looks up the work tree that holds a directory. Tests substitute a script.
@@ -26,12 +30,17 @@ final class GitGraphRepositoryTracker {
     var onResolveRoot: ((_ root: String) -> Void)?
     /// The resolution in flight, if any. Tests await it.
     private(set) var resolutionTask: Task<Void, Never>?
-    /// The root whose files are watched: the shown root while it is `.ready`.
+    /// The root whose Git metadata is watched: the shown root while it is `.ready`
+    /// and the page is visible.
     private(set) var watchedRoot: String?
+    /// The refresh waiting for the watcher to go quiet, if any. Tests await it.
+    private(set) var pendingInvalidation: Task<Void, Never>?
 
     private weak var controller: GitGraphController?
     private let metadata: GitMetadataService
     private let workTreeRoot: WorkTreeRootLookup
+    private let refreshClock: any FileWatchClock
+    private let refreshQuietPeriod: Duration
     private var isPinned = false
     private var target: GitGraphTarget?
     /// Bumped for every new target. A resolution started for an older one is dropped.
@@ -40,7 +49,6 @@ final class GitGraphRepositoryTracker {
     private var watcher: RecursivePathWatcher?
     private var watcherTask: Task<Void, Never>?
     private var isVisible = false
-    private var hasChangesWhileHidden = false
 
     /// Work-tree walks share one runner app-wide, which answers `.unavailable` to a
     /// walk started while another is running. Every tracker's walks queue here.
@@ -51,19 +59,27 @@ final class GitGraphRepositoryTracker {
         let status: GitGraphRepoStatus
     }
 
+    /// - Parameters:
+    ///   - refreshClock: Waits out ``refreshQuietPeriod``. Tests substitute a clock they release by hand.
+    ///   - refreshQuietPeriod: How long the watcher must stay quiet before the page refreshes.
     init(
         controller: GitGraphController,
         metadata: GitMetadataService = GitMetadataService(),
-        workTreeRoot: WorkTreeRootLookup? = nil
+        workTreeRoot: WorkTreeRootLookup? = nil,
+        refreshClock: any FileWatchClock = SystemFileWatchClock(),
+        refreshQuietPeriod: Duration = .milliseconds(500)
     ) {
         self.controller = controller
         self.metadata = metadata
         self.workTreeRoot = workTreeRoot ?? { directory in
             await metadata.workTreeRoot(forDirectory: directory)
         }
+        self.refreshClock = refreshClock
+        self.refreshQuietPeriod = refreshQuietPeriod
     }
 
     deinit {
+        pendingInvalidation?.cancel()
         watcherTask?.cancel()
         if let watcher {
             Task { await watcher.stop() }
@@ -88,29 +104,49 @@ final class GitGraphRepositoryTracker {
         resolve(target)
     }
 
-    /// Changes while hidden are remembered; becoming visible after one reloads once.
-    /// Becoming visible also retries a failed walk, and re-checks a folder that was
-    /// not a repository.
+    /// Watching runs only while visible. Nothing is tracked while hidden, so
+    /// becoming visible refreshes a shown repository once. It also retries a failed
+    /// walk, and re-checks a folder that was not a repository.
     func setVisible(_ visible: Bool) {
-        let becameVisible = visible && !isVisible
+        guard visible != isVisible else { return }
         isVisible = visible
-        guard visible else { return }
-        if hasChangesWhileHidden {
-            hasChangesWhileHidden = false
+        guard visible else {
+            cancelPendingInvalidation()
+            updateWatcher()
+            return
+        }
+        updateWatcher()
+        if shown?.status == .ready {
             controller?.notifyInvalidated()
         }
-        if becameVisible, let target, lastWalkFailed || shown?.status == .notRepository {
+        if let target, lastWalkFailed || shown?.status == .notRepository {
             resolve(target)
         }
     }
 
-    /// Called for each coalesced change the watcher reports.
+    /// Called for each coalesced change the watcher reports. The page refreshes
+    /// once the changes stop for ``refreshQuietPeriod``; nothing happens while hidden.
     func repositoryFilesChanged() {
-        guard isVisible else {
-            hasChangesWhileHidden = true
-            return
+        guard isVisible else { return }
+        pendingInvalidation?.cancel()
+        let clock = refreshClock
+        let quietPeriod = refreshQuietPeriod
+        pendingInvalidation = Task { [weak self] in
+            do {
+                try await clock.sleep(for: quietPeriod)
+            } catch {
+                return
+            }
+            // A later change restarted the wait, or the page was hidden.
+            guard !Task.isCancelled, let self else { return }
+            self.pendingInvalidation = nil
+            self.controller?.notifyInvalidated()
         }
-        controller?.notifyInvalidated()
+    }
+
+    private func cancelPendingInvalidation() {
+        pendingInvalidation?.cancel()
+        pendingInvalidation = nil
     }
 
     // MARK: Resolution
@@ -179,16 +215,20 @@ final class GitGraphRepositoryTracker {
         if next != shown {
             shown = next
             // Showing another repository reloads the page anyway.
-            hasChangesWhileHidden = false
+            cancelPendingInvalidation()
             controller?.showRepository(root: root, status: status)
         }
-        watch(status == .ready ? root : nil)
+        updateWatcher()
         if status == .ready, let root {
             onResolveRoot?(root)
         }
     }
 
     // MARK: Watching
+
+    private func updateWatcher() {
+        watch(isVisible && shown?.status == .ready ? shown?.root : nil)
+    }
 
     private func watch(_ root: String?) {
         guard root != watchedRoot else { return }
@@ -212,16 +252,20 @@ final class GitGraphRepositoryTracker {
         }
     }
 
-    /// Built the way `SidebarGitMetadataService` builds its watchers.
+    /// Watches the repository's Git metadata from the sidebar's watch plan (HEAD,
+    /// index, refs, packed-refs, reftable and config), not its work tree: editing a
+    /// tracked file refreshes nothing until it reaches the index. The plan's
+    /// `watchedPaths` lists the paths that existed when it was built, so keeping the
+    /// metadata paths found there needs no filesystem call here.
     nonisolated private static func makeWatcher(
         root: String,
         metadata: GitMetadataService
     ) async -> RecursivePathWatcher? {
         guard let descriptor = await metadata.watchDescriptor(for: root) else { return nil }
+        let existing = Set(descriptor.watchedPaths)
         return await RecursivePathWatcher(
-            paths: descriptor.watchedPaths,
-            throttleInterval: descriptor.eventCoalescingInterval,
-            eventFilter: { descriptor.containsRelevantChange(
+            paths: descriptor.gitMetadataPaths.filter(existing.contains),
+            eventFilter: { descriptor.containsGitMetadataChange(
                 paths: $0.paths, requiresFullRescan: $0.requiresFullRescan
             ) }
         )

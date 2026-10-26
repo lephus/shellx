@@ -190,6 +190,62 @@ test("history.invalidated reloads HEAD, refs, working tree and page 0, keeping a
   expect(s.historyVersion).toBe(historyVersion + 1);
 });
 
+test("invalidations during a refresh queue exactly one more refresh, and the first refresh still lands", async () => {
+  const bridge = readyBridge();
+  const store = new GitGraphStore(bridge);
+  await store.start();
+  const before = store.getState();
+  delete bridge.handlers["history.page"];
+  bridge.calls = [];
+  bridge.emit({ type: "history.invalidated", generation: 1 });
+  await flush();
+  expect(bridge.callsTo("history.page")).toHaveLength(1);
+
+  bridge.emit({ type: "history.invalidated", generation: 1 });
+  void store.refresh();
+  bridge.emit({ type: "history.invalidated", generation: 1 });
+  await flush();
+  expect(bridge.callsTo("history.page")).toHaveLength(1);
+
+  bridge.callsTo("history.page")[0]!.resolve(ok({ commits: range(10, 13), hasMore: false, reachedLimit: false }));
+  await flush();
+  expect(store.getState().commits.map((c) => c.subject)).toEqual(["commit 10", "commit 11", "commit 12"]);
+  expect(store.getState().historyVersion).toBe(before.historyVersion + 1);
+  expect(bridge.callsTo("repo.state")).toHaveLength(2);
+  const pages = bridge.callsTo("history.page");
+  expect(pages).toHaveLength(2);
+
+  pages[1]!.resolve(ok({ commits: range(20, 23), hasMore: false, reachedLimit: false }));
+  await flush();
+  expect(store.getState().commits.map((c) => c.subject)).toEqual(["commit 20", "commit 21", "commit 22"]);
+  expect(store.getState().historyVersion).toBe(before.historyVersion + 2);
+  expect(bridge.callsTo("history.page")).toHaveLength(2);
+  expect(bridge.callsTo("repo.state")).toHaveLength(2);
+});
+
+test("an invalidation during the initial load runs one refresh after it", async () => {
+  const bridge = readyBridge();
+  const page = bridge.handlers["history.page"]!;
+  delete bridge.handlers["history.page"];
+  const store = new GitGraphStore(bridge);
+  void store.start();
+  await flush();
+  expect(bridge.callsTo("history.page")).toHaveLength(1);
+
+  bridge.emit({ type: "history.invalidated", generation: 1 });
+  await flush();
+  expect(bridge.callsTo("repo.state")).toHaveLength(1);
+  expect(bridge.callsTo("history.page")).toHaveLength(1);
+
+  bridge.handlers["history.page"] = page;
+  bridge.callsTo("history.page")[0]!.resolve(ok({ commits: range(0, 3), hasMore: true, reachedLimit: false }));
+  await flush();
+  expect(store.getState().view).toEqual({ kind: "ready" });
+  expect(bridge.callsTo("repo.state")).toHaveLength(2);
+  expect(bridge.callsTo("history.page").map((c) => c.params.skip)).toEqual([0, 0]);
+  expect(store.getState().scroll).toBe("keep");
+});
+
 test("history.invalidated drops a selection that is gone and remounts the graph", async () => {
   const bridge = readyBridge();
   const store = new GitGraphStore(bridge);
