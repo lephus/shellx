@@ -7655,7 +7655,7 @@ extension CMUXCLI {
         guard let text = String(data: data, encoding: .utf8) else {
             throw CLIError(message: "Failed to encode diff viewer payload")
         }
-        return text.replacingOccurrences(of: "</", with: "<\\/")
+        return scriptSafeJSON(text)
     }
 
     private func jsonStringLiteral(_ value: String) throws -> String {
@@ -7663,7 +7663,28 @@ extension CMUXCLI {
         guard let text = String(data: data, encoding: .utf8) else {
             throw CLIError(message: "Failed to encode diff viewer string")
         }
-        return text.replacingOccurrences(of: "</", with: "<\\/")
+        return scriptSafeJSON(text)
+    }
+
+    /// JSON text that is safe inside an HTML `<script>` element. There, `<!--` and
+    /// `<script` change how the parser looks for `</script>`, so a value such as a
+    /// file path containing `<!--<script` would swallow the rest of the page.
+    /// `<`, `>` and `&` only occur inside JSON strings, where a `\u` escape reads
+    /// back as the same character; U+2028 and U+2029 are escaped too, because
+    /// JavaScript before ES2019 rejects them in string literals.
+    private func scriptSafeJSON(_ json: String) -> String {
+        var escaped = String.UnicodeScalarView()
+        for scalar in json.unicodeScalars {
+            switch scalar {
+            case "<": escaped.append(contentsOf: "\\u003c".unicodeScalars)
+            case ">": escaped.append(contentsOf: "\\u003e".unicodeScalars)
+            case "&": escaped.append(contentsOf: "\\u0026".unicodeScalars)
+            case "\u{2028}": escaped.append(contentsOf: "\\u2028".unicodeScalars)
+            case "\u{2029}": escaped.append(contentsOf: "\\u2029".unicodeScalars)
+            default: escaped.append(scalar)
+            }
+        }
+        return String(escaped)
     }
 
     func htmlEscaped(_ raw: String) -> String {

@@ -1011,6 +1011,43 @@ final class CMUXOpenCommandTests: XCTestCase {
         XCTAssertEqual(result.params["show_omnibar"] as? Bool, false)
     }
 
+    func testDiffCommandTitleCannotBreakTheViewerConfigScript() throws {
+        let cliPath = try bundledCLIPath()
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let patchURL = rootURL.appendingPathComponent("changes.patch", isDirectory: false)
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+        try """
+        diff --git a/hello.txt b/hello.txt
+        index 8ab686e..d95f3ad 100644
+        --- a/hello.txt
+        +++ b/hello.txt
+        @@ -1 +1 @@
+        -old
+        +new
+        """.write(to: patchURL, atomically: true, encoding: .utf8)
+        // Git Graph passes a commit's file path as the title. Inside a script element,
+        // "<!--<script" makes the HTML parser swallow the rest of the page, the
+        // viewer's module script included, and the page renders blank.
+        let title = "src/<!--<script>a&b</script>-->\u{2028}\u{2029}.txt"
+
+        let result = try runDiffCLIAndReadHTML(
+            cliPath: cliPath,
+            arguments: ["diff", patchURL.path, "--title", title, "--no-focus"]
+        )
+
+        let marker = "<script id=\"cmux-diff-viewer-config\" type=\"application/json\">"
+        let start = try XCTUnwrap(result.html.range(of: marker)?.upperBound)
+        let end = try XCTUnwrap(result.html[start...].range(of: "</script>")?.lowerBound)
+        let literal = String(result.html[start..<end])
+        for character in ["<", ">", "&", "\u{2028}", "\u{2029}"] {
+            XCTAssertFalse(literal.contains(character), "raw \(character) in the config literal: \(literal)")
+        }
+        XCTAssertEqual(try diffViewerPayload(from: result.html)["title"] as? String, title)
+        XCTAssertTrue(result.html[end...].contains("<script type=\"module\" src=\""), result.html)
+    }
+
     func testDiffCommandUsesBundledAppLocalizationsForViewerLabels() throws {
         let cliPath = try bundledCLIPath()
         let rootURL = FileManager.default.temporaryDirectory
