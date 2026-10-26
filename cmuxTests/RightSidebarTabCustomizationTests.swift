@@ -61,7 +61,7 @@ final class RightSidebarTabCustomizationTests: XCTestCase {
         XCTAssertTrue(RightSidebarTabPreferences.setHidden(true, mode: .find, defaults: defaults))
         XCTAssertEqual(
             RightSidebarMode.visibleModes(defaults: defaults),
-            [.files, .sessions, .feed, .dock, .machines]
+            [.files, .sessions, .feed, .dock, .machines, .git]
         )
     }
 
@@ -195,7 +195,7 @@ final class RightSidebarTabCustomizationTests: XCTestCase {
         XCTAssertTrue(RightSidebarTabPreferences.setHidden(true, mode: .dock, defaults: defaults))
         XCTAssertEqual(
             RightSidebarMode.visibleModes(defaults: defaults),
-            [.files, .find, .sessions, .machines]
+            [.files, .find, .sessions, .machines, .git]
         )
         XCTAssertEqual(
             KeyboardShortcutSettings.rightSidebarPositionalDefaultShortcut(for: .machines, defaults: defaults),
@@ -206,7 +206,7 @@ final class RightSidebarTabCustomizationTests: XCTestCase {
     func testAllTabsVisibleKeepsHistoricDigits() {
         enableAllModeGates()
         let expected: [(RightSidebarMode, String)] = [
-            (.files, "1"), (.find, "2"), (.sessions, "3"), (.feed, "4"), (.dock, "5"), (.machines, "6"),
+            (.files, "1"), (.find, "2"), (.sessions, "3"), (.feed, "4"), (.dock, "5"), (.machines, "6"), (.git, "7"),
         ]
         for (mode, digit) in expected {
             XCTAssertEqual(
