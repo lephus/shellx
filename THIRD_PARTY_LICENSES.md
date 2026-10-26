@@ -402,6 +402,57 @@ has no runtime CDN dependency.
 
 ---
 
+## Git Graph Web Assets
+
+cmux bundles react-git-log and the packages it ships with (compiled from
+`webviews/`) inside the generated `Resources/markdown-viewer/webviews-app/`
+bundle (`chunks/git-graph-vendor.mjs`) so the Git Graph view has no runtime CDN
+dependency.
+
+### @tomplum/react-git-log
+
+- **Version:** 3.5.1
+- **License:** Apache License 2.0
+- **Copyright:** Copyright (c) Thomas Plumpton
+- **Source:** https://github.com/TomPlum/react-git-log
+
+### fastpriorityqueue
+
+- **Version:** 0.7.5
+- **License:** Apache License 2.0
+- **Copyright:** Copyright (c) Daniel Lemire and contributors
+- **Source:** https://github.com/lemire/FastPriorityQueue.js
+
+### @uidotdev/usehooks
+
+- **Version:** 2.4.1
+- **License:** MIT License
+- **Copyright:** Copyright (c) 2023 ui.dev
+- **Source:** https://github.com/uidotdev/usehooks
+
+### classnames
+
+- **Version:** 2.5.1
+- **License:** MIT License
+- **Copyright:** Copyright (c) 2018 Jed Watson
+- **Source:** https://github.com/JedWatson/classnames
+
+### dayjs
+
+- **Version:** 1.11.23
+- **License:** MIT License
+- **Copyright:** Copyright (c) 2018-present, iamkun
+- **Source:** https://github.com/iamkun/dayjs
+
+### react-tiny-popover
+
+- **Version:** 8.1.6
+- **License:** MIT License
+- **Copyright:** Copyright (c) 2019 by Alex Katz
+- **Source:** https://github.com/alexkatz/react-tiny-popover
+
+---
+
 ## Browser REPL Runtime Assets
 
 cmux bundles these files under `Resources/browser-repl/vendor/` for the

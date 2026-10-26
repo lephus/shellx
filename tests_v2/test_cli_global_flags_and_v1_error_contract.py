@@ -90,7 +90,7 @@ def main() -> int:
         ([cli, "settings", "--", "path"], "config files:"),
         ([cli, "settings", "docs"], "config files:"),
         ([cli, "settings", "--", "docs"], "config files:"),
-        ([cli, "welcome"], "built for coding agents"),
+        ([cli, "welcome"], "your terminal, everywhere"),
     ]:
         docs_proc = _run(docs_cmd, env=conflict_env)
         docs_out = _merged_output(docs_proc).lower()

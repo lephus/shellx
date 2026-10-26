@@ -779,7 +779,10 @@ extension Workspace {
             browserSnapshot = nil
             markdownSnapshot = nil
             filePreviewSnapshot = nil
-            rightSidebarToolSnapshot = SessionRightSidebarToolPanelSnapshot(mode: toolPanel.mode)
+            rightSidebarToolSnapshot = SessionRightSidebarToolPanelSnapshot(
+                mode: toolPanel.mode,
+                gitRepositoryRoot: toolPanel.pinnedGitRepositoryRoot
+            )
             agentSessionSnapshot = nil
             projectSnapshot = nil
         case .customSidebar:
@@ -2333,11 +2336,14 @@ extension Workspace {
                   let toolPanel = newRightSidebarToolSurface(
                     inPane: paneId,
                     mode: mode,
-                    focus: false
+                    focus: false,
+                    gitRepositoryRoot: restoresUntrustedSavedDirectory ? nil : snapshot.rightSidebarTool?.gitRepositoryRoot
                   ) else {
                 return nil
             }
             applySessionPanelMetadata(snapshot, toPanelId: toolPanel.id)
+            // The saved title can name a repository this restore did not pin.
+            rightSidebarToolTitleDidChange(toolPanel)
             return toolPanel.id
         case .customSidebar: return restoreCustomSidebarPanel(from: snapshot, inPane: paneId)
         case .simulator: return restoreSimulatorPanel(from: snapshot, inPane: paneId)
@@ -10958,7 +10964,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
     func openOrFocusRightSidebarToolSurface(
         inPane paneId: PaneID,
         mode: RightSidebarMode,
-        focus: Bool = true
+        focus: Bool = true,
+        gitRepositoryRoot: String? = nil
     ) -> RightSidebarToolPanel? {
         guard !isRetiredFromOwningTabManager else { return nil }
         guard mode.canOpenAsPane, mode.isAvailable() else { return nil }
@@ -10967,12 +10974,14 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
                   toolPanel.mode == mode else {
                 continue
             }
+            // An open Git Graph tab moves to the requested repository.
+            toolPanel.retargetGit(repositoryRoot: gitRepositoryRoot)
             if focus {
                 focusPanel(existingId)
             }
             return toolPanel
         }
-        return newRightSidebarToolSurface(inPane: paneId, mode: mode, focus: focus)
+        return newRightSidebarToolSurface(inPane: paneId, mode: mode, focus: focus, gitRepositoryRoot: gitRepositoryRoot)
     }
 
     @discardableResult
@@ -10980,7 +10989,8 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         inPane paneId: PaneID,
         mode: RightSidebarMode,
         focus: Bool? = nil,
-        targetIndex: Int? = nil
+        targetIndex: Int? = nil,
+        gitRepositoryRoot: String? = nil
     ) -> RightSidebarToolPanel? {
         guard !isRetiredFromOwningTabManager else { return nil }
         guard mode.canOpenAsPane, mode.isAvailable() else { return nil }
@@ -10989,6 +10999,7 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         let previousHostedView = focusedTerminalInputTarget()?.panel.hostedView
 
         let toolPanel = RightSidebarToolPanel(workspace: self, mode: mode)
+        toolPanel.retargetGit(repositoryRoot: gitRepositoryRoot)
         panels[toolPanel.id] = toolPanel
         panelTitles[toolPanel.id] = toolPanel.displayTitle
 
@@ -11023,6 +11034,25 @@ final class Workspace: Identifiable, ObservableObject, FilePreviewTabMetadataHos
         }
 
         return toolPanel
+    }
+
+    /// Refreshes a right-sidebar tool tab's title after its panel retargets, the way
+    /// a Markdown tab's title follows its file.
+    func rightSidebarToolTitleDidChange(_ toolPanel: RightSidebarToolPanel) {
+        guard panels[toolPanel.id] === toolPanel else { return }
+        let title = toolPanel.displayTitle
+        if panelTitles[toolPanel.id] != title {
+            panelTitles[toolPanel.id] = title
+        }
+        guard let tabId = surfaceIdFromPanelId(toolPanel.id),
+              let existing = bonsplitController.tab(tabId) else { return }
+        let resolvedTitle = resolvedPanelTitle(panelId: toolPanel.id, fallback: title)
+        guard existing.title != resolvedTitle else { return }
+        bonsplitController.updateTab(
+            tabId,
+            title: resolvedTitle,
+            hasCustomTitle: panelCustomTitles[toolPanel.id] != nil
+        )
     }
 
     @discardableResult

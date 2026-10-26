@@ -4,19 +4,24 @@ import Foundation
 /// Right-sidebar panel snapshot stored with adjacent todo persistence helpers, extracted from `SessionPersistence.swift`, which sits at its file-length budget.
 struct SessionRightSidebarToolPanelSnapshot: Codable, Sendable {
     var mode: RightSidebarMode?
+    /// The repository a Git Graph tab is pinned to; nil until it pins one.
+    var gitRepositoryRoot: String?
 
-    init(mode: RightSidebarMode?) {
+    init(mode: RightSidebarMode?, gitRepositoryRoot: String? = nil) {
         self.mode = mode
+        self.gitRepositoryRoot = gitRepositoryRoot
     }
 
     private enum CodingKeys: String, CodingKey {
         case mode
+        case gitRepositoryRoot
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let raw = try container.decodeIfPresent(String.self, forKey: .mode)
         self.mode = raw.flatMap { RightSidebarMode(rawValue: $0) }
+        self.gitRepositoryRoot = try container.decodeIfPresent(String.self, forKey: .gitRepositoryRoot)
     }
 }
 

@@ -1,6 +1,12 @@
-type WebviewKind = "agent-session" | "diff";
+type WebviewKind = "agent-session" | "diff" | "git-graph";
 
 function resolveWebviewKind(): WebviewKind {
+  if (
+    document.documentElement.dataset.cmuxWebviewKind === "git-graph" ||
+    document.body.dataset.cmuxWebviewKind === "git-graph"
+  ) {
+    return "git-graph";
+  }
   if (
     document.documentElement.dataset.cmuxWebviewKind === "agent-session" ||
     document.body.dataset.cmuxWebviewKind === "agent-session" ||
@@ -18,9 +24,14 @@ if (!rootElement) {
 
 // Load only the active surface so each one ships as its own chunk: the diff
 // viewer pulls in `@pierre/diffs`, the agent session pulls in its editor UI,
-// and neither pays for the other. Shared vendor code (React, the router) is
-// hoisted by Rollup into chunks both surfaces reuse.
-if (resolveWebviewKind() === "agent-session") {
+// the Git Graph pulls in react-git-log, and none pays for the others. Shared
+// vendor code (React, the router) is hoisted by Rollup into chunks they reuse.
+const kind = resolveWebviewKind();
+if (kind === "git-graph") {
+  void import("./surfaces/gitGraphSurface").then((surface) => {
+    surface.mountGitGraphSurface(rootElement);
+  });
+} else if (kind === "agent-session") {
   void import("./surfaces/agentSessionSurface").then((surface) => {
     surface.mountAgentSessionSurface(rootElement);
   });
