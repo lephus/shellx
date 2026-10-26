@@ -3,7 +3,8 @@ import Foundation
 /// Parses the delimited Git output used by the Git Graph history service.
 enum GitHistoryParser {
     static let logFormat = "%H%x1f%P%x1f%S%x1f%an%x1f%ae%x1f%aI%x1f%cI%x1f%s%x1e"
-    static let refFormat = "%(refname)%x1f%(objectname)%x1f%(*objectname)%x1e"
+    /// for-each-ref takes `%xx` hex escapes, not the `%x1f` form that `git log` uses.
+    static let refFormat = "%(refname)%1f%(objectname)%1f%(*objectname)%1e"
 
     private static let fieldSeparator: Character = "\u{1f}"
     private static let recordSeparator: Character = "\u{1e}"
