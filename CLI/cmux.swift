@@ -45789,33 +45789,32 @@ export default {
 
         let isDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
 
-        let c1 = trueColor(0, 212, 255)
-        let c2 = trueColor(24, 181, 250)
-        let c3 = trueColor(48, 150, 245)
-        let c4 = trueColor(72, 119, 241)
-        let c5 = trueColor(96, 88, 239)
-        let c6 = trueColor(110, 73, 238)
-        let c7 = trueColor(124, 58, 237)
-
+        // The ShellX icon: a mint ">" (the computer), a lilac "<" (the phone) and a mint cursor.
+        let mint: String
+        let lilac: String
         let tagline: String
         let subdued: String
 
         if isDark {
+            mint = trueColor(86, 232, 164)
+            lilac = trueColor(207, 200, 238)
             tagline = trueColor(130, 130, 140)
             subdued = "\u{001B}[2m"
         } else {
+            mint = trueColor(22, 150, 95)
+            lilac = trueColor(110, 100, 150)
             tagline = trueColor(90, 90, 98)
             subdued = trueColor(100, 100, 108)
         }
 
         let logo = """
-        \(c1)  ::\(reset)
-        \(c2)    ::::\(reset)              \(c1)c\(c2)m\(c3)u\(c7)x\(reset)
-        \(c3)      ::::::\(reset)
-        \(c4)        ::::::\(reset)        \(tagline)the open source terminal\(reset)
-        \(c5)      ::::::\(reset)          \(tagline)built for coding agents\(reset)
-        \(c6)    ::::\(reset)
-        \(c7)  ::\(reset)
+        \(mint)  ::::\(reset)          \(lilac)::::\(reset)
+        \(mint)    ::::\(reset)      \(lilac)::::\(reset)    \(bold)\(lilac)Shell\(mint)X\(reset)
+        \(mint)      ::::\(reset)  \(lilac)::::\(reset)
+        \(mint)    ::::\(reset)      \(lilac)::::\(reset)    \(tagline)your terminal, everywhere\(reset)
+        \(mint)  ::::\(reset)          \(lilac)::::\(reset)  \(tagline)end-to-end encrypted, from your phone\(reset)
+
+        \(mint)              ::::::\(reset)
         """
 
         let shortcuts = """
@@ -45843,9 +45842,9 @@ export default {
         print("  \(bold)GitHub\(reset)\(subdued)              \(ShellXBrand.sourceCodeURL.absoluteString)\(reset)")
         print("  \(bold)Email\(reset)\(subdued)               \(ShellXBrand.contactEmail)\(reset)")
         print()
-        print("  \(subdued)Run \(reset)\(bold)cmux --help\(reset)\(subdued) for all commands.\(reset)")
-        print("  \(subdued)Run \(reset)\(bold)cmux shortcuts\(reset)\(subdued) to edit shortcuts.\(reset)")
-        print("  \(subdued)Run \(reset)\(bold)cmux feedback\(reset)\(subdued) to report a bug.\(reset)")
+        print("  \(subdued)Run \(reset)\(bold)\(ShellXBrand.cliName) --help\(reset)\(subdued) for all commands.\(reset)")
+        print("  \(subdued)Run \(reset)\(bold)\(ShellXBrand.cliName) shortcuts\(reset)\(subdued) to edit shortcuts.\(reset)")
+        print("  \(subdued)Run \(reset)\(bold)\(ShellXBrand.cliName) feedback\(reset)\(subdued) to report a bug.\(reset)")
         print()
     }
 
