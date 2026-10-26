@@ -162,7 +162,8 @@ function HistoryView({ store, state, layout, appearance, label }: HistoryViewPro
   };
 
   // A reload replaces the commits: a refresh keeps the scroll position, a
-  // filter change starts at the top.
+  // filter change starts at the top. A refresh re-reads every loaded page before
+  // it lands, and this runs after those rows are in the DOM, so the old offset exists.
   useLayoutEffect(() => {
     const element = scrollRef.current;
     if (!element) return;

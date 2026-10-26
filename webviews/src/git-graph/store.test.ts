@@ -296,3 +296,85 @@ test("a file list for an earlier selection is ignored", async () => {
   expect(store.getState().selectedSha).toBe(sha(2));
   expect(store.getState().files).toEqual([]);
 });
+
+test("a refresh re-reads every loaded page, so a selection past the first page and the loaded count survive", async () => {
+  const bridge = readyBridge();
+  const store = new GitGraphStore(bridge);
+  await store.start();
+  await store.loadMore();
+  await store.loadMore();
+  await store.select(sha(7));
+  const { logKey, loadedCount } = store.getState();
+  expect(loadedCount).toBe(9);
+  bridge.calls = [];
+  bridge.emit({ type: "history.invalidated", generation: 1 });
+  await flush();
+  expect(bridge.callsTo("history.page").map((c) => c.params.skip)).toEqual([0, 3, 6]);
+  const s = store.getState();
+  expect(s.loadedCount).toBe(9);
+  expect(s.commits).toHaveLength(9);
+  expect(s.selectedSha).toBe(sha(7));
+  expect(s.files).toHaveLength(1);
+  expect(s.logKey).toBe(logKey);
+  expect(s.scroll).toBe("keep");
+});
+
+test("a refresh keeps reachedLimit when the loaded commits had hit the limit", async () => {
+  const bridge = readyBridge();
+  bridge.handlers["history.page"] = (p) => {
+    const skip = Number(p.skip);
+    return ok({ commits: range(skip, skip + 3), hasMore: skip + 3 < 6, reachedLimit: skip + 3 >= 6 });
+  };
+  const store = new GitGraphStore(bridge);
+  await store.start();
+  await store.loadMore();
+  expect(store.getState().reachedLimit).toBe(true);
+  bridge.calls = [];
+  await store.refresh();
+  expect(bridge.callsTo("history.page").map((c) => c.params.skip)).toEqual([0, 3]);
+  expect(store.getState().reachedLimit).toBe(true);
+  expect(store.getState().loadedCount).toBe(6);
+});
+
+test("a multi-page refresh is discarded when a later page arrives with a new generation", async () => {
+  const bridge = readyBridge();
+  const store = new GitGraphStore(bridge);
+  await store.start();
+  await store.loadMore();
+  await store.select(sha(4));
+  const before = store.getState();
+  const page = bridge.handlers["history.page"]!;
+  bridge.handlers["history.page"] = (p) => (Number(p.skip) === 0 ? page(p) : undefined);
+  bridge.calls = [];
+  bridge.emit({ type: "history.invalidated", generation: 1 });
+  await flush();
+  const pending = bridge.callsTo("history.page");
+  expect(pending.map((c) => c.params.skip)).toEqual([0, 3]);
+  pending[1]!.resolve(ok({ commits: range(30, 33), hasMore: false, reachedLimit: false }, 2));
+  await flush();
+  const s = store.getState();
+  expect(s.historyVersion).toBe(before.historyVersion);
+  expect(s.commits).toBe(before.commits);
+  expect(s.selectedSha).toBe(sha(4));
+});
+
+test("repo.changed during a multi-page refresh wins over the refresh", async () => {
+  const bridge = readyBridge();
+  const store = new GitGraphStore(bridge);
+  await store.start();
+  await store.loadMore();
+  const page = bridge.handlers["history.page"]!;
+  bridge.handlers["history.page"] = (p) => (Number(p.skip) === 0 ? page(p) : undefined);
+  bridge.calls = [];
+  bridge.emit({ type: "history.invalidated", generation: 1 });
+  await flush();
+  const stale = bridge.callsTo("history.page")[1]!;
+  bridge.handlers = readyBridge(2).handlers;
+  bridge.handlers["repo.state"] = () => ok({ status: "notRepository" }, 2);
+  bridge.emit({ type: "repo.changed", generation: 2 });
+  await flush();
+  stale.resolve(ok({ commits: range(3, 6), hasMore: false, reachedLimit: false }, 1));
+  await flush();
+  expect(store.getState().view).toEqual({ kind: "status", status: "notRepository" });
+  expect(store.getState().commits).toEqual([]);
+});

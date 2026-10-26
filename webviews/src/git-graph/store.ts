@@ -114,8 +114,19 @@ type LoadMode =
   | "initial"
   /** Branch or remote filter changed: keep a still-present selection, scroll to the top. */
   | "filter"
-  /** Refresh or `history.invalidated`: also re-read HEAD, keep selection and scroll. */
+  /**
+   * Refresh or `history.invalidated`: also re-read HEAD and every page loaded so
+   * far, keeping the selection and the scroll position.
+   */
   | "refresh";
+
+/** The commit list a (re)load produced, applied to the state in one step. */
+type LoadedHistory = {
+  commits: GitGraphCommit[];
+  loadedCount: number;
+  hasMore: boolean;
+  reachedLimit: boolean;
+};
 
 export class GitGraphStore {
   private state: GitGraphState = initialState();
@@ -237,6 +248,9 @@ export class GitGraphStore {
     this.historyInFlight = true;
     // A page still in flight belongs to the old list and will be ignored.
     if (this.state.loadingMore) this.set({ loadingMore: false });
+    // A refresh reads back as many commits as are loaded now (spec §6.8), so a
+    // selection past the first page and the scroll position survive it.
+    const target = mode === "refresh" ? this.state.loadedCount : 0;
     try {
       const [repo, refs, workingTree, page] = await Promise.all([
         mode === "refresh" ? this.call<GitGraphRepoState>("repo.state") : Promise.resolve(null),
@@ -259,20 +273,51 @@ export class GitGraphStore {
         return this.loadHistory(mode);
       }
       if (!page.ok) return this.set({ view: viewForError(page.error.code) });
-      this.applyFirstPage(mode, refs.result, workingTree?.ok ? workingTree.result : null, page.result, repo);
+      const history = await this.readRemainingPages(epoch, page.generation, page.result, target);
+      if (!history) return;
+      this.applyHistory(mode, refs.result, workingTree?.ok ? workingTree.result : null, history, repo);
     } finally {
       if (epoch === this.historyEpoch) this.historyInFlight = false;
     }
   }
 
-  private applyFirstPage(
+  /**
+   * Fetches pages after `first`, one at a time, until `target` commits are read,
+   * history runs out or the limit is hit. Returns null, so the caller applies
+   * nothing, when a newer reload started, the generation changed or a page failed
+   * (the failure is shown).
+   */
+  private async readRemainingPages(
+    epoch: number,
+    generation: number,
+    first: GitGraphPage,
+    target: number,
+  ): Promise<LoadedHistory | null> {
+    let commits = mergePage([], first, 0);
+    let loadedCount = first.commits.length;
+    let last = first;
+    while (loadedCount < target && last.hasMore && !last.reachedLimit && last.commits.length > 0) {
+      const reply = await this.call<GitGraphPage>("history.page", this.pageParams(loadedCount));
+      if (epoch !== this.historyEpoch || !reply || reply.generation !== generation) return null;
+      if (!reply.ok) {
+        this.set({ view: viewForError(reply.error.code) });
+        return null;
+      }
+      commits = mergePage(commits, reply.result, loadedCount);
+      loadedCount += reply.result.commits.length;
+      last = reply.result;
+    }
+    return { commits, loadedCount, hasMore: last.hasMore, reachedLimit: last.reachedLimit };
+  }
+
+  private applyHistory(
     mode: LoadMode,
     refs: GitGraphRef[],
     workingTree: GitGraphWorkingTree | null,
-    page: GitGraphPage,
+    history: LoadedHistory,
     repo: GitGraphReply<GitGraphRepoState> | null,
   ): void {
-    const commits = mergePage([], page, 0);
+    const { commits } = history;
     const { selectedSha } = this.state;
     const dirty = workingTree !== null && workingTree.added + workingTree.modified + workingTree.deleted > 0;
     const keepSelection =
@@ -288,9 +333,9 @@ export class GitGraphStore {
       refs,
       workingTree,
       commits,
-      loadedCount: page.commits.length,
-      hasMore: page.hasMore,
-      reachedLimit: page.reachedLimit,
+      loadedCount: history.loadedCount,
+      hasMore: history.hasMore,
+      reachedLimit: history.reachedLimit,
       loadingMore: false,
       pagingFailed: false,
       selectedSha: keepSelection ? selectedSha : null,
