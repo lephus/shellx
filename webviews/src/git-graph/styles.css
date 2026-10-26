@@ -1,0 +1,510 @@
+/* Git Graph page. Dark tokens follow the approved mockup (placement.html). */
+:root {
+  color-scheme: dark;
+  --gg-bg: #0b0716;
+  --gg-panel: #100b1d;
+  --gg-raise: #171128;
+  --gg-line: #211a37;
+  --gg-border: #2a2145;
+  --gg-text: #cdc7e0;
+  --gg-hi: #e6e2f2;
+  --gg-muted: #8a83a6;
+  --gg-pri: #60a5fa;
+  --gg-pri-text: #93c5fd;
+  --gg-add: #6fd49a;
+  --gg-del: #e88a8a;
+  --gg-mod: #e8c468;
+  --gg-match: rgba(232, 196, 104, 0.1);
+  --gg-match-outline: #e8c468;
+
+  --gg-chip-local-text: #93c5fd;
+  --gg-chip-local-bg: rgba(96, 165, 250, 0.12);
+  --gg-chip-local-border: #60a5fa;
+  --gg-chip-head-text: #0b0716;
+  --gg-chip-head-bg: #93c5fd;
+  --gg-chip-remote-text: #c4b5fd;
+  --gg-chip-remote-bg: rgba(196, 181, 253, 0.08);
+  --gg-chip-remote-border: #c4b5fd;
+  --gg-chip-tag-text: #e8c468;
+  --gg-chip-tag-bg: rgba(232, 196, 104, 0.1);
+  --gg-chip-tag-border: #e8c468;
+
+  --gg-col-date: 150px;
+  --gg-col-author: 120px;
+  --gg-col-hash: 64px;
+}
+
+:root[data-gg-appearance="light"] {
+  color-scheme: light;
+  --gg-bg: #fbfaff;
+  --gg-panel: #f4f2fa;
+  --gg-raise: #ffffff;
+  --gg-line: #ebe7f5;
+  --gg-border: #dcd6ea;
+  --gg-text: #3b3552;
+  --gg-hi: #1a1528;
+  --gg-muted: #6f6889;
+  --gg-pri: #2563eb;
+  --gg-pri-text: #1d4ed8;
+  --gg-add: #15803d;
+  --gg-del: #b91c1c;
+  --gg-mod: #a16207;
+  --gg-match: rgba(232, 196, 104, 0.2);
+  --gg-match-outline: #c99a2e;
+
+  --gg-chip-local-text: #1d4ed8;
+  --gg-chip-local-bg: rgba(96, 165, 250, 0.1);
+  --gg-chip-remote-text: #6d28d9;
+  --gg-chip-remote-bg: rgba(196, 181, 253, 0.14);
+  --gg-chip-tag-text: #8a6410;
+  --gg-chip-tag-bg: rgba(232, 196, 104, 0.14);
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--gg-bg);
+  color: var(--gg-text);
+  font: 12.5px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+}
+
+#root {
+  height: 100%;
+}
+
+.gg-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.gg-muted {
+  color: var(--gg-muted);
+}
+
+.gg-mono {
+  font: 11.5px "SF Mono", Menlo, monospace;
+}
+
+.gg-button {
+  font: inherit;
+  color: var(--gg-hi);
+  background: var(--gg-raise);
+  border: 1px solid var(--gg-border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.gg-button:hover {
+  border-color: var(--gg-pri);
+}
+
+.gg-button:focus-visible,
+.gg-icon-button:focus-visible,
+.gg-select:focus-visible,
+.gg-search-input:focus-visible,
+.gg-file:focus-visible {
+  outline: 2px solid var(--gg-pri);
+  outline-offset: 1px;
+}
+
+/* Status and error states */
+
+.gg-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex: 1;
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--gg-muted);
+}
+
+.gg-status output {
+  margin: 0;
+}
+
+/* Toolbar */
+
+.gg-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 6px 10px;
+  background: var(--gg-panel);
+  border-bottom: 1px solid var(--gg-line);
+}
+
+.gg-select {
+  font: inherit;
+  max-width: 200px;
+  min-width: 0;
+  color: var(--gg-hi);
+  background: var(--gg-raise);
+  border: 1px solid var(--gg-border);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.gg-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--gg-text);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.gg-toggle input {
+  margin: 0;
+  accent-color: var(--gg-pri);
+}
+
+.gg-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.gg-search-input {
+  flex: 1 1 auto;
+  min-width: 80px;
+  font: inherit;
+  color: var(--gg-hi);
+  background: var(--gg-raise);
+  border: 1px solid var(--gg-border);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+.gg-search-input::placeholder {
+  color: var(--gg-muted);
+}
+
+.gg-search-count {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--gg-muted);
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gg-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 14px;
+  color: var(--gg-muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.gg-icon-button:hover {
+  color: var(--gg-hi);
+  background: var(--gg-raise);
+  border-color: var(--gg-border);
+}
+
+/* Commit list */
+
+.gg-scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.gg-columns {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: grid;
+  align-items: center;
+  column-gap: 8px;
+  height: 26px;
+  padding-right: 10px;
+  color: var(--gg-muted);
+  background: var(--gg-panel);
+  border-bottom: 1px solid var(--gg-border);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.gg-columns > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gg-columns > span:first-child {
+  padding-left: 8px;
+}
+
+.gg-log {
+  min-width: 0;
+}
+
+/* react-git-log lays the graph and the table out as flex children. */
+.gg-log > div {
+  flex: none;
+}
+
+.gg-log > div:last-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* react-git-log sizes the graph for the most lanes anywhere in the loaded
+   history. In the narrow sidebar that can leave the subject a few characters
+   wide, so lanes past 30% of the width are clipped there; the wide tab shows
+   every lane. */
+.gg-app[data-layout="narrow"] .gg-log > div:first-child {
+  max-width: 30%;
+  overflow: hidden;
+}
+
+/* Rows must stay 40 px high: react-git-log draws the graph on a 40 px grid. */
+.gg-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 10px 0 6px;
+  white-space: nowrap;
+  color: var(--gg-hi);
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.gg-row[data-match="true"] {
+  background-color: var(--gg-match);
+}
+
+.gg-row[data-current-match="true"] {
+  outline: 1px solid var(--gg-match-outline);
+  outline-offset: -1px;
+}
+
+.gg-msg {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gg-row[data-merge="true"] .gg-msg,
+.gg-wip {
+  color: var(--gg-muted);
+}
+
+.gg-cell {
+  flex: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--gg-muted);
+  font-size: 11.5px;
+}
+
+.gg-cell-date {
+  width: var(--gg-col-date);
+}
+
+.gg-cell-author {
+  width: var(--gg-col-author);
+}
+
+.gg-cell-hash {
+  width: var(--gg-col-hash);
+  font-family: "SF Mono", Menlo, monospace;
+}
+
+.gg-chips {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  min-width: 0;
+  max-width: 45%;
+  overflow: hidden;
+}
+
+.gg-chip {
+  flex: none;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  line-height: 17px;
+  padding: 0 6px;
+  border: 1px solid;
+  border-radius: 5px;
+}
+
+.gg-chip-local {
+  color: var(--gg-chip-local-text);
+  background: var(--gg-chip-local-bg);
+  border-color: var(--gg-chip-local-border);
+}
+
+.gg-chip-head {
+  color: var(--gg-chip-head-text);
+  background: var(--gg-chip-head-bg);
+  border-color: var(--gg-chip-head-bg);
+  font-weight: 600;
+}
+
+.gg-chip-remote {
+  color: var(--gg-chip-remote-text);
+  background: var(--gg-chip-remote-bg);
+  border-color: var(--gg-chip-remote-border);
+}
+
+.gg-chip-tag {
+  color: var(--gg-chip-tag-text);
+  background: var(--gg-chip-tag-bg);
+  border-color: var(--gg-chip-tag-border);
+}
+
+.gg-chip-more {
+  color: var(--gg-muted);
+  border-color: var(--gg-border);
+}
+
+.gg-counts {
+  display: inline-flex;
+  gap: 8px;
+  flex: none;
+  font: 11.5px "SF Mono", Menlo, monospace;
+}
+
+.gg-add {
+  color: var(--gg-add);
+}
+
+.gg-del {
+  color: var(--gg-del);
+}
+
+.gg-mod {
+  color: var(--gg-mod);
+}
+
+.gg-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 14px;
+  color: var(--gg-muted);
+  border-top: 1px solid var(--gg-line);
+}
+
+/* Detail panel */
+
+.gg-detail {
+  flex: 0 0 auto;
+  max-height: 40%;
+  overflow: auto;
+  padding: 10px 12px;
+  background: var(--gg-panel);
+  border-top: 1px solid var(--gg-border);
+}
+
+.gg-app[data-layout="wide"] .gg-detail {
+  display: flex;
+  gap: 24px;
+}
+
+.gg-app[data-layout="wide"] .gg-detail > div {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.gg-detail p {
+  margin: 0 0 4px;
+}
+
+.gg-detail-subject {
+  margin: 0 0 4px;
+  color: var(--gg-hi);
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.gg-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-bottom: 6px;
+  color: var(--gg-muted);
+  font-size: 11.5px;
+}
+
+.gg-detail-note {
+  color: var(--gg-muted);
+  font-style: italic;
+}
+
+.gg-file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.gg-file {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 4px;
+  font: 12px "SF Mono", Menlo, monospace;
+  color: var(--gg-text);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.gg-file:hover {
+  background: var(--gg-raise);
+}
+
+.gg-file-status {
+  flex: none;
+  width: 12px;
+  color: var(--gg-mod);
+}
+
+.gg-file-status-added {
+  color: var(--gg-add);
+}
+
+.gg-file-status-deleted {
+  color: var(--gg-del);
+}
+
+.gg-file-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--gg-pri-text);
+}
