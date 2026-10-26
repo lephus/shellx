@@ -2324,7 +2324,12 @@
 		F50C3237EF790051B3B0A76B /* GhosttyWorkspaceActionTestHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 787B6BD93E69D2D1157A3AF8 /* GhosttyWorkspaceActionTestHarness.swift */; };
 		ED5DB47E40B1F74D486EEAB9 /* GhosttyWorkspaceActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C9035917ADD1609A214451A /* GhosttyWorkspaceActionTests.swift */; };
 		FE001107 /* GitFileStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE001007 /* GitFileStatus.swift */; };
+		20804F0602EFDC9788A7FA2A /* GitGraphBridgeContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9236B8C66510CED44543D4C8 /* GitGraphBridgeContract.swift */; };
+		3E8A57BFBD3E1FB6F612AC66 /* GitGraphController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF31168B255379139F7AEE6 /* GitGraphController.swift */; };
+		C5529076ED7E72B7B02EAFFC /* GitGraphControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 966F3E99DEA29C58FFB6862C /* GitGraphControllerTests.swift */; };
+		2C9A617CB2735BA37A425784 /* GitGraphLabels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A197BF2245EF3DCC5F4C8810 /* GitGraphLabels.swift */; };
 		47B6DA3227200EDE26DD0E8D /* GitGraphRightSidebarModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73FF3E4FA9971857D3B73D55 /* GitGraphRightSidebarModeTests.swift */; };
+		11F671A3D5BF4B05AFCA2753 /* GitGraphWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01F0BD3DD58C48F7EF443CBF /* GitGraphWebView.swift */; };
 		FE001106 /* GitStatusProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE001006 /* GitStatusProvider.swift */; };
 		2ECC1D8069E0AED4557E0950 /* GlobalSearchCoordinator+Debug.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43F8CFB1AFABB4807FA907E3 /* GlobalSearchCoordinator+Debug.swift */; };
 		3865A0023865A0023865A002 /* GlobalSearchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3865B0023865B0023865B002 /* GlobalSearchCoordinator.swift */; };
@@ -6951,7 +6956,12 @@
 		787B6BD93E69D2D1157A3AF8 /* GhosttyWorkspaceActionTestHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GhosttyWorkspaceActionTestHarness.swift"; sourceTree = "<group>"; };
 		5C9035917ADD1609A214451A /* GhosttyWorkspaceActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GhosttyWorkspaceActionTests.swift"; sourceTree = "<group>"; };
 		FE001007 /* GitFileStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitFileStatus.swift; sourceTree = "<group>"; };
+		9236B8C66510CED44543D4C8 /* GitGraphBridgeContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitGraph/GitGraphBridgeContract.swift; sourceTree = "<group>"; };
+		DFF31168B255379139F7AEE6 /* GitGraphController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitGraph/GitGraphController.swift; sourceTree = "<group>"; };
+		966F3E99DEA29C58FFB6862C /* GitGraphControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GitGraphControllerTests.swift"; sourceTree = "<group>"; };
+		A197BF2245EF3DCC5F4C8810 /* GitGraphLabels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitGraph/GitGraphLabels.swift; sourceTree = "<group>"; };
 		73FF3E4FA9971857D3B73D55 /* GitGraphRightSidebarModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GitGraphRightSidebarModeTests.swift"; sourceTree = "<group>"; };
+		01F0BD3DD58C48F7EF443CBF /* GitGraphWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitGraph/GitGraphWebView.swift; sourceTree = "<group>"; };
 		FE001006 /* GitStatusProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitStatusProvider.swift; sourceTree = "<group>"; };
 		43F8CFB1AFABB4807FA907E3 /* GlobalSearchCoordinator+Debug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Search/GlobalSearchCoordinator+Debug.swift"; sourceTree = "<group>"; };
 		3865B0023865B0023865B002 /* GlobalSearchCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Search/GlobalSearchCoordinator.swift; sourceTree = "<group>"; };
@@ -12510,6 +12520,10 @@
 				E7612DBD8DEC65587094FBA8 /* AgentNameEffect+TabActivity.swift */,
 				1873422115023A417824115F /* AgentNameEffectSource.swift */,
 				D9F24AF0CF6FD3732C011F10 /* ShellXRightSidebarToggleModel.swift */,
+				9236B8C66510CED44543D4C8 /* GitGraphBridgeContract.swift */,
+				DFF31168B255379139F7AEE6 /* GitGraphController.swift */,
+				A197BF2245EF3DCC5F4C8810 /* GitGraphLabels.swift */,
+				01F0BD3DD58C48F7EF443CBF /* GitGraphWebView.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -14104,6 +14118,7 @@
 				2451C5736A08D634760946D2 /* ShellXSidebarNameEffectTests.swift */,
 				10FADEED3C5521B4E67FD1D5 /* ShellXRightSidebarToggleTests.swift */,
 				73FF3E4FA9971857D3B73D55 /* GitGraphRightSidebarModeTests.swift */,
+				966F3E99DEA29C58FFB6862C /* GitGraphControllerTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -16125,6 +16140,10 @@
 				468140000000000000000009 /* GhosttyTitleUpdateSurfaceKey.swift in Sources */,
 				46814000000000000000000B /* GhosttyTitleUpdateSurfaceState.swift in Sources */,
 				FE001107 /* GitFileStatus.swift in Sources */,
+				20804F0602EFDC9788A7FA2A /* GitGraphBridgeContract.swift in Sources */,
+				3E8A57BFBD3E1FB6F612AC66 /* GitGraphController.swift in Sources */,
+				2C9A617CB2735BA37A425784 /* GitGraphLabels.swift in Sources */,
+				11F671A3D5BF4B05AFCA2753 /* GitGraphWebView.swift in Sources */,
 				FE001106 /* GitStatusProvider.swift in Sources */,
 				2ECC1D8069E0AED4557E0950 /* GlobalSearchCoordinator+Debug.swift in Sources */,
 					3865A0023865A0023865A002 /* GlobalSearchCoordinator.swift in Sources */,
@@ -18790,6 +18809,7 @@
 				A10190000000000000000001 /* GhosttyTitleUpdateIngressTests.swift in Sources */,
 				F50C3237EF790051B3B0A76B /* GhosttyWorkspaceActionTestHarness.swift in Sources */,
 				ED5DB47E40B1F74D486EEAB9 /* GhosttyWorkspaceActionTests.swift in Sources */,
+				C5529076ED7E72B7B02EAFFC /* GitGraphControllerTests.swift in Sources */,
 				47B6DA3227200EDE26DD0E8D /* GitGraphRightSidebarModeTests.swift in Sources */,
 				8561A0018561A0018561A001 /* GlobalSearchInputOwnershipTests.swift in Sources */,
 				3865A0113865A0113865A011 /* GlobalSearchPaletteModelTests.swift in Sources */,
