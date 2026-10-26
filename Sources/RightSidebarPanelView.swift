@@ -31,7 +31,7 @@ enum FileExplorerRootSyncPolicy {
         switch mode {
         case .files, .find:
             return true
-        case .sessions, .feed, .dock, .machines, .customSidebar:
+        case .sessions, .feed, .dock, .machines, .git, .customSidebar:
             return false
         }
     }
@@ -489,6 +489,9 @@ struct RightSidebarPanelView: View {
                     activationCoordinator: cloudActivationCoordinator,
                     coderouterStore: tabManager.coderouterAccountStore
                 )
+            case .git:
+                // Task 7 mounts the Git Graph surface here.
+                Color.clear
             case .customSidebar:
                 customSidebarPanel
             }

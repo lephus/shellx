@@ -20,6 +20,8 @@ extension RightSidebarMode {
             return .machines
         case "devices", "device", "macs":
             return .machines
+        case "git", "git-graph", "graph":
+            return .git
         case "custom", "custom-sidebar":
             return .customSidebar
         default:
@@ -102,7 +104,7 @@ extension RightSidebarMode {
             return true
         case .feed:
             return feedEnabled
-        case .dock:
+        case .dock, .git:
             return true
         case .machines:
             // ShellX: the Machines tab (Cloud machines and the account's other

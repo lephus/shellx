@@ -10,6 +10,7 @@ extension RightSidebarMode {
         case .feed: .feed
         case .dock: .dock
         case .machines: .cloudSidebar
+        case .git: .gitGraph
         case .customSidebar: .customSidebar
         }
     }

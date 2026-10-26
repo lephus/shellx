@@ -2329,6 +2329,10 @@
       "vi": "English UI or developer term Vietnamese ShellX keeps as-is (glossary: terminal, tab, agent, prompt, commit, branch, fork, log, OK, Cloud VM); the translated entry is still required."
     }
   },
+  "rightSidebar.mode.git": {
+    "class": "brand",
+    "source": "Git"
+  },
   "rightSidebar.mode.machines": {
     "source": "Cloud",
     "identityLocales": {

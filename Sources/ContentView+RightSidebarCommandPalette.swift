@@ -139,8 +139,10 @@ extension ContentView {
         // customSidebar has none yet (a new cmux-owned shortcut carries the
         // full settings/config/docs policy), so it stays out of the palette
         // until that lands. The mode bar, CLI, and socket verb cover it.
-        return RightSidebarMode.availableModes().filter { $0.shortcutAction != nil }.map { mode in
-            let title = mode.shortcutAction?.label ?? mode.label
+        return RightSidebarMode.availableModes().filter { $0.shortcutAction != nil || $0 == .git }.map { mode in
+            let title = mode == .git
+                ? String(localized: "command.showGitGraph.title", defaultValue: "Show Git Graph")
+                : (mode.shortcutAction?.label ?? mode.label)
             return CommandPaletteCommandContribution(
                 commandId: Self.commandPaletteRightSidebarModeCommandID(mode),
                 title: constant(title),
@@ -181,6 +183,8 @@ extension ContentView {
             return "palette.showRightSidebarMachines"
         case .customSidebar:
             return "palette.showRightSidebarCustomSidebar"
+        case .git:
+            return "palette.showRightSidebarGit"
         }
     }
 
@@ -205,6 +209,8 @@ extension ContentView {
             return "palette.openVaultPane"
         case .machines:
             return "palette.openCloudPane"
+        case .git:
+            return "palette.openGitGraphPane"
         case .feed, .dock, .customSidebar:
             return nil
         }
@@ -220,6 +226,8 @@ extension ContentView {
             return String(localized: "command.openVaultPane.title", defaultValue: "Open Vault as Pane")
         case .machines:
             return String(localized: "command.openCloudPane.title", defaultValue: "Open Cloud as Pane")
+        case .git:
+            return String(localized: "command.openGitGraphPane.title", defaultValue: "Open Git Graph as Tab")
         case .feed, .dock, .customSidebar:
             return nil
         }

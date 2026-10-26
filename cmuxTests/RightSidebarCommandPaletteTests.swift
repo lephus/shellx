@@ -104,7 +104,12 @@ final class RightSidebarCommandPaletteTests: XCTestCase {
                     "Expected command palette contribution for \(mode.rawValue)"
                 )
 
-                XCTAssertEqual(contribution.title(context), mode.shortcutAction?.label ?? mode.label)
+                XCTAssertEqual(
+                    contribution.title(context),
+                    mode == .git
+                        ? String(localized: "command.showGitGraph.title", defaultValue: "Show Git Graph")
+                        : (mode.shortcutAction?.label ?? mode.label)
+                )
                 XCTAssertEqual(
                     contribution.subtitle(context),
                     String(localized: "command.rightSidebarMode.subtitle", defaultValue: "Right Sidebar")
@@ -121,7 +126,7 @@ final class RightSidebarCommandPaletteTests: XCTestCase {
             // tab is parked behind remoteMachines, so it has no command.
             let machinesAvailable = RightSidebarMode.machines.isAvailable()
             XCTAssertEqual(machinesAvailable, ShellXSwitches.remoteMachines)
-            XCTAssertEqual(contributions.count, ShellXSwitches.remoteMachines ? 5 : 4)
+            XCTAssertEqual(contributions.count, ShellXSwitches.remoteMachines ? 6 : 5)
             XCTAssertNil(contributionsByID[ContentView.commandPaletteRightSidebarModeCommandID(.feed)])
             XCTAssertNotNil(contributionsByID[ContentView.commandPaletteRightSidebarModeCommandID(.dock)])
             XCTAssertEqual(
