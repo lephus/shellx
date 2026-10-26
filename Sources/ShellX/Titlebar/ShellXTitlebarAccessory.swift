@@ -4,9 +4,9 @@ import ShellXIcons
 import SwiftUI
 
 /// ShellX title bar, right side (spec §7.1): the search field look-alike with
-/// its shortcut key cap, and the settings button. The sidebar toggle and the
-/// notifications bell stay in the existing left accessory
-/// (`TitlebarControlsView`), whose bell badge draws `ShellXTitlebarModel`.
+/// its shortcut key cap, the settings button and the right sidebar toggle.
+/// The left sidebar toggle and the notifications bell stay in the existing left
+/// accessory (`TitlebarControlsView`), whose bell badge draws `ShellXTitlebarModel`.
 /// Flat colors only (`ShellXPalette`), no gradients or shadows.
 struct ShellXTitlebarView: View {
     let shortcutText: String
@@ -15,10 +15,14 @@ struct ShellXTitlebarView: View {
     /// "Chia sẻ phiên" (L7); hidden while `ShellXShareGate` is off.
     var showsShare: Bool = false
     var onShare: () -> Void = {}
+    /// Lit while this window's right sidebar (Files, Find, …) is open.
+    @ObservedObject var rightSidebarToggle: ShellXRightSidebarToggleModel = ShellXRightSidebarToggleModel()
+    var onToggleRightSidebar: () -> Void = {}
 
     @State private var searchHover = false
     @State private var settingsHover = false
     @State private var shareHover = false
+    @State private var rightSidebarHover = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -97,15 +101,55 @@ struct ShellXTitlebarView: View {
             .accessibilityIdentifier("titlebarControl.shellxSettings")
             .accessibilityLabel(ShellXTitlebarStrings.settings)
             .help(ShellXTitlebarStrings.settings)
+
+            Button(action: onToggleRightSidebar) {
+                // AppKit-hosted like the left accessory's icons, which stay
+                // visible where a SwiftUI-composited symbol can draw blank.
+                CmuxSystemSymbolImage(symbolName: "sidebar.right", pointSize: 14, tint: rightSidebarIconColor)
+                    .frame(width: 24, height: 24)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(rightSidebarFill)
+                    )
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onHover { rightSidebarHover = $0 }
+            .accessibilityIdentifier("titlebarControl.shellxRightSidebar")
+            .accessibilityLabel(ShellXTitlebarStrings.toggleRightSidebar)
+            .accessibilityAddTraits(rightSidebarToggle.isOn ? .isSelected : [])
+            .help(ShellXTitlebarStrings.toggleRightSidebarTooltip)
         }
         .padding(.horizontal, 8)
         .frame(height: 28)
+    }
+
+    private var rightSidebarIconColor: Color {
+        if rightSidebarToggle.isOn { return ShellXPalette.primaryText.color }
+        return rightSidebarHover ? ShellXPalette.textHi.color : ShellXPalette.text.color
+    }
+
+    private var rightSidebarFill: Color {
+        if rightSidebarToggle.isOn { return ShellXPalette.primarySoft.color }
+        return rightSidebarHover ? ShellXPalette.raise.color : Color.clear
     }
 }
 
 enum ShellXTitlebarStrings {
     static var settings: String {
         String(localized: "titlebar.settings.accessibilityLabel", defaultValue: "Settings")
+    }
+
+    static var toggleRightSidebar: String {
+        String(localized: "menu.view.toggleRightSidebar", defaultValue: "Toggle Right Sidebar")
+    }
+
+    /// Same tooltip as the right sidebar's own close button, with the
+    /// current ⌘⌥B binding appended.
+    static var toggleRightSidebarTooltip: String {
+        KeyboardShortcutSettings.Action.toggleRightSidebar.tooltip(
+            String(localized: "rightSidebar.toggle.tooltip", defaultValue: "Toggle right sidebar")
+        )
     }
 }
 
@@ -120,9 +164,24 @@ extension ShellXTitlebarModel {
 final class ShellXTitlebarAccessoryViewController: NSTitlebarAccessoryViewController {
     static let identifier = NSUserInterfaceItemIdentifier("shellx.titlebar.accessory")
     private let hostingView: NSHostingView<ShellXTitlebarView>
+    private let rightSidebarToggle = ShellXRightSidebarToggleModel()
+    private let resolveRightSidebarState: @MainActor (NSWindow?) -> FileExplorerState?
+    private var contextsObserver: NSObjectProtocol?
 
-    init() {
+    /// The right sidebar button toggles through the same path as ⌘⌥B and
+    /// View ▸ Toggle Right Sidebar; tests inject both closures.
+    init(
+        resolveRightSidebarState: @escaping @MainActor (NSWindow?) -> FileExplorerState? = { window in
+            guard let window else { return nil }
+            return AppDelegate.shared?.contextForMainTerminalWindow(window, reindex: false)?.fileExplorerState
+        },
+        toggleRightSidebar: @escaping @MainActor (NSWindow?) -> Void = { window in
+            _ = AppDelegate.shared?.toggleRightSidebarInActiveMainWindow(preferredWindow: window)
+        }
+    ) {
+        self.resolveRightSidebarState = resolveRightSidebarState
         let containerView = TitlebarAccessoryContainerView()
+        let toggleModel = rightSidebarToggle
         let host = NSHostingView(rootView: ShellXTitlebarView(
             shortcutText: Self.paletteShortcutText(),
             onSearch: { [weak containerView] in
@@ -137,6 +196,10 @@ final class ShellXTitlebarAccessoryViewController: NSTitlebarAccessoryViewContro
             showsShare: ShellXShareGate.isEnabled,
             onShare: { [weak containerView] in
                 ShellXShareActions.shareSelectedWorkspace(in: containerView?.window)
+            },
+            rightSidebarToggle: toggleModel,
+            onToggleRightSidebar: { [weak containerView] in
+                toggleRightSidebar(containerView?.window)
             }
         ))
         hostingView = host
@@ -150,10 +213,31 @@ final class ShellXTitlebarAccessoryViewController: NSTitlebarAccessoryViewContro
         containerView.frame = host.frame
         containerView.addSubview(host)
         preferredContentSize = size
+
+        // The accessory is attached before the window registers its context,
+        // so bind again whenever the window or the registered contexts change.
+        containerView.onWindowChange = { [weak self] _ in self?.bindRightSidebarState() }
+        contextsObserver = NotificationCenter.default.addObserver(
+            forName: .mainWindowContextsDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.bindRightSidebarState() }
+        }
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    deinit {
+        if let contextsObserver {
+            NotificationCenter.default.removeObserver(contextsObserver)
+        }
+    }
+
+    private func bindRightSidebarState() {
+        rightSidebarToggle.bind(to: resolveRightSidebarState(view.window))
+    }
 
     /// The hosted view (tests read which buttons it shows).
     var rootView: ShellXTitlebarView { hostingView.rootView }

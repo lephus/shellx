@@ -65,9 +65,12 @@ tmp-*/
 .iter-logs/
 .claude/worktrees/
 .claude/scheduled_tasks.lock
+.superpowers/
+.vscode/
 
 # Local dogfood scratch (screenshots, recordings) — never commit
 artifacts/
+docs/superpowers/design/*/dogfood/
 !Packages/Shared/CmuxAgentChat/Sources/CmuxAgentChat/Artifacts/
 !Packages/Shared/CmuxAgentChat/Sources/CmuxAgentChat/Artifacts/*.swift
 !Packages/iOS/CmuxAgentChatUI/Sources/CmuxAgentChatUI/Artifacts/

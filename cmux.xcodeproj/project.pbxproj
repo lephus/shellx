@@ -3365,6 +3365,8 @@
 		5E13C3000000000000000011 /* ShellXRemoteUI in Frameworks */ = {isa = PBXBuildFile; productRef = 5E13C3000000000000000010 /* ShellXRemoteUI */; };
 		1DD66080021B6033F57D2308 /* ShellXRemoteUIActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2BD91002A2294345F3973E1 /* ShellXRemoteUIActions.swift */; };
 		6CDDB319FED107C3EB57AE87 /* ShellXRemoteUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0766083F21AAC8FF1BDCB01C /* ShellXRemoteUITests.swift */; };
+		A6735381B899552E82D7882B /* ShellXRightSidebarToggleModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9F24AF0CF6FD3732C011F10 /* ShellXRightSidebarToggleModel.swift */; };
+		C85C042A4E1AC2D4ECE542E0 /* ShellXRightSidebarToggleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FADEED3C5521B4E67FD1D5 /* ShellXRightSidebarToggleTests.swift */; };
 		11B15420CEF0E98F12AC4F48 /* ShellXSelectionTint+Sidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12B4554514B5F90C4DA750E3 /* ShellXSelectionTint+Sidebar.swift */; };
 		7FE3DBDC782F741D0908C14A /* ShellXShareController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28727A245A45CE6FF2F3B847 /* ShellXShareController.swift */; };
 		0EBF253D2B12A5B1950B96F2 /* ShellXSharePopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F87374CBE57AAC30DC9F08 /* ShellXSharePopover.swift */; };
@@ -7962,6 +7964,8 @@
 		5223C753F4D56F05A0A0B6B0 /* ShellXRemoteServicing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/UI/ShellXRemoteServicing.swift; sourceTree = "<group>"; };
 		A2BD91002A2294345F3973E1 /* ShellXRemoteUIActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/UI/ShellXRemoteUIActions.swift; sourceTree = "<group>"; };
 		0766083F21AAC8FF1BDCB01C /* ShellXRemoteUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXRemoteUITests.swift"; sourceTree = "<group>"; };
+		D9F24AF0CF6FD3732C011F10 /* ShellXRightSidebarToggleModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Titlebar/ShellXRightSidebarToggleModel.swift; sourceTree = "<group>"; };
+		10FADEED3C5521B4E67FD1D5 /* ShellXRightSidebarToggleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXRightSidebarToggleTests.swift"; sourceTree = "<group>"; };
 		12B4554514B5F90C4DA750E3 /* ShellXSelectionTint+Sidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sidebar/ShellXSelectionTint+Sidebar.swift"; sourceTree = "<group>"; };
 		28727A245A45CE6FF2F3B847 /* ShellXShareController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Share/ShellXShareController.swift; sourceTree = "<group>"; };
 		86F87374CBE57AAC30DC9F08 /* ShellXSharePopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Share/ShellXSharePopover.swift; sourceTree = "<group>"; };
@@ -12503,6 +12507,7 @@
 				1DEC713FB4C2B0E10B69BEBA /* SidebarRowNameEffectPresenter.swift */,
 				E7612DBD8DEC65587094FBA8 /* AgentNameEffect+TabActivity.swift */,
 				1873422115023A417824115F /* AgentNameEffectSource.swift */,
+				D9F24AF0CF6FD3732C011F10 /* ShellXRightSidebarToggleModel.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -14095,6 +14100,7 @@
 				1575D951D11F58C68DA2F2A8 /* ShellXAgentActivityTests.swift */,
 				0086129B06987F4A5CC88A52 /* ShellXTabActivitySyncTests.swift */,
 				2451C5736A08D634760946D2 /* ShellXSidebarNameEffectTests.swift */,
+				10FADEED3C5521B4E67FD1D5 /* ShellXRightSidebarToggleTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -16748,6 +16754,7 @@
 				506D3B28A199B87AE7D9FB1C /* ShellXRemoteService+App.swift in Sources */,
 				4B8B64A3E7AC76B5D2FF9F2D /* ShellXRemoteServicing.swift in Sources */,
 				1DD66080021B6033F57D2308 /* ShellXRemoteUIActions.swift in Sources */,
+				A6735381B899552E82D7882B /* ShellXRightSidebarToggleModel.swift in Sources */,
 				11B15420CEF0E98F12AC4F48 /* ShellXSelectionTint+Sidebar.swift in Sources */,
 				7FE3DBDC782F741D0908C14A /* ShellXShareController.swift in Sources */,
 				0EBF253D2B12A5B1950B96F2 /* ShellXSharePopover.swift in Sources */,
@@ -19101,6 +19108,7 @@
 				068517128CB0B3002C263E47 /* ShellXNoPhoneHomeTests.swift in Sources */,
 				7413037583554EAA6E41D32F /* ShellXPathsTests.swift in Sources */,
 				6CDDB319FED107C3EB57AE87 /* ShellXRemoteUITests.swift in Sources */,
+				C85C042A4E1AC2D4ECE542E0 /* ShellXRightSidebarToggleTests.swift in Sources */,
 				FA7DD6E004CD07E9E7CE313D /* ShellXShareTests.swift in Sources */,
 				3065388AAFB47F2F3B52D356 /* ShellXSidebarNameEffectTests.swift in Sources */,
 				60C4D402ECE7067826019E69 /* ShellXSidebarSelectionTests.swift in Sources */,
