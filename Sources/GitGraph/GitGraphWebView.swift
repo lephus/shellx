@@ -27,7 +27,6 @@ struct GitGraphWebView: NSViewRepresentable {
     final class Coordinator: NSObject, WKScriptMessageHandlerWithReply, WKNavigationDelegate {
         private(set) var controller: GitGraphController
         private weak var webView: WKWebView?
-        private var trustedShellURL: URL?
 
         init(controller: GitGraphController) {
             self.controller = controller
@@ -35,15 +34,17 @@ struct GitGraphWebView: NSViewRepresentable {
 
         func makeWebView() -> WKWebView {
             let configuration = WKWebViewConfiguration()
+            // The page and its module scripts come from the bundle through this
+            // scheme, which also inflates the scripts the build deflated.
+            configuration.setURLSchemeHandler(
+                GitGraphURLSchemeHandler(),
+                forURLScheme: GitGraphURLSchemeHandler.scheme
+            )
             configuration.userContentController.addScriptMessageHandler(
                 self,
                 contentWorld: .page,
                 name: GitGraphBridgeContract.handlerName
             )
-            // The bundled page is a module script loaded from a file URL. WebKit blocks
-            // those as cross-origin unless file-to-file access is allowed. Navigation is
-            // limited to the trusted shell, and the page renders repository text as text.
-            configuration.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
             let webView = WKWebView(frame: .zero, configuration: configuration)
             webView.setValue(false, forKey: "drawsBackground")
             webView.allowsBackForwardNavigationGestures = false
@@ -74,7 +75,6 @@ struct GitGraphWebView: NSViewRepresentable {
             )
             webView.navigationDelegate = nil
             self.webView = nil
-            trustedShellURL = nil
         }
 
         // MARK: Bridge
@@ -86,7 +86,7 @@ struct GitGraphWebView: NSViewRepresentable {
         ) {
             let controller = controller
             guard message.frameInfo.isMainFrame,
-                  Self.isShellDocument(message.frameInfo.request.url, trustedShellURL: trustedShellURL) else {
+                  GitGraphURLSchemeHandler.isShellDocument(message.frameInfo.request.url) else {
                 let message = "Requests are accepted only from the Git Graph page."
                 replyHandler(controller.errorReply(code: .notAllowed, message: message), nil)
                 return
@@ -108,7 +108,8 @@ struct GitGraphWebView: NSViewRepresentable {
             decidePolicyFor navigationAction: WKNavigationAction,
             decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
         ) {
-            let isShell = Self.isShellDocument(navigationAction.request.url, trustedShellURL: trustedShellURL)
+            // Only the page itself and its in-page fragments; everything else is cancelled.
+            let isShell = GitGraphURLSchemeHandler.isShellDocument(navigationAction.request.url)
             decisionHandler(isShell ? .allow : .cancel)
         }
 
@@ -126,19 +127,6 @@ struct GitGraphWebView: NSViewRepresentable {
         }
 #endif
 
-        /// True for the bundled page itself and for in-page fragments of it.
-        nonisolated static func isShellDocument(_ url: URL?, trustedShellURL: URL?) -> Bool {
-            if AgentSessionWebRendererCoordinator.isTrustedShellURL(url, expected: trustedShellURL) {
-                return true
-            }
-            guard let url, url.fragment != nil,
-                  var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-                return false
-            }
-            components.fragment = nil
-            return AgentSessionWebRendererCoordinator.isTrustedShellURL(components.url, expected: trustedShellURL)
-        }
-
         // MARK: Private
 
         private func connect(_ controller: GitGraphController) {
@@ -153,13 +141,7 @@ struct GitGraphWebView: NSViewRepresentable {
         }
 
         private func loadShell() {
-            guard let webView, let resourceURL = Bundle.main.resourceURL else { return }
-            let shellURL = resourceURL.appendingPathComponent(
-                "markdown-viewer/webviews-app/git-graph.html",
-                isDirectory: false
-            )
-            trustedShellURL = shellURL
-            webView.loadFileURL(shellURL, allowingReadAccessTo: resourceURL)
+            webView?.load(URLRequest(url: GitGraphURLSchemeHandler.shellURL))
         }
 
         private func send(_ event: [String: Any]) {

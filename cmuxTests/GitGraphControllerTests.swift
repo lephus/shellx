@@ -284,17 +284,23 @@ final class GitGraphControllerTests: XCTestCase {
     }
 
     func testShellDocumentCheckAllowsOnlyThePageAndItsFragments() throws {
-        let shell = URL(fileURLWithPath: "/tmp/shellx-bundle/markdown-viewer/webviews-app/git-graph.html")
-        let fragment = try XCTUnwrap(URL(string: shell.absoluteString + "#commit"))
-        let sibling = shell.deletingLastPathComponent().appendingPathComponent("agent-session.html")
-        let isShell = GitGraphWebView.Coordinator.isShellDocument
+        let shell = GitGraphURLSchemeHandler.shellURL
+        let isShell = GitGraphURLSchemeHandler.isShellDocument
 
-        XCTAssertTrue(isShell(shell, shell))
-        XCTAssertTrue(isShell(fragment, shell))
-        XCTAssertFalse(isShell(sibling, shell))
-        XCTAssertFalse(isShell(URL(string: "https://example.com/git-graph.html"), shell))
-        XCTAssertFalse(isShell(nil, shell))
-        XCTAssertFalse(isShell(shell, nil))
+        XCTAssertEqual(shell.absoluteString, "shellx-git-graph://app/git-graph.html")
+        XCTAssertTrue(isShell(shell))
+        XCTAssertTrue(isShell(URL(string: "shellx-git-graph://app/git-graph.html#commit")))
+        XCTAssertTrue(isShell(URL(string: "shellx-git-graph://app/git-graph.html#")))
+        XCTAssertFalse(isShell(URL(string: "shellx-git-graph://app/agent-session.html")))
+        XCTAssertFalse(isShell(URL(string: "shellx-git-graph://app/main.mjs")))
+        XCTAssertFalse(isShell(URL(string: "shellx-git-graph://app/chunks/../git-graph.html")))
+        XCTAssertFalse(isShell(URL(string: "shellx-git-graph://app/git-graph.html?x=1")))
+        XCTAssertFalse(isShell(URL(string: "shellx-git-graph://other/git-graph.html")))
+        XCTAssertFalse(isShell(URL(string: "shellx-git-graph://app:8080/git-graph.html")))
+        XCTAssertFalse(isShell(URL(string: "shellx-git-graph://user@app/git-graph.html")))
+        XCTAssertFalse(isShell(URL(string: "https://app/git-graph.html")))
+        XCTAssertFalse(isShell(URL(fileURLWithPath: "/tmp/shellx-bundle/markdown-viewer/webviews-app/git-graph.html")))
+        XCTAssertFalse(isShell(nil))
     }
 
     // MARK: Helpers

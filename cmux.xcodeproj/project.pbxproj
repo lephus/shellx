@@ -2330,11 +2330,14 @@
 		C5529076ED7E72B7B02EAFFC /* GitGraphControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 966F3E99DEA29C58FFB6862C /* GitGraphControllerTests.swift */; };
 		9DCA7223004B7053CB91ED0A /* GitGraphDiffOpenerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24E01BDDAF6FEE0350738B78 /* GitGraphDiffOpenerTests.swift */; };
 		2C9A617CB2735BA37A425784 /* GitGraphLabels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A197BF2245EF3DCC5F4C8810 /* GitGraphLabels.swift */; };
+		8155AA677B4C092CF20F36C6 /* GitGraphPageAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B07472215FBD3C09DF7A20D8 /* GitGraphPageAssets.swift */; };
 		71B7E61CD72B4B4DB1E18946 /* GitGraphPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6110FED3503578779DF387D1 /* GitGraphPanelView.swift */; };
 		A1A4136F8F2B8CE8D3B2AF9B /* GitGraphRepositoryTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7362C4D6415DFF961A0A150 /* GitGraphRepositoryTracker.swift */; };
 		47B6DA3227200EDE26DD0E8D /* GitGraphRightSidebarModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73FF3E4FA9971857D3B73D55 /* GitGraphRightSidebarModeTests.swift */; };
 		97595850729A3B336FEAA828 /* GitGraphTargetingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9210AAE5BB1AE934F93161C2 /* GitGraphTargetingTests.swift */; };
 		11209F497B4FC30BB5D55854 /* GitGraphTargetPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 080A612C9C49F97ACE533BB9 /* GitGraphTargetPolicy.swift */; };
+		3E5151FDBBB81473CC800E53 /* GitGraphURLSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFAEAB391E70CE264E969FCB /* GitGraphURLSchemeHandler.swift */; };
+		BC75054AC64835D84124C8B7 /* GitGraphURLSchemeHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEFB5C9D875DCD4195AB8E21 /* GitGraphURLSchemeHandlerTests.swift */; };
 		11F671A3D5BF4B05AFCA2753 /* GitGraphWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01F0BD3DD58C48F7EF443CBF /* GitGraphWebView.swift */; };
 		FE001106 /* GitStatusProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE001006 /* GitStatusProvider.swift */; };
 		2ECC1D8069E0AED4557E0950 /* GlobalSearchCoordinator+Debug.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43F8CFB1AFABB4807FA907E3 /* GlobalSearchCoordinator+Debug.swift */; };
@@ -6968,11 +6971,14 @@
 		966F3E99DEA29C58FFB6862C /* GitGraphControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GitGraphControllerTests.swift"; sourceTree = "<group>"; };
 		24E01BDDAF6FEE0350738B78 /* GitGraphDiffOpenerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GitGraphDiffOpenerTests.swift"; sourceTree = "<group>"; };
 		A197BF2245EF3DCC5F4C8810 /* GitGraphLabels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitGraph/GitGraphLabels.swift; sourceTree = "<group>"; };
+		B07472215FBD3C09DF7A20D8 /* GitGraphPageAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitGraph/GitGraphPageAssets.swift; sourceTree = "<group>"; };
 		6110FED3503578779DF387D1 /* GitGraphPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitGraph/GitGraphPanelView.swift; sourceTree = "<group>"; };
 		D7362C4D6415DFF961A0A150 /* GitGraphRepositoryTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitGraph/GitGraphRepositoryTracker.swift; sourceTree = "<group>"; };
 		73FF3E4FA9971857D3B73D55 /* GitGraphRightSidebarModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GitGraphRightSidebarModeTests.swift"; sourceTree = "<group>"; };
 		9210AAE5BB1AE934F93161C2 /* GitGraphTargetingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GitGraphTargetingTests.swift"; sourceTree = "<group>"; };
 		080A612C9C49F97ACE533BB9 /* GitGraphTargetPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitGraph/GitGraphTargetPolicy.swift; sourceTree = "<group>"; };
+		BFAEAB391E70CE264E969FCB /* GitGraphURLSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitGraph/GitGraphURLSchemeHandler.swift; sourceTree = "<group>"; };
+		DEFB5C9D875DCD4195AB8E21 /* GitGraphURLSchemeHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GitGraphURLSchemeHandlerTests.swift"; sourceTree = "<group>"; };
 		01F0BD3DD58C48F7EF443CBF /* GitGraphWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitGraph/GitGraphWebView.swift; sourceTree = "<group>"; };
 		FE001006 /* GitStatusProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitStatusProvider.swift; sourceTree = "<group>"; };
 		43F8CFB1AFABB4807FA907E3 /* GlobalSearchCoordinator+Debug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Search/GlobalSearchCoordinator+Debug.swift"; sourceTree = "<group>"; };
@@ -12540,6 +12546,8 @@
 				D7362C4D6415DFF961A0A150 /* GitGraphRepositoryTracker.swift */,
 				6110FED3503578779DF387D1 /* GitGraphPanelView.swift */,
 				122F5C308793117F982DC5AA /* AppDelegate+GitGraphDiff.swift */,
+				B07472215FBD3C09DF7A20D8 /* GitGraphPageAssets.swift */,
+				BFAEAB391E70CE264E969FCB /* GitGraphURLSchemeHandler.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -14137,6 +14145,7 @@
 				966F3E99DEA29C58FFB6862C /* GitGraphControllerTests.swift */,
 				9210AAE5BB1AE934F93161C2 /* GitGraphTargetingTests.swift */,
 				24E01BDDAF6FEE0350738B78 /* GitGraphDiffOpenerTests.swift */,
+				DEFB5C9D875DCD4195AB8E21 /* GitGraphURLSchemeHandlerTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -16162,9 +16171,11 @@
 				20804F0602EFDC9788A7FA2A /* GitGraphBridgeContract.swift in Sources */,
 				3E8A57BFBD3E1FB6F612AC66 /* GitGraphController.swift in Sources */,
 				2C9A617CB2735BA37A425784 /* GitGraphLabels.swift in Sources */,
+				8155AA677B4C092CF20F36C6 /* GitGraphPageAssets.swift in Sources */,
 				71B7E61CD72B4B4DB1E18946 /* GitGraphPanelView.swift in Sources */,
 				A1A4136F8F2B8CE8D3B2AF9B /* GitGraphRepositoryTracker.swift in Sources */,
 				11209F497B4FC30BB5D55854 /* GitGraphTargetPolicy.swift in Sources */,
+				3E5151FDBBB81473CC800E53 /* GitGraphURLSchemeHandler.swift in Sources */,
 				11F671A3D5BF4B05AFCA2753 /* GitGraphWebView.swift in Sources */,
 				FE001106 /* GitStatusProvider.swift in Sources */,
 				2ECC1D8069E0AED4557E0950 /* GlobalSearchCoordinator+Debug.swift in Sources */,
@@ -18835,6 +18846,7 @@
 				9DCA7223004B7053CB91ED0A /* GitGraphDiffOpenerTests.swift in Sources */,
 				47B6DA3227200EDE26DD0E8D /* GitGraphRightSidebarModeTests.swift in Sources */,
 				97595850729A3B336FEAA828 /* GitGraphTargetingTests.swift in Sources */,
+				BC75054AC64835D84124C8B7 /* GitGraphURLSchemeHandlerTests.swift in Sources */,
 				8561A0018561A0018561A001 /* GlobalSearchInputOwnershipTests.swift in Sources */,
 				3865A0113865A0113865A011 /* GlobalSearchPaletteModelTests.swift in Sources */,
 				D5AAB5856FF095F610EB565A /* GlobalSearchShortcutBehaviorTests.swift in Sources */,
