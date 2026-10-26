@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Git Graph: chỗ đặt</title>
+<style>body{margin:0;padding:24px;background:#0b0716;color:#cdc7e0;font-family:-apple-system,BlinkMacSystemFont,sans-serif}h2,h3{color:#e6e2f2}.subtitle{color:#8a83a6}.options{display:flex;gap:12px;flex-wrap:wrap}.option{flex:1;min-width:220px;border:1px solid #2a2145;border-radius:8px;padding:10px 12px}.letter{font-weight:700;color:#93c5fd}.option h3{margin:4px 0}code{color:#93c5fd}</style>
+<script>function toggleSelect(){}</script></head><body>
+<style>
+  .gg { --bg:#0b0716; --panel:#100b1d; --raise:#171128; --line:#211a37; --border:#2a2145;
+        --text:#cdc7e0; --hi:#e6e2f2; --muted:#8a83a6; --pri:#60a5fa; --priText:#93c5fd;
+        font: 12.5px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; color:var(--text); }
+  .gg-win { background:var(--bg); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .gg-titlebar { height:30px; display:flex; align-items:center; gap:7px; padding:0 12px; background:var(--panel); border-bottom:1px solid var(--line); }
+  .gg-dot { width:11px; height:11px; border-radius:50%; background:#3a3252; }
+  .gg-tabs { display:flex; gap:2px; margin-left:16px; }
+  .gg-tab { padding:5px 12px; border-radius:6px 6px 0 0; color:var(--muted); font-size:12px; }
+  .gg-tab.on { background:var(--bg); color:var(--hi); border:1px solid var(--line); border-bottom-color:var(--bg); }
+  .gg-term { font:12px/1.5 "SF Mono", Menlo, monospace; color:#9d97b8; padding:12px 14px; }
+  .gg-term b { color:var(--hi); font-weight:500; }
+  .gg-bar { display:flex; align-items:center; gap:10px; padding:7px 10px; border-bottom:1px solid var(--line); background:var(--panel); font-size:12px; }
+  .gg-select { border:1px solid var(--border); border-radius:6px; padding:2px 8px; color:var(--hi); background:var(--raise); }
+  .gg-icon { color:var(--muted); font-size:13px; }
+  .gg-spacer { flex:1; }
+  .gg-list { display:flex; }
+  .gg-graph { flex:none; }
+  .gg-rows { flex:1; min-width:0; }
+  .gg-row { height:26px; display:flex; align-items:center; gap:8px; padding-right:10px; white-space:nowrap; border-bottom:1px solid rgba(255,255,255,0.02); }
+  .gg-row.sel { background:rgba(96,165,250,0.13); }
+  .gg-msg { overflow:hidden; text-overflow:ellipsis; color:var(--hi); flex:1; min-width:0; }
+  .gg-merge .gg-msg { color:var(--muted); }
+  .gg-meta { color:var(--muted); font-size:11.5px; flex:none; }
+  .gg-hash { font:11.5px "SF Mono", Menlo, monospace; color:var(--muted); flex:none; }
+  .chip { flex:none; font-size:11px; padding:0 6px; border-radius:5px; line-height:17px; border:1px solid; }
+  .chip.local { color:var(--priText); background:rgba(96,165,250,0.12); border-color:rgba(96,165,250,0.45); }
+  .chip.head  { color:#0b0716; background:#93c5fd; border-color:#93c5fd; font-weight:600; }
+  .chip.remote{ color:#c4b5fd; background:rgba(196,181,253,0.08); border-color:rgba(196,181,253,0.35); }
+  .chip.tag   { color:#e8c468; background:rgba(232,196,104,0.10); border-color:rgba(232,196,104,0.40); }
+  .gg-detail { border-top:1px solid var(--border); background:var(--panel); padding:10px 12px; }
+  .gg-detail h4 { margin:0 0 4px; color:var(--hi); font-size:12.5px; font-weight:600; }
+  .gg-file { display:flex; gap:8px; align-items:center; padding:3px 0; font:12px "SF Mono", Menlo, monospace; }
+  .gg-file .st { color:#e8c468; width:12px; }
+  .gg-file .add { color:#6fd49a; } .gg-file .del { color:#e88a8a; }
+  .gg-file .name { color:var(--priText); }
+  .gg-th { display:flex; height:26px; align-items:center; gap:8px; padding-right:10px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11.5px; font-weight:600; background:var(--panel); }
+  .gg-cap { color:var(--muted); font-size:12px; margin:8px 0 18px; }
+</style>
+
+<h2>Đặt Git Graph ở đâu?</h2>
+<p class="subtitle">Dữ liệu trong mockup là lịch sử thật của repo ShellX (nhánh develop). Chỉ xem, không có nút thao tác git.</p>
+
+<!-- ========== A: right sidebar tab ========== -->
+<h3>A. Một tab "Git" trong sidebar phải (⌘⌥B)</h3>
+<div class="gg gg-win">
+  <div class="gg-titlebar"><span class="gg-dot"></span><span class="gg-dot"></span><span class="gg-dot"></span>
+    <div class="gg-tabs"><span class="gg-tab on">zsh — shellx</span></div></div>
+  <div style="display:flex; min-height:470px;">
+    <div class="gg-term" style="flex:1;">
+      <div>lehuuphu@PhuLes-MacBook-Pro shellx % <b>git status</b></div>
+      <div>On branch develop</div>
+      <div>Your branch is up to date with 'origin/develop'.</div>
+      <div>&nbsp;</div>
+      <div>nothing to commit, working tree clean</div>
+      <div>lehuuphu@PhuLes-MacBook-Pro shellx % <b>▌</b></div>
+    </div>
+    <div style="width:390px; border-left:1px solid var(--border); background:var(--bg); display:flex; flex-direction:column;">
+      <div class="gg-bar" style="gap:14px;">
+        <span class="gg-icon">Files</span><span class="gg-icon">Find</span><span class="gg-icon">Vault</span>
+        <span style="color:var(--hi); border-bottom:2px solid var(--pri); padding-bottom:2px;">Git</span>
+      </div>
+      <div class="gg-bar"><span class="gg-select">All branches ▾</span><span class="gg-spacer"></span><span class="gg-icon">⌕</span><span class="gg-icon">↻</span><span class="gg-icon" title="Open as tab">⤢</span></div>
+      <div class="gg-list" style="flex:1;">
+        <svg class="gg-graph" width="58" height="312" viewBox="0 0 58 312">
+          <path d="M14 13 V299" stroke="#60a5fa" stroke-width="2" fill="none"/>
+          <path d="M30 65 V221" stroke="#c4b5fd" stroke-width="2" fill="none"/>
+          <path d="M30 65 C30 52, 14 52, 14 39" stroke="#c4b5fd" stroke-width="2" fill="none"/>
+          <path d="M30 221 C30 208, 14 208, 14 195" stroke="#c4b5fd" stroke-width="2" fill="none"/>
+          <path d="M30 221 C30 270, 14 270, 14 299" stroke="#c4b5fd" stroke-width="2" fill="none"/>
+          <path d="M14 169 C14 156, 30 156, 30 143" stroke="#60a5fa" stroke-width="2" fill="none"/>
+          <path d="M30 143 C30 130, 46 130, 46 117" stroke="#6fd49a" stroke-width="2" fill="none"/>
+          <path d="M46 117 C46 104, 30 104, 30 91" stroke="#6fd49a" stroke-width="2" fill="none"/>
+          <circle cx="14" cy="13" r="5" fill="#0b0716" stroke="#60a5fa" stroke-width="2.5"/>
+          <g stroke="#0b0716" stroke-width="2">
+          <circle cx="14" cy="39" r="4.5" fill="#60a5fa"/><circle cx="30" cy="65" r="4.5" fill="#c4b5fd"/>
+          <circle cx="30" cy="91" r="4.5" fill="#c4b5fd"/><circle cx="46" cy="117" r="4.5" fill="#6fd49a"/>
+          <circle cx="30" cy="143" r="4.5" fill="#c4b5fd"/><circle cx="14" cy="169" r="4.5" fill="#60a5fa"/>
+          <circle cx="14" cy="195" r="4.5" fill="#60a5fa"/><circle cx="30" cy="221" r="4.5" fill="#c4b5fd"/>
+          <circle cx="14" cy="247" r="4.5" fill="#60a5fa"/><circle cx="14" cy="273" r="4.5" fill="#60a5fa"/>
+          <circle cx="14" cy="299" r="4.5" fill="#60a5fa"/></g>
+        </svg>
+        <div class="gg-rows">
+          <div class="gg-row sel"><span class="chip head">develop</span><span class="gg-msg">feat(cli): ShellX branding for the…</span><span class="gg-meta">1h</span></div>
+          <div class="gg-row gg-merge"><span class="gg-msg">Merge main into develop: ShellX 1.3.1…</span><span class="gg-meta">1h</span></div>
+          <div class="gg-row"><span class="chip remote">origin/main</span><span class="gg-msg">feat(web): download ShellX 1.3.1…</span><span class="gg-meta">2h</span></div>
+          <div class="gg-row gg-merge"><span class="gg-msg">Merge pull request #5 from lephus/…</span><span class="gg-meta">2h</span></div>
+          <div class="gg-row"><span class="chip remote">release/1.3.1</span><span class="gg-msg">build(shellx): ShellX 1.3.1 (build…</span><span class="gg-meta">3h</span></div>
+          <div class="gg-row gg-merge"><span class="gg-msg">Merge pull request #4 from lephus/…</span><span class="gg-meta">3h</span></div>
+          <div class="gg-row"><span class="gg-msg">test(shellx): the titlebar string guard…</span><span class="gg-meta">3h</span></div>
+          <div class="gg-row gg-merge"><span class="gg-msg">Merge main into develop: ShellX 1.3.0…</span><span class="gg-meta">3h</span></div>
+          <div class="gg-row"><span class="gg-msg">feat(web): download ShellX 1.3.0…</span><span class="gg-meta">3h</span></div>
+          <div class="gg-row"><span class="gg-msg">fix(reload): resource bundles in a…</span><span class="gg-meta">2d</span></div>
+          <div class="gg-row"><span class="gg-msg">feat(shellx): a title bar button opens…</span><span class="gg-meta">2d</span></div>
+          <div class="gg-row gg-merge"><span class="chip local">main</span><span class="chip tag">v1.3.0</span><span class="gg-msg">Merge pull request #3…</span><span class="gg-meta">2d</span></div>
+        </div>
+      </div>
+      <div class="gg-detail">
+        <h4>feat(cli): ShellX branding for the terminal welcome banner</h4>
+        <div class="gg-meta" style="margin-bottom:6px;">8429ad9 · Phu.le · 26 Oct 11:52</div>
+        <div class="gg-file"><span class="st">M</span><span class="name">CLI/cmux.swift</span><span class="add">+17</span><span class="del">−18</span></div>
+        <div class="gg-file"><span class="st">M</span><span class="name">tests_v2/test_cli_global…</span><span class="add">+1</span><span class="del">−1</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="gg-cap">Mở bằng ⌘⌥B rồi chọn tab Git, cạnh Files / Find. Sidebar hẹp nên mỗi dòng chỉ có graph, branch, message và thời gian. Bấm commit thì danh sách file hiện ở dưới; bấm file thì mở diff ở pane bên cạnh. Nút ⤢ mở thành tab lớn (kiểu B).</p>
+
+<!-- ========== B: workspace tab ========== -->
+<h3>B. Một tab riêng "Git Graph" trong workspace (giống extension VS Code)</h3>
+<div class="gg gg-win">
+  <div class="gg-titlebar"><span class="gg-dot"></span><span class="gg-dot"></span><span class="gg-dot"></span>
+    <div class="gg-tabs"><span class="gg-tab">zsh — shellx</span><span class="gg-tab on">⑂ Git Graph &nbsp;✕</span></div></div>
+  <div class="gg-bar"><span>Branches:</span><span class="gg-select">Show All ▾</span><span>☑ Show remote branches</span><span class="gg-spacer"></span><span class="gg-icon">⌕</span><span class="gg-icon">↻</span></div>
+  <div class="gg-th"><span style="width:58px; padding-left:8px;">Graph</span><span style="flex:1;">Description</span><span style="width:110px;">Date</span><span style="width:96px;">Author</span><span style="width:70px;">Commit</span></div>
+  <div class="gg-list">
+    <svg class="gg-graph" width="58" height="312" viewBox="0 0 58 312">
+      <path d="M14 13 V299" stroke="#60a5fa" stroke-width="2" fill="none"/>
+      <path d="M30 65 V221" stroke="#c4b5fd" stroke-width="2" fill="none"/>
+      <path d="M30 65 C30 52, 14 52, 14 39" stroke="#c4b5fd" stroke-width="2" fill="none"/>
+      <path d="M30 221 C30 208, 14 208, 14 195" stroke="#c4b5fd" stroke-width="2" fill="none"/>
+      <path d="M30 221 C30 270, 14 270, 14 299" stroke="#c4b5fd" stroke-width="2" fill="none"/>
+      <path d="M14 169 C14 156, 30 156, 30 143" stroke="#60a5fa" stroke-width="2" fill="none"/>
+      <path d="M30 143 C30 130, 46 130, 46 117" stroke="#6fd49a" stroke-width="2" fill="none"/>
+      <path d="M46 117 C46 104, 30 104, 30 91" stroke="#6fd49a" stroke-width="2" fill="none"/>
+      <circle cx="14" cy="13" r="5" fill="#0b0716" stroke="#60a5fa" stroke-width="2.5"/>
+      <g stroke="#0b0716" stroke-width="2">
+      <circle cx="14" cy="39" r="4.5" fill="#60a5fa"/><circle cx="30" cy="65" r="4.5" fill="#c4b5fd"/>
+      <circle cx="30" cy="91" r="4.5" fill="#c4b5fd"/><circle cx="46" cy="117" r="4.5" fill="#6fd49a"/>
+      <circle cx="30" cy="143" r="4.5" fill="#c4b5fd"/><circle cx="14" cy="169" r="4.5" fill="#60a5fa"/>
+      <circle cx="14" cy="195" r="4.5" fill="#60a5fa"/><circle cx="30" cy="221" r="4.5" fill="#c4b5fd"/>
+      <circle cx="14" cy="247" r="4.5" fill="#60a5fa"/><circle cx="14" cy="273" r="4.5" fill="#60a5fa"/>
+      <circle cx="14" cy="299" r="4.5" fill="#60a5fa"/></g>
+    </svg>
+    <div class="gg-rows">
+      <div class="gg-row sel"><span class="chip head">develop</span><span class="chip remote">origin</span><span class="gg-msg">feat(cli): ShellX branding for the terminal welcome banner</span><span class="gg-meta" style="width:110px;">26 Oct 11:52</span><span class="gg-meta" style="width:96px;">Phu.le</span><span class="gg-hash" style="width:70px;">8429ad9</span></div>
+      <div class="gg-row gg-merge"><span class="gg-msg">Merge main into develop: ShellX 1.3.1 release</span><span class="gg-meta" style="width:110px;">26 Oct 11:24</span><span class="gg-meta" style="width:96px;">Phu.le</span><span class="gg-hash" style="width:70px;">485c25a</span></div>
+      <div class="gg-row"><span class="chip remote">origin/main</span><span class="gg-msg">feat(web): download ShellX 1.3.1; relay announces 1.3.1 to desktop apps</span><span class="gg-meta" style="width:110px;">26 Oct 10:40</span><span class="gg-meta" style="width:96px;">Phu.le</span><span class="gg-hash" style="width:70px;">fb4539e</span></div>
+      <div class="gg-row gg-merge"><span class="gg-msg">Merge pull request #5 from lephus/release/1.3.1</span><span class="gg-meta" style="width:110px;">26 Oct 10:31</span><span class="gg-meta" style="width:96px;">LE HUU PHU</span><span class="gg-hash" style="width:70px;">5c16a52</span></div>
+      <div class="gg-row"><span class="chip remote">origin/release/1.3.1</span><span class="gg-msg">build(shellx): ShellX 1.3.1 (build 114)</span><span class="gg-meta" style="width:110px;">26 Oct 09:58</span><span class="gg-meta" style="width:96px;">Phu.le</span><span class="gg-hash" style="width:70px;">c2dc63e</span></div>
+      <div class="gg-row gg-merge"><span class="gg-msg">Merge pull request #4 from lephus/develop</span><span class="gg-meta" style="width:110px;">26 Oct 09:40</span><span class="gg-meta" style="width:96px;">LE HUU PHU</span><span class="gg-hash" style="width:70px;">d1fa676</span></div>
+      <div class="gg-row"><span class="gg-msg">test(shellx): the titlebar string guard expects the right sidebar button's keys</span><span class="gg-meta" style="width:110px;">26 Oct 09:31</span><span class="gg-meta" style="width:96px;">Phu.le</span><span class="gg-hash" style="width:70px;">0b626ca</span></div>
+      <div class="gg-row gg-merge"><span class="gg-msg">Merge main into develop: ShellX 1.3.0 web and relay pointers</span><span class="gg-meta" style="width:110px;">26 Oct 09:20</span><span class="gg-meta" style="width:96px;">Phu.le</span><span class="gg-hash" style="width:70px;">79a9f3f</span></div>
+      <div class="gg-row"><span class="gg-msg">feat(web): download ShellX 1.3.0; relay announces 1.3.0 to desktop apps</span><span class="gg-meta" style="width:110px;">26 Oct 09:12</span><span class="gg-meta" style="width:96px;">Phu.le</span><span class="gg-hash" style="width:70px;">a211ad8</span></div>
+      <div class="gg-row"><span class="gg-msg">fix(reload): resource bundles in a reload.sh build keep their own bundle IDs</span><span class="gg-meta" style="width:110px;">24 Oct 18:05</span><span class="gg-meta" style="width:96px;">Phu.le</span><span class="gg-hash" style="width:70px;">a2e63ec</span></div>
+      <div class="gg-row"><span class="gg-msg">feat(shellx): a title bar button opens and closes the right sidebar</span><span class="gg-meta" style="width:110px;">24 Oct 16:47</span><span class="gg-meta" style="width:96px;">Phu.le</span><span class="gg-hash" style="width:70px;">ce19e0c</span></div>
+      <div class="gg-row gg-merge"><span class="chip local">main</span><span class="chip tag">shellx-v1.3.0</span><span class="gg-msg">Merge pull request #3 from lephus/release/1.3.0</span><span class="gg-meta" style="width:110px;">24 Oct 15:10</span><span class="gg-meta" style="width:96px;">LE HUU PHU</span><span class="gg-hash" style="width:70px;">0d6c8af</span></div>
+    </div>
+  </div>
+  <div class="gg-detail" style="display:flex; gap:24px;">
+    <div style="flex:1;">
+      <h4>feat(cli): ShellX branding for the terminal welcome banner</h4>
+      <div class="gg-meta">8429ad99e0 · Phu.le &lt;thuyenpham.dev@…&gt; · 26 Oct 2026 11:52</div>
+      <div style="margin-top:6px; color:var(--text);">Draw the ShellX icon (mint "&gt;", lilac "&lt;", mint cursor) instead of the cmux arrow…</div>
+    </div>
+    <div style="flex:1;">
+      <div class="gg-meta" style="margin-bottom:4px;">2 files changed</div>
+      <div class="gg-file"><span class="st">M</span><span class="name">CLI/cmux.swift</span><span class="add">+17</span><span class="del">−18</span></div>
+      <div class="gg-file"><span class="st">M</span><span class="name">tests_v2/test_cli_global_flags_and_v1_error_contract.py</span><span class="add">+1</span><span class="del">−1</span></div>
+    </div>
+  </div>
+</div>
+<p class="gg-cap">Mở như mở một tab mới (command palette, menu, hoặc lệnh <code>shellx git-graph</code>). Rộng nên có đủ cột Date / Author / Commit. Bấm commit thì chi tiết hiện ở dưới; bấm file thì mở diff.</p>
+
+<h3>Bạn chọn hướng nào?</h3>
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content"><h3>Tab trong sidebar phải</h3><p>Xem nhanh cạnh terminal, không chiếm chỗ.</p></div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content"><h3>Tab riêng trong workspace</h3><p>Rộng, đủ cột, giống extension VS Code.</p></div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content"><h3>Cả hai (tôi đề xuất)</h3><p>Cùng một view: ở sidebar thì gọn như A, bấm ⤢ mở thành tab lớn như B. App đã có sẵn cơ chế "mở tab sidebar thành pane", nên làm cả hai gần như không tốn thêm.</p></div>
+  </div>
+</div>
+</body></html>
