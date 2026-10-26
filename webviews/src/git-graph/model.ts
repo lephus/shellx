@@ -21,16 +21,40 @@ export function toRgb(hex: string): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-export function toLogEntries(commits: GitGraphCommit[]): GitLogEntry[] {
+/**
+ * The `branch` of HEAD's entry, and the `currentBranch` passed to `GitLog`.
+ *
+ * react-git-log takes the first entry whose `branch` contains `currentBranch` as
+ * HEAD: that commit gets lane 0 (its first-parent line follows), and the
+ * uncommitted-changes row hangs off it. A `git log --source` name cannot stand in
+ * for HEAD: `origin/main` contains `main`, `develop` contains `dev`, and HEAD's
+ * commit is often reported as reached from another branch. A ref name cannot
+ * contain a space, so no other entry can contain this value. It is never shown:
+ * the rows are ours (`CommitRow`), and `GitLog.Tags`, which prints `branch`, is not used.
+ */
+export const GIT_LOG_HEAD_BRANCH = "shellx HEAD";
+
+export function toLogEntries(commits: GitGraphCommit[], headSha: string | null): GitLogEntry[] {
   return commits.map((c) => ({
     hash: c.sha,
     parents: c.parents,
-    branch: c.source,
+    branch: c.sha === headSha ? GIT_LOG_HEAD_BRANCH : c.source,
     message: c.subject,
     committerDate: c.committerDate,
     authorDate: c.authorDate,
     author: { name: c.authorName, email: c.authorEmail },
   }));
+}
+
+/** The `entries` and `currentBranch` props of `GitLog`, and whether HEAD's commit is among the entries. */
+export type GitLogInputs = { entries: GitLogEntry[]; currentBranch: string; hasHead: boolean };
+
+export function gitLogInputs(commits: GitGraphCommit[], head: GitGraphHead): GitLogInputs {
+  return {
+    entries: toLogEntries(commits, head.sha),
+    currentBranch: GIT_LOG_HEAD_BRANCH,
+    hasHead: head.sha !== null && commits.some((c) => c.sha === head.sha),
+  };
 }
 
 export type RefChip = { label: string; kind: "head" | "local" | "remote" | "tag" };

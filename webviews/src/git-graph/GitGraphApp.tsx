@@ -7,9 +7,9 @@ import { createGitGraphLabelResolver, type GitGraphLabelKey, type GitGraphLabelR
 import {
   GIT_GRAPH_LANE_COLORS,
   findMatches,
+  gitLogInputs,
   layoutFor,
   refChipsByCommit,
-  toLogEntries,
   toRgb,
   type GitGraphLayout,
 } from "./model";
@@ -199,10 +199,13 @@ function HistoryView({ store, state, layout, appearance, label }: HistoryViewPro
     label,
     now,
   };
-  const entries = toLogEntries(state.commits);
+  const { entries, currentBranch, hasHead } = gitLogInputs(state.commits, state.head);
   const headBranchRef = state.head.branch === null ? null : `refs/heads/${state.head.branch}`;
-  // The working-tree row hangs off HEAD, so it only shows when HEAD's branch is in view.
-  const showIndex = isDirty(state.workingTree) && (state.branch === null || state.branch === headBranchRef);
+  // The working-tree row hangs off HEAD, so it only shows when HEAD's branch is in
+  // view and HEAD's commit is loaded. Without that commit there is nothing to hang
+  // it from, yet react-git-log would still reserve an empty graph row for it.
+  const showIndex =
+    isDirty(state.workingTree) && hasHead && (state.branch === null || state.branch === headBranchRef);
   const selectedCommit = state.commits.find((c) => c.sha === state.selectedSha) ?? null;
 
   return (
@@ -243,7 +246,7 @@ function HistoryView({ store, state, layout, appearance, label }: HistoryViewPro
             <GitLog
               key={state.logKey}
               entries={entries}
-              currentBranch={state.head.branch ?? "HEAD"}
+              currentBranch={currentBranch}
               theme={appearance}
               colours={LANE_COLOURS}
               showGitIndex={showIndex}

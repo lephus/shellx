@@ -2,12 +2,14 @@ import { expect, test } from "bun:test";
 import {
   GIT_GRAPH_LANE_COLORS,
   findMatches,
+  gitLogInputs,
   layoutFor,
   mergePage,
   refChipsByCommit,
   toLogEntries,
   toRgb,
   visibleChips,
+  type GitLogInputs,
   type RefChip,
 } from "./model";
 import type { GitGraphCommit, GitGraphPage, GitGraphRef } from "./types";
@@ -36,7 +38,7 @@ test("toRgb converts the lane palette", () => {
 
 test("toLogEntries maps commits and keeps unloaded parents", () => {
   const c = { ...commit("a", "Subject", "Ann", "ann@y.io"), parents: ["zzz"] };
-  expect(toLogEntries([c])).toEqual([
+  expect(toLogEntries([c], "b")).toEqual([
     {
       hash: "a",
       parents: ["zzz"],
@@ -47,6 +49,62 @@ test("toLogEntries maps commits and keeps unloaded parents", () => {
       author: { name: "Ann", email: "ann@y.io" },
     },
   ]);
+});
+
+/**
+ * The commit react-git-log treats as HEAD: the first entry whose `branch`
+ * contains `currentBranch` (`commits.find((t) => t.branch.includes(e.currentBranch))`
+ * in the graph builder, and the same lookup for the uncommitted-changes row).
+ */
+function libraryHead({ entries, currentBranch }: GitLogInputs): string | undefined {
+  return entries.find((entry) => entry.branch.includes(currentBranch))?.hash;
+}
+
+/** Commits newest first, with the `--source` names real git reports for that shape. */
+function shaped(rows: Array<[sha: string, source: string]>): GitGraphCommit[] {
+  return rows.map(([sha, source], index) => ({
+    ...commit(sha),
+    source,
+    parents: index + 1 < rows.length ? [rows[index + 1]![0]] : [],
+  }));
+}
+
+test("HEAD on main with origin/main ahead and another branch at HEAD: the HEAD commit is HEAD", () => {
+  // git log --source reports HEAD's commit as reached from aaa-backup (sorted
+  // before main), and origin/main's tip contains the text "main".
+  const head = { sha: "c3", branch: "main" };
+  const withRemotes = shaped([["c5", "origin/main"], ["c4", "origin/main"], ["c3", "aaa-backup"], ["c2", "aaa-backup"]]);
+  const withoutRemotes = shaped([["c3", "aaa-backup"], ["c2", "aaa-backup"]]);
+  expect(libraryHead(gitLogInputs(withRemotes, head))).toBe("c3");
+  expect(libraryHead(gitLogInputs(withoutRemotes, head))).toBe("c3");
+});
+
+test("a branch whose name contains HEAD's branch name does not take HEAD's place", () => {
+  const dev = shaped([["d1", "develop"], ["c3", "aaa-backup"], ["c2", "aaa-backup"]]);
+  expect(libraryHead(gitLogInputs(dev, { sha: "c3", branch: "dev" }))).toBe("c3");
+  const feat = shaped([["r1", "origin/feat/x"], ["c3", "feat/x"]]);
+  expect(libraryHead(gitLogInputs(feat, { sha: "c3", branch: "feat/x" }))).toBe("c3");
+});
+
+test("a detached HEAD is its own commit, even below a branch named like HEAD", () => {
+  const detached = shaped([["n1", "fix-HEADER"], ["c3", "aaa-backup"], ["c2", "HEAD"], ["c1", "HEAD"]]);
+  expect(libraryHead(gitLogInputs(detached, { sha: "c2", branch: null }))).toBe("c2");
+});
+
+test("only HEAD's entry carries the HEAD marker; the others keep their source", () => {
+  const commits = shaped([["c5", "origin/main"], ["c3", "aaa-backup"]]);
+  const { entries, currentBranch, hasHead } = gitLogInputs(commits, { sha: "c3", branch: "main" });
+  // Ref names cannot contain a space, so no source can contain the marker.
+  expect(currentBranch).toContain(" ");
+  expect(entries.map((entry) => entry.branch)).toEqual(["origin/main", currentBranch]);
+  expect(hasHead).toBe(true);
+  // HEAD's commit not loaded (a branch filter without it): no entry is HEAD, and
+  // the caller must not ask for the uncommitted-changes row.
+  const unloaded = gitLogInputs(commits, { sha: "zz", branch: "main" });
+  expect(unloaded.entries.map((entry) => entry.branch)).toEqual(["origin/main", "aaa-backup"]);
+  expect(libraryHead(unloaded)).toBeUndefined();
+  expect(unloaded.hasHead).toBe(false);
+  expect(gitLogInputs(commits, { sha: null, branch: "main" }).hasHead).toBe(false);
 });
 
 test("refChipsByCommit orders head, local, remote, tag", () => {
