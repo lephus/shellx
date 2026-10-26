@@ -2329,6 +2329,10 @@
       "vi": "English UI or developer term Vietnamese ShellX keeps as-is (glossary: terminal, tab, agent, prompt, commit, branch, fork, log, OK, Cloud VM); the translated entry is still required."
     }
   },
+  "rightSidebar.mode.git": {
+    "class": "brand",
+    "source": "Git"
+  },
   "rightSidebar.mode.machines": {
     "source": "Cloud",
     "identityLocales": {
@@ -6257,6 +6261,46 @@
     "identityLocales": {
       "de": "Skill and Workflow are Claude Code feature names, kept in English in this locale. The translated entry is still required.",
       "vi": "Skill and Workflow are Claude Code feature names, kept in English in this locale. The translated entry is still required."
+    }
+  },
+  "gitGraph.label.searchCount": {
+    "source": "{current}/{total}",
+    "identityLocales": {
+      "de": "Compact match counter made only of the two page placeholders and a slash; it reads the same in this locale.",
+      "fr": "Compact match counter made only of the two page placeholders and a slash; it reads the same in this locale.",
+      "es": "Compact match counter made only of the two page placeholders and a slash; it reads the same in this locale.",
+      "zh-Hant": "Compact match counter made only of the two page placeholders and a slash; it reads the same in this locale.",
+      "zh-Hans": "Compact match counter made only of the two page placeholders and a slash; it reads the same in this locale.",
+      "ko": "Compact match counter made only of the two page placeholders and a slash; it reads the same in this locale.",
+      "ja": "Compact match counter made only of the two page placeholders and a slash; it reads the same in this locale.",
+      "vi": "Compact match counter made only of the two page placeholders and a slash; it reads the same in this locale."
+    }
+  },
+  "gitGraph.label.columnGraph": {
+    "source": "Graph",
+    "identityLocales": {
+      "de": "Graph is the standard German noun for this column heading; a translated entry is still required."
+    }
+  },
+  "gitGraph.label.columnDescription": {
+    "source": "Description",
+    "identityLocales": {
+      "fr": "Description is the standard French noun for this column heading; a translated entry is still required."
+    }
+  },
+  "gitGraph.label.columnDate": {
+    "source": "Date",
+    "identityLocales": {
+      "fr": "Date is the standard French noun for this column heading; a translated entry is still required."
+    }
+  },
+  "gitGraph.label.columnCommit": {
+    "source": "Commit",
+    "identityLocales": {
+      "de": "Established UI or technical term with the same spelling in this locale; a translated entry is still required.",
+      "fr": "Reviewed shared native developer term, abbreviation, or borrowed technical noun. The translated entry is still required.",
+      "es": "Reviewed shared native developer term, abbreviation, or borrowed technical noun. The translated entry is still required.",
+      "vi": "English UI or developer term Vietnamese ShellX keeps as-is (glossary: terminal, tab, agent, prompt, commit, branch, fork, log, OK, Cloud VM); the translated entry is still required."
     }
   }
 }

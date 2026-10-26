@@ -4,6 +4,19 @@ import { defineConfig } from "vite";
 
 const outDir = process.env.CMUX_WEBVIEWS_OUT_DIR ?? "../Resources/markdown-viewer/webviews-app";
 
+const reactGitLogEntry = "/@tomplum/react-git-log/dist/react-git-log.js";
+const reactGitLogCssImport = "import './index.css';";
+// Same shape as installWebviewStyles: a <style> tag carrying the inlined CSS.
+const reactGitLogInlineCss = [
+  "import __shellxReactGitLogCss from './index.css?inline';",
+  "{",
+  '  const style = document.createElement("style");',
+  '  style.dataset.cmuxWebviewStyle = "react-git-log";',
+  "  style.textContent = __shellxReactGitLogCss;",
+  "  document.head.append(style);",
+  "}",
+].join("\n");
+
 export default defineConfig({
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),
@@ -26,6 +39,25 @@ export default defineConfig({
           return { code, map: null, moduleSideEffects: true };
         }
         return null;
+      },
+    },
+    {
+      // react-git-log imports its stylesheet as a side effect. Left alone, Vite
+      // emits it as `assets/*.css`, which the `file://` Git Graph page never
+      // links. Inline it like the surfaces' own `?inline` styles instead. Fail
+      // the build when the import moves, so a library update cannot silently
+      // drop the graph's layout CSS.
+      name: "shellx-react-git-log-inline-css",
+      transform(code, id) {
+        if (!id.endsWith(reactGitLogEntry)) {
+          return null;
+        }
+        if (!code.includes(reactGitLogCssImport)) {
+          this.error(
+            `shellx-react-git-log-inline-css: \`${reactGitLogCssImport}\` not found in ${id}; update the plugin for this react-git-log version.`,
+          );
+        }
+        return { code: code.replace(reactGitLogCssImport, reactGitLogInlineCss), map: null };
       },
     },
   ],
@@ -120,6 +152,17 @@ export default defineConfig({
           }
           if (id.includes("/@pierre/")) {
             return "diff-vendor";
+          }
+          // react-git-log and its dependencies load only with the Git Graph surface.
+          if (
+            id.includes("/@tomplum/") ||
+            id.includes("/@uidotdev/") ||
+            id.includes("/dayjs/") ||
+            id.includes("/fastpriorityqueue/") ||
+            id.includes("/react-tiny-popover/") ||
+            id.includes("/classnames/")
+          ) {
+            return "git-graph-vendor";
           }
           // Framework code both surfaces share. Pinning it to a stable `vendor`
           // chunk name keeps the shared chunk from being renamed (and rehashed)
