@@ -58,4 +58,7 @@ enum GitGraphRepoStatus: String {
     case noDirectory
     case gitUnavailable
     case empty
+    /// The bounded work-tree walk timed out or found the shared runner busy. Never
+    /// sent: `repo.state` answers it with a `timedOut` error, so the page offers Retry.
+    case lookupFailed
 }

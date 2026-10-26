@@ -271,6 +271,27 @@ final class GitGraphTargetingTests: XCTestCase {
         XCTAssertEqual(recorder.invalidations, 0)
     }
 
+    func testFailedFolderCheckShowsFailureAndRetryWalksAgain() async throws {
+        let (a, _) = try makeRepositories()
+        let script = ScriptedWorkTreeRoots([a: [.unavailable, .root(a)]])
+        let controller = GitGraphController(placement: .sidebar, diffOpener: nil)
+        let recorder = EventRecorder(controller)
+        let tracker = GitGraphRepositoryTracker(controller: controller, workTreeRoot: { await script.lookup($0) })
+        tracker.setTarget(.directory(a))
+        await tracker.resolutionTask?.value
+
+        // A walk that timed out or found the runner busy is not "git is missing".
+        let failed = await controller.handle(method: "repo.state", params: [:])
+        XCTAssertEqual((failed["error"] as? [String: Any])?["code"] as? String, "timedOut")
+
+        // That repo.state is the page's Retry: it walks the folder again.
+        await tracker.resolutionTask?.value
+        XCTAssertEqual(controller.status, .ready)
+        XCTAssertEqual(recorder.changedRoots, [nil, a])
+        let walks = await script.lookupCount(a)
+        XCTAssertEqual(walks, 2)
+    }
+
     func testSnapshotDecodesOldFormatAndRoundTripsRepositoryRoot() throws {
         let old = try JSONDecoder().decode(SessionRightSidebarToolPanelSnapshot.self, from: Data(#"{"mode":"git"}"#.utf8))
         XCTAssertEqual(old.mode, .git); XCTAssertNil(old.gitRepositoryRoot)

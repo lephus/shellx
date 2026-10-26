@@ -14,9 +14,10 @@ import Foundation
 /// a resolution that finishes after a newer target was set is dropped.
 ///
 /// An unchanged target is resolved again only when the last walk failed
-/// (`.gitUnavailable`, usually because another walk held the shared runner), and on
-/// becoming visible also after `.notRepository` (`git init` in place). A repeated
-/// answer stays silent.
+/// (`.lookupFailed`: it timed out, or another walk held the shared runner): on the
+/// same target or pin, on becoming visible, and when the page's Retry asks
+/// `repo.state`. Becoming visible also re-checks a `.notRepository` folder (`git init`
+/// in place). A repeated answer stays silent.
 ///
 /// Targets resolve whether or not the page is on screen, because ⤢ and the command
 /// palette need the root. Watching runs only while it is: there is no refresh while
@@ -76,6 +77,9 @@ final class GitGraphRepositoryTracker {
         }
         self.refreshClock = refreshClock
         self.refreshQuietPeriod = refreshQuietPeriod
+        controller.onRetryLookup = { [weak self] in
+            self?.retryFailedLookup()
+        }
     }
 
     deinit {
@@ -144,6 +148,13 @@ final class GitGraphRepositoryTracker {
         }
     }
 
+    /// Walks the target again after a failed walk. The page's Retry reaches it
+    /// through `repo.state`; a result that differs emits `repo.changed` as usual.
+    func retryFailedLookup() {
+        guard lastWalkFailed, let target else { return }
+        resolve(target)
+    }
+
     private func cancelPendingInvalidation() {
         pendingInvalidation?.cancel()
         pendingInvalidation = nil
@@ -152,7 +163,7 @@ final class GitGraphRepositoryTracker {
     // MARK: Resolution
 
     private var lastWalkFailed: Bool {
-        shown?.status == .gitUnavailable
+        shown?.status == .lookupFailed
     }
 
     private func resolve(_ target: GitGraphTarget) {
@@ -189,9 +200,10 @@ final class GitGraphRepositoryTracker {
     ) async -> (root: String?, status: GitGraphRepoStatus) {
         let lookup = await workTreeRoot(directory)
         // The walk is bounded, so a hung mount ends here; a plain stat of it would
-        // block a thread (and the walk queue) with no timeout.
+        // block a thread (and the walk queue) with no timeout. The walk runs no git,
+        // so this is a failed check, not a missing git.
         if lookup == .unavailable {
-            return (nil, .gitUnavailable)
+            return (nil, .lookupFailed)
         }
         // A walk from a deleted folder climbs into the repository above it, so its
         // answer counts only for a folder that exists.
@@ -206,7 +218,7 @@ final class GitGraphRepositoryTracker {
         case .notInRepository:
             return (directory, .notRepository)
         case .unavailable:
-            return (nil, .gitUnavailable)
+            return (nil, .lookupFailed)
         }
     }
 

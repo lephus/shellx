@@ -86,6 +86,9 @@ final class GitGraphController: ObservableObject {
     var eventSink: ((_ event: [String: Any]) -> Void)?
     /// Called for `history.openAsTab`.
     var onOpenAsTab: ((_ repositoryRoot: String?) -> Void)?
+    /// Called by `repo.state` while the shown status is `.lookupFailed`, so the
+    /// page's Retry walks the folder again. ``GitGraphRepositoryTracker`` sets it.
+    var onRetryLookup: (() -> Void)?
     /// The appearance `app.context` reports. ``GitGraphWebView`` points it at its web view.
     var effectiveAppearance: @MainActor () -> NSAppearance = { NSApplication.shared.effectiveAppearance }
     /// Resolves the target this controller shows and watches its files. It holds the
@@ -216,8 +219,14 @@ final class GitGraphController: ObservableObject {
     }
 
     /// `{status, repositoryName, head}`. HEAD is read only while the shown status is
-    /// `.ready`; an unborn HEAD (no sha) reports `empty`.
+    /// `.ready`; an unborn HEAD (no sha) reports `empty`. While the last folder check
+    /// failed, it walks the folder again and answers `timedOut`; a walk that finds
+    /// the folder emits `repo.changed`.
     private func repoState(generation requestGeneration: UInt64) async throws -> [String: Any] {
+        if shownStatus == .lookupFailed {
+            onRetryLookup?()
+            throw BridgeFailure(code: .timedOut, message: "The folder check did not finish.")
+        }
         var state: [String: Any] = [:]
         if let root = repositoryRoot {
             // Not `URL(fileURLWithPath:)`, which stats the path on the main actor.
