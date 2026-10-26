@@ -280,6 +280,7 @@ function HistoryView({ store, state, layout, appearance, label }: HistoryViewPro
         workingTree={state.workingTree}
         files={state.files}
         filesState={state.filesState}
+        message={state.message}
         onOpenFile={(path) => void store.openFile(path)}
       />
     </>

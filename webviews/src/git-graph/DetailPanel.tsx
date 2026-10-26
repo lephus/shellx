@@ -1,5 +1,6 @@
 import { FILE_STATUS_LETTER, formatDate } from "./format";
 import type { GitGraphLabelResolver } from "./labels";
+import { splitCommitMessage } from "./model";
 import { INDEX_SHA } from "./store";
 import type { GitGraphCommit, GitGraphFileChange, GitGraphWorkingTree } from "./types";
 
@@ -10,10 +11,21 @@ type DetailPanelProps = {
   workingTree: GitGraphWorkingTree | null;
   files: GitGraphFileChange[] | null;
   filesState: "idle" | "loading" | "failed";
+  /** The commit's full message, or null until it is read. */
+  message: string | null;
   onOpenFile: (path: string) => void;
 };
 
-export function DetailPanel({ label, selectedSha, commit, workingTree, files, filesState, onOpenFile }: DetailPanelProps) {
+export function DetailPanel({
+  label,
+  selectedSha,
+  commit,
+  workingTree,
+  files,
+  filesState,
+  message,
+  onOpenFile,
+}: DetailPanelProps) {
   if (selectedSha === INDEX_SHA) {
     return (
       <section className="gg-detail">
@@ -37,12 +49,15 @@ export function DetailPanel({ label, selectedSha, commit, workingTree, files, fi
       </section>
     );
   }
+  // The log's subject stands in until the full message is read, and if it cannot be.
+  const { subject, body } = splitCommitMessage(message ?? commit.subject);
   return (
     <section className="gg-detail">
       <div className="gg-detail-info">
-        <h2 className="gg-detail-subject">{commit.subject}</h2>
+        <h2 className="gg-detail-subject">{subject || commit.subject}</h2>
+        {body ? <p className="gg-detail-body">{body}</p> : null}
         <div className="gg-detail-meta">
-          <span className="gg-mono">{commit.sha.slice(0, 10)}</span>
+          <span className="gg-mono gg-detail-sha">{commit.sha}</span>
           <span>
             {commit.authorName} &lt;{commit.authorEmail}&gt;
           </span>

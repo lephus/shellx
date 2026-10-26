@@ -161,6 +161,43 @@ import Testing
         #expect(body.contains("\n+++ b/tracked.txt"))
     }
 
+    @Test func commitMessageReturnsTheFullMultiLineMessage() async throws {
+        let service = GitHistoryService()
+        let fixture = try WorkspaceChangesGitRepositoryFixture()
+        try fixture.makeBaseline()
+        try fixture.write("a.txt", "a\n")
+        try fixture.git(["add", "a.txt"])
+        let message = "Subject <b>line</b>\n\nFirst body line\n  indented line\n\nTrailer: value"
+        try fixture.commit(message)
+        let sha = text(try fixture.git(["rev-parse", "HEAD"]))
+
+        let read = try await service.commitMessage(repositoryRoot: fixture.root.path, sha: sha)
+
+        #expect(read == message)
+    }
+
+    @Test func commitMessageDecodesInvalidUTF8LossilyAndCapsItsSize() async throws {
+        let service = GitHistoryService()
+        let fixture = try WorkspaceChangesGitRepositoryFixture()
+        try fixture.makeBaseline()
+        let root = fixture.root.path
+
+        // `git commit` rewrites invalid UTF-8 as Latin-1, so write the object directly.
+        let tree = text(try fixture.git(["rev-parse", "HEAD^{tree}"]))
+        let object = "tree \(tree)\nauthor t <t@example.invalid> 1700000000 +0000\n"
+            + "committer t <t@example.invalid> 1700000000 +0000\n\nBad \u{1}byte\n"
+        try fixture.write("bad-commit", Data(object.utf8.map { $0 == 1 ? 0xFF : $0 }))
+        let bad = text(try fixture.git(["hash-object", "-t", "commit", "-w", "bad-commit"]))
+        #expect(try await service.commitMessage(repositoryRoot: root, sha: bad) == "Bad \u{FFFD}byte")
+
+        try fixture.write("huge-message", "Huge\n\n" + String(repeating: "x", count: 300 * 1024) + "\n")
+        try fixture.git(["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "--allow-empty", "-F", "huge-message"])
+        let huge = text(try fixture.git(["rev-parse", "HEAD"]))
+        await #expect(throws: GitHistoryError.outputTooLarge) {
+            _ = try await service.commitMessage(repositoryRoot: root, sha: huge)
+        }
+    }
+
     @Test func rejectsUntrustedArguments() async throws {
         let fixture = try WorkspaceChangesGitRepositoryFixture()
         try fixture.makeBaseline()
@@ -188,6 +225,7 @@ import Testing
         for bad in ["HEAD", "--output=/tmp/x", String(sha.dropLast())] {
             await expectInvalid { _ = try await service.fileChanges(repositoryRoot: root, sha: bad) }
             await expectInvalid { _ = try await service.filePatch(repositoryRoot: root, sha: bad, path: "tracked.txt") }
+            await expectInvalid { _ = try await service.commitMessage(repositoryRoot: root, sha: bad) }
         }
         for bad in ["--all", "heads/main", ""] {
             await expectInvalid {

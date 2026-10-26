@@ -55,6 +55,11 @@ export type GitGraphWorkingTree = {
   deleted: number;
 };
 
+/** `history.message`: one commit's full message, as `git log -1 --format=%B` prints it. */
+export type GitGraphCommitMessage = {
+  message: string;
+};
+
 // Bridge contract shared with the bridge client and the Swift side.
 
 export type GitGraphMethod =
@@ -63,6 +68,7 @@ export type GitGraphMethod =
   | "history.refs"
   | "history.page"
   | "history.files"
+  | "history.message"
   | "history.workingTree"
   | "history.openFileDiff"
   | "history.openWorkingTreeDiff"

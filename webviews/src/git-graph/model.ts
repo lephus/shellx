@@ -105,6 +105,21 @@ export function mergePage(existing: GitGraphCommit[], page: GitGraphPage, skip: 
   return [...existing, ...page.commits.filter((c) => !seen.has(c.sha))];
 }
 
+/**
+ * Splits a raw commit message (`%B`) into its first line and the rest, dropping
+ * the blank lines between them and trailing whitespace. The body keeps its own
+ * line breaks and indentation.
+ */
+export function splitCommitMessage(message: string): { subject: string; body: string } {
+  const text = message.replace(/\s+$/, "");
+  const newline = text.indexOf("\n");
+  if (newline < 0) return { subject: text, body: "" };
+  return {
+    subject: text.slice(0, newline).replace(/\r$/, ""),
+    body: text.slice(newline + 1).replace(/^(?:[ \t]*\r?\n)+/, ""),
+  };
+}
+
 export function visibleChips(chips: RefChip[], layout: GitGraphLayout): { shown: RefChip[]; overflow: number } {
   if (layout === "wide") return { shown: chips, overflow: 0 };
   return { shown: chips.slice(0, 1), overflow: Math.max(0, chips.length - 1) };

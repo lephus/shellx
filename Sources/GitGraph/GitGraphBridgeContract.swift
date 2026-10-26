@@ -16,6 +16,7 @@ enum GitGraphBridgeContract {
         case historyRefs = "history.refs"
         case historyPage = "history.page"
         case historyFiles = "history.files"
+        case historyMessage = "history.message"
         case historyWorkingTree = "history.workingTree"
         case historyOpenFileDiff = "history.openFileDiff"
         case historyOpenWorkingTreeDiff = "history.openWorkingTreeDiff"

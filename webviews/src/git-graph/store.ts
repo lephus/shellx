@@ -2,6 +2,7 @@ import { createGenerationGate, type GitGraphBridge } from "./bridge";
 import { mergePage } from "./model";
 import type {
   GitGraphCommit,
+  GitGraphCommitMessage,
   GitGraphContext,
   GitGraphEvent,
   GitGraphFileChange,
@@ -49,6 +50,12 @@ export type GitGraphState = {
   selectedSha: string | null;
   files: GitGraphFileChange[] | null;
   filesState: "idle" | "loading" | "failed";
+  /**
+   * The selected commit's full message (`git log --format=%B`), or null until it
+   * is read. The detail pane shows the subject from the log meanwhile, and also
+   * when reading fails.
+   */
+  message: string | null;
   /** Bumped whenever `commits` is replaced (not appended). */
   historyVersion: number;
   /** What the list's scroll position should do after `historyVersion` changes. */
@@ -76,6 +83,7 @@ function initialState(): GitGraphState {
     selectedSha: null,
     files: null,
     filesState: "idle",
+    message: null,
     historyVersion: 0,
     scroll: "top",
   };
@@ -140,7 +148,7 @@ export class GitGraphStore {
   private refreshQueued = false;
   /** Callers of a queued refresh, resolved when no load is left to run. */
   private idleWaiters: Array<() => void> = [];
-  /** Bumped by every selection change; older file lists are ignored. */
+  /** Bumped by every selection change; older file lists and messages are ignored. */
   private selectionEpoch = 0;
   private offEvent: (() => void) | null = null;
 
@@ -377,6 +385,7 @@ export class GitGraphStore {
       selectedSha: keepSelection ? selectedSha : null,
       files: keepSelection ? this.state.files : null,
       filesState: keepSelection ? this.state.filesState : "idle",
+      message: keepSelection ? this.state.message : null,
       logKey: droppedSelection ? this.state.logKey + 1 : this.state.logKey,
       historyVersion: this.state.historyVersion + 1,
       scroll: mode === "refresh" ? "keep" : "top",
@@ -409,19 +418,29 @@ export class GitGraphStore {
     return this.loadMore();
   }
 
-  /** `"index"` opens the working-tree diff; a sha loads its file list. */
+  /** `"index"` opens the working-tree diff; a sha loads its file list and full message. */
   async select(sha: string | null): Promise<void> {
     const token = ++this.selectionEpoch;
     if (sha === null || sha === INDEX_SHA) {
-      this.set({ selectedSha: sha, files: null, filesState: "idle" });
+      this.set({ selectedSha: sha, files: null, filesState: "idle", message: null });
       if (sha === INDEX_SHA) await this.call("history.openWorkingTreeDiff");
       return;
     }
-    this.set({ selectedSha: sha, files: null, filesState: "loading" });
+    this.set({ selectedSha: sha, files: null, filesState: "loading", message: null });
+    await Promise.all([this.loadFiles(sha, token), this.loadMessage(sha, token)]);
+  }
+
+  private async loadFiles(sha: string, token: number): Promise<void> {
     const reply = await this.call<GitGraphFileChange[]>("history.files", { sha });
     if (token !== this.selectionEpoch || !reply) return;
     if (!reply.ok) return this.set({ filesState: "failed" });
     this.set({ files: reply.result, filesState: "idle" });
+  }
+
+  private async loadMessage(sha: string, token: number): Promise<void> {
+    const reply = await this.call<GitGraphCommitMessage>("history.message", { sha });
+    if (token !== this.selectionEpoch || !reply?.ok || typeof reply.result?.message !== "string") return;
+    this.set({ message: reply.result.message });
   }
 
   async openFile(path: string): Promise<void> {

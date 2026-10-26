@@ -78,6 +78,7 @@ function readyBridge(generation = 1): FakeBridge {
       return ok({ commits: range(skip, skip + 3), hasMore: skip < 6, reachedLimit: false }, generation);
     },
     "history.files": () => ok([{ path: "a.txt", oldPath: null, status: "modified", additions: 1, deletions: 0 }], generation),
+    "history.message": (p) => ok({ message: `message of ${String(p.sha)}\n\nBody line` }, generation),
     "history.openFileDiff": () => ok({ opened: true }, generation),
     "history.openWorkingTreeDiff": () => ok({ opened: true }, generation),
     "history.openAsTab": () => ok(null, generation),
@@ -185,6 +186,7 @@ test("history.invalidated reloads HEAD, refs, working tree and page 0, keeping a
   const s = store.getState();
   expect(s.selectedSha).toBe(sha(1));
   expect(s.files).toHaveLength(1);
+  expect(s.message).toBe(`message of ${sha(1)}\n\nBody line`);
   expect(s.scroll).toBe("keep");
   expect(s.logKey).toBe(logKey);
   expect(s.historyVersion).toBe(historyVersion + 1);
@@ -244,6 +246,34 @@ test("an invalidation during the initial load runs one refresh after it", async 
   expect(bridge.callsTo("repo.state")).toHaveLength(2);
   expect(bridge.callsTo("history.page").map((c) => c.params.skip)).toEqual([0, 0]);
   expect(store.getState().scroll).toBe("keep");
+});
+
+test("a commit's full message loads on selection; an earlier selection's message and the index row never land", async () => {
+  const bridge = readyBridge();
+  const store = new GitGraphStore(bridge);
+  await store.start();
+  delete bridge.handlers["history.message"];
+  void store.select(sha(1));
+  void store.select(sha(2));
+  await flush();
+  const [first, second] = bridge.callsTo("history.message");
+  expect(first!.params).toEqual({ sha: sha(1) });
+  expect(second!.params).toEqual({ sha: sha(2) });
+  expect(store.getState().message).toBeNull();
+
+  second!.resolve(ok({ message: "Second\n\nwith a body" }));
+  first!.resolve(ok({ message: "stale" }));
+  await flush();
+  expect(store.getState().message).toBe("Second\n\nwith a body");
+
+  await store.select("index");
+  expect(bridge.callsTo("history.message")).toHaveLength(2);
+  expect(store.getState().message).toBeNull();
+
+  bridge.handlers["history.message"] = () => err("timedOut");
+  await store.select(sha(1));
+  expect(store.getState().message).toBeNull();
+  expect(store.getState().files).toHaveLength(1);
 });
 
 test("history.invalidated drops a selection that is gone and remounts the graph", async () => {

@@ -11,6 +11,7 @@ import type { GitGraphEvent, GitGraphMethod, GitGraphReply } from "./types";
 // - `history.workingTree` → GitGraphWorkingTree
 // - `history.page { skip, includeRemotes, branch? }` → GitGraphPage
 // - `history.files { sha }` → GitGraphFileChange[]
+// - `history.message { sha }` → GitGraphCommitMessage (`{ message }`)
 // - `history.openFileDiff { sha, path }`, `history.openWorkingTreeDiff`,
 //   `history.openAsTab` → no meaningful result
 // The host pushes events by calling `window.shellxGitGraph.receive(event)`.

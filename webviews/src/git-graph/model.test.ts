@@ -6,6 +6,7 @@ import {
   layoutFor,
   mergePage,
   refChipsByCommit,
+  splitCommitMessage,
   toLogEntries,
   toRgb,
   visibleChips,
@@ -139,6 +140,19 @@ test("mergePage replaces on skip 0 and appends without duplicates", () => {
   const a = [commit("a"), commit("b")];
   expect(mergePage(a, page([commit("b"), commit("c")]), 2).map((c) => c.sha)).toEqual(["a", "b", "c"]);
   expect(mergePage(a, page([commit("z")]), 0).map((c) => c.sha)).toEqual(["z"]);
+});
+
+test("splitCommitMessage separates the first line from a body that keeps its breaks", () => {
+  expect(splitCommitMessage("Subject only\n")).toEqual({ subject: "Subject only", body: "" });
+  expect(splitCommitMessage("Subject\n\n\nFirst para\n  indented\n\nSecond <b>x</b>\n\n")).toEqual({
+    subject: "Subject",
+    body: "First para\n  indented\n\nSecond <b>x</b>",
+  });
+  expect(splitCommitMessage("Windows\r\n\r\nBody\r\n")).toEqual({ subject: "Windows", body: "Body" });
+  expect(splitCommitMessage("Wrapped first\nparagraph\n\nBody")).toEqual({
+    subject: "Wrapped first",
+    body: "paragraph\n\nBody",
+  });
 });
 
 test("visibleChips keeps one chip in narrow layout", () => {

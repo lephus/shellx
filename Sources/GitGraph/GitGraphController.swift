@@ -10,6 +10,7 @@ protocol GitGraphHistoryProviding: AnyObject {
     func refs(repositoryRoot: String) async throws -> [GitHistoryRef]
     func page(repositoryRoot: String, query: GitHistoryQuery, skip: Int) async throws -> GitHistoryPage
     func fileChanges(repositoryRoot: String, sha: String) async throws -> [GitHistoryFileChange]
+    func commitMessage(repositoryRoot: String, sha: String) async throws -> String
     func filePatch(repositoryRoot: String, sha: String, path: String) async throws -> Data
     func workingTreeStatus(repositoryRoot: String) async throws -> GitHistoryWorkingTreeStatus
 }
@@ -37,6 +38,10 @@ final class GitHistoryServiceProvider: GitGraphHistoryProviding {
 
     func fileChanges(repositoryRoot: String, sha: String) async throws -> [GitHistoryFileChange] {
         try await service.fileChanges(repositoryRoot: repositoryRoot, sha: sha)
+    }
+
+    func commitMessage(repositoryRoot: String, sha: String) async throws -> String {
+        try await service.commitMessage(repositoryRoot: repositoryRoot, sha: sha)
     }
 
     func filePatch(repositoryRoot: String, sha: String, path: String) async throws -> Data {
@@ -174,6 +179,11 @@ final class GitGraphController: ObservableObject {
                 await history.fileChanges(repositoryRoot: root, sha: sha),
                 nullableKeys: ["oldPath", "additions", "deletions"]
             )
+        case .historyMessage:
+            let root = try readyRoot()
+            let sha = try string(params, "sha")
+            let message = try await history.commitMessage(repositoryRoot: root, sha: sha)
+            return ["message": message]
         case .historyWorkingTree:
             let root = try readyRoot()
             return try GitGraphBridgeJSON.object(await history.workingTreeStatus(repositoryRoot: root))

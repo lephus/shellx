@@ -15,6 +15,7 @@ public struct GitHistoryService: Sendable {
     private static let pageOutputLimit = 16 * 1024 * 1024
     private static let patchOutputLimit = 8 * 1024 * 1024
     private static let metadataOutputLimit = 16 * 1024 * 1024
+    private static let messageOutputLimit = 256 * 1024
     private static let commonPrefix = [
         "-c", "core.fsmonitor=false",
         "-c", "log.showSignature=false",
@@ -101,6 +102,24 @@ public struct GitHistoryService: Sendable {
     public func fileChanges(repositoryRoot: String, sha: String) async throws -> [GitHistoryFileChange] {
         try GitHistoryArgumentValidator.validateSHA(sha)
         return try await execute(repositoryRoot) { try $0.loadFileChanges(sha: sha) }
+    }
+
+    /// The full message of `sha` as `git log -1 --format=%B` prints it, without
+    /// trailing whitespace. Invalid UTF-8 is replaced, not rejected. A message over
+    /// 256 KiB throws ``GitHistoryError/outputTooLarge``.
+    public func commitMessage(repositoryRoot: String, sha: String) async throws -> String {
+        try GitHistoryArgumentValidator.validateSHA(sha)
+        return try await execute(repositoryRoot) { command in
+            let output = try command.run(
+                ["log", "-1", "--no-color", "--encoding=UTF-8", "--format=%B", sha, "--"],
+                maximumOutputByteCount: Self.messageOutputLimit
+            )
+            var message = String(decoding: output, as: UTF8.self)
+            while message.last?.isWhitespace == true {
+                message.removeLast()
+            }
+            return message
+        }
     }
 
     public func filePatch(repositoryRoot: String, sha: String, path: String) async throws -> Data {

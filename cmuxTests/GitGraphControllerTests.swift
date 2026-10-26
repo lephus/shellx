@@ -185,6 +185,47 @@ final class GitGraphControllerTests: XCTestCase {
         XCTAssertEqual(reply as NSDictionary, ["ok": true, "generation": 1, "result": ["opened": true]] as NSDictionary)
     }
 
+    func testHistoryMessageReturnsTheFullMessage() async {
+        let history = FakeGitHistory()
+        let message = "Fix <b>bold</b> parsing\n\nThe body keeps\n  its line breaks.\n"
+        history.messageResult = .success(message)
+        let controller = GitGraphController(placement: .sidebar, history: history, diffOpener: nil)
+        controller.showRepository(root: "/tmp/shellx", status: .ready)
+
+        let reply = await controller.handle(method: "history.message", params: ["sha": sha])
+        let missing = await controller.handle(method: "history.message", params: [:])
+
+        XCTAssertEqual(reply as NSDictionary, ["ok": true, "generation": 1, "result": ["message": message]] as NSDictionary)
+        XCTAssertEqual(history.messageRequests.map(\.root), ["/tmp/shellx"])
+        XCTAssertEqual(history.messageRequests.map(\.sha), [sha])
+        XCTAssertEqual(errorCode(missing), "invalidArgument")
+        XCTAssertEqual(history.messageRequests.count, 1, "a request without a sha never reaches git")
+    }
+
+    func testHistoryMessageMapsErrorsAndDropsStaleReplies() async {
+        let history = FakeGitHistory()
+        history.messageResult = .failure(.outputTooLarge)
+        let controller = GitGraphController(placement: .sidebar, history: history, diffOpener: nil)
+        controller.showRepository(root: "/tmp/shellx", status: .ready)
+        let tooLarge = await controller.handle(method: "history.message", params: ["sha": sha])
+        XCTAssertEqual(errorCode(tooLarge), "outputTooLarge")
+
+        history.messageResult = .success("Subject")
+        history.holdsMessage = true
+        let pending = Task { () -> ReplySummary in
+            ReplySummary(await controller.handle(method: "history.message", params: ["sha": self.sha]))
+        }
+        await history.waitForHeldMessage()
+        controller.showRepository(root: "/tmp/other", status: .ready)
+        history.releaseMessage()
+        let stale = await pending.value
+        XCTAssertEqual(stale, ReplySummary(ok: false, code: "notAllowed", generation: 2))
+
+        controller.showRepository(root: nil, status: .noDirectory)
+        let noRepository = await controller.handle(method: "history.message", params: ["sha": sha])
+        XCTAssertEqual(errorCode(noRepository), "notAllowed")
+    }
+
     func testOpenWorkingTreeDiffCallsOpenerWithRepositoryRoot() async {
         let opener = FakeDiffOpener()
         let controller = GitGraphController(placement: .sidebar, history: FakeGitHistory(), diffOpener: opener)
@@ -348,6 +389,7 @@ private final class FakeGitHistory: GitGraphHistoryProviding {
         GitHistoryPage(commits: [], hasMore: false, reachedLimit: false)
     )
     var fileChangesResult: Result<[GitHistoryFileChange], GitHistoryError> = .success([])
+    var messageResult: Result<String, GitHistoryError> = .success("")
     var patchResult: Result<Data, GitHistoryError> = .success(Data())
     var workingTreeResult: Result<GitHistoryWorkingTreeStatus, GitHistoryError> = .success(
         GitHistoryWorkingTreeStatus(added: 0, modified: 0, deleted: 0)
@@ -356,12 +398,39 @@ private final class FakeGitHistory: GitGraphHistoryProviding {
     var error: GitHistoryError?
     /// When true, `page` suspends until `releasePage()`.
     var holdsPage = false
+    /// When true, `commitMessage` suspends until `releaseMessage()`.
+    var holdsMessage = false
 
     private(set) var calls: [String] = []
     private(set) var pageRequests: [(root: String, query: GitHistoryQuery, skip: Int)] = []
     private(set) var patchRequests: [(root: String, sha: String, path: String)] = []
+    private(set) var messageRequests: [(root: String, sha: String)] = []
     private var heldPage: CheckedContinuation<Void, Never>?
     private var pageWaiter: CheckedContinuation<Void, Never>?
+    private var heldMessage: CheckedContinuation<Void, Never>?
+    private var messageWaiter: CheckedContinuation<Void, Never>?
+
+    func waitForHeldMessage() async {
+        guard heldMessage == nil else { return }
+        await withCheckedContinuation { messageWaiter = $0 }
+    }
+
+    func releaseMessage() {
+        heldMessage?.resume()
+        heldMessage = nil
+    }
+
+    func commitMessage(repositoryRoot: String, sha: String) async throws -> String {
+        messageRequests.append((repositoryRoot, sha))
+        if holdsMessage {
+            await withCheckedContinuation { continuation in
+                heldMessage = continuation
+                messageWaiter?.resume()
+                messageWaiter = nil
+            }
+        }
+        return try record("commitMessage", messageResult)
+    }
 
     func waitForHeldPage() async {
         guard heldPage == nil else { return }
