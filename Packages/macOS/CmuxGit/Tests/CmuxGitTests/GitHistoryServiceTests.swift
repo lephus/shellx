@@ -145,6 +145,22 @@ import Testing
         #expect(expected == ["side.txt"])
     }
 
+    @Test func patchKeepsABPrefixesDespiteNoprefixConfig() async throws {
+        let service = GitHistoryService()
+        let fixture = try WorkspaceChangesGitRepositoryFixture()
+        try fixture.makeBaseline()
+        try fixture.git(["config", "diff.noprefix", "true"])
+        try fixture.write("tracked.txt", "changed\n")
+        try fixture.git(["add", "tracked.txt"])
+        try fixture.commit("modify tracked")
+        let sha = text(try fixture.git(["rev-parse", "HEAD"]))
+        let patch = try await service.filePatch(repositoryRoot: fixture.root.path, sha: sha, path: "tracked.txt")
+        let body = String(decoding: patch, as: UTF8.self)
+        #expect(body.hasPrefix("diff --git a/"))
+        #expect(body.contains("\n--- a/tracked.txt"))
+        #expect(body.contains("\n+++ b/tracked.txt"))
+    }
+
     @Test func rejectsUntrustedArguments() async throws {
         let fixture = try WorkspaceChangesGitRepositoryFixture()
         try fixture.makeBaseline()

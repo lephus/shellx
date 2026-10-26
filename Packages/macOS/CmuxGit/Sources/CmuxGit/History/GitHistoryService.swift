@@ -122,6 +122,7 @@ public struct GitHistoryService: Sendable {
                 [
                     "--literal-pathspecs",
                     "diff", "--no-color", "--no-ext-diff", "--no-textconv", "-M",
+                    "--src-prefix=a/", "--dst-prefix=b/",
                     base, sha, "--",
                 ] + pathspecs,
                 maximumOutputByteCount: Self.patchOutputLimit

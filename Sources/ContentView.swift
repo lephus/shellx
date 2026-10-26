@@ -2684,6 +2684,10 @@ struct ContentView: View {
             selectedWorkspaceDirectoryObserver.wire(tabManager: tabManager)
             // Weak captures only: capturing this view would retain the controller
             // that stores the closure (its @State), and its watcher, past the window.
+            // Resolves the selected workspace on each open, so the sidebar follows selection.
+            gitGraphSidebarController.diffOpener = GitGraphDiffOpener(
+                workspaceProvider: { [weak tabManager] in tabManager?.selectedWorkspace }
+            )
             gitGraphSidebarController.onOpenAsTab = { [weak tabManager, weak sidebarSelectionState] repositoryRoot in
                 guard let tabManager, let sidebarSelectionState else { return }
                 ContentView.openRightSidebarToolPane(

@@ -7277,8 +7277,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         sessionId: String?,
         focus: Bool = true
     ) -> Bool {
-        let process = Process()
-        process.executableURL = cliURL
         var arguments = [
             "--socket", socketPath,
             "diff",
@@ -7293,6 +7291,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         if useLastTurnSource, let sessionId {
             arguments.append(contentsOf: ["--session", sessionId])
         }
+        return spawnBundledDiffViewerCLI(
+            cliURL: cliURL,
+            socketPath: socketPath,
+            arguments: arguments,
+            workspaceId: workspaceId,
+            surfaceId: surfaceId
+        )
+    }
+
+    /// Runs the bundled CLI with `arguments` the way every diff-viewer launch does:
+    /// same environment, output collector and beep on a non-zero exit. `onExit` runs
+    /// on the main actor after the process terminates (not when it fails to start).
+    @discardableResult
+    func spawnBundledDiffViewerCLI(
+        cliURL: URL,
+        socketPath: String,
+        arguments: [String],
+        workspaceId: UUID,
+        surfaceId: UUID?,
+        onExit: (@MainActor @Sendable () -> Void)? = nil
+    ) -> Bool {
+        let process = Process()
+        process.executableURL = cliURL
         process.arguments = arguments
         var environment = ProcessInfo.processInfo.environment
         environment["CMUX_SOCKET_PATH"] = socketPath
@@ -7317,6 +7338,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             let terminationStatus = terminatedProcess.terminationStatus
             Task { @MainActor in
                 AppDelegate.shared?.diffViewerProcesses.removeValue(forKey: processIdentifier)
+                onExit?()
                 guard terminationStatus != 0 else { return }
 #if DEBUG
                 // Log only non-sensitive metadata: the child's stdout/stderr can echo

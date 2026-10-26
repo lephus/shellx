@@ -73,7 +73,12 @@ final class RightSidebarToolPanel: Panel, ObservableObject {
 
     var gitGraphController: GitGraphController {
         if let controller = gitGraphControllerStorage { return controller }
-        let controller = GitGraphController(placement: .tab, diffOpener: nil)
+        // The opener holds the workspace weakly: panel -> controller -> opener must not
+        // lead back to the workspace that owns the panel.
+        let controller = GitGraphController(
+            placement: .tab,
+            diffOpener: GitGraphDiffOpener(workspaceProvider: { [weak self] in self?.workspace })
+        )
         gitGraphControllerStorage = controller
         controller.tracker.onResolveRoot = { [weak self] root in
             self?.adoptGitRepositoryRoot(root)
