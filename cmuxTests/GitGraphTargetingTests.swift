@@ -51,6 +51,83 @@ final class GitGraphTargetingTests: XCTestCase {
         XCTAssertEqual(tracker.watchedRoot, b)
     }
 
+    func testTrackerDropsResolutionSupersededDuringItsWalk() async throws {
+        let (a, b) = try makeRepositories()
+        let script = ScriptedWorkTreeRoots([a: [.root(a)], b: [.root(b)]], holding: a)
+        let controller = GitGraphController(placement: .sidebar, diffOpener: nil)
+        let recorder = EventRecorder(controller)
+        let tracker = GitGraphRepositoryTracker(controller: controller, workTreeRoot: { await script.lookup($0) })
+
+        tracker.setTarget(.directory(a))
+        await script.waitUntilHeld()
+        tracker.setTarget(.directory(b))
+        await script.release()
+        await tracker.resolutionTask?.value
+
+        let walksOfA = await script.lookupCount(a)
+        XCTAssertEqual(walksOfA, 1)
+        XCTAssertEqual(recorder.changedRoots, [b])
+        XCTAssertEqual(tracker.watchedRoot, b)
+    }
+
+    func testFailedWalkIsRetriedForTheSameTargetOrPin() async throws {
+        let (a, b) = try makeRepositories()
+        let script = ScriptedWorkTreeRoots([a: [.unavailable, .unavailable, .root(a)], b: [.unavailable, .root(b)]])
+        let controller = GitGraphController(placement: .sidebar, diffOpener: nil)
+        let recorder = EventRecorder(controller)
+        let tracker = GitGraphRepositoryTracker(controller: controller, workTreeRoot: { await script.lookup($0) })
+
+        for _ in 0..<3 {
+            tracker.setTarget(.directory(a))
+            await tracker.resolutionTask?.value
+        }
+        XCTAssertEqual(controller.status, .ready)
+        XCTAssertEqual(controller.repositoryRoot, a)
+        // The repeated failure stayed silent.
+        XCTAssertEqual(recorder.changedRoots, [nil, a])
+
+        let pinned = GitGraphRepositoryTracker(controller: controller, workTreeRoot: { await script.lookup($0) })
+        for _ in 0..<3 {
+            pinned.pin(repositoryRoot: b)
+            await pinned.resolutionTask?.value
+        }
+        XCTAssertEqual(controller.repositoryRoot, b)
+        let walksOfB = await script.lookupCount(b)
+        XCTAssertEqual(walksOfB, 2, "a pin of the same root is not walked again once it resolved")
+    }
+
+    func testBecomingVisibleRechecksAFolderThatWasNotARepository() async throws {
+        let plain = try makeDirectory("plain")
+        let controller = GitGraphController(placement: .sidebar, diffOpener: nil)
+        let tracker = controller.tracker
+
+        tracker.setTarget(.directory(plain))
+        await tracker.resolutionTask?.value
+        XCTAssertEqual(controller.status, .notRepository)
+
+        try gitInit(plain)
+        tracker.setVisible(true)
+        await tracker.resolutionTask?.value
+
+        XCTAssertEqual(controller.status, .ready)
+        XCTAssertEqual(controller.repositoryRoot, plain)
+    }
+
+    func testOpenAsTabPassesOnlyARepository() async {
+        let controller = GitGraphController(placement: .sidebar, diffOpener: nil)
+        var requestedRoots: [String?] = []
+        controller.onOpenAsTab = { requestedRoots.append($0) }
+
+        controller.showRepository(root: "/r/plain", status: .notRepository)
+        XCTAssertNil(controller.readyRepositoryRoot)
+        _ = await controller.handle(method: "history.openAsTab", params: [:])
+        controller.showRepository(root: "/r/a", status: .ready)
+        XCTAssertEqual(controller.readyRepositoryRoot, "/r/a")
+        _ = await controller.handle(method: "history.openAsTab", params: [:])
+
+        XCTAssertEqual(requestedRoots, [nil, "/r/a"])
+    }
+
     func testTrackerMapsTargetsWithoutRepositoriesToStatuses() async throws {
         let (a, _) = try makeRepositories()
         let plain = try makeDirectory("plain")
@@ -141,6 +218,13 @@ final class GitGraphTargetingTests: XCTestCase {
         XCTAssertEqual(workspace.bonsplitController.tab(tabId)?.title, title)
         let snapshot = workspace.sessionSnapshot(includeScrollback: false)
         XCTAssertEqual(snapshot.panels.first { $0.id == first.id }?.rightSidebarTool?.gitRepositoryRoot, "/r/b")
+
+        // Opening without a repository keeps the tab's pin.
+        let third = try XCTUnwrap(workspace.openOrFocusRightSidebarToolSurface(
+            inPane: pane, mode: .git, focus: false, gitRepositoryRoot: nil
+        ))
+        XCTAssertEqual(third.id, first.id)
+        XCTAssertEqual(third.pinnedGitRepositoryRoot, "/r/b")
     }
 
     // MARK: Fixtures
@@ -172,6 +256,54 @@ final class GitGraphTargetingTests: XCTestCase {
         try process.run()
         process.waitUntilExit()
         XCTAssertEqual(process.terminationStatus, 0, "git init failed in \(directory)")
+    }
+}
+
+/// Answers work-tree lookups from a per-directory script; the last answer repeats.
+/// The first lookup of `holding` waits for ``release()``.
+private actor ScriptedWorkTreeRoots {
+    private var answers: [String: [GitWorkTreeRootLookup]]
+    private var holding: String?
+    private var counts: [String: Int] = [:]
+    private var isHolding = false
+    private var held: CheckedContinuation<Void, Never>?
+    private var holdWaiter: CheckedContinuation<Void, Never>?
+
+    init(_ answers: [String: [GitWorkTreeRootLookup]], holding: String? = nil) {
+        self.answers = answers
+        self.holding = holding
+    }
+
+    func lookup(_ directory: String) async -> GitWorkTreeRootLookup {
+        counts[directory, default: 0] += 1
+        if directory == holding {
+            holding = nil
+            isHolding = true
+            holdWaiter?.resume()
+            holdWaiter = nil
+            await withCheckedContinuation { held = $0 }
+        }
+        guard var queue = answers[directory], let answer = queue.first else { return .notInRepository }
+        if queue.count > 1 {
+            queue.removeFirst()
+            answers[directory] = queue
+        }
+        return answer
+    }
+
+    func lookupCount(_ directory: String) -> Int {
+        counts[directory, default: 0]
+    }
+
+    /// Returns once the held lookup has started.
+    func waitUntilHeld() async {
+        guard !isHolding else { return }
+        await withCheckedContinuation { holdWaiter = $0 }
+    }
+
+    func release() {
+        held?.resume()
+        held = nil
     }
 }
 

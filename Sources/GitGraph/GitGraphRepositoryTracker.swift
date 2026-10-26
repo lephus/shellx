@@ -12,8 +12,16 @@ import Foundation
 /// The controller is told only about real changes: a target that resolves to the
 /// root and status already shown (a `cd` inside the same repository) is silent, and
 /// a resolution that finishes after a newer target was set is dropped.
+///
+/// An unchanged target is resolved again only when the last walk failed
+/// (`.gitUnavailable`, usually because another walk held the shared runner), and on
+/// becoming visible also after `.notRepository` (`git init` in place). There are no
+/// timers: a repeated answer stays silent.
 @MainActor
 final class GitGraphRepositoryTracker {
+    /// Looks up the work tree that holds a directory. Tests substitute a script.
+    typealias WorkTreeRootLookup = @Sendable (_ directory: String) async -> GitWorkTreeRootLookup
+
     /// Called with the work-tree root each time a resolution finds one.
     var onResolveRoot: ((_ root: String) -> Void)?
     /// The resolution in flight, if any. Tests await it.
@@ -23,6 +31,7 @@ final class GitGraphRepositoryTracker {
 
     private weak var controller: GitGraphController?
     private let metadata: GitMetadataService
+    private let workTreeRoot: WorkTreeRootLookup
     private var isPinned = false
     private var target: GitGraphTarget?
     /// Bumped for every new target. A resolution started for an older one is dropped.
@@ -42,9 +51,16 @@ final class GitGraphRepositoryTracker {
         let status: GitGraphRepoStatus
     }
 
-    init(controller: GitGraphController, metadata: GitMetadataService = GitMetadataService()) {
+    init(
+        controller: GitGraphController,
+        metadata: GitMetadataService = GitMetadataService(),
+        workTreeRoot: WorkTreeRootLookup? = nil
+    ) {
         self.controller = controller
         self.metadata = metadata
+        self.workTreeRoot = workTreeRoot ?? { directory in
+            await metadata.workTreeRoot(forDirectory: directory)
+        }
     }
 
     deinit {
@@ -54,26 +70,38 @@ final class GitGraphRepositoryTracker {
         }
     }
 
-    /// Follows `target`. Does nothing once pinned, or when `target` is the current one.
+    /// Follows `target`. Does nothing once pinned, or when `target` is the current one
+    /// and its last walk did not fail.
     func setTarget(_ target: GitGraphTarget) {
-        guard !isPinned, target != self.target else { return }
+        guard !isPinned, target != self.target || lastWalkFailed else { return }
         resolve(target)
     }
 
     /// Shows the work tree that holds `repositoryRoot` from now on. The path is
     /// resolved like a target's directory, so a saved subdirectory shows its work
-    /// tree's top level and a deleted folder shows `.noDirectory`.
+    /// tree's top level and a deleted folder shows `.noDirectory`. Pinning the same
+    /// path again resolves it again only when its last walk failed.
     func pin(repositoryRoot: String) {
+        let target = GitGraphTarget.directory(repositoryRoot)
+        guard !isPinned || target != self.target || lastWalkFailed else { return }
         isPinned = true
-        resolve(.directory(repositoryRoot))
+        resolve(target)
     }
 
     /// Changes while hidden are remembered; becoming visible after one reloads once.
+    /// Becoming visible also retries a failed walk, and re-checks a folder that was
+    /// not a repository.
     func setVisible(_ visible: Bool) {
+        let becameVisible = visible && !isVisible
         isVisible = visible
-        guard visible, hasChangesWhileHidden else { return }
-        hasChangesWhileHidden = false
-        controller?.notifyInvalidated()
+        guard visible else { return }
+        if hasChangesWhileHidden {
+            hasChangesWhileHidden = false
+            controller?.notifyInvalidated()
+        }
+        if becameVisible, let target, lastWalkFailed || shown?.status == .notRepository {
+            resolve(target)
+        }
     }
 
     /// Called for each coalesced change the watcher reports.
@@ -86,6 +114,10 @@ final class GitGraphRepositoryTracker {
     }
 
     // MARK: Resolution
+
+    private var lastWalkFailed: Bool {
+        shown?.status == .gitUnavailable
+    }
 
     private func resolve(_ target: GitGraphTarget) {
         self.target = target
@@ -100,12 +132,12 @@ final class GitGraphRepositoryTracker {
             show(root: nil, status: .remote)
         case .directory(let directory):
             let previousWalk = Self.walkQueueTail
-            let metadata = metadata
+            let workTreeRoot = workTreeRoot
             let task = Task { [weak self] in
                 await previousWalk?.value
                 // A newer target arrived while this one waited its turn.
                 guard self?.resolutionGeneration == generation else { return }
-                let resolved = await Self.resolution(of: directory, metadata: metadata)
+                let resolved = await Self.resolution(of: directory, workTreeRoot: workTreeRoot)
                 guard let self, self.resolutionGeneration == generation else { return }
                 self.show(root: resolved.root, status: resolved.status)
             }
@@ -117,9 +149,9 @@ final class GitGraphRepositoryTracker {
     /// Resolves `directory` off the main actor.
     nonisolated private static func resolution(
         of directory: String,
-        metadata: GitMetadataService
+        workTreeRoot: WorkTreeRootLookup
     ) async -> (root: String?, status: GitGraphRepoStatus) {
-        let lookup = await metadata.workTreeRoot(forDirectory: directory)
+        let lookup = await workTreeRoot(directory)
         // The walk is bounded, so a hung mount ends here; a plain stat of it would
         // block a thread (and the walk queue) with no timeout.
         if lookup == .unavailable {

@@ -88,7 +88,8 @@ final class RightSidebarToolPanel: Panel, ObservableObject {
 
     var displayTitle: String {
         guard mode == .git, let root = pinnedGitRepositoryRoot else { return mode.label }
-        let name = URL(fileURLWithPath: root).lastPathComponent
+        // Not `URL(fileURLWithPath:)`, which stats the path: a hung mount would freeze this.
+        let name = (root as NSString).lastPathComponent
         return String(localized: "gitGraph.tab.title", defaultValue: "Git Graph: \(name)")
     }
     var displayIcon: String? { mode.symbolName }
@@ -127,11 +128,12 @@ final class RightSidebarToolPanel: Panel, ObservableObject {
     }
 
     /// Pins this Git Graph tab to the work tree holding `repositoryRoot`. With nil,
-    /// the tab stays as it is.
+    /// the tab stays as it is. The same root again retries a walk that failed.
     func retargetGit(repositoryRoot: String?) {
-        guard mode == .git, let repositoryRoot, repositoryRoot != pinnedGitRepositoryRoot else { return }
-        pinnedGitRepositoryRoot = repositoryRoot
+        guard mode == .git, let repositoryRoot else { return }
         gitGraphControllerStorage?.tracker.pin(repositoryRoot: repositoryRoot)
+        guard repositoryRoot != pinnedGitRepositoryRoot else { return }
+        pinnedGitRepositoryRoot = repositoryRoot
         workspace?.rightSidebarToolTitleDidChange(self)
     }
 

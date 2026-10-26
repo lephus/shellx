@@ -2399,6 +2399,22 @@ struct ContentView: View {
     /// Opens `mode` as a workspace tab. A Git Graph tab pins `gitRepositoryRoot`;
     /// without one it pins the repository the workspace is in.
     func openRightSidebarToolPane(_ mode: RightSidebarMode, gitRepositoryRoot: String? = nil) {
+        Self.openRightSidebarToolPane(
+            mode,
+            gitRepositoryRoot: gitRepositoryRoot,
+            tabManager: tabManager,
+            sidebarSelectionState: sidebarSelectionState
+        )
+    }
+
+    /// The body of ``openRightSidebarToolPane(_:gitRepositoryRoot:)``, callable from a
+    /// closure that holds only weak references.
+    private static func openRightSidebarToolPane(
+        _ mode: RightSidebarMode,
+        gitRepositoryRoot: String?,
+        tabManager: TabManager,
+        sidebarSelectionState: SidebarSelectionState
+    ) {
         guard mode.canOpenAsPane, mode.isAvailable(),
               let workspace = tabManager.selectedWorkspace,
               let paneId = workspace.bonsplitController.focusedPaneId ?? workspace.bonsplitController.allPaneIds.first else {
@@ -2416,9 +2432,10 @@ struct ContentView: View {
         )
     }
 
-    /// The repository the sidebar Git Graph shows, for opening it as a tab.
+    /// The repository the sidebar Git Graph shows, for opening it as a tab; nil
+    /// unless it shows a repository.
     var gitGraphSidebarRepositoryRoot: String? {
-        gitGraphSidebarController.repositoryRoot
+        gitGraphSidebarController.readyRepositoryRoot
     }
 
     private func openFilePreviewFromSidebar(filePath: String) {
@@ -2665,8 +2682,16 @@ struct ContentView: View {
                 }
             }
             selectedWorkspaceDirectoryObserver.wire(tabManager: tabManager)
-            gitGraphSidebarController.onOpenAsTab = { repositoryRoot in
-                openRightSidebarToolPane(.git, gitRepositoryRoot: repositoryRoot)
+            // Weak captures only: capturing this view would retain the controller
+            // that stores the closure (its @State), and its watcher, past the window.
+            gitGraphSidebarController.onOpenAsTab = { [weak tabManager, weak sidebarSelectionState] repositoryRoot in
+                guard let tabManager, let sidebarSelectionState else { return }
+                ContentView.openRightSidebarToolPane(
+                    .git,
+                    gitRepositoryRoot: repositoryRoot,
+                    tabManager: tabManager,
+                    sidebarSelectionState: sidebarSelectionState
+                )
             }
             tabManager.applyWindowBackgroundForSelectedTab()
             reconcileMountedWorkspaceIds()

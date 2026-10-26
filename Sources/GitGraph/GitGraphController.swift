@@ -72,6 +72,11 @@ final class GitGraphController: ObservableObject {
     /// changes it to `.notRepository` or `.gitUnavailable` until `repo.state` reads HEAD again.
     @Published private(set) var status: GitGraphRepoStatus = .loading
     private(set) var generation: UInt64 = 0
+    /// ``repositoryRoot`` while it is a repository, else nil, so a tab opened from
+    /// this controller never pins a folder that is not one.
+    var readyRepositoryRoot: String? {
+        status == .ready ? repositoryRoot : nil
+    }
     /// Delivers `repo.changed` and `history.invalidated` to the page.
     var eventSink: ((_ event: [String: Any]) -> Void)?
     /// Called for `history.openAsTab`.
@@ -186,7 +191,7 @@ final class GitGraphController: ObservableObject {
             return ["opened": diffOpener?.openWorkingTreeDiff(repositoryRoot: root) ?? false]
         case .historyOpenAsTab:
             guard let onOpenAsTab else { return ["opened": false] }
-            onOpenAsTab(repositoryRoot)
+            onOpenAsTab(readyRepositoryRoot)
             return ["opened": true]
         }
     }
@@ -205,7 +210,8 @@ final class GitGraphController: ObservableObject {
     private func repoState(generation requestGeneration: UInt64) async throws -> [String: Any] {
         var state: [String: Any] = [:]
         if let root = repositoryRoot {
-            state["repositoryName"] = URL(fileURLWithPath: root).lastPathComponent
+            // Not `URL(fileURLWithPath:)`, which stats the path on the main actor.
+            state["repositoryName"] = (root as NSString).lastPathComponent
         }
         guard shownStatus == .ready, let root = repositoryRoot else {
             state["status"] = shownStatus.rawValue
