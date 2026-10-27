@@ -1,0 +1,3 @@
+# Catalog keys whose Vietnamese text is, on purpose, the same as the English text (product names,
+# version numbers). check-strings.py fails on any other key whose vi value copies its en value.
+root.title
