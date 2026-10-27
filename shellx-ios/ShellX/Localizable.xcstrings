@@ -19,6 +19,816 @@
         }
       }
     },
+    "common.close": {
+      "comment": "Closes a sheet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đóng"
+          }
+        }
+      }
+    },
+    "common.ok": {
+      "comment": "Dismisses an alert that only informs.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
+    "firstMac.scan": {
+      "comment": "Primary button of the first-Mac screen: opens the scanner.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan QR Code"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quét mã QR"
+          }
+        }
+      }
+    },
+    "firstMac.step2": {
+      "comment": "Second step of the first-Mac screen.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan the QR code it shows with this iPhone."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quét mã QR hiện ra bằng iPhone này."
+          }
+        }
+      }
+    },
+    "firstMac.subtitle": {
+      "comment": "Under the title of the first-Mac screen.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See and answer Claude Code on your Mac from this iPhone."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xem và trả lời Claude Code trên Mac ngay từ iPhone này."
+          }
+        }
+      }
+    },
+    "machine.state.connecting": {
+      "comment": "Status of a paired Mac: connecting or reconnecting.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecting…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang kết nối…"
+          }
+        }
+      }
+    },
+    "machine.state.hostKeyChanged": {
+      "comment": "Status of a Mac whose Link key is not the one pinned at pairing.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac's key changed. Pair again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Khoá của Mac đã đổi. Ghép cặp lại."
+          }
+        }
+      }
+    },
+    "machine.state.needsUpdate": {
+      "comment": "Status of a Mac that speaks another protocol version.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update ShellX"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cần cập nhật ShellX"
+          }
+        }
+      }
+    },
+    "machine.state.offline %@": {
+      "comment": "Status of a paired Mac that cannot be reached; %@ is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is offline"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đang offline"
+          }
+        }
+      }
+    },
+    "machine.state.online": {
+      "comment": "Status of a paired Mac: the link is live.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connected"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã kết nối"
+          }
+        }
+      }
+    },
+    "machine.state.revoked": {
+      "comment": "Status of a Mac that removed this iPhone from its paired phones.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Mac removed this iPhone"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac này đã gỡ iPhone"
+          }
+        }
+      }
+    },
+    "machines.default": {
+      "comment": "Badge on the default Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mặc định"
+          }
+        }
+      }
+    },
+    "machines.footer": {
+      "comment": "Footer under the list of paired Macs.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Touch and hold a Mac to make it the default or unpair it."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chạm và giữ một Mac để đặt làm mặc định hoặc gỡ ghép cặp."
+          }
+        }
+      }
+    },
+    "machines.makeDefault": {
+      "comment": "Context menu and swipe action: make this Mac the default.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make Default"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đặt làm mặc định"
+          }
+        }
+      }
+    },
+    "machines.pairAgain": {
+      "comment": "Button on a Mac whose key changed: scan its new code.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pair Again"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghép cặp lại"
+          }
+        }
+      }
+    },
+    "machines.remove": {
+      "comment": "Button on a Mac that already removed this iPhone: take it off the list.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xoá"
+          }
+        }
+      }
+    },
+    "machines.title": {
+      "comment": "Title of the list of paired Macs.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your Macs"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Máy của bạn"
+          }
+        }
+      }
+    },
+    "machines.unpair": {
+      "comment": "Context menu and swipe action, and the confirm button: remove this iPhone from the Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unpair"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gỡ ghép cặp"
+          }
+        }
+      }
+    },
+    "machines.unpair.failed.message %@": {
+      "comment": "Message of the alert when unpairing failed; %@ is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is still paired. Check your connection and try again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ vẫn đang được ghép cặp. Kiểm tra kết nối rồi thử lại."
+          }
+        }
+      }
+    },
+    "machines.unpair.failed.title": {
+      "comment": "Title of the alert when unpairing failed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't Unpair"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không gỡ được ghép cặp"
+          }
+        }
+      }
+    },
+    "machines.unpair.message": {
+      "comment": "Message of the unpair confirmation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This iPhone will stop getting requests from this Mac. To use it again, pair again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone này sẽ không còn nhận việc chờ từ Mac này. Muốn dùng lại thì ghép cặp lại."
+          }
+        }
+      }
+    },
+    "machines.unpair.title %@": {
+      "comment": "Title of the unpair confirmation; %@ is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unpair %@?"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gỡ ghép cặp %@?"
+          }
+        }
+      }
+    },
+    "pairing.camera.denied": {
+      "comment": "Shown instead of the scanner when the camera is not allowed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX can't use the camera. Allow it in Settings to scan the code, or paste the pairing code."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX không dùng được camera. Hãy cho phép trong Cài đặt để quét mã, hoặc dán mã ghép cặp."
+          }
+        }
+      }
+    },
+    "pairing.camera.label": {
+      "comment": "VoiceOver label of the camera viewfinder.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "QR code scanner"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Máy quét mã QR"
+          }
+        }
+      }
+    },
+    "pairing.camera.openSettings": {
+      "comment": "Button that opens the app's page in Settings.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Settings"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở Cài đặt"
+          }
+        }
+      }
+    },
+    "pairing.camera.unavailable": {
+      "comment": "Shown instead of the scanner on a device without a camera.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device has no camera. Paste the pairing code instead."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Máy này không có camera. Hãy dán mã ghép cặp."
+          }
+        }
+      }
+    },
+    "pairing.confirm.button": {
+      "comment": "Primary button: send the pairing request.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pair"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghép cặp"
+          }
+        }
+      }
+    },
+    "pairing.confirm.message": {
+      "comment": "Under the pairing question: a link from elsewhere must not pair by itself.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only pair if you just opened this code on your own Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chỉ ghép cặp nếu bạn vừa mở mã này trên Mac của mình."
+          }
+        }
+      }
+    },
+    "pairing.confirm.title %@": {
+      "comment": "Asked before any pairing request is sent; %@ is the Mac's name from the code.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pair with %@?"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghép cặp với %@?"
+          }
+        }
+      }
+    },
+    "pairing.done": {
+      "comment": "Closes the sheet after pairing.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xong"
+          }
+        }
+      }
+    },
+    "pairing.error.damagedCode": {
+      "comment": "A ShellX code with a missing or malformed field.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The pairing code is damaged. Open it again on the Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mã ghép cặp bị hỏng. Mở lại mã trên Mac."
+          }
+        }
+      }
+    },
+    "pairing.error.denied": {
+      "comment": "The user pressed Deny on the Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac declined."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac đã từ chối."
+          }
+        }
+      }
+    },
+    "pairing.error.expired": {
+      "comment": "Nobody pressed Allow in time.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The code expired. Open it again on the Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mã đã hết hạn. Mở lại mã trên Mac."
+          }
+        }
+      }
+    },
+    "pairing.error.needsUpdate": {
+      "comment": "The code comes from a newer ShellX.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This code is from a newer ShellX. Update ShellX on this iPhone."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mã này từ bản ShellX mới hơn. Hãy cập nhật ShellX trên iPhone này."
+          }
+        }
+      }
+    },
+    "pairing.error.network": {
+      "comment": "The relay could not be reached while pairing.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't reach ShellX."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không kết nối được tới ShellX."
+          }
+        }
+      }
+    },
+    "pairing.error.notShellXCode": {
+      "comment": "The scanned or pasted text is not a ShellX pairing code.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This isn't a ShellX pairing code."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đây không phải mã ghép cặp ShellX."
+          }
+        }
+      }
+    },
+    "pairing.error.otherAccount": {
+      "comment": "The Mac is signed in to another ShellX account.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Mac belongs to another account."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac này thuộc tài khoản khác."
+          }
+        }
+      }
+    },
+    "pairing.error.server %@": {
+      "comment": "Any other pairing error; %@ is the server's error code.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't pair (%@). Try again later."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không ghép cặp được (%@). Thử lại sau."
+          }
+        }
+      }
+    },
+    "pairing.instructions": {
+      "comment": "Where to find the pairing QR code on the Mac. “This Mac” and Pair iPhone… name items of the Mac app.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On your Mac, open ShellX, right-click “This Mac” and choose Pair iPhone…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trên Mac, mở ShellX, bấm chuột phải vào “Mac này” rồi chọn Ghép cặp iPhone…"
+          }
+        }
+      }
+    },
+    "pairing.paired %@": {
+      "comment": "Pairing succeeded; %@ is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paired with %@."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã ghép cặp với %@."
+          }
+        }
+      }
+    },
+    "pairing.paste": {
+      "comment": "Button: read the pairing code from the pasteboard.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste Pairing Code"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dán mã ghép cặp"
+          }
+        }
+      }
+    },
+    "pairing.retry": {
+      "comment": "Back to scanning after a failure.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try Again"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thử lại"
+          }
+        }
+      }
+    },
+    "pairing.title": {
+      "comment": "Title of the pairing sheet and of the first-Mac screen; the add button of Your Macs.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pair a Mac"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ghép cặp Mac"
+          }
+        }
+      }
+    },
+    "pairing.waiting %@": {
+      "comment": "While the Mac shows the request; %@ is the Mac's name. Allow is the Mac's button.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click Allow on %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bấm Đồng ý trên %@"
+          }
+        }
+      }
+    },
+    "pairing.waiting.detail": {
+      "comment": "Under the waiting title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep ShellX open on this iPhone until the Mac answers."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giữ ShellX mở trên iPhone này cho tới khi Mac trả lời."
+          }
+        }
+      }
+    },
     "root.title": {
       "comment": "The app's name, shown under the logo on the first screen.",
       "extractionState": "manual",

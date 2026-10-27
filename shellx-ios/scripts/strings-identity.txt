@@ -3,3 +3,4 @@
 root.title
 signin.email
 settings.about.license.value
+common.ok

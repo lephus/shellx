@@ -1,9 +1,14 @@
 import ShellXAppCore
 import SwiftUI
 
-/// Chooses the screen by the account phase: the logo while launching, sign-in, or Settings.
+/// Chooses the screen by the account phase: the logo while launching, sign-in, or the signed-in
+/// screens.
 struct RootView: View {
-    let coordinator: AppCoordinator
+    let graph: AppGraph
+    /// A `shellx-link://` link opened from outside, held until a signed-in screen takes it.
+    let inbox: PairingInbox
+
+    private var coordinator: AppCoordinator { graph.coordinator }
 
     var body: some View {
         switch coordinator.phase {
@@ -12,8 +17,14 @@ struct RootView: View {
         case let .signedOut(expired):
             SignInView(coordinator: coordinator, expired: expired)
         case let .signedIn(email):
-            NavigationStack {
-                SettingsView(email: email, signOut: { await coordinator.signOut() })
+            if let hub = coordinator.hub, hub.isLoaded {
+                SignedInView(
+                    hub: hub, email: email, inbox: inbox, makePairing: graph.makePairing,
+                    signOut: { await coordinator.signOut() }
+                )
+                .id(ObjectIdentifier(hub))
+            } else {
+                LaunchView()
             }
         }
     }
@@ -41,6 +52,6 @@ struct LaunchView: View {
 
 #if DEBUG
 #Preview {
-    RootView(coordinator: .preview())
+    RootView(graph: .preview(), inbox: PairingInbox())
 }
 #endif
