@@ -68,11 +68,17 @@ shellx-ios/scripts/dev.sh clean              # delete the private simulator and 
   `SHELLX_API_BASE` (`sim --api <url>`) when it is `https`, or `http` to the loopback host, so a
   relay on the Mac is reachable from the simulator only. Anything else is ignored.
 
+## Releasing
+
+App Store builds are made on the maintainer's Mac with `release/mobile/ios.sh`; see
+[release/mobile/README.md](../release/mobile/README.md) for the steps, the checks on the ipa and the
+App Store Connect answers. The privacy manifest is `ShellX/PrivacyInfo.xcprivacy`.
+
 ## Demo mode
 
 `dev.sh sim --demo` (or `device --demo`) launches a Debug build with `SHELLX_DEMO=1`: the app skips
 sign-in and is paired with a fake Mac running inside the app, with pending requests, agent sessions
-and chat, so the UI can be worked on without a real Mac. Release builds ignore it. The fake Mac
+and chat, so the UI can be worked on without a real Mac. Release builds contain none of it. The fake Mac
 arrives with the account and link work; until then the flag is passed through and has no effect.
 
 ## Strings
