@@ -5,6 +5,11 @@ import Speech
 /// The mic's permissions from iOS: the microphone (`NSMicrophoneUsageDescription`) and speech
 /// recognition (`NSSpeechRecognitionUsageDescription`). Each asks once, the first time it is needed.
 struct SystemVoicePermissions: VoicePermissionChecking {
+    func needsPrompt() async -> Bool {
+        AVAudioApplication.shared.recordPermission == .undetermined
+            || SFSpeechRecognizer.authorizationStatus() == .notDetermined
+    }
+
     func microphone() async -> Bool {
         switch AVAudioApplication.shared.recordPermission {
         case .granted: return true

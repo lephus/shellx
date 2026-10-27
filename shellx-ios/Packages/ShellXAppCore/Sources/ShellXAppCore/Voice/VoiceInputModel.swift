@@ -11,7 +11,11 @@ import Observation
 /// - Past `maxBytes` UTF-8 bytes, listening stops on its own; the words within the limit are kept
 ///   and `limitReached` is set, so nothing longer than the composer accepts is ever sent.
 /// - `firstWordLatency` is the time from `press()` to the first update with a word, also recorded
-///   in the `LatencyLog` (`firstWord`, target 300 ms). Transcripts are never logged.
+///   in the `LatencyLog` (`firstWord`, target 300 ms); not for a press that showed a permission
+///   prompt. Transcripts are never logged.
+/// - The microphone is always given back: on release, cancel, `typeInstead()`, and when the
+///   recognizer's stream ends by itself. Each press is its own `SpeechRunID`, so stopping an old
+///   press never stops a newer one.
 @MainActor @Observable
 public final class VoiceInputModel {
     public enum Phase: Equatable, Sendable {
@@ -54,6 +58,9 @@ public final class VoiceInputModel {
         case starting
         /// Running: updates are taken.
         case running
+        /// Released: `finish` was asked for; late updates are still taken, but the stream's end is
+        /// not an end by itself.
+        case finishing
         /// Stopped by itself (the limit, an error, its own end): what was heard is kept.
         case stopped
     }
@@ -72,6 +79,8 @@ public final class VoiceInputModel {
     @ObservationIgnored private var text = ""
     @ObservationIgnored private var elapsed: (@MainActor () -> Duration)?
     @ObservationIgnored private var reader: Task<Void, Never>?
+    /// The current press's run: the transcriber's `finish` and `cancel` name it.
+    @ObservationIgnored private var run: SpeechRunID?
 
     public init(
         transcriber: any SpeechTranscribing, permissions: any VoicePermissionChecking,
@@ -117,6 +126,8 @@ public final class VoiceInputModel {
         guard !isActive else { return }
         attempt += 1
         let current = attempt
+        let run = SpeechRunID()
+        self.run = run
         released = false
         recognition = .starting
         text = ""
@@ -126,6 +137,8 @@ public final class VoiceInputModel {
         elapsed = startStopwatch()
         phase = .listening(text: "")
 
+        // A system prompt's time is not speech latency: that press records no first-word sample.
+        if await permissions.needsPrompt(), attempt == current { elapsed = nil }
         guard await permissions.microphone() else { return refuse(current, .denied(.microphone)) }
         guard await permissions.speech() else { return refuse(current, .denied(.speech)) }
         guard await capabilities(language).engine != nil else { return refuse(current, .unavailable) }
@@ -133,17 +146,18 @@ public final class VoiceInputModel {
 
         let stream: AsyncThrowingStream<String, any Error>
         do {
-            stream = try await transcriber.start(locale: language.locale, contextualStrings: contextualStrings())
+            stream = try await transcriber.start(
+                run: run, locale: language.locale, contextualStrings: contextualStrings())
         } catch {
             return refuse(current, .unavailable)
         }
         guard attempt == current, !released else {
-            // Released while the recognizer started: stop it again.
-            await transcriber.cancel()
+            // Released while the recognizer started: stop that run, and only that one.
+            await transcriber.cancel(run: run)
             return
         }
         recognition = .running
-        reader = Task { [weak self] in await self?.read(stream, attempt: current) }
+        reader = Task { [weak self] in await self?.read(stream, attempt: current, run: run) }
     }
 
     /// The finger moved by (`dx`, `dy`) points from where it went down.
@@ -154,9 +168,9 @@ public final class VoiceInputModel {
         }
         if dy <= -Self.keyboardDistance, Self.isBlank(text) {
             wantsKeyboard = true
-            if stop() {
+            if let run = drop() {
                 let transcriber = self.transcriber
-                Task { await transcriber.cancel() }
+                Task { await transcriber.cancel(run: run) }
             }
             return
         }
@@ -170,7 +184,7 @@ public final class VoiceInputModel {
         case .listening:
             break
         case .cancelArmed:
-            if stop() { await transcriber.cancel() }
+            if let run = drop() { await transcriber.cancel(run: run) }
             return nil
         default:
             released = true
@@ -179,14 +193,16 @@ public final class VoiceInputModel {
         switch recognition {
         case .starting:
             // The press stops the recognizer if it starts after all.
-            _ = stop()
+            _ = drop()
             return nil
-        case .stopped:
+        case .stopped, .finishing:
             phase = .idle
             return Self.nonBlank(text)
         case .running:
+            guard let run else { return nil }
             phase = .finishing
-            let finalText = await transcriber.finish()
+            recognition = .finishing
+            let finalText = await transcriber.finish(run: run)
             recognition = .stopped
             reader?.cancel()
             reader = nil
@@ -196,12 +212,25 @@ public final class VoiceInputModel {
         }
     }
 
-    /// Stops listening at once and drops the words: the mic's screen went away. Does nothing while
-    /// nothing listens.
+    /// What released words become: everything said, or words stopped at `maxBytes`, which the
+    /// composer puts in its field to be read rather than sending (and the mic plays no success).
+    public func outcome(for words: String) -> DictationOutcome {
+        limitReached ? .cutAtLimit(words) : .complete(words)
+    }
+
+    /// The user chose the keyboard (the keyboard button, "Type instead"): a dictation in progress is
+    /// cancelled and its words dropped, so nothing heard while typing is sent later. A "can't listen"
+    /// notice stays until typing clears it (`dismiss()`).
+    public func typeInstead() async {
+        await cancel()
+    }
+
+    /// Stops listening at once and drops the words: the mic's screen went away, the audio was
+    /// interrupted or the app left the foreground. Does nothing while nothing listens.
     public func cancel() async {
         switch phase {
         case .listening, .cancelArmed:
-            if stop() { await transcriber.cancel() }
+            if let run = drop() { await transcriber.cancel(run: run) }
         default:
             break
         }
@@ -226,22 +255,24 @@ public final class VoiceInputModel {
         phase = reason
     }
 
-    /// Stops listening now and drops the words. True when the recognizer was running: the caller
-    /// cancels it.
-    private func stop() -> Bool {
+    /// Stops listening now and drops the words. Returns the run when its recognizer was running: the
+    /// caller cancels it.
+    private func drop() -> SpeechRunID? {
         released = true
         let wasRunning = recognition == .running
         recognition = .stopped
         reader?.cancel()
         reader = nil
         phase = .idle
-        return wasRunning
+        return wasRunning ? run : nil
     }
 
-    private func read(_ stream: AsyncThrowingStream<String, any Error>, attempt current: Int) async {
+    /// Takes the run's updates. When the stream ends by itself (an error, a time limit), the words
+    /// heard stay for release, and the run is cancelled so the microphone is given back at once.
+    private func read(_ stream: AsyncThrowingStream<String, any Error>, attempt current: Int, run: SpeechRunID) async {
         do {
             for try await update in stream {
-                guard attempt == current, recognition == .running else { return }
+                guard attempt == current, recognition == .running || recognition == .finishing else { return }
                 take(update)
             }
             guard attempt == current, recognition == .running else { return }
@@ -255,6 +286,7 @@ public final class VoiceInputModel {
                 phase = .unavailable
             }
         }
+        await transcriber.cancel(run: run)
     }
 
     private func take(_ update: String) {
@@ -270,11 +302,11 @@ public final class VoiceInputModel {
         case .cancelArmed: phase = .cancelArmed(text: kept)
         default: break
         }
-        if limitReached, recognition == .running {
+        if limitReached, recognition == .running, let run {
             // Stop listening at the limit; the kept words stay until release.
             recognition = .stopped
             let transcriber = self.transcriber
-            Task { await transcriber.cancel() }
+            Task { await transcriber.cancel(run: run) }
         }
     }
 

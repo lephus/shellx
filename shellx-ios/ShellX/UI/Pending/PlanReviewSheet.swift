@@ -105,6 +105,22 @@ struct PlanReviewSheet: View {
         .onChange(of: voice?.wantsKeyboard ?? false, initial: true) { _, wants in
             guard wants else { return }
             voice?.wantsKeyboard = false
+            typeFeedback()
+        }
+        // Typing in the field (it stays on screen beside the mic) cancels a dictation in progress.
+        .onChange(of: feedbackFocused) { _, isFocused in
+            guard isFocused else { return }
+            let voice = self.voice
+            Task { await voice?.typeInstead() }
+        }
+    }
+
+    /// The keyboard for the feedback field; a dictation in progress is cancelled first
+    /// (`VoiceInputModel.typeInstead()`).
+    private func typeFeedback() {
+        let voice = self.voice
+        Task { @MainActor in
+            await voice?.typeInstead()
             feedbackFocused = true
         }
     }
@@ -203,17 +219,22 @@ struct PlanReviewSheet: View {
                 if let voice {
                     MicButton(
                         model: voice, label: LocalizedStringResource("pending.plan.voice"), diameter: 44,
-                        onText: addFeedback, onKeyboard: { feedbackFocused = true })
+                        onOutcome: { addFeedback($0.words) }, onKeyboard: typeFeedback)
                 }
             }
             ByteCounter(used: feedbackBytes, limit: DecisionCenter.maxFeedbackBytes)
             HStack(spacing: 8) {
                 wideButton(LocalizedStringResource("common.cancel"), primary: false) {
+                    // The mic goes with this step: a dictation in progress stops with it.
+                    let voice = self.voice
+                    Task { await voice?.cancel() }
                     revising = false
                     feedbackFocused = false
                 }
                 wideButton(LocalizedStringResource("pending.plan.sendFeedback"), primary: true) {
                     guard canSendFeedback else { return }
+                    let voice = self.voice
+                    Task { await voice?.cancel() }
                     feedbackFocused = false
                     decide(.exitPlan(.deny, feedback: trimmedFeedback))
                 }

@@ -44,7 +44,7 @@ final class MicButtonRenderTests: XCTestCase {
         let transcriber = FakeTranscriber()
         let service = VoiceService(
             transcriber: transcriber, permissions: FakeVoicePermissions(microphone: microphone),
-            capabilities: { _ in capabilities }, meter: AudioLevelMeter(level: 0.6), latency: LatencyLog(),
+            cache: VoiceCapabilityCache { _ in capabilities }, meter: AudioLevelMeter(level: 0.6), latency: LatencyLog(),
             defaults: defaults, contextualStrings: { [] })
         return Rig(service: service, model: service.makeModel(maxBytes: maxBytes), transcriber: transcriber)
     }
@@ -158,6 +158,16 @@ final class MicButtonRenderTests: XCTestCase {
             )
             .environment(rig.service),
             name: "pending-question-voice-no-match")
+    }
+
+    func testQuestionSheetListeningRenders() async throws {
+        // The mic and its words sit in the bottom bar, outside the list.
+        let rig = try makeRig(maxBytes: QuestionDraft.maxAnswerBytes)
+        await listen(rig, saying: "cái thứ hai")
+        try assertRenders(
+            QuestionAnswerSheet(item: Self.question, state: PendingSheetState(), send: { _ in }, close: {}, voice: rig.model)
+                .environment(rig.service),
+            name: "pending-question-voice-listening")
     }
 
     func testPlanSheetFeedbackMicRenders() async throws {

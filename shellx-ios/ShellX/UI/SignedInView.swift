@@ -14,6 +14,7 @@ struct SignedInView: View {
 
     @State private var path = NavigationPath()
     @State private var showsPairing = false
+    @Environment(\.scenePhase) private var scenePhase
 
     private var hub: MachineHub { scope.hub }
 
@@ -59,6 +60,11 @@ struct SignedInView: View {
         // The center follows the hub's whole list here, outside any body; the cards only read it.
         .onChange(of: hub.pendingItems) { _, items in scope.decisions.sync(items) }
         .task { await scope.home.run() }
+        // Leaving the foreground stops every mic, in touch and in VoiceOver tap mode alike.
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .background, let voice = scope.voice else { return }
+            Task { await voice.cancelAll() }
+        }
     }
 
     private func openPairing() {

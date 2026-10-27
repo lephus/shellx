@@ -8,7 +8,9 @@ import XCTest
 @MainActor
 final class VoiceCapabilityProbeTests: XCTestCase {
     func testProbeReturnsEngineForEnglish() async {
-        let probe = VoiceCapabilityProbe(assets: AnalyzerAssets())
+        // The analyzer check is left out: asking it would start real asset downloads on the shared
+        // simulator, and its answer would then change between runs.
+        let probe = VoiceCapabilityProbe { _ in false }
         let english = await probe.capabilities(for: .english)
         XCTAssertNotNil(english.engine, "en-US runs on the device or on Apple's servers: \(english)")
 
@@ -21,6 +23,14 @@ final class VoiceCapabilityProbeTests: XCTestCase {
             line += "; SpeechTranscriber vi-VN \(analyzer.speech), DictationTranscriber vi-VN \(analyzer.dictation)"
         }
         print(line)
+    }
+
+    func testProbeTakesTheAnalyzerAnswerItIsGiven() async {
+        let probe = VoiceCapabilityProbe { $0.identifier == "vi-VN" }
+        let vietnamese = await probe.capabilities(for: .vietnamese)
+        XCTAssertEqual(vietnamese.engine, .analyzer)
+        let english = await probe.capabilities(for: .english)
+        XCTAssertFalse(english.analyzerSupportsLocale)
     }
 
     func testSettingsLineSaysWhereTheVoiceGoes() {

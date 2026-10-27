@@ -133,7 +133,7 @@ struct ComposerBar<Accessory: View>: View {
     /// The mic in the middle, the keyboard button at the trailing edge, the hint below.
     private func micRow(_ voice: VoiceInputModel) -> some View {
         VStack(spacing: 4) {
-            MicButton(model: voice, label: LocalizedStringResource("voice.mic"), onText: said, onKeyboard: openKeyboard)
+            MicButton(model: voice, label: LocalizedStringResource("voice.mic"), onOutcome: said, onKeyboard: openKeyboard)
                 .frame(maxWidth: .infinity)
                 .overlay(alignment: .trailing) {
                     Button(action: openKeyboard) {
@@ -154,22 +154,29 @@ struct ComposerBar<Accessory: View>: View {
         .padding(.top, 2)
     }
 
+    /// The keyboard button, "Type instead", a swipe up, or no recognizer: a dictation in progress is
+    /// cancelled first (`VoiceInputModel.typeInstead()`), so nothing heard while typing is sent later.
     private func openKeyboard() {
+        let voice = self.voice
         typing = true
-        // The field appears in this update; focus it in the next one.
-        Task { @MainActor in focused = true }
+        Task { @MainActor in
+            await voice?.typeInstead()
+            // The field appeared in the update before; focus it now.
+            focused = true
+        }
     }
 
-    /// Released with words: sent, unless the dictation stopped at the limit; those words go into the
-    /// field, to be read before sending.
-    private func said(_ words: String) {
-        if voice?.limitReached == true {
+    /// Released with words: whole ones are sent; words stopped at the limit go into the field, to be
+    /// read before sending (`VoiceInputModel.outcome(for:)`).
+    private func said(_ outcome: DictationOutcome) {
+        switch outcome {
+        case let .complete(words):
+            (sendVoice ?? send)(words)
+        case let .cutAtLimit(words):
             text = words
             cutText = words
             openKeyboard()
-            return
         }
-        (sendVoice ?? send)(words)
     }
 }
 

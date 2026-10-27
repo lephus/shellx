@@ -7,9 +7,10 @@ import SwiftUI
 /// picks that join to more, is counted and said, never cut silently. When the item was decided
 /// elsewhere meanwhile, the sheet says so and nothing can be sent.
 ///
-/// With a `VoiceService` in the environment, "Answer by voice" listens: words that pick exactly one
-/// option (`PendingQuestion.option(matching:)`) mark it; anything else becomes the "Other…" answer,
-/// shown in its field with "That didn't match an option". Nothing is sent until the user taps Send.
+/// With a `VoiceService` in the environment, "Answer by voice" (in the bottom bar, outside the list)
+/// listens: words that pick exactly one option (`PendingQuestion.option(matching:)`) mark it;
+/// anything else becomes the "Other…" answer, shown in its field with "That didn't match an option".
+/// Nothing is sent until the user taps Send. Opening the "Other…" field cancels a dictation.
 struct QuestionAnswerSheet: View {
     let item: MachinePendingItem
     let state: PendingSheetState
@@ -89,7 +90,6 @@ struct QuestionAnswerSheet: View {
                 if let question {
                     promptSection(question)
                     optionsSection(question)
-                    if let voice, editable { voiceSection(question, voice: voice) }
                 }
             }
             .disabled(!editable)
@@ -125,34 +125,45 @@ struct QuestionAnswerSheet: View {
             voice?.wantsKeyboard = false
             openOther(question)
         }
+        // Typing in an "Other…" field cancels a dictation in progress.
+        .onChange(of: focused) { _, field in
+            guard field != nil else { return }
+            let voice = self.voice
+            Task { await voice?.typeInstead() }
+        }
     }
 
-    /// Opens the question's "Other…" field and its keyboard.
+    /// Opens the question's "Other…" field and its keyboard. A dictation in progress is cancelled
+    /// first (`VoiceInputModel.typeInstead()`).
     private func openOther(_ question: PendingQuestion) {
+        let voice = self.voice
         typing.insert(question.id)
-        // The field appears in this update; focus it in the next one.
-        Task { @MainActor in focused = question.id }
+        Task { @MainActor in
+            await voice?.typeInstead()
+            // The field appeared in the update before; focus it now.
+            focused = question.id
+        }
     }
 
     // MARK: - Voice
 
-    /// "Answer by voice": the words as they come, and the mic. ("That didn't match an option" shows
-    /// under the options, by the "Other…" field the words went into.)
-    private func voiceSection(_ question: PendingQuestion, voice: VoiceInputModel) -> some View {
-        Section {
-            VStack(spacing: 8) {
-                VoiceStatusView(model: voice, level: voiceService?.meter.level ?? 0)
+    /// "Answer by voice", in the bottom bar (outside the list, so holding the mic never scrolls it):
+    /// the words as they come, then the mic and its label. ("That didn't match an option" shows under
+    /// the options, by the "Other…" field the words went into.)
+    private func voiceRow(_ question: PendingQuestion, voice: VoiceInputModel) -> some View {
+        VStack(spacing: 6) {
+            VoiceStatusView(model: voice, level: voiceService?.meter.level ?? 0)
+            HStack(spacing: 12) {
                 MicButton(
                     model: voice, label: LocalizedStringResource("pending.question.voice"),
-                    onText: { answer(question, bySaying: $0) },
+                    onOutcome: { answer(question, bySaying: $0.words) },
                     onKeyboard: { openOther(question) })
                 Text(LocalizedStringResource("pending.question.voice"))
-                    .font(.footnote)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityHidden(true)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
         }
     }
 
@@ -256,8 +267,7 @@ struct QuestionAnswerSheet: View {
         let text = fieldText(question)
         let answeredByText = QuestionDraft.freeTextBytes(text) > 0
         Button {
-            typing.insert(question.id)
-            focused = question.id
+            openOther(question)
         } label: {
             ChoiceRow(selected: answeredByText) {
                 Text(LocalizedStringResource("pending.question.other"))
@@ -291,6 +301,9 @@ struct QuestionAnswerSheet: View {
 
     private var bottomBar: some View {
         VStack(spacing: 8) {
+            if let voice, editable, let question {
+                voiceRow(question, voice: voice)
+            }
             PendingCardStatusLine(
                 status: state.shownStatus, actionable: state.actionable, machineName: item.machineName,
                 retry: sendDraft)

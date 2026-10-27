@@ -2,20 +2,23 @@ import ShellXAppCore
 import SwiftUI
 
 /// The mic (spec section 4): a round #60a5fa button with a #0b1220 mic, held to talk. Lifting the
-/// finger hands the words to `onText`; dragging left arms cancel (`VoiceInputModel.drag`); swiping
-/// up before any word asks for the keyboard (the host watches `wantsKeyboard`). A light tap starts,
-/// success sends, a warning cancels (haptics).
+/// finger hands what was said to `onOutcome` (`VoiceInputModel.outcome(for:)`); dragging left arms
+/// cancel (`VoiceInputModel.drag`); swiping up before any word asks for the keyboard (the host
+/// watches `wantsKeyboard`). Haptics: a light tap as listening starts, success when the words are
+/// taken whole (not for words stopped at the byte limit, which go to a field to be read), a warning
+/// on cancel.
 ///
 /// With VoiceOver on, the hold gesture is off and the button works by taps: the first starts
 /// listening, the next one finishes. "Cancel" (while listening) and "Type instead" are actions of the
-/// button, so neither needs a gesture.
+/// button, so neither needs a gesture. The host's "Type instead" cancels a dictation in progress
+/// (`VoiceInputModel.typeInstead()`).
 struct MicButton: View {
     let model: VoiceInputModel
     /// What VoiceOver calls the button.
     let label: LocalizedStringResource
     var diameter: CGFloat = 58
-    /// The words said, trimmed and not empty.
-    let onText: (String) -> Void
+    /// What was said (trimmed, not empty), whole or stopped at the limit.
+    let onOutcome: (DictationOutcome) -> Void
     /// Opens the keyboard ("Type instead"); nil hides that action.
     var onKeyboard: (() -> Void)?
 
@@ -82,8 +85,9 @@ struct MicButton: View {
         let armed = Self.isCancelArmed(model.phase)
         Task {
             if let text = await model.release() {
-                sends += 1
-                onText(text)
+                let outcome = model.outcome(for: text)
+                if case .complete = outcome { sends += 1 }
+                onOutcome(outcome)
             } else if armed {
                 cancels += 1
             }
