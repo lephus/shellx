@@ -114,9 +114,9 @@ public actor LinkClient {
 
     /// Asks the host for the full pending set.
     ///
-    /// Throws `LinkClientError.timedOut` when no snapshot arrives within the request timeout
-    /// (10 s), for example because the host could not fit it in one frame and dropped it
-    /// (PROTOCOL.md section 6); the session stays usable, and a snapshot that arrives late is
+    /// Throws `LinkClientError.remote(code: "too_large", ...)` when the host could not fit the
+    /// snapshot in one frame (PROTOCOL.md section 6), and `.timedOut` when no answer arrives within
+    /// the request timeout (10 s); the session stays usable, and a snapshot that arrives late is
     /// dropped (its `call_id` is no longer awaited). Throws `.sessionClosed` when the session
     /// ends first.
     public func snapshot() async throws -> (revision: Int, pending: [PendingItem]) {

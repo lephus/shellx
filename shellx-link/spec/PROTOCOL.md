@@ -99,7 +99,7 @@ Every request that expects exactly one answer carries a `call_id`: `agent.snapsh
 | `ping` | either | Keep-alive / latency probe | `nonce` uint64 |
 | `pong` | either | Immediately after `ping`, echoing it | `nonce` uint64 (same value) |
 
-Error codes in use: `protocol_mismatch`, `bad_request`. Others MAY be added; receivers treat
+Error codes in use: `protocol_mismatch`, `bad_request`, `too_large`. Others MAY be added; receivers treat
 an unrecognized code as a generic error.
 
 `revision` counts changes of the pending set. A host MUST raise it by exactly 1 with each
@@ -213,8 +213,12 @@ previews in steps and re-encodes after each step, stopping at the first that fit
 2. every `tool_input_preview` and `plan_preview` truncated to at most 1024 bytes;
 3. `tool_input_preview` and `plan_preview` omitted on every item.
 
-If the frame still does not fit after step 3, the host MUST NOT send it; it logs the failure
-(a client recovers through `agent.snapshot.get`, which the host answers with the same rule).
+If the frame still does not fit after step 3, the host MUST NOT send it. When it was the answer
+to a call, the host sends `error` with code `too_large` and that `call_id` instead, so the call
+still gets exactly one answer (section 3); the client fails that call. This holds for every
+answer to a call, not only snapshots. A push that answers no call, such as `agent.changed`, is
+logged and dropped; a client recovers through `agent.snapshot.get`, which the host answers with
+the same rule.
 Splitting one logical message into several frames is not defined in v1.
 
 ## 7. Error handling and session phases

@@ -130,7 +130,7 @@ public actor LinkHost {
             case let .snapshotGet(callId):
                 // Answered in order, so snapshot replies follow the order of the requests.
                 let snapshot = await feed.snapshot()
-                await Self.sendShrinking(on: channel, items: snapshot.pending) {
+                await Self.sendShrinking(on: channel, items: snapshot.pending, answering: callId) {
                     .snapshot(callId: callId, revision: snapshot.revision, pending: $0)
                 }
             case let .reply(callId, requestId, decision):
@@ -164,12 +164,18 @@ public actor LinkHost {
         try? await channel.send(.error(code: code, message: message, callId: callId))
     }
 
-    /// Sends a message built from `items`, shrinking previews when the frame is too large.
+    /// Sends a message built from `items`, shrinking previews when the frame is too large. When it still
+    /// does not fit, an answer to call `callId` becomes `error` `too_large` with that id (PROTOCOL.md
+    /// section 6); a push (no `callId`) is logged and dropped.
     private static func sendShrinking(
-        on channel: SecureChannel, items: [PendingItem], _ make: ([PendingItem]) -> LinkMessage
+        on channel: SecureChannel, items: [PendingItem], answering callId: String? = nil,
+        _ make: ([PendingItem]) -> LinkMessage
     ) async {
         guard let frame = shrunkFrame(items: items, make) else {
-            linkLog.error("dropping a frame that does not fit even without previews (\(items.count) items)")
+            linkLog.error("a frame does not fit even without previews (\(items.count) items)")
+            if let callId {
+                await sendError(on: channel, "too_large", "the answer does not fit in one frame", callId: callId)
+            }
             return
         }
         try? await channel.send(frame: frame)

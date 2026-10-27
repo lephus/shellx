@@ -326,9 +326,9 @@ final class LinkSessionTests: XCTestCase {
 
     // MARK: - Request timeout
 
-    func testDroppedSnapshotTimesOutAndSessionStaysUsable() async throws {
-        // One item that does not fit in a frame even without its preview: the host must drop the
-        // snapshot (PROTOCOL.md section 6) and the client must not wait forever.
+    func testOversizedSnapshotAnswersTooLargeAndSessionStaysUsable() async throws {
+        // One item that does not fit in a frame even without its preview: the host answers the call
+        // with `error` `too_large` (PROTOCOL.md section 6) instead of leaving it unanswered.
         let huge = PendingItem(
             requestId: "huge", kind: .permission, agent: "claude", workspaceId: "ws-1",
             workspaceTitle: String(repeating: "w", count: 70_000), createdAtMs: 1)
@@ -339,16 +339,15 @@ final class LinkSessionTests: XCTestCase {
         let (end, served) = startServe(rig.host)
         let client = try await connectClient(end, rig, timings: quickRequests)
 
-        let start = ContinuousClock.now
         do {
             _ = try await within { try await client.snapshot() }
-            XCTFail("a dropped snapshot was answered")
+            XCTFail("an oversized snapshot was answered")
         } catch {
-            XCTAssertEqual(error as? LinkClientError, .timedOut, "unexpected error \(error)")
+            guard case let .remote(code, _)? = error as? LinkClientError else {
+                return XCTFail("unexpected error \(error)")
+            }
+            XCTAssertEqual(code, "too_large")
         }
-        let waited = ContinuousClock.now - start
-        XCTAssertGreaterThanOrEqual(waited, .milliseconds(150))
-        XCTAssertLessThan(waited, .seconds(3))
 
         feed.resolveLocally(requestId: "huge")
         feed.add(permissionItem("r1"))
