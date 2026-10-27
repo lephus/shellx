@@ -20,6 +20,7 @@ import { newSlot } from "./v2/encoding.js";
 import { shareRoutes } from "./v2/shares.js";
 import { relayTicketRoutes } from "./v2/relay-tickets.js";
 import { machinePairingRoutes, randomPairingCode } from "./v2/pairings.js";
+import { phoneGrantRoutes, phonePairingRoutes } from "./v2/phones.js";
 import type { PushGateway } from "./push/fcm.js";
 import { webSocketAuth, webSocketUpgrade } from "./routes/ws.js";
 import { readNativeLatest } from "./native-latest.js";
@@ -117,6 +118,8 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   app.route("/v1/notifications", notificationRoutes);
   app.route("/v2/machines", machineRoutes);
   app.route("/v2/pairings", machinePairingRoutes);
+  app.route("/v2/phone-pairings", phonePairingRoutes);
+  app.route("/v2/phone-grants", phoneGrantRoutes);
   app.route("/v2/relay/tickets", relayTicketRoutes);
   app.route("/v2/shares", shareRoutes);
   app.get("/v1/ws", webSocketAuth, webSocketUpgrade);
