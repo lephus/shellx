@@ -32,7 +32,7 @@
 Mọi mục dưới đây là **[người viết plan]**, builder có thể xem lại.
 
 **D1. Thư mục và project Xcode.**
-- App nằm ở `shellx-ios/` (gốc repo), có `LICENSE` riêng (xem câu hỏi 3).
+- App nằm ở `shellx-ios/` (gốc repo), có `LICENSE` riêng: "All rights reserved" (quyết định 3 của người dùng).
 - `shellx-ios/ShellX.xcodeproj` được commit, viết tay một lần với `objectVersion = 77`. `ShellX/` và `ShellXTests/` là `PBXFileSystemSynchronizedRootGroup` (thư mục đồng bộ, Xcode 16+), nên thêm hay đổi tên file Swift không đụng tới `project.pbxproj`.
 - Mọi build setting nằm trong `shellx-ios/Config/*.xcconfig`, nên diff đọc được.
 - `Info.plist` và entitlements nằm ở `Config/`, ngoài thư mục đồng bộ, để khỏi bị chép thành resource.
@@ -82,7 +82,7 @@ Dùng danh sách cho phép thay vì danh sách cấm: một module GPL mới th�
 - **Gỡ app:** Keychain còn lại sau khi gỡ app (đó là hành vi của iOS). Cài lại thì vẫn đăng nhập và vẫn ghép cặp, chỉ mất lịch sử.
 - **Đăng xuất và token hết hạn:** luật ở Task 2. Đăng xuất gỡ ghép cặp mọi Mac rồi xoá hết, để Mac không còn liệt kê một iPhone đã chết. Token hết hạn (401) chỉ xoá token: relay giữ `device_id` theo khoá công khai, nên đăng nhập lại cùng tài khoản thì grant còn nguyên.
 
-**D7. Màn chính trong P3, khi chưa có AI điều phối (P6).** Xem câu hỏi 1.
+**D7. Màn chính trong P3, khi chưa có AI điều phối (P6).** Người dùng đã chọn mặc định này (quyết định 1).
 - **Ghim trên cùng:** "Cần bạn · N", gồm việc chờ của mọi Mac, ghim tới khi được xử lý.
 - **Dưới đó:** "Agent · N". Mỗi phiên Claude Code còn sống là một dòng: chấm màu trạng thái, workspace, Mac, và trạng thái đó kéo dài bao lâu. Bấm vào thì mở chi tiết agent.
 - **Dòng thời gian:** câu người dùng đã nói hoặc gõ, và tin của "ShellX". Tin của ShellX là câu soạn sẵn, không phải AI, ví dụ:
@@ -111,17 +111,17 @@ Dùng danh sách cho phép thay vì danh sách cấm: một module GPL mới th�
 
 P3b được viết sau P3 Task 8. Màn chi tiết agent của P3 chưa có nút terminal.
 
-## Câu hỏi cho người dùng (plan đang theo mặc định)
+## Quyết định của người dùng (2026-10-27)
 
-1. **Màn chính P3 (D7).**
-   - Mặc định: nhắn việc vào một phiên Claude Code đang chạy; chưa mở được phiên mới từ điện thoại cho tới P5/P6.
-   - Nếu muốn "giao việc mới" ngay ở P3 (mở workspace ở một thư mục rồi chạy Claude Code), phải thêm message vào giao thức và làm phần Mac (thuộc P2), cỡ một task mỗi bên.
-2. **Trả lời câu hỏi của agent.**
-   - Giao thức chỉ cho chọn đáp án có sẵn (theo `label`). P3 cho trả lời bằng giọng nói bằng cách khớp câu nói với một đáp án.
-   - Nếu cần trả lời tự do ("Khác…") ngay, phải thêm trường vào giao thức và sửa P2 Task 10.
-3. **`shellx-ios/LICENSE`.**
-   - Mặc định: "All rights reserved". Đổi sang MIT sau vẫn được; còn đã phát hành theo MIT thì không rút lại được.
-   - Có muốn dùng MIT như `shellx-link/` không?
+1. **Màn chính P3 (D7):** giữ mặc định. Ô soạn nhắn việc vào một phiên Claude Code đang chạy; chưa mở phiên mới từ điện thoại cho tới P5/P6.
+2. **Trả lời câu hỏi của agent:** **có trả lời tự do ("Khác…") ngay ở P3.** Giao thức đã đổi ở P2 Task 4b (`shellx-link/spec/PROTOCOL.md` §4 Decision, §5 luật 3):
+   - `selections` theo vị trí: `selections[i]` trả lời `questions[i]`, số phần tử bằng số câu hỏi;
+   - mỗi phần tử dài 1–1024 byte UTF-8;
+   - phần tử trùng `label` là chọn đáp án đó, chuỗi khác là câu trả lời tự do;
+   - câu chọn nhiều nối các `label` đã chọn bằng `", "`.
+
+   Mac nhận ở P2 Task 10. Phần app nằm ở Task 5 (`QuestionDraft`, sheet câu hỏi) và Task 9 (giọng nói).
+3. **`shellx-ios/LICENSE`:** "All rights reserved".
 
 ## Global Constraints
 
@@ -661,9 +661,12 @@ P3b được viết sau P3 Task 8. Màn chi tiết agent của P3 chưa có nút
     - **kind lạ:** `[.openOnMac]`.
   - **`QuestionDraft`:** `public struct QuestionDraft: Equatable, Sendable`, gồm:
     - `init(questions: [PendingQuestion])`;
-    - `mutating func toggle(questionID: String, label: String)`: câu chọn một thì thay đáp án cũ; câu chọn nhiều thì bật hoặc tắt;
-    - `var isComplete: Bool`;
-    - `var decision: LinkDecision?` = `.question(selections:)`, xếp theo thứ tự câu hỏi rồi thứ tự đáp án.
+    - `mutating func toggle(questionID: String, label: String)`: câu chọn một thì thay đáp án cũ; câu chọn nhiều thì bật hoặc tắt. Chọn một đáp án thì xoá chữ tự do của câu đó;
+    - `mutating func setFreeText(questionID: String, text: String)`: câu trả lời "Khác…" cho câu đó; chữ không rỗng thì thay mọi đáp án đã chọn của câu đó. Chữ bị cắt còn 1024 byte UTF-8, đúng ranh giới ký tự;
+    - `var isComplete: Bool`: câu nào cũng có đáp án hoặc chữ tự do;
+    - `var decision: LinkDecision?` = `.question(selections:)` theo luật vị trí của P2 Task 4b. Mỗi câu hỏi đúng một phần tử, theo thứ tự câu hỏi: chữ tự do nếu có; nếu không thì `label` đã chọn, câu chọn nhiều nối các `label` bằng `", "` theo thứ tự đáp án.
+    - Test thêm: `testFreeTextAnswerIsPositional`, `testChoosingOptionClearsFreeText`, `testMultiSelectJoinsLabels`, `testFreeTextCutAt1024Bytes`.
+  - **Sheet câu hỏi:** mỗi câu hỏi có thêm dòng "Khác…" / "Other…" mở ô nhập chữ (bàn phím hoặc giữ mic). Chuỗi vi/en theo `skills/cmux-localization`.
   - **Gửi quyết định:**
     - `public protocol DecisionSending: Sendable { @MainActor func reply(_ key: PendingKey, decision: LinkDecision) async throws -> ReplyOutcome }`; `MachineHub` conform.
     - `public enum DecisionStatus: Equatable, Sendable { case sending, done, handledElsewhere, failed(DecisionFailure) }`.
@@ -998,6 +1001,7 @@ P3b được viết sau P3 Task 8. Màn chi tiết agent của P3 chưa có nút
       - câu nói chứa label (label có ít nhất 2 ký tự);
       - câu nói chỉ số thứ tự: "1", "một", "thứ nhất", "đầu tiên", "first", "số hai", "cái thứ hai"…
     - Chỉ trả về khi đúng một đáp án khớp.
+    - Không khớp đáp án nào (hoặc khớp nhiều hơn một) thì câu nói thành chữ tự do của câu hỏi đó (`QuestionDraft.setFreeText`). Sheet hiện chữ đó để người dùng xem lại rồi mới gửi, không tự gửi.
 
 **Phần của app:**
 - **`AudioCapture`:**
@@ -1170,8 +1174,7 @@ App Flutter, `release/mobile/ios.sh` và `android.sh` cũ đã bị xoá ở `e9
   - Mục "Mang sang":
     - P3b: kênh `terminal`; xem trước chữ đang viết (`streamingProse`);
     - P4: APNs, gỡ thông báo, `aps-environment`;
-    - giao thức: `selections` là mảng phẳng nên không phân biệt được hai đáp án trùng `label` ở hai câu hỏi khác nhau;
-    - trả lời tự do, nếu người dùng chọn làm (câu hỏi 2).
+    - những gì đo được về trả lời tự do bằng giọng nói (tỉ lệ khớp đáp án, số lần người dùng sửa chữ).
 - [ ] **Step 7: Commit** (`docs(shellx-ios): P3 end-to-end on a real Mac and latency results`).
 
 ---
@@ -1181,8 +1184,7 @@ App Flutter, `release/mobile/ios.sh` và `android.sh` cũ đã bị xoá ở `e9
 - APNs, Notification Service Extension, gỡ thông báo (P4);
 - skill và chip skill (P5);
 - AI điều phối: câu tự do tự định tuyến, câu "hôm nay thế nào?" gộp từ nhiều Mac (P6);
-- mở phiên hoặc workspace mới từ điện thoại (P5/P6, xem câu hỏi 1);
-- trả lời câu hỏi bằng chữ tự do (câu hỏi 2);
+- mở phiên hoặc workspace mới từ điện thoại (P5/P6, xem quyết định 1);
 - đăng ký và xoá tài khoản trong app: khách hàng đã có tài khoản từ Mac, app chỉ đăng nhập;
 - màn "cần cập nhật" theo `min_mobile` của `/v1/version`. Lệch phiên bản giao thức với Mac đã được báo qua trạng thái `needsUpdate`;
 - iPad, Apple Watch, widget, Android, CI cho mobile;
