@@ -1,8 +1,8 @@
 import ShellXAppCore
 import SwiftUI
 
-/// The signed-in screens: `FirstMacView` while no Mac is paired, otherwise "Your Macs" (until the
-/// main screen replaces it), Settings, and the pairing sheet.
+/// The signed-in screens: `FirstMacView` while no Mac is paired, otherwise "Your Macs" with the
+/// pending cards (until the main screen replaces it), Settings, and the pairing sheet.
 struct SignedInView: View {
     let hub: MachineHub
     let email: String
@@ -12,6 +12,21 @@ struct SignedInView: View {
 
     @State private var pairing: PairingModel?
     @State private var showsPairing = false
+    /// One per hub: the view is rebuilt (`.id`) for a new hub.
+    @State private var decisions: DecisionCenter
+
+    init(
+        hub: MachineHub, email: String, inbox: PairingInbox,
+        makePairing: @escaping @MainActor (MachineHub) -> PairingModel,
+        makeDecisions: @MainActor (MachineHub) -> DecisionCenter, signOut: @escaping () async -> Void
+    ) {
+        self.hub = hub
+        self.email = email
+        self.inbox = inbox
+        self.makePairing = makePairing
+        self.signOut = signOut
+        _decisions = State(initialValue: makeDecisions(hub))
+    }
 
     var body: some View {
         NavigationStack {
@@ -19,7 +34,7 @@ struct SignedInView: View {
                 if hub.machines.isEmpty {
                     FirstMacView(pair: openPairing)
                 } else {
-                    MachinesView(hub: hub, pair: openPairing)
+                    MachinesView(hub: hub, center: decisions, pair: openPairing)
                 }
             }
             .toolbar {

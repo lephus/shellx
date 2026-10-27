@@ -20,7 +20,7 @@ struct RootView: View {
             if let hub = coordinator.hub, hub.isLoaded {
                 SignedInView(
                     hub: hub, email: email, inbox: inbox, makePairing: graph.makePairing,
-                    signOut: { await coordinator.signOut() }
+                    makeDecisions: graph.makeDecisions, signOut: { await coordinator.signOut() }
                 )
                 .id(ObjectIdentifier(hub))
             } else {

@@ -5,12 +5,13 @@ import UIKit
 import ShellXAppTestSupport
 #endif
 
-/// What the app's screens are built from: the coordinator, and how to make the pairing model for
-/// the signed-in account's hub.
+/// What the app's screens are built from: the coordinator, and how to make the pairing model and
+/// the decision center for the signed-in account's hub.
 @MainActor
 struct AppGraph {
     let coordinator: AppCoordinator
     let makePairing: @MainActor (MachineHub) -> PairingModel
+    let makeDecisions: @MainActor (MachineHub) -> DecisionCenter
     /// Runs once before `coordinator.launch()`; the Debug demo seeds its fake account here.
     var prepare: @MainActor () async -> Void = {}
 }
@@ -55,7 +56,8 @@ enum AppComposition {
             })
         owner.coordinator = coordinator
         return AppGraph(
-            coordinator: coordinator, makePairing: { PairingModel(hub: $0, relay: relay, vault: vault) })
+            coordinator: coordinator, makePairing: { PairingModel(hub: $0, relay: relay, vault: vault) },
+            makeDecisions: { DecisionCenter(sender: $0, latency: latency, sleep: { try await Task.sleep(for: $0) }) })
     }
 }
 
@@ -78,15 +80,18 @@ extension AppGraph {
     static func preview() -> AppGraph {
         let vault = AccountVault(store: InMemorySecretStore())
         let relay = FakeRelayAccount()
+        let latency = LatencyLog()
         let coordinator = AppCoordinator(
             vault: vault, relay: relay, deviceName: "iPhone", wipers: [],
             makeHub: {
                 MachineHub(
                     vault: vault, relay: relay, connector: FakeMacFleet([], phoneKey: { try await vault.phoneKey() }),
-                    latency: LatencyLog(), defaults: .standard, sleep: { try await Task.sleep(for: $0) },
+                    latency: latency, defaults: .standard, sleep: { try await Task.sleep(for: $0) },
                     onUnauthorized: {})
             })
-        return AppGraph(coordinator: coordinator, makePairing: { PairingModel(hub: $0, relay: relay, vault: vault) })
+        return AppGraph(
+            coordinator: coordinator, makePairing: { PairingModel(hub: $0, relay: relay, vault: vault) },
+            makeDecisions: { DecisionCenter(sender: $0, latency: latency, sleep: { try await Task.sleep(for: $0) }) })
     }
 }
 #endif

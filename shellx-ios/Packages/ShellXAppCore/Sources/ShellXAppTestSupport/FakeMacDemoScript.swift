@@ -84,7 +84,7 @@ public actor FakeMacDemoScript {
                 requestId: id, kind: .permission, agent: "claude", workspaceId: "ws-\(workspace)",
                 workspaceTitle: workspace, toolName: "Bash",
                 toolInputPreview: #"{"command":"git push origin feat/pairing","description":"Push the branch"}"#,
-                createdAtMs: ms, modes: ["once", "always", "deny"])
+                createdAtMs: ms, modes: ["once", "always", "all", "deny"])
         case 1:
             return PendingItem(
                 requestId: id, kind: .question, agent: "claude", workspaceId: "ws-\(workspace)",
@@ -95,16 +95,30 @@ public actor FakeMacDemoScript {
                         options: [
                             PendingQuestionOption(id: "blue", label: "Xanh #60a5fa", description: "Màu chính của ShellX"),
                             PendingQuestionOption(id: "gray", label: "Xám", description: "Ít nổi hơn"),
-                        ])
+                        ]),
+                    PendingQuestion(
+                        id: "q2", header: "Kiểm tra", prompt: "Chạy những bước kiểm tra nào trước khi push?",
+                        multiSelect: true,
+                        options: [
+                            PendingQuestionOption(id: "lint", label: "Lint"),
+                            PendingQuestionOption(id: "unit", label: "Unit test", description: "swift test"),
+                            PendingQuestionOption(id: "ui", label: "UI test", description: "Chậm, khoảng 5 phút"),
+                        ]),
                 ])
         default:
             return PendingItem(
                 requestId: id, kind: .exitPlan, agent: "claude", workspaceId: "ws-\(workspace)",
-                workspaceTitle: workspace, createdAtMs: ms, modes: ["auto_accept", "manual", "deny"],
+                workspaceTitle: workspace, createdAtMs: ms, modes: ["auto_accept", "manual", "ultraplan", "deny"],
                 planPreview: """
-                    1. Thêm PairingModel và test.
+                    ## Ghép cặp Mac
+
+                    1. Thêm `PairingModel` và **test** trước.
                     2. Làm sheet ghép cặp: quét QR, dán mã, xác nhận.
                     3. Danh sách "Máy của bạn" với gỡ ghép cặp.
+
+                    ### Kiểm tra
+                    - `swift test` cho ShellXAppCore
+                    - Ảnh chụp sáng và tối, tiếng Việt và tiếng Anh
                     """)
         }
     }

@@ -139,10 +139,11 @@ public actor FakeMac {
     public func resolvePending(_ requestId: String) { feed.resolve(requestId) }
     /// The next pending change arrives one revision too far, so the phone sees a gap.
     public func skipNextPendingRevision() { feed.skipRevision() }
-    /// Every reply waits `delay`, then answers `outcome` (`.delivered` also resolves the item);
-    /// nil goes back to answering from the pending set.
-    public func setReplyOutcome(_ outcome: ReplyOutcome?, delay: Duration = .zero) {
-        feed.setReplyOutcome(outcome, delay: delay)
+    /// Every reply waits `delay`, then answers `outcome`; nil goes back to answering from the pending
+    /// set. `.delivered` also resolves the item, unless `resolves` is false: then the Mac's
+    /// `agent.changed` waits for `resolvePending(_:)`, as when it arrives after the reply's result.
+    public func setReplyOutcome(_ outcome: ReplyOutcome?, delay: Duration = .zero, resolves: Bool = true) {
+        feed.setReplyOutcome(outcome, delay: delay, resolves: resolves)
     }
     public var decisions: [Decision] { feed.decisions }
     /// How many `agent.snapshot.get` the Mac answered.

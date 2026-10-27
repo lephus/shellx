@@ -4,3 +4,5 @@ root.title
 signin.email
 settings.about.license.value
 common.ok
+pending.plan.title
+pending.plan.ultraplan

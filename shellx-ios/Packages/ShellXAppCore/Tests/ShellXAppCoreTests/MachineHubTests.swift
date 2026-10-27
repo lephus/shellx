@@ -328,7 +328,7 @@ final class MachineHubTests: XCTestCase {
         let decisionsB = await b.decisions
         XCTAssertEqual(decisionsA, [])
         XCTAssertEqual(decisionsB, [FakeMac.Decision(requestId: "b1", decision: .permission(.always))])
-        XCTAssertEqual(rig.latency.summary(.replyRoundTrip)?.count, 1)
+        XCTAssertNil(rig.latency.summary(.replyRoundTrip), "DecisionCenter measures from the tap, not the hub")
 
         let ref = try XCTUnwrap(rig.hub.liveSessions.first?.ref)
         XCTAssertEqual(ref.machineID, a.machine.machineID)

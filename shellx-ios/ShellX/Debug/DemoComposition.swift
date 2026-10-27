@@ -38,6 +38,7 @@ enum DemoComposition {
         return AppGraph(
             coordinator: coordinator,
             makePairing: { PairingModel(hub: $0, relay: relay, vault: vault) },
+            makeDecisions: { DecisionCenter(sender: $0, latency: latency, sleep: { try await Task.sleep(for: $0) }) },
             prepare: {
                 // Seeding again would drop a Mac paired since.
                 guard once.first() else { return }
