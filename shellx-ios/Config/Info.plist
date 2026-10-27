@@ -47,6 +47,10 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>ShellX uses the camera to scan the pairing QR code on your Mac.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>ShellX listens while you hold the mic button to talk to your agents.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Apple turns your speech into text to send to your agents.</string>
 	<key>ShellXKeychainGroup</key>
 	<string>$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER).shared</string>
 	<key>UIApplicationSceneManifest</key>

@@ -8,7 +8,7 @@ import SwiftUI
 ///   strip. It leaves the conversation and the composer room (`conversationMinimum`) and scrolls
 ///   inside itself past that.
 /// - Middle: the conversation, newest at the bottom, scrolled down when an entry arrives.
-/// - Bottom: the composer with its "Send to:" chip.
+/// - Bottom: the composer (the mic, or the field) with its "Send to:" chip.
 /// - Toolbar: the default Mac (opens "Your Macs") on the left, Settings on the right.
 struct HomeScreen: View {
     struct Actions {
@@ -19,6 +19,8 @@ struct HomeScreen: View {
         var choose: (SessionRef?) -> Void = { _ in }
         /// The composer's trimmed, valid text.
         var send: (String) -> Void = { _ in }
+        /// What the user said into the mic (trimmed, not empty).
+        var sendVoice: (String) -> Void = { _ in }
         var card: (MachinePendingItem) -> PendingCardView.Actions = { _ in PendingCardView.Actions() }
     }
 
@@ -158,7 +160,7 @@ struct HomeScreen: View {
     // MARK: - Composer
 
     private var composer: some View {
-        ComposerBar(text: $draft, send: actions.send) {
+        ComposerBar(text: $draft, send: actions.send, sendVoice: actions.sendVoice) {
             TargetPicker(current: target, picked: pickedTarget, sessions: sessions, choose: actions.choose)
         }
     }

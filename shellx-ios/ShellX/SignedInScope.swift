@@ -1,8 +1,8 @@
 import ShellXAppCore
 
 /// What the signed-in account's screens share: its hub, the decision center, the home model, the
-/// pairing model and the history store. Made with the hub at every sign-in (`AppComposition`) and
-/// dropped with it.
+/// pairing model, the history store and the voice input. Made with the hub at every sign-in
+/// (`AppComposition`) and dropped with it.
 @MainActor
 final class SignedInScope {
     let hub: MachineHub
@@ -11,11 +11,13 @@ final class SignedInScope {
     let pairing: PairingModel
     /// Where each agent's chat copy is kept (wiped on sign-out).
     let history: ConversationStore
+    /// The mic's models and settings; nil shows no mic (render tests, previews).
+    let voice: VoiceService?
     private let launch: LaunchMark
 
     init(
         hub: MachineHub, decisions: DecisionCenter, home: HomeModel, pairing: PairingModel,
-        history: ConversationStore, launch: LaunchMark
+        history: ConversationStore, launch: LaunchMark, voice: VoiceService? = nil
     ) {
         self.hub = hub
         self.decisions = decisions
@@ -23,6 +25,7 @@ final class SignedInScope {
         self.pairing = pairing
         self.history = history
         self.launch = launch
+        self.voice = voice
     }
 
     /// The model of one agent's screen, over this account's hub and history.

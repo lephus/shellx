@@ -5,6 +5,9 @@ import SwiftUI
 /// approval modes in "Other modes", "Revise…" (sends `deny` with the user's feedback: required, at
 /// most 4096 bytes, counted as it is typed) and "Deny". Only the modes the Mac offers show. When the
 /// item was decided elsewhere meanwhile, the sheet says so and nothing can be sent.
+///
+/// With a `VoiceService` in the environment, a mic beside the feedback field fills it with what the
+/// user says (added after what is there); it never sends.
 struct PlanReviewSheet: View {
     let item: MachinePendingItem
     let state: PendingSheetState
@@ -15,13 +18,16 @@ struct PlanReviewSheet: View {
     @State private var feedback: String
     /// The decision last sent from here, for "Try again".
     @State private var last: LinkDecision?
+    @State private var ownVoice: VoiceInputModel?
     @FocusState private var feedbackFocused: Bool
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(VoiceService.self) private var voiceService: VoiceService?
+    private let injectedVoice: VoiceInputModel?
 
-    /// `revising` and `feedback` start a render test in the feedback step.
+    /// `revising` and `feedback` start a render test in the feedback step; `voice` shows its mic.
     init(
         item: MachinePendingItem, state: PendingSheetState, send: @escaping (LinkDecision) -> Void,
-        close: @escaping () -> Void, revising: Bool = false, feedback: String = ""
+        close: @escaping () -> Void, revising: Bool = false, feedback: String = "", voice: VoiceInputModel? = nil
     ) {
         self.item = item
         self.state = state
@@ -29,7 +35,10 @@ struct PlanReviewSheet: View {
         self.close = close
         _revising = State(initialValue: revising)
         _feedback = State(initialValue: feedback)
+        injectedVoice = voice
     }
+
+    private var voice: VoiceInputModel? { injectedVoice ?? ownVoice }
 
     private var actions: [PendingAction] { item.item.actions }
     private var approvals: [ExitPlanMode] {
@@ -77,6 +86,33 @@ struct PlanReviewSheet: View {
                 }
             }
         }
+        .onAppear {
+            if injectedVoice == nil, ownVoice == nil {
+                ownVoice = voiceService?.makeModel(maxBytes: DecisionCenter.maxFeedbackBytes)
+            }
+        }
+        // The sheet closed, or the item was handled elsewhere (the mic goes): the microphone stops.
+        .onDisappear {
+            let voice = self.voice
+            Task { await voice?.cancel() }
+        }
+        .onChange(of: state.handledElsewhere) { _, handled in
+            guard handled else { return }
+            let voice = self.voice
+            Task { await voice?.cancel() }
+        }
+        // A swipe up on the mic, or no recognizer: the keyboard instead.
+        .onChange(of: voice?.wantsKeyboard ?? false, initial: true) { _, wants in
+            guard wants else { return }
+            voice?.wantsKeyboard = false
+            feedbackFocused = true
+        }
+    }
+
+    /// Adds what was said to the feedback, after what is already there.
+    private func addFeedback(_ words: String) {
+        let current = feedback.trimmingCharacters(in: .whitespacesAndNewlines)
+        feedback = current.isEmpty ? words : current + " " + words
     }
 
     // MARK: - Bottom bar
@@ -154,12 +190,22 @@ struct PlanReviewSheet: View {
 
     private var feedbackStep: some View {
         VStack(spacing: 8) {
-            TextField(String(localized: "pending.plan.feedback"), text: $feedback, axis: .vertical)
-                .lineLimit(2...6)
-                .focused($feedbackFocused)
-                .padding(10)
-                .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
-                .accessibilityIdentifier("pending.feedback")
+            if let voice {
+                VoiceStatusView(model: voice, level: voiceService?.meter.level ?? 0)
+            }
+            HStack(alignment: .bottom, spacing: 8) {
+                TextField(String(localized: "pending.plan.feedback"), text: $feedback, axis: .vertical)
+                    .lineLimit(2...6)
+                    .focused($feedbackFocused)
+                    .padding(10)
+                    .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                    .accessibilityIdentifier("pending.feedback")
+                if let voice {
+                    MicButton(
+                        model: voice, label: LocalizedStringResource("pending.plan.voice"), diameter: 44,
+                        onText: addFeedback, onKeyboard: { feedbackFocused = true })
+                }
+            }
             ByteCounter(used: feedbackBytes, limit: DecisionCenter.maxFeedbackBytes)
             HStack(spacing: 8) {
                 wideButton(LocalizedStringResource("common.cancel"), primary: false) {

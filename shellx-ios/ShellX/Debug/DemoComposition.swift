@@ -41,9 +41,11 @@ enum DemoComposition {
                 let hub = MachineHub(
                     vault: vault, relay: relay, connector: connector, latency: latency, defaults: defaults,
                     sleep: { try await Task.sleep(for: $0) }, onUnauthorized: {})
+                // Real speech recognition, so the demo measures the mic on an iPhone.
                 scopes.current = AppComposition.makeScope(
                     hub: hub, history: history, latency: latency, launch: launch,
-                    pairing: PairingModel(hub: hub, relay: relay, vault: vault))
+                    pairing: PairingModel(hub: hub, relay: relay, vault: vault),
+                    voice: VoiceService.system(latency: latency, defaults: defaults, hub: hub))
                 return hub
             })
         let script = DemoScript(mac: first)

@@ -1,0 +1,306 @@
+import Foundation
+import ShellXAppTestSupport
+import XCTest
+
+@testable import ShellXAppCore
+
+/// Hold-to-talk: press starts listening and shows the words as they come; release returns them;
+/// a drag to the left arms cancel; a swipe up before any word asks for the keyboard. Permissions,
+/// a missing recognizer and the 16 384-byte limit each end the dictation visibly, and the keyboard
+/// always stays usable.
+@MainActor
+final class VoiceInputModelTests: XCTestCase {
+    private struct Rig {
+        let model: VoiceInputModel
+        let transcriber: FakeTranscriber
+        let permissions: FakeVoicePermissions
+        let clock: ManualClock
+        let latency: LatencyLog
+    }
+
+    private static let everything = VoiceCapabilities(
+        analyzerSupportsLocale: true, legacyOnDevice: true, legacyAvailable: true)
+
+    private func makeRig(
+        microphone: Bool = true, speech: Bool = true, capabilities: VoiceCapabilities = everything,
+        language: VoiceLanguage = .vietnamese, maxBytes: Int = ComposerValidation.maxBytes
+    ) -> Rig {
+        let transcriber = FakeTranscriber()
+        let permissions = FakeVoicePermissions(microphone: microphone, speech: speech)
+        let clock = ManualClock()
+        let latency = LatencyLog()
+        let model = VoiceInputModel(
+            transcriber: transcriber, permissions: permissions, capabilities: { _ in capabilities },
+            language: language, contextualStrings: { ["shellx", "PR"] }, latency: latency, clock: clock,
+            maxBytes: maxBytes)
+        return Rig(model: model, transcriber: transcriber, permissions: permissions, clock: clock, latency: latency)
+    }
+
+    private func waitForPhase(_ model: VoiceInputModel, _ phase: VoiceInputModel.Phase) async {
+        let reached = await eventually { model.phase == phase }
+        XCTAssertTrue(reached, "phase is \(model.phase), expected \(phase)")
+    }
+
+    func testPressStartsListeningAndStreamsText() async throws {
+        let rig = makeRig()
+        await rig.model.press()
+        XCTAssertEqual(rig.model.phase, .listening(text: ""))
+        let start = try XCTUnwrap(rig.transcriber.starts.first)
+        XCTAssertEqual(rig.transcriber.starts.count, 1)
+        XCTAssertEqual(start.locale.identifier, "vi-VN")
+        XCTAssertEqual(start.contextualStrings, ["shellx", "PR"])
+
+        rig.transcriber.say("chạy test")
+        await waitForPhase(rig.model, .listening(text: "chạy test"))
+        rig.transcriber.say("chạy test cho shellx")
+        await waitForPhase(rig.model, .listening(text: "chạy test cho shellx"))
+
+        // A second press while listening changes nothing.
+        await rig.model.press()
+        XCTAssertEqual(rig.transcriber.starts.count, 1)
+    }
+
+    func testReleaseReturnsFinalText() async {
+        let rig = makeRig(language: .english)
+        await rig.model.press()
+        XCTAssertEqual(rig.transcriber.starts.first?.locale.identifier, "en-US")
+        rig.transcriber.say("run the tests for shell")
+        await waitForPhase(rig.model, .listening(text: "run the tests for shell"))
+        rig.transcriber.finalText = " Run the tests for shellx. "
+
+        let text = await rig.model.release()
+        XCTAssertEqual(text, "Run the tests for shellx.")
+        XCTAssertEqual(rig.model.phase, .idle)
+        XCTAssertEqual(rig.transcriber.finishCalls, 1)
+        XCTAssertEqual(rig.transcriber.cancelCalls, 0)
+
+        // When the recognizer has no final text, the last words heard are kept.
+        await rig.model.press()
+        rig.transcriber.say("open a PR")
+        await waitForPhase(rig.model, .listening(text: "open a PR"))
+        rig.transcriber.finalText = ""
+        let fallback = await rig.model.release()
+        XCTAssertEqual(fallback, "open a PR")
+    }
+
+    func testDragLeftThenReleaseCancels() async {
+        let rig = makeRig()
+        await rig.model.press()
+        rig.transcriber.say("xoá nhánh main")
+        await waitForPhase(rig.model, .listening(text: "xoá nhánh main"))
+
+        rig.model.drag(dx: -79, dy: 0)
+        XCTAssertEqual(rig.model.phase, .listening(text: "xoá nhánh main"))
+        rig.model.drag(dx: -80, dy: 0)
+        XCTAssertEqual(rig.model.phase, .cancelArmed(text: "xoá nhánh main"))
+        // Back to the right: listening again.
+        rig.model.drag(dx: -40, dy: 0)
+        XCTAssertEqual(rig.model.phase, .listening(text: "xoá nhánh main"))
+        rig.model.drag(dx: -120, dy: 10)
+        XCTAssertEqual(rig.model.phase, .cancelArmed(text: "xoá nhánh main"))
+
+        let text = await rig.model.release()
+        XCTAssertNil(text)
+        XCTAssertEqual(rig.model.phase, .idle)
+        XCTAssertEqual(rig.transcriber.cancelCalls, 1)
+        XCTAssertEqual(rig.transcriber.finishCalls, 0)
+        XCTAssertFalse(rig.model.wantsKeyboard)
+    }
+
+    func testSwipeUpBeforeWordsAsksKeyboard() async {
+        let rig = makeRig()
+        await rig.model.press()
+        rig.model.drag(dx: 0, dy: -59)
+        XCTAssertFalse(rig.model.wantsKeyboard)
+        rig.model.drag(dx: 5, dy: -60)
+        XCTAssertTrue(rig.model.wantsKeyboard)
+        XCTAssertEqual(rig.model.phase, .idle)
+        let cancelled = await eventually { rig.transcriber.cancelCalls == 1 }
+        XCTAssertTrue(cancelled, "listening stops")
+        let text = await rig.model.release()
+        XCTAssertNil(text)
+
+        // Once words came, a swipe up keeps listening.
+        rig.model.wantsKeyboard = false
+        await rig.model.press()
+        rig.transcriber.say("merge main")
+        await waitForPhase(rig.model, .listening(text: "merge main"))
+        rig.model.drag(dx: 0, dy: -200)
+        XCTAssertFalse(rig.model.wantsKeyboard)
+        XCTAssertEqual(rig.model.phase, .listening(text: "merge main"))
+    }
+
+    func testEmptyTranscriptReturnsNil() async {
+        let rig = makeRig()
+        await rig.model.press()
+        rig.transcriber.finalText = "  \n "
+        let text = await rig.model.release()
+        XCTAssertNil(text)
+        XCTAssertEqual(rig.model.phase, .idle)
+        XCTAssertNil(rig.model.firstWordLatency)
+    }
+
+    func testDeniedMicrophoneShowsDenied() async {
+        let rig = makeRig(microphone: false)
+        await rig.model.press()
+        XCTAssertEqual(rig.model.phase, .denied(.microphone))
+        XCTAssertTrue(rig.transcriber.starts.isEmpty)
+        let text = await rig.model.release()
+        XCTAssertNil(text)
+        XCTAssertEqual(rig.model.phase, .denied(.microphone), "the reason stays until the next press")
+
+        let speech = makeRig(speech: false)
+        await speech.model.press()
+        XCTAssertEqual(speech.model.phase, .denied(.speech))
+        XCTAssertTrue(speech.transcriber.starts.isEmpty)
+        XCTAssertEqual(speech.permissions.microphoneRequests, 1)
+        XCTAssertEqual(speech.permissions.speechRequests, 1)
+
+        // Granted later (in Settings): the next press listens.
+        speech.permissions.speechGranted = true
+        await speech.model.press()
+        XCTAssertEqual(speech.model.phase, .listening(text: ""))
+        XCTAssertEqual(speech.transcriber.starts.count, 1)
+    }
+
+    func testUnavailableNeverBlocksKeyboard() async {
+        let rig = makeRig(capabilities: .none)
+        await rig.model.press()
+        XCTAssertEqual(rig.model.phase, .unavailable)
+        XCTAssertTrue(rig.model.wantsKeyboard, "the reason shows and the keyboard opens")
+        XCTAssertTrue(rig.transcriber.starts.isEmpty)
+        let text = await rig.model.release()
+        XCTAssertNil(text)
+
+        // A recognizer that fails to start is unavailable too, never a stuck mic.
+        let failing = makeRig()
+        failing.transcriber.startError = URLError(.notConnectedToInternet)
+        await failing.model.press()
+        XCTAssertEqual(failing.model.phase, .unavailable)
+        XCTAssertTrue(failing.model.wantsKeyboard)
+
+        // So does one that fails before any word.
+        let dropped = makeRig()
+        await dropped.model.press()
+        dropped.transcriber.fail(URLError(.networkConnectionLost))
+        await waitForPhase(dropped.model, .unavailable)
+        XCTAssertTrue(dropped.model.wantsKeyboard)
+        dropped.model.dismiss()
+        XCTAssertEqual(dropped.model.phase, .idle)
+    }
+
+    func testFirstWordLatencyRecorded() async throws {
+        let rig = makeRig()
+        await rig.model.press()
+        rig.clock.advance(by: .milliseconds(40))
+        rig.transcriber.say(" ")
+        // A blank update is not a word.
+        await waitForPhase(rig.model, .listening(text: " "))
+        XCTAssertNil(rig.model.firstWordLatency)
+        rig.clock.advance(by: .milliseconds(140))
+        rig.transcriber.say("chạy")
+        await waitForPhase(rig.model, .listening(text: "chạy"))
+        XCTAssertEqual(rig.model.firstWordLatency, .milliseconds(180))
+        rig.clock.advance(by: .milliseconds(500))
+        rig.transcriber.say("chạy test")
+        await waitForPhase(rig.model, .listening(text: "chạy test"))
+        XCTAssertEqual(rig.model.firstWordLatency, .milliseconds(180), "only the first word counts")
+
+        let summary = try XCTUnwrap(rig.latency.summary(.firstWord))
+        XCTAssertEqual(summary.count, 1)
+        XCTAssertEqual(summary.p50, .milliseconds(180))
+        _ = await rig.model.release()
+
+        // Each press measures again.
+        await rig.model.press()
+        XCTAssertNil(rig.model.firstWordLatency)
+        rig.clock.advance(by: .milliseconds(90))
+        rig.transcriber.say("push")
+        await waitForPhase(rig.model, .listening(text: "push"))
+        XCTAssertEqual(rig.model.firstWordLatency, .milliseconds(90))
+        XCTAssertEqual(rig.latency.summary(.firstWord)?.count, 2)
+    }
+
+    func testDictationStopsAtByteLimit() async throws {
+        let rig = makeRig()
+        await rig.model.press()
+        let start = String(repeating: "chạy test rồi push. ", count: 600)
+        XCTAssertLessThan(start.utf8.count, ComposerValidation.maxBytes)
+        rig.transcriber.say(start)
+        await waitForPhase(rig.model, .listening(text: start))
+        XCTAssertFalse(rig.model.limitReached)
+
+        // Ten minutes of talking: far past 16 384 bytes, ending in multi-byte letters.
+        let long = start + String(repeating: "giữ route v1, đừng xoá. ", count: 600)
+        rig.transcriber.say(long)
+        let stopped = await eventually { rig.model.limitReached }
+        XCTAssertTrue(stopped)
+        let cancelled = await eventually { rig.transcriber.cancelCalls == 1 }
+        XCTAssertTrue(cancelled, "listening stops at the limit")
+        guard case let .listening(kept) = rig.model.phase else {
+            return XCTFail("the kept words stay on screen, not \(rig.model.phase)")
+        }
+        XCTAssertLessThanOrEqual(kept.utf8.count, ComposerValidation.maxBytes)
+        XCTAssertGreaterThan(kept.utf8.count, ComposerValidation.maxBytes - 4)
+        XCTAssertTrue(long.hasPrefix(kept))
+        XCTAssertFalse(rig.transcriber.isRunning, "nothing more is heard")
+
+        let released = await rig.model.release()
+        let text = try XCTUnwrap(released)
+        XCTAssertEqual(text, kept.trimmingCharacters(in: .whitespacesAndNewlines))
+        XCTAssertEqual(ComposerValidation(text), .ok(text), "the kept words can be sent")
+        XCTAssertEqual(rig.transcriber.finishCalls, 0)
+        XCTAssertTrue(rig.model.limitReached, "the flag stays for the screen to say why")
+
+        // A final text past a smaller limit (a question's answer) is cut the same way.
+        let answer = makeRig(maxBytes: 1024)
+        await answer.model.press()
+        answer.transcriber.finalText = String(repeating: "ệ", count: 400)
+        let answered = await answer.model.release()
+        let cut = try XCTUnwrap(answered)
+        XCTAssertEqual(cut.utf8.count, 1023)
+        XCTAssertTrue(answer.model.limitReached)
+    }
+
+    func testReleaseWhileStartingStopsCleanly() async {
+        let rig = makeRig()
+        rig.transcriber.holdStarts()
+        let press = Task { await rig.model.press() }
+        let held = await eventually { rig.transcriber.startsWaiting == 1 }
+        XCTAssertTrue(held)
+        let text = await rig.model.release()
+        XCTAssertNil(text)
+        XCTAssertEqual(rig.model.phase, .idle)
+        rig.transcriber.releaseStarts()
+        await press.value
+        XCTAssertEqual(rig.model.phase, .idle, "the late start is not shown")
+        let cancelled = await eventually { rig.transcriber.cancelCalls == 1 }
+        XCTAssertTrue(cancelled, "the recognizer that started late is stopped")
+    }
+
+    func testCancelStopsListeningWhenTheScreenGoes() async {
+        let rig = makeRig()
+        await rig.model.press()
+        rig.transcriber.say("đang nói dở")
+        await waitForPhase(rig.model, .listening(text: "đang nói dở"))
+        await rig.model.cancel()
+        XCTAssertEqual(rig.model.phase, .idle)
+        XCTAssertEqual(rig.transcriber.cancelCalls, 1)
+        XCTAssertFalse(rig.transcriber.isRunning)
+        let text = await rig.model.release()
+        XCTAssertNil(text, "nothing is sent after the screen went away")
+
+        // Nothing listening: nothing to stop.
+        await rig.model.cancel()
+        XCTAssertEqual(rig.transcriber.cancelCalls, 1)
+    }
+
+    func testContextualStringsAddTermsToWorkspaces() {
+        let strings = VoiceInputModel.contextualStrings(workspaceTitles: ["shellx", "web", "shellx", " ", "PR"])
+        XCTAssertEqual(Array(strings.prefix(2)), ["shellx", "web"])
+        for term in ["PR", "CI", "push", "pull request", "branch", "merge", "deploy", "commit", "Claude"] {
+            XCTAssertEqual(strings.filter { $0 == term }.count, 1, term)
+        }
+        XCTAssertEqual(strings.count, 11)
+    }
+}

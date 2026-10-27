@@ -136,3 +136,38 @@ Nhỏ, làm khi đụng tới:
 - Test helper của relay integration (tearDown không có timeout và vài chỗ khác); các test có khoảng thời gian sát.
 - Swift 6.0: CI biên dịch bằng Xcode 26 (Swift 6.2), nên chưa lần nào biên dịch bằng 6.0. Review đọc tay không thấy cú pháp 6.1+.
 - Spec §9 còn câu cũ về việc thay `cmux-tui`, dù việc này đã quyết trong `3f424d82c4`.
+
+## D-iOS-2 (2026-10-27): đường giọng nói trên iPhone thật
+
+Task 9 của P3 đã làm xong phần code. Số đo trên iPhone thật còn trống: P3 Task 11 đo bằng `dev.sh device --demo` (bản demo dùng nhận dạng thật) rồi điền vào bảng dưới. Không đạt mục tiêu thì báo người dùng.
+
+Đường đã cài (plan D8):
+
+- Mỗi lần bấm, app hỏi hệ điều hành rồi chọn theo thứ tự `SpeechAnalyzer` (iOS 26+), `SFSpeechRecognizer` trên máy, rồi `SFSpeechRecognizer` qua máy chủ Apple. Mic chỉ tắt khi không còn đường nào; khi đó app nói lý do và mở bàn phím.
+- `SpeechAnalyzer`: dùng `SpeechTranscriber` (kết quả tạm, `fastResults`); nếu chỉ `DictationTranscriber` có ngôn ngữ đó thì dùng module này. Model được giữ lại giữa các lần bấm (`modelRetention: .lingering`).
+- `SpeechAnalyzer` chỉ được tính là "có" khi tài nguyên ngôn ngữ **đã cài**. Lúc tài nguyên còn đang tải, lần bấm đó chạy `SFSpeechRecognizer`, và Cài đặt nói đúng đường đang chạy (máy chủ Apple nếu `vi-VN` không chạy được trên máy). Nhờ vậy Cài đặt không bao giờ ghi "Nhận dạng ngay trên iPhone" trong khi giọng nói thật ra đang đi qua máy chủ.
+- `contextualStrings`: tên workspace của các phiên còn sống, cộng `PR`, `CI`, `push`, `pull request`, `branch`, `merge`, `deploy`, `commit`, `Claude`.
+- Nghe tới 16 384 byte thì tự dừng; phần chữ trong giới hạn được đưa vào ô gõ để xem lại, không tự gửi.
+
+Simulator (`VoiceCapabilityProbeTests` chỉ hỏi hệ điều hành hỗ trợ gì; chưa thử nhận dạng giọng nói thật trên simulator, test của model dùng transcriber giả):
+
+- iOS 26.2, lần hỏi đầu (chưa có tài nguyên): `en-US` chạy trên máy bằng `SFSpeechRecognizer` (engine `onDevice`). `vi-VN`: `SpeechTranscriber` không có, `DictationTranscriber` có; tài nguyên chưa cài nên `SpeechAnalyzer` chưa được tính; `SFSpeechRecognizer` không chạy trên máy được (`supportsOnDeviceRecognition` false) nhưng có qua máy chủ, nên engine là `server` và Cài đặt ghi rõ điều đó.
+- iOS 26.2, lần chạy test sau (khoảng 20 phút sau): lần hỏi đầu đã tự tải tài nguyên trong nền. Cả `en-US` lẫn `vi-VN` thành `analyzer` (`vi-VN` qua `DictationTranscriber`), và `SFSpeechRecognizer` cũng báo `vi-VN` chạy được trên máy. Vậy trên simulator, việc tải tài nguyên chạy đúng và đổi engine từ `server` sang trên máy mà không cần người dùng làm gì.
+- iOS 18.4 (không có `SpeechAnalyzer`): cả `en-US` lẫn `vi-VN` đều chỉ có `SFSpeechRecognizer` qua máy chủ (`supportsOnDeviceRecognition` false), engine `server`. Mic vẫn bật, Cài đặt ghi rõ giọng nói đi tới máy chủ Apple.
+
+Nếu iPhone thật cũng chỉ có `DictationTranscriber` cho `vi-VN`, app dùng module này sau khi tài nguyên tải xong (đường đã viết, chưa chạy thật).
+
+Cần đo trên iPhone thật (Task 11):
+
+| Mục | Kết quả |
+| --- | --- |
+| Phiên bản iOS | chưa đo |
+| `SpeechTranscriber` có `vi-VN` | chưa đo |
+| `DictationTranscriber` có `vi-VN` | chưa đo |
+| `supportsOnDeviceRecognition` của `vi-VN` | chưa đo |
+| Engine app chọn cho `vi-VN` | chưa đo |
+| `firstWordLatency` p50 / p95, 20 lần nói "chạy test cho shellx rồi tạo PR" (mục tiêu < 300 ms) | chưa đo |
+
+Chữ nhận được cho 5 câu mẫu (chưa đo): "sửa CI đỏ ở nhánh fix/relay", "tạo PR cho branch develop", "chạy test cmuxTests rồi push", "giữ route v1, đừng xoá", "merge main vào develop".
+
+`firstWordLatency` nằm trong `LatencyLog` (`firstWord`); log chỉ ghi tên số đo và số mili giây, không ghi chữ nhận được.

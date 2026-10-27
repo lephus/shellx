@@ -46,6 +46,8 @@ struct SignedInView: View {
                 }
             }
         }
+        // Every mic below (the composers, the question and plan sheets) and Settings › Voice.
+        .environment(scope.voice)
         .sheet(isPresented: $showsPairing, onDismiss: { scope.pairing.cancel() }) {
             PairingSheet(model: scope.pairing, close: { showsPairing = false })
         }

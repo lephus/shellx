@@ -4,7 +4,8 @@ import SwiftUI
 /// What the home's controls do, wired to the signed-in scope. Built outside the view body, so a
 /// test can run each action and see the model call it makes:
 /// - the toolbar and "See all" push `HomeRoute`s through `open`;
-/// - "Send to:" sets `HomeModel.target`; the composer calls `HomeModel.submit`;
+/// - "Send to:" sets `HomeModel.target`; the composer calls `HomeModel.submit` (`viaVoice` for what
+///   was said into the mic);
 /// - a card's decisions go to `DecisionCenter`; "Answer", "Review plan" and "Show more" set `route`.
 @MainActor
 enum HomeActions {
@@ -22,6 +23,7 @@ enum HomeActions {
             seeAllPending: { open(.pending) },
             choose: { home.target = $0 },
             send: { text in sent(Task { await home.submit(text, viaVoice: false) }) },
+            sendVoice: { text in sent(Task { await home.submit(text, viaVoice: true) }) },
             card: { item in PendingCardsSection.actions(for: item, hub: hub, center: center, route: route) })
     }
 }
