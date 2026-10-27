@@ -23,6 +23,7 @@ public enum LinkCodec {
         static let sessionsGet = "agent.sessions.get", sessions = "agent.sessions"
         static let sessionsChanged = "agent.sessions.changed"
         static let chatHistoryGet = "chat.history.get", chatHistory = "chat.history", chatEntries = "chat.entries"
+        static let chatReset = "chat.reset"
         static let chatSend = "chat.send", chatSendResult = "chat.send.result"
         static let chatInterrupt = "chat.interrupt", chatInterruptResult = "chat.interrupt.result"
     }
@@ -43,6 +44,7 @@ public enum LinkCodec {
     private struct HistoryGet: Codable { var callId: String; var sessionId: String; var beforeSeq: Int?; var limit: Int }
     private struct History: Codable { var callId: String; var sessionId: String; var entries: [ChatEntry]; var hasMore: Bool }
     private struct Entries: Codable { var sessionId: String; var entries: [ChatEntry] }
+    private struct Reset: Codable { var sessionId: String }
     private struct Send: Codable { var callId: String; var sessionId: String; var text: String }
     private struct SendResult: Codable { var callId: String; var outcome: ChatSendOutcome }
     private struct Interrupt: Codable { var callId: String; var sessionId: String; var hard: Bool }
@@ -122,6 +124,7 @@ public enum LinkCodec {
                 try requireValid(callId)
                 data = try enc(T.chatHistory, History(callId: callId, sessionId: sid, entries: entries, hasMore: more))
             case let .chatEntries(sid, entries): data = try enc(T.chatEntries, Entries(sessionId: sid, entries: entries))
+            case let .chatReset(sid): data = try enc(T.chatReset, Reset(sessionId: sid))
             case let .chatSend(callId, sid, text):
                 try requireValid(callId)
                 data = try enc(T.chatSend, Send(callId: callId, sessionId: sid, text: text))
@@ -201,6 +204,7 @@ public enum LinkCodec {
         case T.chatEntries:
             let b = try body(Entries.self)
             return .chatEntries(sessionId: b.sessionId, entries: b.entries)
+        case T.chatReset: return .chatReset(sessionId: try body(Reset.self).sessionId)
         case T.chatSend:
             let b = try call(Send.self, \.callId)
             return .chatSend(callId: b.callId, sessionId: b.sessionId, text: b.text)

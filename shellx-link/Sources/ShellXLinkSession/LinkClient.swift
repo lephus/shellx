@@ -24,7 +24,6 @@ public enum LinkClientError: Error, Equatable, Sendable {
 public actor LinkClient {
     private typealias Change = (revision: Int, added: [PendingItem], resolved: [String])
     private typealias SessionChange = (revision: Int, upserted: [AgentSession], removed: [String])
-    private typealias ChatPush = (sessionId: String, entries: [ChatEntry])
 
     /// Every `agent.changed` from the host, in order. Single consumer. It finishes when the
     /// session ends.
@@ -42,7 +41,7 @@ public actor LinkClient {
 
     /// Every `chat.entries` push from the host, in order. Single consumer. It finishes when the
     /// session ends. Entries are upserts by `ChatEntry.id`.
-    public nonisolated let chatEntries: AsyncStream<(sessionId: String, entries: [ChatEntry])>
+    public nonisolated let chatEntries: AsyncStream<ChatPush>
 
     private let changesContinuation: AsyncStream<Change>.Continuation
     private let sessionChangesContinuation: AsyncStream<SessionChange>.Continuation
@@ -281,7 +280,7 @@ public actor LinkClient {
         case let .sessionsChanged(revision, upserted, removed):
             sessionChangesContinuation.yield((revision, upserted, removed))
         case let .chatEntries(sessionId, entries):
-            chatEntriesContinuation.yield((sessionId, entries))
+            chatEntriesContinuation.yield(.upsert(sessionId: sessionId, entries: entries))
         case let .changed(revision, added, resolved):
             changesContinuation.yield((revision, added, resolved))
         case let .ping(nonce):
@@ -297,7 +296,7 @@ public actor LinkClient {
             }
             linkLog.info("host reported error \(code, privacy: .public)")
         case .pong, .unknown, .hello, .welcome, .snapshotGet, .reply, .sessionsGet, .chatHistoryGet, .chatSend,
-             .chatInterrupt:
+             .chatInterrupt, .chatReset:
             break
         }
         return true

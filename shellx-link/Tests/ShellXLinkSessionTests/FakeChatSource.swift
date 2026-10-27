@@ -2,8 +2,6 @@ import Foundation
 import ShellXLinkCore
 import ShellXLinkSession
 
-typealias ChatPush = (sessionId: String, entries: [ChatEntry])
-
 /// An in-memory `AgentChatSource`: transcripts per session, configurable outcomes, and a log of calls.
 /// A session exists when it has a transcript (possibly empty).
 final class FakeChatSource: AgentChatSource, @unchecked Sendable {
@@ -43,9 +41,22 @@ final class FakeChatSource: AgentChatSource, @unchecked Sendable {
     func append(_ entries: [ChatEntry], to sessionId: String) {
         lock.withLock {
             transcripts[sessionId, default: []].append(contentsOf: entries)
-            for (id, continuation) in subscribers {
-                if case .terminated = continuation.yield((sessionId, entries)) { subscribers[id] = nil }
-            }
+            publish(.upsert(sessionId: sessionId, entries: entries))
+        }
+    }
+
+    /// Replaces a transcript (as a fork or `claude --resume` does) and pushes a reset to every subscriber.
+    func reset(_ sessionId: String, to entries: [ChatEntry]) {
+        lock.withLock {
+            transcripts[sessionId] = entries
+            publish(.reset(sessionId: sessionId))
+        }
+    }
+
+    /// Call with `lock` held.
+    private func publish(_ push: ChatPush) {
+        for (id, continuation) in subscribers {
+            if case .terminated = continuation.yield(push) { subscribers[id] = nil }
         }
     }
 

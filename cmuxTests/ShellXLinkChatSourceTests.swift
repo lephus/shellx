@@ -26,9 +26,10 @@ struct ShellXLinkChatSourceTests {
     /// The pushes one `entries()` subscriber received, filled by its consumer task.
     private final class Pushes: @unchecked Sendable {
         private let lock = NSLock()
-        private var recorded: [(sessionId: String, entries: [ChatEntry])] = []
-        func record(_ push: (sessionId: String, entries: [ChatEntry])) { lock.lock(); recorded.append(push); lock.unlock() }
-        var entries: [ChatEntry] { lock.lock(); defer { lock.unlock() }; return recorded.flatMap(\.entries) }
+        private var recorded: [ChatPush] = []
+        func record(_ push: ChatPush) { lock.lock(); recorded.append(push); lock.unlock() }
+        var all: [ChatPush] { lock.lock(); defer { lock.unlock() }; return recorded }
+        var entries: [ChatEntry] { all.flatMap(\.entries) }
     }
 
     private static func makeHome() throws -> URL {
@@ -460,5 +461,79 @@ struct ShellXLinkChatSourceTests {
         #expect(paged.text == "make && echo ok")
         #expect(paged.rev > pushed.rev)
         #expect(ChatEntry.newer(pushed, paged).text == "make && echo ok")
+    }
+
+    /// A transcript the service reloaded from scratch reaches the phone as a reset, in order with the entries
+    /// around it, for Claude Code sessions only: the phone drops what it held and pages again.
+    @Test func testTranscriptResetIsPushedInOrder() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let (source, session, codex) = try await MainActor.run { () throws -> (ShellXLinkChatSource, String, String) in
+            (ShellXLinkChatSource(service: { service }),
+             try Self.addSession(service, home: home, lines: []).id,
+             try Self.addSession(service, home: home, lines: [], source: "codex").id)
+        }
+        let pushes = Pushes()
+        let stream = source.entries()
+        let consumer = Task { for await push in stream { pushes.record(push) } }
+        defer { consumer.cancel() }
+        #expect(await Self.waitUntil { service.frameObserverCount == 1 })
+        func message(_ id: String, _ seq: Int) -> ChatMessage {
+            ChatMessage(id: id, seq: seq, role: .agent, timestamp: Date(timeIntervalSince1970: 1),
+                        kind: .terminal(ChatTerminalCapture(command: id, isRunning: false)))
+        }
+
+        await MainActor.run {
+            source.receive(ChatSessionEventFrame(sessionID: session, event: .appended([message("old", 7)])))
+            source.receive(ChatSessionEventFrame(sessionID: codex, event: .reset))
+            source.receive(ChatSessionEventFrame(sessionID: "no-such-session", event: .reset))
+            source.receive(ChatSessionEventFrame(sessionID: session, event: .reset))
+            source.receive(ChatSessionEventFrame(sessionID: session, event: .appended([message("new", 0)])))
+        }
+
+        #expect(await Self.waitUntil { pushes.all.count >= 3 })
+        let all = pushes.all
+        #expect(all.map(\.sessionId) == [session, session, session])
+        #expect(all.map { push -> String in
+            if case .reset = push { return "reset" }
+            return push.entries.map(\.id).joined(separator: ",")
+        } == ["old", "reset", "new"])
+    }
+
+    /// The real path: a tailed transcript that is cut and rewritten (the tailer's truncation/rotation reload,
+    /// as after `claude --resume` or a fork's oversized first read) pushes a reset, and history is then the
+    /// new transcript.
+    @Test func testReloadedTranscriptPushesAReset() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let source = await MainActor.run { ShellXLinkChatSource(service: { service }) }
+        let pushes = Pushes()
+        let stream = source.entries()
+        let consumer = Task { for await push in stream { pushes.record(push) } }
+        defer { consumer.cancel() }
+        #expect(await Self.waitUntil { service.frameObserverCount == 1 })
+        let (session, transcript) = try await MainActor.run {
+            try Self.addSession(service, home: home, lines: [
+                Self.userLine("u-1", "A long first prompt of the old transcript"),
+                Self.assistantLine("a-1", [["type": "text", "text": "An equally long answer of the old transcript"]]),
+            ])
+        }
+        #expect(await MainActor.run { Self.tailerActive(service, session) })
+        _ = await service.history(sessionID: session, beforeSeq: nil, limit: 1)   // the tailer's first read is done
+
+        let handle = try FileHandle(forWritingTo: transcript)
+        try handle.truncate(atOffset: 0)
+        try handle.write(contentsOf: Data((Self.userLine("u-9", "New") + "\n").utf8))
+        try handle.close()
+
+        #expect(await Self.waitUntil { pushes.all.contains(.reset(sessionId: session)) })
+        var texts: [String] = []
+        for _ in 0..<300 where texts != ["New"] {
+            texts = await source.history(sessionId: session, beforeSeq: nil, limit: 10)?.entries.map(\.text) ?? []
+            if texts != ["New"] { try? await Task.sleep(nanoseconds: 10_000_000) }
+        }
+        #expect(texts == ["New"])
     }
 }

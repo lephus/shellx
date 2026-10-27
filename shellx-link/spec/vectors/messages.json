@@ -1002,6 +1002,18 @@
       }
     },
     {
+      "name": "chat_reset",
+      "message": {
+        "case": "chat_reset",
+        "session_id": "s-1"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.reset",
+        "session_id": "s-1"
+      }
+    },
+    {
       "name": "chat_send",
       "message": {
         "case": "chat_send",
@@ -1536,6 +1548,14 @@
       },
       "error": "bad_json",
       "call_id": "c1"
+    },
+    {
+      "name": "chat_reset_missing_session_id",
+      "json": {
+        "v": 1,
+        "t": "chat.reset"
+      },
+      "error": "bad_json"
     }
   ],
   "boundary_frames": {

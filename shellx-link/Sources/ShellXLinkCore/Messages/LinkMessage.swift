@@ -21,6 +21,8 @@ public enum LinkMessage: Equatable, Sendable {
     case chatHistoryGet(callId: String, sessionId: String, beforeSeq: Int?, limit: Int)
     case chatHistory(callId: String, sessionId: String, entries: [ChatEntry], hasMore: Bool)
     case chatEntries(sessionId: String, entries: [ChatEntry])
+    /// The session's transcript was replaced: the client drops its entries and pages again (PROTOCOL.md 4).
+    case chatReset(sessionId: String)
     case chatSend(callId: String, sessionId: String, text: String)
     case chatSendResult(callId: String, outcome: ChatSendOutcome)
     case chatInterrupt(callId: String, sessionId: String, hard: Bool)

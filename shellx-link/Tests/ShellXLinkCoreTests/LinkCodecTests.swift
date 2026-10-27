@@ -393,6 +393,7 @@ final class LinkCodecTests: XCTestCase {
                 callId: try s("call_id"), sessionId: try s("session_id"), entries: try entries(m["entries"]),
                 hasMore: try XCTUnwrap(m["has_more"] as? Bool))
         case "chat_entries": return .chatEntries(sessionId: try s("session_id"), entries: try entries(m["entries"]))
+        case "chat_reset": return .chatReset(sessionId: try s("session_id"))
         case "chat_send": return .chatSend(callId: try s("call_id"), sessionId: try s("session_id"), text: try s("text"))
         case "chat_send_result": return .chatSendResult(callId: try s("call_id"), outcome: ChatSendOutcome(wire: try s("outcome")))
         case "chat_interrupt":

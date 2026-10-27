@@ -29,7 +29,7 @@ import ShellXLinkSession
 final class ShellXLinkChatSource: AgentChatSource {
     typealias Send = @MainActor (_ sessionID: String, _ text: String) async -> TerminalController.V2CallResult
     typealias Interrupt = @MainActor (_ sessionID: String, _ hard: Bool) async -> TerminalController.V2CallResult
-    typealias Push = (sessionId: String, entries: [ChatEntry])
+    typealias Push = ChatPush
 
     /// A history read in flight, from ``beginHistoryRead(sessionId:)`` to ``finishHistoryRead(_:page:)``.
     struct HistoryRead {
@@ -90,7 +90,7 @@ final class ShellXLinkChatSource: AgentChatSource {
         return Self.interruptOutcome(await interruptCommand(sessionId, hard))
     }
 
-    nonisolated func entries() -> AsyncStream<(sessionId: String, entries: [ChatEntry])> {
+    nonisolated func entries() -> AsyncStream<ChatPush> {
         let (stream, continuation) = AsyncStream<Push>.makeStream(bufferingPolicy: .unbounded)
         let id = UUID()
         // Synchronous from cancellation, `finish()` or release: only schedule the removal.
@@ -160,7 +160,7 @@ final class ShellXLinkChatSource: AgentChatSource {
             for entry in entries { reads[id]?.pushed[entry.id] = entry }
         }
         for continuation in subscribers.values {
-            continuation.yield((sessionId: frame.sessionID, entries: entries))
+            continuation.yield(.upsert(sessionId: frame.sessionID, entries: entries))
         }
     }
 

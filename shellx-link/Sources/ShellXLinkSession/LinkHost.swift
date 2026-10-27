@@ -127,7 +127,7 @@ public actor LinkHost {
         // pusher starts. Leaving the scope without iterating it drops the subscription.
         let changes = feed.changes()
         let sessionChanges = sessions?.sessionChanges()
-        let chatEntries = chat?.entries()
+        let chatPushes = chat?.entries()
         do {
             try await channel.send(.welcome(
                 protocolVersion: ShellXLink.protocolVersion, hostVersion: hostVersion, machineName: machineName))
@@ -153,11 +153,16 @@ public actor LinkHost {
                 }
             }
         }
-        if let chatEntries {
+        if let chatPushes {
             group.addTask {
-                for await push in chatEntries {
-                    for frame in Self.entryFrames(sessionId: push.sessionId, entries: push.entries.map { $0.withTextCap() }) {
-                        try? await channel.send(frame: frame)
+                for await push in chatPushes {
+                    switch push {
+                    case let .upsert(sessionId, entries):
+                        for frame in Self.entryFrames(sessionId: sessionId, entries: entries.map { $0.withTextCap() }) {
+                            try? await channel.send(frame: frame)
+                        }
+                    case .reset:
+                        break
                     }
                 }
             }
@@ -273,7 +278,7 @@ public actor LinkHost {
                 await Self.sendError(on: channel, "unsupported", "this host does not know this call", callId: callId)
             case .pong, .unknown, .error:
                 break
-            case .hello, .welcome, .changed, .sessionsChanged, .chatEntries:
+            case .hello, .welcome, .changed, .sessionsChanged, .chatEntries, .chatReset:
                 // Not allowed from a client once established: ignored, and answered (PROTOCOL.md 7).
                 await Self.sendError(on: channel, "bad_request", "unexpected frame from a client")
             case let .snapshot(callId, _, _), let .replyResult(callId, _, _), let .sessions(callId, _, _),
