@@ -1,5 +1,4 @@
 import ShellXAppCore
-import ShellXLinkCore
 import SwiftUI
 
 /// Everything a request's preview holds, in a scrolling sheet ("Show more" on a card): each field

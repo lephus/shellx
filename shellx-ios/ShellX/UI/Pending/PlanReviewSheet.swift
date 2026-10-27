@@ -1,5 +1,4 @@
 import ShellXAppCore
-import ShellXLinkCore
 import SwiftUI
 
 /// Reviews an agent's plan: the plan as Markdown, scrollable; "Approve" (mode `manual`), the other

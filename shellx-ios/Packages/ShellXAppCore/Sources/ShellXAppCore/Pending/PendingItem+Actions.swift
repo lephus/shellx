@@ -16,7 +16,9 @@ extension PendingItem {
             offered = buttons.filter { modes.contains($0.0.wire) }.map(\.1)
         case .question:
             let questions = questions ?? []
+            // Answers are kept by question id, so two questions sharing one cannot be answered here.
             let answerable = !questions.isEmpty && questions.allSatisfy { !$0.options.isEmpty }
+                && Set(questions.map(\.id)).count == questions.count
             offered = answerable ? [.answer] : []
         case .exitPlan:
             let approvals = [ExitPlanMode.manual, .autoAccept, .ultraplan]

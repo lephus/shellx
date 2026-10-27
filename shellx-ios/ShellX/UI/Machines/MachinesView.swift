@@ -23,6 +23,9 @@ struct MachinesView: View {
         .sheet(item: $route) { route in
             PendingSheetHost(route: route, close: { self.route = nil })
         }
+        // The center follows the hub's whole list here, outside any body; the cards only read it.
+        .onAppear { center.sync(hub.pendingItems) }
+        .onChange(of: hub.pendingItems) { _, items in center.sync(items) }
     }
 }
 

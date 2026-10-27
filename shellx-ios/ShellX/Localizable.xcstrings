@@ -1279,6 +1279,24 @@
         }
       }
     },
+    "pending.question.choicesTooLong %lld %lld": {
+      "comment": "Under a multiple-choice question whose picked options join to more than the limit; %1$lld is used, %2$lld the limit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These choices together are too long: %1$lld / %2$lld bytes. Pick fewer."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các lựa chọn này cộng lại dài quá: %1$lld / %2$lld byte. Hãy bỏ bớt."
+          }
+        }
+      }
+    },
     "pending.question.next": {
       "comment": "Goes to the next question.",
       "extractionState": "manual",
@@ -1401,6 +1419,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Câu hỏi"
+          }
+        }
+      }
+    },
+    "pending.question.tooLong": {
+      "comment": "Under the question sheet's buttons: Send is off because an answer is over 1024 bytes.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An answer is too long. Shorten it to send."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Có câu trả lời dài quá. Rút gọn để gửi."
           }
         }
       }

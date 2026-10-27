@@ -1,5 +1,4 @@
 import ShellXAppCore
-import ShellXLinkCore
 import SwiftUI
 
 /// The sheet over the pending cards, fed by its `PendingSheetModel`: it closes once its own

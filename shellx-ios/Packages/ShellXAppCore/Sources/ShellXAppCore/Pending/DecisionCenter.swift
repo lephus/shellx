@@ -15,9 +15,12 @@ import ShellXLinkSession
 /// - No answer in time: sent once more (safe: replies are idempotent); still none, `failed(.noAnswer)`.
 /// - No live, synced session (`LinkCallError.offline`, `LinkClientError.sessionClosed`, or a card
 ///   shown not actionable): `failed(.offline)`. Nothing is queued: once the Mac is back, nothing
-///   goes out unless the user taps again.
+///   goes out unless the user taps again, and the note goes as soon as the card can act again.
 /// - Feedback over `maxFeedbackBytes` is not sent at all (the sheet counts bytes and stops it first).
-/// - An item that left the pending set loses its status (see `visibleItems(_:)`).
+/// - An item that left the pending set loses its status.
+///
+/// The screen calls `sync(_:)` with the hub's whole `pendingItems` when it appears and whenever
+/// they change (`onChange`); its body only reads `visibleItems(_:)`.
 @MainActor @Observable
 public final class DecisionCenter {
     /// The most UTF-8 bytes of a plan's feedback.
@@ -36,7 +39,7 @@ public final class DecisionCenter {
     @ObservationIgnored private let sender: any DecisionSending
     @ObservationIgnored private let latency: LatencyLog
     @ObservationIgnored private let sleep: @Sendable (Duration) async throws -> Void
-    /// The items as the cards last showed them (written by `visibleItems`, read by `send`).
+    /// The hub's items at the last `sync(_:)`: what the cards show (read by `send`).
     @ObservationIgnored private var shown: [PendingKey: MachinePendingItem] = [:]
     /// The last decision sent per item, for `retry(_:)`.
     @ObservationIgnored private var lastDecision: [PendingKey: LinkDecision] = [:]
@@ -94,22 +97,38 @@ public final class DecisionCenter {
         }
     }
 
+    /// Takes the hub's whole pending list (never a subset: what is missing counts as resolved):
+    /// - forgets the status of every item that left it (unless its reply is still out, or its
+    ///   "handled elsewhere" is still showing);
+    /// - clears `failed(.offline)` of an item that can act again (it was not actionable, or not
+    ///   there, at the last sync): the note no longer holds once the buttons are back.
+    ///
+    /// Writes only what changes. Call it outside a view's body (`onAppear`, `onChange`).
+    public func sync(_ pendingItems: [MachinePendingItem]) {
+        let before = shown
+        shown = Dictionary(pendingItems.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        forgetGone(present: shown)
+        for (key, item) in shown where item.actionable && before[key]?.actionable != true {
+            if status[key] == .failed(.offline) { status[key] = nil }
+        }
+    }
+
     /// "Try again" on a failed item: sends its last decision once more.
     public func retry(_ key: PendingKey) async {
         guard case .failed = status[key], let decision = lastDecision[key] else { return }
         await send(decision, for: key)
     }
 
-    /// The items to show as cards, from the hub's `pendingItems`:
+    /// The items to show as cards, out of `items` (the hub's `pendingItems`, or any part of it):
     /// - without the `done` ones (the Mac's `agent.changed` may still be on its way);
     /// - with the ones handled elsewhere until their linger is over, kept even when they left the
-    ///   set meanwhile (then not actionable);
-    /// - the statuses of items that left the set are forgotten.
+    ///   set meanwhile (then not actionable).
+    ///
+    /// Only reads, so a view's body may call it.
     public func visibleItems(_ items: [MachinePendingItem]) -> [MachinePendingItem] {
-        shown = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        forgetGone(present: shown)
+        let present = Set(items.map(\.id))
         var visible = items.filter { status[$0.id] != .done && !dismissed.contains($0.id) }
-        let kept = lingering.filter { shown[$0.key] == nil }.map(\.value)
+        let kept = lingering.filter { !present.contains($0.key) && !dismissed.contains($0.key) }.map(\.value)
         if !kept.isEmpty {
             // The hub's order: oldest first.
             visible = (visible + kept).sorted {
@@ -146,7 +165,7 @@ public final class DecisionCenter {
     }
 
     /// Drops what is kept about items that are neither pending, nor on their way, nor lingering.
-    /// Writes only when something changes, so reading the cards does not redraw them again.
+    /// Writes only when something changes.
     private func forgetGone(present: [PendingKey: MachinePendingItem]) {
         let known = Set(status.keys).union(dismissed).union(lastDecision.keys)
         let gone = known.filter { present[$0] == nil && !inFlight.contains($0) && lingering[$0] == nil }

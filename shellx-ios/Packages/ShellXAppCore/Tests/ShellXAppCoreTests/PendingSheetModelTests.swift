@@ -48,7 +48,7 @@ final class PendingSheetModelTests: XCTestCase {
         XCTAssertEqual(decisions, [FakeMac.Decision(requestId: "q1", decision: .question(selections: ["Free text answer"]))])
         let gone = await eventually { rig.hub.pendingItems.isEmpty }
         XCTAssertTrue(gone, "the Mac resolved it")
-        _ = rig.center.visibleItems(rig.hub.pendingItems)
+        rig.center.sync(rig.hub.pendingItems)
         XCTAssertNil(rig.center.status[key], "the center forgot it")
         XCTAssertFalse(sheet.handledElsewhere, "our own answer is not someone else's")
         XCTAssertEqual(sheet.status, .done)

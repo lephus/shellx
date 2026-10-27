@@ -59,6 +59,16 @@ final class PendingActionTests: XCTestCase {
             [.openOnMac], "one question has nothing to pick")
     }
 
+    func testQuestionWithRepeatedIDsOpenOnMac() {
+        // Answers are kept by question id: two questions sharing one could not be told apart.
+        XCTAssertEqual(
+            item(.question, questions: [question("q1", options: ["A"]), question("q1", options: ["B"])]).actions,
+            [.openOnMac])
+        XCTAssertEqual(
+            item(.question, questions: [question("q1", options: ["A"]), question("q2", options: ["B"])]).actions,
+            [.answer])
+    }
+
     func testPlanApproveManualFirst() {
         XCTAssertEqual(
             item(.exitPlan, modes: ["ultraplan", "deny", "auto_accept", "manual"]).actions,

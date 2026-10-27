@@ -81,7 +81,7 @@ final class DecisionCenterTests: XCTestCase {
         await rig.center.send(.permission(.once), for: key)
 
         XCTAssertEqual(rig.center.status[key], .handledElsewhere)
-        let shown = rig.center.visibleItems(rig.hub.pendingItems)
+        let shown = rig.shown
         XCTAssertEqual(shown.map(\.item.requestId), ["r1"], "the card says it was handled elsewhere")
         XCTAssertEqual(shown.map(\.actionable), [false])
         let lingering = await eventually { rig.linger.waiting.count == 1 }
@@ -195,6 +195,11 @@ final class DecisionCenterTests: XCTestCase {
         let decisions = await mac.decisions
         XCTAssertEqual(decisions, [])
         XCTAssertEqual(rig.center.status[key], .failed(.offline))
+        // The card is back with live buttons: "offline, not sent" no longer holds.
+        rig.center.sync(rig.hub.pendingItems)
+        XCTAssertNil(rig.center.status[key])
+        let after = await mac.decisions
+        XCTAssertEqual(after, [], "clearing the message sends nothing")
 
         // A session that ends while the reply is out reads the same, and is not resent.
         let sender = ScriptedSender([.failure(LinkClientError.sessionClosed)])
@@ -210,21 +215,21 @@ final class DecisionCenterTests: XCTestCase {
         let rig = try await PendingRig.make([mac], in: self)
         let synced = await rig.synced(count: 1)
         XCTAssertTrue(synced)
-        XCTAssertEqual(rig.center.visibleItems(rig.hub.pendingItems).map(\.actionable), [true])
+        XCTAssertEqual(rig.shown.map(\.actionable), [true])
         let key = rig.key(mac, "r1")
         // The session drops; the next one connects but has not synced yet.
         await mac.holdSnapshots()
         await mac.dropLiveSessions()
         let reconnecting = await eventually { rig.backoff.waiting.count == 1 }
         XCTAssertTrue(reconnecting, "\(rig.hub.machines.map(\.state))")
-        XCTAssertEqual(rig.center.visibleItems(rig.hub.pendingItems).map(\.actionable), [false])
+        XCTAssertEqual(rig.shown.map(\.actionable), [false])
         rig.backoff.release()
         let unsynced = await eventually {
             let held = await mac.heldSnapshotCount
             return held == 1 && rig.hub.pendingItems.map(\.actionable) == [false]
         }
         XCTAssertTrue(unsynced, "\(rig.hub.machines.map(\.state))")
-        XCTAssertEqual(rig.center.visibleItems(rig.hub.pendingItems).map(\.actionable), [false], "buttons off")
+        XCTAssertEqual(rig.shown.map(\.actionable), [false], "buttons off")
 
         // A tap that got through anyway (it raced the redraw) fails where the user can see it.
         await rig.center.send(.permission(.once), for: key)
@@ -233,11 +238,37 @@ final class DecisionCenterTests: XCTestCase {
         let decisions = await mac.decisions
         XCTAssertEqual(decisions, [], "nothing was sent for unsynced data")
 
+        rig.center.sync(rig.hub.pendingItems)
+        XCTAssertEqual(rig.center.status[key], .failed(.offline), "still not live: the card keeps saying so")
+
         await mac.releaseSnapshots()
         let back = await rig.synced(count: 1)
         XCTAssertTrue(back)
+        XCTAssertEqual(rig.shown.map(\.actionable), [true])
+        XCTAssertNil(rig.center.status[key], "live again: the offline note goes, the buttons are back")
         let still = await mac.decisions
         XCTAssertEqual(still, [], "and nothing goes out once it syncs")
+    }
+
+    func testVisibleItemsOnlyReads() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.addPending(permissionItem("r1"))
+        await mac.setReplyOutcome(.unknown)
+        let rig = try await PendingRig.make([mac], in: self)
+        let synced = await rig.synced(count: 1)
+        XCTAssertTrue(synced)
+        let key = rig.key(mac, "r1")
+        await rig.center.send(.permission(.once), for: key)
+        await mac.resolvePending("r1")
+        let gone = await eventually { rig.hub.pendingItems.isEmpty }
+        XCTAssertTrue(gone)
+
+        // A body may call it any number of times, with any subset: nothing changes.
+        XCTAssertEqual(rig.center.visibleItems([]), [])
+        XCTAssertEqual(rig.center.status[key], .failed(.rejected))
+
+        rig.center.sync(rig.hub.pendingItems)
+        XCTAssertNil(rig.center.status[key], "sync forgets what left the set")
     }
 
     func testResolvedItemClearsStatus() async throws {

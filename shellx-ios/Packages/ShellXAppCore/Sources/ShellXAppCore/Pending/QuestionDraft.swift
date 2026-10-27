@@ -60,6 +60,23 @@ public struct QuestionDraft: Equatable, Sendable {
         questions.first { $0.id == questionID }.flatMap(answer) != nil
     }
 
+    /// UTF-8 bytes of the answer the decision would carry for the question (0 when none).
+    public func answerBytes(questionID: String) -> Int {
+        questions.first { $0.id == questionID }.flatMap(answer)?.utf8.count ?? 0
+    }
+
+    /// The question has an answer, but too long for the wire: its picked labels joined pass
+    /// `maxAnswerBytes`. `decision` is nil until fewer are picked; the sheet says why.
+    public func isTooLong(questionID: String) -> Bool {
+        answerBytes(questionID: questionID) > Self.maxAnswerBytes
+    }
+
+    /// UTF-8 bytes a typed answer takes once trimmed, as the decision would send it; never cut.
+    /// The sheet counts with it while the field still holds more than `setFreeText` keeps.
+    public static func freeTextBytes(_ text: String) -> Int {
+        trimmed(text).utf8.count
+    }
+
     /// Every question has an answer that fits the wire: `decision` is not nil.
     public var isComplete: Bool { decision != nil }
 

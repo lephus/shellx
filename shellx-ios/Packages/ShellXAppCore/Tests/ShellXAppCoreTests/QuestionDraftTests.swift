@@ -91,6 +91,33 @@ final class QuestionDraftTests: XCTestCase {
         XCTAssertEqual(draft.decision, .question(selections: ["UI"]))
     }
 
+    func testJoinedLabelsOverLimitSayWhy() {
+        let long = PendingQuestion(
+            id: "long", prompt: "Pick", multiSelect: true,
+            options: (0..<3).map { PendingQuestionOption(id: "o\($0)", label: String(repeating: "\($0)", count: 400)) })
+        var draft = QuestionDraft(questions: [long])
+        draft.toggle(questionID: "long", label: String(repeating: "0", count: 400))
+        draft.toggle(questionID: "long", label: String(repeating: "1", count: 400))
+        XCTAssertEqual(draft.answerBytes(questionID: "long"), 802)
+        XCTAssertFalse(draft.isTooLong(questionID: "long"))
+        XCTAssertTrue(draft.isComplete)
+
+        draft.toggle(questionID: "long", label: String(repeating: "2", count: 400))
+
+        XCTAssertEqual(draft.answerBytes(questionID: "long"), 1204, "three labels and two separators")
+        XCTAssertTrue(draft.isTooLong(questionID: "long"), "the sheet can say why Send is off")
+        XCTAssertTrue(draft.isAnswered(questionID: "long"))
+        XCTAssertFalse(draft.isComplete)
+        XCTAssertNil(draft.decision)
+        XCTAssertEqual(draft.answerBytes(questionID: "missing"), 0)
+    }
+
+    func testFreeTextBytesCountWhatIsSent() {
+        XCTAssertEqual(QuestionDraft.freeTextBytes("  ệ \n"), 3, "trimmed, as the decision sends it")
+        XCTAssertEqual(QuestionDraft.freeTextBytes(String(repeating: "a", count: 2000)), 2000, "never cut")
+        XCTAssertEqual(QuestionDraft.freeTextBytes(""), 0)
+    }
+
     func testFreeTextCutAt1024Bytes() {
         var draft = QuestionDraft(questions: [color])
         // "ệ" is 3 UTF-8 bytes: 341 of them make 1023 bytes, so a 342nd cannot fit whole.

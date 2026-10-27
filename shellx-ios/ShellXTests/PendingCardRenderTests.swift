@@ -1,5 +1,4 @@
 import ShellXAppCore
-import ShellXLinkCore
 import SwiftUI
 import UIKit
 import XCTest
@@ -148,11 +147,17 @@ final class PendingCardRenderTests: XCTestCase {
         let all = PendingCardView.PermissionLayout([.allowOnce, .deny, .allowAlways, .allowAllTools])
         XCTAssertEqual(all.buttons, [.deny, .allowOnce])
         XCTAssertEqual(all.menu, [.allowAlways, .allowAllTools])
-        let noOnce = PendingCardView.PermissionLayout([.deny, .allowAlways, .allowAllTools])
-        XCTAssertEqual(noOnce.buttons, [.deny, .allowAlways], "without Allow, the first way to allow takes its place")
-        XCTAssertEqual(noOnce.menu, [.allowAllTools])
         XCTAssertEqual(PendingCardView.PermissionLayout([.deny]).buttons, [.deny])
         XCTAssertEqual(PendingCardView.PermissionLayout([.deny]).menu, [])
+    }
+
+    func testLastingGrantIsNeverTheOneTapButton() {
+        let noOnce = PendingCardView.PermissionLayout([.deny, .allowAlways, .allowAllTools])
+        XCTAssertEqual(noOnce.buttons, [.deny], "without Allow (once) the row has Deny only")
+        XCTAssertEqual(noOnce.menu, [.allowAlways, .allowAllTools], "lasting grants stay one step away")
+        let alwaysOnly = PendingCardView.PermissionLayout([.allowAlways])
+        XCTAssertEqual(alwaysOnly.buttons, [])
+        XCTAssertEqual(alwaysOnly.menu, [.allowAlways])
     }
 
     func testHeadlineNamesWorkspaceAgentMacAndKind() {
@@ -207,6 +212,50 @@ final class PendingCardRenderTests: XCTestCase {
     }
 
     // MARK: - Sheets
+
+    func testQuestionSheetBlocksAnswersOverTheLimit() {
+        let questions = Self.question.questions ?? []
+        var draft = QuestionDraft(questions: questions)
+        draft.toggle(questionID: "db", label: "Postgres")
+        let long = String(repeating: "ệ", count: 400)
+        draft.setFreeText(questionID: "checks", text: long)
+        XCTAssertTrue(draft.isComplete, "the draft holds the cut text")
+        XCTAssertTrue(
+            QuestionAnswerSheet.tooLong(draft, typed: ["checks": long]), "the field holds 1200 bytes: Send stays off")
+        XCTAssertFalse(QuestionAnswerSheet.tooLong(draft, typed: ["checks": "Only lint"]))
+        XCTAssertFalse(QuestionAnswerSheet.tooLong(draft, typed: [:]))
+
+        let wide = PendingQuestion(
+            id: "wide", prompt: "Pick", multiSelect: true,
+            options: (0..<3).map { PendingQuestionOption(id: "o\($0)", label: String(repeating: "\($0)", count: 400)) })
+        var picks = QuestionDraft(questions: [wide])
+        for option in wide.options { picks.toggle(questionID: "wide", label: option.label) }
+        XCTAssertTrue(QuestionAnswerSheet.tooLong(picks, typed: [:]), "joined labels past the limit")
+    }
+
+    func testQuestionSheetRendersAnswersOverTheLimit() throws {
+        let item = Self.mac(Self.question)
+        try assertRenders(
+            QuestionAnswerSheet(
+                item: item, state: PendingSheetState(), send: { _ in }, close: {}, page: 1, typing: ["checks"],
+                freeText: ["checks": String(repeating: "Chỉ chạy lint thôi. ", count: 60)]),
+            name: "pending-question-too-long")
+        let wide = PendingItem(
+            requestId: "w1", kind: .question, agent: "claude", workspaceId: "ws", workspaceTitle: "shellx",
+            createdAtMs: 6,
+            questions: [
+                PendingQuestion(
+                    id: "wide", prompt: "Which notes go in the release?", multiSelect: true,
+                    options: (1...3).map {
+                        PendingQuestionOption(id: "o\($0)", label: "Note \($0): " + String(repeating: "x", count: 400))
+                    })
+            ])
+        var picks = QuestionDraft(questions: wide.questions ?? [])
+        for option in wide.questions?.first?.options ?? [] { picks.toggle(questionID: "wide", label: option.label) }
+        try assertRenders(
+            QuestionAnswerSheet(item: Self.mac(wide), state: PendingSheetState(), send: { _ in }, close: {}, draft: picks),
+            name: "pending-question-choices-too-long")
+    }
 
     func testQuestionSheetRenders() throws {
         let item = Self.mac(Self.question)

@@ -1,5 +1,4 @@
 import ShellXAppCore
-import ShellXLinkCore
 import SwiftUI
 
 /// One pending request as a card: who asks and what (`workspace · agent`, the Mac when there are
@@ -22,18 +21,16 @@ struct PendingCardView: View {
         var retry: () -> Void = {}
     }
 
-    /// How a permission's actions are laid out: Deny, then one way to allow (the primary button) in
-    /// the row, the other ways to allow in the "…" menu. The row's allow is "Allow" (`once`) when the
-    /// Mac offers it, otherwise the first one it offers.
+    /// How a permission's actions are laid out: Deny and Allow (`once`, the primary button) in the
+    /// row, the lasting grants ("Always allow", "All tools") in the "…" menu. A lasting grant is never
+    /// the one-tap primary button, also when the Mac does not offer `once`.
     struct PermissionLayout: Equatable {
         var buttons: [PendingAction]
         var menu: [PendingAction]
 
         init(_ actions: [PendingAction]) {
-            var allows = actions.filter { $0 != .deny && $0.decision != nil }
-            if let once = allows.firstIndex(of: .allowOnce) { allows.insert(allows.remove(at: once), at: 0) }
-            buttons = (actions.contains(.deny) ? [.deny] : []) + allows.prefix(1)
-            menu = Array(allows.dropFirst())
+            buttons = [PendingAction.deny, .allowOnce].filter { actions.contains($0) }
+            menu = [PendingAction.allowAlways, .allowAllTools].filter { actions.contains($0) }
         }
     }
 
@@ -181,7 +178,7 @@ struct PendingCardView: View {
                         .font(.body.weight(.semibold))
                         .foregroundStyle(Color("AccentText"))
                         .frame(minWidth: 50, minHeight: 50)
-                        .frame(maxWidth: stacked ? .infinity : nil)
+                        .frame(maxWidth: stacked || layout.buttons.isEmpty ? .infinity : nil)
                         .background(Color("AccentText").opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
                         .opacity(enabled ? 1 : 0.4)
                 }

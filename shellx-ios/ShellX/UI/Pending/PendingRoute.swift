@@ -1,5 +1,4 @@
 import ShellXAppCore
-import ShellXLinkCore
 
 /// The sheet open over the pending cards, and the model that follows its item.
 struct PendingRoute: Identifiable {

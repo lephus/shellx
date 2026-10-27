@@ -49,8 +49,15 @@ struct PendingRig {
         }
     }
 
+    /// The cards as the app shows them: the center syncs with the hub's list (as `onChange` does),
+    /// then the body reads `visibleItems`.
+    var shown: [MachinePendingItem] {
+        center.sync(hub.pendingItems)
+        return center.visibleItems(hub.pendingItems)
+    }
+
     /// The request ids the cards show right now.
-    var visibleIDs: [String] { center.visibleItems(hub.pendingItems).map(\.item.requestId) }
+    var visibleIDs: [String] { shown.map(\.item.requestId) }
 }
 
 /// A `DecisionSending` that answers from a script, for what the real Link cannot do quickly (its
