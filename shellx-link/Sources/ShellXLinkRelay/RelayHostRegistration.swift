@@ -89,7 +89,9 @@ public actor RelayHostRegistration {
 
     private struct Opened: Sendable {
         var socket: RelaySocket
-        var expiresAtUnix: Int64
+        /// When to open the next registration: counted on the continuous clock from the moment the ticket
+        /// arrived, so the Mac's wall clock never moves it.
+        var renewAt: ContinuousClock.Instant
         var leaseSeconds: UInt32
     }
 
@@ -154,7 +156,7 @@ public actor RelayHostRegistration {
                     let result: Result<Opened, any Error>
                     do {
                         result = .success(try await Self.open(
-                            endpoint: endpoint, slot: slot, tickets: tickets))
+                            endpoint: endpoint, slot: slot, tickets: tickets, renewLead: renewLead))
                     } catch {
                         result = .failure(error)
                     }
@@ -222,9 +224,8 @@ public actor RelayHostRegistration {
                             emit.yield(.ended(id: id, error: error))
                         }
                     }
-                    let delay = Self.renewDelay(expiresAtUnix: opened.expiresAtUnix, renewLead: renewLead)
                     group.addTask {
-                        try? await Task.sleep(for: delay)
+                        try? await Task.sleep(until: opened.renewAt, clock: .continuous)
                         emit.yield(.renewDue(id: id))
                     }
                 case .opened(.failure(let error)):
@@ -267,10 +268,20 @@ public actor RelayHostRegistration {
         }
     }
 
-    /// When to open the next registration, from now: half the ticket's remaining lifetime at the
-    /// latest, `renewLead` before it ends at the earliest.
-    private static func renewDelay(expiresAtUnix: Int64, renewLead: Duration) -> Duration {
-        let lifetime = max(0, Double(expiresAtUnix) - Date().timeIntervalSince1970)
+    /// When to open the next registration, counted from the moment the ticket arrived: half the ticket's
+    /// lifetime at the latest, `renewLead` before it ends at the earliest, and never sooner than 1 s.
+    ///
+    /// The lifetime is the server's own `expires_at - issued_at`: both come from the server's clock, so a Mac
+    /// clock that runs ahead (which used to collapse the delay to 1 s, a ticket mint and register about once a
+    /// second) or behind (which used to outlive the ticket, losing make-before-break) changes nothing. Only a
+    /// ticket without `issued_at` compares its expiry with `now`, this device's clock at arrival.
+    static func renewDelay(issuedAtUnix: Int64?, expiresAtUnix: Int64, renewLead: Duration, now: Date) -> Duration {
+        let remaining: Double = if let issuedAtUnix {
+            Double(expiresAtUnix) - Double(issuedAtUnix)
+        } else {
+            Double(expiresAtUnix) - now.timeIntervalSince1970
+        }
+        let lifetime = max(0, remaining)
         let lead = Double(renewLead.components.seconds) + Double(renewLead.components.attoseconds) / 1e18
         return .seconds(max(1, max(lifetime / 2, lifetime - lead)))
     }
@@ -292,9 +303,15 @@ public actor RelayHostRegistration {
     private static func open(
         endpoint: URL,
         slot: String,
-        tickets: TicketProvider
+        tickets: TicketProvider,
+        renewLead: Duration
     ) async throws -> Opened {
         let ticket = try await tickets()
+        let arrived = ContinuousClock.now
+        let claims = ticket.claims
+        let renewAt = arrived + renewDelay(
+            issuedAtUnix: claims?.issuedAtUnix, expiresAtUnix: claims?.expiresAtUnix ?? ticket.expiresAtUnix,
+            renewLead: renewLead, now: Date())
         let socket = RelaySocket(url: endpoint, bearer: ticket.ticket)
         do {
             try await socket.send(.register(
@@ -304,10 +321,7 @@ public actor RelayHostRegistration {
             }
             switch reply {
             case .registered(let lease):
-                return Opened(
-                    socket: socket,
-                    expiresAtUnix: ticket.claims?.expiresAtUnix ?? ticket.expiresAtUnix,
-                    leaseSeconds: lease)
+                return Opened(socket: socket, renewAt: renewAt, leaseSeconds: lease)
             case let .error(code, _, retryable):
                 throw RelayError.server(code: code, retryable: retryable)
             default:

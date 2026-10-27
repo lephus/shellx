@@ -12,7 +12,8 @@ public enum LinkClientError: Error, Equatable, Sendable {
     case sessionClosed
     /// No answer arrived within the request timeout (10 s by default). The session stays usable.
     case timedOut
-    /// The host answered one specific call with an `error` (PROTOCOL.md section 7).
+    /// The host answered one specific call with an `error` (PROTOCOL.md section 7). `unsupported` means the host
+    /// cannot serve this call: it has no source for it, or it predates the call's type (section 3).
     case remote(code: String, message: String)
     /// The host answered a call with a message of another type than the call expects. A fault of the
     /// host's, not an `error` it sent: callers that branch on `.remote` codes never see it.
@@ -23,7 +24,6 @@ public enum LinkClientError: Error, Equatable, Sendable {
 public actor LinkClient {
     private typealias Change = (revision: Int, added: [PendingItem], resolved: [String])
     private typealias SessionChange = (revision: Int, upserted: [AgentSession], removed: [String])
-    private typealias ChatPush = (sessionId: String, entries: [ChatEntry])
 
     /// Every `agent.changed` from the host, in order. Single consumer. It finishes when the
     /// session ends.
@@ -39,9 +39,19 @@ public actor LinkClient {
     /// revision of its last `sessions()` result or applied change, exactly as for `changes`.
     public nonisolated let sessionChanges: AsyncStream<(revision: Int, upserted: [AgentSession], removed: [String])>
 
-    /// Every `chat.entries` push from the host, in order. Single consumer. It finishes when the
-    /// session ends. Entries are upserts by `ChatEntry.id`.
-    public nonisolated let chatEntries: AsyncStream<(sessionId: String, entries: [ChatEntry])>
+    /// Every `chat.entries` and `chat.reset` push from the host, in the order they arrived. Single consumer. It
+    /// finishes when the session ends.
+    ///
+    /// * `.upsert(sessionId, entries)`: upserts by `ChatEntry.id`, keeping the higher `rev`.
+    /// * `.reset(sessionId)`: the session's transcript was replaced (PROTOCOL.md section 4, ChatEntry). Drop
+    ///   every entry held for that session, drop the result of any `chatHistory` call for it that started
+    ///   before the reset, and page again from the newest (`chatHistory(sessionId:beforeSeq: nil, limit:)`).
+    ///   The `.upsert` pushes after it belong to the new transcript.
+    ///
+    /// `ChatPush.sessionId` and `ChatPush.entries` read both cases (`entries` is empty for a reset), so a
+    /// consumer written for the earlier `(sessionId, entries)` element treats a reset as an empty upsert until
+    /// it handles `.reset`.
+    public nonisolated let chatEntries: AsyncStream<ChatPush>
 
     private let changesContinuation: AsyncStream<Change>.Continuation
     private let sessionChangesContinuation: AsyncStream<SessionChange>.Continuation
@@ -280,7 +290,9 @@ public actor LinkClient {
         case let .sessionsChanged(revision, upserted, removed):
             sessionChangesContinuation.yield((revision, upserted, removed))
         case let .chatEntries(sessionId, entries):
-            chatEntriesContinuation.yield((sessionId, entries))
+            chatEntriesContinuation.yield(.upsert(sessionId: sessionId, entries: entries))
+        case let .chatReset(sessionId):
+            chatEntriesContinuation.yield(.reset(sessionId: sessionId))
         case let .changed(revision, added, resolved):
             changesContinuation.yield((revision, added, resolved))
         case let .ping(nonce):

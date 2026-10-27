@@ -47,7 +47,8 @@ call `xcodebuild` directly. Build output goes to `shellx-ios/.derived/` (ignored
 ```sh
 shellx-ios/scripts/dev.sh test core          # swift test for ShellXAppCore (no simulator)
 shellx-ios/scripts/dev.sh test app           # ShellXTests on the "ShellX Dev" simulator
-shellx-ios/scripts/dev.sh test all           # both; every test command also runs the two checks
+shellx-ios/scripts/dev.sh test release       # unsigned Release build + App Store checks (= build-release)
+shellx-ios/scripts/dev.sh test all           # all three; every test command also runs the two checks
 shellx-ios/scripts/dev.sh sim                # build, install and open on "ShellX Dev"
 shellx-ios/scripts/dev.sh sim --api http://127.0.0.1:8787   # Debug app talks to a local relay
 shellx-ios/scripts/dev.sh device --device-id <iPhone UDID>  # build, install and open on an iPhone
@@ -64,16 +65,27 @@ shellx-ios/scripts/dev.sh clean              # delete the private simulator and 
   `$SHELLX_IPHONE_DEVICE_ID`, then `~/.config/shellx/iphone-device-id` (any id `xcrun devicectl`
   accepts: the UDID, or the identifier `xcrun devicectl list devices` prints). `--build-only` stops
   after the build. The app arrives signed out; sign in on the phone. `dev.sh` never takes a password.
+- **Release check.** `build-release` (run by `test release` and `test all`) builds Release for a
+  generic iPhone without signing, so no Apple account is involved, then runs
+  `release/mobile/ios.sh --check-app --unsigned` on it: bundle id `com.shellx.prod`, the version in
+  `Config/Version.xcconfig`, no embedded framework, and no Debug-only code (the demo, `FakeMac`,
+  `FakeRelayAccount`, `InMemorySecretStore`, anything from `ShellXAppTestSupport`) in any Mach-O
+  file. A leak shows up there long before release day.
 - **API server.** Release builds always use `https://relay.shellx.pro`. Debug builds take
   `SHELLX_API_BASE` (`sim --api <url>`) when it is `https`, or `http` to the loopback host, so a
   relay on the Mac is reachable from the simulator only. Anything else is ignored.
+
+## Releasing
+
+App Store builds are made on the maintainer's Mac with `release/mobile/ios.sh`; see
+[release/mobile/README.md](../release/mobile/README.md) for the steps, the checks on the ipa and the
+App Store Connect answers. The privacy manifest is `ShellX/PrivacyInfo.xcprivacy`.
 
 ## Demo mode
 
 `dev.sh sim --demo` (or `device --demo`) launches a Debug build with `SHELLX_DEMO=1`: the app skips
 sign-in and is paired with a fake Mac running inside the app, with pending requests, agent sessions
-and chat, so the UI can be worked on without a real Mac. Release builds ignore it. The fake Mac
-arrives with the account and link work; until then the flag is passed through and has no effect.
+and chat, so the UI can be worked on without a real Mac. Release builds contain none of it.
 
 ## Strings
 

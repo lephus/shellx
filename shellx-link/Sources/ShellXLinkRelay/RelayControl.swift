@@ -38,12 +38,16 @@ public struct RelayTicketClaims: Equatable, Sendable, Decodable {
     public var permission: String
     public var role: String
     public var expiresAtUnix: Int64
+    /// When the server minted the ticket, by the server's clock. With `expiresAtUnix` it gives the ticket's
+    /// lifetime without consulting this device's clock. Nil for a ticket that does not carry it.
+    public var issuedAtUnix: Int64?
 
-    public init(slot: String, permission: String, role: String, expiresAtUnix: Int64) {
+    public init(slot: String, permission: String, role: String, expiresAtUnix: Int64, issuedAtUnix: Int64? = nil) {
         self.slot = slot
         self.permission = permission
         self.role = role
         self.expiresAtUnix = expiresAtUnix
+        self.issuedAtUnix = issuedAtUnix
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -51,6 +55,7 @@ public struct RelayTicketClaims: Equatable, Sendable, Decodable {
         case permission
         case role
         case expiresAtUnix = "expires_at_unix"
+        case issuedAtUnix = "issued_at_unix"
     }
 }
 

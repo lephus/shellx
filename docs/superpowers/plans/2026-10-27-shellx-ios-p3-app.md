@@ -1161,12 +1161,13 @@ App Flutter, `release/mobile/ios.sh` và `android.sh` cũ đã bị xoá ở `e9
   Ghi nhật ký ngắn vào ledger.
 - [ ] **Step 4: iPhone thật qua relay.shellx.pro. Cần người dùng đồng ý trước.** Route điện thoại của relay chỉ có trên production sau khi P2 vào `main` và được deploy.
   - Được đồng ý: chạy `dev.sh device`, đăng nhập tài khoản thật, ghép với Mac (tag `link`, API production), rồi lặp lại các bước 3–6 của Step 3, một lần trên 4G (tắt Wi-Fi) và một lần trên Wi-Fi.
-  - Không được: ghi vào ledger "chưa đo trên iPhone thật qua relay.shellx.pro". Phần giọng nói đã đo ở Task 9.
+  - Không được: ghi vào ledger "chưa đo trên iPhone thật qua relay.shellx.pro". Phần giọng nói không phụ thuộc relay: Task 9 không có iPhone thật nên đo ở Step 5 (ruling P3-R9), chỉ cần người dùng đồng ý cài bản Debug lên iPhone.
 - [ ] **Step 5: Đo.** Dùng mục "Đo độ trễ" trong Cài đặt (bản Debug), 20 lần cho mỗi loại:
   - `replyRoundTrip`: cận trên của "bấm Cho phép → hook nhận quyết định", vì host chỉ trả `delivered` sau khi hook đã nhận;
   - `pendingArrival` và `sessionChangeArrival`;
   - xử lý trên Mac → thẻ trên app biến mất (bấm giờ bằng tay);
-  - `launchToHome`.
+  - `launchToHome`;
+  - giọng nói (ruling P3-R9): `firstWord` 20 lần, p95 < 300 ms; 5 câu mẫu tiếng Việt và 1 câu trộn Việt–Anh, ghi chữ nhận được vào ledger D-iOS-2. Không đạt thì báo người dùng.
 
   Ghi p50 và p95, so với §7.4. Không đạt thì báo người dùng.
 - [ ] **Step 6: Cập nhật ledger.**

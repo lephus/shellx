@@ -135,6 +135,7 @@ final class AgentThreadModelTests: XCTestCase {
         XCTAssertEqual(model.thread.entries.last?.seq, 700, "the newest entries are the ones kept")
         XCTAssertTrue(model.thread.hasMore)
         XCTAssertTrue(model.olderOnlyOnMac)
+        XCTAssertEqual(model.older, .onlyOnMac)
         let requests = await mac.historyRequests
         XCTAssertEqual(requests.count, 10, "the newest page, then nine older pages up to the cap, then no more calls")
     }
@@ -202,7 +203,7 @@ final class AgentThreadModelTests: XCTestCase {
         var probe = rig.hub.chatUpdates().makeAsyncIterator()
         await mac.pushChat(sessionId: "s1", entries: entries(4...5))
         let arrived = await probe.next()
-        XCTAssertEqual(arrived?.1.map(\.seq), [4, 5])
+        XCTAssertEqual(arrived?.entries.map(\.seq), [4, 5])
         XCTAssertEqual(model.thread.entries.count, 3, "nobody follows the hub for the covered screen")
 
         // Shown again: the newest page brings them.
@@ -246,6 +247,257 @@ final class AgentThreadModelTests: XCTestCase {
         await gone.loadOlder()
         let requests = await mac.historyRequests
         XCTAssertEqual(requests.map(\.sessionId), ["s1", "s2"])
+    }
+
+    func testEmptyStateSaysWhatIsKnown() async throws {
+        let mac = await mac(history: [])
+        // One transcript line of 20 entries of 4 KB: more than one frame holds, so the Mac answers
+        // `too_large` while the link stays up.
+        let big = String(repeating: "a", count: ChatEntry.maxTextBytes)
+        await mac.upsertSession(agentSession("s2", workspace: "web"))
+        await mac.setHistory(
+            sessionId: "s2",
+            entries: (1...20).map {
+                ChatEntry(id: "big-\($0)", rev: 1, seq: 1, role: .agent, kind: .prose, text: big, tsMs: 1)
+            })
+        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let online = await rig.online(sessions: 2)
+        XCTAssertTrue(online)
+
+        // Before the copy and the first page: loading, never "no messages yet".
+        let (fresh, _) = model(ref(mac), rig)
+        XCTAssertEqual(fresh.emptyState, .loading)
+        await mac.holdChat()
+        let opening = Task { await fresh.open() }
+        let waiting = await eventually { fresh.loading }
+        XCTAssertTrue(waiting)
+        XCTAssertEqual(fresh.emptyState, .loading)
+        await mac.releaseChat()
+        await opening.value
+        XCTAssertEqual(fresh.emptyState, .noMessages, "only after an empty first page")
+
+        // The first page fails: say so, with a retry.
+        let s2 = ref(mac, "s2", workspace: "web")
+        let (failing, _) = model(s2, rig)
+        await failing.open()
+        XCTAssertEqual(failing.emptyState, .failed)
+        XCTAssertFalse(failing.sessionGone)
+        await mac.setHistory(sessionId: "s2", entries: entries(1...2))
+        await failing.retry()
+        XCTAssertNil(failing.emptyState)
+        XCTAssertEqual(failing.thread.entries.map(\.seq), [1, 2])
+
+        // Gone: a session the Mac has no chat for.
+        await mac.upsertSession(agentSession("s3", workspace: "relay"))
+        let (gone, _) = model(ref(mac, "s3", workspace: "relay"), rig)
+        await gone.open()
+        XCTAssertEqual(gone.emptyState, .gone)
+    }
+
+    func testEmptyStateWhileTheMacIsOffline() async throws {
+        let mac = await mac(history: [])
+        await mac.failNextConnects(URLError(.notConnectedToInternet), count: 1_000)
+        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let (model, _) = model(ref(mac), rig)
+        await model.open()
+        if case .offline = rig.hub.machines.first?.state {
+            XCTAssertEqual(model.emptyState, .offline, "no copy and an unreachable Mac")
+        } else {
+            XCTAssertEqual(model.emptyState, .loading, "still connecting")
+        }
+        let unreachable = await eventually {
+            if case .offline = rig.hub.machines.first?.state { return true }
+            return false
+        }
+        XCTAssertTrue(unreachable)
+        XCTAssertEqual(model.emptyState, .offline)
+    }
+
+    func testOlderRowHidesOfflineAndOffersRetryAfterAFailure() async throws {
+        let mac = await mac(history: entries(1...120))
+        let s1 = ref(mac)
+        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let (model, _) = model(s1, rig)
+        await model.open()
+        XCTAssertEqual(model.older, .loadable)
+
+        // The link dies while an older page is on its way.
+        await mac.holdChat()
+        let loading = Task { await model.loadOlder() }
+        let asked = await eventually { await mac.historyRequests.count == 2 }
+        XCTAssertTrue(asked)
+        let drop = Task { await mac.dropLiveSessions() }
+        await loading.value
+        await mac.releaseChat()
+        await drop.value
+        let down = await eventually { model.offline }
+        XCTAssertTrue(down)
+        XCTAssertEqual(model.older, .none, "no spinner that cannot load while offline")
+
+        // Back online: a retry row, not a spinner that would ask again by itself.
+        let retrying = await eventually { !rig.backoff.waiting.isEmpty }
+        XCTAssertTrue(retrying)
+        rig.backoff.release()
+        let back = await eventually { !model.offline }
+        XCTAssertTrue(back)
+        XCTAssertEqual(model.older, .failed)
+        await model.loadOlder()
+        XCTAssertEqual(model.older, .loadable)
+        XCTAssertEqual(model.thread.entries.first?.seq, 21)
+    }
+
+    func testClosedScreenStopsWorkAndANewerScreenWins() async throws {
+        let mac = await mac(history: entries(1...3))
+        let s1 = ref(mac)
+        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let (first, firstTimers) = model(s1, rig)
+
+        // Shown, then closed: closing writes the copy.
+        let shown = Task { await first.run() }
+        let opened = await eventually { first.thread.entries.count == 3 }
+        XCTAssertTrue(opened)
+        shown.cancel()
+        await shown.value
+        await first.close()
+        var stored = await stored(s1, rig)
+        XCTAssertEqual(stored?.entries.map(\.seq), [1, 2, 3])
+
+        // Shown again, then closed before its catch-up page comes back.
+        await mac.setHistory(sessionId: "s1", entries: entries(1...4))
+        await mac.holdChat()
+        let again = Task { await first.run() }
+        let asked = await eventually { await mac.historyRequests.count == 2 }
+        XCTAssertTrue(asked)
+        again.cancel()
+        await first.close()
+        await mac.releaseChat()
+        await again.value
+        XCTAssertFalse(firstTimers.waiting.contains(AgentThreadModel.saveDelay), "a closed screen schedules no save")
+        stored = await self.stored(s1, rig)
+        XCTAssertEqual(stored?.entries.map(\.seq), [1, 2, 3])
+        var requests = await mac.historyRequests
+        XCTAssertEqual(requests.count, 2, "a cancelled run asks for nothing more")
+
+        // Shown once more, a save still pending, when it is popped and the session pushed again at
+        // once: the new screen's writer wins, and the old screen's late write is dropped.
+        let third = Task { await first.run() }
+        let caughtUp = await eventually { first.thread.entries.count == 4 }
+        XCTAssertTrue(caughtUp)
+        let unsaved = await eventually { firstTimers.waiting.contains(AgentThreadModel.saveDelay) }
+        XCTAssertTrue(unsaved)
+        await mac.setHistory(sessionId: "s1", entries: entries(1...5))
+        let (second, secondTimers) = model(s1, rig)
+        await second.open()
+        XCTAssertEqual(second.thread.entries.map(\.seq), [1, 2, 3, 4, 5])
+        let pending = await eventually { secondTimers.waiting.contains(AgentThreadModel.saveDelay) }
+        XCTAssertTrue(pending)
+        secondTimers.release { $0 == AgentThreadModel.saveDelay }
+        let saved = await eventually { await self.stored(s1, rig)?.entries.count == 5 }
+        XCTAssertTrue(saved)
+        third.cancel()
+        await third.value
+        await first.close()
+        stored = await self.stored(s1, rig)
+        XCTAssertEqual(stored?.entries.map(\.seq), [1, 2, 3, 4, 5], "the old screen's late write is dropped")
+        requests = await mac.historyRequests
+        XCTAssertEqual(requests.count, 4)
+    }
+
+    // MARK: - Transcript reset (chat.reset)
+
+    /// Entries of a reloaded transcript: other ids and text than `entries(_:)`, the same `seq` range.
+    private func reloaded(_ seqs: ClosedRange<Int>) -> [ChatEntry] {
+        seqs.map {
+            ChatEntry(
+                id: "new-\($0)", rev: 1, seq: $0, role: .agent, kind: .prose, text: "new \($0)",
+                tsMs: 1_800_000_000_000 + Int64($0))
+        }
+    }
+
+    func testResetReplacesTheChatAndIgnoresAnswersStartedBefore() async throws {
+        let mac = await mac(history: entries(1...60, text: "old"))
+        let s1 = ref(mac)
+        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let (model, _) = model(s1, rig)
+
+        // The newest page of the old transcript is on its way when the Mac reloads the transcript.
+        await mac.holdChat()
+        let running = await startRunning(model)
+        XCTAssertTrue(running)
+        let asked = await eventually { await mac.historyRequests.count == 1 }
+        XCTAssertTrue(asked)
+        await mac.resetChat(sessionId: "s1", entries: reloaded(1...80))
+        // The screen pages again from the newest at once.
+        let again = await eventually { await mac.historyRequests.count == 2 }
+        XCTAssertTrue(again)
+        let requests = await mac.historyRequests
+        XCTAssertEqual(requests.map(\.beforeSeq), [nil, nil])
+        await mac.releaseChat()
+
+        // The old transcript's page, asked for before the reset, is dropped whichever comes first.
+        let fresh = await eventually { model.thread.entries.map(\.id) == (31...80).map { "new-\($0)" } }
+        XCTAssertTrue(fresh, "\(model.thread.entries.map(\.id).prefix(5))")
+        XCTAssertTrue(model.thread.hasMore)
+        XCTAssertFalse(model.loading)
+        XCTAssertNil(model.emptyState)
+
+        // Entries after the reset upsert as usual; paging back goes through the new transcript.
+        await mac.pushChat(sessionId: "s1", entries: reloaded(81...81))
+        let live = await eventually { model.thread.entries.last?.id == "new-81" }
+        XCTAssertTrue(live)
+        await model.loadOlder()
+        XCTAssertEqual(model.thread.entries.first?.id, "new-1")
+        XCTAssertFalse(model.thread.entries.contains { $0.id.hasPrefix("e-") }, "nothing of the old transcript is left")
+    }
+
+    func testResetDropsTheStoredCopyAndOtherSessionsResetsChangeNothing() async throws {
+        let mac = await mac(history: entries(1...5, text: "old"))
+        await mac.upsertSession(agentSession("s2", workspace: "web"))
+        await mac.setHistory(sessionId: "s2", entries: [])
+        let s1 = ref(mac)
+        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let online = await rig.online(sessions: 2)
+        XCTAssertTrue(online)
+        let (model, timers) = model(s1, rig)
+        let running = await startRunning(model)
+        XCTAssertTrue(running)
+        let opened = await eventually { model.thread.entries.count == 5 }
+        XCTAssertTrue(opened)
+        let pending = await eventually { timers.waiting.contains(AgentThreadModel.saveDelay) }
+        XCTAssertTrue(pending)
+        timers.release { $0 == AgentThreadModel.saveDelay }
+        let saved = await eventually { await self.stored(s1, rig)?.entries.count == 5 }
+        XCTAssertTrue(saved)
+
+        // Another session's reset changes nothing here.
+        await mac.resetChat(sessionId: "s2", entries: [])
+        await mac.pushChat(sessionId: "s1", entries: entries(6...6, text: "old"))
+        let six = await eventually { model.thread.entries.count == 6 }
+        XCTAssertTrue(six, "the s2 reset, sent before this push, was ignored")
+        var requests = await mac.historyRequests
+        XCTAssertEqual(requests.count, 1)
+
+        // This session's reset: the stored copy goes at once, before the new page is in.
+        await mac.holdChat()
+        await mac.resetChat(sessionId: "s1", entries: reloaded(1...2))
+        let dropped = await eventually { await self.stored(s1, rig) == nil }
+        XCTAssertTrue(dropped, "a relaunch must not show the old transcript")
+        XCTAssertEqual(model.thread.entries, [])
+        XCTAssertEqual(model.emptyState, .loading)
+        await mac.releaseChat()
+        let fresh = await eventually { model.thread.entries.map(\.id) == ["new-1", "new-2"] }
+        XCTAssertTrue(fresh)
+        await model.close()
+        let stored = await stored(s1, rig)
+        XCTAssertEqual(stored?.entries.map(\.id), ["new-1", "new-2"])
+        requests = await mac.historyRequests
+        XCTAssertEqual(requests.count, 2)
     }
 
     // MARK: - Send and stop
@@ -349,6 +601,8 @@ final class AgentThreadModelTests: XCTestCase {
         outcome = await model.stop(hard: true)
         XCTAssertEqual(outcome, .notFound)
         XCTAssertTrue(model.sessionGone)
+        XCTAssertFalse(model.canStop, "the Mac said the session is gone, even if its list still shows it")
+        await mac.setInterruptOutcome(nil)
 
         // Offline: nothing is sent, there is no answer, and Stop goes away.
         await mac.dropLiveSessions()
@@ -382,6 +636,7 @@ final class AgentThreadModelTests: XCTestCase {
         XCTAssertTrue(model.offline)
         XCTAssertFalse(model.loading)
         XCTAssertEqual(model.thread, cached)
+        XCTAssertNil(model.emptyState, "the copy shows")
         XCTAssertFalse(model.sessionGone, "an offline Mac's silence says nothing about the session")
         var requests = await mac.historyRequests
         XCTAssertEqual(requests, [])

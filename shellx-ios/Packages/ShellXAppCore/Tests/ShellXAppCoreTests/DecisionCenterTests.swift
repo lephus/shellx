@@ -222,7 +222,10 @@ final class DecisionCenterTests: XCTestCase {
         await mac.dropLiveSessions()
         let reconnecting = await eventually { rig.backoff.waiting.count == 1 }
         XCTAssertTrue(reconnecting, "\(rig.hub.machines.map(\.state))")
-        XCTAssertEqual(rig.shown.map(\.actionable), [false])
+        // The hub applies the not-actionable event on its own reader, which may run after the
+        // connection registered its backoff wait.
+        let notActionable = await eventually { rig.shown.map(\.actionable) == [false] }
+        XCTAssertTrue(notActionable, "\(rig.shown.map(\.actionable))")
         rig.backoff.release()
         let unsynced = await eventually {
             let held = await mac.heldSnapshotCount

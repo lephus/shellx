@@ -53,7 +53,9 @@ A frame is one UTF-8 JSON object:
   decode (`frame_too_large`). A sender whose content does not fit MUST shrink the content.
 - Decoding order: (1) size check, (2) parse as an object with integer-token `v` and string `t`,
   else `bad_json`; (3) `v` != 1 gives `wrong_version`; (4) if `t` is unknown, the frame is
-  `unknown` and is ignored (forward compatibility); (5) if `t` is known but a field is
+  `unknown` (forward compatibility), whatever its other fields hold; it keeps the frame's `call_id`
+  when that is a valid one (a string of 1 to 64 UTF-8 bytes), and section 7 says how each side handles
+  it; (5) if `t` is known but a field is
   missing or has the wrong type, `bad_json` (an unlisted enum value is not an error, see
   Extension). A known `t` never degrades to `unknown`.
 - `unknown` is decode-only; an implementation MUST NOT be able to send it.
@@ -65,6 +67,9 @@ A frame is one UTF-8 JSON object:
   decodes (an implementation keeps the raw string, for example as `.other(raw)`); it is never
   `bad_json`.
 - A sender MAY add an optional field at any time; receivers ignore fields they do not know.
+- A host MAY add a push, a message that answers no call (such as `chat.reset`): a client that predates it
+  ignores it (section 7), so it needs no new `v`. A new request that expects an answer carries a
+  `call_id`, and a host that predates it answers `unsupported` (section 3).
 - Adding a required field, or changing the meaning of a field, requires raising `v`.
 - `v` stays 1 in P2: the P2 changes revise v1 before its first release, because no P1 build has
   left the spike.
@@ -83,6 +88,10 @@ requests later versions add on the same pattern).
 - A client drops an answer whose `call_id` it is no longer waiting for (for example because the
   call timed out).
 - A missing, empty or longer-than-64-byte `call_id` on a message that requires one is `bad_json`.
+- A call the host does not know (a request type of a later version, sent by a newer client) still gets
+  its one answer: the host answers a frame of unknown `t` that carries a valid `call_id` with `error`
+  `unsupported` and that `call_id`, so the client fails the call at once instead of waiting for its
+  timeout. A frame of unknown `t` without a valid `call_id` gets no answer.
 - The P1 rule still holds: the host answers the `agent.reply` messages for one `request_id` in
   the order they arrived (section 5).
 
@@ -104,6 +113,7 @@ requests later versions add on the same pattern).
 | `chat.history.get` | client | The user opens a session, or scrolls to older entries | `call_id` string, `session_id` string, `before_seq` int (optional), `limit` int (1 to 50) |
 | `chat.history` | host | Reply to `chat.history.get` | `call_id` string, `session_id` string, `entries` array of ChatEntry (oldest first), `has_more` bool |
 | `chat.entries` | host | A transcript entry is added or changes | `session_id` string, `entries` array of ChatEntry (upsert by `id`) |
+| `chat.reset` | host | The session's transcript was replaced: the entries the client holds for it are gone (see ChatEntry) | `session_id` string |
 | `chat.send` | client | The user sends a message to a session | `call_id` string, `session_id` string, `text` string (1 to 16 384 UTF-8 bytes) |
 | `chat.send.result` | host | Reply to every acceptable `chat.send` | `call_id` string, `outcome` string |
 | `chat.interrupt` | client | The user stops the session's current turn | `call_id` string, `session_id` string, `hard` bool |
@@ -112,7 +122,8 @@ requests later versions add on the same pattern).
 | `pong` | either | Immediately after `ping`, echoing it | `nonce` uint64 (same value) |
 
 Error codes in use: `protocol_mismatch`, `bad_request`, `too_large`, `unsupported` (the host has no
-session list or no chat: it answers each such call with this code and its `call_id`), `not_found`
+session list or no chat, or does not know the call's `t`: it answers each such call with this code and
+its `call_id`), `not_found`
 (`chat.history.get` for a `session_id` the host does not have). Others MAY be added; receivers treat
 an unrecognized code as a generic error.
 
@@ -175,7 +186,12 @@ The `decision` object of `agent.reply` has a `kind` (open enum) that selects the
 | --- | --- | --- |
 | `permission` | `mode` string | `{"kind":"permission","mode":"once"}` |
 | `question` | `selections` array of string, positional: `selections[i]` answers `questions[i]`, so its length equals the number of the item's `questions`. Each element is 1 to 1024 UTF-8 bytes. An element equal to an option `label` picks that option; any other string is a free-text answer. For a `multi_select` question, the chosen labels are joined with `", "` | `{"kind":"question","selections":["Postgres"]}` |
-| `exit_plan` | `mode` string, `feedback` string (optional) | `{"kind":"exit_plan","mode":"manual","feedback":"split step 2"}` |
+| `exit_plan` | `mode` string, `feedback` string (optional, at most 4096 UTF-8 bytes) | `{"kind":"exit_plan","mode":"manual","feedback":"split step 2"}` |
+
+An `exit_plan` decision whose `feedback` is not empty (after trimming white space) rejects the plan and asks
+the agent to revise it with that change, whatever `mode` says: the host answers the agent "rejected, wants
+this change: <feedback>". `mode` takes effect only without feedback, but it is still required and must be one
+of the item's `modes`.
 
 A `decision` with a `kind` this version does not know decodes (it is not `bad_json`); the host
 answers it `unknown` (section 5). A known `kind` with a missing required field is `bad_json`.
@@ -214,13 +230,30 @@ answers it `unknown` (section 5). A known `kind` with a missing required field i
 entries when `before_seq` is absent), oldest first; `has_more` is true when older entries exist.
 Entries that share a `seq` belong to one transcript line; a `chat.history` page never contains part of
 a `seq` group (section 6), and `before_seq` pages strictly older groups. A
-client keeps the entries it has by `id`: `chat.entries` and `chat.history` both upsert.
+client keeps the entries it has by `id`: `chat.entries` and `chat.history` both upsert. A session the host
+lists whose agent has not written its transcript yet has an empty history (`entries` empty, `has_more`
+false), not `not_found`; its entries arrive in `chat.entries` once written.
 
 `rev` orders the emissions of one entry. The host gives every emission of an entry, in a `chat.history` or
 a `chat.entries`, a `rev` strictly greater than that of any earlier emission of the same `id`. The two
 messages travel independently, so an older emission can arrive after a newer one: a receiver that already
 holds an entry with this `id` keeps whichever has the higher `rev` (equal `rev` means the same content)
 and drops the other. A host takes `rev` from its transcript source.
+
+`chat.reset` says a session's transcript was replaced: the host reloaded it from scratch, for example
+because the agent was resumed into a rewritten file, or a forked session's file first appeared already
+holding a whole history. The entries a client holds for that session, their `seq` values and its
+`before_seq` position no longer apply. A host sends `chat.reset` in order with that session's
+`chat.entries`: every entry pushed before it belongs to the old transcript, every entry after it to the
+new one. On `chat.reset` a client:
+
+- drops every entry it holds for that session;
+- drops the answer to any `chat.history.get` for that session it sent before the reset;
+- pages again from the newest (`chat.history.get` without `before_seq`), keeping the `chat.entries` that
+  arrive meanwhile (they upsert as usual).
+
+A client that predates `chat.reset` ignores it (unknown `t`, section 7) and keeps the old entries until
+it opens the session again.
 
 ### Enums (exact strings, all open)
 
@@ -230,8 +263,9 @@ and drops the other. A host takes `rev` from its transcript source.
 - `state` (AgentSession): `idle`, `working`, `needs_input`, `ended`.
 - `role` (ChatEntry): `user`, `agent`, `system`. `kind` (ChatEntry): `prose`, `thought`, `tool_use`, `status`, `other`.
 - `outcome` of `chat.send.result`: `submitted`, `not_found`, `busy`, `failed`. A `chat.send` for a
-  `session_id` the host does not have gets the outcome `not_found`, not an `error`.
-- `outcome` of `chat.interrupt.result`: `sent`, `not_found`, `failed`.
+  `session_id` the host does not have gets the outcome `not_found`, not an `error`; so does one for a listed
+  session whose agent is not live, an `ended` one for example (section 10).
+- `outcome` of `chat.interrupt.result`: `sent`, `not_found`, `failed`, with the same `not_found` rule.
 
 ## 5. Rules
 
@@ -252,7 +286,8 @@ A request is resolved at most once. For an `agent.reply`, the first rule that ma
    was. That is any of: the `decision.kind` differs from the item's `kind`; the decision's
    `mode` is not in the item's `modes`; for a `question`, the number of `selections` differs from
    the number of the item's `questions`, or an element is empty or longer than 1024 UTF-8 bytes;
-   the `decision.kind` is not known to the host.
+   for an `exit_plan`, the `feedback` is longer than 4096 UTF-8 bytes; the `decision.kind` is not
+   known to the host.
 4. No agent is waiting for the request any more (the agent stopped waiting, it never waited
    because it sent the request without waiting, or the host restarted since the request
    arrived): nothing can take the decision. The host marks the
@@ -332,7 +367,9 @@ Rules:
   connection. A client that receives `error` `protocol_mismatch` closes the connection and tells
   the user to update the app.
 - **First frame is not `hello`**: the host sends `error` code `bad_request` and then closes.
-- **Unknown `t`**: ignored by both sides, session kept.
+- **Unknown `t`**: the session is kept. The host answers a frame of unknown `t` that carries a valid
+  `call_id` with `error` `unsupported` and that `call_id` (section 3), and ignores one without. The
+  client ignores every frame of unknown `t`.
 - A frame that decodes but is not allowed in the current phase or direction (for example a
   client sending `welcome`) is ignored; the host MAY answer `error` `bad_request`.
 
@@ -354,7 +391,7 @@ Rules:
   succeed or fail the same way.
 
 `message.case` names the message; the other `message` keys use the JSON field names (`decision`
-and PendingItem objects use their wire form). All 21 cases:
+and PendingItem objects use their wire form). All 22 cases:
 
 | `message.case` | Wire `t` | Other keys |
 | --- | --- | --- |
@@ -374,11 +411,12 @@ and PendingItem objects use their wire form). All 21 cases:
 | `chat_history_get` | `chat.history.get` | `call_id`, `session_id`, `before_seq` (optional), `limit` |
 | `chat_history` | `chat.history` | `call_id`, `session_id`, `entries` (ChatEntry objects), `has_more` |
 | `chat_entries` | `chat.entries` | `session_id`, `entries` |
+| `chat_reset` | `chat.reset` | `session_id` |
 | `chat_send` | `chat.send` | `call_id`, `session_id`, `text` |
 | `chat_send_result` | `chat.send.result` | `call_id`, `outcome` |
 | `chat_interrupt` | `chat.interrupt` | `call_id`, `session_id`, `hard` |
 | `chat_interrupt_result` | `chat.interrupt.result` | `call_id`, `outcome` |
-| `unknown` | any unrecognized `t` | `type` (the `t` value); decode-only |
+| `unknown` | any unrecognized `t` | `type` (the `t` value), `call_id` (optional: the frame's valid `call_id`); decode-only |
 
 ## 9. Pairing and trust
 
@@ -450,3 +488,56 @@ accepts a pairing request for a machine of the phone's own account.
 - The API base URL MUST be `https`, except for a loopback host (development). The phone never
   follows an HTTP redirect from the API.
 - Tokens, passwords, tickets, keys, codes and proofs are never logged.
+
+## 10. Phone commands
+
+A phone can make the Mac act: decide an agent's pending request, type into an agent session, interrupt
+it. This section is the safety analysis for those commands. It follows the rules a remote command
+channel must meet: deny by default, allow only the calls a product flow needs, scope every call to
+objects the caller may touch, and never let a call execute or open arbitrary content on the Mac.
+
+**Default deny.** A host acts only on the calls in the table below. Every other `t` gets no effect: a
+call of a later version is answered `error` `unsupported` (section 3), any other unknown frame is
+ignored, and a host frame type sent by a client is ignored or answered `bad_request` (section 7). No
+field of any message names a command line, a path, a URL, a workspace or a terminal for the host to
+open, run or type into.
+
+**Allowed calls.**
+
+| Call | Effect on the Mac | Scope |
+| --- | --- | --- |
+| `agent.snapshot.get`, `agent.sessions.get`, `chat.history.get` | None (reads) | The pending requests and sessions of this Mac's Claude Code agents; the transcripts of listed sessions |
+| `agent.reply` | Gives a decision to an agent hook that is waiting for it | One pending request, by `request_id`. Only the item's `modes` (never `bypass` or `bypassPermissions`, which stay on the Mac), at most once (section 5) |
+| `chat.send` | Pastes `text` (1 to 16 384 bytes) at the agent's prompt in its terminal and submits it | One live Claude Code session, by `session_id` |
+| `chat.interrupt` | Sends Esc, or ctrl-C when `hard`, to that agent's terminal | One live Claude Code session, by `session_id` |
+| `ping` | None | |
+
+**Scope.** The host serves only its own Claude Code agent sessions and their pending requests.
+`session_id` and `request_id` are looked up in the host's own lists; an id it does not have is
+`not_found` (`unknown` for a reply). A phone cannot name another workspace, terminal, file, machine or
+account. Only a phone the Mac trusts gets this far: signed in to the same account, holding a proof from a
+QR code the Mac showed, and allowed by the user on that Mac (section 9).
+
+**Shell fall-through.** `chat.send` and `chat.interrupt` type into the terminal the agent runs in. Once the
+agent has exited, that terminal runs the user's shell or whatever started next: a message would run there
+as a command line, and ctrl-C would stop another program. A host therefore accepts them only for a *live*
+session: one that is not `ended`, whose agent process the host knows by process id, and whose process is
+alive when the call arrives. Any other session, including every ended session it lists (they stay listed
+for their read-only history), is answered `not_found` before any terminal is touched. A session whose
+agent process the host has not learned yet is `not_found` until the agent's next hook names it. The host
+then types only into the terminal that session is bound to, and only while that terminal still exists
+and still hosts the agent; it never sends the text to another terminal. What remains is the moment
+between that check and the typing: an agent that exits within it can still let one message reach the
+terminal, the same window the Mac's own remote-control path has.
+
+**Why the rest is acceptable.** A paired phone is trusted like the user sitting at the Mac: it is signed in
+to the user's account, and the user allowed that phone on that Mac in person; the relay can neither create
+that trust nor widen it (section 9). Removing the phone on the Mac untrusts its key at once: its live
+sessions close and its next handshake is refused. Removing it on the phone deletes the grant, so the relay
+mints it no new connect ticket, and the Mac drops the key when it next checks the grants. Within that
+trust, typing into the user's own agent session, stopping it, and answering its requests are what the user
+could do at the keyboard; the allowed calls limit *which objects* a phone reaches (this Mac's live agent
+sessions and their pending requests), not what the user may do with them. Out of reach for a phone in v1:
+spawning or respawning terminals, keys or text for anything but a live agent, opening URLs or files, the
+Mac's settings, the `bypass` modes, other machines and other accounts. The host never logs message text,
+tool inputs, keys, tickets or tokens.

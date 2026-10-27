@@ -146,8 +146,18 @@ public final class HomeModel {
         _ = await (chat, sessions)
     }
 
-    private func watch(_ updates: AsyncStream<(SessionRef, [ChatEntry])>) async {
-        for await (ref, entries) in updates { remember(entries, of: ref) }
+    private func watch(_ updates: AsyncStream<ChatUpdate>) async {
+        for await update in updates {
+            switch update {
+            case let .upsert(ref, entries):
+                remember(entries, of: ref)
+            case let .reset(ref):
+                // The old transcript's lines and seq values are void: no note quotes them, and a
+                // note still following the session stops (its seq marks no longer compare).
+                lastAgentLines[ref] = nil
+                stopFollowing(ref)
+            }
+        }
     }
 
     private func watch(_ updates: AsyncStream<(machineID: String, sessions: [AgentSession])>) async {

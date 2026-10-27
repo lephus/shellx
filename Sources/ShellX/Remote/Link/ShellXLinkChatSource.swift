@@ -9,16 +9,20 @@ import ShellXLinkSession
 ///
 /// * Entries are the service's ``ChatMessage``s mapped to ``ChatEntry`` (prose, thought, tool use, status,
 ///   other), with `text` cut to ``ChatEntry/maxTextBytes``. Live entries come from `appended` and `updated`
-///   frames; P2 skips the live prose preview (`streamingProse`) and transcript resets.
+///   frames, and a `reset` frame (the service reloaded the transcript) becomes a ``ChatPush/reset(sessionId:)``
+///   in order with them; P2 skips the live prose preview (`streamingProse`).
 /// * `rev` comes from one counter for every emission, history and push alike, so it rises strictly per
 ///   entry id. The counter starts at the wall clock in microseconds, so a relaunched Mac never reuses a
 ///   revision a phone still holds.
 /// * The tailer updates its cache before it publishes a batch, so a history read can return an entry older
 ///   than a push that reached the main actor while the read was in flight. Such an entry is served with the
 ///   pushed content (and a new `rev`), so a stale copy never outranks the push on the phone.
+/// * A listed session whose agent has not written its transcript yet has an empty history; `nil` (the
+///   phone's `not_found`) is for sessions the Mac does not have or cannot read.
 /// * Send and interrupt run ``TerminalController/agentChatSend(sessionID:text:attachments:)`` and
 ///   ``TerminalController/agentChatInterrupt(sessionID:hard:)``, the paths behind `mobile.chat.send` and
-///   `mobile.chat.interrupt`.
+///   `mobile.chat.interrupt`, and only for a session whose agent still runs (not ended, a known live pid);
+///   any other session is `not_found` before a terminal is touched (PROTOCOL.md section 10).
 ///
 /// The frame observer is registered only while someone subscribes to ``entries()``; it also keeps the
 /// service tailing transcripts with no mobile client subscribed. All state is main-actor isolated.
@@ -26,7 +30,7 @@ import ShellXLinkSession
 final class ShellXLinkChatSource: AgentChatSource {
     typealias Send = @MainActor (_ sessionID: String, _ text: String) async -> TerminalController.V2CallResult
     typealias Interrupt = @MainActor (_ sessionID: String, _ hard: Bool) async -> TerminalController.V2CallResult
-    typealias Push = (sessionId: String, entries: [ChatEntry])
+    typealias Push = ChatPush
 
     /// A history read in flight, from ``beginHistoryRead(sessionId:)`` to ``finishHistoryRead(_:page:)``.
     struct HistoryRead {
@@ -70,22 +74,24 @@ final class ShellXLinkChatSource: AgentChatSource {
         let page = await service.historyRebindingIfStale(sessionID: sessionId, beforeSeq: beforeSeq, limit: limit)
         guard let page else {
             reads[read.id] = nil
-            return nil
+            // A listed session whose agent has not written its transcript yet has an empty history, not
+            // `not_found` (PROTOCOL.md 4, ChatEntry); its entries arrive in `chat.entries` once written.
+            return await service.isAwaitingTranscript(sessionID: sessionId) ? ([], false) : nil
         }
         return finishHistoryRead(read, page: page)
     }
 
     func send(sessionId: String, text: String) async -> ChatSendOutcome {
-        guard linkSession(sessionId) != nil else { return .notFound }
+        guard hasLiveAgent(sessionId) else { return .notFound }
         return Self.sendOutcome(await sendCommand(sessionId, text))
     }
 
     func interrupt(sessionId: String, hard: Bool) async -> ChatInterruptOutcome {
-        guard linkSession(sessionId) != nil else { return .notFound }
+        guard hasLiveAgent(sessionId) else { return .notFound }
         return Self.interruptOutcome(await interruptCommand(sessionId, hard))
     }
 
-    nonisolated func entries() -> AsyncStream<(sessionId: String, entries: [ChatEntry])> {
+    nonisolated func entries() -> AsyncStream<ChatPush> {
         let (stream, continuation) = AsyncStream<Push>.makeStream(bufferingPolicy: .unbounded)
         let id = UUID()
         // Synchronous from cancellation, `finish()` or release: only schedule the removal.
@@ -141,12 +147,16 @@ final class ShellXLinkChatSource: AgentChatSource {
         observation = (service, token)
     }
 
-    /// Publishes the entries of an `appended` or `updated` frame of a Claude Code session.
+    /// Publishes the entries of an `appended` or `updated` frame, and the reset of a reloaded transcript, of a
+    /// Claude Code session, in the order the service emitted them.
     func receive(_ frame: ChatSessionEventFrame) {
         let messages: [ChatMessage]
         switch frame.event {
         case .appended(let list), .updated(let list): messages = list
-        case .stateChanged, .descriptorChanged, .sessionRemoved, .terminalBlocks, .streamingProse, .reset, .unknown:
+        case .reset:
+            publishReset(frame.sessionID)
+            return
+        case .stateChanged, .descriptorChanged, .sessionRemoved, .terminalBlocks, .streamingProse, .unknown:
             return
         }
         guard !messages.isEmpty, linkSession(frame.sessionID) != nil else { return }
@@ -154,8 +164,23 @@ final class ShellXLinkChatSource: AgentChatSource {
         for (id, read) in reads where read.sessionId == frame.sessionID {
             for entry in entries { reads[id]?.pushed[entry.id] = entry }
         }
+        publish(.upsert(sessionId: frame.sessionID, entries: entries))
+    }
+
+    /// The service reloaded the session's transcript from scratch (a rotated or truncated file, a fork's
+    /// oversized first read): the phone drops what it holds and pages again (PROTOCOL.md 4, `chat.reset`).
+    /// Entries pushed during a read in flight belong to the old transcript, so that read no longer overlays them.
+    private func publishReset(_ sessionId: String) {
+        guard linkSession(sessionId) != nil else { return }
+        for (id, read) in reads where read.sessionId == sessionId {
+            reads[id]?.pushed = [:]
+        }
+        publish(.reset(sessionId: sessionId))
+    }
+
+    private func publish(_ push: ChatPush) {
         for continuation in subscribers.values {
-            continuation.yield((sessionId: frame.sessionID, entries: entries))
+            continuation.yield(push)
         }
     }
 
@@ -163,13 +188,34 @@ final class ShellXLinkChatSource: AgentChatSource {
 
     /// The service when `sessionId` is a Claude Code agent session it knows.
     private func linkSession(_ sessionId: String) -> AgentChatTranscriptService? {
+        linkRecord(sessionId)?.service
+    }
+
+    private func linkRecord(_ sessionId: String) -> (service: AgentChatTranscriptService, record: AgentChatSessionRecord)? {
         guard let service = serviceProvider() else { return nil }
         if !subscribers.isEmpty { startObserving() }
         guard let record = service.sessionRecord(sessionID: sessionId),
               record.agentKind == .claude, record.descriptor.kind == .agent else {
             return nil
         }
-        return service
+        return (service, record)
+    }
+
+    /// Whether a phone's text or interrupt may go to `sessionId` (PROTOCOL.md section 10): a Claude Code session
+    /// that has not ended and whose agent process the Mac knows by pid and finds alive. The send path then types
+    /// into the terminal the agent ran in; once the agent is gone that terminal runs the user's shell (or whatever
+    /// started next), so text must never reach it. Stricter than the mobile path, which trusts a binding without
+    /// a pid: a session whose pid the Mac has not learned yet is `not_found` here until a hook names it.
+    private func hasLiveAgent(_ sessionId: String) -> Bool {
+        guard let record = linkRecord(sessionId)?.record, let pid = record.pid else { return false }
+        if case .ended = record.state { return false }
+        return Self.processIsAlive(pid)
+    }
+
+    /// `kill(pid, 0)`: the process exists (EPERM: it exists under another user).
+    private static func processIsAlive(_ pid: Int) -> Bool {
+        guard pid > 0, let id = pid_t(exactly: pid) else { return false }
+        return kill(id, 0) == 0 || errno == EPERM
     }
 
     private func nextRev() -> Int {

@@ -213,6 +213,17 @@ final class PhonePairingTests: XCTestCase {
         XCTAssertEqual(StubURLProtocol.requests.filter { $0.method == "GET" }.count, 1)
     }
 
+    func testPairReportsTheRequestIdBeforeItPolls() async throws {
+        let response = approved()
+        install { response }
+        let reported = Reported()
+        _ = try await PhonePairing.pair(
+            offerURI: offer().uri, clientKey: clientKey, api: api(), token: "tok", pollInterval: .milliseconds(5),
+            onRequested: { id in reported.set(id, requestsSoFar: StubURLProtocol.requests.count) })
+        XCTAssertEqual(reported.id, "p-1")
+        XCTAssertEqual(reported.requestsSoFar, 1, "reported after the POST, before the first poll")
+    }
+
     func testBadOfferNeverReachesRelay() async throws {
         StubURLProtocol.install { _ in StubResponse(500) }
         do {
@@ -224,6 +235,14 @@ final class PhonePairingTests: XCTestCase {
         }
         XCTAssertTrue(StubURLProtocol.requests.isEmpty)
     }
+}
+
+private final class Reported: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: (id: String?, requestsSoFar: Int?) = (nil, nil)
+    var id: String? { lock.withLock { values.id } }
+    var requestsSoFar: Int? { lock.withLock { values.requestsSoFar } }
+    func set(_ id: String, requestsSoFar: Int) { lock.withLock { values = (id, requestsSoFar) } }
 }
 
 private final class PollCounter: @unchecked Sendable {

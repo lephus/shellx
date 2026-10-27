@@ -5,7 +5,7 @@ import ShellXLinkSession
 /// `FakeMac`'s chat: an `AgentChatSource` in memory. A session has a transcript once `setHistory`
 /// or `push` named it; others answer `not_found`.
 final class FakeMacChat: AgentChatSource, @unchecked Sendable {
-    typealias Push = (sessionId: String, entries: [ChatEntry])
+    typealias Push = ChatPush
 
     private let lock = NSLock()
     /// Entries by session, then by `ChatEntry.id` (upserts).
@@ -56,8 +56,20 @@ final class FakeMacChat: AgentChatSource, @unchecked Sendable {
     func push(sessionId: String, entries: [ChatEntry]) {
         lock.withLock {
             for entry in entries { transcripts[sessionId, default: [:]][entry.id] = entry }
+            let push = ChatPush.upsert(sessionId: sessionId, entries: entries)
             for (id, continuation) in subscribers {
-                if case .terminated = continuation.yield((sessionId, entries)) { subscribers[id] = nil }
+                if case .terminated = continuation.yield(push) { subscribers[id] = nil }
+            }
+        }
+    }
+
+    /// Replaces the session's transcript, as when the Mac reloads it, and pushes `chat.reset` to
+    /// every subscriber, in order with the entries pushed before and after.
+    func reset(sessionId: String, entries: [ChatEntry]) {
+        lock.withLock {
+            transcripts[sessionId] = Dictionary(entries.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+            for (id, continuation) in subscribers {
+                if case .terminated = continuation.yield(.reset(sessionId: sessionId)) { subscribers[id] = nil }
             }
         }
     }
@@ -70,16 +82,17 @@ final class FakeMacChat: AgentChatSource, @unchecked Sendable {
         lock.withLock { interruptOutcome = outcome }
     }
 
+    /// Answers from the transcript as it is when the call arrives, like a Mac reading its file; a
+    /// held call delivers that answer later (after a reset, it is the old transcript's page).
     func history(sessionId: String, beforeSeq: Int?, limit: Int) async -> (entries: [ChatEntry], hasMore: Bool)? {
-        lock.withLock {
+        let page = lock.withLock { () -> (entries: [ChatEntry], hasMore: Bool)? in
             historyCalls.append(FakeMac.HistoryRequest(sessionId: sessionId, beforeSeq: beforeSeq, limit: limit))
-        }
-        await waitWhileHeld()
-        return lock.withLock {
             guard let all = transcripts[sessionId]?.values.sorted(by: { $0.seq < $1.seq }) else { return nil }
             let older = all.filter { entry in beforeSeq.map { entry.seq < $0 } ?? true }
             return (Array(older.suffix(limit)), older.count > limit)
         }
+        await waitWhileHeld()
+        return page
     }
 
     func send(sessionId: String, text: String) async -> ChatSendOutcome {

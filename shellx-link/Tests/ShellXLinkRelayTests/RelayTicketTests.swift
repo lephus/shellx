@@ -33,11 +33,19 @@ final class RelayTicketTests: XCTestCase {
         let register = minter.mint(.register, slot: "slot-a", now: Date(timeIntervalSince1970: 1_000), lifetime: 90)
         XCTAssertEqual(
             register.claims,
-            RelayTicketClaims(slot: "slot-a", permission: "register", role: "daemon", expiresAtUnix: 1_090))
+            RelayTicketClaims(
+                slot: "slot-a", permission: "register", role: "daemon", expiresAtUnix: 1_090, issuedAtUnix: 1_000))
         let connect = minter.mint(.connect, slot: "slot-b", now: Date(timeIntervalSince1970: 2_000))
         XCTAssertEqual(connect.claims?.permission, "connect")
         XCTAssertEqual(connect.claims?.role, "client")
         XCTAssertEqual(connect.claims?.expiresAtUnix, 2_120)
+        XCTAssertEqual(connect.claims?.issuedAtUnix, 2_000)
+        // A ticket without `issued_at_unix` still parses; the renewal then falls back to the local clock.
+        let older = TestTicketMinter.base64URL(Data(
+            #"{"slot":"s","permission":"register","role":"daemon","expires_at_unix":5}"#.utf8))
+        XCTAssertEqual(
+            RelayTicket(ticket: "v2.\(older).sig", expiresAtUnix: 5).claims,
+            RelayTicketClaims(slot: "s", permission: "register", role: "daemon", expiresAtUnix: 5))
     }
 
     func testClaimsNilForMalformedTicket() {

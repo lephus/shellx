@@ -92,7 +92,20 @@ final class LinkCodecTests: XCTestCase {
 
     func testUnknownTypeDecodesAsUnknown() throws {
         let m = try LinkCodec.decode(Data(#"{"v":1,"t":"future.thing"}"#.utf8))
-        XCTAssertEqual(m, .unknown(type: "future.thing"))
+        XCTAssertEqual(m, .unknown(type: "future.thing", callId: nil))
+    }
+
+    /// A call of a later version keeps its `call_id`, so the host can answer it `unsupported` (PROTOCOL.md 3);
+    /// an invalid one is dropped, never `bad_json`.
+    func testUnknownTypeKeepsAValidCallId() throws {
+        func decode(_ text: String) throws -> LinkMessage { try LinkCodec.decode(Data(text.utf8)) }
+        XCTAssertEqual(try decode(#"{"v":1,"t":"future.call","call_id":"c1","x":{}}"#),
+                       .unknown(type: "future.call", callId: "c1"))
+        let tooLong = String(repeating: "c", count: LinkCodec.maxCallIdBytes + 1)
+        for bad in [#""""#, #""\#(tooLong)""#, "7", "null", "[\"c1\"]"] {
+            XCTAssertEqual(try decode(#"{"v":1,"t":"future.call","call_id":\#(bad)}"#),
+                           .unknown(type: "future.call", callId: nil), bad)
+        }
     }
 
     func testWrongVersionThrows() {
@@ -173,7 +186,7 @@ final class LinkCodecTests: XCTestCase {
     }
 
     func testEncodingUnknownThrows() {
-        XCTAssertThrowsError(try LinkCodec.encode(.unknown(type: "x"))) {
+        XCTAssertThrowsError(try LinkCodec.encode(.unknown(type: "x", callId: "c1"))) {
             XCTAssertEqual($0 as? LinkCodecError, .cannotEncodeUnknown)
         }
     }
@@ -363,7 +376,7 @@ final class LinkCodecTests: XCTestCase {
             return .replyResult(callId: try s("call_id"), requestId: try s("request_id"), outcome: ReplyOutcome(wire: try s("outcome")))
         case "ping": return .ping(nonce: try n("nonce").uint64Value)
         case "pong": return .pong(nonce: try n("nonce").uint64Value)
-        case "unknown": return .unknown(type: try s("type"))
+        case "unknown": return .unknown(type: try s("type"), callId: m["call_id"] as? String)
         case "sessions_get": return .sessionsGet(callId: try s("call_id"))
         case "sessions":
             return .sessions(callId: try s("call_id"), revision: try n("revision").intValue, sessions: try sessions(m["sessions"]))
@@ -380,6 +393,7 @@ final class LinkCodecTests: XCTestCase {
                 callId: try s("call_id"), sessionId: try s("session_id"), entries: try entries(m["entries"]),
                 hasMore: try XCTUnwrap(m["has_more"] as? Bool))
         case "chat_entries": return .chatEntries(sessionId: try s("session_id"), entries: try entries(m["entries"]))
+        case "chat_reset": return .chatReset(sessionId: try s("session_id"))
         case "chat_send": return .chatSend(callId: try s("call_id"), sessionId: try s("session_id"), text: try s("text"))
         case "chat_send_result": return .chatSendResult(callId: try s("call_id"), outcome: ChatSendOutcome(wire: try s("outcome")))
         case "chat_interrupt":

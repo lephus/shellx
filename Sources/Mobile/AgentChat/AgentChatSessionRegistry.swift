@@ -374,6 +374,28 @@ final class AgentChatSessionRegistry {
         return sessionIDs.count
     }
 
+    /// Optimistically marks a working or needs-input session idle once its
+    /// terminal accepted an interrupt key: the agent stops its turn and waits
+    /// for input without a hook. The next hook remains authoritative.
+    ///
+    /// - Parameters:
+    ///   - sessionID: The interrupted session.
+    ///   - at: The interrupt time, recorded as the session's last activity.
+    /// - Returns: Whether the session changed state.
+    @discardableResult
+    func noteInterrupted(sessionID: String, at: Date = Date()) -> Bool {
+        switch records[sessionID]?.state {
+        case .working, .needsInput:
+            update(sessionID: sessionID) { record in
+                record.state = .idle
+                record.lastActivityAt = at
+            }
+            return true
+        case .idle, .ended, nil:
+            return false
+        }
+    }
+
     #if DEBUG
     /// Compact state label for the debug trace (`idle`/`working`/`needsInput`/
     /// `ended`), stripping any associated value.

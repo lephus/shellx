@@ -29,7 +29,7 @@ let package = Package(
             name: "ShellXLinkAccountTests",
             dependencies: ["ShellXLinkAccount", "ShellXLinkCore", "ShellXLinkRelay", "ShellXLinkSession"]
         ),
-        // Plays the phone in the P1 spike; see Sources/shellx-link-probe/main.swift.
+        // Plays a paired phone for end-to-end checks and benches; see README.md.
         .executableTarget(
             name: "shellx-link-probe",
             dependencies: ["ShellXLinkSession", "ShellXLinkCore", "ShellXLinkRelay", "ShellXLinkAccount"]

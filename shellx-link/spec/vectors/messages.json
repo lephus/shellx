@@ -1002,6 +1002,18 @@
       }
     },
     {
+      "name": "chat_reset",
+      "message": {
+        "case": "chat_reset",
+        "session_id": "s-1"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.reset",
+        "session_id": "s-1"
+      }
+    },
+    {
       "name": "chat_send",
       "message": {
         "case": "chat_send",
@@ -1163,6 +1175,46 @@
       "message": {
         "case": "unknown",
         "type": "future.thing"
+      }
+    },
+    {
+      "name": "unknown_type_keeps_call_id",
+      "json": {
+        "v": 1,
+        "t": "future.call",
+        "call_id": "c42",
+        "anything": {
+          "x": 1
+        }
+      },
+      "message": {
+        "case": "unknown",
+        "type": "future.call",
+        "call_id": "c42"
+      }
+    },
+    {
+      "name": "unknown_type_drops_invalid_call_id",
+      "json": {
+        "v": 1,
+        "t": "future.call",
+        "call_id": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "message": {
+        "case": "unknown",
+        "type": "future.call"
+      }
+    },
+    {
+      "name": "unknown_type_drops_non_string_call_id",
+      "json": {
+        "v": 1,
+        "t": "future.call",
+        "call_id": 7
+      },
+      "message": {
+        "case": "unknown",
+        "type": "future.call"
       }
     },
     {
@@ -1496,6 +1548,14 @@
       },
       "error": "bad_json",
       "call_id": "c1"
+    },
+    {
+      "name": "chat_reset_missing_session_id",
+      "json": {
+        "v": 1,
+        "t": "chat.reset"
+      },
+      "error": "bad_json"
     }
   ],
   "boundary_frames": {

@@ -1,4 +1,5 @@
 import CMUXAgentLaunch
+import CmuxMobileHost
 import Foundation
 import ShellXLinkCore
 import ShellXLinkSession
@@ -548,6 +549,87 @@ extension ShellXLinkFeedSourceTests {
         guard case .ok(let payload) = result else { return nil }
         return (payload as? [String: Any])?["delivered"] as? Bool
     }
+
+    /// Once a phone's answer reaches the waiting hook the agent resumes, but Claude Code fires no hook until its
+    /// next tool call or stop. The session turns `working` as soon as the reply is delivered, and every phone is
+    /// pushed the change with no further hook event. While the session still waits on another request, it
+    /// stays `needs_input`.
+    @Test func testReplyMovesSessionToWorkingAtOnce() async throws {
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("shellx-link-reply-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let session = UUID().uuidString, surface = UUID().uuidString
+        let (store, feed) = await MainActor.run { Self.makeSource() }
+        // `deliverReply` reaches the app's transcript service, so this test's service stands in for it.
+        let (service, sessions, previous) = await MainActor.run {
+            () -> (AgentChatTranscriptService, ShellXLinkSessionSource, AgentChatTranscriptService?) in
+            let service = AgentChatTranscriptService(
+                registry: AgentChatSessionRegistry(hookStore: AgentChatHookSessionStore(homeDirectory: home)),
+                resolver: AgentChatTranscriptResolver(homeDirectory: home, environment: [:]),
+                hasEventSubscribers: { false },
+                emitEventPayload: { _ in }
+            )
+            let previous = TerminalController.shared.agentChatTranscriptService
+            TerminalController.shared.agentChatTranscriptService = service
+            let sessions = ShellXLinkSessionSource(service: { service }, workspaceLookup: { _ in Self.workspace })
+            return (service, sessions, previous)
+        }
+        defer {
+            let restore: @Sendable () -> Void = {
+                MainActor.assumeIsolated {
+                    TerminalController.shared.agentChatTranscriptService = previous
+                    service.shutdown()
+                }
+            }
+            if Thread.isMainThread { restore() } else { DispatchQueue.main.sync(execute: restore) }
+        }
+        func permission(_ requestId: String) -> WorkstreamEvent {
+            WorkstreamEvent(sessionId: session, hookEventName: .permissionRequest, source: "claude", surfaceId: surface,
+                            cwd: "/tmp/shellx", toolName: "Bash", toolInputJSON: #"{"command":"git status"}"#,
+                            requestId: requestId)
+        }
+        await MainActor.run {
+            service.noteHookEvent(WorkstreamEvent(sessionId: session, hookEventName: .sessionStart, source: "claude",
+                                                  surfaceId: surface, cwd: "/tmp/shellx"))
+            service.noteHookEvent(permission("resume-1"))
+            service.noteHookEvent(permission("resume-2"))
+        }
+        let changes = SessionChangeRecorder()
+        let consumer = Task { for await change in sessions.sessionChanges() { changes.record(change) } }
+        defer { consumer.cancel() }
+        // The subscription registers on the main actor; this call orders it before the replies.
+        let before = await sessions.sessions()
+        #expect(before.sessions.first { $0.sessionId == session }?.state == .needsInput)
+        let first = Self.startBlockingHook(permission("resume-1"))
+        let second = Self.startBlockingHook(permission("resume-2"))
+        #expect(await Self.waitUntil {
+            Set(store.pending.compactMap(\.payload.requestID)).isSuperset(of: ["resume-1", "resume-2"])
+        })
+
+        // The session still waits on its other request.
+        #expect(await feed.reply(requestId: "resume-1", decision: .permission(.once)) == .delivered)
+        #expect(first.wait())
+        #expect(changes.all.isEmpty)
+        #expect(await sessions.sessions().revision == before.revision)
+
+        // Its last request answered, the agent resumes: pushed at once, with no hook event and no list pull.
+        #expect(await feed.reply(requestId: "resume-2", decision: .permission(.once)) == .delivered)
+        #expect(await Self.waitUntil { !changes.all.isEmpty })
+        let resumed = try #require(changes.all.first)
+        #expect(resumed.revision == before.revision + 1)
+        #expect(resumed.upserted.map(\.sessionId) == [session])
+        #expect(resumed.upserted.first?.state == .working)
+        #expect(second.wait())
+    }
+}
+
+/// The changes one `sessionChanges()` subscriber received, filled by its consumer task.
+private final class SessionChangeRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [ShellXLinkSessionSource.Change] = []
+    func record(_ change: ShellXLinkSessionSource.Change) { lock.lock(); recorded.append(change); lock.unlock() }
+    var all: [ShellXLinkSessionSource.Change] { lock.lock(); defer { lock.unlock() }; return recorded }
 }
 
 /// The result of one blocking hook, filled on its worker thread.

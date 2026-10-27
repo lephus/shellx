@@ -40,10 +40,10 @@ struct AgentView: View {
             pendingStatus: center.status,
             showsMachineName: hub.machines.count > 1,
             entries: model.thread.entries,
-            loading: model.loading,
-            canLoadOlder: model.canLoadOlder,
+            emptyState: model.emptyState,
+            machineName: model.machineName,
+            older: model.older,
             loadingOlder: model.loadingOlder,
-            olderOnlyOnMac: model.olderOnlyOnMac,
             canStop: model.canStop,
             notice: notice,
             draft: $draft,
@@ -52,6 +52,7 @@ struct AgentView: View {
                 stop: { stop(hard: false) },
                 forceStop: { stop(hard: true) },
                 loadOlder: { Task { await model.loadOlder() } },
+                retry: { Task { await model.retry() } },
                 seeAllPending: { open(.pending) },
                 card: { PendingCardsSection.actions(for: $0, hub: hub, center: center, route: $route) })
         )
@@ -65,7 +66,8 @@ struct AgentView: View {
             notice = nil
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { Task { await model.close() } }
+            // Still the screen shown: write now, keep following.
+            if phase != .active { Task { await model.save() } }
         }
         .onDisappear { Task { await model.close() } }
     }

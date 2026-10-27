@@ -55,6 +55,42 @@
         }
       }
     },
+    "agent.empty.failed": {
+      "comment": "An agent's chat whose first messages could not be loaded; a Try again button follows.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load the messages."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không tải được tin nhắn."
+          }
+        }
+      }
+    },
+    "agent.empty.offline %@": {
+      "comment": "An agent's chat with no copy on the phone while its Mac is offline. The argument is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is offline. Messages show up here when it's back."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đang offline. Tin nhắn sẽ hiện ở đây khi Mac kết nối lại."
+          }
+        }
+      }
+    },
     "agent.forceStop": {
       "comment": "Confirm button of Force Stop.",
       "extractionState": "manual",
@@ -141,6 +177,60 @@
           "stringUnit": {
             "state": "translated",
             "value": "Phiên này không còn trên Mac"
+          }
+        }
+      }
+    },
+    "agent.newMessages": {
+      "comment": "Button over the bottom of an agent's chat: newer messages came while the user read older ones.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New messages"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tin mới"
+          }
+        }
+      }
+    },
+    "agent.newMessages.hint": {
+      "comment": "VoiceOver hint of the New messages button.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scrolls to the newest message"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuộn tới tin mới nhất"
+          }
+        }
+      }
+    },
+    "agent.older.failed": {
+      "comment": "At the top of an agent's chat when older messages could not be loaded; a Try again button follows.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load older messages."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không tải được tin cũ hơn."
           }
         }
       }
@@ -339,6 +429,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac không dừng được agent"
+          }
+        }
+      }
+    },
+    "agent.stop.noAnswer": {
+      "comment": "Shown when the Mac did not answer a Stop or Force Stop.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac didn't answer. The agent may still be running."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac không trả lời. Agent có thể vẫn đang chạy."
           }
         }
       }

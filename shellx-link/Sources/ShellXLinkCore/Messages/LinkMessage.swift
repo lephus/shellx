@@ -21,10 +21,14 @@ public enum LinkMessage: Equatable, Sendable {
     case chatHistoryGet(callId: String, sessionId: String, beforeSeq: Int?, limit: Int)
     case chatHistory(callId: String, sessionId: String, entries: [ChatEntry], hasMore: Bool)
     case chatEntries(sessionId: String, entries: [ChatEntry])
+    /// The session's transcript was replaced: the client drops its entries and pages again (PROTOCOL.md 4).
+    case chatReset(sessionId: String)
     case chatSend(callId: String, sessionId: String, text: String)
     case chatSendResult(callId: String, outcome: ChatSendOutcome)
     case chatInterrupt(callId: String, sessionId: String, hard: Bool)
     case chatInterruptResult(callId: String, outcome: ChatInterruptOutcome)
-    /// Decode-only: a well-formed frame whose `t` this version does not know.
-    case unknown(type: String)
+    /// Decode-only: a well-formed frame whose `t` this version does not know. `callId` is the frame's `call_id`
+    /// when it is a valid one (1 to 64 UTF-8 bytes): such a frame is a call of a later version, which a host
+    /// answers `error` `unsupported` (PROTOCOL.md section 3).
+    case unknown(type: String, callId: String?)
 }

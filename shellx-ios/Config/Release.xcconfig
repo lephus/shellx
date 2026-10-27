@@ -11,3 +11,10 @@ DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
 ENABLE_NS_ASSERTIONS = NO
 VALIDATE_PRODUCT = YES
 MTL_ENABLE_DEBUG_INFO = NO
+
+// ShellXAppTestSupport (FakeMac, FakeRelayAccount, InMemorySecretStore) serves tests and the Debug
+// demo only, and every use of it in the app is under #if DEBUG. Xcode links a package product in
+// every configuration and dead-stripping keeps its Swift type metadata, so it is left out of the
+// link here. The exclusion matches by file name (the product links as ShellXAppTestSupport.o): a
+// renamed product would slip back in, which `dev.sh test release` and ios.sh then refuse.
+EXCLUDED_SOURCE_FILE_NAMES = ShellXAppTestSupport*
