@@ -69,6 +69,12 @@ enum WorkspaceTabColorSettings {
         effectivePaletteMap(defaults: defaults)[name]
     }
 
+    /// ShellX: the color a new workspace starts with, Purple as the palette
+    /// currently defines it (Settings can change its hex).
+    static func newWorkspaceColorHex(defaults: UserDefaults = .standard) -> String? {
+        currentColorHex(named: "Purple", defaults: defaults) ?? defaultColorHex(named: "Purple")
+    }
+
     static func setColor(named name: String, hex: String, defaults: UserDefaults = .standard) {
         guard let normalizedName = normalizedColorName(name),
               let normalizedHex = normalizedHex(hex) else { return }

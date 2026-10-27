@@ -14,11 +14,11 @@ public struct WorkspaceColorsCatalogSection: SettingCatalogSection {
         userDefaultsKey: "sidebarSelectionColorHex"
     )
 
-    /// Opt-in faint accent tint with a hairline edge for the selected
-    /// workspace, in place of the solid fill (manaflow-ai/cmux#14890).
+    /// Faint accent tint with a hairline edge for the selected workspace, in
+    /// place of the solid fill (manaflow-ai/cmux#14890). On by default in ShellX.
     public let subtleSelection = DefaultsKey<Bool>(
         id: "workspaceColors.subtleSelection",
-        defaultValue: false,
+        defaultValue: true,
         userDefaultsKey: "sidebarSubtleSelection"
     )
 
