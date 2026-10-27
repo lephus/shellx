@@ -540,10 +540,11 @@ final class CMUXOpenCommandTests: XCTestCase {
             .appendingPathComponent(".config", isDirectory: true)
             .appendingPathComponent("ghostty", isDirectory: true)
             .appendingPathComponent("config", isDirectory: false)
-        let cmuxConfigURL = homeURL
+        // The CLI reads ShellX's settings file, not cmux's.
+        let shellxConfigURL = homeURL
             .appendingPathComponent(".config", isDirectory: true)
-            .appendingPathComponent("cmux", isDirectory: true)
-            .appendingPathComponent("cmux.json", isDirectory: false)
+            .appendingPathComponent("shellx", isDirectory: true)
+            .appendingPathComponent("shellx.json", isDirectory: false)
         let cmuxAppSupportConfigURL = homeURL
             .appendingPathComponent("Library", isDirectory: true)
             .appendingPathComponent("Application Support", isDirectory: true)
@@ -553,7 +554,7 @@ final class CMUXOpenCommandTests: XCTestCase {
         let ghosttyThemesURL = ghosttyResourcesURL.appendingPathComponent("themes", isDirectory: true)
         try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: ghosttyConfigURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: cmuxConfigURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: shellxConfigURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: cmuxAppSupportConfigURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: ghosttyThemesURL, withIntermediateDirectories: true)
         try """
@@ -618,7 +619,7 @@ final class CMUXOpenCommandTests: XCTestCase {
             }
           }
         }
-        """.write(to: cmuxConfigURL, atomically: true, encoding: .utf8)
+        """.write(to: shellxConfigURL, atomically: true, encoding: .utf8)
         try """
         diff --git a/hello.txt b/hello.txt
         index 8ab686e..d95f3ad 100644
@@ -1643,7 +1644,8 @@ final class CMUXOpenCommandTests: XCTestCase {
         XCTAssertTrue(refLastTurn.html.contains("Last turn diff"), refLastTurn.html)
 
         let homeURL = rootURL.appendingPathComponent("custom-home", isDirectory: true)
-        let homeStateURL = homeURL.appendingPathComponent(".cmuxterm", isDirectory: true)
+        // The CLI keeps agent turn baselines in ~/.shellx.
+        let homeStateURL = homeURL.appendingPathComponent(".shellx", isDirectory: true)
         try FileManager.default.createDirectory(at: homeStateURL, withIntermediateDirectories: true)
         try writeDiffBaselineStore(
             stateDirectoryURL: homeStateURL,
