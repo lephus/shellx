@@ -189,6 +189,10 @@ final class HomeModelTests: XCTestCase {
 
         // A long first line is cut to 140 characters.
         await mac.upsertSession(agentSession("s1", state: .working, stateSinceMs: 1_700_000_080_000))
+        // The session change and the chat push travel apart: wait until the home saw s1 working
+        // (its first note stops following), or the reply would go into that note instead.
+        let working = await eventually { !rig.home.isFollowingFinish(of: s1) }
+        XCTAssertTrue(working)
         await mac.pushChat(sessionId: "s1", entries: [agentProse(8, String(repeating: "ệ", count: 300))])
         let long = await eventually { rig.home.lastAgentLine(for: s1)?.count == 140 }
         XCTAssertTrue(long)

@@ -13,6 +13,8 @@ public actor ConversationStore: LocalDataWiping {
     private let maxThreads: Int
     private let now: @Sendable () -> Date
     private var epoch = 0
+    /// The newest claim on each document (`writer(claiming:)`).
+    private var claims: [StoreDocument: Int] = [:]
     private let log = Logger(subsystem: "com.shellx.app", category: "store")
 
     public init(directory: URL, maxThreads: Int = 100, now: @escaping @Sendable () -> Date = { Date() }) {
@@ -38,22 +40,39 @@ public actor ConversationStore: LocalDataWiping {
     /// A writer bound to the store's current epoch. Obtain one when work for the signed-in account
     /// starts (a refresh, a chat subscription) and keep it only for that work: once `wipe()` runs,
     /// every older writer's saves are dropped.
-    public func writer() -> Writer { Writer(store: self, epoch: epoch) }
+    public func writer() -> Writer { Writer(store: self, epoch: epoch, claim: nil) }
 
-    /// Saves for one epoch of the store. Cheap to copy.
+    /// A writer that also claims `doc`: once a newer writer claims the same document, this one's
+    /// saves to it are dropped. An agent screen takes one, so when the same session's screen is
+    /// popped and pushed again, a late save of the old screen cannot overwrite the new one's.
+    public func writer(claiming doc: StoreDocument) -> Writer {
+        claims[doc, default: 0] += 1
+        return Writer(store: self, epoch: epoch, claim: (doc, claims[doc, default: 0]))
+    }
+
+    /// Saves for one epoch of the store (and, for a claiming writer, one claim). Cheap to copy.
     public struct Writer: Sendable {
         fileprivate let store: ConversationStore
         fileprivate let epoch: Int
+        fileprivate let claim: (doc: StoreDocument, number: Int)?
 
-        /// Replaces the stored document unless the store was wiped since this writer was made.
+        /// Replaces the stored document unless the store was wiped since this writer was made, or a
+        /// newer writer claimed the document.
         public func save<T: Encodable & Sendable>(_ value: T, to doc: StoreDocument) async {
-            await store.write(value, to: doc, epoch: epoch)
+            let number = claim.flatMap { $0.doc == doc ? $0.number : nil }
+            await store.write(value, to: doc, epoch: epoch, claim: number)
         }
     }
 
-    private func write<T: Encodable & Sendable>(_ value: T, to doc: StoreDocument, epoch writerEpoch: Int) {
+    private func write<T: Encodable & Sendable>(
+        _ value: T, to doc: StoreDocument, epoch writerEpoch: Int, claim: Int?
+    ) {
         guard writerEpoch == epoch else {
             log.notice("store_write_stale kind=\(doc.kind, privacy: .public)")
+            return
+        }
+        if let claim, claims[doc] != claim {
+            log.notice("store_write_superseded kind=\(doc.kind, privacy: .public)")
             return
         }
         do {

@@ -7,7 +7,8 @@ import SwiftUI
 /// - Navigation bar: the workspace, and "Stop" while the session works or waits for the user.
 /// - Top, pinned: the header ("Claude Code · Mac", state) and the pending cards of this workspace.
 ///   It keeps at most 40 % of the height and scrolls inside itself past that.
-/// - Middle: the chat, newest at the bottom; scrolling to the top loads older entries.
+/// - Middle: the chat, newest at the bottom; scrolling to the top loads older entries. It follows
+///   new entries only while its bottom shows; otherwise "New messages ↓" offers to jump down.
 /// - Bottom: what became of the last send or stop, then the composer (its target is this session).
 struct AgentScreen: View {
     struct Actions {
@@ -16,10 +17,16 @@ struct AgentScreen: View {
         var stop: () -> Void = {}
         /// Force Stop, once confirmed.
         var forceStop: () -> Void = {}
+        /// Asks for older entries (also the retry after a failure).
         var loadOlder: () -> Void = {}
+        /// Asks for the newest page again after it failed.
+        var retry: () -> Void = {}
         var seeAllPending: () -> Void = {}
         var card: (MachinePendingItem) -> PendingCardView.Actions = { _ in PendingCardView.Actions() }
     }
+
+    /// Where the chat's bottom sentinel sits, to scroll to.
+    private static let bottomID = "agent.chat.bottom"
 
     /// A short line over the composer: what became of the last send or stop.
     struct Notice: Equatable {
@@ -38,18 +45,20 @@ struct AgentScreen: View {
     let pendingStatus: [PendingKey: DecisionStatus]
     let showsMachineName: Bool
     let entries: [ChatEntry]
-    /// The newest page is on its way.
-    let loading: Bool
-    let canLoadOlder: Bool
+    /// What the chat says while it has no entries.
+    let emptyState: AgentThreadModel.EmptyState?
+    /// The Mac's name, for "<Mac> is offline".
+    let machineName: String
+    /// What the top of the chat shows about older entries.
+    let older: AgentThreadModel.Older
     let loadingOlder: Bool
-    /// Older entries exist, but the phone keeps no more.
-    let olderOnlyOnMac: Bool
     let canStop: Bool
     let notice: Notice?
     @Binding var draft: String
     var actions = Actions()
 
     @State private var confirmsForceStop = false
+    @State private var follow = ChatFollow()
     /// The first entry when older ones were asked for: the chat stays on it when they arrive.
     @State private var olderAnchor: String?
     @ScaledMetric(relativeTo: .body) private var conversationMinimum: CGFloat = 260
@@ -124,15 +133,35 @@ struct AgentScreen: View {
                     ForEach(entries, id: \.id) { entry in
                         ChatEntryRow(entry: entry, agent: agent).id(entry.id)
                     }
+                    // Shows while the bottom of the chat is on screen: new entries are followed
+                    // only then.
+                    Color.clear
+                        .frame(height: 1)
+                        .id(Self.bottomID)
+                        .onAppear { follow.bottomVisible(true) }
+                        .onDisappear { follow.bottomVisible(false) }
+                        .accessibilityHidden(true)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
             }
             .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
+            .overlay(alignment: .bottom) {
+                if follow.hasUnseen {
+                    NewMessagesButton {
+                        follow.jumpedToBottom()
+                        withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
+                    }
+                    .padding(.bottom, 8)
+                    .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: follow.hasUnseen)
             .onChange(of: entries.last?.id) { _, last in
-                guard let last else { return }
-                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(last, anchor: .bottom) }
+                // Never pulled down while the user reads older entries.
+                guard follow.newest(last) else { return }
+                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(Self.bottomID, anchor: .bottom) }
             }
             .onChange(of: loadingOlder) { was, now in
                 // Older entries came in above: stay on the entry that was first.
@@ -143,18 +172,22 @@ struct AgentScreen: View {
         }
     }
 
-    /// At the top: a spinner that asks for older entries when it scrolls into view, or a line saying
-    /// the older ones are only on the Mac.
+    /// At the top: a spinner that asks for older entries when it scrolls into view, a row to try
+    /// again after a failure, or a line saying the older ones are only on the Mac. Nothing while the
+    /// Mac is offline.
     @ViewBuilder private var olderRow: some View {
-        if !entries.isEmpty, canLoadOlder {
+        switch older {
+        case .none:
+            EmptyView()
+        case .loadable:
             ProgressView()
                 .frame(maxWidth: .infinity, minHeight: 44)
-                .onAppear {
-                    olderAnchor = entries.first?.id
-                    actions.loadOlder()
-                }
+                .onAppear(perform: loadOlder)
                 .accessibilityIdentifier("agent.loadOlder")
-        } else if !entries.isEmpty, olderOnlyOnMac {
+        case .failed:
+            failedRow(LocalizedStringResource("agent.older.failed"), retry: loadOlder)
+                .accessibilityIdentifier("agent.older.failed")
+        case .onlyOnMac:
             Text(LocalizedStringResource("agent.olderOnMac"))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -164,20 +197,61 @@ struct AgentScreen: View {
         }
     }
 
+    private func loadOlder() {
+        olderAnchor = entries.first?.id
+        actions.loadOlder()
+    }
+
     @ViewBuilder private var emptyRow: some View {
-        if loading {
+        switch emptyState {
+        case nil:
+            EmptyView()
+        case .loading?:
             ProgressView()
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 32)
-        } else {
-            Text(LocalizedStringResource("agent.empty"))
-                .font(.callout)
+                .accessibilityIdentifier("agent.loading")
+        case .noMessages?:
+            emptyText(LocalizedStringResource("agent.empty"))
+                .accessibilityIdentifier("agent.empty")
+        case .offline?:
+            emptyText(LocalizedStringResource("agent.empty.offline \(machineName)"))
+                .accessibilityIdentifier("agent.empty.offline")
+        case .failed?:
+            failedRow(LocalizedStringResource("agent.empty.failed"), retry: actions.retry)
+                .padding(.vertical, 32)
+                .accessibilityIdentifier("agent.empty.failed")
+        case .gone?:
+            emptyText(LocalizedStringResource("agent.gone"))
+                .accessibilityIdentifier("agent.empty.gone")
+        }
+    }
+
+    private func emptyText(_ text: LocalizedStringResource) -> some View {
+        Text(text)
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 32)
+    }
+
+    /// What failed, and "Try again".
+    private func failedRow(_ text: LocalizedStringResource, retry: @escaping () -> Void) -> some View {
+        VStack(spacing: 4) {
+            Text(text)
+                .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 32)
-                .accessibilityIdentifier("agent.empty")
+            Button(action: retry) {
+                Text(LocalizedStringResource("pending.status.retry"))
+                    .font(.footnote.weight(.semibold))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .tint(Color("AccentText"))
         }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Bottom

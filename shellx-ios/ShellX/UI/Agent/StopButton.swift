@@ -39,7 +39,7 @@ struct StopButton: View {
         case nil:
             return offline
                 ? String(localized: "home.note.offline \(machineName)")
-                : String(localized: "pending.status.noAnswer")
+                : String(localized: "agent.stop.noAnswer")
         }
     }
 }

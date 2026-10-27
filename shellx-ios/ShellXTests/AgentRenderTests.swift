@@ -57,16 +57,18 @@ final class AgentRenderTests: XCTestCase {
 
     private func screen(
         session: MachineSession? = AgentRenderTests.session, entries: [ChatEntry] = AgentRenderTests.everyKind,
-        pending: [MachinePendingItem] = [], gone: Bool = false, offline: Bool = false, loading: Bool = false,
-        canLoadOlder: Bool = false, olderOnlyOnMac: Bool = false, notice: String? = nil, draft: String = ""
+        pending: [MachinePendingItem] = [], gone: Bool = false, offline: Bool = false,
+        emptyState: AgentThreadModel.EmptyState? = nil, older: AgentThreadModel.Older = .none,
+        notice: String? = nil, draft: String = ""
     ) -> some View {
         let row = session.map { AgentStatusRow(session: $0, now: Self.now) }
         let canStop = row.map { $0.online && ($0.state == .working || $0.state == .needsInput) } ?? false
         return NavigationStack {
             AgentScreen(
                 ref: Self.ref, place: "Claude Code · MacBook Pro", row: { row }, gone: gone, offline: offline,
-                pending: pending, pendingStatus: [:], showsMachineName: false, entries: entries, loading: loading,
-                canLoadOlder: canLoadOlder, loadingOlder: false, olderOnlyOnMac: olderOnlyOnMac, canStop: canStop,
+                pending: pending, pendingStatus: [:], showsMachineName: false, entries: entries,
+                emptyState: entries.isEmpty ? emptyState : nil, machineName: "MacBook Pro", older: older,
+                loadingOlder: false, canStop: canStop && !gone,
                 notice: notice.map { AgentScreen.Notice(text: $0) }, draft: .constant(draft))
         }
     }
@@ -120,6 +122,16 @@ final class AgentRenderTests: XCTestCase {
         }
         let mine = Self.entry(3, .user, .prose, text, truncated: true)
         XCTAssertGreaterThan(size(of: row(mine)).height, size(of: row(Self.entry(3, .user, .prose, text))).height + 10)
+
+        // VoiceOver hears the marker once per entry: in the entry's own label, never twice.
+        for (role, kind) in [
+            (ChatEntryRole.user, ChatEntryKind.prose), (.agent, .prose), (.system, .prose), (.agent, .thought),
+            (.agent, .toolUse), (.system, .status), (.agent, .other("x")),
+        ] {
+            let entry = Self.entry(4, role, kind, "abc", tool: "Bash", truncated: true)
+            let label = ChatEntryRow.accessibilityText(for: entry, agent: "Claude Code")
+            XCTAssertEqual(label.components(separatedBy: marker).count - 1, 1, "\(role) \(kind): \(label)")
+        }
         try assertRenders(screen(entries: [whole, cut, mine]), name: "agent-cut")
     }
 
@@ -171,21 +183,42 @@ final class AgentRenderTests: XCTestCase {
             Self.entry(seq, seq.isMultiple(of: 7) ? .user : .agent, seq.isMultiple(of: 5) ? .toolUse : .prose, text,
                        tool: "Bash", truncated: true)
         }
-        try assertRenders(screen(entries: entries, olderOnlyOnMac: true), name: "agent-500")
+        try assertRenders(screen(entries: entries, older: .onlyOnMac), name: "agent-500")
     }
 
     // MARK: - States
 
     func testStatesRender() throws {
-        try assertRenders(screen(entries: []), name: "agent-empty")
-        try assertRenders(screen(entries: [], loading: true), name: "agent-loading")
+        try assertRenders(screen(entries: [], emptyState: .noMessages), name: "agent-empty")
+        try assertRenders(screen(entries: [], emptyState: .loading), name: "agent-loading")
         var offline = Self.session
         offline.online = false
         try assertRenders(screen(session: offline, offline: true, draft: "Còn đó không?"), name: "agent-offline")
-        try assertRenders(screen(session: nil, gone: true), name: "agent-gone")
         try assertRenders(
-            screen(pending: [Self.pending], canLoadOlder: true).environment(\.dynamicTypeSize, .accessibility3),
+            screen(session: offline, entries: [], offline: true, emptyState: .offline), name: "agent-offline-empty")
+        try assertRenders(screen(entries: [], emptyState: .failed), name: "agent-failed")
+        try assertRenders(screen(session: nil, gone: true), name: "agent-gone")
+        try assertRenders(screen(session: nil, entries: [], gone: true, emptyState: .gone), name: "agent-gone-empty")
+        try assertRenders(
+            screen(entries: Array(Self.everyKind.prefix(3)), older: .failed), name: "agent-older-failed")
+        try assertRenders(
+            screen(pending: [Self.pending], older: .loadable).environment(\.dynamicTypeSize, .accessibility3),
             name: "agent-ax3")
+    }
+
+    func testNewMessagesButtonRenders() throws {
+        XCTAssertNotEqual(String(localized: "agent.newMessages"), "agent.newMessages")
+        let button = NewMessagesButton(action: {})
+        XCTAssertGreaterThanOrEqual(size(of: button).height, 44, "a full tap target")
+        try assertRenders(
+            VStack {
+                Spacer()
+                button
+                Spacer().frame(height: 120)
+            }
+            .frame(maxWidth: .infinity)
+            .background(Color(uiColor: .systemGroupedBackground)),
+            name: "agent-new-messages")
     }
 
     func testHeaderSaysTheState() {
@@ -230,5 +263,8 @@ final class AgentRenderTests: XCTestCase {
         XCTAssertEqual(Set(stops).count, stops.count)
         XCTAssertEqual(stops[0], String(localized: "agent.stop.sent"))
         XCTAssertTrue(stops[3].contains("MacBook Pro"))
+        // No answer is final for a stop: not the pending cards' "not yet" line.
+        XCTAssertEqual(stops[4], String(localized: "agent.stop.noAnswer"))
+        XCTAssertNotEqual(stops[4], String(localized: "pending.status.noAnswer"))
     }
 }

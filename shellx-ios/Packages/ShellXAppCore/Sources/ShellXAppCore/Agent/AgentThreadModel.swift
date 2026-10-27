@@ -8,9 +8,10 @@ import ShellXLinkSession
 /// Stop / Force stop.
 ///
 /// The copy is written to the store at most `saveDelay` after its last change, and at once by
-/// `close()` (the screen goes away). Writes use the store writer taken by `open()`, so nothing is
-/// written after a sign-out wipe. Sending to an offline Mac answers at once and queues nothing
-/// (spec section 7.5).
+/// `close()` (the screen goes away) or `save()` (the app leaves the foreground). Writes use the
+/// store writer `open()` takes, which claims the thread: nothing is written after a sign-out wipe,
+/// nor after a later screen of the same session claimed it. Sending to an offline Mac answers at
+/// once and queues nothing (spec section 7.5).
 @MainActor @Observable
 public final class AgentThreadModel {
     /// Entries asked for per `chat.history` call (the protocol's most).
@@ -25,6 +26,14 @@ public final class AgentThreadModel {
     public private(set) var loadingOlder = false
     /// The Mac answered that it does not have this session (history, send or stop).
     private var answeredNotFound = false
+    /// `open()` read the phone's copy.
+    private var cacheRead = false
+    /// A newest page came since `open()`.
+    private var latestLoaded = false
+    /// The last newest page failed with an error from the Mac.
+    private var latestFailed = false
+    /// The last older page failed.
+    private var olderFailed = false
 
     @ObservationIgnored private let hub: MachineHub
     @ObservationIgnored private let store: ConversationStore
@@ -38,6 +47,9 @@ public final class AgentThreadModel {
     @ObservationIgnored private var observers = 0
     /// `run()` ran before (and was cancelled when the screen was covered).
     @ObservationIgnored private var hasRun = false
+    /// The screen went away (`close()`) and is not shown again yet: late answers change the copy in
+    /// memory only, nothing is saved or asked for.
+    @ObservationIgnored private var closed = false
 
     /// `sleep` waits out `saveDelay`; tests pass one they release by hand.
     public init(
@@ -81,9 +93,10 @@ public final class AgentThreadModel {
         return hub.pendingItems.filter { $0.machineID == ref.machineID && $0.item.workspaceId == workspaceId }
     }
 
-    /// Stop applies: the Mac is online and the session works or waits for the user.
+    /// Stop applies: the Mac is online, the session works or waits for the user, and the Mac did
+    /// not say the session is gone.
     public var canStop: Bool {
-        guard let session, session.online else { return false }
+        guard !answeredNotFound, let session, session.online else { return false }
         switch session.session.state {
         case .working, .needsInput: return true
         case .idle, .ended, .other: return false
@@ -100,6 +113,59 @@ public final class AgentThreadModel {
     /// them, and the session is still on the Mac (`not_found` ends paging).
     public var canLoadOlder: Bool {
         thread.hasMore && !olderOnlyOnMac && !sessionGone
+    }
+
+    /// What an empty chat says.
+    public enum EmptyState: Equatable, Sendable {
+        /// The phone's copy or the Mac's first page is on its way (or the Mac is still connecting).
+        case loading
+        /// The Mac's first page came, and it was empty. Live entries fill it as the agent writes.
+        case noMessages
+        /// The Mac is offline and the phone has no copy.
+        case offline
+        /// The first page did not come (the Mac answered an error): retry.
+        case failed
+        /// The Mac no longer has this session.
+        case gone
+    }
+
+    /// What the top of the chat shows about older entries.
+    public enum Older: Equatable, Sendable {
+        /// Nothing: no older entries, or none can be asked for now (the Mac is offline).
+        case none
+        /// Scrolling to the top asks for them.
+        case loadable
+        /// The last try failed: a row to try again (never a spinner that asks by itself).
+        case failed
+        /// The phone keeps no more; they are on the Mac.
+        case onlyOnMac
+    }
+
+    /// Nil when the chat has entries.
+    public var emptyState: EmptyState? {
+        guard thread.entries.isEmpty else { return nil }
+        if sessionGone { return .gone }
+        if latestLoaded { return .noMessages }
+        if !cacheRead || loading { return .loading }
+        if offline {
+            switch machine?.state {
+            case .connecting?, .reconnecting?: return .loading
+            default: return .offline
+            }
+        }
+        return latestFailed ? .failed : .loading
+    }
+
+    public var older: Older {
+        guard !thread.entries.isEmpty, thread.hasMore, !sessionGone else { return .none }
+        if olderOnlyOnMac { return .onlyOnMac }
+        if offline { return .none }
+        return olderFailed ? .failed : .loadable
+    }
+
+    /// Asks the Mac for its newest page again (after `EmptyState.failed`).
+    public func retry() async {
+        await loadLatest()
     }
 
     /// True while `run()` follows the hub (tests).
@@ -119,18 +185,21 @@ public final class AgentThreadModel {
     }
 
     /// Asks for the page before the oldest entry here (`before_seq` = its `seq`) when
-    /// `canLoadOlder`.
+    /// `canLoadOlder`. A failure shows as `Older.failed`; calling again retries.
     public func loadOlder() async {
         guard !loadingOlder, !offline, canLoadOlder, let oldest = thread.entries.first?.seq else { return }
         loadingOlder = true
+        olderFailed = false
         defer { loadingOlder = false }
         do {
             let page = try await hub.chatHistory(ref, beforeSeq: oldest, limit: Self.pageSize)
             // The copy changed meanwhile (a newest page replaced it): this page may not join it.
             guard thread.entries.first?.seq == oldest else { return }
             change { $0.applyOlderPage(page.entries, hasMore: page.hasMore) }
+        } catch is CancellationError {
+            return
         } catch {
-            noteNotFound(error)
+            if !noteNotFound(error) { olderFailed = true }
         }
     }
 
@@ -138,8 +207,9 @@ public final class AgentThreadModel {
     /// entries, and the newest page again each time its Mac's link comes back (entries pushed while
     /// it was down were missed). Subscribes before asking for history, so nothing falls between.
     /// Run again after a cancel (the screen was covered, then shown again), it reads the newest page
-    /// again, for what came while nobody followed.
+    /// again, for what came while nobody followed. Cancelled before that, it asks for nothing.
     public func run() async {
+        closed = false
         let chat = hub.chatUpdates()
         let states = hub.stateUpdates()
         let again = hasRun
@@ -149,7 +219,11 @@ public final class AgentThreadModel {
         async let live: Void = follow(chat)
         async let link: Void = follow(states)
         await open()
-        if again { await loadLatest() }
+        if again, !Task.isCancelled, !closed {
+            // Saves skipped while the screen was away are written now.
+            if changed { scheduleSave() }
+            await loadLatest()
+        }
         _ = await (live, link)
     }
 
@@ -186,8 +260,16 @@ public final class AgentThreadModel {
         }
     }
 
-    /// The screen goes away: writes the copy now if it changed.
+    /// The screen goes away: writes the copy now if it changed. Until `run()` shows it again,
+    /// answers still on their way change the copy in memory only: nothing is saved. If the same
+    /// session's screen was opened again meanwhile, its writer won and this write is dropped.
     public func close() async {
+        closed = true
+        await flush()
+    }
+
+    /// Writes the copy now if it changed (the app leaves the foreground).
+    public func save() async {
         await flush()
     }
 
@@ -207,15 +289,19 @@ public final class AgentThreadModel {
     }
 
     private func load() async {
-        writer = await store.writer()
+        // This screen's writer claims the thread: a screen for the same session opened later wins.
+        writer = await store.writer(claiming: .thread(ref))
         if let cached = await store.load(.thread(ref), as: ChatThread.self) {
             // Entries pushed live before the copy was read are newer than it.
             var merged = cached
             merged.upsert(thread.entries)
             thread = merged
         }
+        cacheRead = true
         // Changes made before there was a writer were not saved yet.
         if changed { scheduleSave() }
+        // Closed while reading the copy: the screen is gone, ask for nothing.
+        guard !closed else { return }
         await loadLatest()
     }
 
@@ -229,9 +315,16 @@ public final class AgentThreadModel {
         }
         do {
             let page = try await hub.chatHistory(ref, beforeSeq: nil, limit: Self.pageSize)
+            latestLoaded = true
+            latestFailed = false
             change { $0.applyLatestPage(page.entries, hasMore: page.hasMore) }
+        } catch is CancellationError {
+            return
+        } catch LinkCallError.offline {
+            // The Mac went offline meanwhile: the page loads when it is back.
+            return
         } catch {
-            noteNotFound(error)
+            if !noteNotFound(error) { latestFailed = true }
         }
     }
 
@@ -244,17 +337,21 @@ public final class AgentThreadModel {
     private func follow(_ updates: AsyncStream<(machineID: String, state: MachineLinkState)>) async {
         // `.online` comes once per new link, after its first sync.
         for await update in updates where update.machineID == ref.machineID && update.state == .online {
-            // Before `open()` the first page is its job.
-            guard opening != nil else { continue }
+            // Before `open()` the first page is its job; a closed screen asks for nothing.
+            guard opening != nil, !closed else { continue }
             await loadLatest()
         }
     }
 
-    private func noteNotFound(_ error: any Error) {
-        if case LinkClientError.remote(code: "not_found", message: _) = error { answeredNotFound = true }
+    /// Records a `not_found` answer (the session is gone); returns whether it was one.
+    @discardableResult
+    private func noteNotFound(_ error: any Error) -> Bool {
+        guard case LinkClientError.remote(code: "not_found", message: _) = error else { return false }
+        answeredNotFound = true
+        return true
     }
 
-    /// Applies `body` to the copy; saves it when it changed.
+    /// Applies `body` to the copy; saves it when it changed (unless the screen is closed).
     private func change(_ body: (inout ChatThread) -> Void) {
         let before = thread
         body(&thread)
@@ -264,6 +361,7 @@ public final class AgentThreadModel {
     }
 
     private func scheduleSave() {
+        guard !closed else { return }
         pendingSave?.cancel()
         let sleep = self.sleep
         pendingSave = Task {

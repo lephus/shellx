@@ -28,6 +28,32 @@ final class ConversationStoreTests: XCTestCase {
         return ConversationStore(directory: directory, maxThreads: maxThreads, now: { ticks.next() })
     }
 
+    func testNewerClaimOnADocumentDropsTheOlderWriter() async {
+        let store = makeStore()
+        let s1 = StoreDocument.thread(ref("s1"))
+        // A screen is popped and the same session pushed again: two writers for one thread.
+        let older = await store.writer(claiming: s1)
+        let newer = await store.writer(claiming: s1)
+
+        await newer.save(Doc(items: ["new"]), to: s1)
+        await older.save(Doc(items: ["old, written late"]), to: s1)
+        var loaded = await store.load(s1, as: Doc.self)
+        XCTAssertEqual(loaded, Doc(items: ["new"]), "the older screen's late save is dropped")
+
+        // A claim on another thread changes nothing for this one.
+        let other = await store.writer(claiming: .thread(ref("s2")))
+        await other.save(Doc(items: ["s2"]), to: .thread(ref("s2")))
+        await newer.save(Doc(items: ["newer"]), to: s1)
+        loaded = await store.load(s1, as: Doc.self)
+        XCTAssertEqual(loaded, Doc(items: ["newer"]))
+
+        // A wipe still ends every claimed writer.
+        try? await store.wipe()
+        await newer.save(Doc(items: ["after wipe"]), to: s1)
+        loaded = await store.load(s1, as: Doc.self)
+        XCTAssertNil(loaded)
+    }
+
     func testRoundTripEachDocument() async {
         let store = makeStore()
         let docs: [StoreDocument] = [.home, .lastSessions, .thread(ref("s1"))]

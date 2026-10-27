@@ -30,10 +30,12 @@ struct ChatEntryRow: View {
         VStack(alignment: isMine ? .trailing : entry.kind == .status ? .center : .leading, spacing: 4) {
             content
             if isCut {
+                // VoiceOver hears it once, at the end of the entry's own label.
                 Text(LocalizedStringResource("agent.cut"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(isMine ? .trailing : .leading)
+                    .accessibilityHidden(true)
                     .accessibilityIdentifier("agent.entry.cut")
             }
         }
@@ -69,11 +71,15 @@ struct ChatEntryRow: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .textSelection(.enabled)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(verbatim: Self.accessibilityText(for: entry, agent: agent)))
         case .other:
             Text(verbatim: entry.text)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(verbatim: Self.accessibilityText(for: entry, agent: agent)))
         }
     }
 
@@ -94,6 +100,8 @@ struct ChatEntryRow: View {
             .font(.subheadline)
             .foregroundStyle(.secondary)
             .frame(minHeight: 44, alignment: .leading)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: Self.accessibilityText(for: entry, agent: agent)))
         }
         .tint(.secondary)
         .foregroundStyle(.secondary)
@@ -132,7 +140,9 @@ struct ChatEntryRow: View {
         .accessibilityIdentifier("agent.entry.tool")
     }
 
-    /// What VoiceOver reads for the entry: who wrote it, its text, and the cut notice when the Mac cut it.
+    /// What VoiceOver reads for the entry's one element: who wrote it, its text, and the cut notice
+    /// when the Mac cut it (the notice's own view is hidden from VoiceOver). A thought's element is
+    /// its "Thinking" row; its text, once opened, is read on its own.
     static func accessibilityText(for entry: ChatEntry, agent: String) -> String {
         var parts: [String] = []
         switch (entry.role, entry.kind) {
@@ -143,7 +153,7 @@ struct ChatEntryRow: View {
         case (_, .toolUse):
             parts.append([entry.toolName, entry.text].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ": "))
         case (_, .thought):
-            parts.append("\(String(localized: "agent.thought")): \(entry.text)")
+            parts.append(String(localized: "agent.thought"))
         default:
             parts.append(entry.text)
         }
