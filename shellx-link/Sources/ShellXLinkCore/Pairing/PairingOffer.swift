@@ -55,7 +55,9 @@ public struct PairingOffer: Equatable, Sendable, CustomStringConvertible, Custom
 
     /// Parses an offer URI.
     public init(uri: String) throws {
-        guard let parts = URLComponents(string: uri), parts.scheme == "shellx-link", parts.host == "pair"
+        guard let parts = URLComponents(string: uri), parts.scheme == "shellx-link", parts.host == "pair",
+            parts.path.isEmpty, parts.port == nil, parts.user == nil, parts.password == nil,
+            parts.fragment == nil
         else { throw PairingOfferError.badURI }
         var fields: [String: String] = [:]
         for item in parts.queryItems ?? [] {
@@ -71,37 +73,67 @@ public struct PairingOffer: Equatable, Sendable, CustomStringConvertible, Custom
             return value
         }
         func bytes(_ name: String, count: Int) throws -> Data {
-            guard let data = Self.decodeBase64URL(try text(name)), data.count == count
+            let value = try text(name)
+            guard Self.isBase64URL(value), let data = Self.decodeBase64URL(value), data.count == count
             else { throw PairingOfferError.badField(name) }
             return data
         }
-        self.init(
-            machineID: try text("m"), linkSlot: try text("s"), hostKey: try bytes("k", count: 32),
-            code: try bytes("c", count: 16), machineName: try text("n"))
+        func limited(_ name: String, _ allowed: (Character) -> Bool) throws -> String {
+            let value = try text(name)
+            guard value.count <= 64, value.allSatisfy(allowed) else { throw PairingOfferError.badField(name) }
+            return value
+        }
+        let machineID = try limited("m") { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
+        let linkSlot = try limited("s") { Self.isBase64URL(String($0)) }
+        let hostKey = try bytes("k", count: 32)
+        let code = try bytes("c", count: 16)
+        let name = try text("n")
+        let scalars = name.unicodeScalars
+        guard scalars.count <= 100, scalars.allSatisfy({ !Self.isForbiddenInName($0) }) else {
+            throw PairingOfferError.badField("n")
+        }
+        self.init(machineID: machineID, linkSlot: linkSlot, hostKey: hostKey, code: code, machineName: name)
     }
 
-    private static func message(machineID: String, clientKey: Data) -> Data {
+    /// Control characters and the bidi overrides and isolates (U+202A-U+202E, U+2066-U+2069), which
+    /// could make a machine name display as something else in the approval prompt.
+    private static func isForbiddenInName(_ scalar: Unicode.Scalar) -> Bool {
+        scalar.properties.generalCategory == .control
+            || (0x202A...0x202E).contains(scalar.value) || (0x2066...0x2069).contains(scalar.value)
+    }
+
+    private static func isBase64URL(_ text: String) -> Bool {
+        text.utf8.allSatisfy {
+            ($0 >= 0x30 && $0 <= 0x39) || ($0 >= 0x41 && $0 <= 0x5A) || ($0 >= 0x61 && $0 <= 0x7A)
+                || $0 == 0x2D || $0 == 0x5F
+        }
+    }
+
+    private static func message(machineID: String, linkSlot: String, hostKey: Data, clientKey: Data) -> Data {
         var message = Data("shellx-link-pair/1".utf8)
         message.append(0)
         message.append(Data(machineID.utf8))
         message.append(0)
+        message.append(Data(linkSlot.utf8))
+        message.append(0)
+        message.append(hostKey)
         message.append(clientKey)
         return message
     }
 
     /// The phone's proof that it scanned this offer: HMAC-SHA256 keyed with `code` over
-    /// `"shellx-link-pair/1" 0x00 machineID 0x00 clientKey`.
+    /// `"shellx-link-pair/1" 0x00 machineID 0x00 linkSlot 0x00 hostKey clientKey`.
     public func proof(clientKey: Data) -> Data {
         Data(
             HMAC<SHA256>.authenticationCode(
-                for: Self.message(machineID: machineID, clientKey: clientKey),
+                for: Self.message(machineID: machineID, linkSlot: linkSlot, hostKey: hostKey, clientKey: clientKey),
                 using: SymmetricKey(data: code)))
     }
 
     /// Checks a proof in constant time.
     public func verify(proof: Data, clientKey: Data) -> Bool {
         HMAC<SHA256>.isValidAuthenticationCode(
-            proof, authenticating: Self.message(machineID: machineID, clientKey: clientKey),
+            proof, authenticating: Self.message(machineID: machineID, linkSlot: linkSlot, hostKey: hostKey, clientKey: clientKey),
             using: SymmetricKey(data: code))
     }
 

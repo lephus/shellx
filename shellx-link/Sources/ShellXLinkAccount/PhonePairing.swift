@@ -34,30 +34,51 @@ public enum PhonePairing {
         clientKey: Data,
         api: RelayAPI,
         token: String,
-        pollInterval: Duration = .seconds(2)
+        pollInterval: Duration = .seconds(2),
+        timeout: Duration = .seconds(PairingOffer.lifetime)
     ) async throws -> PairedMachine {
         let offer = try PairingOffer(uri: offerURI)
         let id = try await api.requestPairing(offer: offer, clientKey: clientKey, token: token)
         let clock = ContinuousClock()
-        let deadline = clock.now.advanced(by: .seconds(PairingOffer.lifetime))
-        while true {
-            switch try await api.pairingStatus(id: id, token: token) {
-            case .pending:
-                break
-            case .denied:
-                throw PhonePairingError.denied
-            case .expired:
-                throw PhonePairingError.expired
-            case let .approved(machineID, _, linkSlot):
-                guard machineID == offer.machineID, linkSlot == offer.linkSlot else {
-                    throw RelayAPIError.badResponse
+        let deadline = clock.now.advanced(by: timeout)
+        // Unless the relay itself reported the end of the request, leave nothing pending (or granted)
+        // behind for a phone that is not going to pin the key: ask the relay to withdraw it, once.
+        var relayDecided = false
+        do {
+            while true {
+                try Task.checkCancellation()
+                do {
+                    switch try await api.pairingStatus(id: id, token: token) {
+                    case .pending:
+                        break
+                    case .denied:
+                        relayDecided = true
+                        throw PhonePairingError.denied
+                    case .expired:
+                        relayDecided = true
+                        throw PhonePairingError.expired
+                    case let .approved(machineID, _, linkSlot):
+                        guard machineID == offer.machineID, linkSlot == offer.linkSlot else {
+                            throw RelayAPIError.badResponse
+                        }
+                        return PairedMachine(
+                            machineID: offer.machineID, name: offer.machineName, linkSlot: offer.linkSlot,
+                            hostKey: offer.hostKey)
+                    }
+                } catch let error as URLError where error.code != .cancelled {
+                    // Transient (network): keep polling until the deadline.
+                } catch RelayAPIError.http(let status, _) where status >= 500 {
+                    // Transient (relay trouble): keep polling until the deadline.
                 }
-                return PairedMachine(
-                    machineID: offer.machineID, name: offer.machineName, linkSlot: offer.linkSlot,
-                    hostKey: offer.hostKey)
+                guard clock.now < deadline else { throw PhonePairingError.expired }
+                try await Task.sleep(for: pollInterval)
             }
-            guard clock.now < deadline else { throw PhonePairingError.expired }
-            try await Task.sleep(for: pollInterval)
+        } catch {
+            if !relayDecided {
+                // Detached so that it still runs when this task was cancelled.
+                await Task.detached { try? await api.cancelPairing(id: id, token: token) }.value
+            }
+            throw error
         }
     }
 }

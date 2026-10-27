@@ -119,6 +119,100 @@ final class PhonePairingTests: XCTestCase {
         }
     }
 
+    private var denyCalls: [StubRequest] {
+        StubURLProtocol.requests.filter { $0.method == "POST" && $0.path.hasSuffix("/deny") }
+    }
+
+    func testMismatchedApprovalCancelsPairingOnce() async throws {
+        let response = approved(slot: "evil-slot")
+        install { response }
+        do {
+            _ = try await PhonePairing.pair(
+                offerURI: offer().uri, clientKey: clientKey, api: api(), token: "tok", pollInterval: .milliseconds(5))
+            XCTFail("expected badResponse")
+        } catch {
+            XCTAssertEqual(error as? RelayAPIError, .badResponse)
+        }
+        XCTAssertEqual(denyCalls.map(\.path), ["/v2/phone-pairings/p-1/deny"])
+    }
+
+    func testClientSideTimeoutExpiresAndCancels() async throws {
+        StubURLProtocol.install { request in
+            request.method == "POST" ? StubResponse(201, ["pairing_id": "p-1"]) : StubResponse(200, ["status": "pending"])
+        }
+        do {
+            _ = try await PhonePairing.pair(
+                offerURI: offer().uri, clientKey: clientKey, api: api(), token: "tok",
+                pollInterval: .milliseconds(5), timeout: .milliseconds(60))
+            XCTFail("expected expired")
+        } catch {
+            XCTAssertEqual(error as? PhonePairingError, .expired)
+        }
+        XCTAssertEqual(denyCalls.count, 1)
+    }
+
+    func testCancellationCancelsPairing() async throws {
+        StubURLProtocol.install { request in
+            request.method == "POST" ? StubResponse(201, ["pairing_id": "p-1"]) : StubResponse(200, ["status": "pending"])
+        }
+        let api = try api()
+        let uri = offer().uri
+        let key = clientKey
+        let task = Task {
+            try await PhonePairing.pair(
+                offerURI: uri, clientKey: key, api: api, token: "tok", pollInterval: .milliseconds(20))
+        }
+        try await Task.sleep(for: .milliseconds(80))
+        task.cancel()
+        do {
+            _ = try await task.value
+            XCTFail("expected cancellation")
+        } catch {
+            XCTAssertTrue(error is CancellationError || (error as? URLError)?.code == .cancelled, "\(error)")
+        }
+        XCTAssertEqual(denyCalls.count, 1)
+    }
+
+    func testServerDenyDoesNotCallDenyAgain() async throws {
+        install { StubResponse(200, ["status": "denied"]) }
+        _ = try? await PhonePairing.pair(
+            offerURI: offer().uri, clientKey: clientKey, api: api(), token: "tok", pollInterval: .milliseconds(5))
+        XCTAssertTrue(denyCalls.isEmpty)
+    }
+
+    func testTransientPollErrorsAreRetried() async throws {
+        let polls = PollCounter()
+        let response = approved()
+        StubURLProtocol.install { request in
+            if request.method == "POST" { return StubResponse(201, ["pairing_id": "p-1"]) }
+            switch polls.next() {
+            case 0: return StubResponse(503, ["error": ["code": "relay_v2_unavailable", "message": "x"]])
+            case 1: return StubResponse(502)
+            default: return response
+            }
+        }
+        let machine = try await PhonePairing.pair(
+            offerURI: offer().uri, clientKey: clientKey, api: api(), token: "tok", pollInterval: .milliseconds(5))
+        XCTAssertEqual(machine.machineID, machineID)
+        XCTAssertTrue(denyCalls.isEmpty)
+    }
+
+    func testClientErrorWhilePollingAborts() async throws {
+        StubURLProtocol.install { request in
+            request.method == "POST"
+                ? StubResponse(201, ["pairing_id": "p-1"])
+                : StubResponse(404, ["error": ["code": "pairing_not_found", "message": "x"]])
+        }
+        do {
+            _ = try await PhonePairing.pair(
+                offerURI: offer().uri, clientKey: clientKey, api: api(), token: "tok", pollInterval: .milliseconds(5))
+            XCTFail("expected http error")
+        } catch {
+            XCTAssertEqual(error as? RelayAPIError, .http(status: 404, code: "pairing_not_found"))
+        }
+        XCTAssertEqual(StubURLProtocol.requests.filter { $0.method == "GET" }.count, 1)
+    }
+
     func testBadOfferNeverReachesRelay() async throws {
         StubURLProtocol.install { _ in StubResponse(500) }
         do {

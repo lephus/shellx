@@ -396,11 +396,24 @@ repeated field, and keys or codes of the wrong length. An offer is valid for 300
 **Proof.** The phone proves it scanned the offer without sending the code:
 
 ```
-proof = HMAC-SHA256(key: code, message: "shellx-link-pair/1" || 0x00 || UTF-8(machine_id) || 0x00 || client_key)
+proof = HMAC-SHA256(key: code, message: "shellx-link-pair/1" || 0x00 || UTF-8(machine_id) || 0x00
+                    || UTF-8(link_slot) || 0x00 || host_key (32 bytes) || client_key (32 bytes))
 ```
 
-`client_key` is the phone's 32-byte Noise static public key. The Mac recomputes the proof and
-compares in constant time. `spec/vectors/pairing.json` has a fixed vector.
+`client_key` is the phone's 32-byte Noise static public key; `machine_id`, `link_slot` and
+`host_key` are the values the phone read from the QR code. The Mac recomputes the proof from its
+own machine id, slot and host key and compares in constant time, so a QR substituted in transit
+(same code, another host key or slot) cannot produce a proof the Mac accepts.
+`spec/vectors/pairing.json` has a fixed vector.
+
+**Field limits.** A parser rejects: any path after `pair`, a port, userinfo, a fragment or a
+repeated key; `m` outside 1-64 characters of `A-Z a-z 0-9 -`; `s` outside 1-64 characters of the
+base64url alphabet; `k` or `c` containing anything but the base64url alphabet (no `+`, `/`, `=`);
+`n` outside 1-100 Unicode scalars, or containing a control character or a bidi override or isolate
+(U+202A-U+202E, U+2066-U+2069).
+
+**Same account.** Phone and Mac MUST be signed in to the same ShellX account; the relay only
+accepts a pairing request for a machine of the phone's own account.
 
 **Relay routes** (JSON; `Authorization: Bearer <token>`; errors are `{"error": {"code", "message"}}`;
 `*_b64` fields are standard base64):
@@ -427,5 +440,9 @@ compares in constant time. `spec/vectors/pairing.json` has a fixed vector.
   relay mints names that slot and carries the `connect` permission.
 - The relay can only remove trust (delete a grant, stop routing); a compromised relay cannot make a
   phone trust another host or a Mac trust another phone.
-- The API base URL MUST be `https`, except for a loopback host (development).
+- If the phone gives up (cancelled, 300-second client deadline) or rejects an approval, it asks
+  the relay once to withdraw the request (`POST /v2/phone-pairings/:id/deny`), ignoring errors.
+  Transient poll failures (network errors, HTTP 5xx) are retried until the deadline; 4xx aborts.
+- The API base URL MUST be `https`, except for a loopback host (development). The phone never
+  follows an HTTP redirect from the API.
 - Tokens, passwords, tickets, keys, codes and proofs are never logged.

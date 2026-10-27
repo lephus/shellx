@@ -76,6 +76,68 @@ final class PairingOfferTests: XCTestCase {
         XCTAssertFalse(o.verify(proof: Data(v.proof.dropLast()), clientKey: v.clientKey))
     }
 
+    func testProofIsBoundToHostKeyAndSlot() throws {
+        let v = try vector()
+        let genuine = offer(v)
+        // An attacker swaps the QR's host key (same code): the proof the phone makes from it must
+        // not verify against the Mac's own offer.
+        var swappedKey = genuine
+        swappedKey.hostKey[0] ^= 1
+        let forged = swappedKey.proof(clientKey: v.clientKey)
+        XCTAssertNotEqual(forged, genuine.proof(clientKey: v.clientKey))
+        XCTAssertFalse(genuine.verify(proof: forged, clientKey: v.clientKey))
+        var swappedSlot = genuine
+        swappedSlot.linkSlot = "attacker-slot"
+        XCTAssertFalse(genuine.verify(proof: swappedSlot.proof(clientKey: v.clientKey), clientKey: v.clientKey))
+    }
+
+    func testParseRejectsStrictFieldClasses() throws {
+        let v = try vector()
+        let good = offer(v).uri
+        func fails(_ uri: String, _ expected: PairingOfferError? = nil, line: UInt = #line) {
+            XCTAssertThrowsError(try PairingOffer(uri: uri), line: line) { error in
+                if let expected { XCTAssertEqual(error as? PairingOfferError, expected, line: line) }
+            }
+        }
+        let m = "m=\(v.machineID)", s = "s=slot-test-1", n = "n=Phu%27s%20Mac"
+        let k = "k=QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8"
+        // m: only [A-Za-z0-9-], 1...64.
+        fails(good.replacingOccurrences(of: m, with: "m=a_b"), .badField("m"))
+        fails(good.replacingOccurrences(of: m, with: "m=a%2Fb"), .badField("m"))
+        fails(good.replacingOccurrences(of: m, with: "m=\(String(repeating: "a", count: 65))"), .badField("m"))
+        fails(good.replacingOccurrences(of: m, with: "m="), .badField("m"))
+        // s: base64url alphabet only, 1...64.
+        fails(good.replacingOccurrences(of: s, with: "s=a.b"), .badField("s"))
+        fails(good.replacingOccurrences(of: s, with: "s=a%20b"), .badField("s"))
+        fails(good.replacingOccurrences(of: s, with: "s=\(String(repeating: "a", count: 65))"), .badField("s"))
+        // k and c: base64url alphabet only (no +, /, =).
+        let plus = "k=QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdX+8"
+        fails(good.replacingOccurrences(of: k, with: plus), .badField("k"))
+        fails(good.replacingOccurrences(of: k, with: "k=QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdX%2F8"), .badField("k"))
+        fails(good.replacingOccurrences(of: k, with: k + "%3D"), .badField("k"))
+        fails(good.replacingOccurrences(of: "c=AAECAwQFBgcICQoLDA0ODw", with: "c=AAECAwQFBgcICQoLDA0OD%2B"), .badField("c"))
+        // n: 1...100 scalars, no controls, no bidi overrides or isolates.
+        fails(good.replacingOccurrences(of: n, with: "n="), .badField("n"))
+        fails(good.replacingOccurrences(of: n, with: "n=\(String(repeating: "a", count: 101))"), .badField("n"))
+        fails(good.replacingOccurrences(of: n, with: "n=a%0Ab"), .badField("n"))
+        fails(good.replacingOccurrences(of: n, with: "n=a%00b"), .badField("n"))
+        fails(good.replacingOccurrences(of: n, with: "n=a%7Fb"), .badField("n"))
+        for scalar in ["%E2%80%AA", "%E2%80%AE", "%E2%81%A6", "%E2%81%A9"] {
+            fails(good.replacingOccurrences(of: n, with: "n=a\(scalar)b"), .badField("n"))
+        }
+        let hundred = String(repeating: "a", count: 100)
+        XCTAssertNoThrow(try PairingOffer(uri: good.replacingOccurrences(of: n, with: "n=\(hundred)")))
+        XCTAssertNoThrow(try PairingOffer(uri: good.replacingOccurrences(of: n, with: "n=%E2%80%8F%20ok")))
+        // Structure: no path, port, userinfo, fragment, duplicate keys.
+        fails(good.replacingOccurrences(of: "pair?", with: "pair/x?"), .badURI)
+        fails(good.replacingOccurrences(of: "pair?", with: "pair/?"), .badURI)
+        fails(good.replacingOccurrences(of: "//pair?", with: "//pair:80?"), .badURI)
+        fails(good.replacingOccurrences(of: "//pair?", with: "//user@pair?"), .badURI)
+        fails(good + "#frag", .badURI)
+        fails(good + "&n=Other", .badField("n"))
+        fails(good + "&k=\(String(k.dropFirst(2)))", .badField("k"))
+    }
+
     func testParseRejectsBadFields() throws {
         let v = try vector()
         let good = offer(v).uri
