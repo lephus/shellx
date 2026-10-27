@@ -811,6 +811,24 @@
         }
       }
     },
+    "home.note.ended %@ %@": {
+      "comment": "ShellX note: the session the message was started for stopped running before it was sent; it was sent nowhere else. 1: agent name, 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sent: %1$@ in %2$@ is no longer running."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa gửi: %1$@ ở %2$@ không còn chạy."
+          }
+        }
+      }
+    },
     "home.note.failed %@ %@": {
       "comment": "ShellX note: the Mac could not type the message in. 1: agent name, 2: workspace.",
       "extractionState": "manual",
@@ -861,6 +879,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ ở %2$@ đã xong."
+          }
+        }
+      }
+    },
+    "home.note.needsPairing %@": {
+      "comment": "ShellX note: nothing was sent because the Mac removed this iPhone or its key changed; it will not come back by itself. The argument is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sent: %@ needs to be paired again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa gửi: cần ghép cặp lại %@."
           }
         }
       }

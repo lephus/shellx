@@ -104,6 +104,11 @@ check_app() {
   [ "$version" = "$VERSION" ] ||
     fail+=("CFBundleShortVersionString is '$version', Version.xcconfig says $VERSION")
   [ "$build" = "$BUILD" ] || fail+=("CFBundleVersion is '$build', Version.xcconfig says $BUILD")
+  # Plain HTTP to the local network serves only the Debug relay override (ShellXEndpoints); the App
+  # Store build keeps App Transport Security whole.
+  if [ "$(plist_value NSAppTransportSecurity:NSAllowsLocalNetworking "$info" || true)" = "true" ]; then
+    fail+=("allows plain HTTP to the local network (NSAllowsLocalNetworking), which only Debug builds need")
+  fi
 
   if [ "$mode" = "signed" ]; then
     local entitlements="$WORK/entitlements.plist"

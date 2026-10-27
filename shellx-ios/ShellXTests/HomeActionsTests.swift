@@ -49,10 +49,10 @@ final class HomeActionsTests: XCTestCase {
         return scope
     }
 
-    private func session(_ id: String) -> AgentSession {
+    private func session(_ id: String, lastActivityMs: Int64 = 1_700_000_000_000) -> AgentSession {
         AgentSession(
             sessionId: id, agent: "claude", workspaceId: "ws-shellx", workspaceTitle: "shellx", state: .working,
-            stateSinceMs: 1_700_000_000_000, lastActivityMs: 1_700_000_000_000)
+            stateSinceMs: 1_700_000_000_000, lastActivityMs: lastActivityMs)
     }
 
     func testToolbarSeeAllAndTargetActions() async throws {
@@ -126,6 +126,40 @@ final class HomeActionsTests: XCTestCase {
         ])
         let sent = await mac.sentTexts
         XCTAssertEqual(sent, [FakeMac.SentText(sessionId: "s1", text: "Tạo PR cho branch develop")])
+    }
+
+    /// The mic is pressed while the chip shows s2; s1 becomes the newest session before the release.
+    /// The words go to s2 (final review, Important 3).
+    func testSpokenTextGoesWhereTheChipPointedAtThePress() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.upsertSession(session("s1"))
+        await mac.upsertSession(session("s2", lastActivityMs: 1_700_000_000_001))
+        await mac.setHistory(sessionId: "s1", entries: [])
+        await mac.setHistory(sessionId: "s2", entries: [])
+        let scope = try await makeScope(mac)
+        let online = await eventually { scope.hub.liveSessions.count == 2 && scope.hub.liveSessions.allSatisfy(\.online) }
+        XCTAssertTrue(online)
+        let s1 = SessionRef(machineID: mac.machine.machineID, sessionId: "s1", agent: "claude", workspaceTitle: "shellx")
+        let s2 = SessionRef(machineID: mac.machine.machineID, sessionId: "s2", agent: "claude", workspaceTitle: "shellx")
+        var sends: [Task<ComposerValidation, Never>] = []
+        let box = RouteBox()
+        let actions = HomeActions.make(
+            scope: scope, open: { _ in }, route: Binding(get: { box.route }, set: { box.route = $0 }),
+            sent: { sends.append($0) })
+
+        actions.beginMessage()
+        await mac.upsertSession(session("s1", lastActivityMs: 1_800_000_000_000))
+        let moved = await eventually { scope.home.effectiveTarget == s1 }
+        XCTAssertTrue(moved)
+        actions.sendVoice("merge it")
+
+        XCTAssertEqual(sends.count, 1)
+        _ = await sends[0].value
+        let sent = await mac.sentTexts
+        XCTAssertEqual(sent, [FakeMac.SentText(sessionId: "s2", text: "merge it")])
+        XCTAssertEqual(scope.home.entries.map(\.content), [
+            .userSaid(text: "merge it", target: s2, viaVoice: true), .note(.sent(s2)),
+        ])
     }
 
     func testCardActionsReachTheDecisionCenterAndOpenSheets() async throws {

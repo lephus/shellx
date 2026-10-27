@@ -168,6 +168,14 @@ public final class HomeModel {
 
     // MARK: - Sending
 
+    /// Seams for the final-review regression tests; the fix fills them in.
+    public var messageTarget: SessionRef? { effectiveTarget }
+    public func beginMessage() {}
+    public func endMessage() {}
+    public func submit(_ text: String, to target: SessionRef?, viaVoice: Bool) async -> ComposerValidation {
+        await submit(text, viaVoice: viaVoice)
+    }
+
     /// Sends `text` to `effectiveTarget` and notes what happened (D7, spec section 7.5):
     /// - empty: nothing; too long: nothing is sent or noted, the result says so;
     /// - otherwise the message is added, then one note: no target (the default Mac offline, or no

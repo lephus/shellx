@@ -28,4 +28,9 @@ public final class PairingInbox {
         defer { held = nil }
         return held
     }
+
+    /// Seam for the final-review regression tests; the fix fills it in.
+    public func take(over sheets: SheetPresence) -> String? {
+        take()
+    }
 }

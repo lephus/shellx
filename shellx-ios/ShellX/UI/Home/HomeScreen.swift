@@ -17,6 +17,10 @@ struct HomeScreen: View {
         var seeAllPending: () -> Void = {}
         /// The user picked a session in the "Send to:" menu (nil: automatic).
         var choose: (SessionRef?) -> Void = { _ in }
+        /// A message began (the mic pressed, the field focused): it goes where the chip points now.
+        var beginMessage: () -> Void = {}
+        /// The message was dropped (released with nothing said, the keyboard closed empty).
+        var endMessage: () -> Void = {}
         /// The composer's trimmed, valid text.
         var send: (String) -> Void = { _ in }
         /// What the user said into the mic (trimmed, not empty).

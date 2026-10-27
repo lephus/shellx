@@ -10,6 +10,18 @@ import ShellXLinkCore
 /// sent any more (Review Focus 2).
 @MainActor @Observable
 public final class PendingSheetModel {
+    /// Why nothing can be sent from the sheet right now, while its item was not handled elsewhere.
+    public enum LinkNote: Equatable, Sendable {
+        /// The session ended; the link is coming back ("Reconnecting…").
+        case reconnecting
+        /// The Mac could not be reached ("<Mac> is offline · Not sent").
+        case offline
+        /// The Mac removed this iPhone, its key changed, or it is no longer paired.
+        case needsPairing
+        /// The Mac speaks another protocol version.
+        case needsUpdate
+    }
+
     public let key: PendingKey
     /// The item as it was when the sheet opened (nil when it was already gone). What it asks never
     /// changes, so the sheet keeps showing it after the item left the pending set.
@@ -54,6 +66,9 @@ public final class PendingSheetModel {
         case .failed, nil: return current == nil
         }
     }
+
+    /// Seam for the final-review regression tests; the fix fills it in.
+    public var linkNote: LinkNote? { nil }
 
     /// The send buttons are on: the item is pending and synced, and nothing is out or taken yet.
     public var canSend: Bool {

@@ -19,6 +19,23 @@ final class PairingInboxTests: XCTestCase {
         XCTAssertNil(inbox.take(), "a link opens once")
     }
 
+    /// A link opened while an answer or review sheet is up waits (final review, Minor 8): the pairing
+    /// sheet cannot show over that sheet, and closing it would lose an answer being typed.
+    func testLinkWaitsWhileASheetIsOpen() {
+        let inbox = PairingInbox()
+        let sheets = SheetPresence()
+        sheets.opened()
+        XCTAssertTrue(inbox.receive(link))
+
+        XCTAssertNil(inbox.take(over: sheets))
+        XCTAssertTrue(inbox.hasLink, "the link is kept")
+
+        sheets.closed()
+        XCTAssertEqual(inbox.take(over: sheets), link.absoluteString)
+        XCTAssertFalse(inbox.hasLink)
+        XCTAssertNil(inbox.take(over: sheets), "a link opens once")
+    }
+
     func testOtherSchemesIgnored() {
         let inbox = PairingInbox()
         XCTAssertFalse(inbox.receive(URL(string: "https://shellx.pro/pair")!))

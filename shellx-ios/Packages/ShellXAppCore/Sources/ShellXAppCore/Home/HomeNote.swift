@@ -10,6 +10,9 @@ public enum HomeNote: Codable, Equatable, Sendable {
     case sendFailed(SessionRef, SendFailure)
     /// "MacBook Pro is offline." Nothing was sent or queued (spec section 7.5).
     case machineOffline(machineName: String)
+    /// "Not sent: MacBook Pro needs to be paired again." The Mac removed this iPhone, or its key
+    /// changed: it will not come back by itself, so it is not called offline.
+    case machineNeedsPairing(machineName: String)
     /// No Claude Code session is running on any online Mac.
     case noLiveSession
     /// "Claude Code in shellx is done: <first line of its last reply>"; nil when there is none.

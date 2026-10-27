@@ -500,6 +500,65 @@ final class AgentThreadModelTests: XCTestCase {
         XCTAssertEqual(requests.count, 2)
     }
 
+    /// No agent screen follows the session when its transcript is reset (final review, Important 2):
+    /// the stored copy still goes, so opening the screen later shows the new transcript only.
+    func testResetWithNoScreenOpenDropsTheStoredCopy() async throws {
+        let mac = await mac(history: entries(1...300, text: "old"))
+        let s1 = ref(mac)
+        let cached = ChatThread(entries: entries(1...300, text: "old"), hasMore: false)
+        let rig = try await HomeRig.make([mac], in: self, seed: { await $0.writer().save(cached, to: .thread(s1)) })
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        // The home follows the hub for the whole sign-in, as `SignedInView` runs it.
+        let homeRunning = await rig.startRunning(in: self)
+        XCTAssertTrue(homeRunning)
+
+        // The Mac reloads the transcript (a resume or /compact): its seq starts over.
+        await mac.resetChat(sessionId: "s1", entries: reloaded(1...20))
+        let dropped = await eventually { await self.stored(s1, rig) == nil }
+        XCTAssertTrue(dropped, "the old transcript's copy goes although no screen follows the session")
+
+        let (model, _) = model(s1, rig)
+        let running = await startRunning(model)
+        XCTAssertTrue(running)
+        let fresh = await eventually { model.thread.entries.map(\.id) == (1...20).map { "new-\($0)" } }
+        XCTAssertTrue(fresh, "\(model.thread.entries.map(\.id).suffix(3)), \(model.thread.entries.count) entries")
+        XCTAssertFalse(model.thread.entries.contains { $0.id.hasPrefix("e-") }, "nothing of the old transcript is left")
+    }
+
+    /// The screen is covered (its task cancelled, then closed) when the transcript is reset: shown
+    /// again, it replaces its copy instead of merging the new transcript into the old one.
+    func testResetWhileCoveredReplacesTheCopyWhenShownAgain() async throws {
+        let mac = await mac(history: entries(1...60, text: "old"))
+        let s1 = ref(mac)
+        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let (model, _) = model(s1, rig)
+        let first = Task { await model.run() }
+        let opened = await eventually { model.thread.entries.map(\.seq) == Array(11...60) }
+        XCTAssertTrue(opened)
+        // Covered: SwiftUI cancels the screen's task, and its onDisappear closes the model.
+        first.cancel()
+        await first.value
+        await model.close()
+
+        var probe = rig.hub.chatUpdates().makeAsyncIterator()
+        await mac.resetChat(sessionId: "s1", entries: reloaded(1...20))
+        let arrived = await probe.next()
+        XCTAssertEqual(arrived, .reset(s1))
+        XCTAssertEqual(model.thread.entries.count, 50, "nobody follows the hub for the covered screen")
+
+        // Shown again: only the new transcript.
+        let running = await startRunning(model)
+        XCTAssertTrue(running)
+        let fresh = await eventually { model.thread.entries.map(\.id) == (1...20).map { "new-\($0)" } }
+        XCTAssertTrue(fresh, "\(model.thread.entries.map(\.id).suffix(3)), \(model.thread.entries.count) entries")
+        await model.close()
+        let stored = await stored(s1, rig)
+        XCTAssertEqual(stored?.entries.map(\.id), (1...20).map { "new-\($0)" }, "the stored copy is the new transcript's")
+    }
+
     // MARK: - Send and stop
 
     func testSendMapsOutcomes() async throws {

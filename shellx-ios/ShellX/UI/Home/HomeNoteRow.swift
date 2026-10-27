@@ -43,6 +43,7 @@ struct HomeNoteRow: View {
         case .sent: return "paperplane.fill"
         case .sendFailed: return "exclamationmark.triangle.fill"
         case .machineOffline: return "wifi.slash"
+        case .machineNeedsPairing: return "iphone.slash"
         case .noLiveSession: return "info.circle.fill"
         case .agentFinished: return "checkmark.circle.fill"
         }
@@ -52,7 +53,7 @@ struct HomeNoteRow: View {
         switch note {
         case .sent: return Color("AccentText")
         case .sendFailed: return Color("StatusError")
-        case .machineOffline, .noLiveSession: return Color("StatusIdle")
+        case .machineOffline, .machineNeedsPairing, .noLiveSession: return Color("StatusIdle")
         case .agentFinished: return Color("StatusDone")
         }
     }
@@ -65,12 +66,15 @@ struct HomeNoteRow: View {
         case let .sendFailed(ref, failure):
             switch failure {
             case .notFound: return String(localized: "home.note.notFound \(agent(ref)) \(ref.workspaceTitle)")
+            case .ended: return String(localized: "home.note.ended \(agent(ref)) \(ref.workspaceTitle)")
             case .busy: return String(localized: "home.note.busy \(agent(ref)) \(ref.workspaceTitle)")
             case .failed: return String(localized: "home.note.failed \(agent(ref)) \(ref.workspaceTitle)")
             case .noAnswer: return String(localized: "home.note.noAnswer \(agent(ref)) \(ref.workspaceTitle)")
             }
         case let .machineOffline(machineName):
             return String(localized: "home.note.offline \(machineName)")
+        case let .machineNeedsPairing(machineName):
+            return String(localized: "home.note.needsPairing \(machineName)")
         case .noLiveSession:
             return String(localized: "home.note.noLiveSession")
         case let .agentFinished(ref, summary?):

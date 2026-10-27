@@ -22,6 +22,8 @@ enum HomeActions {
             openSettings: { open(.settings) },
             seeAllPending: { open(.pending) },
             choose: { home.target = $0 },
+            beginMessage: { home.beginMessage() },
+            endMessage: { home.endMessage() },
             send: { text in sent(Task { await home.submit(text, viaVoice: false) }) },
             sendVoice: { text in sent(Task { await home.submit(text, viaVoice: true) }) },
             card: { item in PendingCardsSection.actions(for: item, hub: hub, center: center, route: route) })

@@ -33,6 +33,39 @@ final class FlakyWiper: LocalDataWiping, @unchecked Sendable {
     }
 }
 
+/// A wiper whose `wipe()` does not return while it is held: the app dying in the middle of a
+/// sign-out's wipe looks like this from outside.
+final class GatedWiper: LocalDataWiping, @unchecked Sendable {
+    private let lock = NSLock()
+    private var isHeld = false
+    private var entered = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    /// How many times `wipe()` was called, held or not.
+    var calls: Int { lock.withLock { entered } }
+
+    func hold() { lock.withLock { isHeld = true } }
+
+    func release() {
+        let waiting = lock.withLock {
+            isHeld = false
+            defer { waiters = [] }
+            return waiters
+        }
+        for waiter in waiting { waiter.resume() }
+    }
+
+    func wipe() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let held = lock.withLock {
+                entered += 1
+                if isHeld { waiters.append(continuation) }
+                return isHeld
+            }
+            if !held { continuation.resume() }
+        }
+    }
+}
+
 @MainActor
 final class AppCoordinatorTests: XCTestCase {
     private let account = AccountSession(userID: "u1", deviceID: "d1", token: "tok-1")
@@ -292,5 +325,50 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(attemptsAfterLaunch, 4, "the blocked sign-in and this launch each retried once")
         XCTAssertFalse(pending.bool(forKey: "shellx.localWipePending"))
         XCTAssertEqual(relaunched.phase, .signedOut(expired: false))
+    }
+
+    /// The app dies during a sign-out after the vault was wiped (so no account owns the Macs any
+    /// more) but before the history wipers finished (final review, Minor 1): the marker is already
+    /// written, so the next launch wipes, and so would the next sign-in.
+    func testSignOutThatDiesBeforeTheWipersFinishIsWipedAtNextLaunch() async throws {
+        let gate = GatedWiper()
+        let pending = UserDefaults(suiteName: "AppCoordinatorTests-pending-\(UUID().uuidString)")!
+        let rig = await rig(extraWipers: [gate], pendingDefaults: pending)
+        try await rig.coordinator.signIn(email: "a@b.c", password: "pw")
+        try await rig.vault.setMachines([mac], owner: "u1")
+
+        gate.hold()
+        let signOut = Task { await rig.coordinator.signOut() }
+        let wiping = await eventually { gate.calls == 1 }
+        XCTAssertTrue(wiping, "the sign-out reached the history wipers")
+        let owner = try await rig.vault.machinesOwner()
+        XCTAssertNil(owner, "the vault is wiped already: only the marker can force the next wipe")
+        XCTAssertTrue(pending.bool(forKey: "shellx.localWipePending"), "the marker is written before anything is wiped")
+
+        // The app dies here. The next launch finds the marker and wipes.
+        let afterCrash = CountingWiper()
+        let relaunched = AppCoordinator(
+            vault: rig.vault, relay: rig.relay, deviceName: "iPhone", wipers: [afterCrash],
+            pendingWipeDefaults: pending, makeHub: { preconditionFailure("no hub expected") })
+        await relaunched.launch()
+        XCTAssertEqual(afterCrash.wipes, 1, "the launch finished the wipe")
+        XCTAssertFalse(pending.bool(forKey: "shellx.localWipePending"), "cleared once every wiper succeeded")
+
+        gate.release()
+        await signOut.value
+    }
+
+    /// The marker stays set until every wiper succeeded, also when the vault itself was wiped fine.
+    func testSignOutClearsTheMarkerOnlyAfterEveryWiper() async throws {
+        let flaky = FlakyWiper()
+        let pending = UserDefaults(suiteName: "AppCoordinatorTests-pending-\(UUID().uuidString)")!
+        let rig = await rig(extraWipers: [flaky], pendingDefaults: pending)
+        flaky.setFailing(false)
+        try await rig.coordinator.signIn(email: "a@b.c", password: "pw")
+
+        await rig.coordinator.signOut()
+        XCTAssertFalse(pending.bool(forKey: "shellx.localWipePending"), "all wipers succeeded")
+        XCTAssertEqual(flaky.attempts, 1)
+        XCTAssertEqual(rig.wiper.wipes, 1)
     }
 }

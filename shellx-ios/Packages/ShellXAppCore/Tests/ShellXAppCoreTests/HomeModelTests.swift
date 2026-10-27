@@ -142,10 +142,166 @@ final class HomeModelTests: XCTestCase {
             XCTAssertEqual(notes(rig.home).last, .sendFailed(s1, failure), "\(outcome)")
         }
 
-        // Errors: an offline Mac names itself; anything else means no answer.
+        // Errors: an offline Mac names itself, as does one that must be paired again; anything else
+        // means no answer.
         XCTAssertEqual(HomeNote(sendError: LinkCallError.offline(machineName: "Mac mini"), to: s1), .machineOffline(machineName: "Mac mini"))
+        XCTAssertEqual(
+            HomeNote(sendError: LinkCallError.needsPairing(machineName: "Mac mini"), to: s1),
+            .machineNeedsPairing(machineName: "Mac mini"))
         XCTAssertEqual(HomeNote(sendError: CancellationError(), to: s1), .sendFailed(s1, .noAnswer))
         XCTAssertEqual(HomeNote(sendError: LinkCallError.unknownMachine, to: s1), .sendFailed(s1, .noAnswer))
+    }
+
+    // MARK: - Where a message goes (final review, Important 3)
+
+    func testMessageGoesToTheSessionTheChipShowedWhenItBegan() async throws {
+        let mac = await macWithSessions(["s1", "s2"])
+        let rig = try await HomeRig.make([mac], in: self)
+        let online = await rig.online(sessions: 2)
+        XCTAssertTrue(online)
+        let s1 = ref(mac, "s1")
+        let s2 = ref(mac, "s2")
+        XCTAssertEqual(rig.home.messageTarget, s2, "nothing picked: the newest session")
+
+        // The mic is pressed (or the field gets focus) while the chip shows s2.
+        rig.home.beginMessage()
+        // While the user talks, s1 finishes a turn and becomes the newest session.
+        await mac.upsertSession(agentSession("s1", state: .idle, lastActivityMs: 1_800_000_000_000))
+        let moved = await eventually { rig.home.effectiveTarget == s1 }
+        XCTAssertTrue(moved)
+        XCTAssertEqual(rig.home.messageTarget, s2, "the chip keeps the session it showed when the message began")
+
+        // Released: the words go where the chip said.
+        let to = rig.home.messageTarget
+        rig.home.endMessage()
+        _ = await rig.home.submit("merge it", to: to, viaVoice: true)
+        let sent = await mac.sentTexts
+        XCTAssertEqual(sent, [FakeMac.SentText(sessionId: "s2", text: "merge it")])
+        XCTAssertEqual(rig.home.entries.map(\.content), [
+            .userSaid(text: "merge it", target: s2, viaVoice: true), .note(.sent(s2)),
+        ])
+        XCTAssertEqual(rig.home.messageTarget, s2, "between messages the chip follows the session just messaged")
+    }
+
+    func testPickWhileComposingMovesTheMessageAndEndingFollowsTheChipAgain() async throws {
+        let mac = await macWithSessions(["s1", "s2"])
+        let rig = try await HomeRig.make([mac], in: self)
+        let online = await rig.online(sessions: 2)
+        XCTAssertTrue(online)
+        let s1 = ref(mac, "s1")
+        let s2 = ref(mac, "s2")
+
+        rig.home.beginMessage()
+        XCTAssertEqual(rig.home.messageTarget, s2)
+        // Picking a session in the chip while typing moves this message at once.
+        rig.home.target = s1
+        XCTAssertEqual(rig.home.messageTarget, s1)
+        rig.home.target = nil
+        // A second begin (the field focused again) keeps what the message goes to.
+        await mac.upsertSession(agentSession("s1", lastActivityMs: 1_800_000_000_000))
+        let moved = await eventually { rig.home.effectiveTarget == s1 }
+        XCTAssertTrue(moved)
+        rig.home.beginMessage()
+        XCTAssertEqual(rig.home.messageTarget, s2)
+
+        // Dropped (the keyboard closed with nothing typed): the chip follows the live target again.
+        rig.home.endMessage()
+        XCTAssertEqual(rig.home.messageTarget, s1)
+    }
+
+    func testMessageToASessionThatStoppedMeanwhileIsNotSentElsewhere() async throws {
+        let mac = await macWithSessions(["s1", "s2", "s3"])
+        let rig = try await HomeRig.make([mac], in: self)
+        let online = await rig.online(sessions: 3)
+        XCTAssertTrue(online)
+        let s2 = ref(mac, "s2")
+        let s3 = ref(mac, "s3")
+
+        // The message began for s3, which ends before it is sent.
+        rig.home.beginMessage()
+        XCTAssertEqual(rig.home.messageTarget, s3)
+        await mac.upsertSession(agentSession("s3", state: .ended))
+        let ended = await eventually { rig.hub.liveSessions.count == 2 }
+        XCTAssertTrue(ended)
+        var to = rig.home.messageTarget
+        rig.home.endMessage()
+        _ = await rig.home.submit("merge it", to: to, viaVoice: true)
+        XCTAssertEqual(Array(rig.home.entries.suffix(2)).map(\.content), [
+            .userSaid(text: "merge it", target: s3, viaVoice: true), .note(.sendFailed(s3, .ended)),
+        ])
+
+        // The next began for s2, which the Mac then drops from its list.
+        rig.home.beginMessage()
+        XCTAssertEqual(rig.home.messageTarget, s2)
+        await mac.removeSession("s2")
+        let removed = await eventually { rig.hub.liveSessions.count == 1 }
+        XCTAssertTrue(removed)
+        to = rig.home.messageTarget
+        rig.home.endMessage()
+        _ = await rig.home.submit("còn đó không?", to: to, viaVoice: false)
+        XCTAssertEqual(Array(rig.home.entries.suffix(2)).map(\.content), [
+            .userSaid(text: "còn đó không?", target: s2, viaVoice: false), .note(.sendFailed(s2, .notFound)),
+        ])
+
+        let sent = await mac.sentTexts
+        XCTAssertEqual(sent, [], "nothing went to s1 instead")
+    }
+
+    // MARK: - A Mac that must be paired again (final review, Minor 2)
+
+    func testMacThatRemovedThisIPhoneIsNotCalledOffline() async throws {
+        let mac = await macWithSessions(["s1"])
+        let rig = try await HomeRig.make([mac], in: self)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let s1 = ref(mac, "s1")
+
+        // The relay no longer lists the Mac's grant (the rig's relay has none): it removed this iPhone.
+        await rig.hub.refreshGrants()
+        XCTAssertEqual(rig.hub.machines.first?.state, .revoked)
+
+        // Nothing to send to: the default Mac needs pairing, it is not offline.
+        XCTAssertNil(rig.home.messageTarget)
+        _ = await rig.home.submit("Có ai không?", to: rig.home.messageTarget, viaVoice: false)
+        XCTAssertEqual(notes(rig.home).last, .machineNeedsPairing(machineName: "MacBook Pro"))
+        // A message that began for one of its sessions: the same, and nothing is sent.
+        _ = await rig.home.submit("Gửi lại", to: s1, viaVoice: false)
+        XCTAssertEqual(notes(rig.home).last, .machineNeedsPairing(machineName: "MacBook Pro"))
+        // A call through the hub says so too.
+        do {
+            _ = try await rig.hub.chatSend(s1, text: "x")
+            XCTFail("a Mac that removed this iPhone takes nothing")
+        } catch {
+            XCTAssertEqual(error as? LinkCallError, .needsPairing(machineName: "MacBook Pro"))
+        }
+        let sent = await mac.sentTexts
+        XCTAssertEqual(sent, [])
+    }
+
+    func testMacWhoseKeyChangedIsNotCalledOffline() async throws {
+        let mac = await macWithSessions(["s1"])
+        let rig = try await HomeRig.make([mac], in: self)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let s1 = ref(mac, "s1")
+
+        // The Mac's key changes: the reconnect refuses its handshake.
+        await mac.rotateHostKey()
+        await mac.dropLiveSessions()
+        let retrying = await eventually { rig.backoff.waiting.count == 1 }
+        XCTAssertTrue(retrying)
+        rig.backoff.release()
+        let changed = await eventually { rig.hub.machines.first?.state == .hostKeyChanged }
+        XCTAssertTrue(changed)
+
+        _ = await rig.home.submit("Có ai không?", to: s1, viaVoice: false)
+        XCTAssertEqual(notes(rig.home).last, .machineNeedsPairing(machineName: "MacBook Pro"))
+        do {
+            _ = try await rig.hub.chatSend(s1, text: "x")
+            XCTFail("a Mac whose key changed takes nothing")
+        } catch {
+            XCTAssertEqual(error as? LinkCallError, .needsPairing(machineName: "MacBook Pro"))
+        }
     }
 
     // MARK: - Finished sessions
