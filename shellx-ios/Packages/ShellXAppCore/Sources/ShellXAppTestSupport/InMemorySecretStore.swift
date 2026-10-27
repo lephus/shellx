@@ -1,9 +1,8 @@
-// Debug builds only (swift test, the ShellXTests bundle, previews and the demo): the App Store build
-// never contains it, and release/mobile/ios.sh refuses an ipa that does.
-#if DEBUG
 import Foundation
+import ShellXAppCore
 
-/// A `SecretStore` in memory, for tests and previews. Each operation can be made to fail.
+/// A `SecretStore` in memory, for tests, previews and the Debug demo. Each operation can be made to
+/// fail.
 public final class InMemorySecretStore: SecretStore, @unchecked Sendable {
     private let lock = NSLock()
     private var items: [SecretItem: Data] = [:]
@@ -60,4 +59,3 @@ public final class InMemorySecretStore: SecretStore, @unchecked Sendable {
         return try body()
     }
 }
-#endif

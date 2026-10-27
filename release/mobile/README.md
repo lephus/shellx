@@ -6,12 +6,13 @@ and signed on the maintainer's Mac, not in CI. There is no Android app; the Flut
 
 | Command | Does | Output |
 |---|---|---|
-| `release/mobile/ios.sh` | Release archive, App Store export, checks | `build/release/ios/ShellX-<version>-<build>.ipa` and `.xcarchive` |
-| `release/mobile/ios.sh --upload` | The same, then uploads that archive to App Store Connect | TestFlight build |
-| `release/mobile/ios.sh --check-app <path.app>` | Only the checks, on a built app | |
+| `release/mobile/ios.sh` | Release archive, App Store export, checks | `build/release/ios/ShellX-<version>-<build>.xcarchive`, `.ipa` and `.source` |
+| `release/mobile/ios.sh --upload` | Uploads the archive that `ios.sh` built and checked for the current version and build | TestFlight build, `ShellX-<version>-<build>.uploaded` |
+| `release/mobile/ios.sh --check-app [--unsigned] <path.app>` | Only the checks, on a built app | |
+| `shellx-ios/scripts/dev.sh test release` | Unsigned Release build and `--check-app --unsigned`, no Apple account (also part of `test all`) | |
 
-Run them from the repo root. Full `xcodebuild` logs go to `build/release/ios/logs/`. Keep the
-`.xcarchive` of every uploaded build: it holds the dSYMs for crash reports.
+Run them from the repo root. Full `xcodebuild` logs go to `build/release/ios/logs/`. The
+`.xcarchive` of an uploaded build is never deleted: it holds the dSYMs for crash reports.
 
 ## Every release
 
@@ -27,11 +28,19 @@ Run them from the repo root. Full `xcodebuild` logs go to `build/release/ios/log
    - `get-task-allow` is true (a development signature);
    - it has `aps-environment` with a value other than `production`;
    - it embeds a `.framework` in `Frameworks/` (P3 links everything statically);
-   - it contains Debug-only code: the demo (`SHELLX_DEMO`), `FakeMac`, `FakeRelayAccount`,
-     `InMemorySecretStore` or anything from `ShellXAppTestSupport`. `Release.xcconfig` leaves
-     `ShellXAppTestSupport` out of the link and the rest is under `#if DEBUG`.
-3. Only when the maintainer says so: `release/mobile/ios.sh --upload`. It exports the same archive
-   again with `destination upload`, using Xcode's account session. App Store Connect → ShellX →
+   - any Mach-O file in it contains Debug-only code: the demo (`SHELLX_DEMO`), `FakeMac`,
+     `FakeRelayAccount`, `InMemorySecretStore` or anything from `ShellXAppTestSupport`.
+     `Release.xcconfig` leaves `ShellXAppTestSupport` out of the link, and the app's demo code is
+     under `#if DEBUG`.
+
+   It also refuses to start when this build number was already uploaded, and it records the commit
+   it was built from (`.source`).
+3. Test the ipa if needed, then, only when the maintainer says so: `release/mobile/ios.sh --upload`.
+   It uploads the archive from step 2, not a new build: it exports it again with
+   `destination upload`, using Xcode's account session. It refuses when there is no checked archive
+   for the current version and build, when `shellx-ios/`, `shellx-link/` or `release/mobile/` has
+   uncommitted changes or a new commit since step 2, and when the build was already uploaded. After
+   the upload it writes `ShellX-<version>-<build>.uploaded`. App Store Connect → ShellX →
    TestFlight lists the build after processing (5–30 minutes).
 4. Test the TestFlight build on a real iPhone against a Mac running ShellX, then submit it for
    review.
@@ -51,11 +60,13 @@ Run them from the repo root. Full `xcodebuild` logs go to `build/release/ios/log
 - **App Review** needs a demo account and a video in the review notes: the app does nothing until
   it is paired with a Mac running ShellX, and a reviewer has no such Mac. The video shows sign-in,
   pairing by QR, an agent session, answering a pending request and voice input.
-- **App Privacy** answers match `shellx-ios/ShellX/PrivacyInfo.xcprivacy`: no tracking; the only
-  data collected is the email address, linked to the account and used for app functionality
-  (sign-in). Agent conversations travel end to end encrypted between iPhone and Mac. The manifest
-  also declares the required-reason APIs the app uses: `UserDefaults` (`CA92.1`) and file
-  timestamps of its own history files (`C617.1`).
+- **App Privacy.** `shellx-ios/ShellX/PrivacyInfo.xcprivacy` declares no tracking and one collected
+  data type: the email address, linked to the account, used for app functionality (sign-in). The
+  maintainer decides whether the App Store Connect answers (and then the manifest) also list
+  **User ID** (the account's `user_id`) and **Device ID** (the relay stores each phone's device
+  name, platform and Link public key). Agent conversations travel end to end encrypted between
+  iPhone and Mac. The manifest also declares the required-reason APIs the app uses: `UserDefaults`
+  (`CA92.1`) and file timestamps of its own history files (`C617.1`).
 - **Push.** P3 has no push, so the build has no `aps-environment`. From P4 (notifications) the
   entitlement becomes required, and `ios.sh` should then refuse a build without it.
 
@@ -70,5 +81,11 @@ Run them from the repo root. Full `xcodebuild` logs go to `build/release/ios/log
     lives with Apple, so the keychain has no distribution identity) and the Xcode-managed App Store
     profile of `com.shellx.prod`.
 
-  If Xcode says it would create a certificate, a profile or an App ID capability, stop and decide
-  first; only the Account Holder or an Admin may create a distribution certificate.
+  With `-allowProvisioningUpdates`, Xcode does not ask: when automatic signing needs a profile, a
+  renewed profile or a certificate, it creates it on the account during the step. `ios.sh` cannot
+  stop that. It lists team `W4RF3W4VTZ`'s provisioning profiles, the certificates they name and the
+  keychain's signing identities before and after each signing step (archive, export, upload) and
+  prints anything new or gone between `!!!` lines. A new cloud-managed certificate never reaches the
+  keychain; it shows up as a new `certificate` line in a new profile. When such lines appear
+  unexpectedly, review Certificates, Identifiers & Profiles in the developer account before
+  uploading. Only the Account Holder or an Admin may create a distribution certificate.
