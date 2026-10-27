@@ -53,7 +53,9 @@ extension ShellXRemoteEnvironment {
         // a `link_slot` from `machines.register`.
         let linkHost = ShellXLinkHostController(
             core: core,
-            storage: KeychainLinkSecretStorage(),
+            storage: FallbackLinkSecretStorage.standard(onFallback: {
+                ShellXLinkHostController.log.notice("link keys: the Keychain refuses this build; using the development file store")
+            }),
             feed: ShellXLinkFeedSource(coordinator: .shared),
             hostVersion: device.appVersion,
             machineName: device.machineName)

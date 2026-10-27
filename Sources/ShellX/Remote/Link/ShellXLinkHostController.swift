@@ -141,6 +141,9 @@ final class ShellXLinkHostController: RemoteLinkHosting {
                 log.notice("link keys not available yet (\(status)); retrying")
                 try await sleep(.seconds(ReconnectBackoff.delay(attempt: attempt)))
                 attempt += 1
+            } catch ShellXLinkSecretError.unavailable(let status) {
+                log.error("link host stopped: keychain_unavailable (\(status))")
+                throw ShellXLinkSecretError.unavailable(status)
             } catch {
                 log.error("link host stopped: link_keys_corrupt (\(keyErrorKind(error), privacy: .public))")
                 throw error
@@ -156,8 +159,10 @@ final class ShellXLinkHostController: RemoteLinkHosting {
     nonisolated static func reconcile(core: ShellXCoreClient, keys: ShellXLinkKeyStore, liveHost: LiveLinkHost) async {
         do {
             let removed = try await offMain { () -> Set<Data> in
+                // Taken before the call: a phone paired while it is in flight must survive this round.
+                let askedAt = Date()
                 let granted = Set(try core.pairedPhones().map(\.clientKey))
-                return try keys.retainOnly(keys: granted)
+                return try keys.retainOnly(keys: granted, pairedSince: askedAt)
             }
             guard !removed.isEmpty else { return }
             log.info("link host dropped \(removed.count) phone(s) the relay no longer grants")
@@ -241,6 +246,7 @@ final class ShellXLinkHostController: RemoteLinkHosting {
         case let secret as ShellXLinkSecretError:
             switch secret {
             case .transient(let status): return "keychain_transient_\(status)"
+            case .unavailable: return "keychain_unavailable"
             case .failed(let status): return "keychain_\(status)"
             }
         case is DecodingError: return "trusted_list_unreadable"

@@ -12,6 +12,7 @@ final class InMemoryLinkSecretStorage: ShellXLinkSecretStorage, @unchecked Senda
     private let lock = NSLock()
     private var items: [String: Data] = [:]
     private var readFailures: [ShellXLinkSecretError]
+    private var failWrites = false
 
     init(readFailures: [ShellXLinkSecretError] = []) { self.readFailures = readFailures }
 
@@ -22,8 +23,11 @@ final class InMemoryLinkSecretStorage: ShellXLinkSecretStorage, @unchecked Senda
         }
     }
 
+    func setWriteFailure(_ fail: Bool) { lock.withLock { failWrites = fail } }
+
     func add(_ data: Data, account: String) throws -> Bool {
-        lock.withLock {
+        if lock.withLock({ failWrites }) { throw ShellXLinkSecretError.failed(-1) }
+        return lock.withLock {
             if items[account] != nil { return false }
             items[account] = data
             return true
@@ -31,6 +35,7 @@ final class InMemoryLinkSecretStorage: ShellXLinkSecretStorage, @unchecked Senda
     }
 
     func update(_ data: Data, account: String) throws {
+        if lock.withLock({ failWrites }) { throw ShellXLinkSecretError.failed(-1) }
         try lock.withLock {
             guard items[account] != nil else { throw ShellXLinkSecretError.failed(-25300) }
             items[account] = data
@@ -148,6 +153,129 @@ struct ShellXLinkKeyStoreTests {
         storage.set(Data("short".utf8), account: "host-key.acct")
         #expect(throws: (any Error).self) { try ShellXLinkKeyStore(storage: storage, accountID: "acct").hostKey() }
         #expect(storage.raw("host-key.acct") == Data("short".utf8))
+    }
+
+    @Test func testRetainOnlyKeepsPhonesPairedSinceTheSnapshot() throws {
+        let storage = InMemoryLinkSecretStorage()
+        let store = ShellXLinkKeyStore(storage: storage, accountID: "acct")
+        let snapshot = Date(timeIntervalSince1970: 1_800_000_100)
+        let before = TrustedPhone(key: Data(repeating: 1, count: 32), deviceID: "d1", name: "Old",
+                                  pairedAt: snapshot.addingTimeInterval(-10))
+        let during = TrustedPhone(key: Data(repeating: 2, count: 32), deviceID: "d2", name: "New", pairedAt: snapshot)
+        try store.trust(before)
+        try store.trust(during)
+
+        let removed = try store.retainOnly(keys: [], pairedSince: snapshot)
+
+        #expect(removed == [before.key])
+        #expect(store.trustedClients() == [during.key])
+    }
+
+    @Test func testUntrustDropsTheKeyEvenWhenSavingFails() throws {
+        let storage = InMemoryLinkSecretStorage()
+        let store = ShellXLinkKeyStore(storage: storage, accountID: "acct")
+        try store.trust(Self.phone(1))
+        try store.trust(Self.phone(2))
+        storage.setWriteFailure(true)
+
+        #expect(throws: (any Error).self) { try store.untrust(key: Self.phone(1).key) }
+
+        #expect(store.trustedClients() == [Self.phone(2).key])
+    }
+
+    @Test func testRetainOnlyDropsKeysEvenWhenSavingFails() throws {
+        let storage = InMemoryLinkSecretStorage()
+        let store = ShellXLinkKeyStore(storage: storage, accountID: "acct")
+        try store.trust(Self.phone(1))
+        storage.setWriteFailure(true)
+
+        #expect(throws: (any Error).self) { try store.retainOnly(keys: []) }
+
+        #expect(store.trustedClients().isEmpty)
+    }
+
+    // MARK: Development file store
+
+    private struct RefusingKeychain: ShellXLinkSecretStorage {
+        func read(account: String) throws -> Data? { throw ShellXLinkSecretError.unavailable(-34018) }
+        func add(_ data: Data, account: String) throws -> Bool { throw ShellXLinkSecretError.unavailable(-34018) }
+        func update(_ data: Data, account: String) throws { throw ShellXLinkSecretError.unavailable(-34018) }
+    }
+
+    private static func temporaryHome() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("shellx-link-dev-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    private static func mode(_ url: URL) throws -> Int {
+        ((try FileManager.default.attributesOfItem(atPath: url.path))[.posixPermissions] as? NSNumber)?.intValue ?? -1
+    }
+
+    @Test func testMissingEntitlementInANonProductionBundleSelectsTheFileStore() throws {
+        let home = try Self.temporaryHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let notices = Box<Int>()
+        let storage = FallbackLinkSecretStorage(
+            primary: RefusingKeychain(),
+            fallback: FallbackLinkSecretStorage.developmentFallback(bundleID: "pro.shellx.desktop.debug.link", home: home),
+            onFallback: { notices.add(1) })
+        let store = ShellXLinkKeyStore(storage: storage, accountID: "acct")
+
+        let key = try store.hostKey()
+        try store.trust(Self.phone(1))
+        _ = try store.hostKey()
+
+        #expect(try ShellXLinkKeyStore(storage: storage, accountID: "acct").hostKey().publicKey == key.publicKey)
+        #expect(notices.all.count == 1)   // logged once
+        let directory = FileLinkSecretStorage.directory(home: home, bundleID: "pro.shellx.desktop.debug.link")
+        #expect(try Self.mode(directory) == 0o700)
+        #expect(try Self.mode(directory.appendingPathComponent("host-key.acct")) == 0o600)
+        // Never the shared P1 directory.
+        #expect(!FileManager.default.fileExists(atPath: home.appendingPathComponent("Library/Application Support/ShellX/link").path))
+    }
+
+    @Test func testProductionNeverFallsBackToFiles() throws {
+        let home = try Self.temporaryHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        #expect(FallbackLinkSecretStorage.developmentFallback(bundleID: "pro.shellx.desktop", home: home) == nil)
+        let storage = FallbackLinkSecretStorage(primary: RefusingKeychain(), fallback: nil)
+        let store = ShellXLinkKeyStore(storage: storage, accountID: "acct")
+
+        #expect(throws: ShellXLinkSecretError.unavailable(-34018)) { try store.hostKey() }
+        #expect(!FileManager.default.fileExists(atPath: home.appendingPathComponent("Library").path))
+    }
+
+    @MainActor
+    @Test func testProductionHostStopsAsKeychainUnavailableWithoutRetry() async throws {
+        let storage = FallbackLinkSecretStorage(primary: RefusingKeychain(), fallback: nil)
+        let store = ShellXLinkKeyStore(storage: storage, accountID: "acct")
+        let delays = Box<Duration>()
+
+        await #expect(throws: ShellXLinkSecretError.unavailable(-34018)) {
+            _ = try await ShellXLinkHostController.loadKeys(store, sleep: { delays.add($0) })
+        }
+        #expect(delays.all.isEmpty)
+        #expect(ShellXLinkHostController.keyErrorKind(ShellXLinkSecretError.unavailable(-34018)) == "keychain_unavailable")
+    }
+
+    @Test func testFileStoreRoundTripsAndIsPerBundleID() throws {
+        let home = try Self.temporaryHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let a = try #require(FallbackLinkSecretStorage.developmentFallback(bundleID: "pro.shellx.desktop.debug.a", home: home))
+        let b = try #require(FallbackLinkSecretStorage.developmentFallback(bundleID: "pro.shellx.desktop.debug.b", home: home))
+
+        #expect(try a.read(account: "host-key.x/../y") == nil)
+        #expect(try a.add(Data("one".utf8), account: "host-key.x/../y"))
+        #expect(try !a.add(Data("two".utf8), account: "host-key.x/../y"))
+        #expect(try a.read(account: "host-key.x/../y") == Data("one".utf8))
+        try a.update(Data("three".utf8), account: "host-key.x/../y")
+        #expect(try a.read(account: "host-key.x/../y") == Data("three".utf8))
+        #expect(try b.read(account: "host-key.x/../y") == nil)
+        #expect(a.directory != b.directory)
+        // One file per account name, no leftover temporary file.
+        #expect(try FileManager.default.contentsOfDirectory(atPath: a.directory.path).count == 1)
     }
 
     @MainActor

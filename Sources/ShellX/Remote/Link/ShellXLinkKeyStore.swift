@@ -144,26 +144,35 @@ final class ShellXLinkKeyStore: Sendable {
     }
 
     /// Removes the phone with `key` and saves the list.
+    ///
+    /// Fails closed: the key leaves memory first, so a failed read or save still stops new sessions from it.
     func untrust(key: Data) throws {
         storageLock.lock()
         defer { storageLock.unlock() }
+        state.withLock { _ = $0.trusted.removeValue(forKey: key) }
         var phones = try loadLocked()
         guard phones.removeValue(forKey: key) != nil else { return }
+        state.withLock { $0.trusted = phones }
         try saveLocked(phones)
     }
 
     /// Drops every trusted phone whose key is not in `keys`. It only removes, never adds: a key in `keys`
     /// that is not trusted stays untrusted.
     ///
+    /// - Parameters:
+    ///   - keys: The keys to keep.
+    ///   - pairedSince: A phone paired at or after this time is kept even when it is not in `keys`: `keys` was
+    ///     fetched before it was paired, so it cannot say anything about it.
     /// - Returns: The keys that were removed.
     @discardableResult
-    func retainOnly(keys: Set<Data>) throws -> Set<Data> {
+    func retainOnly(keys: Set<Data>, pairedSince: Date? = nil) throws -> Set<Data> {
         storageLock.lock()
         defer { storageLock.unlock() }
         let phones = try loadLocked()
-        let kept = phones.filter { keys.contains($0.key) }
+        let kept = phones.filter { keys.contains($0.key) || ($0.value.pairedAt >= (pairedSince ?? .distantFuture)) }
         let removed = Set(phones.keys).subtracting(kept.keys)
         guard !removed.isEmpty else { return [] }
+        state.withLock { $0.trusted = kept }
         try saveLocked(kept)
         return removed
     }
