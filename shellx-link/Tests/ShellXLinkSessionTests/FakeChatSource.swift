@@ -89,9 +89,9 @@ final class FakeChatSource: AgentChatSource, @unchecked Sendable {
 }
 
 func chatEntry(
-    _ seq: Int, role: ChatEntryRole = .agent, kind: ChatEntryKind = .prose, text: String? = nil
+    _ seq: Int, rev: Int = 1, role: ChatEntryRole = .agent, kind: ChatEntryKind = .prose, text: String? = nil
 ) -> ChatEntry {
     ChatEntry(
-        id: "e-\(seq)", seq: seq, role: role, kind: kind, text: text ?? "entry \(seq)",
+        id: "e-\(seq)", rev: rev, seq: seq, role: role, kind: kind, text: text ?? "entry \(seq)",
         tsMs: 1_700_000_000_000 + Int64(seq))
 }

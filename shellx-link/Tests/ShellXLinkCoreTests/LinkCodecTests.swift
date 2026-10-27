@@ -236,6 +236,22 @@ final class LinkCodecTests: XCTestCase {
         XCTAssertFalse(ChatEntry.cut(exact).truncated)
     }
 
+    func testNewerEntryRevisionWins() {
+        let old = ChatEntry(id: "e", rev: 1, seq: 1, role: .agent, kind: .prose, text: "old", tsMs: 1)
+        var fresh = old
+        fresh.rev = 2
+        fresh.text = "new"
+        // A stale history entry applied after a newer pushed one, and the other way round.
+        XCTAssertEqual(ChatEntry.newer(fresh, old).text, "new")
+        XCTAssertEqual(ChatEntry.newer(old, fresh).text, "new")
+        XCTAssertEqual(ChatEntry.newer(old, old), old)
+    }
+
+    func testChatEntryNeedsRev() {
+        let json = Data(#"{"v":1,"t":"chat.entries","session_id":"s","entries":[{"id":"e","seq":1,"role":"user","kind":"prose","text":"x","ts_ms":1}]}"#.utf8)
+        XCTAssertThrowsError(try LinkCodec.decode(json)) { XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: nil)) }
+    }
+
     func testChatMessagesNeedValidCallIds() throws {
         let long = String(repeating: "c", count: 65)
         XCTAssertThrowsError(try LinkCodec.encode(.chatSend(callId: long, sessionId: "s", text: "x")))
@@ -315,7 +331,8 @@ final class LinkCodecTests: XCTestCase {
     static func entries(_ o: Any?) throws -> [ChatEntry] {
         try XCTUnwrap(o as? [[String: Any]]).map { d in
             ChatEntry(
-                id: try XCTUnwrap(d["id"] as? String), seq: try XCTUnwrap((d["seq"] as? NSNumber)?.intValue),
+                id: try XCTUnwrap(d["id"] as? String), rev: try XCTUnwrap((d["rev"] as? NSNumber)?.intValue),
+                seq: try XCTUnwrap((d["seq"] as? NSNumber)?.intValue),
                 role: ChatEntryRole(wire: try XCTUnwrap(d["role"] as? String)),
                 kind: ChatEntryKind(wire: try XCTUnwrap(d["kind"] as? String)),
                 text: try XCTUnwrap(d["text"] as? String), truncated: d["truncated"] as? Bool,

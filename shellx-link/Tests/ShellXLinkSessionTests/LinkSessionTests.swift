@@ -661,6 +661,22 @@ final class LinkSessionTests: XCTestCase {
         XCTAssertThrowsError(try LinkCodec.encode(oneMore))
     }
 
+    func testHostCapsOversizedEntryText() async throws {
+        let huge = String(repeating: "\u{00E9}", count: 500_000)
+        let chat = FakeChatSource(["s1": [chatEntry(1, text: huge)]])
+        let client = try await connect(makeHost(FakeFeedSource(), chat: chat))
+        let seen = collect(client.chatEntries)
+        let page = try await within { try await client.chatHistory(sessionId: "s1", beforeSeq: nil, limit: 10) }
+        XCTAssertEqual(page.entries.count, 1)
+        XCTAssertTrue(page.entries.first?.truncated == true)
+        XCTAssertLessThanOrEqual(page.entries.first?.text.utf8.count ?? .max, ChatEntry.maxTextBytes)
+        XCTAssertFalse(page.hasMore)
+        chat.append([chatEntry(2, text: huge)], to: "s1")
+        let arrived = await eventually { !seen.items.isEmpty }
+        XCTAssertTrue(arrived)
+        XCTAssertTrue(seen.items.first?.entries.first?.truncated == true)
+    }
+
     func testChatEntriesPushedToEveryClient() async throws {
         let chat = FakeChatSource(["s1": [chatEntry(1)]])
         let rig = makeHost(FakeFeedSource(), clientCount: 2, chat: chat)

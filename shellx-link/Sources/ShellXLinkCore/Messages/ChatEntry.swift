@@ -60,6 +60,8 @@ public struct ChatEntry: Codable, Equatable, Sendable {
     public static let maxTextBytes = 4096
 
     public var id: String
+    /// Revision of this entry; strictly greater in every later emission of the same `id` (PROTOCOL.md section 4).
+    public var rev: Int
     public var seq: Int
     public var role: ChatEntryRole
     public var kind: ChatEntryKind
@@ -70,10 +72,11 @@ public struct ChatEntry: Codable, Equatable, Sendable {
     public var tsMs: Int64
 
     public init(
-        id: String, seq: Int, role: ChatEntryRole, kind: ChatEntryKind, text: String, truncated: Bool? = nil,
+        id: String, rev: Int, seq: Int, role: ChatEntryRole, kind: ChatEntryKind, text: String, truncated: Bool? = nil,
         toolName: String? = nil, tsMs: Int64
     ) {
         self.id = id
+        self.rev = rev
         self.seq = seq
         self.role = role
         self.kind = kind
@@ -81,6 +84,21 @@ public struct ChatEntry: Codable, Equatable, Sendable {
         self.truncated = truncated
         self.toolName = toolName
         self.tsMs = tsMs
+    }
+
+    /// Of two emissions of the same entry, the one with the higher `rev`; `a` when they are equal.
+    public static func newer(_ a: ChatEntry, _ b: ChatEntry) -> ChatEntry {
+        b.rev > a.rev ? b : a
+    }
+
+    /// The entry with `text` cut to `maxTextBytes` (`truncated = true` when it cut); unchanged when it fits.
+    public func withTextCap() -> ChatEntry {
+        let cut = Self.cut(text)
+        guard cut.truncated else { return self }
+        var copy = self
+        copy.text = cut.text
+        copy.truncated = true
+        return copy
     }
 
     /// Cuts `text` to at most `maxTextBytes` UTF-8 bytes on a Unicode scalar boundary. The creator of an

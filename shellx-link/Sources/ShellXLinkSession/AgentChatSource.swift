@@ -16,6 +16,10 @@ public protocol AgentChatSource: Sendable {
     func interrupt(sessionId: String, hard: Bool) async -> ChatInterruptOutcome
     /// Every new or changed entry from now on; the client upserts by `ChatEntry.id`.
     ///
+    /// The source assigns `ChatEntry.rev`: every emission of an entry, here and in `history`, carries a
+    /// `rev` strictly greater than any earlier emission of the same `id`. The host does not renumber it.
+    /// The host cuts any `text` longer than `ChatEntry.maxTextBytes` before sending.
+    ///
     /// Multicast, with the same lifetime and `onTermination` rules as `AgentFeedSource.changes()`.
     func entries() -> AsyncStream<(sessionId: String, entries: [ChatEntry])>
 }

@@ -60,8 +60,8 @@ A frame is one UTF-8 JSON object:
 
 ### Extension
 
-- Every string enum field is an open enum: `kind` (of a PendingItem and of a decision), `mode`,
-  `outcome`, `state`, `role`, and the enum fields later versions add. A value this version does not know still
+- Every string enum field is an open enum: `kind` (of a PendingItem, of a decision and of a ChatEntry), `mode`,
+  `outcome`, `state` (of an AgentSession), `role` (of a ChatEntry), and the enum fields later versions add. A value this version does not know still
   decodes (an implementation keeps the raw string, for example as `.other(raw)`); it is never
   `bad_json`.
 - A sender MAY add an optional field at any time; receivers ignore fields they do not know.
@@ -78,7 +78,8 @@ requests later versions add on the same pattern).
 - The client chooses it: a string of 1 to 64 UTF-8 bytes, different from every other call of
   that client that is still waiting in the session.
 - The host answers a call with exactly one message carrying the same `call_id`: the matching
-  answer (`agent.snapshot`, `agent.reply.result`), or an `error` that carries it.
+  answer (`agent.snapshot`, `agent.reply.result`, `agent.sessions`, `chat.history`,
+  `chat.send.result`, `chat.interrupt.result`), or an `error` that carries it.
 - A client drops an answer whose `call_id` it is no longer waiting for (for example because the
   call timed out).
 - A missing, empty or longer-than-64-byte `call_id` on a message that requires one is `bad_json`.
@@ -200,6 +201,7 @@ answers it `unknown` (section 5). A known `kind` with a missing required field i
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | string | Stable id of the entry; `chat.entries` upserts by it |
+| `rev` | int | Revision of the entry, required: see below |
 | `seq` | int | Orders the entries of one session; `before_seq` of `chat.history.get` compares with it |
 | `role` | string | `user`, `agent`, `system` (open enum) |
 | `kind` | string | `prose`, `thought`, `tool_use`, `status`, `other` (open enum) |
@@ -211,6 +213,12 @@ answers it `unknown` (section 5). A known `kind` with a missing required field i
 `chat.history` returns the newest `limit` entries whose `seq` is below `before_seq` (the newest
 entries when `before_seq` is absent), oldest first; `has_more` is true when older entries exist. A
 client keeps the entries it has by `id`: `chat.entries` and `chat.history` both upsert.
+
+`rev` orders the emissions of one entry. The host gives every emission of an entry, in a `chat.history` or
+a `chat.entries`, a `rev` strictly greater than that of any earlier emission of the same `id`. The two
+messages travel independently, so an older emission can arrive after a newer one: a receiver that already
+holds an entry with this `id` keeps whichever has the higher `rev` (equal `rev` means the same content)
+and drops the other. A host takes `rev` from its transcript source.
 
 ### Enums (exact strings, all open)
 
@@ -282,8 +290,8 @@ the same rule.
 Splitting one logical message into several frames is not defined in v1, except for `chat.entries`
 (below).
 
-`text` of a ChatEntry is cut by whoever creates the entry (the host) to at most 4096 UTF-8 bytes, on a
-Unicode scalar boundary, with `truncated` set to `true` when it cut. Besides the snapshot rule above,
+`text` of a ChatEntry is at most 4096 UTF-8 bytes, cut on a Unicode scalar boundary, with `truncated` set
+to `true` when it was cut. The host enforces this on every entry it sends, whatever its transcript source gave. Besides the snapshot rule above,
 three more rules apply:
 
 - `chat.history`: the host drops the oldest entries, one at a time, until the frame fits, and sets

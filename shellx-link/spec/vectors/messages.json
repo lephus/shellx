@@ -808,7 +808,8 @@
             "role": "user",
             "kind": "prose",
             "text": "Fix the relay",
-            "ts_ms": 1700000001000
+            "ts_ms": 1700000001000,
+            "rev": 11
           },
           {
             "id": "e-2",
@@ -818,7 +819,8 @@
             "text": "cat relay.rs",
             "truncated": true,
             "tool_name": "Bash",
-            "ts_ms": 1700000002000
+            "ts_ms": 1700000002000,
+            "rev": 21
           },
           {
             "id": "e-3",
@@ -826,7 +828,8 @@
             "role": "agent",
             "kind": "thought",
             "text": "Thinking about the relay",
-            "ts_ms": 1700000003000
+            "ts_ms": 1700000003000,
+            "rev": 31
           }
         ],
         "has_more": true
@@ -843,7 +846,8 @@
             "role": "user",
             "kind": "prose",
             "text": "Fix the relay",
-            "ts_ms": 1700000001000
+            "ts_ms": 1700000001000,
+            "rev": 11
           },
           {
             "id": "e-2",
@@ -853,7 +857,8 @@
             "text": "cat relay.rs",
             "truncated": true,
             "tool_name": "Bash",
-            "ts_ms": 1700000002000
+            "ts_ms": 1700000002000,
+            "rev": 21
           },
           {
             "id": "e-3",
@@ -861,7 +866,8 @@
             "role": "agent",
             "kind": "thought",
             "text": "Thinking about the relay",
-            "ts_ms": 1700000003000
+            "ts_ms": 1700000003000,
+            "rev": 31
           }
         ],
         "has_more": true
@@ -899,7 +905,8 @@
             "text": "cat relay.rs",
             "truncated": true,
             "tool_name": "Bash",
-            "ts_ms": 1700000002000
+            "ts_ms": 1700000002000,
+            "rev": 21
           },
           {
             "id": "e-3",
@@ -907,7 +914,8 @@
             "role": "agent",
             "kind": "thought",
             "text": "Thinking about the relay",
-            "ts_ms": 1700000003000
+            "ts_ms": 1700000003000,
+            "rev": 31
           }
         ]
       },
@@ -924,7 +932,8 @@
             "text": "cat relay.rs",
             "truncated": true,
             "tool_name": "Bash",
-            "ts_ms": 1700000002000
+            "ts_ms": 1700000002000,
+            "rev": 21
           },
           {
             "id": "e-3",
@@ -932,7 +941,8 @@
             "role": "agent",
             "kind": "thought",
             "text": "Thinking about the relay",
-            "ts_ms": 1700000003000
+            "ts_ms": 1700000003000,
+            "rev": 31
           }
         ]
       }
@@ -1259,7 +1269,8 @@
             "role": "tool",
             "kind": "diagram",
             "text": "?",
-            "ts_ms": 1700000009000
+            "ts_ms": 1700000009000,
+            "rev": 91
           }
         ]
       },
@@ -1274,7 +1285,8 @@
             "role": "tool",
             "kind": "diagram",
             "text": "?",
-            "ts_ms": 1700000009000
+            "ts_ms": 1700000009000,
+            "rev": 91
           }
         ]
       }

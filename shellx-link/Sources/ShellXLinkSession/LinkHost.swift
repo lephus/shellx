@@ -130,7 +130,7 @@ public actor LinkHost {
         if let chatEntries {
             group.addTask {
                 for await push in chatEntries {
-                    for frame in Self.entryFrames(sessionId: push.sessionId, entries: push.entries) {
+                    for frame in Self.entryFrames(sessionId: push.sessionId, entries: push.entries.map { $0.withTextCap() }) {
                         try? await channel.send(frame: frame)
                     }
                 }
@@ -206,7 +206,8 @@ public actor LinkHost {
                         return
                     }
                     await Self.deliver(
-                        on: channel, frame: Self.fittedHistory(callId: callId, sessionId: sessionId, page: page),
+                        on: channel, frame: Self.fittedHistory(callId: callId, sessionId: sessionId,
+                            page: (page.entries.map { $0.withTextCap() }, page.hasMore)),
                         what: "chat.history", answering: callId)
                 }
             case let .chatSend(callId, sessionId, text):
