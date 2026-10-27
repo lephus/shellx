@@ -1,5 +1,5 @@
 import { GitLog } from "@tomplum/react-git-log";
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createGitGraphBridge, type GitGraphBridge } from "./bridge";
 import { CommitRow, CommitRowContext, type CommitRowContextValue } from "./CommitRow";
 import { DetailPanel } from "./DetailPanel";
@@ -78,7 +78,8 @@ export function GitGraphApp({ bridge }: { bridge?: GitGraphBridge }) {
     document.documentElement.dataset.ggAppearance = appearance;
   }, [appearance]);
 
-  const label = createGitGraphLabelResolver(state.context?.labels);
+  const labels = state.context?.labels;
+  const label = useMemo(() => createGitGraphLabelResolver(labels), [labels]);
   const { view } = state;
 
   return (
@@ -138,7 +139,10 @@ function HistoryView({ store, state, layout, appearance, label }: HistoryViewPro
   const [graphColumnWidth, setGraphColumnWidth] = useState(0);
 
   // Search covers loaded commits only; matches are highlighted, never hidden.
-  const matches = findMatches(state.commits, query);
+  // Up to 5,000 commits: the list and everything derived from it are rebuilt only
+  // when the commits (or the query) change, not on every render.
+  const matches = useMemo(() => findMatches(state.commits, query), [state.commits, query]);
+  const matchSet = useMemo(() => new Set(matches), [matches]);
   const current = matches.length === 0 ? -1 : Math.min(matchIndex, matches.length - 1);
   const currentMatch = current >= 0 ? (matches[current] ?? null) : null;
 
@@ -189,24 +193,30 @@ function HistoryView({ store, state, layout, appearance, label }: HistoryViewPro
     return () => observer.disconnect();
   }, [state.logKey]);
 
-  const visibleRefs = state.includeRemotes ? state.refs : state.refs.filter((ref) => ref.kind !== "remoteBranch");
-  const rowContext: CommitRowContextValue = {
-    chipsByCommit: refChipsByCommit(visibleRefs, state.head),
-    layout,
-    matches: new Set(matches),
-    currentMatch,
-    workingTree: state.workingTree,
-    label,
-    now,
-  };
-  const { entries, currentBranch, hasHead } = gitLogInputs(state.commits, state.head);
+  const visibleRefs = useMemo(
+    () => (state.includeRemotes ? state.refs : state.refs.filter((ref) => ref.kind !== "remoteBranch")),
+    [state.includeRemotes, state.refs],
+  );
+  const chipsByCommit = useMemo(() => refChipsByCommit(visibleRefs, state.head), [visibleRefs, state.head]);
+  // Every row reads this context, so a new object re-renders all of them.
+  const rowContext = useMemo<CommitRowContextValue>(
+    () => ({ chipsByCommit, layout, matches: matchSet, currentMatch, workingTree: state.workingTree, label, now }),
+    [chipsByCommit, layout, matchSet, currentMatch, state.workingTree, label, now],
+  );
+  const { entries, currentBranch, hasHead } = useMemo(
+    () => gitLogInputs(state.commits, state.head),
+    [state.commits, state.head],
+  );
   const headBranchRef = state.head.branch === null ? null : `refs/heads/${state.head.branch}`;
   // The working-tree row hangs off HEAD, so it only shows when HEAD's branch is in
   // view and HEAD's commit is loaded. Without that commit there is nothing to hang
   // it from, yet react-git-log would still reserve an empty graph row for it.
   const showIndex =
     isDirty(state.workingTree) && hasHead && (state.branch === null || state.branch === headBranchRef);
-  const selectedCommit = state.commits.find((c) => c.sha === state.selectedSha) ?? null;
+  const selectedCommit = useMemo(
+    () => state.commits.find((c) => c.sha === state.selectedSha) ?? null,
+    [state.commits, state.selectedSha],
+  );
 
   return (
     <>
