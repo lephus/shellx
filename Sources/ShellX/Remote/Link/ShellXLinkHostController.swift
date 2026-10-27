@@ -13,19 +13,11 @@ import ShellXRemoteCore
 /// `ShellXRemoteGate` is on, and stops it when the host session ends. Logs carry slots, codes and counts,
 /// never a ticket or a key.
 @MainActor
-final class ShellXLinkHostController: RemoteLinkHosting {
-    /// The phone-side invite `shellx.link.debug_invite` returns: everything a probe needs to connect.
-    struct DebugInvite: Sendable {
-        let relayURL: String
-        let slot: String
-        let ticket: String
-        let expiresAtUnix: Int64
-        let hostKeyB64: String
-    }
-
+final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
     private struct Running {
         let machineID: String
         let linkSlot: String
+        let accountID: String
         let keys: ShellXLinkKeyStore
         let liveHost: LiveLinkHost
         let task: Task<Void, Never>
@@ -33,7 +25,8 @@ final class ShellXLinkHostController: RemoteLinkHosting {
 
     nonisolated static let log = Logger(subsystem: "pro.shellx.desktop", category: "link-host")
 
-    private let core: ShellXCoreClient
+    /// shellx-core: link-lane tickets here, and the `phones.*` calls of phone pairing.
+    let core: ShellXCoreClient
     private let storage: any ShellXLinkSecretStorage
     private let feed: any AgentFeedSource
     private let hostVersion: String
@@ -66,7 +59,8 @@ final class ShellXLinkHostController: RemoteLinkHosting {
             await Self.serve(linkSlot: linkSlot, core: core, keys: keys, liveHost: liveHost, feed: feed,
                              hostVersion: hostVersion, machineName: machineName)
         }
-        running = Running(machineID: machineID, linkSlot: linkSlot, keys: keys, liveHost: liveHost, task: task)
+        running = Running(machineID: machineID, linkSlot: linkSlot, accountID: accountID, keys: keys,
+                          liveHost: liveHost, task: task)
         Self.log.info("link host starting on slot \(linkSlot, privacy: .public)")
     }
 
@@ -77,32 +71,12 @@ final class ShellXLinkHostController: RemoteLinkHosting {
         Self.log.info("link host stopped")
     }
 
-    /// DEBUG spike pairing (`shellx.link.debug_invite`): trusts `clientKey`, then mints a link-lane connect
-    /// ticket to this machine itself (D3).
-    ///
-    /// - Parameter clientKey: The phone's 32-byte static public key.
-    /// - Throws: ``ShellXCoreError``: `link_not_running` while no link slot is served, `invalid_params`
-    ///   for a key that is not 32 bytes, or the mint's error.
-    func debugInvite(clientKey: Data) async throws -> DebugInvite {
-        guard let running else {
-            throw ShellXCoreError(code: "link_not_running", message: "this Mac is not serving ShellX Link")
+    /// What a pairing QR offers and where an allowed phone is trusted, while the link host runs.
+    var pairingHost: PhonePairingHost? {
+        running.map {
+            PhonePairingHost(machineID: $0.machineID, linkSlot: $0.linkSlot, accountID: $0.accountID,
+                             machineName: machineName, keys: $0.keys)
         }
-        guard clientKey.count == 32 else {
-            throw ShellXCoreError(code: "invalid_params", message: "client_key_b64 must be a 32-byte key")
-        }
-        let keys = running.keys, core = core, machineID = running.machineID, linkSlot = running.linkSlot
-        let hostKey = try await Self.offMain { () -> Data in
-            let key = try keys.hostKey()
-            // Reconciliation with the relay's grants removes this probe again (Task 9 drops the method).
-            try keys.trust(TrustedPhone(key: clientKey, deviceID: "debug-probe", name: "debug probe",
-                                        pairedAt: Date()))
-            return key.publicKey
-        }
-        let ticket = try await Self.offMain {
-            try core.mintLinkTicket(.connect(targetMachineID: machineID), expectedSlot: linkSlot)
-        }
-        return DebugInvite(relayURL: ticket.relayURL.absoluteString, slot: linkSlot, ticket: ticket.ticket,
-                           expiresAtUnix: ticket.expiresAtUnix, hostKeyB64: hostKey.base64EncodedString())
     }
 
     /// Removes the phone from the trusted list, then ends its live sessions. A new session with that key is
