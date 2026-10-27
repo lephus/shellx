@@ -55,6 +55,10 @@ public final class AgentThreadModel {
     @ObservationIgnored private var transcript = 0
     /// A reset came before `open()` took the writer: the stored copy is the old transcript's.
     @ObservationIgnored private var storedCopyIsStale = false
+    /// The hub's count of this session's transcript resets (`MachineHub.transcriptResets(of:)`) that
+    /// this model has dealt with: set when it starts following, raised by each reset it reads. A
+    /// higher count when it follows again is a reset it missed while covered or closed.
+    @ObservationIgnored private var resetsSeen: Int
 
     /// `sleep` waits out `saveDelay`; tests pass one they release by hand.
     public init(
@@ -65,6 +69,8 @@ public final class AgentThreadModel {
         self.hub = hub
         self.store = store
         self.sleep = sleep
+        // Resets before the screen existed: the home already dropped their stored copy.
+        resetsSeen = hub.transcriptResets(of: ref)
     }
 
     // MARK: - What the screen reads
@@ -215,11 +221,20 @@ public final class AgentThreadModel {
     /// entries, and the newest page again each time its Mac's link comes back (entries pushed while
     /// it was down were missed). Subscribes before asking for history, so nothing falls between.
     /// Run again after a cancel (the screen was covered, then shown again), it reads the newest page
-    /// again, for what came while nobody followed. Cancelled before that, it asks for nothing.
+    /// again, for what came while nobody followed; when the transcript was reset meanwhile, the copy
+    /// is dropped first, so the new transcript replaces it instead of merging into it (PROTOCOL.md
+    /// section 4, ruling P3-R7). Cancelled before that, it asks for nothing.
     public func run() async {
         closed = false
+        // Subscribing and reading the hub's reset count happen in one main-actor step: every reset
+        // is either counted here or delivered to `chat`.
         let chat = hub.chatUpdates()
         let states = hub.stateUpdates()
+        let resets = hub.transcriptResets(of: ref)
+        if resets != resetsSeen {
+            resetsSeen = resets
+            voidCopy()
+        }
         let again = hasRun
         hasRun = true
         observers += 1
@@ -248,7 +263,7 @@ public final class AgentThreadModel {
             let outcome = try await hub.chatSend(ref, text: message)
             if outcome == .notFound { answeredNotFound = true }
             return .sent(outcome)
-        } catch LinkCallError.offline {
+        } catch LinkCallError.offline, LinkCallError.needsPairing {
             return .offline
         } catch {
             return .noAnswer
@@ -340,8 +355,8 @@ public final class AgentThreadModel {
             change { $0.applyLatestPage(page.entries, hasMore: page.hasMore) }
         } catch is CancellationError {
             return
-        } catch LinkCallError.offline {
-            // The Mac went offline meanwhile: the page loads when it is back.
+        } catch LinkCallError.offline, LinkCallError.needsPairing {
+            // The Mac went offline meanwhile (the page loads when it is back), or must be paired again.
             return
         } catch {
             guard asked == transcript else { return }
@@ -355,27 +370,33 @@ public final class AgentThreadModel {
             case let .upsert(_, entries):
                 change { $0.upsert(entries) }
             case .reset:
+                resetsSeen += 1
                 await transcriptReset()
             }
         }
     }
 
-    /// The Mac replaced the session's transcript: every entry held for it, its `seq` values and any
-    /// history answer still on its way are void. Drops the copy in memory and on disk, then pages
-    /// again from the newest; entries pushed after the reset upsert as usual.
+    /// The Mac replaced the session's transcript: drops the copy (`voidCopy()`), then pages again
+    /// from the newest; entries pushed after the reset upsert as usual.
     private func transcriptReset() async {
+        voidCopy()
+        // Before `open()` (or while it reads the copy), its own newest page comes after the reset.
+        guard cacheRead, !closed else { return }
+        await loadLatest()
+    }
+
+    /// Every entry held for the session, its `seq` values and any history answer still on its way
+    /// belong to a transcript the Mac replaced: drops the copy in memory and on disk.
+    private func voidCopy() {
         transcript += 1
         thread = ChatThread()
         latestLoaded = false
         latestFailed = false
         olderFailed = false
-        // The Mac is pushing about this session: it has it.
+        // The Mac reset this session's transcript: it has the session.
         answeredNotFound = false
         // At once, not after `saveDelay`: a relaunch must not show the old transcript.
         removeStoredCopy()
-        // Before `open()` (or while it reads the copy), its own newest page comes after the reset.
-        guard cacheRead, !closed else { return }
-        await loadLatest()
     }
 
     /// Drops the stored copy through this screen's writer, after any write already under way; a

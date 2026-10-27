@@ -91,7 +91,7 @@ final class DemoCompositionTests: XCTestCase {
         let firstHub = try XCTUnwrap(first.coordinator.hub)
         let home = try XCTUnwrap(first.scopes.scope(for: firstHub)?.home)
         await home.load()
-        _ = await home.submit("Xin chào", viaVoice: false)
+        _ = await home.submit("Xin chào", to: home.messageTarget, viaVoice: false)
         await home.flush()
         await firstHub.stopAll()
         XCTAssertEqual(home.entries.count, 2)

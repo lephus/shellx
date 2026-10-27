@@ -5,7 +5,8 @@ import SwiftUI
 /// several, the kind of request), up to three lines of what it is about, then its buttons.
 ///
 /// The buttons come from `PendingItem.actions`: a permission shows Deny and Allow (the primary
-/// button), with "Always allow" and "All tools" in the "…" menu; a question opens the answer sheet, a
+/// button), with "Always allow" and "All tools" in the "…" menu, as `PermissionLayout` (ShellXAppCore)
+/// lays them out; a question opens the answer sheet, a
 /// plan the review sheet; anything else says to open it on the Mac. The buttons are off while the
 /// card cannot act (reconnecting, or its decision is out or taken). No hub here, so render tests
 /// can show every kind and state.
@@ -19,19 +20,6 @@ struct PendingCardView: View {
         var showMore: () -> Void = {}
         /// "Try again" after no answer.
         var retry: () -> Void = {}
-    }
-
-    /// How a permission's actions are laid out: Deny and Allow (`once`, the primary button) in the
-    /// row, the lasting grants ("Always allow", "All tools") in the "…" menu. A lasting grant is never
-    /// the one-tap primary button, also when the Mac does not offer `once`.
-    struct PermissionLayout: Equatable {
-        var buttons: [PendingAction]
-        var menu: [PendingAction]
-
-        init(_ actions: [PendingAction]) {
-            buttons = [PendingAction.deny, .allowOnce].filter { actions.contains($0) }
-            menu = [PendingAction.allowAlways, .allowAllTools].filter { actions.contains($0) }
-        }
     }
 
     let item: MachinePendingItem

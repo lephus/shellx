@@ -180,7 +180,9 @@ public final class DecisionCenter {
 
     private static func failure(_ error: any Error) -> DecisionFailure {
         switch error {
-        case LinkCallError.offline, LinkClientError.sessionClosed:
+        // Nothing was sent. A Mac to be paired again has dropped its items, so its cards are gone
+        // before this line could show.
+        case LinkCallError.offline, LinkCallError.needsPairing, LinkClientError.sessionClosed:
             return .offline
         case LinkClientError.remote, LinkCallError.unknownMachine:
             return .rejected

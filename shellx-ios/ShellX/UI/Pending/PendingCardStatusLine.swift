@@ -20,10 +20,12 @@ struct PendingCardStatusLine: View {
     let status: DecisionStatus?
     let actionable: Bool
     let machineName: String
+    /// A sheet's reason it cannot send (`PendingSheetModel.linkNote`); a card has none.
+    var linkNote: PendingSheetModel.LinkNote?
     var retry: () -> Void = {}
 
     var body: some View {
-        if let line = Self.line(status: status, actionable: actionable, machineName: machineName) {
+        if let line = Self.line(status: status, actionable: actionable, machineName: machineName, linkNote: linkNote) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 switch line.mark {
                 case .progress:
@@ -56,8 +58,11 @@ struct PendingCardStatusLine: View {
     }
 
     /// The line for a decision's status and the card's link. A failure says more than the link, so
-    /// it wins; with no decision out, a card that cannot act says it is reconnecting.
-    static func line(status: DecisionStatus?, actionable: Bool, machineName: String) -> Line? {
+    /// it wins; with no decision out, a card that cannot act says it is reconnecting, and a sheet says
+    /// what `linkNote` gives (offline, or to be paired again: never "handled elsewhere").
+    static func line(
+        status: DecisionStatus?, actionable: Bool, machineName: String, linkNote: PendingSheetModel.LinkNote? = nil
+    ) -> Line? {
         switch status {
         case .sending:
             return Line(text: String(localized: "pending.status.sending"), mark: .progress)
@@ -79,7 +84,22 @@ struct PendingCardStatusLine: View {
                 mark: .symbol("xmark.octagon", colorName: "StatusError"))
         case .done, nil:
             guard !actionable else { return nil }
-            return Line(text: String(localized: "pending.status.reconnecting"), mark: .progress)
+            switch linkNote {
+            case .offline?:
+                return Line(
+                    text: String(localized: "pending.status.offline \(machineName)"),
+                    mark: .symbol("wifi.slash", colorName: "StatusIdle"))
+            case .needsPairing?:
+                return Line(
+                    text: String(localized: "pending.status.needsPairing \(machineName)"),
+                    mark: .symbol("iphone.slash", colorName: "StatusIdle"))
+            case .needsUpdate?:
+                return Line(
+                    text: String(localized: "machine.state.needsUpdate"),
+                    mark: .symbol("arrow.down.circle", colorName: "StatusIdle"))
+            case .reconnecting?, nil:
+                return Line(text: String(localized: "pending.status.reconnecting"), mark: .progress)
+            }
         }
     }
 }

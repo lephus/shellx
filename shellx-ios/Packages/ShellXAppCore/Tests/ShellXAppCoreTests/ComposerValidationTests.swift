@@ -39,7 +39,7 @@ final class ComposerValidationTests: XCTestCase {
         XCTAssertTrue(online)
         XCTAssertNotNil(rig.home.effectiveTarget)
 
-        let result = await rig.home.submit(text, viaVoice: true)
+        let result = await rig.home.submit(text, to: rig.home.messageTarget, viaVoice: true)
 
         XCTAssertEqual(result, .tooLong(bytes: 16_385))
         XCTAssertEqual(rig.home.entries, [])

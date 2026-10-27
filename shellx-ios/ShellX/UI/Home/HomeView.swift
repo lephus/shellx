@@ -29,7 +29,8 @@ struct HomeView: View {
             rows: { home.statusRows },
             isLoaded: home.isLoaded,
             entries: home.entries,
-            target: home.effectiveTarget,
+            // While a message is under way, the session the chip showed when it began.
+            target: home.messageTarget,
             pickedTarget: picked,
             sessions: sessions,
             draft: $draft,

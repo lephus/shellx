@@ -45,7 +45,7 @@ final class HomeModelTests: XCTestCase {
         XCTAssertTrue(online)
         XCTAssertEqual(rig.home.effectiveTarget, ref(mac, "s1"))
 
-        let result = await rig.home.submit("  Chạy lại test giúp mình \n", viaVoice: true)
+        let result = await rig.home.submit("  Chạy lại test giúp mình \n", to: rig.home.messageTarget, viaVoice: true)
 
         XCTAssertEqual(result, .ok("Chạy lại test giúp mình"))
         XCTAssertEqual(rig.home.entries.map(\.content), [
@@ -67,7 +67,7 @@ final class HomeModelTests: XCTestCase {
         // A session the user picks wins until they pick another.
         rig.home.target = ref(mac, "s2")
         XCTAssertEqual(rig.home.effectiveTarget, ref(mac, "s2"))
-        _ = await rig.home.submit("Còn bên này?", viaVoice: false)
+        _ = await rig.home.submit("Còn bên này?", to: rig.home.messageTarget, viaVoice: false)
         sent = await mac.sentTexts
         XCTAssertEqual(sent.last, FakeMac.SentText(sessionId: "s2", text: "Còn bên này?"))
         XCTAssertEqual(notes(rig.home).last, .sent(ref(mac, "s2")))
@@ -87,7 +87,7 @@ final class HomeModelTests: XCTestCase {
 
         // Nothing is chosen: the default Mac is offline.
         XCTAssertNil(rig.home.effectiveTarget)
-        _ = await rig.home.submit("Có ai không?", viaVoice: false)
+        _ = await rig.home.submit("Có ai không?", to: rig.home.messageTarget, viaVoice: false)
         XCTAssertEqual(rig.home.entries.map(\.content), [
             .userSaid(text: "Có ai không?", target: nil, viaVoice: false),
             .note(.machineOffline(machineName: "MacBook Pro")),
@@ -96,7 +96,7 @@ final class HomeModelTests: XCTestCase {
         // The user picked that session: still nothing is sent or queued.
         rig.home.target = ref(mac, "s1")
         XCTAssertEqual(rig.home.effectiveTarget, ref(mac, "s1"))
-        _ = await rig.home.submit("Gửi lại", viaVoice: false)
+        _ = await rig.home.submit("Gửi lại", to: rig.home.messageTarget, viaVoice: false)
         XCTAssertEqual(Array(rig.home.entries.suffix(2)).map(\.content), [
             .userSaid(text: "Gửi lại", target: ref(mac, "s1"), viaVoice: false),
             .note(.machineOffline(machineName: "MacBook Pro")),
@@ -113,7 +113,7 @@ final class HomeModelTests: XCTestCase {
         XCTAssertTrue(synced)
 
         XCTAssertNil(rig.home.effectiveTarget)
-        let result = await rig.home.submit("Làm issue 12 đi", viaVoice: false)
+        let result = await rig.home.submit("Làm issue 12 đi", to: rig.home.messageTarget, viaVoice: false)
 
         XCTAssertEqual(result, .ok("Làm issue 12 đi"))
         XCTAssertEqual(rig.home.entries.map(\.content), [
@@ -121,7 +121,7 @@ final class HomeModelTests: XCTestCase {
             .note(.noLiveSession),
         ])
         // Empty text does nothing at all.
-        let empty = await rig.home.submit(" \n ", viaVoice: false)
+        let empty = await rig.home.submit(" \n ", to: rig.home.messageTarget, viaVoice: false)
         XCTAssertEqual(empty, .empty)
         XCTAssertEqual(rig.home.entries.count, 2)
     }
@@ -138,7 +138,7 @@ final class HomeModelTests: XCTestCase {
             (.other("rate_limited"), .failed),
         ] {
             await mac.setSendOutcome(outcome)
-            _ = await rig.home.submit("Thử lại", viaVoice: false)
+            _ = await rig.home.submit("Thử lại", to: rig.home.messageTarget, viaVoice: false)
             XCTAssertEqual(notes(rig.home).last, .sendFailed(s1, failure), "\(outcome)")
         }
 
@@ -552,7 +552,7 @@ final class HomeModelTests: XCTestCase {
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
 
-        _ = await rig.home.submit("Lần một", viaVoice: false)
+        _ = await rig.home.submit("Lần một", to: rig.home.messageTarget, viaVoice: false)
         // Written 0.5 s after the last change, not before.
         let waiting = await eventually { rig.timers.waiting == [HomeModel.saveDelay] }
         XCTAssertTrue(waiting, "\(rig.timers.waiting)")
@@ -563,7 +563,7 @@ final class HomeModelTests: XCTestCase {
         XCTAssertTrue(saved)
 
         // The app goes to the background: written at once.
-        _ = await rig.home.submit("Lần hai", viaVoice: true)
+        _ = await rig.home.submit("Lần hai", to: rig.home.messageTarget, viaVoice: true)
         await rig.home.flush()
         let reopened = await rig.reopened()
         XCTAssertEqual(reopened.entries, rig.home.entries)
@@ -572,7 +572,7 @@ final class HomeModelTests: XCTestCase {
 
         // After a sign-out wipe, this account's model can no longer write.
         try await rig.store.wipe()
-        _ = await rig.home.submit("Sau khi đăng xuất", viaVoice: false)
+        _ = await rig.home.submit("Sau khi đăng xuất", to: rig.home.messageTarget, viaVoice: false)
         await rig.home.flush()
         let afterWipe = await rig.stored()
         XCTAssertNil(afterWipe)
@@ -585,7 +585,7 @@ final class HomeModelTests: XCTestCase {
             [mac], in: self, seed: { await $0.writer().save(stored, to: .home) }, loads: false)
 
         // A message before the stored timeline is read: there is no writer yet, so nothing is saved.
-        _ = await rig.home.submit("Trước khi tải xong", viaVoice: false)
+        _ = await rig.home.submit("Trước khi tải xong", to: rig.home.messageTarget, viaVoice: false)
         XCTAssertEqual(rig.home.entries.count, 2)
         await rig.home.flush()
 
@@ -622,7 +622,7 @@ final class HomeModelTests: XCTestCase {
         XCTAssertTrue(synced)
 
         // A message and its note: 2001, so the oldest goes.
-        _ = await rig.home.submit("Thêm một", viaVoice: false)
+        _ = await rig.home.submit("Thêm một", to: rig.home.messageTarget, viaVoice: false)
 
         XCTAssertEqual(rig.home.entries.count, HomeModel.maxEntries)
         XCTAssertEqual(rig.home.entries.first?.id, "e1")

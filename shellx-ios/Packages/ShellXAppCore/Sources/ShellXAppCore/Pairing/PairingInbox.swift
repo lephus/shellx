@@ -29,8 +29,11 @@ public final class PairingInbox {
         return held
     }
 
-    /// Seam for the final-review regression tests; the fix fills it in.
+    /// The waiting link, once, when the pairing sheet can show: while another sheet is up (an
+    /// answer being typed, a plan being read) it stays here and nil is returned. The caller asks
+    /// again when that sheet closes.
     public func take(over sheets: SheetPresence) -> String? {
-        take()
+        guard !sheets.isAnyOpen else { return nil }
+        return take()
     }
 }

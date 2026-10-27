@@ -31,12 +31,16 @@ extension HomeNote {
         }
     }
 
-    /// The note for a `chat.send` that threw: an offline Mac (nothing was sent) names itself; any
-    /// other error leaves it unknown whether the message arrived.
+    /// The note for a `chat.send` that threw: an offline Mac, or one that must be paired again
+    /// (nothing was sent), names itself; any other error leaves it unknown whether the message
+    /// arrived.
     init(sendError: any Error, to ref: SessionRef) {
-        if case let LinkCallError.offline(machineName) = sendError {
+        switch sendError {
+        case let LinkCallError.offline(machineName):
             self = .machineOffline(machineName: machineName)
-        } else {
+        case let LinkCallError.needsPairing(machineName):
+            self = .machineNeedsPairing(machineName: machineName)
+        default:
             self = .sendFailed(ref, .noAnswer)
         }
     }

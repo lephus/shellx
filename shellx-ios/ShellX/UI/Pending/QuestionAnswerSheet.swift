@@ -306,7 +306,7 @@ struct QuestionAnswerSheet: View {
             }
             PendingCardStatusLine(
                 status: state.shownStatus, actionable: state.actionable, machineName: item.machineName,
-                retry: sendDraft)
+                linkNote: state.linkNote, retry: sendDraft)
             if tooLong, !state.handledElsewhere {
                 Label {
                     Text(LocalizedStringResource("pending.question.tooLong"))

@@ -13,11 +13,20 @@ import SwiftUI
 /// The text is checked as it changes (`ComposerValidation`): past 16 384 bytes the bar says "Too
 /// long" and the button stays off, so nothing that long ever leaves the phone. A dictation stops at
 /// that limit by itself; its words then go into the field to be read before sending.
+///
+/// `onBegin` and `onEnd` tell the home when a message starts (the mic pressed, the field focused)
+/// and when it is dropped (released with nothing said, the keyboard closed with the field empty),
+/// so it goes to the session the chip showed when it started.
 struct ComposerBar<Accessory: View>: View {
     @Binding var text: String
     let send: (String) -> Void
     /// Sends what was said (the home marks it as said by voice); nil uses `send`.
     let sendVoice: ((String) -> Void)?
+    /// A message started: the mic was pressed, or the field got focus.
+    let onBegin: (() -> Void)?
+    /// The message was dropped: the mic released with nothing to send while the field is empty and
+    /// unfocused, the keyboard closed with the field empty, or the bar went away empty.
+    let onEnd: (() -> Void)?
     let accessory: Accessory
     /// The dictation for render tests; otherwise one is made from the environment's `VoiceService`.
     private let injectedVoice: VoiceInputModel?
@@ -33,11 +42,14 @@ struct ComposerBar<Accessory: View>: View {
 
     init(
         text: Binding<String>, send: @escaping (String) -> Void, sendVoice: ((String) -> Void)? = nil,
-        voice: VoiceInputModel? = nil, @ViewBuilder accessory: () -> Accessory
+        onBegin: (() -> Void)? = nil, onEnd: (() -> Void)? = nil, voice: VoiceInputModel? = nil,
+        @ViewBuilder accessory: () -> Accessory
     ) {
         _text = text
         self.send = send
         self.sendVoice = sendVoice
+        self.onBegin = onBegin
+        self.onEnd = onEnd
         injectedVoice = voice
         self.accessory = accessory()
     }
@@ -81,10 +93,12 @@ struct ComposerBar<Accessory: View>: View {
         .onAppear {
             if injectedVoice == nil, ownVoice == nil { ownVoice = voiceService?.makeModel() }
         }
-        // Another screen covers this one: the microphone never stays on behind it.
+        // Another screen covers this one: the microphone never stays on behind it, and a message
+        // that holds no text is over.
         .onDisappear {
             let voice = self.voice
             Task { await voice?.cancel() }
+            if text.isEmpty { onEnd?() }
         }
         .onChange(of: voice?.wantsKeyboard ?? false, initial: true) { _, wants in
             guard wants else { return }
@@ -92,8 +106,13 @@ struct ComposerBar<Accessory: View>: View {
             openKeyboard()
         }
         .onChange(of: focused) { _, isFocused in
-            // The keyboard went away with nothing typed: back to the mic.
-            if !isFocused, text.isEmpty { typing = false }
+            if isFocused {
+                onBegin?()
+            } else if text.isEmpty {
+                // The keyboard went away with nothing typed: back to the mic, and no message.
+                typing = false
+                onEnd?()
+            }
         }
         .onChange(of: text) { _, newText in
             guard !newText.isEmpty, let voice else { return }
@@ -137,7 +156,13 @@ struct ComposerBar<Accessory: View>: View {
     /// The mic in the middle, the keyboard button at the trailing edge, the hint below.
     private func micRow(_ voice: VoiceInputModel) -> some View {
         VStack(spacing: 4) {
-            MicButton(model: voice, label: LocalizedStringResource("voice.mic"), onOutcome: said, onKeyboard: openKeyboard)
+            MicButton(
+                model: voice, label: LocalizedStringResource("voice.mic"), onOutcome: said, onKeyboard: openKeyboard,
+                onPress: onBegin,
+                onNothing: {
+                    // Swiping up to type keeps the message (and where it goes) for the keyboard.
+                    if !focused, !typing, text.isEmpty { onEnd?() }
+                })
                 .frame(maxWidth: .infinity)
                 .overlay(alignment: .trailing) {
                     Button(action: openKeyboard) {
@@ -206,8 +231,10 @@ extension ComposerValidation {
 extension ComposerBar where Accessory == EmptyView {
     init(
         text: Binding<String>, send: @escaping (String) -> Void, sendVoice: ((String) -> Void)? = nil,
-        voice: VoiceInputModel? = nil
+        onBegin: (() -> Void)? = nil, onEnd: (() -> Void)? = nil, voice: VoiceInputModel? = nil
     ) {
-        self.init(text: text, send: send, sendVoice: sendVoice, voice: voice) { EmptyView() }
+        self.init(text: text, send: send, sendVoice: sendVoice, onBegin: onBegin, onEnd: onEnd, voice: voice) {
+            EmptyView()
+        }
     }
 }

@@ -6,10 +6,17 @@ import ShellXLinkCore
 /// canned notes about it, kept on the phone; which running session the composer sends to; and the
 /// live sessions' status rows.
 ///
-/// `submit(_:viaVoice:)` sends to one running session and notes the outcome. `run()` watches the hub
-/// and notes each session that finishes a turn, with the first line of its final reply: it waits
-/// `finishSettle`, reads the history, and keeps the note up to date for `finishFollow` (the Mac may
-/// report idle before its transcript has the reply). Every change is written to the store at most
+/// A message goes to the session the "Send to:" chip showed when it began (`beginMessage()`: the
+/// mic pressed, the field focused), not to whichever session is the target when it is sent: with
+/// several agents running, another one can become the newest while the user talks.
+/// `submit(_:to:viaVoice:)` sends to that one session and notes the outcome; when it no longer runs,
+/// or its Mac cannot take it, the note says so and nothing goes elsewhere.
+///
+/// `run()` watches the hub and notes each session that finishes a turn, with the first line of its
+/// final reply: it waits `finishSettle`, reads the history, and keeps the note up to date for
+/// `finishFollow` (the Mac may report idle before its transcript has the reply). It also drops a
+/// session's stored chat copy when the Mac resets its transcript (`chat.reset`, PROTOCOL.md section
+/// 4), whether or not an agent screen follows that session. Every change is written to the store at most
 /// `saveDelay` after the last one, and at once by `flush()` (the app calls it when it goes to the
 /// background). Writes use the store writer of the account that loaded the model, so nothing is
 /// written after a sign-out wipe.
@@ -27,12 +34,19 @@ public final class HomeModel {
     static let summaryLength = 140
 
     public private(set) var entries: [HomeEntry] = []
-    /// The session the user picked in the composer; nil leaves it to `effectiveTarget`.
-    public var target: SessionRef?
+    /// The session the user picked in the composer; nil leaves it to `effectiveTarget`. A pick while
+    /// a message is under way moves that message too.
+    public var target: SessionRef? {
+        didSet { if composing { held = effectiveTarget } }
+    }
     /// True once `load()` read the stored timeline.
     public private(set) var isLoaded = false
     /// The session the last message went to.
     private var lastUsed: SessionRef?
+    /// A message is under way (`beginMessage()` until `endMessage()`).
+    private var composing = false
+    /// Where the message under way goes: what the chip showed when it began.
+    private var held: SessionRef?
 
     /// An agent reply: its first line, and where it stands in the transcript.
     private struct AgentLine {
@@ -156,6 +170,7 @@ public final class HomeModel {
                 // note still following the session stops (its seq marks no longer compare).
                 lastAgentLines[ref] = nil
                 stopFollowing(ref)
+                dropStoredThread(ref)
             }
         }
     }
@@ -168,35 +183,46 @@ public final class HomeModel {
 
     // MARK: - Sending
 
-    /// Seams for the final-review regression tests; the fix fills them in.
-    public var messageTarget: SessionRef? { effectiveTarget }
-    public func beginMessage() {}
-    public func endMessage() {}
-    public func submit(_ text: String, to target: SessionRef?, viaVoice: Bool) async -> ComposerValidation {
-        await submit(text, viaVoice: viaVoice)
+    /// What the "Send to:" chip shows, and where the message under way goes: while one is under way,
+    /// the session the chip showed when it began; otherwise `effectiveTarget`.
+    public var messageTarget: SessionRef? {
+        composing ? held : effectiveTarget
     }
 
-    /// Sends `text` to `effectiveTarget` and notes what happened (D7, spec section 7.5):
+    /// A message began (the mic pressed, the field focused): it goes to the session the chip shows
+    /// now, even if another session becomes the newest before it is sent. Does nothing while one is
+    /// already under way (the keyboard opened from a dictation keeps the dictation's target).
+    public func beginMessage() {
+        guard !composing else { return }
+        composing = true
+        held = effectiveTarget
+    }
+
+    /// The message under way was sent or dropped: the chip follows `effectiveTarget` again.
+    public func endMessage() {
+        composing = false
+        held = nil
+    }
+
+    /// Sends `text` to `target`, the session the chip showed when the message began
+    /// (`messageTarget`, read by the caller when the user sends), and notes what happened (D7, spec
+    /// section 7.5):
     /// - empty: nothing; too long: nothing is sent or noted, the result says so;
-    /// - otherwise the message is added, then one note: no target (the default Mac offline, or no
-    ///   running session), the target's Mac offline (nothing sent or queued), or the Mac's answer.
+    /// - otherwise the message is added, then one note: no target (the default Mac offline or to be
+    ///   paired again, or no running session); the target's Mac offline or to be paired again, or the
+    ///   session no longer running (nothing sent, queued, or sent elsewhere); or the Mac's answer.
     /// The target becomes the session last messaged.
-    public func submit(_ text: String, viaVoice: Bool) async -> ComposerValidation {
+    public func submit(_ text: String, to target: SessionRef?, viaVoice: Bool) async -> ComposerValidation {
         let validation = ComposerValidation(text)
         guard case let .ok(message) = validation else { return validation }
-        let target = effectiveTarget
         append(.userSaid(text: message, target: target, viaVoice: viaVoice))
         guard let target else {
             append(.note(noTargetNote()))
             return validation
         }
         lastUsed = target
-        guard let machine = hub.machines.first(where: { $0.id == target.machineID }) else {
-            append(.note(.sendFailed(target, .notFound)))
-            return validation
-        }
-        guard machine.state == .online else {
-            append(.note(.machineOffline(machineName: machine.name)))
+        if let blocked = blockedNote(for: target) {
+            append(.note(blocked))
             return validation
         }
         let note: HomeNote
@@ -243,9 +269,24 @@ public final class HomeModel {
         if let id = hub.defaultMachineID, let machine = hub.machines.first(where: { $0.id == id }),
             machine.state != .online
         {
-            return .machineOffline(machineName: machine.name)
+            return machine.state.needsPairing
+                ? .machineNeedsPairing(machineName: machine.name) : .machineOffline(machineName: machine.name)
         }
         return .noLiveSession
+    }
+
+    /// Why nothing can go to `target` now, without asking the Mac; nil when it can be sent.
+    private func blockedNote(for target: SessionRef) -> HomeNote? {
+        guard let machine = hub.machines.first(where: { $0.id == target.machineID }) else {
+            return .sendFailed(target, .notFound)
+        }
+        if machine.state.needsPairing { return .machineNeedsPairing(machineName: machine.name) }
+        guard machine.state == .online else { return .machineOffline(machineName: machine.name) }
+        // The session the message began for stopped meanwhile: say so, never send it elsewhere. A Mac
+        // without a session list (an older ShellX) cannot say; it answers `not_found` itself.
+        guard machine.sessionsSupported else { return nil }
+        guard let session = machine.sessions.session(target.sessionId) else { return .sendFailed(target, .notFound) }
+        return session.state == .ended ? .sendFailed(target, .ended) : nil
     }
 
     /// Adds an entry; returns its id.
@@ -366,6 +407,20 @@ public final class HomeModel {
         }
         if let current = lastAgentLines[ref], !Self.isNewer(newest, than: current) { return }
         lastAgentLines[ref] = newest
+    }
+
+    /// Deletes the session's stored chat copy after a transcript reset, also when no agent screen
+    /// follows the session (ruling P3-R7): opening it later must not merge the old transcript into
+    /// the new one. Through this account's writer, after any write already under way, so nothing is
+    /// deleted after a sign-out wipe. A screen that follows the session drops it too, then saves the
+    /// new transcript; should this delete land after that save, only the cache is lost.
+    private func dropStoredThread(_ ref: SessionRef) {
+        guard let writer else { return }
+        let previous = writing
+        writing = Task {
+            await previous?.value
+            await writer.remove(.thread(ref))
+        }
     }
 
     private func scheduleSave() {

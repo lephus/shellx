@@ -135,7 +135,7 @@ struct PlanReviewSheet: View {
         VStack(spacing: 8) {
             PendingCardStatusLine(
                 status: state.shownStatus, actionable: state.actionable, machineName: item.machineName,
-                retry: resend)
+                linkNote: state.linkNote, retry: resend)
             if state.handledElsewhere {
                 wideButton(LocalizedStringResource("common.close"), primary: true, action: close)
             } else if revising {

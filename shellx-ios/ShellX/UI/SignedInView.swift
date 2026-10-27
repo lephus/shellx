@@ -49,6 +49,8 @@ struct SignedInView: View {
         }
         // Every mic below (the composers, the question and plan sheets) and Settings › Voice.
         .environment(scope.voice)
+        // Every pending sheet below counts itself here.
+        .environment(scope.sheets)
         .sheet(isPresented: $showsPairing, onDismiss: { scope.pairing.cancel() }) {
             PairingSheet(model: scope.pairing, close: { showsPairing = false })
         }
@@ -57,6 +59,10 @@ struct SignedInView: View {
             scope.decisions.sync(hub.pendingItems)
         }
         .onChange(of: inbox.hasLink) { takeLink() }
+        // A link that came while a pending sheet was up shows once the last one closed.
+        .onChange(of: scope.sheets.isAnyOpen) { _, open in
+            if !open { takeLink() }
+        }
         // The center follows the hub's whole list here, outside any body; the cards only read it.
         .onChange(of: hub.pendingItems) { _, items in scope.decisions.sync(items) }
         .task { await scope.home.run() }
@@ -72,9 +78,11 @@ struct SignedInView: View {
         showsPairing = true
     }
 
-    /// A link opened from elsewhere goes to the confirmation step, never straight to pairing.
+    /// A link opened from elsewhere goes to the confirmation step, never straight to pairing. While
+    /// a pending sheet is up the link waits in the inbox: the pairing sheet cannot show over it, and
+    /// closing it would lose an answer being typed.
     private func takeLink() {
-        guard let uri = inbox.take() else { return }
+        guard let uri = inbox.take(over: scope.sheets) else { return }
         scope.pairing.begin(uri: uri)
         showsPairing = true
     }

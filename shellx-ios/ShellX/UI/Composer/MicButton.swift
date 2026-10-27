@@ -21,6 +21,11 @@ struct MicButton: View {
     let onOutcome: (DictationOutcome) -> Void
     /// Opens the keyboard ("Type instead"); nil hides that action.
     var onKeyboard: (() -> Void)?
+    /// Listening was asked for (a press, or VoiceOver's first tap), before the recognizer starts.
+    var onPress: (() -> Void)?
+    /// Released with nothing to send: nothing was said, the dictation was cancelled, or the mic
+    /// could not listen.
+    var onNothing: (() -> Void)?
 
     @GestureState private var holding = false
     @State private var starts = 0
@@ -78,6 +83,7 @@ struct MicButton: View {
     private func start() {
         guard !model.isActive else { return }
         starts += 1
+        onPress?()
         Task { await model.press() }
     }
 
@@ -88,8 +94,9 @@ struct MicButton: View {
                 let outcome = model.outcome(for: text)
                 if case .complete = outcome { sends += 1 }
                 onOutcome(outcome)
-            } else if armed {
-                cancels += 1
+            } else {
+                if armed { cancels += 1 }
+                onNothing?()
             }
         }
     }

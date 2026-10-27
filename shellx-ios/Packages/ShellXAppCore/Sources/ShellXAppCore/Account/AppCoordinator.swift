@@ -103,6 +103,9 @@ public final class AppCoordinator {
     }
 
     /// Removes this iPhone from its Macs and the relay (best effort), then forgets everything local.
+    /// The "local wipe pending" marker is written before anything local is wiped and cleared only
+    /// once every wiper succeeded: if the app dies in between, the vault no longer names an owner, so
+    /// only the marker makes the next launch or sign-in wipe the history.
     public func signOut() async {
         await stopHub()
         let session = try? await vault.session()
@@ -120,14 +123,13 @@ public final class AppCoordinator {
                 log.notice("sign_out_logout_failed")
             }
         }
+        pendingWipeDefaults.set(true, forKey: Self.pendingWipeKey)
         do { try await vault.wipe() } catch {
             log.error("sign_out_wipe_failed")
         }
-        // Sign out regardless; a failed wipe is remembered and retried before anyone signs in.
+        // Sign out regardless; a failed wipe keeps the marker and is retried before anyone signs in.
         if await runWipers() {
             pendingWipeDefaults.removeObject(forKey: Self.pendingWipeKey)
-        } else {
-            pendingWipeDefaults.set(true, forKey: Self.pendingWipeKey)
         }
         phase = .signedOut(expired: false)
     }

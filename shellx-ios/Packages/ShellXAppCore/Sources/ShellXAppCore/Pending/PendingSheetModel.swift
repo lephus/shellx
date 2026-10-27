@@ -8,6 +8,10 @@ import ShellXLinkCore
 /// The sheet stays open while the user reads and types, so the item may be decided elsewhere
 /// meanwhile (on the Mac, on another phone): then `handledElsewhere` turns true and nothing can be
 /// sent any more (Review Focus 2).
+///
+/// An item also leaves the hub's list when its Mac goes offline, removes this iPhone or changes its
+/// key. That is not a decision: the sheet keeps what was typed, sends nothing, and says why
+/// (`linkNote`) until the Mac is back with the item, or its synced list shows it was decided.
 @MainActor @Observable
 public final class PendingSheetModel {
     /// Why nothing can be sent from the sheet right now, while its item was not handled elsewhere.
@@ -56,19 +60,44 @@ public final class PendingSheetModel {
         current?.actionable ?? false
     }
 
-    /// The item was decided without this sheet: it left the pending set while this sheet had sent
-    /// nothing (or only a send that failed), or the Mac answered `already_handled`.
+    /// The item was decided without this sheet: while this sheet had sent nothing (or only a send
+    /// that failed), it left the Mac's list while the Mac was live and synced, or the Mac's synced
+    /// list no longer has it; or the Mac answered `already_handled`. An item dropped because the
+    /// link went down does not count.
     public var handledElsewhere: Bool {
         if sending { return false }
         switch status {
         case .handledElsewhere: return true
         case .sending, .done: return false
-        case .failed, nil: return current == nil
+        case .failed, nil:
+            guard current == nil else { return false }
+            return hub.leftWhileSynced(key) || macSynced
         }
     }
 
-    /// Seam for the final-review regression tests; the fix fills it in.
-    public var linkNote: LinkNote? { nil }
+    /// Why nothing can be sent while the item is neither sendable nor handled elsewhere; nil when
+    /// the item is live and synced, or was handled elsewhere.
+    public var linkNote: LinkNote? {
+        guard !actionable, !handledElsewhere else { return nil }
+        guard let machine else { return .needsPairing }
+        switch machine.state {
+        case .revoked, .hostKeyChanged: return .needsPairing
+        case .needsUpdate: return .needsUpdate
+        case .offline: return .offline
+        case .connecting, .reconnecting, .online: return .reconnecting
+        }
+    }
+
+    /// The item's Mac; nil once it is no longer paired.
+    private var machine: MachineModel? {
+        hub.machines.first { $0.id == key.machineID }
+    }
+
+    /// The Mac's pending list is live and synced: an item missing from it is no longer pending there.
+    private var macSynced: Bool {
+        guard let machine else { return false }
+        return machine.state == .online && machine.pendingActionable
+    }
 
     /// The send buttons are on: the item is pending and synced, and nothing is out or taken yet.
     public var canSend: Bool {

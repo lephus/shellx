@@ -164,7 +164,10 @@ struct HomeScreen: View {
     // MARK: - Composer
 
     private var composer: some View {
-        ComposerBar(text: $draft, send: actions.send, sendVoice: actions.sendVoice) {
+        ComposerBar(
+            text: $draft, send: actions.send, sendVoice: actions.sendVoice, onBegin: actions.beginMessage,
+            onEnd: actions.endMessage
+        ) {
             TargetPicker(current: target, picked: pickedTarget, sessions: sessions, choose: actions.choose)
         }
     }

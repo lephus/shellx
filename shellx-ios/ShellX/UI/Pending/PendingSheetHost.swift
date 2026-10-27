@@ -2,10 +2,13 @@ import ShellXAppCore
 import SwiftUI
 
 /// The sheet over the pending cards, fed by its `PendingSheetModel`: it closes once its own
-/// decision is taken, and tells VoiceOver when the item was decided elsewhere meanwhile.
+/// decision is taken, and tells VoiceOver when the item was decided elsewhere meanwhile. While it is
+/// up it counts in the environment's `SheetPresence`, so a pairing link opened meanwhile waits.
 struct PendingSheetHost: View {
     let route: PendingRoute
     let close: () -> Void
+
+    @Environment(SheetPresence.self) private var sheets: SheetPresence?
 
     private var model: PendingSheetModel { route.model }
 
@@ -30,6 +33,8 @@ struct PendingSheetHost: View {
             guard handled else { return }
             AccessibilityNotification.Announcement(String(localized: "pending.status.handledElsewhere")).post()
         }
+        .onAppear { sheets?.opened() }
+        .onDisappear { sheets?.closed() }
     }
 
     private func send(_ decision: LinkDecision) {

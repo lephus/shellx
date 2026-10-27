@@ -2557,6 +2557,24 @@
         }
       }
     },
+    "pending.status.needsPairing %@": {
+      "comment": "Under an open question or plan: nothing can be sent because the Mac removed this iPhone or its key changed. The argument is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ needs to be paired again · Not sent"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cần ghép cặp lại %@ · Chưa gửi"
+          }
+        }
+      }
+    },
     "pending.status.noAnswer": {
       "comment": "The Mac did not answer a decision in time.",
       "extractionState": "manual",

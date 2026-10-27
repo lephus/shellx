@@ -143,21 +143,20 @@ final class PendingCardRenderTests: XCTestCase {
             false, "no retry while reconnecting")
     }
 
-    func testPermissionLayoutKeepsAllowAndDenyInTheRow() {
-        let all = PendingCardView.PermissionLayout([.allowOnce, .deny, .allowAlways, .allowAllTools])
-        XCTAssertEqual(all.buttons, [.deny, .allowOnce])
-        XCTAssertEqual(all.menu, [.allowAlways, .allowAllTools])
-        XCTAssertEqual(PendingCardView.PermissionLayout([.deny]).buttons, [.deny])
-        XCTAssertEqual(PendingCardView.PermissionLayout([.deny]).menu, [])
-    }
-
-    func testLastingGrantIsNeverTheOneTapButton() {
-        let noOnce = PendingCardView.PermissionLayout([.deny, .allowAlways, .allowAllTools])
-        XCTAssertEqual(noOnce.buttons, [.deny], "without Allow (once) the row has Deny only")
-        XCTAssertEqual(noOnce.menu, [.allowAlways, .allowAllTools], "lasting grants stay one step away")
-        let alwaysOnly = PendingCardView.PermissionLayout([.allowAlways])
-        XCTAssertEqual(alwaysOnly.buttons, [])
-        XCTAssertEqual(alwaysOnly.menu, [.allowAlways])
+    /// An open sheet whose item went because the Mac went offline or removed this iPhone says so, not
+    /// "handled elsewhere" or a spinner that never ends (final review, Important 1 and Minor 2).
+    func testSheetLinkNotesSayWhyNothingIsSent() throws {
+        let notes: [PendingSheetModel.LinkNote] = [.reconnecting, .offline, .needsPairing, .needsUpdate]
+        let lines = try notes.map {
+            try XCTUnwrap(PendingCardStatusLine.line(status: nil, actionable: false, machineName: "Studio", linkNote: $0))
+        }
+        XCTAssertEqual(Set(lines.map(\.text)).count, 4)
+        XCTAssertEqual(lines[0], PendingCardStatusLine.line(status: nil, actionable: false, machineName: "Studio"))
+        XCTAssertEqual(lines[1], PendingCardStatusLine.line(status: .failed(.offline), actionable: true, machineName: "Studio"))
+        XCTAssertTrue(lines[2].text.contains("Studio"), "names the Mac to pair again")
+        let handled = PendingCardStatusLine.line(status: .handledElsewhere, actionable: false, machineName: "Studio")
+        XCTAssertFalse(lines.contains { $0 == handled }, "never says handled elsewhere")
+        XCTAssertNil(PendingCardStatusLine.line(status: nil, actionable: true, machineName: "Studio", linkNote: .offline))
     }
 
     func testHeadlineNamesWorkspaceAgentMacAndKind() {
@@ -281,6 +280,13 @@ final class PendingCardRenderTests: XCTestCase {
                 state: PendingSheetState(canSend: false, actionable: false), send: { _ in }, close: {}, draft: draft,
                 page: 1),
             name: "pending-question-reconnecting")
+        // The Mac went offline with the answer typed: the answer stays, Send is off, the line says why.
+        try assertRenders(
+            QuestionAnswerSheet(
+                item: Self.mac(Self.question, actionable: false),
+                state: PendingSheetState(canSend: false, actionable: false, linkNote: .offline), send: { _ in },
+                close: {}, draft: draft, page: 1),
+            name: "pending-question-offline")
     }
 
     func testPlanSheetRenders() throws {
@@ -297,6 +303,12 @@ final class PendingCardRenderTests: XCTestCase {
                 item: item, state: PendingSheetState(status: .handledElsewhere, canSend: false), send: { _ in },
                 close: {}),
             name: "pending-plan-handled")
+        try assertRenders(
+            PlanReviewSheet(
+                item: Self.mac(Self.plan(), actionable: false),
+                state: PendingSheetState(canSend: false, actionable: false, linkNote: .needsPairing), send: { _ in },
+                close: {}),
+            name: "pending-plan-needs-pairing")
         try assertRenders(
             PlanReviewSheet(
                 item: Self.mac(Self.plan(nil, modes: ["manual", "deny"])), state: PendingSheetState(status: .sending, canSend: false),

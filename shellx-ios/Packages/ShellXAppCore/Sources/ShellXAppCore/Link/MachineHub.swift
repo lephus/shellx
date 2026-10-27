@@ -15,11 +15,16 @@ public final class MachineHub {
     /// How long sessions stay open after the app went to the background.
     public static let backgroundGrace: Duration = .seconds(25)
     static let defaultMachineKey = "shellx.defaultMachineID"
+    /// How many items `leftWhileSynced(_:)` remembers; the oldest go first.
+    static let handledMemory = 256
 
     public private(set) var machines: [MachineModel] = []
     /// True once `start()` read the vault, so an empty `machines` means "no Mac paired yet".
     public private(set) var isLoaded = false
     private var storedDefaultMachineID: String?
+    /// Items that left a Mac's list while the Mac was live and synced, newest last
+    /// (`leftWhileSynced(_:)`).
+    private var handledKeys: [PendingKey] = []
 
     @ObservationIgnored private let vault: AccountVault
     @ObservationIgnored private let relay: any RelayAccountCalling
@@ -47,6 +52,8 @@ public final class MachineHub {
     @ObservationIgnored private var suspended = false
     @ObservationIgnored private var grace: Task<Bool, Never>?
     @ObservationIgnored private var unauthorizedReported = false
+    /// Transcript resets (`chat.reset`) per session since the hub started (`transcriptResets(of:)`).
+    @ObservationIgnored private var resetCounts: [SessionRef: Int] = [:]
 
     public init(
         vault: AccountVault, relay: any RelayAccountCalling, connector: any MachineLinkConnecting,
@@ -87,6 +94,20 @@ public final class MachineHub {
             }
         }
         .sorted { ($0.item.createdAtMs, $0.machineID, $0.item.requestId) < ($1.item.createdAtMs, $1.machineID, $1.item.requestId) }
+    }
+
+    /// True when the item left its Mac's list while the Mac was live and synced: the Mac's own list
+    /// said it is no longer pending, so it was decided (on the Mac, another phone, or by the agent).
+    /// Items dropped because the link went down, or the Mac removed this iPhone, are not.
+    public func leftWhileSynced(_ key: PendingKey) -> Bool {
+        handledKeys.contains(key)
+    }
+
+    /// How many times the session's transcript was reset (`chat.reset`) since the hub started,
+    /// counted as each reset arrives, before any subscriber sees it. A screen that stopped following
+    /// the chat compares it when it follows again: a reset it missed voids its copy.
+    public func transcriptResets(of ref: SessionRef) -> Int {
+        resetCounts[ref, default: 0]
     }
 
     /// Every session that has not ended, on every Mac, most recent activity first. An offline Mac's
@@ -395,6 +416,7 @@ public final class MachineHub {
                 if case .terminated = continuation.yield((model.id, state)) { stateSubscribers[id] = nil }
             }
         case let .pending(set, actionable):
+            if actionable { rememberHandled(leaving: model.pending, for: set, of: model) }
             model.pending = set
             model.pendingActionable = actionable
         case let .sessions(set, supported):
@@ -406,10 +428,20 @@ public final class MachineHub {
         case let .chat(sessionId, entries):
             publishChat(sessionId, of: model) { .upsert($0, entries) }
         case let .chatReset(sessionId):
+            resetCounts[SessionRef(machineID: model.id, sessionId: sessionId, agent: "", workspaceTitle: ""), default: 0] += 1
             publishChat(sessionId, of: model) { .reset($0) }
         case .signedOut:
             Task { await self.reportUnauthorized() }
         }
+    }
+
+    /// Records the items that leave `old` for `new`, a list backed by a live, synced session.
+    private func rememberHandled(leaving old: PendingSet, for new: PendingSet, of model: MachineModel) {
+        let kept = Set(new.items.map(\.requestId))
+        let left = old.items.filter { !kept.contains($0.requestId) }
+        guard !left.isEmpty else { return }
+        handledKeys.append(contentsOf: left.map { PendingKey(machineID: model.id, requestId: $0.requestId) })
+        if handledKeys.count > Self.handledMemory { handledKeys.removeFirst(handledKeys.count - Self.handledMemory) }
     }
 
     /// Hands a chat push to every subscriber, with the session's labels as the Mac lists it.
@@ -492,6 +524,8 @@ public final class MachineHub {
         _ machineID: String, _ body: @Sendable (LinkClient) async throws -> T
     ) async throws -> T {
         guard let model = machines.first(where: { $0.id == machineID }) else { throw LinkCallError.unknownMachine }
+        // It will not come back by itself, so it is not called offline.
+        guard !model.state.needsPairing else { throw LinkCallError.needsPairing(machineName: model.name) }
         guard let connection = connections[machineID] else { throw LinkCallError.offline(machineName: model.name) }
         do {
             return try await connection.call(body)

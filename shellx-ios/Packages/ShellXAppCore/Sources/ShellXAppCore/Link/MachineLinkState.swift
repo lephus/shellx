@@ -19,10 +19,14 @@ public enum MachineLinkState: Equatable, Sendable {
 
     /// False for a Mac that removed this iPhone or whose key changed: it cannot take messages until
     /// it is paired again, so it is not offered as the default Mac.
-    public var canBeDefault: Bool {
+    public var canBeDefault: Bool { !needsPairing }
+
+    /// True for a Mac that removed this iPhone or whose key changed: nothing reaches it until it is
+    /// paired again, and it will not come back by itself, so the app never calls it offline.
+    public var needsPairing: Bool {
         switch self {
-        case .revoked, .hostKeyChanged: return false
-        case .connecting, .online, .reconnecting, .offline, .needsUpdate: return true
+        case .revoked, .hostKeyChanged: return true
+        case .connecting, .online, .reconnecting, .offline, .needsUpdate: return false
         }
     }
 
