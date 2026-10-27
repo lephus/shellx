@@ -30,7 +30,7 @@ enum Account {
         let offer = try PairingOffer(uri: uri)
         let session = try state.loadSession()
         let key = try state.loadKey()
-        Log.line("pairing with \"\(Log.shown(offer.machineName))\" (machine \(offer.machineID))")
+        Log.line("pairing with \"\(Log.shown(offer.machineName))\" (machine \(Log.shown(offer.machineID)))")
         let started = ContinuousClock.now
         let machine = try await PhonePairing.pair(
             offerURI: uri, clientKey: key.publicKey, api: try session.relayAPI(), token: session.token,
@@ -43,7 +43,8 @@ enum Account {
         try state.saveMachines(machines)
         Log.line(
             "paired with \"\(Log.shown(machine.name))\" after \(Stats.format(Stats.ms(ContinuousClock.now - started))) ms:"
-                + " machine \(machine.machineID) slot \(machine.linkSlot) host key \(fingerprint(machine.hostKey))")
+                + " machine \(Log.shown(machine.machineID)) slot \(Log.shown(machine.linkSlot))"
+                + " host key \(fingerprint(machine.hostKey))")
     }
 
     /// The machines the relay lists for this phone, next to what this state directory pinned.
@@ -66,7 +67,7 @@ enum Account {
                     + " online=\(machine.online) slot=\(Log.shown(machine.linkSlot)) \(pin)")
         }
         for machine in pinned where !listed.contains(where: { $0.machineID == machine.machineID }) {
-            print("    \(machine.machineID) \"\(Log.shown(machine.name))\" pinned here, but the relay has no grant (removed?)")
+            print("    \(Log.shown(machine.machineID)) \"\(Log.shown(machine.name))\" pinned here, but the relay has no grant (removed?)")
         }
     }
 

@@ -159,8 +159,9 @@ Môi trường, tất cả trên một Mac, loopback, như Spike P1 với các �
 Các lệnh (`p` là probe, `S` là `--state phone`):
 
 ```bash
+umask 077   # redirect thường tạo file 0644: probe từ chối offer.txt như vậy, và file password cũng phải 0600
 $p login $S --api http://127.0.0.1:8787 --email <tài khoản dùng một lần> --password-stdin < password
-CMUX_TAG=link scripts/cmux-debug-cli.sh rpc shellx.link.debug_pairing_offer '{}' > offer.txt   # file 0600
+CMUX_TAG=link scripts/cmux-debug-cli.sh rpc shellx.link.debug_pairing_offer '{}' > offer.txt
 $p pair $S --offer-file offer.txt
 CMUX_TAG=link scripts/cmux-debug-cli.sh rpc shellx.link.debug_pairing_approve '{"pairing_id":"<id probe in ra>"}'
 $p watch $S --seconds 3600
@@ -240,7 +241,7 @@ watch (chạy lại, machines.json chép lại từ bản sao): shellx-link-prob
 
 Màn hình Claude sau `approve` ghi `⎿ Allowed by PermissionRequest hook`, và file được tạo. Sau câu trả lời tự do, Claude tạo `gamma-free-text.txt`. Sau plan, `README.md` có thêm dòng `planned`. Sau `chat-stop`, Claude dừng trước khi viết chữ nào, và prompt quay lại ô nhập.
 
-Ở bước gỡ, phiên `watch` kết thúc 4 ms sau dòng log của Mac. Vé xin trước lúc gỡ vẫn qua được relay, nhưng Mac từ chối handshake. Vé mới thì relay từ chối (`not_granted`). Sau đó danh sách tin cậy của Mac rỗng (`{"phones":[],"version":2}`). Phiên `watch` đầu tiên sống 1123 s, qua nhiều lần vé hết hạn và host đăng ký lại. Nó nhận đủ 200 `agent.changed` của hai lần bench, không có khoảng hở `revision`, và cũng kết thúc khi Mac gỡ điện thoại.
+Ở bước gỡ, phiên `watch` kết thúc 4 ms sau dòng log của Mac. Với vé xin trước lúc gỡ, relay không trả lỗi nào, nhưng circuit bị đóng giữa handshake (`the relay circuit closed`). Nhiều khả năng Mac đã từ chối khoá của điện thoại; log của Mac không ghi lần từ chối này. Vé mới thì relay từ chối (`not_granted`). Sau đó danh sách tin cậy của Mac rỗng (`{"phones":[],"version":2}`). Phiên `watch` đầu tiên sống 1123 s, qua nhiều lần vé hết hạn và host đăng ký lại. Nó nhận đủ 200 `agent.changed` của hai lần bench, không có khoảng hở `revision`, và cũng kết thúc khi Mac gỡ điện thoại.
 
 ### Bench local, 50 yêu cầu
 
@@ -252,7 +253,14 @@ Cách đo như Spike P1, nhưng phiên dùng vé do probe tự xin.
 | `agent.reply` → `agent.reply.result` (round trip) | 3.5 / 4.6 / 5.1 | 3.4 / 5.8 / 14.6 |
 | gửi `agent.reply` → hook nhận quyết định | 4.1 / 5.7 / 6.7 | 3.7 / 6.6 / 14.7 |
 
-Cả hai lần đều 50/50 ok, không có khoảng hở `revision`, và hook nhận đúng `resolved/once`. Lần 2 có vài mẫu chậm (max 76.4 ms) trong lúc Mac còn chạy phiên Claude và các app khác. Trong 22 lần mở phiên có ghi lại, 21 lần mất 13.9–30.3 ms và một lần 106.1 ms. Con số này gồm xin vé HTTP, mở circuit, Noise và `hello`/`welcome`. Số P2 ngang P1.
+Cả hai lần đều 50/50 ok, không có khoảng hở `revision`, và hook nhận đúng `resolved/once`. Lần 2 có vài mẫu chậm (max 76.4 ms), chưa rõ vì sao. Tôi đoán là Mac đang bận việc khác, nhưng chưa kiểm. Trong 22 lần mở phiên có ghi lại, 21 lần mất 13.9–30.3 ms và một lần 106.1 ms. Con số này gồm xin vé HTTP, mở circuit, Noise và `hello`/`welcome`.
+
+Số P1 để đối chiếu (mục "Bench 50 yêu cầu" của Spike P1), p95 của lần 1 và lần 2:
+- hook → `agent.changed`: 12.9 và 13.1 ms;
+- round trip: 3.6 và 3.6 ms;
+- `agent.reply` → hook: 5.1 và 5.7 ms.
+
+Mở phiên ở P1 gồm circuit 8.7–20.8 ms cộng Noise và `hello`/`welcome` 2.6–4.5 ms, chưa có bước xin vé.
 
 Thẻ thật đo từ watch (thời điểm thẻ hiện so với lúc trả lời) không dùng làm số đo, vì tôi trả lời bằng tay. Round trip `agent.reply` của thẻ thật là 9.8–21.4 ms, có một lần 186.3 ms (phiên đó mở mất 106.1 ms). Round trip của `chat.send` là 164–171 ms, vì Mac xoá ô nhập rồi gõ chữ vào terminal.
 
@@ -260,7 +268,7 @@ Thẻ thật đo từ watch (thời điểm thẻ hiện so với lúc trả l�
 
 ### Vấn đề gặp phải
 
-- **Chưa bấm được Gỡ trong sheet.** Tiến trình của agent không có quyền Accessibility (`AXIsProcessTrusted()` = false), và không có lệnh DEBUG nào để gỡ. Vì vậy không bấm được nút, và đường `ShellXPhonePairingCoordinator.revoke` → `revoke(clientKey:)` chưa chạy thật. Bước 8 đã dùng đường khác: relay bỏ grant, rồi lượt đối soát 600 s của Mac gỡ khoá và ngắt phiên. Cần người dùng bấm Gỡ một lần, hoặc thêm `debug_pairing_revoke`.
+- **Chưa bấm được Gỡ trong sheet.** Tiến trình của agent không có quyền Accessibility (`AXIsProcessTrusted()` = false), và không có lệnh DEBUG nào để gỡ. Vì vậy không bấm được nút, và đường `ShellXPhonePairingCoordinator.revoke` → `revoke(clientKey:)` chưa chạy thật. Bước 8 đã dùng đường khác: relay bỏ grant, rồi một lượt đối soát grant của Mac gỡ khoá và ngắt phiên, 22 s sau `unpair` (21:35:30 → 21:35:52.762). Mac không ghi log khi bắt đầu một lượt đối soát, nên không rõ lượt đó do đâu chạy. Thời điểm này trùng với nhịp 600 s tính từ lúc host khởi động (21:15:52), nhưng đó chỉ là suy luận. Cần người dùng bấm Gỡ một lần, hoặc thêm `debug_pairing_revoke`.
 - **`chat.entries` thiếu lượt đầu của phiên mới.** Phiên Claude này mở sau khi điện thoại đã nối. Cả lượt đầu (prompt, `tool_use`, câu trả lời) không có push nào. Push chỉ bắt đầu từ prompt thứ hai, sau lần đọc `chat.history` đầu tiên. `chat.history` vẫn có đủ. Nghi ngờ (chưa xác minh): ở SessionStart và UserPromptSubmit của lượt đầu, `AgentChatTranscriptService` chưa tìm ra file transcript, nên chưa tạo tailer, và không thử lại cho tới prompt sau.
 - **Trạng thái phiên lệch.** Sau khi điện thoại trả lời, phiên vẫn `needs_input` tới hook kế tiếp (PreToolUse hoặc Stop). Có lần lệch 12 s trong khi Claude đang chạy. Sau `chat.interrupt` (Esc), phiên vẫn `working` mãi, vì Claude Code không gọi Stop khi bị ngắt. Lần đo cuối là 252 s sau khi ngắt.
 - **`exit_plan` có `feedback` nghĩa là "sửa plan theo góp ý", bất kể `mode`.** Hook trả `deny` kèm message, nên Claude viết lại plan và hỏi lại. Đây là cách Feed của Mac vốn làm (`CLI/cmux.swift`, nhánh `exit_plan`). App P3 phải coi ô góp ý là "yêu cầu sửa", không phải "duyệt kèm ghi chú". `PROTOCOL.md` nên ghi rõ điều này.

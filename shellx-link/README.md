@@ -15,9 +15,11 @@ swift build --package-path shellx-link
 probe=shellx-link/.build/debug/shellx-link-probe
 state=/private/tmp/phone-state   # outside any repository; created 0700
 
+install -m 600 /dev/null pw.txt   # then write the password into it with an editor
 $probe login --state $state --api https://relay.shellx.pro --email you@example.com --password-stdin < pw.txt
-# On the Mac: right-click "This Mac" > "Pair iPhone…", or in a DEBUG build (keep the file 0600):
-#   CMUX_TAG=<tag> scripts/cmux-debug-cli.sh rpc shellx.link.debug_pairing_offer '{}' > offer.txt
+# On the Mac: right-click "This Mac" > "Pair iPhone…", or in a DEBUG build. The probe refuses an offer
+# file others can read, so create it with umask 077 (a plain redirect makes it 0644):
+#   (umask 077; CMUX_TAG=<tag> scripts/cmux-debug-cli.sh rpc shellx.link.debug_pairing_offer '{}' > offer.txt)
 $probe pair --state $state --offer-file offer.txt   # prints the pairing id; press Allow on the Mac
 #   DEBUG: CMUX_TAG=<tag> scripts/cmux-debug-cli.sh rpc shellx.link.debug_pairing_approve '{"pairing_id":"<id>"}'
 $probe machines --state $state
