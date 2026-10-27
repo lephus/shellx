@@ -209,7 +209,7 @@ has ready-to-copy ones.
 - `workspaceColors.selectionColor` and `workspaceColors.notificationBadgeColor`
   override those colors.
 - `workspaceColors.subtleSelection`: `true` swaps the solid left-rail selection
-  for a light accent tint with a hairline edge. Off by default; ignored with
+  for a light accent tint with a hairline edge. On by default; ignored with
   `solidFill` or a custom `selectionColor`.
 - `workspaceColors.brightenInDarkMode`: workspace colors are lightened in dark
   mode so they stay readable on a dark sidebar. `false` shows them exactly as

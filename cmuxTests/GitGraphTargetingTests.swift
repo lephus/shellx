@@ -242,7 +242,9 @@ final class GitGraphTargetingTests: XCTestCase {
         XCTAssertEqual(recorder.invalidations, 1)
         XCTAssertNil(tracker.pendingInvalidation)
         let durations = await clock.requestedDurations
-        XCTAssertEqual(Set(durations), [.milliseconds(500)])
+        // The quiet period, and the maximum wait the first change started.
+        XCTAssertEqual(Set(durations), [.milliseconds(500), .seconds(2)])
+        XCTAssertNil(tracker.pendingDeadline, "the refresh ends the maximum wait too")
     }
 
     func testHidingDropsAPendingRefreshAndHiddenChangesScheduleNone() async throws {
@@ -269,6 +271,76 @@ final class GitGraphTargetingTests: XCTestCase {
         await clock.open()
         await pending.value
         XCTAssertEqual(recorder.invalidations, 0)
+    }
+
+    /// A sidebar page stays mounted while the sidebar is closed. Switching to a
+    /// terminal in another repository used to reload it there, about 11 git runs
+    /// each time; it now reloads once, when it shows again.
+    func testHiddenPageHoldsRepoChangesUntilShown() async throws {
+        let (a, b) = try makeRepositories()
+        let script = ScriptedWorkTreeRoots([a: [.root(a)], b: [.root(b)]])
+        let controller = GitGraphController(placement: .sidebar, diffOpener: nil)
+        let recorder = EventRecorder(controller)
+        let tracker = GitGraphRepositoryTracker(controller: controller, workTreeRoot: { await script.lookup($0) })
+        tracker.setVisible(true)
+        tracker.setTarget(.directory(a))
+        await tracker.resolutionTask?.value
+        XCTAssertEqual(recorder.changedRoots, [a])
+
+        tracker.setVisible(false)
+        tracker.setTarget(.directory(b))
+        await tracker.resolutionTask?.value
+        tracker.setTarget(.directory(a))
+        await tracker.resolutionTask?.value
+        tracker.setTarget(.directory(b))
+        await tracker.resolutionTask?.value
+        XCTAssertEqual(controller.readyRepositoryRoot, b, "⤢ and the palette still get the new root")
+        XCTAssertEqual(recorder.changedRoots, [a], "a hidden page does not reload")
+
+        tracker.setVisible(true)
+        XCTAssertEqual(recorder.changedRoots, [a, b], "showing the page sends the held change once")
+        XCTAssertEqual(recorder.invalidations, 0, "the held change already reloads the page")
+
+        // Hidden with no repository change: showing refreshes once, as before.
+        tracker.setVisible(false)
+        tracker.setVisible(true)
+        XCTAssertEqual(recorder.changedRoots, [a, b])
+        XCTAssertEqual(recorder.invalidations, 1)
+    }
+
+    /// Each change restarts the quiet period, so changes that never stop (a long
+    /// rebase, a fetch) used to hold the refresh back for as long as they lasted.
+    func testChangesThatNeverGoQuietStillRefreshAfterTheMaximumWait() async throws {
+        let a = try makeDirectory("A")
+        let script = ScriptedWorkTreeRoots([a: [.root(a)]])
+        let clock = DurationGateClock()
+        let controller = GitGraphController(placement: .sidebar, diffOpener: nil)
+        let recorder = EventRecorder(controller)
+        let tracker = GitGraphRepositoryTracker(
+            controller: controller,
+            workTreeRoot: { await script.lookup($0) },
+            refreshClock: clock,
+            refreshQuietPeriod: .milliseconds(500),
+            refreshMaximumWait: .seconds(2)
+        )
+        tracker.setVisible(true)
+        tracker.setTarget(.directory(a))
+        await tracker.resolutionTask?.value
+
+        // The quiet period never ends; only the maximum wait passes.
+        for _ in 0..<5 {
+            tracker.repositoryFilesChanged()
+        }
+        let deadline = try XCTUnwrap(tracker.pendingDeadline, "the first change starts the maximum wait")
+        await clock.open(.seconds(2))
+        await deadline.value
+        XCTAssertEqual(recorder.invalidations, 1)
+        XCTAssertNil(tracker.pendingInvalidation, "the refresh ends the quiet-period wait too")
+        XCTAssertNil(tracker.pendingDeadline)
+
+        // The next change starts a new maximum wait.
+        tracker.repositoryFilesChanged()
+        XCTAssertNotNil(tracker.pendingDeadline)
     }
 
     func testFailedFolderCheckShowsFailureAndRetryWalksAgain() async throws {
@@ -429,6 +501,26 @@ private actor GateClock: FileWatchClock {
             sleeper.resume()
         }
         sleepers.removeAll()
+    }
+}
+
+/// A refresh clock that releases sleeps by their duration, so a test can let the
+/// maximum wait pass while the quiet period never does.
+private actor DurationGateClock: FileWatchClock {
+    private var opened: Set<Duration> = []
+    private var sleepers: [(duration: Duration, continuation: CheckedContinuation<Void, Never>)] = []
+
+    func sleep(for duration: Duration) async throws {
+        guard !opened.contains(duration) else { return }
+        await withCheckedContinuation { sleepers.append((duration, $0)) }
+    }
+
+    func open(_ duration: Duration) {
+        opened.insert(duration)
+        for sleeper in sleepers where sleeper.duration == duration {
+            sleeper.continuation.resume()
+        }
+        sleepers.removeAll { $0.duration == duration }
     }
 }
 

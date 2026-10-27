@@ -78,7 +78,7 @@ struct SidebarAppKitRowCellTests {
         colorSchemeIsDark: Bool = true
     ) -> SidebarWorkspaceRowModel {
         let resolvedSettings = settings
-            ?? SidebarTabItemSettingsSnapshot(defaults: UserDefaults(suiteName: UUID().uuidString)!)
+            ?? SidebarTabItemSettingsSnapshot(defaults: makeDefaults())
         return SidebarWorkspaceRowModel(
             workspaceId: workspaceId,
             index: 0,
@@ -171,8 +171,12 @@ struct SidebarAppKitRowCellTests {
         )
     }
 
+    /// Row tests paint against the solid selection; ShellX turns the subtle
+    /// highlight on by default, so it is pinned off here.
     private static func makeDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "SidebarAppKitRowCellTests.\(UUID().uuidString)")!
+        let defaults = UserDefaults(suiteName: "SidebarAppKitRowCellTests.\(UUID().uuidString)")!
+        defaults.set(false, forKey: SettingCatalog().workspaceColors.subtleSelection.userDefaultsKey)
+        return defaults
     }
 
     static func makeActions(

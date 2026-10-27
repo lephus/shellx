@@ -1,6 +1,7 @@
 import AppKit
 import CmuxFoundation
 import CmuxSettings
+import CmuxSidebar
 import ShellXBrand
 import SwiftUI
 import Testing
@@ -330,8 +331,12 @@ struct ShellXSidebarSelectionTests {
 
     // MARK: Helpers
 
+    /// The ShellX tint replaces the solid selection, so the subtle highlight
+    /// (on by default) is pinned off here.
     private static func makeDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "ShellXSidebarSelectionTests.\(UUID().uuidString)")!
+        let defaults = UserDefaults(suiteName: "ShellXSidebarSelectionTests.\(UUID().uuidString)")!
+        defaults.set(false, forKey: SettingCatalog().workspaceColors.subtleSelection.userDefaultsKey)
+        return defaults
     }
 
     private static func paint(of cell: SidebarWorkspaceRowTableCellView) -> NSColor? {
@@ -441,5 +446,44 @@ struct ShellXSidebarSelectionTests {
             colorSchemeIsDark: true,
             notificationBadgeColorHex: nil
         )
+    }
+}
+
+// ShellX defaults for workspace colors: the subtle selection highlight is on
+// out of the box, and a new workspace starts Purple.
+extension ShellXSidebarSelectionTests {
+    @Test func subtleSelectionIsOnByDefault() throws {
+        let suiteName = "ShellXSidebarSelectionTests.subtle.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        #expect(SidebarTabItemSettingsSnapshot(defaults: defaults).subtleSelection)
+    }
+
+    @Test func newWorkspaceStartsPurple() throws {
+        let manager = TabManager(autoWelcomeIfNeeded: false)
+        let workspace = try #require(manager.addWorkspaceIfActive(select: false))
+
+        #expect(workspace.customColor == WorkspaceTabColorSettings.newWorkspaceColorHex())
+        #expect(WorkspaceTabColorSettings.defaultColorHex(named: "Purple") == "#6A1B9A")
+    }
+}
+
+// ShellX: an agent parked on a background task or wakeup ("Waiting") shows a
+// spinning loader in its status line, not a still hourglass, so it reads as busy.
+extension ShellXSidebarSelectionTests {
+    @Test func waitingStatusLineShowsASpinnerInsteadOfItsIcon() {
+        let line = SidebarRowIconTextLine(frame: NSRect(x: 0, y: 0, width: 200, height: 14))
+        let model = SidebarAppKitRowCellTests.makeModel(isActive: true)
+        let waiting = SidebarStatusEntry(key: "claude_code", value: "Waiting", icon: "hourglass", workState: .waiting)
+        let running = SidebarStatusEntry(key: "claude_code", value: "Running", icon: "bolt.fill", workState: .running)
+
+        line.configureMetadataEntry(waiting, model: model, color: .secondaryLabelColor, onOpenURL: { _ in })
+        #expect(line.showsWaitingSpinner)
+        #expect(!line.showsIconImage)
+
+        line.configureMetadataEntry(running, model: model, color: .secondaryLabelColor, onOpenURL: { _ in })
+        #expect(!line.showsWaitingSpinner)
+        #expect(line.showsIconImage)
     }
 }

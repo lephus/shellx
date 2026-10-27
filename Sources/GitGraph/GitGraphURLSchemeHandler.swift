@@ -1,26 +1,61 @@
 import Foundation
 import WebKit
 
-/// Serves the bundled Git Graph page on `shellx-git-graph://app/`.
-///
-/// The page cannot load from a file URL: WebKit blocks its module scripts there
-/// as cross-origin, and the build deflates them. Each Git Graph web view gets its
-/// own handler. WebKit calls it on the main actor and every ``WKURLSchemeTask``
-/// call stays there; ``GitGraphPageAssets`` reads and inflates files on a
-/// detached task, and a task WebKit stopped is never called again.
-@MainActor
-final class GitGraphURLSchemeHandler: NSObject, WKURLSchemeHandler {
-    nonisolated static let scheme = "shellx-git-graph"
-    nonisolated static let host = "app"
-    nonisolated static let shellPath = "/git-graph.html"
-    /// The page itself: `shellx-git-graph://app/git-graph.html`.
-    nonisolated static var shellURL: URL {
+/// A page in the bundle's `markdown-viewer/webviews-app` folder, served on its own
+/// scheme by ``GitGraphURLSchemeHandler``.
+struct WebviewsAppPage: Equatable, Sendable {
+    let scheme: String
+    let host = "app"
+    /// The page's HTML file, such as `/git-graph.html`.
+    let shellPath: String
+
+    static let gitGraph = WebviewsAppPage(scheme: "shellx-git-graph", shellPath: "/git-graph.html")
+    /// The React agent session renderer.
+    static let agentSession = WebviewsAppPage(scheme: "shellx-agent-session", shellPath: "/agent-session.html")
+
+    /// The page itself, such as `shellx-git-graph://app/git-graph.html`.
+    var shellURL: URL {
         var components = URLComponents()
         components.scheme = scheme
         components.host = host
         components.path = shellPath
         // A literal scheme, host and path always form a URL.
         return components.url!
+    }
+
+    /// True for the page itself and for in-page fragments of it: the scheme, the
+    /// host and ``shellPath``, with no port, credentials or query.
+    func isShellDocument(_ url: URL?) -> Bool {
+        guard let url,
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return false
+        }
+        return components.scheme == scheme
+            && components.host == host
+            && components.port == nil
+            && components.user == nil
+            && components.password == nil
+            && components.percentEncodedPath == shellPath
+            && components.query == nil
+    }
+}
+
+/// Serves a bundled webviews-app page on its own scheme: the Git Graph page on
+/// `shellx-git-graph://app/` and the React agent session on `shellx-agent-session://app/`.
+///
+/// Neither page can load from a file URL: WebKit blocks its module scripts there
+/// as cross-origin, and the build deflates them. Each web view gets its own
+/// handler. WebKit calls it on the main actor and every ``WKURLSchemeTask``
+/// call stays there; ``GitGraphPageAssets`` reads and inflates files on a
+/// detached task, and a task WebKit stopped is never called again.
+@MainActor
+final class GitGraphURLSchemeHandler: NSObject, WKURLSchemeHandler {
+    nonisolated static let scheme = WebviewsAppPage.gitGraph.scheme
+    nonisolated static let host = WebviewsAppPage.gitGraph.host
+    nonisolated static let shellPath = WebviewsAppPage.gitGraph.shellPath
+    /// The page itself: `shellx-git-graph://app/git-graph.html`.
+    nonisolated static var shellURL: URL {
+        WebviewsAppPage.gitGraph.shellURL
     }
 
     /// A task WebKit started and has not stopped. `serial` tells it apart from a
@@ -35,26 +70,16 @@ final class GitGraphURLSchemeHandler: NSObject, WKURLSchemeHandler {
     private var running: [ObjectIdentifier: Running] = [:]
     private var nextSerial: UInt64 = 0
 
-    /// - Parameter assets: The files to serve. Nil fails every request.
+    /// - Parameter assets: The files to serve, for the page whose scheme it is
+    ///   registered on. Nil fails every request.
     init(assets: GitGraphPageAssets? = .bundled()) {
         self.assets = assets
         super.init()
     }
 
-    /// True for the page itself and for in-page fragments of it: the scheme, the
-    /// host and `/git-graph.html`, with no port, credentials or query.
+    /// True for the Git Graph page itself and for in-page fragments of it.
     nonisolated static func isShellDocument(_ url: URL?) -> Bool {
-        guard let url,
-              let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            return false
-        }
-        return components.scheme == scheme
-            && components.host == host
-            && components.port == nil
-            && components.user == nil
-            && components.password == nil
-            && components.percentEncodedPath == shellPath
-            && components.query == nil
+        WebviewsAppPage.gitGraph.isShellDocument(url)
     }
 
     func webView(_ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {

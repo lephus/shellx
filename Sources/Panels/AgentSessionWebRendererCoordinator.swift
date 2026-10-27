@@ -105,6 +105,12 @@ final class AgentSessionWebRendererCoordinator: NSObject, WKNavigationDelegate, 
 
         let configuration = WKWebViewConfiguration()
         configuration.suppressesIncrementalRendering = false
+        // The React page and its module scripts load through this scheme, which
+        // also inflates the scripts the build deflated.
+        configuration.setURLSchemeHandler(
+            GitGraphURLSchemeHandler(assets: .bundled(page: .agentSession)),
+            forURLScheme: WebviewsAppPage.agentSession.scheme
+        )
         configuration.userContentController.addScriptMessageHandler(
             self,
             contentWorld: .page,
@@ -143,14 +149,18 @@ final class AgentSessionWebRendererCoordinator: NSObject, WKNavigationDelegate, 
             rendererKind: rendererKind,
             resourceDirectoryURL: resourceDirectoryURL
         )
-        trustedShellURL = Self.normalizedTrustedFileURL(indexURL)
+        trustedShellURL = indexURL.isFileURL ? Self.normalizedTrustedFileURL(indexURL) : indexURL
 #if DEBUG
         cmuxDebugLog(
             "agentSession.web.load renderer=\(rendererKind.rawValue) " +
-            "index=\(indexURL.path)"
+            "index=\(indexURL.isFileURL ? indexURL.path : indexURL.absoluteString)"
         )
 #endif
-        webView.loadFileURL(indexURL, allowingReadAccessTo: Bundle.main.resourceURL ?? resourceDirectoryURL)
+        if indexURL.isFileURL {
+            webView.loadFileURL(indexURL, allowingReadAccessTo: Bundle.main.resourceURL ?? resourceDirectoryURL)
+        } else {
+            webView.load(URLRequest(url: indexURL))
+        }
         loadedRendererKind = rendererKind
         hasFinishedNavigation = false
         resetVisiblePaintState()
@@ -374,16 +384,25 @@ final class AgentSessionWebRendererCoordinator: NSObject, WKNavigationDelegate, 
         return Self.isTrustedShellURL(frameInfo.request.url, expected: trustedShellURL)
     }
 
+    /// The React page loads on its own scheme: the build deflates its module
+    /// scripts, which a file URL cannot load. The Solid page stays a bundled file.
     nonisolated static func shellURL(
         rendererKind: AgentSessionRendererKind,
         resourceDirectoryURL: URL
     ) -> URL {
-        rendererKind.resourceHTMLPathComponents.reduce(resourceDirectoryURL) {
+        if rendererKind == .react {
+            return WebviewsAppPage.agentSession.shellURL
+        }
+        return rendererKind.resourceHTMLPathComponents.reduce(resourceDirectoryURL) {
             $0.appendingPathComponent($1, isDirectory: false)
         }
     }
 
     nonisolated static func isTrustedShellURL(_ candidate: URL?, expected: URL?) -> Bool {
+        if let expected, !expected.isFileURL {
+            return expected == WebviewsAppPage.agentSession.shellURL
+                && WebviewsAppPage.agentSession.isShellDocument(candidate)
+        }
         guard let candidate = normalizedTrustedFileURL(candidate),
               let expected = normalizedTrustedFileURL(expected) else {
             return false

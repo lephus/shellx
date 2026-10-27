@@ -83,4 +83,29 @@ import Testing
         state.toggle()
         #expect(!accessory.rootView.rightSidebarToggle.isOn)
     }
+
+    // The accessory's buttons sit at the right edge of the titlebar row,
+    // where the right sidebar's mode bar used to draw too: the sidebar's
+    // "Open as pane" and close icons showed through the gear and the toggle.
+    @Test func rightSidebarStartsBelowTheTitlebarRowWhileTheAccessoryShows() {
+        #expect(ShellXTitlebarAccessoryLayout.isShown(isMinimalMode: false, isFullScreen: false))
+        #expect(ShellXTitlebarAccessoryLayout.rightSidebarTopInset(isMinimalMode: false, isFullScreen: false)
+            == WindowChromeMetrics.appTitlebarHeight)
+        // Nothing to clear the row for while the band spans the sidebar too.
+        #expect(ShellXTitlebarAccessoryLayout.titlebarBandTrailingInset(
+            rightSidebarWidth: 320, isMinimalMode: false, isFullScreen: false
+        ) == 0)
+    }
+
+    @Test func rightSidebarKeepsTheTitlebarRowWhileTheAccessoryIsHidden() {
+        for (isMinimalMode, isFullScreen) in [(true, false), (false, true), (true, true)] {
+            #expect(!ShellXTitlebarAccessoryLayout.isShown(isMinimalMode: isMinimalMode, isFullScreen: isFullScreen))
+            #expect(ShellXTitlebarAccessoryLayout.rightSidebarTopInset(
+                isMinimalMode: isMinimalMode, isFullScreen: isFullScreen
+            ) == 0)
+            #expect(ShellXTitlebarAccessoryLayout.titlebarBandTrailingInset(
+                rightSidebarWidth: 320, isMinimalMode: isMinimalMode, isFullScreen: isFullScreen
+            ) == 320)
+        }
+    }
 }

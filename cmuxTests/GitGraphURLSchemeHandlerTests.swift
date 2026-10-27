@@ -102,6 +102,25 @@ final class GitGraphURLSchemeHandlerTests: XCTestCase {
         XCTAssertEqual(try assets.asset(for: pageURL("/legacy.js")).data, Data("var x;".utf8))
     }
 
+    /// The React agent session page shares the folder and its deflated scripts, but
+    /// only on its own scheme: a built app has `main.mjs.deflate`, never `main.mjs`.
+    func testAgentSessionPageInflatesItsScriptsOnItsOwnScheme() throws {
+        try write("<script type=\"module\" src=\"./main.mjs\"></script>", to: root.appendingPathComponent("agent-session.html"))
+        try deflate("boot()", to: root.appendingPathComponent("main.mjs.deflate"))
+        let assets = GitGraphPageAssets(root: root, page: .agentSession)
+        let page = try XCTUnwrap(URL(string: "shellx-agent-session://app/agent-session.html"))
+
+        XCTAssertEqual(WebviewsAppPage.agentSession.shellURL, page)
+        XCTAssertEqual(try assets.asset(for: page).mimeType, "text/html")
+        XCTAssertEqual(
+            try assets.asset(for: XCTUnwrap(URL(string: "shellx-agent-session://app/main.mjs"))),
+            GitGraphPageAssets.Asset(data: Data("boot()".utf8), mimeType: "text/javascript")
+        )
+        XCTAssertThrowsError(try assets.asset(for: pageURL("/main.mjs"))) { error in
+            XCTAssertEqual(error as? GitGraphPageAssets.Failure, .badURL, "the Git Graph scheme is not this page's")
+        }
+    }
+
     func testMissingFileUnknownTypeAndBadDeflateFail() throws {
         try deflate("body {}", to: root.appendingPathComponent("style.css.deflate"))
         try deflate("x()", to: root.appendingPathComponent("packed.mjs.deflate"))

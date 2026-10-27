@@ -98,6 +98,10 @@ final class GitGraphController: ObservableObject {
     private let history: any GitGraphHistoryProviding
     /// The status the caller last passed to ``showRepository(root:status:)``.
     private var shownStatus: GitGraphRepoStatus = .loading
+    /// True while the page is hidden: `repo.changed` then waits for
+    /// ``releaseHeldRepoChange()`` instead of reloading a page no one sees.
+    private var holdsRepoChanges = false
+    private var hasHeldRepoChange = false
 
     init(
         placement: GitGraphPlacement,
@@ -119,7 +123,27 @@ final class GitGraphController: ObservableObject {
         shownStatus = status
         self.status = status
         generation += 1
+        if holdsRepoChanges {
+            hasHeldRepoChange = true
+        } else {
+            emit(.repoChanged)
+        }
+    }
+
+    /// Holds `repo.changed` from now on, while the page is hidden.
+    func holdRepoChanges() {
+        holdsRepoChanges = true
+    }
+
+    /// Stops holding `repo.changed` and sends the held one, if any, for the
+    /// repository shown now. Returns whether it sent one.
+    @discardableResult
+    func releaseHeldRepoChange() -> Bool {
+        holdsRepoChanges = false
+        guard hasHeldRepoChange else { return false }
+        hasHeldRepoChange = false
         emit(.repoChanged)
+        return true
     }
 
     /// Tells the page to reload the current repository's history.

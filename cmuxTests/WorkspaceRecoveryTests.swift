@@ -332,7 +332,8 @@ struct WorkspaceRecoveryTests {
         #expect(generated.title == "Terminal 2")
         #expect(generated.currentDirectory == directory)
         #expect(generated.customTitle == nil)
-        #expect(generated.customColor == nil)
+        // ShellX: new workspaces start Purple, never a sibling's color.
+        #expect(generated.customColor == WorkspaceTabColorSettings.newWorkspaceColorHex())
 
         let explicitlyNamed = manager.addWorkspace(
             title: "Explicit Fresh",
@@ -341,7 +342,8 @@ struct WorkspaceRecoveryTests {
             select: false
         )
         #expect(explicitlyNamed.customTitle == "Explicit Fresh")
-        #expect(explicitlyNamed.customColor == nil)
+        // ShellX: new workspaces start Purple, never a sibling's color.
+        #expect(explicitlyNamed.customColor == WorkspaceTabColorSettings.newWorkspaceColorHex())
     }
 
     @Test
@@ -454,7 +456,8 @@ struct WorkspaceRecoveryTests {
 
         #expect(first.customColor == "#123456")
         #expect(second.customColor == "#123456")
-        #expect(untouched.customColor == nil)
+        // ShellX: new workspaces start Purple, never a sibling's color.
+        #expect(untouched.customColor == WorkspaceTabColorSettings.newWorkspaceColorHex())
     }
 
     @Test
@@ -468,7 +471,8 @@ struct WorkspaceRecoveryTests {
         )
         #expect(explicitlyNamed.customTitle == "CLI Label")
         #expect(explicitlyNamed.effectiveCustomTitleSource == .user)
-        #expect(explicitlyNamed.customColor == nil)
+        // ShellX: new workspaces start Purple, never a sibling's color.
+        #expect(explicitlyNamed.customColor == WorkspaceTabColorSettings.newWorkspaceColorHex())
 
         let laterManager = TabManager(autoWelcomeIfNeeded: false)
         laterManager.restoreSessionSnapshot(SessionTabManagerSnapshot(
