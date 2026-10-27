@@ -135,6 +135,42 @@ struct ShellXTitlebarView: View {
     }
 }
 
+/// Where the right sidebar goes while this accessory shows. Upstream its mode
+/// bar shares the titlebar row, so its trailing icons drew under the gear and
+/// the toggle; while the accessory shows the sidebar starts below the row.
+enum ShellXTitlebarAccessoryLayout {
+    /// Both titlebar accessories hide in minimal mode and full screen.
+    static func isShown(isMinimalMode: Bool, isFullScreen: Bool) -> Bool {
+        !isMinimalMode && !isFullScreen
+    }
+
+    static func rightSidebarTopInset(isMinimalMode: Bool, isFullScreen: Bool) -> CGFloat {
+        isShown(isMinimalMode: isMinimalMode, isFullScreen: isFullScreen) ? WindowChromeMetrics.appTitlebarHeight : 0
+    }
+
+    /// The workspace titlebar band keeps its drag surface off a right sidebar
+    /// mode bar in the same row (#5099); below the row there is none to avoid.
+    static func titlebarBandTrailingInset(rightSidebarWidth: CGFloat, isMinimalMode: Bool, isFullScreen: Bool) -> CGFloat {
+        rightSidebarTopInset(isMinimalMode: isMinimalMode, isFullScreen: isFullScreen) > 0 ? 0 : rightSidebarWidth
+    }
+}
+
+/// Applies `ShellXTitlebarAccessoryLayout.rightSidebarTopInset`, following
+/// presentation mode changes the same way as the terminal's top padding.
+struct ShellXRightSidebarTitlebarInsetModifier: ViewModifier {
+    let isFullScreen: Bool
+
+    @AppStorage(WorkspacePresentationModeSettings.modeKey)
+    private var workspacePresentationMode = WorkspacePresentationModeSettings.defaultMode.rawValue
+
+    func body(content: Content) -> some View {
+        content.padding(.top, ShellXTitlebarAccessoryLayout.rightSidebarTopInset(
+            isMinimalMode: WorkspacePresentationModeSettings.mode(for: workspacePresentationMode) == .minimal,
+            isFullScreen: isFullScreen
+        ))
+    }
+}
+
 enum ShellXTitlebarStrings {
     static var settings: String {
         String(localized: "titlebar.settings.accessibilityLabel", defaultValue: "Settings")

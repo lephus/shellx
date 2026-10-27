@@ -1948,6 +1948,8 @@ struct ContentView: View {
                 )
             }
         }
+        // ShellX: below the titlebar row while the ShellX accessory sits there.
+        .modifier(ShellXRightSidebarTitlebarInsetModifier(isFullScreen: isFullScreen))
 
         return panel
     }
@@ -2215,7 +2217,15 @@ struct ContentView: View {
                     // snaps without animation (`.transaction { $0.animation = nil }`), so we match
                     // that here — otherwise this inset could animate out of step with the panel on
                     // toggle and momentarily expose (or re-cover) the mode bar mid-transition.
-                    .padding(.trailing, rightSidebarWidth)
+                    //
+                    // ShellX: the mode bar moves below this row while the ShellX
+                    // accessory shows, and the band then spans the full width.
+                    // The band only mounts outside minimal mode.
+                    .padding(.trailing, ShellXTitlebarAccessoryLayout.titlebarBandTrailingInset(
+                        rightSidebarWidth: rightSidebarWidth,
+                        isMinimalMode: false,
+                        isFullScreen: isFullScreen
+                    ))
                     .animation(nil, value: rightSidebarWidth)
             }
             .overlay(alignment: .topLeading) {

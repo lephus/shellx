@@ -3003,8 +3003,11 @@ final class UpdateTitlebarAccessoryController {
             pendingAttachRetries.removeValue(forKey: ObjectIdentifier(window))
             return
         }
-        let shouldHide = WorkspacePresentationModeSettings.mode() == .minimal
-            || window.styleMask.contains(.fullScreen)
+        // ShellX: the right sidebar's top inset follows the same rule.
+        let shouldHide = !ShellXTitlebarAccessoryLayout.isShown(
+            isMinimalMode: WorkspacePresentationModeSettings.mode() == .minimal,
+            isFullScreen: window.styleMask.contains(.fullScreen)
+        )
         for accessory in window.titlebarAccessoryViewControllers
             where accessory.view.identifier == controlsIdentifier
                 || accessory.view.identifier == ShellXTitlebarAccessoryViewController.identifier {
