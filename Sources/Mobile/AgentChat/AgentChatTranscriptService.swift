@@ -360,6 +360,12 @@ final class AgentChatTranscriptService {
         return registry.noteUserInput(surfaceID: surfaceID, at: at)
     }
 
+    /// Reflects an interrupt the session's terminal accepted. Not implemented yet.
+    @discardableResult
+    func noteInterrupted(sessionID: String, at: Date = Date()) -> Bool {
+        false
+    }
+
     /// Lists chat-capable sessions.
     ///
     /// - Parameter workspaceID: Workspace UUID string filter, or `nil`.

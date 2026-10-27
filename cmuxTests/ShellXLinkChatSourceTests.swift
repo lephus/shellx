@@ -265,6 +265,59 @@ struct ShellXLinkChatSourceTests {
         #expect(await Self.waitUntil { service.frameObserverCount == 0 })
     }
 
+    /// Claude Code writes a new session's transcript only after its first prompt hook, so SessionStart and the
+    /// first UserPromptSubmit name a file (in a project folder) that does not exist yet. A phone connected
+    /// before the session started still gets the whole first turn live, not only from the second prompt on.
+    @Test func testFirstTurnOfNewSessionIsPushed() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let source = await MainActor.run { ShellXLinkChatSource(service: { service }) }
+        let pushes = Pushes()
+        let stream = source.entries()
+        let consumer = Task { for await push in stream { pushes.record(push) } }
+        defer { consumer.cancel() }
+        #expect(await Self.waitUntil { service.frameObserverCount == 1 })
+        let session = UUID().uuidString
+        let project = home.appendingPathComponent("projects/-private-tmp-first-turn", isDirectory: true)
+        let transcript = project.appendingPathComponent("\(session).jsonl")
+        func hook(_ name: WorkstreamEvent.HookEventName, tool: String? = nil) -> WorkstreamEvent {
+            WorkstreamEvent(sessionId: session, hookEventName: name, source: "claude", transcriptPath: transcript.path,
+                            cwd: "/private/tmp/first-turn", toolName: tool)
+        }
+        func append(_ line: String) throws {
+            if !FileManager.default.fileExists(atPath: transcript.path) {
+                try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+                try Data().write(to: transcript)
+            }
+            let handle = try FileHandle(forWritingTo: transcript)
+            try handle.seekToEnd()
+            try handle.write(contentsOf: Data((line + "\n").utf8))
+            try handle.close()
+        }
+
+        await MainActor.run {
+            service.noteHookEvent(hook(.sessionStart))
+            service.noteHookEvent(hook(.userPromptSubmit))
+        }
+        try append(Self.userLine("u-1", "Create the file"))
+        await MainActor.run { service.noteHookEvent(hook(.preToolUse, tool: "Bash")) }
+        try append(Self.assistantLine("a-1", [
+            ["type": "tool_use", "id": "t-touch", "name": "Bash", "input": ["command": "touch first.txt"]],
+        ]))
+        try append(Self.assistantLine("a-2", [["type": "text", "text": "Created first.txt"]]))
+        await MainActor.run { service.noteHookEvent(hook(.stop)) }
+
+        #expect(await Self.waitUntil {
+            let texts = Set(pushes.entries.map(\.text))
+            return texts.isSuperset(of: ["Create the file", "touch first.txt", "Created first.txt"])
+        })
+        let entries = pushes.entries
+        #expect(entries.first { $0.text == "Create the file" }?.role == .user)
+        #expect(entries.first { $0.text == "touch first.txt" }?.toolName == "Bash")
+        #expect(entries.first { $0.text == "Created first.txt" }?.kind == .prose)
+    }
+
     /// The tailer updates its cache before it publishes the batch, so a history read can return an entry
     /// older than a push that reached the main actor while the read was in flight. The page then carries the
     /// pushed content under a new revision; a stale copy never outranks the push on the phone.

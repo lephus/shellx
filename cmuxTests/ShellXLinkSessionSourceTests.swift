@@ -184,6 +184,50 @@ struct ShellXLinkSessionSourceTests {
         #expect(listed.subtracting([live]) == Set(ended.suffix(ShellXLinkSessionSource.maxEndedSessions)))
     }
 
+    /// Claude Code fires no hook when it is interrupted (Esc or ctrl-C) and then waits for input. Once the
+    /// shared interrupt path's key is accepted, the session turns idle and every phone is told; an interrupt
+    /// the terminal never took changes nothing.
+    @Test func testInterruptMovesSessionToIdle() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let working = UUID().uuidString, asking = UUID().uuidString
+        let (service, source) = await MainActor.run { Self.makeSource(home: home) }
+        await MainActor.run {
+            service.noteHookEvent(Self.event(working, .sessionStart))
+            service.noteHookEvent(Self.event(working, .userPromptSubmit, at: 3))
+            service.noteHookEvent(Self.event(asking, .sessionStart))
+            service.noteHookEvent(Self.event(asking, .permissionRequest, at: 4))
+        }
+        let changes = SessionChanges()
+        let consumer = Task { for await change in source.sessionChanges() { changes.record(change) } }
+        defer { consumer.cancel() }
+        // The subscription registers on the main actor; this call orders it before the interrupts.
+        let base = await source.sessions().revision
+
+        // The shared path finds no terminal for this session: no key reached the agent, so nothing changes.
+        let link = await MainActor.run { ShellXLinkChatSource(service: { service }) }
+        #expect(await link.interrupt(sessionId: working, hard: false) == .notFound)
+        #expect(await source.sessions().sessions.first { $0.sessionId == working }?.state == .working)
+
+        // What `agentChatInterrupt` does once the terminal accepted the key.
+        await MainActor.run { _ = service.noteInterrupted(sessionID: working) }
+        #expect(await Self.waitUntil { changes.all.contains { $0.upserted.contains { $0.sessionId == working } } })
+        let stopped = try #require(changes.all.first)
+        #expect(stopped.revision == base + 1)
+        #expect(stopped.upserted.map(\.sessionId) == [working])
+        #expect(stopped.upserted.first?.state == .idle)
+        #expect(stopped.upserted.first?.stateSinceMs == nil)
+
+        // Esc on a permission prompt rejects it and stops the turn too.
+        await MainActor.run { _ = service.noteInterrupted(sessionID: asking) }
+        #expect(await Self.waitUntil { changes.all.count == 2 })
+        #expect(changes.all.last?.revision == base + 2)
+        #expect(changes.all.last?.upserted.first { $0.sessionId == asking }?.state == .idle)
+        // An idle session stays as it is: no change is published.
+        await MainActor.run { _ = service.noteInterrupted(sessionID: working) }
+        #expect(await source.sessions().revision == base + 2)
+    }
+
     @Test func testEndedSubscriberStopsObserving() async throws {
         let home = try Self.makeHome()
         defer { try? FileManager.default.removeItem(at: home) }
@@ -198,4 +242,12 @@ struct ShellXLinkSessionSourceTests {
 
         #expect(await Self.waitUntil { source.subscriberCount == 0 && service.frameObserverCount == 0 })
     }
+}
+
+/// The changes one `sessionChanges()` subscriber received, filled by its consumer task.
+private final class SessionChanges: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [ShellXLinkSessionSource.Change] = []
+    func record(_ change: ShellXLinkSessionSource.Change) { lock.lock(); recorded.append(change); lock.unlock() }
+    var all: [ShellXLinkSessionSource.Change] { lock.lock(); defer { lock.unlock() }; return recorded }
 }
