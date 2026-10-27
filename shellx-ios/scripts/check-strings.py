@@ -9,9 +9,11 @@ Exits 1 and prints each problem when:
   - a key has `extractionState: stale`;
   - the `vi` text equals the `en` text and the key is not listed in scripts/strings-identity.txt;
   - a key used in ShellX/**/*.swift as `String(localized: "<key>"` or
-    `LocalizedStringResource("<key>"` is not in its catalog (Localizable, or the `table:` given);
+    `LocalizedStringResource("<key>"` is not in its catalog (Localizable, or the `table:` given),
+    or is not a plain one-line string literal the check can read;
   - ShellX/**/*.swift has a bare literal `Text("`, `Button("`, `Label("`, `.navigationTitle("`
-    or `.alert("`. Use a catalog key, or `Text(verbatim:)` for text that is never translated.
+    or `.alert("`, also when the call spans lines or the literal is raw (`#"…"#`). Use a catalog
+    key, or `Text(verbatim:)` for text that is never translated.
 Keys marked `shouldTranslate: false` need no translations.
 """
 
@@ -25,8 +27,10 @@ LANGUAGES = ("en", "vi")
 PLURAL_BRANCHES = {"en": ("one", "other"), "vi": ("other",)}
 DEFAULT_TABLE = "Localizable"
 
-BARE_LITERAL = re.compile(r'(?<![A-Za-z0-9_])(?:Text|Button|Label)\(\s*"|\.(?:navigationTitle|alert)\(\s*"')
-KEY_USE = re.compile(r'(?<![A-Za-z0-9_])(?:String\(\s*localized:|LocalizedStringResource\()\s*"')
+# Run over a whole file, so `\s*` also spans the line breaks of a call written over several lines;
+# `#*` catches raw strings (`Text(#"…"#)`).
+BARE_LITERAL = re.compile(r'(?<![A-Za-z0-9_])(?:Text|Button|Label)\s*\(\s*#*"|\.(?:navigationTitle|alert)\s*\(\s*#*"')
+KEY_USE = re.compile(r'(?<![A-Za-z0-9_])(?:String\(\s*localized:|LocalizedStringResource\()\s*(#*)"')
 TABLE_ARGUMENT = re.compile(r'\s*,[^)]*?\btable:\s*"([^"]+)"')
 COMMENT_LINE = ("//", "/*", "*")
 # A printf-style specifier, which is what a Swift interpolation becomes in a catalog key.
@@ -101,7 +105,8 @@ def swift_literal(text, start):
     """Parses the Swift string literal whose opening quote ends at `start`.
 
     Returns (parts, end): the literal text between interpolations, and the index after the closing
-    quote. Returns (None, start) for a literal it cannot follow (multi-line, unterminated)."""
+    quote. Returns (None, start) for a literal it cannot follow (multi-line, unterminated, a bad
+    escape)."""
     parts, current, index = [], [], start
     while index < len(text):
         char = text[index]
@@ -122,7 +127,10 @@ def swift_literal(text, start):
                 continue
             if following == "u" and text[index + 2:index + 3] == "{":
                 close = text.find("}", index)
-                current.append(chr(int(text[index + 3:close], 16)))
+                try:
+                    current.append(chr(int(text[index + 3:close], 16)))
+                except ValueError:
+                    return None, start
                 index = close + 1
                 continue
             current.append(SWIFT_ESCAPES.get(following, following))
@@ -144,20 +152,21 @@ def check_swift(root, catalogs, problems):
             with open(path, encoding="utf-8") as handle:
                 text = handle.read()
             lines = text.split("\n")
-            for number, line in enumerate(lines, start=1):
-                stripped = line.lstrip()
-                if stripped.startswith(COMMENT_LINE):
+            for match in BARE_LITERAL.finditer(text):
+                number = text.count("\n", 0, match.start()) + 1
+                line = lines[number - 1].strip()
+                if line.startswith(COMMENT_LINE):
                     continue
-                if BARE_LITERAL.search(line):
-                    problems.append(
-                        "%s:%d: bare string literal; use a catalog key or Text(verbatim:): %s"
-                        % (display, number, stripped))
+                problems.append(
+                    "%s:%d: bare string literal; use a catalog key or Text(verbatim:): %s" % (display, number, line))
             for match in KEY_USE.finditer(text):
                 number = text.count("\n", 0, match.start()) + 1
                 if lines[number - 1].lstrip().startswith(COMMENT_LINE):
                     continue
-                parts, end = swift_literal(text, match.end())
+                parts, end = (None, match.end()) if match.group(1) else swift_literal(text, match.end())
                 if parts is None:
+                    problems.append(
+                        "%s:%d: the key's string literal cannot be read; use a plain one-line string" % (display, number))
                     continue
                 table_match = TABLE_ARGUMENT.match(text, end)
                 table = table_match.group(1) if table_match else DEFAULT_TABLE

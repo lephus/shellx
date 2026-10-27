@@ -149,6 +149,35 @@ final class StringsCatalogCheckTests: XCTestCase {
         try assertFails(try makeTree(source: resource), mentioning: "home.other")
     }
 
+    func testBareLiteralSpanningLinesFails() throws {
+        let literals = [
+            "Text(\n  \"Hello\")",
+            "Button(\n    \"Pair a Mac\",\n    action: {}\n)",
+            ".navigationTitle(\n    \"Home\"\n)",
+            "Text (\"Hello\")",
+            "Text(#\"Hello\"#)",
+        ]
+        for literal in literals {
+            let source = Self.cleanSource.replacingOccurrences(of: "Text(verbatim: \"2.0.0\")", with: literal)
+            try assertFails(try makeTree(source: source), mentioning: "ShellX/UI/HomeView.swift:10")
+        }
+    }
+
+    func testLiteralInCommentIsIgnored() throws {
+        let source = Self.cleanSource.replacingOccurrences(
+            of: "Text(verbatim: \"2.0.0\")", with: "// Text(\"Hello\") is refused; see check-strings.py")
+
+        let result = try check(try makeTree(source: source))
+
+        XCTAssertEqual(result.status, 0, result.output)
+    }
+
+    func testUnreadableKeyLiteralFails() throws {
+        let source = Self.cleanSource.replacingOccurrences(
+            of: "Text(verbatim: \"2.0.0\")", with: "Text(String(localized: \"home.\\u{zz}\"))")
+        try assertFails(try makeTree(source: source), mentioning: "ShellX/UI/HomeView.swift:10")
+    }
+
     func testBareTextLiteralFails() throws {
         let literals = [
             "Text(\"Hello\")", "Button(\"Go\") {}", "Label(\"Mac\", systemImage: \"laptopcomputer\")",

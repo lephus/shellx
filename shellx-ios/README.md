@@ -18,9 +18,10 @@ Nothing is copied, linked or imported from `ios/`, `Packages/`, `Sources/`, `cmu
 reference is fine; copying from it is not.
 
 `scripts/shellx/check-ios-license.sh` enforces this. It fails on a network package (in a
-`Package.swift` or in `project.pbxproj`), on a path that leaves `shellx-ios/` and `shellx-link/`,
-on an `import` of a module outside its allowlist, on the name of the upstream cmux company
-(so this README avoids writing it), and when
+package manifest or in `project.pbxproj`), on a manifest `path:` that is not a plain string
+literal, on a path that leaves `shellx-ios/` and `shellx-link/`, on any symlink, on an `import`
+of a module outside its allowlist, on the name of the upstream cmux company (so this README avoids
+writing it), and when
 `scripts/shellx/check-link-license.sh` fails. The import check is an allowlist on purpose: adding a
 new module means adding it to the script, in review.
 
