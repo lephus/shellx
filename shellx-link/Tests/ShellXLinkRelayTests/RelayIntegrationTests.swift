@@ -24,23 +24,17 @@ final class RelayIntegrationTests: XCTestCase {
 
     override func tearDown() async throws {
         for task in hostTasks { task.cancel() }
-        // A host task that ignores cancellation must not hang the suite: give up after 10 s.
+        // A host task that ignores cancellation must not hang the suite: wait at most 10 s. The
+        // waiter is an unstructured task, so the timeout does not wait for it.
         let tasks = hostTasks
-        let finished = await withTaskGroup(of: Bool.self) { group in
-            group.addTask {
-                for task in tasks { _ = await task.result }
-                return true
-            }
-            group.addTask {
-                try? await Task.sleep(for: .seconds(10))
-                return false
-            }
-            let first = await group.next() ?? false
-            group.cancelAll()
-            return first
-        }
         hostTasks.removeAll()
-        XCTAssertTrue(finished, "a host task did not stop within 10 s of cancellation")
+        let stopped = expectation(description: "host tasks stopped")
+        Task {
+            for task in tasks { _ = await task.result }
+            stopped.fulfill()
+        }
+        // A timeout is recorded as a test failure ("host tasks stopped").
+        await fulfillment(of: [stopped], timeout: 10)
         relay?.stop()
         relay = nil
     }
@@ -264,23 +258,66 @@ final class RelayIntegrationTests: XCTestCase {
             return RelayTicket(ticket: "v2.e30.AAAA", expiresAtUnix: Int64(Date().timeIntervalSince1970) + 60)
         }
         let run = Task { try await host.run { _ in } }
-        hostTasks.append(Task { _ = await run.result })
+        hostTasks.append(run)
         let probe = try await connectWhenOnline(relay: relay, slot: "s1", minter: minter)
         await probe.close()
         await host._dropControlForTesting()
 
         switch await run.result {
         case .success: XCTFail("run returned instead of giving up")
-        case .failure(let error): XCTAssertTrue(error is RelayError, "unexpected error \(error)")
+        case .failure(let error):
+            guard case RelayError.server(let code, _) = error else { return XCTFail("unexpected error \(error)") }
+            XCTAssertEqual(code, "invalid-ticket", "events: \(events.all)")
         }
         let seen = events.all
         XCTAssertEqual(seen.first, .registered)
         let failed = seen.filter { if case .failed = $0 { return true } else { return false } }
         XCTAssertEqual(failed.count, 4, "events: \(seen)")
         guard case .gaveUp(let code)? = seen.last else { return XCTFail("events: \(seen)") }
-        XCTAssertFalse(code.isEmpty)
+        XCTAssertEqual(code, "invalid-ticket")
         let tickets = await issued.value
         XCTAssertEqual(tickets, 5, "one good ticket, then four refused ones after the dropped socket")
+    }
+
+    func testFailedRenewalKeepsLiveRegistration() async throws {
+        let relay = try XCTUnwrap(relay)
+        let minter = TestTicketMinter(secret: Self.secret)
+        let events = EventLog()
+        let issued = Counter()
+        let host = RelayHostRegistration(
+            relayURL: relay.url, slot: "s1", renewLead: .seconds(8), maxConsecutiveFailures: 5,
+            onEvent: { events.append($0) }
+        ) {
+            await issued.increment()
+            // Only the first ticket works; every renewal attempt hits a ticket API outage.
+            if await issued.value > 1 { throw TicketOutage() }
+            return minter.mint(.register, slot: "s1", lifetime: 10)
+        }
+        let run = Task {
+            try await host.run { circuit in
+                do {
+                    while true { try await circuit.send(try await circuit.receive()) }
+                } catch {}
+            }
+        }
+        hostTasks.append(run)
+        let probe = try await connectWhenOnline(relay: relay, slot: "s1", minter: minter)
+        await probe.close()
+
+        // Renewal starts about 5 s in; the old ticket lives to about 10 s. Wait for more failed
+        // attempts than the give-up threshold.
+        try await waitUntil("five failed renewals", timeout: 9) {
+            events.all.filter { if case .failed = $0 { return true } else { return false } }.count >= 5
+        }
+        let seen = events.all
+        XCTAssertFalse(seen.contains { if case .gaveUp = $0 { return true } else { return false } }, "events: \(seen)")
+        let circuit = try await RelayClientConnector.connect(
+            relayURL: relay.url, slot: "s1", ticket: minter.mint(.connect, slot: "s1"),
+            slotOfflineRetries: [])
+        try await circuit.send(Data([0x05]))
+        let echo = try await circuit.receive()
+        XCTAssertEqual(echo, Data([0x05]), "the old registration still serves circuits")
+        await circuit.close()
     }
 
     // MARK: - Helpers
@@ -349,6 +386,8 @@ final class EventLog: @unchecked Sendable {
         events.append(event)
     }
 }
+
+struct TicketOutage: Error {}
 
 actor Counter {
     private(set) var value = 0

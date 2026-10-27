@@ -174,8 +174,8 @@ public actor RelayHostRegistration {
                 }
             }
 
-            // Counts one failure after the first registration, reports it, and gives up when
-            // too many in a row have happened.
+            // Counts one failure while no registration is live (after the first one), reports it,
+            // and gives up when too many in a row have happened.
             func failed(_ error: any Error) throws {
                 failures += 1
                 let code = Self.code(for: error)
@@ -204,7 +204,14 @@ public actor RelayHostRegistration {
                     current = Live(id: id, socket: opened.socket)
                     await attach(opened.socket)
                     onEvent(replaced ? .renewed : .registered)
-                    previous?.socket.close()
+                    // The relay closes the replaced socket itself; its pump drains what was queued
+                    // before the swap. Close it only if the relay has not within a few seconds.
+                    if let stale = previous?.socket {
+                        group.addTask {
+                            try? await Task.sleep(for: .seconds(5))
+                            stale.close()
+                        }
+                    }
                     group.addTask {
                         do {
                             try await Self.pump(opened.socket, leaseSeconds: opened.leaseSeconds) {
@@ -227,6 +234,11 @@ public actor RelayHostRegistration {
                     if !everRegistered {
                         // Before the first registration only carrier problems are retried, silently.
                         if !Self.isRetryable(error) { throw error }
+                        scheduleRetry()
+                    } else if current != nil {
+                        // A failed renewal never ends a live registration: report it, keep the
+                        // old socket, and try again until that one ends.
+                        onEvent(.failed(code: Self.code(for: error)))
                         scheduleRetry()
                     } else {
                         try failed(error)

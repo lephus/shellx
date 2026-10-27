@@ -119,14 +119,19 @@ final class ShellXLinkHostController: RemoteLinkHosting {
         }
         var attempt = 0
         while !Task.isCancelled {
+            let progress = RegistrationProgress()
             do {
                 let first = try await offMain { try core.mintLinkTicket(.register, expectedSlot: linkSlot) }
                 let prefetched = PrefetchedTicket(RelayTicket(ticket: first.ticket, expiresAtUnix: first.expiresAtUnix))
                 let registration = RelayHostRegistration(relayURL: first.relayURL, slot: linkSlot, onEvent: { event in
                     // Codes only: never a ticket or a key.
                     switch event {
-                    case .registered: log.info("link host registered slot \(linkSlot, privacy: .public)")
-                    case .renewed: log.info("link host renewed registration for slot \(linkSlot, privacy: .public)")
+                    case .registered:
+                        progress.markRegistered()
+                        log.info("link host registered slot \(linkSlot, privacy: .public)")
+                    case .renewed:
+                        progress.markRegistered()
+                        log.info("link host renewed registration for slot \(linkSlot, privacy: .public)")
                     case .failed(let code): log.error("link host registration attempt failed: \(code, privacy: .public)")
                     case .gaveUp(let code): log.error("link host registration gave up: \(code, privacy: .public)")
                     }
@@ -139,9 +144,11 @@ final class ShellXLinkHostController: RemoteLinkHosting {
                                     hostVersion: hostVersion, machineName: machineName)
                 log.info("link host registering slot \(linkSlot, privacy: .public)")
                 try await registration.run { circuit in await host.serve(circuit) }
-                attempt = 0
             } catch {
                 guard !Task.isCancelled else { return }
+                // `run` only ends by throwing. A registration that succeeded before it gave up means the
+                // relay was reachable, so the next attempt starts from the shortest backoff.
+                if progress.registered { attempt = 0 }
                 let code = (error as? ShellXCoreError)?.code ?? String(describing: type(of: error))
                 if code == "link_slot_mismatch" {
                     log.error("link host stopped: the relay minted a ticket for another slot")
@@ -179,6 +186,24 @@ final class ShellXLinkHostController: RemoteLinkHosting {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .utility).async { continuation.resume(with: Result { try work() }) }
         }
+    }
+}
+
+/// Whether one `RelayHostRegistration.run` got a registration through (set from its events).
+private final class RegistrationProgress: @unchecked Sendable {
+    private let lock = NSLock()
+    private var flag = false
+
+    var registered: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return flag
+    }
+
+    func markRegistered() {
+        lock.lock()
+        defer { lock.unlock() }
+        flag = true
     }
 }
 
