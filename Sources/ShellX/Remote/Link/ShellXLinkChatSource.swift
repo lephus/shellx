@@ -20,7 +20,8 @@ import ShellXLinkSession
 ///   phone's `not_found`) is for sessions the Mac does not have or cannot read.
 /// * Send and interrupt run ``TerminalController/agentChatSend(sessionID:text:attachments:)`` and
 ///   ``TerminalController/agentChatInterrupt(sessionID:hard:)``, the paths behind `mobile.chat.send` and
-///   `mobile.chat.interrupt`.
+///   `mobile.chat.interrupt`, and only for a session whose agent still runs (not ended, a known live pid);
+///   any other session is `not_found` before a terminal is touched (PROTOCOL.md section 10).
 ///
 /// The frame observer is registered only while someone subscribes to ``entries()``; it also keeps the
 /// service tailing transcripts with no mobile client subscribed. All state is main-actor isolated.
@@ -80,12 +81,12 @@ final class ShellXLinkChatSource: AgentChatSource {
     }
 
     func send(sessionId: String, text: String) async -> ChatSendOutcome {
-        guard linkSession(sessionId) != nil else { return .notFound }
+        guard hasLiveAgent(sessionId) else { return .notFound }
         return Self.sendOutcome(await sendCommand(sessionId, text))
     }
 
     func interrupt(sessionId: String, hard: Bool) async -> ChatInterruptOutcome {
-        guard linkSession(sessionId) != nil else { return .notFound }
+        guard hasLiveAgent(sessionId) else { return .notFound }
         return Self.interruptOutcome(await interruptCommand(sessionId, hard))
     }
 
@@ -167,13 +168,34 @@ final class ShellXLinkChatSource: AgentChatSource {
 
     /// The service when `sessionId` is a Claude Code agent session it knows.
     private func linkSession(_ sessionId: String) -> AgentChatTranscriptService? {
+        linkRecord(sessionId)?.service
+    }
+
+    private func linkRecord(_ sessionId: String) -> (service: AgentChatTranscriptService, record: AgentChatSessionRecord)? {
         guard let service = serviceProvider() else { return nil }
         if !subscribers.isEmpty { startObserving() }
         guard let record = service.sessionRecord(sessionID: sessionId),
               record.agentKind == .claude, record.descriptor.kind == .agent else {
             return nil
         }
-        return service
+        return (service, record)
+    }
+
+    /// Whether a phone's text or interrupt may go to `sessionId` (PROTOCOL.md section 10): a Claude Code session
+    /// that has not ended and whose agent process the Mac knows by pid and finds alive. The send path then types
+    /// into the terminal the agent ran in; once the agent is gone that terminal runs the user's shell (or whatever
+    /// started next), so text must never reach it. Stricter than the mobile path, which trusts a binding without
+    /// a pid: a session whose pid the Mac has not learned yet is `not_found` here until a hook names it.
+    private func hasLiveAgent(_ sessionId: String) -> Bool {
+        guard let record = linkRecord(sessionId)?.record, let pid = record.pid else { return false }
+        if case .ended = record.state { return false }
+        return Self.processIsAlive(pid)
+    }
+
+    /// `kill(pid, 0)`: the process exists (EPERM: it exists under another user).
+    private static func processIsAlive(_ pid: Int) -> Bool {
+        guard pid > 0, let id = pid_t(exactly: pid) else { return false }
+        return kill(id, 0) == 0 || errno == EPERM
     }
 
     private func nextRev() -> Int {

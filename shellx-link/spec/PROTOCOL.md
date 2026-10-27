@@ -244,8 +244,9 @@ and drops the other. A host takes `rev` from its transcript source.
 - `state` (AgentSession): `idle`, `working`, `needs_input`, `ended`.
 - `role` (ChatEntry): `user`, `agent`, `system`. `kind` (ChatEntry): `prose`, `thought`, `tool_use`, `status`, `other`.
 - `outcome` of `chat.send.result`: `submitted`, `not_found`, `busy`, `failed`. A `chat.send` for a
-  `session_id` the host does not have gets the outcome `not_found`, not an `error`.
-- `outcome` of `chat.interrupt.result`: `sent`, `not_found`, `failed`.
+  `session_id` the host does not have gets the outcome `not_found`, not an `error`; so does one for a listed
+  session whose agent is not live, an `ended` one for example (section 10).
+- `outcome` of `chat.interrupt.result`: `sent`, `not_found`, `failed`, with the same `not_found` rule.
 
 ## 5. Rules
 
@@ -467,3 +468,56 @@ accepts a pairing request for a machine of the phone's own account.
 - The API base URL MUST be `https`, except for a loopback host (development). The phone never
   follows an HTTP redirect from the API.
 - Tokens, passwords, tickets, keys, codes and proofs are never logged.
+
+## 10. Phone commands
+
+A phone can make the Mac act: decide an agent's pending request, type into an agent session, interrupt
+it. This section is the safety analysis for those commands. It follows the rules a remote command
+channel must meet: deny by default, allow only the calls a product flow needs, scope every call to
+objects the caller may touch, and never let a call execute or open arbitrary content on the Mac.
+
+**Default deny.** A host acts only on the calls in the table below. Every other `t` gets no effect: a
+call of a later version is answered `error` `unsupported` (section 3), any other unknown frame is
+ignored, and a host frame type sent by a client is ignored or answered `bad_request` (section 7). No
+field of any message names a command line, a path, a URL, a workspace or a terminal for the host to
+open, run or type into.
+
+**Allowed calls.**
+
+| Call | Effect on the Mac | Scope |
+| --- | --- | --- |
+| `agent.snapshot.get`, `agent.sessions.get`, `chat.history.get` | None (reads) | The pending requests and sessions of this Mac's Claude Code agents; the transcripts of listed sessions |
+| `agent.reply` | Gives a decision to an agent hook that is waiting for it | One pending request, by `request_id`. Only the item's `modes` (never `bypass` or `bypassPermissions`, which stay on the Mac), at most once (section 5) |
+| `chat.send` | Pastes `text` (1 to 16 384 bytes) at the agent's prompt in its terminal and submits it | One live Claude Code session, by `session_id` |
+| `chat.interrupt` | Sends Esc, or ctrl-C when `hard`, to that agent's terminal | One live Claude Code session, by `session_id` |
+| `ping` | None | |
+
+**Scope.** The host serves only its own Claude Code agent sessions and their pending requests.
+`session_id` and `request_id` are looked up in the host's own lists; an id it does not have is
+`not_found` (`unknown` for a reply). A phone cannot name another workspace, terminal, file, machine or
+account. Only a phone the Mac trusts gets this far: signed in to the same account, holding a proof from a
+QR code the Mac showed, and allowed by the user on that Mac (section 9).
+
+**Shell fall-through.** `chat.send` and `chat.interrupt` type into the terminal the agent runs in. Once the
+agent has exited, that terminal runs the user's shell or whatever started next: a message would run there
+as a command line, and ctrl-C would stop another program. A host therefore accepts them only for a *live*
+session: one that is not `ended`, whose agent process the host knows by process id, and whose process is
+alive when the call arrives. Any other session, including every ended session it lists (they stay listed
+for their read-only history), is answered `not_found` before any terminal is touched. A session whose
+agent process the host has not learned yet is `not_found` until the agent's next hook names it. The host
+then types only into the terminal that session is bound to, and only while that terminal still exists
+and still hosts the agent; it never sends the text to another terminal. What remains is the moment
+between that check and the typing: an agent that exits within it can still let one message reach the
+terminal, the same window the Mac's own remote-control path has.
+
+**Why the rest is acceptable.** A paired phone is trusted like the user sitting at the Mac: it is signed in
+to the user's account, and the user allowed that phone on that Mac in person; the relay can neither create
+that trust nor widen it (section 9). Removing the phone on the Mac untrusts its key at once: its live
+sessions close and its next handshake is refused. Removing it on the phone deletes the grant, so the relay
+mints it no new connect ticket, and the Mac drops the key when it next checks the grants. Within that
+trust, typing into the user's own agent session, stopping it, and answering its requests are what the user
+could do at the keyboard; the allowed calls limit *which objects* a phone reaches (this Mac's live agent
+sessions and their pending requests), not what the user may do with them. Out of reach for a phone in v1:
+spawning or respawning terminals, keys or text for anything but a live agent, opening URLs or files, the
+Mac's settings, the `bypass` modes, other machines and other accounts. The host never logs message text,
+tool inputs, keys, tickets or tokens.
