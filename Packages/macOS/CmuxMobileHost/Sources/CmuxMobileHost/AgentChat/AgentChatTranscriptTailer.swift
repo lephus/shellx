@@ -9,6 +9,10 @@ import Foundation
 /// Seq stability: `seq` equals the absolute transcript line index. The
 /// initial backfill may skip a long head (bounded memory), in which case
 /// pages before the cache report `hasMore` honestly.
+///
+/// A tailer created before its transcript exists (a new Claude Code session
+/// names the file in its first hooks and writes it after them) has no
+/// backfill: every line the agent writes is live, from the first one.
 public actor AgentChatTranscriptTailer {
     /// A live transcript change: newly appended messages and in-place
     /// updates (tool results that completed earlier messages).
@@ -26,7 +30,11 @@ public actor AgentChatTranscriptTailer {
 
     private let sessionID: String
     private let agentKind: ChatAgentKind
-    private let path: String
+    /// Absolute transcript JSONL path.
+    public nonisolated let path: String
+    /// The transcript did not exist when this tailer was created: it is read
+    /// as live growth from its first line instead of backfilled.
+    private let followsFromFirstLine: Bool
     private let onBatch: @Sendable (Batch) async -> Void
 
     private let maxInitialLines: Int
@@ -67,6 +75,7 @@ public actor AgentChatTranscriptTailer {
         self.sessionID = sessionID
         self.agentKind = agentKind
         self.path = path
+        self.followsFromFirstLine = !FileManager.default.fileExists(atPath: path)
         self.maxInitialLines = maxInitialLines
         self.maxCachedMessages = maxCachedMessages
         self.onBatch = onBatch
@@ -77,10 +86,19 @@ public actor AgentChatTranscriptTailer {
     public func start() async {
         guard !started else { return }
         started = true
-        loadInitialTail()
+        let followsFromFirstLine = followsFromFirstLine
+        if !followsFromFirstLine {
+            loadInitialTail()
+        }
         let watcher = FileWatcher(path: path, throttle: .milliseconds(200))
         self.watcher = watcher
         watchTask = Task { [weak self] in
+            // The watcher is already attached, so a transcript created after
+            // this drain still wakes the loop. Draining here, not in `start`,
+            // keeps every live batch in this one task, in file order.
+            if followsFromFirstLine {
+                await self?.drainNewContent()
+            }
             for await _ in watcher.events {
                 guard let self else { return }
                 await self.drainNewContent()
@@ -206,6 +224,11 @@ public actor AgentChatTranscriptTailer {
             loadInitialTail()
             await onBatch(Batch(appended: [], updated: [], discoveredTitle: nil, didReset: true))
             return
+        }
+        if fileInode == nil {
+            // First sight of a transcript created after this tailer started:
+            // remember it so a later replacement is detected.
+            fileInode = currentInode
         }
         guard size > byteOffset else { return }
         try? handle.seek(toOffset: byteOffset)

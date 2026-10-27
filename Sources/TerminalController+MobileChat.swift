@@ -357,7 +357,8 @@ extension TerminalController {
     }
 
     /// Interrupts an agent session's current turn: Esc, or ctrl-C when `hard`. The one interrupt path behind
-    /// `mobile.chat.interrupt` and ShellX Link's `chat.interrupt`.
+    /// `mobile.chat.interrupt` and ShellX Link's `chat.interrupt`. Once the terminal takes the key the session
+    /// is idle: the agent waits for input, and Claude Code fires no hook that would say so.
     func agentChatInterrupt(sessionID: String, hard: Bool) async -> V2CallResult {
         guard let terminalTarget = await mobileChatTerminalTarget(sessionID: sessionID) else {
             return .err(code: "not_found", message: Self.chatTerminalBindingErrorMessage, data: [
@@ -371,6 +372,7 @@ extension TerminalController {
                 defaultValue: "Interrupt key was not accepted"
             ), data: nil)
         }
+        agentChatTranscriptService?.noteInterrupted(sessionID: sessionID)
         terminalTarget.forceRefresh(reason: "mobileHost.chatInterrupt")
         return .ok(["interrupted": true, "hard": hard])
     }

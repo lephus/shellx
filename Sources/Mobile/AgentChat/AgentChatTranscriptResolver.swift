@@ -92,6 +92,21 @@ struct AgentChatTranscriptResolver: Sendable {
         }
     }
 
+    /// The transcript a live session's tailer follows: ``boundedTranscriptPath(for:)``, else the path the
+    /// agent's hooks recorded, before the agent has created the file. Claude Code names a new session's
+    /// transcript in its first hooks (SessionStart, the first UserPromptSubmit) and writes it only after them.
+    func liveTranscriptPath(for record: AgentChatSessionRecord) -> String? {
+        boundedTranscriptPath(for: record) ?? recordedTranscriptLocation(for: record)
+    }
+
+    /// The hook-recorded transcript path, expanded, whether or not the file exists yet; nil when none was
+    /// recorded or it is not absolute.
+    func recordedTranscriptLocation(for record: AgentChatSessionRecord) -> String? {
+        guard let recorded = record.transcriptPath, !recorded.isEmpty else { return nil }
+        let expanded = (recorded as NSString).expandingTildeInPath
+        return expanded.hasPrefix("/") ? expanded : nil
+    }
+
     private func recordedTranscriptPath(for record: AgentChatSessionRecord) -> String? {
         guard let recorded = record.transcriptPath else { return nil }
         let expanded = (recorded as NSString).expandingTildeInPath

@@ -175,7 +175,12 @@ The `decision` object of `agent.reply` has a `kind` (open enum) that selects the
 | --- | --- | --- |
 | `permission` | `mode` string | `{"kind":"permission","mode":"once"}` |
 | `question` | `selections` array of string, positional: `selections[i]` answers `questions[i]`, so its length equals the number of the item's `questions`. Each element is 1 to 1024 UTF-8 bytes. An element equal to an option `label` picks that option; any other string is a free-text answer. For a `multi_select` question, the chosen labels are joined with `", "` | `{"kind":"question","selections":["Postgres"]}` |
-| `exit_plan` | `mode` string, `feedback` string (optional) | `{"kind":"exit_plan","mode":"manual","feedback":"split step 2"}` |
+| `exit_plan` | `mode` string, `feedback` string (optional, at most 4096 UTF-8 bytes) | `{"kind":"exit_plan","mode":"manual","feedback":"split step 2"}` |
+
+An `exit_plan` decision whose `feedback` is not empty (after trimming white space) rejects the plan and asks
+the agent to revise it with that change, whatever `mode` says: the host answers the agent "rejected, wants
+this change: <feedback>". `mode` takes effect only without feedback, but it is still required and must be one
+of the item's `modes`.
 
 A `decision` with a `kind` this version does not know decodes (it is not `bad_json`); the host
 answers it `unknown` (section 5). A known `kind` with a missing required field is `bad_json`.
@@ -252,7 +257,8 @@ A request is resolved at most once. For an `agent.reply`, the first rule that ma
    was. That is any of: the `decision.kind` differs from the item's `kind`; the decision's
    `mode` is not in the item's `modes`; for a `question`, the number of `selections` differs from
    the number of the item's `questions`, or an element is empty or longer than 1024 UTF-8 bytes;
-   the `decision.kind` is not known to the host.
+   for an `exit_plan`, the `feedback` is longer than 4096 UTF-8 bytes; the `decision.kind` is not
+   known to the host.
 4. No agent is waiting for the request any more (the agent stopped waiting, it never waited
    because it sent the request without waiting, or the host restarted since the request
    arrived): nothing can take the decision. The host marks the

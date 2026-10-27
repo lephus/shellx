@@ -300,6 +300,8 @@ struct ShellXLinkChatSourceTests {
             service.noteHookEvent(hook(.sessionStart))
             service.noteHookEvent(hook(.userPromptSubmit))
         }
+        // No transcript yet: no history, as before (the phone hears `not_found`); live entries still follow.
+        #expect(await source.history(sessionId: session, beforeSeq: nil, limit: 10) == nil)
         try append(Self.userLine("u-1", "Create the file"))
         await MainActor.run { service.noteHookEvent(hook(.preToolUse, tool: "Bash")) }
         try append(Self.assistantLine("a-1", [
