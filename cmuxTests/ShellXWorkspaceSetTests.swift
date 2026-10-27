@@ -122,6 +122,14 @@ struct ShellXWorkspaceSetTests {
         #expect(WorkspaceSetPlan.workspaceIdsToSave(orderedIds: ids, selectedIds: []) == ids)
     }
 
+    @Test func selectedWorkspacesThatCannotBeSavedDoNotCountTowardTheSelection() {
+        let ids = (0..<3).map { _ in UUID() }
+        let remote = UUID()
+
+        #expect(WorkspaceSetPlan.workspaceIdsToSave(orderedIds: ids, selectedIds: [ids[1], remote]) == ids)
+        #expect(WorkspaceSetPlan.workspaceIdsToSave(orderedIds: ids, selectedIds: [UUID(), remote]) == ids)
+    }
+
     // MARK: - Which saved workspaces to open
 
     @Test func openingSkipsFoldersThatAlreadyHaveAWorkspace() {
@@ -132,6 +140,16 @@ struct ShellXWorkspaceSetTests {
         )
 
         #expect(indices == [0, 3])
+    }
+
+    @Test func aWorkspaceInASubfolderCountsAsTheDeepestSavedFolderAroundIt() {
+        let indices = WorkspaceSetPlan.indicesToOpen(
+            savedDirectories: ["/p/mono", "/p/mono/web", "/p/api"],
+            openDirectories: ["/p/mono/web/src", "/p/api/cmd/server"],
+            homeDirectory: "/home/me"
+        )
+
+        #expect(indices == [0])
     }
 
     @Test func openingKeepsSavedOrderAndRepeatedFolders() {
