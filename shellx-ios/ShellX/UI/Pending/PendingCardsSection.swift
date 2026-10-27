@@ -17,7 +17,7 @@ struct PendingCardsSection: View {
                 ForEach(items) { item in
                     PendingCardView(
                         item: item, status: center.status[item.id], showsMachineName: hub.machines.count > 1,
-                        actions: actions(for: item)
+                        actions: Self.actions(for: item, hub: hub, center: center, route: $route)
                     )
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                     .listRowBackground(Color.clear)
@@ -29,20 +29,23 @@ struct PendingCardsSection: View {
         }
     }
 
-    private func actions(for item: MachinePendingItem) -> PendingCardView.Actions {
+    /// A card's buttons: decisions go through the center; "Answer", "Review plan" and "Show more"
+    /// set `route` to the item's sheet.
+    @MainActor
+    static func actions(
+        for item: MachinePendingItem, hub: MachineHub, center: DecisionCenter, route: Binding<PendingRoute?>
+    ) -> PendingCardView.Actions {
         let key = item.id
-        let center = self.center
+        let open = {
+            let model = PendingSheetModel(key: item.id, hub: hub, center: center)
+            // Gone between the tap and now: there is nothing left to show.
+            guard model.opened != nil else { return }
+            route.wrappedValue = PendingRoute(kind: PendingRoute.kind(for: item.item), model: model)
+        }
         return PendingCardView.Actions(
             decide: { decision in Task { await center.send(decision, for: key) } },
-            openSheet: { open(item) },
-            showMore: { open(item) },
+            openSheet: open,
+            showMore: open,
             retry: { Task { await center.retry(key) } })
-    }
-
-    private func open(_ item: MachinePendingItem) {
-        let model = PendingSheetModel(key: item.id, hub: hub, center: center)
-        // Gone between the tap and now: there is nothing left to show.
-        guard model.opened != nil else { return }
-        route = PendingRoute(kind: PendingRoute.kind(for: item.item), model: model)
     }
 }

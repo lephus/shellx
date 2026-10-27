@@ -20,10 +20,11 @@ final class DemoScript {
     func start() async {
         guard task == nil else { return }
         await script.setUp()
-        for index in 0..<3 { await script.step(index) }
+        let played = 3
+        for index in 0..<played { await script.step(index) }
         let script = self.script
         task = Task.detached {
-            await script.run(sleep: { try await Task.sleep(for: $0) }, setUp: false)
+            await script.run(sleep: { try await Task.sleep(for: $0) }, setUp: false, from: played)
         }
     }
 }

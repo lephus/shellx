@@ -247,6 +247,34 @@ final class MachineHubTests: XCTestCase {
         XCTAssertEqual(connects, 1)
     }
 
+    func testChatResetArrivesAsItsOwnUpdateInOrder() async throws {
+        let a = FakeMac(name: "MacBook Pro")
+        await a.upsertSession(agentSession("s1"))
+        await a.setHistory(sessionId: "s1", entries: [])
+        let rig = try await rig([a])
+        await rig.hub.start()
+        let online = await eventually { allOnline(rig.hub) && rig.hub.liveSessions.count == 1 }
+        XCTAssertTrue(online)
+        let updates = Collected<ChatUpdate>()
+        let stream = rig.hub.chatUpdates()
+        let reader = Task { for await update in stream { updates.items.append(update) } }
+        defer { reader.cancel() }
+
+        // Entries of the old transcript, the reset, then entries of the new one.
+        await a.pushChat(sessionId: "s1", entries: [chatEntry(7)])
+        await a.resetChat(sessionId: "s1", entries: [chatEntry(1)])
+        await a.pushChat(sessionId: "s1", entries: [chatEntry(2)])
+
+        let all = await eventually { updates.items.count == 3 }
+        XCTAssertTrue(all, "\(updates.items)")
+        let ref = SessionRef(machineID: a.machine.machineID, sessionId: "s1", agent: "claude", workspaceTitle: "shellx")
+        XCTAssertEqual(updates.items, [.upsert(ref, [chatEntry(7)]), .reset(ref), .upsert(ref, [chatEntry(2)])])
+        XCTAssertEqual(updates.items[1].entries, [], "a reset carries no entries")
+        // The Mac answers from the new transcript.
+        let page = try await rig.hub.chatHistory(ref, beforeSeq: nil, limit: 50)
+        XCTAssertEqual(page.entries.map(\.seq), [1, 2])
+    }
+
     func testChatAndSessionUpdatesMulticast() async throws {
         let a = FakeMac(name: "MacBook Pro")
         await a.upsertSession(agentSession("s1"))
@@ -255,8 +283,8 @@ final class MachineHubTests: XCTestCase {
         await rig.hub.start()
         _ = await eventually { allOnline(rig.hub) && rig.hub.liveSessions.count == 1 }
 
-        let chatA = Collected<(SessionRef, [ChatEntry])>()
-        let chatB = Collected<(SessionRef, [ChatEntry])>()
+        let chatA = Collected<ChatUpdate>()
+        let chatB = Collected<ChatUpdate>()
         let listsA = Collected<(machineID: String, sessions: [AgentSession])>()
         let listsB = Collected<(machineID: String, sessions: [AgentSession])>()
         let streamChatA = rig.hub.chatUpdates()
@@ -279,10 +307,10 @@ final class MachineHubTests: XCTestCase {
         }
         XCTAssertTrue(both, "\(chatA.items.count) \(chatB.items.count) \(listsA.items.count) \(listsB.items.count)")
         let ref = SessionRef(machineID: a.machine.machineID, sessionId: "s1", agent: "claude", workspaceTitle: "shellx")
-        XCTAssertEqual(chatA.items.first?.0, ref)
-        XCTAssertEqual(chatA.items.first?.0.workspaceTitle, "shellx")
-        XCTAssertEqual(chatA.items.first?.1, [chatEntry(1)])
-        XCTAssertEqual(chatB.items.first?.1, [chatEntry(1)])
+        XCTAssertEqual(chatA.items.first?.ref, ref)
+        XCTAssertEqual(chatA.items.first?.ref.workspaceTitle, "shellx")
+        XCTAssertEqual(chatA.items.first?.entries, [chatEntry(1)])
+        XCTAssertEqual(chatB.items.first?.entries, [chatEntry(1)])
         XCTAssertEqual(listsA.items.first?.machineID, a.machine.machineID)
         XCTAssertEqual(Set(listsB.items.first?.sessions.map(\.sessionId) ?? []), ["s1", "s2"])
 
@@ -297,14 +325,14 @@ final class MachineHubTests: XCTestCase {
         XCTAssertEqual(chatB.items.count, 1)
 
         // No replay: a new reader only sees what comes after it.
-        let late = Collected<(SessionRef, [ChatEntry])>()
+        let late = Collected<ChatUpdate>()
         let streamLate = rig.hub.chatUpdates()
         let readerLate = Task { for await update in streamLate { late.items.append(update) } }
         defer { readerLate.cancel() }
         await a.pushChat(sessionId: "s1", entries: [chatEntry(3)])
         let third = await eventually { chatA.items.count == 3 && late.items.count == 1 }
         XCTAssertTrue(third)
-        XCTAssertEqual(late.items.first?.1, [chatEntry(3)])
+        XCTAssertEqual(late.items.first?.entries, [chatEntry(3)])
     }
 
     // MARK: - Calls, pairing, default Mac

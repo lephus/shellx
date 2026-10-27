@@ -31,6 +31,18 @@ public actor FakeMac {
         }
     }
 
+    public struct HistoryRequest: Equatable, Sendable {
+        public var sessionId: String
+        public var beforeSeq: Int?
+        public var limit: Int
+
+        public init(sessionId: String, beforeSeq: Int?, limit: Int) {
+            self.sessionId = sessionId
+            self.beforeSeq = beforeSeq
+            self.limit = limit
+        }
+    }
+
     public struct Interrupt: Equatable, Sendable {
         public var sessionId: String
         public var hard: Bool
@@ -57,11 +69,13 @@ public actor FakeMac {
     private var failuresLeft = 0
     private var live: [UUID: (circuit: any RelayCircuit, task: Task<Void, Never>)] = [:]
 
-    public init(name: String, servesSessionsAndChat: Bool = true) {
+    /// `id` names the Mac (`mac-<id>`) and its slot; a new random one by default. The Debug demo
+    /// passes a fixed one, so what the phone keeps about the Mac survives a relaunch.
+    public init(name: String, id: String? = nil, servesSessionsAndChat: Bool = true) {
         let key = NoiseStaticKey()
         hostKey = key
         self.servesSessionsAndChat = servesSessionsAndChat
-        let id = UUID().uuidString.lowercased()
+        let id = id ?? UUID().uuidString.lowercased()
         machine = PairedMachine(
             machineID: "mac-\(id)", name: name, linkSlot: "slot-\(id)", hostKey: key.publicKey)
     }
@@ -168,12 +182,21 @@ public actor FakeMac {
 
     public func setHistory(sessionId: String, entries: [ChatEntry]) { chat.setHistory(sessionId: sessionId, entries: entries) }
     public func pushChat(sessionId: String, entries: [ChatEntry]) { chat.push(sessionId: sessionId, entries: entries) }
+    /// The Mac reloads the session's transcript (its `seq` values start over): the transcript
+    /// becomes `entries` and phones get `chat.reset`, in order with the session's pushes.
+    public func resetChat(sessionId: String, entries: [ChatEntry]) { chat.reset(sessionId: sessionId, entries: entries) }
     /// nil goes back to `submitted` for a known session and `not_found` otherwise.
     public func setSendOutcome(_ outcome: ChatSendOutcome?) { chat.setSendOutcome(outcome) }
     public var sentTexts: [SentText] { chat.sentTexts }
     /// nil goes back to `sent` for a known session and `not_found` otherwise.
     public func setInterruptOutcome(_ outcome: ChatInterruptOutcome?) { chat.setInterruptOutcome(outcome) }
     public var interrupts: [Interrupt] { chat.interrupts }
+    /// Every `chat.history.get` the Mac received, in order.
+    public var historyRequests: [HistoryRequest] { chat.historyRequests }
+    /// From now on chat calls (history, send, interrupt) are recorded but not answered until
+    /// `releaseChat()`, as when the Mac is slow.
+    public func holdChat() { chat.hold() }
+    public func releaseChat() { chat.release() }
 }
 
 /// The phone keys a `FakeMac` trusts; read by `LinkHost` on every handshake, from any thread.

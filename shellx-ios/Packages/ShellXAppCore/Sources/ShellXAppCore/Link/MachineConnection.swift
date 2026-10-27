@@ -170,9 +170,15 @@ public actor MachineConnection {
                 for await change in client.sessionChanges { await self.applySessions(change, from: client) }
             }
             group.addTask {
-                // Read even when no screen shows chat: the client buffers without bound.
+                // Read even when no screen shows chat: the client buffers without bound. A reset
+                // stays in order with the entries around it.
                 for await push in client.chatEntries {
-                    output.yield(.chat(sessionId: push.sessionId, entries: push.entries))
+                    switch push {
+                    case let .upsert(sessionId, entries):
+                        output.yield(.chat(sessionId: sessionId, entries: entries))
+                    case let .reset(sessionId):
+                        output.yield(.chatReset(sessionId: sessionId))
+                    }
                 }
             }
             for await change in client.changes { await applyPending(change, from: client) }

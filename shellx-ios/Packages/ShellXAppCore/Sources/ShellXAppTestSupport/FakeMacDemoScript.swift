@@ -24,10 +24,11 @@ public actor FakeMacDemoScript {
     }
 
     /// `setUp()` (unless already done), then a `step` after every `interval`, until the task is
-    /// cancelled.
-    public func run(sleep: @Sendable (Duration) async throws -> Void, setUp runsSetUp: Bool = true) async {
+    /// cancelled. Steps are numbered from `first`: after steps already played by hand, go on from
+    /// the next one, so new chat entries never reuse an earlier step's id and seq.
+    public func run(sleep: @Sendable (Duration) async throws -> Void, setUp runsSetUp: Bool = true, from first: Int = 0) async {
         if runsSetUp { await setUp() }
-        var index = 0
+        var index = first
         while !Task.isCancelled {
             do { try await sleep(Self.interval) } catch { return }
             await step(index)
@@ -67,12 +68,14 @@ public actor FakeMacDemoScript {
         sessions[slot].state = sessions[slot].state == .working ? .idle : .working
         sessions[slot].stateSinceMs = ms
         sessions[slot].lastActivityMs = ms
-        await mac.upsertSession(sessions[slot])
+        // The reply comes first, then the state change, as when Claude Code writes its last message
+        // and then stops: the home's "done" note quotes this reply.
         let entry = ChatEntry(
             id: "\(sessions[slot].sessionId)-tick-\(index)", rev: 1, seq: 100 + index, role: .agent, kind: .prose,
             text: sessions[slot].state == .idle ? "Xong. Mình đã chạy lại test, tất cả đều xanh." : "Đang làm tiếp…",
             tsMs: ms)
         await mac.pushChat(sessionId: sessions[slot].sessionId, entries: [entry])
+        await mac.upsertSession(sessions[slot])
     }
 
     private func millis() -> Int64 { Int64(now().timeIntervalSince1970 * 1000) }

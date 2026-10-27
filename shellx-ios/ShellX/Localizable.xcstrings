@@ -1,6 +1,510 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "agent.busy": {
+      "comment": "The agent did not take the message because it is busy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The agent is busy; try again later"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent đang bận, thử lại sau"
+          }
+        }
+      }
+    },
+    "agent.cut": {
+      "comment": "Under a chat entry the Mac cut short.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "… (cut; see it in full on the Mac)"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "… (đã cắt, xem đầy đủ trên Mac)"
+          }
+        }
+      }
+    },
+    "agent.empty": {
+      "comment": "An agent's chat with no messages yet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No messages yet. New ones show up here as the agent writes them."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa có tin nhắn nào. Tin mới sẽ hiện ở đây khi agent viết."
+          }
+        }
+      }
+    },
+    "agent.empty.failed": {
+      "comment": "An agent's chat whose first messages could not be loaded; a Try again button follows.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load the messages."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không tải được tin nhắn."
+          }
+        }
+      }
+    },
+    "agent.empty.offline %@": {
+      "comment": "An agent's chat with no copy on the phone while its Mac is offline. The argument is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is offline. Messages show up here when it's back."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đang offline. Tin nhắn sẽ hiện ở đây khi Mac kết nối lại."
+          }
+        }
+      }
+    },
+    "agent.forceStop": {
+      "comment": "Confirm button of Force Stop.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Force Stop"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dừng hẳn"
+          }
+        }
+      }
+    },
+    "agent.forceStop.menu": {
+      "comment": "Menu item under Stop: a stronger stop, asks to confirm first.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Force Stop…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dừng hẳn…"
+          }
+        }
+      }
+    },
+    "agent.forceStop.message": {
+      "comment": "Message of the Force Stop confirmation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This sends Ctrl+C to the agent. Use it when Stop doesn't work."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lệnh này gửi Ctrl+C tới agent. Dùng khi Dừng không có tác dụng."
+          }
+        }
+      }
+    },
+    "agent.forceStop.title %@ %@": {
+      "comment": "Title of the Force Stop confirmation. 1: agent name, 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Force stop %1$@ in %2$@?"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dừng hẳn %1$@ ở %2$@?"
+          }
+        }
+      }
+    },
+    "agent.gone": {
+      "comment": "The Mac no longer has this agent session.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This session is gone from the Mac"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên này không còn trên Mac"
+          }
+        }
+      }
+    },
+    "agent.newMessages": {
+      "comment": "Button over the bottom of an agent's chat: newer messages came while the user read older ones.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New messages"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tin mới"
+          }
+        }
+      }
+    },
+    "agent.newMessages.hint": {
+      "comment": "VoiceOver hint of the New messages button.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scrolls to the newest message"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuộn tới tin mới nhất"
+          }
+        }
+      }
+    },
+    "agent.older.failed": {
+      "comment": "At the top of an agent's chat when older messages could not be loaded; a Try again button follows.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load older messages."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không tải được tin cũ hơn."
+          }
+        }
+      }
+    },
+    "agent.olderOnMac": {
+      "comment": "At the top of an agent's chat when the phone keeps no older messages.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Older messages are only on the Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tin cũ hơn chỉ còn trên Mac."
+          }
+        }
+      }
+    },
+    "agent.open.hint": {
+      "comment": "VoiceOver hint of an agent row or a done note: activating it opens that agent's chat.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the agent's chat"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở cuộc trò chuyện với agent"
+          }
+        }
+      }
+    },
+    "agent.sent": {
+      "comment": "Shown after the agent took a message.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã gửi"
+          }
+        }
+      }
+    },
+    "agent.state.done": {
+      "comment": "An agent session finished its turn (idle).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xong"
+          }
+        }
+      }
+    },
+    "agent.state.ended": {
+      "comment": "An agent session has ended.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ended"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã kết thúc"
+          }
+        }
+      }
+    },
+    "agent.state.needsYou": {
+      "comment": "An agent session waits for the user.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs you"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cần bạn"
+          }
+        }
+      }
+    },
+    "agent.state.offline": {
+      "comment": "An agent session whose Mac is not online (its last known state is not shown).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac offline"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac đang offline"
+          }
+        }
+      }
+    },
+    "agent.state.running": {
+      "comment": "An agent session is working (since when is not known).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang chạy"
+          }
+        }
+      }
+    },
+    "agent.state.running %@": {
+      "comment": "An agent session is working; the argument is how long (\"4 minutes\").",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running for %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang chạy %@"
+          }
+        }
+      }
+    },
+    "agent.stop": {
+      "comment": "The agent screen's Stop button: interrupts the agent's current turn.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dừng"
+          }
+        }
+      }
+    },
+    "agent.stop.failed": {
+      "comment": "Shown when the Mac could not stop the agent.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac couldn't stop the agent"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac không dừng được agent"
+          }
+        }
+      }
+    },
+    "agent.stop.noAnswer": {
+      "comment": "Shown when the Mac did not answer a Stop or Force Stop.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac didn't answer. The agent may still be running."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac không trả lời. Agent có thể vẫn đang chạy."
+          }
+        }
+      }
+    },
+    "agent.stop.sent": {
+      "comment": "Shown after the Mac took a Stop or Force Stop.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop sent"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã gửi lệnh dừng"
+          }
+        }
+      }
+    },
+    "agent.thought": {
+      "comment": "Label of the agent's collapsed reasoning; tapping it shows the text.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thinking"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suy nghĩ"
+          }
+        }
+      }
+    },
+    "agent.tool.expandHint": {
+      "comment": "VoiceOver hint of a one-line tool call: activating it shows the whole call.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows all of it"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiện toàn bộ"
+          }
+        }
+      }
+    },
     "common.cancel": {
       "comment": "Cancel button of alerts.",
       "extractionState": "manual",
@@ -55,6 +559,114 @@
         }
       }
     },
+    "composer.placeholder": {
+      "comment": "Placeholder of the message field.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Message the agent…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nhắn cho agent…"
+          }
+        }
+      }
+    },
+    "composer.send": {
+      "comment": "VoiceOver label of the send button of the message field.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi"
+          }
+        }
+      }
+    },
+    "composer.target %@": {
+      "comment": "Chip above the message field: where the message goes (\"Claude Code · shellx\").",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send to: %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi tới: %@"
+          }
+        }
+      }
+    },
+    "composer.target.automatic": {
+      "comment": "Menu choice: send to the session messaged last, or the newest on the default Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tự động"
+          }
+        }
+      }
+    },
+    "composer.target.none": {
+      "comment": "Where the message goes when no session is running.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no running session"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "chưa có phiên nào"
+          }
+        }
+      }
+    },
+    "composer.tooLong %@ %@": {
+      "comment": "The message is over the byte limit. 1: its length, 2: the limit (16,384), both formatted.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Too long: %1$@ / %2$@ bytes"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dài quá: %1$@ / %2$@ byte"
+          }
+        }
+      }
+    },
     "firstMac.scan": {
       "comment": "Primary button of the first-Mac screen: opens the scanner.",
       "extractionState": "manual",
@@ -105,6 +717,294 @@
           "stringUnit": {
             "state": "translated",
             "value": "Xem và trả lời Claude Code trên Mac ngay từ iPhone này."
+          }
+        }
+      }
+    },
+    "home.agents.title %lld": {
+      "comment": "Title of the agent strip on the home; the number is how many sessions are running.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Agent · %lld"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Agents · %lld"
+                }
+              }
+            }
+          }
+        },
+        "vi": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Agent · %lld"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "home.empty": {
+      "comment": "The home conversation before anything was said.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send work to a Claude Code session running on your Mac. Anything that needs you is pinned at the top."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nhắn việc cho một phiên Claude Code đang chạy trên Mac. Việc nào cần bạn sẽ được ghim ở trên cùng."
+          }
+        }
+      }
+    },
+    "home.macPill.hint": {
+      "comment": "VoiceOver hint of the default Mac at the top of the home.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens Your Macs."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở Máy của bạn."
+          }
+        }
+      }
+    },
+    "home.note.busy %@ %@": {
+      "comment": "ShellX note: the agent was busy and did not take the message. 1: agent name, 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sent: %1$@ in %2$@ is busy. Try again later."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa gửi: %1$@ ở %2$@ đang bận. Thử lại sau."
+          }
+        }
+      }
+    },
+    "home.note.failed %@ %@": {
+      "comment": "ShellX note: the Mac could not type the message in. 1: agent name, 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't send to %1$@ in %2$@."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không gửi được tới %1$@ ở %2$@."
+          }
+        }
+      }
+    },
+    "home.note.finished %@ %@ %@": {
+      "comment": "ShellX note: an agent finished. 1: agent name, 2: workspace, 3: first line of its last reply.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ in %2$@ is done: %3$@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ở %2$@ đã xong: %3$@"
+          }
+        }
+      }
+    },
+    "home.note.finished.noSummary %@ %@": {
+      "comment": "ShellX note: an agent finished (its reply is not known). 1: agent name, 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ in %2$@ is done."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ở %2$@ đã xong."
+          }
+        }
+      }
+    },
+    "home.note.noAnswer %@ %@": {
+      "comment": "ShellX note: the Mac did not answer; the message may not have arrived. 1: agent name, 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No answer from the Mac. The message may not have reached %1$@ in %2$@."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac chưa trả lời. Có thể tin chưa tới %1$@ ở %2$@."
+          }
+        }
+      }
+    },
+    "home.note.noLiveSession": {
+      "comment": "ShellX note: no agent session is running to send the message to.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Claude Code session is running. Start Claude Code in ShellX on your Mac, then try again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa có phiên Claude Code nào đang chạy. Mở Claude Code trong ShellX trên Mac rồi nhắn lại."
+          }
+        }
+      }
+    },
+    "home.note.notFound %@ %@": {
+      "comment": "ShellX note: the session is gone from the Mac. 1: agent name, 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sent: %1$@ in %2$@ is no longer on the Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa gửi: %1$@ ở %2$@ không còn trên Mac."
+          }
+        }
+      }
+    },
+    "home.note.offline %@": {
+      "comment": "ShellX note: the Mac is offline, nothing was sent. The argument is the Mac's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is offline."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đang offline."
+          }
+        }
+      }
+    },
+    "home.note.sent %@ %@": {
+      "comment": "ShellX note: a message reached an agent. 1: agent name (Claude Code), 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent to %1$@ in %2$@."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã gửi tới %1$@ ở %2$@."
+          }
+        }
+      }
+    },
+    "home.pending.seeAll %lld": {
+      "comment": "Opens every pending request; the number is how many there are.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See All (%lld)"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xem tất cả (%lld)"
+          }
+        }
+      }
+    },
+    "home.sender.you": {
+      "comment": "VoiceOver: who said a message in the home conversation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bạn"
+          }
+        }
+      }
+    },
+    "home.voice": {
+      "comment": "VoiceOver: the message was spoken, not typed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spoken"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bằng giọng nói"
           }
         }
       }
@@ -1045,6 +1945,42 @@
         }
       }
     },
+    "pending.list.empty": {
+      "comment": "Every pending request was handled.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing needs you right now."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiện không có việc nào cần bạn."
+          }
+        }
+      }
+    },
+    "pending.list.title": {
+      "comment": "Title of the screen with every pending request.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs You"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cần bạn"
+          }
+        }
+      }
+    },
     "pending.mayBeCut": {
       "comment": "Under a preview that may have been cut by the Mac.",
       "extractionState": "manual",
@@ -1869,6 +2805,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Email hoặc mật khẩu không đúng."
+          }
+        }
+      }
+    },
+    "signin.error.localWipePending": {
+      "comment": "Sign-in error: the previous account's data could not be removed from this iPhone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't clear the previous account's data on this iPhone. Try again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không xoá được dữ liệu của tài khoản trước trên iPhone này. Thử lại."
           }
         }
       }

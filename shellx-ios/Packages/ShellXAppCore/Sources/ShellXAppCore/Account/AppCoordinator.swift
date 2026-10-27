@@ -16,13 +16,18 @@ public final class AppCoordinator {
     @ObservationIgnored private let relay: any RelayAccountCalling
     @ObservationIgnored private let deviceName: String
     @ObservationIgnored private let wipers: [any LocalDataWiping]
+    /// Holds a non-secret "local wipe pending" flag across launches.
+    @ObservationIgnored private let pendingWipeDefaults: UserDefaults
+    private static let pendingWipeKey = "shellx.localWipePending"
     @ObservationIgnored private let makeHub: @MainActor () -> MachineHub
     @ObservationIgnored private let log = Logger(subsystem: "com.shellx.app", category: "account")
 
     public init(
         vault: AccountVault, relay: any RelayAccountCalling, deviceName: String, wipers: [any LocalDataWiping],
+        pendingWipeDefaults: UserDefaults = .standard,
         makeHub: @escaping @MainActor () -> MachineHub
     ) {
+        self.pendingWipeDefaults = pendingWipeDefaults
         self.vault = vault
         self.relay = relay
         self.deviceName = deviceName
@@ -33,6 +38,7 @@ public final class AppCoordinator {
     /// Reads the stored session. A Keychain that is locked (iOS may start the app before the first
     /// unlock) keeps the phase at `.launching`; `protectedDataBecameAvailable()` tries again.
     public func launch() async {
+        _ = await retryPendingWipe()
         do {
             if let session = try await vault.session() {
                 phase = .signedIn(email: session.email)
@@ -55,6 +61,8 @@ public final class AppCoordinator {
     }
 
     public func signIn(email: String, password: String) async throws(SignInError) {
+        // A sign-out whose local wipe failed blocks every sign-in until the wipe succeeds.
+        guard await retryPendingWipe() else { throw .localWipePending }
         let key: Data
         do {
             key = try await vault.phoneKey().publicKey
@@ -70,12 +78,19 @@ public final class AppCoordinator {
         } catch {
             throw SignInError(error)
         }
+        // Another account's Macs and history must not survive into this one. Every wiper runs first;
+        // the owner changes only when all succeeded, so a retry wipes again.
+        let previousOwner: String?
+        do { previousOwner = try await vault.machinesOwner() } catch {
+            log.error("sign_in_store_failed")
+            throw .server(code: "keychain")
+        }
+        let otherAccount = previousOwner != nil && previousOwner != account.userID
+        if otherAccount {
+            guard await runWipers() else { throw .localWipePending }
+        }
         do {
-            // Another account's Macs and history must not survive into this one.
-            if let owner = try await vault.machinesOwner(), owner != account.userID {
-                try await vault.setMachines([], owner: account.userID)
-                for wiper in wipers { await wiper.wipe() }
-            }
+            if otherAccount { try await vault.setMachines([], owner: account.userID) }
             try await vault.setSession(
                 StoredSession(
                     userID: account.userID, deviceID: account.deviceID, token: account.token, email: email))
@@ -108,7 +123,12 @@ public final class AppCoordinator {
         do { try await vault.wipe() } catch {
             log.error("sign_out_wipe_failed")
         }
-        for wiper in wipers { await wiper.wipe() }
+        // Sign out regardless; a failed wipe is remembered and retried before anyone signs in.
+        if await runWipers() {
+            pendingWipeDefaults.removeObject(forKey: Self.pendingWipeKey)
+        } else {
+            pendingWipeDefaults.set(true, forKey: Self.pendingWipeKey)
+        }
         phase = .signedOut(expired: false)
     }
 
@@ -120,6 +140,27 @@ public final class AppCoordinator {
             log.error("unauthorized_clear_failed")
         }
         phase = .signedOut(expired: true)
+    }
+
+    /// Runs every wiper, continuing past failures; true when all succeeded.
+    private func runWipers() async -> Bool {
+        var allSucceeded = true
+        for wiper in wipers {
+            do { try await wiper.wipe() } catch {
+                log.error("local_wipe_failed")
+                allSucceeded = false
+            }
+        }
+        return allSucceeded
+    }
+
+    /// When a sign-out left its local wipe undone, wipes again; the marker is cleared only when
+    /// every wiper succeeds. True when nothing is pending.
+    private func retryPendingWipe() async -> Bool {
+        guard pendingWipeDefaults.bool(forKey: Self.pendingWipeKey) else { return true }
+        guard await runWipers() else { return false }
+        pendingWipeDefaults.removeObject(forKey: Self.pendingWipeKey)
+        return true
     }
 
     private func startHub() async {

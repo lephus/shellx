@@ -10,6 +10,8 @@ public enum MachineEvent: Sendable {
     case sessions(SessionSet, supported: Bool)
     /// New or changed chat entries of one session (upserts by `ChatEntry.id`).
     case chat(sessionId: String, entries: [ChatEntry])
+    /// The session's transcript was replaced (`chat.reset`), in order with its `chat` events.
+    case chatReset(sessionId: String)
     /// The relay refused the account token. The connection has stopped; the owner signs the user out.
     case signedOut
 }

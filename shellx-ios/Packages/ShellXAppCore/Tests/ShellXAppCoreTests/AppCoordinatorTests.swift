@@ -14,6 +14,25 @@ final class CountingWiper: LocalDataWiping, @unchecked Sendable {
     private func increment() { lock.lock(); count += 1; lock.unlock() }
 }
 
+/// A wiper that throws while `failing` is set, and counts its attempts.
+final class FlakyWiper: LocalDataWiping, @unchecked Sendable {
+    struct Failure: Error {}
+    private let lock = NSLock()
+    private var isFailing = true
+    private var attemptCount = 0
+    var attempts: Int { lock.lock(); defer { lock.unlock() }; return attemptCount }
+    func setFailing(_ value: Bool) { lock.lock(); isFailing = value; lock.unlock() }
+    func wipe() async throws {
+        if recordAttempt() { throw Failure() }
+    }
+    private func recordAttempt() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        attemptCount += 1
+        return isFailing
+    }
+}
+
 @MainActor
 final class AppCoordinatorTests: XCTestCase {
     private let account = AccountSession(userID: "u1", deviceID: "d1", token: "tok-1")
@@ -27,14 +46,17 @@ final class AppCoordinatorTests: XCTestCase {
         var coordinator: AppCoordinator
     }
 
-    private func rig(store: InMemorySecretStore = InMemorySecretStore()) async -> Rig {
+    private func rig(
+        store: InMemorySecretStore = InMemorySecretStore(), extraWipers: [any LocalDataWiping] = [],
+        pendingDefaults: UserDefaults = UserDefaults(suiteName: "AppCoordinatorTests-pending-\(UUID().uuidString)")!
+    ) async -> Rig {
         let vault = AccountVault(store: store)
         let relay = FakeRelayAccount()
         await relay.setLogin(.success(account))
         let wiper = CountingWiper()
         let defaults = UserDefaults(suiteName: "AppCoordinatorTests-\(UUID().uuidString)")!
         let coordinator = AppCoordinator(
-            vault: vault, relay: relay, deviceName: "Phu's iPhone", wipers: [wiper],
+            vault: vault, relay: relay, deviceName: "Phu's iPhone", wipers: extraWipers + [wiper], pendingWipeDefaults: pendingDefaults,
             makeHub: {
                 MachineHub(
                     vault: vault, relay: relay, connector: FakeMacFleet([], phoneKey: { try await vault.phoneKey() }),
@@ -204,5 +226,71 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(machines, [])
         XCTAssertEqual(owner, "u1")
         XCTAssertEqual(rig.wiper.wipes, 1)
+    }
+
+    func testFailedWipeOnOtherAccountSignInKeepsOwnerAndRetriesWipe() async throws {
+        let flaky = FlakyWiper()
+        let rig = await rig(extraWipers: [flaky])
+        try await rig.vault.setMachines([mac], owner: "someone-else")
+
+        do {
+            try await rig.coordinator.signIn(email: "a@b.c", password: "pw")
+            XCTFail("sign-in must fail while the previous account's data is still on the phone")
+        } catch {
+            XCTAssertEqual(error, .localWipePending)
+        }
+        // Every wiper ran although the first threw; the owner is still the previous account.
+        XCTAssertEqual(flaky.attempts, 1)
+        XCTAssertEqual(rig.wiper.wipes, 1)
+        let ownerAfterFailure = try await rig.vault.machinesOwner()
+        let session = try await rig.vault.session()
+        XCTAssertEqual(ownerAfterFailure, "someone-else")
+        XCTAssertNil(session)
+
+        flaky.setFailing(false)
+        try await rig.coordinator.signIn(email: "a@b.c", password: "pw")
+        XCTAssertEqual(flaky.attempts, 2)
+        XCTAssertEqual(rig.wiper.wipes, 2)
+        let owner = try await rig.vault.machinesOwner()
+        XCTAssertEqual(owner, "u1")
+    }
+
+    func testSignOutWithFailingWiperRetriesAtLaunchAndBlocksSignInUntilWiped() async throws {
+        let flaky = FlakyWiper()
+        let pending = UserDefaults(suiteName: "AppCoordinatorTests-pending-\(UUID().uuidString)")!
+        let rig = await rig(extraWipers: [flaky], pendingDefaults: pending)
+        flaky.setFailing(false)
+        try await rig.coordinator.signIn(email: "a@b.c", password: "pw")
+        flaky.setFailing(true)
+
+        await rig.coordinator.signOut()
+        XCTAssertEqual(rig.coordinator.phase, .signedOut(expired: false), "sign-out still completes")
+        XCTAssertEqual(rig.wiper.wipes, 1, "the other wiper ran although the first threw")
+        // The vault is empty (no owner), so only the marker can force the retry.
+        let owner = try await rig.vault.machinesOwner()
+        XCTAssertNil(owner)
+
+        // A new launch retries and the wipe still fails: the marker stays and sign-in is refused.
+        let relaunched = AppCoordinator(
+            vault: rig.vault, relay: rig.relay, deviceName: "iPhone", wipers: [flaky, rig.wiper],
+            pendingWipeDefaults: pending,
+            makeHub: { preconditionFailure("no hub expected") })
+        await relaunched.launch()
+        XCTAssertEqual(flaky.attempts, 2)  // sign-out, then launch
+        do {
+            try await relaunched.signIn(email: "x@y.z", password: "pw")
+            XCTFail("sign-in must be blocked")
+        } catch {
+            XCTAssertEqual(error, .localWipePending)
+        }
+        XCTAssertEqual(relaunched.phase, .signedOut(expired: false))
+
+        // Once the wipe works, the next sign-in clears the marker and goes through.
+        flaky.setFailing(false)
+        await relaunched.launch()
+        let attemptsAfterLaunch = flaky.attempts
+        XCTAssertEqual(attemptsAfterLaunch, 4, "the blocked sign-in and this launch each retried once")
+        XCTAssertFalse(pending.bool(forKey: "shellx.localWipePending"))
+        XCTAssertEqual(relaunched.phase, .signedOut(expired: false))
     }
 }

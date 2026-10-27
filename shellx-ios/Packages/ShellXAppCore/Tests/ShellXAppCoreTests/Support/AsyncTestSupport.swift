@@ -154,6 +154,8 @@ final class EventLog: @unchecked Sendable {
             case let .chat(sessionId, entries):
                 chatCount += entries.count
                 lastChatSession = sessionId
+            case let .chatReset(sessionId):
+                lastChatSession = sessionId
             case .signedOut: signedOutCount += 1
             }
         }

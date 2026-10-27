@@ -97,4 +97,29 @@ final class FakeMacDemoScriptTests: XCTestCase {
         running.cancel()
         await running.value
     }
+
+    func testRunAfterStepsGoesOnNumbering() async throws {
+        let mac = FakeMac(name: "Mac giả")
+        let script = FakeMacDemoScript(mac: mac)
+        await script.setUp()
+        for index in 0..<3 { await script.step(index) }
+        let hub = try await hub(for: mac)
+        _ = await eventually { hub.liveSessions.count == 2 }
+        let sleeper = ManualSleeper()
+        let running = Task { await script.run(sleep: sleeper.sleep, setUp: false, from: 3) }
+        defer { running.cancel() }
+
+        _ = await eventually { sleeper.waiting == [FakeMacDemoScript.interval] }
+        sleeper.release()
+        let fourth = await eventually { hub.pendingItems.count == 4 }
+        XCTAssertTrue(fourth)
+
+        // Step 3 flips the second session and adds a new reply; it does not overwrite step 1's.
+        let web = try XCTUnwrap(hub.liveSessions.first { $0.session.sessionId == "demo-web" })
+        let page = try await hub.chatHistory(web.ref, beforeSeq: nil, limit: 50)
+        let ticks = page.entries.filter { $0.id.hasPrefix("demo-web-tick-") }.map(\.seq)
+        XCTAssertEqual(ticks, [101, 103])
+        running.cancel()
+        await running.value
+    }
 }

@@ -6,6 +6,9 @@ public enum SignInError: Error, Equatable, Sendable {
     case rateLimited
     case network
     case server(code: String)
+    /// The previous account's data could not be removed from this iPhone yet; nobody can sign in
+    /// until it is.
+    case localWipePending
 
     /// Maps what `RelayAPI.login` threw.
     init(_ error: Error) {

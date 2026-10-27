@@ -17,12 +17,9 @@ struct RootView: View {
         case let .signedOut(expired):
             SignInView(coordinator: coordinator, expired: expired)
         case let .signedIn(email):
-            if let hub = coordinator.hub, hub.isLoaded {
-                SignedInView(
-                    hub: hub, email: email, inbox: inbox, makePairing: graph.makePairing,
-                    makeDecisions: graph.makeDecisions, signOut: { await coordinator.signOut() }
-                )
-                .id(ObjectIdentifier(hub))
+            if let hub = coordinator.hub, hub.isLoaded, let scope = graph.scopes.scope(for: hub) {
+                SignedInView(scope: scope, email: email, inbox: inbox, signOut: { await coordinator.signOut() })
+                    .id(ObjectIdentifier(hub))
             } else {
                 LaunchView()
             }
