@@ -57,11 +57,13 @@ public actor FakeMac {
     private var failuresLeft = 0
     private var live: [UUID: (circuit: any RelayCircuit, task: Task<Void, Never>)] = [:]
 
-    public init(name: String, servesSessionsAndChat: Bool = true) {
+    /// `id` names the Mac (`mac-<id>`) and its slot; a new random one by default. The Debug demo
+    /// passes a fixed one, so what the phone keeps about the Mac survives a relaunch.
+    public init(name: String, id: String? = nil, servesSessionsAndChat: Bool = true) {
         let key = NoiseStaticKey()
         hostKey = key
         self.servesSessionsAndChat = servesSessionsAndChat
-        let id = UUID().uuidString.lowercased()
+        let id = id ?? UUID().uuidString.lowercased()
         machine = PairedMachine(
             machineID: "mac-\(id)", name: name, linkSlot: "slot-\(id)", hostKey: key.publicKey)
     }

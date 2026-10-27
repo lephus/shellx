@@ -22,6 +22,18 @@ final class SessionSetTests: XCTestCase {
         XCTAssertEqual(set.sessions.map(\.sessionId), ["s1", "s3"])
     }
 
+    func testListAnswerReplacesRevisionAfterMacRestart() {
+        var set = SessionSet()
+        set.reset(revision: 42, sessions: [agentSession("s1")])
+
+        // The Mac app restarted: its `agent.sessions` revision starts at 0 again. The answer replaces
+        // the set's revision, so the next change (1) applies instead of looking already seen.
+        set.reset(revision: 0, sessions: [agentSession("s2")])
+        XCTAssertEqual(set.revision, 0)
+        XCTAssertEqual(set.apply(revision: 1, upserted: [agentSession("s3")], removed: []), .applied)
+        XCTAssertEqual(set.sessions.map(\.sessionId).sorted(), ["s2", "s3"])
+    }
+
     func testGapReported() {
         var set = SessionSet()
         set.reset(revision: 4, sessions: [agentSession("s1")])

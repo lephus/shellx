@@ -1,78 +1,73 @@
 import ShellXAppCore
 import SwiftUI
 
-/// The signed-in screens: `FirstMacView` while no Mac is paired, otherwise "Your Macs" with the
-/// pending cards (until the main screen replaces it), Settings, and the pairing sheet.
+/// The signed-in screens: `FirstMacView` while no Mac is paired, otherwise the home, with "Your
+/// Macs", Settings and every pending card pushed over it, and the pairing sheet.
+///
+/// It owns the account's background work while it is on screen: the decision center follows the
+/// hub's pending items here (the one place that calls `sync`), and the home model watches the hub.
 struct SignedInView: View {
-    let hub: MachineHub
+    let scope: SignedInScope
     let email: String
     let inbox: PairingInbox
-    let makePairing: @MainActor (MachineHub) -> PairingModel
     let signOut: () async -> Void
 
-    @State private var pairing: PairingModel?
+    @State private var path = NavigationPath()
     @State private var showsPairing = false
-    /// One per hub: the view is rebuilt (`.id`) for a new hub.
-    @State private var decisions: DecisionCenter
 
-    init(
-        hub: MachineHub, email: String, inbox: PairingInbox,
-        makePairing: @escaping @MainActor (MachineHub) -> PairingModel,
-        makeDecisions: @MainActor (MachineHub) -> DecisionCenter, signOut: @escaping () async -> Void
-    ) {
-        self.hub = hub
-        self.email = email
-        self.inbox = inbox
-        self.makePairing = makePairing
-        self.signOut = signOut
-        _decisions = State(initialValue: makeDecisions(hub))
-    }
+    private var hub: MachineHub { scope.hub }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Group {
                 if hub.machines.isEmpty {
                     FirstMacView(pair: openPairing)
+                        .toolbar {
+                            // Where the home has it.
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button { path.append(HomeRoute.settings) } label: {
+                                    Label(String(localized: "settings.title"), systemImage: "gearshape")
+                                }
+                                .accessibilityIdentifier("root.settings")
+                            }
+                        }
                 } else {
-                    MachinesView(hub: hub, center: decisions, pair: openPairing)
+                    HomeView(scope: scope, open: { path.append($0) })
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    NavigationLink {
-                        SettingsView(email: email, signOut: signOut)
-                    } label: {
-                        Label(String(localized: "settings.title"), systemImage: "gearshape")
-                    }
-                    .accessibilityIdentifier("root.settings")
+            .navigationDestination(for: HomeRoute.self) { route in
+                switch route {
+                case .machines:
+                    MachinesView(hub: hub, pair: openPairing)
+                case .settings:
+                    SettingsView(email: email, signOut: signOut)
+                case .pending:
+                    PendingListView(hub: hub, center: scope.decisions)
                 }
             }
         }
-        .sheet(isPresented: $showsPairing, onDismiss: { pairing?.cancel() }) {
-            if let pairing {
-                PairingSheet(model: pairing, close: { showsPairing = false })
-            }
+        .sheet(isPresented: $showsPairing, onDismiss: { scope.pairing.cancel() }) {
+            PairingSheet(model: scope.pairing, close: { showsPairing = false })
         }
-        .onAppear(perform: takeLink)
+        .onAppear {
+            takeLink()
+            scope.decisions.sync(hub.pendingItems)
+        }
         .onChange(of: inbox.hasLink) { takeLink() }
-    }
-
-    private func model() -> PairingModel {
-        if let pairing { return pairing }
-        let made = makePairing(hub)
-        pairing = made
-        return made
+        // The center follows the hub's whole list here, outside any body; the cards only read it.
+        .onChange(of: hub.pendingItems) { _, items in scope.decisions.sync(items) }
+        .task { await scope.home.run() }
     }
 
     private func openPairing() {
-        model().cancel()
+        scope.pairing.cancel()
         showsPairing = true
     }
 
     /// A link opened from elsewhere goes to the confirmation step, never straight to pairing.
     private func takeLink() {
         guard let uri = inbox.take() else { return }
-        model().begin(uri: uri)
+        scope.pairing.begin(uri: uri)
         showsPairing = true
     }
 }

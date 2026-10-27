@@ -1,14 +1,11 @@
 import ShellXAppCore
 import SwiftUI
 
-/// "Your Macs", fed by the hub, with the pending cards on top (until the main screen takes them).
+/// "Your Macs", fed by the hub, opened from the Mac at the top of the home.
 struct MachinesView: View {
     let hub: MachineHub
-    let center: DecisionCenter
     /// Opens the pairing sheet.
     let pair: () -> Void
-
-    @State private var route: PendingRoute?
 
     var body: some View {
         MachineList(
@@ -17,15 +14,7 @@ struct MachinesView: View {
             makeDefault: { hub.defaultMachineID = $0 },
             unpair: { try await hub.unpair(machineID: $0) },
             pair: pair
-        ) {
-            PendingCardsSection(hub: hub, center: center, route: $route)
-        }
-        .sheet(item: $route) { route in
-            PendingSheetHost(route: route, close: { self.route = nil })
-        }
-        // The center follows the hub's whole list here, outside any body; the cards only read it.
-        .onAppear { center.sync(hub.pendingItems) }
-        .onChange(of: hub.pendingItems) { _, items in center.sync(items) }
+        )
     }
 }
 

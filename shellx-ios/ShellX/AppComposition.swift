@@ -5,13 +5,14 @@ import UIKit
 import ShellXAppTestSupport
 #endif
 
-/// What the app's screens are built from: the coordinator, and how to make the pairing model and
-/// the decision center for the signed-in account's hub.
+/// What the app's screens are built from: the coordinator, and the signed-in account's scope (its
+/// hub, decision center, home model and pairing model), made with each hub the coordinator makes.
 @MainActor
 struct AppGraph {
     let coordinator: AppCoordinator
-    let makePairing: @MainActor (MachineHub) -> PairingModel
-    let makeDecisions: @MainActor (MachineHub) -> DecisionCenter
+    let scopes: SignedInScope.Slot
+    /// Measures `launchToHome`.
+    let launch: LaunchMark
     /// Runs once before `coordinator.launch()`; the Debug demo seeds its fake account here.
     var prepare: @MainActor () async -> Void = {}
 }
@@ -47,20 +48,35 @@ enum AppComposition {
         // History lives in Application Support/ShellX and is wiped on sign-out.
         let historyDirectory = URL.applicationSupportDirectory.appendingPathComponent("ShellX", isDirectory: true)
         let history = ConversationStore(directory: historyDirectory)
+        let launch = LaunchMark(latency: latency)
+        let scopes = SignedInScope.Slot()
         // The hub reports a refused token to the coordinator that made it.
         let owner = CoordinatorReference()
         let coordinator = AppCoordinator(
             vault: vault, relay: relay, deviceName: deviceName, wipers: [history],
             makeHub: {
-                MachineHub(
+                let hub = MachineHub(
                     vault: vault, relay: relay, connector: connector, latency: latency, defaults: .standard,
                     sleep: { try await Task.sleep(for: $0) },
                     onUnauthorized: { await owner.coordinator?.handleUnauthorized() })
+                scopes.current = makeScope(
+                    hub: hub, history: history, latency: latency, launch: launch,
+                    pairing: PairingModel(hub: hub, relay: relay, vault: vault))
+                return hub
             })
         owner.coordinator = coordinator
-        return AppGraph(
-            coordinator: coordinator, makePairing: { PairingModel(hub: $0, relay: relay, vault: vault) },
-            makeDecisions: { DecisionCenter(sender: $0, latency: latency, sleep: { try await Task.sleep(for: $0) }) })
+        return AppGraph(coordinator: coordinator, scopes: scopes, launch: launch)
+    }
+
+    /// One sign-in's scope over `hub`; the home's history lives in `history`.
+    static func makeScope(
+        hub: MachineHub, history: ConversationStore, latency: LatencyLog, launch: LaunchMark, pairing: PairingModel
+    ) -> SignedInScope {
+        SignedInScope(
+            hub: hub,
+            decisions: DecisionCenter(sender: hub, latency: latency, sleep: { try await Task.sleep(for: $0) }),
+            home: HomeModel(hub: hub, store: history, now: { Date() }),
+            pairing: pairing, launch: launch)
     }
 }
 
@@ -84,17 +100,23 @@ extension AppGraph {
         let vault = AccountVault(store: InMemorySecretStore())
         let relay = FakeRelayAccount()
         let latency = LatencyLog()
+        let launch = LaunchMark(latency: latency)
+        let scopes = SignedInScope.Slot()
+        let history = ConversationStore(
+            directory: FileManager.default.temporaryDirectory.appendingPathComponent("ShellXPreview", isDirectory: true))
         let coordinator = AppCoordinator(
-            vault: vault, relay: relay, deviceName: "iPhone", wipers: [],
+            vault: vault, relay: relay, deviceName: "iPhone", wipers: [history],
             makeHub: {
-                MachineHub(
+                let hub = MachineHub(
                     vault: vault, relay: relay, connector: FakeMacFleet([], phoneKey: { try await vault.phoneKey() }),
                     latency: latency, defaults: .standard, sleep: { try await Task.sleep(for: $0) },
                     onUnauthorized: {})
+                scopes.current = AppComposition.makeScope(
+                    hub: hub, history: history, latency: latency, launch: launch,
+                    pairing: PairingModel(hub: hub, relay: relay, vault: vault))
+                return hub
             })
-        return AppGraph(
-            coordinator: coordinator, makePairing: { PairingModel(hub: $0, relay: relay, vault: vault) },
-            makeDecisions: { DecisionCenter(sender: $0, latency: latency, sleep: { try await Task.sleep(for: $0) }) })
+        return AppGraph(coordinator: coordinator, scopes: scopes, launch: launch)
     }
 }
 #endif

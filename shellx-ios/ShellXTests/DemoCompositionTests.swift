@@ -42,9 +42,17 @@ final class DemoCompositionTests: XCTestCase {
         XCTAssertEqual(pasteboard.string, "a note")
     }
 
+    private func makeHistoryDirectory() -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("demo-history-\(UUID().uuidString)", isDirectory: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        return directory
+    }
+
     func testDemoIsSignedInWithFakeMacOnlineAndPairsSecondMacFromPastedCode() async throws {
         let pasteboard = makePasteboard()
-        let graph = DemoComposition.make(approvalDelay: .zero, pasteboard: pasteboard, runsScript: false)
+        let graph = DemoComposition.make(
+            approvalDelay: .zero, pasteboard: pasteboard, runsScript: false, history: makeHistoryDirectory())
         let coordinator = graph.coordinator
         addTeardownBlock { @MainActor in await coordinator.hub?.stopAll() }
 
@@ -57,7 +65,8 @@ final class DemoCompositionTests: XCTestCase {
         XCTAssertTrue(online, "\(hub.machines.map(\.state))")
         XCTAssertEqual(hub.machines.map(\.name), [DemoComposition.firstName])
 
-        let pairing = graph.makePairing(hub)
+        let scope = try XCTUnwrap(graph.scopes.scope(for: hub), "the sign-in made the account's scope with its hub")
+        let pairing = scope.pairing
         pairing.begin(uri: PairingPaste.take(from: pasteboard))
         XCTAssertEqual(pairing.step, .confirm(machineName: DemoComposition.secondName))
         XCTAssertFalse(pasteboard.hasStrings)
@@ -70,5 +79,33 @@ final class DemoCompositionTests: XCTestCase {
         // The fake relay lists the new Mac, so a refresh keeps both.
         await hub.refreshGrants()
         XCTAssertEqual(hub.machines.map(\.state), [.online, .online])
+    }
+
+    func testDemoHomeKeepsItsConversationAcrossRelaunch() async throws {
+        let history = makeHistoryDirectory()
+
+        let first = DemoComposition.make(
+            approvalDelay: .zero, pasteboard: makePasteboard(), runsScript: false, history: history)
+        await first.prepare()
+        await first.coordinator.launch()
+        let firstHub = try XCTUnwrap(first.coordinator.hub)
+        let home = try XCTUnwrap(first.scopes.scope(for: firstHub)?.home)
+        await home.load()
+        _ = await home.submit("Xin chào", viaVoice: false)
+        await home.flush()
+        await firstHub.stopAll()
+        XCTAssertEqual(home.entries.count, 2)
+
+        let second = DemoComposition.make(
+            approvalDelay: .zero, pasteboard: makePasteboard(), runsScript: false, history: history)
+        await second.prepare()
+        await second.coordinator.launch()
+        let secondHub = try XCTUnwrap(second.coordinator.hub)
+        addTeardownBlock { @MainActor in await secondHub.stopAll() }
+        let reopened = try XCTUnwrap(second.scopes.scope(for: secondHub)?.home)
+        await reopened.load()
+
+        XCTAssertEqual(reopened.entries, home.entries)
+        XCTAssertEqual(secondHub.machines.map(\.id), firstHub.machines.map(\.id), "the fake Mac keeps its id")
     }
 }

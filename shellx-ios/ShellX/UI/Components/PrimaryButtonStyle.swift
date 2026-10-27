@@ -4,8 +4,8 @@ import SwiftUI
 struct PrimaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
-    private static let fill = Color(red: 0x60 / 255, green: 0xA5 / 255, blue: 0xFA / 255)
-    private static let label = Color(red: 0x0B / 255, green: 0x12 / 255, blue: 0x20 / 255)
+    static let fill = Color(red: 0x60 / 255, green: 0xA5 / 255, blue: 0xFA / 255)
+    static let label = Color(red: 0x0B / 255, green: 0x12 / 255, blue: 0x20 / 255)
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label

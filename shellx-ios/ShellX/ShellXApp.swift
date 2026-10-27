@@ -18,6 +18,8 @@ struct ShellXApp: App {
                     networkPath.start { [coordinator] in coordinator.hub?.networkChanged() }
                     await graph.prepare()
                     await coordinator.launch()
+                    // Only a launch straight into the home counts towards launchToHome.
+                    if coordinator.hub?.machines.isEmpty ?? true { graph.launch.skip() }
                 }
                 // A shellx-link:// link (the Camera app, Safari) only fills the pairing sheet's
                 // confirmation step, after sign-in if needed; it never pairs by itself.
@@ -35,7 +37,10 @@ struct ShellXApp: App {
                             Task { await hub.refreshGrants() }
                         }
                     case .background:
-                        if let hub = coordinator.hub { Self.closeSessionsAfterGrace(hub) }
+                        if let hub = coordinator.hub {
+                            Self.closeSessionsAfterGrace(hub)
+                            if let home = graph.scopes.scope(for: hub)?.home { Self.saveHistory(home) }
+                        }
                     default:
                         break
                     }
@@ -64,6 +69,22 @@ struct ShellXApp: App {
         }
         Task {
             await hub.appDidEnterBackground()
+            task.end(in: application)
+        }
+    }
+}
+
+extension ShellXApp {
+    /// Writes the home's conversation now, inside a background task, so a message sent just before
+    /// leaving the app is on disk even if the app is never resumed.
+    private static func saveHistory(_ home: HomeModel) {
+        let application = UIApplication.shared
+        let task = BackgroundTask()
+        task.id = application.beginBackgroundTask(withName: "ShellX history") {
+            task.end(in: application)
+        }
+        Task {
+            await home.flush()
             task.end(in: application)
         }
     }
