@@ -51,7 +51,9 @@ struct ComposerBar<Accessory: View>: View {
                 .accessibilityIdentifier("composer.send")
             }
             if case let .tooLong(bytes) = validation {
-                Text(verbatim: String(localized: "pending.tooLong \(bytes) \(ComposerValidation.maxBytes)"))
+                let used = ComposerValidation.byteCount(bytes)
+                let limit = ComposerValidation.byteCount(ComposerValidation.maxBytes)
+                Text(verbatim: String(localized: "composer.tooLong \(used) \(limit)"))
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(Color("StatusError"))
                     .accessibilityIdentifier("composer.tooLong")
@@ -66,6 +68,16 @@ struct ComposerBar<Accessory: View>: View {
 }
 
 extension ComposerValidation {
+    /// A byte count in the app's language: "16,384" in English, "16 384" in Vietnamese (a no-break
+    /// space, where the locale's own grouping would give "16.384").
+    static func byteCount(_ count: Int, locale: Locale = .app) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = locale
+        formatter.numberStyle = .decimal
+        if locale.language.languageCode == .vietnamese { formatter.groupingSeparator = "\u{00A0}" }
+        return formatter.string(from: NSNumber(value: count)) ?? String(count)
+    }
+
     /// Whether the send button acts.
     var canSend: Bool {
         if case .ok = self { return true }

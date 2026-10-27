@@ -42,16 +42,12 @@ struct AgentStateStyle: Equatable {
 
     /// "4 minutes", "1 hour, 5 minutes", or seconds under a minute, in the app's language (not the
     /// region's), so the words match the sentence around them.
-    static func elapsedText(_ elapsed: Duration, locale: Locale = appLocale) -> String {
+    static func elapsedText(_ elapsed: Duration, locale: Locale = .app) -> String {
         if elapsed < .seconds(60) {
             return elapsed.formatted(.units(allowed: [.seconds], width: .wide).locale(locale))
         }
         return elapsed.formatted(
             .units(allowed: [.hours, .minutes], width: .wide, maximumUnitCount: 2, fractionalPart: .hide(rounded: .down))
                 .locale(locale))
-    }
-
-    static var appLocale: Locale {
-        Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en")
     }
 }

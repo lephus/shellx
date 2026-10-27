@@ -71,6 +71,20 @@ final class SessionFinishDetectorTests: XCTestCase {
         XCTAssertEqual(changed, [])
     }
 
+    func testKeepsTheTwoNewestFinishesPerSession() {
+        var detector = SessionFinishDetector()
+        for turn in 0..<5 {
+            let start = Int64(turn * 10)
+            _ = detector.observe(machineID: "m1", sessions: [session("s1", .working, since: start + 1)])
+            XCTAssertEqual(detector.observe(machineID: "m1", sessions: [session("s1", .idle, since: start + 2)]).count, 1)
+        }
+        XCTAssertEqual(detector.reportedCount(machineID: "m1"), 2)
+
+        // The latest finish is still known: a replay of it stays quiet.
+        _ = detector.observe(machineID: "m1", sessions: [session("s1", .working, since: 41)])
+        XCTAssertEqual(detector.observe(machineID: "m1", sessions: [session("s1", .idle, since: 42)]), [])
+    }
+
     func testForgetsMacsNoLongerPaired() {
         var detector = SessionFinishDetector()
         _ = detector.observe(machineID: "m1", sessions: [session("s1", .working, since: 1)])

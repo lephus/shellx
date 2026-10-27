@@ -212,7 +212,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tự chọn"
+            "value": "Tự động"
           }
         }
       }
@@ -231,6 +231,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "chưa có phiên nào"
+          }
+        }
+      }
+    },
+    "composer.tooLong %@ %@": {
+      "comment": "The message is over the byte limit. 1: its length, 2: the limit (16,384), both formatted.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Too long: %1$@ / %2$@ bytes"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dài quá: %1$@ / %2$@ byte"
           }
         }
       }
@@ -572,7 +590,7 @@
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nói bằng giọng"
+            "value": "Bằng giọng nói"
           }
         }
       }

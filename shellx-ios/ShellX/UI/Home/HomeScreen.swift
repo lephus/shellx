@@ -29,6 +29,8 @@ struct HomeScreen: View {
     let showsMachineName: Bool
     /// The agent rows as of now; read again every second for the "Running for" times.
     let rows: () -> [AgentStatusRow]
+    /// False until the stored conversation is read: nothing shows in it yet, not even the empty text.
+    let isLoaded: Bool
     let entries: [HomeEntry]
     let target: SessionRef?
     let pickedTarget: SessionRef?
@@ -36,9 +38,6 @@ struct HomeScreen: View {
     @Binding var draft: String
     @Binding var agentsExpanded: Bool
     var actions = Actions()
-
-    /// The top panel's full height, measured.
-    @State private var panelHeight: CGFloat = 0
 
     /// The conversation and the composer keep at least this much of the height, grown with the text
     /// size; the top panel always keeps 40 %.
@@ -74,19 +73,36 @@ struct HomeScreen: View {
     // MARK: - Top
 
     /// The panel at its full height when it fits in `maxHeight`; otherwise `maxHeight` tall, and it
-    /// scrolls inside itself (its scroll bar flashes, so that shows).
+    /// scrolls inside itself (its scroll bar flashes, so that shows). Sized during layout, so the
+    /// panel never jumps from a first guess to its real height.
     @ViewBuilder private func top(maxHeight: CGFloat) -> some View {
         let hasRows = !rows().isEmpty
         if !pending.isEmpty || hasRows {
-            ScrollView {
-                topPanel
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { panelHeight = $0 }
+            ContentHeightUpTo(maxHeight: maxHeight) {
+                ScrollView { topPanel }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .scrollIndicatorsFlash(onAppear: true)
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollIndicatorsFlash(trigger: panelHeight > maxHeight)
-            .frame(height: min(panelHeight, maxHeight))
             .background(Color(uiColor: .systemGroupedBackground))
             .overlay(alignment: .bottom) { Divider() }
+        }
+    }
+
+    /// Makes its one subview, a vertical scroll view, as tall as its content up to `maxHeight`: the
+    /// height comes from the subview's ideal size (a scroll view's ideal height is its content's).
+    private struct ContentHeightUpTo: Layout {
+        let maxHeight: CGFloat
+
+        func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+            guard let subview = subviews.first else { return .zero }
+            let content = subview.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+            return CGSize(width: proposal.width ?? content.width, height: min(content.height, maxHeight))
+        }
+
+        func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+            subviews.first?.place(
+                at: bounds.origin, anchor: .topLeading,
+                proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
         }
     }
 
@@ -114,7 +130,7 @@ struct HomeScreen: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
-                    if entries.isEmpty {
+                    if isLoaded, entries.isEmpty {
                         Text(LocalizedStringResource("home.empty"))
                             .font(.callout)
                             .foregroundStyle(.secondary)

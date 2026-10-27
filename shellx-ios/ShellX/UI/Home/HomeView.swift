@@ -26,20 +26,14 @@ struct HomeView: View {
             pendingStatus: center.status,
             showsMachineName: hub.machines.count > 1,
             rows: { home.statusRows },
+            isLoaded: home.isLoaded,
             entries: home.entries,
             target: home.effectiveTarget,
             pickedTarget: picked,
             sessions: sessions,
             draft: $draft,
             agentsExpanded: $agentsExpanded,
-            actions: HomeScreen.Actions(
-                openMachines: { open(.machines) },
-                openSettings: { open(.settings) },
-                seeAllPending: { open(.pending) },
-                choose: { home.target = $0 },
-                send: { text in Task { _ = await home.submit(text, viaVoice: false) } },
-                card: { item in PendingCardsSection.actions(for: item, hub: hub, center: center, route: $route) }
-            )
+            actions: HomeActions.make(scope: scope, open: open, route: $route)
         )
         .sheet(item: $route) { route in
             PendingSheetHost(route: route, close: { self.route = nil })

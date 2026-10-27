@@ -209,6 +209,132 @@ final class HomeModelTests: XCTestCase {
         XCTAssertEqual(notes(rig.home).last, .agentFinished(s1, summary: "Lượt mới: đã deploy."))
     }
 
+    func testFinishAfterReconnectQuotesTheNewestReplyFromHistory() async throws {
+        let mac = await macWithSessions(["s1"])
+        let rig = try await HomeRig.make([mac], in: self, settle: HomeModel.finishSettle)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let running = await rig.startRunning(in: self)
+        XCTAssertTrue(running)
+        let s1 = ref(mac, "s1")
+        await mac.pushChat(sessionId: "s1", entries: [agentProse(3, "Đang xem log build.")])
+        let seen = await eventually { rig.home.lastAgentLine(for: s1) == "Đang xem log build." }
+        XCTAssertTrue(seen)
+
+        // The link drops; meanwhile the turn ends on the Mac with a reply this phone never saw.
+        await mac.dropLiveSessions()
+        let down = await eventually { rig.hub.machines.first?.state == .reconnecting && !rig.backoff.waiting.isEmpty }
+        XCTAssertTrue(down)
+        await mac.pushChat(sessionId: "s1", entries: [agentProse(4, "Xong: build xanh lại.")])
+        await mac.upsertSession(agentSession("s1", state: .idle, stateSinceMs: 1_700_000_050_000))
+        rig.backoff.release()
+        let back = await eventually { rig.hub.machines.first?.state == .online }
+        XCTAssertTrue(back)
+
+        // The note waits out the settle delay, then quotes the history's newest reply.
+        let settling = await rig.release(HomeModel.finishSettle)
+        XCTAssertTrue(settling)
+        let noted = await eventually { self.notes(rig.home).count == 1 }
+        XCTAssertTrue(noted)
+        XCTAssertEqual(notes(rig.home), [.agentFinished(s1, summary: "Xong: build xanh lại.")])
+    }
+
+    func testFinishNoteFollowsTheFinalReplyArrivingLater() async throws {
+        let mac = await macWithSessions(["s1"])
+        await mac.setHistory(sessionId: "s1", entries: [agentProse(1, "Để mình xem log.")])
+        let rig = try await HomeRig.make([mac], in: self)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let running = await rig.startRunning(in: self)
+        XCTAssertTrue(running)
+        let s1 = ref(mac, "s1")
+
+        // The Mac reports idle before its transcript has the final reply.
+        await mac.upsertSession(agentSession("s1", state: .idle, stateSinceMs: 1_700_000_050_000))
+        let noted = await eventually { self.notes(rig.home).count == 1 }
+        XCTAssertTrue(noted)
+        XCTAssertEqual(notes(rig.home), [.agentFinished(s1, summary: "Để mình xem log.")])
+
+        // The final reply arrives while the session stays idle: the same note now quotes it.
+        await mac.pushChat(sessionId: "s1", entries: [agentProse(2, "Xong, test xanh hết.")])
+        let updated = await eventually {
+            self.notes(rig.home) == [.agentFinished(s1, summary: "Xong, test xanh hết.")]
+        }
+        XCTAssertTrue(updated, "\(notes(rig.home))")
+        XCTAssertEqual(rig.home.entries.count, 1, "updated in place, not a second note")
+
+        // The session works again: the note stops following it.
+        await mac.upsertSession(agentSession("s1", state: .working, stateSinceMs: 1_700_000_060_000))
+        let stopped = await eventually { !rig.home.isFollowingFinish(of: s1) }
+        XCTAssertTrue(stopped)
+        await mac.pushChat(sessionId: "s1", entries: [agentProse(3, "Lượt tiếp theo.")])
+        let seen = await eventually { rig.home.lastAgentLine(for: s1) == "Lượt tiếp theo." }
+        XCTAssertTrue(seen)
+        XCTAssertEqual(notes(rig.home), [.agentFinished(s1, summary: "Xong, test xanh hết.")])
+    }
+
+    func testFinishNoteStopsFollowingAfterTenSeconds() async throws {
+        let mac = await macWithSessions(["s1"])
+        await mac.setHistory(sessionId: "s1", entries: [agentProse(1, "Xong.")])
+        let rig = try await HomeRig.make([mac], in: self)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let running = await rig.startRunning(in: self)
+        XCTAssertTrue(running)
+        let s1 = ref(mac, "s1")
+        await mac.upsertSession(agentSession("s1", state: .idle, stateSinceMs: 1_700_000_050_000))
+        let noted = await eventually { self.notes(rig.home).count == 1 }
+        XCTAssertTrue(noted)
+        XCTAssertTrue(rig.home.isFollowingFinish(of: s1))
+
+        let ended = await rig.release(HomeModel.finishFollow)
+        XCTAssertTrue(ended)
+        let stopped = await eventually { !rig.home.isFollowingFinish(of: s1) }
+        XCTAssertTrue(stopped)
+        await mac.pushChat(sessionId: "s1", entries: [agentProse(2, "Một dòng muộn.")])
+        let seen = await eventually { rig.home.lastAgentLine(for: s1) == "Một dòng muộn." }
+        XCTAssertTrue(seen)
+        XCTAssertEqual(notes(rig.home), [.agentFinished(s1, summary: "Xong.")])
+    }
+
+    func testFinishUsesALiveReplyNewerThanHistoryOrWhenHistoryFails() async throws {
+        let mac = await macWithSessions(["s1", "s2"])
+        let rig = try await HomeRig.make([mac], in: self, settle: HomeModel.finishSettle)
+        let online = await rig.online(sessions: 2)
+        XCTAssertTrue(online)
+        let running = await rig.startRunning(in: self)
+        XCTAssertTrue(running)
+        let s1 = ref(mac, "s1")
+        let s2 = ref(mac, "s2")
+
+        // The history lags the live reply.
+        await mac.pushChat(sessionId: "s1", entries: [agentProse(9, "Mới nhất.")])
+        let seen = await eventually { rig.home.lastAgentLine(for: s1) == "Mới nhất." }
+        XCTAssertTrue(seen)
+        await mac.setHistory(sessionId: "s1", entries: [agentProse(5, "Cũ hơn.")])
+        await mac.upsertSession(agentSession("s1", state: .idle, stateSinceMs: 1_700_000_050_000))
+        let settled = await rig.release(HomeModel.finishSettle)
+        XCTAssertTrue(settled)
+        let first = await eventually { self.notes(rig.home).count == 1 }
+        XCTAssertTrue(first)
+        XCTAssertEqual(notes(rig.home).last, .agentFinished(s1, summary: "Mới nhất."))
+
+        // The history cannot be read (the link dropped while settling): the live reply alone.
+        await mac.pushChat(sessionId: "s2", entries: [agentProse(4, "Trả lời sống.")])
+        let seenTwo = await eventually { rig.home.lastAgentLine(for: s2) == "Trả lời sống." }
+        XCTAssertTrue(seenTwo)
+        await mac.upsertSession(agentSession("s2", state: .idle, stateSinceMs: 1_700_000_060_000))
+        let settling = await eventually { rig.timers.waiting.contains(HomeModel.finishSettle) }
+        XCTAssertTrue(settling)
+        await mac.dropLiveSessions()
+        let down = await eventually { rig.hub.machines.first?.state == .reconnecting }
+        XCTAssertTrue(down)
+        rig.timers.release { $0 == HomeModel.finishSettle }
+        let second = await eventually { self.notes(rig.home).count == 2 }
+        XCTAssertTrue(second)
+        XCTAssertEqual(notes(rig.home).last, .agentFinished(s2, summary: "Trả lời sống."))
+    }
+
     func testFinishWhileAppClosedNotedOnRun() async throws {
         let mac = FakeMac(name: "MacBook Pro")
         await mac.upsertSession(agentSession("s1", state: .idle, stateSinceMs: 1_700_000_050_000))
@@ -238,11 +364,11 @@ final class HomeModelTests: XCTestCase {
 
         _ = await rig.home.submit("Lần một", viaVoice: false)
         // Written 0.5 s after the last change, not before.
-        let waiting = await eventually { rig.saves.waiting == [HomeModel.saveDelay] }
-        XCTAssertTrue(waiting, "\(rig.saves.waiting)")
+        let waiting = await eventually { rig.timers.waiting == [HomeModel.saveDelay] }
+        XCTAssertTrue(waiting, "\(rig.timers.waiting)")
         let early = await rig.stored()
         XCTAssertNil(early)
-        rig.saves.release()
+        rig.timers.release()
         let saved = await eventually { await rig.stored()?.entries.count == 2 }
         XCTAssertTrue(saved)
 
@@ -260,6 +386,41 @@ final class HomeModelTests: XCTestCase {
         await rig.home.flush()
         let afterWipe = await rig.stored()
         XCTAssertNil(afterWipe)
+    }
+
+    func testEntriesAddedBeforeLoadAreSaved() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        let stored = HomeDocument(entries: [homeEntry(0)], lastUsed: nil)
+        let rig = try await HomeRig.make(
+            [mac], in: self, seed: { await $0.writer().save(stored, to: .home) }, loads: false)
+
+        // A message before the stored timeline is read: there is no writer yet, so nothing is saved.
+        _ = await rig.home.submit("Trước khi tải xong", viaVoice: false)
+        XCTAssertEqual(rig.home.entries.count, 2)
+        await rig.home.flush()
+
+        await rig.home.load()
+        XCTAssertEqual(rig.home.entries.count, 3)
+        XCTAssertEqual(rig.home.entries.first?.id, "e0")
+        // Loading schedules the save it could not do before.
+        let saved = await rig.release(HomeModel.saveDelay)
+        XCTAssertTrue(saved)
+        let written = await eventually { await rig.stored()?.entries.count == 3 }
+        XCTAssertTrue(written)
+    }
+
+    func testUnreadableMacListKeepsTheSavedSessionStates() async throws {
+        // The hub read no Macs (an empty or unreadable list): the saved states must survive.
+        var saved = SessionFinishDetector()
+        _ = saved.observe(machineID: "mac-x", sessions: [agentSession("s1", state: .working)])
+        let rig = try await HomeRig.make([], in: self, seed: { await $0.writer().save(saved, to: .lastSessions) })
+
+        let running = await rig.startRunning(in: self)
+        XCTAssertTrue(running)
+        await rig.home.flush()
+
+        let stored = await rig.storedDetector()
+        XCTAssertEqual(stored, saved)
     }
 
     func testEntriesCappedAt2000() async throws {

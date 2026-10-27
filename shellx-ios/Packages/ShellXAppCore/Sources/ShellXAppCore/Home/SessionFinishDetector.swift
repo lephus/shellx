@@ -47,11 +47,26 @@ public struct SessionFinishDetector: Codable, Equatable, Sendable {
                     workspaceTitle: session.workspaceTitle))
         }
         let listed = Set(sessions.map(\.sessionId))
-        reported[machineID] = done.filter { listed.contains($0.sessionId) }
+        reported[machineID] = Self.newest(done.filter { listed.contains($0.sessionId) })
         seen[machineID] = Dictionary(
             sessions.map { ($0.sessionId, Seen(state: $0.state, sinceMs: $0.stateSinceMs)) },
             uniquingKeysWith: { _, last in last })
         return finished
+    }
+
+    /// The newest `finishesKept` finishes of each session: a resync replays the current list, so
+    /// older finishes cannot come back, and the saved detector stays small.
+    private static func newest(_ finishes: Set<Finish>) -> Set<Finish> {
+        let bySession = Dictionary(grouping: finishes, by: \.sessionId)
+        return Set(bySession.values.flatMap { $0.sorted { $0.sinceMs > $1.sinceMs }.prefix(finishesKept) })
+    }
+
+    /// Finishes remembered per session.
+    static let finishesKept = 2
+
+    /// How many finishes are remembered for `machineID` (tests).
+    func reportedCount(machineID: String) -> Int {
+        reported[machineID]?.count ?? 0
     }
 
     /// Forgets every Mac not in `machineIDs` (unpaired since).

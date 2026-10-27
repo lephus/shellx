@@ -6,8 +6,9 @@ import XCTest
 
 @testable import ShellXAppCore
 
-/// A signed-in hub connected to fake Macs, a store in a temporary directory, and a loaded
-/// `HomeModel` over both, for the home tests. Saves wait on `saves`, reconnects on `backoff`.
+/// A signed-in hub connected to fake Macs, a store in a temporary directory, and a `HomeModel`
+/// over both (loaded unless `loads` is false), for the home tests. The home model's waits (the 0.5 s
+/// save, the finish settle, the 10 s finish follow) wait on `timers`; reconnects on `backoff`.
 @MainActor
 struct HomeRig {
     static let now = Date(timeIntervalSince1970: 1_700_000_100)
@@ -16,14 +17,16 @@ struct HomeRig {
     let home: HomeModel
     let store: ConversationStore
     let directory: URL
-    /// The home model's 0.5 s save delay.
-    let saves: ManualSleeper
+    /// Every wait of the home model; release by duration.
+    let timers: ManualSleeper
     /// The hub's reconnect waits.
     let backoff: ManualSleeper
 
-    /// `seed` runs on the store before the home model loads it.
+    /// `seed` runs on the store before the home model loads it. `settle` is the home model's finish
+    /// settle delay (none by default, so finish notes come at once).
     static func make(
-        _ macs: [FakeMac], in test: XCTestCase, seed: (ConversationStore) async -> Void = { _ in }
+        _ macs: [FakeMac], in test: XCTestCase, seed: (ConversationStore) async -> Void = { _ in },
+        settle: Duration = .zero, loads: Bool = true
     ) async throws -> HomeRig {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("home-model-\(UUID().uuidString)", isDirectory: true)
@@ -45,19 +48,31 @@ struct HomeRig {
         test.addTeardownBlock { await hub.stopAll() }
         await hub.start()
 
-        let saves = ManualSleeper()
-        let home = HomeModel(hub: hub, store: store, now: { now }, sleep: saves.sleep)
-        // Ends a save still waiting on `saves`.
+        let timers = ManualSleeper()
+        let home = HomeModel(hub: hub, store: store, now: { now }, sleep: timers.sleep, finishSettle: settle)
+        // Ends a save still waiting on `timers`.
         test.addTeardownBlock { @MainActor in await home.flush() }
-        await home.load()
-        return HomeRig(hub: hub, home: home, store: store, directory: directory, saves: saves, backoff: backoff)
+        if loads { await home.load() }
+        return HomeRig(hub: hub, home: home, store: store, directory: directory, timers: timers, backoff: backoff)
     }
 
     /// Another home model over the same hub and store, as after a relaunch; loaded.
     func reopened() async -> HomeModel {
-        let home = HomeModel(hub: hub, store: store, now: { Self.now }, sleep: ManualSleeper().sleep)
+        let home = HomeModel(hub: hub, store: store, now: { Self.now }, sleep: ManualSleeper().sleep, finishSettle: .zero)
         await home.load()
         return home
+    }
+
+    /// Lets the waits of `duration` (for example `HomeModel.finishSettle`) end, once one is waiting.
+    func release(_ duration: Duration) async -> Bool {
+        let waiting = await eventually { timers.waiting.contains(duration) }
+        timers.release { $0 == duration }
+        return waiting
+    }
+
+    /// The stored finish detector, if one was written.
+    func storedDetector() async -> SessionFinishDetector? {
+        await store.load(.lastSessions, as: SessionFinishDetector.self)
     }
 
     /// Runs `home.run()` until the test ends; returns once it watches the hub.

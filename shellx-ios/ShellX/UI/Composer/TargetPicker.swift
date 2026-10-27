@@ -2,8 +2,9 @@ import ShellXAppCore
 import SwiftUI
 
 /// The "Send to: Claude Code · shellx ▾" chip above the composer. Its menu lists the running
-/// sessions by Mac (an offline Mac says so), with "Automatic" first: the session messaged last, or
-/// the newest on the default Mac (`HomeModel.effectiveTarget`).
+/// sessions by Mac, with "Automatic" first: the session messaged last, or the newest on the default
+/// Mac (`HomeModel.effectiveTarget`). An offline Mac's sessions stay listed under "… is offline",
+/// but cannot be picked.
 struct TargetPicker: View {
     /// Where the next message goes now.
     let current: SessionRef?
@@ -13,22 +14,26 @@ struct TargetPicker: View {
     let sessions: [MachineSession]
     let choose: (SessionRef?) -> Void
 
-    /// The sessions of one Mac.
-    private struct MachineGroup: Identifiable {
+    /// The sessions of one Mac, as the menu lists them. A session on an offline Mac cannot take a
+    /// message: it is shown, but not `selectable`.
+    struct MachineGroup: Identifiable, Equatable {
         let id: String
         let title: String
-        var sessions: [MachineSession]
+        let selectable: Bool
+        var sessions: [SessionRef]
     }
 
-    private var groups: [MachineGroup] {
+    /// `sessions` by Mac, in the order of each Mac's first session; an offline Mac's title says so.
+    static func groups(_ sessions: [MachineSession]) -> [MachineGroup] {
         var groups: [MachineGroup] = []
         for session in sessions {
             if let index = groups.firstIndex(where: { $0.id == session.machineID }) {
-                groups[index].sessions.append(session)
+                groups[index].sessions.append(session.ref)
             } else {
                 let title = session.online
                     ? session.machineName : String(localized: "machine.state.offline \(session.machineName)")
-                groups.append(MachineGroup(id: session.machineID, title: title, sessions: [session]))
+                groups.append(
+                    MachineGroup(id: session.machineID, title: title, selectable: session.online, sessions: [session.ref]))
             }
         }
         return groups
@@ -45,10 +50,12 @@ struct TargetPicker: View {
             Picker(selection: Binding(get: { picked }, set: { choose($0) })) {
                 Text(LocalizedStringResource("composer.target.automatic"))
                     .tag(SessionRef?.none)
-                ForEach(groups) { group in
+                ForEach(Self.groups(sessions)) { group in
                     Section(group.title) {
-                        ForEach(group.sessions) { session in
-                            Text(verbatim: Self.label(session.ref)).tag(Optional(session.ref))
+                        ForEach(group.sessions, id: \.self) { ref in
+                            Text(verbatim: Self.label(ref))
+                                .tag(Optional(ref))
+                                .disabled(!group.selectable)
                         }
                     }
                 }

@@ -7,15 +7,22 @@ import ShellXLinkCore
 /// live sessions' status rows.
 ///
 /// `submit(_:viaVoice:)` sends to one running session and notes the outcome. `run()` watches the hub
-/// and notes each session that finishes a turn, with the first line of its last reply. Every change
-/// is written to the store at most `saveDelay` after the last one, and at once by `flush()` (the app
-/// calls it when it goes to the background). Writes use the store writer of the account that loaded
-/// the model, so nothing is written after a sign-out wipe.
+/// and notes each session that finishes a turn, with the first line of its final reply: it waits
+/// `finishSettle`, reads the history, and keeps the note up to date for `finishFollow` (the Mac may
+/// report idle before its transcript has the reply). Every change is written to the store at most
+/// `saveDelay` after the last one, and at once by `flush()` (the app calls it when it goes to the
+/// background). Writes use the store writer of the account that loaded the model, so nothing is
+/// written after a sign-out wipe.
 @MainActor @Observable
 public final class HomeModel {
     /// The most entries kept; the oldest go first.
     public static let maxEntries = 2000
     public static let saveDelay: Duration = .milliseconds(500)
+    /// How long a finished session waits before its note is written.
+    public static let finishSettle: Duration = .milliseconds(1500)
+    /// How long a finish note follows its session: a newer agent reply in that time, while the
+    /// session stays idle, replaces the note's summary.
+    public static let finishFollow: Duration = .seconds(10)
     /// The longest summary in an `agentFinished` note, in characters.
     static let summaryLength = 140
 
@@ -27,17 +34,26 @@ public final class HomeModel {
     /// The session the last message went to.
     private var lastUsed: SessionRef?
 
-    /// The last agent reply seen live for one session.
+    /// An agent reply: its first line, and where it stands in the transcript.
     private struct AgentLine {
         var seq: Int
         var rev: Int
         var line: String?
     }
 
+    /// A finish note still following its session, and the reply it quotes (`Int.min` for none).
+    private struct FinishFollow {
+        var entryID: String
+        var seq: Int
+        var rev: Int
+        var timer: Task<Void, Never>
+    }
+
     @ObservationIgnored private let hub: MachineHub
     @ObservationIgnored private let store: ConversationStore
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private let sleep: @Sendable (Duration) async throws -> Void
+    @ObservationIgnored private let finishSettleDelay: Duration
     @ObservationIgnored private var writer: ConversationStore.Writer?
     @ObservationIgnored private var loading: Task<Void, Never>?
     @ObservationIgnored private var pendingSave: Task<Void, Never>?
@@ -45,18 +61,25 @@ public final class HomeModel {
     @ObservationIgnored private var homeChanged = false
     @ObservationIgnored private var sessionsChanged = false
     @ObservationIgnored private var detector = SessionFinishDetector()
+    /// The newest agent reply seen live per session, not yet used by a finish note.
     @ObservationIgnored private var lastAgentLines: [SessionRef: AgentLine] = [:]
+    /// Finishes waiting out the settle delay or reading the history.
+    @ObservationIgnored private var finishing: [SessionRef: Task<Void, Never>] = [:]
+    @ObservationIgnored private var follows: [SessionRef: FinishFollow] = [:]
     @ObservationIgnored private var observers = 0
 
-    /// `sleep` waits out `saveDelay`; tests pass one they release by hand.
+    /// `sleep` waits out `saveDelay`, `finishSettle` and `finishFollow`; tests pass one they release
+    /// by hand. `finishSettle` zero writes a finish note without waiting.
     public init(
         hub: MachineHub, store: ConversationStore, now: @escaping () -> Date,
-        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        finishSettle: Duration = HomeModel.finishSettle
     ) {
         self.hub = hub
         self.store = store
         self.now = now
         self.sleep = sleep
+        finishSettleDelay = finishSettle
     }
 
     // MARK: - What the screen reads
@@ -77,9 +100,14 @@ public final class HomeModel {
     /// True while `run()` watches the hub, after its first look at every online Mac.
     var isObserving: Bool { observers > 0 }
 
-    /// The first line of the last agent reply seen live for `ref` (tests).
+    /// The first line of the last agent reply seen live for `ref` and not used by a note (tests).
     func lastAgentLine(for ref: SessionRef) -> String? {
         lastAgentLines[ref]?.line
+    }
+
+    /// Whether a finish note still follows `ref` (tests).
+    func isFollowingFinish(of ref: SessionRef) -> Bool {
+        follows[ref] != nil
     }
 
     // MARK: - Lifecycle
@@ -99,28 +127,32 @@ public final class HomeModel {
         await load()
         let sessionUpdates = hub.sessionUpdates()
         let chatUpdates = hub.chatUpdates()
-        if hub.isLoaded {
+        // Forget unpaired Macs, but not when the hub has none: its list may simply be unreadable.
+        if hub.isLoaded, !hub.machines.isEmpty {
             changeDetector { $0.retain(machineIDs: Set(hub.machines.map(\.id))) }
         }
         // Lists that arrived before this subscription. Only a synced (online) Mac's list counts: a
         // Mac still connecting has an empty one, which would hide what finished meanwhile.
         for machine in hub.machines where machine.state == .online {
-            await sessionsArrived(machineID: machine.id, sessions: machine.sessions.sessions)
+            sessionsArrived(machineID: machine.id, sessions: machine.sessions.sessions)
         }
         observers += 1
-        defer { observers -= 1 }
-        async let chat: Void = follow(chatUpdates)
-        async let sessions: Void = follow(sessionUpdates)
+        defer {
+            observers -= 1
+            if observers == 0 { stopAllFinishes() }
+        }
+        async let chat: Void = watch(chatUpdates)
+        async let sessions: Void = watch(sessionUpdates)
         _ = await (chat, sessions)
     }
 
-    private func follow(_ updates: AsyncStream<(SessionRef, [ChatEntry])>) async {
+    private func watch(_ updates: AsyncStream<(SessionRef, [ChatEntry])>) async {
         for await (ref, entries) in updates { remember(entries, of: ref) }
     }
 
-    private func follow(_ updates: AsyncStream<(machineID: String, sessions: [AgentSession])>) async {
+    private func watch(_ updates: AsyncStream<(machineID: String, sessions: [AgentSession])>) async {
         for await update in updates {
-            await sessionsArrived(machineID: update.machineID, sessions: update.sessions)
+            sessionsArrived(machineID: update.machineID, sessions: update.sessions)
         }
     }
 
@@ -185,6 +217,8 @@ public final class HomeModel {
             detector = saved
         }
         isLoaded = true
+        // Changes made before there was a writer were not saved yet.
+        if homeChanged || sessionsChanged { scheduleSave() }
     }
 
     private func noTargetNote() -> HomeNote {
@@ -196,24 +230,103 @@ public final class HomeModel {
         return .noLiveSession
     }
 
-    private func append(_ content: HomeEntry.Content) {
-        entries.append(HomeEntry(id: UUID().uuidString, at: now(), content: content))
+    /// Adds an entry; returns its id.
+    @discardableResult
+    private func append(_ content: HomeEntry.Content) -> String {
+        let id = UUID().uuidString
+        entries.append(HomeEntry(id: id, at: now(), content: content))
         entries = Self.capped(entries)
+        homeChanged = true
+        scheduleSave()
+        return id
+    }
+
+    private func sessionsArrived(machineID: String, sessions: [AgentSession]) {
+        var finished: [SessionRef] = []
+        changeDetector { finished = $0.observe(machineID: machineID, sessions: sessions) }
+        let listed = Set(sessions.map(\.sessionId))
+        let idle = Set(sessions.filter { $0.state == .idle }.map(\.sessionId))
+        lastAgentLines = lastAgentLines.filter { $0.key.machineID != machineID || listed.contains($0.key.sessionId) }
+        // A note follows its session only while the session stays idle.
+        for ref in follows.keys where ref.machineID == machineID && !idle.contains(ref.sessionId) {
+            stopFollowing(ref)
+        }
+        for ref in finished { startFinish(ref) }
+    }
+
+    // MARK: - Finished sessions
+
+    /// Notes a finished session after `finishSettle`: the Mac may report idle before its transcript
+    /// has the final reply (the state comes from hooks, the reply from the transcript).
+    private func startFinish(_ ref: SessionRef) {
+        stopFollowing(ref)
+        finishing[ref]?.cancel()
+        let settle = finishSettleDelay
+        let sleep = self.sleep
+        finishing[ref] = Task {
+            if settle > .zero {
+                do { try await sleep(settle) } catch { return }
+            }
+            guard !Task.isCancelled else { return }
+            await self.noteFinish(ref)
+        }
+    }
+
+    /// The note quotes the newest agent prose, by `(seq, rev)`, of the session's last ten history
+    /// entries and of what was seen live; the live reply alone when the history cannot be read. Then
+    /// the note follows the session for `finishFollow`.
+    private func noteFinish(_ ref: SessionRef) async {
+        var newest: AgentLine?
+        if let page = try? await hub.chatHistory(ref, beforeSeq: nil, limit: 10) {
+            newest = Self.newestAgentLine(page.entries)
+        }
+        guard !Task.isCancelled else { return }
+        // A reply seen live serves this finish only.
+        if let live = lastAgentLines.removeValue(forKey: ref), newest.map({ Self.isNewer(live, than: $0) }) ?? true {
+            newest = live
+        }
+        let id = append(.note(.agentFinished(ref, summary: newest?.line)))
+        follow(ref, note: id, quoting: newest)
+    }
+
+    /// For `finishFollow`, a newer agent reply of `ref` while it stays idle replaces the note's
+    /// summary in place.
+    private func follow(_ ref: SessionRef, note entryID: String, quoting line: AgentLine?) {
+        stopFollowing(ref)
+        let sleep = self.sleep
+        let timer = Task {
+            do { try await sleep(Self.finishFollow) } catch { return }
+            guard !Task.isCancelled, self.follows[ref]?.entryID == entryID else { return }
+            self.follows[ref] = nil
+        }
+        follows[ref] = FinishFollow(entryID: entryID, seq: line?.seq ?? .min, rev: line?.rev ?? .min, timer: timer)
+    }
+
+    private func stopFollowing(_ ref: SessionRef) {
+        follows.removeValue(forKey: ref)?.timer.cancel()
+    }
+
+    /// Replaces a followed note's summary with `line`, a newer reply.
+    private func update(_ follow: FinishFollow, of ref: SessionRef, with line: AgentLine) {
+        guard let index = entries.lastIndex(where: { $0.id == follow.entryID }) else {
+            stopFollowing(ref)
+            return
+        }
+        entries[index].content = .note(.agentFinished(ref, summary: line.line))
+        follows[ref]?.seq = line.seq
+        follows[ref]?.rev = line.rev
         homeChanged = true
         scheduleSave()
     }
 
-    private func sessionsArrived(machineID: String, sessions: [AgentSession]) async {
-        var finished: [SessionRef] = []
-        changeDetector { finished = $0.observe(machineID: machineID, sessions: sessions) }
-        let listed = Set(sessions.map(\.sessionId))
-        lastAgentLines = lastAgentLines.filter { $0.key.machineID != machineID || listed.contains($0.key.sessionId) }
-        for ref in finished {
-            let summary = await summary(for: ref)
-            // A reply serves one finish: the next turn's note never quotes this one.
-            lastAgentLines[ref] = nil
-            append(.note(.agentFinished(ref, summary: summary)))
-        }
+    private func isIdle(_ ref: SessionRef) -> Bool {
+        hub.machines.first { $0.id == ref.machineID }?.sessions.session(ref.sessionId)?.state == .idle
+    }
+
+    private func stopAllFinishes() {
+        for task in finishing.values { task.cancel() }
+        finishing = [:]
+        for ref in Array(follows.keys) { stopFollowing(ref) }
     }
 
     /// Applies `change` to the detector; saves it when it changed.
@@ -225,21 +338,15 @@ public final class HomeModel {
         scheduleSave()
     }
 
-    /// The first line of the session's last agent reply: seen live, otherwise from its last ten
-    /// history entries; nil when there is none or the history cannot be read.
-    private func summary(for ref: SessionRef) async -> String? {
-        if let seen = lastAgentLines[ref] { return seen.line }
-        do {
-            let page = try await hub.chatHistory(ref, beforeSeq: nil, limit: 10)
-            return Self.newestAgentLine(page.entries)?.line
-        } catch {
-            return nil
-        }
-    }
-
+    /// Keeps the newest agent reply seen live for `ref`; while a finish note follows `ref`, a newer
+    /// reply goes into that note instead.
     private func remember(_ entries: [ChatEntry], of ref: SessionRef) {
         guard let newest = Self.newestAgentLine(entries) else { return }
-        if let current = lastAgentLines[ref], (current.seq, current.rev) >= (newest.seq, newest.rev) { return }
+        if let follow = follows[ref] {
+            if Self.isNewer(newest, than: (follow.seq, follow.rev)), isIdle(ref) { update(follow, of: ref, with: newest) }
+            return
+        }
+        if let current = lastAgentLines[ref], !Self.isNewer(newest, than: current) { return }
         lastAgentLines[ref] = newest
     }
 
@@ -267,6 +374,14 @@ public final class HomeModel {
 
     private static func capped(_ entries: [HomeEntry]) -> [HomeEntry] {
         entries.count > maxEntries ? Array(entries.suffix(maxEntries)) : entries
+    }
+
+    private static func isNewer(_ line: AgentLine, than other: AgentLine) -> Bool {
+        isNewer(line, than: (other.seq, other.rev))
+    }
+
+    private static func isNewer(_ line: AgentLine, than other: (seq: Int, rev: Int)) -> Bool {
+        (line.seq, line.rev) > (other.seq, other.rev)
     }
 
     /// The newest agent prose among `entries`, as its first line.

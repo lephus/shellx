@@ -88,14 +88,14 @@ final class HomeRenderTests: XCTestCase {
     private func home(
         machine: (name: String, state: MachineLinkState)? = ("MacBook Pro", .online),
         pending: [MachinePendingItem] = [], sessions: [MachineSession] = [], entries: [HomeEntry] = [],
-        target: SessionRef? = nil, draft: String = "", expanded: Bool = true
+        target: SessionRef? = nil, draft: String = "", expanded: Bool = true, loaded: Bool = true
     ) -> some View {
         let rows = AgentStatusRow.rows(sessions, now: Self.now)
         return NavigationStack {
             HomeScreen(
                 machine: machine, pending: pending, pendingStatus: [:], showsMachineName: false, rows: { rows },
-                entries: entries, target: target, pickedTarget: nil, sessions: sessions, draft: .constant(draft),
-                agentsExpanded: .constant(expanded))
+                isLoaded: loaded, entries: entries, target: target, pickedTarget: nil, sessions: sessions,
+                draft: .constant(draft), agentsExpanded: .constant(expanded))
         }
     }
 
@@ -103,6 +103,10 @@ final class HomeRenderTests: XCTestCase {
 
     func testEmptyHomeRenders() throws {
         try assertRenders(home(), name: "home-empty")
+    }
+
+    func testHomeStillLoadingShowsNoEmptyText() throws {
+        try assertRenders(home(sessions: Self.sessions, loaded: false), name: "home-loading")
     }
 
     func testFullHomeRenders() throws {
@@ -181,6 +185,26 @@ final class HomeRenderTests: XCTestCase {
         XCTAssertEqual(AgentStateStyle.elapsedText(.seconds(299), locale: en), "4 minutes", "not rounded up")
         XCTAssertEqual(AgentStateStyle.elapsedText(.seconds(30), locale: en), "30 seconds")
         XCTAssertTrue(AgentStateStyle.elapsedText(.seconds(3_900), locale: en).contains("1 hour"))
+    }
+
+    func testOfflineMacSessionsAreListedButNotSelectable() {
+        var other = Self.session("s9", workspace: "ios", state: .working, sinceAgo: 1_000, online: false, machine: "Mac mini")
+        other.machineID = "m2"
+
+        let groups = TargetPicker.groups(Self.sessions + [other])
+
+        XCTAssertEqual(groups.map(\.id), ["m1", "m2"])
+        XCTAssertEqual(groups.map(\.selectable), [true, false])
+        XCTAssertEqual(groups[0].title, "MacBook Pro")
+        XCTAssertEqual(groups[1].title, String(localized: "machine.state.offline \("Mac mini")"))
+        XCTAssertEqual(groups[0].sessions, Self.sessions.map(\.ref))
+        XCTAssertEqual(groups[1].sessions, [other.ref])
+    }
+
+    func testByteCountsInTheAppLanguage() {
+        XCTAssertEqual(ComposerValidation.byteCount(16_384, locale: Locale(identifier: "en")), "16,384")
+        XCTAssertEqual(ComposerValidation.byteCount(16_385, locale: Locale(identifier: "vi")), "16\u{00A0}385")
+        XCTAssertEqual(ComposerValidation.byteCount(512, locale: Locale(identifier: "vi")), "512")
     }
 
     func testEveryNoteHasASentence() {
