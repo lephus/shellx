@@ -2,33 +2,6 @@ import AVFoundation
 import SwiftUI
 import UIKit
 
-/// Whether the scanner can use the camera.
-enum CameraAccess: Equatable {
-    /// Not asked yet: the sheet asks when the scanner is about to show.
-    case notDetermined
-    case authorized
-    /// Turned off in Settings, or restricted (Screen Time, a profile).
-    case denied
-    /// No camera at all (the simulator).
-    case unavailable
-
-    static func current() -> CameraAccess {
-        guard AVCaptureDevice.default(for: .video) != nil else { return .unavailable }
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .authorized: return .authorized
-        case .notDetermined: return .notDetermined
-        default: return .denied
-        }
-    }
-
-    /// Shows the system prompt (with `NSCameraUsageDescription`) when not asked yet.
-    static func request() async -> CameraAccess {
-        let now = current()
-        guard now == .notDetermined else { return now }
-        return await AVCaptureDevice.requestAccess(for: .video) ? .authorized : .denied
-    }
-}
-
 /// The back camera's live picture, reporting every QR code it reads (`AVCaptureMetadataOutput`).
 /// Codes arrive on the main thread, many times a second while one is in view; the caller filters
 /// them (`PairingScanFilter`). The capture stops when the view goes away.

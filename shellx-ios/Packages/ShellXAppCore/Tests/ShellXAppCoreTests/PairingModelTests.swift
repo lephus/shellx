@@ -15,13 +15,15 @@ final class PairingModelTests: XCTestCase {
         var relay: FakeRelayAccount
         /// The relay's wait for the user to press Allow on the Mac.
         var approval: ManualSleeper
+        var store: InMemorySecretStore
     }
 
     private func rig(
         _ macs: [FakeMac], saved: [FakeMac] = [],
         relay wrapRelay: (FakeRelayAccount) -> any RelayAccountCalling = { $0 }
     ) async throws -> Rig {
-        let vault = AccountVault(store: InMemorySecretStore())
+        let store = InMemorySecretStore()
+        let vault = AccountVault(store: store)
         try await vault.setSession(StoredSession(userID: "u1", deviceID: "d1", token: "tok-1", email: "a@b.c"))
         if !saved.isEmpty { try await vault.setMachines(saved.map(\.machine), owner: "u1") }
         let approval = ManualSleeper()
@@ -37,7 +39,14 @@ final class PairingModelTests: XCTestCase {
         await hub.start()
         return Rig(
             model: PairingModel(hub: hub, relay: relay, vault: vault), hub: hub, vault: vault, relay: fake,
-            approval: approval)
+            approval: approval, store: store)
+    }
+
+    private func unpairCalls(_ relay: FakeRelayAccount) async -> [String] {
+        await relay.calls.compactMap {
+            if case let .unpair(grantID, _) = $0 { return grantID }
+            return nil
+        }
     }
 
     private func pairCalls(_ relay: FakeRelayAccount) async -> Int {
@@ -230,7 +239,8 @@ final class PairingModelTests: XCTestCase {
     }
 
     /// The Mac approves just as the user cancels (the relay call ignores the cancellation): the
-    /// cancelled attempt must not save or connect anything.
+    /// cancelled attempt must not save or connect anything, and takes back the grant the relay made,
+    /// so the Mac does not list an iPhone that does not know it.
     func testApprovalAfterCancelIsIgnored() async throws {
         let mac = FakeMac(name: "MacBook Pro")
         let gate = Gate()
@@ -248,6 +258,120 @@ final class PairingModelTests: XCTestCase {
         XCTAssertTrue(rig.hub.machines.isEmpty)
         let saved = try await rig.vault.machines()
         XCTAssertEqual(saved, [])
+        let unpaired = await unpairCalls(rig.relay)
+        XCTAssertEqual(unpaired, ["grant-\(mac.machine.machineID)"], "the orphan grant was withdrawn")
+        let grants = try await rig.relay.machines(token: "tok-1")
+        XCTAssertEqual(grants, [])
+    }
+
+    /// The Mac approved but the iPhone could not save it: the grant is taken back too.
+    func testSaveFailureAfterApprovalWithdrawsGrant() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        let rig = try await rig([mac])
+        _ = try await rig.vault.phoneKey()
+        rig.store.failWrites = .failed(status: -25300)
+        rig.model.begin(uri: await mac.pairingOffer().uri)
+
+        await rig.model.confirm()
+
+        XCTAssertEqual(rig.model.step, .failed(.server(code: "keychain")))
+        XCTAssertTrue(rig.hub.machines.isEmpty)
+        let unpaired = await unpairCalls(rig.relay)
+        XCTAssertEqual(unpaired, ["grant-\(mac.machine.machineID)"])
+        let grants = try await rig.relay.machines(token: "tok-1")
+        XCTAssertEqual(grants, [])
+    }
+
+    /// Withdrawing is best effort: a relay that cannot be reached leaves the failure as it was.
+    func testWithdrawErrorsAreIgnored() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        let rig = try await rig([mac])
+        _ = try await rig.vault.phoneKey()
+        rig.store.failWrites = .failed(status: -25300)
+        await rig.relay.setError(URLError(.notConnectedToInternet), for: .unpair)
+        rig.model.begin(uri: await mac.pairingOffer().uri)
+
+        await rig.model.confirm()
+
+        XCTAssertEqual(rig.model.step, .failed(.server(code: "keychain")))
+    }
+
+    /// Cancelling a re-pair of a Mac this iPhone already keeps must not take away its grant: that
+    /// grant is not an orphan.
+    func testCancelledRepairKeepsTheGrantOfAPairedMac() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        let gate = Gate()
+        let rig = try await rig([mac], saved: [mac], relay: { HeldPairRelay(base: $0, gate: gate) })
+        rig.model.begin(uri: await mac.pairingOffer().uri)
+
+        let confirming = Task { await rig.model.confirm() }
+        _ = await eventually { gate.waiting == 1 }
+        rig.model.cancel()
+        gate.open()
+        await confirming.value
+
+        let unpaired = await unpairCalls(rig.relay)
+        XCTAssertEqual(unpaired, [])
+        XCTAssertEqual(rig.hub.machines.map(\.id), [mac.machine.machineID])
+    }
+
+    /// The system routes a link whatever the scheme's case, and the parser wants it lowercase: the
+    /// inbox and the model agree, so `SHELLX-LINK://pair…` reaches the confirmation, and the relay
+    /// gets the code with a lowercase scheme.
+    func testUppercaseSchemeLinkReachesConfirmation() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        let rig = try await rig([mac])
+        let uri = await mac.pairingOffer().uri
+        let shouted = "SHELLX-LINK" + uri.dropFirst("shellx-link".count)
+        let inbox = PairingInbox()
+
+        XCTAssertTrue(inbox.receive(try XCTUnwrap(URL(string: shouted))))
+        rig.model.begin(uri: try XCTUnwrap(inbox.take()))
+
+        XCTAssertEqual(rig.model.step, .confirm(machineName: "MacBook Pro"))
+        await rig.model.confirm()
+        XCTAssertEqual(rig.model.step, .paired(machineName: "MacBook Pro"))
+        let key = try await rig.vault.phoneKey().publicKey
+        let calls = await rig.relay.calls
+        XCTAssertEqual(calls.first, .pair(offerURI: uri, clientKey: key, token: "tok-1"))
+    }
+
+    /// The relay refuses the token while pairing: the app signs out to the "session expired" sign-in,
+    /// instead of leaving the user retrying a pairing that cannot work.
+    func testUnauthorizedWhilePairingSignsOut() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        let saved = FakeMac(name: "Mac mini")
+        let vault = AccountVault(store: InMemorySecretStore())
+        try await vault.setSession(StoredSession(userID: "u1", deviceID: "d1", token: "tok-1", email: "a@b.c"))
+        try await vault.setMachines([saved.machine], owner: "u1")
+        let relay = FakeRelayAccount()
+        let suite = "PairingModelTests-\(UUID().uuidString)"
+        addTeardownBlock { UserDefaults().removePersistentDomain(forName: suite) }
+        let box = CoordinatorBox()
+        let coordinator = AppCoordinator(
+            vault: vault, relay: relay, deviceName: "iPhone", wipers: [],
+            makeHub: {
+                MachineHub(
+                    vault: vault, relay: relay,
+                    connector: FakeMacFleet([mac, saved], phoneKey: { try await vault.phoneKey() }),
+                    latency: LatencyLog(), defaults: UserDefaults(suiteName: suite)!, sleep: instantSleep,
+                    onUnauthorized: { await box.coordinator?.handleUnauthorized() })
+            })
+        box.coordinator = coordinator
+        addTeardownBlock { await coordinator.hub?.stopAll() }
+        await coordinator.launch()
+        let hub = try XCTUnwrap(coordinator.hub)
+        await relay.setError(RelayAPIError.http(status: 401, code: "unauthorized"), for: .pair)
+        let model = PairingModel(hub: hub, relay: relay, vault: vault)
+        model.begin(uri: await mac.pairingOffer().uri)
+
+        await model.confirm()
+
+        XCTAssertEqual(coordinator.phase, .signedOut(expired: true), "sign-in says the session expired")
+        let session = try await vault.session()
+        XCTAssertNil(session)
+        let machines = try await vault.machines()
+        XCTAssertEqual(machines, [saved.machine], "the paired Macs stay for the same account")
     }
 
     /// A second link while waiting replaces the attempt: the first stops and asks again.

@@ -52,6 +52,12 @@ final class MachinesRenderTests: XCTestCase {
         XCTAssertEqual(Set(styles.map(\.text)).count, 6)
     }
 
+    func testMakeDefaultOfferedOnlyForUsableMacs() {
+        let offered = Self.everyState.map { $0.offersMakeDefault(defaultID: "m2") }
+        // online, the default itself, reconnecting, offline, revoked, key changed, needs update
+        XCTAssertEqual(offered, [true, false, true, true, false, false, true])
+    }
+
     func testFirstMacRenders() throws {
         try assertRenders(NavigationStack { FirstMacView(pair: {}) }, name: "first-mac")
     }

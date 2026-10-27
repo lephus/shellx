@@ -17,6 +17,15 @@ public enum MachineLinkState: Equatable, Sendable {
     /// The Mac speaks another protocol version. Stops the reconnect loop.
     case needsUpdate
 
+    /// False for a Mac that removed this iPhone or whose key changed: it cannot take messages until
+    /// it is paired again, so it is not offered as the default Mac.
+    public var canBeDefault: Bool {
+        switch self {
+        case .revoked, .hostKeyChanged: return false
+        case .connecting, .online, .reconnecting, .offline, .needsUpdate: return true
+        }
+    }
+
     /// True for the three states that stop the reconnect loop for good.
     public var isTerminal: Bool {
         switch self {

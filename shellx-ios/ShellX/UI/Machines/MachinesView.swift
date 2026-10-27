@@ -22,6 +22,12 @@ struct MachineListItem: Identifiable, Equatable {
     let id: String
     let name: String
     let state: MachineLinkState
+
+    /// "Make Default" is offered unless the Mac is already the default, or cannot take messages
+    /// until it is paired again (revoked, key changed).
+    func offersMakeDefault(defaultID: String?) -> Bool {
+        id != defaultID && state.canBeDefault
+    }
 }
 
 /// The list of paired Macs with its actions; no hub, so render tests can show every state.
@@ -86,7 +92,7 @@ struct MachineList: View {
     }
 
     @ViewBuilder private func menu(for item: MachineListItem) -> some View {
-        if item.id != defaultID {
+        if item.offersMakeDefault(defaultID: defaultID) {
             Button { makeDefault(item.id) } label: {
                 Label(String(localized: "machines.makeDefault"), systemImage: "star")
             }
@@ -104,7 +110,7 @@ struct MachineList: View {
         // before the confirmation or the relay has answered.
         removeButton(for: item, role: nil)
             .tint(Color("StatusError"))
-        if item.id != defaultID {
+        if item.offersMakeDefault(defaultID: defaultID) {
             Button { makeDefault(item.id) } label: {
                 Label(String(localized: "machines.makeDefault"), systemImage: "star")
             }

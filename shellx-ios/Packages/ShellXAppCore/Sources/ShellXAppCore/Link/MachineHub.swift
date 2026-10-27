@@ -474,7 +474,9 @@ public final class MachineHub {
         }
     }
 
-    private func reportUnauthorized() async {
+    /// The relay refused the account token (401): tells the app once, which signs out to the
+    /// "session expired" sign-in. Also used by `PairingModel` for a 401 while pairing.
+    func reportUnauthorized() async {
         // After a stop (a sign-out), a late 401 answers a request made with the dropped token.
         guard !unauthorizedReported, !stopped else { return }
         unauthorizedReported = true
