@@ -222,7 +222,8 @@ public actor RelayHostRegistration {
                             emit.yield(.ended(id: id, error: error))
                         }
                     }
-                    let delay = Self.renewDelay(expiresAtUnix: opened.expiresAtUnix, renewLead: renewLead)
+                    let delay = Self.renewDelay(
+                        issuedAtUnix: nil, expiresAtUnix: opened.expiresAtUnix, renewLead: renewLead, now: Date())
                     group.addTask {
                         try? await Task.sleep(for: delay)
                         emit.yield(.renewDue(id: id))
@@ -269,8 +270,8 @@ public actor RelayHostRegistration {
 
     /// When to open the next registration, from now: half the ticket's remaining lifetime at the
     /// latest, `renewLead` before it ends at the earliest.
-    private static func renewDelay(expiresAtUnix: Int64, renewLead: Duration) -> Duration {
-        let lifetime = max(0, Double(expiresAtUnix) - Date().timeIntervalSince1970)
+    static func renewDelay(issuedAtUnix: Int64?, expiresAtUnix: Int64, renewLead: Duration, now: Date) -> Duration {
+        let lifetime = max(0, Double(expiresAtUnix) - now.timeIntervalSince1970)
         let lead = Double(renewLead.components.seconds) + Double(renewLead.components.attoseconds) / 1e18
         return .seconds(max(1, max(lifetime / 2, lifetime - lead)))
     }

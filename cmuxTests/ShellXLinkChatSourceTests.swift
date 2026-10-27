@@ -63,17 +63,20 @@ struct ShellXLinkChatSourceTests {
               "timestamp": "2026-10-27T05:00:01.000Z", "sessionId": "s"])
     }
 
-    /// A Claude session (or `source`) whose transcript holds `lines`.
+    /// A Claude session (or `source`) whose transcript holds `lines`, run by agent process `pid` (none when nil).
     @MainActor
     private static func addSession(_ service: AgentChatTranscriptService, home: URL, lines: [String],
-                                   source: String = "claude") throws -> (id: String, transcript: URL) {
+                                   source: String = "claude", pid: Int? = nil) throws -> (id: String, transcript: URL) {
         let id = UUID().uuidString
         let transcript = home.appendingPathComponent("\(id).jsonl")
         try lines.map { $0 + "\n" }.joined().write(to: transcript, atomically: true, encoding: .utf8)
         service.noteHookEvent(WorkstreamEvent(sessionId: id, hookEventName: .sessionStart, source: source,
-                                              transcriptPath: transcript.path, cwd: "/Users/example/project"))
+                                              transcriptPath: transcript.path, cwd: "/Users/example/project", ppid: pid))
         return (id, transcript)
     }
+
+    /// A live process for a session's agent: this test process.
+    private static var livePID: Int { Int(getpid()) }
 
     @MainActor
     private static func tailerActive(_ service: AgentChatTranscriptService, _ sessionID: String) -> Bool {
@@ -191,8 +194,8 @@ struct ShellXLinkChatSourceTests {
                     return interrupts.popFirst() ?? .err(code: "internal_error", message: "", data: nil)
                 }
             )
-            let session = try Self.addSession(service, home: home, lines: []).id
-            let codex = try Self.addSession(service, home: home, lines: [], source: "codex").id
+            let session = try Self.addSession(service, home: home, lines: [], pid: Self.livePID).id
+            let codex = try Self.addSession(service, home: home, lines: [], source: "codex", pid: Self.livePID).id
             return (source, session, codex)
         }
 
@@ -222,6 +225,53 @@ struct ShellXLinkChatSourceTests {
             return
         }
         #expect(code == "not_found")
+    }
+
+    /// A phone's message or ctrl-C reaches only a live agent (PROTOCOL.md, Phone commands): an ended session, or
+    /// one whose agent process the Mac cannot name or that has exited, is `not_found` before any terminal is touched,
+    /// so the text never falls through to the shell (or whatever now runs) in that terminal.
+    @Test func testSendAndInterruptReachOnlyALiveAgent() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let calls = Calls()
+        // A process that has exited (reaped), so its pid names no agent.
+        let exited = Process()
+        exited.executableURL = URL(fileURLWithPath: "/usr/bin/true")
+        try exited.run()
+        exited.waitUntilExit()
+        let deadPID = Int(exited.processIdentifier)
+        let (source, live, ended, unnamed, dead) = try await MainActor.run {
+            () throws -> (ShellXLinkChatSource, String, String, String, String) in
+            let source = ShellXLinkChatSource(
+                service: { service },
+                send: { sessionID, text in
+                    calls.record("send \(sessionID) \(text)")
+                    return .ok(["submitted": true])
+                },
+                interrupt: { sessionID, hard in
+                    calls.record("interrupt \(sessionID) \(hard)")
+                    return .ok(["interrupted": true])
+                }
+            )
+            let live = try Self.addSession(service, home: home, lines: [], pid: Self.livePID).id
+            let ended = try Self.addSession(service, home: home, lines: [], pid: Self.livePID).id
+            service.noteHookEvent(WorkstreamEvent(sessionId: ended, hookEventName: .sessionEnd, source: "claude"))
+            let unnamed = try Self.addSession(service, home: home, lines: [], pid: nil).id
+            let dead = try Self.addSession(service, home: home, lines: [], pid: deadPID).id
+            return (source, live, ended, unnamed, dead)
+        }
+        #expect(await MainActor.run { service.sessionRecord(sessionID: ended)?.state } == .ended)
+
+        for session in [ended, unnamed, dead] {
+            #expect(await source.send(sessionId: session, text: "rm -rf build") == .notFound)
+            #expect(await source.interrupt(sessionId: session, hard: true) == .notFound)
+        }
+        #expect(calls.all.isEmpty, "a command ran for a session without a live agent: \(calls.all)")
+
+        #expect(await source.send(sessionId: live, text: "go on") == .submitted)
+        #expect(await source.interrupt(sessionId: live, hard: false) == .sent)
+        #expect(calls.all == ["send \(live) go on", "interrupt \(live) false"])
     }
 
     /// A phone connected over Link (no mobile client subscribed to `chat.message`) still gets live entries:

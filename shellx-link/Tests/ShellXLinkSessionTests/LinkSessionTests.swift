@@ -493,6 +493,27 @@ final class LinkSessionTests: XCTestCase {
         XCTAssertEqual(answerId, "c10")
     }
 
+    /// A call this host predates (a newer phone's method) is answered `unsupported` with its `call_id`, so the phone
+    /// fails it at once instead of waiting 10 s; an unknown frame without a valid `call_id` stays ignored.
+    func testUnknownCallIsAnsweredUnsupported() async throws {
+        let rig = makeHost(FakeFeedSource())
+        let (end, served) = startServe(rig.host)
+        let raw = try await rawEstablished(end, rig)
+        try await raw.send(frame: Data(#"{"v":1,"t":"future.notice","x":1}"#.utf8))
+        let tooLong = String(repeating: "c", count: LinkCodec.maxCallIdBytes + 1)
+        try await raw.send(frame: Data(#"{"v":1,"t":"future.call","call_id":"\#(tooLong)"}"#.utf8))
+        try await raw.send(frame: Data(#"{"v":1,"t":"future.call","call_id":"f1","x":[1,2]}"#.utf8))
+        let answer = try await within(.seconds(2)) { try await raw.receive() }
+        guard case let .error(code, _, callId) = answer else { return XCTFail("expected an error, got \(answer)") }
+        XCTAssertEqual(code, "unsupported")
+        XCTAssertEqual(callId, "f1", "only the frame with a valid call_id is answered")
+        // Nothing else was answered, and the session stays usable.
+        try await raw.send(.ping(nonce: 3))
+        let pong = try await within(.seconds(2)) { try await raw.receive() }
+        XCTAssertEqual(pong, .pong(nonce: 3))
+        XCTAssertFalse(served.isSet)
+    }
+
     func testRemoteErrorWithCallIdFailsOnlyThatCall() async throws {
         let hostKey = NoiseStaticKey()
         let clientKey = NoiseStaticKey()
