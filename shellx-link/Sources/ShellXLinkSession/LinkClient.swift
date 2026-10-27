@@ -12,11 +12,12 @@ public enum LinkClientError: Error, Equatable, Sendable {
     case sessionClosed
     /// No answer arrived within the request timeout (10 s by default). The session stays usable.
     case timedOut
+    /// The host answered one specific call with an `error` (PROTOCOL.md section 7).
+    case remote(code: String, message: String)
 }
 
 /// The phone side of ShellX Link: one established session with one host.
 public actor LinkClient {
-    private typealias Snapshot = (revision: Int, pending: [PendingItem])
     private typealias Change = (revision: Int, added: [PendingItem], resolved: [String])
 
     /// Every `agent.changed` from the host, in order. Single consumer. It finishes when the
@@ -33,23 +34,19 @@ public actor LinkClient {
     private let pinger: Task<Void, Never>
     private let watchdog: Task<Void, Never>
     private var reader: Task<Void, Never>?
-    private var nextWaiterId = 0
+    private var nextCallNumber = 0
     private let requestTimeout: Duration
-    private var snapshotWaiters: [Waiter<Snapshot>] = []
-    private var replyWaiters: [String: [Waiter<ReplyOutcome>]] = [:]
-    /// Per `request_id`, how many `agent.reply.result` frames still belong to replies that timed
-    /// out or were cancelled. The host answers every `agent.reply` (PROTOCOL.md 4), so such a
-    /// late answer is dropped instead of reaching a newer reply for the same request.
-    private var lateReplyResults: [String: Int] = [:]
+    /// The calls waiting for their answer, by `call_id` (PROTOCOL.md section 3). An answer whose
+    /// `call_id` is not here (the call timed out or was cancelled) is dropped.
+    private var waiters: [String: Waiter] = [:]
     private var endError: LinkClientError?
 
     /// One caller waiting for an answer, and the timer that fails it after `requestTimeout`.
-    private struct Waiter<Value: Sendable> {
-        let id: Int
-        let continuation: CheckedContinuation<Value, any Error>
+    private struct Waiter {
+        let continuation: CheckedContinuation<LinkMessage, any Error>
         let timer: Task<Void, Never>
 
-        func resume(returning value: Value) {
+        func resume(returning value: LinkMessage) {
             timer.cancel()
             continuation.resume(returning: value)
         }
@@ -119,25 +116,13 @@ public actor LinkClient {
     ///
     /// Throws `LinkClientError.timedOut` when no snapshot arrives within the request timeout
     /// (10 s), for example because the host could not fit it in one frame and dropped it
-    /// (PROTOCOL.md section 6); the session stays usable. Throws `.sessionClosed` when the session
-    /// ends first. Snapshots carry no request id, so a snapshot that arrives after its request
-    /// timed out answers the next waiting `snapshot()`; every snapshot is a complete state stamped
-    /// with its `revision`, so that answer is still valid.
+    /// (PROTOCOL.md section 6); the session stays usable, and a snapshot that arrives late is
+    /// dropped (its `call_id` is no longer awaited). Throws `.sessionClosed` when the session
+    /// ends first.
     public func snapshot() async throws -> (revision: Int, pending: [PendingItem]) {
-        try checkOpen()
-        let id = makeWaiterId()
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Snapshot, any Error>) in
-                if let endError {
-                    continuation.resume(throwing: endError)
-                    return
-                }
-                snapshotWaiters.append(Waiter(id: id, continuation: continuation, timer: startTimer(for: id)))
-                Task { await self.transmit(.snapshotGet, forWaiter: id) }
-            }
-        } onCancel: {
-            Task { await self.failWaiter(id, with: CancellationError()) }
-        }
+        let answer = try await call { .snapshotGet(callId: $0) }
+        guard case let .snapshot(_, revision, pending) = answer else { throw Self.unexpectedAnswer }
+        return (revision, pending)
     }
 
     /// Sends a decision. Safe to repeat: the host answers `already_handled` for a resolved request.
@@ -145,23 +130,12 @@ public actor LinkClient {
     /// Throws `LinkClientError.timedOut` when no result arrives within the request timeout (10 s);
     /// the decision may still have been delivered, and repeating it is safe. A result that arrives
     /// after its call timed out (or was cancelled) is dropped, never given to a newer call.
-    /// Throws `.sessionClosed` when the session ends first.
-    public func reply(requestId: String, mode: PermissionMode) async throws -> ReplyOutcome {
-        try checkOpen()
-        let id = makeWaiterId()
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<ReplyOutcome, any Error>) in
-                if let endError {
-                    continuation.resume(throwing: endError)
-                    return
-                }
-                replyWaiters[requestId, default: []].append(
-                    Waiter(id: id, continuation: continuation, timer: startTimer(for: id)))
-                Task { await self.transmit(.reply(requestId: requestId, mode: mode), forWaiter: id) }
-            }
-        } onCancel: {
-            Task { await self.failWaiter(id, with: CancellationError()) }
-        }
+    /// Throws `.remote` when the host answers the call with an `error`, and `.sessionClosed` when
+    /// the session ends first.
+    public func reply(requestId: String, decision: LinkDecision) async throws -> ReplyOutcome {
+        let answer = try await call { .reply(callId: $0, requestId: requestId, decision: decision) }
+        guard case let .replyResult(_, _, outcome) = answer else { throw Self.unexpectedAnswer }
+        return outcome
     }
 
     /// Ends the session and closes the circuit. Pending calls throw `LinkClientError.sessionClosed`.
@@ -188,7 +162,7 @@ public actor LinkClient {
                     throw LinkClientError.protocolMismatch(message: "the host speaks protocol \(protocolVersion)")
                 }
                 return
-            case let .error(code, text):
+            case let .error(code, text, _):
                 if code == "protocol_mismatch" { throw LinkClientError.protocolMismatch(message: text) }
                 throw LinkClientError.rejected(code: code, message: text)
             default:
@@ -232,26 +206,21 @@ public actor LinkClient {
             return false
         }
         switch message {
-        case let .snapshot(revision, pending):
-            if !snapshotWaiters.isEmpty {
-                snapshotWaiters.removeFirst().resume(returning: (revision, pending))
-            }
+        case let .snapshot(callId, _, _), let .replyResult(callId, _, _):
+            // A late answer (its call timed out or was cancelled) finds no waiter and is dropped.
+            waiters.removeValue(forKey: callId)?.resume(returning: message)
         case let .changed(revision, added, resolved):
             changesContinuation.yield((revision, added, resolved))
-        case let .replyResult(requestId, outcome):
-            if let late = lateReplyResults[requestId] {
-                lateReplyResults[requestId] = late > 1 ? late - 1 : nil
-            } else if var waiters = replyWaiters[requestId], !waiters.isEmpty {
-                let first = waiters.removeFirst()
-                replyWaiters[requestId] = waiters.isEmpty ? nil : waiters
-                first.resume(returning: outcome)
-            }
         case let .ping(nonce):
             try? await channel.send(.pong(nonce: nonce))
-        case let .error(code, text):
+        case let .error(code, text, callId):
             if code == "protocol_mismatch" {
                 await end(.protocolMismatch(message: text))
                 return false
+            }
+            if let callId, let waiter = waiters.removeValue(forKey: callId) {
+                waiter.resume(throwing: LinkClientError.remote(code: code, message: text))
+                return true
             }
             linkLog.info("host reported error \(code, privacy: .public)")
         case .pong, .unknown, .hello, .welcome, .snapshotGet, .reply:
@@ -263,13 +232,9 @@ public actor LinkClient {
     private func end(_ error: LinkClientError) async {
         guard endError == nil else { return }
         endError = error
-        for waiter in snapshotWaiters { waiter.resume(throwing: error) }
-        snapshotWaiters = []
-        for waiters in replyWaiters.values {
-            for waiter in waiters { waiter.resume(throwing: error) }
-        }
-        replyWaiters = [:]
-        lateReplyResults = [:]
+        let pending = waiters
+        waiters = [:]
+        for waiter in pending.values { waiter.resume(throwing: error) }
         changesContinuation.finish()
         pinger.cancel()
         watchdog.cancel()
@@ -281,23 +246,44 @@ public actor LinkClient {
         try Task.checkCancellation()
     }
 
-    /// Sends a request whose answer `id` waits for; the waiter fails if the send does.
-    private func transmit(_ message: LinkMessage, forWaiter id: Int) async {
-        do {
-            try await channel.send(message)
-        } catch {
-            failWaiter(id, with: LinkClientError.sessionClosed)
+    private static var unexpectedAnswer: LinkClientError {
+        .remote(code: "unexpected_answer", message: "the host answered with another message type")
+    }
+
+    /// Sends the message `make` builds for a fresh `call_id` and waits for the one answer that carries
+    /// that id (or an `error` that does). Generic over the message type: the answer is the raw
+    /// `LinkMessage`, which the caller unpacks.
+    func call(_ make: @Sendable (String) -> LinkMessage) async throws -> LinkMessage {
+        try checkOpen()
+        nextCallNumber += 1
+        let callId = "c\(nextCallNumber)"
+        let message = make(callId)
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<LinkMessage, any Error>) in
+                if let endError {
+                    continuation.resume(throwing: endError)
+                    return
+                }
+                waiters[callId] = Waiter(continuation: continuation, timer: startTimer(for: callId))
+                Task { await self.transmit(message, forCall: callId) }
+            }
+        } onCancel: {
+            Task { await self.failWaiter(callId, with: CancellationError()) }
         }
     }
 
-    private func makeWaiterId() -> Int {
-        nextWaiterId += 1
-        return nextWaiterId
+    /// Sends a request whose answer `callId` waits for; the waiter fails if the send does.
+    private func transmit(_ message: LinkMessage, forCall callId: String) async {
+        do {
+            try await channel.send(message)
+        } catch {
+            failWaiter(callId, with: LinkClientError.sessionClosed)
+        }
     }
 
-    /// Fails waiter `id` after `requestTimeout`. Only the waiter times out: the reader keeps its
+    /// Fails waiter `callId` after `requestTimeout`. Only the waiter times out: the reader keeps its
     /// pending `receive()`, because cancelling that would kill the circuit.
-    private func startTimer(for id: Int) -> Task<Void, Never> {
+    private func startTimer(for callId: String) -> Task<Void, Never> {
         let timeout = requestTimeout
         return Task { [weak self] in
             do {
@@ -305,25 +291,12 @@ public actor LinkClient {
             } catch {
                 return
             }
-            await self?.failWaiter(id, with: LinkClientError.timedOut)
+            await self?.failWaiter(callId, with: LinkClientError.timedOut)
         }
     }
 
-    /// Removes waiter `id` (if it is still waiting) and throws `error` to it.
-    private func failWaiter(_ id: Int, with error: any Error) {
-        if let index = snapshotWaiters.firstIndex(where: { $0.id == id }) {
-            snapshotWaiters.remove(at: index).resume(throwing: error)
-            return
-        }
-        for (requestId, waiters) in replyWaiters {
-            guard let index = waiters.firstIndex(where: { $0.id == id }) else { continue }
-            var rest = waiters
-            let waiter = rest.remove(at: index)
-            replyWaiters[requestId] = rest.isEmpty ? nil : rest
-            // Its `agent.reply` was sent (or the session is ending); the host will still answer it.
-            lateReplyResults[requestId, default: 0] += 1
-            waiter.resume(throwing: error)
-            return
-        }
+    /// Removes waiter `callId` (if it is still waiting) and throws `error` to it.
+    private func failWaiter(_ callId: String, with error: any Error) {
+        waiters.removeValue(forKey: callId)?.resume(throwing: error)
     }
 }

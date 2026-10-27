@@ -16,9 +16,11 @@ public protocol AgentFeedSource: Sendable {
     /// source must not take any lock that it holds while calling `yield` or `finish`, or they
     /// deadlock.
     func changes() -> AsyncStream<(revision: Int, added: [PendingItem], resolved: [String])>
-    /// Resolves `requestId` at most once (PROTOCOL.md section 5).
+    /// Resolves `requestId` at most once with `decision` (PROTOCOL.md section 5). A decision that does not
+    /// fit the item (another `kind`, a mode the item does not offer, an unknown selection) answers
+    /// `.unknown` and leaves the item as it was.
     ///
     /// Must return promptly or honor task cancellation: `LinkHost.serve` waits for in-flight
     /// replies before it returns, and the phone stops waiting after 10 s.
-    func reply(requestId: String, mode: PermissionMode) async -> ReplyOutcome
+    func reply(requestId: String, decision: LinkDecision) async -> ReplyOutcome
 }

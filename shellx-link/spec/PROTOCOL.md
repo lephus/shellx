@@ -54,9 +54,35 @@ A frame is one UTF-8 JSON object:
 - Decoding order: (1) size check, (2) parse as an object with integer-token `v` and string `t`,
   else `bad_json`; (3) `v` != 1 gives `wrong_version`; (4) if `t` is unknown, the frame is
   `unknown` and is ignored (forward compatibility); (5) if `t` is known but a field is
-  missing or has the wrong type or an unlisted enum value, `bad_json`. A known `t` never
-  degrades to `unknown`.
+  missing or has the wrong type, `bad_json` (an unlisted enum value is not an error, see
+  Extension). A known `t` never degrades to `unknown`.
 - `unknown` is decode-only; an implementation MUST NOT be able to send it.
+
+### Extension
+
+- Every string enum field is an open enum: `kind` (of a PendingItem and of a decision), `mode`,
+  `outcome`, and the enum fields later versions add. A value this version does not know still
+  decodes (an implementation keeps the raw string, for example as `.other(raw)`); it is never
+  `bad_json`.
+- A sender MAY add an optional field at any time; receivers ignore fields they do not know.
+- Adding a required field, or changing the meaning of a field, requires raising `v`.
+- `v` stays 1 in P2: the P2 changes revise v1 before its first release, because no P1 build has
+  left the spike.
+
+### Call ids
+
+Every request that expects exactly one answer carries a `call_id`: `agent.snapshot.get` and
+`agent.reply` (and the requests later versions add on the same pattern).
+
+- The client chooses it: a string of 1 to 64 UTF-8 bytes, different from every other call of
+  that client that is still waiting in the session.
+- The host answers a call with exactly one message carrying the same `call_id`: the matching
+  answer (`agent.snapshot`, `agent.reply.result`), or an `error` that carries it.
+- A client drops an answer whose `call_id` it is no longer waiting for (for example because the
+  call timed out).
+- A missing, empty or longer-than-64-byte `call_id` on a message that requires one is `bad_json`.
+- The P1 rule still holds: the host answers the `agent.reply` messages for one `request_id` in
+  the order they arrived (section 5).
 
 ## 4. Messages
 
@@ -64,12 +90,12 @@ A frame is one UTF-8 JSON object:
 | --- | --- | --- | --- |
 | `hello` | client | First frame after the handshake | `client_version` string, `device_name` string |
 | `welcome` | host | Reply to an acceptable `hello` | `protocol_version` int, `host_version` string, `machine_name` string |
-| `error` | either | A request cannot be honored | `code` string, `message` string (human readable) |
-| `agent.snapshot.get` | client | After `welcome`, and whenever it wants a full resync | none |
-| `agent.snapshot` | host | Reply to `agent.snapshot.get` | `revision` int, `pending` array of PendingItem |
+| `error` | either | A request cannot be honored | `code` string, `message` string (human readable), `call_id` string, optional: set when the error answers that call |
+| `agent.snapshot.get` | client | After `welcome`, and whenever it wants a full resync | `call_id` string |
+| `agent.snapshot` | host | Reply to `agent.snapshot.get` | `call_id` string, `revision` int, `pending` array of PendingItem |
 | `agent.changed` | host | Whenever the pending set changes | `revision` int, `added` array of PendingItem, `resolved` array of request_id strings |
-| `agent.reply` | client | The user decides on a pending item | `request_id` string, `mode` string |
-| `agent.reply.result` | host | Reply to every `agent.reply` | `request_id` string, `outcome` string |
+| `agent.reply` | client | The user decides on a pending item | `call_id` string, `request_id` string, `decision` object (Decision) |
+| `agent.reply.result` | host | Reply to every `agent.reply` | `call_id` string, `request_id` string, `outcome` string |
 | `ping` | either | Keep-alive / latency probe | `nonce` uint64 |
 | `pong` | either | Immediately after `ping`, echoing it | `nonce` uint64 (same value) |
 
@@ -91,17 +117,50 @@ each `agent.changed`:
 | Field | Type | Notes |
 | --- | --- | --- |
 | `request_id` | string | Unique, stable id of the request |
-| `kind` | string | `permission`, `question`, `exit_plan` |
+| `kind` | string | `permission`, `question`, `exit_plan` (open enum) |
 | `agent` | string | `claude` in P1 |
 | `workspace_id` | string | |
 | `workspace_title` | string | |
 | `tool_name` | string, optional | |
 | `tool_input_preview` | string, optional | At most 8192 UTF-8 bytes (section 6) |
 | `created_at_ms` | int64 | Unix time in milliseconds |
+| `modes` | array of string | Required, may be empty: the decision modes the host accepts for this item. For a `permission`, `PermissionMode` strings, never `bypass`; for an `exit_plan`, `ExitPlanMode` strings; empty for a `question` |
+| `questions` | array of PendingQuestion, optional | The questions of a `question` item |
+| `plan_preview` | string, optional | The plan text of an `exit_plan` item. At most 8192 UTF-8 bytes (section 6) |
 
-### Enums (exact strings)
+A client that meets an item whose `kind` it does not know shows a generic card ("open on the
+Mac") with no buttons.
 
-- `mode`: `once`, `always`, `all`, `deny`.
+### PendingQuestion
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | |
+| `header` | string, optional | Short title |
+| `prompt` | string | The question text |
+| `multi_select` | bool | Whether more than one option can be chosen |
+| `options` | array of PendingQuestionOption | |
+
+A PendingQuestionOption has `id` string, `label` string and `description` string (optional). A
+decision selects options by `label`.
+
+### Decision
+
+The `decision` object of `agent.reply` has a `kind` (open enum) that selects the other fields:
+
+| `kind` | Other fields | Example |
+| --- | --- | --- |
+| `permission` | `mode` string | `{"kind":"permission","mode":"once"}` |
+| `question` | `selections` array of string: the chosen option labels | `{"kind":"question","selections":["Postgres"]}` |
+| `exit_plan` | `mode` string, `feedback` string (optional) | `{"kind":"exit_plan","mode":"manual","feedback":"split step 2"}` |
+
+A `decision` with a `kind` this version does not know decodes (it is not `bad_json`); the host
+answers it `unknown` (section 5). A known `kind` with a missing required field is `bad_json`.
+
+### Enums (exact strings, all open)
+
+- `PermissionMode` (`mode` of a `permission` decision): `once`, `always`, `all`, `deny`.
+- `ExitPlanMode` (`mode` of an `exit_plan` decision): `ultraplan`, `auto_accept`, `manual`, `deny`.
 - `outcome`: `delivered`, `already_handled`, `unknown`.
 
 ## 5. Rules
@@ -119,8 +178,10 @@ A request is resolved at most once. For an `agent.reply`, the first rule that ma
 1. `request_id` never seen (or forgotten): the host answers `unknown`.
 2. `request_id` no longer pending (resolved by this or another client or on the Mac, or
    expired): the host MUST NOT resolve it again and answers `already_handled`.
-3. A request that is not a permission, or a `mode` this agent does not offer for the request:
-   the host answers `unknown` and leaves the item as it was.
+3. A decision that does not fit the item: the host answers `unknown` and leaves the item as it
+   was. That is any of: the `decision.kind` differs from the item's `kind`; the decision's
+   `mode` is not in the item's `modes`; a `question` selection matches no option `label` in the
+   item's `questions`; the `decision.kind` is not known to the host.
 4. No agent is waiting for the request any more (the agent stopped waiting, it never waited
    because it sent the request without waiting, or the host restarted since the request
    arrived): nothing can take the decision. The host marks the
@@ -140,17 +201,17 @@ arrive first.
 
 ## 6. Preview truncation and oversize frames
 
-`tool_input_preview` is cut by the host to at most 8192 UTF-8 bytes. Every cut falls on a
+`tool_input_preview` and `plan_preview` are cut by the host to at most 8192 UTF-8 bytes. Every cut falls on a
 Unicode scalar boundary: the result is valid UTF-8, never a split character. The client treats
-the preview as display text only, not as the complete tool input.
+the previews as display text only, not as the complete tool input or plan.
 
 Several items of 8 KiB previews can overflow the frame limit (eight already do). If an
 `agent.snapshot` or `agent.changed` frame would exceed 65 519 bytes, the host shrinks the
 previews in steps and re-encodes after each step, stopping at the first that fits:
 
-1. every `tool_input_preview` truncated to at most 8192 bytes;
-2. every `tool_input_preview` truncated to at most 1024 bytes;
-3. `tool_input_preview` omitted on every item.
+1. every `tool_input_preview` and `plan_preview` truncated to at most 8192 bytes;
+2. every `tool_input_preview` and `plan_preview` truncated to at most 1024 bytes;
+3. `tool_input_preview` and `plan_preview` omitted on every item.
 
 If the frame still does not fit after step 3, the host MUST NOT send it; it logs the failure
 (a client recovers through `agent.snapshot.get`, which the host answers with the same rule).
@@ -172,7 +233,8 @@ phase is a protocol violation, handled like any other unexpected frame below.
 Rules:
 
 - **Undecodable frame** (`bad_json` or `frame_too_large`): received by the host, it replies
-  `error` with code `bad_request` and keeps the session. Received by the client, it drops the
+  `error` with code `bad_request`, carrying the frame's `call_id` when that could be read (a valid
+  1 to 64 byte string), and keeps the session. A client fails the call that `error` names. Received by the client, it drops the
   frame and logs it.
 - **`wrong_version`**: the host sends `error` code `protocol_mismatch` and then closes the
   connection. A client that receives `error` `protocol_mismatch` closes the connection and tells
@@ -191,24 +253,27 @@ Rules:
 - `decode_only`: decoding `json` MUST give `message` (unknown type, unknown fields).
 - `decode_errors`: decoding `json` (or the raw text `json_text`, used where the exact number or
   string token matters) MUST fail with the named error (`wrong_version`, `bad_json`, `frame_too_large`).
+  For `bad_json`, `call_id` (when present) is the call id the decoder reports with the error; when
+  absent, none is reported.
 - `boundary_frames`: generated frames. Frame text = `prefix` + filler + `suffix`, where filler is
   each `{text, count}` repeated and concatenated. Entries check exactly 65 519 bytes (accepted),
   65 520 bytes (`frame_too_large`) and multi-byte content whose byte count exceeds the limit while
   its character count does not. Encoding the `error` message with that filler as `message` must
   succeed or fail the same way.
 
-`message.case` names the message; the other `message` keys use the JSON field names. All 11 cases:
+`message.case` names the message; the other `message` keys use the JSON field names (`decision`
+and PendingItem objects use their wire form). All 11 cases:
 
 | `message.case` | Wire `t` | Other keys |
 | --- | --- | --- |
 | `hello` | `hello` | `client_version`, `device_name` |
 | `welcome` | `welcome` | `protocol_version`, `host_version`, `machine_name` |
-| `error` | `error` | `code`, `message` |
-| `snapshot_get` | `agent.snapshot.get` | none |
-| `snapshot` | `agent.snapshot` | `revision`, `pending` |
+| `error` | `error` | `code`, `message`, `call_id` (optional) |
+| `snapshot_get` | `agent.snapshot.get` | `call_id` |
+| `snapshot` | `agent.snapshot` | `call_id`, `revision`, `pending` |
 | `changed` | `agent.changed` | `revision`, `added`, `resolved` |
-| `reply` | `agent.reply` | `request_id`, `mode` |
-| `reply_result` | `agent.reply.result` | `request_id`, `outcome` |
+| `reply` | `agent.reply` | `call_id`, `request_id`, `decision` |
+| `reply_result` | `agent.reply.result` | `call_id`, `request_id`, `outcome` |
 | `ping` | `ping` | `nonce` |
 | `pong` | `pong` | `nonce` |
 | `unknown` | any unrecognized `t` | `type` (the `t` value); decode-only |

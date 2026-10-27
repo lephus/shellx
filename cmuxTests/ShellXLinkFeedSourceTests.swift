@@ -88,6 +88,19 @@ struct ShellXLinkFeedSourceTests {
         #expect(item?.workspaceId == Self.workspace.id)
         #expect(item?.workspaceTitle == Self.workspace.title)
         #expect((item?.createdAtMs ?? 0) > 0)
+        // The offered modes are what the Feed panel allows for this agent, and never `bypass`.
+        #expect(item?.modes.contains("deny") == true)
+        #expect(item?.modes.contains("bypass") == false)
+        #expect(item?.modes.allSatisfy { ["once", "always", "all", "deny"].contains($0) } == true)
+    }
+
+    @Test func testModesFollowTheAgentsPolicy() async {
+        let (store, source) = await MainActor.run { Self.makeSource() }
+        // Hermes has no persistent permission modes (`FeedPermissionActionPolicy`).
+        await MainActor.run { store.ingest(Self.permission("hermes-modes", source: "hermes-agent")) }
+        let modes = await source.snapshot().pending.first { $0.requestId == "hermes-modes" }?.modes
+        #expect(modes?.contains("always") == false)
+        #expect(modes?.contains("deny") == true)
     }
 
     @Test func testChangesEmitsAddedThenResolved() async throws {
@@ -121,7 +134,7 @@ struct ShellXLinkFeedSourceTests {
         FeedCoordinator.shared.deliverReply(requestId: "mac-first", decision: .permission(.deny))
         #expect(hook.wait())
 
-        let outcome = await source.reply(requestId: "mac-first", mode: .always)
+        let outcome = await source.reply(requestId: "mac-first", decision: .permission(.always))
 
         #expect(outcome == .alreadyHandled)
         guard case .resolved(_, .permission(.deny))? = hook.result else {
@@ -140,25 +153,42 @@ struct ShellXLinkFeedSourceTests {
         let hook = Self.startBlockingHook(Self.permission("phone-first"))
         #expect(await Self.waitUntil { store.pending.contains { $0.payload.requestID == "phone-first" } })
 
-        #expect(await source.reply(requestId: "phone-first", mode: .once) == .delivered)
+        #expect(await source.reply(requestId: "phone-first", decision: .permission(.once)) == .delivered)
         #expect(hook.wait())
         guard case .resolved(_, .permission(.once))? = hook.result else {
             Issue.record("the hook must get the phone's decision: \(String(describing: hook.result))")
             return
         }
         // A resend is answered, never resolved again.
-        #expect(await source.reply(requestId: "phone-first", mode: .deny) == .alreadyHandled)
+        #expect(await source.reply(requestId: "phone-first", decision: .permission(.deny)) == .alreadyHandled)
     }
 
     @Test func testReplyToUnknownRequestOrDisallowedModeIsUnknown() async {
         let (store, source) = await MainActor.run { Self.makeSource() }
-        #expect(await source.reply(requestId: "never-seen", mode: .once) == .unknown)
+        #expect(await source.reply(requestId: "never-seen", decision: .permission(.once)) == .unknown)
 
         // Hermes has no persistent permission modes (`FeedPermissionActionPolicy`).
         await MainActor.run { store.ingest(Self.permission("hermes-1", source: "hermes-agent")) }
-        #expect(await source.reply(requestId: "hermes-1", mode: .always) == .unknown)
+        #expect(await source.reply(requestId: "hermes-1", decision: .permission(.always)) == .unknown)
         let stillPending = await MainActor.run { store.pending.contains { $0.payload.requestID == "hermes-1" } }
         #expect(stillPending)
+    }
+
+    @Test func testNonPermissionAndUnknownDecisionsAreUnknown() async {
+        let (store, source) = await MainActor.run { Self.makeSource() }
+        let hook = Self.startBlockingHook(Self.permission("kind-mismatch"))
+        #expect(await Self.waitUntil { store.pending.contains { $0.payload.requestID == "kind-mismatch" } })
+
+        #expect(await source.reply(requestId: "kind-mismatch", decision: .question(selections: ["A"])) == .unknown)
+        #expect(await source.reply(requestId: "kind-mismatch", decision: .exitPlan(.manual, feedback: nil)) == .unknown)
+        #expect(await source.reply(requestId: "kind-mismatch", decision: .other(kind: "teleport")) == .unknown)
+        // `bypass` is never accepted over Link, and an unknown mode is not a permission mode.
+        #expect(await source.reply(requestId: "kind-mismatch", decision: .permission(.other("bypass"))) == .unknown)
+        let stillPending = await MainActor.run { store.pending.contains { $0.payload.requestID == "kind-mismatch" } }
+        #expect(stillPending)
+        // Release the blocked hook so it does not outlive the test.
+        FeedCoordinator.shared.deliverReply(requestId: "kind-mismatch", decision: .permission(.deny))
+        #expect(hook.wait())
     }
 
     @Test func testToolInputPreviewTruncated() async throws {
@@ -236,7 +266,7 @@ extension ShellXLinkFeedSourceTests {
 
         // One main-actor turn: the reply, then the state it left before any other code ran.
         let (outcome, statusAtReturn) = await MainActor.run { () -> (ReplyOutcome, WorkstreamStatus?) in
-            let outcome = source.resolveReply(requestId: "orphan-1", mode: .deny)
+            let outcome = source.resolveReply(requestId: "orphan-1", decision: .permission(.deny))
             return (outcome, store.items.first { $0.payload.requestID == "orphan-1" }?.status)
         }
 
@@ -252,7 +282,7 @@ extension ShellXLinkFeedSourceTests {
         #expect(change?.added.isEmpty == true)
         #expect(await source.snapshot().pending.map(\.requestId).contains("orphan-1") == false)
         // A resend is answered and changes nothing.
-        #expect(await source.reply(requestId: "orphan-1", mode: .once) == .alreadyHandled)
+        #expect(await source.reply(requestId: "orphan-1", decision: .permission(.once)) == .alreadyHandled)
         let status = await MainActor.run { store.items.first { $0.payload.requestID == "orphan-1" }?.status }
         guard case .expired? = status else {
             Issue.record("a resend must not resolve the expired card: \(String(describing: status))")
@@ -275,7 +305,7 @@ extension ShellXLinkFeedSourceTests {
             }
             _ = winnerReturned.wait(timeout: .now() + 5)
             return (
-                source.resolveReply(requestId: "race-1", mode: .once),
+                source.resolveReply(requestId: "race-1", decision: .permission(.once)),
                 FeedCoordinator.shared.deliverReply(requestId: "race-1", decision: .permission(.always))
             )
         }

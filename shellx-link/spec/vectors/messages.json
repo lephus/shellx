@@ -1,5 +1,5 @@
 {
-  "comment": "ShellX Link v1 golden vectors. For each entry: decoding `json` must yield `message`; encoding `message` must yield JSON that is semantically equal to `json` (key order and whitespace do not matter; absent optional keys are omitted, never null). `message.case` names the message; all other `message` keys carry the field values using the JSON key names. `nonce` is a plain JSON number; 18446744073709551615 must be parsed as an unsigned 64-bit integer, never through a double.",
+  "comment": "ShellX Link v1 golden vectors. For each entry: decoding `json` must yield `message`; encoding `message` must yield JSON that is semantically equal to `json` (key order and whitespace do not matter; absent optional keys are omitted, never null). `message.case` names the message; all other `message` keys carry the field values using the JSON key names. `nonce` is a plain JSON number; 18446744073709551615 must be parsed as an unsigned 64-bit integer, never through a double. `decode_errors` entries may carry `call_id`: the call id the decoder reports with the error (absent means none).",
   "vectors": [
     {
       "name": "hello",
@@ -48,11 +48,13 @@
     {
       "name": "snapshot_get",
       "message": {
-        "case": "snapshot_get"
+        "case": "snapshot_get",
+        "call_id": "c1"
       },
       "json": {
         "v": 1,
-        "t": "agent.snapshot.get"
+        "t": "agent.snapshot.get",
+        "call_id": "c1"
       }
     },
     {
@@ -60,13 +62,15 @@
       "message": {
         "case": "snapshot",
         "revision": 0,
-        "pending": []
+        "pending": [],
+        "call_id": "c1"
       },
       "json": {
         "v": 1,
         "t": "agent.snapshot",
         "revision": 0,
-        "pending": []
+        "pending": [],
+        "call_id": "c1"
       }
     },
     {
@@ -82,8 +86,14 @@
             "workspace_id": "ws-1",
             "workspace_title": "shellx",
             "tool_name": "Bash",
-            "tool_input_preview": "rm -rf build \"quoted\" é 🚀",
-            "created_at_ms": 1789000000000
+            "tool_input_preview": "rm -rf build \"quoted\" \u00e9 \ud83d\ude80",
+            "created_at_ms": 1789000000000,
+            "modes": [
+              "once",
+              "always",
+              "all",
+              "deny"
+            ]
           },
           {
             "request_id": "req-2",
@@ -91,9 +101,11 @@
             "agent": "claude",
             "workspace_id": "ws-2",
             "workspace_title": "docs",
-            "created_at_ms": 1789000001000
+            "created_at_ms": 1789000001000,
+            "modes": []
           }
-        ]
+        ],
+        "call_id": "c1"
       },
       "json": {
         "v": 1,
@@ -107,8 +119,14 @@
             "workspace_id": "ws-1",
             "workspace_title": "shellx",
             "tool_name": "Bash",
-            "tool_input_preview": "rm -rf build \"quoted\" é 🚀",
-            "created_at_ms": 1789000000000
+            "tool_input_preview": "rm -rf build \"quoted\" \u00e9 \ud83d\ude80",
+            "created_at_ms": 1789000000000,
+            "modes": [
+              "once",
+              "always",
+              "all",
+              "deny"
+            ]
           },
           {
             "request_id": "req-2",
@@ -116,9 +134,11 @@
             "agent": "claude",
             "workspace_id": "ws-2",
             "workspace_title": "docs",
-            "created_at_ms": 1789000001000
+            "created_at_ms": 1789000001000,
+            "modes": []
           }
-        ]
+        ],
+        "call_id": "c1"
       }
     },
     {
@@ -133,7 +153,13 @@
             "agent": "claude",
             "workspace_id": "ws-1",
             "workspace_title": "shellx",
-            "created_at_ms": 1789000002000
+            "created_at_ms": 1789000002000,
+            "modes": [
+              "ultraplan",
+              "auto_accept",
+              "manual",
+              "deny"
+            ]
           }
         ],
         "resolved": [
@@ -152,7 +178,13 @@
             "agent": "claude",
             "workspace_id": "ws-1",
             "workspace_title": "shellx",
-            "created_at_ms": 1789000002000
+            "created_at_ms": 1789000002000,
+            "modes": [
+              "ultraplan",
+              "auto_accept",
+              "manual",
+              "deny"
+            ]
           }
         ],
         "resolved": [
@@ -166,13 +198,21 @@
       "message": {
         "case": "reply",
         "request_id": "req-1",
-        "mode": "once"
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "once"
+        }
       },
       "json": {
         "v": 1,
         "t": "agent.reply",
         "request_id": "req-1",
-        "mode": "once"
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "once"
+        }
       }
     },
     {
@@ -180,13 +220,21 @@
       "message": {
         "case": "reply",
         "request_id": "req-1",
-        "mode": "always"
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "always"
+        }
       },
       "json": {
         "v": 1,
         "t": "agent.reply",
         "request_id": "req-1",
-        "mode": "always"
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "always"
+        }
       }
     },
     {
@@ -194,13 +242,21 @@
       "message": {
         "case": "reply",
         "request_id": "req-1",
-        "mode": "all"
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "all"
+        }
       },
       "json": {
         "v": 1,
         "t": "agent.reply",
         "request_id": "req-1",
-        "mode": "all"
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "all"
+        }
       }
     },
     {
@@ -208,13 +264,21 @@
       "message": {
         "case": "reply",
         "request_id": "req-1",
-        "mode": "deny"
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "deny"
+        }
       },
       "json": {
         "v": 1,
         "t": "agent.reply",
         "request_id": "req-1",
-        "mode": "deny"
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "deny"
+        }
       }
     },
     {
@@ -222,13 +286,15 @@
       "message": {
         "case": "reply_result",
         "request_id": "req-1",
-        "outcome": "delivered"
+        "outcome": "delivered",
+        "call_id": "c1"
       },
       "json": {
         "v": 1,
         "t": "agent.reply.result",
         "request_id": "req-1",
-        "outcome": "delivered"
+        "outcome": "delivered",
+        "call_id": "c1"
       }
     },
     {
@@ -236,13 +302,15 @@
       "message": {
         "case": "reply_result",
         "request_id": "req-1",
-        "outcome": "already_handled"
+        "outcome": "already_handled",
+        "call_id": "c1"
       },
       "json": {
         "v": 1,
         "t": "agent.reply.result",
         "request_id": "req-1",
-        "outcome": "already_handled"
+        "outcome": "already_handled",
+        "call_id": "c1"
       }
     },
     {
@@ -250,13 +318,15 @@
       "message": {
         "case": "reply_result",
         "request_id": "req-9",
-        "outcome": "unknown"
+        "outcome": "unknown",
+        "call_id": "c1"
       },
       "json": {
         "v": 1,
         "t": "agent.reply.result",
         "request_id": "req-9",
-        "outcome": "unknown"
+        "outcome": "unknown",
+        "call_id": "c1"
       }
     },
     {
@@ -281,6 +351,298 @@
         "v": 1,
         "t": "pong",
         "nonce": 18446744073709551615
+      }
+    },
+    {
+      "name": "reply_permission",
+      "message": {
+        "case": "reply",
+        "call_id": "c2",
+        "request_id": "req-1",
+        "decision": {
+          "kind": "permission",
+          "mode": "once"
+        }
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c2",
+        "request_id": "req-1",
+        "decision": {
+          "kind": "permission",
+          "mode": "once"
+        }
+      }
+    },
+    {
+      "name": "reply_question",
+      "message": {
+        "case": "reply",
+        "call_id": "c3",
+        "request_id": "req-2",
+        "decision": {
+          "kind": "question",
+          "selections": [
+            "Postgres",
+            "SQLite \u00e9"
+          ]
+        }
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c3",
+        "request_id": "req-2",
+        "decision": {
+          "kind": "question",
+          "selections": [
+            "Postgres",
+            "SQLite \u00e9"
+          ]
+        }
+      }
+    },
+    {
+      "name": "reply_exit_plan",
+      "message": {
+        "case": "reply",
+        "call_id": "c4",
+        "request_id": "req-3",
+        "decision": {
+          "kind": "exit_plan",
+          "mode": "manual",
+          "feedback": "split step 2 \ud83d\ude80"
+        }
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c4",
+        "request_id": "req-3",
+        "decision": {
+          "kind": "exit_plan",
+          "mode": "manual",
+          "feedback": "split step 2 \ud83d\ude80"
+        }
+      }
+    },
+    {
+      "name": "reply_exit_plan_no_feedback",
+      "message": {
+        "case": "reply",
+        "call_id": "c4",
+        "request_id": "req-3",
+        "decision": {
+          "kind": "exit_plan",
+          "mode": "auto_accept"
+        }
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c4",
+        "request_id": "req-3",
+        "decision": {
+          "kind": "exit_plan",
+          "mode": "auto_accept"
+        }
+      }
+    },
+    {
+      "name": "reply_result",
+      "message": {
+        "case": "reply_result",
+        "call_id": "c2",
+        "request_id": "req-1",
+        "outcome": "delivered"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply.result",
+        "call_id": "c2",
+        "request_id": "req-1",
+        "outcome": "delivered"
+      }
+    },
+    {
+      "name": "snapshot_get_call_id",
+      "message": {
+        "case": "snapshot_get",
+        "call_id": "c7"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.snapshot.get",
+        "call_id": "c7"
+      }
+    },
+    {
+      "name": "snapshot_with_question",
+      "message": {
+        "case": "snapshot",
+        "call_id": "c5",
+        "revision": 9,
+        "pending": [
+          {
+            "request_id": "req-2",
+            "kind": "question",
+            "agent": "claude",
+            "workspace_id": "ws-1",
+            "workspace_title": "shellx",
+            "created_at_ms": 1789000003000,
+            "modes": [],
+            "questions": [
+              {
+                "id": "q-1",
+                "header": "Database",
+                "prompt": "Which database should the app use?",
+                "multi_select": false,
+                "options": [
+                  {
+                    "id": "o-1",
+                    "label": "Postgres",
+                    "description": "Hosted, relational"
+                  },
+                  {
+                    "id": "o-2",
+                    "label": "SQLite \u00e9"
+                  }
+                ]
+              },
+              {
+                "id": "q-2",
+                "prompt": "Which extras?",
+                "multi_select": true,
+                "options": [
+                  {
+                    "id": "o-3",
+                    "label": "Auth"
+                  },
+                  {
+                    "id": "o-4",
+                    "label": "Metrics"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.snapshot",
+        "call_id": "c5",
+        "revision": 9,
+        "pending": [
+          {
+            "request_id": "req-2",
+            "kind": "question",
+            "agent": "claude",
+            "workspace_id": "ws-1",
+            "workspace_title": "shellx",
+            "created_at_ms": 1789000003000,
+            "modes": [],
+            "questions": [
+              {
+                "id": "q-1",
+                "header": "Database",
+                "prompt": "Which database should the app use?",
+                "multi_select": false,
+                "options": [
+                  {
+                    "id": "o-1",
+                    "label": "Postgres",
+                    "description": "Hosted, relational"
+                  },
+                  {
+                    "id": "o-2",
+                    "label": "SQLite \u00e9"
+                  }
+                ]
+              },
+              {
+                "id": "q-2",
+                "prompt": "Which extras?",
+                "multi_select": true,
+                "options": [
+                  {
+                    "id": "o-3",
+                    "label": "Auth"
+                  },
+                  {
+                    "id": "o-4",
+                    "label": "Metrics"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "snapshot_with_plan",
+      "message": {
+        "case": "snapshot",
+        "call_id": "c6",
+        "revision": 10,
+        "pending": [
+          {
+            "request_id": "req-3",
+            "kind": "exit_plan",
+            "agent": "claude",
+            "workspace_id": "ws-1",
+            "workspace_title": "shellx",
+            "created_at_ms": 1789000004000,
+            "modes": [
+              "ultraplan",
+              "auto_accept",
+              "manual",
+              "deny"
+            ],
+            "plan_preview": "1. Add the codec\n2. Add the tests \ud83d\ude80"
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.snapshot",
+        "call_id": "c6",
+        "revision": 10,
+        "pending": [
+          {
+            "request_id": "req-3",
+            "kind": "exit_plan",
+            "agent": "claude",
+            "workspace_id": "ws-1",
+            "workspace_title": "shellx",
+            "created_at_ms": 1789000004000,
+            "modes": [
+              "ultraplan",
+              "auto_accept",
+              "manual",
+              "deny"
+            ],
+            "plan_preview": "1. Add the codec\n2. Add the tests \ud83d\ude80"
+          }
+        ]
+      }
+    },
+    {
+      "name": "error_with_call_id",
+      "message": {
+        "case": "error",
+        "code": "bad_request",
+        "message": "the frame could not be decoded",
+        "call_id": "c9"
+      },
+      "json": {
+        "v": 1,
+        "t": "error",
+        "code": "bad_request",
+        "message": "the frame could not be decoded",
+        "call_id": "c9"
       }
     }
   ],
@@ -312,6 +674,106 @@
       "message": {
         "case": "ping",
         "nonce": 5
+      }
+    },
+    {
+      "name": "reply_unknown_mode",
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c1",
+        "request_id": "r",
+        "decision": {
+          "kind": "permission",
+          "mode": "bypass2"
+        }
+      },
+      "message": {
+        "case": "reply",
+        "call_id": "c1",
+        "request_id": "r",
+        "decision": {
+          "kind": "permission",
+          "mode": "bypass2"
+        }
+      }
+    },
+    {
+      "name": "pending_unknown_kind",
+      "json": {
+        "v": 1,
+        "t": "agent.snapshot",
+        "call_id": "c1",
+        "revision": 1,
+        "pending": [
+          {
+            "request_id": "r",
+            "kind": "hologram",
+            "agent": "claude",
+            "workspace_id": "w",
+            "workspace_title": "t",
+            "created_at_ms": 1,
+            "modes": [
+              "wave"
+            ],
+            "future_field": 1
+          }
+        ]
+      },
+      "message": {
+        "case": "snapshot",
+        "call_id": "c1",
+        "revision": 1,
+        "pending": [
+          {
+            "request_id": "r",
+            "kind": "hologram",
+            "agent": "claude",
+            "workspace_id": "w",
+            "workspace_title": "t",
+            "created_at_ms": 1,
+            "modes": [
+              "wave"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "reply_unknown_decision_kind",
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c1",
+        "request_id": "r",
+        "decision": {
+          "kind": "teleport",
+          "where": "moon"
+        }
+      },
+      "message": {
+        "case": "reply",
+        "call_id": "c1",
+        "request_id": "r",
+        "decision": {
+          "kind": "teleport"
+        }
+      }
+    },
+    {
+      "name": "reply_result_unknown_outcome",
+      "json": {
+        "v": 1,
+        "t": "agent.reply.result",
+        "call_id": "c1",
+        "request_id": "r",
+        "outcome": "later"
+      },
+      "message": {
+        "case": "reply_result",
+        "call_id": "c1",
+        "request_id": "r",
+        "outcome": "later"
       }
     }
   ],
@@ -357,14 +819,18 @@
       "error": "bad_json"
     },
     {
-      "name": "known_type_bad_enum",
+      "name": "known_type_missing_decision_mode",
       "json": {
         "v": 1,
         "t": "agent.reply",
+        "call_id": "c1",
         "request_id": "r",
-        "mode": "sometimes"
+        "decision": {
+          "kind": "permission"
+        }
       },
-      "error": "bad_json"
+      "error": "bad_json",
+      "call_id": "c1"
     },
     {
       "name": "version_float",
@@ -385,6 +851,82 @@
       "name": "version_bool",
       "json_text": "{\"v\":true,\"t\":\"ping\",\"nonce\":1}",
       "error": "bad_json"
+    },
+    {
+      "name": "reply_without_call_id",
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "request_id": "r",
+        "decision": {
+          "kind": "permission",
+          "mode": "once"
+        }
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "reply_call_id_65_bytes",
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "request_id": "r",
+        "decision": {
+          "kind": "permission",
+          "mode": "once"
+        }
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "reply_empty_call_id",
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "",
+        "request_id": "r",
+        "decision": {
+          "kind": "permission",
+          "mode": "once"
+        }
+      },
+      "error": "bad_json"
+    },
+    {
+      "name": "reply_missing_request_id",
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c1",
+        "decision": {
+          "kind": "permission",
+          "mode": "once"
+        }
+      },
+      "error": "bad_json",
+      "call_id": "c1"
+    },
+    {
+      "name": "pending_missing_modes",
+      "json": {
+        "v": 1,
+        "t": "agent.snapshot",
+        "call_id": "c1",
+        "revision": 1,
+        "pending": [
+          {
+            "request_id": "r",
+            "kind": "permission",
+            "agent": "claude",
+            "workspace_id": "w",
+            "workspace_title": "t",
+            "created_at_ms": 1
+          }
+        ]
+      },
+      "error": "bad_json",
+      "call_id": "c1"
     }
   ],
   "boundary_frames": {
@@ -422,7 +964,7 @@
             "count": 1
           },
           {
-            "text": "é",
+            "text": "\u00e9",
             "count": 32738
           }
         ],
@@ -438,7 +980,7 @@
             "count": 2
           },
           {
-            "text": "é",
+            "text": "\u00e9",
             "count": 32737
           }
         ],

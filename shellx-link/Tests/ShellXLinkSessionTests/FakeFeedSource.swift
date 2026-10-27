@@ -13,7 +13,7 @@ final class FakeFeedSource: AgentFeedSource, @unchecked Sendable {
     private var subscribers: [UUID: AsyncStream<FeedChange>.Continuation] = [:]
     private var _snapshotCalls = 0
     private var _changesCalls = 0
-    private var _replies: [(requestId: String, mode: PermissionMode)] = []
+    private var _replies: [(requestId: String, decision: LinkDecision)] = []
     private var _changeOnSubscribe = false
     /// Subscribers whose stream has terminated. Kept under its own lock: `onTermination` runs
     /// inside the runtime's cancellation path while `broadcastLocked` holds `lock` and yields,
@@ -27,7 +27,7 @@ final class FakeFeedSource: AgentFeedSource, @unchecked Sendable {
 
     var snapshotCalls: Int { lock.withLock { _snapshotCalls } }
     var changesCalls: Int { lock.withLock { _changesCalls } }
-    var replies: [(requestId: String, mode: PermissionMode)] { lock.withLock { _replies } }
+    var replies: [(requestId: String, decision: LinkDecision)] { lock.withLock { _replies } }
     var activeSubscribers: Int {
         let ids = lock.withLock { Set(subscribers.keys) }
         return ids.subtracting(terminationLock.withLock { terminated }).count
@@ -86,9 +86,9 @@ final class FakeFeedSource: AgentFeedSource, @unchecked Sendable {
         return stream
     }
 
-    func reply(requestId: String, mode: PermissionMode) async -> ReplyOutcome {
+    func reply(requestId: String, decision: LinkDecision) async -> ReplyOutcome {
         lock.withLock {
-            _replies.append((requestId, mode))
+            _replies.append((requestId, decision))
             if pending.removeValue(forKey: requestId) != nil {
                 resolved.insert(requestId)
                 broadcastLocked(added: [], resolved: [requestId])
@@ -122,7 +122,7 @@ final class SlowFirstReplyFeed: AgentFeedSource, @unchecked Sendable {
     private let delay: Duration
     private let lock = NSLock()
     private var seen: Set<String> = []
-    private var _answers: [(requestId: String, mode: PermissionMode, outcome: ReplyOutcome)] = []
+    private var _answers: [(requestId: String, decision: LinkDecision, outcome: ReplyOutcome)] = []
 
     init(_ base: FakeFeedSource, slowIds: Set<String>, delay: Duration) {
         self.base = base
@@ -130,17 +130,17 @@ final class SlowFirstReplyFeed: AgentFeedSource, @unchecked Sendable {
         self.delay = delay
     }
 
-    var answers: [(requestId: String, mode: PermissionMode, outcome: ReplyOutcome)] { lock.withLock { _answers } }
+    var answers: [(requestId: String, decision: LinkDecision, outcome: ReplyOutcome)] { lock.withLock { _answers } }
 
     func snapshot() async -> (revision: Int, pending: [PendingItem]) { await base.snapshot() }
 
     func changes() -> AsyncStream<FeedChange> { base.changes() }
 
-    func reply(requestId: String, mode: PermissionMode) async -> ReplyOutcome {
+    func reply(requestId: String, decision: LinkDecision) async -> ReplyOutcome {
         let slow = lock.withLock { slowIds.contains(requestId) && seen.insert(requestId).inserted }
         if slow { try? await Task.sleep(for: delay) }
-        let outcome = await base.reply(requestId: requestId, mode: mode)
-        lock.withLock { _answers.append((requestId, mode, outcome)) }
+        let outcome = await base.reply(requestId: requestId, decision: decision)
+        lock.withLock { _answers.append((requestId, decision, outcome)) }
         return outcome
     }
 }

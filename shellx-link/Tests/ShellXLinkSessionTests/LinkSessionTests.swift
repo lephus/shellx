@@ -34,17 +34,17 @@ final class LinkSessionTests: XCTestCase {
     func testReplyDelivered() async throws {
         let feed = FakeFeedSource([permissionItem("r1")])
         let client = try await connect(makeHost(feed))
-        let outcome = try await within { try await client.reply(requestId: "r1", mode: .once) }
+        let outcome = try await within { try await client.reply(requestId: "r1", decision: .permission(.once)) }
         XCTAssertEqual(outcome, .delivered)
         XCTAssertEqual(feed.replies.map(\.requestId), ["r1"])
-        XCTAssertEqual(feed.replies.first?.mode, .once)
+        XCTAssertEqual(feed.replies.first?.decision, .permission(.once))
     }
 
     func testReplyTwiceIsAlreadyHandled() async throws {
         let feed = FakeFeedSource([permissionItem("r1")])
         let client = try await connect(makeHost(feed))
-        let first = try await within { try await client.reply(requestId: "r1", mode: .once) }
-        let second = try await within { try await client.reply(requestId: "r1", mode: .once) }
+        let first = try await within { try await client.reply(requestId: "r1", decision: .permission(.once)) }
+        let second = try await within { try await client.reply(requestId: "r1", decision: .permission(.once)) }
         XCTAssertEqual(first, .delivered)
         XCTAssertEqual(second, .alreadyHandled)
     }
@@ -76,7 +76,7 @@ final class LinkSessionTests: XCTestCase {
             XCTAssertTrue(added, "client \(name) did not learn that r2 was added")
         }
 
-        let outcome = try await within { try await clientA.reply(requestId: "r1", mode: .always) }
+        let outcome = try await within { try await clientA.reply(requestId: "r1", decision: .permission(.always)) }
         XCTAssertEqual(outcome, .delivered)
         for (name, seen) in [("A", seenByA), ("B", seenByB)] {
             let resolved = await eventually { seen.items.contains { $0.resolved == ["r1"] } }
@@ -188,7 +188,7 @@ final class LinkSessionTests: XCTestCase {
         let rig = makeHost(feed)
         let (end, served) = startServe(rig.host)
         let raw = try await rawChannel(end, rig)
-        try await raw.send(.snapshotGet)
+        try await raw.send(.snapshotGet(callId: "c1"))
         let reply = try await raw.receive()
         XCTAssertEqual(errorCode(reply), "bad_request")
         await assertClosed(raw)
@@ -253,7 +253,7 @@ final class LinkSessionTests: XCTestCase {
             let ch = try await SecureChannel.open(
                 hostEnd, role: .responder, key: hostKey, trusts: { _ in true })
             _ = try await ch.receive()
-            try await ch.send(.error(code: "protocol_mismatch", message: "update the app"))
+            try await ch.send(.error(code: "protocol_mismatch", message: "update the app", callId: nil))
         }
         do {
             _ = try await LinkClient.connect(
@@ -354,41 +354,148 @@ final class LinkSessionTests: XCTestCase {
         feed.add(permissionItem("r1"))
         let snap = try await within { try await client.snapshot() }
         XCTAssertEqual(snap.pending.map(\.requestId), ["r1"])
-        let outcome = try await within { try await client.reply(requestId: "r1", mode: .once) }
+        let outcome = try await within { try await client.reply(requestId: "r1", decision: .permission(.once)) }
         XCTAssertEqual(outcome, .delivered)
         XCTAssertFalse(served.isSet)
     }
 
-    func testLateReplyResultIsNotGivenToNewerReply() async throws {
+    func testReplyCarriesCallIdAndResultMatches() async throws {
         let hostKey = NoiseStaticKey()
         let clientKey = NoiseStaticKey()
         let (clientEnd, hostEnd) = makeInMemoryCircuitPair()
-        // A slow host: it answers the first reply only after the client gave up on it.
+        let seen = Collector<LinkMessage>()
         let rawHost = Task {
             let ch = try await SecureChannel.open(hostEnd, role: .responder, key: hostKey, trusts: { _ in true })
             _ = try await ch.receive()
             try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac"))
-            guard case .reply = try await ch.receive() else { throw RelayError.closed }
-            // 500 ms after the first call's 1 s timeout, 500 ms before the retry's.
-            try await Task.sleep(for: .milliseconds(1500))
-            try await ch.send(.replyResult(requestId: "r1", outcome: .delivered))
-            guard case .reply = try await ch.receive() else { throw RelayError.closed }
-            try await ch.send(.replyResult(requestId: "r1", outcome: .alreadyHandled))
+            for _ in 0..<2 {
+                let message = try await ch.receive()
+                seen.append(message)
+                guard case let .reply(callId, requestId, _) = message else { throw RelayError.closed }
+                try await ch.send(.replyResult(callId: callId, requestId: requestId, outcome: .delivered))
+            }
         }
         let client = try await LinkClient.connect(
             clientEnd, key: clientKey, hostKey: hostKey.publicKey, clientVersion: "1", deviceName: "phone",
-            timings: LinkTimings(pingInterval: .seconds(20), idleTimeout: .seconds(45), requestTimeout: .seconds(1)))
+            timings: .standard)
+        clients.append(client)
+        let a = try await within { try await client.reply(requestId: "r1", decision: .permission(.once)) }
+        let b = try await within { try await client.reply(requestId: "r1", decision: .permission(.deny)) }
+        XCTAssertEqual([a, b], [.delivered, .delivered])
+        try await rawHost.value
+        let callIds = seen.items.compactMap { message -> String? in
+            if case let .reply(callId, _, _) = message { return callId }
+            return nil
+        }
+        XCTAssertEqual(callIds.count, 2)
+        XCTAssertEqual(Set(callIds).count, 2, "call ids must be unique")
+        XCTAssertTrue(callIds.allSatisfy { (1...LinkCodec.maxCallIdBytes).contains($0.utf8.count) })
+    }
+
+    func testLateResultOfTimedOutCallIsDropped() async throws {
+        // The host answers the first call after the client gave up on it, in front of the answer to
+        // the second call: the late answer carries the first call's id and must not reach the second.
+        let hostKey = NoiseStaticKey()
+        let clientKey = NoiseStaticKey()
+        let (clientEnd, hostEnd) = makeInMemoryCircuitPair()
+        let rawHost = Task {
+            let ch = try await SecureChannel.open(hostEnd, role: .responder, key: hostKey, trusts: { _ in true })
+            _ = try await ch.receive()
+            try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac"))
+            guard case let .reply(first, _, _) = try await ch.receive() else { throw RelayError.closed }
+            guard case let .reply(second, _, _) = try await ch.receive() else { throw RelayError.closed }
+            try await ch.send(.replyResult(callId: first, requestId: "r1", outcome: .delivered))
+            try await ch.send(.replyResult(callId: second, requestId: "r1", outcome: .alreadyHandled))
+        }
+        let client = try await LinkClient.connect(
+            clientEnd, key: clientKey, hostKey: hostKey.publicKey, clientVersion: "1", deviceName: "phone",
+            timings: LinkTimings(pingInterval: .seconds(20), idleTimeout: .seconds(45), requestTimeout: .milliseconds(50)))
         clients.append(client)
 
         do {
-            _ = try await within { try await client.reply(requestId: "r1", mode: .deny) }
-            XCTFail("the slow reply did not time out")
+            _ = try await within { try await client.reply(requestId: "r1", decision: .permission(.deny)) }
+            XCTFail("the unanswered reply did not time out")
         } catch {
             XCTAssertEqual(error as? LinkClientError, .timedOut, "unexpected error \(error)")
         }
-        let retry = try await within { try await client.reply(requestId: "r1", mode: .once) }
-        XCTAssertEqual(retry, .alreadyHandled, "the late result of the first reply reached the retry")
+        let retry = try await within { try await client.reply(requestId: "r1", decision: .permission(.once)) }
+        XCTAssertEqual(retry, .alreadyHandled, "the late result of the first call reached the second")
         try await rawHost.value
+    }
+
+    func testHostEchoesCallIdOnBadRequest() async throws {
+        let rig = makeHost(FakeFeedSource())
+        let (end, _) = startServe(rig.host)
+        let raw = try await rawEstablished(end, rig)
+        // A reply without `request_id`: undecodable, but its call_id is readable.
+        try await raw.send(frame: Data(#"{"v":1,"t":"agent.reply","call_id":"c9","decision":{"kind":"permission","mode":"once"}}"#.utf8))
+        let received = try await within { try await raw.receive() }
+        guard case let .error(code, _, callId) = received else {
+            return XCTFail("expected an error")
+        }
+        XCTAssertEqual(code, "bad_request")
+        XCTAssertEqual(callId, "c9")
+        // Without a readable call_id the error carries none, and the session stays usable.
+        try await raw.send(frame: Data(#"{"v":1,"t":"agent.reply","request_id":"r"}"#.utf8))
+        let second = try await within { try await raw.receive() }
+        guard case let .error(_, _, noId) = second else {
+            return XCTFail("expected an error")
+        }
+        XCTAssertNil(noId)
+        try await raw.send(.snapshotGet(callId: "c10"))
+        let third = try await within { try await raw.receive() }
+        guard case let .snapshot(answerId, _, _) = third else {
+            return XCTFail("expected a snapshot")
+        }
+        XCTAssertEqual(answerId, "c10")
+    }
+
+    func testRemoteErrorWithCallIdFailsOnlyThatCall() async throws {
+        let hostKey = NoiseStaticKey()
+        let clientKey = NoiseStaticKey()
+        let (clientEnd, hostEnd) = makeInMemoryCircuitPair()
+        let rawHost = Task {
+            let ch = try await SecureChannel.open(hostEnd, role: .responder, key: hostKey, trusts: { _ in true })
+            _ = try await ch.receive()
+            try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac"))
+            guard case let .reply(callId, _, _) = try await ch.receive() else { throw RelayError.closed }
+            try await ch.send(.error(code: "bad_request", message: "nope", callId: callId))
+            guard case let .snapshotGet(next) = try await ch.receive() else { throw RelayError.closed }
+            try await ch.send(.snapshot(callId: next, revision: 3, pending: []))
+        }
+        let client = try await LinkClient.connect(
+            clientEnd, key: clientKey, hostKey: hostKey.publicKey, clientVersion: "1", deviceName: "phone",
+            timings: .standard)
+        clients.append(client)
+        do {
+            _ = try await within { try await client.reply(requestId: "r1", decision: .permission(.once)) }
+            XCTFail("the error did not fail the call")
+        } catch {
+            XCTAssertEqual(error as? LinkClientError, .remote(code: "bad_request", message: "nope"))
+        }
+        let snap = try await within { try await client.snapshot() }
+        XCTAssertEqual(snap.revision, 3)
+        try await rawHost.value
+    }
+
+    func testQuestionDecisionReachesFeed() async throws {
+        let feed = FakeFeedSource([permissionItem("q1")])
+        let client = try await connect(makeHost(feed))
+        let outcome = try await within {
+            try await client.reply(requestId: "q1", decision: .question(selections: ["Blue", "Green"]))
+        }
+        XCTAssertEqual(outcome, .delivered)
+        XCTAssertEqual(feed.replies.first?.decision, .question(selections: ["Blue", "Green"]))
+    }
+
+    func testExitPlanDecisionCarriesFeedback() async throws {
+        let feed = FakeFeedSource([permissionItem("p1")])
+        let client = try await connect(makeHost(feed))
+        let outcome = try await within {
+            try await client.reply(requestId: "p1", decision: .exitPlan(.manual, feedback: "add tests \u{1F680}"))
+        }
+        XCTAssertEqual(outcome, .delivered)
+        XCTAssertEqual(feed.replies.first?.decision, .exitPlan(.manual, feedback: "add tests \u{1F680}"))
     }
 
     func testRepliesToOneRequestKeepTheirOwnOutcome() async throws {
@@ -403,16 +510,16 @@ final class LinkSessionTests: XCTestCase {
             timings: LinkTimings(pingInterval: .seconds(20), idleTimeout: .seconds(45), requestTimeout: .seconds(1)))
 
         do {
-            _ = try await within { try await client.reply(requestId: "r1", mode: .deny) }
+            _ = try await within { try await client.reply(requestId: "r1", decision: .permission(.deny)) }
             XCTFail("the slow reply did not time out")
         } catch {
             XCTAssertEqual(error as? LinkClientError, .timedOut, "unexpected error \(error)")
         }
-        let retry = try await within { try await client.reply(requestId: "r1", mode: .once) }
+        let retry = try await within { try await client.reply(requestId: "r1", decision: .permission(.once)) }
 
         let answers = feed.answers
-        XCTAssertEqual(answers.map(\.mode), [.deny, .once], "the retry overtook the first reply")
-        XCTAssertEqual(retry, answers.first { $0.mode == .once }?.outcome, "the retry got another reply's outcome")
+        XCTAssertEqual(answers.map(\.decision), [.permission(.deny), .permission(.once)], "the retry overtook the first reply")
+        XCTAssertEqual(retry, answers.first { $0.decision == .permission(.once) }?.outcome, "the retry got another reply's outcome")
         XCTAssertEqual(retry, .alreadyHandled)
     }
 
@@ -421,10 +528,10 @@ final class LinkSessionTests: XCTestCase {
             FakeFeedSource([permissionItem("slow"), permissionItem("fast")]), slowIds: ["slow"],
             delay: .milliseconds(1500))
         let client = try await connect(makeHost(feed))
-        let slow = Task { try await within { try await client.reply(requestId: "slow", mode: .once) } }
+        let slow = Task { try await within { try await client.reply(requestId: "slow", decision: .permission(.once)) } }
         try await Task.sleep(for: .milliseconds(50))
         let start = ContinuousClock.now
-        let fast = try await within { try await client.reply(requestId: "fast", mode: .once) }
+        let fast = try await within { try await client.reply(requestId: "fast", decision: .permission(.once)) }
         XCTAssertEqual(fast, .delivered)
         XCTAssertLessThan(ContinuousClock.now - start, .seconds(1), "a slow reply blocked another request")
         let slowOutcome = try await slow.value
@@ -536,7 +643,7 @@ final class LinkSessionTests: XCTestCase {
     }
 
     private func errorCode(_ message: LinkMessage) -> String? {
-        guard case let .error(code, _) = message else { return nil }
+        guard case let .error(code, _, _) = message else { return nil }
         return code
     }
 

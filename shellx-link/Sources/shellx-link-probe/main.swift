@@ -99,9 +99,9 @@ enum Probe {
         let mode = try args.mode()
         let client = try await Session.open(args)
         let started = ContinuousClock.now
-        let outcome = try await client.reply(requestId: requestId, mode: mode)
+        let outcome = try await client.reply(requestId: requestId, decision: .permission(mode))
         let rtt = Stats.ms(ContinuousClock.now - started)
-        Log.line("reply \(requestId) mode=\(mode.rawValue) outcome=\(outcome.rawValue) rtt=\(Stats.format(rtt)) ms")
+        Log.line("reply \(requestId) mode=\(mode.wire) outcome=\(outcome.wire) rtt=\(Stats.format(rtt)) ms")
         await client.close()
         if outcome == .unknown { throw ExitStatus(code: 2) }
     }
@@ -253,7 +253,7 @@ struct Bench {
         }
         let start = try await client.snapshot()
         await seen.setRevision(start.revision)
-        Log.line("bench: \(count) requests, mode \(mode.rawValue), start revision \(start.revision), pending \(start.pending.count)")
+        Log.line("bench: \(count) requests, mode \(mode.wire), start revision \(start.revision), pending \(start.pending.count)")
 
         let run = String(UUID().uuidString.prefix(8)).lowercased()
         let sessionId = "shellx-link-probe-\(run)"
@@ -268,7 +268,7 @@ struct Bench {
             guard let seenAt = await seen.wait(for: .added(requestId), timeout: .seconds(10)) else {
                 failures += 1
                 Log.line("#\(index) FAIL: no agent.changed for the request within 10 s")
-                _ = try? await client.reply(requestId: requestId, mode: .deny)
+                _ = try? await client.reply(requestId: requestId, decision: .permission(.deny))
                 let result = await hook.value
                 Log.line("#\(index) hook ended: \(result.summary)")
                 continue
@@ -276,7 +276,7 @@ struct Bench {
             let replyStarted = ContinuousClock.now
             let outcome: ReplyOutcome
             do {
-                outcome = try await client.reply(requestId: requestId, mode: mode)
+                outcome = try await client.reply(requestId: requestId, decision: .permission(mode))
             } catch {
                 failures += 1
                 Log.line("#\(index) FAIL: agent.reply failed: \(ErrorText.describe(error))")
@@ -291,7 +291,7 @@ struct Bench {
                 Log.line("#\(index) FAIL: hook \(result.summary)")
                 continue
             }
-            let ok = outcome == .delivered && result.status == "resolved" && result.mode == mode.rawValue
+            let ok = outcome == .delivered && result.status == "resolved" && result.mode == mode.wire
             let changedMs = Stats.ms(seenAt - sentAt)
             let rttMs = Stats.ms(replyAnswered - replyStarted)
             let hookMs = Stats.ms(answeredAt - replyStarted)
@@ -306,7 +306,7 @@ struct Bench {
             Log.line(
                 "#\(index) \(ok ? "ok" : "FAIL") changed=\(Stats.format(changedMs)) ms"
                     + " reply_rtt=\(Stats.format(rttMs)) ms reply_to_hook=\(Stats.format(hookMs)) ms"
-                    + " outcome=\(outcome.rawValue) hook=\(result.summary)"
+                    + " outcome=\(outcome.wire) hook=\(result.summary)"
                     + (resolvedAt == nil ? " (no resolved change within 5 s)" : ""))
             try await Task.sleep(for: .milliseconds(100))
         }
@@ -533,7 +533,8 @@ struct Arguments {
 
     func mode() throws -> PermissionMode {
         guard let text = options["mode"] else { return .once }
-        guard let mode = PermissionMode(rawValue: text) else {
+        let mode = PermissionMode(wire: text)
+        guard [.once, .always, .all, .deny].contains(mode) else {
             throw ProbeError("--mode must be once, always, all or deny")
         }
         return mode
@@ -578,7 +579,7 @@ enum Log {
     static func item(_ item: PendingItem) {
         let preview = item.toolInputPreview.map { short($0) } ?? "-"
         print(
-            "    pending \(shown(item.requestId)) kind=\(item.kind.rawValue) agent=\(shown(item.agent))"
+            "    pending \(shown(item.requestId)) kind=\(item.kind.wire) agent=\(shown(item.agent))"
                 + " tool=\(item.toolName.map { shown($0) } ?? "-") workspace=\"\(short(item.workspaceTitle))\""
                 + " preview=\(preview)")
     }

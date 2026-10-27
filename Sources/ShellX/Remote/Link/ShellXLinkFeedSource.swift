@@ -69,12 +69,15 @@ final class ShellXLinkFeedSource: AgentFeedSource {
         return stream
     }
 
-    func reply(requestId: String, mode: PermissionMode) async -> ReplyOutcome {
-        resolveReply(requestId: requestId, mode: mode)
+    func reply(requestId: String, decision: LinkDecision) async -> ReplyOutcome {
+        resolveReply(requestId: requestId, decision: decision)
     }
 
-    /// ``reply(requestId:mode:)`` without the suspension: decides and resolves in one main-actor turn.
-    func resolveReply(requestId: String, mode: PermissionMode) -> ReplyOutcome {
+    /// ``reply(requestId:decision:)`` without the suspension: decides and resolves in one main-actor turn.
+    ///
+    /// Only permission decisions are handled here; a question, plan or unknown decision answers `.unknown`
+    /// (the pending set holds permission requests only).
+    func resolveReply(requestId: String, decision: LinkDecision) -> ReplyOutcome {
         guard let store = coordinator.store,
               let item = store.items.last(where: { $0.payload.requestID == requestId }) else {
             return .unknown
@@ -85,8 +88,9 @@ final class ShellXLinkFeedSource: AgentFeedSource {
             return .alreadyHandled
         }
         guard case .permissionRequest(_, _, let toolInputJSON, _) = item.payload,
-              let decision = Self.permissionMode(mode),
-              Self.allows(decision, source: item.source, toolInputJSON: toolInputJSON) else {
+              case .permission(let linkMode) = decision,
+              let mode = Self.permissionMode(linkMode),
+              Self.allows(mode, source: item.source, toolInputJSON: toolInputJSON) else {
             return .unknown
         }
         // No hook waits (a card restored from the Feed log, or pushed without a wait): nothing would receive
@@ -99,7 +103,7 @@ final class ShellXLinkFeedSource: AgentFeedSource {
         // On the main actor `deliverReply` marks the item resolved synchronously, so subscribers see the
         // change before this returns. It never waits on the hook. It is first-wins: when another entry point
         // took the waiter since the checks above, the phone hears `already_handled`.
-        return coordinator.deliverReply(requestId: requestId, decision: .permission(decision))
+        return coordinator.deliverReply(requestId: requestId, decision: .permission(mode))
             ? .delivered : .alreadyHandled
     }
 
@@ -170,15 +174,30 @@ final class ShellXLinkFeedSource: AgentFeedSource {
             workspaceTitle: workspace?.title ?? fallbackTitle,
             toolName: toolName,
             toolInputPreview: PendingItem.truncatedPreview(toolInputJSON),
-            createdAtMs: Int64((item.createdAt.timeIntervalSince1970 * 1000).rounded())
+            createdAtMs: Int64((item.createdAt.timeIntervalSince1970 * 1000).rounded()),
+            modes: Self.offeredModes(source: item.source, toolInputJSON: toolInputJSON)
         )
     }
 
     // MARK: - Mapping
 
-    /// ShellX Link modes map to Feed modes by name (`bypass` has no Link mode).
+    /// ShellX Link modes map to Feed modes by name. `bypass` is never offered or accepted over Link, so a
+    /// mode this version does not know (including a raw `bypass`) maps to nil.
     static func permissionMode(_ mode: PermissionMode) -> WorkstreamPermissionMode? {
-        WorkstreamPermissionMode(rawValue: mode.rawValue)
+        switch mode {
+        case .once: return .once
+        case .always: return .always
+        case .all: return .all
+        case .deny: return .deny
+        case .other: return nil
+        }
+    }
+
+    /// The `modes` of a permission item: what ``allows(_:source:toolInputJSON:)`` permits, never `bypass`.
+    static func offeredModes(source: WorkstreamSource, toolInputJSON: String) -> [String] {
+        [PermissionMode.once, .always, .all, .deny].filter { mode in
+            permissionMode(mode).map { allows($0, source: source, toolInputJSON: toolInputJSON) } ?? false
+        }.map(\.wire)
     }
 
     /// The modes the Feed panel offers for this agent and request (`FeedPermissionActionPolicy`).

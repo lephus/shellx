@@ -117,6 +117,9 @@ public actor LinkHost {
             } catch LinkCodecError.wrongVersion {
                 await Self.sendError(on: channel, "protocol_mismatch", "this host speaks ShellX Link protocol 1")
                 return
+            } catch let LinkCodecError.badJSON(callId) {
+                await Self.sendError(on: channel, "bad_request", "the frame could not be decoded", callId: callId)
+                continue
             } catch is LinkCodecError {
                 await Self.sendError(on: channel, "bad_request", "the frame could not be decoded")
                 continue
@@ -124,13 +127,13 @@ public actor LinkHost {
                 return
             }
             switch message {
-            case .snapshotGet:
+            case let .snapshotGet(callId):
                 // Answered in order, so snapshot replies follow the order of the requests.
                 let snapshot = await feed.snapshot()
                 await Self.sendShrinking(on: channel, items: snapshot.pending) {
-                    .snapshot(revision: snapshot.revision, pending: $0)
+                    .snapshot(callId: callId, revision: snapshot.revision, pending: $0)
                 }
-            case let .reply(requestId, mode):
+            case let .reply(callId, requestId, decision):
                 // Resolving may wait on the agent hook; keep reading meanwhile. Replies to one
                 // request run one after another in arrival order, so their results leave in the
                 // order the client sent them (it matches a result to the oldest reply for that
@@ -138,23 +141,27 @@ public actor LinkHost {
                 let turn = await replyOrder.reserve(requestId)
                 group.addTask {
                     await replyOrder.wait(for: turn, of: requestId)
-                    let outcome = await feed.reply(requestId: requestId, mode: mode)
-                    try? await channel.send(.replyResult(requestId: requestId, outcome: outcome))
+                    let outcome = await feed.reply(requestId: requestId, decision: decision)
+                    try? await channel.send(.replyResult(callId: callId, requestId: requestId, outcome: outcome))
                     await replyOrder.finish(turn, of: requestId)
                 }
             case let .ping(nonce):
                 try? await channel.send(.pong(nonce: nonce))
             case .pong, .unknown, .error:
                 break
-            case .hello, .welcome, .snapshot, .changed, .replyResult:
+            case .hello, .welcome, .changed:
                 // Not allowed from a client once established: ignored, and answered (PROTOCOL.md 7).
                 await Self.sendError(on: channel, "bad_request", "unexpected frame from a client")
+            case let .snapshot(callId, _, _), let .replyResult(callId, _, _):
+                await Self.sendError(on: channel, "bad_request", "unexpected frame from a client", callId: callId)
             }
         }
     }
 
-    private static func sendError(on channel: SecureChannel, _ code: String, _ message: String) async {
-        try? await channel.send(.error(code: code, message: message))
+    private static func sendError(
+        on channel: SecureChannel, _ code: String, _ message: String, callId: String? = nil
+    ) async {
+        try? await channel.send(.error(code: code, message: message, callId: callId))
     }
 
     /// Sends a message built from `items`, shrinking previews when the frame is too large.
