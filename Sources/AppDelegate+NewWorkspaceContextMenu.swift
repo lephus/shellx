@@ -87,6 +87,7 @@ extension AppDelegate {
             },
             agentChatAction: resolvedBuiltInNewAgentChatAction(cmuxConfigStore: cmuxConfigStore),
             templateNames: savedLayoutNames(),
+            workspaceSetNames: workspaceSetNames(),
             loadedActions: cmuxConfigStore.loadedActions,
             newWorkspaceActionID: cmuxConfigStore.newWorkspaceActionID,
             deletable: { [weak self, weak cmuxConfigStore] action in
@@ -126,6 +127,10 @@ extension AppDelegate {
 
     private func savedLayoutNames() -> [String] {
         ((try? SavedLayoutStore().list()) ?? []).map(\.name)
+    }
+
+    private func workspaceSetNames() -> [String] {
+        ((try? WorkspaceSetStore().list()) ?? []).map(\.name)
     }
 
     private func resolvedBuiltInNewAgentChatAction(

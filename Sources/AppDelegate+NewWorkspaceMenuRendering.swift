@@ -117,6 +117,10 @@ extension AppDelegate {
                 if let item = savedLayoutNewWorkspaceMenuItem(layoutNames: names, windowId: context.windowId) {
                     addRenderedSection([item])
                 }
+            case .workspaceSets(let names):
+                if let item = workspaceSetOpenMenuItem(setNames: names, windowId: context.windowId) {
+                    addRenderedSection([item])
+                }
             case .management(let management):
                 var items: [NSMenuItem] = []
                 let saveItem = NSMenuItem(
