@@ -5,10 +5,14 @@ import os
 /// History kept on this phone as JSON files (plan decision D6): excluded from backup, readable
 /// after the first unlock, replaced atomically. A corrupt file is dropped, never fatal. Pending
 /// items and agent state are not stored here; they are always fetched from the Mac.
+///
+/// Writes go through a `Writer` bound to an epoch; `wipe()` ends the epoch, so a write that was in
+/// flight at sign-out cannot recreate the previous account's history.
 public actor ConversationStore: LocalDataWiping {
     private let directory: URL
     private let maxThreads: Int
     private let now: @Sendable () -> Date
+    private var epoch = 0
     private let log = Logger(subsystem: "com.shellx.app", category: "store")
 
     public init(directory: URL, maxThreads: Int = 100, now: @escaping @Sendable () -> Date = { Date() }) {
@@ -31,23 +35,50 @@ public actor ConversationStore: LocalDataWiping {
         }
     }
 
-    /// Replaces the stored document. A failed write is logged by kind only and leaves the old file.
-    public func save<T: Encodable & Sendable>(_ value: T, to doc: StoreDocument) {
+    /// A writer bound to the store's current epoch. Obtain one when work for the signed-in account
+    /// starts (a refresh, a chat subscription) and keep it only for that work: once `wipe()` runs,
+    /// every older writer's saves are dropped.
+    public func writer() -> Writer { Writer(store: self, epoch: epoch) }
+
+    /// Saves for one epoch of the store. Cheap to copy.
+    public struct Writer: Sendable {
+        fileprivate let store: ConversationStore
+        fileprivate let epoch: Int
+
+        /// Replaces the stored document unless the store was wiped since this writer was made.
+        public func save<T: Encodable & Sendable>(_ value: T, to doc: StoreDocument) async {
+            await store.write(value, to: doc, epoch: epoch)
+        }
+    }
+
+    private func write<T: Encodable & Sendable>(_ value: T, to doc: StoreDocument, epoch writerEpoch: Int) {
+        guard writerEpoch == epoch else {
+            log.notice("store_write_stale kind=\(doc.kind, privacy: .public)")
+            return
+        }
         do {
             try prepareDirectories()
             let data = try JSONEncoder().encode(value)
             let url = fileURL(doc)
             try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
             try FileManager.default.setAttributes([.modificationDate: now()], ofItemAtPath: url.path)
-            if case .thread = doc { evictOldThreads() }
+            if case .thread = doc { evictOldThreads(keeping: url) }
         } catch {
             log.error("store_write_failed kind=\(doc.kind, privacy: .public)")
         }
     }
 
-    /// Deletes everything this store holds.
-    public func wipe() {
-        try? FileManager.default.removeItem(at: directory)
+    /// Deletes everything this store holds and invalidates every writer made before. The epoch moves
+    /// even when the delete fails, so no stale writer can write afterwards; the failure is thrown.
+    public func wipe() throws {
+        epoch += 1
+        guard FileManager.default.fileExists(atPath: directory.path) else { return }
+        do {
+            try FileManager.default.removeItem(at: directory)
+        } catch {
+            log.error("store_wipe_failed")
+            throw error
+        }
     }
 
     // MARK: - Files
@@ -64,6 +95,7 @@ public actor ConversationStore: LocalDataWiping {
             return threadsDirectory.appendingPathComponent("\(name).json")
         }
     }
+
     private func prepareDirectories() throws {
         try FileManager.default.createDirectory(at: threadsDirectory, withIntermediateDirectories: true)
         var root = directory
@@ -72,15 +104,17 @@ public actor ConversationStore: LocalDataWiping {
         try root.setResourceValues(values)
     }
 
-    /// Keeps the `maxThreads` most recently written thread files.
-    private func evictOldThreads() {
+    /// Keeps the `maxThreads` most recently written thread files; the file just written is never
+    /// evicted, even if the clock went backwards.
+    private func evictOldThreads(keeping fresh: URL) {
         let keys: [URLResourceKey] = [.contentModificationDateKey]
         guard
             let files = try? FileManager.default.contentsOfDirectory(
                 at: threadsDirectory, includingPropertiesForKeys: keys),
             files.count > maxThreads
         else { return }
-        let dated = files.map { url in
+        let freshName = fresh.lastPathComponent
+        let dated = files.filter { $0.lastPathComponent != freshName }.map { url in
             (url, (try? url.resourceValues(forKeys: Set(keys)).contentModificationDate) ?? .distantPast)
         }
         let oldestFirst = dated.sorted { $0.1 != $1.1 ? $0.1 < $1.1 : $0.0.lastPathComponent < $1.0.lastPathComponent }

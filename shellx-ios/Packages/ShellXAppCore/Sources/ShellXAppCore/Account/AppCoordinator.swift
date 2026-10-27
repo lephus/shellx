@@ -74,7 +74,7 @@ public final class AppCoordinator {
             // Another account's Macs and history must not survive into this one.
             if let owner = try await vault.machinesOwner(), owner != account.userID {
                 try await vault.setMachines([], owner: account.userID)
-                for wiper in wipers { await wiper.wipe() }
+                for wiper in wipers { try await wiper.wipe() }
             }
             try await vault.setSession(
                 StoredSession(
@@ -108,7 +108,9 @@ public final class AppCoordinator {
         do { try await vault.wipe() } catch {
             log.error("sign_out_wipe_failed")
         }
-        for wiper in wipers { await wiper.wipe() }
+        for wiper in wipers {
+            do { try await wiper.wipe() } catch { log.error("sign_out_local_wipe_failed") }
+        }
         phase = .signedOut(expired: false)
     }
 
