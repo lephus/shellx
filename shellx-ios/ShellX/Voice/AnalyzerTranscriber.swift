@@ -18,7 +18,7 @@ import Speech
 /// microphone; a start that was overtaken or cancelled while it started never does. A run whose
 /// results end by themselves gives the microphone back at once.
 @available(iOS 26, *)
-final class AnalyzerTranscriber: SpeechTranscribing, @unchecked Sendable {
+final class AnalyzerTranscriber: SpeechTranscribing {
     /// Whether the analyzer can transcribe a language now.
     enum Readiness: Equatable {
         case unsupported
