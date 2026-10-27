@@ -176,6 +176,187 @@ struct ShellXPhonePairingCoordinatorTests {
         rig.coordinator.close()
     }
 
+    @Test func testOneApprovalAtATime() async throws {
+        let rig = Rig()
+        rig.coordinator.open()
+        await rig.ticker.waitUntilSleeping()
+        let offer = try await rig.coordinator.currentOffer()
+        let first = Data(repeating: 3, count: 32)
+        let second = Data(repeating: 4, count: 32)
+        rig.relay.setPending([
+            Self.request("pa", key: first, proof: offer.proof(clientKey: first)),
+            Self.request("pb", key: second, proof: offer.proof(clientKey: second)),
+        ])
+        await rig.coordinator.pollNow()
+        rig.relay.holdApprovals()
+        let approval = Task { try await rig.coordinator.approve("pa") }
+        await Self.waitUntil { rig.relay.approvesEntered == 1 }
+
+        // A second Allow while the first is still at the relay is refused before anything is trusted or sent.
+        await #expect(throws: ShellXCoreError.self) { try await rig.coordinator.approve("pb") }
+        #expect(rig.coordinator.approvingID == "pa")
+        #expect(rig.relay.approvesEntered == 1)
+        #expect(!rig.keys.trustedClients().contains(second))
+
+        // The QR expires mid-approval: the request being allowed is never refused as a proof mismatch.
+        rig.clock.advance(by: PairingOffer.lifetime + 1)
+        await rig.coordinator.pollNow()
+        #expect(!rig.relay.denied.contains("pa"))
+        #expect(rig.coordinator.candidates.map(\.id) == ["pa"])
+
+        rig.relay.releaseApprovals()
+        try await approval.value
+        rig.relay.removePending("pa")
+        #expect(rig.relay.approved == ["pa"])
+        #expect(rig.keys.trustedClients() == [first])
+        #expect(rig.relay.denied == ["pb"])
+        #expect(rig.coordinator.approvingID == nil)
+        rig.coordinator.close()
+    }
+
+    @Test func testRemoveWithoutRunningHostStillUntrustsFirst() async throws {
+        let rig = Rig()
+        let phoneKey = Data(repeating: 8, count: 32)
+        try rig.keys.trust(TrustedPhone(key: phoneKey, deviceID: "d1", name: "iPhone", pairedAt: Date()))
+        let phone = PairedPhone(grantID: "g1", deviceID: "d1", deviceName: "iPhone", platform: "ios",
+                                clientKey: phoneKey, createdAt: Date(), lastSeen: nil)
+        rig.relay.setGrants([phone])
+        let keys = rig.keys
+        let trustedAtRelay = Recorder<Bool>()
+        rig.relay.onRevoke = { _ in trustedAtRelay.add(keys.trustedClients().contains(phoneKey)) }
+        rig.coordinator.open()
+        await rig.ticker.waitUntilSleeping()
+
+        // The link host stops (sign-out, relay restart) while the list is still on screen.
+        rig.host.pairingHost = nil
+        try await rig.coordinator.revoke(phone)
+
+        #expect(trustedAtRelay.all == [false])
+        #expect(rig.journal.all == ["relay.revoke g1"])
+        #expect(!rig.keys.trustedClients().contains(phoneKey))
+        let reloaded = ShellXLinkKeyStore(storage: rig.storage, accountID: Rig.accountID)
+        try reloaded.load()
+        #expect(!reloaded.trustedClients().contains(phoneKey))
+        rig.coordinator.close()
+
+        // Nothing local was ever reachable: refused before the relay is asked.
+        let cold = Rig(hostRunning: false)
+        cold.relay.setGrants([phone])
+        cold.coordinator.open()
+        await cold.ticker.waitUntilSleeping()
+        await #expect(throws: ShellXCoreError.self) { try await cold.coordinator.revoke(phone) }
+        #expect(cold.journal.all.isEmpty)
+        cold.coordinator.close()
+    }
+
+    @Test func testApproveRefusesWhenTheLinkChanged() async throws {
+        let rig = Rig()
+        rig.coordinator.open()
+        await rig.ticker.waitUntilSleeping()
+        let offer = try await rig.coordinator.currentOffer()
+        let phone = Data(repeating: 6, count: 32)
+        rig.relay.setPending([Self.request("p1", key: phone, proof: offer.proof(clientKey: phone))])
+        await rig.coordinator.pollNow()
+
+        // Before Allow, the link host restarts for another account and machine.
+        let otherKeys = ShellXLinkKeyStore(storage: rig.storage, accountID: "acct-other")
+        rig.host.pairingHost = PhonePairingHost(machineID: "other-machine", linkSlot: "slot_Other",
+                                                accountID: "acct-other", machineName: "Mac", keys: otherKeys)
+        await #expect(throws: ShellXCoreError.self) { try await rig.coordinator.approve("p1") }
+
+        #expect(rig.relay.approved.isEmpty)
+        #expect(!rig.journal.all.contains { $0.hasPrefix("relay.approve") })
+        #expect(!rig.keys.trustedClients().contains(phone))
+        #expect(!otherKeys.trustedClients().contains(phone))
+        #expect(!rig.coordinator.isReady)
+        #expect(rig.coordinator.offer == nil)
+        #expect(rig.coordinator.candidates.isEmpty)
+        #expect(rig.relay.denied == ["p1"])
+        rig.coordinator.close()
+
+        // The link host stopped: refused the same way.
+        let stopped = Rig()
+        stopped.coordinator.open()
+        await stopped.ticker.waitUntilSleeping()
+        let stoppedOffer = try await stopped.coordinator.currentOffer()
+        stopped.relay.setPending([Self.request("p2", key: phone, proof: stoppedOffer.proof(clientKey: phone))])
+        await stopped.coordinator.pollNow()
+        stopped.host.pairingHost = nil
+        await #expect(throws: ShellXCoreError.self) { try await stopped.coordinator.approve("p2") }
+        #expect(stopped.relay.approved.isEmpty)
+        #expect(!stopped.keys.trustedClients().contains(phone))
+        #expect(!stopped.coordinator.isReady)
+        stopped.coordinator.close()
+    }
+
+    @Test func testErrorsClearOnTheNextSuccessOfTheSameKind() async throws {
+        let rig = Rig()
+        rig.coordinator.open()
+        await rig.ticker.waitUntilSleeping()
+
+        // The paired phones list.
+        rig.relay.grantsError = ShellXCoreError(code: "bad_response", message: "bad row")
+        await rig.coordinator.refreshPhones()
+        #expect(rig.coordinator.errorText != nil)
+        rig.relay.grantsError = nil
+        await rig.coordinator.refreshPhones()
+        #expect(rig.coordinator.errorText == nil)
+
+        // Allow: another kind's success leaves the error; the next approval clears it.
+        let phone = Data(repeating: 6, count: 32)
+        let offer = try await rig.coordinator.currentOffer()
+        rig.relay.setPending([Self.request("p1", key: phone, proof: offer.proof(clientKey: phone))])
+        await rig.coordinator.pollNow()
+        rig.relay.approveError = ShellXCoreError(code: "pairing_expired", message: "expired")
+        await #expect(throws: ShellXCoreError.self) { try await rig.coordinator.approve("p1") }
+        #expect(rig.coordinator.errorText != nil)
+        await rig.coordinator.refreshPhones()
+        #expect(rig.coordinator.errorText != nil)
+        rig.relay.approveError = nil
+        try await rig.coordinator.approve("p1")
+        #expect(rig.coordinator.errorText == nil)
+
+        // Remove.
+        let paired = PairedPhone(grantID: "g1", deviceID: "d1", deviceName: "iPhone", platform: "ios",
+                                 clientKey: phone, createdAt: Date(), lastSeen: nil)
+        rig.relay.setGrants([paired])
+        rig.relay.revokeError = ShellXCoreError(code: "network", message: "offline")
+        await #expect(throws: ShellXCoreError.self) { try await rig.coordinator.revoke(paired) }
+        #expect(rig.coordinator.errorText != nil)
+        rig.relay.revokeError = nil
+        try await rig.coordinator.revoke(paired)
+        #expect(rig.coordinator.errorText == nil)
+        rig.coordinator.close()
+    }
+
+    @Test func testApproveRewritesTrustAfterTheRelayGrants() async throws {
+        let rig = Rig()
+        rig.coordinator.open()
+        await rig.ticker.waitUntilSleeping()
+        let offer = try await rig.coordinator.currentOffer()
+        let phone = Data(repeating: 6, count: 32)
+        rig.relay.setPending([Self.request("p1", key: phone, proof: offer.proof(clientKey: phone))])
+        await rig.coordinator.pollNow()
+        let keys = rig.keys, clock = rig.clock
+        let firstWrite = rig.clock.now
+        let droppedDuringApprove = Recorder<Bool>()
+        rig.relay.onApprove = { _, key in
+            // A grants check took its snapshot after the first trust write and before this grant existed.
+            clock.advance(by: 10)
+            _ = try? keys.retainOnly(keys: [], pairedSince: firstWrite.addingTimeInterval(5))
+            droppedDuringApprove.add(!keys.trustedClients().contains(key))
+        }
+
+        try await rig.coordinator.approve("p1")
+
+        #expect(droppedDuringApprove.all == [true])
+        #expect(rig.keys.trustedClients().contains(phone))
+        let reloaded = ShellXLinkKeyStore(storage: rig.storage, accountID: Rig.accountID)
+        try reloaded.load()
+        #expect(reloaded.trustedPhones().first { $0.key == phone }?.pairedAt == firstWrite.addingTimeInterval(10))
+        rig.coordinator.close()
+    }
+
     // MARK: - Lifecycle
 
     @Test func testCloseStopsPolling() async throws {
@@ -258,6 +439,14 @@ struct ShellXPhonePairingCoordinatorTests {
     private static func request(_ id: String, name: String = "iPhone", key: Data, proof: Data) -> PhonePairingRequest {
         PhonePairingRequest(id: id, deviceName: name, platform: "ios", clientKey: key, proof: proof, createdAt: Date())
     }
+
+    private static func waitUntil(_ condition: () -> Bool) async {
+        let deadline = Date().addingTimeInterval(5)
+        while !condition(), Date() < deadline {
+            try? await Task.sleep(nanoseconds: 2_000_000)
+        }
+        #expect(condition(), "timed out waiting")
+    }
 }
 
 /// One coordinator over a fake host, a fake relay, a test clock and a hand-driven poll timer.
@@ -311,7 +500,9 @@ private final class FakePairingHost: PhonePairingHosting {
         self.keys = keys
     }
 
+    /// Like the real controller, does nothing while no link host runs.
     func revoke(clientKey: Data) async {
+        guard pairingHost != nil else { return }
         journal.add("host.revoke")
         revokedKeys.append(clientKey)
         try? keys.untrust(key: clientKey)
@@ -331,8 +522,29 @@ private final class FakePhonePairingRelay: PhonePairingCalling, @unchecked Senda
     private var revokeFailure: ShellXCoreError?
     private var approveHook: (@Sendable (String, Data) -> Void)?
     private var revokeHook: (@Sendable (String) -> Void)?
+    private var grantsFailure: ShellXCoreError?
+    private var approveGate: DispatchSemaphore?
+    private var approveEntries = 0
 
     init(journal: Recorder<String>) { self.journal = journal }
+
+    var grantsError: ShellXCoreError? {
+        get { lock.withLock { grantsFailure } }
+        set { lock.withLock { grantsFailure = newValue } }
+    }
+    /// How many `phones.approve` calls have started.
+    var approvesEntered: Int { lock.withLock { approveEntries } }
+
+    /// Makes `phones.approve` wait inside the relay until `releaseApprovals()`.
+    func holdApprovals() { lock.withLock { approveGate = DispatchSemaphore(value: 0) } }
+
+    func releaseApprovals() {
+        let gate = lock.withLock { () -> DispatchSemaphore? in
+            defer { approveGate = nil }
+            return approveGate
+        }
+        gate?.signal()
+    }
 
     var denied: [String] { lock.withLock { deniedIDs } }
     var approved: [String] { lock.withLock { approvedIDs } }
@@ -366,6 +578,11 @@ private final class FakePhonePairingRelay: PhonePairingCalling, @unchecked Senda
     }
 
     func approvePhonePairing(_ id: String) throws {
+        let gate = lock.withLock { () -> DispatchSemaphore? in
+            approveEntries += 1
+            return approveGate
+        }
+        gate?.wait()
         let (hook, failure, key) = lock.withLock { (approveHook, approveFailure, pending.first { $0.id == id }?.clientKey) }
         journal.add("relay.approve \(id)")
         if let key { hook?(id, key) }
@@ -379,7 +596,10 @@ private final class FakePhonePairingRelay: PhonePairingCalling, @unchecked Senda
     }
 
     func pairedPhones() throws -> [PairedPhone] {
-        lock.withLock { grants }
+        try lock.withLock {
+            if let grantsFailure { throw grantsFailure }
+            return grants
+        }
     }
 
     func revokePhone(grantID: String) throws {

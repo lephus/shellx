@@ -54,10 +54,15 @@ protocol PhonePairingHosting: AnyObject {
 ///   the polling and drops the offer.
 /// * **Proofs:** only a request whose proof matches the current offer becomes a ``Candidate``. Every other
 ///   one is refused without showing anything, and only counted in the log (`pairing_proof_mismatch`).
-/// * **Allow:** the phone is trusted here first, then `phones.approve` grants it. A failed approval takes
-///   the trust back. An approval spends the QR: the other requests for it are refused and a new QR shows.
-/// * **Remove:** the host drops the phone and ends its sessions first, then `phones.revoke`. A relay
-///   failure shows an error; the phone stays untrusted here (fail closed).
+/// * **Allow:** one approval at a time, and only while this Mac still serves the link (account, machine,
+///   link slot) of the offer the phone answered. The phone is trusted here first, then `phones.approve`
+///   grants it, then the trust is written again with a fresh time so a grants check that read the relay in
+///   between cannot leave it dropped. A failed approval takes the trust back. An approval spends the QR:
+///   the other requests for it are refused and a new QR shows.
+/// * **Remove:** this Mac drops the phone first (the running host also ends its sessions; with no host
+///   running, the last link's key store), then `phones.revoke`. A relay failure shows an error; the phone
+///   stays untrusted here (fail closed).
+/// * **Errors** clear on the next success of the same kind (polling, the phone list, Allow, Remove).
 ///
 /// Core and key store calls run off the main thread. Logs carry counts and codes only: never the offer,
 /// its code, a key or a proof.
@@ -90,6 +95,8 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
     @Published private(set) var isReady = false
     /// Pairing ids and grant ids with a decision or removal in flight.
     @Published private(set) var busy: Set<String> = []
+    /// The pairing id being allowed. Only one at a time, so one QR never pairs two phones.
+    @Published private(set) var approvingID: String?
 
     /// Requests refused because their proof did not match the current offer.
     private(set) var proofMismatches = 0
@@ -114,8 +121,13 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
     private var appliedRead = 0
     /// Approved or refused here: a lagging relay that still lists them never shows or refuses them again.
     private var handled: Set<String> = []
-    private var approving: Set<String> = []
-    private var errorCameFromPoll = false
+    /// The link each shown candidate's offer was made for; Allow trusts only where that link is served.
+    private var answeredHost: [String: PhonePairingHost] = [:]
+    /// The link host last seen running. With no host running now, Remove untrusts through its key store.
+    private var lastHost: PhonePairingHost?
+    private enum ErrorKind { case poll, phones, approve, revoke }
+    /// What produced `errorText`; the next success of the same kind clears it.
+    private var errorKind: ErrorKind?
 
     /// - Parameters:
     ///   - host: The link host (``ShellXLinkHostController`` in the app).
@@ -146,7 +158,7 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
         isOpen = true
         generation += 1
         errorText = nil
-        errorCameFromPoll = false
+        errorKind = nil
         isReady = host.pairingHost != nil
         let interval = pollInterval, sleep = sleep
         poller = Task { [weak self] in
@@ -179,9 +191,15 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
         guard isOpen else { return }
         let session = generation
         guard let current = host.pairingHost else {
-            becomeNotReady()
+            await becomeNotReady()
             return
         }
+        if let lastHost, !current.servesSameLink(as: lastHost) {
+            // Another account or machine: the list on screen belonged to the old link.
+            phones = []
+            phonesListed = false
+        }
+        lastHost = current
         if !isReady { isReady = true }
         if needsOffer(for: current) { await makeOfferOnce(for: current) }
         guard isOpen, generation == session, let offer else { return }
@@ -212,12 +230,11 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
         return age >= PairingOffer.lifetime || age < 0
     }
 
-    private func becomeNotReady() {
+    private func becomeNotReady() async {
         if isReady { isReady = false }
         let waiting = retireOffer()
         candidates = []
-        guard !waiting.isEmpty else { return }
-        Task { await self.refuse(waiting) }
+        await refuse(waiting)
     }
 
     private func makeOfferOnce(for current: PhonePairingHost) async {
@@ -240,7 +257,7 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
         } catch {
             guard isOpen, generation == session else { return }
             Self.log.error("pairing offer not made: \(ShellXLinkHostController.keyErrorKind(error), privacy: .public)")
-            show(error, fromPoll: true)
+            show(error, as: .poll)
             return
         }
         guard isOpen, generation == session else { return }
@@ -250,7 +267,7 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
         guard (try? PairingOffer(uri: made.uri)) == made else {
             Self.log.error("pairing offer not made: the machine id or link slot does not fit the QR")
             show(ShellXCoreError(code: "offer_unusable", message: "the pairing offer does not fit the QR format"),
-                 fromPoll: true)
+                 as: .poll)
             return
         }
         // A new QR spends the old one: requests that answered it are refused.
@@ -268,10 +285,11 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
         offer = nil
         offerHost = nil
         offerMadeAt = nil
-        let waiting = candidates.map(\.id).filter { !approving.contains($0) }
-        let kept = candidates.filter { approving.contains($0.id) }
+        let waiting = candidates.map(\.id).filter { $0 != approvingID }
+        let kept = candidates.filter { $0.id == approvingID }
         if kept != candidates { candidates = kept }
         handled.formUnion(waiting)
+        for id in waiting { answeredHost[id] = nil }
         return waiting
     }
 
@@ -284,27 +302,33 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
             requests = try await ShellXLinkHostController.offMain { try relay.pendingPhonePairings() }
         } catch {
             guard isOpen, generation == session else { return }
-            show(error, fromPoll: true)
+            show(error, as: .poll)
             return
         }
         // A closed sheet, a new offer or a newer read makes this answer stale.
-        guard isOpen, generation == session, self.offer == offer, read > appliedRead else { return }
+        guard isOpen, generation == session, self.offer == offer, let answered = offerHost, read > appliedRead
+        else { return }
         appliedRead = read
-        clearPollError()
+        clearError(.poll)
         var next: [Candidate] = []
         var mismatched: [String] = []
-        for request in requests where !handled.contains(request.id) {
+        // The request being allowed answered an earlier check; judging it against a newer offer would
+        // refuse it while its approval is in flight.
+        for request in requests where !handled.contains(request.id) && request.id != approvingID {
             if offer.verify(proof: request.proof, clientKey: request.clientKey) {
                 next.append(Candidate(id: request.id, deviceName: request.deviceName, platform: request.platform,
                                       clientKey: request.clientKey))
+                if answeredHost[request.id] == nil { answeredHost[request.id] = answered }
             } else {
                 mismatched.append(request.id)
             }
         }
         // One being allowed stays on screen until its approval finishes, even once the relay stops listing it.
-        for candidate in candidates where approving.contains(candidate.id) && !next.contains(candidate) {
+        if let approvingID, let candidate = candidates.first(where: { $0.id == approvingID }) {
             next.append(candidate)
         }
+        let shown = Set(next.map(\.id))
+        answeredHost = answeredHost.filter { shown.contains($0.key) }
         if next != candidates { candidates = next }
         guard !mismatched.isEmpty else { return }
         handled.formUnion(mismatched)
@@ -328,28 +352,66 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
 
     // MARK: - Decisions
 
-    /// Allows a candidate: trusts its key on this Mac, then has the relay grant it. A failed grant takes
-    /// the trust back (a phone that was already paired keeps its earlier trust). Success spends the QR.
+    /// Allows a candidate: trusts its key on this Mac, has the relay grant it, then writes the trust again
+    /// with a fresh time. A failed grant takes the trust back (a phone that was already paired keeps its
+    /// earlier trust). Success spends the QR. One approval runs at a time.
     ///
     /// - Parameter id: A candidate's pairing id. One not shown yet is looked for in a fresh round first.
-    /// - Throws: ``ShellXCoreError`` `not_a_candidate` when no request with that id matches the current
-    ///   offer, `link_not_running` while no link host runs, or the trust or relay failure.
+    /// - Throws: ``ShellXCoreError``: `approval_in_progress` while another approval runs, `not_a_candidate`
+    ///   when no request with that id answered the QR on screen, `link_not_running` / `link_changed` when
+    ///   this Mac no longer serves the link that QR offered (the sheet then shows the not-ready state), or
+    ///   the trust or relay failure.
     func approve(_ id: String) async throws {
+        try refuseWhileApproving()
         if !candidates.contains(where: { $0.id == id }) { await pollNow() }
-        guard isOpen, let candidate = candidates.first(where: { $0.id == id }), !approving.contains(id) else {
+        // The round awaited: another approval may have started meanwhile.
+        try refuseWhileApproving()
+        guard isOpen, let candidate = candidates.first(where: { $0.id == id }), let answered = answeredHost[id] else {
             throw ShellXCoreError(code: "not_a_candidate",
                                   message: "no pairing request with that id answered the QR on screen")
         }
-        guard let current = host.pairingHost else {
-            throw ShellXCoreError(code: "link_not_running", message: "this Mac is not serving ShellX Link")
+        // Trust goes only where the offer the phone answered is served: same account, machine and slot.
+        guard let current = host.pairingHost, current.servesSameLink(as: answered) else {
+            let error = host.pairingHost == nil
+                ? ShellXCoreError(code: "link_not_running", message: "this Mac is not serving ShellX Link")
+                : ShellXCoreError(code: "link_changed", message: "this Mac's ShellX Link changed since the QR was shown")
+            Self.log.notice("pairing not allowed: \(error.code, privacy: .public)")
+            await becomeNotReady()
+            show(error, as: .approve)
+            throw error
         }
-        approving.insert(id)
+        approvingID = id
         busy.insert(id)
-        defer {
-            approving.remove(id)
+        do {
+            try await allow(candidate, answered: answered, keys: current.keys)
+        } catch {
+            approvingID = nil
             busy.remove(id)
+            throw error
         }
-        let keys = current.keys, relay = relay
+        // Handled before the approval ends, so no read can judge it against a newer offer.
+        handled.insert(id)
+        candidates.removeAll { $0.id == id }
+        answeredHost[id] = nil
+        approvingID = nil
+        busy.remove(id)
+        Self.log.info("paired a phone")
+        // One QR, one phone: the QR that paired this one is spent.
+        let waiting = retireOffer()
+        await refuse(waiting)
+        await pollNow()
+        await refreshPhones()
+    }
+
+    private func refuseWhileApproving() throws {
+        guard approvingID == nil else {
+            throw ShellXCoreError(code: "approval_in_progress", message: "another phone is being allowed")
+        }
+    }
+
+    /// Trust, grant, trust again; rolls the first write back when the grant fails.
+    private func allow(_ candidate: Candidate, answered: PhonePairingHost, keys: ShellXLinkKeyStore) async throws {
+        let relay = relay, id = candidate.id
         // The request carries no device id; the pairing id names the entry until the next pairing.
         let phone = TrustedPhone(key: candidate.clientKey, deviceID: id, name: candidate.deviceName, pairedAt: now())
         let previous: TrustedPhone?
@@ -361,7 +423,7 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
             }
         } catch {
             Self.log.error("pairing not allowed: \(ShellXLinkHostController.keyErrorKind(error), privacy: .public)")
-            show(error)
+            show(error, as: .approve)
             throw error
         }
         do {
@@ -377,24 +439,28 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
             }
             let code = (error as? ShellXCoreError)?.code ?? "error"
             Self.log.notice("pairing approval failed: \(code, privacy: .public)")
-            show(error)
+            show(error, as: .approve)
             throw error
         }
-        handled.insert(id)
-        candidates.removeAll { $0.id == id }
-        Self.log.info("paired a phone")
-        // One QR, one phone: the QR that paired this one is spent.
-        let waiting = retireOffer()
-        await refuse(waiting)
-        await pollNow()
-        await refreshPhones()
+        clearError(.approve)
+        // A grants check whose snapshot fell between the first write and the grant drops the phone (its
+        // time is older than the snapshot). Writing it again now puts it back and keeps it past that check.
+        let confirmed = TrustedPhone(key: phone.key, deviceID: id, name: phone.name, pairedAt: now())
+        let target = host.pairingHost.flatMap { $0.servesSameLink(as: answered) ? $0.keys : nil } ?? keys
+        do {
+            try await ShellXLinkHostController.offMain { try target.trust(confirmed) }
+        } catch {
+            Self.log.error("paired phone not saved again: \(ShellXLinkHostController.keyErrorKind(error), privacy: .public)")
+            show(error, as: .approve)
+        }
     }
 
     /// Refuses a candidate. A relay failure is left to the request's expiry.
     func deny(_ id: String) async {
-        guard !approving.contains(id) else { return }
+        guard id != approvingID else { return }
         handled.insert(id)
         candidates.removeAll { $0.id == id }
+        answeredHost[id] = nil
         await refuse([id])
     }
 
@@ -408,20 +474,40 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
             let list = try await ShellXLinkHostController.offMain { try relay.pairedPhones() }
             phones = list.sorted { $0.createdAt < $1.createdAt }
             phonesListed = true
+            clearError(.phones)
         } catch {
-            show(error)
+            show(error, as: .phones)
         }
     }
 
-    /// Removes a phone: this Mac stops trusting it and ends its sessions first, then the relay drops the
-    /// grant. A grant the relay no longer has counts as removed.
+    /// Removes a phone. This Mac stops trusting it first: the running host untrusts it and ends its
+    /// sessions; with no host running, the key store of the last link seen untrusts it. Then the relay
+    /// drops the grant. A grant the relay no longer has counts as removed.
     ///
-    /// - Throws: The relay's failure, after showing it. The phone stays untrusted here.
+    /// - Throws: ``ShellXCoreError`` `link_not_running`, before any relay call, when no key store of this
+    ///   Mac is reachable; otherwise the relay's failure, after showing it. The phone stays untrusted here.
     func revoke(_ phone: PairedPhone) async throws {
         guard !busy.contains(phone.grantID) else { return }
+        let running = host.pairingHost
+        guard let local = running ?? lastHost else {
+            let error = ShellXCoreError(code: "link_not_running",
+                                        message: "this Mac has no ShellX Link key store to remove the phone from")
+            show(error, as: .revoke)
+            throw error
+        }
         busy.insert(phone.grantID)
         defer { busy.remove(phone.grantID) }
-        await host.revoke(clientKey: phone.clientKey)
+        if running != nil {
+            await host.revoke(clientKey: phone.clientKey)
+        } else {
+            let keys = local.keys, key = phone.clientKey
+            do {
+                try await ShellXLinkHostController.offMain { try keys.untrust(key: key) }
+            } catch {
+                // The relay revoke below and the next grants check still take it away.
+                Self.log.error("phone removal not saved here: \(ShellXLinkHostController.keyErrorKind(error), privacy: .public)")
+            }
+        }
         let relay = relay
         do {
             try await ShellXLinkHostController.offMain { try relay.revokePhone(grantID: phone.grantID) }
@@ -430,24 +516,26 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
         } catch {
             let code = (error as? ShellXCoreError)?.code ?? "error"
             Self.log.notice("phone removal not sent to the relay: \(code, privacy: .public)")
-            show(error)
+            show(error, as: .revoke)
             throw error
         }
+        clearError(.revoke)
         phones.removeAll { $0.grantID == phone.grantID }
         await refreshPhones()
     }
 
     // MARK: - Errors
 
-    private func show(_ error: any Error, fromPoll: Bool = false) {
+    private func show(_ error: any Error, as kind: ErrorKind) {
         errorText = Self.message(for: error)
-        errorCameFromPoll = fromPoll
+        errorKind = kind
     }
 
-    private func clearPollError() {
-        guard errorCameFromPoll else { return }
+    /// Clears the shown error when it came from `kind`.
+    private func clearError(_ kind: ErrorKind) {
+        guard errorKind == kind else { return }
         errorText = nil
-        errorCameFromPoll = false
+        errorKind = nil
     }
 
     /// A short line for the sheet: "Can't reach relay.shellx.pro" offline, otherwise the code.

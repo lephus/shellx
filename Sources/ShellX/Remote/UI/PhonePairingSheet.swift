@@ -120,13 +120,15 @@ struct PhonePairingSheet: View {
                     Task { await coordinator.deny(candidate.id) }
                 }
                 .buttonStyle(ShellXSheetButtonStyle(kind: .secondary))
-                // Deliberately not the default action: allowing a phone always takes a click.
+                .disabled(busy)
+                // Deliberately not the default action: allowing a phone always takes a click. While any
+                // phone is being allowed, every Allow waits: one QR pairs one phone.
                 Button(String(localized: "remote.phonePairing.allow", defaultValue: "Allow")) {
                     Task { try? await coordinator.approve(candidate.id) }
                 }
                 .buttonStyle(ShellXSheetButtonStyle(kind: .primary))
+                .disabled(coordinator.approvingID != nil)
             }
-            .disabled(busy)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
