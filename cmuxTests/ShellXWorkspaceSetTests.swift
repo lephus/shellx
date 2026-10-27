@@ -152,6 +152,16 @@ struct ShellXWorkspaceSetTests {
         #expect(indices == [0])
     }
 
+    @Test func aSiblingFolderSharingTheNamePrefixDoesNotCountAsOpen() {
+        let indices = WorkspaceSetPlan.indicesToOpen(
+            savedDirectories: ["/p/a"],
+            openDirectories: ["/p/ab", "/p/ab/x"],
+            homeDirectory: "/home/me"
+        )
+
+        #expect(indices == [0])
+    }
+
     @Test func theHomeFolderAndItsParentsOnlyMatchExactly() {
         let indices = WorkspaceSetPlan.indicesToOpen(
             savedDirectories: ["~", "/home", "/", "/home/me/p"],
