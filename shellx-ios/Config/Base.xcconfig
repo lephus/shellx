@@ -24,6 +24,10 @@ CODE_SIGN_STYLE = Automatic
 
 INFOPLIST_FILE = Config/Info.plist
 GENERATE_INFOPLIST_FILE = NO
+// Info.plist goes through the C preprocessor (`cc -E -P -x c`), so a configuration can add keys only
+// it needs with `#if` (Debug.xcconfig). Keep the plist free of a bare `'` and of `//` outside quotes:
+// C would read them as a character literal or a comment.
+INFOPLIST_PREPROCESS = YES
 CODE_SIGN_ENTITLEMENTS = Config/ShellX.entitlements
 
 ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon

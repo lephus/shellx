@@ -4,6 +4,9 @@
 
 PRODUCT_BUNDLE_IDENTIFIER = com.shellx.dev
 SHELLX_DISPLAY_NAME = ShellX Dev
+// App Transport Security's local-network exception, for a relay on the Mac over plain HTTP
+// (SHELLX_API_BASE, honoured by Debug builds only). Release never has it: ios.sh --check-app refuses it.
+INFOPLIST_PREPROCESSOR_DEFINITIONS = SHELLX_ALLOWS_LOCAL_NETWORKING=1
 
 SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG $(inherited)
 SWIFT_OPTIMIZATION_LEVEL = -Onone

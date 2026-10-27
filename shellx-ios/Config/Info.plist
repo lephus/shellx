@@ -40,11 +40,13 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+#if SHELLX_ALLOWS_LOCAL_NETWORKING
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+#endif
 	<key>NSCameraUsageDescription</key>
 	<string>ShellX uses the camera to scan the pairing QR code on your Mac.</string>
 	<key>NSMicrophoneUsageDescription</key>
