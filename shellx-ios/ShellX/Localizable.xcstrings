@@ -1873,6 +1873,24 @@
         }
       }
     },
+    "signin.error.localWipePending": {
+      "comment": "Sign-in error: the previous account's data could not be removed from this iPhone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't clear the previous account's data on this iPhone. Try again."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không xoá được dữ liệu của tài khoản trước trên iPhone này. Thử lại."
+          }
+        }
+      }
+    },
     "signin.error.network": {
       "comment": "Sign-in error: no connection.",
       "extractionState": "manual",

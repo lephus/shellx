@@ -106,6 +106,7 @@ struct SignInView: View {
         case .rateLimited: String(localized: "signin.error.rateLimited")
         case .network: String(localized: "signin.error.network")
         case .server: String(localized: "signin.error.server")
+        case .localWipePending: String(localized: "signin.error.localWipePending")
         }
     }
 
