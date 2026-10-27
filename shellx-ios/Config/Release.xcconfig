@@ -1,0 +1,13 @@
+// Release: the App Store build "ShellX".
+
+#include "Base.xcconfig"
+
+PRODUCT_BUNDLE_IDENTIFIER = com.shellx.prod
+SHELLX_DISPLAY_NAME = ShellX
+
+SWIFT_COMPILATION_MODE = wholemodule
+SWIFT_OPTIMIZATION_LEVEL = -O
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+ENABLE_NS_ASSERTIONS = NO
+VALIDATE_PRODUCT = YES
+MTL_ENABLE_DEBUG_INFO = NO

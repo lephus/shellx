@@ -100,3 +100,7 @@ release/out/
 
 # ShellX core
 shellx-core/target/
+
+# ShellX iOS app (DerivedData of shellx-ios/scripts/dev.sh, SwiftPM build of its packages)
+shellx-ios/.derived/
+shellx-ios/Packages/*/.build/
