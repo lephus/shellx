@@ -1,33 +1,36 @@
 import AVFoundation
 import Foundation
+import ShellXAppCore
 
 /// The microphone while the user holds the mic: a tap on `AVAudioEngine`'s input node. The audio
 /// session (category `.record`, mode `.measurement`, ducking other audio) is activated by `start`
 /// and deactivated by `stop` with `.notifyOthersOnDeactivation`, so music the user paused comes
 /// back. Buffers go to the transcriber in memory only; nothing is written or sent anywhere.
 ///
+/// Each capture belongs to one dictation (`owner`): `stop(owner:)` stops only that one, so the late
+/// teardown of an old run can never stop a newer capture, and `start` gives up when its run no longer
+/// holds the microphone (`stillWanted`).
+///
 /// Engine work (`start`, `stop`) runs one at a time on `engineQueue`, which the audio thread never
 /// touches: `removeTap` waits for a tap block still running, so the tap must never wait for
 /// anything `stop` holds. The tap only takes `levelLock`, which nothing else holds while waiting.
 ///
-/// An interruption (a call, Siri) or a route change that takes the input away stops the capture and
-/// calls `onLost`, so the dictation is cancelled rather than left listening to nothing.
+/// An interruption (a call, Siri), or a route change that takes away the input in use, stops the
+/// capture and calls `onLost`, so the dictation is cancelled rather than left listening to nothing.
+/// An output-only device leaving (AirPods, a speaker) keeps the dictation (`AudioInputRoute`).
 final class AudioCapture: @unchecked Sendable {
     enum Failure: Error {
         /// The input has no channels or no sample rate (no microphone, or the route is gone).
         case noInput
     }
 
-    /// Every how many buffers the level bar is updated (1024 frames each: about 20 times a second).
-    private static let levelEvery = 2
-
     private let engineQueue = DispatchQueue(label: "com.shellx.audio-capture")
     private let engine = AVAudioEngine()
     private let meter: AudioLevelMeter
-    /// Read and written on `engineQueue` only.
-    private var running = false
+    /// The dictation the running capture belongs to. Read and written on `engineQueue` only.
+    private var owner: SpeechRunID?
     private let levelLock = NSLock()
-    private var buffersSinceLevel = 0
+    private var throttle = AudioLevelThrottle()
     private let lostLock = NSLock()
     private var lostHandler: (@Sendable () -> Void)?
     private let notifications: NotificationCenter
@@ -48,10 +51,7 @@ final class AudioCapture: @unchecked Sendable {
             notifications.addObserver(
                 forName: AVAudioSession.routeChangeNotification, object: session, queue: nil
             ) { [weak self] note in
-                let reason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt)
-                    .flatMap(AVAudioSession.RouteChangeReason.init(rawValue:))
-                let inputGone = !AVAudioSession.sharedInstance().isInputAvailable
-                if reason == .oldDeviceUnavailable || inputGone { self?.lose() }
+                if Self.inputLost(note) { self?.lose() }
             },
         ]
     }
@@ -66,10 +66,16 @@ final class AudioCapture: @unchecked Sendable {
         set { lostLock.withLock { lostHandler = newValue } }
     }
 
-    /// Activates the session and starts the tap. `onBuffer` gets every buffer, in the returned
-    /// format, on the audio thread. A running capture is stopped first.
-    func start(onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void) throws -> AVAudioFormat {
+    /// Activates the session and starts the tap for `owner`, replacing any other capture, unless
+    /// `stillWanted` says the run no longer holds the microphone (then false, and nothing changes).
+    /// `onBuffer` gets every buffer, in the input's format, on the audio thread.
+    @discardableResult
+    func start(
+        owner run: SpeechRunID, stillWanted: @escaping @Sendable () -> Bool,
+        onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void
+    ) throws -> Bool {
         try engineQueue.sync {
+            guard stillWanted() else { return false }
             tearDown()
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
@@ -80,7 +86,7 @@ final class AudioCapture: @unchecked Sendable {
                 try? session.setActive(false, options: .notifyOthersOnDeactivation)
                 throw Failure.noInput
             }
-            levelLock.withLock { buffersSinceLevel = 0 }
+            levelLock.withLock { throttle = AudioLevelThrottle() }
             input.installTap(onBus: 0, bufferSize: 1024, format: format, block: makeTap(onBuffer))
             engine.prepare()
             do {
@@ -90,22 +96,26 @@ final class AudioCapture: @unchecked Sendable {
                 try? session.setActive(false, options: .notifyOthersOnDeactivation)
                 throw error
             }
-            running = true
-            return format
+            owner = run
+            return true
         }
     }
 
-    /// Stops the tap and the engine and gives the audio back to other apps. Safe to call twice.
-    func stop() {
-        engineQueue.sync { tearDown() }
+    /// Stops `owner`'s capture and gives the audio back to other apps. Does nothing when another run
+    /// owns the capture now, or when none runs.
+    func stop(owner run: SpeechRunID) {
+        engineQueue.sync {
+            guard owner == run else { return }
+            tearDown()
+        }
     }
 
     // MARK: - Private
 
     /// On `engineQueue` only, holding no lock: the audio thread may still be inside the tap.
     private func tearDown() {
-        guard running else { return }
-        running = false
+        guard owner != nil else { return }
+        owner = nil
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
@@ -117,14 +127,28 @@ final class AudioCapture: @unchecked Sendable {
     /// notification while `start` or `stop` runs on `engineQueue`.
     private func lose() {
         engineQueue.async { [weak self] in
-            guard let self, self.running else { return }
+            guard let self, self.owner != nil else { return }
             self.tearDown()
             self.onLost?()
         }
     }
 
-    /// The tap: hands the buffer on, then reports its level every `levelEvery` buffers. Built outside
-    /// any actor, because the audio thread calls it.
+    /// A route change that takes away the input in use (or every input); an output-only device
+    /// leaving is not one.
+    private static func inputLost(_ note: Notification) -> Bool {
+        let session = AVAudioSession.sharedInstance()
+        let reason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt)
+            .flatMap(AVAudioSession.RouteChangeReason.init(rawValue:))
+        guard reason == .oldDeviceUnavailable || !session.isInputAvailable else { return false }
+        let previous = (note.userInfo?[AVAudioSessionRouteChangePreviousRouteKey] as? AVAudioSessionRouteDescription)?
+            .inputs.map(\.uid) ?? []
+        return AudioInputRoute.inputLost(
+            previousInputs: Set(previous), currentInputs: Set(session.currentRoute.inputs.map(\.uid)),
+            inputAvailable: session.isInputAvailable)
+    }
+
+    /// The tap: hands the buffer on, then reports its level about 20 times a second of audio
+    /// (`AudioLevelThrottle`, counted in frames). Built outside any actor: the audio thread calls it.
     private func makeTap(_ onBuffer: @escaping @Sendable (AVAudioPCMBuffer) -> Void) -> AVAudioNodeTapBlock {
         { [weak self] buffer, _ in
             onBuffer(buffer)
@@ -133,11 +157,8 @@ final class AudioCapture: @unchecked Sendable {
     }
 
     private func report(_ buffer: AVAudioPCMBuffer) {
-        let due = levelLock.withLock { () -> Bool in
-            buffersSinceLevel += 1
-            guard buffersSinceLevel >= Self.levelEvery else { return false }
-            buffersSinceLevel = 0
-            return true
+        let due = levelLock.withLock {
+            throttle.take(frames: Int(buffer.frameLength), sampleRate: buffer.format.sampleRate)
         }
         guard due else { return }
         let level = Self.level(of: buffer)

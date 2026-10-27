@@ -56,12 +56,20 @@ final class VoiceService {
         let audio = AudioCapture(meter: meter)
         audio.onLost = { Task { @MainActor in await owner.service?.cancelAll() } }
         let assets = AnalyzerAssets()
-        let legacy = LegacyTranscriber(audio: audio)
+        // One slot for the microphone: one run holds it, across both recognizers.
+        let slot = SpeechRunSlot()
+        let legacy = LegacyTranscriber(audio: audio, slot: slot)
         let transcriber: any SpeechTranscribing
         if #available(iOS 26, *) {
-            transcriber = AnalyzerTranscriber(
-                audio: audio, fallback: legacy, assets: assets,
-                onFallback: { locale in Task { @MainActor in await owner.service?.analyzerFellBack(locale) } })
+            transcriber = FallbackTranscriber(
+                primary: AnalyzerTranscriber(audio: audio, slot: slot), fallback: legacy,
+                usePrimary: { await AnalyzerTranscriber.readiness(for: $0, assets: assets) == .ready },
+                primaryFailed: { locale in
+                    // Only the analyzer's own failures: not offered again for the language, and
+                    // Settings asks again to name the path really used.
+                    await assets.markFailed(locale)
+                    await owner.fellBack(locale)
+                })
         } else {
             transcriber = legacy
         }
@@ -127,5 +135,9 @@ final class VoiceService {
     @MainActor
     private final class Owner {
         weak var service: VoiceService?
+
+        func fellBack(_ locale: Locale) async {
+            await service?.analyzerFellBack(locale)
+        }
     }
 }

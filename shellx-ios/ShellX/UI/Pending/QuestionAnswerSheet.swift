@@ -133,15 +133,15 @@ struct QuestionAnswerSheet: View {
         }
     }
 
-    /// Opens the question's "Other…" field and its keyboard. A dictation in progress is cancelled
-    /// first (`VoiceInputModel.typeInstead()`).
+    /// Opens the question's "Other…" field and its keyboard at once; a dictation in progress is then
+    /// cancelled (`VoiceInputModel.typeInstead()`). The keyboard never waits for the recognizer.
     private func openOther(_ question: PendingQuestion) {
         let voice = self.voice
         typing.insert(question.id)
         Task { @MainActor in
-            await voice?.typeInstead()
-            // The field appeared in the update before; focus it now.
+            // The field appeared in the update before; focus it now, then cancel.
             focused = question.id
+            await voice?.typeInstead()
         }
     }
 

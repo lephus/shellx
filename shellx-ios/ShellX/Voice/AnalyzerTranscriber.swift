@@ -6,14 +6,17 @@ import Speech
 /// Dictation with `SpeechAnalyzer` (iOS 26 and later), on the iPhone: `SpeechTranscriber` with
 /// volatile (tentative) results, or `DictationTranscriber` when only it has the language. The
 /// workspace names and terms go in as the analysis context; the microphone's audio is converted to
-/// the analyzer's best format. While the language's assets are not installed yet (they download in
-/// the background), when the analyzer has no such language, or when it fails to start (then it is
-/// not tried again for that language, and `onFallback` lets Settings name the path really used), a
-/// press uses `LegacyTranscriber`.
+/// the analyzer's best format.
 ///
-/// One run at a time: starting a run tears down any other; `finish` and `cancel` act on the run they
-/// name only. A run whose results end by itself (an error, the analyzer stopping) gives the
-/// microphone back at once.
+/// It is the primary transcriber of a `FallbackTranscriber`: `readiness` says when it can run a
+/// language now (its assets installed, and it never failed to start for it). Its start errors say
+/// whose fault they were: `SpeechStartError.recognizer` (the analyzer's context, format, preparation
+/// or start; the press falls back and the language stops being offered to the analyzer) or
+/// `SpeechStartError.audio` (the microphone; that press fails, the analyzer stays).
+///
+/// Runs go through the `SpeechRunSlot` shared with `LegacyTranscriber`: the newest start takes the
+/// microphone; a start that was overtaken or cancelled while it started never does. A run whose
+/// results end by themselves gives the microphone back at once.
 @available(iOS 26, *)
 final class AnalyzerTranscriber: SpeechTranscribing, @unchecked Sendable {
     /// Whether the analyzer can transcribe a language now.
@@ -46,9 +49,8 @@ final class AnalyzerTranscriber: SpeechTranscribing, @unchecked Sendable {
         let analyzer: SpeechAnalyzer
         let input: AsyncStream<AnalyzerInput>.Continuation
         let continuation: AsyncThrowingStream<String, any Error>.Continuation
-        /// Reads the module's results into `continuation`; returns the final text. Set once, under
-        /// `AnalyzerTranscriber.lock`, right after the run is made.
-        var results: Task<String, Never>?
+        private let lock = NSLock()
+        private var resultsTask: Task<String, Never>?
 
         init(
             id: SpeechRunID, analyzer: SpeechAnalyzer, input: AsyncStream<AnalyzerInput>.Continuation,
@@ -59,37 +61,20 @@ final class AnalyzerTranscriber: SpeechTranscribing, @unchecked Sendable {
             self.input = input
             self.continuation = continuation
         }
-    }
 
-    private enum Active {
-        case fallback(SpeechRunID)
-        case analyzer(Run)
-
-        var id: SpeechRunID {
-            switch self {
-            case let .fallback(id): return id
-            case let .analyzer(run): return run.id
-            }
+        /// Reads the module's results into `continuation`; returns the final text.
+        var results: Task<String, Never>? {
+            get { lock.withLock { resultsTask } }
+            set { lock.withLock { resultsTask = newValue } }
         }
     }
 
     private let audio: AudioCapture
-    private let fallback: LegacyTranscriber
-    private let assets: AnalyzerAssets
-    private let onFallback: @Sendable (Locale) -> Void
-    private let lock = NSLock()
-    private var active: Active?
+    private let slot: SpeechRunSlot
 
-    /// `onFallback` is told when the analyzer failed to start for a locale (and will not be tried
-    /// again for it).
-    init(
-        audio: AudioCapture, fallback: LegacyTranscriber, assets: AnalyzerAssets,
-        onFallback: @escaping @Sendable (Locale) -> Void = { _ in }
-    ) {
+    init(audio: AudioCapture, slot: SpeechRunSlot) {
         self.audio = audio
-        self.fallback = fallback
-        self.assets = assets
-        self.onFallback = onFallback
+        self.slot = slot
     }
 
     /// Whether the analyzer can transcribe `locale` now. Starts downloading the assets when it could
@@ -119,156 +104,117 @@ final class AnalyzerTranscriber: SpeechTranscribing, @unchecked Sendable {
     func start(run id: SpeechRunID, locale: Locale, contextualStrings: [String]) async throws
         -> AsyncThrowingStream<String, any Error>
     {
-        if let other = take(unless: id) { await tearDown(other) }
-        if await !assets.hasFailed(locale), let module = await Self.module(for: locale) {
-            if await AssetInventory.status(forModules: [module.base]) == .installed {
-                do {
-                    return try await startAnalyzer(id, module: module, contextualStrings: contextualStrings)
-                } catch {
-                    // The analyzer could not start: this press and the next ones go through
-                    // SFSpeechRecognizer, and Settings is told which path that is.
-                    await assets.markFailed(locale)
-                    onFallback(locale)
-                }
-            } else {
-                await assets.install(module.base, locale: locale)
+        slot.begin(id)
+        guard let module = await Self.module(for: locale) else {
+            throw SpeechStartError.recognizer(LegacyTranscriber.Failure.unavailable)
+        }
+        // The analyzer's own steps: a failure here is the analyzer's.
+        let analyzer: SpeechAnalyzer
+        let format: AVAudioFormat
+        let inputs: AsyncStream<AnalyzerInput>
+        let input: AsyncStream<AnalyzerInput>.Continuation
+        do {
+            // Keep the model loaded between presses: the next first word comes sooner.
+            analyzer = SpeechAnalyzer(
+                modules: [module.base],
+                options: SpeechAnalyzer.Options(priority: .userInitiated, modelRetention: .lingering))
+            let context = AnalysisContext()
+            context.contextualStrings[.general] = contextualStrings
+            try await analyzer.setContext(context)
+            guard let best = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [module.base]) else {
+                throw LegacyTranscriber.Failure.unavailable
             }
+            format = best
+            try await analyzer.prepareToAnalyze(in: format)
+            (inputs, input) = AsyncStream<AnalyzerInput>.makeStream()
+            try await analyzer.start(inputSequence: inputs)
+        } catch {
+            throw SpeechStartError.recognizer(error)
         }
-        let previous = lock.withLock { () -> Active? in
-            defer { active = .fallback(id) }
-            return active
-        }
-        if let previous, previous.id != id { await tearDown(previous) }
-        return try await fallback.start(run: id, locale: locale, contextualStrings: contextualStrings)
-    }
 
-    func finish(run id: SpeechRunID) async -> String {
-        switch take(id) {
-        case let .fallback(id):
-            return await fallback.finish(run: id)
-        case let .analyzer(run):
-            audio.stop()
-            run.input.finish()
-            let results = lock.withLock { run.results }
-            return await withTaskGroup(of: String?.self) { group in
-                group.addTask {
-                    try? await run.analyzer.finalizeAndFinishThroughEndOfInput()
-                    return await results?.value ?? ""
-                }
-                group.addTask {
-                    try? await Task.sleep(for: Self.finalizeTimeout)
-                    return nil
-                }
-                let first = await group.next() ?? nil
-                if let first {
-                    group.cancelAll()
-                    return first
-                }
-                // Took too long: stop the analyzer, which ends the other child, and keep what came.
-                await run.analyzer.cancelAndFinishNow()
-                return await results?.value ?? ""
-            }
-        case nil:
-            return ""
-        }
-    }
-
-    func cancel(run id: SpeechRunID) async {
-        if let run = take(id) { await tearDown(run) }
-    }
-
-    // MARK: - Private
-
-    /// The active run when it is `id`, made inactive.
-    private func take(_ id: SpeechRunID) -> Active? {
-        lock.withLock {
-            guard let current = active, current.id == id else { return nil }
-            active = nil
-            return current
-        }
-    }
-
-    /// The active run when it is not `id`, made inactive.
-    private func take(unless id: SpeechRunID) -> Active? {
-        lock.withLock {
-            guard let current = active, current.id != id else { return nil }
-            active = nil
-            return current
-        }
-    }
-
-    /// Stops a run's audio and analysis and ends its stream.
-    private func tearDown(_ run: Active) async {
-        switch run {
-        case let .fallback(id):
-            await fallback.cancel(run: id)
-        case let .analyzer(run):
-            audio.stop()
-            run.input.finish()
-            await run.analyzer.cancelAndFinishNow()
-            lock.withLock { run.results }?.cancel()
-            run.continuation.finish()
-        }
-    }
-
-    /// The results ended by themselves (an error, the analyzer stopping): when `run` is still the
-    /// active one, it stops holding the microphone now. (The model also cancels it.)
-    private func resultsEnded(_ run: Run) {
-        let stillActive = lock.withLock { () -> Bool in
-            guard case let .analyzer(current) = active, current === run else { return false }
-            active = nil
-            return true
-        }
-        guard stillActive else { return }
-        audio.stop()
-        run.input.finish()
-        Task { await run.analyzer.cancelAndFinishNow() }
-    }
-
-    private func startAnalyzer(_ id: SpeechRunID, module: Module, contextualStrings: [String]) async throws
-        -> AsyncThrowingStream<String, any Error>
-    {
-        // Keep the model loaded between presses: the next first word comes sooner.
-        let analyzer = SpeechAnalyzer(
-            modules: [module.base], options: SpeechAnalyzer.Options(priority: .userInitiated, modelRetention: .lingering))
-        let context = AnalysisContext()
-        context.contextualStrings[.general] = contextualStrings
-        try await analyzer.setContext(context)
-        guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [module.base]) else {
-            throw LegacyTranscriber.Failure.unavailable
-        }
-        try await analyzer.prepareToAnalyze(in: format)
-
-        let (inputs, input) = AsyncStream<AnalyzerInput>.makeStream()
         let (stream, continuation) = AsyncThrowingStream<String, any Error>.makeStream()
         let run = Run(id: id, analyzer: analyzer, input: input, continuation: continuation)
-        let results = Task { [weak self] in
+        run.results = Task { [weak self] in
             let text = await Self.read(module, into: continuation)
             self?.resultsEnded(run)
             return text
         }
-        lock.withLock { run.results = results }
+        let handlers = SpeechRunSlot.Handlers(
+            finish: { [weak self] in await self?.finish(run) ?? "" },
+            teardown: { [weak self] in await self?.tearDown(run) })
+        switch slot.claim(id, handlers) {
+        case .refused:
+            // Overtaken or cancelled while starting: never takes the microphone.
+            await tearDown(run)
+            return stream
+        case let .granted(replaced):
+            await replaced?.teardown()
+        }
         do {
-            try await analyzer.start(inputSequence: inputs)
-            // This run replaces any other: the other one is torn down, never left holding the mic.
-            let previous = lock.withLock { () -> Active? in
-                defer { active = .analyzer(run) }
-                return active
-            }
-            if let previous { await tearDown(previous) }
+            let slot = self.slot
             let converter = AudioBufferConverter(to: format)
-            _ = try audio.start { buffer in
+            try audio.start(owner: id, stillWanted: { slot.isActive(id) }) { buffer in
                 if let converted = converter.convert(buffer) { input.yield(AnalyzerInput(buffer: converted)) }
             }
         } catch {
-            _ = take(id)
-            audio.stop()
-            input.finish()
-            await analyzer.cancelAndFinishNow()
-            results.cancel()
-            throw error
+            // The microphone's fault, not the analyzer's: this press fails, the analyzer stays.
+            _ = slot.ended(id)
+            await tearDown(run)
+            throw SpeechStartError.audio(error)
         }
         return stream
+    }
+
+    func finish(run id: SpeechRunID) async -> String {
+        await slot.takeForFinish(id)?.finish() ?? ""
+    }
+
+    func cancel(run id: SpeechRunID) async {
+        await slot.cancel(id)?.teardown()
+    }
+
+    // MARK: - Private
+
+    private func finish(_ run: Run) async -> String {
+        audio.stop(owner: run.id)
+        run.input.finish()
+        let results = run.results
+        return await withTaskGroup(of: String?.self) { group in
+            group.addTask {
+                try? await run.analyzer.finalizeAndFinishThroughEndOfInput()
+                return await results?.value ?? ""
+            }
+            group.addTask {
+                try? await Task.sleep(for: Self.finalizeTimeout)
+                return nil
+            }
+            let first = await group.next() ?? nil
+            if let first {
+                group.cancelAll()
+                return first
+            }
+            // Took too long: stop the analyzer, which ends the other child, and keep what came.
+            await run.analyzer.cancelAndFinishNow()
+            return await results?.value ?? ""
+        }
+    }
+
+    /// Stops a run's audio and analysis and ends its stream.
+    private func tearDown(_ run: Run) async {
+        audio.stop(owner: run.id)
+        run.input.finish()
+        await run.analyzer.cancelAndFinishNow()
+        run.results?.cancel()
+        run.continuation.finish()
+    }
+
+    /// The results ended by themselves (an error, the analyzer stopping): when `run` still holds the
+    /// microphone, it gives it back now. (The model also cancels it.)
+    private func resultsEnded(_ run: Run) {
+        guard slot.ended(run.id) else { return }
+        audio.stop(owner: run.id)
+        run.input.finish()
+        Task { await run.analyzer.cancelAndFinishNow() }
     }
 
     /// `SpeechTranscriber` when it has the language (and runs on this iPhone), else

@@ -60,13 +60,19 @@ final class VoiceServiceTests: XCTestCase {
         transcriber.say("đang nói")
         let heard = await eventually { composer.phase == .listening(text: "đang nói") }
         XCTAssertTrue(heard)
+        // One microphone: the sheet's press takes it over, as the real transcribers do.
         await sheet.press()
+        let runs = transcriber.starts.map(\.run)
+        XCTAssertEqual(transcriber.activeRun, runs[1])
+        let handedOver = await eventually { transcriber.cancelledRuns.contains(runs[0]) }
+        XCTAssertTrue(handedOver, "the composer's model let go of its run once it ended")
 
         await service.cancelAll()
         XCTAssertEqual(composer.phase, .idle)
         XCTAssertEqual(sheet.phase, .idle)
         XCTAssertEqual(idle.phase, .idle)
-        XCTAssertEqual(Set(transcriber.cancelledRuns), Set(transcriber.starts.map(\.run)), "both runs stopped")
+        XCTAssertNil(transcriber.activeRun, "nothing holds the microphone")
+        XCTAssertEqual(Set(transcriber.cancelledRuns), Set(runs), "both runs stopped")
         let words = await composer.release()
         XCTAssertNil(words, "nothing heard before the interruption is sent afterwards")
     }

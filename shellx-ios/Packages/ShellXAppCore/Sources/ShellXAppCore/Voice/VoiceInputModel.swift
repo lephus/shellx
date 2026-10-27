@@ -151,11 +151,9 @@ public final class VoiceInputModel {
         } catch {
             return refuse(current, .unavailable)
         }
-        guard attempt == current, !released else {
-            // Released while the recognizer started: stop that run, and only that one.
-            await transcriber.cancel(run: run)
-            return
-        }
+        // Released while the recognizer started: the release already cancelled this run, so the
+        // transcriber refused it the microphone; nothing more to stop.
+        guard attempt == current, !released else { return }
         recognition = .running
         reader = Task { [weak self] in await self?.read(stream, attempt: current, run: run) }
     }
@@ -192,8 +190,8 @@ public final class VoiceInputModel {
         }
         switch recognition {
         case .starting:
-            // The press stops the recognizer if it starts after all.
-            _ = drop()
+            // Cancelled now, while it starts: the transcriber never gives it the microphone.
+            if let run = drop() { await transcriber.cancel(run: run) }
             return nil
         case .stopped, .finishing:
             phase = .idle
@@ -255,16 +253,16 @@ public final class VoiceInputModel {
         phase = reason
     }
 
-    /// Stops listening now and drops the words. Returns the run when its recognizer was running: the
-    /// caller cancels it.
+    /// Stops listening now and drops the words. Returns the run when its recognizer was running or
+    /// still starting: the caller cancels it (a run cancelled while it starts never gets the mic).
     private func drop() -> SpeechRunID? {
         released = true
-        let wasRunning = recognition == .running
+        let live = recognition == .running || recognition == .starting
         recognition = .stopped
         reader?.cancel()
         reader = nil
         phase = .idle
-        return wasRunning ? run : nil
+        return live ? run : nil
     }
 
     /// Takes the run's updates. When the stream ends by itself (an error, a time limit), the words

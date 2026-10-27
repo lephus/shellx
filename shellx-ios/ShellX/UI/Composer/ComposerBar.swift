@@ -96,8 +96,12 @@ struct ComposerBar<Accessory: View>: View {
             if !isFocused, text.isEmpty { typing = false }
         }
         .onChange(of: text) { _, newText in
+            guard !newText.isEmpty, let voice else { return }
             // Typing replaces a "can't listen" message.
-            if !newText.isEmpty { voice?.dismiss() }
+            voice.dismiss()
+            // Text in the field hides the mic (a draft put back, for instance): a dictation still
+            // listening is cancelled, so a hidden mic never keeps running.
+            if voice.isActive { Task { await voice.typeInstead() } }
         }
     }
 
@@ -154,15 +158,16 @@ struct ComposerBar<Accessory: View>: View {
         .padding(.top, 2)
     }
 
-    /// The keyboard button, "Type instead", a swipe up, or no recognizer: a dictation in progress is
-    /// cancelled first (`VoiceInputModel.typeInstead()`), so nothing heard while typing is sent later.
+    /// The keyboard button, "Type instead", a swipe up, or no recognizer: the keyboard comes up at
+    /// once, and a dictation in progress is cancelled (`VoiceInputModel.typeInstead()`), so nothing
+    /// heard while typing is sent later. The keyboard never waits for the recognizer to stop.
     private func openKeyboard() {
         let voice = self.voice
         typing = true
         Task { @MainActor in
-            await voice?.typeInstead()
-            // The field appeared in the update before; focus it now.
+            // The field appeared in the update before; focus it now, then cancel.
             focused = true
+            await voice?.typeInstead()
         }
     }
 

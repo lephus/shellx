@@ -115,14 +115,12 @@ struct PlanReviewSheet: View {
         }
     }
 
-    /// The keyboard for the feedback field; a dictation in progress is cancelled first
-    /// (`VoiceInputModel.typeInstead()`).
+    /// The keyboard for the feedback field, at once; a dictation in progress is then cancelled
+    /// (`VoiceInputModel.typeInstead()`). The keyboard never waits for the recognizer.
     private func typeFeedback() {
+        feedbackFocused = true
         let voice = self.voice
-        Task { @MainActor in
-            await voice?.typeInstead()
-            feedbackFocused = true
-        }
+        Task { await voice?.typeInstead() }
     }
 
     /// Adds what was said to the feedback, after what is already there.
