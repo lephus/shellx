@@ -5,7 +5,7 @@ extension TabManager {
     /// when it has two or more, otherwise every workspace. Remote workspaces are
     /// left out, as their folders live on another machine.
     func captureWorkspaceSet(named name: String) -> CmuxWorkspaceSet {
-        let localWorkspaces = tabs.filter { !$0.isRemoteWorkspace && !$0.isRemoteTmuxMirror }
+        let localWorkspaces = workspaceSetCandidates
         let workspacesById = Dictionary(uniqueKeysWithValues: localWorkspaces.map { ($0.id, $0) })
         let ids = WorkspaceSetPlan.workspaceIdsToSave(
             orderedIds: localWorkspaces.map(\.id),
@@ -17,17 +17,27 @@ extension TabManager {
         )
     }
 
+    /// Whether ``captureWorkspaceSet(named:)`` saves only the sidebar
+    /// multi-selection rather than every workspace in the window.
+    var workspaceSetSavesSelection: Bool {
+        WorkspaceSetPlan.savesSelection(
+            orderedIds: workspaceSetCandidates.map(\.id),
+            selectedIds: sidebarSelectedWorkspaceIds
+        )
+    }
+
     /// Opens the set's workspaces whose folders are not open in this window yet,
     /// at the end of the sidebar in saved order, then focuses the set's first
     /// workspace. Returns the workspaces it opened.
     @discardableResult
     func openWorkspaceSet(_ workspaceSet: CmuxWorkspaceSet) -> [Workspace] {
-        let homeDirectory = FileManager.default.homeDirectoryForCurrentUser.path
-        let indices = WorkspaceSetPlan.indicesToOpen(
+        let localWorkspaces = workspaceSetCandidates
+        let openIndices = WorkspaceSetPlan.openWorkspaceIndices(
             savedDirectories: workspaceSet.workspaces.map(\.cwd),
-            openDirectories: tabs.map(\.currentDirectory),
-            homeDirectory: homeDirectory
+            openDirectories: localWorkspaces.map(\.currentDirectory),
+            homeDirectory: FileManager.default.homeDirectoryForCurrentUser.path
         )
+        let indices = openIndices.indices.filter { openIndices[$0] == nil }
         var openedByIndex: [Int: Workspace] = [:]
         for index in indices {
             let definition = workspaceSet.workspaces[index]
@@ -41,19 +51,17 @@ extension TabManager {
         }
 
         let firstWorkspace = openedByIndex[0]
-            ?? workspace(openAt: workspaceSet.workspaces.first?.cwd, homeDirectory: homeDirectory)
+            ?? openIndices.first.flatMap { $0 }.map { localWorkspaces[$0] }
         if let firstWorkspace {
             selectWorkspace(firstWorkspace)
         }
         return indices.compactMap { openedByIndex[$0] }
     }
 
-    private func workspace(openAt directory: String?, homeDirectory: String) -> Workspace? {
-        guard let directory else { return nil }
-        let target = WorkspaceSetPlan.normalizedDirectory(directory, homeDirectory: homeDirectory)
-        return tabs.first {
-            WorkspaceSetPlan.normalizedDirectory($0.currentDirectory, homeDirectory: homeDirectory) == target
-        }
+    /// The workspaces a set can hold. Remote workspaces are left out, as their
+    /// folders live on another machine.
+    private var workspaceSetCandidates: [Workspace] {
+        tabs.filter { !$0.isRemoteWorkspace && !$0.isRemoteTmuxMirror }
     }
 
     private static func workspaceSetEntry(for workspace: Workspace) -> CmuxWorkspaceDefinition {
@@ -61,7 +69,9 @@ extension TabManager {
             ?? CmuxWorkspaceDefinition(cwd: workspace.currentDirectory, color: workspace.customColor)
         // An automatic title describes the task in progress and goes stale, so
         // a set keeps only the names the user chose.
-        definition.name = workspace.customTitleSource == .auto ? nil : workspace.customTitle
+        definition.name = workspace.effectiveCustomTitleSource == .user
+            ? workspace.customTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+            : nil
         return definition
     }
 }

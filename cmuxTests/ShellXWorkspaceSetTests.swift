@@ -152,6 +152,16 @@ struct ShellXWorkspaceSetTests {
         #expect(indices == [0])
     }
 
+    @Test func theHomeFolderAndItsParentsOnlyMatchExactly() {
+        let indices = WorkspaceSetPlan.indicesToOpen(
+            savedDirectories: ["~", "/home", "/", "/home/me/p"],
+            openDirectories: ["/home/me/p/a"],
+            homeDirectory: "/home/me"
+        )
+
+        #expect(indices == [0, 1, 2])
+    }
+
     @Test func openingKeepsSavedOrderAndRepeatedFolders() {
         let indices = WorkspaceSetPlan.indicesToOpen(
             savedDirectories: ["/p/b", "/p/a", "/p/b"],
