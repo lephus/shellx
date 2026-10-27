@@ -15,6 +15,16 @@ public enum LinkMessage: Equatable, Sendable {
     case replyResult(callId: String, requestId: String, outcome: ReplyOutcome)
     case ping(nonce: UInt64)
     case pong(nonce: UInt64)
+    case sessionsGet(callId: String)
+    case sessions(callId: String, revision: Int, sessions: [AgentSession])
+    case sessionsChanged(revision: Int, upserted: [AgentSession], removed: [String])
+    case chatHistoryGet(callId: String, sessionId: String, beforeSeq: Int?, limit: Int)
+    case chatHistory(callId: String, sessionId: String, entries: [ChatEntry], hasMore: Bool)
+    case chatEntries(sessionId: String, entries: [ChatEntry])
+    case chatSend(callId: String, sessionId: String, text: String)
+    case chatSendResult(callId: String, outcome: ChatSendOutcome)
+    case chatInterrupt(callId: String, sessionId: String, hard: Bool)
+    case chatInterruptResult(callId: String, outcome: ChatInterruptOutcome)
     /// Decode-only: a well-formed frame whose `t` this version does not know.
     case unknown(type: String)
 }

@@ -408,7 +408,7 @@ final class LinkSessionTests: XCTestCase {
         }
         let client = try await LinkClient.connect(
             clientEnd, key: clientKey, hostKey: hostKey.publicKey, clientVersion: "1", deviceName: "phone",
-            timings: LinkTimings(pingInterval: .seconds(20), idleTimeout: .seconds(45), requestTimeout: .milliseconds(50)))
+            timings: LinkTimings(pingInterval: .seconds(20), idleTimeout: .seconds(45), requestTimeout: .seconds(1)))
         clients.append(client)
 
         do {
@@ -580,6 +580,266 @@ final class LinkSessionTests: XCTestCase {
         XCTAssertEqual(feed.changesCalls, 1)
     }
 
+    // MARK: - Agent sessions and chat (PROTOCOL.md sections 4 and 6)
+
+    func testSessionsSnapshotThenChanges() async throws {
+        let sessions = FakeSessionSource([agentSession("s1", title: "Fix relay")])
+        let client = try await connect(makeHost(FakeFeedSource(), sessions: sessions))
+        let snap = try await within { try await client.sessions() }
+        XCTAssertEqual(snap.revision, 0)
+        XCTAssertEqual(snap.sessions, [agentSession("s1", title: "Fix relay")])
+
+        let seen = collect(client.sessionChanges)
+        sessions.upsert(agentSession("s2", state: .working))
+        sessions.remove("s1")
+        let arrived = await eventually { seen.items.count == 2 }
+        XCTAssertTrue(arrived, "agent.sessions.changed did not arrive")
+        XCTAssertEqual(seen.items.map(\.revision), [1, 2])
+        XCTAssertEqual(seen.items.first?.upserted.map(\.sessionId), ["s2"])
+        XCTAssertEqual(seen.items.first?.upserted.first?.state, .working)
+        XCTAssertEqual(seen.items.last?.removed, ["s1"])
+        let after = try await within { try await client.sessions() }
+        XCTAssertEqual(after.revision, 2)
+        XCTAssertEqual(after.sessions.map(\.sessionId), ["s2"])
+    }
+
+    func testSessionChangeGapForcesResync() async throws {
+        let sessions = FakeSessionSource([agentSession("s1")])
+        let client = try await connect(makeHost(FakeFeedSource(), sessions: sessions))
+        let first = try await within { try await client.sessions() }
+        let seen = collect(client.sessionChanges)
+
+        // The source raised its revision once without a change reaching the phone: the next change
+        // is two above the phone's current one, which means it missed one (section 4).
+        sessions.skipRevision()
+        sessions.upsert(agentSession("s2"))
+        let arrived = await eventually { !seen.items.isEmpty }
+        XCTAssertTrue(arrived)
+        XCTAssertEqual(seen.items.first?.revision, first.revision + 2)
+
+        let resynced = try await within { try await client.sessions() }
+        XCTAssertEqual(resynced.revision, 2)
+        XCTAssertEqual(resynced.sessions.map(\.sessionId), ["s1", "s2"])
+    }
+
+    func testChatHistoryRoundTrip() async throws {
+        let transcript = (1...5).map { chatEntry($0) }
+        let chat = FakeChatSource(["s1": transcript])
+        let client = try await connect(makeHost(FakeFeedSource(), chat: chat))
+        let latest = try await within { try await client.chatHistory(sessionId: "s1", beforeSeq: nil, limit: 3) }
+        XCTAssertEqual(latest.entries.map(\.seq), [3, 4, 5])
+        XCTAssertTrue(latest.hasMore)
+        let older = try await within { try await client.chatHistory(sessionId: "s1", beforeSeq: 3, limit: 3) }
+        XCTAssertEqual(older.entries, Array(transcript.prefix(2)))
+        XCTAssertFalse(older.hasMore)
+    }
+
+    func testHistoryPageShrinksToFit() async throws {
+        let text = String(repeating: "h", count: ChatEntry.maxTextBytes)
+        let transcript = (1...50).map { chatEntry($0, text: text) }
+        let chat = FakeChatSource(["s1": transcript])
+        let rig = makeHost(FakeFeedSource(), chat: chat)
+        let (end, _) = startServe(rig.host)
+        let raw = try await rawEstablished(end, rig)
+        try await raw.send(.chatHistoryGet(callId: "h1", sessionId: "s1", beforeSeq: nil, limit: 50))
+        let answer = try await within { try await raw.receive() }
+        guard case let .chatHistory(callId, sessionId, entries, hasMore) = answer else {
+            return XCTFail("unexpected answer \(answer)")
+        }
+        XCTAssertEqual(callId, "h1")
+        XCTAssertEqual(sessionId, "s1")
+        XCTAssertTrue(hasMore, "dropped entries must set has_more")
+        XCTAssertFalse(entries.isEmpty)
+        XCTAssertLessThan(entries.count, 50)
+        // The oldest entries go first: what is left is the newest run, oldest to newest.
+        XCTAssertEqual(entries.last?.seq, 50)
+        XCTAssertEqual(entries.map(\.seq), Array((51 - entries.count)...50))
+        XCTAssertLessThanOrEqual(try LinkCodec.encode(answer).count, LinkCodec.maxFrameBytes)
+        // One more entry would not have fit.
+        let oneMore = LinkMessage.chatHistory(
+            callId: "h1", sessionId: "s1", entries: Array(transcript.suffix(entries.count + 1)), hasMore: true)
+        XCTAssertThrowsError(try LinkCodec.encode(oneMore))
+    }
+
+    func testChatEntriesPushedToEveryClient() async throws {
+        let chat = FakeChatSource(["s1": [chatEntry(1)]])
+        let rig = makeHost(FakeFeedSource(), clientCount: 2, chat: chat)
+        let clientA = try await connect(rig, clientIndex: 0)
+        let clientB = try await connect(rig, clientIndex: 1)
+        let seenByA = collect(clientA.chatEntries)
+        let seenByB = collect(clientB.chatEntries)
+        chat.append([chatEntry(2), chatEntry(3)], to: "s1")
+        for (name, seen) in [("A", seenByA), ("B", seenByB)] {
+            let arrived = await eventually { !seen.items.isEmpty }
+            XCTAssertTrue(arrived, "client \(name) got no chat.entries")
+            XCTAssertEqual(seen.items.first?.sessionId, "s1")
+            XCTAssertEqual(seen.items.first?.entries.map(\.seq), [2, 3])
+        }
+    }
+
+    func testOversizeChatEntriesSplitIntoFrames() async throws {
+        let chat = FakeChatSource(["s1": []])
+        let client = try await connect(makeHost(FakeFeedSource(), chat: chat))
+        let seen = collect(client.chatEntries)
+        let text = String(repeating: "p", count: ChatEntry.maxTextBytes)
+        chat.append((1...40).map { chatEntry($0, text: text) }, to: "s1")
+        let arrived = await eventually { seen.items.flatMap(\.entries).count == 40 }
+        XCTAssertTrue(arrived, "split chat.entries lost entries")
+        XCTAssertGreaterThan(seen.items.count, 1)
+        XCTAssertEqual(seen.items.flatMap(\.entries).map(\.seq), Array(1...40))
+    }
+
+    func testChatSendAndInterruptOutcomes() async throws {
+        let chat = FakeChatSource(["s1": [], "s2": [], "s3": []])
+        chat.setSendOutcome(.busy, for: "s2")
+        chat.setSendOutcome(.failed, for: "s3")
+        chat.setInterruptOutcome(.failed, for: "s3")
+        let client = try await connect(makeHost(FakeFeedSource(), chat: chat))
+
+        let submitted = try await within { try await client.chatSend(sessionId: "s1", text: "go on") }
+        let busy = try await within { try await client.chatSend(sessionId: "s2", text: "hi") }
+        let failed = try await within { try await client.chatSend(sessionId: "s3", text: "hi") }
+        let missing = try await within { try await client.chatSend(sessionId: "nope", text: "hi") }
+        XCTAssertEqual([submitted, busy, failed, missing], [.submitted, .busy, .failed, .notFound])
+        XCTAssertEqual(chat.sends.first?.text, "go on")
+
+        let sent = try await within { try await client.chatInterrupt(sessionId: "s1", hard: false) }
+        let hard = try await within { try await client.chatInterrupt(sessionId: "s1", hard: true) }
+        let interruptFailed = try await within { try await client.chatInterrupt(sessionId: "s3", hard: false) }
+        let interruptMissing = try await within { try await client.chatInterrupt(sessionId: "nope", hard: false) }
+        XCTAssertEqual([sent, hard, interruptFailed, interruptMissing], [.sent, .sent, .failed, .notFound])
+        XCTAssertEqual(chat.interrupts.map(\.hard), [false, true, false, false])
+    }
+
+    func testChatSendTextBoundsAreEnforced() async throws {
+        let chat = FakeChatSource(["s1": []])
+        let rig = makeHost(FakeFeedSource(), chat: chat)
+        let (end, _) = startServe(rig.host)
+        let raw = try await rawEstablished(end, rig)
+        let tooLong = String(repeating: "t", count: 16_385)
+        for (callId, text) in [("t1", ""), ("t2", tooLong)] {
+            try await raw.send(.chatSend(callId: callId, sessionId: "s1", text: text))
+            let answer = try await within { try await raw.receive() }
+            XCTAssertEqual(errorCode(answer), "bad_request")
+            guard case let .error(_, _, id) = answer else { return XCTFail("unexpected answer \(answer)") }
+            XCTAssertEqual(id, callId)
+        }
+        let longest = String(repeating: "t", count: 16_384)
+        try await raw.send(.chatSend(callId: "t3", sessionId: "s1", text: longest))
+        let ok = try await within { try await raw.receive() }
+        XCTAssertEqual(ok, .chatSendResult(callId: "t3", outcome: .submitted))
+        for (callId, limit) in [("t4", 0), ("t5", 51)] {
+            try await raw.send(.chatHistoryGet(callId: callId, sessionId: "s1", beforeSeq: nil, limit: limit))
+            let answer = try await within { try await raw.receive() }
+            XCTAssertEqual(errorCode(answer), "bad_request")
+        }
+        XCTAssertEqual(chat.sends.count, 1, "an out-of-range text reached the chat source")
+    }
+
+    func testMissingChatSourceAnswersUnsupported() async throws {
+        let client = try await connect(makeHost(FakeFeedSource()))
+        let calls: [(String, @Sendable () async throws -> Void)] = [
+            ("sessions", { _ = try await client.sessions() }),
+            ("history", { _ = try await client.chatHistory(sessionId: "s1", beforeSeq: nil, limit: 10) }),
+            ("send", { _ = try await client.chatSend(sessionId: "s1", text: "x") }),
+            ("interrupt", { _ = try await client.chatInterrupt(sessionId: "s1", hard: false) }),
+        ]
+        for (name, call) in calls {
+            do {
+                try await within { try await call() }
+                XCTFail("\(name) was answered without a source")
+            } catch {
+                guard case let .remote(code, _)? = error as? LinkClientError else {
+                    XCTFail("\(name): unexpected error \(error)")
+                    continue
+                }
+                XCTAssertEqual(code, "unsupported", name)
+            }
+        }
+        // The session stays usable.
+        let snap = try await within { try await client.snapshot() }
+        XCTAssertTrue(snap.pending.isEmpty)
+    }
+
+    func testUnknownSessionAnswersNotFound() async throws {
+        let chat = FakeChatSource(["s1": [chatEntry(1)]])
+        let client = try await connect(makeHost(FakeFeedSource(), chat: chat))
+        do {
+            _ = try await within { try await client.chatHistory(sessionId: "nope", beforeSeq: nil, limit: 10) }
+            XCTFail("history of an unknown session was answered")
+        } catch {
+            guard case let .remote(code, _)? = error as? LinkClientError else {
+                return XCTFail("unexpected error \(error)")
+            }
+            XCTAssertEqual(code, "not_found")
+        }
+        let known = try await within { try await client.chatHistory(sessionId: "s1", beforeSeq: nil, limit: 10) }
+        XCTAssertEqual(known.entries.map(\.seq), [1])
+    }
+
+    func testOversizedSessionsDropTitlesThenAnswerTooLarge() async throws {
+        let many = (0..<300).map {
+            agentSession(String(format: "s%03d", $0), title: String(repeating: "t", count: 400))
+        }
+        let sessions = FakeSessionSource(many)
+        let client = try await connect(makeHost(FakeFeedSource(), sessions: sessions))
+        let snap = try await within { try await client.sessions() }
+        XCTAssertEqual(snap.sessions.count, 300)
+        XCTAssertTrue(snap.sessions.allSatisfy { $0.title == nil }, "titles are dropped when the list does not fit")
+        XCTAssertEqual(snap.sessions.first?.workspaceTitle, "shellx")
+
+        sessions.upsert(agentSession("huge", workspaceTitle: String(repeating: "w", count: 70_000)))
+        do {
+            _ = try await within { try await client.sessions() }
+            XCTFail("an oversized session list was answered")
+        } catch {
+            guard case let .remote(code, _)? = error as? LinkClientError else {
+                return XCTFail("unexpected error \(error)")
+            }
+            XCTAssertEqual(code, "too_large")
+        }
+    }
+
+    func testSessionEndReleasesSessionAndChatSubscriptions() async throws {
+        let sessions = FakeSessionSource()
+        let chat = FakeChatSource()
+        let rig = makeHost(FakeFeedSource(), sessions: sessions, chat: chat)
+        let (end, served) = startServe(rig.host)
+        let client = try await connectClient(end, rig)
+        _ = try await within { try await client.sessions() }
+        XCTAssertEqual(sessions.activeSubscribers, 1)
+        XCTAssertEqual(chat.activeSubscribers, 1)
+        await client.close()
+        let ended = await eventually { served.isSet }
+        XCTAssertTrue(ended)
+        let released = await eventually { sessions.activeSubscribers == 0 && chat.activeSubscribers == 0 }
+        XCTAssertTrue(released, "the host leaked a subscription")
+    }
+
+    func testAnswerOfAnotherTypeIsUnexpectedAnswerNotRemote() async throws {
+        let hostKey = NoiseStaticKey()
+        let clientKey = NoiseStaticKey()
+        let (clientEnd, hostEnd) = makeInMemoryCircuitPair()
+        let rawHost = Task {
+            let ch = try await SecureChannel.open(hostEnd, role: .responder, key: hostKey, trusts: { _ in true })
+            _ = try await ch.receive()
+            try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac"))
+            guard case let .snapshotGet(callId) = try await ch.receive() else { throw RelayError.closed }
+            try await ch.send(.chatSendResult(callId: callId, outcome: .submitted))
+        }
+        let client = try await LinkClient.connect(
+            clientEnd, key: clientKey, hostKey: hostKey.publicKey, clientVersion: "1", deviceName: "phone",
+            timings: .standard)
+        clients.append(client)
+        do {
+            _ = try await within { try await client.snapshot() }
+            XCTFail("a chat.send.result answered a snapshot call")
+        } catch {
+            XCTAssertEqual(error as? LinkClientError, .unexpectedAnswer, "unexpected error \(error)")
+        }
+        try await rawHost.value
+    }
+
     // MARK: - Helpers
 
     private struct Rig {
@@ -590,14 +850,14 @@ final class LinkSessionTests: XCTestCase {
 
     private func makeHost(
         _ feed: any AgentFeedSource, clientCount: Int = 1, trustClients: Bool = true, timings: LinkTimings = .standard,
-        machineName: String = "Test Mac"
+        machineName: String = "Test Mac", sessions: (any AgentSessionSource)? = nil, chat: (any AgentChatSource)? = nil
     ) -> Rig {
         let hostKey = NoiseStaticKey()
         let clientKeys = (0..<clientCount).map { _ in NoiseStaticKey() }
         let trusted: Set<Data> = trustClients ? Set(clientKeys.map(\.publicKey)) : []
         let host = LinkHost(
-            key: hostKey, trustedClients: { trusted }, feed: feed, hostVersion: "test-host", machineName: machineName,
-            timings: timings)
+            key: hostKey, trustedClients: { trusted }, feed: feed, sessions: sessions, chat: chat, hostVersion: "test-host",
+            machineName: machineName, timings: timings)
         return Rig(host: host, hostKey: hostKey, clientKeys: clientKeys)
     }
 

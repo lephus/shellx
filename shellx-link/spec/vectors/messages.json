@@ -644,6 +644,444 @@
         "message": "the frame could not be decoded",
         "call_id": "c9"
       }
+    },
+    {
+      "name": "sessions_get",
+      "message": {
+        "case": "sessions_get",
+        "call_id": "c1"
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.sessions.get",
+        "call_id": "c1"
+      }
+    },
+    {
+      "name": "sessions_empty",
+      "message": {
+        "case": "sessions",
+        "call_id": "c2",
+        "revision": 0,
+        "sessions": []
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.sessions",
+        "call_id": "c2",
+        "revision": 0,
+        "sessions": []
+      }
+    },
+    {
+      "name": "sessions",
+      "message": {
+        "case": "sessions",
+        "call_id": "c3",
+        "revision": 4,
+        "sessions": [
+          {
+            "session_id": "s-1",
+            "agent": "claude",
+            "workspace_id": "ws-1",
+            "workspace_title": "shellx",
+            "title": "Fix the relay",
+            "state": "working",
+            "state_since_ms": 1700000000000,
+            "last_activity_ms": 1700000005000
+          },
+          {
+            "session_id": "s-2",
+            "agent": "claude",
+            "workspace_id": "ws-2",
+            "workspace_title": "docs",
+            "state": "needs_input"
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.sessions",
+        "call_id": "c3",
+        "revision": 4,
+        "sessions": [
+          {
+            "session_id": "s-1",
+            "agent": "claude",
+            "workspace_id": "ws-1",
+            "workspace_title": "shellx",
+            "title": "Fix the relay",
+            "state": "working",
+            "state_since_ms": 1700000000000,
+            "last_activity_ms": 1700000005000
+          },
+          {
+            "session_id": "s-2",
+            "agent": "claude",
+            "workspace_id": "ws-2",
+            "workspace_title": "docs",
+            "state": "needs_input"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sessions_changed",
+      "message": {
+        "case": "sessions_changed",
+        "revision": 5,
+        "upserted": [
+          {
+            "session_id": "s-2",
+            "agent": "claude",
+            "workspace_id": "ws-2",
+            "workspace_title": "docs",
+            "state": "needs_input"
+          }
+        ],
+        "removed": [
+          "s-1"
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.sessions.changed",
+        "revision": 5,
+        "upserted": [
+          {
+            "session_id": "s-2",
+            "agent": "claude",
+            "workspace_id": "ws-2",
+            "workspace_title": "docs",
+            "state": "needs_input"
+          }
+        ],
+        "removed": [
+          "s-1"
+        ]
+      }
+    },
+    {
+      "name": "chat_history_get_latest",
+      "message": {
+        "case": "chat_history_get",
+        "call_id": "c4",
+        "session_id": "s-1",
+        "limit": 50
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.history.get",
+        "call_id": "c4",
+        "session_id": "s-1",
+        "limit": 50
+      }
+    },
+    {
+      "name": "chat_history_get_before",
+      "message": {
+        "case": "chat_history_get",
+        "call_id": "c5",
+        "session_id": "s-1",
+        "before_seq": 40,
+        "limit": 20
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.history.get",
+        "call_id": "c5",
+        "session_id": "s-1",
+        "before_seq": 40,
+        "limit": 20
+      }
+    },
+    {
+      "name": "chat_history",
+      "message": {
+        "case": "chat_history",
+        "call_id": "c5",
+        "session_id": "s-1",
+        "entries": [
+          {
+            "id": "e-1",
+            "seq": 1,
+            "role": "user",
+            "kind": "prose",
+            "text": "Fix the relay",
+            "ts_ms": 1700000001000
+          },
+          {
+            "id": "e-2",
+            "seq": 2,
+            "role": "agent",
+            "kind": "tool_use",
+            "text": "cat relay.rs",
+            "truncated": true,
+            "tool_name": "Bash",
+            "ts_ms": 1700000002000
+          },
+          {
+            "id": "e-3",
+            "seq": 3,
+            "role": "agent",
+            "kind": "thought",
+            "text": "Thinking about the relay",
+            "ts_ms": 1700000003000
+          }
+        ],
+        "has_more": true
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.history",
+        "call_id": "c5",
+        "session_id": "s-1",
+        "entries": [
+          {
+            "id": "e-1",
+            "seq": 1,
+            "role": "user",
+            "kind": "prose",
+            "text": "Fix the relay",
+            "ts_ms": 1700000001000
+          },
+          {
+            "id": "e-2",
+            "seq": 2,
+            "role": "agent",
+            "kind": "tool_use",
+            "text": "cat relay.rs",
+            "truncated": true,
+            "tool_name": "Bash",
+            "ts_ms": 1700000002000
+          },
+          {
+            "id": "e-3",
+            "seq": 3,
+            "role": "agent",
+            "kind": "thought",
+            "text": "Thinking about the relay",
+            "ts_ms": 1700000003000
+          }
+        ],
+        "has_more": true
+      }
+    },
+    {
+      "name": "chat_history_empty",
+      "message": {
+        "case": "chat_history",
+        "call_id": "c6",
+        "session_id": "s-2",
+        "entries": [],
+        "has_more": false
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.history",
+        "call_id": "c6",
+        "session_id": "s-2",
+        "entries": [],
+        "has_more": false
+      }
+    },
+    {
+      "name": "chat_entries",
+      "message": {
+        "case": "chat_entries",
+        "session_id": "s-1",
+        "entries": [
+          {
+            "id": "e-2",
+            "seq": 2,
+            "role": "agent",
+            "kind": "tool_use",
+            "text": "cat relay.rs",
+            "truncated": true,
+            "tool_name": "Bash",
+            "ts_ms": 1700000002000
+          },
+          {
+            "id": "e-3",
+            "seq": 3,
+            "role": "agent",
+            "kind": "thought",
+            "text": "Thinking about the relay",
+            "ts_ms": 1700000003000
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.entries",
+        "session_id": "s-1",
+        "entries": [
+          {
+            "id": "e-2",
+            "seq": 2,
+            "role": "agent",
+            "kind": "tool_use",
+            "text": "cat relay.rs",
+            "truncated": true,
+            "tool_name": "Bash",
+            "ts_ms": 1700000002000
+          },
+          {
+            "id": "e-3",
+            "seq": 3,
+            "role": "agent",
+            "kind": "thought",
+            "text": "Thinking about the relay",
+            "ts_ms": 1700000003000
+          }
+        ]
+      }
+    },
+    {
+      "name": "chat_send",
+      "message": {
+        "case": "chat_send",
+        "call_id": "c7",
+        "session_id": "s-1",
+        "text": "Go ahead"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.send",
+        "call_id": "c7",
+        "session_id": "s-1",
+        "text": "Go ahead"
+      }
+    },
+    {
+      "name": "chat_send_result_submitted",
+      "message": {
+        "case": "chat_send_result",
+        "call_id": "c7",
+        "outcome": "submitted"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.send.result",
+        "call_id": "c7",
+        "outcome": "submitted"
+      }
+    },
+    {
+      "name": "chat_send_result_not_found",
+      "message": {
+        "case": "chat_send_result",
+        "call_id": "c8",
+        "outcome": "not_found"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.send.result",
+        "call_id": "c8",
+        "outcome": "not_found"
+      }
+    },
+    {
+      "name": "chat_send_result_busy",
+      "message": {
+        "case": "chat_send_result",
+        "call_id": "c9",
+        "outcome": "busy"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.send.result",
+        "call_id": "c9",
+        "outcome": "busy"
+      }
+    },
+    {
+      "name": "chat_send_result_failed",
+      "message": {
+        "case": "chat_send_result",
+        "call_id": "c10",
+        "outcome": "failed"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.send.result",
+        "call_id": "c10",
+        "outcome": "failed"
+      }
+    },
+    {
+      "name": "chat_interrupt_soft",
+      "message": {
+        "case": "chat_interrupt",
+        "call_id": "c11",
+        "session_id": "s-1",
+        "hard": false
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.interrupt",
+        "call_id": "c11",
+        "session_id": "s-1",
+        "hard": false
+      }
+    },
+    {
+      "name": "chat_interrupt_hard",
+      "message": {
+        "case": "chat_interrupt",
+        "call_id": "c12",
+        "session_id": "s-1",
+        "hard": true
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.interrupt",
+        "call_id": "c12",
+        "session_id": "s-1",
+        "hard": true
+      }
+    },
+    {
+      "name": "chat_interrupt_result_sent",
+      "message": {
+        "case": "chat_interrupt_result",
+        "call_id": "c11",
+        "outcome": "sent"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.interrupt.result",
+        "call_id": "c11",
+        "outcome": "sent"
+      }
+    },
+    {
+      "name": "chat_interrupt_result_not_found",
+      "message": {
+        "case": "chat_interrupt_result",
+        "call_id": "c13",
+        "outcome": "not_found"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.interrupt.result",
+        "call_id": "c13",
+        "outcome": "not_found"
+      }
+    },
+    {
+      "name": "chat_interrupt_result_failed",
+      "message": {
+        "case": "chat_interrupt_result",
+        "call_id": "c14",
+        "outcome": "failed"
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.interrupt.result",
+        "call_id": "c14",
+        "outcome": "failed"
+      }
     }
   ],
   "decode_only": [
@@ -774,6 +1212,71 @@
         "call_id": "c1",
         "request_id": "r",
         "outcome": "later"
+      }
+    },
+    {
+      "name": "session_unknown_state",
+      "message": {
+        "case": "sessions",
+        "call_id": "c20",
+        "revision": 1,
+        "sessions": [
+          {
+            "session_id": "s-9",
+            "agent": "codex",
+            "workspace_id": "ws-9",
+            "workspace_title": "lab",
+            "state": "sleeping"
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.sessions",
+        "call_id": "c20",
+        "revision": 1,
+        "sessions": [
+          {
+            "session_id": "s-9",
+            "agent": "codex",
+            "workspace_id": "ws-9",
+            "workspace_title": "lab",
+            "state": "sleeping",
+            "future_field": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "entry_unknown_kind",
+      "message": {
+        "case": "chat_entries",
+        "session_id": "s-9",
+        "entries": [
+          {
+            "id": "e-9",
+            "seq": 9,
+            "role": "tool",
+            "kind": "diagram",
+            "text": "?",
+            "ts_ms": 1700000009000
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.entries",
+        "session_id": "s-9",
+        "entries": [
+          {
+            "id": "e-9",
+            "seq": 9,
+            "role": "tool",
+            "kind": "diagram",
+            "text": "?",
+            "ts_ms": 1700000009000
+          }
+        ]
       }
     }
   ],

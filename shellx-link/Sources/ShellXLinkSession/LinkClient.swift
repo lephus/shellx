@@ -14,11 +14,16 @@ public enum LinkClientError: Error, Equatable, Sendable {
     case timedOut
     /// The host answered one specific call with an `error` (PROTOCOL.md section 7).
     case remote(code: String, message: String)
+    /// The host answered a call with a message of another type than the call expects. A fault of the
+    /// host's, not an `error` it sent: callers that branch on `.remote` codes never see it.
+    case unexpectedAnswer
 }
 
 /// The phone side of ShellX Link: one established session with one host.
 public actor LinkClient {
     private typealias Change = (revision: Int, added: [PendingItem], resolved: [String])
+    private typealias SessionChange = (revision: Int, upserted: [AgentSession], removed: [String])
+    private typealias ChatPush = (sessionId: String, entries: [ChatEntry])
 
     /// Every `agent.changed` from the host, in order. Single consumer. It finishes when the
     /// session ends.
@@ -29,7 +34,18 @@ public actor LinkClient {
     /// `snapshot()` (PROTOCOL.md section 4).
     public nonisolated let changes: AsyncStream<(revision: Int, added: [PendingItem], resolved: [String])>
 
+    /// Every `agent.sessions.changed` from the host, in order. Single consumer. It finishes when the
+    /// session ends. The caller applies the revision rule of PROTOCOL.md section 4 against the
+    /// revision of its last `sessions()` result or applied change, exactly as for `changes`.
+    public nonisolated let sessionChanges: AsyncStream<(revision: Int, upserted: [AgentSession], removed: [String])>
+
+    /// Every `chat.entries` push from the host, in order. Single consumer. It finishes when the
+    /// session ends. Entries are upserts by `ChatEntry.id`.
+    public nonisolated let chatEntries: AsyncStream<(sessionId: String, entries: [ChatEntry])>
+
     private let changesContinuation: AsyncStream<Change>.Continuation
+    private let sessionChangesContinuation: AsyncStream<SessionChange>.Continuation
+    private let chatEntriesContinuation: AsyncStream<ChatPush>.Continuation
     private let channel: SecureChannel
     private let pinger: Task<Void, Never>
     private let watchdog: Task<Void, Never>
@@ -63,6 +79,12 @@ public actor LinkClient {
         let (stream, continuation) = AsyncStream.makeStream(of: Change.self)
         changes = stream
         changesContinuation = continuation
+        let (sessionStream, sessionContinuation) = AsyncStream.makeStream(of: SessionChange.self)
+        sessionChanges = sessionStream
+        sessionChangesContinuation = sessionContinuation
+        let (chatStream, chatContinuation) = AsyncStream.makeStream(of: ChatPush.self)
+        chatEntries = chatStream
+        chatEntriesContinuation = chatContinuation
         self.channel = channel
         self.watchdog = watchdog
         pinger = Task { await runPings(on: channel, every: pingInterval) }
@@ -72,6 +94,8 @@ public actor LinkClient {
         pinger.cancel()
         watchdog.cancel()
         changesContinuation.finish()
+        sessionChangesContinuation.finish()
+        chatEntriesContinuation.finish()
         let channel = self.channel
         Task { await channel.close() }
     }
@@ -121,7 +145,7 @@ public actor LinkClient {
     /// ends first.
     public func snapshot() async throws -> (revision: Int, pending: [PendingItem]) {
         let answer = try await call { .snapshotGet(callId: $0) }
-        guard case let .snapshot(_, revision, pending) = answer else { throw Self.unexpectedAnswer }
+        guard case let .snapshot(_, revision, pending) = answer else { throw LinkClientError.unexpectedAnswer }
         return (revision, pending)
     }
 
@@ -134,7 +158,50 @@ public actor LinkClient {
     /// the session ends first.
     public func reply(requestId: String, decision: LinkDecision) async throws -> ReplyOutcome {
         let answer = try await call { .reply(callId: $0, requestId: requestId, decision: decision) }
-        guard case let .replyResult(_, _, outcome) = answer else { throw Self.unexpectedAnswer }
+        guard case let .replyResult(_, _, outcome) = answer else { throw LinkClientError.unexpectedAnswer }
+        return outcome
+    }
+
+    /// Asks the host for the full list of agent sessions.
+    ///
+    /// Throws `.remote(code: "unsupported", ...)` when the host has no session list,
+    /// `.remote(code: "too_large", ...)` when it could not fit the list in one frame (PROTOCOL.md
+    /// section 6), `.timedOut` after the request timeout, and `.sessionClosed` when the session ends first.
+    public func sessions() async throws -> (revision: Int, sessions: [AgentSession]) {
+        let answer = try await call { .sessionsGet(callId: $0) }
+        guard case let .sessions(_, revision, sessions) = answer else { throw LinkClientError.unexpectedAnswer }
+        return (revision, sessions)
+    }
+
+    /// A page of a session's transcript, oldest entry first: the newest `limit` (1 to 50) entries with
+    /// `seq` below `beforeSeq`, or the newest entries when it is nil. `hasMore` tells whether older
+    /// entries exist; the host sets it also when it dropped entries to fit the frame.
+    ///
+    /// Throws `.remote(code: "not_found", ...)` for an unknown session, `"unsupported"` when the
+    /// host has no chat, and `"bad_request"` for a `limit` out of range.
+    public func chatHistory(
+        sessionId: String, beforeSeq: Int?, limit: Int
+    ) async throws -> (entries: [ChatEntry], hasMore: Bool) {
+        let answer = try await call {
+            .chatHistoryGet(callId: $0, sessionId: sessionId, beforeSeq: beforeSeq, limit: limit)
+        }
+        guard case let .chatHistory(_, _, entries, hasMore) = answer else { throw LinkClientError.unexpectedAnswer }
+        return (entries, hasMore)
+    }
+
+    /// Types `text` (1 to 16 384 UTF-8 bytes) into a session. Not safe to repeat: a timeout leaves it
+    /// unknown whether the host delivered it. Errors as for `chatHistory`, except `"not_found"` comes
+    /// as the outcome `.notFound`.
+    public func chatSend(sessionId: String, text: String) async throws -> ChatSendOutcome {
+        let answer = try await call { .chatSend(callId: $0, sessionId: sessionId, text: text) }
+        guard case let .chatSendResult(_, outcome) = answer else { throw LinkClientError.unexpectedAnswer }
+        return outcome
+    }
+
+    /// Interrupts a session's current turn; `hard` asks for a stronger stop. Errors as for `chatSend`.
+    public func chatInterrupt(sessionId: String, hard: Bool) async throws -> ChatInterruptOutcome {
+        let answer = try await call { .chatInterrupt(callId: $0, sessionId: sessionId, hard: hard) }
+        guard case let .chatInterruptResult(_, outcome) = answer else { throw LinkClientError.unexpectedAnswer }
         return outcome
     }
 
@@ -206,9 +273,14 @@ public actor LinkClient {
             return false
         }
         switch message {
-        case let .snapshot(callId, _, _), let .replyResult(callId, _, _):
+        case let .snapshot(callId, _, _), let .replyResult(callId, _, _), let .sessions(callId, _, _),
+             let .chatHistory(callId, _, _, _), let .chatSendResult(callId, _), let .chatInterruptResult(callId, _):
             // A late answer (its call timed out or was cancelled) finds no waiter and is dropped.
             waiters.removeValue(forKey: callId)?.resume(returning: message)
+        case let .sessionsChanged(revision, upserted, removed):
+            sessionChangesContinuation.yield((revision, upserted, removed))
+        case let .chatEntries(sessionId, entries):
+            chatEntriesContinuation.yield((sessionId, entries))
         case let .changed(revision, added, resolved):
             changesContinuation.yield((revision, added, resolved))
         case let .ping(nonce):
@@ -223,7 +295,8 @@ public actor LinkClient {
                 return true
             }
             linkLog.info("host reported error \(code, privacy: .public)")
-        case .pong, .unknown, .hello, .welcome, .snapshotGet, .reply:
+        case .pong, .unknown, .hello, .welcome, .snapshotGet, .reply, .sessionsGet, .chatHistoryGet, .chatSend,
+             .chatInterrupt:
             break
         }
         return true
@@ -236,6 +309,8 @@ public actor LinkClient {
         waiters = [:]
         for waiter in pending.values { waiter.resume(throwing: error) }
         changesContinuation.finish()
+        sessionChangesContinuation.finish()
+        chatEntriesContinuation.finish()
         pinger.cancel()
         watchdog.cancel()
         await channel.close()
@@ -244,10 +319,6 @@ public actor LinkClient {
     private func checkOpen() throws {
         if let endError { throw endError }
         try Task.checkCancellation()
-    }
-
-    private static var unexpectedAnswer: LinkClientError {
-        .remote(code: "unexpected_answer", message: "the host answered with another message type")
     }
 
     /// Sends the message `make` builds for a fresh `call_id` and waits for the one answer that carries

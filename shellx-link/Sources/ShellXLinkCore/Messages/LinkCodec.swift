@@ -20,6 +20,11 @@ public enum LinkCodec {
         static let snapshotGet = "agent.snapshot.get", snapshot = "agent.snapshot", changed = "agent.changed"
         static let reply = "agent.reply", replyResult = "agent.reply.result"
         static let ping = "ping", pong = "pong"
+        static let sessionsGet = "agent.sessions.get", sessions = "agent.sessions"
+        static let sessionsChanged = "agent.sessions.changed"
+        static let chatHistoryGet = "chat.history.get", chatHistory = "chat.history", chatEntries = "chat.entries"
+        static let chatSend = "chat.send", chatSendResult = "chat.send.result"
+        static let chatInterrupt = "chat.interrupt", chatInterruptResult = "chat.interrupt.result"
     }
 
     // Per-message bodies (keys are snake_case on the wire).
@@ -33,6 +38,15 @@ public enum LinkCodec {
     private struct Reply: Codable { var callId: String; var requestId: String; var decision: LinkDecision }
     private struct ReplyResult: Codable { var callId: String; var requestId: String; var outcome: ReplyOutcome }
     private struct Nonce: Codable { var nonce: UInt64 }
+    private struct Sessions: Codable { var callId: String; var revision: Int; var sessions: [AgentSession] }
+    private struct SessionsChanged: Codable { var revision: Int; var upserted: [AgentSession]; var removed: [String] }
+    private struct HistoryGet: Codable { var callId: String; var sessionId: String; var beforeSeq: Int?; var limit: Int }
+    private struct History: Codable { var callId: String; var sessionId: String; var entries: [ChatEntry]; var hasMore: Bool }
+    private struct Entries: Codable { var sessionId: String; var entries: [ChatEntry] }
+    private struct Send: Codable { var callId: String; var sessionId: String; var text: String }
+    private struct SendResult: Codable { var callId: String; var outcome: ChatSendOutcome }
+    private struct Interrupt: Codable { var callId: String; var sessionId: String; var hard: Bool }
+    private struct InterruptResult: Codable { var callId: String; var outcome: ChatInterruptOutcome }
 
     private struct Envelope { var v: Int; var t: String }
 
@@ -93,6 +107,33 @@ public enum LinkCodec {
                 data = try enc(T.replyResult, ReplyResult(callId: callId, requestId: id, outcome: o))
             case let .ping(n): data = try enc(T.ping, Nonce(nonce: n))
             case let .pong(n): data = try enc(T.pong, Nonce(nonce: n))
+            case let .sessionsGet(callId):
+                try requireValid(callId)
+                data = try enc(T.sessionsGet, CallOnly(callId: callId))
+            case let .sessions(callId, r, s):
+                try requireValid(callId)
+                data = try enc(T.sessions, Sessions(callId: callId, revision: r, sessions: s))
+            case let .sessionsChanged(r, up, rem):
+                data = try enc(T.sessionsChanged, SessionsChanged(revision: r, upserted: up, removed: rem))
+            case let .chatHistoryGet(callId, sid, before, limit):
+                try requireValid(callId)
+                data = try enc(T.chatHistoryGet, HistoryGet(callId: callId, sessionId: sid, beforeSeq: before, limit: limit))
+            case let .chatHistory(callId, sid, entries, more):
+                try requireValid(callId)
+                data = try enc(T.chatHistory, History(callId: callId, sessionId: sid, entries: entries, hasMore: more))
+            case let .chatEntries(sid, entries): data = try enc(T.chatEntries, Entries(sessionId: sid, entries: entries))
+            case let .chatSend(callId, sid, text):
+                try requireValid(callId)
+                data = try enc(T.chatSend, Send(callId: callId, sessionId: sid, text: text))
+            case let .chatSendResult(callId, outcome):
+                try requireValid(callId)
+                data = try enc(T.chatSendResult, SendResult(callId: callId, outcome: outcome))
+            case let .chatInterrupt(callId, sid, hard):
+                try requireValid(callId)
+                data = try enc(T.chatInterrupt, Interrupt(callId: callId, sessionId: sid, hard: hard))
+            case let .chatInterruptResult(callId, outcome):
+                try requireValid(callId)
+                data = try enc(T.chatInterruptResult, InterruptResult(callId: callId, outcome: outcome))
             case .unknown: throw LinkCodecError.cannotEncodeUnknown
             }
         } catch let e as LinkCodecError {
@@ -144,6 +185,34 @@ public enum LinkCodec {
             return .replyResult(callId: b.callId, requestId: b.requestId, outcome: b.outcome)
         case T.ping: return .ping(nonce: try body(Nonce.self).nonce)
         case T.pong: return .pong(nonce: try body(Nonce.self).nonce)
+        case T.sessionsGet: return .sessionsGet(callId: try call(CallOnly.self, \.callId).callId)
+        case T.sessions:
+            let b = try call(Sessions.self, \.callId)
+            return .sessions(callId: b.callId, revision: b.revision, sessions: b.sessions)
+        case T.sessionsChanged:
+            let b = try body(SessionsChanged.self)
+            return .sessionsChanged(revision: b.revision, upserted: b.upserted, removed: b.removed)
+        case T.chatHistoryGet:
+            let b = try call(HistoryGet.self, \.callId)
+            return .chatHistoryGet(callId: b.callId, sessionId: b.sessionId, beforeSeq: b.beforeSeq, limit: b.limit)
+        case T.chatHistory:
+            let b = try call(History.self, \.callId)
+            return .chatHistory(callId: b.callId, sessionId: b.sessionId, entries: b.entries, hasMore: b.hasMore)
+        case T.chatEntries:
+            let b = try body(Entries.self)
+            return .chatEntries(sessionId: b.sessionId, entries: b.entries)
+        case T.chatSend:
+            let b = try call(Send.self, \.callId)
+            return .chatSend(callId: b.callId, sessionId: b.sessionId, text: b.text)
+        case T.chatSendResult:
+            let b = try call(SendResult.self, \.callId)
+            return .chatSendResult(callId: b.callId, outcome: b.outcome)
+        case T.chatInterrupt:
+            let b = try call(Interrupt.self, \.callId)
+            return .chatInterrupt(callId: b.callId, sessionId: b.sessionId, hard: b.hard)
+        case T.chatInterruptResult:
+            let b = try call(InterruptResult.self, \.callId)
+            return .chatInterruptResult(callId: b.callId, outcome: b.outcome)
         default: return .unknown(type: env.t)
         }
     }

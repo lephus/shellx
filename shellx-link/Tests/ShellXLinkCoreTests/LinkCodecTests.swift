@@ -217,6 +217,33 @@ final class LinkCodecTests: XCTestCase {
         XCTAssertTrue(odd.hasPrefix(u))
     }
 
+    func testChatEntryTextTruncated() throws {
+        // 2 MB of multi-byte text: the cut lands on a scalar boundary and says so.
+        let big = String(repeating: "\u{1F600}x\u{00E9}", count: 2_000_000 / 7)
+        XCTAssertGreaterThan(big.utf8.count, 1_900_000)
+        let cut = ChatEntry.cut(big)
+        XCTAssertTrue(cut.truncated)
+        XCTAssertLessThanOrEqual(cut.text.utf8.count, ChatEntry.maxTextBytes)
+        XCTAssertGreaterThan(cut.text.utf8.count, ChatEntry.maxTextBytes - 4)
+        XCTAssertNotNil(String(data: Data(cut.text.utf8), encoding: .utf8))
+        XCTAssertTrue(big.hasPrefix(cut.text))
+
+        let short = ChatEntry.cut("hello")
+        XCTAssertEqual(short.text, "hello")
+        XCTAssertFalse(short.truncated)
+        let exact = String(repeating: "a", count: ChatEntry.maxTextBytes)
+        XCTAssertEqual(ChatEntry.cut(exact).text, exact)
+        XCTAssertFalse(ChatEntry.cut(exact).truncated)
+    }
+
+    func testChatMessagesNeedValidCallIds() throws {
+        let long = String(repeating: "c", count: 65)
+        XCTAssertThrowsError(try LinkCodec.encode(.chatSend(callId: long, sessionId: "s", text: "x")))
+        XCTAssertThrowsError(try LinkCodec.encode(.sessionsGet(callId: "")))
+        let json = Data(#"{"v":1,"t":"chat.history.get","session_id":"s","limit":5}"#.utf8)
+        XCTAssertThrowsError(try LinkCodec.decode(json)) { XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: nil)) }
+    }
+
     // MARK: - helpers
 
     static func item(preview: String) -> PendingItem {
@@ -273,6 +300,29 @@ final class LinkCodecTests: XCTestCase {
         }
     }
 
+    static func sessions(_ o: Any?) throws -> [AgentSession] {
+        try XCTUnwrap(o as? [[String: Any]]).map { d in
+            AgentSession(
+                sessionId: try XCTUnwrap(d["session_id"] as? String), agent: try XCTUnwrap(d["agent"] as? String),
+                workspaceId: try XCTUnwrap(d["workspace_id"] as? String),
+                workspaceTitle: try XCTUnwrap(d["workspace_title"] as? String), title: d["title"] as? String,
+                state: AgentState(wire: try XCTUnwrap(d["state"] as? String)),
+                stateSinceMs: (d["state_since_ms"] as? NSNumber)?.int64Value,
+                lastActivityMs: (d["last_activity_ms"] as? NSNumber)?.int64Value)
+        }
+    }
+
+    static func entries(_ o: Any?) throws -> [ChatEntry] {
+        try XCTUnwrap(o as? [[String: Any]]).map { d in
+            ChatEntry(
+                id: try XCTUnwrap(d["id"] as? String), seq: try XCTUnwrap((d["seq"] as? NSNumber)?.intValue),
+                role: ChatEntryRole(wire: try XCTUnwrap(d["role"] as? String)),
+                kind: ChatEntryKind(wire: try XCTUnwrap(d["kind"] as? String)),
+                text: try XCTUnwrap(d["text"] as? String), truncated: d["truncated"] as? Bool,
+                toolName: d["tool_name"] as? String, tsMs: try XCTUnwrap((d["ts_ms"] as? NSNumber)?.int64Value))
+        }
+    }
+
     static func message(from m: [String: Any], _ name: String) throws -> LinkMessage {
         func s(_ k: String) throws -> String { try XCTUnwrap(m[k] as? String, "\(name).\(k)") }
         func n(_ k: String) throws -> NSNumber { try XCTUnwrap(m[k] as? NSNumber, "\(name).\(k)") }
@@ -297,6 +347,29 @@ final class LinkCodecTests: XCTestCase {
         case "ping": return .ping(nonce: try n("nonce").uint64Value)
         case "pong": return .pong(nonce: try n("nonce").uint64Value)
         case "unknown": return .unknown(type: try s("type"))
+        case "sessions_get": return .sessionsGet(callId: try s("call_id"))
+        case "sessions":
+            return .sessions(callId: try s("call_id"), revision: try n("revision").intValue, sessions: try sessions(m["sessions"]))
+        case "sessions_changed":
+            return .sessionsChanged(
+                revision: try n("revision").intValue, upserted: try sessions(m["upserted"]),
+                removed: try XCTUnwrap(m["removed"] as? [String]))
+        case "chat_history_get":
+            return .chatHistoryGet(
+                callId: try s("call_id"), sessionId: try s("session_id"),
+                beforeSeq: (m["before_seq"] as? NSNumber)?.intValue, limit: try n("limit").intValue)
+        case "chat_history":
+            return .chatHistory(
+                callId: try s("call_id"), sessionId: try s("session_id"), entries: try entries(m["entries"]),
+                hasMore: try XCTUnwrap(m["has_more"] as? Bool))
+        case "chat_entries": return .chatEntries(sessionId: try s("session_id"), entries: try entries(m["entries"]))
+        case "chat_send": return .chatSend(callId: try s("call_id"), sessionId: try s("session_id"), text: try s("text"))
+        case "chat_send_result": return .chatSendResult(callId: try s("call_id"), outcome: ChatSendOutcome(wire: try s("outcome")))
+        case "chat_interrupt":
+            return .chatInterrupt(
+                callId: try s("call_id"), sessionId: try s("session_id"), hard: try XCTUnwrap(m["hard"] as? Bool))
+        case "chat_interrupt_result":
+            return .chatInterruptResult(callId: try s("call_id"), outcome: ChatInterruptOutcome(wire: try s("outcome")))
         default:
             XCTFail("unknown vector case in \(name)")
             throw LinkCodecError.badJSON(callId: nil)
