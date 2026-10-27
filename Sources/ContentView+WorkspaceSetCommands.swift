@@ -67,7 +67,7 @@ extension ContentView {
 
         let alert = NSAlert()
         alert.messageText = String(localized: "dialog.workspaceSet.save.title", defaultValue: "Save Workspaces as Set")
-        alert.informativeText = tabManager.sidebarSelectedWorkspaceIds.count >= 2
+        alert.informativeText = tabManager.workspaceSetSavesSelection
             ? String(localized: "dialog.workspaceSet.save.messageSelected", defaultValue: "The set saves the selected workspaces. Open it later to bring them all back.")
             : String(localized: "dialog.workspaceSet.save.messageAll", defaultValue: "The set saves every workspace in this window. Open it later to bring them all back.")
         alert.addButton(withTitle: String(localized: "dialog.workspaceSet.save.confirm", defaultValue: "Save"))
