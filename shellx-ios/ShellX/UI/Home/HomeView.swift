@@ -3,7 +3,8 @@ import SwiftUI
 
 /// The main screen, "ShellX" (plan decision D7), fed by the signed-in scope: the pinned cards from
 /// the decision center (its owner, `SignedInView`, keeps it synced with the hub), the agent rows
-/// and the conversation from the home model, and the composer that sends through it.
+/// and the conversation from the home model, and the composer that sends through it. An agent row
+/// or a "done" note opens that session's `AgentView`.
 struct HomeView: View {
     let scope: SignedInScope
     /// Pushes a screen over the home.
@@ -37,6 +38,10 @@ struct HomeView: View {
         )
         .sheet(item: $route) { route in
             PendingSheetHost(route: route, close: { self.route = nil })
+        }
+        // The agent rows and the "done" notes push a session's screen.
+        .navigationDestination(for: SessionRef.self) { ref in
+            AgentView(scope: scope, ref: ref, open: open)
         }
         .task {
             await home.load()

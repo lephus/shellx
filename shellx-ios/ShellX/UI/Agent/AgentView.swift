@@ -1,0 +1,121 @@
+import ShellXAppCore
+import SwiftUI
+
+/// One agent's screen, pushed from the home's agent rows and "done" notes: `AgentScreen` fed by the
+/// session's `AgentThreadModel` (its chat, sends and stops), the hub and the decision center (the
+/// pending cards of the session's workspace). The model follows the hub while the screen is shown
+/// and writes its chat copy when the screen goes or the app leaves the foreground.
+struct AgentView: View {
+    let scope: SignedInScope
+    /// Pushes a screen ("See all" opens every pending card).
+    let open: (HomeRoute) -> Void
+
+    @State private var model: AgentThreadModel
+    @State private var draft = ""
+    @State private var route: PendingRoute?
+    @State private var notice: AgentScreen.Notice?
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// How long a notice over the composer stays.
+    static let noticeDuration: Duration = .seconds(4)
+
+    init(scope: SignedInScope, ref: SessionRef, open: @escaping (HomeRoute) -> Void) {
+        self.scope = scope
+        self.open = open
+        _model = State(initialValue: scope.agentThread(ref))
+    }
+
+    var body: some View {
+        let hub = scope.hub
+        let center = scope.decisions
+        let model = self.model
+        let session = model.session
+        AgentScreen(
+            ref: session?.ref ?? model.ref,
+            place: "\(AgentLabel(agent: model.ref.agent).text) · \(session?.machineName ?? model.machineName)",
+            row: { model.session.map { AgentStatusRow(session: $0, now: Date()) } },
+            gone: model.sessionGone,
+            offline: model.offline,
+            pending: center.visibleItems(model.pendingHere),
+            pendingStatus: center.status,
+            showsMachineName: hub.machines.count > 1,
+            entries: model.thread.entries,
+            loading: model.loading,
+            canLoadOlder: model.canLoadOlder,
+            loadingOlder: model.loadingOlder,
+            olderOnlyOnMac: model.olderOnlyOnMac,
+            canStop: model.canStop,
+            notice: notice,
+            draft: $draft,
+            actions: AgentScreen.Actions(
+                send: send,
+                stop: { stop(hard: false) },
+                forceStop: { stop(hard: true) },
+                loadOlder: { Task { await model.loadOlder() } },
+                seeAllPending: { open(.pending) },
+                card: { PendingCardsSection.actions(for: $0, hub: hub, center: center, route: $route) })
+        )
+        .sheet(item: $route) { route in
+            PendingSheetHost(route: route, close: { self.route = nil })
+        }
+        .task { await model.run() }
+        .task(id: notice?.id) {
+            guard notice != nil else { return }
+            do { try await Task.sleep(for: Self.noticeDuration) } catch { return }
+            notice = nil
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { Task { await model.close() } }
+        }
+        .onDisappear { Task { await model.close() } }
+    }
+
+    private func send(_ text: String) {
+        let model = self.model
+        Task {
+            let result = await model.send(text, viaVoice: false)
+            // The Mac surely did not take it: give the text back, unless the user typed meanwhile.
+            if result.keepsDraft, draft.isEmpty { draft = text }
+            show(Self.text(for: result, ref: model.ref, machineName: model.machineName))
+        }
+    }
+
+    private func stop(hard: Bool) {
+        let model = self.model
+        Task {
+            let outcome = await model.stop(hard: hard)
+            show(StopButton.text(for: outcome, offline: model.offline, machineName: model.machineName))
+        }
+    }
+
+    private func show(_ text: String?) {
+        guard let text else { return }
+        notice = AgentScreen.Notice(text: text)
+        AccessibilityNotification.Announcement(text).post()
+    }
+
+    /// What the screen says after a send; nil for empty text (nothing happened).
+    static func text(for result: AgentSendResult, ref: SessionRef, machineName: String) -> String? {
+        let agent = AgentLabel(agent: ref.agent).text
+        switch result {
+        case .refused(.empty), .refused(.ok):
+            return nil
+        case let .refused(.tooLong(bytes)):
+            let used = ComposerValidation.byteCount(bytes)
+            let limit = ComposerValidation.byteCount(ComposerValidation.maxBytes)
+            return String(localized: "composer.tooLong \(used) \(limit)")
+        case .sent(.submitted):
+            return String(localized: "agent.sent")
+        case .sent(.busy):
+            return String(localized: "agent.busy")
+        case .sent(.notFound):
+            return String(localized: "agent.gone")
+        case .sent(.failed), .sent(.other):
+            return String(localized: "home.note.failed \(agent) \(ref.workspaceTitle)")
+        case .offline:
+            return String(localized: "home.note.offline \(machineName)")
+        case .noAnswer:
+            return String(localized: "home.note.noAnswer \(agent) \(ref.workspaceTitle)")
+        }
+    }
+}

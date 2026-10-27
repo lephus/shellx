@@ -2,9 +2,9 @@ import Foundation
 import ShellXAppCore
 import SwiftUI
 
-/// How a live session's state looks in the agent strip: the dot colour and the words next to it.
-/// The words always carry the state, so the colour is never the only cue. A state this app does
-/// not know shows neither (PROTOCOL.md: no state badge).
+/// How a session's state looks in the agent strip and the agent screen's header: the dot colour
+/// and the words next to it. The words always carry the state, so the colour is never the only
+/// cue. A state this app does not know shows neither (PROTOCOL.md: no state badge).
 struct AgentStateStyle: Equatable {
     let text: String?
     /// An asset catalog colour (darker in light mode, the soft tone in dark mode).
@@ -32,7 +32,8 @@ struct AgentStateStyle: Equatable {
             text = String(localized: "agent.state.done")
             colorName = "StatusDone"
         case .ended:
-            text = nil
+            // Only the agent screen shows an ended session; the home lists live ones.
+            text = String(localized: "agent.state.ended")
             colorName = "StatusIdle"
         case .other:
             text = nil

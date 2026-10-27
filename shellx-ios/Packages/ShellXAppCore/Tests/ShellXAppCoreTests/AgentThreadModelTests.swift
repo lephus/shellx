@@ -1,0 +1,445 @@
+import Foundation
+import ShellXAppTestSupport
+import ShellXLinkCore
+import XCTest
+
+@testable import ShellXAppCore
+
+/// One agent's detail screen: the chat copy shown from the phone at once, then the Mac's newest
+/// page, older pages on demand, live entries, sending, Stop and Force stop, and the pending items of
+/// the session's workspace.
+@MainActor
+final class AgentThreadModelTests: XCTestCase {
+    private func ref(_ mac: FakeMac, _ sessionId: String = "s1", workspace: String = "shellx") -> SessionRef {
+        SessionRef(machineID: mac.machine.machineID, sessionId: sessionId, agent: "claude", workspaceTitle: workspace)
+    }
+
+    /// A Mac with one working session `s1` whose transcript holds `history`.
+    private func mac(history: [ChatEntry], name: String = "MacBook Pro") async -> FakeMac {
+        let mac = FakeMac(name: name)
+        await mac.upsertSession(agentSession("s1"))
+        await mac.setHistory(sessionId: "s1", entries: history)
+        return mac
+    }
+
+    private func entries(_ seqs: ClosedRange<Int>, text: String? = nil, rev: Int = 1) -> [ChatEntry] {
+        seqs.map { seq in
+            ChatEntry(
+                id: "e-\(seq)", rev: rev, seq: seq, role: .agent, kind: .prose, text: "\(text ?? "entry") \(seq)",
+                tsMs: 1_700_000_000_000 + Int64(seq))
+        }
+    }
+
+    /// The model's waits (the 0.5 s save) wait on the returned sleeper.
+    private func model(_ ref: SessionRef, _ rig: HomeRig) -> (AgentThreadModel, ManualSleeper) {
+        let timers = ManualSleeper()
+        let model = AgentThreadModel(ref: ref, hub: rig.hub, store: rig.store, sleep: timers.sleep)
+        addTeardownBlock { @MainActor in await model.close() }
+        return (model, timers)
+    }
+
+    /// Runs `model.run()` until the test ends; returns once it follows the hub.
+    private func startRunning(_ model: AgentThreadModel) async -> Bool {
+        let task = Task { await model.run() }
+        addTeardownBlock { task.cancel() }
+        return await eventually { model.isObserving }
+    }
+
+    private func stored(_ ref: SessionRef, _ rig: HomeRig) async -> ChatThread? {
+        await rig.store.load(.thread(ref), as: ChatThread.self)
+    }
+
+    // MARK: - History
+
+    func testOpenShowsCacheThenLatest() async throws {
+        let mac = await mac(history: entries(1...30, rev: 2))
+        let s1 = ref(mac)
+        let cached = ChatThread(entries: entries(1...5, text: "cached"), hasMore: false)
+        let rig = try await HomeRig.make(
+            [mac], in: self, seed: { await $0.writer().save(cached, to: .thread(s1)) }, loads: false)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let (model, timers) = model(s1, rig)
+        XCTAssertEqual(model.thread, ChatThread(), "nothing before open()")
+
+        await mac.holdChat()
+        let opening = Task { await model.open() }
+        let showsCache = await eventually { model.thread == cached && model.loading }
+        XCTAssertTrue(showsCache, "the copy on the phone shows while the Mac's page is on its way")
+        let asked = await eventually { await mac.historyRequests.count == 1 }
+        XCTAssertTrue(asked)
+        await mac.releaseChat()
+        await opening.value
+
+        XCTAssertFalse(model.loading)
+        XCTAssertEqual(model.thread.entries.map(\.seq), Array(1...30))
+        XCTAssertEqual(model.thread.entries.map(\.rev), Array(repeating: 2, count: 30), "the Mac's newer revisions win")
+        XCTAssertFalse(model.thread.hasMore)
+        let requests = await mac.historyRequests
+        XCTAssertEqual(requests, [FakeMac.HistoryRequest(sessionId: "s1", beforeSeq: nil, limit: 50)])
+
+        // The new copy is written at most `saveDelay` after the change.
+        let waiting = await eventually { timers.waiting.contains(AgentThreadModel.saveDelay) }
+        XCTAssertTrue(waiting)
+        XCTAssertEqual(AgentThreadModel.saveDelay, .milliseconds(500))
+        let before = await stored(s1, rig)
+        XCTAssertEqual(before, cached)
+        timers.release { $0 == AgentThreadModel.saveDelay }
+        let saved = await eventually { await self.stored(s1, rig) == model.thread }
+        XCTAssertTrue(saved)
+
+        // Opening again does not ask twice.
+        await model.open()
+        let after = await mac.historyRequests
+        XCTAssertEqual(after.count, 1)
+    }
+
+    func testLoadOlderUsesSmallestSeq() async throws {
+        let mac = await mac(history: entries(1...120))
+        let s1 = ref(mac)
+        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let (model, _) = model(s1, rig)
+
+        await model.open()
+        XCTAssertEqual(model.thread.entries.map(\.seq), Array(71...120))
+        XCTAssertTrue(model.thread.hasMore)
+
+        await model.loadOlder()
+        XCTAssertEqual(model.thread.entries.map(\.seq), Array(21...120))
+        XCTAssertTrue(model.thread.hasMore)
+        await model.loadOlder()
+        XCTAssertEqual(model.thread.entries.map(\.seq), Array(1...120))
+        XCTAssertFalse(model.thread.hasMore)
+        XCTAssertFalse(model.loadingOlder)
+
+        // Nothing older: no call.
+        await model.loadOlder()
+        let requests = await mac.historyRequests
+        XCTAssertEqual(requests.map(\.beforeSeq), [nil, 71, 21])
+        XCTAssertEqual(requests.map(\.limit), [50, 50, 50])
+    }
+
+    func testLoadOlderStopsAtThePhonesCap() async throws {
+        let mac = await mac(history: entries(1...700))
+        let s1 = ref(mac)
+        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let (model, _) = model(s1, rig)
+        await model.open()
+        for _ in 0..<12 { await model.loadOlder() }
+
+        XCTAssertEqual(model.thread.entries.count, ChatThread.maxEntries)
+        XCTAssertEqual(model.thread.entries.last?.seq, 700, "the newest entries are the ones kept")
+        XCTAssertTrue(model.thread.hasMore)
+        XCTAssertTrue(model.olderOnlyOnMac)
+        let requests = await mac.historyRequests
+        XCTAssertEqual(requests.count, 10, "the newest page, then nine older pages up to the cap, then no more calls")
+    }
+
+    func testLiveEntriesAppendWhileOpen() async throws {
+        let mac = await mac(history: entries(1...3))
+        await mac.upsertSession(agentSession("s2", workspace: "web"))
+        await mac.setHistory(sessionId: "s2", entries: [])
+        let s1 = ref(mac)
+        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let online = await rig.online(sessions: 2)
+        XCTAssertTrue(online)
+        let (model, timers) = model(s1, rig)
+
+        let running = await startRunning(model)
+        XCTAssertTrue(running)
+        let opened = await eventually { model.thread.entries.map(\.seq) == [1, 2, 3] }
+        XCTAssertTrue(opened, "run() opens the screen's history")
+
+        await mac.pushChat(sessionId: "s1", entries: entries(4...4))
+        let appended = await eventually { model.thread.entries.map(\.seq) == [1, 2, 3, 4] }
+        XCTAssertTrue(appended)
+
+        // The entry grows in place (a higher rev); another session's entries never show here.
+        await mac.pushChat(
+            sessionId: "s2",
+            entries: [ChatEntry(id: "web-5", rev: 1, seq: 5, role: .agent, kind: .prose, text: "web", tsMs: 1)])
+        await mac.pushChat(sessionId: "s1", entries: entries(4...4, text: "grown", rev: 2) + entries(5...5))
+        let grown = await eventually { model.thread.entries.map(\.seq) == [1, 2, 3, 4, 5] }
+        XCTAssertTrue(grown)
+        XCTAssertEqual(model.thread.entries.first { $0.seq == 4 }?.text, "grown 4")
+        XCTAssertFalse(model.thread.entries.contains { $0.id == "web-5" })
+
+        // Saved once the changes settle; closing the screen writes what came after at once.
+        let waiting = await eventually { timers.waiting.contains(AgentThreadModel.saveDelay) }
+        XCTAssertTrue(waiting)
+        timers.release { $0 == AgentThreadModel.saveDelay }
+        let saved = await eventually { await self.stored(s1, rig)?.entries.count == 5 }
+        XCTAssertTrue(saved)
+        await mac.pushChat(sessionId: "s1", entries: entries(6...6))
+        let six = await eventually { model.thread.entries.count == 6 }
+        XCTAssertTrue(six)
+        await model.close()
+        let closed = await stored(s1, rig)
+        XCTAssertEqual(closed?.entries.map(\.seq), Array(1...6))
+    }
+
+    func testRunAgainCatchesUpOnWhatCameWhileCovered() async throws {
+        let mac = await mac(history: entries(1...3))
+        let s1 = ref(mac)
+        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let (model, _) = model(s1, rig)
+
+        // Shown, then covered by another screen: SwiftUI cancels the screen's task.
+        let first = Task { await model.run() }
+        let opened = await eventually { model.thread.entries.count == 3 }
+        XCTAssertTrue(opened)
+        first.cancel()
+        await first.value
+        XCTAssertFalse(model.isObserving)
+
+        // Meanwhile the agent writes two entries; they reach the phone before the screen is back.
+        var probe = rig.hub.chatUpdates().makeAsyncIterator()
+        await mac.pushChat(sessionId: "s1", entries: entries(4...5))
+        let arrived = await probe.next()
+        XCTAssertEqual(arrived?.1.map(\.seq), [4, 5])
+        XCTAssertEqual(model.thread.entries.count, 3, "nobody follows the hub for the covered screen")
+
+        // Shown again: the newest page brings them.
+        let running = await startRunning(model)
+        XCTAssertTrue(running)
+        let caughtUp = await eventually { model.thread.entries.map(\.seq) == [1, 2, 3, 4, 5] }
+        XCTAssertTrue(caughtUp)
+        let requests = await mac.historyRequests
+        XCTAssertEqual(requests.map(\.beforeSeq), [nil, nil])
+    }
+
+    func testEmptyFirstPageIsNoMessagesYetAndNotFoundIsGone() async throws {
+        // A new session whose transcript does not exist yet: the Mac answers an empty page.
+        let mac = await mac(history: [])
+        // A session the Mac lists but has no chat for: it answers `not_found`.
+        await mac.upsertSession(agentSession("s2", workspace: "web"))
+        let s2 = ref(mac, "s2", workspace: "web")
+        let cached = ChatThread(entries: entries(40...45), hasMore: true)
+        let rig = try await HomeRig.make(
+            [mac], in: self, seed: { await $0.writer().save(cached, to: .thread(s2)) }, loads: false)
+        let online = await rig.online(sessions: 2)
+        XCTAssertTrue(online)
+
+        let (fresh, _) = model(ref(mac), rig)
+        await fresh.open()
+        XCTAssertEqual(fresh.thread, ChatThread(), "no messages yet")
+        XCTAssertFalse(fresh.loading)
+        XCTAssertFalse(fresh.sessionGone)
+        // The agent writes its first entries: they arrive live.
+        let running = await startRunning(fresh)
+        XCTAssertTrue(running)
+        await mac.pushChat(sessionId: "s1", entries: entries(1...2))
+        let filled = await eventually { fresh.thread.entries.map(\.seq) == [1, 2] }
+        XCTAssertTrue(filled)
+
+        let (gone, _) = model(s2, rig)
+        await gone.open()
+        XCTAssertTrue(gone.sessionGone)
+        XCTAssertEqual(gone.thread, cached, "the copy on the phone still shows")
+        // Gone on the Mac: no paging back.
+        await gone.loadOlder()
+        let requests = await mac.historyRequests
+        XCTAssertEqual(requests.map(\.sessionId), ["s1", "s2"])
+    }
+
+    // MARK: - Send and stop
+
+    func testSendMapsOutcomes() async throws {
+        let mac = await mac(history: [])
+        let s1 = ref(mac)
+        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let (model, _) = model(s1, rig)
+
+        // Refused on the phone: nothing leaves it.
+        var result = await model.send(" \n ", viaVoice: false)
+        XCTAssertEqual(result, .refused(.empty))
+        let long = String(repeating: "a", count: ComposerValidation.maxBytes + 1)
+        result = await model.send(long, viaVoice: true)
+        XCTAssertEqual(result, .refused(.tooLong(bytes: 16_385)))
+        var sent = await mac.sentTexts
+        XCTAssertEqual(sent, [])
+
+        result = await model.send("  Chạy lại test giúp mình \n", viaVoice: false)
+        XCTAssertEqual(result, .sent(.submitted))
+        sent = await mac.sentTexts
+        XCTAssertEqual(sent, [FakeMac.SentText(sessionId: "s1", text: "Chạy lại test giúp mình")])
+
+        for outcome in [ChatSendOutcome.busy, .failed, .other("rate_limited")] {
+            await mac.setSendOutcome(outcome)
+            result = await model.send("Thử lại", viaVoice: false)
+            XCTAssertEqual(result, .sent(outcome))
+        }
+        XCTAssertFalse(model.sessionGone)
+        await mac.setSendOutcome(.notFound)
+        result = await model.send("Còn đó không?", viaVoice: false)
+        XCTAssertEqual(result, .sent(.notFound))
+        XCTAssertTrue(model.sessionGone, "the Mac said the session is gone")
+        await mac.setSendOutcome(nil)
+
+        // The link dies before the answer: it is unknown whether the text arrived.
+        await mac.holdChat()
+        let pending = Task { await model.send("Đang gửi", viaVoice: false) }
+        let asked = await eventually { await mac.sentTexts.count == 6 }
+        XCTAssertTrue(asked)
+        let drop = Task { await mac.dropLiveSessions() }
+        result = await pending.value
+        XCTAssertEqual(result, .noAnswer)
+        await mac.releaseChat()
+        await drop.value
+
+        // Offline: answered at once, nothing sent or queued.
+        let down = await eventually { model.offline }
+        XCTAssertTrue(down)
+        result = await model.send("Có ai không?", viaVoice: false)
+        XCTAssertEqual(result, .offline)
+        sent = await mac.sentTexts
+        XCTAssertEqual(sent.count, 6)
+
+        // Only a text the Mac surely did not take goes back into the composer.
+        XCTAssertEqual(
+            [AgentSendResult.offline, .refused(.tooLong(bytes: 16_385)), .sent(.busy), .sent(.failed),
+             .sent(.notFound), .sent(.other("x"))].map(\.keepsDraft),
+            [true, true, true, true, true, true])
+        XCTAssertEqual(
+            [AgentSendResult.sent(.submitted), .noAnswer, .refused(.empty)].map(\.keepsDraft), [false, false, false])
+    }
+
+    func testStopSoftAndHard() async throws {
+        let mac = await mac(history: [])
+        let s1 = ref(mac)
+        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let (model, _) = model(s1, rig)
+        XCTAssertTrue(model.canStop, "a working session can be stopped")
+        XCTAssertEqual(model.session?.session.state, .working)
+        XCTAssertEqual(model.session?.machineName, "MacBook Pro")
+
+        var outcome = await model.stop(hard: false)
+        XCTAssertEqual(outcome, .sent)
+        outcome = await model.stop(hard: true)
+        XCTAssertEqual(outcome, .sent)
+        var interrupts = await mac.interrupts
+        XCTAssertEqual(interrupts, [
+            FakeMac.Interrupt(sessionId: "s1", hard: false), FakeMac.Interrupt(sessionId: "s1", hard: true),
+        ])
+
+        await mac.setInterruptOutcome(.failed)
+        outcome = await model.stop(hard: false)
+        XCTAssertEqual(outcome, .failed)
+        XCTAssertFalse(model.sessionGone)
+
+        // Stop shows only while the session works or waits for the user.
+        await mac.upsertSession(agentSession("s1", state: .idle))
+        let idle = await eventually { !model.canStop }
+        XCTAssertTrue(idle)
+        await mac.upsertSession(agentSession("s1", state: .needsInput))
+        let needsYou = await eventually { model.canStop }
+        XCTAssertTrue(needsYou)
+
+        await mac.setInterruptOutcome(.notFound)
+        outcome = await model.stop(hard: true)
+        XCTAssertEqual(outcome, .notFound)
+        XCTAssertTrue(model.sessionGone)
+
+        // Offline: nothing is sent, there is no answer, and Stop goes away.
+        await mac.dropLiveSessions()
+        let down = await eventually { model.offline }
+        XCTAssertTrue(down)
+        XCTAssertFalse(model.canStop, "the state shown is only the last known one")
+        outcome = await model.stop(hard: false)
+        XCTAssertNil(outcome)
+        interrupts = await mac.interrupts
+        XCTAssertEqual(interrupts.count, 4)
+    }
+
+    // MARK: - Offline and pending
+
+    func testOfflineOpenShowsCacheAndOffline() async throws {
+        let mac = await mac(history: entries(1...3, text: "fresh", rev: 2))
+        let s1 = ref(mac)
+        let cached = ChatThread(entries: entries(1...2, text: "cached"), hasMore: false)
+        await mac.failNextConnects(URLError(.notConnectedToInternet), count: 1_000)
+        let rig = try await HomeRig.make(
+            [mac], in: self, seed: { await $0.writer().save(cached, to: .thread(s1)) }, loads: false)
+        let unreachable = await eventually {
+            if case .offline = rig.hub.machines.first?.state { return true }
+            return false
+        }
+        XCTAssertTrue(unreachable)
+        let (model, _) = model(s1, rig)
+
+        await model.open()
+
+        XCTAssertTrue(model.offline)
+        XCTAssertFalse(model.loading)
+        XCTAssertEqual(model.thread, cached)
+        XCTAssertFalse(model.sessionGone, "an offline Mac's silence says nothing about the session")
+        var requests = await mac.historyRequests
+        XCTAssertEqual(requests, [])
+
+        // The Mac comes back while the screen is open: its newest page loads.
+        let running = await startRunning(model)
+        XCTAssertTrue(running)
+        await mac.failNextConnects(URLError(.notConnectedToInternet), count: 0)
+        let retrying = await eventually { !rig.backoff.waiting.isEmpty }
+        XCTAssertTrue(retrying)
+        rig.backoff.release()
+        let fresh = await eventually { !model.offline && model.thread.entries.map(\.rev) == [2, 2, 2] }
+        XCTAssertTrue(fresh)
+        XCTAssertEqual(model.thread.entries.map(\.seq), [1, 2, 3])
+        requests = await mac.historyRequests
+        XCTAssertEqual(requests.map(\.beforeSeq), [nil])
+
+        // A drop and a return while open: the page is read again, for what was missed meanwhile.
+        await mac.dropLiveSessions()
+        let dropped = await eventually { model.offline }
+        XCTAssertTrue(dropped)
+        await mac.setHistory(sessionId: "s1", entries: entries(1...4, text: "fresh", rev: 2))
+        let again = await eventually { !rig.backoff.waiting.isEmpty }
+        XCTAssertTrue(again)
+        rig.backoff.release()
+        let caughtUp = await eventually { model.thread.entries.map(\.seq) == [1, 2, 3, 4] }
+        XCTAssertTrue(caughtUp)
+    }
+
+    func testPendingHereFiltersByWorkspace() async throws {
+        let first = FakeMac(name: "MacBook Pro")
+        await first.upsertSession(agentSession("s1", workspace: "shellx"))
+        await first.upsertSession(agentSession("s2", workspace: "web"))
+        await first.addPending(pendingItem("p1", createdAtMs: 1, workspace: "shellx"))
+        await first.addPending(pendingItem("p2", createdAtMs: 2, workspace: "web"))
+        await first.addPending(pendingItem("p3", createdAtMs: 3, workspace: "shellx"))
+        // Another Mac with a workspace of the same id.
+        let second = FakeMac(name: "Mac mini")
+        await second.upsertSession(agentSession("s1", workspace: "shellx"))
+        await second.addPending(pendingItem("p4", createdAtMs: 0, workspace: "shellx"))
+        let rig = try await HomeRig.make([first, second], in: self, loads: false)
+        let synced = await eventually {
+            rig.hub.machines.allSatisfy { $0.state == .online } && rig.hub.liveSessions.count == 3
+                && rig.hub.pendingItems.count == 4
+        }
+        XCTAssertTrue(synced)
+
+        let (shellx, _) = model(ref(first, "s1"), rig)
+        let (web, _) = model(ref(first, "s2", workspace: "web"), rig)
+        let (other, _) = model(ref(second, "s1"), rig)
+
+        XCTAssertEqual(shellx.pendingHere.map(\.item.requestId), ["p1", "p3"])
+        XCTAssertEqual(web.pendingHere.map(\.item.requestId), ["p2"])
+        XCTAssertEqual(other.pendingHere.map(\.item.requestId), ["p4"])
+
+        // Handled on the Mac: gone here too.
+        await first.resolvePending("p1")
+        let resolved = await eventually { shellx.pendingHere.map(\.item.requestId) == ["p3"] }
+        XCTAssertTrue(resolved)
+    }
+}

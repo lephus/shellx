@@ -31,6 +31,18 @@ public actor FakeMac {
         }
     }
 
+    public struct HistoryRequest: Equatable, Sendable {
+        public var sessionId: String
+        public var beforeSeq: Int?
+        public var limit: Int
+
+        public init(sessionId: String, beforeSeq: Int?, limit: Int) {
+            self.sessionId = sessionId
+            self.beforeSeq = beforeSeq
+            self.limit = limit
+        }
+    }
+
     public struct Interrupt: Equatable, Sendable {
         public var sessionId: String
         public var hard: Bool
@@ -176,6 +188,12 @@ public actor FakeMac {
     /// nil goes back to `sent` for a known session and `not_found` otherwise.
     public func setInterruptOutcome(_ outcome: ChatInterruptOutcome?) { chat.setInterruptOutcome(outcome) }
     public var interrupts: [Interrupt] { chat.interrupts }
+    /// Every `chat.history.get` the Mac received, in order.
+    public var historyRequests: [HistoryRequest] { chat.historyRequests }
+    /// From now on chat calls (history, send, interrupt) are recorded but not answered until
+    /// `releaseChat()`, as when the Mac is slow.
+    public func holdChat() { chat.hold() }
+    public func releaseChat() { chat.release() }
 }
 
 /// The phone keys a `FakeMac` trusts; read by `LinkHost` on every handshake, from any thread.

@@ -15,9 +15,38 @@ final class FakeMacChat: AgentChatSource, @unchecked Sendable {
     private var interruptOutcome: ChatInterruptOutcome?
     private var sends: [FakeMac.SentText] = []
     private var interruptCalls: [FakeMac.Interrupt] = []
+    private var historyCalls: [FakeMac.HistoryRequest] = []
+    private var holding = false
+    private var held: [CheckedContinuation<Void, Never>] = []
 
     var sentTexts: [FakeMac.SentText] { lock.withLock { sends } }
     var interrupts: [FakeMac.Interrupt] { lock.withLock { interruptCalls } }
+    var historyRequests: [FakeMac.HistoryRequest] { lock.withLock { historyCalls } }
+
+    /// Chat calls are recorded, then wait for `release()`.
+    func hold() {
+        lock.withLock { holding = true }
+    }
+
+    func release() {
+        let waiting = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
+            holding = false
+            defer { held = [] }
+            return held
+        }
+        for continuation in waiting { continuation.resume() }
+    }
+
+    private func waitWhileHeld() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let pass = lock.withLock { () -> Bool in
+                guard holding else { return true }
+                held.append(continuation)
+                return false
+            }
+            if pass { continuation.resume() }
+        }
+    }
 
     func setHistory(sessionId: String, entries: [ChatEntry]) {
         lock.withLock { transcripts[sessionId] = Dictionary(entries.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last }) }
@@ -43,6 +72,10 @@ final class FakeMacChat: AgentChatSource, @unchecked Sendable {
 
     func history(sessionId: String, beforeSeq: Int?, limit: Int) async -> (entries: [ChatEntry], hasMore: Bool)? {
         lock.withLock {
+            historyCalls.append(FakeMac.HistoryRequest(sessionId: sessionId, beforeSeq: beforeSeq, limit: limit))
+        }
+        await waitWhileHeld()
+        return lock.withLock {
             guard let all = transcripts[sessionId]?.values.sorted(by: { $0.seq < $1.seq }) else { return nil }
             let older = all.filter { entry in beforeSeq.map { entry.seq < $0 } ?? true }
             return (Array(older.suffix(limit)), older.count > limit)
@@ -50,16 +83,18 @@ final class FakeMacChat: AgentChatSource, @unchecked Sendable {
     }
 
     func send(sessionId: String, text: String) async -> ChatSendOutcome {
-        lock.withLock {
-            sends.append(FakeMac.SentText(sessionId: sessionId, text: text))
+        lock.withLock { sends.append(FakeMac.SentText(sessionId: sessionId, text: text)) }
+        await waitWhileHeld()
+        return lock.withLock {
             if let sendOutcome { return sendOutcome }
             return transcripts[sessionId] == nil ? .notFound : .submitted
         }
     }
 
     func interrupt(sessionId: String, hard: Bool) async -> ChatInterruptOutcome {
-        lock.withLock {
-            interruptCalls.append(FakeMac.Interrupt(sessionId: sessionId, hard: hard))
+        lock.withLock { interruptCalls.append(FakeMac.Interrupt(sessionId: sessionId, hard: hard)) }
+        await waitWhileHeld()
+        return lock.withLock {
             if let interruptOutcome { return interruptOutcome }
             return transcripts[sessionId] == nil ? .notFound : .sent
         }

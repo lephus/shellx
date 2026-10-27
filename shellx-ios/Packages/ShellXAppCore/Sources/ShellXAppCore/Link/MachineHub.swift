@@ -37,6 +37,8 @@ public final class MachineHub {
     @ObservationIgnored private var chatSubscribers: [UUID: AsyncStream<(SessionRef, [ChatEntry])>.Continuation] = [:]
     @ObservationIgnored private var sessionSubscribers:
         [UUID: AsyncStream<(machineID: String, sessions: [AgentSession])>.Continuation] = [:]
+    @ObservationIgnored private var stateSubscribers:
+        [UUID: AsyncStream<(machineID: String, state: MachineLinkState)>.Continuation] = [:]
     @ObservationIgnored private var started = false
     @ObservationIgnored private var stopped = false
     /// The app is in the background (until `appDidBecomeActive()`).
@@ -133,8 +135,10 @@ public final class MachineHub {
         for connection in all { await connection.stop() }
         for continuation in chatSubscribers.values { continuation.finish() }
         for continuation in sessionSubscribers.values { continuation.finish() }
+        for continuation in stateSubscribers.values { continuation.finish() }
         chatSubscribers = [:]
         sessionSubscribers = [:]
+        stateSubscribers = [:]
         for model in machines { model.pendingActionable = false }
     }
 
@@ -340,6 +344,18 @@ public final class MachineHub {
         return stream
     }
 
+    /// Each Mac's link state whenever its connection reports one (`.online` once a new session is
+    /// synced, after every reconnect). Multicast like `chatUpdates()`.
+    public func stateUpdates() -> AsyncStream<(machineID: String, state: MachineLinkState)> {
+        let (stream, continuation) = AsyncStream.makeStream(of: (machineID: String, state: MachineLinkState).self)
+        let id = UUID()
+        stateSubscribers[id] = continuation
+        continuation.onTermination = { [weak self] _ in
+            Task { @MainActor in self?.stateSubscribers[id] = nil }
+        }
+        return stream
+    }
+
     var chatSubscriberCount: Int { chatSubscribers.count }
     var connectionCount: Int { connections.count }
     var sessionSubscriberCount: Int { sessionSubscribers.count }
@@ -375,6 +391,9 @@ public final class MachineHub {
         switch event {
         case let .state(state):
             model.state = state
+            for (id, continuation) in stateSubscribers {
+                if case .terminated = continuation.yield((model.id, state)) { stateSubscribers[id] = nil }
+            }
         case let .pending(set, actionable):
             model.pending = set
             model.pendingActionable = actionable

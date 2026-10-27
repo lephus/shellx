@@ -88,24 +88,6 @@ struct HomeScreen: View {
         }
     }
 
-    /// Makes its one subview, a vertical scroll view, as tall as its content up to `maxHeight`: the
-    /// height comes from the subview's ideal size (a scroll view's ideal height is its content's).
-    private struct ContentHeightUpTo: Layout {
-        let maxHeight: CGFloat
-
-        func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-            guard let subview = subviews.first else { return .zero }
-            let content = subview.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
-            return CGSize(width: proposal.width ?? content.width, height: min(content.height, maxHeight))
-        }
-
-        func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-            subviews.first?.place(
-                at: bounds.origin, anchor: .topLeading,
-                proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
-        }
-    }
-
     private var topPanel: some View {
         VStack(alignment: .leading, spacing: 4) {
             if !pending.isEmpty {
@@ -160,7 +142,16 @@ struct HomeScreen: View {
         case let .userSaid(text, target, viaVoice):
             UserMessageBubble(text: text, target: target, viaVoice: viaVoice)
         case let .note(note):
-            HomeNoteRow(note: note)
+            if case let .agentFinished(ref, _) = note {
+                // A "done" note opens its agent.
+                NavigationLink(value: ref) {
+                    HomeNoteRow(note: note, showsDisclosure: true)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(Text(LocalizedStringResource("agent.open.hint")))
+            } else {
+                HomeNoteRow(note: note)
+            }
         }
     }
 

@@ -68,7 +68,7 @@ enum AppComposition {
         return AppGraph(coordinator: coordinator, scopes: scopes, launch: launch)
     }
 
-    /// One sign-in's scope over `hub`; the home's history lives in `history`.
+    /// One sign-in's scope over `hub`; the home's and each agent's history live in `history`.
     static func makeScope(
         hub: MachineHub, history: ConversationStore, latency: LatencyLog, launch: LaunchMark, pairing: PairingModel
     ) -> SignedInScope {
@@ -76,7 +76,7 @@ enum AppComposition {
             hub: hub,
             decisions: DecisionCenter(sender: hub, latency: latency, sleep: { try await Task.sleep(for: $0) }),
             home: HomeModel(hub: hub, store: history, now: { Date() }),
-            pairing: pairing, launch: launch)
+            pairing: pairing, history: history, launch: launch)
     }
 }
 

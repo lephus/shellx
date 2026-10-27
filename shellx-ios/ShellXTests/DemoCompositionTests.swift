@@ -108,4 +108,33 @@ final class DemoCompositionTests: XCTestCase {
         XCTAssertEqual(reopened.entries, home.entries)
         XCTAssertEqual(secondHub.machines.map(\.id), firstHub.machines.map(\.id), "the fake Mac keeps its id")
     }
+
+    func testDemoAgentScreenShowsTheScriptedChatAndStops() async throws {
+        let graph = DemoComposition.make(
+            approvalDelay: .zero, pasteboard: makePasteboard(), runsScript: true, history: makeHistoryDirectory())
+        await graph.prepare()
+        await graph.coordinator.launch()
+        let hub = try XCTUnwrap(graph.coordinator.hub)
+        addTeardownBlock { @MainActor in await hub.stopAll() }
+        let scope = try XCTUnwrap(graph.scopes.scope(for: hub))
+        let listed = await eventually { hub.liveSessions.count == 2 }
+        XCTAssertTrue(listed, "\(hub.machines.map(\.state))")
+        let session = try XCTUnwrap(hub.liveSessions.first { $0.session.workspaceTitle == "shellx" })
+
+        // What tapping its row opens.
+        let model = scope.agentThread(session.ref)
+        addTeardownBlock { @MainActor in await model.close() }
+        await model.open()
+
+        let kinds = Set(model.thread.entries.map(\.kind.wire))
+        XCTAssertTrue(kinds.isSuperset(of: ["prose", "thought", "tool_use", "status"]), "\(kinds)")
+        XCTAssertTrue(model.thread.entries.contains { $0.truncated == true }, "one entry is cut")
+        XCTAssertEqual(model.thread.entries.first?.role, .user)
+        let sent = await model.send("Chạy lại test giúp mình", viaVoice: false)
+        XCTAssertEqual(sent, .sent(.submitted))
+        // The script leaves shellx working (its third step switched it back on).
+        XCTAssertTrue(model.canStop)
+        let stopped = await model.stop(hard: false)
+        XCTAssertEqual(stopped, .sent)
+    }
 }

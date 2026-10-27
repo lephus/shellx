@@ -5,6 +5,8 @@ import SwiftUI
 /// one fixed sentence with an icon whose colour follows the state colours.
 struct HomeNoteRow: View {
     let note: HomeNote
+    /// The note opens a screen (a "done" note opens its agent): a chevron at its end says so.
+    var showsDisclosure = false
 
     var body: some View {
         let text = Self.text(for: note)
@@ -15,6 +17,12 @@ struct HomeNoteRow: View {
             Text(verbatim: text)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            if showsDisclosure {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
