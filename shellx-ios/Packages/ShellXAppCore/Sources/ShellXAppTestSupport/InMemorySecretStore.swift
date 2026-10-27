@@ -1,6 +1,8 @@
 import Foundation
+import ShellXAppCore
 
-/// A `SecretStore` in memory, for tests and previews. Each operation can be made to fail.
+/// A `SecretStore` in memory, for tests, previews and the Debug demo. Each operation can be made to
+/// fail.
 public final class InMemorySecretStore: SecretStore, @unchecked Sendable {
     private let lock = NSLock()
     private var items: [SecretItem: Data] = [:]

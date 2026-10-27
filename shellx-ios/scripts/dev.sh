@@ -10,9 +10,14 @@
 #       Debug build signed automatically for team W4RF3W4VTZ, installed and opened with devicectl.
 #       Device id: --device-id, then $SHELLX_IPHONE_DEVICE_ID, then ~/.config/shellx/iphone-device-id.
 #       --build-only stops after the build (no device needed).
-#   dev.sh test [core|app|all] [--runtime <ver>]
-#       core: swift test for Packages/ShellXAppCore; app: the ShellXTests bundle on "ShellX Dev".
-#       Both also run scripts/shellx/check-ios-license.sh and scripts/check-strings.py.
+#   dev.sh build-release
+#       Release build for a generic iPhone without signing (no Apple account), then
+#       release/mobile/ios.sh --check-app --unsigned: bundle id, version, no embedded framework and
+#       no Debug-only code (the demo, FakeMac, InMemorySecretStore...).
+#   dev.sh test [core|app|release|all] [--runtime <ver>]
+#       core: swift test for Packages/ShellXAppCore; app: the ShellXTests bundle on "ShellX Dev";
+#       release: build-release; all: the three. Each also runs scripts/shellx/check-ios-license.sh
+#       and scripts/check-strings.py.
 #   dev.sh screenshots <dir> [--runtime <ver>]
 #       Runs every *RenderTests class twice (-testLanguage en, then vi), writing PNGs into <dir>.
 #   dev.sh clean
@@ -36,8 +41,13 @@ die() { echo "dev.sh: $*" >&2; exit 1; }
 note() { echo "==> $*" >&2; }
 
 usage() {
-  awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "${BASH_SOURCE[0]}"
-  exit "${1:-0}"
+  local status="${1:-0}"
+  if [ "$status" -eq 0 ]; then
+    awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "${BASH_SOURCE[0]}"
+  else
+    awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "${BASH_SOURCE[0]}" >&2
+  fi
+  exit "$status"
 }
 
 # Prints "<runtime identifier> <version> <newest|older>" for the newest installed iOS runtime, or
@@ -232,11 +242,32 @@ cmd_device() {
   "${launch[@]}" "$DEBUG_BUNDLE_ID"
 }
 
+cmd_build_release() {
+  [ $# -eq 0 ] || die "build-release takes no options"
+  mkdir -p "$DERIVED/logs"
+  local log="$DERIVED/logs/build-release-$(date +%Y%m%d-%H%M%S).log" status=0
+  note "building Release for iPhone, unsigned"
+  xcodebuild build \
+    -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
+    -destination "generic/platform=iOS" \
+    -derivedDataPath "$DERIVED" \
+    CODE_SIGNING_ALLOWED=NO >"$log" 2>&1 || status=1
+  grep -E "error:|warning:|\*\* BUILD (SUCCEEDED|FAILED) \*\*" "$log" | grep -v "Metadata extraction skipped" || true
+  if [ "$status" -ne 0 ]; then
+    note "full xcodebuild log: $log"
+    return 1
+  fi
+  local app="$DERIVED/Build/Products/Release-iphoneos/ShellX.app"
+  [ -d "$app" ] || die "build produced no $app"
+  note "App Store checks that need no signature"
+  "$REPO_ROOT/release/mobile/ios.sh" --check-app --unsigned "$app"
+}
+
 cmd_test() {
   local which="all" runtime=""
   while [ $# -gt 0 ]; do
     case "$1" in
-      core|app|all) which="$1" ;;
+      core|app|release|all) which="$1" ;;
       --runtime) [ $# -ge 2 ] || die "--runtime needs a version"; runtime="$2"; shift ;;
       *) die "test: unknown option $1" ;;
     esac
@@ -253,6 +284,9 @@ cmd_test() {
     udid="$(ensure_sim "$runtime")"
     note "ShellXTests on simulator $udid"
     xcodebuild_test "$udid" || status=1
+  fi
+  if [ "$which" = "release" ] || [ "$which" = "all" ]; then
+    cmd_build_release || status=1
   fi
   if [ "$status" -ne 0 ]; then note "test $which: FAILED"; else note "test $which: passed"; fi
   return $status
@@ -306,6 +340,7 @@ shift
 case "$command" in
   sim) cmd_sim "$@" ;;
   device) cmd_device "$@" ;;
+  build-release) cmd_build_release "$@" ;;
   test) cmd_test "$@" ;;
   screenshots) cmd_screenshots "$@" ;;
   clean) cmd_clean "$@" ;;
