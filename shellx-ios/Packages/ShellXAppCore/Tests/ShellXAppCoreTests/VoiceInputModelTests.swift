@@ -369,6 +369,55 @@ final class VoiceInputModelTests: XCTestCase {
         XCTAssertEqual(text, "Tạo PR.")
     }
 
+    func testStartReleasedWhileStartingNeverTakesTheMic() async {
+        let rig = makeRig()
+        rig.transcriber.holdStarts()
+        let press = Task { await rig.model.press() }
+        let held = await eventually { rig.transcriber.startsWaiting == 1 }
+        XCTAssertTrue(held)
+        let run = rig.transcriber.starts[0].run
+        let none = await rig.model.release()
+        XCTAssertNil(none)
+        XCTAssertEqual(rig.transcriber.cancelledRuns, [run], "the release cancels the run while it still starts")
+
+        rig.transcriber.releaseStarts()
+        await press.value
+        XCTAssertFalse(rig.transcriber.grantedRuns.contains(run), "it never took the microphone, not even briefly")
+        XCTAssertNil(rig.transcriber.activeRun)
+        XCTAssertEqual(rig.model.phase, .idle)
+    }
+
+    func testStaleStartFinishingSecondNeverTakesTheMic() async {
+        let rig = makeRig()
+        rig.transcriber.holdStarts()
+        // A quick tap, released while its start is held.
+        let tap = Task { await rig.model.press() }
+        let tapHeld = await eventually { rig.transcriber.startsWaiting == 1 }
+        XCTAssertTrue(tapHeld)
+        _ = await rig.model.release()
+        // A hold right after.
+        let hold = Task { await rig.model.press() }
+        let holdHeld = await eventually { rig.transcriber.startsWaiting == 2 }
+        XCTAssertTrue(holdHeld)
+        let runs = rig.transcriber.starts.map(\.run)
+
+        // The newer start finishes first, the stale one second.
+        rig.transcriber.releaseStart(of: runs[1])
+        await hold.value
+        XCTAssertEqual(rig.transcriber.activeRun, runs[1])
+        rig.transcriber.releaseStart(of: runs[0])
+        await tap.value
+
+        XCTAssertEqual(rig.transcriber.grantedRuns, [runs[1]], "the stale start never took the microphone")
+        XCTAssertEqual(rig.transcriber.activeRun, runs[1], "and never tore down the newer run")
+        XCTAssertTrue(rig.transcriber.isRunning)
+        rig.transcriber.say("tạo PR")
+        await waitForPhase(rig.model, .listening(text: "tạo PR"))
+        rig.transcriber.finalText = "Tạo PR."
+        let text = await rig.model.release()
+        XCTAssertEqual(text, "Tạo PR.")
+    }
+
     func testNoFirstWordSampleAfterAPermissionPrompt() async {
         let rig = makeRig()
         rig.permissions.promptPending = true

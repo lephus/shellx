@@ -1,11 +1,15 @@
 import Foundation
 import ShellXAppCore
 
-/// A `SpeechTranscribing` the test drives. `say(_:)` sends the words heard so far on the newest
-/// run; `fail(_:)` and `endStream()` end it by themselves (an error, a time limit); `finalText` is
-/// what `finish` returns (by default the last words said). Every run has its own stream: `finish`
-/// and `cancel` end only the run they name. Records each start, finish and cancel, and can hold
-/// starts until the test releases them.
+/// A `SpeechTranscribing` the test drives, following the real transcribers' rule through a
+/// `SpeechRunSlot`: one run holds the microphone; the newest start wins; a start that was overtaken,
+/// or whose run was cancelled while it started, never takes the microphone; a granted start tears
+/// down the run it replaces (its stream ends).
+///
+/// `say(_:)` sends the words heard so far on the run that holds the microphone; `fail(_:)` and
+/// `endStream()` end it by themselves (an error, a time limit); `finalText` is what `finish` returns
+/// (by default the last words said). Records each start, granted claim, finish and cancel, and can
+/// hold starts until the test releases them, all at once or one run at a time.
 public final class FakeTranscriber: SpeechTranscribing, @unchecked Sendable {
     /// One `start` call.
     public struct Start: Equatable, Sendable {
@@ -14,30 +18,40 @@ public final class FakeTranscriber: SpeechTranscribing, @unchecked Sendable {
         public var contextualStrings: [String]
     }
 
+    private let slot: SpeechRunSlot
     private let lock = NSLock()
     private var streams: [SpeechRunID: AsyncThrowingStream<String, any Error>.Continuation] = [:]
-    /// The newest run started (the one `say` speaks to).
-    private var newest: SpeechRunID?
     private var lastSaid = ""
     private var finalAnswer: String?
     private var storedStartError: (any Error)?
     private var startList: [Start] = []
+    private var grantList: [SpeechRunID] = []
     private var finishCount = 0
     private var cancelList: [SpeechRunID] = []
     private var holding = false
-    private var heldStarts: [CheckedContinuation<Void, Never>] = []
+    private var heldStarts: [(run: SpeechRunID, continuation: CheckedContinuation<Void, Never>)] = []
 
-    public init() {}
+    /// `slot` is shared with other transcribers of the same microphone (a fallback, for instance).
+    public init(slot: SpeechRunSlot = SpeechRunSlot()) {
+        self.slot = slot
+    }
 
     /// Every start, in order.
     public var starts: [Start] { lock.withLock { startList } }
+    /// The runs whose start took the microphone, in order.
+    public var grantedRuns: [SpeechRunID] { lock.withLock { grantList } }
     public var finishCalls: Int { lock.withLock { finishCount } }
     /// Every `cancel`, whatever run it named.
     public var cancelCalls: Int { lock.withLock { cancelList.count } }
     /// The runs `cancel` named, in order.
     public var cancelledRuns: [SpeechRunID] { lock.withLock { cancelList } }
-    /// The newest run's stream is open: started, and not finished, cancelled or ended.
-    public var isRunning: Bool { lock.withLock { newest.map { streams[$0] != nil } ?? false } }
+    /// The run that holds the microphone.
+    public var activeRun: SpeechRunID? { slot.active }
+    /// A run holds the microphone and its stream is open.
+    public var isRunning: Bool {
+        guard let active = slot.active else { return false }
+        return lock.withLock { streams[active] != nil }
+    }
     /// Starts held by `holdStarts()`.
     public var startsWaiting: Int { lock.withLock { heldStarts.count } }
 
@@ -47,51 +61,64 @@ public final class FakeTranscriber: SpeechTranscribing, @unchecked Sendable {
         set { lock.withLock { finalAnswer = newValue } }
     }
 
-    /// When set, `start` throws it.
+    /// When set, `start` throws it (before taking the microphone).
     public var startError: (any Error)? {
         get { lock.withLock { storedStartError } }
         set { lock.withLock { storedStartError = newValue } }
     }
 
-    /// Holds every later `start` (after it is recorded) until `releaseStarts()`.
+    /// Holds every later `start` (after it is recorded and has begun) until it is released.
     public func holdStarts() {
         lock.withLock { holding = true }
     }
 
+    /// Lets every held start through, oldest first, and stops holding.
     public func releaseStarts() {
         let held = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
             holding = false
             defer { heldStarts = [] }
-            return heldStarts
+            return heldStarts.map(\.continuation)
         }
         for start in held { start.resume() }
     }
 
-    /// Sends `text` as everything the newest run heard so far.
+    /// Lets the held start of `run` through; the others stay held.
+    public func releaseStart(of run: SpeechRunID) {
+        let held = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+            guard let index = heldStarts.firstIndex(where: { $0.run == run }) else { return nil }
+            return heldStarts.remove(at: index).continuation
+        }
+        held?.resume()
+    }
+
+    /// Sends `text` as everything the run holding the microphone heard so far.
     public func say(_ text: String) {
         let open = lock.withLock { () -> AsyncThrowingStream<String, any Error>.Continuation? in
-            guard let newest, let current = streams[newest] else { return nil }
+            guard let active = slot.active, let current = streams[active] else { return nil }
             lastSaid = text
             return current
         }
         open?.yield(text)
     }
 
-    /// Ends the newest run's stream with `error`, as a recognizer that fails does.
+    /// Ends the active run's stream with `error`, as a recognizer that fails does.
     public func fail(_ error: any Error) {
-        takeNewest()?.finish(throwing: error)
+        endActive()?.finish(throwing: error)
     }
 
-    /// Ends the newest run's stream without an error, as a recognizer that reaches its time limit does.
+    /// Ends the active run's stream without an error, as a recognizer that reaches its time limit does.
     public func endStream() {
-        takeNewest()?.finish()
+        endActive()?.finish()
     }
 
-    private func takeNewest() -> AsyncThrowingStream<String, any Error>.Continuation? {
-        lock.withLock {
-            guard let newest else { return nil }
-            return streams.removeValue(forKey: newest)
-        }
+    private func endActive() -> AsyncThrowingStream<String, any Error>.Continuation? {
+        guard let active = slot.active, slot.ended(active) else { return nil }
+        return lock.withLock { streams.removeValue(forKey: active) }
+    }
+
+    private func close(_ run: SpeechRunID) {
+        let continuation = lock.withLock { streams.removeValue(forKey: run) }
+        continuation?.finish()
     }
 
     // MARK: - SpeechTranscribing
@@ -99,16 +126,16 @@ public final class FakeTranscriber: SpeechTranscribing, @unchecked Sendable {
     public func start(run: SpeechRunID, locale: Locale, contextualStrings: [String]) async throws
         -> AsyncThrowingStream<String, any Error>
     {
+        slot.begin(run)
         let hold = lock.withLock { () -> Bool in
             startList.append(Start(run: run, locale: locale, contextualStrings: contextualStrings))
-            newest = run
             return holding
         }
         if hold {
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 let resumeNow = lock.withLock { () -> Bool in
                     guard holding else { return true }
-                    heldStarts.append(continuation)
+                    heldStarts.append((run, continuation))
                     return false
                 }
                 if resumeNow { continuation.resume() }
@@ -116,27 +143,36 @@ public final class FakeTranscriber: SpeechTranscribing, @unchecked Sendable {
         }
         if let error = startError { throw error }
         let (stream, continuation) = AsyncThrowingStream<String, any Error>.makeStream()
-        lock.withLock {
-            streams[run] = continuation
-            if newest == run { lastSaid = "" }
+        lock.withLock { streams[run] = continuation }
+        let handlers = SpeechRunSlot.Handlers(
+            finish: { [weak self] in
+                guard let self else { return "" }
+                let text = self.lock.withLock { self.finalAnswer ?? self.lastSaid }
+                self.close(run)
+                return text
+            },
+            teardown: { [weak self] in self?.close(run) })
+        switch slot.claim(run, handlers) {
+        case .refused:
+            // Overtaken or cancelled while starting: never takes the microphone.
+            close(run)
+        case let .granted(replaced):
+            lock.withLock {
+                grantList.append(run)
+                lastSaid = ""
+            }
+            await replaced?.teardown()
         }
         return stream
     }
 
     public func finish(run: SpeechRunID) async -> String {
-        let (continuation, text) = lock.withLock { () -> (AsyncThrowingStream<String, any Error>.Continuation?, String) in
-            finishCount += 1
-            return (streams.removeValue(forKey: run), finalAnswer ?? lastSaid)
-        }
-        continuation?.finish()
-        return text
+        lock.withLock { finishCount += 1 }
+        return await slot.takeForFinish(run)?.finish() ?? ""
     }
 
     public func cancel(run: SpeechRunID) async {
-        let continuation = lock.withLock { () -> AsyncThrowingStream<String, any Error>.Continuation? in
-            cancelList.append(run)
-            return streams.removeValue(forKey: run)
-        }
-        continuation?.finish()
+        lock.withLock { cancelList.append(run) }
+        await slot.cancel(run)?.teardown()
     }
 }
