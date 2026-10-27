@@ -50,6 +50,11 @@ public final class AgentThreadModel {
     /// The screen went away (`close()`) and is not shown again yet: late answers change the copy in
     /// memory only, nothing is saved or asked for.
     @ObservationIgnored private var closed = false
+    /// Counts the Mac's transcript resets (`chat.reset`): a history answer asked for under an older
+    /// count belongs to the old transcript and is dropped.
+    @ObservationIgnored private var transcript = 0
+    /// A reset came before `open()` took the writer: the stored copy is the old transcript's.
+    @ObservationIgnored private var storedCopyIsStale = false
 
     /// `sleep` waits out `saveDelay`; tests pass one they release by hand.
     public init(
@@ -191,14 +196,17 @@ public final class AgentThreadModel {
         loadingOlder = true
         olderFailed = false
         defer { loadingOlder = false }
+        let asked = transcript
         do {
             let page = try await hub.chatHistory(ref, beforeSeq: oldest, limit: Self.pageSize)
-            // The copy changed meanwhile (a newest page replaced it): this page may not join it.
-            guard thread.entries.first?.seq == oldest else { return }
+            // Asked before a transcript reset, or the copy changed meanwhile (a newest page replaced
+            // it): this page may not join it.
+            guard asked == transcript, thread.entries.first?.seq == oldest else { return }
             change { $0.applyOlderPage(page.entries, hasMore: page.hasMore) }
         } catch is CancellationError {
             return
         } catch {
+            guard asked == transcript else { return }
             if !noteNotFound(error) { olderFailed = true }
         }
     }
@@ -291,11 +299,19 @@ public final class AgentThreadModel {
     private func load() async {
         // This screen's writer claims the thread: a screen for the same session opened later wins.
         writer = await store.writer(claiming: .thread(ref))
-        if let cached = await store.load(.thread(ref), as: ChatThread.self) {
-            // Entries pushed live before the copy was read are newer than it.
-            var merged = cached
-            merged.upsert(thread.entries)
-            thread = merged
+        if storedCopyIsStale {
+            // A reset came before there was a writer: the stored copy is the old transcript's.
+            storedCopyIsStale = false
+            removeStoredCopy()
+        } else {
+            let asked = transcript
+            // A reset while reading: the copy read is the old transcript's (its removal is queued).
+            if let cached = await store.load(.thread(ref), as: ChatThread.self), asked == transcript {
+                // Entries pushed live before the copy was read are newer than it.
+                var merged = cached
+                merged.upsert(thread.entries)
+                thread = merged
+            }
         }
         cacheRead = true
         // Changes made before there was a writer were not saved yet.
@@ -313,8 +329,12 @@ public final class AgentThreadModel {
             latestInFlight -= 1
             loading = latestInFlight > 0
         }
+        let asked = transcript
         do {
             let page = try await hub.chatHistory(ref, beforeSeq: nil, limit: Self.pageSize)
+            // The answer to a call sent before a transcript reset is the old transcript's: drop it
+            // (PROTOCOL.md section 4, `chat.reset`).
+            guard asked == transcript else { return }
             latestLoaded = true
             latestFailed = false
             change { $0.applyLatestPage(page.entries, hasMore: page.hasMore) }
@@ -324,13 +344,55 @@ public final class AgentThreadModel {
             // The Mac went offline meanwhile: the page loads when it is back.
             return
         } catch {
+            guard asked == transcript else { return }
             if !noteNotFound(error) { latestFailed = true }
         }
     }
 
-    private func follow(_ updates: AsyncStream<(SessionRef, [ChatEntry])>) async {
-        for await (ref, entries) in updates where ref == self.ref {
-            change { $0.upsert(entries) }
+    private func follow(_ updates: AsyncStream<ChatUpdate>) async {
+        for await update in updates where update.ref == ref {
+            switch update {
+            case let .upsert(_, entries):
+                change { $0.upsert(entries) }
+            case .reset:
+                await transcriptReset()
+            }
+        }
+    }
+
+    /// The Mac replaced the session's transcript: every entry held for it, its `seq` values and any
+    /// history answer still on its way are void. Drops the copy in memory and on disk, then pages
+    /// again from the newest; entries pushed after the reset upsert as usual.
+    private func transcriptReset() async {
+        transcript += 1
+        thread = ChatThread()
+        latestLoaded = false
+        latestFailed = false
+        olderFailed = false
+        // The Mac is pushing about this session: it has it.
+        answeredNotFound = false
+        // At once, not after `saveDelay`: a relaunch must not show the old transcript.
+        removeStoredCopy()
+        // Before `open()` (or while it reads the copy), its own newest page comes after the reset.
+        guard cacheRead, !closed else { return }
+        await loadLatest()
+    }
+
+    /// Drops the stored copy through this screen's writer, after any write already under way; a
+    /// save still waiting is cancelled.
+    private func removeStoredCopy() {
+        pendingSave?.cancel()
+        pendingSave = nil
+        changed = false
+        guard let writer else {
+            storedCopyIsStale = true
+            return
+        }
+        let ref = self.ref
+        let previous = writing
+        writing = Task {
+            await previous?.value
+            await writer.remove(.thread(ref))
         }
     }
 

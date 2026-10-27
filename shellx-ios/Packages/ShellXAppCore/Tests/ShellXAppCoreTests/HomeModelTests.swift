@@ -150,6 +150,36 @@ final class HomeModelTests: XCTestCase {
 
     // MARK: - Finished sessions
 
+    func testTranscriptResetForgetsTheLiveLineOfThatSession() async throws {
+        let mac = await macWithSessions(["s1", "s2"])
+        let rig = try await HomeRig.make([mac], in: self)
+        let online = await rig.online(sessions: 2)
+        XCTAssertTrue(online)
+        let running = await rig.startRunning(in: self)
+        XCTAssertTrue(running)
+        let s1 = ref(mac, "s1")
+        let s2 = ref(mac, "s2")
+        await mac.pushChat(sessionId: "s1", entries: [agentProse(9, "Dòng của bản ghi cũ")])
+        await mac.pushChat(sessionId: "s2", entries: [agentProse(4, "Bên web vẫn giữ")])
+        let seen = await eventually {
+            rig.home.lastAgentLine(for: s1) == "Dòng của bản ghi cũ" && rig.home.lastAgentLine(for: s2) == "Bên web vẫn giữ"
+        }
+        XCTAssertTrue(seen)
+
+        // The Mac reloads s1's transcript: its seq starts over.
+        await mac.resetChat(sessionId: "s1", entries: [agentProse(1, "Bản ghi mới, đã xong.")])
+        let forgotten = await eventually { rig.home.lastAgentLine(for: s1) == nil }
+        XCTAssertTrue(forgotten)
+        XCTAssertEqual(rig.home.lastAgentLine(for: s2), "Bên web vẫn giữ", "only that session's line goes")
+        XCTAssertEqual(notes(rig.home), [], "a reset alone notes nothing")
+
+        // s1 finishes: the note quotes the new transcript, not the old line (whose seq 9 beats the new 1).
+        await mac.upsertSession(agentSession("s1", state: .idle, stateSinceMs: 1_700_000_050_000))
+        let noted = await eventually { self.notes(rig.home).count == 1 }
+        XCTAssertTrue(noted)
+        XCTAssertEqual(notes(rig.home), [.agentFinished(s1, summary: "Bản ghi mới, đã xong.")])
+    }
+
     func testFinishedNoteCarriesFirstLineOfLastAgentProse() async throws {
         let mac = await macWithSessions(["s1", "s2", "s3"])
         await mac.setHistory(sessionId: "s2", entries: [

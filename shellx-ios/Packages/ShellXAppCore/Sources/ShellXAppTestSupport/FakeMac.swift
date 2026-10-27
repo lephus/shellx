@@ -182,6 +182,9 @@ public actor FakeMac {
 
     public func setHistory(sessionId: String, entries: [ChatEntry]) { chat.setHistory(sessionId: sessionId, entries: entries) }
     public func pushChat(sessionId: String, entries: [ChatEntry]) { chat.push(sessionId: sessionId, entries: entries) }
+    /// The Mac reloads the session's transcript (its `seq` values start over): the transcript
+    /// becomes `entries` and phones get `chat.reset`, in order with the session's pushes.
+    public func resetChat(sessionId: String, entries: [ChatEntry]) { chat.reset(sessionId: sessionId, entries: entries) }
     /// nil goes back to `submitted` for a known session and `not_found` otherwise.
     public func setSendOutcome(_ outcome: ChatSendOutcome?) { chat.setSendOutcome(outcome) }
     public var sentTexts: [SentText] { chat.sentTexts }

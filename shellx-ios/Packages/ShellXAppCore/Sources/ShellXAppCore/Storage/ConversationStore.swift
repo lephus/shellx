@@ -62,6 +62,31 @@ public actor ConversationStore: LocalDataWiping {
             let number = claim.flatMap { $0.doc == doc ? $0.number : nil }
             await store.write(value, to: doc, epoch: epoch, claim: number)
         }
+
+        /// Deletes the stored document (a transcript reset drops the old copy), with the same rules
+        /// as `save`: nothing after a wipe, nothing once a newer writer claimed the document.
+        public func remove(_ doc: StoreDocument) async {
+            let number = claim.flatMap { $0.doc == doc ? $0.number : nil }
+            await store.delete(doc, epoch: epoch, claim: number)
+        }
+    }
+
+    private func delete(_ doc: StoreDocument, epoch writerEpoch: Int, claim: Int?) {
+        guard writerEpoch == epoch else {
+            log.notice("store_remove_stale kind=\(doc.kind, privacy: .public)")
+            return
+        }
+        if let claim, claims[doc] != claim {
+            log.notice("store_remove_superseded kind=\(doc.kind, privacy: .public)")
+            return
+        }
+        let url = fileURL(doc)
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        do {
+            try FileManager.default.removeItem(at: url)
+        } catch {
+            log.error("store_remove_failed kind=\(doc.kind, privacy: .public)")
+        }
     }
 
     private func write<T: Encodable & Sendable>(

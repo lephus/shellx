@@ -54,6 +54,26 @@ final class ConversationStoreTests: XCTestCase {
         XCTAssertNil(loaded)
     }
 
+    func testRemoveDropsTheDocumentUnlessSuperseded() async {
+        let store = makeStore()
+        let s1 = StoreDocument.thread(ref("s1"))
+        let older = await store.writer(claiming: s1)
+        await older.save(Doc(items: ["old transcript"]), to: s1)
+        await older.remove(s1)
+        var loaded = await store.load(s1, as: Doc.self)
+        XCTAssertNil(loaded, "a transcript reset drops the stored copy")
+
+        // A newer screen claimed the thread: the older writer can neither write nor remove it.
+        let newer = await store.writer(claiming: s1)
+        await newer.save(Doc(items: ["new"]), to: s1)
+        await older.remove(s1)
+        loaded = await store.load(s1, as: Doc.self)
+        XCTAssertEqual(loaded, Doc(items: ["new"]))
+
+        // Removing what is not there is fine.
+        await newer.remove(.thread(ref("never-written")))
+    }
+
     func testRoundTripEachDocument() async {
         let store = makeStore()
         let docs: [StoreDocument] = [.home, .lastSessions, .thread(ref("s1"))]

@@ -203,7 +203,7 @@ final class AgentThreadModelTests: XCTestCase {
         var probe = rig.hub.chatUpdates().makeAsyncIterator()
         await mac.pushChat(sessionId: "s1", entries: entries(4...5))
         let arrived = await probe.next()
-        XCTAssertEqual(arrived?.1.map(\.seq), [4, 5])
+        XCTAssertEqual(arrived?.entries.map(\.seq), [4, 5])
         XCTAssertEqual(model.thread.entries.count, 3, "nobody follows the hub for the covered screen")
 
         // Shown again: the newest page brings them.
@@ -405,6 +405,99 @@ final class AgentThreadModelTests: XCTestCase {
         XCTAssertEqual(stored?.entries.map(\.seq), [1, 2, 3, 4, 5], "the old screen's late write is dropped")
         requests = await mac.historyRequests
         XCTAssertEqual(requests.count, 4)
+    }
+
+    // MARK: - Transcript reset (chat.reset)
+
+    /// Entries of a reloaded transcript: other ids and text than `entries(_:)`, the same `seq` range.
+    private func reloaded(_ seqs: ClosedRange<Int>) -> [ChatEntry] {
+        seqs.map {
+            ChatEntry(
+                id: "new-\($0)", rev: 1, seq: $0, role: .agent, kind: .prose, text: "new \($0)",
+                tsMs: 1_800_000_000_000 + Int64($0))
+        }
+    }
+
+    func testResetReplacesTheChatAndIgnoresAnswersStartedBefore() async throws {
+        let mac = await mac(history: entries(1...60, text: "old"))
+        let s1 = ref(mac)
+        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        let (model, _) = model(s1, rig)
+
+        // The newest page of the old transcript is on its way when the Mac reloads the transcript.
+        await mac.holdChat()
+        let running = await startRunning(model)
+        XCTAssertTrue(running)
+        let asked = await eventually { await mac.historyRequests.count == 1 }
+        XCTAssertTrue(asked)
+        await mac.resetChat(sessionId: "s1", entries: reloaded(1...80))
+        // The screen pages again from the newest at once.
+        let again = await eventually { await mac.historyRequests.count == 2 }
+        XCTAssertTrue(again)
+        let requests = await mac.historyRequests
+        XCTAssertEqual(requests.map(\.beforeSeq), [nil, nil])
+        await mac.releaseChat()
+
+        // The old transcript's page, asked for before the reset, is dropped whichever comes first.
+        let fresh = await eventually { model.thread.entries.map(\.id) == (31...80).map { "new-\($0)" } }
+        XCTAssertTrue(fresh, "\(model.thread.entries.map(\.id).prefix(5))")
+        XCTAssertTrue(model.thread.hasMore)
+        XCTAssertFalse(model.loading)
+        XCTAssertNil(model.emptyState)
+
+        // Entries after the reset upsert as usual; paging back goes through the new transcript.
+        await mac.pushChat(sessionId: "s1", entries: reloaded(81...81))
+        let live = await eventually { model.thread.entries.last?.id == "new-81" }
+        XCTAssertTrue(live)
+        await model.loadOlder()
+        XCTAssertEqual(model.thread.entries.first?.id, "new-1")
+        XCTAssertFalse(model.thread.entries.contains { $0.id.hasPrefix("e-") }, "nothing of the old transcript is left")
+    }
+
+    func testResetDropsTheStoredCopyAndOtherSessionsResetsChangeNothing() async throws {
+        let mac = await mac(history: entries(1...5, text: "old"))
+        await mac.upsertSession(agentSession("s2", workspace: "web"))
+        await mac.setHistory(sessionId: "s2", entries: [])
+        let s1 = ref(mac)
+        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let online = await rig.online(sessions: 2)
+        XCTAssertTrue(online)
+        let (model, timers) = model(s1, rig)
+        let running = await startRunning(model)
+        XCTAssertTrue(running)
+        let opened = await eventually { model.thread.entries.count == 5 }
+        XCTAssertTrue(opened)
+        let pending = await eventually { timers.waiting.contains(AgentThreadModel.saveDelay) }
+        XCTAssertTrue(pending)
+        timers.release { $0 == AgentThreadModel.saveDelay }
+        let saved = await eventually { await self.stored(s1, rig)?.entries.count == 5 }
+        XCTAssertTrue(saved)
+
+        // Another session's reset changes nothing here.
+        await mac.resetChat(sessionId: "s2", entries: [])
+        await mac.pushChat(sessionId: "s1", entries: entries(6...6, text: "old"))
+        let six = await eventually { model.thread.entries.count == 6 }
+        XCTAssertTrue(six, "the s2 reset, sent before this push, was ignored")
+        var requests = await mac.historyRequests
+        XCTAssertEqual(requests.count, 1)
+
+        // This session's reset: the stored copy goes at once, before the new page is in.
+        await mac.holdChat()
+        await mac.resetChat(sessionId: "s1", entries: reloaded(1...2))
+        let dropped = await eventually { await self.stored(s1, rig) == nil }
+        XCTAssertTrue(dropped, "a relaunch must not show the old transcript")
+        XCTAssertEqual(model.thread.entries, [])
+        XCTAssertEqual(model.emptyState, .loading)
+        await mac.releaseChat()
+        let fresh = await eventually { model.thread.entries.map(\.id) == ["new-1", "new-2"] }
+        XCTAssertTrue(fresh)
+        await model.close()
+        let stored = await stored(s1, rig)
+        XCTAssertEqual(stored?.entries.map(\.id), ["new-1", "new-2"])
+        requests = await mac.historyRequests
+        XCTAssertEqual(requests.count, 2)
     }
 
     // MARK: - Send and stop
