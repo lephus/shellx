@@ -44,10 +44,13 @@ enum AppComposition {
             preconditionFailure("the relay URL must be https")
         }
         let latency = LatencyLog()
+        // History lives in Application Support/ShellX and is wiped on sign-out.
+        let historyDirectory = URL.applicationSupportDirectory.appendingPathComponent("ShellX", isDirectory: true)
+        let history = ConversationStore(directory: historyDirectory)
         // The hub reports a refused token to the coordinator that made it.
         let owner = CoordinatorReference()
         let coordinator = AppCoordinator(
-            vault: vault, relay: relay, deviceName: deviceName, wipers: [],
+            vault: vault, relay: relay, deviceName: deviceName, wipers: [history],
             makeHub: {
                 MachineHub(
                     vault: vault, relay: relay, connector: connector, latency: latency, defaults: .standard,
