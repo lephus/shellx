@@ -28,7 +28,7 @@ final class LegacyTranscriber: SpeechTranscribing, @unchecked Sendable {
         let request: SFSpeechAudioBufferRecognitionRequest
         let continuation: AsyncThrowingStream<String, any Error>.Continuation
         /// The fields below are read and written under `LegacyTranscriber.lock`.
-        var task: SFSpeechRecognitionTask?
+        var task: (any RecognitionTask)?
         var latest = ""
         var ended = false
         var finalWaiter: CheckedContinuation<String, Never>?
@@ -44,13 +44,25 @@ final class LegacyTranscriber: SpeechTranscribing, @unchecked Sendable {
         }
     }
 
+    /// Starts the recognition task of a request (the system's in the app; tests record and fake it).
+    typealias TaskStarter = @Sendable (
+        SFSpeechRecognizer, SFSpeechAudioBufferRecognitionRequest,
+        @escaping @Sendable (SFSpeechRecognitionResult?, (any Error)?) -> Void
+    ) -> any RecognitionTask
+
+    static let systemTasks: TaskStarter = { recognizer, request, handler in
+        recognizer.recognitionTask(with: request, resultHandler: handler)
+    }
+
     private let audio: AudioCapture
     private let slot: SpeechRunSlot
+    private let startTask: TaskStarter
     private let lock = NSLock()
 
-    init(audio: AudioCapture, slot: SpeechRunSlot) {
+    init(audio: AudioCapture, slot: SpeechRunSlot, startTask: @escaping TaskStarter = LegacyTranscriber.systemTasks) {
         self.audio = audio
         self.slot = slot
+        self.startTask = startTask
     }
 
     func start(run id: SpeechRunID, locale: Locale, contextualStrings: [String]) async throws
@@ -81,7 +93,7 @@ final class LegacyTranscriber: SpeechTranscribing, @unchecked Sendable {
         case let .granted(replaced):
             await replaced?.teardown()
         }
-        let task = recognizer.recognitionTask(with: request) { [weak self] result, error in
+        let task = startTask(recognizer, request) { [weak self] result, error in
             self?.handle(run, text: result?.bestTranscription.formattedString, isFinal: result?.isFinal ?? false, error: error)
         }
         lock.withLock { run.task = task }

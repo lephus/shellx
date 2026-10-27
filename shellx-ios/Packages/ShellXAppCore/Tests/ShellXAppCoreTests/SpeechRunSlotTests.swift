@@ -65,6 +65,21 @@ final class SpeechRunSlotTests: XCTestCase {
         XCTAssertTrue(log.all.isEmpty, "and tears nothing down")
     }
 
+    func testBeginningAgainNeverMovesNewestBack() {
+        // The router begins every press at its entry; an inner transcriber (or a fallback retry)
+        // begins the same run again later. That must not make an older run the newest again.
+        let slot = SpeechRunSlot()
+        let log = Log()
+        let stale = SpeechRunID()
+        let newer = SpeechRunID()
+        slot.begin(stale)
+        slot.begin(newer)
+        slot.begin(stale)
+        XCTAssertTrue(refused(slot.claim(stale, log.handlers("stale"))))
+        XCTAssertNotNil(granted(slot.claim(newer, log.handlers("newer"))), "the newer press still gets the mic")
+        XCTAssertTrue(slot.isActive(newer))
+    }
+
     func testRunCancelledWhileStartingIsRefused() async {
         let slot = SpeechRunSlot()
         let log = Log()
