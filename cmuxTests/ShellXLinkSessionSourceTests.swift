@@ -49,11 +49,11 @@ struct ShellXLinkSessionSourceTests {
 
     private static func event(
         _ sessionID: String, _ name: WorkstreamEvent.HookEventName, source: String = "claude",
-        transcriptPath: String? = nil, at offset: TimeInterval = 0
+        surface: String? = nil, transcriptPath: String? = nil, at offset: TimeInterval = 0
     ) -> WorkstreamEvent {
         WorkstreamEvent(
-            sessionId: sessionID, hookEventName: name, source: source, transcriptPath: transcriptPath,
-            cwd: "/Users/example/project", receivedAt: start.addingTimeInterval(offset)
+            sessionId: sessionID, hookEventName: name, source: source, surfaceId: surface,
+            transcriptPath: transcriptPath, cwd: "/Users/example/project", receivedAt: start.addingTimeInterval(offset)
         )
     }
 
@@ -187,45 +187,59 @@ struct ShellXLinkSessionSourceTests {
     /// Claude Code fires no hook when it is interrupted (Esc or ctrl-C) and then waits for input. Once the
     /// shared interrupt path's key is accepted, the session turns idle and every phone is told; an interrupt
     /// the terminal never took changes nothing.
+    ///
+    /// The accepted key is explicit input first: the terminal's `onExplicitInput` reaches
+    /// `noteAcceptedAgentInput`, which moves a needs-input session to working, and `agentChatInterrupt` then
+    /// moves it to idle, in the same main-actor turn. A phone gets both changes, in order, and ends idle.
     @Test func testInterruptMovesSessionToIdle() async throws {
         let home = try Self.makeHome()
         defer { try? FileManager.default.removeItem(at: home) }
         let working = UUID().uuidString, asking = UUID().uuidString
+        let workingSurface = UUID().uuidString, askingSurface = UUID().uuidString
         let (service, source) = await MainActor.run { Self.makeSource(home: home) }
         await MainActor.run {
-            service.noteHookEvent(Self.event(working, .sessionStart))
-            service.noteHookEvent(Self.event(working, .userPromptSubmit, at: 3))
-            service.noteHookEvent(Self.event(asking, .sessionStart))
-            service.noteHookEvent(Self.event(asking, .permissionRequest, at: 4))
+            service.noteHookEvent(Self.event(working, .sessionStart, surface: workingSurface))
+            service.noteHookEvent(Self.event(working, .userPromptSubmit, surface: workingSurface, at: 3))
+            service.noteHookEvent(Self.event(asking, .sessionStart, surface: askingSurface))
+            service.noteHookEvent(Self.event(asking, .permissionRequest, surface: askingSurface, at: 4))
         }
         let changes = SessionChanges()
         let consumer = Task { for await change in source.sessionChanges() { changes.record(change) } }
         defer { consumer.cancel() }
         // The subscription registers on the main actor; this call orders it before the interrupts.
         let base = await source.sessions().revision
+        // What an accepted interrupt key does in production, in one main-actor turn.
+        @MainActor func acceptedInterrupt(_ sessionID: String, surface: String) {
+            service.noteExplicitInput(surfaceID: surface)   // the key's `onExplicitInput`
+            service.noteInterrupted(sessionID: sessionID)   // `agentChatInterrupt` after the key was accepted
+        }
 
         // The shared path finds no terminal for this session: no key reached the agent, so nothing changes.
         let link = await MainActor.run { ShellXLinkChatSource(service: { service }) }
         #expect(await link.interrupt(sessionId: working, hard: false) == .notFound)
         #expect(await source.sessions().sessions.first { $0.sessionId == working }?.state == .working)
 
-        // What `agentChatInterrupt` does once the terminal accepted the key.
-        await MainActor.run { _ = service.noteInterrupted(sessionID: working) }
-        #expect(await Self.waitUntil { changes.all.contains { $0.upserted.contains { $0.sessionId == working } } })
+        // A working session: explicit input leaves it working, the interrupt makes it idle.
+        await MainActor.run { acceptedInterrupt(working, surface: workingSurface) }
+        #expect(await Self.waitUntil { changes.all.count == 1 })
         let stopped = try #require(changes.all.first)
         #expect(stopped.revision == base + 1)
         #expect(stopped.upserted.map(\.sessionId) == [working])
         #expect(stopped.upserted.first?.state == .idle)
         #expect(stopped.upserted.first?.stateSinceMs == nil)
 
-        // Esc on a permission prompt rejects it and stops the turn too.
-        await MainActor.run { _ = service.noteInterrupted(sessionID: asking) }
-        #expect(await Self.waitUntil { changes.all.count == 2 })
-        #expect(changes.all.last?.revision == base + 2)
-        #expect(changes.all.last?.upserted.first { $0.sessionId == asking }?.state == .idle)
+        // Esc on a permission prompt rejects it and stops the turn: working for an instant, then idle.
+        await MainActor.run { acceptedInterrupt(asking, surface: askingSurface) }
+        #expect(await Self.waitUntil { changes.all.count == 3 })
+        let states = changes.all.dropFirst().map { change in
+            change.upserted.first { $0.sessionId == asking }?.state
+        }
+        #expect(states == [.working, .idle])
+        #expect(changes.all.map(\.revision) == [base + 1, base + 2, base + 3])
+        #expect(await source.sessions().sessions.first { $0.sessionId == asking }?.state == .idle)
         // An idle session stays as it is: no change is published.
-        await MainActor.run { _ = service.noteInterrupted(sessionID: working) }
-        #expect(await source.sessions().revision == base + 2)
+        await MainActor.run { acceptedInterrupt(working, surface: workingSurface) }
+        #expect(await source.sessions().revision == base + 3)
     }
 
     @Test func testEndedSubscriberStopsObserving() async throws {

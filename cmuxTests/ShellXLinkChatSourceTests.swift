@@ -300,8 +300,10 @@ struct ShellXLinkChatSourceTests {
             service.noteHookEvent(hook(.sessionStart))
             service.noteHookEvent(hook(.userPromptSubmit))
         }
-        // No transcript yet: no history, as before (the phone hears `not_found`); live entries still follow.
-        #expect(await source.history(sessionId: session, beforeSeq: nil, limit: 10) == nil)
+        // No transcript yet: a listed session has an empty history, not `not_found`; live entries still follow.
+        let early = try #require(await source.history(sessionId: session, beforeSeq: nil, limit: 10))
+        #expect(early.entries.isEmpty)
+        #expect(early.hasMore == false)
         try append(Self.userLine("u-1", "Create the file"))
         await MainActor.run { service.noteHookEvent(hook(.preToolUse, tool: "Bash")) }
         try append(Self.assistantLine("a-1", [
@@ -318,6 +320,62 @@ struct ShellXLinkChatSourceTests {
         #expect(entries.first { $0.text == "Create the file" }?.role == .user)
         #expect(entries.first { $0.text == "touch first.txt" }?.toolName == "Bash")
         #expect(entries.first { $0.text == "Created first.txt" }?.kind == .prose)
+    }
+
+    /// A listed (not ended) session whose transcript its agent has not written yet answers an empty page, even
+    /// with no phone subscribed when it started; `not_found` stays for sessions the Mac cannot read: unknown,
+    /// another agent's, or ended without a transcript. `mobile.chat.history` keeps its "transcript not
+    /// readable" answer for the waiting session.
+    @Test func testHistoryOfNewSessionIsEmptyUntilItsTranscriptExists() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let source = await MainActor.run { ShellXLinkChatSource(service: { service }) }
+        let waiting = UUID().uuidString, ended = UUID().uuidString
+        let transcript = home.appendingPathComponent("projects/-tmp-new/\(waiting).jsonl")
+        await MainActor.run {
+            service.noteHookEvent(WorkstreamEvent(sessionId: waiting, hookEventName: .sessionStart, source: "claude",
+                                                  transcriptPath: transcript.path, cwd: "/tmp/new"))
+            let missing = home.appendingPathComponent("projects/-tmp-new/\(ended).jsonl").path
+            service.noteHookEvent(WorkstreamEvent(sessionId: ended, hookEventName: .sessionStart, source: "claude",
+                                                  transcriptPath: missing, cwd: "/tmp/new"))
+            service.noteHookEvent(WorkstreamEvent(sessionId: ended, hookEventName: .sessionEnd, source: "claude",
+                                                  transcriptPath: missing, cwd: "/tmp/new"))
+        }
+
+        let page = try #require(await source.history(sessionId: waiting, beforeSeq: nil, limit: 10))
+        #expect(page.entries.isEmpty)
+        #expect(page.hasMore == false)
+        #expect(await service.historyRebindingIfStale(sessionID: waiting, beforeSeq: nil, limit: 10) == nil)
+        #expect(await source.history(sessionId: ended, beforeSeq: nil, limit: 10) == nil)
+        #expect(await source.history(sessionId: "no-such-session", beforeSeq: nil, limit: 10) == nil)
+
+        // Once the agent writes it, the history is the transcript.
+        try FileManager.default.createDirectory(at: transcript.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try (Self.userLine("u-1", "First prompt") + "\n").write(to: transcript, atomically: false, encoding: .utf8)
+        var texts: [String] = []
+        for _ in 0..<300 where texts.isEmpty {
+            texts = await source.history(sessionId: waiting, beforeSeq: nil, limit: 10)?.entries.map(\.text) ?? []
+            if texts.isEmpty { try? await Task.sleep(nanoseconds: 10_000_000) }
+        }
+        #expect(texts == ["First prompt"])
+    }
+
+    /// A session whose transcript was read and then removed still serves the history it read.
+    @Test func testHistorySurvivesTheTranscriptBeingRemoved() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let source = await MainActor.run { ShellXLinkChatSource(service: { service }) }
+        let (session, transcript) = try await MainActor.run {
+            try Self.addSession(service, home: home, lines: [Self.userLine("u-1", "Kept")])
+        }
+        #expect(await source.history(sessionId: session, beforeSeq: nil, limit: 10)?.entries.map(\.text) == ["Kept"])
+
+        try FileManager.default.removeItem(at: transcript)
+
+        #expect(await source.history(sessionId: session, beforeSeq: nil, limit: 10)?.entries.map(\.text) == ["Kept"])
+        #expect(await service.history(sessionID: session, beforeSeq: nil, limit: 10)?.messages.count == 1)
     }
 
     /// The tailer updates its cache before it publishes the batch, so a history read can return an entry

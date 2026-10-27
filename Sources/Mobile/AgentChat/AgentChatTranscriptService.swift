@@ -508,8 +508,11 @@ final class AgentChatTranscriptService {
             }
             guard let currentRecord = registry.record(sessionID: sessionID) else { return nil }
             failedResolutions.remove(sessionID)
+            // A live session whose agent has not written its transcript yet
+            // gets a tailer that waits for it, as a hook event would start.
+            let awaitedPath = currentRecord.state == .ended ? nil : resolver.recordedTranscriptLocation(for: currentRecord)
             guard let resolvedTailer = ensureTailer(for: currentRecord, resolvePath: {
-                resolver.boundedTranscriptPath(for: currentRecord) ?? fallbackPath
+                resolver.boundedTranscriptPath(for: currentRecord) ?? fallbackPath ?? awaitedPath
             }) else {
                 return nil
             }
@@ -517,14 +520,27 @@ final class AgentChatTranscriptService {
         }
         await tailer.start()
         // A live session's tailer can wait for a transcript its agent has not
-        // written yet: until then there is no history (callers report the
-        // transcript missing), while live entries follow from its first line.
-        guard FileManager.default.fileExists(atPath: tailer.path) else { return nil }
+        // written yet: until then there is no transcript to page (see
+        // ``isAwaitingTranscript(sessionID:)``), while live entries follow from
+        // its first line. A tailer that read its file serves its cache even if
+        // the file is gone now.
+        if await tailer.isWaitingForTranscript { return nil }
         let page = await tailer.history(beforeSeq: beforeSeq, limit: limit)
         if record.title == nil, let title = await tailer.title {
             registry.update(sessionID: sessionID) { $0.title = title }
         }
         return page
+    }
+
+    /// Whether a live session's tailer waits for a transcript its agent has not written yet, so the session
+    /// has no history so far (``history(sessionID:beforeSeq:limit:)`` answers nil for it) rather than a
+    /// transcript the Mac cannot read. ShellX Link answers such a session with an empty page.
+    func isAwaitingTranscript(sessionID: String) async -> Bool {
+        guard let record = registry.record(sessionID: sessionID), record.state != .ended,
+              let tailer = tailers[sessionID] else {
+            return false
+        }
+        return await tailer.isWaitingForTranscript
     }
 
     /// ``history(sessionID:beforeSeq:limit:)``, retried once when the session is known but its transcript

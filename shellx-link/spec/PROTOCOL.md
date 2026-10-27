@@ -219,7 +219,9 @@ answers it `unknown` (section 5). A known `kind` with a missing required field i
 entries when `before_seq` is absent), oldest first; `has_more` is true when older entries exist.
 Entries that share a `seq` belong to one transcript line; a `chat.history` page never contains part of
 a `seq` group (section 6), and `before_seq` pages strictly older groups. A
-client keeps the entries it has by `id`: `chat.entries` and `chat.history` both upsert.
+client keeps the entries it has by `id`: `chat.entries` and `chat.history` both upsert. A session the host
+lists whose agent has not written its transcript yet has an empty history (`entries` empty, `has_more`
+false), not `not_found`; its entries arrive in `chat.entries` once written.
 
 `rev` orders the emissions of one entry. The host gives every emission of an entry, in a `chat.history` or
 a `chat.entries`, a `rev` strictly greater than that of any earlier emission of the same `id`. The two

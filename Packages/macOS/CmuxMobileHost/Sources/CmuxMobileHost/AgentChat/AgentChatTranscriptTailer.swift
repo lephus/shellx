@@ -39,6 +39,9 @@ public actor AgentChatTranscriptTailer {
 
     private let maxInitialLines: Int
     private let maxCachedMessages: Int
+    /// A transcript created after this tailer started is published live from
+    /// its first line, unless it first appears larger than this.
+    static let maxLiveFirstReadBytes: UInt64 = 256 * 1024
 
     private var cache: [ChatMessage] = []
     private var parseState = ChatTranscriptParseState()
@@ -148,6 +151,14 @@ public actor AgentChatTranscriptTailer {
         )
     }
 
+    /// Whether this tailer waits for a transcript its agent has not written
+    /// yet: it was created before the file existed and has never seen it. A
+    /// tailer that read its file once keeps serving its cache even if the file
+    /// is removed later.
+    public var isWaitingForTranscript: Bool {
+        followsFromFirstLine && fileInode == nil && !FileManager.default.fileExists(atPath: path)
+    }
+
     /// First user prompt in the cache, for the session title.
     public var title: String? {
         for message in cache {
@@ -211,18 +222,7 @@ public actor AgentChatTranscriptTailer {
             // new file's head). Reset, re-read from scratch, and tell
             // clients explicitly: the seq space restarted, and id-based
             // heuristics can't always detect that (codex line-N ids repeat).
-            byteOffset = 0
-            lineCount = 0
-            pendingFragment = Data()
-            cache = []
-            parseState = ChatTranscriptParseState()
-            headTruncated = false
-            // A rotated/replaced transcript (e.g. `claude --resume` rewriting
-            // the file) carries a new first prompt; allow it to be rediscovered
-            // and re-emitted as the title instead of keeping the stale one.
-            reportedTitle = false
-            loadInitialTail()
-            await onBatch(Batch(appended: [], updated: [], discoveredTitle: nil, didReset: true))
+            await reloadAsBackfill()
             return
         }
         if fileInode == nil {
@@ -231,6 +231,16 @@ public actor AgentChatTranscriptTailer {
             fileInode = currentInode
         }
         guard size > byteOffset else { return }
+        // The first lines of a transcript created after this tailer started
+        // are the session's first turn, published live. One that first appears
+        // already holding a whole history (cmux's Claude fork writes the
+        // parent's history into the new session's file) is backfilled instead,
+        // like an existing transcript, rather than pushed as one huge batch.
+        let isFirstRead = followsFromFirstLine && lineCount == 0
+        if isFirstRead, size > Self.maxLiveFirstReadBytes {
+            await reloadAsBackfill()
+            return
+        }
         try? handle.seek(toOffset: byteOffset)
         guard let newData = try? handle.readToEnd(), !newData.isEmpty else { return }
         byteOffset += UInt64(newData.count)
@@ -245,6 +255,10 @@ public actor AgentChatTranscriptTailer {
         }
         pendingFragment = Data(buffer[sliceStart...])
         guard !lines.isEmpty else { return }
+        if isFirstRead, lines.count > maxInitialLines {
+            await reloadAsBackfill()
+            return
+        }
 
         let startingSeq = lineCount
         lineCount += lines.count
@@ -274,6 +288,23 @@ public actor AgentChatTranscriptTailer {
                 discoveredTitle: discoveredTitle
             )
         )
+    }
+
+    /// Re-reads the transcript from scratch as a bounded backfill and tells
+    /// clients to re-anchor (page it with history); later lines are live.
+    private func reloadAsBackfill() async {
+        byteOffset = 0
+        lineCount = 0
+        pendingFragment = Data()
+        cache = []
+        parseState = ChatTranscriptParseState()
+        headTruncated = false
+        // A rotated/replaced transcript (e.g. `claude --resume` rewriting
+        // the file) carries a new first prompt; allow it to be rediscovered
+        // and re-emitted as the title instead of keeping the stale one.
+        reportedTitle = false
+        loadInitialTail()
+        await onBatch(Batch(appended: [], updated: [], discoveredTitle: nil, didReset: true))
     }
 
     private func parse(lines: [String], startingSeq: Int) -> ChatTranscriptParseResult {

@@ -16,6 +16,8 @@ import ShellXLinkSession
 /// * The tailer updates its cache before it publishes a batch, so a history read can return an entry older
 ///   than a push that reached the main actor while the read was in flight. Such an entry is served with the
 ///   pushed content (and a new `rev`), so a stale copy never outranks the push on the phone.
+/// * A listed session whose agent has not written its transcript yet has an empty history; `nil` (the
+///   phone's `not_found`) is for sessions the Mac does not have or cannot read.
 /// * Send and interrupt run ``TerminalController/agentChatSend(sessionID:text:attachments:)`` and
 ///   ``TerminalController/agentChatInterrupt(sessionID:hard:)``, the paths behind `mobile.chat.send` and
 ///   `mobile.chat.interrupt`.
@@ -70,7 +72,9 @@ final class ShellXLinkChatSource: AgentChatSource {
         let page = await service.historyRebindingIfStale(sessionID: sessionId, beforeSeq: beforeSeq, limit: limit)
         guard let page else {
             reads[read.id] = nil
-            return nil
+            // A listed session whose agent has not written its transcript yet has an empty history, not
+            // `not_found` (PROTOCOL.md 4, ChatEntry); its entries arrive in `chat.entries` once written.
+            return await service.isAwaitingTranscript(sessionID: sessionId) ? ([], false) : nil
         }
         return finishHistoryRead(read, page: page)
     }

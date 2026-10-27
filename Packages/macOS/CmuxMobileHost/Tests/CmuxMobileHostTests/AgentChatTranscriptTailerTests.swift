@@ -14,6 +14,7 @@ struct AgentChatTranscriptTailerTests {
         func record(_ batch: AgentChatTranscriptTailer.Batch) { lock.lock(); recorded.append(batch); lock.unlock() }
         var appendedIDs: [String] { lock.lock(); defer { lock.unlock() }; return recorded.flatMap(\.appended).map(\.id) }
         var titles: [String] { lock.lock(); defer { lock.unlock() }; return recorded.compactMap(\.discoveredTitle) }
+        var resets: Int { lock.lock(); defer { lock.unlock() }; return recorded.filter(\.didReset).count }
     }
 
     private static func json(_ object: [String: Any]) -> String {
@@ -89,6 +90,71 @@ struct AgentChatTranscriptTailerTests {
         try Self.append([Self.userLine("u-2", "Thanks")], to: file)
         #expect(await Self.waitUntil { batches.appendedIDs.count >= 3 })
         await tailer.stop()
+    }
+
+    /// A transcript that first appears already holding a whole history (cmux's Claude fork writes the parent's
+    /// history into the new session's file after SessionStart) is backfilled, not pushed as one huge batch:
+    /// clients are told to re-anchor, history pages it, and later lines are live again.
+    @Test func testLateTranscriptOverTheByteBudgetIsBackfilled() async throws {
+        let (home, file) = try Self.missingTranscript()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let batches = Batches()
+        let tailer = AgentChatTranscriptTailer(sessionID: "s", agentKind: .claude, path: file.path) { batches.record($0) }
+        await tailer.start()
+
+        let padding = String(repeating: "x", count: 40)
+        let history = (0..<3000).map { Self.userLine("u-\($0)", "Earlier prompt \($0) \(padding)") }
+        try Self.append(history, to: file)
+
+        #expect(await Self.waitUntil { batches.resets > 0 })
+        #expect(batches.appendedIDs.isEmpty)
+        let page = await tailer.history(beforeSeq: nil, limit: 50)
+        #expect(page.messages.last?.seq == 2999)
+        #expect(page.hasMore)
+        try Self.append([Self.assistantLine("a-1", "Live again")], to: file)
+        #expect(await Self.waitUntil { batches.appendedIDs.count == 1 })
+        await tailer.stop()
+    }
+
+    /// The same for a first write under the byte budget but over the backfill line bound.
+    @Test func testLateTranscriptOverTheLineBoundIsBackfilled() async throws {
+        let (home, file) = try Self.missingTranscript()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let batches = Batches()
+        let tailer = AgentChatTranscriptTailer(sessionID: "s", agentKind: .claude, path: file.path,
+                                               maxInitialLines: 10) { batches.record($0) }
+        await tailer.start()
+
+        try Self.append((0..<30).map { Self.userLine("u-\($0)", "Prompt \($0)") }, to: file)
+
+        #expect(await Self.waitUntil { batches.resets > 0 })
+        #expect(batches.appendedIDs.isEmpty)
+        let page = await tailer.history(beforeSeq: nil, limit: 50)
+        #expect(page.messages.map(\.seq) == Array(20..<30))
+        #expect(page.hasMore)
+        await tailer.stop()
+    }
+
+    /// A tailer that never saw its transcript says so; once the file appeared it does not, even if the file is
+    /// later removed (its cache still serves history).
+    @Test func testWaitingForTranscriptUntilTheFileAppears() async throws {
+        let (home, file) = try Self.missingTranscript()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let batches = Batches()
+        let tailer = AgentChatTranscriptTailer(sessionID: "s", agentKind: .claude, path: file.path) { batches.record($0) }
+        await tailer.start()
+        #expect(await tailer.isWaitingForTranscript)
+
+        try Self.append([Self.userLine("u-1", "Create the file")], to: file)
+        #expect(await Self.waitUntil { !batches.appendedIDs.isEmpty })
+        #expect(await tailer.isWaitingForTranscript == false)
+        try FileManager.default.removeItem(at: file)
+        #expect(await tailer.isWaitingForTranscript == false)
+        #expect(await tailer.history(beforeSeq: nil, limit: 10).messages.count == 1)
+        await tailer.stop()
+
+        let existing = AgentChatTranscriptTailer(sessionID: "s", agentKind: .claude, path: #filePath) { _ in }
+        #expect(await existing.isWaitingForTranscript == false)
     }
 
     /// An existing transcript is backfilled, not published: only later lines are live.

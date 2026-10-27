@@ -287,7 +287,8 @@ Từ kế hoạch:
 
 Từ lần chạy trọn đường ở trên:
 - Bấm Gỡ trong sheet một lần trên Mac thật, trong lúc điện thoại đang nối.
-- Push `chat.entries` cho lượt đầu của phiên mới. Trước khi sửa, app P3 nên gọi `chat.history` khi mở một phiên, và gọi lại khi trạng thái phiên đổi.
-- Trạng thái phiên: chuyển sang `working` khi thẻ được trả lời, và về `idle` sau `chat.interrupt`.
-- Ghi ngữ nghĩa `feedback` của `exit_plan` vào `PROTOCOL.md` và vào giao diện P3.
+- Đã sửa ở Task 10c (commit `547b978ea4`, `77e9f827d6` và `fix(shellx): bounded first read for late transcripts; empty history for new sessions`), chỉ kiểm bằng test, chưa đo lại trên máy thật:
+  - Push `chat.entries` cho lượt đầu của phiên mới. Phiên đã liệt kê mà transcript chưa có thì `chat.history` trả trang rỗng, không còn `not_found`.
+  - Trạng thái phiên chuyển sang `working` ngay khi thẻ được trả lời, và về `idle` sau `chat.interrupt`. Interrupt một phiên `needs_input` đẩy hai thay đổi liền nhau: `working` rồi `idle`.
+- Ngữ nghĩa `feedback` của `exit_plan`: đã ghi vào `PROTOCOL.md` (Task 10c). Còn phải đưa vào giao diện P3.
 - WAN của P2 (Step 4 Task 11): chờ người dùng bật relay2 và cho deploy.
