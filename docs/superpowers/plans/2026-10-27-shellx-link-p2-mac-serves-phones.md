@@ -309,6 +309,30 @@ Task này chạy trên code P1 ở đầu `develop` (worktree riêng), trước 
 - [ ] **Step 4: Chạy lại** `swift test --package-path shellx-link`. Kỳ vọng PASS.
 - [ ] **Step 5: Commit** (`feat(shellx-link): wss only, make-before-break host registration, slot-offline retry`).
 
+### Task 4b: Giao thức: trả lời tự do cho câu hỏi của agent
+
+Thêm ngày 2026-10-27 theo quyết định của người dùng: điện thoại phải trả lời được bằng chữ tự do ("Khác…"), không chỉ chọn đáp án có sẵn. Mac đã chuyển `selections` theo vị trí sang `answers` của Claude (`claudeAskUserQuestionInput`, `CLI/cmux.swift:45367`), nên chỉ cần đổi luật giao thức.
+
+**Files:**
+- Modify: `shellx-link/spec/PROTOCOL.md` (§4 mô tả `selections`, §5 luật 3)
+- Modify: `shellx-link/spec/vectors/messages.json`
+- Modify: `shellx-link/Sources/ShellXLinkCore/Messages/LinkDecision.swift` (chỉ doc comment)
+- Test: `shellx-link/Tests/ShellXLinkCoreTests/LinkCodecTests.swift`
+
+**Interfaces:**
+- Consumes: `LinkDecision.question(selections:)` (Task 2).
+- Produces: luật mới, Task 10 (Mac) và P3 (app iOS) dựa vào:
+  - `selections` theo vị trí: `selections[i]` trả lời `questions[i]`, số phần tử phải bằng số câu hỏi của item;
+  - mỗi phần tử dài 1–1024 byte UTF-8;
+  - phần tử trùng `label` của một lựa chọn nghĩa là chọn lựa chọn đó; chuỗi khác là câu trả lời tự do;
+  - câu hỏi `multi_select` thì nối các `label` đã chọn bằng `", "`.
+  - §5 luật 3 đổi tương ứng: trả `unknown` khi số phần tử khác số câu hỏi, có phần tử rỗng hoặc dài quá 1024 byte.
+
+- [ ] **Step 1: Viết test fail.** Thêm vector `reply_question_free_text` (một câu hỏi, selection là chữ tự do) và `reply_question_two_questions` (hai câu hỏi, một chọn sẵn, một tự do). Chạy `swift test --package-path shellx-link --filter LinkCodecTests`. Kỳ vọng FAIL: vector chưa có trong file, hoặc test vector mới chưa chạy.
+- [ ] **Step 2: Sửa PROTOCOL.md và doc comment** theo luật ở trên.
+- [ ] **Step 3: Chạy lại** `swift test --package-path shellx-link`. Kỳ vọng PASS.
+- [ ] **Step 4: Commit** (`docs(shellx-link): positional free-text answers to agent questions`).
+
 ### Task 5: Relay v2 nhận điện thoại
 
 **Files:**
@@ -622,7 +646,7 @@ Task này chạy trên code P1 ở đầu `develop` (worktree riêng), trước 
   - `feedback` dài quá 4096 byte thì trả `unknown`.
 - **Câu hỏi:**
   - `questions` lấy từ `WorkstreamQuestionPrompt`; mỗi trường chữ cắt còn 1024 byte; `modes` rỗng;
-  - quyết định hợp lệ khi có ít nhất một selection và mọi selection đều trùng một `label`; khi đó map sang `.question(selections:)`.
+  - quyết định hợp lệ theo luật Task 4b: số `selections` bằng số câu hỏi, mỗi phần tử 1–1024 byte; phần tử có thể là `label` hoặc chữ tự do. Khi đó map nguyên văn sang `.question(selections:)`.
 - **Phiên agent:**
   - `ChatSessionDescriptor` có `agentKind == .claude` và `kind == .agent`;
   - `workspace_title` tra như feed (`liveWorkspace`);
@@ -654,7 +678,7 @@ Task này chạy trên code P1 ở đầu `develop` (worktree riêng), trước 
     - `testQuestionItemCarriesQuestionsAndAnswers`;
     - `testExitPlanItemModesExcludeBypass`;
     - `testExitPlanFeedbackDelivered`;
-    - `testSelectionNotAnOptionIsUnknown`;
+    - `testFreeTextSelectionDelivered` và `testSelectionCountMismatchIsUnknown`;
     - `testFeedReplySocketReportsNotDelivered`.
   - Phiên agent: `testClaudeSessionsListedWithState`, `testStateChangeEmitsUpsertWithNextRevision`, `testRemovedSessionEmitsRemoved`.
   - Chat:
