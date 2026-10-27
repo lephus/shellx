@@ -9,6 +9,7 @@ extension ContentView {
              "palette.forkAgentConversationNewTab",
              "palette.forkAgentConversationNewWorkspace",
              "palette.layout.saveCurrent",
+             ContentView.workspaceSetSaveCommandId,
              "palette.swapWithSession",
              ContentView.commandPaletteCloudAvailabilityInfoCommandId,
              // Entering browser focus mode focuses the web view synchronously;
@@ -30,7 +31,8 @@ extension ContentView {
              Self.commandPaletteComputerUseScreenRecordingCommandId:
             return true
         default:
-            return false
+            // Deleting a workspace set asks for confirmation in a modal alert.
+            return commandId.hasPrefix(ContentView.workspaceSetDeleteCommandIdPrefix)
         }
     }
 }

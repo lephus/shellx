@@ -21,6 +21,7 @@ struct NewWorkspaceMenuModel: Equatable {
         case create([CreateRow])
         case layouts([LayoutRow])
         case templates([String])
+        case workspaceSets([String])
         case management(ManagementSection)
     }
 
@@ -30,6 +31,7 @@ struct NewWorkspaceMenuModel: Equatable {
         newWorkspaceContextMenuItems: [CmuxResolvedConfigContextMenuItem],
         agentChatAction: CmuxResolvedConfigAction?,
         templateNames: [String],
+        workspaceSetNames: [String] = [],
         loadedActions: [CmuxResolvedConfigAction],
         newWorkspaceActionID: String?,
         deletable: (CmuxResolvedConfigAction) -> Bool
@@ -104,6 +106,9 @@ struct NewWorkspaceMenuModel: Equatable {
         sections.append(contentsOf: [createSection, layoutsSection].compactMap { $0 })
         if !templateNames.isEmpty {
             sections.append(.templates(templateNames))
+        }
+        if !workspaceSetNames.isEmpty {
+            sections.append(.workspaceSets(workspaceSetNames))
         }
         // Always present: the Save affordance must survive an otherwise-empty
         // menu (no create/cloud/layout/template rows), matching the pre-model menu.
