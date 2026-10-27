@@ -249,6 +249,36 @@ extension RelayControl: Codable {
     }
 }
 
+/// The rule that keeps tickets and passwords off unencrypted links: only loopback hosts may use
+/// a plain-text scheme. Shared by the relay socket and the ShellX account API.
+public enum RelayTransportPolicy {
+    /// `localhost`, `127.0.0.0/8` and `::1`.
+    public static func isLoopback(_ host: String?) -> Bool {
+        guard var host = host?.lowercased() else { return false }
+        if host.hasPrefix("["), host.hasSuffix("]") { host = String(host.dropFirst().dropLast()) }
+        if host == "localhost" || host == "::1" { return true }
+        let octets = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard octets.count == 4, octets.allSatisfy({ UInt8($0) != nil }) else { return false }
+        return octets[0] == "127"
+    }
+
+    /// Accepts `https`, and `http` only for a loopback host; throws
+    /// `RelayError.insecureTransport` for plain `http` to any other host and
+    /// `RelayError.protocolViolation` for a URL without a host or another scheme.
+    public static func requireHTTPS(_ url: URL) throws {
+        guard let scheme = url.scheme?.lowercased(), url.host != nil else {
+            throw RelayError.protocolViolation("URL is invalid")
+        }
+        switch scheme {
+        case "https": return
+        case "http":
+            guard isLoopback(url.host) else { throw RelayError.insecureTransport(scheme: scheme) }
+        default:
+            throw RelayError.protocolViolation("URL scheme \(scheme) is unsupported")
+        }
+    }
+}
+
 /// URL rules for the relay control socket and per-circuit sockets.
 enum RelayEndpoint {
     /// Normalizes the configured relay URL into the control WebSocket URL.
@@ -264,7 +294,9 @@ enum RelayEndpoint {
         }
         switch scheme {
         case "ws", "relay+ws", "http":
-            guard isLoopback(parts.host) else { throw RelayError.insecureTransport(scheme: scheme) }
+            guard RelayTransportPolicy.isLoopback(parts.host) else {
+                throw RelayError.insecureTransport(scheme: scheme)
+            }
             parts.scheme = "ws"
         case "wss", "relay+wss", "https": parts.scheme = "wss"
         default: throw RelayError.protocolViolation("relay URL scheme \(scheme) is unsupported")
@@ -278,16 +310,6 @@ enum RelayEndpoint {
             throw RelayError.protocolViolation("relay URL is invalid")
         }
         return control
-    }
-
-    /// `localhost`, `127.0.0.0/8` and `::1`.
-    private static func isLoopback(_ host: String?) -> Bool {
-        guard var host = host?.lowercased() else { return false }
-        if host.hasPrefix("["), host.hasSuffix("]") { host = String(host.dropFirst().dropLast()) }
-        if host == "localhost" || host == "::1" { return true }
-        let octets = host.split(separator: ".", omittingEmptySubsequences: false)
-        guard octets.count == 4, octets.allSatisfy({ UInt8($0) != nil }) else { return false }
-        return octets[0] == "127"
     }
 
     /// The URL a circuit socket joins on. The native relay takes joins on the control URL;

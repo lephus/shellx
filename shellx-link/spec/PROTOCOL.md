@@ -375,3 +375,57 @@ and PendingItem objects use their wire form). All 21 cases:
 | `chat_interrupt` | `chat.interrupt` | `call_id`, `session_id`, `hard` |
 | `chat_interrupt_result` | `chat.interrupt.result` | `call_id`, `outcome` |
 | `unknown` | any unrecognized `t` | `type` (the `t` value); decode-only |
+
+## 9. Pairing and trust
+
+A phone trusts a Mac only through a QR code the Mac shows, and a Mac trusts a phone only after the
+user presses Allow on that Mac. The relay carries the request; it cannot create trust.
+
+**Offer (QR code).** The Mac shows
+
+```
+shellx-link://pair?v=1&m=<machine_id>&s=<link_slot>&k=<host key>&c=<code>&n=<machine name>
+```
+
+`k` is the Mac's 32-byte Noise static public key and `c` a 16-byte one-time code from a system
+random source; both are base64url without padding. `n` is the machine name, percent-encoded (only
+`A-Z a-z 0-9 - . _ ~` stay literal). `v` MUST be `1`; a parser rejects another version, a missing or
+repeated field, and keys or codes of the wrong length. An offer is valid for 300 seconds
+(`PairingOffer.lifetime`).
+
+**Proof.** The phone proves it scanned the offer without sending the code:
+
+```
+proof = HMAC-SHA256(key: code, message: "shellx-link-pair/1" || 0x00 || UTF-8(machine_id) || 0x00 || client_key)
+```
+
+`client_key` is the phone's 32-byte Noise static public key. The Mac recomputes the proof and
+compares in constant time. `spec/vectors/pairing.json` has a fixed vector.
+
+**Relay routes** (JSON; `Authorization: Bearer <token>`; errors are `{"error": {"code", "message"}}`;
+`*_b64` fields are standard base64):
+
+| Route | Caller | Purpose |
+| --- | --- | --- |
+| `POST /v1/auth/login` | phone | `{email, password, device: {kind: "mobile", platform: "ios", name, public_key}}` (`public_key` base64url) gives `{user_id, device_id, token}` |
+| `POST /v2/phone-pairings` | phone | `{machine_id, client_key_b64, proof_b64}` gives `201 {pairing_id}` |
+| `GET /v2/phone-pairings/:id` | phone | `{status: pending\|approved\|denied\|expired, machine?: {machine_id, name, link_slot}}` |
+| `GET /v2/phone-pairings?role=target`, `POST .../:id/approve`, `POST .../:id/deny` | Mac | list, approve or deny requests to this Mac |
+| `GET /v2/phone-grants` | phone | `{grants: [{grant_id, machine_id, name, platform, online, link_slot, fingerprint}]}` |
+| `DELETE /v2/phone-grants/:id` | phone or Mac | remove access (`204`) |
+| `POST /v2/relay/tickets` | phone | `{permission: "connect", lane: "link", target_machine_id}` gives `{ticket, expires_at_unix, relay_url}` |
+
+**Rules.**
+
+- The phone's key becomes trusted by the Mac only after the user presses Allow on the Mac; the Mac
+  then adds `client_key` to its list of allowed phones. A pending request grants nothing.
+- The phone pins the host key from the QR offer. It never takes a host key from the relay. When the
+  pairing is approved, the `machine_id` and `link_slot` the relay returns MUST equal the offer's;
+  otherwise the phone aborts and stores nothing.
+- Every later connection is a Noise handshake (section 2) in which the phone accepts only the pinned
+  host key, over a circuit to the pinned `link_slot`. The phone checks that the connect ticket the
+  relay mints names that slot and carries the `connect` permission.
+- The relay can only remove trust (delete a grant, stop routing); a compromised relay cannot make a
+  phone trust another host or a Mac trust another phone.
+- The API base URL MUST be `https`, except for a loopback host (development).
+- Tokens, passwords, tickets, keys, codes and proofs are never logged.

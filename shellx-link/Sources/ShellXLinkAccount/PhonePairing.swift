@@ -1,0 +1,63 @@
+import Foundation
+import ShellXLinkCore
+
+/// A machine this phone is paired with. `hostKey` comes from the QR offer, never from the relay.
+public struct PairedMachine: Codable, Equatable, Sendable {
+    public var machineID: String
+    public var name: String
+    public var linkSlot: String
+    public var hostKey: Data
+
+    public init(machineID: String, name: String, linkSlot: String, hostKey: Data) {
+        self.machineID = machineID
+        self.name = name
+        self.linkSlot = linkSlot
+        self.hostKey = hostKey
+    }
+}
+
+public enum PhonePairingError: Error, Equatable, Sendable {
+    /// The user pressed Deny on the Mac.
+    case denied
+    /// Nobody approved within `PairingOffer.lifetime`, or the relay reports the request expired.
+    case expired
+}
+
+public enum PhonePairing {
+    /// Sends a pairing request for the scanned offer and waits (up to `PairingOffer.lifetime`) for
+    /// the user to approve it on the Mac.
+    ///
+    /// Trust comes from the offer: the host key is the offer's, and the machine id and link slot the
+    /// relay reports on approval must equal the offer's, otherwise `RelayAPIError.badResponse`.
+    public static func pair(
+        offerURI: String,
+        clientKey: Data,
+        api: RelayAPI,
+        token: String,
+        pollInterval: Duration = .seconds(2)
+    ) async throws -> PairedMachine {
+        let offer = try PairingOffer(uri: offerURI)
+        let id = try await api.requestPairing(offer: offer, clientKey: clientKey, token: token)
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(PairingOffer.lifetime))
+        while true {
+            switch try await api.pairingStatus(id: id, token: token) {
+            case .pending:
+                break
+            case .denied:
+                throw PhonePairingError.denied
+            case .expired:
+                throw PhonePairingError.expired
+            case let .approved(machineID, _, linkSlot):
+                guard machineID == offer.machineID, linkSlot == offer.linkSlot else {
+                    throw RelayAPIError.badResponse
+                }
+                return PairedMachine(
+                    machineID: offer.machineID, name: offer.machineName, linkSlot: offer.linkSlot,
+                    hostKey: offer.hostKey)
+            }
+            guard clock.now < deadline else { throw PhonePairingError.expired }
+            try await Task.sleep(for: pollInterval)
+        }
+    }
+}
