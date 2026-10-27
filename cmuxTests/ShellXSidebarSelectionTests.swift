@@ -1,6 +1,7 @@
 import AppKit
 import CmuxFoundation
 import CmuxSettings
+import CmuxSidebar
 import ShellXBrand
 import SwiftUI
 import Testing
@@ -465,5 +466,24 @@ extension ShellXSidebarSelectionTests {
 
         #expect(workspace.customColor == WorkspaceTabColorSettings.newWorkspaceColorHex())
         #expect(WorkspaceTabColorSettings.defaultColorHex(named: "Purple") == "#6A1B9A")
+    }
+}
+
+// ShellX: an agent parked on a background task or wakeup ("Waiting") shows a
+// spinning loader in its status line, not a still hourglass, so it reads as busy.
+extension ShellXSidebarSelectionTests {
+    @Test func waitingStatusLineShowsASpinnerInsteadOfItsIcon() {
+        let line = SidebarRowIconTextLine(frame: NSRect(x: 0, y: 0, width: 200, height: 14))
+        let model = SidebarAppKitRowCellTests.makeModel(isActive: true)
+        let waiting = SidebarStatusEntry(key: "claude_code", value: "Waiting", icon: "hourglass", workState: .waiting)
+        let running = SidebarStatusEntry(key: "claude_code", value: "Running", icon: "bolt.fill", workState: .running)
+
+        line.configureMetadataEntry(waiting, model: model, color: .secondaryLabelColor, onOpenURL: { _ in })
+        #expect(line.showsWaitingSpinner)
+        #expect(!line.showsIconImage)
+
+        line.configureMetadataEntry(running, model: model, color: .secondaryLabelColor, onOpenURL: { _ in })
+        #expect(!line.showsWaitingSpinner)
+        #expect(line.showsIconImage)
     }
 }

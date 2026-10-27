@@ -315,12 +315,17 @@ final class SidebarRowIconTextLine: NSView {
     private let secondTextView = SidebarRowTextView(lines: 1)
     /// ShellX: the agent's ✻ glyph, in the icon slot while the line says what the agent does.
     private var activityGlyph: ActivityGlyphView?
+    /// ShellX: a loader in the icon slot while the agent waits on a background task or wakeup.
+    private var waitingSpinner: GPUSpinnerNSView?
     private var iconSize: CGFloat = 0
     private var stacked = false
 
     /// Whether the activity glyph may move: off for rows that are scrolled away or not presented.
     var isPresentationActive = true {
-        didSet { activityGlyph?.isPresentationActive = isPresentationActive }
+        didSet {
+            activityGlyph?.isPresentationActive = isPresentationActive
+            waitingSpinner?.isPresentationActive = isPresentationActive
+        }
     }
 
     override var isFlipped: Bool { true }
@@ -356,7 +361,14 @@ final class SidebarRowIconTextLine: NSView {
         iconLabel.isHidden = true
         iconView.isHidden = true
         iconSize = 0
-        if let icon = entry.icon {
+        if entry.workState == .waiting {
+            // A still icon reads as idle; the agent is parked on work it will wake for.
+            let spinner = waitingSpinner ?? makeWaitingSpinner()
+            spinner.color = color
+            spinner.colorScheme = model.colorSchemeIsDark ? .dark : .light
+            spinner.isHidden = false
+            iconSize = model.scaled(8) + 3
+        } else if let icon = entry.icon {
             if icon.hasPrefix("emoji:") {
                 iconLabel.isHidden = false
                 iconLabel.stringValue = String(icon.dropFirst("emoji:".count))
@@ -434,6 +446,15 @@ final class SidebarRowIconTextLine: NSView {
         textView.isHidden = false
         textView.configurePlainText(text, font: .systemFont(ofSize: model.scaled(10)), color: color, toolTip: nil)
         needsLayout = true
+    }
+
+    private func makeWaitingSpinner() -> GPUSpinnerNSView {
+        let spinner = GPUSpinnerNSView()
+        spinner.style = .macOSSpokes
+        spinner.isPresentationActive = isPresentationActive
+        addSubview(spinner)
+        waitingSpinner = spinner
+        return spinner
     }
 
     private func makeActivityGlyph() -> ActivityGlyphView {
@@ -548,6 +569,11 @@ final class SidebarRowIconTextLine: NSView {
         return first + second
     }
 
+    /// Whether the line shows the waiting spinner.
+    var showsWaitingSpinner: Bool { waitingSpinner.map { !$0.isHidden } ?? false }
+    /// Whether the line shows an icon image.
+    var showsIconImage: Bool { !iconView.isHidden }
+
     private func resetPrimaryContent(keepingActivityGlyph: Bool = false) {
         textView.isHidden = true
         textView.toolTip = nil
@@ -560,6 +586,7 @@ final class SidebarRowIconTextLine: NSView {
         if !keepingActivityGlyph {
             activityGlyph?.isHidden = true
         }
+        waitingSpinner?.isHidden = true
     }
 
     private func primaryMeasuredHeight(width: CGFloat) -> CGFloat {
@@ -574,6 +601,7 @@ final class SidebarRowIconTextLine: NSView {
 
     private var visibleIcon: NSView? {
         if let activityGlyph, !activityGlyph.isHidden { return activityGlyph }
+        if let waitingSpinner, !waitingSpinner.isHidden { return waitingSpinner }
         if !iconView.isHidden { return iconView }
         return iconLabel.isHidden ? nil : iconLabel
     }
