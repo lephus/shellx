@@ -209,6 +209,30 @@ final class HomeModelTests: XCTestCase {
         XCTAssertEqual(rig.home.messageTarget, s1)
     }
 
+    func testMessageBegunWithNoSessionGoesToTheFirstOneThatAppears() async throws {
+        let mac = await macWithSessions([])
+        let rig = try await HomeRig.make([mac], in: self)
+        let online = await rig.online(sessions: 0)
+        XCTAssertTrue(online)
+        let running = await rig.startRunning(in: self)
+        XCTAssertTrue(running)
+
+        // The mic is pressed while the chip shows no session; one starts while the user talks.
+        rig.home.beginMessage()
+        XCTAssertNil(rig.home.messageTarget)
+        await mac.upsertSession(agentSession("s1"))
+        let appeared = await eventually { rig.home.effectiveTarget == self.ref(mac, "s1") }
+        XCTAssertTrue(appeared)
+        XCTAssertEqual(rig.home.messageTarget, ref(mac, "s1"),
+                       "going from no session to one is not a silent switch: the chip shows it")
+
+        // Once the chip shows s1, the message stays with it even if s2 becomes the newest.
+        await mac.upsertSession(agentSession("s2", lastActivityMs: 1_800_000_000_000))
+        let moved = await eventually { rig.home.effectiveTarget == self.ref(mac, "s2") }
+        XCTAssertTrue(moved)
+        XCTAssertEqual(rig.home.messageTarget, ref(mac, "s1"))
+    }
+
     func testMessageToASessionThatStoppedMeanwhileIsNotSentElsewhere() async throws {
         let mac = await macWithSessions(["s1", "s2", "s3"])
         let rig = try await HomeRig.make([mac], in: self)

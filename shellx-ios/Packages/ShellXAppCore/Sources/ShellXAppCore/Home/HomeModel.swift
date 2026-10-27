@@ -184,9 +184,11 @@ public final class HomeModel {
     // MARK: - Sending
 
     /// What the "Send to:" chip shows, and where the message under way goes: while one is under way,
-    /// the session the chip showed when it began; otherwise `effectiveTarget`.
+    /// the session the chip showed when it began; otherwise `effectiveTarget`. A message that began
+    /// with no session takes the first one that appears (the chip shows it, so nothing switches
+    /// silently).
     public var messageTarget: SessionRef? {
-        composing ? held : effectiveTarget
+        composing ? (held ?? effectiveTarget) : effectiveTarget
     }
 
     /// A message began (the mic pressed, the field focused): it goes to the session the chip shows
@@ -311,6 +313,8 @@ public final class HomeModel {
             stopFollowing(ref)
         }
         for ref in finished { startFinish(ref) }
+        // A message begun with no session keeps the first one the chip shows.
+        if composing, held == nil { held = effectiveTarget }
     }
 
     // MARK: - Finished sessions
