@@ -1161,6 +1161,23 @@ App Flutter, `release/mobile/ios.sh` và `android.sh` cũ đã bị xoá ở `e9
   Ghi nhật ký ngắn vào ledger.
 - [ ] **Step 4: iPhone thật qua relay.shellx.pro. Cần người dùng đồng ý trước.** Route điện thoại của relay chỉ có trên production sau khi P2 vào `main` và được deploy.
   - Được đồng ý: chạy `dev.sh device`, đăng nhập tài khoản thật, ghép với Mac (tag `link`, API production), rồi lặp lại các bước 3–6 của Step 3, một lần trên 4G (tắt Wi-Fi) và một lần trên Wi-Fi.
+  - Thêm (final review P3, ruling P3-R11), ghi kết quả từng mục vào ledger:
+    1. "Xem tất cả" (List): Từ chối, Cho phép, "…", Xem thêm, Thử lại — mỗi nút chỉ làm việc của nó, không bao giờ lỡ Cho phép.
+    2. Sheet câu hỏi đang mở, đã gõ dài ở "Khác…", bật chế độ máy bay tới khi Mac offline: sheet không nói "đã xử lý ở nơi khác", nháp còn nguyên sau khi nối lại.
+    3. Trên Mac resume/compact một phiên Claude khi màn agent đang đóng, và khi bị "Xem tất cả" che: mở lại không còn dòng nào của transcript cũ.
+    4. Hai agent đang chạy, giữ mic ~5 s trong lúc một agent xong: tin đi tới phiên chip hiện lúc bấm.
+    5. Nền > 25 s rồi quay lại, và quay lại đúng lúc hết grace: không Mac nào kẹt ở "Đang nối lại…".
+    6. Đổi Wi-Fi → 4G đúng lúc đang gửi quyết định.
+    7. Ngắt giọng nói: cắm/rút AirPods, cuộc gọi, Siri, Control Center; giữ mic 70 s trên nhận dạng máy chủ (vi-VN): giữ chữ, nhả mic.
+    8. iOS 26 mới: lần bấm đầu qua SFSpeechRecognizer trong lúc tải asset, Cài đặt nói "máy chủ Apple" rồi "trên iPhone này"; lần bấm hiện hộp xin quyền để mic tắt.
+    9. VoiceOver tap mode: bật mic ở home, mở sheet câu hỏi dùng mic của sheet, quay lại: mic home không gửi chữ cũ.
+    10. Đăng xuất trên mạng chậm: logo hiện bao lâu, Mac có bỏ iPhone không.
+    11. Đổi tài khoản trên một máy: tài khoản thứ hai không thấy lịch sử hay Mac của tài khoản đầu.
+    12. Bản Debug ký trên máy và ipa Release ký: Keychain access group chạy với team prefix thật.
+    13. Ghép hai iPhone vào một Mac: Mac đặt tên chúng ra sao.
+    14. Dán 1 MB vào composer và ô "Khác…": UI không đơ.
+    15. 2000 mục ở home: `launchToHome` < 1 s.
+    16. Quét QR khi xoay ngang; Dynamic Type cỡ trợ năng; màu sáng và tối.
   - Không được: ghi vào ledger "chưa đo trên iPhone thật qua relay.shellx.pro". Phần giọng nói không phụ thuộc relay: Task 9 không có iPhone thật nên đo ở Step 5 (ruling P3-R9), chỉ cần người dùng đồng ý cài bản Debug lên iPhone.
 - [ ] **Step 5: Đo.** Dùng mục "Đo độ trễ" trong Cài đặt (bản Debug), 20 lần cho mỗi loại:
   - `replyRoundTrip`: cận trên của "bấm Cho phép → hook nhận quyết định", vì host chỉ trả `delivered` sau khi hook đã nhận;
