@@ -29,6 +29,17 @@ export const requireDesktop: MiddlewareHandler<AppEnv> = async (c, next) => {
   await next();
 };
 
+/** Only a phone (a `mobile` device) may use the phone request routes; run after `requireAuth`. */
+export const requireMobile: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (c.get("auth").kind !== "mobile") throw Errors.mobileOnly();
+  await next();
+};
+
+/** The grant id of this phone for this machine, if the machine approved it and it was not removed since. */
+export function phoneGrant(db: Db, deviceId: string, machineId: string): { id: string } | undefined {
+  return db.get<{ id: string }>("SELECT id FROM phone_grants WHERE device_id = ? AND machine_id = ?", deviceId, machineId);
+}
+
 /** The machine registered by this device, if any. */
 export function ownMachine(db: Db, deviceId: string): MachineRow | undefined {
   return db.get<MachineRow>("SELECT * FROM machines WHERE device_id = ?", deviceId);
