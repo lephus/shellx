@@ -155,6 +155,8 @@ public final class MachineHub {
         guard !stopped else { return }
         if let model = machines.first(where: { $0.id == machine.machineID }) {
             await disconnect(model)
+            // A sign-out may have stopped the hub while the old connection closed.
+            guard !stopped else { return }
             model.replace(with: machine)
             connect(model)
         } else {
@@ -175,7 +177,9 @@ public final class MachineHub {
         } catch {
             return
         }
-        let known = machines
+        // What each Mac was paired as when the request left: a Mac re-paired meanwhile (replaced in
+        // place by `add`) or added meanwhile may not be in this list yet.
+        let known = machines.map { (model: $0, machine: $0.machine) }
         let grants: [PairedMachineListing]
         do {
             grants = try await relay.machines(token: token)
@@ -185,8 +189,8 @@ public final class MachineHub {
         }
         guard !stopped else { return }
         let byID = Dictionary(grants.map { ($0.machineID, $0) }, uniquingKeysWith: { first, _ in first })
-        // Only Macs that were there before the request: one added meanwhile may not be listed yet.
-        for model in known where machines.contains(where: { $0 === model }) {
+        for (model, machine) in known where model.machine == machine && machines.contains(where: { $0 === model }) {
+            guard !stopped else { return }
             if let grant = byID[model.id] {
                 if model.name != grant.name { model.name = grant.name }
             } else if model.state != .revoked {
@@ -214,7 +218,7 @@ public final class MachineHub {
     /// Waits `backgroundGrace`; when the app is still in the background then, closes every session.
     /// Returns early when the app comes back. The app calls it inside a background task.
     public func appDidEnterBackground() async {
-        guard !stopped else { return }
+        guard !stopped, !suspended else { return }
         inBackground = true
         grace?.cancel()
         let sleep = self.sleep
@@ -233,17 +237,27 @@ public final class MachineHub {
         await suspend()
     }
 
-    /// The network path changed (Wi-Fi to cellular, a new Wi-Fi, back online): a live session may be
-    /// dead without anyone knowing yet, so it is replaced at once, and the others retry now.
+    /// iOS ends the background time before the grace ran out, or granted none: closes every session
+    /// now. Everything that matters happens before this returns (items not actionable, connections
+    /// detached), so a return to the app reconnects every Mac from scratch even if the app is frozen
+    /// before the sessions finish closing.
+    public func backgroundTimeExpired() {
+        guard !stopped, !suspended else { return }
+        inBackground = true
+        grace?.cancel()
+        grace = nil
+        let closing = detachAll()
+        Task { for connection in closing { await connection.stop() } }
+    }
+
+    /// The network path changed (Wi-Fi to cellular, a new Wi-Fi, back online): a session, or an
+    /// attempt still syncing, may ride a dead path without anyone knowing yet, so each connection
+    /// replaces its client at once, and one without a client retries now. The connection decides
+    /// from its own state; the model's copy may lag.
     public func networkChanged() {
         guard !stopped, !suspended else { return }
-        for model in machines {
-            guard let connection = connections[model.id] else { continue }
-            if model.state == .online {
-                Task { await connection.forceReconnect() }
-            } else {
-                Task { await connection.reconnectNow() }
-            }
+        for connection in connections.values {
+            Task { await connection.forceReconnect() }
         }
     }
 
@@ -298,11 +312,14 @@ public final class MachineHub {
     }
 
     var chatSubscriberCount: Int { chatSubscribers.count }
+    var connectionCount: Int { connections.count }
     var sessionSubscriberCount: Int { sessionSubscribers.count }
 
     // MARK: - Connections
 
     private func connect(_ model: MachineModel) {
+        // A stopped hub (signed out, or 401) never starts a connection: nobody reads its events.
+        guard !stopped else { return }
         if let old = connections[model.id] {
             readers[model.id]?.cancel()
             Task { await old.stop() }
@@ -361,21 +378,26 @@ public final class MachineHub {
     }
 
     private func suspend() async {
+        for connection in detachAll() { await connection.stop() }
+    }
+
+    /// Marks every Mac as not live and takes every connection out of the hub, without waiting, so
+    /// nothing can interleave halfway. Returns the connections for the caller to stop.
+    private func detachAll() -> [MachineConnection] {
         suspended = true
-        for model in machines {
-            guard inBackground else { break }
-            guard connections[model.id] != nil else { continue }
-            if !model.state.isTerminal {
-                model.pendingActionable = false
-                if model.state == .online { model.state = .reconnecting }
-            }
-            await disconnect(model)
+        for model in machines where !model.state.isTerminal {
+            model.pendingActionable = false
+            if model.state == .online { model.state = .reconnecting }
         }
-        // The app came back while the sessions were closing.
-        if !inBackground { resume() }
+        for reader in readers.values { reader.cancel() }
+        readers = [:]
+        let detached = Array(connections.values)
+        connections = [:]
+        return detached
     }
 
     private func resume() {
+        guard !stopped else { return }
         suspended = false
         for model in machines where !model.state.isTerminal && connections[model.id] == nil {
             connect(model)
@@ -395,7 +417,8 @@ public final class MachineHub {
     }
 
     private func reportUnauthorized() async {
-        guard !unauthorizedReported else { return }
+        // After a stop (a sign-out), a late 401 answers a request made with the dropped token.
+        guard !unauthorizedReported, !stopped else { return }
         unauthorizedReported = true
         await onUnauthorized()
     }

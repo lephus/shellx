@@ -11,7 +11,8 @@ public enum LinkFailure: Equatable, Sendable {
     case signedOut
     /// The Mac no longer lets this iPhone in (its grant is gone, or the Mac was removed).
     case revoked
-    /// The Mac answered with another key than the one pinned at pairing.
+    /// The Mac is not the one pinned at pairing: it answered with another key, or the relay hands out
+    /// tickets for another slot.
     case hostKeyChanged
     /// The Mac speaks another protocol version: one of the two apps needs an update.
     case needsUpdate
@@ -22,7 +23,7 @@ public enum LinkFailure: Equatable, Sendable {
             self = .signedOut
         case RelayAPIError.http(status: _, code: "not_granted"), RelayAPIError.http(status: _, code: "machine_not_found"):
             self = .revoked
-        case NoiseError.untrustedPeer:
+        case NoiseError.untrustedPeer, RelayAPIError.slotMismatch:
             self = .hostKeyChanged
         case LinkClientError.protocolMismatch:
             self = .needsUpdate

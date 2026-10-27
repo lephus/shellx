@@ -15,9 +15,26 @@ final class FakeMacFeed: AgentFeedSource, @unchecked Sendable {
     private var replyDelay: Duration = .zero
     private var replies: [FakeMac.Decision] = []
     private var snapshots = 0
+    private var holding = false
+    private var held: [CheckedContinuation<Void, Never>] = []
 
     var decisions: [FakeMac.Decision] { lock.withLock { replies } }
     var snapshotCount: Int { lock.withLock { snapshots } }
+    var heldSnapshotCount: Int { lock.withLock { held.count } }
+
+    /// Snapshot requests wait (the session stays connected but never syncs) until `releaseSnapshots()`.
+    func holdSnapshots() {
+        lock.withLock { holding = true }
+    }
+
+    func releaseSnapshots() {
+        let waiting = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
+            holding = false
+            defer { held = [] }
+            return held
+        }
+        for continuation in waiting { continuation.resume() }
+    }
 
     func add(_ item: PendingItem) {
         lock.withLock {
@@ -43,7 +60,15 @@ final class FakeMacFeed: AgentFeedSource, @unchecked Sendable {
     }
 
     func snapshot() async -> (revision: Int, pending: [PendingItem]) {
-        lock.withLock {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let pass = lock.withLock { () -> Bool in
+                guard holding else { return true }
+                held.append(continuation)
+                return false
+            }
+            if pass { continuation.resume() }
+        }
+        return lock.withLock {
             snapshots += 1
             return (revision, items.values.sorted { $0.requestId < $1.requestId })
         }

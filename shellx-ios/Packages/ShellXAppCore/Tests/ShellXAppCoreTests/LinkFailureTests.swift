@@ -25,6 +25,12 @@ final class LinkFailureTests: XCTestCase {
         XCTAssertEqual(LinkFailure(NoiseError.untrustedPeer), .hostKeyChanged)
     }
 
+    func testSlotMismatchIsHostKeyChanged() {
+        // The relay hands out a ticket for another slot than the one pinned at pairing: a pinning
+        // failure like a changed host key, which retrying cannot fix.
+        XCTAssertEqual(LinkFailure(RelayAPIError.slotMismatch), .hostKeyChanged)
+    }
+
     func testProtocolMismatchIsNeedsUpdate() {
         XCTAssertEqual(LinkFailure(LinkClientError.protocolMismatch(message: "the host speaks protocol 2")), .needsUpdate)
     }

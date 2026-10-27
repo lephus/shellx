@@ -137,6 +137,12 @@ public actor FakeMac {
     public var decisions: [Decision] { feed.decisions }
     /// How many `agent.snapshot.get` the Mac answered.
     public var snapshotCount: Int { feed.snapshotCount }
+    /// From now on `agent.snapshot.get` is not answered (the phone stays connected but unsynced)
+    /// until `releaseSnapshots()`.
+    public func holdSnapshots() { feed.holdSnapshots() }
+    public func releaseSnapshots() { feed.releaseSnapshots() }
+    /// How many snapshot requests are being held.
+    public var heldSnapshotCount: Int { feed.heldSnapshotCount }
 
     // MARK: - Sessions
 

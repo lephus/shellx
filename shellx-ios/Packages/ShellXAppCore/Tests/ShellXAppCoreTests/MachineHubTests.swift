@@ -2,6 +2,7 @@ import Foundation
 import ShellXAppTestSupport
 import ShellXLinkAccount
 import ShellXLinkCore
+import ShellXLinkSession
 import XCTest
 
 @testable import ShellXAppCore
@@ -38,7 +39,9 @@ final class MachineHubTests: XCTestCase {
 
     private func rig(
         _ macs: [FakeMac], saved: [FakeMac]? = nil, sleeper: ManualSleeper = ManualSleeper(),
-        defaults: UserDefaults? = nil
+        defaults: UserDefaults? = nil,
+        connector wrapConnector: (any MachineLinkConnecting) -> any MachineLinkConnecting = { $0 },
+        relay wrapRelay: (FakeRelayAccount) -> any RelayAccountCalling = { $0 }
     ) async throws -> Rig {
         let vault = AccountVault(store: InMemorySecretStore())
         try await vault.setSession(StoredSession(userID: "u1", deviceID: "d1", token: "tok-1", email: "a@b.c"))
@@ -49,7 +52,8 @@ final class MachineHubTests: XCTestCase {
         let unauthorized = Collected<Void>()
         let defaults = defaults ?? makeDefaults()
         let hub = MachineHub(
-            vault: vault, relay: relay, connector: FakeMacFleet(macs, phoneKey: { try await vault.phoneKey() }),
+            vault: vault, relay: wrapRelay(relay),
+            connector: wrapConnector(FakeMacFleet(macs, phoneKey: { try await vault.phoneKey() })),
             latency: latency, defaults: defaults, sleep: sleeper.sleep,
             onUnauthorized: { unauthorized.items.append(()) })
         addTeardownBlock { await hub.stopAll() }
@@ -404,6 +408,213 @@ final class MachineHubTests: XCTestCase {
         await rig.hub.refreshGrants()
 
         XCTAssertEqual(rig.unauthorized.items.count, 1, "reported once")
+    }
+}
+
+// MARK: - Fix round 1 regressions
+
+extension MachineHubTests {
+    /// Grace runs out, the closing of one Mac hangs; meanwhile the app returns and the hub is stopped
+    /// (a 401 or a sign-out). When the closing ends, nothing may connect again.
+    func testStopAllWhileSuspendingStartsNothing() async throws {
+        let a = FakeMac(name: "MacBook Pro")
+        let b = FakeMac(name: "Mac mini")
+        let gate = Gate()
+        let sleeper = ManualSleeper()
+        let rig = try await rig(
+            [a, b], sleeper: sleeper, connector: { GatedConnector(base: $0, gated: [b.machine.machineID], gate: gate) })
+        await rig.hub.start()
+        let settled = await eventually { model(rig.hub, a)?.state == .online && gate.waiting == 1 }
+        XCTAssertTrue(settled)
+
+        let hub = rig.hub
+        let background = Task { await hub.appDidEnterBackground() }
+        _ = await eventually { sleeper.waiting == [MachineHub.backgroundGrace] }
+        sleeper.release()
+        // Suspending: every connection is detached, and closing Mac mini's hangs on the gate.
+        let detached = await eventually { rig.hub.connectionCount == 0 }
+        XCTAssertTrue(detached)
+
+        rig.hub.appDidBecomeActive()
+        let stopping = Task { await hub.stopAll() }
+        let stopped = await eventually { rig.hub.connectionCount == 0 }
+        XCTAssertTrue(stopped)
+        gate.open()
+        await stopping.value
+        await background.value
+
+        XCTAssertEqual(rig.hub.connectionCount, 0, "a stopped hub never reconnects")
+    }
+
+    /// `add` replacing a Mac waits for the old connection to close; a stop meanwhile wins.
+    func testStopAllWhileAddingStartsNothing() async throws {
+        let b = FakeMac(name: "Mac mini")
+        let gate = Gate()
+        let rig = try await rig([b], connector: { GatedConnector(base: $0, gated: [b.machine.machineID], gate: gate) })
+        await rig.hub.start()
+        _ = await eventually { gate.waiting == 1 }
+
+        var renamed = b.machine
+        renamed.name = "Studio"
+        let hub = rig.hub
+        let adding = Task { try await hub.add(renamed) }
+        let closing = await eventually { rig.hub.connectionCount == 0 }
+        XCTAssertTrue(closing, "add is waiting for the old connection to close")
+
+        await rig.hub.stopAll()
+        gate.open()
+        try await adding.value
+
+        XCTAssertEqual(rig.hub.connectionCount, 0, "a stopped hub never reconnects")
+    }
+
+    /// A Mac re-paired while the grant list was in flight is not revoked by that (older) list.
+    func testRefreshSkipsMacRepairedMeanwhile() async throws {
+        let a = FakeMac(name: "MacBook Pro")
+        let gate = Gate()
+        var base: FakeRelayAccount?
+        let rig = try await rig([a], relay: { relay in
+            base = relay
+            return GatedGrantsRelay(base: relay, gate: gate)
+        })
+        let relay = try XCTUnwrap(base)
+        await rig.hub.start()
+        _ = await eventually { allOnline(rig.hub) }
+
+        let hub = rig.hub
+        let refreshing = Task { await hub.refreshGrants() }
+        _ = await eventually { gate.waiting == 1 }
+        var repaired = a.machine
+        repaired.name = "Studio"
+        try await rig.hub.add(repaired)
+        await relay.setGrants([])
+        gate.open()
+        await refreshing.value
+
+        XCTAssertNotEqual(model(rig.hub, a)?.state, .revoked)
+        XCTAssertEqual(model(rig.hub, a)?.name, "Studio")
+    }
+
+    /// A 401 that answers a grant request sent before a sign-out does not sign out a second time.
+    func testRefreshAfterStopAllDoesNotReport() async throws {
+        let a = FakeMac(name: "MacBook Pro")
+        let gate = Gate()
+        var base: FakeRelayAccount?
+        let rig = try await rig([a], relay: { relay in
+            base = relay
+            return GatedGrantsRelay(base: relay, gate: gate)
+        })
+        let relay = try XCTUnwrap(base)
+        await relay.setError(RelayAPIError.http(status: 401, code: "unauthorized"), for: .machines)
+        await rig.hub.start()
+
+        let hub = rig.hub
+        let refreshing = Task { await hub.refreshGrants() }
+        _ = await eventually { gate.waiting == 1 }
+        await rig.hub.stopAll()
+        gate.open()
+        await refreshing.value
+
+        XCTAssertEqual(rig.unauthorized.items.count, 0)
+    }
+
+    /// The network path changed while a Mac was still syncing (connected, snapshot not back): that
+    /// attempt may ride the dying path, so it is replaced too.
+    func testPathChangeAbortsAttemptStillSyncing() async throws {
+        let a = FakeMac(name: "MacBook Pro")
+        await a.addPending(pendingItem("a1"))
+        await a.holdSnapshots()
+        let sleeper = ManualSleeper()
+        let rig = try await rig([a], sleeper: sleeper)
+        await rig.hub.start()
+        let syncing = await eventually { await a.heldSnapshotCount == 1 }
+        XCTAssertTrue(syncing)
+
+        rig.hub.networkChanged()
+
+        let replaced = await eventually(timeout: .seconds(3)) { await a.connectCount == 2 }
+        XCTAssertTrue(replaced, "the attempt on the old path was dropped")
+        await a.releaseSnapshots()
+        let online = await eventually { allOnline(rig.hub) && rig.hub.pendingItems.map(\.actionable) == [true] }
+        XCTAssertTrue(online)
+        XCTAssertEqual(sleeper.requested, [], "no backoff for a path change")
+    }
+
+    /// iOS ends the background time before the grace (or grants none): sessions close at once, and
+    /// coming back reconnects from scratch.
+    func testBackgroundExpiryClosesAtOnce() async throws {
+        let a = FakeMac(name: "MacBook Pro")
+        await a.addPending(pendingItem("a1"))
+        let sleeper = ManualSleeper()
+        let rig = try await rig([a], sleeper: sleeper)
+        await rig.hub.start()
+        _ = await eventually { allOnline(rig.hub) && rig.hub.pendingItems.count == 1 }
+
+        let hub = rig.hub
+        let background = Task { await hub.appDidEnterBackground() }
+        _ = await eventually { sleeper.waiting == [MachineHub.backgroundGrace] }
+
+        rig.hub.backgroundTimeExpired()
+
+        // Synchronous: nothing on screen stays actionable, even if the app is frozen right now.
+        XCTAssertEqual(rig.hub.connectionCount, 0)
+        XCTAssertEqual(model(rig.hub, a)?.state, .reconnecting)
+        XCTAssertEqual(rig.hub.pendingItems.map(\.actionable), [false])
+        let graceCut = await eventually(timeout: .seconds(2)) { sleeper.cancelled == 1 }
+        XCTAssertTrue(graceCut, "the grace was cut short")
+        if !graceCut { sleeper.release() }
+        await background.value
+        let closed = await eventually { await a.liveSessionCount == 0 }
+        XCTAssertTrue(closed)
+
+        rig.hub.appDidBecomeActive()
+        let back = await eventually { allOnline(rig.hub) && rig.hub.pendingItems.map(\.actionable) == [true] }
+        XCTAssertTrue(back)
+        var connects = await a.connectCount
+        XCTAssertEqual(connects, 2)
+
+        // No background time at all: close at once, without a grace.
+        rig.hub.backgroundTimeExpired()
+        XCTAssertEqual(rig.hub.connectionCount, 0)
+        rig.hub.appDidBecomeActive()
+        let again = await eventually { allOnline(rig.hub) }
+        XCTAssertTrue(again)
+        connects = await a.connectCount
+        XCTAssertEqual(connects, 3)
+        XCTAssertEqual(sleeper.requested, [MachineHub.backgroundGrace])
+    }
+}
+
+/// Holds connects to the `gated` Macs until the gate opens, then fails them; others go to `base`.
+/// The hold ignores cancellation, so stopping such a connection waits for the gate.
+private struct GatedConnector: MachineLinkConnecting {
+    let base: any MachineLinkConnecting
+    let gated: Set<String>
+    let gate: Gate
+
+    func connect(_ machine: PairedMachine) async throws -> LinkClient {
+        guard gated.contains(machine.machineID) else { return try await base.connect(machine) }
+        await gate.wait()
+        throw URLError(.cannotConnectToHost)
+    }
+}
+
+/// A `FakeRelayAccount` whose grant list waits for the gate before answering.
+private struct GatedGrantsRelay: RelayAccountCalling {
+    let base: FakeRelayAccount
+    let gate: Gate
+
+    func login(email: String, password: String, deviceName: String, clientKey: Data) async throws -> AccountSession {
+        try await base.login(email: email, password: password, deviceName: deviceName, clientKey: clientKey)
+    }
+    func logout(token: String) async throws { try await base.logout(token: token) }
+    func machines(token: String) async throws -> [PairedMachineListing] {
+        await gate.wait()
+        return try await base.machines(token: token)
+    }
+    func unpair(grantID: String, token: String) async throws { try await base.unpair(grantID: grantID, token: token) }
+    func pair(offerURI: String, clientKey: Data, token: String) async throws -> PairedMachine {
+        try await base.pair(offerURI: offerURI, clientKey: clientKey, token: token)
     }
 }
 

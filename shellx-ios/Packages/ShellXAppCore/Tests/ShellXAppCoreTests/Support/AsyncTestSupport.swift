@@ -75,6 +75,38 @@ final class ManualSleeper: @unchecked Sendable {
     }
 }
 
+/// Holds callers until the test opens it. Ignores cancellation on purpose, so a test can keep a
+/// call (and whoever awaits it) suspended at a known point.
+final class Gate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    /// How many callers are held right now.
+    var waiting: Int { lock.withLock { waiters.count } }
+
+    func wait() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let pass = lock.withLock { () -> Bool in
+                if isOpen { return true }
+                waiters.append(continuation)
+                return false
+            }
+            if pass { continuation.resume() }
+        }
+    }
+
+    /// Lets every held caller and every later one through.
+    func open() {
+        let held = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
+            isOpen = true
+            defer { waiters = [] }
+            return waiters
+        }
+        for continuation in held { continuation.resume() }
+    }
+}
+
 /// Reads a `MachineConnection`'s events as they come and keeps what tests look at. Chat pushes are
 /// only counted, so a flood of them is not kept in memory here either.
 final class EventLog: @unchecked Sendable {

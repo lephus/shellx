@@ -40,12 +40,18 @@ struct ShellXApp: App {
     }
 
     /// Keeps the app running through the hub's background grace, so sessions close cleanly when the
-    /// app stays away, and stay open when it comes back within the grace.
+    /// app stays away, and stay open when it comes back within the grace. When iOS ends the time
+    /// early, or grants none, the sessions close at once.
     private static func closeSessionsAfterGrace(_ hub: MachineHub) {
         let application = UIApplication.shared
         let task = BackgroundTask()
         task.id = application.beginBackgroundTask(withName: "ShellX Link grace") {
+            hub.backgroundTimeExpired()
             task.end(in: application)
+        }
+        guard task.id != .invalid else {
+            hub.backgroundTimeExpired()
+            return
         }
         Task {
             await hub.appDidEnterBackground()

@@ -290,6 +290,40 @@ final class MachineConnectionTests: XCTestCase {
         XCTAssertEqual(outcome, .delivered)
     }
 
+    func testForceReconnectAbortsAnAttemptStillSyncing() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.addPending(pendingItem("r1"))
+        await mac.holdSnapshots()
+        let sleeper = ManualSleeper()
+        let (connection, log) = await connect(mac, sleep: sleeper.sleep)
+        let syncing = await eventually { await mac.heldSnapshotCount == 1 }
+        XCTAssertTrue(syncing)
+
+        await connection.forceReconnect()
+
+        let replaced = await eventually(timeout: .seconds(3)) { await mac.connectCount == 2 }
+        XCTAssertTrue(replaced, "the attempt was dropped and started again")
+        await mac.releaseSnapshots()
+        let online = await eventually { log.isOnline }
+        XCTAssertTrue(online, "\(log.states)")
+        // Dropping our own attempt is not a failure: no offline, no cleared items, no backoff.
+        XCTAssertEqual(log.states, [.connecting, .online])
+        XCTAssertEqual(log.pendingIDs, ["r1"])
+        XCTAssertEqual(sleeper.requested, [])
+    }
+
+    func testSlotMismatchStops() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.failNextConnects(RelayAPIError.slotMismatch, count: 5)
+        let (_, log) = await connect(mac)
+
+        let stopped = await eventually { log.finished }
+        XCTAssertTrue(stopped, "\(log.states)")
+        XCTAssertEqual(log.state, .hostKeyChanged)
+        let connects = await mac.connectCount
+        XCTAssertEqual(connects, 1)
+    }
+
     func testForceReconnectReplacesLiveSession() async throws {
         let mac = FakeMac(name: "MacBook Pro")
         let sleeper = ManualSleeper()

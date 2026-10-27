@@ -36,6 +36,8 @@ public actor MachineConnection {
     private var backoffWait: Task<Void, Never>?
     /// Set by `reconnectNow()` / `forceReconnect()` when no wait is running: the next wait is skipped.
     private var skipBackoff = false
+    /// Set by `forceReconnect()` when it closes the client: the round's end is ours, not a failure.
+    private var forcedClose = false
     /// Failures in a row since the last `welcome`; a session that ended counts as one.
     private var failures = 0
     /// When the last live session ended: what `.offline(since:)` reports.
@@ -82,11 +84,14 @@ public actor MachineConnection {
         }
     }
 
-    /// Closes the live session and connects again at once: after a network change the old session
-    /// may be dead without either side knowing yet. Without a live session it is `reconnectNow()`.
+    /// Closes the current client and connects again at once: after a network change the session (or
+    /// the attempt still syncing) may ride a dead path without either side knowing yet. Dropping it
+    /// is not a failure: no backoff, and the items are not cleared. Without a client it is
+    /// `reconnectNow()`.
     public func forceReconnect() async {
         guard !ended else { return }
-        guard state == .online, let client else { return reconnectNow() }
+        guard let client else { return reconnectNow() }
+        forcedClose = true
         skipBackoff = true
         await client.close()
     }
@@ -112,12 +117,18 @@ public actor MachineConnection {
                 await read(client)
                 await client.close()
                 self.client = nil
+                forcedClose = false
                 guard !Task.isCancelled else { break }
                 sessionEnded()
             } catch {
                 await closeClient()
                 guard !Task.isCancelled else { break }
-                guard keepTrying(after: error) else { break }
+                if forcedClose {
+                    // `forceReconnect()` dropped an attempt still syncing: start over at once.
+                    forcedClose = false
+                } else {
+                    guard keepTrying(after: error) else { break }
+                }
             }
             await waitBeforeRetry()
         }
