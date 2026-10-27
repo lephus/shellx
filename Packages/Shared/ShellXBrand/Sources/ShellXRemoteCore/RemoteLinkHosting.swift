@@ -12,7 +12,8 @@ public protocol RemoteLinkHosting: AnyObject, Sendable {
     /// - Parameters:
     ///   - machineID: This machine's id from `machines.register`, the target of self-connect tickets.
     ///   - linkSlot: The relay slot of this machine's ShellX Link lane.
-    func start(machineID: String, linkSlot: String)
+    ///   - accountID: The signed-in ShellX account (`accountOwnerID`); the host key and trusted phones are kept per account.
+    func start(machineID: String, linkSlot: String, accountID: String)
     /// Stops serving. Returns at once and is idempotent.
     func stop()
 }

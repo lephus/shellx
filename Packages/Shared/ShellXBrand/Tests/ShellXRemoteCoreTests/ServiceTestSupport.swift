@@ -154,14 +154,14 @@ final class FakeBridge: RemoteBridgeControlling, @unchecked Sendable {
 /// Records the link host's starts and stops (in the shared event log too, for ordering checks).
 @MainActor
 final class FakeLinkHost: RemoteLinkHosting {
-    struct Start: Equatable { let machineID: String; let linkSlot: String }
+    struct Start: Equatable { let machineID: String; let linkSlot: String; let accountID: String }
     let log: EventLog
     private(set) var starts: [Start] = []
     private(set) var stops = 0
     init(log: EventLog) { self.log = log }
-    func start(machineID: String, linkSlot: String) {
+    func start(machineID: String, linkSlot: String, accountID: String) {
         log.add("link:start")
-        starts.append(Start(machineID: machineID, linkSlot: linkSlot))
+        starts.append(Start(machineID: machineID, linkSlot: linkSlot, accountID: accountID))
     }
     func stop() { log.add("link:stop"); stops += 1 }
 }
@@ -206,6 +206,8 @@ final class ServiceRig {
          devCredentials: ShellXRemoteDevCredentials? = nil) {
         core = FakeRemoteCore(clock: base.clock, log: base.log, coreStateDir: base.paths.coreStateDir)
         core.signedIn.with { $0 = signedIn }
+        // A restored session keeps the owner of its last sign-in; the link host is scoped by it.
+        if signedIn { try? base.store.saveOwner("u_1") }
         bridge = FakeBridge(log: base.log)
         linkHost = FakeLinkHost(log: base.log)
         gate = Locked(gateOn)

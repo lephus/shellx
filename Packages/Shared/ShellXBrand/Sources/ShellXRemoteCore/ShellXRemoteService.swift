@@ -386,7 +386,11 @@ public final class ShellXRemoteService: ObservableObject {
             RemoteLog.service.notice("link host not started: the relay gave no link slot")
             return
         }
-        linkHost.start(machineID: machineID, linkSlot: linkSlot)
+        guard let accountID = accountOwnerID, !accountID.isEmpty else {
+            RemoteLog.service.notice("link host not started: no signed-in account")
+            return
+        }
+        linkHost.start(machineID: machineID, linkSlot: linkSlot, accountID: accountID)
     }
 
     func hostChanged(_ state: LinkState, _ gen: Int) {

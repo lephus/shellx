@@ -53,8 +53,7 @@ extension ShellXRemoteEnvironment {
         // a `link_slot` from `machines.register`.
         let linkHost = ShellXLinkHostController(
             core: core,
-            keys: ShellXLinkKeyStore(directory: ShellXLinkKeyStore.defaultDirectory(
-                home: FileManager.default.homeDirectoryForCurrentUser)),
+            storage: KeychainLinkSecretStorage(),
             feed: ShellXLinkFeedSource(coordinator: .shared),
             hostVersion: device.appVersion,
             machineName: device.machineName)

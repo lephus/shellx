@@ -1,120 +1,180 @@
-import Darwin
 import Foundation
 import os
+import Security
 import ShellXLinkCore
-import ShellXRemoteCore
 
-/// ShellX: the Mac's ShellX Link identity and the phones it trusts, under
-/// `~/Library/Application Support/ShellX/link/` (directory `0700`, files `0600`).
+/// A phone this Mac lets in over ShellX Link.
+struct TrustedPhone: Equatable, Sendable {
+    /// The phone's 32-byte static public key.
+    let key: Data
+    let deviceID: String
+    let name: String
+    let pairedAt: Date
+}
+
+/// ShellX: the Mac's ShellX Link identity and the phones it trusts, in secret storage (the Keychain in the
+/// app), one set per signed-in ShellX account.
 ///
-/// * `host-key`: the 32-byte X25519 private key, created on first use.
-/// * `trusted-clients.json`: `{"version": 1, "clients": ["<base64 public key>", ...]}`.
+/// * `host-key.<accountID>`: the 32-byte X25519 private key, created on first use.
+/// * `trusted-clients.<accountID>`: `{"version": 2, "phones": [{"key", "device_id", "name", "paired_at"}]}`.
 ///
-/// P1 spike storage; P2 moves both into the Keychain together with real pairing. File I/O blocks, so
-/// ``hostKey()``, ``load()`` and ``trust(_:)`` run off the main thread. ``trustedClients()`` only reads
-/// memory and is safe from any thread.
+/// The P1 files under `~/Library/Application Support/ShellX/link/` are neither read nor deleted.
+/// Storage calls block, so ``hostKey()``, ``load()`` and the mutators run off the main thread.
+/// ``trustedClients()`` only reads memory and is safe from any thread.
 final class ShellXLinkKeyStore: Sendable {
+    private struct StoredPhone: Codable {
+        var key: String
+        var deviceID: String
+        var name: String
+        var pairedAt: Date
+
+        enum CodingKeys: String, CodingKey {
+            case key, name
+            case deviceID = "device_id"
+            case pairedAt = "paired_at"
+        }
+    }
+
     private struct TrustedFile: Codable {
-        var version = 1
-        var clients: [String]
+        var version = 2
+        var phones: [StoredPhone]
     }
 
     private struct State: Sendable {
         var hostKey: NoiseStaticKey?
-        var trusted: Set<Data> = []
+        var trusted: [Data: TrustedPhone] = [:]
     }
 
-    let directory: URL
-    private var hostKeyURL: URL { directory.appendingPathComponent("host-key", isDirectory: false) }
-    private var trustedURL: URL { directory.appendingPathComponent("trusted-clients.json", isDirectory: false) }
+    private let storage: any ShellXLinkSecretStorage
+    private let hostAccount: String
+    private let trustedAccount: String
 
     // Lock carve-out: `LinkHost` reads the trusted keys through a synchronous `@Sendable () -> Set<Data>`
     // closure on every handshake, from its own executor. Each critical section only copies a value.
     private let state = OSAllocatedUnfairLock(initialState: State())
-    // Lock carve-out: serializes this store's read-modify-write of its files (first host key, trusted list).
-    // The callers are synchronous blocks on global queues (`offMain`), so an actor would add a hop at every
-    // call site; the section blocks on file I/O, which an unfair lock must not do. Never taken by
-    // `trustedClients()`.
-    private let fileLock = NSLock()
+    // Lock carve-out: serializes this store's read-modify-write of the stored items. The callers are
+    // synchronous blocks on global queues (`offMain`), so an actor would add a hop at every call site; the
+    // section blocks on Keychain I/O, which an unfair lock must not do. Never taken by `trustedClients()`.
+    private let storageLock = NSLock()
 
-    /// - Parameter directory: The link state directory (the app passes
-    ///   `~/Library/Application Support/ShellX/link`; tests pass a temp directory).
-    init(directory: URL) {
-        self.directory = directory
+    /// - Parameters:
+    ///   - storage: Where the items live.
+    ///   - accountID: The signed-in ShellX account; another account has another host key and phone list.
+    init(storage: any ShellXLinkSecretStorage, accountID: String) {
+        self.storage = storage
+        hostAccount = "host-key.\(accountID)"
+        trustedAccount = "trusted-clients.\(accountID)"
     }
 
-    /// The default directory for `home`.
-    static func defaultDirectory(home: URL) -> URL {
-        home.appendingPathComponent("Library/Application Support/ShellX/link", isDirectory: true)
-    }
+    // MARK: - Host key
 
-    /// The host's static key: read from `host-key`, or created and saved there on first use.
+    /// The host's static key: read from storage, or created and added there on first use.
     ///
-    /// A corrupt file throws; it is never replaced. First-time creation is exclusive: the new key is
-    /// written to a private temporary file and hard-linked to `host-key`, which fails if another process
-    /// created it first, and then that key is read back. Every caller therefore uses the key on disk.
+    /// A corrupt item throws; it is never replaced. First-time creation uses `add`, which fails when
+    /// another caller created the item first; the key stored then wins, so every caller uses one key.
     func hostKey() throws -> NoiseStaticKey {
         if let cached = state.withLock({ $0.hostKey }) { return cached }
-        fileLock.lock()
-        defer { fileLock.unlock() }
+        storageLock.lock()
+        defer { storageLock.unlock() }
         if let cached = state.withLock({ $0.hostKey }) { return cached }
-        try OwnerOnlyFile.ensurePrivateDirectory(directory)
         let key = try readHostKey() ?? createHostKey()
         state.withLock { $0.hostKey = key }
         return key
     }
 
     private func readHostKey() throws -> NoiseStaticKey? {
-        guard let raw = try OwnerOnlyFile.read(hostKeyURL) else { return nil }
+        guard let raw = try storage.read(account: hostAccount) else { return nil }
         return try NoiseStaticKey(rawPrivate: raw)
     }
 
     private func createHostKey() throws -> NoiseStaticKey {
         let candidate = NoiseStaticKey()
-        let temporary = directory.appendingPathComponent("host-key.\(UUID().uuidString).tmp", isDirectory: false)
-        // Registered first: `write` can throw after its rename (the directory fsync) and leave this file.
-        defer { unlink(temporary.path) }
-        try OwnerOnlyFile.write(candidate.rawPrivate, to: temporary)
-        if link(temporary.path, hostKeyURL.path) == 0 { return candidate }
-        let code = errno
-        guard code == EEXIST, let existing = try readHostKey() else {
-            throw OwnerOnlyFileError.io(operation: "link", path: hostKeyURL.path, errno: code)
-        }
+        if try storage.add(candidate.rawPrivate, account: hostAccount) { return candidate }
+        guard let existing = try readHostKey() else { throw ShellXLinkSecretError.failed(errSecItemNotFound) }
         return existing
     }
 
-    /// Reads `trusted-clients.json` into memory. A missing file means no trusted phone. Merged, never
-    /// replaced: P1 only adds keys, so a key trusted while the file was being read stays trusted.
+    // MARK: - Trusted phones
+
+    /// Reads the trusted list from storage into memory, replacing what memory held. A missing item means
+    /// no trusted phone; a corrupt one throws and is left as it is.
     func load() throws {
-        fileLock.lock()
-        defer { fileLock.unlock() }
-        try loadLocked()
+        storageLock.lock()
+        defer { storageLock.unlock() }
+        _ = try loadLocked()
     }
 
-    private func loadLocked() throws {
-        guard let data = try OwnerOnlyFile.read(trustedURL) else { return }
-        let file = try JSONDecoder().decode(TrustedFile.self, from: data)
-        let keys = Set(file.clients.compactMap { Data(base64Encoded: $0) }.filter { $0.count == 32 })
-        state.withLock { $0.trusted.formUnion(keys) }
-    }
-
-    /// Adds a phone's 32-byte static public key to the trusted list and saves the list. The list on disk
-    /// is read first, so phones trusted earlier survive even when ``load()`` has not run yet.
-    func trust(_ publicKey: Data) throws {
-        fileLock.lock()
-        defer { fileLock.unlock() }
-        try OwnerOnlyFile.ensurePrivateDirectory(directory)
-        try loadLocked()
-        let keys = state.withLock { current -> Set<Data> in
-            current.trusted.insert(publicKey)
-            return current.trusted
+    private func loadLocked() throws -> [Data: TrustedPhone] {
+        var phones: [Data: TrustedPhone] = [:]
+        if let data = try storage.read(account: trustedAccount) {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            for stored in try decoder.decode(TrustedFile.self, from: data).phones {
+                guard let key = Data(base64Encoded: stored.key), key.count == 32 else { continue }
+                phones[key] = TrustedPhone(key: key, deviceID: stored.deviceID, name: stored.name,
+                                           pairedAt: stored.pairedAt)
+            }
         }
-        let file = TrustedFile(clients: keys.map { $0.base64EncodedString() }.sorted())
-        try OwnerOnlyFile.write(try JSONEncoder().encode(file), to: trustedURL)
+        state.withLock { $0.trusted = phones }
+        return phones
+    }
+
+    private func saveLocked(_ phones: [Data: TrustedPhone]) throws {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let stored = phones.values.sorted { $0.key.base64EncodedString() < $1.key.base64EncodedString() }
+            .map { StoredPhone(key: $0.key.base64EncodedString(), deviceID: $0.deviceID, name: $0.name,
+                               pairedAt: $0.pairedAt) }
+        let data = try encoder.encode(TrustedFile(phones: stored))
+        if try !storage.add(data, account: trustedAccount) {
+            try storage.update(data, account: trustedAccount)
+        }
+        state.withLock { $0.trusted = phones }
+    }
+
+    /// Adds `phone` (or replaces the entry with the same key) and saves the list. The stored list is read
+    /// first, so phones trusted earlier survive even when ``load()`` has not run yet.
+    func trust(_ phone: TrustedPhone) throws {
+        guard phone.key.count == 32 else { throw ShellXLinkSecretError.failed(errSecParam) }
+        storageLock.lock()
+        defer { storageLock.unlock() }
+        var phones = try loadLocked()
+        phones[phone.key] = phone
+        try saveLocked(phones)
+    }
+
+    /// Removes the phone with `key` and saves the list.
+    func untrust(key: Data) throws {
+        storageLock.lock()
+        defer { storageLock.unlock() }
+        var phones = try loadLocked()
+        guard phones.removeValue(forKey: key) != nil else { return }
+        try saveLocked(phones)
+    }
+
+    /// Drops every trusted phone whose key is not in `keys`. It only removes, never adds: a key in `keys`
+    /// that is not trusted stays untrusted.
+    ///
+    /// - Returns: The keys that were removed.
+    @discardableResult
+    func retainOnly(keys: Set<Data>) throws -> Set<Data> {
+        storageLock.lock()
+        defer { storageLock.unlock() }
+        let phones = try loadLocked()
+        let kept = phones.filter { keys.contains($0.key) }
+        let removed = Set(phones.keys).subtracting(kept.keys)
+        guard !removed.isEmpty else { return [] }
+        try saveLocked(kept)
+        return removed
     }
 
     /// The trusted phones' static public keys, as last loaded or trusted.
     func trustedClients() -> Set<Data> {
-        state.withLock { $0.trusted }
+        state.withLock { Set($0.trusted.keys) }
+    }
+
+    /// The trusted phones, as last loaded or trusted, oldest pairing first.
+    func trustedPhones() -> [TrustedPhone] {
+        state.withLock { $0.trusted.values.sorted { $0.pairedAt < $1.pairedAt } }
     }
 }

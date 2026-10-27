@@ -97,6 +97,50 @@ final class LinkSessionTests: XCTestCase {
         XCTAssertTrue(feed.untouched, "host called the feed for an untrusted client")
     }
 
+    func testDisconnectClosesLiveSessionsOfKey() async throws {
+        let feed = FakeFeedSource([permissionItem("r1")])
+        let rig = makeHost(feed, clientCount: 2)
+        let clientA = try await connect(rig, clientIndex: 0)
+        let clientB = try await connect(rig, clientIndex: 1)
+        _ = try await within { try await clientA.snapshot() }
+        _ = try await within { try await clientB.snapshot() }
+
+        await rig.host.disconnect(clientKey: rig.clientKeys[0].publicKey)
+
+        do {
+            _ = try await within { try await clientA.snapshot() }
+            XCTFail("the disconnected client still got an answer")
+        } catch {
+            XCTAssertEqual(error as? LinkClientError, .sessionClosed, "unexpected error \(error)")
+        }
+        let other = try await within { try await clientB.snapshot() }
+        XCTAssertEqual(other.pending.map(\.requestId), ["r1"])
+    }
+
+    func testHandshakeRejectedAfterUntrust() async throws {
+        let feed = FakeFeedSource([permissionItem("r1")])
+        let clientKey = NoiseStaticKey()
+        let hostKey = NoiseStaticKey()
+        let trusted = Collector<Set<Data>>()
+        trusted.append([clientKey.publicKey])
+        let host = LinkHost(
+            key: hostKey, trustedClients: { trusted.items.last ?? [] }, feed: feed, hostVersion: "test-host",
+            machineName: "Test Mac")
+        let rig = Rig(host: host, hostKey: hostKey, clientKeys: [clientKey])
+        let first = try await connect(rig)
+        _ = try await within { try await first.snapshot() }
+
+        trusted.append([])
+        await host.disconnect(clientKey: clientKey.publicKey)
+
+        do {
+            _ = try await connect(rig)
+            XCTFail("connect succeeded after the key was untrusted")
+        } catch {
+            XCTAssertEqual(error as? RelayError, .closed, "unexpected error \(error)")
+        }
+    }
+
     func testReconnectGetsFreshSnapshot() async throws {
         let feed = FakeFeedSource([permissionItem("r1")])
         let rig = makeHost(feed)
