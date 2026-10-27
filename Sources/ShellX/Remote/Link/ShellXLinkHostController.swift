@@ -7,7 +7,7 @@ import ShellXRemoteCore
 
 /// ShellX: this Mac's ShellX Link host (P1 spike). It keeps the machine's link slot registered on the
 /// relay (`tickets.mint {permission: "register", lane: "link"}`, a fresh ticket per registration) and serves
-/// every incoming circuit with a `LinkHost` over the agent Feed.
+/// every incoming circuit with a `LinkHost` over the agent Feed, the agent sessions and their chat.
 ///
 /// `ShellXRemoteService` starts it once `machines.register` returned a `link_slot`, which happens only while
 /// `ShellXRemoteGate` is on, and stops it when the host session ends. Logs carry slots, codes and counts,
@@ -29,6 +29,8 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
     let core: ShellXCoreClient
     private let storage: any ShellXLinkSecretStorage
     private let feed: any AgentFeedSource
+    private let sessions: (any AgentSessionSource)?
+    private let chat: (any AgentChatSource)?
     private let hostVersion: String
     private let machineName: String
     private var running: Running?
@@ -37,13 +39,18 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
     ///   - core: shellx-core, for link-lane tickets.
     ///   - storage: Where the host key and the trusted phones are kept (the Keychain in the app).
     ///   - feed: What phones see and answer (the app passes ``ShellXLinkFeedSource``).
+    ///   - sessions: The agent session list (the app passes ``ShellXLinkSessionSource``).
+    ///   - chat: Transcripts and chat commands (the app passes ``ShellXLinkChatSource``).
     ///   - hostVersion: The app version sent in `welcome`.
     ///   - machineName: This Mac's name sent in `welcome`.
-    init(core: ShellXCoreClient, storage: any ShellXLinkSecretStorage, feed: any AgentFeedSource, hostVersion: String,
+    init(core: ShellXCoreClient, storage: any ShellXLinkSecretStorage, feed: any AgentFeedSource,
+         sessions: (any AgentSessionSource)? = nil, chat: (any AgentChatSource)? = nil, hostVersion: String,
          machineName: String) {
         self.core = core
         self.storage = storage
         self.feed = feed
+        self.sessions = sessions
+        self.chat = chat
         self.hostVersion = hostVersion
         self.machineName = machineName
     }
@@ -52,12 +59,13 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
         stop()
         // The service already runs only with the gate on; the link host never outlives that rule.
         guard ShellXRemoteGate.isEnabled else { return }
-        let core = core, feed = feed, hostVersion = hostVersion, machineName = machineName
+        let core = core, feed = feed, sessions = sessions, chat = chat
+        let hostVersion = hostVersion, machineName = machineName
         let keys = ShellXLinkKeyStore(storage: storage, accountID: accountID)
         let liveHost = LiveLinkHost()
         let task = Task.detached {
             await Self.serve(linkSlot: linkSlot, core: core, keys: keys, liveHost: liveHost, feed: feed,
-                             hostVersion: hostVersion, machineName: machineName)
+                             sessions: sessions, chat: chat, hostVersion: hostVersion, machineName: machineName)
         }
         running = Running(machineID: machineID, linkSlot: linkSlot, accountID: accountID, keys: keys,
                           liveHost: liveHost, task: task)
@@ -152,8 +160,9 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
     /// A ticket for another slot (an old relay) ends it: retrying cannot fix that. So does an unreadable host
     /// key or trusted list: the host fails closed and never replaces the key.
     private nonisolated static func serve(linkSlot: String, core: ShellXCoreClient, keys: ShellXLinkKeyStore,
-                                          liveHost: LiveLinkHost, feed: any AgentFeedSource, hostVersion: String,
-                                          machineName: String) async {
+                                          liveHost: LiveLinkHost, feed: any AgentFeedSource,
+                                          sessions: (any AgentSessionSource)?, chat: (any AgentChatSource)?,
+                                          hostVersion: String, machineName: String) async {
         let hostKey: NoiseStaticKey
         do {
             hostKey = try await loadKeys(keys, sleep: { try await Task.sleep(for: $0) })
@@ -191,7 +200,8 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
                     return RelayTicket(ticket: next.ticket, expiresAtUnix: next.expiresAtUnix)
                 }
                 let host = LinkHost(key: hostKey, trustedClients: { keys.trustedClients() }, feed: feed,
-                                    hostVersion: hostVersion, machineName: machineName)
+                                    sessions: sessions, chat: chat, hostVersion: hostVersion,
+                                    machineName: machineName)
                 await liveHost.set(host)
                 log.info("link host registering slot \(linkSlot, privacy: .public)")
                 try await registration.run { circuit in await host.serve(circuit) }

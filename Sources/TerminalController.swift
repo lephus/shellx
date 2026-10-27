@@ -6894,7 +6894,8 @@ class TerminalController {
     // The three feed reply handlers are internal (not private) because the
     // mobile data plane dispatches the same bodies from
     // `TerminalController+MobileFeed.swift`'s verb family; every entrypoint
-    // resolves through the single `FeedCoordinator.deliverReply` path.
+    // resolves through the single `FeedCoordinator.deliverReply` path, and
+    // `delivered` reports whether a waiting hook took the decision.
     nonisolated func v2FeedPermissionReply(params: [String: Any]) -> V2CallResult {
         guard let requestId = params["request_id"] as? String else {
             return .err(
@@ -6912,11 +6913,11 @@ class TerminalController {
                 data: nil
             )
         }
-        FeedCoordinator.shared.deliverReply(
+        let delivered = FeedCoordinator.shared.deliverReply(
             requestId: requestId,
             decision: .permission(mode)
         )
-        return .ok(["delivered": true])
+        return .ok(["delivered": delivered])
     }
 
     nonisolated func v2FeedQuestionReply(params: [String: Any]) -> V2CallResult {
@@ -6934,11 +6935,11 @@ class TerminalController {
                 data: nil
             )
         }
-        FeedCoordinator.shared.deliverReply(
+        let delivered = FeedCoordinator.shared.deliverReply(
             requestId: requestId,
             decision: .question(selections: selections)
         )
-        return .ok(["delivered": true])
+        return .ok(["delivered": delivered])
     }
 
     nonisolated func v2FeedExitPlanReply(params: [String: Any]) -> V2CallResult {
@@ -6959,11 +6960,11 @@ class TerminalController {
             )
         }
         let feedback = params["feedback"] as? String
-        FeedCoordinator.shared.deliverReply(
+        let delivered = FeedCoordinator.shared.deliverReply(
             requestId: requestId,
             decision: .exitPlan(mode, feedback: feedback)
         )
-        return .ok(["delivered": true])
+        return .ok(["delivered": delivered])
     }
 
     // MARK: - V2 Browser Methods

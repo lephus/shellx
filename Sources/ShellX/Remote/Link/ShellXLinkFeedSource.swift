@@ -3,11 +3,14 @@ import Foundation
 import ShellXLinkCore
 import ShellXLinkSession
 
-/// ShellX: ShellX Link's view of the agent Feed: the pending permission requests in `FeedCoordinator`'s
-/// store, their changes, and replies that resolve them through `FeedCoordinator.deliverReply`.
+/// ShellX: ShellX Link's view of the agent Feed: the pending requests in `FeedCoordinator`'s store, their
+/// changes, and replies that resolve them through `FeedCoordinator.deliverReply`.
 ///
-/// * The pending set is every `.pending` `.permissionRequest` item (P1 answers permissions only). A reply
+/// * The pending set is every `.pending` permission, question and plan item of Claude Code (v1 phones answer
+///   Claude Code only; another agent's card never reaches a phone, and a reply to it is `unknown`). A reply
 ///   to an item no hook waits for expires it (PROTOCOL.md 5), so no card stays pending without an agent.
+/// * A question answer is positional and passes to the hook unchanged: an option label picks that option,
+///   any other text is a free-text answer (the hook maps each element to Claude's `answers`).
 /// * `revision` counts changes of that set: it rises by exactly 1 per `agent.changed` (PROTOCOL.md 4), so a
 ///   phone resyncs only when it really missed one. It starts at the store's revision, which never runs
 ///   behind an earlier session's count after a relaunch.
@@ -74,12 +77,11 @@ final class ShellXLinkFeedSource: AgentFeedSource {
     }
 
     /// ``reply(requestId:decision:)`` without the suspension: decides and resolves in one main-actor turn.
-    ///
-    /// Only permission decisions are handled here; a question, plan or unknown decision answers `.unknown`
-    /// (the pending set holds permission requests only).
     func resolveReply(requestId: String, decision: LinkDecision) -> ReplyOutcome {
+        // Another agent's item never reached a phone: for the phone it is a request it never saw.
         guard let store = coordinator.store,
-              let item = store.items.last(where: { $0.payload.requestID == requestId }) else {
+              let item = store.items.last(where: { $0.payload.requestID == requestId }),
+              Self.isLinkItem(item) else {
             return .unknown
         }
         // Resolved here, by another phone, or on the Mac (Feed panel, notification, `feed.*.reply`). The
@@ -87,10 +89,7 @@ final class ShellXLinkFeedSource: AgentFeedSource {
         guard item.status.isPending, !coordinator.waiterRegistry.hasDecision(requestId) else {
             return .alreadyHandled
         }
-        guard case .permissionRequest(_, _, let toolInputJSON, _) = item.payload,
-              case .permission(let linkMode) = decision,
-              let mode = Self.permissionMode(linkMode),
-              Self.allows(mode, source: item.source, toolInputJSON: toolInputJSON) else {
+        guard let feedDecision = Self.feedDecision(decision, for: item) else {
             return .unknown
         }
         // No hook waits (a card restored from the Feed log, or pushed without a wait): nothing would receive
@@ -103,7 +102,7 @@ final class ShellXLinkFeedSource: AgentFeedSource {
         // On the main actor `deliverReply` marks the item resolved synchronously, so subscribers see the
         // change before this returns. It never waits on the hook. It is first-wins: when another entry point
         // took the waiter since the checks above, the phone hears `already_handled`.
-        return coordinator.deliverReply(requestId: requestId, decision: .permission(mode))
+        return coordinator.deliverReply(requestId: requestId, decision: feedDecision)
             ? .delivered : .alreadyHandled
     }
 
@@ -136,15 +135,13 @@ final class ShellXLinkFeedSource: AgentFeedSource {
         var current: [PendingItem] = []
         var added: [PendingItem] = []
         var seen = Set<String>()
-        for item in items where item.status.isPending {
-            guard case .permissionRequest(let requestId, let toolName, let toolInputJSON, _) = item.payload,
-                  seen.insert(requestId).inserted else {
+        for item in items where item.status.isPending && Self.isLinkItem(item) {
+            guard let requestId = item.payload.requestID, seen.insert(requestId).inserted else {
                 continue
             }
             if let existing = known[requestId] {
                 current.append(existing)
-            } else {
-                let pending = makePendingItem(item, requestId: requestId, toolName: toolName, toolInputJSON: toolInputJSON)
+            } else if let pending = makePendingItem(item, requestId: requestId) {
                 current.append(pending)
                 added.append(pending)
             }
@@ -161,25 +158,101 @@ final class ShellXLinkFeedSource: AgentFeedSource {
         }
     }
 
-    private func makePendingItem(_ item: WorkstreamItem, requestId: String, toolName: String,
-                                 toolInputJSON: String) -> PendingItem {
+    /// The phone's card for a pending permission, question or plan item; nil for any other payload.
+    private func makePendingItem(_ item: WorkstreamItem, requestId: String) -> PendingItem? {
         let workspace = workspaces[item.workstreamId] ?? workspaceLookup(item)
         if let workspace { workspaces[item.workstreamId] = workspace }
         let fallbackTitle = item.title ?? item.cwd.map { ($0 as NSString).lastPathComponent } ?? ""
-        return PendingItem(
+        var pending = PendingItem(
             requestId: requestId,
             kind: .permission,
             agent: item.sourceID ?? item.source.rawValue,
             workspaceId: workspace?.id ?? item.workstreamId,
             workspaceTitle: workspace?.title ?? fallbackTitle,
-            toolName: toolName,
-            toolInputPreview: PendingItem.truncatedPreview(toolInputJSON),
-            createdAtMs: Int64((item.createdAt.timeIntervalSince1970 * 1000).rounded()),
-            modes: Self.offeredModes(source: item.source, toolInputJSON: toolInputJSON)
+            createdAtMs: Int64((item.createdAt.timeIntervalSince1970 * 1000).rounded())
         )
+        switch item.payload {
+        case .permissionRequest(_, let toolName, let toolInputJSON, _):
+            pending.toolName = toolName
+            pending.toolInputPreview = PendingItem.truncatedPreview(toolInputJSON)
+            pending.modes = Self.offeredModes(source: item.source, toolInputJSON: toolInputJSON)
+        case .question(_, let questions):
+            pending.kind = .question
+            pending.questions = questions.map(Self.pendingQuestion)
+        case .exitPlan(_, let plan, _):
+            pending.kind = .exitPlan
+            pending.modes = Self.exitPlanModes
+            // The plan text the Feed panel shows, not the tool's JSON envelope.
+            pending.planPreview = PendingItem.truncatedPreview(WorkstreamExitPlanPreview(rawPlan: plan).planText)
+        default:
+            return nil
+        }
+        return pending
     }
 
     // MARK: - Mapping
+
+    /// Longest question text field, and longest question answer, in UTF-8 bytes (PROTOCOL.md 4, Decision).
+    static let maxQuestionTextBytes = 1024
+    /// Longest plan feedback the Mac accepts, in UTF-8 bytes.
+    static let maxPlanFeedbackBytes = 4096
+
+    /// Whether a Feed item may reach a phone: Claude Code's own items. An agent the store does not know is
+    /// stored as `.claude` with its raw id in `sourceID`, so that id must be absent.
+    static func isLinkItem(_ item: WorkstreamItem) -> Bool {
+        item.source == .claude && item.sourceID == nil
+    }
+
+    /// The Feed decision for a phone's decision on `item`, or nil when it does not fit the item (PROTOCOL.md 5,
+    /// rule 3): another kind, a mode the item does not offer, or answers that break the question rule.
+    static func feedDecision(_ decision: LinkDecision, for item: WorkstreamItem) -> WorkstreamDecision? {
+        switch (decision, item.payload) {
+        case (.permission(let linkMode), .permissionRequest(_, _, let toolInputJSON, _)):
+            guard let mode = permissionMode(linkMode),
+                  allows(mode, source: item.source, toolInputJSON: toolInputJSON) else { return nil }
+            return .permission(mode)
+        case (.question(let selections), .question(_, let questions)):
+            // Positional: one answer per question, each 1...1024 bytes, passed to the hook unchanged.
+            guard selections.count == questions.count,
+                  selections.allSatisfy({ (1...maxQuestionTextBytes).contains($0.utf8.count) }) else { return nil }
+            return .question(selections: selections)
+        case (.exitPlan(let linkMode, let feedback), .exitPlan):
+            guard let mode = exitPlanMode(linkMode),
+                  (feedback?.utf8.count ?? 0) <= maxPlanFeedbackBytes else { return nil }
+            return .exitPlan(mode, feedback: feedback)
+        default:
+            return nil
+        }
+    }
+
+    /// The `modes` of a plan item: every Feed plan mode except `bypassPermissions`, in wire form.
+    static let exitPlanModes = [ExitPlanMode.ultraplan, .autoAccept, .manual, .deny].map(\.wire)
+
+    /// ShellX Link plan modes map to Feed modes by name. `bypassPermissions` is never offered or accepted over
+    /// Link, so a mode this version does not know maps to nil.
+    static func exitPlanMode(_ mode: ExitPlanMode) -> WorkstreamExitPlanMode? {
+        switch mode {
+        case .ultraplan: return .ultraplan
+        case .autoAccept: return .autoAccept
+        case .manual: return .manual
+        case .deny: return .deny
+        case .other: return nil
+        }
+    }
+
+    /// A Feed question as the phone sees it, every text field cut to ``maxQuestionTextBytes``.
+    static func pendingQuestion(_ question: WorkstreamQuestionPrompt) -> PendingQuestion {
+        func cut(_ text: String) -> String { PendingItem.truncatedPreview(text, maxBytes: maxQuestionTextBytes) }
+        return PendingQuestion(
+            id: cut(question.id),
+            header: question.header.map(cut),
+            prompt: cut(question.prompt),
+            multiSelect: question.multiSelect,
+            options: question.options.map { option in
+                PendingQuestionOption(id: cut(option.id), label: cut(option.label), description: option.description.map(cut))
+            }
+        )
+    }
 
     /// ShellX Link modes map to Feed modes by name. `bypass` is never offered or accepted over Link, so a
     /// mode this version does not know (including a raw `bypass`) maps to nil.

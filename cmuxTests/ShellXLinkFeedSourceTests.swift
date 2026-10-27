@@ -12,7 +12,7 @@ import Testing
 
 /// ShellX Link's `AgentFeedSource` over the app's Feed: what a phone sees and what its replies do.
 /// Each test installs a fresh store on the shared coordinator, like `FeedCoordinatorTests`.
-@Suite("ShellX Link feed source", .serialized)
+@Suite("ShellX Link feed source", .serialized, .timeLimit(.minutes(1)))
 struct ShellXLinkFeedSourceTests {
     private static let workspace = (id: "11111111-2222-3333-4444-555555555555", title: "shellx")
 
@@ -88,19 +88,8 @@ struct ShellXLinkFeedSourceTests {
         #expect(item?.workspaceId == Self.workspace.id)
         #expect(item?.workspaceTitle == Self.workspace.title)
         #expect((item?.createdAtMs ?? 0) > 0)
-        // The offered modes are what the Feed panel allows for this agent, and never `bypass`.
-        #expect(item?.modes.contains("deny") == true)
-        #expect(item?.modes.contains("bypass") == false)
-        #expect(item?.modes.allSatisfy { ["once", "always", "all", "deny"].contains($0) } == true)
-    }
-
-    @Test func testModesFollowTheAgentsPolicy() async {
-        let (store, source) = await MainActor.run { Self.makeSource() }
-        // Hermes has no persistent permission modes (`FeedPermissionActionPolicy`).
-        await MainActor.run { store.ingest(Self.permission("hermes-modes", source: "hermes-agent")) }
-        let modes = await source.snapshot().pending.first { $0.requestId == "hermes-modes" }?.modes
-        #expect(modes?.contains("always") == false)
-        #expect(modes?.contains("deny") == true)
+        // Exactly what the Feed panel offers Claude Code, in wire order, and never `bypass`.
+        #expect(item?.modes == ["once", "always", "all", "deny"])
     }
 
     @Test func testChangesEmitsAddedThenResolved() async throws {
@@ -163,15 +152,9 @@ struct ShellXLinkFeedSourceTests {
         #expect(await source.reply(requestId: "phone-first", decision: .permission(.deny)) == .alreadyHandled)
     }
 
-    @Test func testReplyToUnknownRequestOrDisallowedModeIsUnknown() async {
-        let (store, source) = await MainActor.run { Self.makeSource() }
+    @Test func testReplyToUnknownRequestIsUnknown() async {
+        let (_, source) = await MainActor.run { Self.makeSource() }
         #expect(await source.reply(requestId: "never-seen", decision: .permission(.once)) == .unknown)
-
-        // Hermes has no persistent permission modes (`FeedPermissionActionPolicy`).
-        await MainActor.run { store.ingest(Self.permission("hermes-1", source: "hermes-agent")) }
-        #expect(await source.reply(requestId: "hermes-1", decision: .permission(.always)) == .unknown)
-        let stillPending = await MainActor.run { store.pending.contains { $0.payload.requestID == "hermes-1" } }
-        #expect(stillPending)
     }
 
     @Test func testNonPermissionAndUnknownDecisionsAreUnknown() async {
@@ -345,6 +328,225 @@ extension ShellXLinkFeedSourceTests {
         #expect(pending.map(\.requestId) == ["same-ws-1", "same-ws-2"])
         #expect(pending.allSatisfy { $0.workspaceTitle == Self.workspace.title })
         #expect(lookups.values.count == 1)
+    }
+}
+
+// MARK: - Questions, plans and the Claude-only rule (Task 10)
+
+extension ShellXLinkFeedSourceTests {
+    private static let questionJSON = #"""
+    {"questions":[
+      {"id":"q-db","header":"Database","question":"Which database?","multiSelect":false,
+       "options":[{"id":"pg","label":"Postgres","description":"Server"},{"id":"lite","label":"SQLite"}]},
+      {"id":"q-goals","question":"What matters?","multiSelect":true,
+       "options":[{"id":"fast","label":"Fast"},{"id":"cheap","label":"Cheap"}]}
+    ]}
+    """#
+
+    private static func question(_ requestId: String, toolInputJSON: String = questionJSON,
+                                 source: String = "claude") -> WorkstreamEvent {
+        WorkstreamEvent(sessionId: "link-\(requestId)", hookEventName: .askUserQuestion, source: source,
+                        cwd: "/tmp/shellx", toolName: "AskUserQuestion", toolInputJSON: toolInputJSON,
+                        requestId: requestId)
+    }
+
+    private static func exitPlan(_ requestId: String, plan: String = "1. Split step 2") -> WorkstreamEvent {
+        let json = String(data: try! JSONSerialization.data(withJSONObject: ["plan": plan]), encoding: .utf8)!
+        return WorkstreamEvent(sessionId: "link-\(requestId)", hookEventName: .exitPlanMode, source: "claude",
+                               cwd: "/tmp/shellx", toolName: "ExitPlanMode", toolInputJSON: json,
+                               requestId: requestId)
+    }
+
+    /// Releases a blocked hook so it does not outlive the test.
+    private static func release(_ requestId: String, _ hook: BlockingHook) {
+        FeedCoordinator.shared.deliverReply(requestId: requestId, decision: .permission(.deny))
+        _ = hook.wait()
+    }
+
+    /// v1 phones answer Claude Code only: another agent's card never reaches a phone, and a reply to it is
+    /// a request the phone never saw.
+    @Test func testOnlyClaudeItemsArePending() async {
+        let (store, source) = await MainActor.run { Self.makeSource() }
+        await MainActor.run {
+            store.ingest(Self.permission("only-claude", source: "claude"))
+            store.ingest(Self.permission("only-codex", source: "codex"))
+            store.ingest(Self.permission("only-hermes", source: "hermes-agent"))
+            // An unregistered agent is stored as `.claude` with its raw id in `sourceID`.
+            store.ingest(Self.permission("only-custom", source: "my-agent"))
+            store.ingest(Self.question("only-codex-question", source: "codex"))
+        }
+
+        let pending = await source.snapshot().pending
+
+        #expect(pending.map(\.requestId) == ["only-claude"])
+        #expect(pending.allSatisfy { $0.agent == "claude" })
+        for requestId in ["only-codex", "only-custom"] {
+            #expect(await source.reply(requestId: requestId, decision: .permission(.deny)) == .unknown)
+        }
+        let stillPending = await MainActor.run {
+            ["only-codex", "only-custom"].allSatisfy { id in store.pending.contains { $0.payload.requestID == id } }
+        }
+        #expect(stillPending)
+    }
+
+    @Test func testQuestionItemCarriesQuestionsAndAnswers() async throws {
+        let (store, source) = await MainActor.run { Self.makeSource() }
+        let longHeader = String(repeating: "é", count: 600)   // 1200 bytes
+        let json = String(data: try JSONSerialization.data(withJSONObject: ["questions": [
+            ["id": "q-long", "header": longHeader, "question": "Pick", "multiSelect": false,
+             "options": [["id": "a", "label": "A"]]],
+        ]]), encoding: .utf8)!
+        await MainActor.run { store.ingest(Self.question("question-long", toolInputJSON: json)) }
+        let hook = Self.startBlockingHook(Self.question("question-1"))
+        #expect(await Self.waitUntil { store.pending.contains { $0.payload.requestID == "question-1" } })
+
+        let pending = await source.snapshot().pending
+        let item = try #require(pending.first { $0.requestId == "question-1" })
+        #expect(item.kind == .question)
+        #expect(item.modes.isEmpty)
+        #expect(item.questions == [
+            PendingQuestion(id: "q-db", header: "Database", prompt: "Which database?", multiSelect: false, options: [
+                PendingQuestionOption(id: "pg", label: "Postgres", description: "Server"),
+                PendingQuestionOption(id: "lite", label: "SQLite"),
+            ]),
+            PendingQuestion(id: "q-goals", prompt: "What matters?", multiSelect: true, options: [
+                PendingQuestionOption(id: "fast", label: "Fast"),
+                PendingQuestionOption(id: "cheap", label: "Cheap"),
+            ]),
+        ])
+        // Every text field is cut to 1024 bytes on a scalar boundary.
+        let cutHeader = try #require(pending.first { $0.requestId == "question-long" }?.questions?.first?.header)
+        #expect(cutHeader.utf8.count == 1024)
+        #expect(longHeader.hasPrefix(cutHeader))
+
+        // Positional answers: an option label, and a multi-select answer joined with ", ".
+        let outcome = await source.reply(requestId: "question-1",
+                                         decision: .question(selections: ["Postgres", "Fast, Cheap"]))
+        #expect(outcome == .delivered)
+        #expect(hook.wait())
+        guard case .resolved(_, .question(let selections))? = hook.result else {
+            Issue.record("the hook must get the phone's answers: \(String(describing: hook.result))")
+            return
+        }
+        #expect(selections == ["Postgres", "Fast, Cheap"])
+    }
+
+    /// Any string that is not an option label is a free-text answer, passed to the hook unchanged; 1024
+    /// bytes is the longest answer accepted.
+    @Test func testFreeTextSelectionDelivered() async {
+        let (store, source) = await MainActor.run { Self.makeSource() }
+        let hook = Self.startBlockingHook(Self.question("free-text-1"))
+        #expect(await Self.waitUntil { store.pending.contains { $0.payload.requestID == "free-text-1" } })
+        let longest = String(repeating: "x", count: 1021) + "€"   // 1024 bytes
+
+        let outcome = await source.reply(requestId: "free-text-1",
+                                         decision: .question(selections: ["Use DuckDB instead", longest]))
+
+        #expect(outcome == .delivered)
+        #expect(hook.wait())
+        guard case .resolved(_, .question(let selections))? = hook.result else {
+            Issue.record("the hook must get the free-text answers: \(String(describing: hook.result))")
+            return
+        }
+        #expect(selections == ["Use DuckDB instead", longest])
+    }
+
+    @Test func testSelectionCountMismatchIsUnknown() async {
+        let (store, source) = await MainActor.run { Self.makeSource() }
+        let hook = Self.startBlockingHook(Self.question("mismatch-1"))
+        #expect(await Self.waitUntil { store.pending.contains { $0.payload.requestID == "mismatch-1" } })
+        let tooLong = String(repeating: "x", count: 1022) + "€"   // 1025 bytes
+
+        for selections in [["Postgres"], ["Postgres", "Fast", "Cheap"], [], ["Postgres", ""], ["Postgres", tooLong]] {
+            #expect(await source.reply(requestId: "mismatch-1", decision: .question(selections: selections)) == .unknown)
+        }
+        // A permission or plan decision does not answer a question either.
+        #expect(await source.reply(requestId: "mismatch-1", decision: .permission(.once)) == .unknown)
+        #expect(await source.reply(requestId: "mismatch-1", decision: .exitPlan(.manual, feedback: nil)) == .unknown)
+
+        let stillPending = await MainActor.run { store.pending.contains { $0.payload.requestID == "mismatch-1" } }
+        #expect(stillPending)
+        #expect(hook.result == nil)
+        Self.release("mismatch-1", hook)
+    }
+
+    @Test func testExitPlanItemModesExcludeBypass() async throws {
+        let (store, source) = await MainActor.run { Self.makeSource() }
+        let plan = "# Plan\n" + String(repeating: "€", count: 5000)   // 15 007 bytes
+        let hook = Self.startBlockingHook(Self.exitPlan("plan-modes", plan: plan))
+        #expect(await Self.waitUntil { store.pending.contains { $0.payload.requestID == "plan-modes" } })
+
+        let item = try #require(await source.snapshot().pending.first { $0.requestId == "plan-modes" })
+
+        #expect(item.kind == .exitPlan)
+        #expect(item.modes == ["ultraplan", "auto_accept", "manual", "deny"])
+        // The plan text itself (not the tool's JSON envelope), cut to 8192 bytes on a scalar boundary.
+        let preview = try #require(item.planPreview)
+        #expect(preview.utf8.count <= PendingItem.maxPreviewBytes)
+        #expect(preview.utf8.count > PendingItem.maxPreviewBytes - 3)
+        #expect(plan.hasPrefix(preview))
+        #expect(item.questions == nil)
+        for mode in ["bypassPermissions", "bypass_permissions", "bypass"] {
+            #expect(await source.reply(requestId: "plan-modes", decision: .exitPlan(.other(mode), feedback: nil)) == .unknown)
+        }
+        #expect(await source.reply(requestId: "plan-modes", decision: .question(selections: ["A"])) == .unknown)
+        #expect(hook.result == nil)
+        Self.release("plan-modes", hook)
+    }
+
+    @Test func testExitPlanFeedbackDelivered() async {
+        let (store, source) = await MainActor.run { Self.makeSource() }
+        let hook = Self.startBlockingHook(Self.exitPlan("plan-feedback"))
+        #expect(await Self.waitUntil { store.pending.contains { $0.payload.requestID == "plan-feedback" } })
+        let longest = String(repeating: "f", count: 4093) + "€"   // 4096 bytes
+
+        // Longer than 4096 bytes is not a decision the Mac accepts; the item stays pending.
+        let tooLong = await source.reply(requestId: "plan-feedback", decision: .exitPlan(.deny, feedback: longest + "f"))
+        #expect(tooLong == .unknown)
+        #expect(hook.result == nil)
+
+        let outcome = await source.reply(requestId: "plan-feedback", decision: .exitPlan(.deny, feedback: longest))
+
+        #expect(outcome == .delivered)
+        #expect(hook.wait())
+        guard case .resolved(_, .exitPlan(.deny, let feedback))? = hook.result else {
+            Issue.record("the hook must get the plan decision: \(String(describing: hook.result))")
+            return
+        }
+        #expect(feedback == longest)
+
+        // Modes map by name: `auto_accept` is the Feed's `autoAccept`.
+        let accept = Self.startBlockingHook(Self.exitPlan("plan-accept"))
+        #expect(await Self.waitUntil { store.pending.contains { $0.payload.requestID == "plan-accept" } })
+        #expect(await source.reply(requestId: "plan-accept", decision: .exitPlan(.autoAccept, feedback: nil)) == .delivered)
+        #expect(accept.wait())
+        guard case .resolved(_, .exitPlan(.autoAccept, nil))? = accept.result else {
+            Issue.record("auto_accept must reach the hook as autoAccept: \(String(describing: accept.result))")
+            return
+        }
+    }
+
+    /// `feed.*.reply` reports whether a waiting hook took the decision (`deliverReply`), not always `true`.
+    @Test func testFeedReplySocketReportsNotDelivered() async {
+        let (store, _) = await MainActor.run { Self.makeSource() }
+        let controller = await MainActor.run { TerminalController.shared }
+        let results = [
+            controller.v2FeedPermissionReply(params: ["request_id": "socket-none-1", "mode": "once"]),
+            controller.v2FeedQuestionReply(params: ["request_id": "socket-none-2", "selections": ["A"]]),
+            controller.v2FeedExitPlanReply(params: ["request_id": "socket-none-3", "mode": "manual"]),
+        ]
+        #expect(results.map(Self.delivered) == [false, false, false])
+
+        let hook = Self.startBlockingHook(Self.permission("socket-waiting"))
+        #expect(await Self.waitUntil { store.pending.contains { $0.payload.requestID == "socket-waiting" } })
+        let waiting = controller.v2FeedPermissionReply(params: ["request_id": "socket-waiting", "mode": "once"])
+        #expect(Self.delivered(waiting) == true)
+        #expect(hook.wait())
+    }
+
+    private static func delivered(_ result: TerminalController.V2CallResult) -> Bool? {
+        guard case .ok(let payload) = result else { return nil }
+        return (payload as? [String: Any])?["delivered"] as? Bool
     }
 }
 

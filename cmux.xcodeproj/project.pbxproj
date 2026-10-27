@@ -3359,6 +3359,8 @@
 		8825E0A1CFB96235256FD162 /* ShellXCoreFFI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26ED4CBA5E356DC862332C80 /* ShellXCoreFFI.swift */; };
 		E42EC94C29109FA8A189FE34 /* ShellXCoreFFITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9FE6EA47AFDBBF1DED049CD /* ShellXCoreFFITests.swift */; };
 		5E11A00000000000000000B2 /* ShellXIcons in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000B1 /* ShellXIcons */; };
+		F5D85DDFB6D8D06F86818A00 /* ShellXLinkChatSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 068E4D2A7F1EC4F7927F33D0 /* ShellXLinkChatSource.swift */; };
+		D5E55992758670FA515A098C /* ShellXLinkChatSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 717290D6E8F1BA131C1A049C /* ShellXLinkChatSourceTests.swift */; };
 		5E11A10000000000000000B1 /* ShellXLinkCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A10000000000000000A1 /* ShellXLinkCore */; };
 		5E11A10000000000000000C1 /* ShellXLinkCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A10000000000000000A1 /* ShellXLinkCore */; };
 		7C1D04B9E485BA999F349B85 /* ShellXLinkFeedSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 213BB8218BD3650191A72A94 /* ShellXLinkFeedSource.swift */; };
@@ -3370,6 +3372,8 @@
 		A7C3D91E5B2F48A6908E1D01 /* ShellXLinkSecretStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C3D91E5B2F48A6908E1D02 /* ShellXLinkSecretStorage.swift */; };
 		5E11A10000000000000000B3 /* ShellXLinkSession in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A10000000000000000A3 /* ShellXLinkSession */; };
 		5E11A10000000000000000C3 /* ShellXLinkSession in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A10000000000000000A3 /* ShellXLinkSession */; };
+		D7D8ECF76D016AF9BAF4CCDF /* ShellXLinkSessionSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3951343772D06EA84F8DFB /* ShellXLinkSessionSource.swift */; };
+		5D693441A945A84AB92EDCC0 /* ShellXLinkSessionSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4FA75B16A59721F4A0DDFD /* ShellXLinkSessionSourceTests.swift */; };
 		068517128CB0B3002C263E47 /* ShellXNoPhoneHomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 670CA928F698AA3B4424ED2D /* ShellXNoPhoneHomeTests.swift */; };
 		7413037583554EAA6E41D32F /* ShellXPathsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A657627F06A42A092E1F085 /* ShellXPathsTests.swift */; };
 		067A3A09F525B237CBC042CE /* ShellXPhoneHandoffPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ED77518C2AC614A20D35B29 /* ShellXPhoneHandoffPopover.swift */; };
@@ -7984,12 +7988,16 @@
 		71099E791FDFEEBC0898FEAB /* ShellXCloudOffTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXCloudOffTests.swift"; sourceTree = "<group>"; };
 		26ED4CBA5E356DC862332C80 /* ShellXCoreFFI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/ShellXCoreFFI.swift; sourceTree = "<group>"; };
 		B9FE6EA47AFDBBF1DED049CD /* ShellXCoreFFITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXCoreFFITests.swift"; sourceTree = "<group>"; };
+		068E4D2A7F1EC4F7927F33D0 /* ShellXLinkChatSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkChatSource.swift; sourceTree = "<group>"; };
+		717290D6E8F1BA131C1A049C /* ShellXLinkChatSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkChatSourceTests.swift"; sourceTree = "<group>"; };
 		213BB8218BD3650191A72A94 /* ShellXLinkFeedSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkFeedSource.swift; sourceTree = "<group>"; };
 		8C1A5BADF27E5C2E5499B0C6 /* ShellXLinkFeedSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkFeedSourceTests.swift"; sourceTree = "<group>"; };
 		FBD4B47D6577BDFEC05038ED /* ShellXLinkHostController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkHostController.swift; sourceTree = "<group>"; };
 		C1B03FC23876B84852EF3F72 /* ShellXLinkKeyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkKeyStore.swift; sourceTree = "<group>"; };
 		E62DE980C7E9E4A1D8E54437 /* ShellXLinkKeyStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkKeyStoreTests.swift"; sourceTree = "<group>"; };
 		A7C3D91E5B2F48A6908E1D02 /* ShellXLinkSecretStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkSecretStorage.swift; sourceTree = "<group>"; };
+		0D3951343772D06EA84F8DFB /* ShellXLinkSessionSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkSessionSource.swift; sourceTree = "<group>"; };
+		5C4FA75B16A59721F4A0DDFD /* ShellXLinkSessionSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkSessionSourceTests.swift"; sourceTree = "<group>"; };
 		670CA928F698AA3B4424ED2D /* ShellXNoPhoneHomeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXNoPhoneHomeTests.swift"; sourceTree = "<group>"; };
 		8A657627F06A42A092E1F085 /* ShellXPathsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXPathsTests.swift"; sourceTree = "<group>"; };
 		7ED77518C2AC614A20D35B29 /* ShellXPhoneHandoffPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Share/ShellXPhoneHandoffPopover.swift; sourceTree = "<group>"; };
@@ -12530,6 +12538,8 @@
 				BB1AB2A2159DE90CD845C988 /* WorkspaceShareSource.swift */,
 				510EA0A2A7CAF653E3E7D26E /* ShellXShareStore.swift */,
 				213BB8218BD3650191A72A94 /* ShellXLinkFeedSource.swift */,
+				0D3951343772D06EA84F8DFB /* ShellXLinkSessionSource.swift */,
+				068E4D2A7F1EC4F7927F33D0 /* ShellXLinkChatSource.swift */,
 				FBD4B47D6577BDFEC05038ED /* ShellXLinkHostController.swift */,
 				C1B03FC23876B84852EF3F72 /* ShellXLinkKeyStore.swift */,
 				A7C3D91E5B2F48A6908E1D02 /* ShellXLinkSecretStorage.swift */,
@@ -14158,6 +14168,8 @@
 				24E01BDDAF6FEE0350738B78 /* GitGraphDiffOpenerTests.swift */,
 				DEFB5C9D875DCD4195AB8E21 /* GitGraphURLSchemeHandlerTests.swift */,
 				9548501B25F7BAB51EE66690 /* ShellXPhonePairingCoordinatorTests.swift */,
+				717290D6E8F1BA131C1A049C /* ShellXLinkChatSourceTests.swift */,
+				5C4FA75B16A59721F4A0DDFD /* ShellXLinkSessionSourceTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -16812,10 +16824,12 @@
 				96EE12720D113E7977F5F9EA /* ShellXAccountFlow.swift in Sources */,
 				642F735E1D470D3C1F4B8DAB /* ShellXBonsplitStyles.swift in Sources */,
 				8825E0A1CFB96235256FD162 /* ShellXCoreFFI.swift in Sources */,
+				F5D85DDFB6D8D06F86818A00 /* ShellXLinkChatSource.swift in Sources */,
 				7C1D04B9E485BA999F349B85 /* ShellXLinkFeedSource.swift in Sources */,
 				1094273B6145F185A8C8368E /* ShellXLinkHostController.swift in Sources */,
 				4F01552EA2EEE386C3CD1C23 /* ShellXLinkKeyStore.swift in Sources */,
 				A7C3D91E5B2F48A6908E1D01 /* ShellXLinkSecretStorage.swift in Sources */,
+				D7D8ECF76D016AF9BAF4CCDF /* ShellXLinkSessionSource.swift in Sources */,
 				067A3A09F525B237CBC042CE /* ShellXPhoneHandoffPopover.swift in Sources */,
 				94FD51A057547AB301A0EEA5 /* ShellXPhonePairingCoordinator.swift in Sources */,
 				1EA4DF7B949BB6F40EA075E6 /* ShellXQRCode.swift in Sources */,
@@ -19178,8 +19192,10 @@
 				9843B79AC550EC9EB196BDAB /* ShellXBonsplitStylesTests.swift in Sources */,
 				1A8C19D1252050EBAB35B5D1 /* ShellXCloudOffTests.swift in Sources */,
 				E42EC94C29109FA8A189FE34 /* ShellXCoreFFITests.swift in Sources */,
+				D5E55992758670FA515A098C /* ShellXLinkChatSourceTests.swift in Sources */,
 				2A7D98BF041DCE78F7E67C20 /* ShellXLinkFeedSourceTests.swift in Sources */,
 				8228ADD7A74BFCB3F916A6A0 /* ShellXLinkKeyStoreTests.swift in Sources */,
+				5D693441A945A84AB92EDCC0 /* ShellXLinkSessionSourceTests.swift in Sources */,
 				068517128CB0B3002C263E47 /* ShellXNoPhoneHomeTests.swift in Sources */,
 				7413037583554EAA6E41D32F /* ShellXPathsTests.swift in Sources */,
 				7EE7B9BC69774E0B60D4C1B2 /* ShellXPhonePairingCoordinatorTests.swift in Sources */,
