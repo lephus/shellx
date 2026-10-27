@@ -9,7 +9,8 @@ import ShellXLinkSession
 ///
 /// * Entries are the service's ``ChatMessage``s mapped to ``ChatEntry`` (prose, thought, tool use, status,
 ///   other), with `text` cut to ``ChatEntry/maxTextBytes``. Live entries come from `appended` and `updated`
-///   frames; P2 skips the live prose preview (`streamingProse`) and transcript resets.
+///   frames, and a `reset` frame (the service reloaded the transcript) becomes a ``ChatPush/reset(sessionId:)``
+///   in order with them; P2 skips the live prose preview (`streamingProse`).
 /// * `rev` comes from one counter for every emission, history and push alike, so it rises strictly per
 ///   entry id. The counter starts at the wall clock in microseconds, so a relaunched Mac never reuses a
 ///   revision a phone still holds.
@@ -146,12 +147,16 @@ final class ShellXLinkChatSource: AgentChatSource {
         observation = (service, token)
     }
 
-    /// Publishes the entries of an `appended` or `updated` frame of a Claude Code session.
+    /// Publishes the entries of an `appended` or `updated` frame, and the reset of a reloaded transcript, of a
+    /// Claude Code session, in the order the service emitted them.
     func receive(_ frame: ChatSessionEventFrame) {
         let messages: [ChatMessage]
         switch frame.event {
         case .appended(let list), .updated(let list): messages = list
-        case .stateChanged, .descriptorChanged, .sessionRemoved, .terminalBlocks, .streamingProse, .reset, .unknown:
+        case .reset:
+            publishReset(frame.sessionID)
+            return
+        case .stateChanged, .descriptorChanged, .sessionRemoved, .terminalBlocks, .streamingProse, .unknown:
             return
         }
         guard !messages.isEmpty, linkSession(frame.sessionID) != nil else { return }
@@ -159,8 +164,23 @@ final class ShellXLinkChatSource: AgentChatSource {
         for (id, read) in reads where read.sessionId == frame.sessionID {
             for entry in entries { reads[id]?.pushed[entry.id] = entry }
         }
+        publish(.upsert(sessionId: frame.sessionID, entries: entries))
+    }
+
+    /// The service reloaded the session's transcript from scratch (a rotated or truncated file, a fork's
+    /// oversized first read): the phone drops what it holds and pages again (PROTOCOL.md 4, `chat.reset`).
+    /// Entries pushed during a read in flight belong to the old transcript, so that read no longer overlays them.
+    private func publishReset(_ sessionId: String) {
+        guard linkSession(sessionId) != nil else { return }
+        for (id, read) in reads where read.sessionId == sessionId {
+            reads[id]?.pushed = [:]
+        }
+        publish(.reset(sessionId: sessionId))
+    }
+
+    private func publish(_ push: ChatPush) {
         for continuation in subscribers.values {
-            continuation.yield(.upsert(sessionId: frame.sessionID, entries: entries))
+            continuation.yield(push)
         }
     }
 

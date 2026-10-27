@@ -97,8 +97,13 @@ enum Watch {
 
     private static func followChat(_ client: LinkClient) async {
         for await push in client.chatEntries {
-            Log.line("chat \(Log.shown(push.sessionId)): \(push.entries.count) entr\(push.entries.count == 1 ? "y" : "ies")")
-            for entry in push.entries { Log.entry(entry) }
+            switch push {
+            case let .upsert(sessionId, entries):
+                Log.line("chat \(Log.shown(sessionId)): \(entries.count) entr\(entries.count == 1 ? "y" : "ies")")
+                for entry in entries { Log.entry(entry) }
+            case let .reset(sessionId):
+                Log.line("chat \(Log.shown(sessionId)): transcript reset; page it again")
+            }
         }
     }
 }

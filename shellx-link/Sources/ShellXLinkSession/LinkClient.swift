@@ -39,8 +39,18 @@ public actor LinkClient {
     /// revision of its last `sessions()` result or applied change, exactly as for `changes`.
     public nonisolated let sessionChanges: AsyncStream<(revision: Int, upserted: [AgentSession], removed: [String])>
 
-    /// Every `chat.entries` push from the host, in order. Single consumer. It finishes when the
-    /// session ends. Entries are upserts by `ChatEntry.id`.
+    /// Every `chat.entries` and `chat.reset` push from the host, in the order they arrived. Single consumer. It
+    /// finishes when the session ends.
+    ///
+    /// * `.upsert(sessionId, entries)`: upserts by `ChatEntry.id`, keeping the higher `rev`.
+    /// * `.reset(sessionId)`: the session's transcript was replaced (PROTOCOL.md section 4, ChatEntry). Drop
+    ///   every entry held for that session, drop the result of any `chatHistory` call for it that started
+    ///   before the reset, and page again from the newest (`chatHistory(sessionId:beforeSeq: nil, limit:)`).
+    ///   The `.upsert` pushes after it belong to the new transcript.
+    ///
+    /// `ChatPush.sessionId` and `ChatPush.entries` read both cases (`entries` is empty for a reset), so a
+    /// consumer written for the earlier `(sessionId, entries)` element treats a reset as an empty upsert until
+    /// it handles `.reset`.
     public nonisolated let chatEntries: AsyncStream<ChatPush>
 
     private let changesContinuation: AsyncStream<Change>.Continuation
@@ -281,6 +291,8 @@ public actor LinkClient {
             sessionChangesContinuation.yield((revision, upserted, removed))
         case let .chatEntries(sessionId, entries):
             chatEntriesContinuation.yield(.upsert(sessionId: sessionId, entries: entries))
+        case let .chatReset(sessionId):
+            chatEntriesContinuation.yield(.reset(sessionId: sessionId))
         case let .changed(revision, added, resolved):
             changesContinuation.yield((revision, added, resolved))
         case let .ping(nonce):
@@ -296,7 +308,7 @@ public actor LinkClient {
             }
             linkLog.info("host reported error \(code, privacy: .public)")
         case .pong, .unknown, .hello, .welcome, .snapshotGet, .reply, .sessionsGet, .chatHistoryGet, .chatSend,
-             .chatInterrupt, .chatReset:
+             .chatInterrupt:
             break
         }
         return true

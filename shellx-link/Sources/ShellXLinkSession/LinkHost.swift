@@ -53,7 +53,7 @@ public actor LinkHost {
     /// Flow: Noise handshake (responder), `hello` -> `welcome`, then `agent.changed` pushes for
     /// every feed change and answers to `agent.snapshot.get`, `agent.reply`, `ping` and, with the
     /// sources, the session and chat calls (`agent.sessions.get`, `chat.*`), plus pushes for every
-    /// session change and chat entry.
+    /// session change, chat entry and transcript reset (`chat.reset`).
     /// Cancelling the calling task ends the session.
     public func serve(_ circuit: any RelayCircuit) async {
         await runSession(circuit)
@@ -161,8 +161,10 @@ public actor LinkHost {
                         for frame in Self.entryFrames(sessionId: sessionId, entries: entries.map { $0.withTextCap() }) {
                             try? await channel.send(frame: frame)
                         }
-                    case .reset:
-                        break
+                    case let .reset(sessionId):
+                        // In order with the session's entries: what was pushed before belongs to the old
+                        // transcript (PROTOCOL.md section 4, ChatEntry).
+                        try? await channel.send(.chatReset(sessionId: sessionId))
                     }
                 }
             }

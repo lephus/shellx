@@ -67,6 +67,9 @@ A frame is one UTF-8 JSON object:
   decodes (an implementation keeps the raw string, for example as `.other(raw)`); it is never
   `bad_json`.
 - A sender MAY add an optional field at any time; receivers ignore fields they do not know.
+- A host MAY add a push, a message that answers no call (such as `chat.reset`): a client that predates it
+  ignores it (section 7), so it needs no new `v`. A new request that expects an answer carries a
+  `call_id`, and a host that predates it answers `unsupported` (section 3).
 - Adding a required field, or changing the meaning of a field, requires raising `v`.
 - `v` stays 1 in P2: the P2 changes revise v1 before its first release, because no P1 build has
   left the spike.
@@ -110,6 +113,7 @@ requests later versions add on the same pattern).
 | `chat.history.get` | client | The user opens a session, or scrolls to older entries | `call_id` string, `session_id` string, `before_seq` int (optional), `limit` int (1 to 50) |
 | `chat.history` | host | Reply to `chat.history.get` | `call_id` string, `session_id` string, `entries` array of ChatEntry (oldest first), `has_more` bool |
 | `chat.entries` | host | A transcript entry is added or changes | `session_id` string, `entries` array of ChatEntry (upsert by `id`) |
+| `chat.reset` | host | The session's transcript was replaced: the entries the client holds for it are gone (see ChatEntry) | `session_id` string |
 | `chat.send` | client | The user sends a message to a session | `call_id` string, `session_id` string, `text` string (1 to 16 384 UTF-8 bytes) |
 | `chat.send.result` | host | Reply to every acceptable `chat.send` | `call_id` string, `outcome` string |
 | `chat.interrupt` | client | The user stops the session's current turn | `call_id` string, `session_id` string, `hard` bool |
@@ -235,6 +239,21 @@ a `chat.entries`, a `rev` strictly greater than that of any earlier emission of 
 messages travel independently, so an older emission can arrive after a newer one: a receiver that already
 holds an entry with this `id` keeps whichever has the higher `rev` (equal `rev` means the same content)
 and drops the other. A host takes `rev` from its transcript source.
+
+`chat.reset` says a session's transcript was replaced: the host reloaded it from scratch, for example
+because the agent was resumed into a rewritten file, or a forked session's file first appeared already
+holding a whole history. The entries a client holds for that session, their `seq` values and its
+`before_seq` position no longer apply. A host sends `chat.reset` in order with that session's
+`chat.entries`: every entry pushed before it belongs to the old transcript, every entry after it to the
+new one. On `chat.reset` a client:
+
+- drops every entry it holds for that session;
+- drops the answer to any `chat.history.get` for that session it sent before the reset;
+- pages again from the newest (`chat.history.get` without `before_seq`), keeping the `chat.entries` that
+  arrive meanwhile (they upsert as usual).
+
+A client that predates `chat.reset` ignores it (unknown `t`, section 7) and keeps the old entries until
+it opens the session again.
 
 ### Enums (exact strings, all open)
 
@@ -372,7 +391,7 @@ Rules:
   succeed or fail the same way.
 
 `message.case` names the message; the other `message` keys use the JSON field names (`decision`
-and PendingItem objects use their wire form). All 21 cases:
+and PendingItem objects use their wire form). All 22 cases:
 
 | `message.case` | Wire `t` | Other keys |
 | --- | --- | --- |
@@ -392,6 +411,7 @@ and PendingItem objects use their wire form). All 21 cases:
 | `chat_history_get` | `chat.history.get` | `call_id`, `session_id`, `before_seq` (optional), `limit` |
 | `chat_history` | `chat.history` | `call_id`, `session_id`, `entries` (ChatEntry objects), `has_more` |
 | `chat_entries` | `chat.entries` | `session_id`, `entries` |
+| `chat_reset` | `chat.reset` | `session_id` |
 | `chat_send` | `chat.send` | `call_id`, `session_id`, `text` |
 | `chat_send_result` | `chat.send.result` | `call_id`, `outcome` |
 | `chat_interrupt` | `chat.interrupt` | `call_id`, `session_id`, `hard` |
