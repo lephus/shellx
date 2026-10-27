@@ -165,7 +165,7 @@ Mac") with no buttons.
 | `options` | array of PendingQuestionOption | |
 
 A PendingQuestionOption has `id` string, `label` string and `description` string (optional). A
-decision selects options by `label`.
+decision selects options by `label`, or gives a free-text answer (section 4, Decision).
 
 ### Decision
 
@@ -174,7 +174,7 @@ The `decision` object of `agent.reply` has a `kind` (open enum) that selects the
 | `kind` | Other fields | Example |
 | --- | --- | --- |
 | `permission` | `mode` string | `{"kind":"permission","mode":"once"}` |
-| `question` | `selections` array of string: the chosen option labels | `{"kind":"question","selections":["Postgres"]}` |
+| `question` | `selections` array of string, positional: `selections[i]` answers `questions[i]`, so its length equals the number of the item's `questions`. Each element is 1 to 1024 UTF-8 bytes. An element equal to an option `label` picks that option; any other string is a free-text answer. For a `multi_select` question, the chosen labels are joined with `", "` | `{"kind":"question","selections":["Postgres"]}` |
 | `exit_plan` | `mode` string, `feedback` string (optional) | `{"kind":"exit_plan","mode":"manual","feedback":"split step 2"}` |
 
 A `decision` with a `kind` this version does not know decodes (it is not `bad_json`); the host
@@ -248,8 +248,9 @@ A request is resolved at most once. For an `agent.reply`, the first rule that ma
    expired): the host MUST NOT resolve it again and answers `already_handled`.
 3. A decision that does not fit the item: the host answers `unknown` and leaves the item as it
    was. That is any of: the `decision.kind` differs from the item's `kind`; the decision's
-   `mode` is not in the item's `modes`; a `question` selection matches no option `label` in the
-   item's `questions`; the `decision.kind` is not known to the host.
+   `mode` is not in the item's `modes`; for a `question`, the number of `selections` differs from
+   the number of the item's `questions`, or an element is empty or longer than 1024 UTF-8 bytes;
+   the `decision.kind` is not known to the host.
 4. No agent is waiting for the request any more (the agent stopped waiting, it never waited
    because it sent the request without waiting, or the host restarted since the request
    arrived): nothing can take the decision. The host marks the

@@ -100,10 +100,13 @@ public enum ReplyOutcome: LinkWireEnum {
 }
 
 /// The user's decision in an `agent.reply`: `{"kind":"permission","mode":"once"}`,
-/// `{"kind":"question","selections":["<label>"]}` or `{"kind":"exit_plan","mode":"manual","feedback":"..."}`.
+/// `{"kind":"question","selections":["<label or free text>"]}` or `{"kind":"exit_plan","mode":"manual","feedback":"..."}`.
 public enum LinkDecision: Codable, Equatable, Sendable {
     case permission(PermissionMode)
-    /// The labels of the chosen options (`PendingQuestionOption.label`).
+    /// Positional answers: `selections[i]` answers `questions[i]`, and the count equals the item's
+    /// number of questions. Each element is 1...1024 UTF-8 bytes. An element equal to an option's
+    /// `PendingQuestionOption.label` picks that option; any other string is a free-text answer.
+    /// For a `multi_select` question the chosen labels are joined with `", "`.
     case question(selections: [String])
     case exitPlan(ExitPlanMode, feedback: String?)
     /// A `kind` this version does not know.

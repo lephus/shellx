@@ -404,6 +404,60 @@
       }
     },
     {
+      "name": "reply_question_free_text",
+      "message": {
+        "case": "reply",
+        "call_id": "c21",
+        "request_id": "req-12",
+        "decision": {
+          "kind": "question",
+          "selections": [
+            "Other: MySQL 8"
+          ]
+        }
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c21",
+        "request_id": "req-12",
+        "decision": {
+          "kind": "question",
+          "selections": [
+            "Other: MySQL 8"
+          ]
+        }
+      }
+    },
+    {
+      "name": "reply_question_two_questions",
+      "message": {
+        "case": "reply",
+        "call_id": "c22",
+        "request_id": "req-13",
+        "decision": {
+          "kind": "question",
+          "selections": [
+            "Postgres",
+            "Redis and a queue"
+          ]
+        }
+      },
+      "json": {
+        "v": 1,
+        "t": "agent.reply",
+        "call_id": "c22",
+        "request_id": "req-13",
+        "decision": {
+          "kind": "question",
+          "selections": [
+            "Postgres",
+            "Redis and a queue"
+          ]
+        }
+      }
+    },
+    {
       "name": "reply_exit_plan",
       "message": {
         "case": "reply",
