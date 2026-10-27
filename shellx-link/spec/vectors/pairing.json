@@ -1,11 +1,11 @@
 {
-  "comment": "ShellX Link pairing vectors. proof = HMAC-SHA256(key: code, message: 'shellx-link-pair/1' || 0x00 || UTF-8(machine_id) || 0x00 || client_key), generated once with CryptoKit. All binary values are base64url without padding.",
+  "comment": "ShellX Link pairing vectors. proof = HMAC-SHA256(key: code, message: 'shellx-link-pair/1' || 0x00 || UTF-8(machine_id) || 0x00 || UTF-8(link_slot) || 0x00 || host_key || client_key), computed with CryptoKit and cross-checked with Python hmac. All binary values are base64url without padding.",
   "machine_id": "6f1c2b7e-0d4a-4c1e-9a53-3b8e5d2f7a10",
   "link_slot": "slot-test-1",
   "machine_name": "Phu's Mac",
   "host_key_b64url": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8",
   "code_b64url": "AAECAwQFBgcICQoLDA0ODw",
   "client_key_b64url": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8",
-  "proof_hex": "8b329fba37f5144e8f28964d10f2db71a07c8a151dc9ac4bf46fffe215065344",
-  "proof_b64url": "izKfujf1FE6PKJZNEPLbcaB8ihUdyaxL9G__4hUGU0Q"
+  "proof_hex": "25373f8ec0d1aa9048a60d5c7b7e61ce4d7808bc382c060e285f672a9f42f725",
+  "proof_b64url": "JTc_jsDRqpBIpg1ce35hzk14CLw4LAYOKF9nKp9C9yU"
 }

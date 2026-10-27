@@ -40,6 +40,56 @@ final class RelayAPITests: XCTestCase {
         XCTAssertEqual(device["public_key"] as? String, "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8")
     }
 
+    func testLoginUsesBase64URLAlphabetForPublicKey() async throws {
+        // Standard base64 of this key starts with "+/+/" and ends with "=".
+        let key = Data([0xFB, 0xFF, 0xBF] + [UInt8](repeating: 0, count: 29))
+        XCTAssertTrue(key.base64EncodedString().hasPrefix("+/+/"))
+        StubURLProtocol.install { _ in StubResponse(200, ["user_id": "u", "device_id": "d", "token": "t"]) }
+        _ = try await api().login(email: "a@b.c", password: "pw", deviceName: "p", clientKey: key)
+        let device = try XCTUnwrap(StubURLProtocol.requests.first?.json?["device"] as? [String: Any])
+        let publicKey = try XCTUnwrap(device["public_key"] as? String)
+        XCTAssertEqual(publicKey, "-_-_" + String(repeating: "A", count: 39))
+        XCTAssertFalse(publicKey.contains("+") || publicKey.contains("/") || publicKey.contains("="))
+    }
+
+    func testRedirectIsRefusedAndNotFollowed() async throws {
+        StubURLProtocol.install { request in
+            request.host == "api.example.test"
+                ? StubResponse(307, location: "https://evil.example.test/steal") : StubResponse(200, ["token": "x"])
+        }
+        do {
+            _ = try await api().login(email: "a@b.c", password: "pw-secret", deviceName: "p", clientKey: clientKey)
+            XCTFail("expected an error")
+        } catch {
+            let isHTTP = (error as? RelayAPIError).map {
+                if case .http(status: 307, _) = $0 { return true } else { return $0 == .badResponse }
+            }
+            XCTAssertEqual(isHTTP, true, "\(error)")
+        }
+        XCTAssertEqual(StubURLProtocol.requests.map(\.host), ["api.example.test"])
+
+        StubURLProtocol.install { request in
+            request.host == "api.example.test"
+                ? StubResponse(302, location: "https://evil.example.test/steal") : StubResponse(200, ["grants": []])
+        }
+        do {
+            _ = try await api().machines(token: "tok-secret")
+            XCTFail("expected an error")
+        } catch {
+            XCTAssertTrue(error is RelayAPIError, "\(error)")
+        }
+        XCTAssertEqual(StubURLProtocol.requests.map(\.host), ["api.example.test"])
+    }
+
+    func testCancelPairingPostsDeny() async throws {
+        StubURLProtocol.install { _ in StubResponse(204) }
+        try await api().cancelPairing(id: "p-1", token: "tok")
+        let request = try XCTUnwrap(StubURLProtocol.requests.first)
+        XCTAssertEqual(request.method, "POST")
+        XCTAssertEqual(request.path, "/v2/phone-pairings/p-1/deny")
+        XCTAssertEqual(request.headers["Authorization"], "Bearer tok")
+    }
+
     func testMintChecksSlotClaim() async throws {
         StubURLProtocol.install { _ in
             StubResponse(200, [

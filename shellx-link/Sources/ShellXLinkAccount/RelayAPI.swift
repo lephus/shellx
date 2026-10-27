@@ -109,6 +109,12 @@ public struct RelayAPI: Sendable {
         return reply.pairingID
     }
 
+    /// Withdraws a pending pairing request (`POST /v2/phone-pairings/:id/deny`, which the sending phone may call).
+    public func cancelPairing(id: String, token: String) async throws {
+        guard Self.isSafeSegment(id) else { throw RelayAPIError.badResponse }
+        let _: Empty = try await send("POST", "/v2/phone-pairings/\(id)/deny", token: token, body: nil)
+    }
+
     public func pairingStatus(id: String, token: String) async throws -> PhonePairingStatus {
         guard Self.isSafeSegment(id) else { throw RelayAPIError.badResponse }
         let reply: PairingStatusReply = try await send("GET", "/v2/phone-pairings/\(id)", token: token, body: nil)
@@ -169,7 +175,8 @@ public struct RelayAPI: Sendable {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
-        let (data, response) = try await session.data(for: request)
+        // A redirect could carry the bearer token or the login body to another host: never follow one.
+        let (data, response) = try await session.data(for: request, delegate: RefuseRedirects())
         guard let http = response as? HTTPURLResponse else { throw RelayAPIError.badResponse }
         guard (200..<300).contains(http.statusCode) else {
             let code = (try? JSONDecoder().decode(ErrorEnvelope.self, from: data))?.error.code ?? "unknown"
@@ -194,6 +201,16 @@ public struct RelayAPI: Sendable {
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
+    }
+}
+
+/// Answers every HTTP redirect with "do not follow", so the 3xx response is the result.
+private final class RefuseRedirects: NSObject, URLSessionTaskDelegate, Sendable {
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest
+    ) async -> URLRequest? {
+        nil
     }
 }
 

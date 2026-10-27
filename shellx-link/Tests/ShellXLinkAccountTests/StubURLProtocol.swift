@@ -4,6 +4,7 @@ import ShellXLinkRelay
 /// A request as the stub saw it (the body is read from the body stream).
 struct StubRequest: Sendable {
     var method: String
+    var host: String
     var path: String
     var headers: [String: String]
     var body: Data
@@ -13,8 +14,10 @@ struct StubRequest: Sendable {
 struct StubResponse: Sendable {
     var status: Int
     var body: Data
-    init(_ status: Int, _ json: Any? = nil) {
+    var location: String?
+    init(_ status: Int, _ json: Any? = nil, location: String? = nil) {
         self.status = status
+        self.location = location
         self.body = json.flatMap { try? JSONSerialization.data(withJSONObject: $0) } ?? Data()
     }
 }
@@ -61,16 +64,22 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
             stream.close()
         }
         let seenRequest = StubRequest(
-            method: request.httpMethod ?? "GET", path: request.url?.path ?? "",
+            method: request.httpMethod ?? "GET", host: request.url?.host ?? "", path: request.url?.path ?? "",
             headers: request.allHTTPHeaderFields ?? [:], body: body)
         Self.lock.lock()
         Self.seen.append(seenRequest)
         let handler = Self.handler
         Self.lock.unlock()
         let response = handler?(seenRequest) ?? StubResponse(500)
+        var headers = ["Content-Type": "application/json"]
+        if let location = response.location { headers["Location"] = location }
         let http = HTTPURLResponse(
-            url: request.url!, statusCode: response.status, httpVersion: "HTTP/1.1",
-            headerFields: ["Content-Type": "application/json"])!
+            url: request.url!, statusCode: response.status, httpVersion: "HTTP/1.1", headerFields: headers)!
+        if let location = response.location, let target = URL(string: location) {
+            // Let URLSession ask its delegate whether to follow, as it does for a real redirect.
+            client?.urlProtocol(self, wasRedirectedTo: URLRequest(url: target), redirectResponse: http)
+            // When the session declines to follow, the redirect response itself is the result.
+        }
         client?.urlProtocol(self, didReceive: http, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: response.body)
         client?.urlProtocolDidFinishLoading(self)
