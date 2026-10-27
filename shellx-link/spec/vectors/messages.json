@@ -1166,6 +1166,46 @@
       }
     },
     {
+      "name": "unknown_type_keeps_call_id",
+      "json": {
+        "v": 1,
+        "t": "future.call",
+        "call_id": "c42",
+        "anything": {
+          "x": 1
+        }
+      },
+      "message": {
+        "case": "unknown",
+        "type": "future.call",
+        "call_id": "c42"
+      }
+    },
+    {
+      "name": "unknown_type_drops_invalid_call_id",
+      "json": {
+        "v": 1,
+        "t": "future.call",
+        "call_id": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "message": {
+        "case": "unknown",
+        "type": "future.call"
+      }
+    },
+    {
+      "name": "unknown_type_drops_non_string_call_id",
+      "json": {
+        "v": 1,
+        "t": "future.call",
+        "call_id": 7
+      },
+      "message": {
+        "case": "unknown",
+        "type": "future.call"
+      }
+    },
+    {
       "name": "unknown_fields_ignored",
       "json": {
         "v": 1,

@@ -196,9 +196,10 @@ public actor LinkHost {
                 }
             case let .reply(callId, requestId, decision):
                 // Resolving may wait on the agent hook; keep reading meanwhile. Replies to one
-                // request run one after another in arrival order, so their results leave in the
-                // order the client sent them (it matches a result to the oldest reply for that
-                // id). Replies to different requests run concurrently.
+                // request run one after another in arrival order, so the first decision sent is the
+                // one the feed takes and later ones answer `already_handled` (PROTOCOL.md section 5);
+                // the client matches each result to its call by `call_id`. Replies to different
+                // requests run concurrently.
                 let turn = await replyOrder.reserve(requestId)
                 group.addTask {
                     await replyOrder.wait(for: turn, of: requestId)
@@ -266,6 +267,10 @@ public actor LinkHost {
                 }
             case let .ping(nonce):
                 try? await channel.send(.pong(nonce: nonce))
+            case let .unknown(_, callId?):
+                // A call of a later version (PROTOCOL.md section 3): answered at once, so the phone does not
+                // wait out its timeout. One without a call_id is ignored below.
+                await Self.sendError(on: channel, "unsupported", "this host does not know this call", callId: callId)
             case .pong, .unknown, .error:
                 break
             case .hello, .welcome, .changed, .sessionsChanged, .chatEntries:

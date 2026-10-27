@@ -213,7 +213,7 @@ public enum LinkCodec {
         case T.chatInterruptResult:
             let b = try call(InterruptResult.self, \.callId)
             return .chatInterruptResult(callId: b.callId, outcome: b.outcome)
-        default: return .unknown(type: env.t)
+        default: return .unknown(type: env.t, callId: readCallId(d))
         }
     }
 

@@ -53,7 +53,9 @@ A frame is one UTF-8 JSON object:
   decode (`frame_too_large`). A sender whose content does not fit MUST shrink the content.
 - Decoding order: (1) size check, (2) parse as an object with integer-token `v` and string `t`,
   else `bad_json`; (3) `v` != 1 gives `wrong_version`; (4) if `t` is unknown, the frame is
-  `unknown` and is ignored (forward compatibility); (5) if `t` is known but a field is
+  `unknown` (forward compatibility), whatever its other fields hold; it keeps the frame's `call_id`
+  when that is a valid one (a string of 1 to 64 UTF-8 bytes), and section 7 says how each side handles
+  it; (5) if `t` is known but a field is
   missing or has the wrong type, `bad_json` (an unlisted enum value is not an error, see
   Extension). A known `t` never degrades to `unknown`.
 - `unknown` is decode-only; an implementation MUST NOT be able to send it.
@@ -83,6 +85,10 @@ requests later versions add on the same pattern).
 - A client drops an answer whose `call_id` it is no longer waiting for (for example because the
   call timed out).
 - A missing, empty or longer-than-64-byte `call_id` on a message that requires one is `bad_json`.
+- A call the host does not know (a request type of a later version, sent by a newer client) still gets
+  its one answer: the host answers a frame of unknown `t` that carries a valid `call_id` with `error`
+  `unsupported` and that `call_id`, so the client fails the call at once instead of waiting for its
+  timeout. A frame of unknown `t` without a valid `call_id` gets no answer.
 - The P1 rule still holds: the host answers the `agent.reply` messages for one `request_id` in
   the order they arrived (section 5).
 
@@ -112,7 +118,8 @@ requests later versions add on the same pattern).
 | `pong` | either | Immediately after `ping`, echoing it | `nonce` uint64 (same value) |
 
 Error codes in use: `protocol_mismatch`, `bad_request`, `too_large`, `unsupported` (the host has no
-session list or no chat: it answers each such call with this code and its `call_id`), `not_found`
+session list or no chat, or does not know the call's `t`: it answers each such call with this code and
+its `call_id`), `not_found`
 (`chat.history.get` for a `session_id` the host does not have). Others MAY be added; receivers treat
 an unrecognized code as a generic error.
 
@@ -340,7 +347,9 @@ Rules:
   connection. A client that receives `error` `protocol_mismatch` closes the connection and tells
   the user to update the app.
 - **First frame is not `hello`**: the host sends `error` code `bad_request` and then closes.
-- **Unknown `t`**: ignored by both sides, session kept.
+- **Unknown `t`**: the session is kept. The host answers a frame of unknown `t` that carries a valid
+  `call_id` with `error` `unsupported` and that `call_id` (section 3), and ignores one without. The
+  client ignores every frame of unknown `t`.
 - A frame that decodes but is not allowed in the current phase or direction (for example a
   client sending `welcome`) is ignored; the host MAY answer `error` `bad_request`.
 
@@ -386,7 +395,7 @@ and PendingItem objects use their wire form). All 21 cases:
 | `chat_send_result` | `chat.send.result` | `call_id`, `outcome` |
 | `chat_interrupt` | `chat.interrupt` | `call_id`, `session_id`, `hard` |
 | `chat_interrupt_result` | `chat.interrupt.result` | `call_id`, `outcome` |
-| `unknown` | any unrecognized `t` | `type` (the `t` value); decode-only |
+| `unknown` | any unrecognized `t` | `type` (the `t` value), `call_id` (optional: the frame's valid `call_id`); decode-only |
 
 ## 9. Pairing and trust
 

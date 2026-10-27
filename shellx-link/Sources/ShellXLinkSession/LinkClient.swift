@@ -12,7 +12,8 @@ public enum LinkClientError: Error, Equatable, Sendable {
     case sessionClosed
     /// No answer arrived within the request timeout (10 s by default). The session stays usable.
     case timedOut
-    /// The host answered one specific call with an `error` (PROTOCOL.md section 7).
+    /// The host answered one specific call with an `error` (PROTOCOL.md section 7). `unsupported` means the host
+    /// cannot serve this call: it has no source for it, or it predates the call's type (section 3).
     case remote(code: String, message: String)
     /// The host answered a call with a message of another type than the call expects. A fault of the
     /// host's, not an `error` it sent: callers that branch on `.remote` codes never see it.
