@@ -71,16 +71,20 @@ final class AnalyzerTranscriber: SpeechTranscribing, @unchecked Sendable {
 
     private let audio: AudioCapture
     private let slot: SpeechRunSlot
+    private let assets: AnalyzerAssets
 
-    init(audio: AudioCapture, slot: SpeechRunSlot) {
+    init(audio: AudioCapture, slot: SpeechRunSlot, assets: AnalyzerAssets) {
         self.audio = audio
         self.slot = slot
+        self.assets = assets
     }
 
     /// Whether the analyzer can transcribe `locale` now. Starts downloading the assets when it could
     /// but they are missing. A locale it failed to start for counts as unsupported.
     static func readiness(for locale: Locale, assets: AnalyzerAssets) async -> Readiness {
-        guard await !assets.hasFailed(locale), let module = await module(for: locale) else { return .unsupported }
+        guard await !assets.hasFailed(locale), let module = await module(for: locale, assets: assets) else {
+            return .unsupported
+        }
         switch await AssetInventory.status(forModules: [module.base]) {
         case .installed:
             return .ready
@@ -105,7 +109,8 @@ final class AnalyzerTranscriber: SpeechTranscribing, @unchecked Sendable {
         -> AsyncThrowingStream<String, any Error>
     {
         slot.begin(id)
-        guard let module = await Self.module(for: locale) else {
+        // The answer `readiness` just got: no second `supportedLocale` round on the first-word path.
+        guard let module = await Self.module(for: locale, assets: assets) else {
             throw SpeechStartError.recognizer(LegacyTranscriber.Failure.unavailable)
         }
         // The analyzer's own steps: a failure here is the analyzer's.
@@ -217,22 +222,35 @@ final class AnalyzerTranscriber: SpeechTranscribing, @unchecked Sendable {
         Task { await run.analyzer.cancelAndFinishNow() }
     }
 
-    /// `SpeechTranscriber` when it has the language (and runs on this iPhone), else
-    /// `DictationTranscriber` when it has it; nil when neither does.
-    private static func module(for locale: Locale) async -> Module? {
+    /// Asks iOS which module has `locale`: `SpeechTranscriber` when it has the language (and runs on
+    /// this iPhone), else `DictationTranscriber` when it has it. `AnalyzerAssets` keeps the answer.
+    private static func lookUpModule(_ locale: Locale) async -> AnalyzerAssets.ModuleChoice {
         if SpeechTranscriber.isAvailable, let supported = await SpeechTranscriber.supportedLocale(equivalentTo: locale) {
+            return .speech(supported)
+        }
+        if let supported = await DictationTranscriber.supportedLocale(equivalentTo: locale) {
+            return .dictation(supported)
+        }
+        return .unsupported
+    }
+
+    /// A new module for `locale` (one per press), from the answer kept in `assets`; nil when no module
+    /// has the language.
+    private static func module(for locale: Locale, assets: AnalyzerAssets) async -> Module? {
+        switch await assets.module(for: locale, lookup: lookUpModule) {
+        case let .speech(supported):
             return .speech(
                 SpeechTranscriber(
                     locale: supported, transcriptionOptions: [], reportingOptions: [.volatileResults, .fastResults],
                     attributeOptions: []))
-        }
-        if let supported = await DictationTranscriber.supportedLocale(equivalentTo: locale) {
+        case let .dictation(supported):
             return .dictation(
                 DictationTranscriber(
                     locale: supported, contentHints: [.shortForm], transcriptionOptions: [.punctuation],
                     reportingOptions: [.volatileResults], attributeOptions: []))
+        case .unsupported:
+            return nil
         }
-        return nil
     }
 
     private static func read(_ module: Module, into continuation: AsyncThrowingStream<String, any Error>.Continuation) async -> String {

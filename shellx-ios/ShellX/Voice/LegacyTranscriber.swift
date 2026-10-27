@@ -96,7 +96,17 @@ final class LegacyTranscriber: SpeechTranscribing, @unchecked Sendable {
         let task = startTask(recognizer, request) { [weak self] result, error in
             self?.handle(run, text: result?.bestTranscription.formattedString, isFinal: result?.isFinal ?? false, error: error)
         }
-        lock.withLock { run.task = task }
+        let ended = lock.withLock { () -> Bool in
+            run.task = task
+            return run.ended
+        }
+        // Torn down while it started (released, or taken over during the await above): its teardown
+        // found no task yet, so the task stops here rather than linger as a server session.
+        if ended || !slot.isActive(id) {
+            task.cancel()
+            end(run, error: nil)
+            return stream
+        }
         do {
             let slot = self.slot
             try audio.start(owner: id, stillWanted: { slot.isActive(id) }) { buffer in run.request.append(buffer) }

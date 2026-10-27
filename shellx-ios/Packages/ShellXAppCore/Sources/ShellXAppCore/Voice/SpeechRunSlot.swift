@@ -3,7 +3,9 @@ import Foundation
 /// The microphone holds one dictation at a time; this decides which. Every transcriber that shares
 /// the microphone shares one slot.
 ///
-/// - `begin` marks a start: the newest start is the only one that may take the microphone.
+/// - `begin` marks a start: the newest start is the only one that may take the microphone. The
+///   outermost transcriber begins a press at its entry, before any await; beginning the same run
+///   again later changes nothing.
 /// - `claim` is asked right before the audio starts. A start that a newer one overtook, or whose run
 ///   was cancelled while it started (or before), is refused: it cleans up after itself and leaves
 ///   the active run alone. A granted claim hands back the run it replaced, which the caller tears down.
@@ -31,9 +33,12 @@ public final class SpeechRunSlot: @unchecked Sendable {
 
     /// Cancels remembered for runs that are not active (bounded, oldest dropped).
     private static let cancelMemory = 32
+    /// Runs remembered as begun, so beginning one again changes nothing (bounded, oldest dropped).
+    private static let beginMemory = 32
 
     private let lock = NSLock()
     private var newest: SpeechRunID?
+    private var begun: [SpeechRunID] = []
     private var current: (run: SpeechRunID, handlers: Handlers)?
     private var cancelled: [SpeechRunID] = []
 
@@ -46,9 +51,16 @@ public final class SpeechRunSlot: @unchecked Sendable {
         lock.withLock { current?.run == run }
     }
 
-    /// A start of `run` began; it is the newest start now.
+    /// A start of `run` began; it is the newest start now, unless `run` began before. Beginning a run
+    /// again (an inner transcriber after the router, a fallback retry) never makes an older run the
+    /// newest again.
     public func begin(_ run: SpeechRunID) {
-        lock.withLock { newest = run }
+        lock.withLock {
+            guard !begun.contains(run) else { return }
+            begun.append(run)
+            if begun.count > Self.beginMemory { begun.removeFirst(begun.count - Self.beginMemory) }
+            newest = run
+        }
     }
 
     /// `run` is ready to take the microphone.

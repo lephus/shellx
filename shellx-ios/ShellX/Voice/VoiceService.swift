@@ -62,7 +62,7 @@ final class VoiceService {
         let transcriber: any SpeechTranscribing
         if #available(iOS 26, *) {
             transcriber = FallbackTranscriber(
-                primary: AnalyzerTranscriber(audio: audio, slot: slot), fallback: legacy,
+                slot: slot, primary: AnalyzerTranscriber(audio: audio, slot: slot, assets: assets), fallback: legacy,
                 usePrimary: { await AnalyzerTranscriber.readiness(for: $0, assets: assets) == .ready },
                 primaryFailed: { locale in
                     // Only the analyzer's own failures: not offered again for the language, and
