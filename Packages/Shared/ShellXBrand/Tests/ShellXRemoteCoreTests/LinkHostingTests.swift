@@ -8,7 +8,7 @@ import Testing
     let rig = ServiceRig()
     #expect(await rig.startConnected())
     #expect(await until { !rig.linkHost.starts.isEmpty })
-    #expect(rig.linkHost.starts == [FakeLinkHost.Start(machineID: "m_self", linkSlot: "link-self")])
+    #expect(rig.linkHost.starts == [FakeLinkHost.Start(machineID: "m_self", linkSlot: "link-self", accountID: "u_1")])
 }
 
 @MainActor @Test func oldRelayWithoutLinkSlotLeavesTheRestOfTheHostRunning() async {

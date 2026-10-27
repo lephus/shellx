@@ -5,8 +5,11 @@ import ShellXLinkRelay
 /// The Mac (or PC) side of ShellX Link: serves the agent feed to trusted phones.
 ///
 /// One `LinkHost` serves any number of circuits at once; each `serve` call is one session.
-/// Session state lives in `serve`, so the actor holds only configuration.
+/// Session state lives in `serve`; the actor holds the configuration and a registry of the live sessions
+/// (by authenticated client key) so that ``disconnect(clientKey:)`` can end them.
 public actor LinkHost {
+    private var live: [UUID: (clientKey: Data, circuit: WatchedCircuit)] = [:]
+
     private nonisolated let key: NoiseStaticKey
     private nonisolated let trustedClients: @Sendable () -> Set<Data>
     private nonisolated let feed: any AgentFeedSource
@@ -56,11 +59,28 @@ public actor LinkHost {
         await runSession(circuit)
     }
 
+    /// Closes every live session authenticated with `clientKey`. A new handshake with that key is refused
+    /// only once `trustedClients` no longer contains it, so untrust first.
+    public func disconnect(clientKey: Data) async {
+        let circuits = live.values.filter { $0.clientKey == clientKey }.map(\.circuit)
+        for circuit in circuits { await circuit.close() }
+    }
+
+    private func register(_ id: UUID, clientKey: Data, circuit: WatchedCircuit) {
+        live[id] = (clientKey, circuit)
+    }
+
+    private func unregister(_ id: UUID) {
+        live[id] = nil
+    }
+
     private nonisolated func runSession(_ circuit: any RelayCircuit) async {
         let watched = WatchedCircuit(circuit)
+        let sessionID = UUID()
         await withDiscardingTaskGroup { group in
             group.addTask { await watched.watch(idleTimeout: self.timings.idleTimeout) }
-            await self.converse(on: watched, group: &group)
+            await self.converse(on: watched, sessionID: sessionID, group: &group)
+            await self.unregister(sessionID)
             // Close first so that child tasks blocked on the circuit fail fast, then stop the rest.
             await watched.close()
             group.cancelAll()
@@ -68,7 +88,7 @@ public actor LinkHost {
     }
 
     /// The session itself. Returns when the session must end.
-    private nonisolated func converse(on circuit: WatchedCircuit, group: inout DiscardingTaskGroup) async {
+    private nonisolated func converse(on circuit: WatchedCircuit, sessionID: UUID, group: inout DiscardingTaskGroup) async {
         let trustedClients = self.trustedClients
         let channel: SecureChannel
         do {
@@ -76,6 +96,12 @@ public actor LinkHost {
                 circuit, role: .responder, key: key, trusts: { trustedClients().contains($0) })
         } catch {
             linkLog.info("host handshake failed: \(String(describing: error), privacy: .public)")
+            return
+        }
+        // Registered so `disconnect` can end it. A key untrusted between the handshake and here is closed now.
+        await register(sessionID, clientKey: channel.peerKey, circuit: circuit)
+        guard trustedClients().contains(channel.peerKey) else {
+            await circuit.close()
             return
         }
 
@@ -309,23 +335,28 @@ public actor LinkHost {
         return nil
     }
 
-    /// PROTOCOL.md section 6: a history page that does not fit loses its oldest entries one by one, and
-    /// `has_more` becomes true. Nil when not even an empty page fits.
+    /// PROTOCOL.md section 6: a history page that does not fit loses its oldest whole `seq` group at a
+    /// time (every entry sharing the smallest remaining `seq`), and `has_more` becomes true, so a client
+    /// paging with `before_seq` never skips an entry. Nil when not even the newest group fits.
     static func fittedHistory(callId: String, sessionId: String, page: (entries: [ChatEntry], hasMore: Bool)) -> Data? {
-        for dropped in 0...page.entries.count {
+        var entries = page.entries
+        var hasMore = page.hasMore
+        while true {
             let message = LinkMessage.chatHistory(
-                callId: callId, sessionId: sessionId, entries: Array(page.entries.dropFirst(dropped)),
-                hasMore: page.hasMore || dropped > 0)
+                callId: callId, sessionId: sessionId, entries: entries, hasMore: hasMore)
             do {
                 return try LinkCodec.encode(message)
             } catch LinkCodecError.frameTooLarge {
-                continue
+                guard let oldest = entries.map(\.seq).min() else { return nil }
+                let rest = entries.filter { $0.seq != oldest }
+                guard !rest.isEmpty else { return nil }
+                entries = rest
+                hasMore = true
             } catch {
                 linkLog.error("cannot encode a host frame: \(String(describing: error), privacy: .public)")
                 return nil
             }
         }
-        return nil
     }
 
     /// PROTOCOL.md section 6: `chat.entries` that do not fit are split into several frames, each complete

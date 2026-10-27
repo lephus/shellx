@@ -23,7 +23,8 @@ public final class ShellXRemoteService: ObservableObject {
     nonisolated static let heartbeatInterval: TimeInterval = 30
     nonisolated static let machinesInterval: TimeInterval = 15
     nonisolated static let pendingInterval: TimeInterval = 5
-    nonisolated static let pollInterval: TimeInterval = 2
+    /// How often a waiting pairing is polled; the app's phone pairing sheet polls at the same pace.
+    public nonisolated static let pollInterval: TimeInterval = 2
     nonisolated static let enrollPollInterval: TimeInterval = 1
     /// Pairings, invitations and shown requests all live 300 s.
     nonisolated static let pairingLifetime: TimeInterval = 300
@@ -386,7 +387,11 @@ public final class ShellXRemoteService: ObservableObject {
             RemoteLog.service.notice("link host not started: the relay gave no link slot")
             return
         }
-        linkHost.start(machineID: machineID, linkSlot: linkSlot)
+        guard let accountID = accountOwnerID, !accountID.isEmpty else {
+            RemoteLog.service.notice("link host not started: no signed-in account")
+            return
+        }
+        linkHost.start(machineID: machineID, linkSlot: linkSlot, accountID: accountID)
     }
 
     func hostChanged(_ state: LinkState, _ gen: Int) {

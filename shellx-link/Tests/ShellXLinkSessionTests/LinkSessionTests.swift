@@ -97,6 +97,50 @@ final class LinkSessionTests: XCTestCase {
         XCTAssertTrue(feed.untouched, "host called the feed for an untrusted client")
     }
 
+    func testDisconnectClosesLiveSessionsOfKey() async throws {
+        let feed = FakeFeedSource([permissionItem("r1")])
+        let rig = makeHost(feed, clientCount: 2)
+        let clientA = try await connect(rig, clientIndex: 0)
+        let clientB = try await connect(rig, clientIndex: 1)
+        _ = try await within { try await clientA.snapshot() }
+        _ = try await within { try await clientB.snapshot() }
+
+        await rig.host.disconnect(clientKey: rig.clientKeys[0].publicKey)
+
+        do {
+            _ = try await within { try await clientA.snapshot() }
+            XCTFail("the disconnected client still got an answer")
+        } catch {
+            XCTAssertEqual(error as? LinkClientError, .sessionClosed, "unexpected error \(error)")
+        }
+        let other = try await within { try await clientB.snapshot() }
+        XCTAssertEqual(other.pending.map(\.requestId), ["r1"])
+    }
+
+    func testHandshakeRejectedAfterUntrust() async throws {
+        let feed = FakeFeedSource([permissionItem("r1")])
+        let clientKey = NoiseStaticKey()
+        let hostKey = NoiseStaticKey()
+        let trusted = Collector<Set<Data>>()
+        trusted.append([clientKey.publicKey])
+        let host = LinkHost(
+            key: hostKey, trustedClients: { trusted.items.last ?? [] }, feed: feed, hostVersion: "test-host",
+            machineName: "Test Mac")
+        let rig = Rig(host: host, hostKey: hostKey, clientKeys: [clientKey])
+        let first = try await connect(rig)
+        _ = try await within { try await first.snapshot() }
+
+        trusted.append([])
+        await host.disconnect(clientKey: clientKey.publicKey)
+
+        do {
+            _ = try await connect(rig)
+            XCTFail("connect succeeded after the key was untrusted")
+        } catch {
+            XCTAssertEqual(error as? RelayError, .closed, "unexpected error \(error)")
+        }
+    }
+
     func testReconnectGetsFreshSnapshot() async throws {
         let feed = FakeFeedSource([permissionItem("r1")])
         let rig = makeHost(feed)
@@ -659,6 +703,60 @@ final class LinkSessionTests: XCTestCase {
         let oneMore = LinkMessage.chatHistory(
             callId: "h1", sessionId: "s1", entries: Array(transcript.suffix(entries.count + 1)), hasMore: true)
         XCTAssertThrowsError(try LinkCodec.encode(oneMore))
+    }
+
+    /// `groups` seqs of `size` entries each; the entries of one group share the seq.
+    private func groupedTranscript(groups: Int, size: Int, textBytes: Int) -> [ChatEntry] {
+        (1...groups).flatMap { seq in
+            (0..<size).map { index in
+                ChatEntry(
+                    id: "e-\(seq)-\(index)", rev: 1, seq: seq, role: .agent, kind: .prose,
+                    text: String(repeating: "g", count: textBytes), tsMs: 1_700_000_000_000 + Int64(seq))
+            }
+        }
+    }
+
+    func testHistoryPageNeverSplitsASeqGroup() async throws {
+        let transcript = groupedTranscript(groups: 12, size: 4, textBytes: 3500)
+        let chat = FakeChatSource(["s1": transcript])
+        let client = try await connect(makeHost(FakeFeedSource(), chat: chat))
+        // 48 entries (12 groups) are asked for; ~192 KB cannot fit one frame.
+        var beforeSeq: Int?
+        var served: [ChatEntry] = []
+        var pages = 0
+        while true {
+            let before = beforeSeq
+            let page = try await within { try await client.chatHistory(sessionId: "s1", beforeSeq: before, limit: 48) }
+            XCTAssertFalse(page.entries.isEmpty)
+            let counts = Dictionary(grouping: page.entries, by: \.seq).mapValues(\.count)
+            for (seq, count) in counts { XCTAssertEqual(count, 4, "seq \(seq) is split") }
+            if pages == 0 { XCTAssertTrue(page.hasMore, "dropped groups must set has_more") }
+            served = page.entries + served
+            pages += 1
+            guard page.hasMore, let oldest = page.entries.map(\.seq).min() else { break }
+            if let beforeSeq { XCTAssertLessThan(oldest, beforeSeq) }
+            beforeSeq = oldest
+            if pages > 20 { XCTFail("paging does not terminate"); break }
+        }
+        XCTAssertGreaterThan(pages, 1)
+        XCTAssertEqual(served.map(\.id), transcript.map(\.id), "no entry skipped or repeated")
+    }
+
+    func testSingleOversizedGroupAnswersTooLarge() async throws {
+        // 20 entries sharing one seq, 4096 bytes each after the cap: more than one frame.
+        let group = (0..<20).map { index in
+            ChatEntry(
+                id: "big-\(index)", rev: 1, seq: 1, role: .agent, kind: .prose,
+                text: String(repeating: "b", count: ChatEntry.maxTextBytes), tsMs: 1_700_000_000_000)
+        }
+        let chat = FakeChatSource(["s1": group])
+        let client = try await connect(makeHost(FakeFeedSource(), chat: chat))
+        do {
+            _ = try await within { try await client.chatHistory(sessionId: "s1", beforeSeq: nil, limit: 20) }
+            XCTFail("expected too_large")
+        } catch let LinkClientError.remote(code, _) {
+            XCTAssertEqual(code, "too_large")
+        }
     }
 
     func testHostCapsOversizedEntryText() async throws {

@@ -49,13 +49,16 @@ extension ShellXRemoteEnvironment {
             appVersion: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0",
             osVersion: "\(system.majorVersion).\(system.minorVersion).\(system.patchVersion)")
         let core = ShellXCoreClient(ShellXCoreFFI.shared)
-        // ShellX Link (P1 spike): the agent Feed for phones. The service starts it only with the gate on and
-        // a `link_slot` from `machines.register`.
+        // ShellX Link: the agent Feed, sessions and chat for phones. The service starts it only with the gate on
+        // and a `link_slot` from `machines.register`.
         let linkHost = ShellXLinkHostController(
             core: core,
-            keys: ShellXLinkKeyStore(directory: ShellXLinkKeyStore.defaultDirectory(
-                home: FileManager.default.homeDirectoryForCurrentUser)),
+            storage: FallbackLinkSecretStorage.standard(onFallback: {
+                ShellXLinkHostController.log.notice("link keys: the Keychain refuses this build; using the development file store")
+            }),
             feed: ShellXLinkFeedSource(coordinator: .shared),
+            sessions: ShellXLinkSessionSource(),
+            chat: ShellXLinkChatSource(),
             hostVersion: device.appVersion,
             machineName: device.machineName)
         return ShellXRemoteEnvironment(

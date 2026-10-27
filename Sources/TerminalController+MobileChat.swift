@@ -237,22 +237,7 @@ extension TerminalController {
         guard let service = agentChatTranscriptService else {
             return .err(code: "unavailable", message: Self.chatServiceUnavailableErrorMessage, data: nil)
         }
-        var page = await service.history(sessionID: sessionID, beforeSeq: beforeSeq, limit: limit)
-        if page == nil, let staleRecord = service.sessionRecord(sessionID: sessionID) {
-            // The record exists but its transcript didn't resolve — the
-            // recorded path can be stale the same way terminal bindings
-            // are. Re-adopt from the hook store and retry once, but only
-            // when the refresh actually changed the resolution inputs (a
-            // pointless retry re-runs the codex directory walk).
-            #if DEBUG
-            cmuxDebugLog("mobile.chat.history transcript unresolved session=\(sessionID.prefix(8)); refreshing bindings")
-            #endif
-            let refreshed = await service.refreshSessionBindings(sessionID: sessionID)
-            if refreshed?.transcriptPath != staleRecord.transcriptPath
-                || refreshed?.workingDirectory != staleRecord.workingDirectory {
-                page = await service.history(sessionID: sessionID, beforeSeq: beforeSeq, limit: limit)
-            }
-        }
+        let page = await service.historyRebindingIfStale(sessionID: sessionID, beforeSeq: beforeSeq, limit: limit)
         guard let page else {
             #if DEBUG
             cmuxDebugLog("mobile.chat.history not_found session=\(sessionID.prefix(8))")
@@ -271,7 +256,8 @@ extension TerminalController {
     }
 
     /// `mobile.chat.send`: deliver attachments then inject the prompt into
-    /// the session's terminal (bracketed paste + submit key).
+    /// the session's terminal (bracketed paste + submit key), through
+    /// ``agentChatSend(sessionID:text:attachments:)``.
     func v2MobileChatSend(params: [String: Any]) async -> V2CallResult {
         guard let sessionID = v2RawString(params, "session_id") else {
             return .err(code: "invalid_params", message: "Missing session_id", data: nil)
@@ -281,6 +267,18 @@ extension TerminalController {
         guard !text.isEmpty || !attachments.isEmpty else {
             return .err(code: "invalid_params", message: "Nothing to send", data: nil)
         }
+        return await agentChatSend(sessionID: sessionID, text: text, attachments: attachments)
+    }
+
+    /// Types a message into an agent session's terminal: clears the agent's prompt, pastes each attachment,
+    /// then pastes `text` and submits it. The one send path behind `mobile.chat.send` and ShellX Link's
+    /// `chat.send`.
+    ///
+    /// - Parameters:
+    ///   - sessionID: The chat session to type into.
+    ///   - text: The message; may be empty only when `attachments` is not.
+    ///   - attachments: Images to paste first (`data_b64`, optional `format`).
+    func agentChatSend(sessionID: String, text: String, attachments: [[String: Any]] = []) async -> V2CallResult {
         guard let terminalParams = await mobileChatTerminalParams(sessionID: sessionID) else {
             return .err(code: "not_found", message: Self.chatTerminalBindingErrorMessage, data: [
                 "session_id": sessionID
@@ -349,12 +347,18 @@ extension TerminalController {
     }
 
     /// `mobile.chat.interrupt`: polite (Esc) or hard (ctrl-C) interrupt of
-    /// the session's agent.
+    /// the session's agent (``agentChatInterrupt(sessionID:hard:)``).
     func v2MobileChatInterrupt(params: [String: Any]) async -> V2CallResult {
         guard let sessionID = v2RawString(params, "session_id") else {
             return .err(code: "invalid_params", message: "Missing session_id", data: nil)
         }
         let hard = (params["hard"] as? Bool) ?? false
+        return await agentChatInterrupt(sessionID: sessionID, hard: hard)
+    }
+
+    /// Interrupts an agent session's current turn: Esc, or ctrl-C when `hard`. The one interrupt path behind
+    /// `mobile.chat.interrupt` and ShellX Link's `chat.interrupt`.
+    func agentChatInterrupt(sessionID: String, hard: Bool) async -> V2CallResult {
         guard let terminalTarget = await mobileChatTerminalTarget(sessionID: sessionID) else {
             return .err(code: "not_found", message: Self.chatTerminalBindingErrorMessage, data: [
                 "session_id": sessionID

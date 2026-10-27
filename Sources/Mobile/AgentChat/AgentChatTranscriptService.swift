@@ -19,6 +19,8 @@ final class AgentChatTranscriptService {
     private var tailers: [String: AgentChatTranscriptTailer] = [:]
     private let hasEventSubscribers: @MainActor () -> Bool
     private let emitEventPayload: @MainActor ([String: Any]) -> Void
+    /// Typed observers of every published frame (ShellX Link), by token.
+    private var frameObservers: [UUID: @MainActor (ChatSessionEventFrame) -> Void] = [:]
     private let now: () -> Date
     /// Drives the live agent-prose streaming preview.
     private var proseStreamer: AgentChatProseStreamer!
@@ -150,6 +152,29 @@ final class AgentChatTranscriptService {
         self.proseWakeDriver.start()
     }
 
+    /// Adds a typed observer of every frame this service publishes (the frames mobile clients receive as
+    /// `chat.message`). While any observer is registered the service tails transcripts and publishes
+    /// session changes as if a mobile client were subscribed. The live prose preview stays reserved for
+    /// mobile subscribers. Returns the token for ``removeFrameObserver(_:)``.
+    func addFrameObserver(_ handler: @escaping @MainActor (ChatSessionEventFrame) -> Void) -> UUID {
+        let token = UUID()
+        guard !didShutdown else { return token }
+        frameObservers[token] = handler
+        return token
+    }
+
+    func removeFrameObserver(_ token: UUID) {
+        frameObservers[token] = nil
+    }
+
+    /// Registered frame observers (tests).
+    var frameObserverCount: Int { frameObservers.count }
+
+    /// Whether anyone receives published frames: a mobile `chat.message` subscriber or a frame observer.
+    private var hasFrameSubscribers: Bool {
+        !frameObservers.isEmpty || hasEventSubscribers()
+    }
+
     /// Stops streaming resources while the application still owns its service.
     ///
     /// App termination calls this on the main actor so observer removal,
@@ -162,6 +187,7 @@ final class AgentChatTranscriptService {
         registry.onRecordChanged = nil
         registry.onRecordRemoved = nil
         proseTurnStates.removeAll()
+        frameObservers.removeAll()
         let activeTailers = Array(tailers.values)
         tailers.removeAll()
         for tailer in activeTailers {
@@ -296,7 +322,7 @@ final class AgentChatTranscriptService {
         // ended session (its transcript can no longer grow; recreating the
         // tailer here would undo the ended-state eviction).
         if record.state != .ended,
-           hasEventSubscribers() {
+           hasFrameSubscribers {
             ensureTailer(for: record) {
                 resolver.boundedTranscriptPath(for: record)
             }
@@ -483,6 +509,25 @@ final class AgentChatTranscriptService {
         return page
     }
 
+    /// ``history(sessionID:beforeSeq:limit:)``, retried once when the session is known but its transcript
+    /// did not resolve: the recorded path can be stale the same way terminal bindings are, so the record's
+    /// bindings are re-adopted from the hook store first. `mobile.chat.history` and ShellX Link share it.
+    func historyRebindingIfStale(sessionID: String, beforeSeq: Int?, limit: Int) async -> ChatHistoryPage? {
+        if let page = await history(sessionID: sessionID, beforeSeq: beforeSeq, limit: limit) { return page }
+        guard let staleRecord = registry.record(sessionID: sessionID) else { return nil }
+        #if DEBUG
+        cmuxDebugLog("agentChat.history transcript unresolved session=\(sessionID.prefix(8)); refreshing bindings")
+        #endif
+        let refreshed = await refreshSessionBindings(sessionID: sessionID)
+        // Retry only when the refresh changed the resolution inputs (a pointless retry re-runs the codex
+        // directory walk).
+        guard refreshed?.transcriptPath != staleRecord.transcriptPath
+            || refreshed?.workingDirectory != staleRecord.workingDirectory else {
+            return nil
+        }
+        return await history(sessionID: sessionID, beforeSeq: beforeSeq, limit: limit)
+    }
+
     /// Debug-socket dump of every registry record plus tailer liveness.
     func debugSessionDump() -> [[String: Any]] {
         registry.sessions(workspaceID: nil).map { record in
@@ -651,7 +696,7 @@ final class AgentChatTranscriptService {
                 Task { await tailer.stop() }
             }
         }
-        guard hasEventSubscribers() else { return }
+        guard hasFrameSubscribers else { return }
         if transcriptBecameAvailable, record.state != .ended {
             ensureTailer(for: record) {
                 resolver.boundedTranscriptPath(for: record)
@@ -682,13 +727,20 @@ final class AgentChatTranscriptService {
         }
         failedResolutions.remove(record.sessionID)
         endedListability.remove(sessionID: record.sessionID)
-        guard hasEventSubscribers() else { return }
+        guard hasFrameSubscribers else { return }
         emit(frame: ChatSessionEventFrame(sessionID: record.sessionID, event: .sessionRemoved(version: record.version)))
     }
 
     private func emit(frame: ChatSessionEventFrame) {
-        guard !didShutdown, let payload = wirePayload(frame) else { return }
-        emitEventPayload(payload)
+        guard !didShutdown else { return }
+        // With only frame observers listening, skip the mobile payload encoding.
+        if frameObservers.isEmpty || hasEventSubscribers(), let payload = wirePayload(frame) {
+            emitEventPayload(payload)
+        }
+        // A copy: an observer may add or remove observers while it runs.
+        for handler in Array(frameObservers.values) {
+            handler(frame)
+        }
     }
 
     private func settleProseTurn(sessionID: String, turnState: ProseTurnState) {
