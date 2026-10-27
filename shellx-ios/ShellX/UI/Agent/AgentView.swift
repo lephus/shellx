@@ -48,7 +48,8 @@ struct AgentView: View {
             notice: notice,
             draft: $draft,
             actions: AgentScreen.Actions(
-                send: send,
+                send: { send($0, viaVoice: false) },
+                sendVoice: { send($0, viaVoice: true) },
                 stop: { stop(hard: false) },
                 forceStop: { stop(hard: true) },
                 loadOlder: { Task { await model.loadOlder() } },
@@ -72,10 +73,10 @@ struct AgentView: View {
         .onDisappear { Task { await model.close() } }
     }
 
-    private func send(_ text: String) {
+    private func send(_ text: String, viaVoice: Bool) {
         let model = self.model
         Task {
-            let result = await model.send(text, viaVoice: false)
+            let result = await model.send(text, viaVoice: viaVoice)
             // The Mac surely did not take it: give the text back, unless the user typed meanwhile.
             if result.keepsDraft, draft.isEmpty { draft = text }
             show(Self.text(for: result, ref: model.ref, machineName: model.machineName))

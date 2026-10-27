@@ -18,7 +18,7 @@ struct AppGraph {
 }
 
 /// Builds the app's object graph. The only place that knows the Keychain, the relay URL, the
-/// device name and the clock.
+/// device name, the clock and the speech recognizers.
 @MainActor
 enum AppComposition {
     static func make() -> AppGraph {
@@ -61,7 +61,8 @@ enum AppComposition {
                     onUnauthorized: { await owner.coordinator?.handleUnauthorized() })
                 scopes.current = makeScope(
                     hub: hub, history: history, latency: latency, launch: launch,
-                    pairing: PairingModel(hub: hub, relay: relay, vault: vault))
+                    pairing: PairingModel(hub: hub, relay: relay, vault: vault),
+                    voice: VoiceService.system(latency: latency, defaults: .standard, hub: hub))
                 return hub
             })
         owner.coordinator = coordinator
@@ -69,14 +70,16 @@ enum AppComposition {
     }
 
     /// One sign-in's scope over `hub`; the home's and each agent's history live in `history`.
+    /// `voice` nil shows no mic.
     static func makeScope(
-        hub: MachineHub, history: ConversationStore, latency: LatencyLog, launch: LaunchMark, pairing: PairingModel
+        hub: MachineHub, history: ConversationStore, latency: LatencyLog, launch: LaunchMark, pairing: PairingModel,
+        voice: VoiceService? = nil
     ) -> SignedInScope {
         SignedInScope(
             hub: hub,
             decisions: DecisionCenter(sender: hub, latency: latency, sleep: { try await Task.sleep(for: $0) }),
             home: HomeModel(hub: hub, store: history, now: { Date() }),
-            pairing: pairing, history: history, launch: launch)
+            pairing: pairing, history: history, launch: launch, voice: voice)
     }
 }
 

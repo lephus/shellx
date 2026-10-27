@@ -102,6 +102,32 @@ final class HomeActionsTests: XCTestCase {
         XCTAssertEqual(sent, [FakeMac.SentText(sessionId: "s1", text: "Chạy lại test")])
     }
 
+    func testSpokenTextIsSentAndMarkedAsSaid() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.upsertSession(session("s1"))
+        await mac.setHistory(sessionId: "s1", entries: [])
+        let scope = try await makeScope(mac)
+        let online = await eventually { scope.hub.liveSessions.first?.online == true }
+        XCTAssertTrue(online)
+        var sends: [Task<ComposerValidation, Never>] = []
+        let box = RouteBox()
+        let actions = HomeActions.make(
+            scope: scope, open: { _ in }, route: Binding(get: { box.route }, set: { box.route = $0 }),
+            sent: { sends.append($0) })
+
+        actions.sendVoice("Tạo PR cho branch develop")
+
+        XCTAssertEqual(sends.count, 1)
+        let result = await sends[0].value
+        XCTAssertEqual(result, .ok("Tạo PR cho branch develop"))
+        let s1 = SessionRef(machineID: mac.machine.machineID, sessionId: "s1", agent: "claude", workspaceTitle: "shellx")
+        XCTAssertEqual(scope.home.entries.map(\.content), [
+            .userSaid(text: "Tạo PR cho branch develop", target: s1, viaVoice: true), .note(.sent(s1)),
+        ])
+        let sent = await mac.sentTexts
+        XCTAssertEqual(sent, [FakeMac.SentText(sessionId: "s1", text: "Tạo PR cho branch develop")])
+    }
+
     func testCardActionsReachTheDecisionCenterAndOpenSheets() async throws {
         let mac = FakeMac(name: "MacBook Pro")
         await mac.addPending(

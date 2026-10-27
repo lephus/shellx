@@ -14,6 +14,8 @@ struct AgentScreen: View {
     struct Actions {
         /// The composer's trimmed, valid text.
         var send: (String) -> Void = { _ in }
+        /// What the user said into the mic (trimmed, not empty).
+        var sendVoice: (String) -> Void = { _ in }
         var stop: () -> Void = {}
         /// Force Stop, once confirmed.
         var forceStop: () -> Void = {}
@@ -269,7 +271,7 @@ struct AgentScreen: View {
                     .transition(.opacity)
                     .accessibilityIdentifier("agent.notice")
             }
-            ComposerBar(text: $draft, send: actions.send)
+            ComposerBar(text: $draft, send: actions.send, sendVoice: actions.sendVoice)
         }
         .animation(.easeInOut(duration: 0.2), value: notice)
     }

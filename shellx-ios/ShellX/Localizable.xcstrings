@@ -2197,6 +2197,24 @@
         }
       }
     },
+    "pending.plan.voice": {
+      "comment": "The plan sheet's mic beside the feedback field (VoiceOver label).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dictate feedback"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nói góp ý"
+          }
+        }
+      }
+    },
     "pending.question.back": {
       "comment": "Goes to the previous question.",
       "extractionState": "manual",
@@ -2373,6 +2391,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "Có câu trả lời dài quá. Rút gọn để gửi."
+          }
+        }
+      }
+    },
+    "pending.question.voice": {
+      "comment": "The question sheet's mic (label under it and VoiceOver label).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answer by voice"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trả lời bằng giọng nói"
+          }
+        }
+      }
+    },
+    "pending.question.voice.noMatch": {
+      "comment": "A spoken answer picked no option; it became the typed answer.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That didn't match an option; pick one by hand"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không khớp đáp án nào, hãy chọn bằng tay"
           }
         }
       }
@@ -2755,6 +2809,96 @@
         }
       }
     },
+    "settings.voice.language": {
+      "comment": "Settings › Voice: the language picker.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spoken language"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ngôn ngữ nói"
+          }
+        }
+      }
+    },
+    "settings.voice.onDevice": {
+      "comment": "Settings › Voice: speech is recognised on the iPhone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recognized on this iPhone."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nhận dạng ngay trên iPhone."
+          }
+        }
+      }
+    },
+    "settings.voice.server %@": {
+      "comment": "Settings › Voice: speech goes to Apple's servers (the spoken language's name).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This iPhone can't recognize %@ on device, so your voice goes to Apple's servers for recognition. ShellX never receives your voice."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone này chưa nhận dạng được %@ ngay trên máy, nên giọng nói được gửi tới máy chủ của Apple để nhận dạng. ShellX không nhận giọng nói của bạn."
+          }
+        }
+      }
+    },
+    "settings.voice.title": {
+      "comment": "Settings section header.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giọng nói"
+          }
+        }
+      }
+    },
+    "settings.voice.unavailable": {
+      "comment": "No speech recognizer can run right now (Settings › Voice, and above the composer).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech recognition isn't available right now. You can still type."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lúc này không nhận dạng giọng nói được. Bạn vẫn gõ được."
+          }
+        }
+      }
+    },
     "signin.button": {
       "comment": "Primary button of the sign-in screen.",
       "extractionState": "manual",
@@ -2949,6 +3093,222 @@
           "stringUnit": {
             "state": "translated",
             "value": "Đăng nhập ShellX"
+          }
+        }
+      }
+    },
+    "voice.denied": {
+      "comment": "The microphone or speech recognition permission is off.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX needs microphone and speech recognition access to hear you."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX cần quyền micro và nhận dạng giọng nói để nghe bạn."
+          }
+        }
+      }
+    },
+    "voice.hint": {
+      "comment": "Under the mic in the composer.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold to talk · swipe up to type"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giữ để nói · vuốt lên để gõ"
+          }
+        }
+      }
+    },
+    "voice.keyboard": {
+      "comment": "The keyboard button beside the mic, and the mic's VoiceOver action.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type instead"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gõ phím"
+          }
+        }
+      }
+    },
+    "voice.language.english": {
+      "comment": "A spoken language in Settings › Voice.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "English"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiếng Anh"
+          }
+        }
+      }
+    },
+    "voice.language.vietnamese": {
+      "comment": "A spoken language in Settings › Voice.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vietnamese"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiếng Việt"
+          }
+        }
+      }
+    },
+    "voice.limit %@": {
+      "comment": "A dictation stopped at the byte limit (the number, formatted).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopped at the %@-byte limit. Read it over before sending."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã dừng ở giới hạn %@ byte. Xem lại trước khi gửi."
+          }
+        }
+      }
+    },
+    "voice.listening": {
+      "comment": "Above the composer while the mic listens and no word came yet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listening…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang nghe…"
+          }
+        }
+      }
+    },
+    "voice.mic": {
+      "comment": "The mic button's VoiceOver label in the composer.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talk"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nói"
+          }
+        }
+      }
+    },
+    "voice.mic.hint": {
+      "comment": "The mic button's VoiceOver hint.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold to talk and release to finish. With VoiceOver, double-tap to start and double-tap again to finish."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giữ để nói, thả ra là xong. Với VoiceOver, chạm hai lần để bắt đầu, chạm hai lần nữa là xong."
+          }
+        }
+      }
+    },
+    "voice.mic.stop": {
+      "comment": "The mic button's VoiceOver label while it listens.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finish talking"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nói xong"
+          }
+        }
+      }
+    },
+    "voice.openSettings": {
+      "comment": "Opens the app's page in the Settings app.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Settings"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở Cài đặt"
+          }
+        }
+      }
+    },
+    "voice.releaseToCancel": {
+      "comment": "Above the composer once the finger dragged left on the mic.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Release to cancel"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thả để huỷ"
           }
         }
       }

@@ -18,6 +18,42 @@
           }
         }
       }
+    },
+    "NSMicrophoneUsageDescription": {
+      "comment": "Why the app asks for the microphone (system prompt).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX listens while you hold the mic button to talk to your agents."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX nghe khi bạn giữ nút mic để nói với agent."
+          }
+        }
+      }
+    },
+    "NSSpeechRecognitionUsageDescription": {
+      "comment": "Why the app asks for speech recognition (system prompt).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple turns your speech into text to send to your agents."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple chuyển giọng nói của bạn thành chữ để gửi cho agent."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
