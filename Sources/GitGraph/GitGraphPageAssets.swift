@@ -1,8 +1,8 @@
 import CmuxAgentChat
 import Foundation
 
-/// Reads the bundled files that ``GitGraphURLSchemeHandler`` serves for the Git
-/// Graph page.
+/// Reads the bundled files that ``GitGraphURLSchemeHandler`` serves for one
+/// ``WebviewsAppPage``.
 ///
 /// Only a file under ``root`` with a type the page loads is served. The build's
 /// "Compress Markdown Viewer Assets" phase replaces every `.js` and `.mjs` with a
@@ -30,16 +30,20 @@ struct GitGraphPageAssets: Sendable {
 
     /// The folder the page's files are served from, standardized.
     let root: URL
+    /// The page whose scheme and host the requests must use.
+    let page: WebviewsAppPage
 
-    init(root: URL) {
+    init(root: URL, page: WebviewsAppPage = .gitGraph) {
         self.root = root.standardizedFileURL
+        self.page = page
     }
 
     /// The page's folder in `bundle`'s resources, or nil when it has none.
-    static func bundled(in bundle: Bundle = .main) -> GitGraphPageAssets? {
+    static func bundled(in bundle: Bundle = .main, page: WebviewsAppPage = .gitGraph) -> GitGraphPageAssets? {
         guard let resourceURL = bundle.resourceURL else { return nil }
         return GitGraphPageAssets(
-            root: resourceURL.appendingPathComponent("markdown-viewer/webviews-app", isDirectory: true)
+            root: resourceURL.appendingPathComponent("markdown-viewer/webviews-app", isDirectory: true),
+            page: page
         )
     }
 
@@ -75,12 +79,12 @@ struct GitGraphPageAssets: Sendable {
         return Asset(data: data, mimeType: mimeType)
     }
 
-    /// The file under ``root`` that a `shellx-git-graph://app/` URL names. Its
+    /// The file under ``root`` that a URL on ``page``'s scheme and host names. Its
     /// query and fragment are ignored.
     func fileURL(for requestURL: URL) throws -> URL {
         guard let components = URLComponents(url: requestURL, resolvingAgainstBaseURL: false),
-              components.scheme == GitGraphURLSchemeHandler.scheme,
-              components.host == GitGraphURLSchemeHandler.host,
+              components.scheme == page.scheme,
+              components.host == page.host,
               components.port == nil, components.user == nil, components.password == nil else {
             throw Failure.badURL
         }

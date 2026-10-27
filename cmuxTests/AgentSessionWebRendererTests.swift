@@ -72,23 +72,45 @@ struct AgentSessionWebRendererTests {
     func testTrustedShellURLAcceptsOnlyMatchingFileURL() {
         let resources = URL(fileURLWithPath: "/tmp/cmux DEV test.app/Contents/Resources", isDirectory: true)
         let expected = AgentSessionWebRendererCoordinator.shellURL(
-            rendererKind: .react,
+            rendererKind: .solid,
             resourceDirectoryURL: resources
         )
         let equivalent = resources
-            .appendingPathComponent("markdown-viewer", isDirectory: true)
-            .appendingPathComponent("webviews-app", isDirectory: true)
+            .appendingPathComponent("agent-session-solid", isDirectory: true)
             .appendingPathComponent("..", isDirectory: true)
-            .appendingPathComponent("webviews-app", isDirectory: true)
-            .appendingPathComponent("agent-session.html", isDirectory: false)
+            .appendingPathComponent("agent-session-solid", isDirectory: true)
+            .appendingPathComponent("index.html", isDirectory: false)
         let otherBundledFile = resources
-            .appendingPathComponent("markdown-viewer", isDirectory: true)
-            .appendingPathComponent("webviews-app", isDirectory: true)
-            .appendingPathComponent("diff-viewer.html", isDirectory: false)
+            .appendingPathComponent("agent-session-solid", isDirectory: true)
+            .appendingPathComponent("other.html", isDirectory: false)
 
+        expectTrue(expected.isFileURL)
         expectTrue(AgentSessionWebRendererCoordinator.isTrustedShellURL(expected, expected: expected))
         expectTrue(AgentSessionWebRendererCoordinator.isTrustedShellURL(equivalent, expected: expected))
         expectFalse(AgentSessionWebRendererCoordinator.isTrustedShellURL(otherBundledFile, expected: expected))
+        expectFalse(AgentSessionWebRendererCoordinator.isTrustedShellURL(URL(string: "https://example.com"), expected: expected))
+    }
+
+    /// The build deflates the React page's module scripts, which a file URL cannot
+    /// load, so the page was blank in built apps. It loads on its own scheme,
+    /// whose handler inflates them.
+    @Test
+    func testReactRendererLoadsThroughItsScheme() {
+        let resources = URL(fileURLWithPath: "/tmp/cmux DEV test.app/Contents/Resources", isDirectory: true)
+        let expected = AgentSessionWebRendererCoordinator.shellURL(
+            rendererKind: .react,
+            resourceDirectoryURL: resources
+        )
+        let oldFileURL = resources
+            .appendingPathComponent("markdown-viewer/webviews-app/agent-session.html", isDirectory: false)
+
+        #expect(expected.absoluteString == "shellx-agent-session://app/agent-session.html")
+        expectTrue(AgentSessionWebRendererCoordinator.isTrustedShellURL(expected, expected: expected))
+        expectFalse(AgentSessionWebRendererCoordinator.isTrustedShellURL(
+            URL(string: "shellx-agent-session://app/git-graph.html"), expected: expected
+        ))
+        expectFalse(AgentSessionWebRendererCoordinator.isTrustedShellURL(WebviewsAppPage.gitGraph.shellURL, expected: expected))
+        expectFalse(AgentSessionWebRendererCoordinator.isTrustedShellURL(oldFileURL, expected: expected))
         expectFalse(AgentSessionWebRendererCoordinator.isTrustedShellURL(URL(string: "https://example.com"), expected: expected))
     }
 }
