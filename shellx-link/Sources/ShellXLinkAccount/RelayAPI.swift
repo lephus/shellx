@@ -163,7 +163,7 @@ public struct RelayAPI: Sendable {
 
     // MARK: - Transport
 
-    private func send<Reply: Decodable>(
+    func send<Reply: Decodable>(
         _ method: String, _ path: String, token: String?, body: [String: Any]?
     ) async throws -> Reply {
         var request = URLRequest(url: baseURL.appendingPathComponent(path), timeoutInterval: 15)
@@ -216,7 +216,7 @@ private final class RefuseRedirects: NSObject, URLSessionTaskDelegate, Sendable 
 
 // MARK: - Wire types
 
-private struct Empty: Decodable {}
+struct Empty: Decodable {}
 
 private struct ErrorEnvelope: Decodable {
     struct Body: Decodable { var code: String }

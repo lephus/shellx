@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		5E11A0000000000000000025 /* ShellXAppCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A0000000000000000024 /* ShellXAppCore */; };
+		5E11A0000000000000000027 /* ShellXAppTestSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A0000000000000000026 /* ShellXAppTestSupport */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -51,6 +52,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5E11A0000000000000000025 /* ShellXAppCore in Frameworks */,
+				5E11A0000000000000000027 /* ShellXAppTestSupport in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -118,6 +120,7 @@
 			name = ShellX;
 			packageProductDependencies = (
 				5E11A0000000000000000024 /* ShellXAppCore */,
+				5E11A0000000000000000026 /* ShellXAppTestSupport */,
 			);
 			productName = ShellX;
 			productReference = 5E11A0000000000000000007 /* ShellX.app */;
@@ -316,6 +319,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 5E11A0000000000000000023 /* XCLocalSwiftPackageReference "Packages/ShellXAppCore" */;
 			productName = ShellXAppCore;
+		};
+		5E11A0000000000000000026 /* ShellXAppTestSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5E11A0000000000000000023 /* XCLocalSwiftPackageReference "Packages/ShellXAppCore" */;
+			productName = ShellXAppTestSupport;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -1,0 +1,120 @@
+import Foundation
+import Observation
+import os
+
+/// Owns the account state of the app: which screen to show and how to get in and out.
+///
+/// Nothing here logs a token, a password or a key; log lines carry error types only.
+@MainActor @Observable
+public final class AppCoordinator {
+    public private(set) var phase: AppPhase = .launching
+
+    @ObservationIgnored private let vault: AccountVault
+    @ObservationIgnored private let relay: any RelayAccountCalling
+    @ObservationIgnored private let deviceName: String
+    @ObservationIgnored private let wipers: [any LocalDataWiping]
+    @ObservationIgnored private let log = Logger(subsystem: "com.shellx.app", category: "account")
+
+    public init(
+        vault: AccountVault, relay: any RelayAccountCalling, deviceName: String, wipers: [any LocalDataWiping]
+    ) {
+        self.vault = vault
+        self.relay = relay
+        self.deviceName = deviceName
+        self.wipers = wipers
+    }
+
+    /// Reads the stored session. A Keychain that is locked (iOS may start the app before the first
+    /// unlock) keeps the phase at `.launching`; `protectedDataBecameAvailable()` tries again.
+    public func launch() async {
+        do {
+            if let session = try await vault.session() {
+                phase = .signedIn(email: session.email)
+            } else {
+                phase = .signedOut(expired: false)
+            }
+        } catch SecretStoreError.unavailable {
+            log.notice("launch_keychain_unavailable")
+        } catch {
+            log.error("launch_session_unreadable")
+            phase = .signedOut(expired: false)
+        }
+    }
+
+    /// Call when protected data becomes available (the app's `didBecomeActive` / protected-data notification).
+    public func protectedDataBecameAvailable() async {
+        guard phase == .launching else { return }
+        await launch()
+    }
+
+    public func signIn(email: String, password: String) async throws(SignInError) {
+        let key: Data
+        do {
+            key = try await vault.phoneKey().publicKey
+        } catch {
+            log.error("sign_in_keychain_failed")
+            throw .server(code: "keychain")
+        }
+        let account: AccountSessionValue
+        do {
+            let session = try await relay.login(
+                email: email, password: password, deviceName: deviceName, clientKey: key)
+            account = AccountSessionValue(userID: session.userID, deviceID: session.deviceID, token: session.token)
+        } catch {
+            throw SignInError(error)
+        }
+        do {
+            // Another account's Macs and history must not survive into this one.
+            if let owner = try await vault.machinesOwner(), owner != account.userID {
+                try await vault.setMachines([], owner: account.userID)
+                for wiper in wipers { await wiper.wipe() }
+            }
+            try await vault.setSession(
+                StoredSession(
+                    userID: account.userID, deviceID: account.deviceID, token: account.token, email: email))
+        } catch {
+            log.error("sign_in_store_failed")
+            throw .server(code: "keychain")
+        }
+        phase = .signedIn(email: email)
+    }
+
+    /// Removes this iPhone from its Macs and the relay (best effort), then forgets everything local.
+    public func signOut() async {
+        let session = try? await vault.session()
+        if let token = session?.token {
+            do {
+                for grant in try await relay.machines(token: token) {
+                    do { try await relay.unpair(grantID: grant.grantID, token: token) } catch {
+                        log.notice("sign_out_unpair_failed")
+                    }
+                }
+            } catch {
+                log.notice("sign_out_list_failed")
+            }
+            do { try await relay.logout(token: token) } catch {
+                log.notice("sign_out_logout_failed")
+            }
+        }
+        do { try await vault.wipe() } catch {
+            log.error("sign_out_wipe_failed")
+        }
+        for wiper in wipers { await wiper.wipe() }
+        phase = .signedOut(expired: false)
+    }
+
+    /// The relay refused the stored token: drop the session only. The phone key and the Macs stay,
+    /// so signing in again as the same account needs no new pairing.
+    public func handleUnauthorized() async {
+        do { try await vault.clearSession() } catch {
+            log.error("unauthorized_clear_failed")
+        }
+        phase = .signedOut(expired: true)
+    }
+}
+
+private struct AccountSessionValue: Sendable {
+    var userID: String
+    var deviceID: String
+    var token: String
+}

@@ -1,7 +1,26 @@
+import ShellXAppCore
 import SwiftUI
 
-/// The first screen: the ShellX logo and name.
+/// Chooses the screen by the account phase: the logo while launching, sign-in, or Settings.
 struct RootView: View {
+    let coordinator: AppCoordinator
+
+    var body: some View {
+        switch coordinator.phase {
+        case .launching:
+            LaunchView()
+        case let .signedOut(expired):
+            SignInView(coordinator: coordinator, expired: expired)
+        case let .signedIn(email):
+            NavigationStack {
+                SettingsView(email: email, signOut: { await coordinator.signOut() })
+            }
+        }
+    }
+}
+
+/// The ShellX logo and name.
+struct LaunchView: View {
     @ScaledMetric(relativeTo: .largeTitle) private var logoSize: CGFloat = 96
 
     var body: some View {
@@ -21,5 +40,5 @@ struct RootView: View {
 }
 
 #Preview {
-    RootView()
+    RootView(coordinator: .preview())
 }

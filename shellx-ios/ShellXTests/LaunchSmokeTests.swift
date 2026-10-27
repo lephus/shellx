@@ -16,7 +16,7 @@ final class LaunchSmokeTests: XCTestCase {
 
     @MainActor
     func testRootRenders() throws {
-        let images = try SnapshotWriter().write(RootView(), name: "root")
+        let images = try SnapshotWriter().write(RootView(coordinator: .preview()), name: "root")
 
         XCTAssertEqual(images.count, 2)
         for image in images {

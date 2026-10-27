@@ -9,6 +9,7 @@ let package = Package(
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "ShellXAppCore", targets: ["ShellXAppCore"]),
+        .library(name: "ShellXAppTestSupport", targets: ["ShellXAppTestSupport"]),
     ],
     dependencies: [
         .package(path: "../../../shellx-link"),
@@ -23,7 +24,15 @@ let package = Package(
                 .product(name: "ShellXLinkAccount", package: "shellx-link"),
             ]
         ),
-        .testTarget(name: "ShellXAppCoreTests", dependencies: ["ShellXAppCore"]),
+        // Fakes for tests and for the app's demo mode.
+        .target(
+            name: "ShellXAppTestSupport",
+            dependencies: [
+                "ShellXAppCore",
+                .product(name: "ShellXLinkAccount", package: "shellx-link"),
+            ]
+        ),
+        .testTarget(name: "ShellXAppCoreTests", dependencies: ["ShellXAppCore", "ShellXAppTestSupport"]),
     ],
     swiftLanguageModes: [.v6]
 )
