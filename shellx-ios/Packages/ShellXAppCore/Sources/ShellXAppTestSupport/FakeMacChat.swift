@@ -5,7 +5,7 @@ import ShellXLinkSession
 /// `FakeMac`'s chat: an `AgentChatSource` in memory. A session has a transcript once `setHistory`
 /// or `push` named it; others answer `not_found`.
 final class FakeMacChat: AgentChatSource, @unchecked Sendable {
-    typealias Push = (sessionId: String, entries: [ChatEntry])
+    typealias Push = ChatPush
 
     private let lock = NSLock()
     /// Entries by session, then by `ChatEntry.id` (upserts).
@@ -56,8 +56,9 @@ final class FakeMacChat: AgentChatSource, @unchecked Sendable {
     func push(sessionId: String, entries: [ChatEntry]) {
         lock.withLock {
             for entry in entries { transcripts[sessionId, default: [:]][entry.id] = entry }
+            let push = ChatPush.upsert(sessionId: sessionId, entries: entries)
             for (id, continuation) in subscribers {
-                if case .terminated = continuation.yield((sessionId, entries)) { subscribers[id] = nil }
+                if case .terminated = continuation.yield(push) { subscribers[id] = nil }
             }
         }
     }

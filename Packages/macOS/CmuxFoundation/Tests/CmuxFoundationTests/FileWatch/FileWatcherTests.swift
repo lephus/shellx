@@ -112,6 +112,49 @@ import Testing
         #expect(await firstEvent(watcher, within: 5))
     }
 
+    /// A directory created while the watcher attaches to the nearest existing ancestor raises no event on
+    /// that ancestor. The watcher must not stay there: the path, created inside that directory afterwards,
+    /// still yields. (The agent chat tailer watches a new session's transcript before Claude Code creates its
+    /// project folder.) The race is real, so it is run many times.
+    @Test func directoryCreatedWhileAttachingStillYieldsForThePath() async throws {
+        var missed: [Int] = []
+        for iteration in 0..<40 {
+            let root = FileManager.default.temporaryDirectory
+                .appendingPathComponent("cmux-file-watcher-race-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let nested = root.appendingPathComponent("a/b", isDirectory: true)
+            let file = nested.appendingPathComponent("watched.txt")
+
+            let box = WatcherBox()
+            DispatchQueue.concurrentPerform(iterations: 2) { index in
+                if index == 0 {
+                    box.set(FileWatcher(path: file.path))
+                } else {
+                    try? FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+                }
+            }
+            let watcher = try #require(box.watcher)
+            let events = EventCount()
+            let consumer = Task { for await _ in watcher.events { events.add() } }
+            // Let any event the race itself raised arrive first.
+            try? await Task.sleep(for: .milliseconds(100))
+            let before = events.value
+
+            try "created".write(to: file, atomically: false, encoding: .utf8)
+
+            var yielded = false
+            for _ in 0..<200 where !yielded {
+                yielded = events.value > before
+                if !yielded { try? await Task.sleep(for: .milliseconds(10)) }
+            }
+            if !yielded { missed.append(iteration) }
+            consumer.cancel()
+            await watcher.stop()
+        }
+        #expect(missed.isEmpty, "no event for the created path in iterations \(missed)")
+    }
+
     @Test func directoryTargetYieldsOnChildChange() async throws {
         // The FileExplorer path: the watched path is itself a directory, and a
         // change to its contents must yield.
@@ -180,4 +223,18 @@ import Testing
         let next: Void? = await iterator.next()
         #expect(next == nil)
     }
+}
+
+private final class WatcherBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: FileWatcher?
+    func set(_ watcher: FileWatcher) { lock.lock(); stored = watcher; lock.unlock() }
+    var watcher: FileWatcher? { lock.lock(); defer { lock.unlock() }; return stored }
+}
+
+private final class EventCount: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    func add() { lock.lock(); count += 1; lock.unlock() }
+    var value: Int { lock.lock(); defer { lock.unlock() }; return count }
 }

@@ -320,11 +320,13 @@ final class AgentChatTranscriptService {
         }
         // Tail eagerly only while someone is listening, and never for an
         // ended session (its transcript can no longer grow; recreating the
-        // tailer here would undo the ended-state eviction).
+        // tailer here would undo the ended-state eviction). A new session's
+        // transcript is tailed before the agent creates it, so its first turn
+        // is live too.
         if record.state != .ended,
            hasFrameSubscribers {
             ensureTailer(for: record) {
-                resolver.boundedTranscriptPath(for: record)
+                resolver.liveTranscriptPath(for: record)
             }
         }
         // Drive the live prose-streaming preview off the turn lifecycle: a
@@ -358,6 +360,18 @@ final class AgentChatTranscriptService {
     func noteExplicitInput(surfaceID: String, at: Date = Date()) -> Int {
         guard !didShutdown else { return 0 }
         return registry.noteUserInput(surfaceID: surfaceID, at: at)
+    }
+
+    /// Reflects an interrupt (Esc or ctrl-C) the session's terminal accepted:
+    /// the agent stops its turn and waits for input, and Claude Code fires no
+    /// hook for it. The next hook stays authoritative.
+    ///
+    /// - Returns: Whether the session left working or needs-input.
+    @discardableResult
+    func noteInterrupted(sessionID: String, at: Date = Date()) -> Bool {
+        guard !didShutdown, registry.noteInterrupted(sessionID: sessionID, at: at) else { return false }
+        endProseTurn(sessionID: sessionID)
+        return true
     }
 
     /// Lists chat-capable sessions.
@@ -494,19 +508,39 @@ final class AgentChatTranscriptService {
             }
             guard let currentRecord = registry.record(sessionID: sessionID) else { return nil }
             failedResolutions.remove(sessionID)
+            // A live session whose agent has not written its transcript yet
+            // gets a tailer that waits for it, as a hook event would start.
+            let awaitedPath = currentRecord.state == .ended ? nil : resolver.recordedTranscriptLocation(for: currentRecord)
             guard let resolvedTailer = ensureTailer(for: currentRecord, resolvePath: {
-                resolver.boundedTranscriptPath(for: currentRecord) ?? fallbackPath
+                resolver.boundedTranscriptPath(for: currentRecord) ?? fallbackPath ?? awaitedPath
             }) else {
                 return nil
             }
             tailer = resolvedTailer
         }
         await tailer.start()
+        // A live session's tailer can wait for a transcript its agent has not
+        // written yet: until then there is no transcript to page (see
+        // ``isAwaitingTranscript(sessionID:)``), while live entries follow from
+        // its first line. A tailer that read its file serves its cache even if
+        // the file is gone now.
+        if await tailer.isWaitingForTranscript { return nil }
         let page = await tailer.history(beforeSeq: beforeSeq, limit: limit)
         if record.title == nil, let title = await tailer.title {
             registry.update(sessionID: sessionID) { $0.title = title }
         }
         return page
+    }
+
+    /// Whether a live session's tailer waits for a transcript its agent has not written yet, so the session
+    /// has no history so far (``history(sessionID:beforeSeq:limit:)`` answers nil for it) rather than a
+    /// transcript the Mac cannot read. ShellX Link answers such a session with an empty page.
+    func isAwaitingTranscript(sessionID: String) async -> Bool {
+        guard let record = registry.record(sessionID: sessionID), record.state != .ended,
+              let tailer = tailers[sessionID] else {
+            return false
+        }
+        return await tailer.isWaitingForTranscript
     }
 
     /// ``history(sessionID:beforeSeq:limit:)``, retried once when the session is known but its transcript
@@ -559,7 +593,16 @@ final class AgentChatTranscriptService {
     ) -> AgentChatTranscriptTailer? {
         guard !didShutdown else { return nil }
         if let existing = tailers[record.sessionID] {
-            return existing
+            // A tailer still waiting for a transcript the agent never wrote
+            // yields to the one its hooks name now (a pending Claude alias
+            // that picks up the next session after `/clear`).
+            guard let recorded = resolver.recordedTranscriptLocation(for: record),
+                  recorded != existing.path,
+                  !FileManager.default.fileExists(atPath: existing.path) else {
+                return existing
+            }
+            tailers[record.sessionID] = nil
+            Task { await existing.stop() }
         }
         guard !failedResolutions.contains(record.sessionID) else { return nil }
         guard let path = resolvePath() else {
@@ -699,7 +742,7 @@ final class AgentChatTranscriptService {
         guard hasFrameSubscribers else { return }
         if transcriptBecameAvailable, record.state != .ended {
             ensureTailer(for: record) {
-                resolver.boundedTranscriptPath(for: record)
+                resolver.liveTranscriptPath(for: record)
             }
         }
         if record.state == .ended, !endedRecordIsListable {

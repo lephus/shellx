@@ -576,7 +576,10 @@ final class FeedCoordinator: @unchecked Sendable {
                    let itemId = Self.findItemId(for: requestId, in: store.items) {
                     store.markResolved(itemId, decision: decision)
                 }
-                if let reply { FeedCoordinator.shared.waiterRegistry.replyStored(reply) }
+                if let reply {
+                    FeedCoordinator.shared.waiterRegistry.replyStored(reply)
+                    FeedCoordinator.shared.noteAgentResumed(after: reply.event, requestId: requestId)
+                }
             }
         }
         if Thread.isMainThread {
@@ -587,6 +590,24 @@ final class FeedCoordinator: @unchecked Sendable {
 
         cancelNotification(requestId: requestId)
         return reply != nil
+    }
+
+    /// A waiting hook took the user's decision (Feed panel, notification, `feed.*.reply` or a phone), so its
+    /// agent resumes, and Claude Code fires no hook until its next tool call or stop. Moves the agent chat
+    /// session on the hook's terminal out of needs-input now, through the explicit-input path that typed
+    /// input uses, so the Mac's chat state and every phone's session list follow at once. A session that
+    /// still waits on another of its requests stays as it is. Hook delivery stays authoritative.
+    @MainActor
+    private func noteAgentResumed(after event: WorkstreamEvent, requestId: String) {
+        guard let surfaceID = event.surfaceId, !surfaceID.isEmpty else { return }
+        if let store,
+           let workstreamId = store.items.last(where: { $0.payload.requestID == requestId })?.workstreamId,
+           store.items.contains(where: {
+               $0.status.isPending && $0.workstreamId == workstreamId && $0.payload.requestID != requestId
+           }) {
+            return
+        }
+        TerminalController.shared.agentChatTranscriptService?.noteExplicitInput(surfaceID: surfaceID)
     }
 
     func isAwaitingDecision(requestId: String) -> Bool { waiterRegistry.isAwaiting(requestId) }

@@ -108,6 +108,8 @@ public enum LinkDecision: Codable, Equatable, Sendable {
     /// `PendingQuestionOption.label` picks that option; any other string is a free-text answer.
     /// For a `multi_select` question the chosen labels are joined with `", "`.
     case question(selections: [String])
+    /// A non-empty `feedback` (at most 4096 UTF-8 bytes) rejects the plan and asks the agent to revise it with
+    /// that change, whatever the mode; the mode takes effect only without feedback (PROTOCOL.md 4, Decision).
     case exitPlan(ExitPlanMode, feedback: String?)
     /// A `kind` this version does not know.
     case other(kind: String)

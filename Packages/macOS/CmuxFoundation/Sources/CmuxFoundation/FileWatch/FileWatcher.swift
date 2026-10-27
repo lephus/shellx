@@ -123,14 +123,14 @@ public actor FileWatcher {
         // Attach the sources synchronously so the watcher is already listening
         // when init returns. The handlers capture `rawContinuation` (Sendable),
         // not `self`, so this does not escape the actor mid-init.
-        let directory = Self.nearestExistingDirectory(forPath: path)
-        self.watchedDirectory = directory
-        self.directorySource = Self.makeSource(
-            forPath: directory,
-            eventMask: Self.directoryEventMask,
+        let directory = Self.nearestDirectorySource(
+            forPath: path,
+            current: nil,
             queue: queue,
             rawContinuation: rawContinuation
         )
+        self.watchedDirectory = directory.path
+        self.directorySource = directory.source
         self.fileSource = Self.makeSource(
             forPath: path,
             eventMask: Self.fileEventMask,
@@ -203,6 +203,41 @@ public actor FileWatcher {
         return fileManager.currentDirectoryPath
     }
 
+    /// The source on `path`'s nearest existing ancestor directory: `current`
+    /// when that is still the one, else a new source (cancelling `current`'s).
+    ///
+    /// A directory created between the lookup and the attachment raises no
+    /// event on the ancestor the source attached to, so a watcher left there
+    /// would miss the path's creation until something else changes in that
+    /// ancestor. Once the source listens, the lookup runs again and the source
+    /// moves closer until the nearest existing ancestor holds still.
+    private static func nearestDirectorySource(
+        forPath path: String,
+        current: (path: String, source: FileWatchDispatchSource?)?,
+        queue: DispatchQueue,
+        rawContinuation: AsyncStream<Void>.Continuation
+    ) -> (path: String, source: FileWatchDispatchSource?) {
+        var attached = current
+        // Bounded: each pass moves to another directory, normally one level closer.
+        for _ in 0..<32 {
+            let directory = nearestExistingDirectory(forPath: path)
+            if let attached, attached.path == directory { return attached }
+            attached?.source?.cancel()
+            attached = (
+                directory,
+                makeSource(
+                    forPath: directory,
+                    eventMask: directoryEventMask,
+                    queue: queue,
+                    rawContinuation: rawContinuation
+                )
+            )
+        }
+        // Still moving after every pass (directories churning): keep the latest
+        // source; its next event moves it again.
+        return attached ?? (nearestExistingDirectory(forPath: path), nil)
+    }
+
     /// Builds, resumes, and returns a source for `path`, or `nil` if it cannot
     /// be opened. The event handler captures only `rawContinuation`.
     private static func makeSource(
@@ -254,17 +289,14 @@ public actor FileWatcher {
     /// changed) and reattaches the path source to the current inode. Each previous
     /// source's `setCancelHandler` closes its own fd.
     private func reattachSources() {
-        let directory = Self.nearestExistingDirectory(forPath: path)
-        if directory != watchedDirectory {
-            directorySource?.cancel()
-            directorySource = Self.makeSource(
-                forPath: directory,
-                eventMask: Self.directoryEventMask,
-                queue: queue,
-                rawContinuation: rawContinuation
-            )
-            watchedDirectory = directory
-        }
+        let directory = Self.nearestDirectorySource(
+            forPath: path,
+            current: watchedDirectory.map { (path: $0, source: directorySource) },
+            queue: queue,
+            rawContinuation: rawContinuation
+        )
+        watchedDirectory = directory.path
+        directorySource = directory.source
         let newFileSource = Self.makeSource(
             forPath: path,
             eventMask: Self.fileEventMask,

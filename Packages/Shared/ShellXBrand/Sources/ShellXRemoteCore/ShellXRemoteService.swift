@@ -51,6 +51,10 @@ public final class ShellXRemoteService: ObservableObject {
 
     var started = false
     var terminated = false
+    /// The last sign-in could not adopt its account, so `links-owner` may still name the previous one. The link
+    /// host stays off until a sign-in adopts its account: started on the previous account's key store, its first
+    /// reconcile against the new account's grants would delete that account's trusted phones for good.
+    var accountAdoptionFailed = false
     var cmuxTuiAvailable = false
     /// The launch sweep and cmux-tui check, run once and shared by `bootstrap` and `signIn`.
     var preparation: Task<Bool, Never>?
@@ -153,7 +157,7 @@ public final class ShellXRemoteService: ObservableObject {
         guard !terminated else { return }
         if isSignedIn { await beginTeardown().value }   // another account: start over cleanly
         await teardown?.value                           // a 401's stops: an old link may still save its record
-        await adoptAccount(login.user_id)
+        accountAdoptionFailed = !(await adoptAccount(login.user_id))
         guard !terminated else { return }
         RemoteLog.service.info("signed in")
         startSession(list: nil)
@@ -172,8 +176,10 @@ public final class ShellXRemoteService: ObservableObject {
     /// tells the user id, so a session restored at launch keeps the owner of its last sign-in). Signing in
     /// as a different account, or with no owner on record (links saved before owners were kept), drops every
     /// record and this Mac's invite files, so no link of another account is reconnected. Runs on the links
-    /// queue after the last session's links stopped. A failure is logged; the new account's links stay usable.
-    func adoptAccount(_ userID: String) async {
+    /// queue after the last session's links stopped. A failure is logged and returns false; the new account's
+    /// links stay usable, but the ShellX Link host does not start in this session (`accountAdoptionFailed`).
+    @discardableResult
+    func adoptAccount(_ userID: String) async -> Bool {
         let store = env.store
         let tickets = env.paths.coreStateDir.appendingPathComponent("tickets", isDirectory: true)
         do {
@@ -187,8 +193,10 @@ public final class ShellXRemoteService: ObservableObject {
                 }
                 try store.saveOwner(userID)
             }
+            return true
         } catch {
             RemoteLog.service.error("link owner not updated: \(RemoteLog.code(error), privacy: .public)")
+            return false
         }
     }
 
@@ -385,6 +393,10 @@ public final class ShellXRemoteService: ObservableObject {
         guard let linkHost = env.linkHost, let machineID = thisMachineID else { return }
         guard let linkSlot = hostLinkSlot, !linkSlot.isEmpty else {
             RemoteLog.service.notice("link host not started: the relay gave no link slot")
+            return
+        }
+        guard !accountAdoptionFailed else {
+            RemoteLog.service.error("link host not started: \("account_not_adopted", privacy: .public)")
             return
         }
         guard let accountID = accountOwnerID, !accountID.isEmpty else {

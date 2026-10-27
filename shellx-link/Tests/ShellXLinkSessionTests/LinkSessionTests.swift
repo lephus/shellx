@@ -493,6 +493,27 @@ final class LinkSessionTests: XCTestCase {
         XCTAssertEqual(answerId, "c10")
     }
 
+    /// A call this host predates (a newer phone's method) is answered `unsupported` with its `call_id`, so the phone
+    /// fails it at once instead of waiting 10 s; an unknown frame without a valid `call_id` stays ignored.
+    func testUnknownCallIsAnsweredUnsupported() async throws {
+        let rig = makeHost(FakeFeedSource())
+        let (end, served) = startServe(rig.host)
+        let raw = try await rawEstablished(end, rig)
+        try await raw.send(frame: Data(#"{"v":1,"t":"future.notice","x":1}"#.utf8))
+        let tooLong = String(repeating: "c", count: LinkCodec.maxCallIdBytes + 1)
+        try await raw.send(frame: Data(#"{"v":1,"t":"future.call","call_id":"\#(tooLong)"}"#.utf8))
+        try await raw.send(frame: Data(#"{"v":1,"t":"future.call","call_id":"f1","x":[1,2]}"#.utf8))
+        let answer = try await within(.seconds(2)) { try await raw.receive() }
+        guard case let .error(code, _, callId) = answer else { return XCTFail("expected an error, got \(answer)") }
+        XCTAssertEqual(code, "unsupported")
+        XCTAssertEqual(callId, "f1", "only the frame with a valid call_id is answered")
+        // Nothing else was answered, and the session stays usable.
+        try await raw.send(.ping(nonce: 3))
+        let pong = try await within(.seconds(2)) { try await raw.receive() }
+        XCTAssertEqual(pong, .pong(nonce: 3))
+        XCTAssertFalse(served.isSet)
+    }
+
     func testRemoteErrorWithCallIdFailsOnlyThatCall() async throws {
         let hostKey = NoiseStaticKey()
         let clientKey = NoiseStaticKey()
@@ -789,6 +810,45 @@ final class LinkSessionTests: XCTestCase {
             XCTAssertEqual(seen.items.first?.sessionId, "s1")
             XCTAssertEqual(seen.items.first?.entries.map(\.seq), [2, 3])
         }
+    }
+
+    /// A transcript the Mac replaced (a fork's oversized first read, `claude --resume` rotating the file) reaches
+    /// the phone as a reset, in order with the session's entries: what came before it belongs to the old
+    /// transcript, what follows to the new one, and a fresh history page is the new transcript.
+    func testChatResetReachesTheClientInOrder() async throws {
+        let chat = FakeChatSource(["s1": [chatEntry(1)]])
+        let client = try await connect(makeHost(FakeFeedSource(), chat: chat))
+        let seen = collect(client.chatEntries)
+        chat.append([chatEntry(2)], to: "s1")
+        chat.reset("s1", to: [chatEntry(0, text: "forked head")])
+        chat.append([chatEntry(1, rev: 2, text: "new turn")], to: "s1")
+        let arrived = await eventually { seen.items.count == 3 }
+        XCTAssertTrue(arrived, "pushes: \(seen.items)")
+        XCTAssertEqual(seen.items, [
+            .upsert(sessionId: "s1", entries: [chatEntry(2)]),
+            .reset(sessionId: "s1"),
+            .upsert(sessionId: "s1", entries: [chatEntry(1, rev: 2, text: "new turn")]),
+        ])
+        // Read through the tuple-shaped accessors too: a reset is an empty upsert of its session.
+        XCTAssertEqual(seen.items.map(\.sessionId), ["s1", "s1", "s1"])
+        XCTAssertEqual(seen.items.map(\.entries.count), [1, 0, 1])
+        let page = try await within { try await client.chatHistory(sessionId: "s1", beforeSeq: nil, limit: 10) }
+        XCTAssertEqual(page.entries.map(\.text), ["forked head", "new turn"])
+    }
+
+    /// `chat.reset` is a host push: it goes out as its own frame, and a client that sends one gets `bad_request`.
+    func testChatResetIsAHostPush() async throws {
+        let chat = FakeChatSource(["s1": []])
+        let rig = makeHost(FakeFeedSource(), chat: chat)
+        let (end, served) = startServe(rig.host)
+        let raw = try await rawEstablished(end, rig)
+        chat.reset("s1", to: [])
+        let pushed = try await within { try await raw.receive() }
+        XCTAssertEqual(pushed, .chatReset(sessionId: "s1"))
+        try await raw.send(.chatReset(sessionId: "s1"))
+        let answer = try await within { try await raw.receive() }
+        XCTAssertEqual(errorCode(answer), "bad_request")
+        XCTAssertFalse(served.isSet)
     }
 
     func testOversizeChatEntriesSplitIntoFrames() async throws {

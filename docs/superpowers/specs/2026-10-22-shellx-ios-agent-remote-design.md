@@ -295,7 +295,7 @@ Nếu kênh mới cho phép điện thoại gọi lệnh trên Mac (chạy skill
 
 ## 9. Rủi ro còn mở
 
-- **Giấy phép thư viện (§7.1).** App iOS không dùng `cmux-tui` và `shellx-core`, nên chỉ còn phải xác nhận phần vá ghostty của cmux, và chỉ khi builder chọn libghostty thay vì SwiftTerm. Nếu một trong số đó không dùng được trên App Store thì phải thay. Với `cmux-tui`, thay nghĩa là tự làm kênh terminal của ShellX Link ngay ở bản đầu (thêm vài tuần).
+- **Giấy phép thư viện (§7.1).** App iOS không dùng `cmux-tui` và `shellx-core`, nên chỉ còn phải xác nhận phần vá ghostty của cmux, và chỉ khi builder chọn libghostty thay vì SwiftTerm. Nếu một trong số đó không dùng được trên App Store thì phải thay. Việc bỏ `cmux-tui` đã chốt (`3f424d82c4`, §7.2): terminal đi qua kênh `terminal` của ShellX Link ngay từ bản đầu, nên rủi ro này không còn áp dụng cho `cmux-tui`.
 - **Viết mới app iOS** tốn công hơn nhiều so với dùng lại app cmux. Đó là cái giá của G6.
 - **Tiếng Việt chạy trên máy:** có thể không có (§4).
 - **Spike ShellX Link (§7.2)** có thể làm thay đổi lớn ước lượng.
