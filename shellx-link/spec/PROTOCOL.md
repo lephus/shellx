@@ -211,7 +211,9 @@ answers it `unknown` (section 5). A known `kind` with a missing required field i
 | `ts_ms` | int64 | Unix time in milliseconds |
 
 `chat.history` returns the newest `limit` entries whose `seq` is below `before_seq` (the newest
-entries when `before_seq` is absent), oldest first; `has_more` is true when older entries exist. A
+entries when `before_seq` is absent), oldest first; `has_more` is true when older entries exist.
+Entries that share a `seq` belong to one transcript line; a `chat.history` page never contains part of
+a `seq` group (section 6), and `before_seq` pages strictly older groups. A
 client keeps the entries it has by `id`: `chat.entries` and `chat.history` both upsert.
 
 `rev` orders the emissions of one entry. The host gives every emission of an entry, in a `chat.history` or
@@ -295,9 +297,11 @@ Splitting one logical message into several frames is not defined in v1, except f
 to `true` when it was cut. The host enforces this on every entry it sends, whatever its transcript source gave. Besides the snapshot rule above,
 three more rules apply:
 
-- `chat.history`: the host drops the oldest entries, one at a time, until the frame fits, and sets
-  `has_more` to `true`. The client pages back with `before_seq` set to the `seq` of the oldest entry it
-  received. If not even an empty page fits, the call is answered `error` `too_large`.
+- `chat.history`: the host drops the oldest whole `seq` group (every entry with the smallest remaining
+  `seq`) at a time until the frame fits, and sets `has_more` to `true`. A page therefore never contains
+  part of a `seq` group. The client pages back with `before_seq` set to the `seq` of the oldest entry it
+  received, which returns strictly older groups, so no entry is skipped. If even the newest group does
+  not fit (after the 4096-byte text cap), the call is answered `error` `too_large`.
 - `chat.entries`: the host splits the entries into several `chat.entries` frames, each complete by
   itself (every entry is an upsert), in order. An entry that does not fit alone is logged and dropped.
 - `agent.sessions` (and `agent.sessions.changed`): the host drops the `title` of every session. If the

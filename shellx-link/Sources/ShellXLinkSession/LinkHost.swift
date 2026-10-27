@@ -335,23 +335,28 @@ public actor LinkHost {
         return nil
     }
 
-    /// PROTOCOL.md section 6: a history page that does not fit loses its oldest entries one by one, and
-    /// `has_more` becomes true. Nil when not even an empty page fits.
+    /// PROTOCOL.md section 6: a history page that does not fit loses its oldest whole `seq` group at a
+    /// time (every entry sharing the smallest remaining `seq`), and `has_more` becomes true, so a client
+    /// paging with `before_seq` never skips an entry. Nil when not even the newest group fits.
     static func fittedHistory(callId: String, sessionId: String, page: (entries: [ChatEntry], hasMore: Bool)) -> Data? {
-        for dropped in 0...page.entries.count {
+        var entries = page.entries
+        var hasMore = page.hasMore
+        while true {
             let message = LinkMessage.chatHistory(
-                callId: callId, sessionId: sessionId, entries: Array(page.entries.dropFirst(dropped)),
-                hasMore: page.hasMore || dropped > 0)
+                callId: callId, sessionId: sessionId, entries: entries, hasMore: hasMore)
             do {
                 return try LinkCodec.encode(message)
             } catch LinkCodecError.frameTooLarge {
-                continue
+                guard let oldest = entries.map(\.seq).min() else { return nil }
+                let rest = entries.filter { $0.seq != oldest }
+                guard !rest.isEmpty else { return nil }
+                entries = rest
+                hasMore = true
             } catch {
                 linkLog.error("cannot encode a host frame: \(String(describing: error), privacy: .public)")
                 return nil
             }
         }
-        return nil
     }
 
     /// PROTOCOL.md section 6: `chat.entries` that do not fit are split into several frames, each complete
