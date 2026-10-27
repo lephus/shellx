@@ -80,8 +80,7 @@ struct SignInView: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .buttonStyle(PrimaryButtonStyle())
                 .disabled(!canSubmit)
             }
             .padding(.horizontal, 16)
@@ -129,6 +128,8 @@ struct SignInView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     SignInView(coordinator: .preview(), expired: false)
 }
+#endif

@@ -49,3 +49,21 @@ final class KeychainSecretStoreTests: XCTestCase {
         XCTAssertTrue(synchronizable == nil || synchronizable == false, "never synced through iCloud")
     }
 }
+
+/// The Keychain setup the app ships with: the access group from Info.plist.
+final class ShippedKeychainGroupTests: XCTestCase {
+    func testInfoPlistGroupIsExpandedAndRoundTrips() throws {
+        let bundleID = Bundle.main.bundleIdentifier ?? "?"
+        let group = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "ShellXKeychainGroup") as? String)
+        XCTAssertFalse(group.contains("$("), "build setting not expanded: \(group)")
+        XCTAssertTrue(group.hasSuffix(".\(bundleID).shared"), group)
+        XCTAssertFalse(group.hasPrefix("."), "AppIdentifierPrefix expanded to nothing: \(group)")
+
+        let store = KeychainSecretStore(service: "com.shellx.dev.tests.\(UUID().uuidString)", accessGroup: group)
+        defer { for item in SecretItem.allCases { try? store.delete(item) } }
+        try store.write(Data("v".utf8), for: .session)
+        XCTAssertEqual(try store.read(.session), Data("v".utf8))
+        try store.delete(.session)
+        XCTAssertNil(try store.read(.session))
+    }
+}

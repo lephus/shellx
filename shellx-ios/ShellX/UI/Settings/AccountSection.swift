@@ -5,6 +5,7 @@ struct AccountSection: View {
     let email: String
     let signOut: () async -> Void
     @State private var confirming = false
+    @State private var signingOut = false
 
     var body: some View {
         Section {
@@ -20,9 +21,14 @@ struct AccountSection: View {
             Button(role: .destructive) {
                 confirming = true
             } label: {
-                Text(LocalizedStringResource("settings.account.signOut"))
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                HStack {
+                    Text(LocalizedStringResource("settings.account.signOut"))
+                    Spacer()
+                    if signingOut { ProgressView() }
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             }
+            .disabled(signingOut)
         } header: {
             Text(LocalizedStringResource("settings.account.title"))
         }
@@ -31,7 +37,12 @@ struct AccountSection: View {
         ) {
             Button(String(localized: "common.cancel"), role: .cancel) {}
             Button(String(localized: "settings.account.signOut"), role: .destructive) {
-                Task { await signOut() }
+                guard !signingOut else { return }
+                signingOut = true
+                Task {
+                    await signOut()
+                    signingOut = false
+                }
             }
         } message: {
             Text(LocalizedStringResource("settings.account.signOut.confirm"))

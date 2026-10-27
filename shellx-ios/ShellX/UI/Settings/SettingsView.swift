@@ -15,6 +15,8 @@ struct SettingsView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     NavigationStack { SettingsView(email: "phu@example.com", signOut: {}) }
 }
+#endif

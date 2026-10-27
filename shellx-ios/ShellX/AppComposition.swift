@@ -1,8 +1,9 @@
 import Foundation
 import ShellXAppCore
-import ShellXAppTestSupport
-import ShellXLinkAccount
 import UIKit
+#if DEBUG
+import ShellXAppTestSupport
+#endif
 
 /// Builds the app's object graph. The only place that knows the Keychain, the relay URL and the
 /// device name.
@@ -21,7 +22,7 @@ enum AppComposition {
             service: bundle.bundleIdentifier ?? "com.shellx.prod",
             accessGroup: bundle.object(forInfoDictionaryKey: "ShellXKeychainGroup") as? String)
         // The base URL is https (production) or a validated override, so this cannot fail.
-        guard let relay = try? RelayAPI(baseURL: endpoints.apiBase, clientVersion: "ios/\(version)") else {
+        guard let relay = try? RelayClientFactory.make(apiBase: endpoints.apiBase, appVersion: version) else {
             preconditionFailure("the relay URL must be https")
         }
         return AppCoordinator(
@@ -29,8 +30,9 @@ enum AppComposition {
     }
 }
 
+#if DEBUG
 extension AppCoordinator {
-    /// A coordinator over memory and a fake relay, for previews and render tests.
+    /// A coordinator over memory and a fake relay, for previews and render tests (Debug only).
     @MainActor
     static func preview() -> AppCoordinator {
         AppCoordinator(
@@ -38,3 +40,4 @@ extension AppCoordinator {
             wipers: [])
     }
 }
+#endif

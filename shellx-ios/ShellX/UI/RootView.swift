@@ -39,6 +39,8 @@ struct LaunchView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     RootView(coordinator: .preview())
 }
+#endif
