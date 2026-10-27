@@ -8,7 +8,8 @@ import os
 /// Every paired Mac and its Link, for the signed-in account: one `MachineConnection` per Mac, the
 /// merged pending items and live sessions, and the calls that act on them.
 ///
-/// The hub is the only writer of the vault's Mac list: `start()` reads it, `add(_:)` writes it.
+/// The hub is the only writer of the vault's Mac list: `start()` reads it, `add(_:)` and
+/// `unpair(machineID:)` write it.
 @MainActor @Observable
 public final class MachineHub {
     /// How long sessions stay open after the app went to the background.
@@ -16,6 +17,8 @@ public final class MachineHub {
     static let defaultMachineKey = "shellx.defaultMachineID"
 
     public private(set) var machines: [MachineModel] = []
+    /// True once `start()` read the vault, so an empty `machines` means "no Mac paired yet".
+    public private(set) var isLoaded = false
     private var storedDefaultMachineID: String?
 
     @ObservationIgnored private let vault: AccountVault
@@ -115,6 +118,7 @@ public final class MachineHub {
             machines.append(model)
             connect(model)
         }
+        isLoaded = true
     }
 
     /// Stops every connection and finishes the update streams. The hub is done afterwards.
@@ -164,6 +168,32 @@ public final class MachineHub {
             machines.append(model)
             connect(model)
         }
+    }
+
+    /// Removes this iPhone from a Mac: finds the Mac's grant with `machines(token:)`, deletes it on
+    /// the relay, then forgets the Mac (vault, connection, list, default).
+    ///
+    /// A grant that is already gone (not listed, or 404) still forgets the Mac. Any other relay error
+    /// (network, 5xx) throws and keeps the Mac as it was; a 401 also signs out. A `.revoked` Mac has
+    /// no grant left, so it is forgotten even when the relay cannot be reached. An unknown
+    /// `machineID` does nothing.
+    public func unpair(machineID: String) async throws {
+        guard let model = machines.first(where: { $0.id == machineID }) else { return }
+        guard !stopped, let session = try await vault.session() else { throw AddError.notSignedIn }
+        do {
+            try await removeGrant(of: machineID, token: session.token)
+        } catch {
+            if LinkFailure(error) == .signedOut {
+                await reportUnauthorized()
+                throw error
+            }
+            // The Mac already let this iPhone go: nothing is left on the relay to remove.
+            guard model.state == .revoked else { throw error }
+            log.notice("unpair_revoked_relay_unreachable")
+        }
+        // A sign-out meanwhile wipes the vault: writing the list now would bring it back.
+        guard !stopped else { throw AddError.notSignedIn }
+        try await forget(machineID, owner: session.userID)
     }
 
     /// Asks the relay which Macs this iPhone may still reach: a Mac missing from the list becomes
@@ -367,6 +397,34 @@ public final class MachineHub {
         case .signedOut:
             Task { await self.reportUnauthorized() }
         }
+    }
+
+    /// Deletes the relay's grant for `machineID`, if it still has one.
+    private func removeGrant(of machineID: String, token: String) async throws {
+        let grants = try await relay.machines(token: token)
+        guard let grant = grants.first(where: { $0.machineID == machineID }) else { return }
+        do {
+            try await relay.unpair(grantID: grant.grantID, token: token)
+        } catch RelayAPIError.http(status: 404, code: _) {
+            // Removed meanwhile (on the Mac, or by another unpair).
+        }
+    }
+
+    /// Takes the Mac out of the vault, then out of the hub. A failed vault write keeps everything.
+    private func forget(_ machineID: String, owner: String) async throws {
+        let old = records.first { $0.machineID == machineID }
+        records.removeAll { $0.machineID == machineID }
+        do {
+            try await vault.setMachines(records, owner: owner)
+        } catch {
+            if let old { Self.upsert(old, into: &records) }
+            throw error
+        }
+        // Re-pairing the same Mac later should not make it the default again by surprise.
+        if storedDefaultMachineID == machineID { defaultMachineID = nil }
+        guard let model = machines.first(where: { $0.id == machineID }) else { return }
+        machines.removeAll { $0 === model }
+        await disconnect(model)
     }
 
     private func revoke(_ model: MachineModel) async {

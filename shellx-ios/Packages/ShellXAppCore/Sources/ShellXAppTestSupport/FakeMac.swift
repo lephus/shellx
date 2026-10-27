@@ -94,6 +94,16 @@ public actor FakeMac {
         for session in sessions { await session.task.value }
     }
 
+    /// The QR code the Mac would show now: its current host key and a new one-time code.
+    public func pairingOffer() -> PairingOffer {
+        PairingOffer.make(
+            machineID: machine.machineID, linkSlot: machine.linkSlot, hostKey: hostKey.publicKey,
+            machineName: machine.name)
+    }
+
+    /// `pairingOffer().uri`: what scanning the Mac's QR code (or copying its code) gives.
+    public func pairingCode() -> String { pairingOffer().uri }
+
     /// How many sessions are being served right now.
     public var liveSessionCount: Int { live.count }
 

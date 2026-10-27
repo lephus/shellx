@@ -585,6 +585,22 @@ extension MachineHubTests {
     }
 }
 
+// MARK: - Task 4
+
+extension MachineHubTests {
+    /// The UI tells "no Mac yet" from "not read yet": a hub is loaded once `start()` read the vault.
+    func testLoadedOnceTheVaultWasRead() async throws {
+        let a = FakeMac(name: "MacBook Pro")
+        let rig = try await rig([a])
+        XCTAssertFalse(rig.hub.isLoaded)
+
+        await rig.hub.start()
+
+        XCTAssertTrue(rig.hub.isLoaded)
+        XCTAssertEqual(rig.hub.machines.count, 1)
+    }
+}
+
 /// Holds connects to the `gated` Macs until the gate opens, then fails them; others go to `base`.
 /// The hold ignores cancellation, so stopping such a connection waits for the gate.
 private struct GatedConnector: MachineLinkConnecting {
