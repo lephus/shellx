@@ -21,7 +21,8 @@ import Foundation
 ///
 /// Targets resolve whether or not the page is on screen, because ⤢ and the command
 /// palette need the root. Watching runs only while it is: there is no refresh while
-/// hidden, and becoming visible refreshes once.
+/// hidden, and becoming visible refreshes once. A page hidden after it was shown
+/// stays loaded, so the controller holds `repo.changed` until it shows again.
 @MainActor
 final class GitGraphRepositoryTracker {
     /// Looks up the work tree that holds a directory. Tests substitute a script.
@@ -36,12 +37,15 @@ final class GitGraphRepositoryTracker {
     private(set) var watchedRoot: String?
     /// The refresh waiting for the watcher to go quiet, if any. Tests await it.
     private(set) var pendingInvalidation: Task<Void, Never>?
+    /// The refresh due once changes have gone on for ``refreshMaximumWait``, if any. Tests await it.
+    private(set) var pendingDeadline: Task<Void, Never>?
 
     private weak var controller: GitGraphController?
     private let metadata: GitMetadataService
     private let workTreeRoot: WorkTreeRootLookup
     private let refreshClock: any FileWatchClock
     private let refreshQuietPeriod: Duration
+    private let refreshMaximumWait: Duration
     private var isPinned = false
     private var target: GitGraphTarget?
     /// Bumped for every new target. A resolution started for an older one is dropped.
@@ -63,12 +67,14 @@ final class GitGraphRepositoryTracker {
     /// - Parameters:
     ///   - refreshClock: Waits out ``refreshQuietPeriod``. Tests substitute a clock they release by hand.
     ///   - refreshQuietPeriod: How long the watcher must stay quiet before the page refreshes.
+    ///   - refreshMaximumWait: How long changes that never go quiet may hold a refresh back.
     init(
         controller: GitGraphController,
         metadata: GitMetadataService = GitMetadataService(),
         workTreeRoot: WorkTreeRootLookup? = nil,
         refreshClock: any FileWatchClock = SystemFileWatchClock(),
-        refreshQuietPeriod: Duration = .milliseconds(500)
+        refreshQuietPeriod: Duration = .milliseconds(500),
+        refreshMaximumWait: Duration = .seconds(2)
     ) {
         self.controller = controller
         self.metadata = metadata
@@ -77,6 +83,7 @@ final class GitGraphRepositoryTracker {
         }
         self.refreshClock = refreshClock
         self.refreshQuietPeriod = refreshQuietPeriod
+        self.refreshMaximumWait = refreshMaximumWait
         controller.onRetryLookup = { [weak self] in
             self?.retryFailedLookup()
         }
@@ -84,6 +91,7 @@ final class GitGraphRepositoryTracker {
 
     deinit {
         pendingInvalidation?.cancel()
+        pendingDeadline?.cancel()
         watcherTask?.cancel()
         if let watcher {
             Task { await watcher.stop() }
@@ -109,18 +117,21 @@ final class GitGraphRepositoryTracker {
     }
 
     /// Watching runs only while visible. Nothing is tracked while hidden, so
-    /// becoming visible refreshes a shown repository once. It also retries a failed
-    /// walk, and re-checks a folder that was not a repository.
+    /// becoming visible refreshes a shown repository once: with the `repo.changed`
+    /// held while hidden, or else with `history.invalidated`. It also retries a
+    /// failed walk, and re-checks a folder that was not a repository.
     func setVisible(_ visible: Bool) {
         guard visible != isVisible else { return }
         isVisible = visible
         guard visible else {
+            controller?.holdRepoChanges()
             cancelPendingInvalidation()
             updateWatcher()
             return
         }
         updateWatcher()
-        if shown?.status == .ready {
+        let reloaded = controller?.releaseHeldRepoChange() ?? false
+        if !reloaded, shown?.status == .ready {
             controller?.notifyInvalidated()
         }
         if let target, lastWalkFailed || shown?.status == .notRepository {
@@ -129,22 +140,14 @@ final class GitGraphRepositoryTracker {
     }
 
     /// Called for each coalesced change the watcher reports. The page refreshes
-    /// once the changes stop for ``refreshQuietPeriod``; nothing happens while hidden.
+    /// once the changes stop for ``refreshQuietPeriod``, or ``refreshMaximumWait``
+    /// after the first of them when they never stop; nothing happens while hidden.
     func repositoryFilesChanged() {
         guard isVisible else { return }
         pendingInvalidation?.cancel()
-        let clock = refreshClock
-        let quietPeriod = refreshQuietPeriod
-        pendingInvalidation = Task { [weak self] in
-            do {
-                try await clock.sleep(for: quietPeriod)
-            } catch {
-                return
-            }
-            // A later change restarted the wait, or the page was hidden.
-            guard !Task.isCancelled, let self else { return }
-            self.pendingInvalidation = nil
-            self.controller?.notifyInvalidated()
+        pendingInvalidation = invalidate(after: refreshQuietPeriod)
+        if pendingDeadline == nil {
+            pendingDeadline = invalidate(after: refreshMaximumWait)
         }
     }
 
@@ -155,9 +158,28 @@ final class GitGraphRepositoryTracker {
         resolve(target)
     }
 
+    /// Refreshes the page after `delay` unless cancelled first. Either wait that
+    /// ends first refreshes and cancels the other.
+    private func invalidate(after delay: Duration) -> Task<Void, Never> {
+        let clock = refreshClock
+        return Task { [weak self] in
+            do {
+                try await clock.sleep(for: delay)
+            } catch {
+                return
+            }
+            // A later change restarted the wait, the other wait won, or the page was hidden.
+            guard !Task.isCancelled, let self else { return }
+            self.cancelPendingInvalidation()
+            self.controller?.notifyInvalidated()
+        }
+    }
+
     private func cancelPendingInvalidation() {
         pendingInvalidation?.cancel()
         pendingInvalidation = nil
+        pendingDeadline?.cancel()
+        pendingDeadline = nil
     }
 
     // MARK: Resolution
