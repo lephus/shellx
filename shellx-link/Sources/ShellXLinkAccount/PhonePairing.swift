@@ -29,16 +29,21 @@ public enum PhonePairing {
     ///
     /// Trust comes from the offer: the host key is the offer's, and the machine id and link slot the
     /// relay reports on approval must equal the offer's, otherwise `RelayAPIError.badResponse`.
+    ///
+    /// `onRequested` gets the relay's pairing id once the request is sent, before the first poll: the
+    /// moment a UI switches to "approve on the Mac" (and a test harness can approve that id).
     public static func pair(
         offerURI: String,
         clientKey: Data,
         api: RelayAPI,
         token: String,
         pollInterval: Duration = .seconds(2),
-        timeout: Duration = .seconds(PairingOffer.lifetime)
+        timeout: Duration = .seconds(PairingOffer.lifetime),
+        onRequested: @Sendable (String) -> Void = { _ in }
     ) async throws -> PairedMachine {
         let offer = try PairingOffer(uri: offerURI)
         let id = try await api.requestPairing(offer: offer, clientKey: clientKey, token: token)
+        onRequested(id)
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: timeout)
         // Unless the relay itself reported the end of the request, leave nothing pending (or granted)
