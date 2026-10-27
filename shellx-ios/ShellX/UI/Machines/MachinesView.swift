@@ -1,11 +1,14 @@
 import ShellXAppCore
 import SwiftUI
 
-/// "Your Macs", fed by the hub.
+/// "Your Macs", fed by the hub, with the pending cards on top (until the main screen takes them).
 struct MachinesView: View {
     let hub: MachineHub
+    let center: DecisionCenter
     /// Opens the pairing sheet.
     let pair: () -> Void
+
+    @State private var route: PendingRoute?
 
     var body: some View {
         MachineList(
@@ -13,7 +16,13 @@ struct MachinesView: View {
             defaultID: hub.defaultMachineID,
             makeDefault: { hub.defaultMachineID = $0 },
             unpair: { try await hub.unpair(machineID: $0) },
-            pair: pair)
+            pair: pair
+        ) {
+            PendingCardsSection(hub: hub, center: center, route: $route)
+        }
+        .sheet(item: $route) { route in
+            PendingSheetHost(route: route, close: { self.route = nil })
+        }
     }
 }
 
@@ -31,15 +40,30 @@ struct MachineListItem: Identifiable, Equatable {
 }
 
 /// The list of paired Macs with its actions; no hub, so render tests can show every state.
+/// `header` goes above the Macs (the pending cards).
 ///
 /// Each row offers "Make Default" and "Unpair" from its context menu and its swipe actions.
 /// Unpairing asks first; removing a Mac that already removed this iPhone does not.
-struct MachineList: View {
+struct MachineList<Header: View>: View {
     let items: [MachineListItem]
     let defaultID: String?
     let makeDefault: (String) -> Void
     let unpair: (String) async throws -> Void
     let pair: () -> Void
+    let header: Header
+
+    init(
+        items: [MachineListItem], defaultID: String?, makeDefault: @escaping (String) -> Void,
+        unpair: @escaping (String) async throws -> Void, pair: @escaping () -> Void,
+        @ViewBuilder header: () -> Header
+    ) {
+        self.items = items
+        self.defaultID = defaultID
+        self.makeDefault = makeDefault
+        self.unpair = unpair
+        self.pair = pair
+        self.header = header()
+    }
 
     @State private var confirming: MachineListItem?
     @State private var working: Set<String> = []
@@ -47,6 +71,7 @@ struct MachineList: View {
 
     var body: some View {
         List {
+            header
             Section {
                 ForEach(items) { item in
                     MachineRow(
@@ -141,6 +166,17 @@ struct MachineList: View {
                 failed = item
             }
             working.remove(item.id)
+        }
+    }
+}
+
+extension MachineList where Header == EmptyView {
+    init(
+        items: [MachineListItem], defaultID: String?, makeDefault: @escaping (String) -> Void,
+        unpair: @escaping (String) async throws -> Void, pair: @escaping () -> Void
+    ) {
+        self.init(items: items, defaultID: defaultID, makeDefault: makeDefault, unpair: unpair, pair: pair) {
+            EmptyView()
         }
     }
 }

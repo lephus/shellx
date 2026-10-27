@@ -293,13 +293,12 @@ public final class MachineHub {
 
     // MARK: - Calls
 
+    /// Sends one `agent.reply`. `DecisionCenter` calls it for a tap (and records `replyRoundTrip`
+    /// from the tap, across its one resend).
     public func reply(_ key: PendingKey, decision: LinkDecision) async throws -> ReplyOutcome {
-        let start = ContinuousClock.now
-        let outcome = try await withLink(key.machineID) {
+        try await withLink(key.machineID) {
             try await $0.reply(requestId: key.requestId, decision: decision)
         }
-        latency.record(.replyRoundTrip, ContinuousClock.now - start)
-        return outcome
     }
 
     public func chatHistory(
@@ -491,6 +490,8 @@ public final class MachineHub {
         }
     }
 }
+
+extension MachineHub: DecisionSending {}
 
 extension MachineHub {
     public enum AddError: Error, Equatable {

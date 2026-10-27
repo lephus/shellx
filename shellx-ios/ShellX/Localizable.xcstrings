@@ -829,6 +829,798 @@
         }
       }
     },
+    "pending.allow": {
+      "comment": "Primary button of a permission card: allow this one call.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cho phép"
+          }
+        }
+      }
+    },
+    "pending.allowAllTools": {
+      "comment": "Menu item of a permission card: allow every tool from now on.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All tools"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tất cả công cụ"
+          }
+        }
+      }
+    },
+    "pending.allowAlways": {
+      "comment": "Menu item of a permission card: allow this kind of call from now on.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Always allow"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Luôn cho phép"
+          }
+        }
+      }
+    },
+    "pending.answer": {
+      "comment": "Button of a question card: opens the answer sheet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answer"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trả lời"
+          }
+        }
+      }
+    },
+    "pending.bytes %lld %lld": {
+      "comment": "Byte counter under a field; %1$lld is used, %2$lld the limit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld / %2$lld bytes"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld / %2$lld byte"
+          }
+        }
+      }
+    },
+    "pending.deny": {
+      "comment": "Button refusing a permission or a plan.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deny"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Từ chối"
+          }
+        }
+      }
+    },
+    "pending.fullText.title": {
+      "comment": "Title of the full-text sheet when the tool has no name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Details"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chi tiết"
+          }
+        }
+      }
+    },
+    "pending.kind.other": {
+      "comment": "Card header: a request this app cannot show.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "needs you on the Mac"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cần bạn trên Mac"
+          }
+        }
+      }
+    },
+    "pending.kind.permission %@": {
+      "comment": "Card header: an agent asks to run a tool; %@ is the tool's name (Bash, Edit).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "wants to run %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "muốn chạy %@"
+          }
+        }
+      }
+    },
+    "pending.kind.permission.noTool": {
+      "comment": "Card header: an agent asks for permission, tool unknown.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "asks for permission"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "xin phép"
+          }
+        }
+      }
+    },
+    "pending.kind.plan": {
+      "comment": "Card header: an agent proposes a plan to approve.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "proposes a plan"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "đề xuất plan"
+          }
+        }
+      }
+    },
+    "pending.kind.question": {
+      "comment": "Card header: an agent asks the user a question.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "asks"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hỏi"
+          }
+        }
+      }
+    },
+    "pending.mayBeCut": {
+      "comment": "Under a preview that may have been cut by the Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This may be cut short. See all of it on the Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nội dung có thể đã bị cắt bớt. Xem đầy đủ trên Mac."
+          }
+        }
+      }
+    },
+    "pending.more": {
+      "comment": "VoiceOver label of the … menu on a permission card.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More options"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lựa chọn khác"
+          }
+        }
+      }
+    },
+    "pending.openOnMac": {
+      "comment": "Card for a request the phone cannot answer.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open on the Mac"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở trên Mac"
+          }
+        }
+      }
+    },
+    "pending.plan.approve": {
+      "comment": "Primary button of the plan sheet: approve (manual mode).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approve"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duyệt"
+          }
+        }
+      }
+    },
+    "pending.plan.autoAccept": {
+      "comment": "Approve the plan and accept its edits automatically.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-accept edits"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tự chấp nhận chỉnh sửa"
+          }
+        }
+      }
+    },
+    "pending.plan.feedback": {
+      "comment": "Placeholder of the plan feedback field.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feedback for the agent"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Góp ý cho agent"
+          }
+        }
+      }
+    },
+    "pending.plan.missing": {
+      "comment": "The plan text did not fit in the message to the phone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This plan is too long to send to the phone. Open it on the Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan này quá dài để gửi tới điện thoại. Mở trên Mac để xem."
+          }
+        }
+      }
+    },
+    "pending.plan.otherModes": {
+      "comment": "Menu of the other approval modes in the plan sheet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other modes"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chế độ khác"
+          }
+        }
+      }
+    },
+    "pending.plan.revise": {
+      "comment": "Sends the plan back with feedback.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revise…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chỉnh sửa…"
+          }
+        }
+      }
+    },
+    "pending.plan.sendFeedback": {
+      "comment": "Sends the plan feedback.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send feedback"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi góp ý"
+          }
+        }
+      }
+    },
+    "pending.plan.title": {
+      "comment": "Title of the plan review sheet (the Vietnamese UI also says plan).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan"
+          }
+        }
+      }
+    },
+    "pending.plan.ultraplan": {
+      "comment": "Approval mode name (product term, not translated).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultraplan"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultraplan"
+          }
+        }
+      }
+    },
+    "pending.question.back": {
+      "comment": "Goes to the previous question.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trước"
+          }
+        }
+      }
+    },
+    "pending.question.next": {
+      "comment": "Goes to the next question.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tiếp"
+          }
+        }
+      }
+    },
+    "pending.question.other": {
+      "comment": "Last row of a question's options: answer in your own words.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Khác…"
+          }
+        }
+      }
+    },
+    "pending.question.otherPlaceholder": {
+      "comment": "Placeholder of the free-text answer field.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your answer"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Câu trả lời của bạn"
+          }
+        }
+      }
+    },
+    "pending.question.page %lld %lld": {
+      "comment": "Title of the question sheet; %1$lld is the question shown, %2$lld how many.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Question %1$lld of %2$lld"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Câu %1$lld / %2$lld"
+          }
+        }
+      }
+    },
+    "pending.question.pickMany": {
+      "comment": "Hint under a multiple-choice question.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose one or more"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chọn một hoặc nhiều"
+          }
+        }
+      }
+    },
+    "pending.question.pickOne": {
+      "comment": "Hint under a single-choice question.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose one"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chọn một"
+          }
+        }
+      }
+    },
+    "pending.question.title": {
+      "comment": "Title of the question sheet (one question).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Question"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Câu hỏi"
+          }
+        }
+      }
+    },
+    "pending.reviewPlan": {
+      "comment": "Button of a plan card: opens the plan review sheet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review plan"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duyệt plan"
+          }
+        }
+      }
+    },
+    "pending.section.title %lld": {
+      "comment": "Title of the pinned pending cards; %lld is how many.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs you · %lld"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cần bạn · %lld"
+          }
+        }
+      }
+    },
+    "pending.send": {
+      "comment": "Sends the answers of the question sheet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gửi"
+          }
+        }
+      }
+    },
+    "pending.showMore": {
+      "comment": "Under a card's cut preview: opens the full text.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show more"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xem thêm"
+          }
+        }
+      }
+    },
+    "pending.status.handledElsewhere": {
+      "comment": "The request was decided on the Mac or another phone first.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Already handled elsewhere"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đã được xử lý ở nơi khác"
+          }
+        }
+      }
+    },
+    "pending.status.noAnswer": {
+      "comment": "The Mac did not answer a decision in time.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No answer from the Mac yet"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa nhận được trả lời của Mac"
+          }
+        }
+      }
+    },
+    "pending.status.offline %@": {
+      "comment": "A tap while the Mac is unreachable; %@ is the Mac's name. Nothing was sent.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is offline · Not sent"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đang offline · Chưa gửi"
+          }
+        }
+      }
+    },
+    "pending.status.reconnecting": {
+      "comment": "A card's buttons are off until the link to the Mac is back and synced.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnecting…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang kết nối lại…"
+          }
+        }
+      }
+    },
+    "pending.status.rejected": {
+      "comment": "The Mac refused the decision.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac didn't take this decision. Open it on the Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac không nhận quyết định này. Mở trên Mac."
+          }
+        }
+      }
+    },
+    "pending.status.retry": {
+      "comment": "Sends the decision again after no answer.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thử lại"
+          }
+        }
+      }
+    },
+    "pending.status.sending": {
+      "comment": "A decision is on its way to the Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang gửi…"
+          }
+        }
+      }
+    },
+    "pending.tooLong %lld %lld": {
+      "comment": "Byte counter past the limit; %1$lld is used, %2$lld the limit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Too long: %1$lld / %2$lld bytes"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dài quá: %1$lld / %2$lld byte"
+          }
+        }
+      }
+    },
     "root.title": {
       "comment": "The app's name, shown under the logo on the first screen.",
       "extractionState": "manual",

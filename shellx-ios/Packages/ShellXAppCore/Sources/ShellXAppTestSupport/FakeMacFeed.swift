@@ -13,6 +13,7 @@ final class FakeMacFeed: AgentFeedSource, @unchecked Sendable {
     private var subscribers: [UUID: AsyncStream<Change>.Continuation] = [:]
     private var presetOutcome: ReplyOutcome?
     private var replyDelay: Duration = .zero
+    private var presetResolves = true
     private var replies: [FakeMac.Decision] = []
     private var snapshots = 0
     private var holding = false
@@ -52,10 +53,11 @@ final class FakeMacFeed: AgentFeedSource, @unchecked Sendable {
         lock.withLock { revision += 1 }
     }
 
-    func setReplyOutcome(_ outcome: ReplyOutcome?, delay: Duration) {
+    func setReplyOutcome(_ outcome: ReplyOutcome?, delay: Duration, resolves: Bool) {
         lock.withLock {
             presetOutcome = outcome
             replyDelay = delay
+            presetResolves = resolves
         }
     }
 
@@ -83,14 +85,14 @@ final class FakeMacFeed: AgentFeedSource, @unchecked Sendable {
     }
 
     func reply(requestId: String, decision: LinkDecision) async -> ReplyOutcome {
-        let (preset, delay) = lock.withLock {
+        let (preset, delay, resolves) = lock.withLock {
             replies.append(FakeMac.Decision(requestId: requestId, decision: decision))
-            return (presetOutcome, replyDelay)
+            return (presetOutcome, replyDelay, presetResolves)
         }
         if delay > .zero { try? await Task.sleep(for: delay) }
         return lock.withLock {
             if let preset {
-                if preset == .delivered { resolveLocked(requestId) }
+                if preset == .delivered, resolves { resolveLocked(requestId) }
                 return preset
             }
             if items[requestId] != nil {
