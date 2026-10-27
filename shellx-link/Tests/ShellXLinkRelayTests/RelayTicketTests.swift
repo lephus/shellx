@@ -27,4 +27,27 @@ final class RelayTicketTests: XCTestCase {
         XCTAssertTrue("\(ticket)".contains("1900000000"), "the description still says when the ticket expires")
         XCTAssertTrue(ticket.ticket == secret, "the stored ticket is unchanged")
     }
+
+    func testClaimsParseSlotPermissionExpiry() {
+        let minter = TestTicketMinter(secret: "0123456789abcdef0123456789abcdef")
+        let register = minter.mint(.register, slot: "slot-a", now: Date(timeIntervalSince1970: 1_000), lifetime: 90)
+        XCTAssertEqual(
+            register.claims,
+            RelayTicketClaims(slot: "slot-a", permission: "register", role: "daemon", expiresAtUnix: 1_090))
+        let connect = minter.mint(.connect, slot: "slot-b", now: Date(timeIntervalSince1970: 2_000))
+        XCTAssertEqual(connect.claims?.permission, "connect")
+        XCTAssertEqual(connect.claims?.role, "client")
+        XCTAssertEqual(connect.claims?.expiresAtUnix, 2_120)
+    }
+
+    func testClaimsNilForMalformedTicket() {
+        let notJSON = TestTicketMinter.base64URL(Data("not json".utf8))
+        let missing = TestTicketMinter.base64URL(Data(#"{"slot":"s"}"#.utf8))
+        for text in [
+            "", "garbage", "v2.only", "v2..sig", "v1.\(missing).sig", "v2.\(notJSON).sig",
+            "v2.\(missing).sig", "v2.!!!.sig",
+        ] {
+            XCTAssertNil(RelayTicket(ticket: text, expiresAtUnix: 0).claims)
+        }
+    }
 }

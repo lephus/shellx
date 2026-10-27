@@ -13,10 +13,44 @@ public struct RelayTicket: Sendable, CustomStringConvertible, CustomDebugStringC
         self.expiresAtUnix = expiresAtUnix
     }
 
+    /// The claims the ticket carries, read from its middle segment. The signature is not checked
+    /// (the relay does that); `nil` when the ticket is not shaped like `v2.<base64url JSON>.<sig>`.
+    public var claims: RelayTicketClaims? {
+        let parts = ticket.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0] == "v2", !parts[1].isEmpty else { return nil }
+        var base64 = parts[1].replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        base64 += String(repeating: "=", count: (4 - base64.count % 4) % 4)
+        guard let data = Data(base64Encoded: base64) else { return nil }
+        return try? JSONDecoder().decode(RelayTicketClaims.self, from: data)
+    }
+
     public var description: String { "RelayTicket(expires: \(expiresAtUnix), <redacted>)" }
     public var debugDescription: String { description }
     public var customMirror: Mirror {
         Mirror(self, children: ["ticket": "<redacted>", "expiresAtUnix": expiresAtUnix], displayStyle: .struct)
+    }
+}
+
+/// The claims of a relay ticket that matter to the client (`relay/src/v2/tickets.ts`).
+public struct RelayTicketClaims: Equatable, Sendable, Decodable {
+    public var slot: String
+    public var permission: String
+    public var role: String
+    public var expiresAtUnix: Int64
+
+    public init(slot: String, permission: String, role: String, expiresAtUnix: Int64) {
+        self.slot = slot
+        self.permission = permission
+        self.role = role
+        self.expiresAtUnix = expiresAtUnix
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case slot
+        case permission
+        case role
+        case expiresAtUnix = "expires_at_unix"
     }
 }
 
@@ -34,6 +68,8 @@ public enum RelayError: Error, Equatable {
     case server(code: String, retryable: Bool)
     /// The relay sent something this client does not expect.
     case protocolViolation(String)
+    /// The relay URL would send the ticket over an unencrypted WebSocket to a non-loopback host.
+    case insecureTransport(scheme: String)
 }
 
 /// Protocol constants of `cmux-relay`.
@@ -217,7 +253,8 @@ extension RelayControl: Codable {
 enum RelayEndpoint {
     /// Normalizes the configured relay URL into the control WebSocket URL.
     ///
-    /// `relay+ws`/`http` map to `ws`, `relay+wss`/`https` to `wss`. An empty path becomes
+    /// `relay+ws`/`http` map to `ws`, `relay+wss`/`https` to `wss`. Plain `ws`, `relay+ws` and
+    /// `http` are accepted only for a loopback host; any other host throws `insecureTransport`. An empty path becomes
     /// `/v1/relay`; any other path (for example the ShellX `/v2/relay` route) is kept.
     static func control(_ url: URL) throws -> URL {
         guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
@@ -226,7 +263,9 @@ enum RelayEndpoint {
             throw RelayError.protocolViolation("relay URL is invalid")
         }
         switch scheme {
-        case "ws", "relay+ws", "http": parts.scheme = "ws"
+        case "ws", "relay+ws", "http":
+            guard isLoopback(parts.host) else { throw RelayError.insecureTransport(scheme: scheme) }
+            parts.scheme = "ws"
         case "wss", "relay+wss", "https": parts.scheme = "wss"
         default: throw RelayError.protocolViolation("relay URL scheme \(scheme) is unsupported")
         }
@@ -239,6 +278,16 @@ enum RelayEndpoint {
             throw RelayError.protocolViolation("relay URL is invalid")
         }
         return control
+    }
+
+    /// `localhost`, `127.0.0.0/8` and `::1`.
+    private static func isLoopback(_ host: String?) -> Bool {
+        guard var host = host?.lowercased() else { return false }
+        if host.hasPrefix("["), host.hasSuffix("]") { host = String(host.dropFirst().dropLast()) }
+        if host == "localhost" || host == "::1" { return true }
+        let octets = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard octets.count == 4, octets.allSatisfy({ UInt8($0) != nil }) else { return false }
+        return octets[0] == "127"
     }
 
     /// The URL a circuit socket joins on. The native relay takes joins on the control URL;

@@ -627,6 +627,8 @@ enum ErrorText {
             case let .server(code, retryable):
                 return "the relay refused: \(Log.shown(code))\(retryable ? " (retryable)" : "")"
             case let .protocolViolation(text): return "relay protocol violation: \(text)"
+            case let .insecureTransport(scheme):
+                return "refused to send a ticket over plain \(Log.shown(scheme)) to a non-loopback host; use wss"
             }
         }
         if let noise = error as? NoiseError { return "Noise handshake failed: \(noise)" }

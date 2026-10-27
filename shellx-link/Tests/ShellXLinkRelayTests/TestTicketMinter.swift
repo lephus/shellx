@@ -23,9 +23,12 @@ struct TestTicketMinter: Sendable {
         self.secret = Data(secret.utf8)
     }
 
-    func mint(_ permission: Permission, slot: String, now: Date = Date()) -> RelayTicket {
+    func mint(
+        _ permission: Permission, slot: String, now: Date = Date(),
+        lifetime: Int64 = TestTicketMinter.lifetimeSeconds
+    ) -> RelayTicket {
         let issued = Int64(now.timeIntervalSince1970)
-        let expires = issued + Self.lifetimeSeconds
+        let expires = issued + lifetime
         // Circuit, lane and generation stay null, as the ShellX API mints them.
         let claims: [String: Any] = [
             "version": 2,

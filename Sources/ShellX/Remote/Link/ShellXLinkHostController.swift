@@ -122,7 +122,15 @@ final class ShellXLinkHostController: RemoteLinkHosting {
             do {
                 let first = try await offMain { try core.mintLinkTicket(.register, expectedSlot: linkSlot) }
                 let prefetched = PrefetchedTicket(RelayTicket(ticket: first.ticket, expiresAtUnix: first.expiresAtUnix))
-                let registration = RelayHostRegistration(relayURL: first.relayURL, slot: linkSlot) {
+                let registration = RelayHostRegistration(relayURL: first.relayURL, slot: linkSlot, onEvent: { event in
+                    // Codes only: never a ticket or a key.
+                    switch event {
+                    case .registered: log.info("link host registered slot \(linkSlot, privacy: .public)")
+                    case .renewed: log.info("link host renewed registration for slot \(linkSlot, privacy: .public)")
+                    case .failed(let code): log.error("link host registration attempt failed: \(code, privacy: .public)")
+                    case .gaveUp(let code): log.error("link host registration gave up: \(code, privacy: .public)")
+                    }
+                }) {
                     if let ticket = await prefetched.take() { return ticket }
                     let next = try await offMain { try core.mintLinkTicket(.register, expectedSlot: linkSlot) }
                     return RelayTicket(ticket: next.ticket, expiresAtUnix: next.expiresAtUnix)
