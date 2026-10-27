@@ -14,6 +14,20 @@ public enum RelayClientFactory {
     public static func make(
         apiBase: URL, appVersion: String, session: URLSession = .shared
     ) throws -> any RelayAccountCalling {
+        try api(apiBase: apiBase, appVersion: appVersion, session: session)
+    }
+
+    /// The connector that opens Link sessions through the same relay, with the vault's token and
+    /// phone key. `appVersion` is also the `client_version` of the Link `hello`.
+    public static func makeConnector(
+        apiBase: URL, appVersion: String, vault: AccountVault, deviceName: String, session: URLSession = .shared
+    ) throws -> any MachineLinkConnecting {
+        RelayMachineConnector(
+            api: try api(apiBase: apiBase, appVersion: appVersion, session: session), vault: vault,
+            clientVersion: headerVersion(for: appVersion), deviceName: deviceName)
+    }
+
+    private static func api(apiBase: URL, appVersion: String, session: URLSession) throws -> RelayAPI {
         try RelayAPI(baseURL: apiBase, session: session, clientVersion: headerVersion(for: appVersion))
     }
 }

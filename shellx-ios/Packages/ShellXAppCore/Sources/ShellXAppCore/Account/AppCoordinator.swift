@@ -2,26 +2,32 @@ import Foundation
 import Observation
 import os
 
-/// Owns the account state of the app: which screen to show and how to get in and out.
+/// Owns the account state of the app: which screen to show and how to get in and out, and the
+/// `MachineHub` of the signed-in account (made on sign-in, stopped and dropped on sign-out or 401).
 ///
 /// Nothing here logs a token, a password or a key; log lines carry error types only.
 @MainActor @Observable
 public final class AppCoordinator {
     public private(set) var phase: AppPhase = .launching
+    /// The paired Macs and their links; nil unless signed in.
+    public private(set) var hub: MachineHub?
 
     @ObservationIgnored private let vault: AccountVault
     @ObservationIgnored private let relay: any RelayAccountCalling
     @ObservationIgnored private let deviceName: String
     @ObservationIgnored private let wipers: [any LocalDataWiping]
+    @ObservationIgnored private let makeHub: @MainActor () -> MachineHub
     @ObservationIgnored private let log = Logger(subsystem: "com.shellx.app", category: "account")
 
     public init(
-        vault: AccountVault, relay: any RelayAccountCalling, deviceName: String, wipers: [any LocalDataWiping]
+        vault: AccountVault, relay: any RelayAccountCalling, deviceName: String, wipers: [any LocalDataWiping],
+        makeHub: @escaping @MainActor () -> MachineHub
     ) {
         self.vault = vault
         self.relay = relay
         self.deviceName = deviceName
         self.wipers = wipers
+        self.makeHub = makeHub
     }
 
     /// Reads the stored session. A Keychain that is locked (iOS may start the app before the first
@@ -30,6 +36,7 @@ public final class AppCoordinator {
         do {
             if let session = try await vault.session() {
                 phase = .signedIn(email: session.email)
+                await startHub()
             } else {
                 phase = .signedOut(expired: false)
             }
@@ -77,10 +84,12 @@ public final class AppCoordinator {
             throw .server(code: "keychain")
         }
         phase = .signedIn(email: email)
+        await startHub()
     }
 
     /// Removes this iPhone from its Macs and the relay (best effort), then forgets everything local.
     public func signOut() async {
+        await stopHub()
         let session = try? await vault.session()
         if let token = session?.token {
             do {
@@ -106,10 +115,24 @@ public final class AppCoordinator {
     /// The relay refused the stored token: drop the session only. The phone key and the Macs stay,
     /// so signing in again as the same account needs no new pairing.
     public func handleUnauthorized() async {
+        await stopHub()
         do { try await vault.clearSession() } catch {
             log.error("unauthorized_clear_failed")
         }
         phase = .signedOut(expired: true)
+    }
+
+    private func startHub() async {
+        guard hub == nil else { return }
+        let hub = makeHub()
+        self.hub = hub
+        await hub.start()
+    }
+
+    private func stopHub() async {
+        guard let hub else { return }
+        await hub.stopAll()
+        if self.hub === hub { self.hub = nil }
     }
 }
 

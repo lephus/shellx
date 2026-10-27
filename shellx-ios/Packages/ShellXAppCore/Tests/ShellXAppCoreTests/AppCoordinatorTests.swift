@@ -32,8 +32,39 @@ final class AppCoordinatorTests: XCTestCase {
         let relay = FakeRelayAccount()
         await relay.setLogin(.success(account))
         let wiper = CountingWiper()
-        let coordinator = AppCoordinator(vault: vault, relay: relay, deviceName: "Phu's iPhone", wipers: [wiper])
+        let defaults = UserDefaults(suiteName: "AppCoordinatorTests-\(UUID().uuidString)")!
+        let coordinator = AppCoordinator(
+            vault: vault, relay: relay, deviceName: "Phu's iPhone", wipers: [wiper],
+            makeHub: {
+                MachineHub(
+                    vault: vault, relay: relay, connector: FakeMacFleet([], phoneKey: { try await vault.phoneKey() }),
+                    latency: LatencyLog(), defaults: defaults, sleep: { _ in }, onUnauthorized: {})
+            })
+        addTeardownBlock { await coordinator.hub?.stopAll() }
         return Rig(store: store, vault: vault, relay: relay, wiper: wiper, coordinator: coordinator)
+    }
+
+    func testSignedInStartsHubAndSignOutStopsIt() async throws {
+        let rig = await rig()
+        await rig.coordinator.launch()
+        XCTAssertNil(rig.coordinator.hub, "no hub while signed out")
+
+        try await rig.coordinator.signIn(email: "a@b.c", password: "pw")
+        let hub = try XCTUnwrap(rig.coordinator.hub)
+        try await rig.vault.setMachines([mac], owner: "u1")
+        await rig.coordinator.launch()
+        XCTAssertTrue(rig.coordinator.hub === hub, "launching again keeps the running hub")
+
+        await rig.coordinator.signOut()
+        XCTAssertNil(rig.coordinator.hub)
+
+        // A stored session starts the hub at launch, with the saved Macs; a 401 drops it.
+        try await rig.vault.setSession(StoredSession(userID: "u1", deviceID: "d1", token: "t", email: "a@b.c"))
+        try await rig.vault.setMachines([mac], owner: "u1")
+        await rig.coordinator.launch()
+        XCTAssertEqual(rig.coordinator.hub?.machines.map(\.machine), [mac])
+        await rig.coordinator.handleUnauthorized()
+        XCTAssertNil(rig.coordinator.hub)
     }
 
     func testLaunchWithoutSessionIsSignedOut() async {

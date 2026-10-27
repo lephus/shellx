@@ -29,6 +29,9 @@ let package = Package(
             name: "ShellXAppTestSupport",
             dependencies: [
                 "ShellXAppCore",
+                .product(name: "ShellXLinkCore", package: "shellx-link"),
+                .product(name: "ShellXLinkRelay", package: "shellx-link"),
+                .product(name: "ShellXLinkSession", package: "shellx-link"),
                 .product(name: "ShellXLinkAccount", package: "shellx-link"),
             ]
         ),
