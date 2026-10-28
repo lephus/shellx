@@ -495,6 +495,34 @@ final class WorkspaceScreenModelTests: XCTestCase {
         XCTAssertEqual(model.panes.map(\.id), ["t1", "t2"], "the last chips stay")
     }
 
+    /// Back online, the Mac's list no longer fits a frame (`too_large`): the hub has no list to give, but the
+    /// Mac closed nothing. The chips stay.
+    func testTheChipsStayWhenTheListCannotBeReadOnReconnect() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace(terminals: terminals("t1", "t2"))])
+        let rig = try await HubRig.make([mac], in: self)
+        _ = await rig.online(sessions: 0)
+        _ = await eventually { rig.hub.machines.first?.workspacesSupported == true }
+        let model = WorkspaceScreenModel(ref: ref(mac), hub: rig.hub, sleep: ManualSleeper().sleep)
+        let run = Task { await model.run() }
+        addTeardownBlock { run.cancel() }
+
+        await mac.dropLiveSessions()
+        let away = await eventually { rig.hub.machines.first?.state != .online && rig.backoff.waiting.count == 1 }
+        XCTAssertTrue(away)
+        await mac.upsertWorkspace(
+            LinkWorkspace(workspaceId: "ws-huge", title: String(repeating: "w", count: 70_000), order: 1, terminals: []))
+        rig.backoff.release()
+        let unreadable = await eventually {
+            rig.hub.machines.first?.state == .online && rig.hub.machines.first?.workspacesSupported == false
+        }
+        XCTAssertTrue(unreadable)
+        _ = await eventually(timeout: .milliseconds(200)) { false }
+
+        XCTAssertEqual(model.phase, .showing, "nothing was closed on the Mac")
+        XCTAssertEqual(model.panes.map(\.id), ["t1", "t2"], "the last chips stay")
+    }
+
     func testRemovingTheMacLeavesWithoutSayingTheWorkspaceClosed() async throws {
         let mac = FakeMac(name: "MacBook Pro")
         await mac.setWorkspaces([linkWorkspace(terminals: terminals("t1"))])
