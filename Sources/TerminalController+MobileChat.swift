@@ -262,6 +262,14 @@ extension TerminalController {
         case image(base64: String?, format: String)
         /// A file, as typed values. Only ShellX Link builds one: no socket parameter becomes a file.
         case file(name: String, data: Data)
+
+        /// The order ``TerminalController/agentChatSend(sessionID:text:items:)`` types `items` and `text` in: every
+        /// item before the text, in the order the client sent them.
+        static func typingOrder(
+            _ items: [AgentChatPasteItem], text: String
+        ) -> (beforeText: [AgentChatPasteItem], afterText: [AgentChatPasteItem]) {
+            (items, [])
+        }
     }
 
     /// `mobile.chat.send`: deliver attachments then inject the prompt into

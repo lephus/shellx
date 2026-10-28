@@ -329,21 +329,71 @@ struct ShellXLinkChatSourceTests {
         #expect(calls[2].attachments.isEmpty)
     }
 
-    /// The items the shared send path pastes, in the order the phone sent them: an image keeps the extension of
-    /// the name the phone gave (`jpg` without one) and carries its bytes as base64; a file carries its name and
-    /// its bytes as typed values.
-    @Test func testAttachmentsBecomePasteItemsInOrder() {
+    /// The items the shared send path pastes: the images first, then the files, each in the order the phone sent
+    /// them (ruling R13). An image keeps the extension of the name the phone gave (`jpg` without one) and carries
+    /// its bytes as base64; a file carries its name and its bytes as typed values.
+    @Test func testAttachmentsBecomePasteItemsImagesFirst() {
         let bytes = Data([0x01, 0x02, 0x03])
         let items = ShellXLinkChatSource.pasteItems([
-            LinkAttachment(kind: .image, name: "Photo.PNG", data: bytes),
             LinkAttachment(kind: .file, name: "report.pdf", data: bytes),
+            LinkAttachment(kind: .image, name: "Photo.PNG", data: bytes),
+            LinkAttachment(kind: .file, name: "notes.txt", data: bytes),
             LinkAttachment(kind: .image, name: "no-extension", data: bytes),
         ])
         #expect(items == [
             .image(base64: bytes.base64EncodedString(), format: "png"),
-            .file(name: "report.pdf", data: bytes),
             .image(base64: bytes.base64EncodedString(), format: "jpg"),
+            .file(name: "report.pdf", data: bytes),
+            .file(name: "notes.txt", data: bytes),
         ])
+    }
+
+    /// Finding I4, ruling R13: the send path types the images' paths, then the text, then the files' paths, so a
+    /// message with text never starts with a raw file path (which Claude Code could read as a slash command).
+    /// Without text, the files follow the images and the submit key comes last.
+    @Test func testFilePathsAreTypedAfterTheText() {
+        typealias Item = TerminalController.AgentChatPasteItem
+        let image = Item.image(base64: "AQ==", format: "png")
+        let otherImage = Item.image(base64: "Ag==", format: "jpg")
+        let file = Item.file(name: "report.pdf", data: Data([1]))
+        let otherFile = Item.file(name: "notes.txt", data: Data([2]))
+
+        let withText = Item.typingOrder([file, image, otherFile, otherImage], text: "fix this")
+        #expect(withText.beforeText == [image, otherImage])
+        #expect(withText.afterText == [file, otherFile])
+
+        let filesOnly = Item.typingOrder([file, image, otherFile], text: "")
+        #expect(filesOnly.beforeText == [image, file, otherFile])
+        #expect(filesOnly.afterText.isEmpty)
+
+        let imagesOnly = Item.typingOrder([image, otherImage], text: "look")
+        #expect(imagesOnly.beforeText == [image, otherImage])
+        #expect(imagesOnly.afterText.isEmpty)
+    }
+
+    /// Finding M3: the host reaches the source only as `any AgentChatSource`, so a signature that drifted from the
+    /// protocol would fall back to its defaults (no attachments, `.failed`). Through the protocol, the source takes
+    /// attachments and they reach its send command.
+    @Test func testAttachmentsReachTheSendCommandThroughTheProtocol() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let calls = Calls()
+        let (chat, session) = try await MainActor.run { () throws -> (any AgentChatSource, String) in
+            let source = ShellXLinkChatSource(
+                service: { service },
+                send: { sessionID, text, attachments in
+                    calls.record("send \(sessionID) \(text) \(attachments.map(\.name))")
+                    return .ok(["submitted": true])
+                }
+            )
+            return (source, try Self.addSession(service, home: home, lines: [], pid: Self.livePID).id)
+        }
+        #expect(chat.acceptsAttachments)
+
+        let attachment = LinkAttachment(kind: .file, name: "notes.txt", data: Data("hello".utf8))
+        #expect(await chat.send(sessionId: session, text: "look", attachments: [attachment]) == .submitted)
+        #expect(calls.all == ["send \(session) look [\"notes.txt\"]"])
     }
 
     /// `mobile.chat.send` pastes images only: a `file` attachment is `invalid_params`, before the session is
