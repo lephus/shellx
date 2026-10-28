@@ -255,7 +255,7 @@ extension TerminalController {
         return .ok(payload)
     }
 
-    /// One thing a chat send pastes ahead of the message text, in the order the client sent it.
+    /// One image or file a chat send types the path of, next to the message text (``typingOrder(_:text:)``).
     enum AgentChatPasteItem: Equatable {
         /// An image, as the `data_b64` and `format` of a socket attachment. `base64` is nil when the attachment
         /// has no payload; that is refused when the item's turn comes, after the prompt is cleared.
@@ -263,12 +263,22 @@ extension TerminalController {
         /// A file, as typed values. Only ShellX Link builds one: no socket parameter becomes a file.
         case file(name: String, data: Data)
 
-        /// The order ``TerminalController/agentChatSend(sessionID:text:items:)`` types `items` and `text` in: every
-        /// item before the text, in the order the client sent them.
+        /// The order ``TerminalController/agentChatSend(sessionID:text:items:)`` types `items` and `text` in
+        /// (PROTOCOL.md section 10): the images' paths, then the text, then the files' paths, each kind in the
+        /// order the client sent it, then the submit key. A message with text so never starts with the raw path of
+        /// a file, which Claude Code could take for a slash command; an image path first is safe, as Claude Code
+        /// turns it into an attached image. Without text, the files follow the images.
         static func typingOrder(
             _ items: [AgentChatPasteItem], text: String
         ) -> (beforeText: [AgentChatPasteItem], afterText: [AgentChatPasteItem]) {
-            (items, [])
+            let images = items.filter(\.isImage)
+            let files = items.filter { !$0.isImage }
+            return text.isEmpty ? (images + files, []) : (images, files)
+        }
+
+        private var isImage: Bool {
+            if case .image = self { return true }
+            return false
         }
     }
 
@@ -317,15 +327,16 @@ extension TerminalController {
         })
     }
 
-    /// Types a message into an agent session's terminal: clears the agent's prompt, pastes each item in order
-    /// (separated by spaces), then pastes `text` and submits it. The one send path behind
-    /// `mobile.chat.send` and ShellX Link's `chat.send`.
+    /// Types a message into an agent session's terminal: clears the agent's prompt, types the path of each image,
+    /// pastes `text` followed by the path of each file, and submits it, all separated by spaces
+    /// (``AgentChatPasteItem/typingOrder(_:text:)``). Without text, the files' paths follow the images' and the
+    /// submit key comes last. The one send path behind `mobile.chat.send` and ShellX Link's `chat.send`.
     ///
     /// - Parameters:
     ///   - sessionID: The chat session to type into.
     ///   - text: The message; may be empty only when `items` is not.
-    ///   - items: The images and files to paste first, in the order the client sent them. A file's path is typed
-    ///     the way an image's is; its name is only a label the Mac sanitizes.
+    ///   - items: The images and files whose paths go with the text, each kind in the order the client sent
+    ///     them. A file's name is only a label the Mac sanitizes.
     func agentChatSend(sessionID: String, text: String, items: [AgentChatPasteItem]) async -> V2CallResult {
         guard let terminalParams = await mobileChatTerminalParams(sessionID: sessionID) else {
             return .err(code: "not_found", message: Self.chatTerminalBindingErrorMessage, data: [
@@ -341,7 +352,9 @@ extension TerminalController {
         guard clearResult.accepted else {
             return mobileChatInputError(clearResult)
         }
-        for (index, item) in items.enumerated() {
+        let order = AgentChatPasteItem.typingOrder(items, text: text)
+        let typedFirst = order.beforeText
+        for (index, item) in typedFirst.enumerated() {
             let result: V2CallResult
             switch item {
             case .image(let base64, let format):
@@ -363,7 +376,7 @@ extension TerminalController {
             // detects the paths and the echo is "<path> <path> <text>" —
             // the shape the client's pending-row reconcile matches. A
             // dropped separator corrupts that shape; surface it.
-            let needsSeparator = index < items.count - 1 || !text.isEmpty
+            let needsSeparator = index < typedFirst.count - 1 || !text.isEmpty
             if needsSeparator {
                 guard let currentTarget = mobileCanonicalTerminalTarget(params: terminalParams)?.target else {
                     return .err(code: "not_found", message: Self.chatTerminalBindingErrorMessage, data: [
@@ -395,8 +408,18 @@ extension TerminalController {
             let keyResult = currentTarget.sendNamedKeyResult("return")
             return .ok(["submitted": keyResult.accepted])
         }
+        // The files' paths go after the text, in the same paste, so its submit key (the one the text needs)
+        // comes last, once.
+        var pasted = text
+        for item in order.afterText {
+            guard case .file(let name, let data) = item else { continue }
+            guard let escapedPath = GhosttyApp.terminalPasteboard.saveAttachmentData(data, fileName: name) else {
+                return .err(code: "invalid_params", message: "File payload was empty or exceeded the size limit", data: nil)
+            }
+            pasted += " " + escapedPath
+        }
         var pasteParams = terminalParams
-        pasteParams["text"] = text
+        pasteParams["text"] = pasted
         return await v2MobileTerminalPaste(params: pasteParams)
     }
 

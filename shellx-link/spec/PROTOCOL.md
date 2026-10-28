@@ -358,7 +358,7 @@ Rules:
   upload at once, whatever outcome the `chat.send.result` then reports.
 - A client uploads one attachment at a time, and sends one message's uploads and its `chat.send` with no upload
   of another message in between: it starts the next message's first `attach.begin` only once that `chat.send`
-  is answered. An `attach.begin` therefore first drops every upload of the session that has not had its
+  is answered or has failed. An `attach.begin` therefore first drops every upload of the session that has not had its
   `attach.end`, whatever its progress, so an upload that failed or was given up never holds a place.
 - A session holds at most 5 finished uploads that no `chat.send` has used yet, counted after that drop. An
   `attach.begin` that the host accepts while it holds 5 first drops the one whose `attach.end` came first.

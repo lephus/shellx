@@ -3,7 +3,8 @@ public import Foundation
 extension TerminalPasteboardService {
     /// The folder, inside the temporary directory, that holds one UUID folder per saved attachment file.
     static let attachmentsDirectoryName = "shellx-attachments"
-    /// The longest stored attachment file name, in UTF-8 bytes.
+    /// The longest stored attachment file name, in UTF-8 bytes of its canonically decomposed form (NFD), so a
+    /// file system or Foundation version that stores names decomposed cannot grow it past 255 bytes.
     static let maxAttachmentFileNameBytes = 100
     /// The longest extension kept when a long attachment file name is cut.
     private static let maxKeptAttachmentExtensionBytes = 16
@@ -15,8 +16,8 @@ extension TerminalPasteboardService {
     /// The phone only suggests `fileName`; it never chooses where the file goes. The file lands in
     /// `<temporaryDirectory>/shellx-attachments/<UUID>/<name>` with a new UUID folder for every call (two
     /// attachments with one name never meet) and mode 0600. `<name>` is `fileName` without `/`, `\`, control
-    /// characters and leading dots, cut to 100 UTF-8 bytes with its extension kept, and `file` when nothing is
-    /// left, so it can neither leave its folder nor start a hidden file.
+    /// characters and leading dots, cut to 100 UTF-8 bytes (counted decomposed) with its extension kept, and
+    /// `file` when nothing is left, so it can neither leave its folder nor start a hidden file.
     ///
     /// Returns `nil` when the payload is empty, is over the 10 MB clipboard-image cap, or cannot be written
     /// (nothing is left behind then). The file and its folder are registered as owned, so the usual cleanup
@@ -59,9 +60,9 @@ extension TerminalPasteboardService {
         return filePath.terminalShellEscaped
     }
 
-    /// A phone-suggested attachment file name as a single, visible path component of at most 100 UTF-8 bytes:
-    /// `/`, `\`, control characters and line or paragraph separators removed, then leading dots, then cut at a
-    /// character boundary with a short extension kept; `file` when nothing is left.
+    /// A phone-suggested attachment file name as a single, visible path component of at most 100 UTF-8 bytes,
+    /// decomposed or not: `/`, `\`, control characters and line or paragraph separators removed, then leading
+    /// dots, then cut at a character boundary with a short extension kept; `file` when nothing is left.
     func sanitizedAttachmentFileName(_ raw: String) -> String {
         var scalars = String.UnicodeScalarView()
         for scalar in raw.unicodeScalars {
@@ -79,30 +80,37 @@ extension TerminalPasteboardService {
         return Self.attachmentFileName(visible, cutToBytes: Self.maxAttachmentFileNameBytes)
     }
 
-    /// `name` cut to at most `limit` UTF-8 bytes at a character boundary. A short extension survives the cut,
-    /// so an agent can still tell what a long-named file is; the stem is never left empty.
+    /// `name` cut at a character boundary so that its decomposed form is at most `limit` UTF-8 bytes. A short
+    /// extension survives the cut, so an agent can still tell what a long-named file is; the stem is never left
+    /// empty. The precomposed form, never longer, fits as well.
     private static func attachmentFileName(_ name: String, cutToBytes limit: Int) -> String {
-        guard name.utf8.count > limit else { return name }
+        guard decomposedByteCount(name) > limit else { return name }
 
         var stem = name
         var fileExtension = ""
         if let dot = name.lastIndex(of: "."), dot != name.startIndex {
             let suffix = String(name[dot...])
-            if suffix.utf8.count <= Self.maxKeptAttachmentExtensionBytes {
+            if decomposedByteCount(suffix) <= Self.maxKeptAttachmentExtensionBytes {
                 stem = String(name[..<dot])
                 fileExtension = suffix
             }
         }
 
-        let budget = limit - fileExtension.utf8.count
+        let budget = limit - decomposedByteCount(fileExtension)
         var cutStem = ""
         var used = 0
         for character in stem {
-            let size = String(character).utf8.count
+            // Decomposition maps each character on its own, so the sizes add up to the whole name's.
+            let size = decomposedByteCount(String(character))
             if used + size > budget { break }
             cutStem.append(character)
             used += size
         }
         return (cutStem.isEmpty ? "file" : cutStem) + fileExtension
+    }
+
+    /// The UTF-8 size of `text` once canonically decomposed (NFD): "한" is 3 bytes as typed and 9 decomposed.
+    private static func decomposedByteCount(_ text: String) -> Int {
+        text.decomposedStringWithCanonicalMapping.utf8.count
     }
 }

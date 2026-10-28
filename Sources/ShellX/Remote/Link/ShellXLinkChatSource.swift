@@ -25,8 +25,9 @@ import ShellXLinkSession
 ///   any other session is `not_found` before a terminal is touched (PROTOCOL.md section 10).
 /// * A send may carry the photos and files the phone attached: the host has already checked their size and
 ///   SHA-256, and this source hands them to the same path, which saves each one on the Mac and types its path
-///   at the agent's prompt before the text. Like the text, they reach only a live agent, so nothing is saved for
-///   a session that is gone. This source offers the `attachments` feature in `welcome`.
+///   at the agent's prompt: the images' before the text, the files' after it. Like the text, they reach only a
+///   live agent, so nothing is saved for a session that is gone. This source offers the `attachments` feature in
+///   `welcome`.
 ///
 /// The frame observer is registered only while someone subscribes to ``entries()``; it also keeps the
 /// service tailing transcripts with no mobile client subscribed. All state is main-actor isolated.
@@ -302,11 +303,15 @@ final class ShellXLinkChatSource: AgentChatSource {
     }
 
     /// The attachments as the typed items ``TerminalController/agentChatSend(sessionID:text:items:)`` pastes, in
-    /// the order the phone sent them: an image carries the extension of the name the phone gave (`jpg` without
-    /// one) and is pasted like a clipboard image; anything else is a file with its name, which the Mac sanitizes
-    /// before it stores it. Only this path pastes files: `mobile.chat.send` refuses them.
+    /// the order it types them: the images, then the files, each in the order the phone sent them
+    /// (``TerminalController/AgentChatPasteItem/typingOrder(_:text:)``). An image carries the extension of the
+    /// name the phone gave (`jpg` without one) and is pasted like a clipboard image; anything else is a file with
+    /// its name, which the Mac sanitizes before it stores it. Only this path pastes files: `mobile.chat.send`
+    /// refuses them.
     nonisolated static func pasteItems(_ attachments: [Attachment]) -> [TerminalController.AgentChatPasteItem] {
-        attachments.map { attachment -> TerminalController.AgentChatPasteItem in
+        let images = attachments.filter { $0.kind == .image }
+        let files = attachments.filter { $0.kind != .image }
+        return (images + files).map { attachment -> TerminalController.AgentChatPasteItem in
             switch attachment.kind {
             case .image:
                 let fileExtension = (attachment.name as NSString).pathExtension.lowercased()
