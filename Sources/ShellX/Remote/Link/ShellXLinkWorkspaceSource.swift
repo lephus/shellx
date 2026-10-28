@@ -59,6 +59,9 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl {
     /// The most characters a title keeps (the wire allows 512 UTF-8 bytes, about 128 Vietnamese characters).
     static let maxTitleCharacters = 128
 
+    /// The most changes a subscriber that does not keep up holds; older ones are dropped.
+    nonisolated static let changeBufferLimit = 32
+
     nonisolated static let log = Logger(subsystem: "pro.shellx.desktop", category: "link-workspaces")
 
     private let snapshot: Snapshot
@@ -97,7 +100,11 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl {
     }
 
     nonisolated func workspaceChanges() -> AsyncStream<(revision: Int, upserted: [LinkWorkspace], removed: [String])> {
-        let (stream, continuation) = AsyncStream<Change>.makeStream(bufferingPolicy: .unbounded)
+        // A subscriber that falls behind loses the oldest changes, not memory: the phone sees the revision gap and
+        // reads the list again (PROTOCOL.md section 4).
+        let (stream, continuation) = AsyncStream<Change>.makeStream(
+            bufferingPolicy: .bufferingNewest(Self.changeBufferLimit)
+        )
         let id = UUID()
         // Synchronous from cancellation, `finish()` or release: only schedule the removal.
         continuation.onTermination = { [weak self] _ in
@@ -310,7 +317,7 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl {
 
     // MARK: - The live change signal
 
-    /// Watches the main windows and their workspaces, and calls `onChange` at most ten times a second after
+    /// Watches the main windows and their workspaces, and calls `onChange` at most four times a second after
     /// a change.
     static func liveChangeSignal(_ onChange: @escaping @MainActor () -> Void) -> @MainActor () -> Void {
         let observer = LiveWorkspaceChangeObserver(onChange: onChange)
@@ -319,7 +326,8 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl {
 }
 
 /// Watches what ``ShellXLinkWorkspaceSource/liveWorkspaces()`` reads and calls `onChange` after a change, at most
-/// ten times a second, on the main actor: the set of main windows (`mainWindowContextsDidChange`), each window's
+/// four times a second (an agent's spinner in a tab title would otherwise send a phone ten whole lists a second;
+/// the spec's target is a change on the phone within 500 ms), on the main actor: the set of main windows (`mainWindowContextsDidChange`), each window's
 /// workspaces (`tabsPublisher`), each workspace (`objectWillChange`, plus what it keeps outside its `@Published`
 /// properties: its panels, their spatial order, and the git branch in its sidebar metadata model), and the agent
 /// session registry (the session a terminal names).
@@ -344,7 +352,7 @@ private final class LiveWorkspaceChangeObserver {
 
     init(onChange: @escaping @MainActor () -> Void) {
         output = pulses
-            .throttle(for: .milliseconds(100), scheduler: DispatchQueue.main, latest: true)
+            .throttle(for: .milliseconds(250), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] _ in
                 guard let self else { return }
                 attach()

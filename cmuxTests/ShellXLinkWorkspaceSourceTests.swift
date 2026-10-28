@@ -43,12 +43,12 @@ struct ShellXLinkWorkspaceSourceTests {
         return condition()
     }
 
-    /// Waits until `count` stops moving for 300 ms, so what follows is not mixed up with an earlier change's
-    /// trailing signal.
+    /// Waits until `count` stops moving for 500 ms (twice the live signal's 250 ms throttle), so what follows is not
+    /// mixed up with an earlier change's trailing signal.
     private static func waitUntilQuiet(_ count: @MainActor () -> Int) async {
         for _ in 0..<20 {
             let before = count()
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            try? await Task.sleep(nanoseconds: 500_000_000)
             if count() == before { return }
         }
     }
