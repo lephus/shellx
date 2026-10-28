@@ -559,6 +559,132 @@
         }
       }
     },
+    "composer.attach": {
+      "comment": "VoiceOver label of the composer's + button, which opens Photos and Files.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attach"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đính kèm"
+          }
+        }
+      }
+    },
+    "composer.attach.files": {
+      "comment": "Menu item of the composer's + button: pick files with the Files app.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tệp"
+          }
+        }
+      }
+    },
+    "composer.attach.photos": {
+      "comment": "Menu item of the composer's + button: pick photos from the photo library.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photos"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ảnh"
+          }
+        }
+      }
+    },
+    "composer.attach.tooLarge %@": {
+      "comment": "Red line under the composer: a photo or file is bigger than 10 MB and was not added (or cannot be sent). The argument is its file name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is over 10 MB"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ lớn hơn 10 MB"
+          }
+        }
+      }
+    },
+    "composer.attach.tooMany": {
+      "comment": "Red line under the composer: a message carries at most 5 photos and files.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to 5 attachments"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tối đa 5 tệp đính kèm"
+          }
+        }
+      }
+    },
+    "composer.attach.unreadable %@": {
+      "comment": "Red line under the composer: a picked photo or file could not be read (or is empty). The argument is its file name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Can't read %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không đọc được %@"
+          }
+        }
+      }
+    },
+    "composer.attachment.remove %@": {
+      "comment": "VoiceOver label of the x on an attachment waiting in the composer. The argument is its file name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bỏ %@"
+          }
+        }
+      }
+    },
     "composer.placeholder": {
       "comment": "Placeholder of the message field.",
       "extractionState": "manual",
@@ -591,6 +717,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gửi"
+          }
+        }
+      }
+    },
+    "composer.sending": {
+      "comment": "VoiceOver label of the progress ring on the send button while a message's attachments upload.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending attachments"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang gửi tệp đính kèm"
           }
         }
       }
@@ -717,6 +861,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "Xem và trả lời Claude Code trên Mac ngay từ iPhone này."
+          }
+        }
+      }
+    },
+    "home.attachments %lld": {
+      "comment": "Line in a message bubble on the home screen: how many photos and files the message carried.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "📎 %lld file"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "📎 %lld files"
+                }
+              }
+            }
+          }
+        },
+        "vi": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "📎 %lld tệp"
+                }
+              }
+            }
           }
         }
       }

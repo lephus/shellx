@@ -23,11 +23,11 @@ enum HomeActions {
             choose: { home.target = $0 },
             beginMessage: { home.beginMessage() },
             endMessage: { home.endMessage() },
-            send: { text in
+            send: { text, attachments in
                 // Typed: where the chip pointed when the field got focus. The field stays open, so
                 // the message goes on until the keyboard closes empty.
                 let target = home.messageTarget
-                sent(Task { await home.submit(text, to: target, viaVoice: false) })
+                sent(Task { await home.submit(text, attachments: attachments, to: target, viaVoice: false) })
             },
             sendVoice: { text in
                 // Said: where the chip pointed when the mic was pressed; the release ends it.

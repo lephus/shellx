@@ -49,10 +49,14 @@ final class MicButtonRenderTests: XCTestCase {
         return Rig(service: service, model: service.makeModel(maxBytes: maxBytes), transcriber: transcriber)
     }
 
-    private func composer(_ rig: Rig, draft: String = "") -> some View {
+    private func composer(
+        _ rig: Rig, draft: String = "", attachments: [OutgoingAttachment]? = nil, sending: Double? = nil
+    ) -> some View {
         VStack(spacing: 0) {
             Spacer()
-            ComposerBar(text: .constant(draft), send: { _ in }, voice: rig.model)
+            ComposerBar(
+                text: .constant(draft), attachments: attachments.map { .constant($0) }, sending: sending,
+                send: { _, _ in }, voice: rig.model)
         }
         .background(Color.appBackground)
         .environment(rig.service)
@@ -109,6 +113,54 @@ final class MicButtonRenderTests: XCTestCase {
         let stopped = await eventually { rig.model.limitReached }
         XCTAssertTrue(stopped)
         try assertRenders(composer(rig), name: "voice-limit")
+    }
+
+    // MARK: - Attachments
+
+    /// A screenshot of an editor with a red error line, as the photo picker would give it.
+    private static let screenshot: Data = {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let size = CGSize(width: 1170, height: 2532)
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            UIColor(red: 0.12, green: 0.13, blue: 0.17, alpha: 1).setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            for line in 0..<30 {
+                let color: UIColor = line == 12 ? .systemRed : UIColor(white: 0.55, alpha: 1)
+                color.setFill()
+                context.fill(CGRect(x: 90, y: 300 + line * 60, width: 300 + (line * 97) % 600, height: 26))
+            }
+        }
+        return image.pngData() ?? Data()
+    }()
+
+    private static let attachments = [
+        OutgoingAttachment(kind: .image, name: "photo-1.png", data: screenshot),
+        OutgoingAttachment(kind: .file, name: "build-output.log", data: Data("error: missing import\n".utf8)),
+    ]
+
+    func testAttachmentsWaitAboveTheField() throws {
+        let rig = try makeRig()
+        // Attachments and no text: the button is Send, not the mic.
+        try assertRenders(composer(rig, attachments: Self.attachments), name: "composer-attachments")
+    }
+
+    func testSendingLocksTheComposer() throws {
+        let rig = try makeRig()
+        try assertRenders(
+            composer(rig, draft: "Sửa lỗi này giúp mình", attachments: Self.attachments, sending: 0.4),
+            name: "composer-sending")
+    }
+
+    func testAttachmentProblemsAreSaidUnderTheField() throws {
+        let rig = try makeRig()
+        let six = (1...6).map { OutgoingAttachment(kind: .file, name: "log-\($0).txt", data: Data("\($0)".utf8)) }
+        try assertRenders(composer(rig, attachments: six), name: "composer-too-many")
+        XCTAssertEqual(ComposerBar<EmptyView>.problem(.tooManyAttachments), String(localized: "composer.attach.tooMany"))
+        XCTAssertEqual(
+            ComposerBar<EmptyView>.problem(.attachmentTooLarge(name: "video.mov")),
+            AttachmentPreparer.Failure.tooLarge(name: "video.mov").message)
+        XCTAssertNil(ComposerBar<EmptyView>.problem(.ok("x")))
     }
 
     func testLongDictationShowsItsNewestWords() {

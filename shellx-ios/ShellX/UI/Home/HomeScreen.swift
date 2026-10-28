@@ -9,7 +9,8 @@ import SwiftUI
 ///   chips. The chips step aside while the keyboard is up.
 /// - Middle: the conversation, newest at the bottom, scrolled down when an entry arrives. A tap on
 ///   it closes the keyboard.
-/// - Bottom: the composer (the field and the mic) with its "Send to:" chip.
+/// - Bottom: the composer (the field and the mic, and "+" when the target's Mac takes attachments)
+///   with its "Send to:" chip.
 /// - Toolbar: the default Mac (opens "Your Macs") on the left, Settings on the right.
 struct HomeScreen: View {
     struct Actions {
@@ -22,8 +23,8 @@ struct HomeScreen: View {
         var beginMessage: () -> Void = {}
         /// The message was dropped (released with nothing said, the keyboard closed empty).
         var endMessage: () -> Void = {}
-        /// The composer's trimmed, valid text.
-        var send: (String) -> Void = { _ in }
+        /// The composer's trimmed, valid text (empty with attachments only) and its attachments.
+        var send: (String, [OutgoingAttachment]) -> Void = { _, _ in }
         /// What the user said into the mic (trimmed, not empty).
         var sendVoice: (String) -> Void = { _ in }
     }
@@ -41,6 +42,10 @@ struct HomeScreen: View {
     let pickedTarget: SessionRef?
     let sessions: [MachineSession]
     @Binding var draft: String
+    /// The composer's photos and files; nil when the target's Mac takes none.
+    var attachments: Binding<[OutgoingAttachment]>? = nil
+    /// How far the attachments of the message being sent got; not nil locks the composer.
+    var sending: Double? = nil
     var actions = Actions()
 
     @State private var keyboardUp = false
@@ -132,8 +137,8 @@ struct HomeScreen: View {
 
     @ViewBuilder private func row(_ entry: HomeEntry) -> some View {
         switch entry.content {
-        case let .userSaid(text, target, viaVoice, _):
-            UserMessageBubble(text: text, target: target, viaVoice: viaVoice)
+        case let .userSaid(text, target, viaVoice, attachments):
+            UserMessageBubble(text: text, target: target, viaVoice: viaVoice, attachments: attachments)
         case let .note(note):
             if case let .agentFinished(ref, _) = note {
                 // A "done" note opens its agent.
@@ -152,8 +157,8 @@ struct HomeScreen: View {
 
     private var composer: some View {
         ComposerBar(
-            text: $draft, send: actions.send, sendVoice: actions.sendVoice, onBegin: actions.beginMessage,
-            onEnd: actions.endMessage
+            text: $draft, attachments: attachments, sending: sending, send: actions.send,
+            sendVoice: actions.sendVoice, onBegin: actions.beginMessage, onEnd: actions.endMessage
         ) {
             TargetPicker(current: target, picked: pickedTarget, sessions: sessions, choose: actions.choose)
         }

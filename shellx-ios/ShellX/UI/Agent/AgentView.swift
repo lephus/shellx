@@ -5,6 +5,10 @@ import SwiftUI
 /// session's `AgentThreadModel` (its chat, sends and stops), the hub and the decision center (the
 /// "Needs you" bar of the session's workspace). The model follows the hub while the screen is shown
 /// and writes its chat copy when the screen goes or the app leaves the foreground.
+///
+/// The composer offers attachments as the home's does (`HomeView`): when the session's Mac takes
+/// them, or while some wait in it. A message with attachments stays in the composer, locked, until
+/// the Mac answers, and is cleared unless the result keeps it (`AgentSendResult.keepsDraft`).
 struct AgentView: View {
     let scope: SignedInScope
     /// Pushes a screen (the "Needs you" bar opens this workspace's pending cards).
@@ -12,6 +16,9 @@ struct AgentView: View {
 
     @State private var model: AgentThreadModel
     @State private var draft = ""
+    @State private var attachments: [OutgoingAttachment] = []
+    /// A message with attachments is on its way.
+    @State private var sendingAttachments = false
     @State private var notice: AgentScreen.Notice?
     @Environment(\.scenePhase) private var scenePhase
 
@@ -45,9 +52,11 @@ struct AgentView: View {
             canStop: model.canStop,
             notice: notice,
             draft: $draft,
+            attachments: hub.acceptsAttachments(model.ref.machineID) || !attachments.isEmpty ? $attachments : nil,
+            sending: sendingAttachments ? (model.uploadProgress ?? 0) : nil,
             actions: AgentScreen.Actions(
-                send: { send($0, viaVoice: false) },
-                sendVoice: { send($0, viaVoice: true) },
+                send: { send($0, attachments: $1, viaVoice: false) },
+                sendVoice: { send($0, attachments: [], viaVoice: true) },
                 stop: { stop(hard: false) },
                 forceStop: { stop(hard: true) },
                 loadOlder: { Task { await model.loadOlder() } },
@@ -67,12 +76,22 @@ struct AgentView: View {
         .onDisappear { Task { await model.close() } }
     }
 
-    private func send(_ text: String, viaVoice: Bool) {
+    private func send(_ text: String, attachments picked: [OutgoingAttachment], viaVoice: Bool) {
         let model = self.model
+        if !picked.isEmpty { sendingAttachments = true }
         Task {
-            let result = await model.send(text, viaVoice: viaVoice)
-            // The Mac surely did not take it: give the text back, unless the user typed meanwhile.
-            if result.keepsDraft, draft.isEmpty { draft = text }
+            let result = await model.send(text, attachments: picked, viaVoice: viaVoice)
+            if picked.isEmpty {
+                // The Mac surely did not take it: give the text back, unless the user typed meanwhile.
+                if result.keepsDraft, draft.isEmpty { draft = text }
+            } else {
+                // The composer held the message while it went up: clear it once the Mac took it.
+                sendingAttachments = false
+                if !result.keepsDraft {
+                    draft = ""
+                    attachments = []
+                }
+            }
             show(Self.text(for: result, ref: model.ref, machineName: model.machineName))
         }
     }

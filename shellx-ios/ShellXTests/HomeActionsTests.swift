@@ -87,7 +87,7 @@ final class HomeActionsTests: XCTestCase {
             scope: scope, open: { _ in },
             sent: { sends.append($0) })
 
-        actions.send("Chạy lại test")
+        actions.send("Chạy lại test", [])
 
         XCTAssertEqual(sends.count, 1)
         let result = await sends[0].value
@@ -155,6 +155,31 @@ final class HomeActionsTests: XCTestCase {
         XCTAssertEqual(sent, [FakeMac.SentText(sessionId: "s2", text: "merge it")])
         XCTAssertEqual(scope.home.entries.map(\.content), [
             .userSaid(text: "merge it", target: s2, viaVoice: true), .note(.sent(s2)),
+        ])
+    }
+
+    func testSendCarriesTheAttachments() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.upsertSession(session("s1"))
+        await mac.setHistory(sessionId: "s1", entries: [])
+        let scope = try await makeScope(mac)
+        let online = await eventually { scope.hub.liveSessions.first?.online == true }
+        XCTAssertTrue(online)
+        XCTAssertTrue(scope.hub.acceptsAttachments(mac.machine.machineID))
+        var sends: [Task<HomeSubmitResult, Never>] = []
+        let actions = HomeActions.make(scope: scope, open: { _ in }, sent: { sends.append($0) })
+        let log = OutgoingAttachment(kind: .file, name: "build.log", data: Data("error: missing import".utf8))
+
+        actions.send("", [log])
+
+        XCTAssertEqual(sends.count, 1)
+        let result = await sends[0].value
+        XCTAssertEqual(result, .added(""))
+        let received = await mac.receivedAttachments
+        XCTAssertEqual(received.map(\.name), ["build.log"])
+        let s1 = SessionRef(machineID: mac.machine.machineID, sessionId: "s1", agent: "claude", workspaceTitle: "shellx")
+        XCTAssertEqual(scope.home.entries.map(\.content), [
+            .userSaid(text: "", target: s1, viaVoice: false, attachments: ["build.log"]), .note(.sent(s1)),
         ])
     }
 

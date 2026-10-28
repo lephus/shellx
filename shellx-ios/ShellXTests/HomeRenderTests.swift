@@ -88,14 +88,14 @@ final class HomeRenderTests: XCTestCase {
     private func home(
         machine: (name: String, state: MachineLinkState)? = ("MacBook Pro", .online),
         pending: [MachinePendingItem] = [], sessions: [MachineSession] = [], entries: [HomeEntry] = [],
-        target: SessionRef? = nil, draft: String = "", loaded: Bool = true
+        target: SessionRef? = nil, draft: String = "", attachments: [OutgoingAttachment]? = nil, loaded: Bool = true
     ) -> some View {
         let rows = AgentStatusRow.rows(sessions, now: Self.now)
         return NavigationStack {
             HomeScreen(
                 machine: machine, pending: pending, showsMachineName: false, rows: { rows },
                 isLoaded: loaded, entries: entries, target: target, pickedTarget: nil, sessions: sessions,
-                draft: .constant(draft))
+                draft: .constant(draft), attachments: attachments.map { .constant($0) })
         }
     }
 
@@ -143,6 +143,22 @@ final class HomeRenderTests: XCTestCase {
                  target: Self.shellx)
                 .environment(\.dynamicTypeSize, .accessibility3),
             name: "home-ax3")
+    }
+
+    func testMessagesWithAttachmentsSayHowMany() throws {
+        let entries = [
+            Self.entry(0, .userSaid(
+                text: "Sửa lỗi này giúp mình", target: Self.shellx, viaVoice: false,
+                attachments: ["photo-1.jpg", "build.log"])),
+            Self.entry(1, .note(.sent(Self.shellx))),
+            Self.entry(2, .userSaid(text: "", target: Self.shellx, viaVoice: false, attachments: ["photo-2.png"])),
+            Self.entry(3, .note(.sent(Self.shellx))),
+        ]
+        try assertRenders(
+            home(sessions: Self.sessions, entries: entries, target: Self.shellx, attachments: []),
+            name: "home-attachments")
+        XCTAssertNotEqual(UserMessageBubble.attachmentLine(1), UserMessageBubble.attachmentLine(2))
+        XCTAssertTrue(UserMessageBubble.attachmentLine(2).contains("2"))
     }
 
     func testOverlongDraftRenders() throws {

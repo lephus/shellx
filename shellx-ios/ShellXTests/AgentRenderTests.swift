@@ -249,6 +249,11 @@ final class AgentRenderTests: XCTestCase {
         XCTAssertEqual(texts[3], String(localized: "agent.gone"))
         XCTAssertTrue(texts[5].contains("MacBook Pro"), "offline names the Mac")
         XCTAssertNil(AgentView.text(for: .refused(.empty), ref: Self.ref, machineName: "MacBook Pro"))
+        // The composer says these under its field; a send that surely did not arrive reads as a failure.
+        XCTAssertNil(AgentView.text(for: .refused(.tooManyAttachments), ref: Self.ref, machineName: "MacBook Pro"))
+        XCTAssertEqual(
+            AgentView.text(for: .notSent, ref: Self.ref, machineName: "MacBook Pro"),
+            AgentView.text(for: .sent(.failed), ref: Self.ref, machineName: "MacBook Pro"))
         XCTAssertEqual(
             AgentView.text(for: .sent(.other("x")), ref: Self.ref, machineName: "MacBook Pro"),
             AgentView.text(for: .sent(.failed), ref: Self.ref, machineName: "MacBook Pro"))

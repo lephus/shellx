@@ -13,8 +13,8 @@ import SwiftUI
 /// - Bottom: what became of the last send or stop, then the composer (its target is this session).
 struct AgentScreen: View {
     struct Actions {
-        /// The composer's trimmed, valid text.
-        var send: (String) -> Void = { _ in }
+        /// The composer's trimmed, valid text (empty with attachments only) and its attachments.
+        var send: (String, [OutgoingAttachment]) -> Void = { _, _ in }
         /// What the user said into the mic (trimmed, not empty).
         var sendVoice: (String) -> Void = { _ in }
         var stop: () -> Void = {}
@@ -57,6 +57,10 @@ struct AgentScreen: View {
     let canStop: Bool
     let notice: Notice?
     @Binding var draft: String
+    /// The composer's photos and files; nil when the session's Mac takes none.
+    var attachments: Binding<[OutgoingAttachment]>? = nil
+    /// How far the attachments of the message being sent got; not nil locks the composer.
+    var sending: Double? = nil
     var actions = Actions()
 
     @State private var confirmsForceStop = false
@@ -261,7 +265,9 @@ struct AgentScreen: View {
                     .transition(.opacity)
                     .accessibilityIdentifier("agent.notice")
             }
-            ComposerBar(text: $draft, send: actions.send, sendVoice: actions.sendVoice)
+            ComposerBar(
+                text: $draft, attachments: attachments, sending: sending, send: actions.send,
+                sendVoice: actions.sendVoice)
         }
         .animation(.easeInOut(duration: 0.2), value: notice)
     }
