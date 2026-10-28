@@ -11,6 +11,7 @@ extension ShellXRemoteService {
     /// `pair.approve {pairing_id, invite_uri, fingerprint}` → the daemon admits that invitation id only.
     /// The invite URI is a secret: it goes to the core's JSON (which seals it) and nowhere else.
     public func approve(_ id: PairingRequest.ID) async throws {
+        try requireRemoteMachines()
         guard let request = pendingApprovals.first(where: { $0.id == id }) else {
             throw ShellXCoreError(code: "not_found", message: "no pending request with that id")
         }
@@ -201,6 +202,7 @@ extension ShellXRemoteService {
 
     /// `pair.request` → the 6-digit code to compare on both screens; then `pair.poll` every 2 s for 300 s.
     public func requestAccess(to machine: RemoteMachine.ID) async throws -> String {
+        try requireRemoteMachines()
         guard isSignedIn else { throw ShellXCoreError(code: "not_logged_in", message: "sign in first") }
         guard cmuxTuiAvailable else { throw ShellXCoreError(code: "cmux_tui_missing", message: "cmux-tui is missing") }
         if let waiting = outgoing.last(where: { $0.toMachineID == machine && $0.status == .waiting }) { return waiting.code }

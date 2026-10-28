@@ -10,8 +10,8 @@ import ShellXRemoteCore
 /// every incoming circuit with a `LinkHost` over the agent Feed, the agent sessions and their chat.
 ///
 /// `ShellXRemoteService` starts it once `machines.register` returned a `link_slot`, which happens only while
-/// `ShellXRemoteGate` is on, and stops it when the host session ends. Logs carry slots, codes and counts,
-/// never a ticket or a key.
+/// `ShellXRemoteGate.servesPhones` is on, and stops it when the host session ends. Logs carry slots, codes and
+/// counts, never a ticket or a key.
 @MainActor
 final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
     private struct Running {
@@ -57,8 +57,8 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
 
     func start(machineID: String, linkSlot: String, accountID: String) {
         stop()
-        // The service already runs only with the gate on; the link host never outlives that rule.
-        guard ShellXRemoteGate.isEnabled else { return }
+        // The service already runs only while it serves phones; the link host never outlives that rule.
+        guard ShellXRemoteGate.servesPhones else { return }
         let core = core, feed = feed, sessions = sessions, chat = chat
         let hostVersion = hostVersion, machineName = machineName
         let keys = ShellXLinkKeyStore(storage: storage, accountID: accountID)

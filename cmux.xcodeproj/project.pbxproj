@@ -3385,6 +3385,7 @@
 		5E11A00000000000000000A5 /* ShellXRemoteCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A00000000000000000A4 /* ShellXRemoteCore */; };
 		15974A84E1E2593C56ABB928 /* ShellXRemoteFixtureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2612802F161E87745147239E /* ShellXRemoteFixtureService.swift */; };
 		6AADF75FAAE770FAC4225327 /* ShellXRemoteGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE1509AB05C54F55B6FBCBA9 /* ShellXRemoteGate.swift */; };
+		74808E1D069BF7C8BBAF73F8 /* ShellXRemoteGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B507FD57203BB0E2A9E30D /* ShellXRemoteGateTests.swift */; };
 		506D3B28A199B87AE7D9FB1C /* ShellXRemoteService+App.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6F0FD302DAE7B0036569F1C /* ShellXRemoteService+App.swift */; };
 		4B8B64A3E7AC76B5D2FF9F2D /* ShellXRemoteServicing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5223C753F4D56F05A0A0B6B0 /* ShellXRemoteServicing.swift */; };
 		5E13C3000000000000000011 /* ShellXRemoteUI in Frameworks */ = {isa = PBXBuildFile; productRef = 5E13C3000000000000000010 /* ShellXRemoteUI */; };
@@ -8016,6 +8017,7 @@
 		0FC34B858D6B69D34AAAF485 /* ShellXQRCode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Share/ShellXQRCode.swift; sourceTree = "<group>"; };
 		2612802F161E87745147239E /* ShellXRemoteFixtureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/UI/ShellXRemoteFixtureService.swift; sourceTree = "<group>"; };
 		CE1509AB05C54F55B6FBCBA9 /* ShellXRemoteGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/ShellXRemoteGate.swift; sourceTree = "<group>"; };
+		F1B507FD57203BB0E2A9E30D /* ShellXRemoteGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXRemoteGateTests.swift"; sourceTree = "<group>"; };
 		D6F0FD302DAE7B0036569F1C /* ShellXRemoteService+App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellX/Remote/ShellXRemoteService+App.swift"; sourceTree = "<group>"; };
 		5223C753F4D56F05A0A0B6B0 /* ShellXRemoteServicing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/UI/ShellXRemoteServicing.swift; sourceTree = "<group>"; };
 		A2BD91002A2294345F3973E1 /* ShellXRemoteUIActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/UI/ShellXRemoteUIActions.swift; sourceTree = "<group>"; };
@@ -14194,6 +14196,7 @@
 				5C4FA75B16A59721F4A0DDFD /* ShellXLinkSessionSourceTests.swift */,
 				01549F87B427D22CC9C32463 /* ShellXWorkspaceSetOpenTests.swift */,
 				2C6EEC449F68101F20F61E30 /* ShellXWorkspaceSetTests.swift */,
+				F1B507FD57203BB0E2A9E30D /* ShellXRemoteGateTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -19229,6 +19232,7 @@
 				068517128CB0B3002C263E47 /* ShellXNoPhoneHomeTests.swift in Sources */,
 				7413037583554EAA6E41D32F /* ShellXPathsTests.swift in Sources */,
 				7EE7B9BC69774E0B60D4C1B2 /* ShellXPhonePairingCoordinatorTests.swift in Sources */,
+				74808E1D069BF7C8BBAF73F8 /* ShellXRemoteGateTests.swift in Sources */,
 				6CDDB319FED107C3EB57AE87 /* ShellXRemoteUITests.swift in Sources */,
 				C85C042A4E1AC2D4ECE542E0 /* ShellXRightSidebarToggleTests.swift in Sources */,
 				FA7DD6E004CD07E9E7CE313D /* ShellXShareTests.swift in Sources */,

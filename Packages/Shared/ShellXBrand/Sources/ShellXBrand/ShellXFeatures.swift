@@ -2,6 +2,11 @@
 public enum ShellXFeatures {
     public static let remoteMachines = false
 
+    /// iPhone pairing and the ShellX Link host, on in releases from 1.5.1. This Mac signs in, registers with
+    /// the relay and serves paired phones over ShellX Link without `remoteMachines`: the account's other
+    /// machines, share links, access requests and remote terminals stay behind that switch.
+    public static let phonePairing = true
+
     /// Share a workspace as a browser link or a phone QR (L7, spec §7.2/§7.3). Independent of
     /// `remoteMachines`: shares need a signed-in account, not the remote machines feature (ruling R1).
     public static let shareLinks = false

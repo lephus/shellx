@@ -38,8 +38,9 @@ extension ShellXRemoteEnvironment {
             #endif
             return nil
         }()
-        // The host name is only looked up when the feature can run. With it off, Settings → Account can still
-        // sign in, so the device gets the Mac's computer name (a local read, unlike `Host.current()`).
+        // The host name is only looked up when remote machines can run. Otherwise (serving phones only, or
+        // Settings → Account signing in with everything off) the device gets the Mac's computer name, a local
+        // read, unlike `Host.current()`.
         let hostName = ShellXRemoteGate.isEnabled
             ? (Host.current().localizedName ?? processInfo.hostName)
             : (SCDynamicStoreCopyComputerName(nil, nil) as String? ?? ShellXBrand.appName)
@@ -49,8 +50,8 @@ extension ShellXRemoteEnvironment {
             appVersion: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0",
             osVersion: "\(system.majorVersion).\(system.minorVersion).\(system.patchVersion)")
         let core = ShellXCoreClient(ShellXCoreFFI.shared)
-        // ShellX Link: the agent Feed, sessions and chat for phones. The service starts it only with the gate on
-        // and a `link_slot` from `machines.register`.
+        // ShellX Link: the agent Feed, sessions and chat for phones. The service starts it only while it serves
+        // phones (`ShellXRemoteGate.servesPhones`) and has a `link_slot` from `machines.register`.
         let linkHost = ShellXLinkHostController(
             core: core,
             storage: FallbackLinkSecretStorage.standard(onFallback: {
@@ -70,11 +71,12 @@ extension ShellXRemoteEnvironment {
             cmuxTui: bundle.bundleURL.appendingPathComponent("Contents/Resources/bin/cmux-tui"),
             apiBase: apiBase,
             device: device,
-            gateEnabled: { ShellXRemoteGate.isEnabled },
+            gateEnabled: { ShellXRemoteGate.servesPhones },
             devCredentials: devCredentials,
             bridge: ShellXAppBridgeController(),
             workspaceOpener: ShellXTabWorkspaceOpener(),
-            linkHost: linkHost)
+            linkHost: linkHost,
+            remoteMachinesEnabled: { ShellXRemoteGate.isEnabled })
     }
 }
 

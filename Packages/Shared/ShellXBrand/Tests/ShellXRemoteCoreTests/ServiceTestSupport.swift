@@ -202,8 +202,9 @@ final class ServiceRig {
     var store: RemoteLinkStore { base.store }
     var hostConnected: LinkState { .connected(localSocket: paths.muxSocket.path) }
 
+    /// - Parameter remoteMachines: False runs the session for phones only (`remoteMachinesEnabled` off).
     init(gate gateOn: Bool = true, signedIn: Bool = true, cmuxTuiPresent: Bool = true,
-         devCredentials: ShellXRemoteDevCredentials? = nil) {
+         devCredentials: ShellXRemoteDevCredentials? = nil, remoteMachines: Bool = true) {
         core = FakeRemoteCore(clock: base.clock, log: base.log, coreStateDir: base.paths.coreStateDir)
         core.signedIn.with { $0 = signedIn }
         // A restored session keeps the owner of its last sign-in; the link host is scoped by it.
@@ -230,7 +231,8 @@ final class ServiceRig {
         service = ShellXRemoteService(environment: ShellXRemoteEnvironment(
             core: ShellXCoreClient(core), launcher: base.launcher, clock: base.clock, paths: base.paths, cmuxTui: cmuxTui,
             apiBase: URL(string: "http://127.0.0.1:8787")!, device: Self.device, gateEnabled: { gate.get() },
-            devCredentials: devCredentials, bridge: bridge, workspaceOpener: opener, linkHost: linkHost))
+            devCredentials: devCredentials, bridge: bridge, workspaceOpener: opener, linkHost: linkHost,
+            remoteMachinesEnabled: { remoteMachines }))
         stub(["remote", "enroll", "status"], stdout: Self.statusUp)
         stub(["remote", "enroll", "pending"], stdout: "[]")
     }

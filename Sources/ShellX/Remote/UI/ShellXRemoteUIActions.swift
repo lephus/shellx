@@ -5,7 +5,8 @@ import ShellXRemoteCore
 
 /// What the sidebar's remote rows do when clicked. Everything goes through
 /// `ShellXRemoteUIModel.shared.service`, so with the gate off these are no-ops. Phone pairing is the
-/// exception: it works on this Mac's link host, and its menu item exists only with `ShellXRemoteGate` on.
+/// exception: it works on this Mac's link host (`ShellXRemoteGate.servesPhones`). Settings › Mobile opens it;
+/// the This Mac header's menu item exists only with remote machines on (`ShellXRemoteGate.isEnabled`).
 @MainActor
 enum ShellXRemoteUIActions {
     static func requestAccess(to machineID: RemoteMachine.ID) {
@@ -46,8 +47,8 @@ enum ShellXRemoteUIActions {
         RequestAccessSheetPresenter.shared.present(machineID: machineID, expectedCode: expectedCode, service: service)
     }
 
-    /// "Pair iPhone…" on the This Mac header, the one way into phone pairing: shows the pairing sheet over
-    /// this Mac's link host. With no link host running the sheet says the Mac is not ready, with no QR.
+    /// Settings › Mobile › "Show QR Code…" and "Pair iPhone…" on the This Mac header: shows the pairing sheet
+    /// over this Mac's link host. With no link host running the sheet says the Mac is not ready, with no QR.
     ///
     /// - Parameter bringToFront: False from the DEBUG socket methods, which must not take focus.
     /// - Returns: The open sheet's coordinator.

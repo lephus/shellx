@@ -13,6 +13,8 @@ import os
 /// * **Viewer**: `requestAccess` → `pair.request`, then `pair.poll` every 2 s for up to 300 s; on approval the
 ///   link record is saved and a `ShellXClientLinkSupervisor` enrolls with the invite file. `openSession` waits
 ///   for the link, finds or creates a remote terminal and opens a local workspace running the attach wrapper.
+/// * **Phones only** (`remoteMachinesEnabled` off): `machines.register` and the heartbeat, then the ShellX Link
+///   host. No cmux-tui runs: no daemon or bridge, no approvals, no links to other machines, no machine list.
 ///
 /// Core calls run on a global queue and cmux-tui runs in detached tasks or the supervisors' actors; only
 /// `@Published` state lives on the main actor. Signed-out answers (`not_logged_in`, `unauthorized`,
@@ -277,13 +279,20 @@ public final class ShellXRemoteService: ObservableObject {
         let gen = generation
         isSignedIn = true
         if let list { apply(list) }
-        setTask("list", repeating(every: Self.machinesInterval, immediate: list == nil && listImmediately, generation: gen) {
-            await $0.listTick($1)
-        })
+        if env.remoteMachinesEnabled() {
+            setTask("list", repeating(every: Self.machinesInterval, immediate: list == nil && listImmediately, generation: gen) {
+                await $0.listTick($1)
+            })
+        }
         setTask("host", Task { [weak self] in await self?.runSession(gen) })
     }
 
     func runSession(_ gen: Int) async {
+        guard env.remoteMachinesEnabled() else {
+            // Phones only: links to other machines stay as they are on disk, unused.
+            await startPhoneHost(gen)
+            return
+        }
         // Links this Mac already holds; enrolled ones reconnect by themselves while their machine is online.
         // A grant that never enrolled cannot succeed now: its invite file was swept at launch, or dropped when
         // the previous session stopped its link (R33). Such records are removed, but only once the last
@@ -321,7 +330,8 @@ public final class ShellXRemoteService: ObservableObject {
         await teardown?.value
         guard isCurrent(gen) else { return }
         hostState = .connecting
-        guard let (route, slot) = await registerHost(gen) else { return }
+        guard let registered = await registerHost(gen), let route = registered.route else { return }
+        let slot = registered.slot
         startLinkHost()
         hostRoute = route
         let bridge = env.bridge, socket = env.paths.bridgeSocket
@@ -348,9 +358,20 @@ public final class ShellXRemoteService: ObservableObject {
         await daemon.start(route: route, slot: slot)
     }
 
-    /// `machines.register` and the first register-ticket mint (its `relay_url` is the only source of the
-    /// relay route), retried on the backoff while the API is unreachable. Nil when the host cannot start.
-    func registerHost(_ gen: Int) async -> (route: String, slot: String)? {
+    /// Phones only: `machines.register` gives this Mac its id and link slot, then the ShellX Link host serves
+    /// phones. cmux-tui is not needed. `hostState` (the cmux-tui daemon) only reports a failed registration.
+    func startPhoneHost(_ gen: Int) async {
+        await teardown?.value
+        guard isCurrent(gen) else { return }
+        guard await registerHost(gen, mintsRoute: false) != nil else { return }
+        hostState = .idle
+        startLinkHost()
+    }
+
+    /// `machines.register` and, for the cmux-tui daemon (`mintsRoute`), the first register-ticket mint (its
+    /// `relay_url` is the only source of the relay route), retried on the backoff while the API is unreachable.
+    /// Nil when the host cannot start; `route` is nil when `mintsRoute` is false.
+    func registerHost(_ gen: Int, mintsRoute: Bool = true) async -> (route: String?, slot: String)? {
         var failures = 0
         while isCurrent(gen) {
             do {
@@ -364,6 +385,7 @@ public final class ShellXRemoteService: ObservableObject {
                 hostLinkSlot = registered.link_slot
                 rebuildMachines()
                 startRegisteredTimers(gen)
+                guard mintsRoute else { return (nil, registered.slot) }
                 let mint = try await call("tickets.mint", ["permission": .string("register"),
                                                            "write_to": .string(ShellXDaemonSupervisor.registerTicketName)],
                                           as: MintReply.self)
@@ -415,9 +437,15 @@ public final class ShellXRemoteService: ObservableObject {
         }
     }
 
+    /// The heartbeat keeps this Mac online for phones and machines (`last_seen_at`); `pair.pending` only runs
+    /// with remote machines on.
     func startRegisteredTimers(_ gen: Int) {
-        guard tasks["pending"] == nil else { return }
-        setTask("pending", repeating(every: Self.pendingInterval, immediate: true, generation: gen) { await $0.pendingTick($1) })
+        guard tasks["heartbeat"] == nil else { return }
+        if env.remoteMachinesEnabled() {
+            setTask("pending", repeating(every: Self.pendingInterval, immediate: true, generation: gen) {
+                await $0.pendingTick($1)
+            })
+        }
         setTask("heartbeat", repeating(every: Self.heartbeatInterval, immediate: false, generation: gen) {
             await $0.heartbeatTick($1)
         })
@@ -463,6 +491,13 @@ public final class ShellXRemoteService: ObservableObject {
 
     func checkCurrent(_ gen: Int) throws {
         guard isCurrent(gen) else { throw ShellXCoreError(code: "cancelled", message: "the remote session ended") }
+    }
+
+    /// Throws `disabled` unless remote machines are on: this Mac then only serves phones.
+    func requireRemoteMachines() throws {
+        guard env.remoteMachinesEnabled() else {
+            throw ShellXCoreError(code: "disabled", message: "remote machines are turned off")
+        }
     }
 
     func setTask(_ key: String, _ task: Task<Void, Never>) {

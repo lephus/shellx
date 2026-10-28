@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 /// The ShellX account this Mac is signed in to, for Settings → Account. Works whether or not the
-/// remote-machines gate is on:
+/// remote service runs (`gateEnabled`, on while this Mac serves phones):
 ///
 /// * gate off: only `config.set` and `auth.login` / `auth.logout` through the core; no host, bridge or
 ///   remote session starts;

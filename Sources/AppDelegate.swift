@@ -1725,7 +1725,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         CmuxTuiSurfaceProviderRegistry.shared.start(catalog: .shared)
         let env = ProcessInfo.processInfo.environment
-        ShellXRemoteService.shared.startIfEnabled() // ShellX: remote machines (W2 Task 13); gate off returns at once
+        ShellXRemoteService.shared.startIfEnabled() // ShellX: serves phones over ShellX Link (1.5.1); remote machines stay off (W2 Task 13)
         ShellXShareController.resumeIfEnabled() // ShellX: 15 m / 1 h share links resume once signed in (§7.3)
         let telemetryEnabled = TelemetrySettings.enabledForCurrentLaunch
         let sentryStartupPolicy = MacSentryStartupPolicy(
