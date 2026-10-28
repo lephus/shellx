@@ -12,6 +12,9 @@ import Testing
 @testable import cmux
 #endif
 
+/// The host's attachment type; a bare `ChatAttachment` is ambiguous with `CmuxAgentChat`'s.
+private typealias LinkAttachment = ShellXLinkChatSource.Attachment
+
 /// ShellX Link's `AgentChatSource` over the agent chat transcript service: history pages, live entries, and
 /// the send / interrupt commands a phone runs.
 @Suite("ShellX Link chat source", .serialized, .timeLimit(.minutes(1)))
@@ -186,7 +189,7 @@ struct ShellXLinkChatSourceTests {
             var interrupts = interruptResults[...]
             let source = ShellXLinkChatSource(
                 service: { service },
-                send: { sessionID, text in
+                send: { sessionID, text, _ in
                     calls.record("send \(sessionID) \(text)")
                     return sends.popFirst() ?? .err(code: "internal_error", message: "", data: nil)
                 },
@@ -246,7 +249,7 @@ struct ShellXLinkChatSourceTests {
             () throws -> (ShellXLinkChatSource, String, String, String, String) in
             let source = ShellXLinkChatSource(
                 service: { service },
-                send: { sessionID, text in
+                send: { sessionID, text, _ in
                     calls.record("send \(sessionID) \(text)")
                     return .ok(["submitted": true])
                 },
@@ -273,6 +276,112 @@ struct ShellXLinkChatSourceTests {
         #expect(await source.send(sessionId: live, text: "go on") == .submitted)
         #expect(await source.interrupt(sessionId: live, hard: false) == .sent)
         #expect(calls.all == ["send \(live) go on", "interrupt \(live) false"])
+    }
+
+    /// A phone's attachments reach the send command as the host handed them over: same order, same bytes and
+    /// names, and the outcome maps like a text-only send. The source takes attachments (so `welcome` offers
+    /// the feature) and the text may be empty.
+    @Test func testAttachmentsGoToTheSendCommandInOrder() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        final class Sent: @unchecked Sendable {
+            private let lock = NSLock()
+            private var recorded: [(session: String, text: String, attachments: [LinkAttachment])] = []
+            func record(_ session: String, _ text: String, _ attachments: [LinkAttachment]) {
+                lock.lock(); recorded.append((session, text, attachments)); lock.unlock()
+            }
+            var all: [(session: String, text: String, attachments: [LinkAttachment])] {
+                lock.lock(); defer { lock.unlock() }; return recorded
+            }
+        }
+        let sent = Sent()
+        let (source, session) = try await MainActor.run { () throws -> (ShellXLinkChatSource, String) in
+            let source = ShellXLinkChatSource(
+                service: { service },
+                send: { sessionID, text, attachments in
+                    sent.record(sessionID, text, attachments)
+                    return .ok(["submitted": true])
+                }
+            )
+            return (source, try Self.addSession(service, home: home, lines: [], pid: Self.livePID).id)
+        }
+        #expect(source.acceptsAttachments)
+
+        let attachments = [
+            LinkAttachment(kind: .image, name: "screen.jpg", data: Data([0xFF, 0xD8, 0x01])),
+            LinkAttachment(kind: .file, name: "notes.txt", data: Data("hello".utf8)),
+            LinkAttachment(kind: .image, name: "second.jpg", data: Data([0xFF, 0xD8, 0x02])),
+        ]
+        #expect(await source.send(sessionId: session, text: "fix this", attachments: attachments) == .submitted)
+        #expect(await source.send(sessionId: session, text: "", attachments: [attachments[1]]) == .submitted)
+        // Text alone is still the plain send, with no attachments.
+        #expect(await source.send(sessionId: session, text: "just text") == .submitted)
+
+        let calls = sent.all
+        #expect(calls.count == 3)
+        #expect(calls[0].session == session)
+        #expect(calls[0].text == "fix this")
+        #expect(calls[0].attachments == attachments)
+        #expect(calls[1].text == "")
+        #expect(calls[1].attachments == [attachments[1]])
+        #expect(calls[2].text == "just text")
+        #expect(calls[2].attachments.isEmpty)
+    }
+
+    /// The terminal's attachment dictionaries: an image keeps the extension of the name the phone gave
+    /// (`jpg` without one), a file carries its name, and both carry the bytes as base64.
+    @Test func testAttachmentsBecomeTerminalAttachments() {
+        let bytes = Data([0x01, 0x02, 0x03])
+        let dicts = ShellXLinkChatSource.terminalAttachments([
+            LinkAttachment(kind: .image, name: "Photo.PNG", data: bytes),
+            LinkAttachment(kind: .image, name: "no-extension", data: bytes),
+            LinkAttachment(kind: .file, name: "report.pdf", data: bytes),
+        ])
+        #expect(dicts.count == 3)
+        #expect(dicts[0]["format"] as? String == "png")
+        #expect(dicts[0]["kind"] == nil)
+        #expect(dicts[0]["data_b64"] as? String == bytes.base64EncodedString())
+        #expect(dicts[1]["format"] as? String == "jpg")
+        #expect(dicts[2]["kind"] as? String == "file")
+        #expect(dicts[2]["name"] as? String == "report.pdf")
+        #expect(dicts[2]["format"] == nil)
+        #expect(dicts[2]["data_b64"] as? String == bytes.base64EncodedString())
+    }
+
+    /// Attachments follow the text's rule: a session without a live agent is `not_found` before anything
+    /// is written, so no file lands on the Mac for an agent that is gone.
+    @Test func testAttachmentsToADeadSessionWriteNothing() async throws {
+        let home = try Self.makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let service = await MainActor.run { Self.makeService(home: home) }
+        let calls = Calls()
+        let exited = Process()
+        exited.executableURL = URL(fileURLWithPath: "/usr/bin/true")
+        try exited.run()
+        exited.waitUntilExit()
+        let deadPID = Int(exited.processIdentifier)
+        let (source, ended, unnamed, dead) = try await MainActor.run {
+            () throws -> (ShellXLinkChatSource, String, String, String) in
+            let source = ShellXLinkChatSource(
+                service: { service },
+                send: { sessionID, _, _ in
+                    calls.record("send \(sessionID)")
+                    return .ok(["submitted": true])
+                }
+            )
+            let ended = try Self.addSession(service, home: home, lines: [], pid: Self.livePID).id
+            service.noteHookEvent(WorkstreamEvent(sessionId: ended, hookEventName: .sessionEnd, source: "claude"))
+            let unnamed = try Self.addSession(service, home: home, lines: [], pid: nil).id
+            let dead = try Self.addSession(service, home: home, lines: [], pid: deadPID).id
+            return (source, ended, unnamed, dead)
+        }
+
+        let attachment = LinkAttachment(kind: .file, name: "notes.txt", data: Data("hello".utf8))
+        for session in [ended, unnamed, dead, "no-such-session"] {
+            #expect(await source.send(sessionId: session, text: "look", attachments: [attachment]) == .notFound)
+        }
+        #expect(calls.all.isEmpty, "a send command ran for a session without a live agent: \(calls.all)")
     }
 
     /// A phone connected over Link (no mobile client subscribed to `chat.message`) still gets live entries:

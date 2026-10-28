@@ -23,12 +23,20 @@ import ShellXLinkSession
 ///   ``TerminalController/agentChatInterrupt(sessionID:hard:)``, the paths behind `mobile.chat.send` and
 ///   `mobile.chat.interrupt`, and only for a session whose agent still runs (not ended, a known live pid);
 ///   any other session is `not_found` before a terminal is touched (PROTOCOL.md section 10).
+/// * A send may carry the photos and files the phone attached: the host has already checked their size and
+///   SHA-256, and this source hands them to the same path, which saves each one on the Mac and types its path
+///   at the agent's prompt before the text. Like the text, they reach only a live agent, so nothing is saved for
+///   a session that is gone. This source offers the `attachments` feature in `welcome`.
 ///
 /// The frame observer is registered only while someone subscribes to ``entries()``; it also keeps the
 /// service tailing transcripts with no mobile client subscribed. All state is main-actor isolated.
 @MainActor
 final class ShellXLinkChatSource: AgentChatSource {
-    typealias Send = @MainActor (_ sessionID: String, _ text: String) async -> TerminalController.V2CallResult
+    /// The phone's attachment as the host hands it over; named here because `CmuxAgentChat` has its own
+    /// `ChatAttachment` (a transcript's attachment), which a bare name would be ambiguous with.
+    typealias Attachment = ShellXLinkSession.ChatAttachment
+    typealias Send = @MainActor (_ sessionID: String, _ text: String, _ attachments: [Attachment]) async
+        -> TerminalController.V2CallResult
     typealias Interrupt = @MainActor (_ sessionID: String, _ hard: Bool) async -> TerminalController.V2CallResult
     typealias Push = ChatPush
 
@@ -50,11 +58,16 @@ final class ShellXLinkChatSource: AgentChatSource {
 
     /// - Parameters:
     ///   - service: The app's transcript service; nil until the app wires it.
-    ///   - send: Types a message into a session; tests replace the shared `TerminalController` path.
+    ///   - send: Types a message, with its attachments, into a session; tests replace the shared
+    ///     `TerminalController` path.
     ///   - interrupt: Interrupts a session; tests replace the shared `TerminalController` path.
     init(
         service: @escaping @MainActor () -> AgentChatTranscriptService? = { TerminalController.shared.agentChatTranscriptService },
-        send: @escaping Send = { await TerminalController.shared.agentChatSend(sessionID: $0, text: $1) },
+        send: @escaping Send = {
+            await TerminalController.shared.agentChatSend(
+                sessionID: $0, text: $1, attachments: ShellXLinkChatSource.terminalAttachments($2)
+            )
+        },
         interrupt: @escaping Interrupt = { await TerminalController.shared.agentChatInterrupt(sessionID: $0, hard: $1) }
     ) {
         self.serviceProvider = service
@@ -82,8 +95,15 @@ final class ShellXLinkChatSource: AgentChatSource {
     }
 
     func send(sessionId: String, text: String) async -> ChatSendOutcome {
+        await send(sessionId: sessionId, text: text, attachments: [])
+    }
+
+    nonisolated var acceptsAttachments: Bool { true }
+
+    /// Checks for a live agent first, so no attachment is saved for a session that cannot take it.
+    func send(sessionId: String, text: String, attachments: [Attachment]) async -> ChatSendOutcome {
         guard hasLiveAgent(sessionId) else { return .notFound }
-        return Self.sendOutcome(await sendCommand(sessionId, text))
+        return Self.sendOutcome(await sendCommand(sessionId, text, attachments))
     }
 
     func interrupt(sessionId: String, hard: Bool) async -> ChatInterruptOutcome {
@@ -279,6 +299,24 @@ final class ShellXLinkChatSource: AgentChatSource {
 
     private static func firstLine(_ text: String) -> String {
         String(text.prefix { $0 != "\n" && $0 != "\r" })
+    }
+
+    /// The attachments as the dictionaries of ``TerminalController/agentChatSend(sessionID:text:attachments:)``:
+    /// an image carries the extension of the name the phone gave (`jpg` without one) and is pasted like a
+    /// clipboard image; anything else is a file with its name, which the Mac sanitizes before it stores it.
+    nonisolated static func terminalAttachments(_ attachments: [Attachment]) -> [[String: Any]] {
+        attachments.map { attachment in
+            var item: [String: Any] = ["data_b64": attachment.data.base64EncodedString()]
+            switch attachment.kind {
+            case .image:
+                let fileExtension = (attachment.name as NSString).pathExtension.lowercased()
+                item["format"] = fileExtension.isEmpty ? "jpg" : fileExtension
+            case .file, .other:
+                item["kind"] = "file"
+                item["name"] = attachment.name
+            }
+            return item
+        }
     }
 
     /// `chat.send` outcome of the shared send path: `input_queue_full` (and a paste already in flight) is

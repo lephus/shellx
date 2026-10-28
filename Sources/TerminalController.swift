@@ -16640,6 +16640,46 @@ class TerminalController {
             return .err(code: "invalid_params", message: "Missing or invalid image_base64", data: nil)
         }
         let format = v2RawString(params, "image_format") ?? "png"
+        return mobileTerminalPasteSavedAttachment(
+            params: params,
+            debugEvent: "mobile.terminal.paste_image",
+            debugDetail: "bytes=\(imageData.count) format=\(format)",
+            rejectionMessage: "Image payload was empty or exceeded the size limit"
+        ) {
+            GhosttyApp.terminalPasteboard.saveImageData(imageData, fileExtension: format)
+        }
+    }
+
+    /// The file counterpart of ``v2MobileTerminalPasteImage(params:)``, for a paired client's file attachment
+    /// (`file_base64`, `file_name`): saves the bytes under a name the Mac sanitizes, in a folder it names
+    /// (``TerminalPasteboardService/saveAttachmentData(_:fileName:)``), and injects the shell-escaped path as
+    /// terminal input. Called only by ``agentChatSend(sessionID:text:attachments:)``; no socket method reaches it.
+    func v2MobileTerminalPasteFile(params: [String: Any]) -> V2CallResult {
+        guard let base64 = v2RawString(params, "file_base64"),
+              let fileData = Data(base64Encoded: base64), !fileData.isEmpty else {
+            return .err(code: "invalid_params", message: "Missing or invalid file_base64", data: nil)
+        }
+        let fileName = v2RawString(params, "file_name") ?? ""
+        return mobileTerminalPasteSavedAttachment(
+            params: params,
+            debugEvent: "mobile.terminal.paste_file",
+            debugDetail: "bytes=\(fileData.count)",
+            rejectionMessage: "File payload was empty or exceeded the size limit"
+        ) {
+            GhosttyApp.terminalPasteboard.saveAttachmentData(fileData, fileName: fileName)
+        }
+    }
+
+    /// The shared tail of the mobile paste-image and paste-file paths: resolves the terminal, saves the
+    /// attachment with `save` (which returns its shell-escaped path), and injects that path as terminal input.
+    /// `debugDetail` carries counts only, never a name or bytes.
+    private func mobileTerminalPasteSavedAttachment(
+        params: [String: Any],
+        debugEvent: String,
+        debugDetail: String,
+        rejectionMessage: String,
+        save: () -> String?
+    ) -> V2CallResult {
         if let error = mobileWorkspaceIDValidationError(params: params) {
             return error
         }
@@ -16659,10 +16699,10 @@ class TerminalController {
 
         _ = applyMobileViewportReport(params: params, terminalTarget: terminalTarget)
 
-        guard let escapedPath = GhosttyApp.terminalPasteboard.saveImageData(imageData, fileExtension: format) else {
+        guard let escapedPath = save() else {
             return mobileInputWriteFailure(
                 code: "invalid_params",
-                message: "Image payload was empty or exceeded the size limit",
+                message: rejectionMessage,
                 surfaceID: surfaceId,
                 acknowledgement: MobileHostTerminalInputApplier.shared.reject(delivery)
             )
@@ -16684,7 +16724,7 @@ class TerminalController {
         }
         #if DEBUG
         cmuxDebugLog(
-            "mobile.terminal.paste_image workspace=\(resolved.workspace.id.uuidString.prefix(8)) surface=\(surfaceId.uuidString.prefix(8)) bytes=\(imageData.count) format=\(format)"
+            "\(debugEvent) workspace=\(resolved.workspace.id.uuidString.prefix(8)) surface=\(surfaceId.uuidString.prefix(8)) \(debugDetail)"
         )
         #endif
         return .ok(mobileInputSuccessPayload([

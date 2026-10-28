@@ -426,6 +426,89 @@ struct ImageMaterializationTests {
         service.cleanupAllOwnedTemporaryImageFiles()
     }
 
+    /// A phone-chosen attachment name is a label, never a path: whatever it holds, the file lands one level
+    /// below `shellx-attachments/<uuid>/` with a name that cannot climb out, hide, or overrun a path component.
+    @Test(arguments: [
+        "../../.ssh/authorized_keys",
+        "a\u{0}b",
+        "...",
+        String(repeating: "é", count: 300),
+        String(repeating: "한", count: 80) + ".txt",
+        "",
+    ])
+    func saveAttachmentDataKeepsHostileNamesInsideItsFolder(name: String) throws {
+        let scratchDir = try makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratchDir) }
+        let service = TerminalPasteboardService(temporaryDirectory: scratchDir)
+        let payload = Data("attachment bytes".utf8)
+
+        let escapedPath = try #require(service.saveAttachmentData(payload, fileName: name))
+        let plainPath = escapedPath.replacingOccurrences(of: "\\", with: "")
+        let fileURL = URL(fileURLWithPath: plainPath)
+
+        let uuidFolder = fileURL.deletingLastPathComponent()
+        let attachmentsFolder = uuidFolder.deletingLastPathComponent()
+        #expect(UUID(uuidString: uuidFolder.lastPathComponent) != nil)
+        #expect(attachmentsFolder.lastPathComponent == "shellx-attachments")
+        #expect(attachmentsFolder.deletingLastPathComponent().path == scratchDir.path)
+
+        // The last path component as typed, not `URL.lastPathComponent`, which re-normalizes the name.
+        let storedName = String(plainPath.split(separator: "/").last ?? "")
+        #expect(!storedName.isEmpty)
+        #expect(!storedName.contains("/"))
+        #expect(!storedName.hasPrefix("."))
+        #expect(storedName.utf8.count <= 100)
+        if name.isEmpty || name == "..." {
+            #expect(storedName == "file")
+        }
+
+        #expect(try Data(contentsOf: fileURL) == payload)
+        let permissions = try FileManager.default.attributesOfItem(atPath: fileURL.path)[.posixPermissions] as? NSNumber
+        #expect(permissions?.intValue == 0o600)
+
+        // Registered for the usual temp cleanup, which takes the folder with it.
+        #expect(service.isOwnedTemporaryImageFile(fileURL))
+        service.cleanupAllOwnedTemporaryImageFiles()
+        #expect(!FileManager.default.fileExists(atPath: fileURL.path))
+        #expect(!FileManager.default.fileExists(atPath: uuidFolder.path))
+    }
+
+    @Test func saveAttachmentDataKeepsAReadableNameAndItsExtension() throws {
+        let scratchDir = try makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratchDir) }
+        let service = TerminalPasteboardService(temporaryDirectory: scratchDir)
+
+        let plain = try #require(service.saveAttachmentData(Data([0x1]), fileName: "report final (v2).pdf"))
+        #expect(plain.hasSuffix("/report\\ final\\ \\(v2\\).pdf"))
+
+        // A name cut to 100 bytes still ends in its extension, so the agent can tell what the file is.
+        let longName = String(repeating: "x", count: 300) + ".pdf"
+        let cut = try #require(service.saveAttachmentData(Data([0x1]), fileName: longName))
+        let cutName = URL(fileURLWithPath: cut).lastPathComponent
+        #expect(cutName.hasSuffix(".pdf"))
+        #expect(cutName.utf8.count == 100)
+
+        // Two attachments with one name never share a folder.
+        let first = try #require(service.saveAttachmentData(Data([0x1]), fileName: "a.txt"))
+        let second = try #require(service.saveAttachmentData(Data([0x2]), fileName: "a.txt"))
+        #expect(first != second)
+        service.cleanupAllOwnedTemporaryImageFiles()
+    }
+
+    @Test func saveAttachmentDataRefusesOversize() throws {
+        let scratchDir = try makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratchDir) }
+        let service = TerminalPasteboardService(temporaryDirectory: scratchDir)
+
+        #expect(service.saveAttachmentData(Data(count: 10_485_761), fileName: "big.bin") == nil)
+        #expect(service.saveAttachmentData(Data(), fileName: "empty.txt") == nil)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: scratchDir.path).isEmpty)
+
+        // The cap itself is still taken.
+        #expect(service.saveAttachmentData(Data(count: 10_485_760), fileName: "edge.bin") != nil)
+        service.cleanupAllOwnedTemporaryImageFiles()
+    }
+
     @Test func cleanupIgnoresFilesItDoesNotOwn() throws {
         let scratchDir = try makeScratchDirectory()
         defer { try? FileManager.default.removeItem(at: scratchDir) }

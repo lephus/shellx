@@ -62,10 +62,10 @@ A frame is one UTF-8 JSON object:
 
 ### Extension
 
-- Every string enum field is an open enum: `kind` (of a PendingItem, of a decision, of a ChatEntry and of an `attach.begin`), `mode`,
-  `outcome`, `state` (of an AgentSession), `role` (of a ChatEntry), and the enum fields later versions add. A value this version does not know still
-  decodes (an implementation keeps the raw string, for example as `.other(raw)`); it is never
-  `bad_json`.
+- Every string enum field is an open enum: `kind` (of a PendingItem, of a decision, of a ChatEntry and
+  of an `attach.begin`), `mode`, `outcome`, `state` (of an AgentSession), `role` (of a ChatEntry), and
+  the enum fields later versions add. A value this version does not know still decodes (an
+  implementation keeps the raw string, for example as `.other(raw)`); it is never `bad_json`.
 - A sender MAY add an optional field at any time; receivers ignore fields they do not know.
 - A host MAY add a push, a message that answers no call (such as `chat.reset`): a client that predates it
   ignores it (section 7), so it needs no new `v`. A new request that expects an answer carries a
@@ -604,18 +604,23 @@ between that check and the typing: an agent that exits within it can still let o
 terminal, the same window the Mac's own remote-control path has.
 
 **Attachments.** `attach.*` lets a phone put files on the Mac, so what it may choose is narrow. The phone
-never picks a path: the host names the directory (a new UUID directory for every file, inside a temporary
-directory that is its own) and the file mode (0600), and it builds the file name from `name` by removing
-`/`, `\`, control characters and leading dots, cutting it to 100 UTF-8 bytes, and using `file` when nothing
-is left, so the name cannot leave its directory. The host never opens, previews or runs an attachment, and
-nothing is written until a `chat.send` carries the upload to a live session (the shell fall-through rule
-above applies to the paths exactly as it does to `text`). The paths are typed, escaped for the shell, only
-into the terminal of that live session, as the text is, and never into another terminal. The size
-limits (5 uploads of at most 10 MiB per Link session in memory, at most 5 files of 10 MiB per message on
-disk) bound the memory and disk a phone can use, and an upload dies with its session, with the
-`chat.send` that uses it, with the next `attach.begin` if it was not finished, or 5 minutes after its
-`attach.end`. What the agent then does with the path is the agent's own business, as with any path the user types at its
-prompt, and a paired phone is trusted like the user (below). The host never logs attachment names or bytes.
+never picks a path: the host names the directory, the file name and the file mode. An image is saved the
+way a pasted clipboard image is, in the host's own temporary directory under a name the host chooses; the
+extension is the only part taken from `name`, and only when it is a known image type (`png` otherwise).
+A file goes in `shellx-attachments/<UUID>/<sanitized name>` inside that directory, a new UUID directory
+for every file, with mode 0600. The host builds `<sanitized name>` from `name` by removing `/`, `\`, control
+characters and leading dots, cutting it to 100 UTF-8 bytes (keeping the extension), and using `file` when
+nothing is left, so the name cannot leave its directory. The host registers every file it saves (and the
+directory of a file) for the temporary-file cleanup it already runs for pasted images. It never opens,
+previews or runs an attachment, and nothing is written until a `chat.send` carries the upload to a live
+session (the shell fall-through rule above applies to the paths exactly as it does to `text`). The paths
+are typed, escaped for the shell, only into the terminal of that live session, as the text is, and never
+into another terminal. The size limits (5 uploads of at most 10 MiB per Link session in memory, at most 5
+files of 10 MiB per message on disk) bound the memory and disk a phone can use, and an upload dies with
+its session, with the `chat.send` that uses it, with the next `attach.begin` if it was not finished, or
+5 minutes after its `attach.end`. What the agent then does with the path is the agent's own business, as
+with any path the user types at its prompt, and a paired phone is trusted like the user (below). The host
+never logs attachment names or bytes.
 
 **Why the rest is acceptable.** A paired phone is trusted like the user sitting at the Mac: it is signed in
 to the user's account, and the user allowed that phone on that Mac in person; the relay can neither create

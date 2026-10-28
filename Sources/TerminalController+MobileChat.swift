@@ -277,7 +277,9 @@ extension TerminalController {
     /// - Parameters:
     ///   - sessionID: The chat session to type into.
     ///   - text: The message; may be empty only when `attachments` is not.
-    ///   - attachments: Images to paste first (`data_b64`, optional `format`).
+    ///   - attachments: Images (`data_b64`, optional `format`) and files (`kind` `file`, `data_b64`, `name`) to
+    ///     paste first, in order. A file's path is typed the way an image's is; its name is only a label the Mac
+    ///     sanitizes.
     func agentChatSend(sessionID: String, text: String, attachments: [[String: Any]] = []) async -> V2CallResult {
         guard let terminalParams = await mobileChatTerminalParams(sessionID: sessionID) else {
             return .err(code: "not_found", message: Self.chatTerminalBindingErrorMessage, data: [
@@ -297,10 +299,17 @@ extension TerminalController {
             guard let base64 = attachment["data_b64"] as? String else {
                 return .err(code: "invalid_params", message: "Attachment missing data_b64", data: nil)
             }
-            var imageParams = terminalParams
-            imageParams["image_base64"] = base64
-            imageParams["image_format"] = (attachment["format"] as? String) ?? "png"
-            let result = v2MobileTerminalPasteImage(params: imageParams)
+            var pasteParams = terminalParams
+            let result: V2CallResult
+            if (attachment["kind"] as? String) == "file" {
+                pasteParams["file_base64"] = base64
+                pasteParams["file_name"] = (attachment["name"] as? String) ?? ""
+                result = v2MobileTerminalPasteFile(params: pasteParams)
+            } else {
+                pasteParams["image_base64"] = base64
+                pasteParams["image_format"] = (attachment["format"] as? String) ?? "png"
+                result = v2MobileTerminalPasteImage(params: pasteParams)
+            }
             if case .err = result {
                 return result
             }
