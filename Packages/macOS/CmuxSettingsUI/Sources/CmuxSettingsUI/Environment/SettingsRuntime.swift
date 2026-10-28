@@ -74,7 +74,8 @@ public final class SettingsRuntime: @unchecked Sendable {
         self.searchIndex = searchIndex ?? SettingsSearchIndex(
             catalog: catalog,
             curatedEntries: .cmuxDefault(catalog: catalog)
-                .forMobilePairing(throughShellXLink: hostActions.pairsPhonesThroughShellXLink)
+                .forMobilePairing(throughShellXLink: hostActions.pairsPhonesThroughShellXLink),
+            sectionKeywords: SettingsSectionID.searchKeywordOverrides(mobilePairingThroughShellXLink: hostActions.pairsPhonesThroughShellXLink)
         )
         self.userDefaultsStore = userDefaultsStore
         self.jsonStore = jsonStore

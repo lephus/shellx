@@ -30,6 +30,18 @@ extension Array where Element == CuratedSettingEntry {
     }
 }
 
+extension SettingsSectionID {
+    /// The section search words of a host's Settings, for ``SettingsSearchIndex``'s `sectionKeywords`. Unchanged
+    /// unless the host pairs phones through ShellX Link: then Mobile only pairs an iPhone by QR, with no local
+    /// network pairing, sync or phone push to search for.
+    ///
+    /// - Parameter mobilePairingThroughShellXLink: The host's ``SettingsHostActions/pairsPhonesThroughShellXLink``.
+    static func searchKeywordOverrides(mobilePairingThroughShellXLink: Bool) -> [SettingsSectionID: String] {
+        guard mobilePairingThroughShellXLink else { return [:] }
+        return [.mobile: "ios iphone ipad mobile phone pairing pair qr code scan shellx link"]
+    }
+}
+
 extension CuratedSettingEntry {
     /// Settings › Mobile › Pair iPhone for a host pairing phones through ShellX Link.
     static var shellXLinkPairing: CuratedSettingEntry {
