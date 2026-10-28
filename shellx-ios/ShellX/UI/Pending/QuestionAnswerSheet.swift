@@ -88,10 +88,14 @@ struct QuestionAnswerSheet: View {
         NavigationStack {
             List {
                 if let question {
-                    promptSection(question)
-                    optionsSection(question)
+                    Group {
+                        promptSection(question)
+                        optionsSection(question)
+                    }
+                    .listRowBackground(Color.appSurface)
                 }
             }
+            .themedList()
             .disabled(!editable)
             .scrollDismissesKeyboard(.interactively)
             .safeAreaInset(edge: .bottom) { bottomBar }

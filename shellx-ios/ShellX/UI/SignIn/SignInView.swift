@@ -89,7 +89,7 @@ struct SignInView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(Color(uiColor: .systemBackground))
+        .background(Color.appBackground)
     }
 
     private func field<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {

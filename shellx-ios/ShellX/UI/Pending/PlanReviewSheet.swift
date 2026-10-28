@@ -75,7 +75,7 @@ struct PlanReviewSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(Color(uiColor: .systemBackground))
+            .background(Color.appBackground)
             .safeAreaInset(edge: .bottom) { bottomBar }
             .navigationTitle(String(localized: "pending.plan.title"))
             .navigationBarTitleDisplayMode(.inline)

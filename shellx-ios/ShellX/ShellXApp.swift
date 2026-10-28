@@ -7,6 +7,7 @@ struct ShellXApp: App {
     @State private var graph = AppComposition.make()
     @State private var inbox = PairingInbox()
     @State private var networkPath = NetworkPathWatcher()
+    @AppStorage(AppAppearance.storageKey) private var appearance = AppAppearance.system.rawValue
     @Environment(\.scenePhase) private var scenePhase
 
     private var coordinator: AppCoordinator { graph.coordinator }
@@ -26,11 +27,17 @@ struct ShellXApp: App {
                 .onOpenURL { url in
                     inbox.receive(url)
                 }
+                // Settings › Appearance, on the windows so sheets and alerts follow it.
+                .onChange(of: appearance, initial: true) { _, stored in
+                    AppAppearance(stored: stored).apply()
+                }
                 // A locked Keychain keeps the launch screen up; try again whenever the app comes to
                 // the front or protected data opens, so it can never stay there.
                 .onChange(of: scenePhase) { _, phase in
                     switch phase {
                     case .active:
+                        // A window made since the choice was set gets it too.
+                        AppAppearance(stored: appearance).apply()
                         Task { await coordinator.protectedDataBecameAvailable() }
                         if let hub = coordinator.hub {
                             hub.appDidBecomeActive()

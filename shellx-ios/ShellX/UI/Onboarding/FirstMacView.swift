@@ -50,7 +50,7 @@ struct FirstMacView: View {
             .frame(maxWidth: 520)
             .frame(maxWidth: .infinity)
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(Color.appBackground)
     }
 }
 

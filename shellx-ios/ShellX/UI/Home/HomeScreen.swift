@@ -1,14 +1,15 @@
 import ShellXAppCore
 import SwiftUI
 
-/// The home's layout (mockup layout C), from plain values so render tests can show any state;
-/// `HomeView` feeds it from the hub, the decision center and the home model.
+/// The home's layout, from plain values so render tests can show any state; `HomeView` feeds it from
+/// the hub, the decision center and the home model.
 ///
-/// - Top, pinned with `safeAreaInset` so it never scrolls away: "Needs you · N" and the agent
-///   strip. It leaves the conversation and the composer room (`conversationMinimum`) and scrolls
-///   inside itself past that.
-/// - Middle: the conversation, newest at the bottom, scrolled down when an entry arrives.
-/// - Bottom: the composer (the mic, or the field) with its "Send to:" chip.
+/// - Top, pinned with `safeAreaInset` so it never scrolls away and never takes more than two lines:
+///   the "Needs you · N" bar (it opens the "Needs You" page, where the cards are) and the agent
+///   chips. The chips step aside while the keyboard is up.
+/// - Middle: the conversation, newest at the bottom, scrolled down when an entry arrives. A tap on
+///   it closes the keyboard.
+/// - Bottom: the composer (the field and the mic) with its "Send to:" chip.
 /// - Toolbar: the default Mac (opens "Your Macs") on the left, Settings on the right.
 struct HomeScreen: View {
     struct Actions {
@@ -25,13 +26,11 @@ struct HomeScreen: View {
         var send: (String) -> Void = { _ in }
         /// What the user said into the mic (trimmed, not empty).
         var sendVoice: (String) -> Void = { _ in }
-        var card: (MachinePendingItem) -> PendingCardView.Actions = { _ in PendingCardView.Actions() }
     }
 
     /// The default Mac, for the toolbar.
     let machine: (name: String, state: MachineLinkState)?
     let pending: [MachinePendingItem]
-    let pendingStatus: [PendingKey: DecisionStatus]
     let showsMachineName: Bool
     /// The agent rows as of now; read again every second for the "Running for" times.
     let rows: () -> [AgentStatusRow]
@@ -42,23 +41,16 @@ struct HomeScreen: View {
     let pickedTarget: SessionRef?
     let sessions: [MachineSession]
     @Binding var draft: String
-    @Binding var agentsExpanded: Bool
     var actions = Actions()
 
-    /// The conversation and the composer keep at least this much of the height, grown with the text
-    /// size; the top panel always keeps 40 %.
-    @ScaledMetric(relativeTo: .body) private var conversationMinimum: CGFloat = 260
+    @State private var keyboardUp = false
 
     var body: some View {
-        GeometryReader { proxy in
-            let height = proxy.size.height
-            conversation
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    top(maxHeight: max(height * 0.4, min(height * 0.7, height - conversationMinimum)))
-                }
-                .safeAreaInset(edge: .bottom, spacing: 0) { composer }
-        }
-        .background(Color(uiColor: .systemGroupedBackground))
+        conversation
+            .safeAreaInset(edge: .top, spacing: 0) { top }
+            .safeAreaInset(edge: .bottom, spacing: 0) { composer }
+            .tracksKeyboard($keyboardUp)
+        .background(Color.appBackground)
         .navigationTitle(String(localized: "root.title"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -78,38 +70,32 @@ struct HomeScreen: View {
 
     // MARK: - Top
 
-    /// The panel at its full height when it fits in `maxHeight`; otherwise `maxHeight` tall, and it
-    /// scrolls inside itself (its scroll bar flashes, so that shows). Sized during layout, so the
-    /// panel never jumps from a first guess to its real height.
-    @ViewBuilder private func top(maxHeight: CGFloat) -> some View {
-        let hasRows = !rows().isEmpty
-        if !pending.isEmpty || hasRows {
-            ContentHeightUpTo(maxHeight: maxHeight) {
-                ScrollView { topPanel }
-                    .scrollBounceBehavior(.basedOnSize)
-                    .scrollIndicatorsFlash(onAppear: true)
-            }
-            .background(Color(uiColor: .systemGroupedBackground))
-            .overlay(alignment: .bottom) { Divider() }
-        }
-    }
-
-    private var topPanel: some View {
-        VStack(alignment: .leading, spacing: 4) {
+    /// The bar while something is pending, the chips while an agent is live and the keyboard is down;
+    /// nothing at all (not even the divider) otherwise.
+    @ViewBuilder private var top: some View {
+        let showsChips = !keyboardUp && !rows().isEmpty
+        VStack(alignment: .leading, spacing: 2) {
             if !pending.isEmpty {
-                PinnedSection(
-                    items: pending, status: pendingStatus, showsMachineName: showsMachineName, actions: actions.card,
-                    seeAll: actions.seeAllPending)
+                NeedsYouBar(items: pending, showsMachineName: showsMachineName, open: actions.seeAllPending)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 6)
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
-            TimelineView(.periodic(from: .now, by: 1)) { _ in
-                let rows = rows()
-                if !rows.isEmpty {
-                    AgentStrip(rows: rows, expanded: $agentsExpanded)
+            if showsChips {
+                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                    AgentChips(rows: rows())
                 }
+                .transition(.opacity)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, pending.isEmpty && !showsChips ? 0 : 2)
+        .background(Color.appBackground)
+        .overlay(alignment: .bottom) {
+            if !pending.isEmpty || showsChips { Divider() }
+        }
+        .dismissesKeyboardOnTap()
+        .animation(.snappy(duration: 0.25), value: pending.isEmpty)
     }
 
     // MARK: - Conversation
@@ -136,6 +122,7 @@ struct HomeScreen: View {
             }
             .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
+            .dismissesKeyboardOnTap()
             .onChange(of: entries.last?.id) { _, last in
                 guard let last else { return }
                 withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(last, anchor: .bottom) }

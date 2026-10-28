@@ -54,7 +54,7 @@ final class MicButtonRenderTests: XCTestCase {
             Spacer()
             ComposerBar(text: .constant(draft), send: { _ in }, voice: rig.model)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(Color.appBackground)
         .environment(rig.service)
     }
 

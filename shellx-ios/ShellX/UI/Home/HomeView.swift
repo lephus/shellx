@@ -1,18 +1,16 @@
 import ShellXAppCore
 import SwiftUI
 
-/// The main screen, "ShellX" (plan decision D7), fed by the signed-in scope: the pinned cards from
-/// the decision center (its owner, `SignedInView`, keeps it synced with the hub), the agent rows
-/// and the conversation from the home model, and the composer that sends through it. An agent row
+/// The main screen, "ShellX" (plan decision D7), fed by the signed-in scope: the "Needs you" bar from
+/// the decision center (its owner, `SignedInView`, keeps it synced with the hub), the agent chips
+/// and the conversation from the home model, and the composer that sends through it. An agent chip
 /// or a "done" note opens that session's `AgentView`.
 struct HomeView: View {
     let scope: SignedInScope
     /// Pushes a screen over the home.
     let open: (HomeRoute) -> Void
 
-    @State private var route: PendingRoute?
     @State private var draft = ""
-    @AppStorage("shellx.home.agentsExpanded") private var agentsExpanded = true
 
     var body: some View {
         let hub = scope.hub
@@ -24,7 +22,6 @@ struct HomeView: View {
         HomeScreen(
             machine: defaultMachine.map { (name: $0.name, state: $0.state) },
             pending: center.visibleItems(hub.pendingItems),
-            pendingStatus: center.status,
             showsMachineName: hub.machines.count > 1,
             rows: { home.statusRows },
             isLoaded: home.isLoaded,
@@ -34,12 +31,8 @@ struct HomeView: View {
             pickedTarget: picked,
             sessions: sessions,
             draft: $draft,
-            agentsExpanded: $agentsExpanded,
-            actions: HomeActions.make(scope: scope, open: open, route: $route)
+            actions: HomeActions.make(scope: scope, open: open)
         )
-        .sheet(item: $route) { route in
-            PendingSheetHost(route: route, close: { self.route = nil })
-        }
         // The agent rows and the "done" notes push a session's screen.
         .navigationDestination(for: SessionRef.self) { ref in
             AgentView(scope: scope, ref: ref, open: open)

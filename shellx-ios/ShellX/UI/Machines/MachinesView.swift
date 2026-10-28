@@ -63,21 +63,25 @@ struct MachineList<Header: View>: View {
 
     var body: some View {
         List {
-            header
-            Section {
-                ForEach(items) { item in
-                    MachineRow(
-                        name: item.name, state: item.state, isDefault: item.id == defaultID,
-                        pairAgain: pair, remove: { unpairNow(item) }
-                    )
-                    .disabled(working.contains(item.id))
-                    .contextMenu { menu(for: item) }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) { swipe(for: item) }
+            Group {
+                header
+                Section {
+                    ForEach(items) { item in
+                        MachineRow(
+                            name: item.name, state: item.state, isDefault: item.id == defaultID,
+                            pairAgain: pair, remove: { unpairNow(item) }
+                        )
+                        .disabled(working.contains(item.id))
+                        .contextMenu { menu(for: item) }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) { swipe(for: item) }
+                    }
+                } footer: {
+                    Text(LocalizedStringResource("machines.footer"))
                 }
-            } footer: {
-                Text(LocalizedStringResource("machines.footer"))
             }
+            .listRowBackground(Color.appSurface)
         }
+        .themedList()
         .navigationTitle(String(localized: "machines.title"))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

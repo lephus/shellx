@@ -66,7 +66,7 @@ struct PairingSheetContent: View {
                     .frame(maxWidth: 520)
                     .frame(maxWidth: .infinity)
             }
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(Color.appBackground)
             .navigationTitle(String(localized: "pairing.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -251,7 +251,7 @@ private struct PairingScanStep: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.appSurface, in: RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
     }
 

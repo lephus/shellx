@@ -749,6 +749,10 @@ final class AgentThreadModelTests: XCTestCase {
 
         XCTAssertEqual(shellx.pendingHere.map(\.item.requestId), ["p1", "p3"])
         XCTAssertEqual(web.pendingHere.map(\.item.requestId), ["p2"])
+        // The agent's "Needs You" page picks the same requests with `isIn`.
+        let workspaceId = try XCTUnwrap(shellx.session?.session.workspaceId)
+        let page = rig.hub.pendingItems.filter { $0.isIn(machineID: first.machine.machineID, workspaceId: workspaceId) }
+        XCTAssertEqual(page.map(\.item.requestId).sorted(), ["p1", "p3"])
         XCTAssertEqual(other.pendingHere.map(\.item.requestId), ["p4"])
 
         // Handled on the Mac: gone here too.

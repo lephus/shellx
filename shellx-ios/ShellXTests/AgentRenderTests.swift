@@ -66,7 +66,7 @@ final class AgentRenderTests: XCTestCase {
         return NavigationStack {
             AgentScreen(
                 ref: Self.ref, place: "Claude Code · MacBook Pro", row: { row }, gone: gone, offline: offline,
-                pending: pending, pendingStatus: [:], showsMachineName: false, entries: entries,
+                pending: pending, showsMachineName: false, entries: entries,
                 emptyState: entries.isEmpty ? emptyState : nil, machineName: "MacBook Pro", older: older,
                 loadingOlder: false, canStop: canStop && !gone,
                 notice: notice.map { AgentScreen.Notice(text: $0) }, draft: .constant(draft))
@@ -172,7 +172,7 @@ final class AgentRenderTests: XCTestCase {
                 Spacer()
             }
             .padding(.top, 60)
-            .background(Color(uiColor: .systemGroupedBackground)),
+            .background(Color.appBackground),
             name: "agent-thought")
     }
 
@@ -217,7 +217,7 @@ final class AgentRenderTests: XCTestCase {
                 Spacer().frame(height: 120)
             }
             .frame(maxWidth: .infinity)
-            .background(Color(uiColor: .systemGroupedBackground)),
+            .background(Color.appBackground),
             name: "agent-new-messages")
     }
 

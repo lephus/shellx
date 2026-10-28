@@ -39,7 +39,7 @@ struct FullTextSheet: View {
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(Color.appBackground)
             .navigationTitle(Text(verbatim: title))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -57,6 +57,6 @@ struct FullTextSheet: View {
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
-            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+            .background(Color.appSurface, in: RoundedRectangle(cornerRadius: 10))
     }
 }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Settings: the account, the voice (when the mic is set up) and an About section.
+/// Settings: the account, the appearance, the voice (when the mic is set up) and an About section.
 struct SettingsView: View {
     let email: String
     let signOut: () async -> Void
@@ -9,10 +9,15 @@ struct SettingsView: View {
 
     var body: some View {
         List {
-            AccountSection(email: email, signOut: signOut)
-            if let voice { VoiceSection(service: voice) }
-            AboutSection()
+            Group {
+                AccountSection(email: email, signOut: signOut)
+                AppearanceSection()
+                if let voice { VoiceSection(service: voice) }
+                AboutSection()
+            }
+            .listRowBackground(Color.appSurface)
         }
+        .themedList()
         .navigationTitle(String(localized: "settings.title"))
         .navigationBarTitleDisplayMode(.large)
     }

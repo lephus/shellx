@@ -28,4 +28,9 @@ public struct MachinePendingItem: Identifiable, Equatable, Sendable {
     }
 
     public var id: PendingKey { PendingKey(machineID: machineID, requestId: item.requestId) }
+
+    /// Whether the request comes from `workspaceId` on `machineID`: one agent screen's requests.
+    public func isIn(machineID: String, workspaceId: String) -> Bool {
+        self.machineID == machineID && item.workspaceId == workspaceId
+    }
 }

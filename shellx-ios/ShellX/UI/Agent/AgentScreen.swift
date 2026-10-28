@@ -5,10 +5,11 @@ import SwiftUI
 /// from `AgentThreadModel`, the hub and the decision center.
 ///
 /// - Navigation bar: the workspace, and "Stop" while the session works or waits for the user.
-/// - Top, pinned: the header ("Claude Code · Mac", state) and the pending cards of this workspace.
-///   It keeps at most 40 % of the height and scrolls inside itself past that.
+/// - Top, pinned: the header ("Claude Code · Mac", state) and, while this workspace has pending
+///   requests, the "Needs you · N" bar that opens them on their own page.
 /// - Middle: the chat, newest at the bottom; scrolling to the top loads older entries. It follows
-///   new entries only while its bottom shows; otherwise "New messages ↓" offers to jump down.
+///   new entries only while its bottom shows; otherwise "New messages ↓" offers to jump down. A tap
+///   on it closes the keyboard.
 /// - Bottom: what became of the last send or stop, then the composer (its target is this session).
 struct AgentScreen: View {
     struct Actions {
@@ -23,8 +24,8 @@ struct AgentScreen: View {
         var loadOlder: () -> Void = {}
         /// Asks for the newest page again after it failed.
         var retry: () -> Void = {}
+        /// The "Needs you" bar: this workspace's pending cards.
         var seeAllPending: () -> Void = {}
-        var card: (MachinePendingItem) -> PendingCardView.Actions = { _ in PendingCardView.Actions() }
     }
 
     /// Where the chat's bottom sentinel sits, to scroll to.
@@ -44,7 +45,6 @@ struct AgentScreen: View {
     let gone: Bool
     let offline: Bool
     let pending: [MachinePendingItem]
-    let pendingStatus: [PendingKey: DecisionStatus]
     let showsMachineName: Bool
     let entries: [ChatEntry]
     /// What the chat says while it has no entries.
@@ -63,20 +63,14 @@ struct AgentScreen: View {
     @State private var follow = ChatFollow()
     /// The first entry when older ones were asked for: the chat stays on it when they arrive.
     @State private var olderAnchor: String?
-    @ScaledMetric(relativeTo: .body) private var conversationMinimum: CGFloat = 260
 
     private var agent: String { AgentLabel(agent: ref.agent).text }
 
     var body: some View {
-        GeometryReader { proxy in
-            let height = proxy.size.height
-            conversation
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    top(maxHeight: max(height * 0.4, min(height * 0.7, height - conversationMinimum)))
-                }
-                .safeAreaInset(edge: .bottom, spacing: 0) { bottom }
-        }
-        .background(Color(uiColor: .systemGroupedBackground))
+        conversation
+            .safeAreaInset(edge: .top, spacing: 0) { top }
+            .safeAreaInset(edge: .bottom, spacing: 0) { bottom }
+        .background(Color.appBackground)
         .navigationTitle(Text(verbatim: ref.workspaceTitle))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -99,27 +93,22 @@ struct AgentScreen: View {
 
     // MARK: - Top
 
-    private func top(maxHeight: CGFloat) -> some View {
-        ContentHeightUpTo(maxHeight: maxHeight) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 4) {
-                    TimelineView(.periodic(from: .now, by: 1)) { _ in
-                        AgentHeader(place: place, row: row(), gone: gone, offline: offline)
-                    }
-                    if !pending.isEmpty {
-                        PinnedSection(
-                            items: pending, status: pendingStatus, showsMachineName: showsMachineName,
-                            actions: actions.card, seeAll: actions.seeAllPending)
-                            .padding(.bottom, 6)
-                    }
-                }
-                .padding(.horizontal, 16)
+    private var top: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            TimelineView(.periodic(from: .now, by: 1)) { _ in
+                AgentHeader(place: place, row: row(), gone: gone, offline: offline)
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollIndicatorsFlash(onAppear: true)
+            if !pending.isEmpty {
+                NeedsYouBar(items: pending, showsMachineName: showsMachineName, open: actions.seeAllPending)
+                    .padding(.bottom, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .padding(.horizontal, 16)
+        .background(Color.appBackground)
         .overlay(alignment: .bottom) { Divider() }
+        .dismissesKeyboardOnTap()
+        .animation(.snappy(duration: 0.25), value: pending.isEmpty)
     }
 
     // MARK: - Chat
@@ -149,6 +138,7 @@ struct AgentScreen: View {
             }
             .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
+            .dismissesKeyboardOnTap()
             .overlay(alignment: .bottom) {
                 if follow.hasUnseen {
                     NewMessagesButton {

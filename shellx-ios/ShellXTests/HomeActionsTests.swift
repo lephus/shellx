@@ -9,7 +9,7 @@ import XCTest
 /// the executed coverage of the home's wiring).
 @MainActor
 final class HomeActionsTests: XCTestCase {
-    /// Holds the sheet route the way `HomeView`'s `@State` does.
+    /// Holds the sheet route the way `PendingListView`'s `@State` does.
     private final class RouteBox {
         var route: PendingRoute?
     }
@@ -60,9 +60,8 @@ final class HomeActionsTests: XCTestCase {
         await mac.upsertSession(session("s1"))
         let scope = try await makeScope(mac)
         var opened: [HomeRoute] = []
-        let box = RouteBox()
         let actions = HomeActions.make(
-            scope: scope, open: { opened.append($0) }, route: Binding(get: { box.route }, set: { box.route = $0 }))
+            scope: scope, open: { opened.append($0) })
 
         actions.openMachines()
         actions.openSettings()
@@ -84,9 +83,8 @@ final class HomeActionsTests: XCTestCase {
         let online = await eventually { scope.hub.liveSessions.first?.online == true }
         XCTAssertTrue(online)
         var sends: [Task<ComposerValidation, Never>] = []
-        let box = RouteBox()
         let actions = HomeActions.make(
-            scope: scope, open: { _ in }, route: Binding(get: { box.route }, set: { box.route = $0 }),
+            scope: scope, open: { _ in },
             sent: { sends.append($0) })
 
         actions.send("Chạy lại test")
@@ -110,9 +108,8 @@ final class HomeActionsTests: XCTestCase {
         let online = await eventually { scope.hub.liveSessions.first?.online == true }
         XCTAssertTrue(online)
         var sends: [Task<ComposerValidation, Never>] = []
-        let box = RouteBox()
         let actions = HomeActions.make(
-            scope: scope, open: { _ in }, route: Binding(get: { box.route }, set: { box.route = $0 }),
+            scope: scope, open: { _ in },
             sent: { sends.append($0) })
 
         actions.sendVoice("Tạo PR cho branch develop")
@@ -142,9 +139,8 @@ final class HomeActionsTests: XCTestCase {
         let s1 = SessionRef(machineID: mac.machine.machineID, sessionId: "s1", agent: "claude", workspaceTitle: "shellx")
         let s2 = SessionRef(machineID: mac.machine.machineID, sessionId: "s2", agent: "claude", workspaceTitle: "shellx")
         var sends: [Task<ComposerValidation, Never>] = []
-        let box = RouteBox()
         let actions = HomeActions.make(
-            scope: scope, open: { _ in }, route: Binding(get: { box.route }, set: { box.route = $0 }),
+            scope: scope, open: { _ in },
             sent: { sends.append($0) })
 
         actions.beginMessage()
@@ -183,27 +179,27 @@ final class HomeActionsTests: XCTestCase {
         // `SignedInView` keeps the center synced with the hub.
         scope.decisions.sync(scope.hub.pendingItems)
         let box = RouteBox()
-        let actions = HomeActions.make(
-            scope: scope, open: { _ in }, route: Binding(get: { box.route }, set: { box.route = $0 }))
+        let route = Binding(get: { box.route }, set: { box.route = $0 })
+        let card = { PendingCardsSection.actions(for: $0, hub: scope.hub, center: scope.decisions, route: route) }
         let permission = try XCTUnwrap(scope.hub.pendingItems.first { $0.item.requestId == "p1" })
         let question = try XCTUnwrap(scope.hub.pendingItems.first { $0.item.requestId == "q1" })
 
         // "Answer" and "Show more" open the item's sheet.
-        actions.card(question).openSheet()
+        card(question).openSheet()
         XCTAssertEqual(box.route?.kind, .question)
         XCTAssertEqual(box.route?.id, question.id)
-        actions.card(permission).showMore()
+        card(permission).showMore()
         XCTAssertEqual(box.route?.kind, .fullText)
         XCTAssertEqual(box.route?.id, permission.id)
 
         // A decision goes through the center to the Mac; "Try again" sends it once more.
         await mac.setReplyOutcome(.unknown)
-        actions.card(permission).decide(.permission(.once))
+        card(permission).decide(.permission(.once))
         let rejected = await eventually { scope.decisions.status[permission.id] == .failed(.rejected) }
         XCTAssertTrue(rejected)
         var decisions = await mac.decisions
         XCTAssertEqual(decisions, [FakeMac.Decision(requestId: "p1", decision: .permission(.once))])
-        actions.card(permission).retry()
+        card(permission).retry()
         let resent = await eventually { await mac.decisions.count == 2 }
         XCTAssertTrue(resent)
         decisions = await mac.decisions

@@ -83,7 +83,7 @@ final class PendingCardRenderTests: XCTestCase {
 
     private func cards(_ entries: [(MachinePendingItem, DecisionStatus?)], machines: Bool = false) -> some View {
         ScrollView { stack(entries, machines: machines) }
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(Color.appBackground)
     }
 
     private func stack(_ entries: [(MachinePendingItem, DecisionStatus?)], machines: Bool = false) -> some View {

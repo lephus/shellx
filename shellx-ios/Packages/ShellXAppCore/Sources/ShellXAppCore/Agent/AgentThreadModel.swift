@@ -101,7 +101,7 @@ public final class AgentThreadModel {
     /// The pending requests of this session's workspace on its Mac, oldest first.
     public var pendingHere: [MachinePendingItem] {
         guard let workspaceId = session?.session.workspaceId else { return [] }
-        return hub.pendingItems.filter { $0.machineID == ref.machineID && $0.item.workspaceId == workspaceId }
+        return hub.pendingItems.filter { $0.isIn(machineID: ref.machineID, workspaceId: workspaceId) }
     }
 
     /// Stop applies: the Mac is online, the session works or waits for the user, and the Mac did

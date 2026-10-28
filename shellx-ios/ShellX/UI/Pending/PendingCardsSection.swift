@@ -1,17 +1,17 @@
 import ShellXAppCore
 import SwiftUI
 
-/// "Needs you · N": every Mac's pending requests as cards, in a `List`, fed by the hub through the
-/// decision center (a card goes as soon as its decision is taken). It only reads the center: the
-/// list's owner calls `DecisionCenter.sync(_:)` when the hub's items change. Opening a card's sheet
-/// sets `route`; the owner presents it, so the sheet outlives a card that goes meanwhile.
+/// "Needs you · N": pending requests as cards, in a `List`. The owner passes the items the decision
+/// center shows (a card goes as soon as its decision is taken); the owner also calls
+/// `DecisionCenter.sync(_:)` when the hub's items change. Opening a card's sheet sets `route`; the
+/// owner presents it, so the sheet outlives a card that goes meanwhile.
 struct PendingCardsSection: View {
+    let items: [MachinePendingItem]
     let hub: MachineHub
     let center: DecisionCenter
     @Binding var route: PendingRoute?
 
     var body: some View {
-        let items = center.visibleItems(hub.pendingItems)
         if !items.isEmpty {
             Section {
                 ForEach(items) { item in

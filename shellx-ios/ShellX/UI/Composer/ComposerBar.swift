@@ -2,13 +2,14 @@ import ShellXAppCore
 import SwiftUI
 
 /// The bar at the bottom of a conversation: an optional row above (the home's "Send to:" chip),
-/// then the mic, or the text field with its send button.
+/// then the text field with one round button at its trailing edge.
 ///
-/// With a `VoiceService` in the environment the mic comes first (spec section 4): hold to talk,
-/// release to send (through `sendVoice`), swipe up or the keyboard button to type. The words show
-/// above the bar while the user talks. The field shows while it is being typed in or holds text,
-/// and the keyboard opens by itself when no recognizer can run. Without a `VoiceService`, only the
-/// field shows.
+/// The field always shows: a tap on it brings the keyboard, with no gesture to learn. With a
+/// `VoiceService` in the environment and the field empty, the button is the mic (spec section 4):
+/// hold to talk, release to send (through `sendVoice`), drag left to cancel; the words show above
+/// the bar while the user talks. Once the field holds text the button is Send. The keyboard opens by
+/// itself when no recognizer can run, and then the mic steps aside. Without a `VoiceService`, the
+/// button is always Send.
 ///
 /// The text is checked as it changes (`ComposerValidation`): past 16 384 bytes the bar says "Too
 /// long" and the button stays off, so nothing that long ever leaves the phone. A dictation stops at
@@ -33,8 +34,6 @@ struct ComposerBar<Accessory: View>: View {
 
     @Environment(VoiceService.self) private var voiceService: VoiceService?
     @State private var ownVoice: VoiceInputModel?
-    /// The user asked for the keyboard (button, swipe up, or no recognizer).
-    @State private var typing = false
     /// A dictation cut at the limit, put in the field: the limit line shows while the field holds it.
     @State private var cutText: String?
     @FocusState private var focused: Bool
@@ -55,7 +54,13 @@ struct ComposerBar<Accessory: View>: View {
     }
 
     private var voice: VoiceInputModel? { injectedVoice ?? ownVoice }
-    private var showsField: Bool { voice == nil || typing || focused || !text.isEmpty }
+
+    /// The mic, while the field is empty and a recognizer can run.
+    private var mic: VoiceInputModel? {
+        guard let voice, text.isEmpty else { return nil }
+        if case .unavailable = voice.phase { return nil }
+        return voice
+    }
 
     var body: some View {
         let validation = ComposerValidation(text)
@@ -65,11 +70,7 @@ struct ComposerBar<Accessory: View>: View {
                 VoiceStatusView(model: voice, level: voiceService?.meter.level ?? 0)
                     .padding(.bottom, 2)
             }
-            if showsField {
-                field(validation)
-            } else if let voice {
-                micRow(voice)
-            }
+            field(validation)
             if case let .tooLong(bytes) = validation {
                 let used = ComposerValidation.byteCount(bytes)
                 let limit = ComposerValidation.byteCount(ComposerValidation.maxBytes)
@@ -88,7 +89,7 @@ struct ComposerBar<Accessory: View>: View {
         .padding(.horizontal, 16)
         .padding(.top, 6)
         .padding(.bottom, 8)
-        .background(.bar)
+        .background(Color.appBackground)
         .overlay(alignment: .top) { Divider() }
         .onAppear {
             if injectedVoice == nil, ownVoice == nil { ownVoice = voiceService?.makeModel() }
@@ -109,8 +110,7 @@ struct ComposerBar<Accessory: View>: View {
             if isFocused {
                 onBegin?()
             } else if text.isEmpty {
-                // The keyboard went away with nothing typed: back to the mic, and no message.
-                typing = false
+                // The keyboard went away with nothing typed: no message.
                 onEnd?()
             }
         }
@@ -134,66 +134,53 @@ struct ComposerBar<Accessory: View>: View {
                 .frame(minHeight: 44)
                 .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
                 .accessibilityIdentifier("composer.field")
-            Button {
-                guard case let .ok(message) = validation else { return }
-                send(message)
-                text = ""
-                cutText = nil
-            } label: {
-                Image(systemName: "arrow.up")
-                    .font(.body.weight(.bold))
-                    .foregroundStyle(PrimaryButtonStyle.label)
-                    .frame(width: max(buttonSize, 44), height: max(buttonSize, 44))
-                    .background(PrimaryButtonStyle.fill, in: Circle())
-            }
-            .disabled(!validation.canSend)
-            .opacity(validation.canSend ? 1 : 0.4)
-            .accessibilityLabel(Text(LocalizedStringResource("composer.send")))
-            .accessibilityIdentifier("composer.send")
-        }
-    }
-
-    /// The mic in the middle, the keyboard button at the trailing edge, the hint below.
-    private func micRow(_ voice: VoiceInputModel) -> some View {
-        VStack(spacing: 4) {
-            MicButton(
-                model: voice, label: LocalizedStringResource("voice.mic"), onOutcome: said, onKeyboard: openKeyboard,
-                onPress: onBegin,
-                onNothing: {
-                    // Swiping up to type keeps the message (and where it goes) for the keyboard.
-                    if !focused, !typing, text.isEmpty { onEnd?() }
-                })
-                .frame(maxWidth: .infinity)
-                .overlay(alignment: .trailing) {
-                    Button(action: openKeyboard) {
-                        Image(systemName: "keyboard")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(Color("AccentText"))
-                            .frame(width: 44, height: 44)
-                    }
-                    .accessibilityLabel(Text(LocalizedStringResource("voice.keyboard")))
-                    .accessibilityIdentifier("composer.keyboard")
+            Group {
+                if let mic {
+                    MicButton(
+                        model: mic, label: LocalizedStringResource("voice.mic"), diameter: side,
+                        onOutcome: said, onKeyboard: openKeyboard, onPress: onBegin,
+                        onNothing: {
+                            // Swiping up to type keeps the message (and where it goes) for the keyboard.
+                            if !focused, text.isEmpty { onEnd?() }
+                        })
+                } else {
+                    sendButton(validation)
                 }
-            Text(LocalizedStringResource("voice.hint"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .accessibilityHidden(true)
+            }
+            .transition(.scale(scale: 0.6).combined(with: .opacity))
         }
-        .padding(.top, 2)
+        .animation(.snappy(duration: 0.2), value: mic == nil)
     }
 
-    /// The keyboard button, "Type instead", a swipe up, or no recognizer: the keyboard comes up at
-    /// once, and a dictation in progress is cancelled (`VoiceInputModel.typeInstead()`), so nothing
-    /// heard while typing is sent later. The keyboard never waits for the recognizer to stop.
-    private func openKeyboard() {
-        let voice = self.voice
-        typing = true
-        Task { @MainActor in
-            // The field appeared in the update before; focus it now, then cancel.
-            focused = true
-            await voice?.typeInstead()
+    /// The round button's side: 44 points, grown with the text size.
+    private var side: CGFloat { max(buttonSize, 44) }
+
+    private func sendButton(_ validation: ComposerValidation) -> some View {
+        Button {
+            guard case let .ok(message) = validation else { return }
+            send(message)
+            text = ""
+            cutText = nil
+        } label: {
+            Image(systemName: "arrow.up")
+                .font(.body.weight(.bold))
+                .foregroundStyle(PrimaryButtonStyle.label)
+                .frame(width: side, height: side)
+                .background(PrimaryButtonStyle.fill, in: Circle())
         }
+        .disabled(!validation.canSend)
+        .opacity(validation.canSend ? 1 : 0.4)
+        .accessibilityLabel(Text(LocalizedStringResource("composer.send")))
+        .accessibilityIdentifier("composer.send")
+    }
+
+    /// "Type instead", a swipe up on the mic, or no recognizer: the keyboard comes up at once, and a
+    /// dictation in progress is cancelled (`VoiceInputModel.typeInstead()`), so nothing heard while
+    /// typing is sent later. The keyboard never waits for the recognizer to stop.
+    private func openKeyboard() {
+        focused = true
+        let voice = self.voice
+        Task { await voice?.typeInstead() }
     }
 
     /// Released with words: whole ones are sent; words stopped at the limit go into the field, to be

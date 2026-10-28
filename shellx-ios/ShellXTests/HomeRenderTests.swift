@@ -88,14 +88,14 @@ final class HomeRenderTests: XCTestCase {
     private func home(
         machine: (name: String, state: MachineLinkState)? = ("MacBook Pro", .online),
         pending: [MachinePendingItem] = [], sessions: [MachineSession] = [], entries: [HomeEntry] = [],
-        target: SessionRef? = nil, draft: String = "", expanded: Bool = true, loaded: Bool = true
+        target: SessionRef? = nil, draft: String = "", loaded: Bool = true
     ) -> some View {
         let rows = AgentStatusRow.rows(sessions, now: Self.now)
         return NavigationStack {
             HomeScreen(
-                machine: machine, pending: pending, pendingStatus: [:], showsMachineName: false, rows: { rows },
+                machine: machine, pending: pending, showsMachineName: false, rows: { rows },
                 isLoaded: loaded, entries: entries, target: target, pickedTarget: nil, sessions: sessions,
-                draft: .constant(draft), agentsExpanded: .constant(expanded))
+                draft: .constant(draft))
         }
     }
 
@@ -116,11 +116,10 @@ final class HomeRenderTests: XCTestCase {
             name: "home-full")
     }
 
-    func testMoreThanTwoPendingOffersSeeAllAndCollapsedAgents() throws {
+    func testManyPendingStillTakeOneBar() throws {
         try assertRenders(
-            home(pending: Self.pending, sessions: Self.sessions, entries: Self.conversation, target: Self.shellx,
-                 expanded: false),
-            name: "home-see-all")
+            home(pending: Self.pending, sessions: Self.sessions, entries: Self.conversation, target: Self.shellx),
+            name: "home-needs-you")
     }
 
     func testMacOfflineRenders() throws {
@@ -163,6 +162,10 @@ final class HomeRenderTests: XCTestCase {
         XCTAssertEqual(rows.map(\.state), [.needsInput, .working, .idle])
         XCTAssertEqual(styles.map(\.colorName), ["StatusNeedsYou", "StatusRunning", "StatusDone"])
         for style in styles { XCTAssertFalse(style.text?.isEmpty ?? true) }
+        // A chip says only the time while running; the other states keep their word.
+        XCTAssertEqual(styles[1].shortText, AgentStateStyle.elapsedText(.seconds(240)))
+        XCTAssertEqual(styles[0].shortText, styles[0].text)
+        XCTAssertEqual(styles[2].shortText, styles[2].text)
 
         var offline = Self.sessions[0]
         offline.online = false

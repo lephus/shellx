@@ -43,7 +43,7 @@ struct LaunchView: View {
                 .accessibilityAddTraits(.isHeader)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(uiColor: .systemBackground))
+        .background(Color.appBackground)
     }
 }
 

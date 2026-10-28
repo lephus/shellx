@@ -3,16 +3,15 @@ import SwiftUI
 
 /// One agent's screen, pushed from the home's agent rows and "done" notes: `AgentScreen` fed by the
 /// session's `AgentThreadModel` (its chat, sends and stops), the hub and the decision center (the
-/// pending cards of the session's workspace). The model follows the hub while the screen is shown
+/// "Needs you" bar of the session's workspace). The model follows the hub while the screen is shown
 /// and writes its chat copy when the screen goes or the app leaves the foreground.
 struct AgentView: View {
     let scope: SignedInScope
-    /// Pushes a screen ("See all" opens every pending card).
+    /// Pushes a screen (the "Needs you" bar opens this workspace's pending cards).
     let open: (HomeRoute) -> Void
 
     @State private var model: AgentThreadModel
     @State private var draft = ""
-    @State private var route: PendingRoute?
     @State private var notice: AgentScreen.Notice?
     @Environment(\.scenePhase) private var scenePhase
 
@@ -37,7 +36,6 @@ struct AgentView: View {
             gone: model.sessionGone,
             offline: model.offline,
             pending: center.visibleItems(model.pendingHere),
-            pendingStatus: center.status,
             showsMachineName: hub.machines.count > 1,
             entries: model.thread.entries,
             emptyState: model.emptyState,
@@ -54,12 +52,8 @@ struct AgentView: View {
                 forceStop: { stop(hard: true) },
                 loadOlder: { Task { await model.loadOlder() } },
                 retry: { Task { await model.retry() } },
-                seeAllPending: { open(.pending) },
-                card: { PendingCardsSection.actions(for: $0, hub: hub, center: center, route: $route) })
+                seeAllPending: { openPending() })
         )
-        .sheet(item: $route) { route in
-            PendingSheetHost(route: route, close: { self.route = nil })
-        }
         .task { await model.run() }
         .task(id: notice?.id) {
             guard notice != nil else { return }
@@ -81,6 +75,12 @@ struct AgentView: View {
             if result.keepsDraft, draft.isEmpty { draft = text }
             show(Self.text(for: result, ref: model.ref, machineName: model.machineName))
         }
+    }
+
+    /// The page of this workspace's pending cards: the same ones the bar counts (`pendingHere`).
+    private func openPending() {
+        guard let workspaceId = model.session?.session.workspaceId else { return }
+        open(.pendingIn(machineID: model.ref.machineID, workspaceId: workspaceId))
     }
 
     private func stop(hard: Bool) {

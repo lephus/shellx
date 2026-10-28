@@ -44,6 +44,10 @@ struct SignedInView: View {
                     SettingsView(email: email, signOut: signOut)
                 case .pending:
                     PendingListView(hub: hub, center: scope.decisions)
+                case let .pendingIn(machineID, workspaceId):
+                    PendingListView(
+                        hub: hub, center: scope.decisions,
+                        only: { $0.isIn(machineID: machineID, workspaceId: workspaceId) })
                 }
             }
         }

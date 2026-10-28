@@ -254,7 +254,7 @@
       }
     },
     "agent.open.hint": {
-      "comment": "VoiceOver hint of an agent row or a done note: activating it opens that agent's chat.",
+      "comment": "VoiceOver hint of an agent chip or a done note: activating it opens that agent's chat.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -721,42 +721,6 @@
         }
       }
     },
-    "home.agents.title %lld": {
-      "comment": "Title of the agent strip on the home; the number is how many sessions are running.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Agent · %lld"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Agents · %lld"
-                }
-              }
-            }
-          }
-        },
-        "vi": {
-          "variations": {
-            "plural": {
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Agent · %lld"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "home.empty": {
       "comment": "The home conversation before anything was said.",
       "extractionState": "manual",
@@ -789,6 +753,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mở Máy của bạn."
+          }
+        }
+      }
+    },
+    "home.needsYou.hint": {
+      "comment": "VoiceOver hint of the \"Needs you · N\" bar over a conversation: activating it opens the page with the pending requests.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens the requests waiting for you"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở các yêu cầu đang chờ bạn"
           }
         }
       }
@@ -987,24 +969,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Đã gửi tới %1$@ ở %2$@."
-          }
-        }
-      }
-    },
-    "home.pending.seeAll %lld": {
-      "comment": "Opens every pending request; the number is how many there are.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "See All (%lld)"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Xem tất cả (%lld)"
           }
         }
       }
@@ -2845,6 +2809,96 @@
         }
       }
     },
+    "settings.appearance.dark": {
+      "comment": "Appearance choice: always dark.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tối"
+          }
+        }
+      }
+    },
+    "settings.appearance.light": {
+      "comment": "Appearance choice: always light.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Light"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sáng"
+          }
+        }
+      }
+    },
+    "settings.appearance.mode": {
+      "comment": "Label of the light/dark picker in Settings (VoiceOver reads it; the segments show the choices).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Color mode"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chế độ màu"
+          }
+        }
+      }
+    },
+    "settings.appearance.system": {
+      "comment": "Appearance choice: follow the iPhone's own light/dark setting.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Match iPhone"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theo máy"
+          }
+        }
+      }
+    },
+    "settings.appearance.title": {
+      "comment": "Settings section header: light or dark look of the app.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appearance"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giao diện"
+          }
+        }
+      }
+    },
     "settings.title": {
       "comment": "Title of the Settings screen.",
       "extractionState": "manual",
@@ -3165,24 +3219,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "ShellX cần quyền micro và nhận dạng giọng nói để nghe bạn."
-          }
-        }
-      }
-    },
-    "voice.hint": {
-      "comment": "Under the mic in the composer.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hold to talk · swipe up to type"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Giữ để nói · vuốt lên để gõ"
           }
         }
       }
