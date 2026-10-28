@@ -577,6 +577,24 @@
         }
       }
     },
+    "composer.attach.cancelLoading": {
+      "comment": "VoiceOver label of the x on a placeholder tile in the composer while a picked photo or file is being read: stops reading it.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop adding attachment"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dừng thêm tệp đính kèm"
+          }
+        }
+      }
+    },
     "composer.attach.files": {
       "comment": "Menu item of the composer's + button: pick files with the Files app.",
       "extractionState": "manual",
@@ -627,6 +645,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ảnh"
+          }
+        }
+      }
+    },
+    "composer.attach.pickFailed": {
+      "comment": "Red line under the composer: the Files picker could not hand over what was picked.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open what you picked"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không mở được mục đã chọn"
           }
         }
       }
@@ -969,6 +1005,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mở các yêu cầu đang chờ bạn"
+          }
+        }
+      }
+    },
+    "home.note.attachmentsUnsupported %@ %@": {
+      "comment": "ShellX note: a message with photos or files was not sent, because the Mac no longer takes attachments. 1: agent name, 2: workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sent to %1$@ in %2$@: this Mac no longer takes photos or files."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa gửi tới %1$@ ở %2$@: Mac này không còn nhận ảnh hay tệp."
           }
         }
       }

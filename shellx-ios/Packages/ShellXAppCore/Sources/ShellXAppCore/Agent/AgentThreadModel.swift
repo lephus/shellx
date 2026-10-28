@@ -261,8 +261,8 @@ public final class AgentThreadModel {
     /// to send, the text is too long, or the attachments are too many or one is too big; `.offline`
     /// at once when the Mac is not online. The attachments go up first, then the message names them
     /// (`MachineHub.chatSend(_:text:attachments:progress:)`); `.notSent` when they surely did not
-    /// reach the session. `viaVoice` is how the user said it (Task 9); the Mac gets the same text
-    /// either way.
+    /// reach the session, `.attachmentsUnsupported` when the Mac no longer takes them. `viaVoice` is
+    /// how the user said it (Task 9); the Mac gets the same text either way.
     public func send(_ text: String, attachments: [OutgoingAttachment] = [], viaVoice: Bool) async -> AgentSendResult {
         let validation = ComposerValidation.message(text, attachments: attachments)
         guard case let .ok(message) = validation else { return .refused(validation) }
@@ -282,6 +282,8 @@ public final class AgentThreadModel {
             return .sent(outcome)
         } catch LinkCallError.offline, LinkCallError.needsPairing {
             return .offline
+        } catch AttachmentSendError.refused(code: "unsupported") {
+            return .attachmentsUnsupported
         } catch is AttachmentSendError {
             return .notSent
         } catch {

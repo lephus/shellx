@@ -130,6 +130,8 @@ struct AgentView: View {
             return String(localized: "agent.gone")
         case .sent(.failed), .sent(.other), .notSent:
             return String(localized: "home.note.failed \(agent) \(ref.workspaceTitle)")
+        case .attachmentsUnsupported:
+            return String(localized: "home.note.attachmentsUnsupported \(agent) \(ref.workspaceTitle)")
         case .offline:
             return String(localized: "home.note.offline \(machineName)")
         case .noAnswer:

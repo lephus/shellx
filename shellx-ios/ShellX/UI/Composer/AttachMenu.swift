@@ -2,17 +2,19 @@ import PhotosUI
 import ShellXAppCore
 import SwiftUI
 import UniformTypeIdentifiers
+import os
 
 /// The composer's "+": a menu of Photos (the system photo picker, for as many as there is room
 /// left) and Files (the Files picker, several at once). What is picked is read off the main actor
 /// (`AttachmentPreparer`) and added in the order picked, up to
 /// `ShellXLink.maxAttachmentsPerMessage`. What cannot be added says why through `note`, which a new
-/// pick clears. `loading` counts the picks still being read, from the moment the picker closes:
-/// the composer holds Send until it is back to 0, so no picked photo arrives after its message left.
+/// pick clears; so does a Files picker that fails to hand over what was picked. `picks` holds the
+/// picks still being read, from the moment the picker closes: the composer holds Send until none is
+/// left, so no picked photo arrives after its message left, and each one's ✕ cancels it.
 struct AttachMenu: View {
     @Binding var attachments: [OutgoingAttachment]
     /// Picks still being read.
-    @Binding var loading: Int
+    let picks: PendingPicks
     /// The button's side, the same as the send button's.
     let side: CGFloat
     /// The composer's red line: why something picked was not added; nil clears it.
@@ -22,8 +24,8 @@ struct AttachMenu: View {
     @State private var showsFiles = false
     @State private var pickedPhotos: [PhotosPickerItem] = []
 
-    /// How many more the message can carry.
-    private var room: Int { max(ShellXLink.maxAttachmentsPerMessage - attachments.count, 0) }
+    /// How many more the message can carry; a pick still being read holds its place.
+    private var room: Int { max(ShellXLink.maxAttachmentsPerMessage - attachments.count - picks.count, 0) }
 
     var body: some View {
         Menu {
@@ -55,8 +57,15 @@ struct AttachMenu: View {
             isPresented: $showsPhotos, selection: $pickedPhotos, maxSelectionCount: max(room, 1),
             matching: .images, preferredItemEncoding: .compatible)
         .fileImporter(isPresented: $showsFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
-            guard case let .success(urls) = result else { return }
-            addFiles(urls)
+            switch result {
+            case let .success(urls):
+                addFiles(urls)
+            case let .failure(error):
+                // The reason, never a name: the picker failed to hand over what was picked.
+                let reason = error as NSError
+                Self.log.notice("attach_pick_failed domain=\(reason.domain, privacy: .public) code=\(reason.code)")
+                note(String(localized: "composer.attach.pickFailed"))
+            }
         }
         .onChange(of: pickedPhotos) { _, items in
             guard !items.isEmpty else { return }
@@ -66,44 +75,42 @@ struct AttachMenu: View {
     }
 
     private func addPhotos(_ items: [PhotosPickerItem]) {
-        loading += items.count
-        Task {
-            for item in items {
-                defer { loading -= 1 }
-                let types = item.supportedContentTypes
-                let taken = attachments.map(\.name)
-                do {
-                    guard let data = try await item.loadTransferable(type: Data.self) else {
-                        throw AttachmentPreparer.Failure.unreadable(
-                            name: AttachmentPreparer.photoName(for: Data(), contentTypes: types, taken: taken))
-                    }
-                    let attachment = try await Task.detached(priority: .userInitiated) {
-                        try AttachmentPreparer.image(
-                            data: data, name: AttachmentPreparer.photoName(for: data, contentTypes: types, taken: taken))
-                    }.value
-                    add(attachment)
-                } catch {
-                    let name = AttachmentPreparer.photoName(for: Data(), contentTypes: types, taken: taken)
-                    note((error as? AttachmentPreparer.Failure ?? .unreadable(name: name)).message)
-                }
-            }
-        }
+        picks.read(items.map { item in { try await loadPhoto(item) } }, done: received)
     }
 
     private func addFiles(_ urls: [URL]) {
-        loading += urls.count
-        Task {
-            for url in urls {
-                defer { loading -= 1 }
-                do {
-                    let attachment = try await Task.detached(priority: .userInitiated) {
-                        try AttachmentPreparer.file(at: url)
-                    }.value
-                    add(attachment)
-                } catch {
-                    note((error as? AttachmentPreparer.Failure ?? .unreadable(name: url.lastPathComponent)).message)
-                }
+        picks.read(urls.map { url in { try await AttachmentPreparer.readFile(at: url) } }, done: received)
+    }
+
+    /// One picked photo, as picked. Named when its read starts, after what the composer holds then,
+    /// so photos read one after another get distinct names. Throws `AttachmentPreparer.Failure`.
+    private func loadPhoto(_ item: PhotosPickerItem) async throws -> OutgoingAttachment {
+        let types = item.supportedContentTypes
+        let taken = attachments.map(\.name)
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                throw AttachmentPreparer.Failure.unreadable(
+                    name: AttachmentPreparer.photoName(for: Data(), contentTypes: types, taken: taken))
             }
+            return try await Task.detached(priority: .userInitiated) {
+                try AttachmentPreparer.image(
+                    data: data, name: AttachmentPreparer.photoName(for: data, contentTypes: types, taken: taken))
+            }.value
+        } catch let failure as AttachmentPreparer.Failure {
+            throw failure
+        } catch {
+            throw AttachmentPreparer.Failure.unreadable(
+                name: AttachmentPreparer.photoName(for: Data(), contentTypes: types, taken: taken))
+        }
+    }
+
+    /// A pick's read ended (a cancelled pick never gets here).
+    private func received(_ result: Result<OutgoingAttachment, any Error>) {
+        switch result {
+        case let .success(attachment):
+            add(attachment)
+        case let .failure(error):
+            note((error as? AttachmentPreparer.Failure)?.message ?? String(localized: "composer.attach.pickFailed"))
         }
     }
 
@@ -115,4 +122,6 @@ struct AttachMenu: View {
         }
         attachments.append(attachment)
     }
+
+    private static let log = Logger(subsystem: "com.shellx.app", category: "attachments")
 }

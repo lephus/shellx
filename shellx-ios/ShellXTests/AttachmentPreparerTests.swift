@@ -100,6 +100,50 @@ final class AttachmentPreparerTests: XCTestCase {
         XCTAssertEqual(attachment.data, text)
     }
 
+    /// The composer reads a picked file off the main actor through `readFile(at:)`: the same bytes.
+    func testAPickedFileIsReadOffTheMainActor() async throws {
+        let url = try temporaryFile("notes.md", bytes: 0)
+        let text = Data("# notes\n".utf8)
+        try text.write(to: url)
+
+        let attachment = try await AttachmentPreparer.readFile(at: url)
+
+        XCTAssertEqual(attachment.name, "notes.md")
+        XCTAssertEqual(attachment.data, text)
+    }
+
+    /// Finding I3: a coordinated read that never gets its file (an iCloud item that does not
+    /// download; here a file presenter that keeps the file) stops when its pick is cancelled,
+    /// instead of holding the composer for good.
+    func testCancellingAHungFileReadStopsIt() async throws {
+        let url = try temporaryFile("held.txt", bytes: 4)
+        let presenter = HoldingPresenter(url)
+        NSFileCoordinator.addFilePresenter(presenter)
+        defer {
+            NSFileCoordinator.removeFilePresenter(presenter)
+            presenter.letGo()
+        }
+
+        let read = Task { try await AttachmentPreparer.readFile(at: url) }
+        let ended = Flag()
+        Task {
+            _ = await read.result
+            ended.set()
+        }
+        let held = await Self.eventually { presenter.wasAsked }
+        XCTAssertTrue(held, "the read did not wait for the file presenter")
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertFalse(ended.isSet, "the read did not wait")
+
+        read.cancel()
+        let stopped = await Self.eventually { ended.isSet }
+        XCTAssertTrue(stopped, "the cancelled read still waits for the file")
+        // A read that did not stop goes on once the file is free, so this test never hangs.
+        presenter.letGo()
+        let result = await read.result
+        XCTAssertThrowsError(try result.get(), "a cancelled read reads nothing")
+    }
+
     func testUnreadableFileIsRefused() throws {
         let empty = try temporaryFile("empty.txt", bytes: 0)
         XCTAssertThrowsError(try AttachmentPreparer.file(at: empty)) { error in
@@ -115,10 +159,57 @@ final class AttachmentPreparerTests: XCTestCase {
         }
     }
 
+    private static func eventually(_ condition: @Sendable () -> Bool) async -> Bool {
+        let deadline = ContinuousClock.now + .seconds(5)
+        while ContinuousClock.now < deadline {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return condition()
+    }
+
     func testEveryFailureSaysWhichAttachment() {
         let failures: [AttachmentPreparer.Failure] = [.tooLarge(name: "video.mov"), .unreadable(name: "video.mov")]
         let messages = failures.map(\.message)
         XCTAssertEqual(Set(messages).count, 2)
         for message in messages { XCTAssertTrue(message.contains("video.mov"), message) }
     }
+}
+
+/// A file presenter that keeps its file from every reader until `letGo()`: a coordinated read of it
+/// waits meanwhile.
+private final class HoldingPresenter: NSObject, NSFilePresenter, @unchecked Sendable {
+    let presentedItemURL: URL?
+    let presentedItemOperationQueue = OperationQueue()
+    private let lock = NSLock()
+    private var reader: (@Sendable ((@Sendable () -> Void)?) -> Void)?
+    private var asked = false
+
+    init(_ url: URL) {
+        presentedItemURL = url
+    }
+
+    var wasAsked: Bool { lock.withLock { asked } }
+
+    func relinquishPresentedItem(toReader reader: @escaping @Sendable ((@Sendable () -> Void)?) -> Void) {
+        lock.withLock {
+            self.reader = reader
+            asked = true
+        }
+    }
+
+    func letGo() {
+        let reader = lock.withLock { () -> (@Sendable ((@Sendable () -> Void)?) -> Void)? in
+            defer { self.reader = nil }
+            return self.reader
+        }
+        reader?(nil)
+    }
+}
+
+private final class Flag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+    var isSet: Bool { lock.withLock { value } }
+    func set() { lock.withLock { value = true } }
 }

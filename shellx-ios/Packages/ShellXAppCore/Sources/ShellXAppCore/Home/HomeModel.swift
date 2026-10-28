@@ -250,6 +250,9 @@ public final class HomeModel {
                 append(.note(HomeNote(sendOutcome: outcome, to: target)))
                 return .kept
             }
+        } catch AttachmentSendError.refused(code: "unsupported") {
+            append(.note(.sendFailed(target, .attachmentsUnsupported)))
+            return .kept
         } catch is AttachmentSendError {
             append(.note(.sendFailed(target, .failed)))
             return .kept

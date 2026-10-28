@@ -5,15 +5,18 @@ import UIKit
 
 /// The attachments waiting in the composer: a row of 56 pt tiles above the field, a photo as its
 /// thumbnail and a file as a `doc` icon over its name, then a spinner tile for each pick still
-/// being read. Each tile has an ✕ that takes it out, off while the message is being sent
-/// (`locked`).
+/// being read. Each tile has an ✕: on an attachment it takes it out, off while the message is
+/// being sent (`locked`); on a spinner it stops that read (`cancelLoading`), so a photo or file that
+/// never finishes loading never holds the composer.
 struct AttachmentStrip: View {
     static let tileSide: CGFloat = 56
 
     @Binding var attachments: [OutgoingAttachment]
     let locked: Bool
-    /// Picks still being read.
-    var loading = 0
+    /// The picks still being read, in the order picked (`PendingPicks.ids`).
+    var loading: [UUID] = []
+    /// Stops reading one of `loading`.
+    var cancelLoading: (UUID) -> Void = { _ in }
     /// One was taken out.
     let removed: () -> Void
 
@@ -23,12 +26,17 @@ struct AttachmentStrip: View {
                 ForEach(attachments) { attachment in
                     tile(attachment)
                 }
-                ForEach(0..<max(loading, 0), id: \.self) { _ in
+                ForEach(loading, id: \.self) { id in
                     ProgressView()
                         .frame(width: Self.tileSide, height: Self.tileSide)
                         .background(Color(uiColor: .secondarySystemGroupedBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         .accessibilityLabel(Text(LocalizedStringResource("composer.attach.loading")))
+                        .overlay(alignment: .topTrailing) {
+                            removeButton(label: String(localized: "composer.attach.cancelLoading")) {
+                                cancelLoading(id)
+                            }
+                        }
                 }
             }
             // Room for the ✕ buttons, which stand out of the tiles' corners.
@@ -46,23 +54,28 @@ struct AttachmentStrip: View {
             .background(Color(uiColor: .secondarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay(alignment: .topTrailing) {
-                Button {
+                removeButton(label: String(localized: "composer.attachment.remove \(attachment.name)")) {
                     attachments.removeAll { $0.id == attachment.id }
                     removed()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Color(uiColor: .systemBackground))
-                        .frame(width: 20, height: 20)
-                        .background(Color(uiColor: .secondaryLabel), in: Circle())
-                        .frame(width: 32, height: 32)
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .offset(x: 12, y: -12)
                 .disabled(locked)
-                .accessibilityLabel(Text(verbatim: String(localized: "composer.attachment.remove \(attachment.name)")))
             }
+    }
+
+    /// The ✕ standing out of a tile's top-trailing corner, with a 32 pt target.
+    private func removeButton(label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(Color(uiColor: .systemBackground))
+                .frame(width: 20, height: 20)
+                .background(Color(uiColor: .secondaryLabel), in: Circle())
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .offset(x: 12, y: -12)
+        .accessibilityLabel(Text(verbatim: label))
     }
 
     @ViewBuilder private func content(_ attachment: OutgoingAttachment) -> some View {

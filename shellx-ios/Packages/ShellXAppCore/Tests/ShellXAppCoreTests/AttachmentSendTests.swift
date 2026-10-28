@@ -296,9 +296,10 @@ final class AttachmentSendTests: XCTestCase {
             "sửa lỗi này", attachments: [shot], to: rig.home.messageTarget, viaVoice: false)
 
         XCTAssertEqual(result, .kept)
-        XCTAssertEqual(rig.home.entries.map(\.content), [.note(.sendFailed(ref(mac), .failed))])
+        // Finding M4: said apart from a send that failed and can be tried again.
+        XCTAssertEqual(rig.home.entries.map(\.content), [.note(.sendFailed(ref(mac), .attachmentsUnsupported))])
         let agentResult = await model(ref(mac), rig).send("sửa lỗi này", attachments: [shot], viaVoice: false)
-        XCTAssertEqual(agentResult, .notSent)
+        XCTAssertEqual(agentResult, .attachmentsUnsupported)
         XCTAssertTrue(agentResult.keepsDraft)
         do {
             _ = try await rig.hub.chatSend(ref(mac), text: "x", attachments: [shot]) { _ in }
@@ -320,6 +321,7 @@ final class AttachmentSendTests: XCTestCase {
 
         let agentResult = await model(ref(mac), rig).send("xem", attachments: [empty], viaVoice: false)
 
+        // A refusal other than `unsupported` is a plain failure, to try again.
         XCTAssertEqual(agentResult, .notSent)
         XCTAssertTrue(agentResult.keepsDraft)
         let result = await rig.home.submit("xem", attachments: [empty], to: rig.home.messageTarget, viaVoice: false)

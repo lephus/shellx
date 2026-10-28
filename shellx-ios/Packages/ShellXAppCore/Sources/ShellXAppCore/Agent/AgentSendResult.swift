@@ -11,9 +11,12 @@ public enum AgentSendResult: Equatable, Sendable {
     /// The session's Mac is not online: nothing was sent or queued (spec section 7.5).
     case offline
     /// A message with attachments that surely did not reach the session: an upload failed (the link
-    /// dropped, or the Mac refused it), the Mac does not take attachments, or it refused the message
-    /// that named them. Nothing was typed.
+    /// dropped, or the Mac refused it), or the Mac refused the message that named them. Nothing was
+    /// typed; it can be sent again.
     case notSent
+    /// A message with attachments that the Mac no longer takes them for (`unsupported`): nothing was
+    /// typed, and sending it again will not help until the Mac takes attachments again.
+    case attachmentsUnsupported
     /// The link failed before the Mac answered: the text may or may not have arrived.
     case noAnswer
 
@@ -22,7 +25,8 @@ public enum AgentSendResult: Equatable, Sendable {
     /// could deliver it twice.
     public var keepsDraft: Bool {
         switch self {
-        case .refused(.tooLong), .refused(.tooManyAttachments), .refused(.attachmentTooLarge), .offline, .notSent:
+        case .refused(.tooLong), .refused(.tooManyAttachments), .refused(.attachmentTooLarge), .offline, .notSent,
+             .attachmentsUnsupported:
             return true
         case .refused: return false
         case .sent(.submitted), .noAnswer: return false

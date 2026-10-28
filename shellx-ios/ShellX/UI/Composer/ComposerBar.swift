@@ -22,7 +22,8 @@ import SwiftUI
 ///
 /// With `attachments`, the "+" adds photos and files (`AttachMenu`); they wait in a row above the
 /// field (`AttachmentStrip`) and make the button Send even with no text. Too many, or one too big,
-/// is said in red under the field like "Too long", and the button stays off. A message with
+/// is said in red under the field like "Too long", and the button stays off. A pick still being read
+/// shows as a spinner tile, and Send waits for it; its ✕ cancels it. A message with
 /// attachments stays in the bar while it is sent: `sending` (the upload's progress) locks the bar
 /// and turns the button into a progress ring, and the owner clears the text and the attachments
 /// once the Mac took them, or leaves them to send again. A message of text only leaves the field at
@@ -52,8 +53,8 @@ struct ComposerBar<Accessory: View>: View {
     @State private var cutText: String?
     /// Why something picked was not added (too big, unreadable, too many).
     @State private var attachNote: String?
-    /// Picks still being read: Send waits for them.
-    @State private var loadingPicks = 0
+    /// Picks still being read: Send waits for them, and each one's ✕ cancels it.
+    @State private var picks = PendingPicks()
     @FocusState private var focused: Bool
     @ScaledMetric(relativeTo: .body) private var buttonSize: CGFloat = 44
 
@@ -81,7 +82,7 @@ struct ComposerBar<Accessory: View>: View {
     /// The mic, while the field and the attachments are empty, nothing is being picked or sent, and
     /// a recognizer can run.
     private var mic: VoiceInputModel? {
-        guard let voice, text.isEmpty, picked.isEmpty, loadingPicks == 0, sending == nil else { return nil }
+        guard let voice, text.isEmpty, picked.isEmpty, picks.count == 0, sending == nil else { return nil }
         if case .unavailable = voice.phase { return nil }
         return voice
     }
@@ -94,10 +95,11 @@ struct ComposerBar<Accessory: View>: View {
                 VoiceStatusView(model: voice, level: voiceService?.meter.level ?? 0)
                     .padding(.bottom, 2)
             }
-            if let attachments, !attachments.wrappedValue.isEmpty || loadingPicks > 0 {
+            if let attachments, !attachments.wrappedValue.isEmpty || picks.count > 0 {
+                let picks = self.picks
                 AttachmentStrip(
-                    attachments: attachments, locked: sending != nil, loading: loadingPicks,
-                    removed: { attachNote = nil })
+                    attachments: attachments, locked: sending != nil, loading: picks.ids,
+                    cancelLoading: { picks.cancel($0) }, removed: { attachNote = nil })
                     .padding(.bottom, 2)
             }
             field(validation)
@@ -162,7 +164,7 @@ struct ComposerBar<Accessory: View>: View {
     private func field(_ validation: ComposerValidation) -> some View {
         HStack(alignment: .bottom, spacing: 8) {
             if let attachments {
-                AttachMenu(attachments: attachments, loading: $loadingPicks, side: side, note: { attachNote = $0 })
+                AttachMenu(attachments: attachments, picks: picks, side: side, note: { attachNote = $0 })
                     .disabled(sending != nil)
                     .opacity(sending != nil ? 0.4 : 1)
             }
@@ -209,10 +211,10 @@ struct ComposerBar<Accessory: View>: View {
     }
 
     private func sendButtonIdle(_ validation: ComposerValidation) -> some View {
-        let canSend = validation.canSend && loadingPicks == 0
+        let canSend = validation.canSend && picks.count == 0
         return Button {
             // A pick still being read would arrive after its message left.
-            guard case let .ok(message) = validation, loadingPicks == 0 else { return }
+            guard case let .ok(message) = validation, picks.count == 0 else { return }
             let carried = picked
             send(message, carried)
             attachNote = nil

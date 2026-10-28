@@ -232,6 +232,7 @@ final class HomeRenderTests: XCTestCase {
             .sendFailed(Self.shellx, .failed), .sendFailed(Self.shellx, .noAnswer),
             .machineOffline(machineName: "MacBook Pro"), .noLiveSession,
             .agentFinished(Self.shellx, summary: "CI xanh"), .agentFinished(Self.shellx, summary: nil),
+            .sendFailed(Self.shellx, .attachmentsUnsupported),
         ]
         let texts = notes.map(HomeNoteRow.text(for:))
         XCTAssertEqual(Set(texts).count, notes.count, "each note reads differently")

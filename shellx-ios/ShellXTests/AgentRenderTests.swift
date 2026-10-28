@@ -257,6 +257,10 @@ final class AgentRenderTests: XCTestCase {
         XCTAssertEqual(
             AgentView.text(for: .sent(.other("x")), ref: Self.ref, machineName: "MacBook Pro"),
             AgentView.text(for: .sent(.failed), ref: Self.ref, machineName: "MacBook Pro"))
+        // A Mac that no longer takes photos or files says so, apart from a send to try again.
+        let unsupported = AgentView.text(for: .attachmentsUnsupported, ref: Self.ref, machineName: "MacBook Pro")
+        XCTAssertEqual(unsupported, String(localized: "home.note.attachmentsUnsupported \(AgentLabel(agent: Self.ref.agent).text) \(Self.ref.workspaceTitle)"))
+        XCTAssertNotEqual(unsupported, AgentView.text(for: .notSent, ref: Self.ref, machineName: "MacBook Pro"))
 
         let stops = [
             StopButton.text(for: .sent, offline: false, machineName: "MacBook Pro"),

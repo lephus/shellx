@@ -12,4 +12,8 @@ public enum SendFailure: String, Codable, Sendable {
     case failed
     /// No answer from the Mac: the message may or may not have arrived.
     case noAnswer
+    /// The message carried photos or files, and the Mac no longer takes them (it answered
+    /// `unsupported`, or its session no longer lists the feature). Nothing was typed; sending it
+    /// again will not help until the Mac takes attachments again.
+    case attachmentsUnsupported
 }

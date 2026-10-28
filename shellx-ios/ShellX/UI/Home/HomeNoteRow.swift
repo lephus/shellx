@@ -70,6 +70,8 @@ struct HomeNoteRow: View {
             case .busy: return String(localized: "home.note.busy \(agent(ref)) \(ref.workspaceTitle)")
             case .failed: return String(localized: "home.note.failed \(agent(ref)) \(ref.workspaceTitle)")
             case .noAnswer: return String(localized: "home.note.noAnswer \(agent(ref)) \(ref.workspaceTitle)")
+            case .attachmentsUnsupported:
+                return String(localized: "home.note.attachmentsUnsupported \(agent(ref)) \(ref.workspaceTitle)")
             }
         case let .machineOffline(machineName):
             return String(localized: "home.note.offline \(machineName)")

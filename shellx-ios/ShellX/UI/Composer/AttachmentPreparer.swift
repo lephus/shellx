@@ -32,11 +32,26 @@ enum AttachmentPreparer {
         return OutgoingAttachment(kind: .image, name: name, data: data)
     }
 
+    /// `file(at:)` off the main actor, as the composer reads a picked file. Cancelling the calling
+    /// task cancels the coordinated read, so an iCloud download that stalls stops with the pick's ✕
+    /// (the read then throws, and the composer has dropped the pick already).
+    static func readFile(at url: URL) async throws -> OutgoingAttachment {
+        let read = CancellableRead()
+        return try await withTaskCancellationHandler {
+            try await Task.detached(priority: .userInitiated) {
+                if read.isCancelled { throw Failure.unreadable(name: url.lastPathComponent) }
+                return try file(at: url, coordinator: read.coordinator)
+            }.value
+        } onCancel: {
+            read.cancel()
+        }
+    }
+
     /// A file from the Files picker, named as it is there. It is read under security-scoped access,
-    /// through `NSFileCoordinator`, which first downloads an iCloud Drive item that is not on the
-    /// iPhone yet (a plain read fails on it). Its size is checked before the read when the file
-    /// system knows it, so a file too big is refused without being read, and again after.
-    static func file(at url: URL) throws -> OutgoingAttachment {
+    /// through `coordinator`, which first downloads an iCloud Drive item that is not on the iPhone
+    /// yet (a plain read fails on it). Its size is checked before the read when the file system
+    /// knows it, so a file too big is refused without being read, and again after.
+    static func file(at url: URL, coordinator: NSFileCoordinator = NSFileCoordinator()) throws -> OutgoingAttachment {
         let name = url.lastPathComponent
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
@@ -44,7 +59,7 @@ enum AttachmentPreparer {
 
         var coordinationError: NSError?
         var read: Result<Data, any Error> = .failure(Failure.unreadable(name: name))
-        NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { local in
+        coordinator.coordinate(readingItemAt: url, options: [], error: &coordinationError) { local in
             // Downloaded now: its size may be known only here.
             if let size = fileSize(local), size > ShellXLink.maxAttachmentBytes {
                 read = .failure(Failure.tooLarge(name: name))
@@ -70,6 +85,21 @@ enum AttachmentPreparer {
     }
 
     private static let log = Logger(subsystem: "com.shellx.app", category: "attachments")
+
+    /// A coordinated read another task can stop: `NSFileCoordinator.cancel()` is meant to be called
+    /// from another thread than the one that reads, and makes the read return at once with an error.
+    private final class CancellableRead: @unchecked Sendable {
+        let coordinator = NSFileCoordinator()
+        private let lock = NSLock()
+        private var cancelled = false
+
+        var isCancelled: Bool { lock.withLock { cancelled } }
+
+        func cancel() {
+            lock.withLock { cancelled = true }
+            coordinator.cancel()
+        }
+    }
 
     private static func fileSize(_ url: URL) -> Int? {
         try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize

@@ -153,10 +153,10 @@ final class MicButtonRenderTests: XCTestCase {
     }
 
     func testPicksStillLoadingShowInTheStrip() throws {
-        // Two picked photos still load: they hold a place, and Send waits for them.
+        // Two picked photos still load: they hold a place, Send waits for them, and each has an ✕ to stop it.
         let strip = VStack {
             Spacer()
-            AttachmentStrip(attachments: .constant(Self.attachments), locked: false, loading: 2, removed: {})
+            AttachmentStrip(attachments: .constant(Self.attachments), locked: false, loading: [UUID(), UUID()], removed: {})
                 .padding(.horizontal, 16)
         }
         .background(Color.appBackground)
