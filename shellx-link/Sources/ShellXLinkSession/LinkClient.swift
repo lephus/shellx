@@ -71,6 +71,16 @@ public actor LinkClient {
     /// `call_id` is not here (the call timed out or was cancelled) is dropped.
     private var waiters: [String: Waiter] = [:]
     private var endError: LinkClientError?
+    /// The callers of ``uploadAttachment(kind:name:data:progress:)`` waiting for their turn, oldest first. An
+    /// upload runs from `attach.begin` to its end with no other upload in between (the host drops an unfinished
+    /// upload at every `attach.begin`), and this actor is reentrant at every `await`: hence a gate.
+    private var uploadWaiters: [(ticket: Int, continuation: CheckedContinuation<Void, any Error>)] = []
+    /// True while an upload holds the turn, from the moment it gets it until ``releaseUploadTurn()``.
+    private var uploadBusy = false
+    private var nextUploadTicket = 0
+
+    /// How many uploads wait behind the one running. For tests.
+    var uploadsWaiting: Int { uploadWaiters.count }
 
     /// One caller waiting for an answer, and the timer that fails it after `requestTimeout`.
     private struct Waiter {
@@ -234,13 +244,16 @@ public actor LinkClient {
     /// `"bad_request"` for a kind other than `.image` and `.file` or a sixth unsent upload, `"unsupported"`
     /// without the feature.
     ///
-    /// Upload one attachment at a time: the host drops an unfinished upload when the next `attach.begin` arrives,
-    /// so a failed or cancelled upload needs no cleanup, but two uploads running at once would drop each other.
-    /// A finished upload waits for a `chat.send` for `ShellXLink.unsentUploadLifetime` (5 minutes) after its
+    /// Uploads of one client run one at a time, in the order they were called: a caller waits for the upload
+    /// before it to finish or fail (the host drops an unfinished upload at the next `attach.begin`, so two at once
+    /// would drop each other). A failed or cancelled upload needs no cleanup and gives up its turn; so does a caller
+    /// cancelled while it waits. A finished upload waits for a `chat.send` for `ShellXLink.unsentUploadLifetime` (5 minutes) after its
     /// `attach.end`; later its id is `bad_request` and the attachment must be uploaded again.
     public func uploadAttachment(
         kind: AttachmentKind, name: String, data: Data, progress: @Sendable (Int) -> Void = { _ in }
     ) async throws -> String {
+        try await acquireUploadTurn()
+        defer { releaseUploadTurn() }
         let size = data.count
         let ready = try await call { .attachBegin(callId: $0, kind: kind, name: name, size: size) }
         guard case let .attachReady(_, attachmentId) = ready else { throw LinkClientError.unexpectedAnswer }
@@ -271,6 +284,46 @@ public actor LinkClient {
         let answer = try await call { .chatInterrupt(callId: $0, sessionId: sessionId, hard: hard) }
         guard case let .chatInterruptResult(_, outcome) = answer else { throw LinkClientError.unexpectedAnswer }
         return outcome
+    }
+
+    /// Waits for the turn to upload. Throws `CancellationError` when the caller is cancelled first, and the session's
+    /// end error when it ends first; either way the caller holds no turn.
+    private func acquireUploadTurn() async throws {
+        try checkOpen()
+        guard uploadBusy else {
+            uploadBusy = true
+            return
+        }
+        let ticket = nextUploadTicket
+        nextUploadTicket += 1
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                // This body and `leaveUploadQueue` both run on the actor, so a cancellation that came first is
+                // seen here, and one that comes later finds the waiter queued.
+                if Task.isCancelled {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                uploadWaiters.append((ticket, continuation))
+            }
+        } onCancel: {
+            Task { await self.leaveUploadQueue(ticket) }
+        }
+    }
+
+    /// Hands the turn to the oldest waiter, or frees it. The turn passes directly, so `uploadBusy` stays true.
+    private func releaseUploadTurn() {
+        guard !uploadWaiters.isEmpty else {
+            uploadBusy = false
+            return
+        }
+        uploadWaiters.removeFirst().continuation.resume()
+    }
+
+    /// A waiter whose task was cancelled leaves the queue. One that already got the turn is not in it.
+    private func leaveUploadQueue(_ ticket: Int) {
+        guard let index = uploadWaiters.firstIndex(where: { $0.ticket == ticket }) else { return }
+        uploadWaiters.remove(at: index).continuation.resume(throwing: CancellationError())
     }
 
     /// Ends the session and closes the circuit. Pending calls throw `LinkClientError.sessionClosed`.
@@ -380,6 +433,10 @@ public actor LinkClient {
         let pending = waiters
         waiters = [:]
         for waiter in pending.values { waiter.resume(throwing: error) }
+        // Callers still waiting for an upload turn fail the same way; the one running fails on its call.
+        let queued = uploadWaiters
+        uploadWaiters = []
+        for waiter in queued { waiter.continuation.resume(throwing: error) }
         changesContinuation.finish()
         sessionChangesContinuation.finish()
         chatEntriesContinuation.finish()

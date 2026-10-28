@@ -434,6 +434,102 @@ final class AttachmentSessionTests: XCTestCase {
         await expectRemote("bad_request") { try await reconnected.chatSend(sessionId: "s1", text: "x", attachments: [third]) }
     }
 
+    // MARK: - One upload at a time
+
+    /// The host drops an unfinished upload at every `attach.begin`, so a client must not run two uploads at once.
+    func testConcurrentUploadsOnOneClientBothArrive() async throws {
+        let chat = FakeChatSource(["s1": []], acceptsAttachments: true)
+        let client = try await connect(makeHost(chat: chat))
+        let first = Data((0..<100_000).map { UInt8($0 % 251) })
+        let second = Data((0..<120_000).map { UInt8(($0 * 7) % 253) })
+
+        async let firstId = client.uploadAttachment(kind: .file, name: "first.bin", data: first)
+        async let secondId = client.uploadAttachment(kind: .image, name: "second.jpg", data: second)
+        // Every step is a call with a 10 s timeout, so a lost answer fails this instead of hanging it.
+        let ids = try await [firstId, secondId]
+
+        let outcome = try await within { try await client.chatSend(sessionId: "s1", text: "both", attachments: ids) }
+        XCTAssertEqual(outcome, .submitted)
+        XCTAssertEqual(chat.attachmentSends.first?.attachments, [
+            ChatAttachment(kind: .file, name: "first.bin", data: first),
+            ChatAttachment(kind: .image, name: "second.jpg", data: second),
+        ])
+    }
+
+    func testCancelledUploadReleasesTheTurn() async throws {
+        let client = try await connectToAHostThatStallsTheFirstUpload()
+        let progress = Collector<Int>()
+        let first = Task {
+            try await client.uploadAttachment(kind: .file, name: "a", data: Data(count: 100_000)) { progress.append($0) }
+        }
+        // The first upload has its turn and now waits for the answer to its second chunk, which never comes.
+        let running = await eventually { progress.items == [45_000] }
+        XCTAssertTrue(running, "the first upload did not start")
+        let second = Task { try await client.uploadAttachment(kind: .file, name: "b", data: Data([1, 2, 3])) }
+        let queued = await waitForQueue(of: client, toReach: 1)
+        XCTAssertTrue(queued, "the second upload did not wait for its turn")
+
+        first.cancel()
+        do {
+            let id = try await within { try await first.value }
+            XCTFail("the cancelled upload returned \(id)")
+        } catch is CancellationError {
+        } catch {
+            XCTFail("expected CancellationError, got \(error)")
+        }
+        let id = try await within { try await second.value }
+        XCTAssertEqual(id, "U2")
+    }
+
+    func testCancelledWaiterLeavesTheQueue() async throws {
+        let client = try await connectToAHostThatStallsTheFirstUpload()
+        let progress = Collector<Int>()
+        let first = Task {
+            try await client.uploadAttachment(kind: .file, name: "a", data: Data(count: 100_000)) { progress.append($0) }
+        }
+        let running = await eventually { progress.items == [45_000] }
+        XCTAssertTrue(running, "the first upload did not start")
+        let middle = Task { try await client.uploadAttachment(kind: .file, name: "b", data: Data([1])) }
+        let last = Task { try await client.uploadAttachment(kind: .file, name: "c", data: Data([2])) }
+        let queued = await waitForQueue(of: client, toReach: 2)
+        XCTAssertTrue(queued, "the two uploads did not wait for their turn")
+
+        // A waiter that gives up is out of the queue at once, and the turn skips it.
+        middle.cancel()
+        do {
+            let id = try await within { try await middle.value }
+            XCTFail("the cancelled waiter returned \(id)")
+        } catch is CancellationError {
+        } catch {
+            XCTFail("expected CancellationError, got \(error)")
+        }
+        let afterCancel = await waitForQueue(of: client, toReach: 1)
+        XCTAssertTrue(afterCancel, "the cancelled waiter is still queued")
+
+        first.cancel()
+        _ = await first.result
+        // The host saw one begin from the first upload and one from the last: the waiter that left sent nothing.
+        let id = try await within { try await last.value }
+        XCTAssertEqual(id, "U2")
+    }
+
+    func testAFailedUploadReleasesTheTurn() async throws {
+        let chat = FakeChatSource(["s1": []], acceptsAttachments: true)
+        let client = try await connect(makeHost(chat: chat))
+        async let refused: String = client.uploadAttachment(
+            kind: .file, name: "big", data: Data(count: ShellXLink.maxAttachmentBytes + 1))
+        async let fine = client.uploadAttachment(kind: .file, name: "ok", data: Data([1, 2]))
+        do {
+            let id = try await refused
+            XCTFail("the oversize upload returned \(id)")
+        } catch let LinkClientError.remote(code, _) {
+            XCTAssertEqual(code, "too_large")
+        }
+        let id = try await fine
+        let outcome = try await within { try await client.chatSend(sessionId: "s1", text: "", attachments: [id]) }
+        XCTAssertEqual(outcome, .submitted)
+    }
+
     // MARK: - Hosts without attachments
 
     func testHostWithoutAttachmentsAdvertisesNothing() async throws {
@@ -535,6 +631,55 @@ final class AttachmentSessionTests: XCTestCase {
         XCTAssertEqual(
             welcome, .welcome(protocolVersion: 1, hostVersion: "test-host", machineName: "Test Mac", features: features))
         return raw
+    }
+
+    /// A client connected to a scripted host that takes uploads as `U1`, `U2`, ... and never answers the second chunk
+    /// of `U1`, so the first upload stays running until the test cancels it.
+    private func connectToAHostThatStallsTheFirstUpload() async throws -> LinkClient {
+        let hostKey = NoiseStaticKey()
+        let clientKey = NoiseStaticKey()
+        let (clientEnd, hostEnd) = makeInMemoryCircuitPair()
+        serveTasks.append(Task {
+            do {
+                let channel = try await SecureChannel.open(hostEnd, role: .responder, key: hostKey, trusts: { _ in true })
+                _ = try await channel.receive()
+                try await channel.send(.welcome(
+                    protocolVersion: 1, hostVersion: "test", machineName: "mac", features: ["attachments"]))
+                var held: [String: Int] = [:]
+                var begun = 0
+                while true {
+                    switch try await channel.receive() {
+                    case let .attachBegin(callId, _, _, _):
+                        begun += 1
+                        held["U\(begun)"] = 0
+                        try await channel.send(.attachReady(callId: callId, attachmentId: "U\(begun)"))
+                    case let .attachChunk(callId, id, offset, data):
+                        if id == "U1", offset > 0 { continue }
+                        held[id, default: 0] += data.count
+                        try await channel.send(.attachChunkResult(callId: callId, attachmentId: id, received: held[id] ?? 0))
+                    case let .attachEnd(callId, id, _):
+                        try await channel.send(.attachEndResult(callId: callId, attachmentId: id))
+                    default:
+                        continue
+                    }
+                }
+            } catch {
+                // The circuit closed: the test is over.
+            }
+        })
+        let client = try await LinkClient.connect(
+            clientEnd, key: clientKey, hostKey: hostKey.publicKey, clientVersion: "test-client",
+            deviceName: "Test Phone", timings: .standard)
+        clients.append(client)
+        return client
+    }
+
+    private func waitForQueue(of client: LinkClient, toReach count: Int) async -> Bool {
+        for _ in 0..<400 {
+            if await client.uploadsWaiting == count { return true }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        return false
     }
 
     /// `attach.begin` of an image of `size` bytes; returns the host's id.
