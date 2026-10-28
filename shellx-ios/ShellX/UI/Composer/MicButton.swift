@@ -6,7 +6,8 @@ import SwiftUI
 /// grow with the voice (still under Reduce Motion). Lifting the
 /// finger hands what was said to `onOutcome` (`VoiceInputModel.outcome(for:)`); dragging left arms
 /// cancel (`VoiceInputModel.drag`); swiping up before any word asks for the keyboard (the host
-/// watches `wantsKeyboard`). Haptics: a light tap as listening starts, success when the words are
+/// watches `wantsKeyboard`). Only a lift sends: a hold taken away without one (a pager or a scroll
+/// view claimed the touch) cancels (`MicHold`). Haptics: a light tap as listening starts, success when the words are
 /// taken whole (not for words stopped at the byte limit, which go to a field to be read), a warning
 /// on cancel.
 ///

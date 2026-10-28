@@ -77,6 +77,26 @@ final class VoiceServiceTests: XCTestCase {
         XCTAssertNil(words, "nothing heard before the interruption is sent afterwards")
     }
 
+    /// The workspace pager stops paging while any mic listens, so the mic's drag to cancel stays the mic's.
+    func testIsListeningWhileAnyMicIsActive() async throws {
+        let transcriber = FakeTranscriber()
+        let service = try makeService(transcriber: transcriber, asker: Asker(Self.server))
+        XCTAssertFalse(service.isListening, "no mic yet")
+        let composer = service.makeModel()
+        _ = service.makeModel()
+        XCTAssertFalse(service.isListening)
+
+        await composer.press()
+        XCTAssertTrue(service.isListening)
+        transcriber.say("đang nói")
+        let heard = await eventually { composer.phase == .listening(text: "đang nói") }
+        XCTAssertTrue(heard)
+        XCTAssertTrue(service.isListening)
+
+        _ = await composer.release()
+        XCTAssertFalse(service.isListening, "released: the pages follow the finger again")
+    }
+
     func testAnalyzerFallbackMakesSettingsNameThePathUsed() async throws {
         let asker = Asker(Self.analyzer)
         let service = try makeService(transcriber: FakeTranscriber(), asker: asker)

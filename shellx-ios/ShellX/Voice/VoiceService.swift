@@ -30,7 +30,8 @@ final class VoiceService {
     @ObservationIgnored private let contextualStrings: @MainActor () -> [String]
     @ObservationIgnored private let latency: LatencyLog
     @ObservationIgnored private let defaults: UserDefaults
-    @ObservationIgnored private var made: [Made] = []
+    /// Observed, so `isListening` sees a mic made after it was first read.
+    private var made: [Made] = []
 
     init(
         transcriber: any SpeechTranscribing, permissions: any VoicePermissionChecking, cache: VoiceCapabilityCache,
@@ -83,6 +84,12 @@ final class VoiceService {
             })
         owner.service = service
         return service
+    }
+
+    /// Some mic made here is listening (or finishing its words): the workspace screen stops paging, so a
+    /// drag on the mic (left is cancel) stays the mic's.
+    var isListening: Bool {
+        made.contains { $0.model?.isActive == true }
     }
 
     /// A dictation model for one mic; `maxBytes` is the most its text may take.

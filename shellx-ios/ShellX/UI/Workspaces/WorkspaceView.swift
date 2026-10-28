@@ -19,6 +19,7 @@ struct WorkspaceView: View {
     /// The user confirmed closing the workspace here: its leaving needs no word of explanation.
     @State private var closedHere = false
     @Environment(\.dismiss) private var dismiss
+    @Environment(VoiceService.self) private var voiceService: VoiceService?
 
     init(scope: SignedInScope, ref: WorkspaceRef, open: @escaping (HomeRoute) -> Void) {
         self.scope = scope
@@ -35,6 +36,7 @@ struct WorkspaceView: View {
                 WorkspaceScreen(
                     title: model.workspace?.title ?? "", branch: model.workspace?.branch, panes: model.panes,
                     selected: model.selectedTerminalId, canControl: model.canControl,
+                    pagingLocked: voiceService?.isListening ?? false,
                     actions: WorkspaceScreenActions.make(
                         scope: scope, model: model,
                         alert: {
