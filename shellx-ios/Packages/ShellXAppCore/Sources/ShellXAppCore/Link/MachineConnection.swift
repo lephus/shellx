@@ -349,8 +349,10 @@ public actor MachineConnection {
         state = final
         output.yield(.pending(pending, actionable: false))
         output.yield(.sessions(sessions, supported: sessionsSupported))
-        output.yield(.workspaces(workspaces, supported: workspacesSupported))
+        // The state first: a workspace screen that sees the list emptied must already know the Mac is not
+        // online, or it would take the empty list for workspaces closed on the Mac.
         output.yield(.state(final))
+        output.yield(.workspaces(workspaces, supported: workspacesSupported))
         return false
     }
 

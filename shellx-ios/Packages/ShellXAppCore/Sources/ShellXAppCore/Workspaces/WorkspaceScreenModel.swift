@@ -10,10 +10,13 @@ import ShellXLinkCore
 ///   and the requests can arrive after the list: until the user picks a chip, a chip that does not show an
 ///   agent's chat gives way, once, to the pane waiting for the user. What the Mac selects later does not
 ///   move it.
-/// - `phase` is `.dismissed` only for a workspace the screen has seen and that then left the list. A
-///   workspace the Mac has not listed yet (a create's answer can come before the push that lists the
-///   new workspace) is `.waiting`; after `patience` the model asks the Mac for its list once more, and
-///   when the workspace is still absent the phase is `.notFound` (it still shows if a push lists it later).
+/// - `phase` is `.dismissed` only for a workspace the screen has seen and that then left the list of a Mac
+///   that is online and lists its workspaces (`absence(of:)`): only that Mac says the workspace was closed.
+///   A list emptied for another reason (the Mac is offline or no longer reachable from this iPhone, or its
+///   list could not be read) keeps the last chips; a Mac removed from this iPhone is `.machineRemoved`. A
+///   workspace the Mac has not listed yet (a create's answer can come before the push that lists the new
+///   workspace) is `.waiting`; after `patience` the model asks the Mac for its list once more, and when the
+///   workspace is still absent the phase is `.notFound` (it still shows if a push lists it later).
 /// - A Mac that goes offline leaves the last known list in place, so the chips stay.
 ///
 /// `run()` follows the hub while the screen is shown.
@@ -28,6 +31,8 @@ public final class WorkspaceScreenModel {
         case showing
         /// The workspace was listed, and left: it was closed (on the Mac, or by this screen).
         case dismissed
+        /// The workspace's Mac was removed from this iPhone: the screen leaves without a word.
+        case machineRemoved
         /// The workspace did not come within `patience`, even after asking the Mac again.
         case notFound
     }
@@ -43,6 +48,9 @@ public final class WorkspaceScreenModel {
     @ObservationIgnored private var seen = false
     /// The terminal ids as `reconcile()` last saw them, in chip order.
     @ObservationIgnored private var knownTerminalIds: [String] = []
+    /// The workspace as the Mac last listed it: shown while the list does not have it for a reason other than
+    /// a close (`absence(of:)`).
+    @ObservationIgnored private var kept: LinkWorkspace?
     /// The chip shown was chosen for good: the user picked it, the screen moved to the pane waiting for the
     /// user, or the chip shown left and the next one took its place. Until then the screen may still move to
     /// the pane waiting for the user.
@@ -64,13 +72,16 @@ public final class WorkspaceScreenModel {
 
     private var machine: MachineModel? { hub.machines.first { $0.id == ref.machineID } }
 
-    /// The workspace as its Mac last listed it (also while the Mac is offline), or nil while the list
-    /// does not have it.
-    public var workspace: LinkWorkspace? { machine?.workspaces.workspace(ref.workspaceId) }
+    /// The workspace in the Mac's list as the hub has it now.
+    private var listed: LinkWorkspace? { machine?.workspaces.workspace(ref.workspaceId) }
+
+    /// The workspace as its Mac last listed it (also while the Mac is offline, or after the hub emptied the
+    /// list of a Mac that did not close it), or nil while the screen has not seen it.
+    public var workspace: LinkWorkspace? { listed ?? kept }
 
     /// The workspace's chips, in the Mac's order. Empty while there is no workspace.
     public var panes: [WorkspacePane] {
-        guard let machine, let workspace = machine.workspaces.workspace(ref.workspaceId) else { return [] }
+        guard let machine, let workspace else { return [] }
         return WorkspacePane.panes(of: workspace) { sessionId in
             machine.sessions.session(sessionId).map {
                 MachineSession(
@@ -167,15 +178,37 @@ public final class WorkspaceScreenModel {
         await waiting
     }
 
+    /// Why the Mac's list, as the hub has it, lacks a workspace the screen saw.
+    enum Absence: Equatable {
+        /// The Mac is online and lists its workspaces: it closed the workspace.
+        case closed
+        /// The Mac is no longer paired with this iPhone.
+        case machineRemoved
+        /// The hub emptied the list without the Mac saying anything (it is offline, no longer reachable from
+        /// this iPhone, or its list could not be read): the last chips stay.
+        case unknown
+    }
+
+    static func absence(of machine: MachineModel?) -> Absence {
+        guard let machine else { return .machineRemoved }
+        return machine.state == .online && machine.workspacesSupported ? .closed : .unknown
+    }
+
     /// Brings `phase` and the chip shown up to date with the hub's list.
     func reconcile() {
-        guard phase != .dismissed else { return }
-        guard let workspace else {
-            // Gone after it was listed: closed. Never listed: still on its way (or `.notFound`).
-            if seen { phase = .dismissed }
+        guard phase != .dismissed, phase != .machineRemoved else { return }
+        guard let workspace = listed else {
+            // Never listed: still on its way (or `.notFound`).
+            guard seen else { return }
+            switch Self.absence(of: machine) {
+            case .closed: phase = .dismissed
+            case .machineRemoved: phase = .machineRemoved
+            case .unknown: break
+            }
             return
         }
         seen = true
+        if kept != workspace { kept = workspace }
         if phase != .showing { phase = .showing }
         let ids = WorkspacePane.ordered(workspace.terminals).map(\.terminalId)
         if let selected = selectedTerminalId, !ids.contains(selected) {
@@ -231,6 +264,9 @@ public final class WorkspaceScreenModel {
         await withTaskCancellationHandler {
             withObservationTracking {
                 _ = workspace
+                // A Mac back online (or reachable again) says whether a workspace missing from its list was closed.
+                _ = machine?.state
+                _ = machine?.workspacesSupported
                 // Until the chip is settled, the sessions and the requests can still move it.
                 if !settled {
                     _ = sessionsHere

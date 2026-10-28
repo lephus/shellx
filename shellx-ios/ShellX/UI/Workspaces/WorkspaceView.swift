@@ -6,8 +6,10 @@ import SwiftUI
 /// pane (`AgentView`, embedded); the commands in `•••` are the hub's (`WorkspaceScreenActions`).
 ///
 /// It leaves on its own when the workspace it showed is closed on the Mac: it pops, and the list says so
-/// in a short line. A workspace the Mac has not listed yet (a create answers before the list that holds
-/// it) shows a spinner; one that does not come says it is not found.
+/// in a short line. When the Mac is removed from this iPhone it pops without a word; a list emptied for
+/// any other reason (the Mac offline, no longer reachable) keeps the last chips. A workspace the Mac has
+/// not listed yet (a create answers before the list that holds it) shows a spinner; one that does not
+/// come says it is not found.
 struct WorkspaceView: View {
     let scope: SignedInScope
     let ref: WorkspaceRef
@@ -54,14 +56,17 @@ struct WorkspaceView: View {
                 WorkspaceWaitingView()
             case .notFound:
                 WorkspaceMissingView(back: { dismiss() })
-            case .dismissed:
+            case .dismissed, .machineRemoved:
                 Color.appBackground.ignoresSafeArea()
             }
         }
         .task { await model.run() }
         .onChange(of: model.phase) { _, phase in
-            guard phase == .dismissed else { return }
-            leave()
+            switch phase {
+            case .dismissed: leave()
+            case .machineRemoved: dismiss()
+            case .waiting, .showing, .notFound: break
+            }
         }
         // Whatever finished while the user was here, the user saw.
         .onDisappear { scope.hub.markSeen(ref) }

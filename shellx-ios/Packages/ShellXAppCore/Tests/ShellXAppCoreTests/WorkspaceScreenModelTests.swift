@@ -493,6 +493,54 @@ final class WorkspaceScreenModelTests: XCTestCase {
         XCTAssertEqual(model.panes.map(\.id), ["t1", "t2"], "the last chips stay")
     }
 
+    func testRemovingTheMacLeavesWithoutSayingTheWorkspaceClosed() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace(terminals: terminals("t1"))])
+        let (model, hub, _) = try await makeModel(mac)
+
+        try await hub.unpair(machineID: mac.machine.machineID)
+
+        let left = await eventually { model.phase == .machineRemoved }
+        XCTAssertTrue(left, "\(model.phase)")
+    }
+
+    /// Closed on the Mac while the phone was away: once the Mac is back with its list, the screen leaves.
+    func testAWorkspaceClosedWhileTheMacWasAwayLeavesWhenItIsBack() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace("shellx", terminals: terminals("t1")), linkWorkspace("web", order: 1)])
+        let rig = try await HubRig.make([mac], in: self)
+        _ = await rig.online(sessions: 0)
+        _ = await eventually { rig.hub.machines.first?.workspacesSupported == true }
+        let model = WorkspaceScreenModel(ref: ref(mac), hub: rig.hub, sleep: ManualSleeper().sleep)
+        let run = Task { await model.run() }
+        addTeardownBlock { run.cancel() }
+
+        await mac.dropLiveSessions()
+        let away = await eventually { rig.hub.machines.first?.state != .online && rig.backoff.waiting.count == 1 }
+        XCTAssertTrue(away)
+        await mac.removeWorkspace("ws-shellx")
+        XCTAssertEqual(model.phase, .showing, "the phone does not know yet")
+
+        rig.backoff.release()
+        let left = await eventually { model.phase == .dismissed }
+        XCTAssertTrue(left, "\(model.phase)")
+    }
+
+    @MainActor
+    func testOnlyAnOnlineMacThatListsItsWorkspacesSaysOneWasClosed() {
+        let model = MachineModel(machine: FakeMac(name: "MacBook Pro").machine)
+        XCTAssertEqual(WorkspaceScreenModel.absence(of: nil), .machineRemoved)
+        XCTAssertEqual(WorkspaceScreenModel.absence(of: model), .unknown, "connecting, nothing listed yet")
+        model.state = .online
+        XCTAssertEqual(WorkspaceScreenModel.absence(of: model), .unknown, "online, but its list could not be read")
+        model.workspacesSupported = true
+        XCTAssertEqual(WorkspaceScreenModel.absence(of: model), .closed)
+        for state in [MachineLinkState.reconnecting, .revoked, .hostKeyChanged, .needsUpdate] {
+            model.state = state
+            XCTAssertEqual(WorkspaceScreenModel.absence(of: model), .unknown, "\(state)")
+        }
+    }
+
     // MARK: - Seen
 
     func testRunningMarksTheWorkspaceSeen() async throws {
