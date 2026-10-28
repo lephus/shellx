@@ -202,13 +202,16 @@ final class ServiceRig {
     var store: RemoteLinkStore { base.store }
     var hostConnected: LinkState { .connected(localSocket: paths.muxSocket.path) }
 
-    /// - Parameter remoteMachines: False runs the session for phones only (`remoteMachinesEnabled` off).
-    init(gate gateOn: Bool = true, signedIn: Bool = true, cmuxTuiPresent: Bool = true,
+    /// - Parameters:
+    ///   - owner: The `links-owner` a restored session (`signedIn`) starts with. Nil is a session signed in
+    ///     before owners were kept for it (ShellX 1.4.0 and 1.5.0 signed in from Settings › Account only).
+    ///   - remoteMachines: False runs the session for phones only (`remoteMachinesEnabled` off).
+    init(gate gateOn: Bool = true, signedIn: Bool = true, owner: String? = "u_1", cmuxTuiPresent: Bool = true,
          devCredentials: ShellXRemoteDevCredentials? = nil, remoteMachines: Bool = true) {
         core = FakeRemoteCore(clock: base.clock, log: base.log, coreStateDir: base.paths.coreStateDir)
         core.signedIn.with { $0 = signedIn }
         // A restored session keeps the owner of its last sign-in; the link host is scoped by it.
-        if signedIn { try? base.store.saveOwner("u_1") }
+        if signedIn, let owner { try? base.store.saveOwner(owner) }
         bridge = FakeBridge(log: base.log)
         linkHost = FakeLinkHost(log: base.log)
         gate = Locked(gateOn)

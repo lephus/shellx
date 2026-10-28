@@ -80,3 +80,61 @@ import Testing
     #expect(rig.core.methods.last == "auth.logout")
     #expect(rig.launcher.calls.isEmpty)
 }
+
+// MARK: - Upgrading from ShellX 1.4.0 and 1.5.0
+//
+// Those releases signed in from Settings › Account with the remote service off: `auth.login` through the core,
+// then `account.json` only. No `links-owner` was ever written, and a launch restores the core's session without
+// a sign-in, so the owner has to come from `account.json`.
+
+/// `account.json` as ShellX 1.4.0 and 1.5.0 wrote it after `auth.login` (the file those releases leave behind).
+@MainActor func writeAccountRecord(_ rig: ServiceRig, userID: String = "u_1") throws {
+    let record = ShellXAccount.Identity(userID: userID, email: "a@shellx.test", signedInAt: Date(timeIntervalSince1970: 1_800_000_000))
+    try OwnerOnlyFile.ensurePrivateDirectory(rig.paths.stateRoot)
+    try OwnerOnlyFile.write(try JSONEncoder().encode(record), to: rig.paths.stateRoot.appendingPathComponent("account.json"))
+}
+
+@MainActor @Test func phonesOnlyUpgradeFromAnAccountSignInStartsTheLinkHost() async throws {
+    // 1.5.0: everything off, Settings › Account signs in.
+    let rig = ServiceRig(gate: false, signedIn: false, remoteMachines: false)
+    try await ShellXAccount(service: rig.service).signIn(email: "a@shellx.test", password: "pw")
+    #expect(try rig.store.loadOwner() == nil)
+    // 1.5.1 serves phones: the next launch restores that session.
+    rig.gate.with { $0 = true }
+    let relaunched = ShellXRemoteService(environment: rig.service.env)
+    relaunched.startIfEnabled()
+    #expect(await until { !rig.linkHost.starts.isEmpty })
+    #expect(rig.linkHost.starts == [FakeLinkHost.Start(machineID: "m_self", linkSlot: "link-self", accountID: "u_1")])
+    #expect(try rig.store.loadOwner() == "u_1")
+    #expect(!rig.core.methods.dropFirst(2).contains("auth.login"))   // no new sign-in was needed
+}
+
+@MainActor @Test func restoredSessionWithoutOwnerAdoptsTheAccountRecord() async throws {
+    let rig = ServiceRig(signedIn: true, owner: nil, remoteMachines: false)
+    try writeAccountRecord(rig)
+    rig.service.startIfEnabled()
+    #expect(await until { !rig.linkHost.starts.isEmpty })
+    #expect(rig.linkHost.starts == [FakeLinkHost.Start(machineID: "m_self", linkSlot: "link-self", accountID: "u_1")])
+    #expect(try rig.store.loadOwner() == "u_1")
+}
+
+/// With neither an owner nor an account record there is no account to scope the link keys by: nothing is
+/// guessed and the link host stays off until a sign-in.
+@MainActor @Test func restoredSessionWithoutAnyAccountLeavesTheLinkHostOff() async throws {
+    let rig = ServiceRig(signedIn: true, owner: nil, remoteMachines: false)
+    rig.service.startIfEnabled()
+    #expect(await until { rig.core.count("machines.register") == 1 })
+    await settle()
+    #expect(rig.linkHost.starts.isEmpty)
+    #expect(try rig.store.loadOwner() == nil)
+}
+
+/// An owner on record wins over the account record: only a sign-in changes it.
+@MainActor @Test func restoredSessionKeepsTheOwnerOnRecord() async throws {
+    let rig = ServiceRig(signedIn: true, remoteMachines: false)
+    try writeAccountRecord(rig, userID: "u_other")
+    rig.service.startIfEnabled()
+    #expect(await until { !rig.linkHost.starts.isEmpty })
+    #expect(rig.linkHost.starts.map(\.accountID) == ["u_1"])
+    #expect(try rig.store.loadOwner() == "u_1")
+}
