@@ -1,5 +1,6 @@
 import CmuxAgentChat
 import CmuxMobileHost
+import CmuxSidebar
 import Combine
 import Foundation
 import os
@@ -319,8 +320,9 @@ final class ShellXLinkWorkspaceSource: WorkspaceSource, WorkspaceControl {
 
 /// Watches what ``ShellXLinkWorkspaceSource/liveWorkspaces()`` reads and calls `onChange` after a change, at most
 /// ten times a second, on the main actor: the set of main windows (`mainWindowContextsDidChange`), each window's
-/// workspaces (`tabsPublisher`), each workspace (`objectWillChange`, plus its panels and their spatial order,
-/// which are not `@Published`), and the agent session registry (the session a terminal names).
+/// workspaces (`tabsPublisher`), each workspace (`objectWillChange`, plus what it keeps outside its `@Published`
+/// properties: its panels, their spatial order, and the git branch in its sidebar metadata model), and the agent
+/// session registry (the session a terminal names).
 ///
 /// Every change goes through one throttle, after which the watched windows and workspaces are matched to the
 /// current ones before `onChange` runs. The throttle delivers on a later main-queue turn, so a `willSet`-time
@@ -393,10 +395,12 @@ private final class LiveWorkspaceChangeObserver {
                 watchedWorkspaces[key] = watch
                 continue
             }
-            let changes = Publishers.Merge3(
+            let changes = Publishers.Merge4(
                 workspace.objectWillChange.map { _ in () },
                 workspace.panelsPublisher.dropFirst().map { _ in () },
-                workspace.paneLayoutVersionPublisher.dropFirst().map { _ in () }
+                workspace.paneLayoutVersionPublisher.dropFirst().map { _ in () },
+                // A `git checkout` in the same directory changes only this.
+                workspace.sidebarMetadata.gitBranchPublisher.dropFirst().map { _ in () }
             )
             watchedWorkspaces[key] = Watch(object: workspace, cancellable: changes.sink { [weak self] _ in
                 self?.pulses.send()
