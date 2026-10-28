@@ -9,7 +9,8 @@ enum ShellXLinkSecretError: Error, Equatable, Sendable {
     /// Retrying later can succeed.
     case transient(OSStatus)
     /// The data-protection Keychain refuses this build (`errSecMissingEntitlement`, -34018): ad-hoc signed
-    /// tagged and dev builds carry no keychain entitlement. Not corruption, and retrying cannot help.
+    /// tagged and dev builds carry no keychain entitlement authorized by a provisioning profile. Not
+    /// corruption, and retrying cannot help.
     case unavailable(OSStatus)
     /// Any other Keychain failure.
     case failed(OSStatus)
@@ -25,20 +26,48 @@ protocol ShellXLinkSecretStorage: Sendable {
     func update(_ data: Data, account: String) throws
 }
 
-/// The data-protection Keychain, scoped by bundle id (service) so a tagged or dev build never shares keys
-/// with the release build. The account names carry the signed-in ShellX account (see ``ShellXLinkKeyStore``).
+/// A Keychain, scoped by bundle id (service) so a tagged or dev build never shares keys with the release
+/// build. The account names carry the signed-in ShellX account (see ``ShellXLinkKeyStore``).
 struct KeychainLinkSecretStorage: ShellXLinkSecretStorage {
-    let service: String
-
-    init(service: String = (Bundle.main.bundleIdentifier ?? "pro.shellx.desktop") + ".shellx-link") {
-        self.service = service
+    /// Which macOS keychain implementation holds the items (TN3137).
+    enum Kind: Equatable, Sendable {
+        /// The data-protection Keychain. macOS gives a program its keychain access groups only from
+        /// entitlements authorized by a provisioning profile; without them every call fails with
+        /// `errSecMissingEntitlement` (-34018).
+        case dataProtection
+        /// The file-based login keychain. It needs no entitlement: an item's access list trusts the app that
+        /// created it by its designated requirement, so later Developer ID builds of the app read it without
+        /// a prompt.
+        case login
     }
 
-    private func baseQuery(_ account: String) -> [String: Any] {
+    let service: String
+    let kind: Kind
+
+    init(service: String = (Bundle.main.bundleIdentifier ?? "pro.shellx.desktop") + ".shellx-link",
+         kind: Kind = .dataProtection) {
+        self.service = service
+        self.kind = kind
+    }
+
+    /// The query naming one item. Nothing else in it may route a login-keychain call to the data-protection
+    /// Keychain (no access group, protection class or token).
+    func baseQuery(_ account: String) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
          kSecAttrService as String: service,
          kSecAttrAccount as String: account,
-         kSecUseDataProtectionKeychain as String: true]
+         kSecUseDataProtectionKeychain as String: kind == .dataProtection]
+    }
+
+    /// The attributes of a new item holding `data`.
+    func addQuery(_ data: Data, account: String) -> [String: Any] {
+        var insert = baseQuery(account)
+        insert[kSecValueData as String] = data
+        // The file-based keychain has no protection classes.
+        if kind == .dataProtection {
+            insert[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        }
+        return insert
     }
 
     private static func error(_ status: OSStatus) -> ShellXLinkSecretError {
@@ -62,10 +91,7 @@ struct KeychainLinkSecretStorage: ShellXLinkSecretStorage {
     }
 
     func add(_ data: Data, account: String) throws -> Bool {
-        var insert = baseQuery(account)
-        insert[kSecValueData as String] = data
-        insert[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        let status = SecItemAdd(insert as CFDictionary, nil)
+        let status = SecItemAdd(addQuery(data, account: account) as CFDictionary, nil)
         if status == errSecDuplicateItem { return false }
         guard status == errSecSuccess else { throw Self.error(status) }
         return true
@@ -139,6 +165,10 @@ struct FileLinkSecretStorage: ShellXLinkSecretStorage {
 
 /// The Keychain, with a development file store behind it for builds the Keychain refuses.
 ///
+/// The production app keeps its keys in the login keychain (``KeychainLinkSecretStorage/Kind/login``): its
+/// Developer ID signature has no provisioning profile and no keychain access group, so the data-protection
+/// Keychain refuses it. Every other bundle uses the data-protection Keychain with the file store behind it.
+///
 /// When the Keychain answers `.unavailable` and a `fallback` was given, this switches to the fallback for good
 /// (logging once) and repeats the call there. Without a `fallback` (the production app) the error is thrown.
 final class FallbackLinkSecretStorage: ShellXLinkSecretStorage, @unchecked Sendable {
@@ -160,8 +190,15 @@ final class FallbackLinkSecretStorage: ShellXLinkSecretStorage, @unchecked Senda
                          home: URL = FileManager.default.homeDirectoryForCurrentUser,
                          onFallback: @escaping @Sendable () -> Void = {}) -> FallbackLinkSecretStorage {
         FallbackLinkSecretStorage(
-            primary: KeychainLinkSecretStorage(service: bundleID + ".shellx-link"),
+            primary: keychain(bundleID: bundleID),
             fallback: developmentFallback(bundleID: bundleID, home: home), onFallback: onFallback)
+    }
+
+    /// The Keychain for `bundleID`: the login keychain for the production bundle, the data-protection Keychain
+    /// for every other one.
+    static func keychain(bundleID: String) -> KeychainLinkSecretStorage {
+        KeychainLinkSecretStorage(service: bundleID + ".shellx-link",
+                                  kind: bundleID == shellXProductionBundleID ? .login : .dataProtection)
     }
 
     /// The file store for `bundleID`, or nil for the production bundle: production never falls back.

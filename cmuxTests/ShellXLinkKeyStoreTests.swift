@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import Testing
 
 #if canImport(cmux_DEV)
@@ -245,6 +246,48 @@ struct ShellXLinkKeyStoreTests {
 
         #expect(throws: ShellXLinkSecretError.unavailable(-34018)) { try store.hostKey() }
         #expect(!FileManager.default.fileExists(atPath: home.appendingPathComponent("Library").path))
+    }
+
+    // MARK: Production Keychain (Developer ID, no provisioning profile)
+
+    /// The release app is signed with Developer ID and no provisioning profile, so it has no keychain access
+    /// group and the data-protection Keychain answers -34018. Its keys go to the login keychain, by a query
+    /// that nothing routes back to the data-protection Keychain.
+    @Test func testProductionKeepsLinkKeysInTheLoginKeychain() {
+        let keychain = FallbackLinkSecretStorage.keychain(bundleID: shellXProductionBundleID)
+        #expect(keychain.kind == .login)
+        #expect(keychain.service == "pro.shellx.desktop.shellx-link")
+        let insert = keychain.addQuery(Data([1]), account: "host-key.acct")
+        #expect(insert[kSecUseDataProtectionKeychain as String] as? Bool == false)
+        #expect(insert[kSecAttrAccessible as String] == nil)
+        #expect(insert[kSecAttrAccessGroup as String] == nil)
+    }
+
+    @Test func testDevelopmentBuildsKeepTheDataProtectionKeychain() {
+        let keychain = FallbackLinkSecretStorage.keychain(bundleID: "pro.shellx.desktop.debug.link")
+        #expect(keychain.kind == .dataProtection)
+        #expect(keychain.baseQuery("host-key.acct")[kSecUseDataProtectionKeychain as String] as? Bool == true)
+    }
+
+    /// The real Keychain, from this test host: its signature carries no provisioning profile either, so the
+    /// production storage must work here without `errSecMissingEntitlement`. Uses a throwaway service and
+    /// deletes its item.
+    @Test func testProductionKeychainNeedsNoKeychainEntitlement() throws {
+        let kind = FallbackLinkSecretStorage.keychain(bundleID: shellXProductionBundleID).kind
+        let storage = KeychainLinkSecretStorage(service: "pro.shellx.desktop.tests.\(UUID().uuidString).shellx-link",
+                                                kind: kind)
+        let account = "host-key.test"
+        defer { SecItemDelete(storage.baseQuery(account) as CFDictionary) }
+        do {
+            #expect(try storage.read(account: account) == nil)
+            #expect(try storage.add(Data("first".utf8), account: account))
+            #expect(try storage.read(account: account) == Data("first".utf8))
+            #expect(try !storage.add(Data("again".utf8), account: account))
+            try storage.update(Data("second".utf8), account: account)
+            #expect(try storage.read(account: account) == Data("second".utf8))
+        } catch ShellXLinkSecretError.transient {
+            // A locked login keychain (a headless runner): nothing can be checked, nothing was written.
+        }
     }
 
     @MainActor
