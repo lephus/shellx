@@ -396,6 +396,158 @@ final class LinkCodecTests: XCTestCase {
         XCTAssertEqual(ShellXLink.attachmentsFeature, "attachments")
     }
 
+    // MARK: - workspaces
+
+    private static let workspaceA = LinkWorkspace(
+        workspaceId: "w-1", title: "shellx", order: 0, directory: "~/Documents/myProjects/shellx", branch: "main",
+        ports: [3000, 5173],
+        terminals: [
+            LinkTerminal(terminalId: "t-1", title: "claude", order: 0, selected: true, sessionId: "s-1"),
+            LinkTerminal(terminalId: "t-2", title: "zsh", order: 1, selected: false),
+        ])
+    private static let workspaceB = LinkWorkspace(
+        workspaceId: "w-2", title: "notes", order: 1,
+        terminals: [LinkTerminal(terminalId: "t-3", title: "zsh", order: 0, selected: true)])
+
+    private static func jsonObject(_ m: LinkMessage) throws -> [String: Any] {
+        try XCTUnwrap(JSONSerialization.jsonObject(with: try LinkCodec.encode(m)) as? [String: Any])
+    }
+
+    func testWorkspaceListRoundTrip() throws {
+        let list = LinkMessage.workspaces(callId: "c1", revision: 7, workspaces: [Self.workspaceA, Self.workspaceB])
+        XCTAssertEqual(try LinkCodec.decode(try LinkCodec.encode(list)), list)
+        XCTAssertEqual(try LinkCodec.decode(try LinkCodec.encode(.workspacesGet(callId: "c0"))), .workspacesGet(callId: "c0"))
+        // Optional fields are omitted, not null, on a record that has none.
+        let object = try Self.jsonObject(list)
+        XCTAssertEqual(object["t"] as? String, "workspace.list")
+        let records = try XCTUnwrap(object["workspaces"] as? [[String: Any]])
+        XCTAssertEqual(records[0]["workspace_id"] as? String, "w-1")
+        XCTAssertEqual(records[0]["branch"] as? String, "main")
+        XCTAssertEqual(records[0]["directory"] as? String, "~/Documents/myProjects/shellx")
+        XCTAssertEqual(records[0]["ports"] as? [Int], [3000, 5173])
+        let withSession = try XCTUnwrap((records[0]["terminals"] as? [[String: Any]])?[0])
+        XCTAssertEqual(withSession["terminal_id"] as? String, "t-1")
+        XCTAssertEqual(withSession["session_id"] as? String, "s-1")
+        XCTAssertEqual(withSession["selected"] as? Bool, true)
+        let bare = records[1]
+        for key in ["ports", "branch", "directory"] {
+            XCTAssertNil(bare[key], "\(key) must be omitted when nil")
+        }
+        XCTAssertEqual(bare["order"] as? Int, 1)
+        let bareTerminal = try XCTUnwrap((bare["terminals"] as? [[String: Any]])?[0])
+        XCTAssertNil(bareTerminal["session_id"], "session_id must be omitted when nil")
+        XCTAssertEqual(bareTerminal["title"] as? String, "zsh")
+    }
+
+    func testWorkspaceChangedRoundTrip() throws {
+        let changed = LinkMessage.workspacesChanged(revision: 8, upserted: [Self.workspaceB], removed: ["w-1", "w-9"])
+        XCTAssertEqual(try LinkCodec.decode(try LinkCodec.encode(changed)), changed)
+        let empty = LinkMessage.workspacesChanged(revision: 9, upserted: [], removed: [])
+        XCTAssertEqual(try LinkCodec.decode(try LinkCodec.encode(empty)), empty)
+        let object = try Self.jsonObject(changed)
+        XCTAssertEqual(object["t"] as? String, "workspace.changed")
+        XCTAssertEqual(object["revision"] as? Int, 8)
+        XCTAssertEqual(object["removed"] as? [String], ["w-1", "w-9"])
+        XCTAssertEqual((object["upserted"] as? [[String: Any]])?.count, 1)
+        // A workspace without `terminals` is bad_json.
+        XCTAssertThrowsError(try LinkCodec.decode(Data(
+            #"{"v":1,"t":"workspace.changed","revision":1,"upserted":[{"workspace_id":"w","title":"t","order":0}],"removed":[]}"#
+                .utf8))) { XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: nil)) }
+    }
+
+    func testWorkspaceControlRoundTrip() throws {
+        let messages: [LinkMessage] = [
+            .workspaceCreate(callId: "c1"),
+            .workspaceCreateResult(callId: "c1", outcome: .ok, workspaceId: "w-new"),
+            .workspaceCreateResult(callId: "c1", outcome: .refused, workspaceId: nil),
+            .workspaceRename(callId: "c2", workspaceId: "w-1", title: "Tên mới"),
+            .workspaceRenameResult(callId: "c2", outcome: .notFound),
+            .workspaceClose(callId: "c3", workspaceId: "w-1"),
+            .workspaceCloseResult(callId: "c3", outcome: .failed),
+        ]
+        for message in messages {
+            XCTAssertEqual(try LinkCodec.decode(try LinkCodec.encode(message)), message, "\(message)")
+        }
+        let wireTypes: [(LinkMessage, String)] = [
+            (messages[0], "workspace.create"), (messages[1], "workspace.create.result"),
+            (messages[3], "workspace.rename"), (messages[4], "workspace.rename.result"),
+            (messages[5], "workspace.close"), (messages[6], "workspace.close.result"),
+        ]
+        for (message, type) in wireTypes {
+            XCTAssertEqual(try Self.jsonObject(message)["t"] as? String, type)
+        }
+        let ok = try Self.jsonObject(messages[1])
+        XCTAssertEqual(ok["outcome"] as? String, "ok")
+        XCTAssertEqual(ok["workspace_id"] as? String, "w-new")
+        let refused = try Self.jsonObject(messages[2])
+        XCTAssertEqual(refused["outcome"] as? String, "refused")
+        XCTAssertNil(refused["workspace_id"], "workspace_id is present only when the outcome is ok")
+        XCTAssertEqual(try Self.jsonObject(messages[4])["outcome"] as? String, "not_found")
+        // Every control call needs a valid call_id.
+        XCTAssertThrowsError(try LinkCodec.encode(.workspaceCreate(callId: ""))) {
+            XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: nil))
+        }
+        XCTAssertThrowsError(try LinkCodec.decode(Data(#"{"v":1,"t":"workspace.close","workspace_id":"w"}"#.utf8))) {
+            XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: nil))
+        }
+    }
+
+    func testUnknownOutcomeKeepsWire() throws {
+        let decoded = try LinkCodec.decode(Data(
+            #"{"v":1,"t":"workspace.rename.result","call_id":"c1","outcome":"busy"}"#.utf8))
+        XCTAssertEqual(decoded, .workspaceRenameResult(callId: "c1", outcome: .other("busy")))
+        XCTAssertEqual(try Self.jsonObject(decoded)["outcome"] as? String, "busy")
+        XCTAssertEqual(WorkspaceControlOutcome(wire: "not_found"), .notFound)
+        XCTAssertEqual(WorkspaceControlOutcome.notFound.wire, "not_found")
+        XCTAssertEqual(WorkspaceControlOutcome(wire: "refused"), .refused)
+        XCTAssertEqual(WorkspaceControlOutcome(wire: "hologram").wire, "hologram")
+    }
+
+    /// The codec does not cap a rename title: the host checks `ShellXLink.maxWorkspaceTitleBytes` itself.
+    func testRenameTitleCap() throws {
+        let title = String(repeating: "a", count: ShellXLink.maxWorkspaceTitleBytes + 1)
+        XCTAssertEqual(title.utf8.count, 513)
+        let frame = Data(#"{"v":1,"t":"workspace.rename","call_id":"c1","workspace_id":"w-1","title":"\#(title)"}"#.utf8)
+        XCTAssertEqual(try LinkCodec.decode(frame), .workspaceRename(callId: "c1", workspaceId: "w-1", title: title))
+    }
+
+    func testWorkspaceConstants() {
+        XCTAssertEqual(ShellXLink.workspacesFeature, "workspaces")
+        XCTAssertEqual(ShellXLink.workspaceControlFeature, "workspace_control")
+        XCTAssertEqual(ShellXLink.maxWorkspaceTitleBytes, 512)
+    }
+
+    func testWorkspaceShrinkOrder() throws {
+        let full = Self.workspaceA
+        let one = try XCTUnwrap(full.shrunk(step: 1))
+        XCTAssertNil(one.ports)
+        XCTAssertEqual(one.directory, full.directory)
+        XCTAssertEqual(one.branch, full.branch)
+        let two = try XCTUnwrap(full.shrunk(step: 2))
+        XCTAssertNil(two.ports)
+        XCTAssertNil(two.directory)
+        XCTAssertEqual(two.branch, "main")
+        let three = try XCTUnwrap(full.shrunk(step: 3))
+        XCTAssertNil(three.branch)
+        XCTAssertEqual(three.terminals.map(\.title), ["claude", "zsh"])
+        let four = try XCTUnwrap(full.shrunk(step: 4))
+        XCTAssertNil(four.ports)
+        XCTAssertNil(four.directory)
+        XCTAssertNil(four.branch)
+        XCTAssertEqual(four.title, "shellx", "the workspace title is never dropped")
+        XCTAssertEqual(four.terminals.map(\.title), ["", ""])
+        XCTAssertEqual(four.terminals.map(\.terminalId), ["t-1", "t-2"])
+        XCTAssertEqual(four.terminals.map(\.sessionId), ["s-1", nil], "only titles are dropped from a terminal")
+        XCTAssertEqual(four.workspaceId, "w-1")
+        XCTAssertNil(full.shrunk(step: 0))
+        XCTAssertNil(full.shrunk(step: 5))
+        XCTAssertNil(full.shrunk(step: -1))
+        // A shrunk workspace is smaller on the wire than the full one.
+        let fullSize = try LinkCodec.encode(.workspaces(callId: "c", revision: 1, workspaces: [full])).count
+        let smallSize = try LinkCodec.encode(.workspaces(callId: "c", revision: 1, workspaces: [four])).count
+        XCTAssertLessThan(smallSize, fullSize)
+    }
+
     // MARK: - helpers
 
     static func item(preview: String) -> PendingItem {

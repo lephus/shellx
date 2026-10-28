@@ -313,14 +313,20 @@ public actor LinkHost {
                 // A call of a later version (PROTOCOL.md section 3): answered at once, so the phone does not
                 // wait out its timeout. One without a call_id is ignored below.
                 await Self.sendError(on: channel, "unsupported", "this host does not know this call", callId: callId)
+            case let .workspacesGet(callId), let .workspaceCreate(callId), let .workspaceRename(callId, _, _),
+                 let .workspaceClose(callId, _):
+                // No workspace source is wired yet: answered like a host without the feature (PROTOCOL.md section 3).
+                await Self.sendError(on: channel, "unsupported", "this host lists no workspaces", callId: callId)
             case .pong, .unknown, .error:
                 break
-            case .hello, .welcome, .changed, .sessionsChanged, .chatEntries, .chatReset:
+            case .hello, .welcome, .changed, .sessionsChanged, .chatEntries, .chatReset, .workspacesChanged:
                 // Not allowed from a client once established: ignored, and answered (PROTOCOL.md 7).
                 await Self.sendError(on: channel, "bad_request", "unexpected frame from a client")
             case let .snapshot(callId, _, _), let .replyResult(callId, _, _), let .sessions(callId, _, _),
                  let .chatHistory(callId, _, _, _), let .chatSendResult(callId, _), let .chatInterruptResult(callId, _),
-                 let .attachReady(callId, _), let .attachChunkResult(callId, _, _), let .attachEndResult(callId, _):
+                 let .attachReady(callId, _), let .attachChunkResult(callId, _, _), let .attachEndResult(callId, _),
+                 let .workspaces(callId, _, _), let .workspaceCreateResult(callId, _, _),
+                 let .workspaceRenameResult(callId, _), let .workspaceCloseResult(callId, _):
                 await Self.sendError(on: channel, "bad_request", "unexpected frame from a client", callId: callId)
             }
         }

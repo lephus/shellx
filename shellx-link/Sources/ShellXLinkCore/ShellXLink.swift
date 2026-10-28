@@ -16,4 +16,11 @@ public enum ShellXLink {
     public static let maxAttachmentChunkBytes = 45_000
     /// The `welcome.features` entry of a host that takes attachments.
     public static let attachmentsFeature = "attachments"
+    /// The `welcome.features` entry of a host that lists its workspaces (PROTOCOL.md section 4, "Workspace").
+    public static let workspacesFeature = "workspaces"
+    /// The `welcome.features` entry of a host that takes `workspace.create`, `workspace.rename` and `workspace.close`.
+    public static let workspaceControlFeature = "workspace_control"
+    /// Longest `title` of a `workspace.rename`, in UTF-8 bytes (about 128 Vietnamese characters). The host checks it;
+    /// the codec does not.
+    public static let maxWorkspaceTitleBytes = 512
 }

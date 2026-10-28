@@ -29,6 +29,11 @@ public enum LinkCodec {
         static let attachBegin = "attach.begin", attachReady = "attach.ready"
         static let attachChunk = "attach.chunk", attachChunkResult = "attach.chunk.result"
         static let attachEnd = "attach.end", attachEndResult = "attach.end.result"
+        static let workspacesGet = "workspace.list.get", workspaces = "workspace.list"
+        static let workspacesChanged = "workspace.changed"
+        static let workspaceCreate = "workspace.create", workspaceCreateResult = "workspace.create.result"
+        static let workspaceRename = "workspace.rename", workspaceRenameResult = "workspace.rename.result"
+        static let workspaceClose = "workspace.close", workspaceCloseResult = "workspace.close.result"
     }
 
     // Per-message bodies (keys are snake_case on the wire).
@@ -64,6 +69,17 @@ public enum LinkCodec {
     private struct AttachChunkResult: Codable { var callId: String; var attachmentId: String; var received: Int }
     /// `sha256` is the hex text, converted by `hexDigest`.
     private struct AttachEnd: Codable { var callId: String; var attachmentId: String; var sha256: String }
+
+    private struct WorkspaceList: Codable { var callId: String; var revision: Int; var workspaces: [LinkWorkspace] }
+    private struct WorkspaceListChanged: Codable { var revision: Int; var upserted: [LinkWorkspace]; var removed: [String] }
+    /// `workspace_id` is omitted when nil: the host sets it only when `outcome` is `ok`.
+    private struct WorkspaceCreateResult: Codable {
+        var callId: String; var outcome: WorkspaceControlOutcome; var workspaceId: String?
+    }
+    private struct WorkspaceRename: Codable { var callId: String; var workspaceId: String; var title: String }
+    private struct WorkspaceClose: Codable { var callId: String; var workspaceId: String }
+    /// `workspace.rename.result` and `workspace.close.result`.
+    private struct WorkspaceOutcome: Codable { var callId: String; var outcome: WorkspaceControlOutcome }
 
     private struct Envelope { var v: Int; var t: String }
 
@@ -176,6 +192,33 @@ public enum LinkCodec {
             case let .attachEndResult(callId, attachmentId):
                 try requireValid(callId)
                 data = try enc(T.attachEndResult, AttachRef(callId: callId, attachmentId: attachmentId))
+            case let .workspacesGet(callId):
+                try requireValid(callId)
+                data = try enc(T.workspacesGet, CallOnly(callId: callId))
+            case let .workspaces(callId, r, w):
+                try requireValid(callId)
+                data = try enc(T.workspaces, WorkspaceList(callId: callId, revision: r, workspaces: w))
+            case let .workspacesChanged(r, up, rem):
+                data = try enc(T.workspacesChanged, WorkspaceListChanged(revision: r, upserted: up, removed: rem))
+            case let .workspaceCreate(callId):
+                try requireValid(callId)
+                data = try enc(T.workspaceCreate, CallOnly(callId: callId))
+            case let .workspaceCreateResult(callId, outcome, workspaceId):
+                try requireValid(callId)
+                data = try enc(T.workspaceCreateResult, WorkspaceCreateResult(
+                    callId: callId, outcome: outcome, workspaceId: workspaceId))
+            case let .workspaceRename(callId, workspaceId, title):
+                try requireValid(callId)
+                data = try enc(T.workspaceRename, WorkspaceRename(callId: callId, workspaceId: workspaceId, title: title))
+            case let .workspaceRenameResult(callId, outcome):
+                try requireValid(callId)
+                data = try enc(T.workspaceRenameResult, WorkspaceOutcome(callId: callId, outcome: outcome))
+            case let .workspaceClose(callId, workspaceId):
+                try requireValid(callId)
+                data = try enc(T.workspaceClose, WorkspaceClose(callId: callId, workspaceId: workspaceId))
+            case let .workspaceCloseResult(callId, outcome):
+                try requireValid(callId)
+                data = try enc(T.workspaceCloseResult, WorkspaceOutcome(callId: callId, outcome: outcome))
             case .unknown: throw LinkCodecError.cannotEncodeUnknown
             }
         } catch let e as LinkCodecError {
@@ -278,6 +321,29 @@ public enum LinkCodec {
         case T.attachEndResult:
             let b = try call(AttachRef.self, \.callId)
             return .attachEndResult(callId: b.callId, attachmentId: b.attachmentId)
+        case T.workspacesGet: return .workspacesGet(callId: try call(CallOnly.self, \.callId).callId)
+        case T.workspaces:
+            let b = try call(WorkspaceList.self, \.callId)
+            return .workspaces(callId: b.callId, revision: b.revision, workspaces: b.workspaces)
+        case T.workspacesChanged:
+            let b = try body(WorkspaceListChanged.self)
+            return .workspacesChanged(revision: b.revision, upserted: b.upserted, removed: b.removed)
+        case T.workspaceCreate: return .workspaceCreate(callId: try call(CallOnly.self, \.callId).callId)
+        case T.workspaceCreateResult:
+            let b = try call(WorkspaceCreateResult.self, \.callId)
+            return .workspaceCreateResult(callId: b.callId, outcome: b.outcome, workspaceId: b.workspaceId)
+        case T.workspaceRename:
+            let b = try call(WorkspaceRename.self, \.callId)
+            return .workspaceRename(callId: b.callId, workspaceId: b.workspaceId, title: b.title)
+        case T.workspaceRenameResult:
+            let b = try call(WorkspaceOutcome.self, \.callId)
+            return .workspaceRenameResult(callId: b.callId, outcome: b.outcome)
+        case T.workspaceClose:
+            let b = try call(WorkspaceClose.self, \.callId)
+            return .workspaceClose(callId: b.callId, workspaceId: b.workspaceId)
+        case T.workspaceCloseResult:
+            let b = try call(WorkspaceOutcome.self, \.callId)
+            return .workspaceCloseResult(callId: b.callId, outcome: b.outcome)
         default: return .unknown(type: env.t, callId: readCallId(d))
         }
     }

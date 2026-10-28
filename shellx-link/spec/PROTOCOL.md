@@ -78,13 +78,15 @@ A frame is one UTF-8 JSON object:
 
 Every request that expects exactly one answer carries a `call_id`: `agent.snapshot.get`,
 `agent.reply`, `agent.sessions.get`, `chat.history.get`, `chat.send`, `chat.interrupt`, `attach.begin`,
-`attach.chunk` and `attach.end` (and the requests later versions add on the same pattern).
+`attach.chunk`, `attach.end`, `workspace.list.get`, `workspace.create`, `workspace.rename` and
+`workspace.close` (and the requests later versions add on the same pattern).
 
 - The client chooses it: a string of 1 to 64 UTF-8 bytes, different from every other call of
   that client that is still waiting in the session.
 - The host answers a call with exactly one message carrying the same `call_id`: the matching
   answer (`agent.snapshot`, `agent.reply.result`, `agent.sessions`, `chat.history`,
-  `chat.send.result`, `chat.interrupt.result`, `attach.ready`, `attach.chunk.result`, `attach.end.result`), or an
+  `chat.send.result`, `chat.interrupt.result`, `attach.ready`, `attach.chunk.result`, `attach.end.result`,
+  `workspace.list`, `workspace.create.result`, `workspace.rename.result`, `workspace.close.result`), or an
   `error` that carries it.
 - A client drops an answer whose `call_id` it is no longer waiting for (for example because the
   call timed out).
@@ -125,13 +127,22 @@ Every request that expects exactly one answer carries a `call_id`: `agent.snapsh
 | `attach.chunk.result` | host | Reply to every acceptable `attach.chunk` | `call_id` string, `attachment_id` string, `received` int (bytes the host holds so far) |
 | `attach.end` | client | Every byte has been sent | `call_id` string, `attachment_id` string, `sha256` string (64 lowercase hex characters: the SHA-256 of all bytes) |
 | `attach.end.result` | host | Reply to an acceptable `attach.end`: the upload is complete and can be named in a `chat.send` | `call_id` string, `attachment_id` string |
+| `workspace.list.get` | client | Whenever it wants the workspace list: after `welcome` when the host lists `workspaces` (Features), and for a resync | `call_id` string |
+| `workspace.list` | host | Reply to `workspace.list.get` | `call_id` string, `revision` int, `workspaces` array of Workspace |
+| `workspace.changed` | host | Whenever the workspace list changes | `revision` int, `upserted` array of Workspace, `removed` array of `workspace_id` strings |
+| `workspace.create` | client | The user makes a new workspace on the Mac. It carries no path, command or program name: the Mac chooses the directory, as when the user adds a workspace there | `call_id` string |
+| `workspace.create.result` | host | Reply to every `workspace.create` | `call_id` string, `outcome` string, `workspace_id` string (the new workspace; present only when `outcome` is `ok`) |
+| `workspace.rename` | client | The user renames a workspace | `call_id` string, `workspace_id` string, `title` string (at most 512 UTF-8 bytes) |
+| `workspace.rename.result` | host | Reply to every acceptable `workspace.rename` | `call_id` string, `outcome` string |
+| `workspace.close` | client | The user closes a workspace on the Mac | `call_id` string, `workspace_id` string |
+| `workspace.close.result` | host | Reply to every `workspace.close` | `call_id` string, `outcome` string |
 | `ping` | either | Keep-alive / latency probe | `nonce` uint64 |
 | `pong` | either | Immediately after `ping`, echoing it | `nonce` uint64 (same value) |
 
 Error codes in use: `protocol_mismatch`, `bad_request`, `too_large` (an answer that does not fit a frame,
 section 6, or an `attach.begin` whose `size` is above the limit, section 5), `unsupported` (the host has no
-session list or no chat, takes no attachments, or does not know the call's `t`: it answers each such call
-with this code and its `call_id`), `not_found`
+session list or no chat, takes no attachments, lists no workspaces or takes no workspace control, or does
+not know the call's `t`: it answers each such call with this code and its `call_id`), `not_found`
 (`chat.history.get` for a `session_id` the host does not have). Others MAY be added; receivers treat
 an unrecognized code as a generic error.
 
@@ -156,13 +167,20 @@ revision r includes every change up to r, and the client compares each `agent.se
 the revision of its last `agent.sessions` or applied change as above (ignore, apply, or resync with
 `agent.sessions.get`).
 
+The workspace list has a third counter, apart from the other two, and follows the same rules: a host MUST raise
+it by exactly 1 with each `workspace.changed`, a `workspace.list` at revision r includes every change up to r, and
+the client compares each `workspace.changed` with the revision of its last `workspace.list` or applied change as
+above (ignore, apply, or resync with `workspace.list.get`).
+
 ### Features
 
 `welcome.features` lists the optional capabilities the host offers; it is omitted when the host offers none,
 and a receiver reads an absent `features` as an empty list. A client uses a capability only when the host
-lists it, and ignores a string it does not know. One feature is defined:
+lists it, and ignores a string it does not know. These features are defined:
 
 - `attachments`: the host takes `attach.*` uploads and `chat.send.attachments` (section 5).
+- `workspaces`: the host answers `workspace.list.get` and pushes `workspace.changed` (Workspace).
+- `workspace_control`: the host takes `workspace.create`, `workspace.rename` and `workspace.close` (Workspace).
 
 ### PendingItem
 
@@ -230,6 +248,50 @@ answers it `unknown` (section 5). A known `kind` with a missing required field i
 `upserted` in `agent.sessions.changed` adds a session or replaces the one with the same `session_id`;
 `removed` lists the `session_id` of sessions that are gone.
 
+### Workspace
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `workspace_id` | string | Unique, stable id of the workspace; the same value as `workspace_id` of an AgentSession and of a PendingItem of that workspace |
+| `title` | string | The workspace's name on the Mac |
+| `order` | int | Position in the Mac's sidebar: with several windows, window order, then order within the window |
+| `directory` | string, optional | Display text for the working directory, with the home directory written `~`. Read-only: no call takes it. Dropped when the list does not fit (section 6) |
+| `branch` | string, optional | The git branch of `directory`. Dropped when the list does not fit |
+| `ports` | array of int, optional | Ports the workspace's processes listen on. The first thing the host drops to fit a frame |
+| `terminals` | array of Terminal | The workspace's terminal surfaces, in tab order; may be empty |
+
+A Terminal has these fields:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `terminal_id` | string | Unique, stable id of the terminal: the surface id on the Mac |
+| `title` | string | The tab's name. The last thing the host drops to fit a frame: it becomes `""` (section 6) |
+| `order` | int | Position among the workspace's terminals |
+| `selected` | bool | Whether the Mac has this terminal selected in its workspace. A client uses it only to pick its default tab |
+| `session_id` | string, optional | The Claude Code session running in this terminal, matching `session_id` of an AgentSession; absent when none runs there |
+
+The list holds only the Mac's own local workspaces (not SSH or other remote ones) and only their terminal
+surfaces: browser, Markdown and other panels do not appear. Workspace groups do not appear either: the list is flat,
+in sidebar order. It carries no state and no pending question: a client derives them from the session list and the
+pending items (`agent.sessions`, `agent.snapshot`).
+
+`upserted` in `workspace.changed` adds a workspace or replaces the one with the same `workspace_id` (with its whole
+`terminals` array); `removed` lists the `workspace_id` of workspaces that are gone. The revision rules are those of
+the session list (above).
+
+The three control calls (`workspace_control`) act on the Mac and answer with an `outcome` (Enums):
+
+- `workspace.create` makes a workspace without changing the Mac's selection or bringing its window to the front, and
+  answers `ok` with the new `workspace_id`.
+- `workspace.rename` sets `title`. A `title` longer than 512 UTF-8 bytes is `error` `bad_request` carrying the
+  `call_id`.
+- `workspace.close` closes the workspace and its terminals. The Mac keeps its own rules: it can answer `refused`, for
+  example for its last workspace.
+
+A `workspace_id` the host does not have is `not_found`, not an `error`. A command answers `refused` when the Mac
+blocks remote control. A client does not resend a control call after losing the connection: the host may already
+have acted, so it reads the list again.
+
 ### ChatEntry
 
 | Field | Type | Notes |
@@ -285,6 +347,9 @@ it opens the session again.
   session whose agent is not live, an `ended` one for example (section 10).
 - `outcome` of `chat.interrupt.result`: `sent`, `not_found`, `failed`, with the same `not_found` rule.
 - `kind` (`attach.begin`): `image`, `file`.
+- `outcome` of `workspace.create.result`, `workspace.rename.result` and `workspace.close.result`: `ok`,
+  `not_found`, `refused` (the Mac blocks remote control, or its own rule says no, such as closing its last
+  workspace), `failed`.
 
 ## 5. Rules
 
@@ -414,6 +479,18 @@ three more rules apply:
   frame still does not fit, the host does not send it: an `agent.sessions` call is answered `error`
   `too_large` with its `call_id`, and an `agent.sessions.changed` is logged and dropped (the client
   recovers through the revision gap rule and `agent.sessions.get`).
+- `workspace.list` (and `workspace.changed`): the host shrinks every workspace in steps and re-encodes after each
+  step, stopping at the first that fits. The steps add up, so each leaves less than the one before:
+  1. every `ports` omitted;
+  2. every `directory` omitted;
+  3. every `branch` omitted;
+  4. the `title` of every terminal becomes `""`.
+
+  The `title` of a workspace, its `order`, and the `terminal_id`, `order`, `selected` and `session_id` of its
+  terminals are never dropped. If the frame still does not fit after step 4, the host does not send it: a
+  `workspace.list` call is answered `error` `too_large` with its `call_id`, and a `workspace.changed` is logged
+  and dropped (the client recovers through the revision gap rule and `workspace.list.get`). The host never sends
+  a list with a workspace left out.
 
 ## 7. Error handling and session phases
 

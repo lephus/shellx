@@ -39,6 +39,16 @@ public enum LinkMessage: Equatable, Sendable {
     /// `sha256` is the 32-byte digest of the whole upload; on the wire it is 64 lowercase hex characters.
     case attachEnd(callId: String, attachmentId: String, sha256: Data)
     case attachEndResult(callId: String, attachmentId: String)
+    case workspacesGet(callId: String)
+    case workspaces(callId: String, revision: Int, workspaces: [LinkWorkspace])
+    case workspacesChanged(revision: Int, upserted: [LinkWorkspace], removed: [String])
+    case workspaceCreate(callId: String)
+    /// `workspaceId` is the new workspace's id, present only when `outcome` is `ok`.
+    case workspaceCreateResult(callId: String, outcome: WorkspaceControlOutcome, workspaceId: String?)
+    case workspaceRename(callId: String, workspaceId: String, title: String)
+    case workspaceRenameResult(callId: String, outcome: WorkspaceControlOutcome)
+    case workspaceClose(callId: String, workspaceId: String)
+    case workspaceCloseResult(callId: String, outcome: WorkspaceControlOutcome)
     /// Decode-only: a well-formed frame whose `t` this version does not know. `callId` is the frame's `call_id`
     /// when it is a valid one (1 to 64 UTF-8 bytes): such a frame is a call of a later version, which a host
     /// answers `error` `unsupported` (PROTOCOL.md section 3).
