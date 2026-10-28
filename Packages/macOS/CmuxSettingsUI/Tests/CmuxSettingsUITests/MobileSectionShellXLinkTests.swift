@@ -198,6 +198,27 @@ struct MobileSectionShellXLinkTests {
         #expect(!index.match("pairing port").contains { $0.id == "setting:mobile:iOSPairingPort" })
     }
 
+    /// The Mobile section's own search words follow its rows: a ShellX Link host forwards no notifications to
+    /// the phone, so searching for that never lands on Mobile.
+    @Test func shellXLinkSearchHasNoPhonePushWords() {
+        let index = Self.runtime(PairingHost(shellXLink: true)).searchIndex
+        for query in ["push notifications", "forwarding"] {
+            let mobile = index.match(query).map(\.id).filter { $0 == "section:mobile" || $0.hasPrefix("setting:mobile:") }
+            #expect(mobile.isEmpty, "\"\(query)\" finds \(mobile)")
+        }
+        // The Pair iPhone row's long text still holds "alerts" as a scattered subsequence, the matcher's last
+        // fallback for any row; the section itself no longer offers the word.
+        #expect(!index.match("alerts").contains { $0.id == "section:mobile" })
+        #expect(index.match("iphone").contains { $0.id == "section:mobile" })
+    }
+
+    @Test func cmuxSearchKeepsThePhonePushWords() {
+        let index = Self.runtime(PairingHost(shellXLink: false)).searchIndex
+        for query in ["push notifications", "forwarding", "alerts"] {
+            #expect(index.match(query).contains { $0.id == "section:mobile" }, "\"\(query)\" left cmux Mobile")
+        }
+    }
+
     @Test func cmuxSearchKeepsTheMobileRows() {
         let index = Self.runtime(PairingHost(shellXLink: false)).searchIndex
         let ids = Set(index.entries.map(\.id))
