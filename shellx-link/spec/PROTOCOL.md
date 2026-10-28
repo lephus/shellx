@@ -282,11 +282,15 @@ the session list (above).
 The three control calls (`workspace_control`) act on the Mac and answer with an `outcome` (Enums):
 
 - `workspace.create` makes a workspace without changing the Mac's selection or bringing its window to the front, and
-  answers `ok` with the new `workspace_id`.
+  answers `ok`, normally with the new `workspace_id`. The field is optional: a client that gets `ok` without it
+  reads the list again. `workspace.create.result` and the `workspace.changed` that lists the new workspace may
+  arrive in either order, so a client that has the id before the list waits for the list.
 - `workspace.rename` sets `title`. A `title` longer than 512 UTF-8 bytes is `error` `bad_request` carrying the
-  `call_id`.
+  `call_id`. The host cleans the title first (it removes control characters and the whitespace around it); a title
+  left empty by that answers `failed`. There is no "clear the name" call: an empty title never takes the Mac back
+  to its automatic name.
 - `workspace.close` closes the workspace and its terminals. The Mac keeps its own rules: it can answer `refused`, for
-  example for its last workspace.
+  example for a pinned workspace or the last workspace of a window.
 
 A `workspace_id` the host does not have is `not_found`, not an `error`. A command answers `refused` when the Mac
 blocks remote control. A client does not resend a control call after losing the connection: the host may already
@@ -348,8 +352,8 @@ it opens the session again.
 - `outcome` of `chat.interrupt.result`: `sent`, `not_found`, `failed`, with the same `not_found` rule.
 - `kind` (`attach.begin`): `image`, `file`.
 - `outcome` of `workspace.create.result`, `workspace.rename.result` and `workspace.close.result`: `ok`,
-  `not_found`, `refused` (the Mac blocks remote control, or its own rule says no, such as closing its last
-  workspace), `failed`.
+  `not_found`, `refused` (the Mac blocks remote control, or its own rule says no, such as closing a pinned
+  workspace or the last workspace of a window), `failed`.
 
 ## 5. Rules
 
@@ -680,9 +684,9 @@ names a workspace only to rename or close one that the host's own list holds (`w
 | `attach.begin`, `attach.chunk`, `attach.end` | Keeps the uploaded bytes in the host's memory. Writes no file: files are written only when a `chat.send` carries the upload to a *live* session | The uploads of this Link session, by `attachment_id`; at most 5 finished and unsent plus the one going up, each at most 10 MiB |
 | `chat.interrupt` | Sends Esc, or ctrl-C when `hard`, to that agent's terminal | One live Claude Code session, by `session_id` |
 | `workspace.list.get` | None (read) | The host's own local workspaces and their terminals: titles, display directories, git branches, listening ports, tab titles |
-| `workspace.create` | Makes a workspace on the Mac, in a directory the Mac chooses as when the user adds a workspace there, and starts the user's default shell in it. Does not change the Mac's selection or bring its window to the front | None named: the call carries only `call_id`, no path, command, program, URL or environment |
+| `workspace.create` | Makes a workspace on the Mac, in a directory the Mac chooses as when the user adds a workspace there. Its terminal starts the user's default shell when it is first shown (the Mac creates it lazily). Does not change the Mac's selection or bring its window to the front | None named: the call carries only `call_id`, no path, command, program, URL or environment |
 | `workspace.rename` | Sets the workspace's title (at most 512 UTF-8 bytes) | One local workspace in the host's list, by `workspace_id` |
-| `workspace.close` | Closes that workspace and its terminals, ending what runs in them, as when the user closes it there. The Mac keeps its own rule: it refuses to close its last workspace | One local workspace in the host's list, by `workspace_id` |
+| `workspace.close` | Closes that workspace and its terminals, ending what runs in them, as when the user closes it there. The Mac keeps its own rules: it refuses to close a pinned workspace or the last workspace of a window, and refuses every control call while device management blocks remote control | One local workspace in the host's list, by `workspace_id` |
 | `ping` | None | |
 
 **Scope.** The host serves only its own Claude Code agent sessions and their pending requests, and its own
@@ -748,15 +752,15 @@ answers `invalid_params`); only ShellX Link does.
 **Workspaces.** `workspace.*` is the one place where a phone makes the Mac start something, so it answers the
 three questions a remote command channel must answer, one by one.
 
-- Does it run commands or open content on the Mac? Only `workspace.create` starts anything: a workspace with
-  the user's default shell, in a directory the Mac chooses, exactly as when the user presses the add button on
-  the Mac. No call carries a command line, path, directory, environment variable, URL or program name, and no
+- Does it run commands or open content on the Mac? Only `workspace.create` starts anything: a workspace whose
+  terminal starts the user's default shell when it is first shown, in a directory the Mac chooses, exactly as
+  when the user presses the add button on the Mac. No call carries a command line, path, directory, environment variable, URL or program name, and no
   call types into that shell: `chat.send` still reaches only the terminal of a live agent (Shell fall-through
   above). The phone does not select the new workspace on the Mac, nor bring a window forward.
 - Does it change or destroy what the phone does not own? The only objects are this Mac's own local workspaces,
   found by `workspace_id` in the host's list; any other id is `not_found`, and SSH or other remote workspaces
   are not listed, so they can be neither renamed nor closed. `workspace.close` keeps the Mac's rules: the Mac
-  answers `refused` for its last workspace. A rename is bounded by 512 UTF-8 bytes, which the host checks
+  answers `refused` for a pinned workspace or the last workspace of a window. A rename is bounded by 512 UTF-8 bytes, which the host checks
   before it asks the Mac.
 - Does it read state the phone has no business seeing? `workspace.list` carries what the user sees in the
   Mac's sidebar and tab bar (names, display directories with `~` for the home directory, branches, ports),
