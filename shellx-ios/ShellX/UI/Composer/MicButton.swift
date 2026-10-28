@@ -30,6 +30,8 @@ struct MicButton: View {
     var onNothing: (() -> Void)?
 
     @GestureState private var holding = false
+    /// What the hold's signals ask for.
+    @State private var hold = MicHold()
     @State private var starts = 0
     @State private var sends = 0
     @State private var cancels = 0
@@ -54,9 +56,12 @@ struct MicButton: View {
         .opacity(Self.isCancelArmed(model.phase) ? 0.55 : 1)
         .animation(.easeOut(duration: 0.15), value: active)
         .contentShape(Circle())
-        .gesture(hold, including: voiceOver ? .subviews : .all)
+        .gesture(holdGesture, including: voiceOver ? .subviews : .all)
         .onChange(of: holding) { _, isHolding in
-            if isHolding { start() } else { finish() }
+            perform(hold.holdingChanged(isHolding))
+            guard !isHolding else { return }
+            // `onEnded` and the reset state can come in either order: decide once both had their turn.
+            Task { @MainActor in perform(hold.settle()) }
         }
         .accessibilityElement()
         .accessibilityAddTraits(.isButton)
@@ -66,10 +71,7 @@ struct MicButton: View {
         .accessibilityActions {
             if active {
                 // Dragging left is the touch way; this is the same cancel without the gesture.
-                Button(String(localized: "common.cancel")) {
-                    model.drag(dx: -VoiceInputModel.cancelDistance, dy: 0)
-                    finish()
-                }
+                Button(String(localized: "common.cancel"), action: cancel)
             }
             if let onKeyboard {
                 Button(String(localized: "voice.keyboard"), action: onKeyboard)
@@ -97,10 +99,20 @@ struct MicButton: View {
         .accessibilityHidden(true)
     }
 
-    private var hold: some Gesture {
+    private var holdGesture: some Gesture {
         DragGesture(minimumDistance: 0)
             .updating($holding) { _, state, _ in state = true }
             .onChanged { value in model.drag(dx: value.translation.width, dy: value.translation.height) }
+            .onEnded { _ in perform(hold.ended()) }
+    }
+
+    private func perform(_ step: MicHold.Step) {
+        switch step {
+        case .press: start()
+        case .release: finish()
+        case .cancel: cancel()
+        case .none: break
+        }
     }
 
     private func start() {
@@ -108,6 +120,12 @@ struct MicButton: View {
         starts += 1
         onPress?()
         Task { await model.press() }
+    }
+
+    /// Drops what was heard, as a drag to the left and a lift do.
+    private func cancel() {
+        model.drag(dx: -VoiceInputModel.cancelDistance, dy: 0)
+        finish()
     }
 
     private func finish() {
