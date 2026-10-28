@@ -328,7 +328,8 @@ arrive first.
 
 A phone attaches photos and files to a `chat.send` by uploading them first. The host offers this only when
 `welcome.features` lists `attachments` (Features, section 4); a host without it answers every `attach.*`
-call `error` `unsupported` with its `call_id`, so a phone never needs to try. One upload runs in these
+call `error` `unsupported` with its `call_id`, so a phone never needs to try. It answers a `chat.send` that
+carries `attachments` the same way and types nothing, not even the text. One upload runs in these
 steps, each a call (section 3):
 
 1. `attach.begin` states the `kind` (`image` or `file`, an open enum), the `name` and the `size` in bytes.
@@ -342,6 +343,7 @@ Rules:
 
 - `size` is 1 to 10 485 760 (10 MiB). A larger `size` is answered `error` `too_large`, a smaller one
   `bad_request`, and nothing is stored.
+- A `kind` other than `image` and `file` is answered `error` `bad_request`, and nothing is stored.
 - Chunks arrive in order. `offset` MUST equal the number of bytes the host holds for that upload, `data` is
   1 to 45 000 bytes before base64, and the total never passes `size`. A chunk that breaks any of these is
   answered `error` `bad_request` and is not applied.

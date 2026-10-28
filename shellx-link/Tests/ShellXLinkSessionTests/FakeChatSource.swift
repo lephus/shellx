@@ -11,17 +11,27 @@ final class FakeChatSource: AgentChatSource, @unchecked Sendable {
     private var interruptOutcomes: [String: ChatInterruptOutcome] = [:]
     private var subscribers: [UUID: AsyncStream<ChatPush>.Continuation] = [:]
     private var _sends: [(sessionId: String, text: String)] = []
+    private var _attachmentSends: [(sessionId: String, text: String, attachments: [ChatAttachment])] = []
     private var _interrupts: [(sessionId: String, hard: Bool)] = []
     private var _entriesCalls = 0
     private let terminationLock = NSLock()
     private var terminated: Set<UUID> = []
 
-    /// `transcripts` seeds each session's entries, oldest first.
-    init(_ transcripts: [String: [ChatEntry]] = [:]) {
+    let acceptsAttachments: Bool
+
+    /// `transcripts` seeds each session's entries, oldest first. `acceptsAttachments` makes the host advertise
+    /// the `attachments` feature and hand uploads to `send(sessionId:text:attachments:)`.
+    init(_ transcripts: [String: [ChatEntry]] = [:], acceptsAttachments: Bool = false) {
         self.transcripts = transcripts
+        self.acceptsAttachments = acceptsAttachments
     }
 
+    /// The text-only sends (`send(sessionId:text:)`).
     var sends: [(sessionId: String, text: String)] { lock.withLock { _sends } }
+    /// The sends that carried attachments, in the order the host made them.
+    var attachmentSends: [(sessionId: String, text: String, attachments: [ChatAttachment])] {
+        lock.withLock { _attachmentSends }
+    }
     var interrupts: [(sessionId: String, hard: Bool)] { lock.withLock { _interrupts } }
     var entriesCalls: Int { lock.withLock { _entriesCalls } }
     var activeSubscribers: Int {
@@ -71,6 +81,14 @@ final class FakeChatSource: AgentChatSource, @unchecked Sendable {
     func send(sessionId: String, text: String) async -> ChatSendOutcome {
         lock.withLock {
             _sends.append((sessionId, text))
+            guard transcripts[sessionId] != nil else { return .notFound }
+            return sendOutcomes[sessionId] ?? .submitted
+        }
+    }
+
+    func send(sessionId: String, text: String, attachments: [ChatAttachment]) async -> ChatSendOutcome {
+        lock.withLock {
+            _attachmentSends.append((sessionId, text, attachments))
             guard transcripts[sessionId] != nil else { return .notFound }
             return sendOutcomes[sessionId] ?? .submitted
         }

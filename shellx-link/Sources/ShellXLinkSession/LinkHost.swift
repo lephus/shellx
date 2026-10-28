@@ -22,7 +22,10 @@ public actor LinkHost {
     /// - Parameters:
     ///   - trustedClients: the paired phones' static public keys, read on every handshake.
     ///   - sessions: the agent session list; without it `agent.sessions.get` is answered `unsupported`.
-    ///   - chat: transcripts and chat commands; without it every `chat.*` call is answered `unsupported`.
+    ///   - chat: transcripts and chat commands; without it every `chat.*` call is answered `unsupported`. When its
+    ///     `acceptsAttachments` is true the host also offers the `attachments` feature and takes `attach.*` uploads
+    ///     (kept in memory for the session, handed to `send(sessionId:text:attachments:)`); otherwise `attach.*` and a
+    ///     `chat.send` with attachments are answered `unsupported`.
     public init(
         key: NoiseStaticKey, trustedClients: @escaping @Sendable () -> Set<Data>,
         feed: any AgentFeedSource, sessions: (any AgentSessionSource)? = nil, chat: (any AgentChatSource)? = nil,
@@ -128,10 +131,12 @@ public actor LinkHost {
         let changes = feed.changes()
         let sessionChanges = sessions?.sessionChanges()
         let chatPushes = chat?.entries()
+        // Read once: what `welcome` offers is what this session enforces.
+        let takesAttachments = chat?.acceptsAttachments == true
         do {
             try await channel.send(.welcome(
                 protocolVersion: ShellXLink.protocolVersion, hostVersion: hostVersion, machineName: machineName,
-                features: []))
+                features: takesAttachments ? [ShellXLink.attachmentsFeature] : []))
         } catch {
             return
         }
@@ -179,6 +184,8 @@ public actor LinkHost {
         let sendOrder = ReplyOrder()
         let sessions = self.sessions
         let chat = self.chat
+        // The uploads of this session: an id means nothing in another one, and they end with this scope.
+        var uploads = AttachmentUploads()
         while true {
             let message: LinkMessage
             do {
@@ -245,14 +252,31 @@ public actor LinkHost {
                             page: (page.entries.map { $0.withTextCap() }, page.hasMore)),
                         what: "chat.history", answering: callId)
                 }
-            case let .chatSend(callId, sessionId, text, _):
+            case let .chatSend(callId, sessionId, text, attachmentIds):
                 guard let chat else {
                     await Self.sendError(on: channel, "unsupported", "this host has no chat", callId: callId)
                     continue
                 }
-                guard (1...Self.maxSendTextBytes).contains(text.utf8.count) else {
+                // Refused, not typed without them: a silent drop would lose what the user attached.
+                if !attachmentIds.isEmpty, !takesAttachments {
+                    await Self.sendError(on: channel, "unsupported", "this host takes no attachments", callId: callId)
+                    continue
+                }
+                // A message of only attachments has no text (PROTOCOL.md section 4).
+                let textBytes = attachmentIds.isEmpty ? 1...Self.maxSendTextBytes : 0...Self.maxSendTextBytes
+                guard textBytes.contains(text.utf8.count) else {
                     await Self.sendError(
-                        on: channel, "bad_request", "text must be 1 to \(Self.maxSendTextBytes) bytes", callId: callId)
+                        on: channel, "bad_request",
+                        "text must be \(textBytes.lowerBound) to \(Self.maxSendTextBytes) bytes", callId: callId)
+                    continue
+                }
+                // Taken before the chat source is called, so they are gone whatever the outcome; a message that
+                // fails these checks takes none of them.
+                let attachments: [ChatAttachment]
+                do throws(AttachmentRefusal) {
+                    attachments = try uploads.take(attachmentIds)
+                } catch {
+                    await Self.sendError(on: channel, error.code, error.message, callId: callId)
                     continue
                 }
                 // Typing into a session may wait on the agent; keep reading meanwhile. Sends to one
@@ -260,7 +284,9 @@ public actor LinkHost {
                 let turn = await sendOrder.reserve(sessionId)
                 group.addTask {
                     await sendOrder.wait(for: turn, of: sessionId)
-                    let outcome = await chat.send(sessionId: sessionId, text: text)
+                    let outcome = attachments.isEmpty
+                        ? await chat.send(sessionId: sessionId, text: text)
+                        : await chat.send(sessionId: sessionId, text: text, attachments: attachments)
                     try? await channel.send(.chatSendResult(callId: callId, outcome: outcome))
                     await sendOrder.finish(turn, of: sessionId)
                 }
@@ -274,8 +300,13 @@ public actor LinkHost {
                     try? await channel.send(.chatInterruptResult(callId: callId, outcome: outcome))
                 }
             case let .attachBegin(callId, _, _, _), let .attachChunk(callId, _, _, _), let .attachEnd(callId, _, _):
-                // This host takes no attachments yet: answered like a host without the feature (PROTOCOL.md 5).
-                await Self.sendError(on: channel, "unsupported", "this host takes no attachments", callId: callId)
+                // Without the feature every upload call is `unsupported`, so a phone never needs to try
+                // (PROTOCOL.md section 5). Each step is quick: answered in the loop, in order.
+                guard takesAttachments else {
+                    await Self.sendError(on: channel, "unsupported", "this host takes no attachments", callId: callId)
+                    continue
+                }
+                try? await channel.send(uploads.serve(message))
             case let .ping(nonce):
                 try? await channel.send(.pong(nonce: nonce))
             case let .unknown(_, callId?):

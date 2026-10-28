@@ -390,6 +390,7 @@ final class LinkCodecTests: XCTestCase {
     func testAttachmentConstants() {
         XCTAssertEqual(ShellXLink.maxAttachmentBytes, 10_485_760)
         XCTAssertEqual(ShellXLink.maxAttachmentsPerMessage, 5)
+        XCTAssertEqual(ShellXLink.maxPendingUploads, 5)
         XCTAssertEqual(ShellXLink.maxAttachmentChunkBytes, 45_000)
         XCTAssertEqual(ShellXLink.attachmentsFeature, "attachments")
     }

@@ -836,11 +836,13 @@ final class LinkSessionTests: XCTestCase {
         XCTAssertEqual(page.entries.map(\.text), ["forked head", "new turn"])
     }
 
-    /// Until the host takes attachments (it offers no feature), every `attach.*` call is `unsupported` with its
-    /// `call_id`, like a host without the feature; the host-only answers sent by a client are `bad_request`
-    /// (PROTOCOL.md sections 5 and 7).
+    /// A host whose chat source takes no attachments (the default) offers no `attachments` feature: every
+    /// `attach.*` call is `unsupported` with its `call_id`, and so is a `chat.send` that carries attachments; the
+    /// host-only answers sent by a client are `bad_request` (PROTOCOL.md sections 5 and 7). A host that takes
+    /// attachments is in `AttachmentSessionTests`.
     func testAttachFramesAreUnsupportedOrMisdirected() async throws {
-        let rig = makeHost(FakeFeedSource(), chat: FakeChatSource(["s1": []]))
+        let chat = FakeChatSource(["s1": []])
+        let rig = makeHost(FakeFeedSource(), chat: chat)
         let (end, served) = startServe(rig.host)
         let raw = try await rawEstablished(end, rig)
         let calls: [(LinkMessage, String)] = [
@@ -867,10 +869,18 @@ final class LinkSessionTests: XCTestCase {
             XCTAssertEqual(code, "bad_request", "\(frame)")
             XCTAssertEqual(callId, expectedId)
         }
-        // A message that names attachments is still sent as text: the attachments are not used yet.
+        // A message that names attachments is refused, and nothing is typed: not even its text.
         try await raw.send(.chatSend(callId: "u4", sessionId: "s1", text: "see this", attachments: ["a1"]))
+        let refused = try await within { try await raw.receive() }
+        guard case let .error(code, _, callId) = refused else { return XCTFail("expected an error, got \(refused)") }
+        XCTAssertEqual(code, "unsupported")
+        XCTAssertEqual(callId, "u4")
+        XCTAssertTrue(chat.sends.isEmpty && chat.attachmentSends.isEmpty, "nothing was typed")
+        // Text alone still goes through.
+        try await raw.send(.chatSend(callId: "u5", sessionId: "s1", text: "see this", attachments: []))
         let sent = try await within { try await raw.receive() }
-        XCTAssertEqual(sent, .chatSendResult(callId: "u4", outcome: .submitted))
+        XCTAssertEqual(sent, .chatSendResult(callId: "u5", outcome: .submitted))
+        XCTAssertEqual(chat.sends.map(\.text), ["see this"])
         XCTAssertFalse(served.isSet)
     }
 

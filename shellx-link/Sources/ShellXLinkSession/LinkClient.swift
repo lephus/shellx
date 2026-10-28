@@ -53,6 +53,11 @@ public actor LinkClient {
     /// it handles `.reset`.
     public nonisolated let chatEntries: AsyncStream<ChatPush>
 
+    /// The optional capabilities the host listed in `welcome.features` (PROTOCOL.md section 4, Features). Use a
+    /// capability only when it is here: for `ShellXLink.attachmentsFeature`, `uploadAttachment` and
+    /// `chatSend(attachments:)`. A string this version does not know is kept, and ignored.
+    public nonisolated let hostFeatures: Set<String>
+
     private let changesContinuation: AsyncStream<Change>.Continuation
     private let sessionChangesContinuation: AsyncStream<SessionChange>.Continuation
     private let chatEntriesContinuation: AsyncStream<ChatPush>.Continuation
@@ -83,7 +88,8 @@ public actor LinkClient {
         }
     }
 
-    private init(channel: SecureChannel, watchdog: Task<Void, Never>, timings: LinkTimings) {
+    private init(channel: SecureChannel, hostFeatures: Set<String>, watchdog: Task<Void, Never>, timings: LinkTimings) {
+        self.hostFeatures = hostFeatures
         let pingInterval = timings.pingInterval
         requestTimeout = timings.requestTimeout
         let (stream, continuation) = AsyncStream.makeStream(of: Change.self)
@@ -135,8 +141,8 @@ public actor LinkClient {
             let channel = try await SecureChannel.open(
                 watched, role: .initiator, key: key, trusts: { $0 == hostKey })
             try await channel.send(.hello(clientVersion: clientVersion, deviceName: deviceName))
-            try await awaitWelcome(on: channel)
-            let client = LinkClient(channel: channel, watchdog: watchdog, timings: timings)
+            let features = try await awaitWelcome(on: channel)
+            let client = LinkClient(channel: channel, hostFeatures: features, watchdog: watchdog, timings: timings)
             await client.startReading()
             return client
         } catch {
@@ -199,13 +205,60 @@ public actor LinkClient {
         return (entries, hasMore)
     }
 
-    /// Types `text` (1 to 16 384 UTF-8 bytes) into a session. Not safe to repeat: a timeout leaves it
-    /// unknown whether the host delivered it. Errors as for `chatHistory`, except `"not_found"` comes
-    /// as the outcome `.notFound`.
-    public func chatSend(sessionId: String, text: String) async throws -> ChatSendOutcome {
-        let answer = try await call { .chatSend(callId: $0, sessionId: sessionId, text: text, attachments: []) }
+    /// Types `text` (0 to 16 384 UTF-8 bytes; at least 1 when `attachments` is empty) into a session, with the
+    /// finished uploads named by `attachments` (up to 5 ids from ``uploadAttachment(kind:name:data:progress:)``,
+    /// each used by one message only). Not safe to repeat: a timeout leaves it unknown whether the host
+    /// delivered it. Errors as for `chatHistory`, except `"not_found"` comes as the outcome `.notFound`; also
+    /// `.remote(code: "bad_request", ...)` for an id the host does not hold (it ended with its session, was used
+    /// already, or never finished) and `"unsupported"` for attachments to a host without the feature. The host
+    /// removes the uploads of an accepted message whatever the outcome; a refused message uses none of them.
+    public func chatSend(sessionId: String, text: String, attachments: [String] = []) async throws -> ChatSendOutcome {
+        let answer = try await call {
+            .chatSend(callId: $0, sessionId: sessionId, text: text, attachments: attachments)
+        }
         guard case let .chatSendResult(_, outcome) = answer else { throw LinkClientError.unexpectedAnswer }
         return outcome
+    }
+
+    /// Uploads a photo or file to the host (PROTOCOL.md section 5, "Attachments") and returns the id to name in
+    /// ``chatSend(sessionId:text:attachments:)``. Call it only when ``hostFeatures`` lists
+    /// `ShellXLink.attachmentsFeature`.
+    ///
+    /// Sends `attach.begin`, then the bytes in chunks of `ShellXLink.maxAttachmentChunkBytes`, each after the
+    /// result of the one before, then `attach.end` with the SHA-256 of `data`. `progress` gets the bytes sent so
+    /// far after each chunk's result, so the last value is `data.count`. It runs on this actor: keep it quick.
+    ///
+    /// Each step is a call with the usual 10 s timeout. Throws `.remote(code: ...)` when the host refuses a
+    /// step: `"too_large"` or `"bad_request"` for a size outside 1 to `ShellXLink.maxAttachmentBytes`,
+    /// `"bad_request"` for a kind other than `.image` and `.file` or a sixth unsent upload, `"unsupported"`
+    /// without the feature. A failed upload leaves its unfinished part on the host until the session ends, and
+    /// it counts against the 5 unsent uploads a session holds.
+    public func uploadAttachment(
+        kind: AttachmentKind, name: String, data: Data, progress: @Sendable (Int) -> Void = { _ in }
+    ) async throws -> String {
+        let size = data.count
+        let ready = try await call { .attachBegin(callId: $0, kind: kind, name: name, size: size) }
+        guard case let .attachReady(_, attachmentId) = ready else { throw LinkClientError.unexpectedAnswer }
+        var offset = 0
+        while offset < size {
+            let start = offset
+            let end = min(start + ShellXLink.maxAttachmentChunkBytes, size)
+            let chunk = Data(data[(data.startIndex + start)..<(data.startIndex + end)])
+            let answer = try await call {
+                .attachChunk(callId: $0, attachmentId: attachmentId, offset: start, data: chunk)
+            }
+            guard case let .attachChunkResult(_, id, received) = answer, id == attachmentId, received == end else {
+                throw LinkClientError.unexpectedAnswer
+            }
+            offset = end
+            progress(offset)
+        }
+        let digest = sha256Digest(of: data)
+        let finished = try await call { .attachEnd(callId: $0, attachmentId: attachmentId, sha256: digest) }
+        guard case let .attachEndResult(_, id) = finished, id == attachmentId else {
+            throw LinkClientError.unexpectedAnswer
+        }
+        return attachmentId
     }
 
     /// Interrupts a session's current turn; `hard` asks for a stronger stop. Errors as for `chatSend`.
@@ -222,7 +275,8 @@ public actor LinkClient {
 
     // MARK: - Session
 
-    private static func awaitWelcome(on channel: SecureChannel) async throws {
+    /// Waits for `welcome`; returns the host's `features`.
+    private static func awaitWelcome(on channel: SecureChannel) async throws -> Set<String> {
         while true {
             let message: LinkMessage
             do {
@@ -234,11 +288,11 @@ public actor LinkClient {
                 continue
             }
             switch message {
-            case let .welcome(protocolVersion, _, _, _):
+            case let .welcome(protocolVersion, _, _, features):
                 guard protocolVersion == ShellXLink.protocolVersion else {
                     throw LinkClientError.protocolMismatch(message: "the host speaks protocol \(protocolVersion)")
                 }
-                return
+                return Set(features)
             case let .error(code, text, _):
                 if code == "protocol_mismatch" { throw LinkClientError.protocolMismatch(message: text) }
                 throw LinkClientError.rejected(code: code, message: text)
