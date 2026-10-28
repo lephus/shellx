@@ -5,9 +5,11 @@ import ShellXLinkCore
 /// One workspace's screen: the workspace as its Mac lists it, the chip shown, and when the screen
 /// should give up (the workspace is gone, or never came).
 ///
-/// - The chip shown starts as `defaultTerminal(in:pending:liveSessionIds:)` says and changes only when
-///   the user swipes (`select(_:)`), or when the chip shown leaves the Mac's list: the next chip shows.
-///   What the Mac selects later does not move it.
+/// - The chip shown starts as `defaultTerminal(in:pending:sessions:)` says and changes when the user
+///   swipes (`select(_:)`), or when the chip shown leaves the Mac's list: the next chip shows. The sessions
+///   and the requests can arrive after the list: until the user picks a chip, a chip that does not show an
+///   agent's chat gives way, once, to the pane waiting for the user. What the Mac selects later does not
+///   move it.
 /// - `phase` is `.dismissed` only for a workspace the screen has seen and that then left the list. A
 ///   workspace the Mac has not listed yet (a create's answer can come before the push that lists the
 ///   new workspace) is `.waiting`; after `patience` the model asks the Mac for its list once more, and
@@ -41,6 +43,10 @@ public final class WorkspaceScreenModel {
     @ObservationIgnored private var seen = false
     /// The terminal ids as `reconcile()` last saw them, in chip order.
     @ObservationIgnored private var knownTerminalIds: [String] = []
+    /// The chip shown was chosen for good: the user picked it, the screen moved to the pane waiting for the
+    /// user, or the chip shown left and the next one took its place. Until then the screen may still move to
+    /// the pane waiting for the user.
+    @ObservationIgnored private var settled = false
 
     /// `sleep` waits out `patience`; tests pass one they release by hand.
     public init(
@@ -81,37 +87,59 @@ public final class WorkspaceScreenModel {
     // MARK: - Choosing a chip
 
     /// The chip to show first, as its terminal id:
-    /// - while a request of the workspace waits for the user, the agent that asks: the first chip that
-    ///   runs an agent, the one the Mac has selected if that is one (a request does not say which
-    ///   agent asks);
+    /// - an agent whose session needs input waits for the user: among those, one whose agent is the agent of
+    ///   a request of the workspace, then the one the Mac has selected, then the first;
+    /// - while a request of the workspace waits for the user and no session says it needs input yet, the
+    ///   agent the Mac has selected, else the first chip that runs an agent;
     /// - otherwise the chip the Mac has selected;
     /// - otherwise the first chip.
     ///
     /// `pending` are the requests of the workspace's Mac (those of another workspace are ignored).
-    /// `liveSessionIds` are the sessions the hub lists: a terminal naming any other is not an agent
-    /// (nil takes every `sessionId` as a live session).
+    /// `sessions` are the sessions the hub lists for that Mac: a terminal naming any other is not an agent
+    /// (nil takes every `sessionId` as a live session, in no known state).
     public static func defaultTerminal(
-        in workspace: LinkWorkspace, pending: [MachinePendingItem], liveSessionIds: Set<String>? = nil
+        in workspace: LinkWorkspace, pending: [MachinePendingItem], sessions: [AgentSession]? = nil
     ) -> String? {
+        defaultChoice(in: workspace, pending: pending, sessions: sessions).terminalId
+    }
+
+    /// `defaultTerminal(in:pending:sessions:)`, and whether that chip is there because it waits for the user.
+    static func defaultChoice(
+        in workspace: LinkWorkspace, pending: [MachinePendingItem], sessions: [AgentSession]?
+    ) -> (terminalId: String?, waitsForUser: Bool) {
         let terminals = WorkspacePane.ordered(workspace.terminals)
-        func runsAgent(_ terminal: LinkTerminal) -> Bool {
+        let live = sessions.map { list in
+            Dictionary(list.map { ($0.sessionId, $0) }, uniquingKeysWith: { first, _ in first })
+        }
+        func session(of terminal: LinkTerminal) -> AgentSession? {
+            terminal.sessionId.flatMap { live?[$0] }
+        }
+        let agents = terminals.filter { terminal in
             guard let sessionId = terminal.sessionId else { return false }
-            return liveSessionIds?.contains(sessionId) ?? true
+            return live.map { $0[sessionId] != nil } ?? true
         }
-        let mine = pending.contains { $0.item.workspaceId == workspace.workspaceId }
-        if mine {
-            let agents = terminals.filter(runsAgent)
-            if let agent = agents.first(where: \.selected) ?? agents.first { return agent.terminalId }
+        func preferred(_ chips: [LinkTerminal]) -> String? {
+            (chips.first(where: \.selected) ?? chips.first)?.terminalId
         }
-        return (terminals.first(where: \.selected) ?? terminals.first)?.terminalId
+        let asking = pending.filter { $0.item.workspaceId == workspace.workspaceId }
+        let waiting = agents.filter { session(of: $0)?.state == .needsInput }
+        if !waiting.isEmpty {
+            let askingAgents = Set(asking.map(\.item.agent))
+            let matching = waiting.filter { session(of: $0).map { askingAgents.contains($0.agent) } ?? false }
+            return (preferred(matching.isEmpty ? waiting : matching), true)
+        }
+        if !asking.isEmpty, let agent = preferred(agents) { return (agent, true) }
+        return (preferred(terminals), false)
     }
 
     /// Shows the chip `terminalId` (the user swiped to it). An id the workspace does not have is ignored.
     public func select(_ terminalId: String) {
+        // The pager may write back the chip it already shows: only a change is the user's pick.
         guard terminalId != selectedTerminalId,
             workspace?.terminals.contains(where: { $0.terminalId == terminalId }) == true
         else { return }
         selectedTerminalId = terminalId
+        settled = true
     }
 
     /// The chip that takes the place of `gone`: the next one that is still there, else the one before.
@@ -150,13 +178,21 @@ public final class WorkspaceScreenModel {
         seen = true
         if phase != .showing { phase = .showing }
         let ids = WorkspacePane.ordered(workspace.terminals).map(\.terminalId)
-        if let selected = selectedTerminalId {
-            if !ids.contains(selected) {
-                selectedTerminalId = Self.successor(of: selected, before: knownTerminalIds, now: ids)
+        if let selected = selectedTerminalId, !ids.contains(selected) {
+            selectedTerminalId = Self.successor(of: selected, before: knownTerminalIds, now: ids)
+            settled = true
+        } else if selectedTerminalId == nil {
+            let choice = Self.defaultChoice(in: workspace, pending: pendingHere, sessions: sessionsHere)
+            selectedTerminalId = choice.terminalId
+            settled = choice.waitsForUser
+        } else if !settled, !showsAgent(in: workspace) {
+            // The sessions or the request came after the list: move to the pane waiting for the user. A chip
+            // that shows an agent's chat stays, so a message being typed is never pulled away.
+            let choice = Self.defaultChoice(in: workspace, pending: pendingHere, sessions: sessionsHere)
+            if choice.waitsForUser {
+                if choice.terminalId != selectedTerminalId { selectedTerminalId = choice.terminalId }
+                settled = true
             }
-        } else {
-            selectedTerminalId = Self.defaultTerminal(
-                in: workspace, pending: pendingHere, liveSessionIds: liveSessionIds)
         }
         knownTerminalIds = ids
     }
@@ -165,8 +201,16 @@ public final class WorkspaceScreenModel {
         hub.pendingItems.filter { $0.isIn(machineID: ref.machineID, workspaceId: ref.workspaceId) }
     }
 
-    private var liveSessionIds: Set<String> {
-        Set(machine?.sessions.sessions.map(\.sessionId) ?? [])
+    private var sessionsHere: [AgentSession] {
+        machine?.sessions.sessions ?? []
+    }
+
+    /// The chip shown runs an agent the hub lists: its page is that agent's chat.
+    private func showsAgent(in workspace: LinkWorkspace) -> Bool {
+        guard let selectedTerminalId,
+            let sessionId = workspace.terminals.first(where: { $0.terminalId == selectedTerminalId })?.sessionId
+        else { return false }
+        return machine?.sessions.session(sessionId) != nil
     }
 
     /// A workspace not listed yet: after `patience` asks the Mac for its list, once; then it either
@@ -180,13 +224,18 @@ public final class WorkspaceScreenModel {
         if phase == .waiting { phase = .notFound }
     }
 
-    /// Returns when the workspace the screen looks at (or the Mac it is on) changed in the hub, or
-    /// when the task is cancelled.
+    /// Returns when the workspace the screen looks at (or the Mac it is on) changed in the hub, or, while
+    /// the chip shown is not settled, the Mac's sessions or requests; or when the task is cancelled.
     private func nextChange() async {
         let wake = Wake()
         await withTaskCancellationHandler {
             withObservationTracking {
                 _ = workspace
+                // Until the chip is settled, the sessions and the requests can still move it.
+                if !settled {
+                    _ = sessionsHere
+                    _ = pendingHere
+                }
             } onChange: {
                 wake.wake()
             }

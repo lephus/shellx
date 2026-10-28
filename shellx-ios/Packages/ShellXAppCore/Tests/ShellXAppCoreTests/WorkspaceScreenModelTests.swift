@@ -80,11 +80,57 @@ final class WorkspaceScreenModelTests: XCTestCase {
             terminals: terminals("gone", "live", "shell", agent: ["gone": "s-gone", "live": "s-live"], selected: "shell"))
 
         XCTAssertEqual(
-            WorkspaceScreenModel.defaultTerminal(in: workspace, pending: [pending()], liveSessionIds: ["s-live"]),
+            WorkspaceScreenModel.defaultTerminal(in: workspace, pending: [pending()], sessions: [agentSession("s-live")]),
             "live")
         XCTAssertEqual(
-            WorkspaceScreenModel.defaultTerminal(in: workspace, pending: [pending()], liveSessionIds: []), "shell",
+            WorkspaceScreenModel.defaultTerminal(in: workspace, pending: [pending()], sessions: []), "shell",
             "no chip is an agent any more")
+    }
+
+    func testAnAgentThatNeedsInputComesFirstThenTheAskingAgentThenTheMacsSelection() {
+        let workspace = linkWorkspace(
+            terminals: terminals(
+                "shell", "c1", "c2", "x1", agent: ["c1": "s-c1", "c2": "s-c2", "x1": "s-x1"], selected: "shell"))
+        func session(_ id: String, _ state: AgentState, agent: String = "claude") -> AgentSession {
+            var session = agentSession(id, state: state)
+            session.agent = agent
+            return session
+        }
+
+        XCTAssertEqual(
+            WorkspaceScreenModel.defaultTerminal(
+                in: workspace, pending: [pending()],
+                sessions: [session("s-c1", .working), session("s-c2", .needsInput), session("s-x1", .working)]),
+            "c2", "the one agent that needs input")
+        XCTAssertEqual(
+            WorkspaceScreenModel.defaultTerminal(
+                in: workspace, pending: [],
+                sessions: [session("s-c1", .working), session("s-c2", .needsInput)]),
+            "c2", "it waits for the user even before its request is listed")
+        XCTAssertEqual(
+            WorkspaceScreenModel.defaultTerminal(
+                in: workspace, pending: [pending()],
+                sessions: [
+                    session("s-c1", .working), session("s-c2", .needsInput),
+                    session("s-x1", .needsInput, agent: "codex"),
+                ]),
+            "c2", "several need input: the one whose agent asks (the request is Claude's)")
+        XCTAssertEqual(
+            WorkspaceScreenModel.defaultTerminal(
+                in: workspace, pending: [pending()],
+                sessions: [session("s-c1", .needsInput), session("s-c2", .needsInput)]),
+            "c1", "the same agent asks in both: the first, the Mac selecting neither")
+        let macSelectsC2 = linkWorkspace(
+            terminals: terminals("c1", "c2", agent: ["c1": "s-c1", "c2": "s-c2"], selected: "c2"))
+        XCTAssertEqual(
+            WorkspaceScreenModel.defaultTerminal(
+                in: macSelectsC2, pending: [pending()],
+                sessions: [session("s-c1", .needsInput), session("s-c2", .needsInput)]),
+            "c2", "then the one the Mac has selected")
+        XCTAssertEqual(
+            WorkspaceScreenModel.defaultTerminal(
+                in: workspace, pending: [], sessions: [session("s-c1", .working), session("s-c2", .idle)]),
+            "shell", "nothing waits: the Mac's selection")
     }
 
     func testPendingChoosesTheAgentThatIsSelectedWhenThereAreSeveral() {
