@@ -142,6 +142,32 @@ final class AttachmentSendTests: XCTestCase {
         XCTAssertNil(home.uploadProgress)
     }
 
+    /// Ruling R14(a): two messages of five attachments sent at once to one Mac (the home and an agent's screen,
+    /// say) both arrive whole. Each holds the upload turn until its `chat.send` is answered, so the Mac never
+    /// drops one of a message's uploads to make room for the other's.
+    func testTwoMessagesOfFiveAttachmentsAtOnceBothArrive() async throws {
+        let mac = await macWithSession()
+        let rig = try await HomeRig.make([mac], in: self)
+        let online = await rig.online(sessions: 1)
+        XCTAssertTrue(online)
+        func five(_ prefix: String) -> [OutgoingAttachment] {
+            (0..<ShellXLink.maxAttachmentsPerMessage).map {
+                OutgoingAttachment(kind: .file, name: "\(prefix)\($0).log", data: Data(count: 50_000))
+            }
+        }
+        let hub = rig.hub
+        let target = ref(mac)
+
+        async let first = hub.chatSend(target, text: "một", attachments: five("a")) { _ in }
+        async let second = hub.chatSend(target, text: "hai", attachments: five("b")) { _ in }
+        let outcomes = try await [first, second]
+
+        XCTAssertEqual(outcomes, [.submitted, .submitted])
+        let received = await mac.receivedAttachments.map(\.name)
+        XCTAssertEqual(Set(received), Set(five("a").map(\.name) + five("b").map(\.name)))
+        XCTAssertEqual(received.count, 10)
+    }
+
     // MARK: - Refused on the phone
 
     func testSixAttachmentsAreRefusedOnThePhone() async throws {
