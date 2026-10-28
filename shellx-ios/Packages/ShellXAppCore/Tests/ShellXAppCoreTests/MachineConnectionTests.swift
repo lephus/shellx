@@ -113,6 +113,44 @@ final class MachineConnectionTests: XCTestCase {
         XCTAssertEqual(log.pending?.actionable, true)
     }
 
+    func testWorkspacesArriveBeforeOnlineAndChangesFollow() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace("shellx"), linkWorkspace("web", order: 1)])
+        let (_, log) = await connect(mac)
+
+        let online = await eventually { log.isOnline }
+        XCTAssertTrue(online, "\(log.states)")
+        // The first workspace event is the whole list, sent before `.online`.
+        XCTAssertEqual(log.workspaceEvents.first?.set.workspaces.map(\.workspaceId), ["ws-shellx", "ws-web"])
+        XCTAssertEqual(log.workspaces?.supported, true)
+
+        await mac.removeWorkspace("ws-shellx")
+        await mac.upsertWorkspace(linkWorkspace("docs", order: 2))
+        let followed = await eventually { log.workspaceIDs == ["ws-web", "ws-docs"] }
+        XCTAssertTrue(followed, "\(log.workspaceIDs)")
+        // Every change was applied on its own, one revision after the other.
+        let tail = Array(log.workspaceEvents.map(\.set.revision).suffix(3))
+        XCTAssertEqual(tail.map { $0 - tail[0] }, [0, 1, 2])
+        let lists = await mac.workspaceListCount
+        XCTAssertEqual(lists, 1)
+    }
+
+    func testHostWithoutWorkspacesStillServesPendingAndSessions() async throws {
+        let mac = FakeMac(name: "Old Mac", servesWorkspaces: false)
+        await mac.addPending(pendingItem("r1", createdAtMs: 10))
+        await mac.upsertSession(agentSession("s1"))
+        let (_, log) = await connect(mac)
+
+        let online = await eventually { log.isOnline }
+        XCTAssertTrue(online, "\(log.states)")
+        XCTAssertEqual(log.workspaces?.supported, false)
+        XCTAssertEqual(log.workspaceIDs, [])
+        XCTAssertEqual(log.pendingIDs, ["r1"])
+        XCTAssertEqual(log.sessionIDs, ["s1"])
+        let connects = await mac.connectCount
+        XCTAssertEqual(connects, 1, "no failed round on the way")
+    }
+
     func testChatEntriesConsumedWithoutSubscribers() async throws {
         let mac = FakeMac(name: "MacBook Pro")
         await mac.upsertSession(agentSession("s1"))

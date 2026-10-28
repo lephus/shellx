@@ -8,13 +8,14 @@ import os
 /// drops.
 ///
 /// One round: connect, `snapshot()`, `sessions()` (a Mac without a session list answers
-/// `unsupported`, which is not a failure), report the client's `hostFeatures` and `.online`, then
-/// read `changes`, `sessionChanges` and `chatEntries` until `changes` ends. A revision gap resyncs
-/// inside the live session. When the session ends the items stay but are reported not actionable
-/// (`.reconnecting`); when the first attempt after that fails they are dropped (`.offline`). Waits
-/// follow `ReconnectSchedule`; the failure count starts over at every `welcome`. A refused token
-/// (`.signedOut` event), a revoked grant, a changed host key and a protocol mismatch stop the loop
-/// for good and finish `events`.
+/// `unsupported`, which is not a failure), `workspaces()` (only when the Mac lists the `workspaces`
+/// feature), report the client's `hostFeatures` and `.online`, then read `changes`,
+/// `sessionChanges`, `workspaceChanges` and `chatEntries` until `changes` ends. A revision gap
+/// resyncs inside the live session. When the session ends the items stay but are reported not
+/// actionable (`.reconnecting`); when the first attempt after that fails they are dropped
+/// (`.offline`). Waits follow `ReconnectSchedule`; the failure count starts over at every `welcome`.
+/// A refused token (`.signedOut` event), a revoked grant, a changed host key and a protocol
+/// mismatch stop the loop for good and finish `events`.
 public actor MachineConnection {
     /// Every state and data change, in order. Single consumer; it finishes when the loop stops.
     public nonisolated let events: AsyncStream<MachineEvent>
@@ -31,6 +32,8 @@ public actor MachineConnection {
     private var pending = PendingSet()
     private var sessions = SessionSet()
     private var sessionsSupported = true
+    private var workspaces = WorkspaceSet()
+    private var workspacesSupported = false
     /// The client of the current round, from `connect` until the round is over.
     private var client: LinkClient?
     private var loop: Task<Void, Never>?
@@ -152,24 +155,45 @@ public actor MachineConnection {
         } catch LinkClientError.remote(code: "unsupported", message: _) {
             list = nil
         }
+        let workspaceList = try await workspaceList(of: client)
         pending.reset(revision: snapshot.revision, items: snapshot.pending)
         sessions.reset(revision: list?.revision ?? 0, sessions: list?.sessions ?? [])
         sessionsSupported = list != nil
+        workspaces.reset(revision: workspaceList?.revision ?? 0, workspaces: workspaceList?.workspaces ?? [])
+        workspacesSupported = workspaceList != nil
         lostAt = nil
         skipBackoff = false
         state = .online
         output.yield(.pending(pending, actionable: true))
         output.yield(.sessions(sessions, supported: sessionsSupported))
+        output.yield(.workspaces(workspaces, supported: workspacesSupported))
         output.yield(.features(client.hostFeatures))
         output.yield(.state(.online))
     }
 
-    /// Reads the session's three streams until `changes` ends (the session is over).
+    /// The Mac's workspace list, or nil when it has none to give: it did not list the `workspaces`
+    /// feature, or it listed it and answered with an error (`unsupported`, `too_large`). Either way
+    /// the session stays: it carries the requests the user has to answer. A timeout or a closed
+    /// session still ends the round.
+    private func workspaceList(of client: LinkClient) async throws -> (revision: Int, workspaces: [LinkWorkspace])? {
+        guard client.hostFeatures.contains(ShellXLink.workspacesFeature) else { return nil }
+        do {
+            return try await client.workspaces()
+        } catch LinkClientError.remote(code: _, message: _) {
+            log.info("link_workspaces_unavailable")
+            return nil
+        }
+    }
+
+    /// Reads the session's four streams until `changes` ends (the session is over).
     private func read(_ client: LinkClient) async {
         let output = self.output
         await withTaskGroup(of: Void.self) { group in
             group.addTask {
                 for await change in client.sessionChanges { await self.applySessions(change, from: client) }
+            }
+            group.addTask {
+                for await change in client.workspaceChanges { await self.applyWorkspaces(change, from: client) }
             }
             group.addTask {
                 // Read even when no screen shows chat: the client buffers without bound. A reset
@@ -237,6 +261,26 @@ public actor MachineConnection {
         }
     }
 
+    private func applyWorkspaces(
+        _ change: (revision: Int, upserted: [LinkWorkspace], removed: [String]), from client: LinkClient
+    ) async {
+        switch workspaces.apply(revision: change.revision, upserted: change.upserted, removed: change.removed) {
+        case .applied:
+            output.yield(.workspaces(workspaces, supported: workspacesSupported))
+        case .ignored:
+            break
+        case .gap:
+            do {
+                let list = try await client.workspaces()
+                workspaces.reset(revision: list.revision, workspaces: list.workspaces)
+                output.yield(.workspaces(workspaces, supported: workspacesSupported))
+            } catch {
+                log.info("link_resync_failed")
+                await client.close()
+            }
+        }
+    }
+
     private func sessionEnded() {
         lostAt = Date()
         failures = 1
@@ -281,9 +325,11 @@ public actor MachineConnection {
         log.notice("link_stopped \(String(describing: final), privacy: .public)")
         pending.reset(revision: 0, items: [])
         sessions.reset(revision: 0, sessions: [])
+        workspaces.reset(revision: 0, workspaces: [])
         state = final
         output.yield(.pending(pending, actionable: false))
         output.yield(.sessions(sessions, supported: sessionsSupported))
+        output.yield(.workspaces(workspaces, supported: workspacesSupported))
         output.yield(.state(final))
         return false
     }

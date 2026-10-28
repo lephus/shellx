@@ -6,9 +6,10 @@ import ShellXLinkCore
 ///
 /// `setUp()` gives the Mac two Claude Code sessions, both working, each with a chat history that
 /// holds every kind of entry (user, agent and system; prose, thought, tool use, status; one cut
-/// short). Then every `interval`, `step(_:)` adds a pending request, in turn a permission, a
-/// question and a plan, and switches one session between working and idle. At most `maxPending`
-/// requests wait at once: the oldest is resolved when another comes.
+/// short), and three workspaces (`workspaces`) that hold them. Then every `interval`, `step(_:)`
+/// adds a pending request, in turn a permission, a question and a plan, and switches one session
+/// between working and idle. At most `maxPending` requests wait at once: the oldest is resolved
+/// when another comes.
 public actor FakeMacDemoScript {
     public static let interval: Duration = .seconds(20)
     public static let maxPending = 6
@@ -50,7 +51,28 @@ public actor FakeMacDemoScript {
             await mac.setHistory(sessionId: session.sessionId, entries: Self.history(for: session.workspaceTitle, at: ms))
             await mac.upsertSession(session)
         }
+        await mac.setWorkspaces(Self.workspaces)
     }
+
+    /// The Mac's sidebar: one workspace for each session (its terminal names the session), and a third
+    /// with a plain shell and no agent. Their ids are the ones the sessions and pending requests carry.
+    static let workspaces: [LinkWorkspace] = [
+        LinkWorkspace(
+            workspaceId: "ws-shellx", title: "shellx", order: 0, directory: "~/code/shellx", branch: "feat/pairing",
+            ports: [3000],
+            terminals: [
+                LinkTerminal(terminalId: "demo-shellx-t1", title: "claude", order: 0, selected: true, sessionId: "demo-shellx"),
+                LinkTerminal(terminalId: "demo-shellx-t2", title: "zsh", order: 1, selected: false),
+            ]),
+        LinkWorkspace(
+            workspaceId: "ws-web", title: "web", order: 1, directory: "~/code/web", branch: "main",
+            terminals: [
+                LinkTerminal(terminalId: "demo-web-t1", title: "claude", order: 0, selected: true, sessionId: "demo-web")
+            ]),
+        LinkWorkspace(
+            workspaceId: "ws-docs", title: "docs", order: 2, directory: "~/code/docs",
+            terminals: [LinkTerminal(terminalId: "demo-docs-t1", title: "zsh", order: 0, selected: true)]),
+    ]
 
     /// The `index`-th tick (0, 1, 2…).
     public func step(_ index: Int) async {

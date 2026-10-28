@@ -114,6 +114,7 @@ final class EventLog: @unchecked Sendable {
     private var stateList: [MachineLinkState] = []
     private var pendingList: [(set: PendingSet, actionable: Bool)] = []
     private var sessionList: [(set: SessionSet, supported: Bool)] = []
+    private var workspaceList: [(set: WorkspaceSet, supported: Bool)] = []
     private var chatCount = 0
     private var lastChatSession: String?
     private var signedOutCount = 0
@@ -134,6 +135,9 @@ final class EventLog: @unchecked Sendable {
     var pendingIDs: [String] { pending?.set.items.map(\.requestId) ?? [] }
     var sessions: (set: SessionSet, supported: Bool)? { lock.withLock { sessionList.last } }
     var sessionIDs: [String] { sessions?.set.sessions.map(\.sessionId) ?? [] }
+    var workspaceEvents: [(set: WorkspaceSet, supported: Bool)] { lock.withLock { workspaceList } }
+    var workspaces: (set: WorkspaceSet, supported: Bool)? { workspaceEvents.last }
+    var workspaceIDs: [String] { workspaces?.set.workspaces.map(\.workspaceId) ?? [] }
     var chatEntries: Int { lock.withLock { chatCount } }
     var signedOut: Int { lock.withLock { signedOutCount } }
     /// True once the connection finished its event stream.
@@ -152,6 +156,7 @@ final class EventLog: @unchecked Sendable {
             case .features: break
             case let .pending(set, actionable): pendingList.append((set, actionable))
             case let .sessions(set, supported): sessionList.append((set, supported))
+            case let .workspaces(set, supported): workspaceList.append((set, supported))
             case let .chat(sessionId, entries):
                 chatCount += entries.count
                 lastChatSession = sessionId
@@ -176,6 +181,21 @@ func agentSession(
     AgentSession(
         sessionId: id, agent: "claude", workspaceId: "ws-\(workspace)", workspaceTitle: workspace, state: state,
         stateSinceMs: stateSinceMs, lastActivityMs: lastActivityMs)
+}
+
+func linkTerminal(_ id: String, sessionId: String? = nil, order: Int = 0, selected: Bool = false) -> LinkTerminal {
+    LinkTerminal(terminalId: id, title: "zsh \(id)", order: order, selected: selected, sessionId: sessionId)
+}
+
+/// A workspace with the id `ws-<workspace>`, the one `agentSession(_:workspace:)` and `pendingItem(_:workspace:)`
+/// name.
+func linkWorkspace(
+    _ workspace: String = "shellx", order: Int = 0, terminals: [LinkTerminal] = [], directory: String? = nil,
+    branch: String? = nil, ports: [Int]? = nil
+) -> LinkWorkspace {
+    LinkWorkspace(
+        workspaceId: "ws-\(workspace)", title: workspace, order: order, directory: directory, branch: branch,
+        ports: ports, terminals: terminals)
 }
 
 func chatEntry(_ seq: Int, text: String? = nil) -> ChatEntry {
