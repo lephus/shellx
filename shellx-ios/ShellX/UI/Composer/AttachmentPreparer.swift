@@ -2,6 +2,7 @@ import Foundation
 import ImageIO
 import ShellXAppCore
 import UniformTypeIdentifiers
+import os
 
 /// Turns a picked photo or file into an `OutgoingAttachment`, as picked (ruling R9): a photo keeps
 /// the bytes the photo picker delivered (it asks for `.compatible`, so iOS itself hands a HEIC photo
@@ -31,19 +32,47 @@ enum AttachmentPreparer {
         return OutgoingAttachment(kind: .image, name: name, data: data)
     }
 
-    /// A file from the Files picker, under security-scoped access, named as it is there. Its size is
-    /// read first, so a file too big is refused without being read.
+    /// A file from the Files picker, named as it is there. It is read under security-scoped access,
+    /// through `NSFileCoordinator`, which first downloads an iCloud Drive item that is not on the
+    /// iPhone yet (a plain read fails on it). Its size is checked before the read when the file
+    /// system knows it, so a file too big is refused without being read, and again after.
     static func file(at url: URL) throws -> OutgoingAttachment {
         let name = url.lastPathComponent
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        if let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size > ShellXLink.maxAttachmentBytes {
-            throw Failure.tooLarge(name: name)
+        if let size = fileSize(url), size > ShellXLink.maxAttachmentBytes { throw Failure.tooLarge(name: name) }
+
+        var coordinationError: NSError?
+        var read: Result<Data, any Error> = .failure(Failure.unreadable(name: name))
+        NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { local in
+            // Downloaded now: its size may be known only here.
+            if let size = fileSize(local), size > ShellXLink.maxAttachmentBytes {
+                read = .failure(Failure.tooLarge(name: name))
+                return
+            }
+            read = Result { try Data(contentsOf: local) }
         }
-        guard let data = try? Data(contentsOf: url) else { throw Failure.unreadable(name: name) }
+        let data: Data
+        do {
+            if let coordinationError { throw coordinationError }
+            data = try read.get()
+        } catch let failure as Failure {
+            throw failure
+        } catch {
+            // The reason, never the name: a path can say more than the user meant to share.
+            let reason = error as NSError
+            log.notice("attach_file_unreadable domain=\(reason.domain, privacy: .public) code=\(reason.code)")
+            throw Failure.unreadable(name: name)
+        }
         guard data.count <= ShellXLink.maxAttachmentBytes else { throw Failure.tooLarge(name: name) }
         guard !data.isEmpty else { throw Failure.unreadable(name: name) }
         return OutgoingAttachment(kind: .file, name: name, data: data)
+    }
+
+    private static let log = Logger(subsystem: "com.shellx.app", category: "attachments")
+
+    private static func fileSize(_ url: URL) -> Int? {
+        try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize
     }
 
     /// "photo-<n>.<extension>", with the first `n` from 1 that no name in `taken` has. The extension

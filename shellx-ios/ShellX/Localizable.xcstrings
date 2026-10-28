@@ -595,6 +595,24 @@
         }
       }
     },
+    "composer.attach.loading": {
+      "comment": "VoiceOver label of a placeholder tile in the composer while a picked photo or file is being read.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adding attachment"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đang thêm tệp đính kèm"
+          }
+        }
+      }
+    },
     "composer.attach.photos": {
       "comment": "Menu item of the composer's + button: pick photos from the photo library.",
       "extractionState": "manual",

@@ -52,6 +52,8 @@ struct ComposerBar<Accessory: View>: View {
     @State private var cutText: String?
     /// Why something picked was not added (too big, unreadable, too many).
     @State private var attachNote: String?
+    /// Picks still being read: Send waits for them.
+    @State private var loadingPicks = 0
     @FocusState private var focused: Bool
     @ScaledMetric(relativeTo: .body) private var buttonSize: CGFloat = 44
 
@@ -76,10 +78,10 @@ struct ComposerBar<Accessory: View>: View {
 
     private var picked: [OutgoingAttachment] { attachments?.wrappedValue ?? [] }
 
-    /// The mic, while the field and the attachments are empty, nothing is being sent, and a
-    /// recognizer can run.
+    /// The mic, while the field and the attachments are empty, nothing is being picked or sent, and
+    /// a recognizer can run.
     private var mic: VoiceInputModel? {
-        guard let voice, text.isEmpty, picked.isEmpty, sending == nil else { return nil }
+        guard let voice, text.isEmpty, picked.isEmpty, loadingPicks == 0, sending == nil else { return nil }
         if case .unavailable = voice.phase { return nil }
         return voice
     }
@@ -92,8 +94,10 @@ struct ComposerBar<Accessory: View>: View {
                 VoiceStatusView(model: voice, level: voiceService?.meter.level ?? 0)
                     .padding(.bottom, 2)
             }
-            if let attachments, !attachments.wrappedValue.isEmpty {
-                AttachmentStrip(attachments: attachments, locked: sending != nil, removed: { attachNote = nil })
+            if let attachments, !attachments.wrappedValue.isEmpty || loadingPicks > 0 {
+                AttachmentStrip(
+                    attachments: attachments, locked: sending != nil, loading: loadingPicks,
+                    removed: { attachNote = nil })
                     .padding(.bottom, 2)
             }
             field(validation)
@@ -158,7 +162,7 @@ struct ComposerBar<Accessory: View>: View {
     private func field(_ validation: ComposerValidation) -> some View {
         HStack(alignment: .bottom, spacing: 8) {
             if let attachments {
-                AttachMenu(attachments: attachments, side: side, note: { attachNote = $0 })
+                AttachMenu(attachments: attachments, loading: $loadingPicks, side: side, note: { attachNote = $0 })
                     .disabled(sending != nil)
                     .opacity(sending != nil ? 0.4 : 1)
             }
@@ -205,8 +209,10 @@ struct ComposerBar<Accessory: View>: View {
     }
 
     private func sendButtonIdle(_ validation: ComposerValidation) -> some View {
-        Button {
-            guard case let .ok(message) = validation else { return }
+        let canSend = validation.canSend && loadingPicks == 0
+        return Button {
+            // A pick still being read would arrive after its message left.
+            guard case let .ok(message) = validation, loadingPicks == 0 else { return }
             let carried = picked
             send(message, carried)
             attachNote = nil
@@ -221,8 +227,8 @@ struct ComposerBar<Accessory: View>: View {
                 .frame(width: side, height: side)
                 .background(PrimaryButtonStyle.fill, in: Circle())
         }
-        .disabled(!validation.canSend)
-        .opacity(validation.canSend ? 1 : 0.4)
+        .disabled(!canSend)
+        .opacity(canSend ? 1 : 0.4)
         .accessibilityLabel(Text(LocalizedStringResource("composer.send")))
         .accessibilityIdentifier("composer.send")
     }

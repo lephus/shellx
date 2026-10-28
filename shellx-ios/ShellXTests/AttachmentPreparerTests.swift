@@ -87,6 +87,19 @@ final class AttachmentPreparerTests: XCTestCase {
         XCTAssertEqual(try AttachmentPreparer.file(at: atLimit).data.count, ShellXLink.maxAttachmentBytes)
     }
 
+    /// Files are read through `NSFileCoordinator` (which downloads an iCloud Drive item first; that
+    /// part cannot run in a test): a plain file in a folder with spaces reads the same.
+    func testCoordinatedReadOfAPlainFile() throws {
+        let url = try temporaryFile("Báo cáo lỗi (1).txt", bytes: 0)
+        let text = Data(String(repeating: "dòng lỗi\n", count: 2_000).utf8)
+        try text.write(to: url)
+
+        let attachment = try AttachmentPreparer.file(at: url)
+
+        XCTAssertEqual(attachment.name, "Báo cáo lỗi (1).txt")
+        XCTAssertEqual(attachment.data, text)
+    }
+
     func testUnreadableFileIsRefused() throws {
         let empty = try temporaryFile("empty.txt", bytes: 0)
         XCTAssertThrowsError(try AttachmentPreparer.file(at: empty)) { error in

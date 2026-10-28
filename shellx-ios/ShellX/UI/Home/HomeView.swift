@@ -9,16 +9,14 @@ import SwiftUI
 /// The composer offers attachments when the Mac of the session it sends to takes them
 /// (`MachineHub.acceptsAttachments`), and keeps offering them while some wait in it, so none is
 /// ever hidden. A message with attachments stays in the composer, locked, until the Mac answers:
-/// it is cleared once taken and left to send again otherwise (`HomeSubmitResult.keepsDraft`).
+/// what went is cleared once taken, and everything is left to send again otherwise
+/// (`ComposerDraft`, `HomeSubmitResult.keepsDraft`).
 struct HomeView: View {
     let scope: SignedInScope
     /// Pushes a screen over the home.
     let open: (HomeRoute) -> Void
 
-    @State private var draft = ""
-    @State private var attachments: [OutgoingAttachment] = []
-    /// A message with attachments is on its way.
-    @State private var sendingAttachments = false
+    @State private var composer = ComposerDraft()
 
     var body: some View {
         let hub = scope.hub
@@ -40,9 +38,9 @@ struct HomeView: View {
             target: target,
             pickedTarget: picked,
             sessions: sessions,
-            draft: $draft,
-            attachments: offersAttachments || !attachments.isEmpty ? $attachments : nil,
-            sending: sendingAttachments ? (home.uploadProgress ?? 0) : nil,
+            draft: $composer.text,
+            attachments: offersAttachments || !composer.attachments.isEmpty ? $composer.attachments : nil,
+            sending: composer.isSending ? (home.uploadProgress ?? 0) : nil,
             actions: HomeActions.make(scope: scope, open: open, sent: followSend)
         )
         // The agent rows and the "done" notes push a session's screen.
@@ -56,17 +54,14 @@ struct HomeView: View {
     }
 
     /// A message with attachments was handed to the home model with the composer still holding
-    /// it: locks the composer until the answer, then clears it unless it is to be sent again. A
-    /// text-only message already left the field.
+    /// it: locks the composer until the answer, then clears what went unless it is to be sent
+    /// again. A text-only message already left the field.
     private func followSend(_ task: Task<HomeSubmitResult, Never>) {
-        guard !attachments.isEmpty else { return }
-        sendingAttachments = true
+        guard !composer.attachments.isEmpty else { return }
+        composer.sendStarted()
         Task {
             let result = await task.value
-            sendingAttachments = false
-            guard !result.keepsDraft else { return }
-            draft = ""
-            attachments = []
+            composer.sendEnded(keepsDraft: result.keepsDraft)
         }
     }
 }

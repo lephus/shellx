@@ -152,6 +152,17 @@ final class MicButtonRenderTests: XCTestCase {
             name: "composer-sending")
     }
 
+    func testPicksStillLoadingShowInTheStrip() throws {
+        // Two picked photos still load: they hold a place, and Send waits for them.
+        let strip = VStack {
+            Spacer()
+            AttachmentStrip(attachments: .constant(Self.attachments), locked: false, loading: 2, removed: {})
+                .padding(.horizontal, 16)
+        }
+        .background(Color.appBackground)
+        try assertRenders(strip, name: "composer-loading")
+    }
+
     func testAttachmentProblemsAreSaidUnderTheField() throws {
         let rig = try makeRig()
         let six = (1...6).map { OutgoingAttachment(kind: .file, name: "log-\($0).txt", data: Data("\($0)".utf8)) }

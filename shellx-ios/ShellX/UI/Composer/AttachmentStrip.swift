@@ -4,13 +4,16 @@ import SwiftUI
 import UIKit
 
 /// The attachments waiting in the composer: a row of 56 pt tiles above the field, a photo as its
-/// thumbnail and a file as a `doc` icon over its name. Each tile has an ✕ that takes it out, off
-/// while the message is being sent (`locked`).
+/// thumbnail and a file as a `doc` icon over its name, then a spinner tile for each pick still
+/// being read. Each tile has an ✕ that takes it out, off while the message is being sent
+/// (`locked`).
 struct AttachmentStrip: View {
     static let tileSide: CGFloat = 56
 
     @Binding var attachments: [OutgoingAttachment]
     let locked: Bool
+    /// Picks still being read.
+    var loading = 0
     /// One was taken out.
     let removed: () -> Void
 
@@ -19,6 +22,13 @@ struct AttachmentStrip: View {
             HStack(spacing: 10) {
                 ForEach(attachments) { attachment in
                     tile(attachment)
+                }
+                ForEach(0..<max(loading, 0), id: \.self) { _ in
+                    ProgressView()
+                        .frame(width: Self.tileSide, height: Self.tileSide)
+                        .background(Color(uiColor: .secondarySystemGroupedBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .accessibilityLabel(Text(LocalizedStringResource("composer.attach.loading")))
                 }
             }
             // Room for the ✕ buttons, which stand out of the tiles' corners.

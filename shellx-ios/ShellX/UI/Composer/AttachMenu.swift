@@ -7,9 +7,12 @@ import UniformTypeIdentifiers
 /// left) and Files (the Files picker, several at once). What is picked is read off the main actor
 /// (`AttachmentPreparer`) and added in the order picked, up to
 /// `ShellXLink.maxAttachmentsPerMessage`. What cannot be added says why through `note`, which a new
-/// pick clears.
+/// pick clears. `loading` counts the picks still being read, from the moment the picker closes:
+/// the composer holds Send until it is back to 0, so no picked photo arrives after its message left.
 struct AttachMenu: View {
     @Binding var attachments: [OutgoingAttachment]
+    /// Picks still being read.
+    @Binding var loading: Int
     /// The button's side, the same as the send button's.
     let side: CGFloat
     /// The composer's red line: why something picked was not added; nil clears it.
@@ -63,8 +66,10 @@ struct AttachMenu: View {
     }
 
     private func addPhotos(_ items: [PhotosPickerItem]) {
+        loading += items.count
         Task {
             for item in items {
+                defer { loading -= 1 }
                 let types = item.supportedContentTypes
                 let taken = attachments.map(\.name)
                 do {
@@ -86,8 +91,10 @@ struct AttachMenu: View {
     }
 
     private func addFiles(_ urls: [URL]) {
+        loading += urls.count
         Task {
             for url in urls {
+                defer { loading -= 1 }
                 do {
                     let attachment = try await Task.detached(priority: .userInitiated) {
                         try AttachmentPreparer.file(at: url)
