@@ -77,6 +77,13 @@ public final class MachineHub {
 
     // MARK: - What the UI reads
 
+    /// The default Mac has answered with its workspace list (`MachineModel.workspacesSupported`): what
+    /// `LatencyMetric.launchToWorkspaceList` waits for.
+    public var defaultMachineListedWorkspaces: Bool {
+        guard let id = defaultMachineID else { return false }
+        return machines.first { $0.id == id }?.workspacesSupported ?? false
+    }
+
     /// The Mac new messages go to when nothing else picks one: the chosen one while it is paired,
     /// otherwise the first Mac. Kept in `UserDefaults` under `shellx.defaultMachineID`.
     public var defaultMachineID: String? {

@@ -11,6 +11,10 @@ public enum LatencyMetric: String, CaseIterable, Sendable {
     case sessionChangeArrival
     /// App launch to the home screen with content.
     case launchToHome
+    /// App launch to the default Mac's first workspace list (mobile workspaces spec section 2.2, criterion 1:
+    /// p95 under 1.5 s). Criterion 2 (a change on the Mac to the phone) has no metric: `workspace.changed`
+    /// carries no time from the Mac. Agent state changes are `sessionChangeArrival`.
+    case launchToWorkspaceList
     /// Start of speech to the first recognised word.
     case firstWord
 }

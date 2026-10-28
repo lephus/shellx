@@ -31,6 +31,9 @@ struct WorkspaceListView: View {
             AgentView(scope: scope, ref: ref, open: open)
         }
         .task { scope.homeShown() }
+        .onChange(of: hub.defaultMachineListedWorkspaces, initial: true) { _, listed in
+            if listed { scope.workspacesListed() }
+        }
         .task(id: scope.listNotice.current?.id) {
             guard let id = scope.listNotice.current?.id else { return }
             do { try await Task.sleep(for: AgentView.noticeDuration) } catch { return }

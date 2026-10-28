@@ -44,6 +44,11 @@ final class SignedInScope {
         launch.homeShown()
     }
 
+    /// The default Mac's workspace list arrived: records `launchToWorkspaceList` once per launch.
+    func workspacesListed() {
+        launch.workspacesListed()
+    }
+
     /// Holds the scope of the account signed in now.
     @MainActor
     final class Slot {

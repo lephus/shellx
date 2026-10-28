@@ -76,6 +76,22 @@ final class MachineHubWorkspaceTests: XCTestCase {
         XCTAssertEqual(hub.otherSessions(machineID: id).map(\.session.sessionId), ["s1"])
     }
 
+    /// What `launchToWorkspaceList` waits for: the default Mac answered with its list. An old Mac never does.
+    func testTheDefaultMacHasListedItsWorkspacesOnceItsListArrived() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace("shellx")])
+        let hub = try await makeHub(mac)
+        let listed = await eventually { hub.defaultMachineListedWorkspaces }
+        XCTAssertTrue(listed)
+        XCTAssertEqual(hub.workspaceRows(machineID: mac.machine.machineID).count, 1, "the list is there")
+
+        let old = FakeMac(name: "Old Mac", servesWorkspaces: false)
+        let oldHub = try await makeHub(old)
+        let online = await eventually { isOnline(oldHub) }
+        XCTAssertTrue(online)
+        XCTAssertFalse(oldHub.defaultMachineListedWorkspaces)
+    }
+
     func testListThatDoesNotFitLeavesTheSessionOnlineAndUnsupported() async throws {
         // One workspace too big for a frame even after the Mac's shrink steps: `workspace.list` answers
         // `too_large`. That must not cost the phone the Mac (the pending requests ride the same session).
