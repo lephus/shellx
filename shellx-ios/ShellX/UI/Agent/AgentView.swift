@@ -1,16 +1,19 @@
 import ShellXAppCore
 import SwiftUI
 
-/// One agent's screen, pushed from the list of other agent sessions: `AgentScreen` fed by the
-/// session's `AgentThreadModel` (its chat, sends and stops), the hub and the decision center (the
-/// "Needs you" bar of the session's workspace). The model follows the hub while the screen is shown
-/// and writes its chat copy when the screen goes or the app leaves the foreground.
+/// One agent's screen, pushed from the list of other agent sessions or shown as a pane of the
+/// workspace screen (`embedded`: no navigation bar of its own): `AgentScreen` fed by the session's
+/// `AgentThreadModel` (its chat, sends and stops), the hub and the decision center (the "Needs you"
+/// bar of the session's workspace). The model follows the hub while the screen is shown and writes
+/// its chat copy when the screen goes or the app leaves the foreground.
 ///
 /// The composer offers attachments when the session's Mac takes them, or while some wait in it. A message with attachments stays in the composer, locked, until
 /// the Mac answers; what went is cleared unless the result keeps it (`ComposerDraft`,
 /// `AgentSendResult.keepsDraft`).
 struct AgentView: View {
     let scope: SignedInScope
+    /// A pane of the workspace screen, not a screen of its own.
+    let embedded: Bool
     /// Pushes a screen (the "Needs you" bar opens this workspace's pending cards).
     let open: (HomeRoute) -> Void
 
@@ -22,8 +25,9 @@ struct AgentView: View {
     /// How long a notice over the composer stays.
     static let noticeDuration: Duration = .seconds(4)
 
-    init(scope: SignedInScope, ref: SessionRef, open: @escaping (HomeRoute) -> Void) {
+    init(scope: SignedInScope, ref: SessionRef, embedded: Bool = false, open: @escaping (HomeRoute) -> Void) {
         self.scope = scope
+        self.embedded = embedded
         self.open = open
         _model = State(initialValue: scope.agentThread(ref))
     }
@@ -35,6 +39,7 @@ struct AgentView: View {
         let session = model.session
         AgentScreen(
             ref: session?.ref ?? model.ref,
+            embedded: embedded,
             place: "\(AgentLabel(agent: model.ref.agent).text) · \(session?.machineName ?? model.machineName)",
             row: { model.session.map { AgentStatusRow(session: $0, now: Date()) } },
             gone: model.sessionGone,

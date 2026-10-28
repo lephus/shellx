@@ -11,13 +11,14 @@ import UIKit
 struct SnapshotWriter {
     static let size = CGSize(width: 393, height: 852)
 
-    /// Returns the light image, then the dark one.
-    func write(_ view: some View, name: String) throws -> [UIImage] {
+    /// Returns the light image, then the dark one. `settle` is how long the run loop runs before drawing,
+    /// for a view that loads something as it appears.
+    func write(_ view: some View, name: String, settle: TimeInterval = 0.05) throws -> [UIImage] {
         let directory = ProcessInfo.processInfo.environment["SHELLX_SNAPSHOT_DIR"].flatMap { $0.isEmpty ? nil : $0 }
         let language = Bundle.main.preferredLocalizations.first ?? "en"
         var images: [UIImage] = []
         for (style, label) in [(UIUserInterfaceStyle.light, "light"), (.dark, "dark")] {
-            let image = render(view, style: style)
+            let image = render(view, style: style, settle: settle)
             images.append(image)
             if let directory {
                 try save(image, to: URL(fileURLWithPath: directory), name: "\(name)-\(label)-\(language).png")
@@ -26,7 +27,7 @@ struct SnapshotWriter {
         return images
     }
 
-    private func render(_ view: some View, style: UIUserInterfaceStyle) -> UIImage {
+    private func render(_ view: some View, style: UIUserInterfaceStyle, settle: TimeInterval) -> UIImage {
         let bounds = CGRect(origin: .zero, size: Self.size)
         let window = makeWindow(frame: bounds)
         window.overrideUserInterfaceStyle = style
@@ -37,7 +38,7 @@ struct SnapshotWriter {
         host.view.setNeedsLayout()
         host.view.layoutIfNeeded()
         // Let SwiftUI finish its first update (fonts, asset images, scaled metrics) before drawing.
-        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        RunLoop.main.run(until: Date().addingTimeInterval(settle))
 
         // The default format renders at the screen's scale.
         let image = UIGraphicsImageRenderer(bounds: bounds, format: UIGraphicsImageRendererFormat()).image { _ in

@@ -4,7 +4,9 @@ import SwiftUI
 /// One agent's screen, from plain values so render tests can show any state; `AgentView` feeds it
 /// from `AgentThreadModel`, the hub and the decision center.
 ///
-/// - Navigation bar: the workspace, and "Stop" while the session works or waits for the user.
+/// - Navigation bar: the workspace, and "Stop" while the session works or waits for the user. Embedded
+///   as a workspace screen's pane (`embedded`) it has no navigation bar of its own: the screen around
+///   it has one, and "Stop" sits at the end of the header.
 /// - Top, pinned: the header ("Claude Code · Mac", state) and, while this workspace has pending
 ///   requests, the "Needs you · N" bar that opens them on their own page.
 /// - Middle: the chat, newest at the bottom; scrolling to the top loads older entries. It follows
@@ -38,6 +40,8 @@ struct AgentScreen: View {
     }
 
     let ref: SessionRef
+    /// A pane of the workspace screen: no navigation title or toolbar of its own.
+    var embedded = false
     /// "Claude Code · MacBook Pro".
     let place: String
     /// The header's state as of now; read again every second for the "Running for" time.
@@ -75,15 +79,11 @@ struct AgentScreen: View {
             .safeAreaInset(edge: .top, spacing: 0) { top }
             .safeAreaInset(edge: .bottom, spacing: 0) { bottom }
         .background(Color.appBackground)
-        .navigationTitle(Text(verbatim: ref.workspaceTitle))
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if canStop {
-                ToolbarItem(placement: .topBarTrailing) {
-                    StopButton(stop: actions.stop, forceStop: { confirmsForceStop = true })
-                }
-            }
-        }
+        .modifier(
+            NavigationChrome(
+                enabled: !embedded, title: ref.workspaceTitle,
+                stop: canStop ? StopButton(stop: actions.stop, forceStop: { confirmsForceStop = true }) : nil)
+        )
         .confirmationDialog(
             Text(verbatim: String(localized: "agent.forceStop.title \(agent) \(ref.workspaceTitle)")),
             isPresented: $confirmsForceStop, titleVisibility: .visible
@@ -99,8 +99,14 @@ struct AgentScreen: View {
 
     private var top: some View {
         VStack(alignment: .leading, spacing: 4) {
-            TimelineView(.periodic(from: .now, by: 1)) { _ in
-                AgentHeader(place: place, row: row(), gone: gone, offline: offline)
+            HStack(spacing: 12) {
+                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                    AgentHeader(place: place, row: row(), gone: gone, offline: offline)
+                }
+                // Embedded, there is no toolbar to hold it.
+                if embedded, canStop {
+                    StopButton(stop: actions.stop, forceStop: { confirmsForceStop = true })
+                }
             }
             if !pending.isEmpty {
                 NeedsYouBar(items: pending, showsMachineName: showsMachineName, open: actions.seeAllPending)
@@ -270,5 +276,28 @@ struct AgentScreen: View {
                 sendVoice: actions.sendVoice)
         }
         .animation(.easeInOut(duration: 0.2), value: notice)
+    }
+}
+
+/// The agent screen's navigation title and, while it can be stopped, "Stop" in the toolbar: all of it
+/// off when the screen is a pane of the workspace screen, which has its own bar.
+private struct NavigationChrome: ViewModifier {
+    let enabled: Bool
+    let title: String
+    let stop: StopButton?
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content
+                .navigationTitle(Text(verbatim: title))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    if let stop {
+                        ToolbarItem(placement: .topBarTrailing) { stop }
+                    }
+                }
+        } else {
+            content
+        }
     }
 }

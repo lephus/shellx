@@ -21,6 +21,7 @@ struct WorkspaceListView: View {
             groups: Self.groups(hub),
             pending: scope.decisions.visibleItems(hub.pendingItems),
             creating: creating,
+            notice: scope.listNotice.current,
             actions: WorkspaceListActions.make(
                 scope: scope, open: open, alert: { alert = $0 },
                 creating: Binding(get: { creating }, set: { creating = $0 })),
@@ -30,6 +31,11 @@ struct WorkspaceListView: View {
             AgentView(scope: scope, ref: ref, open: open)
         }
         .task { scope.homeShown() }
+        .task(id: scope.listNotice.current?.id) {
+            guard let id = scope.listNotice.current?.id else { return }
+            do { try await Task.sleep(for: AgentView.noticeDuration) } catch { return }
+            scope.listNotice.clear(id)
+        }
     }
 
     /// The hub's Macs as groups, the default Mac first and the others in the order they were paired.

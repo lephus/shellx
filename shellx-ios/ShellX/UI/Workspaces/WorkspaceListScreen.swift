@@ -83,6 +83,8 @@ struct WorkspaceListScreen: View {
     let pending: [MachinePendingItem]
     /// A workspace is being made: ＋ waits for the Mac's answer.
     var creating = false
+    /// A short line over the bottom edge: a workspace screen that closed itself says why.
+    var notice: AgentScreen.Notice?
     var actions = Actions()
     /// Why the last command did not work; the screen shows it until it is dismissed.
     @Binding var alert: WorkspaceAlert?
@@ -105,6 +107,10 @@ struct WorkspaceListScreen: View {
         .themedList()
         .refreshable { await actions.refresh() }
         .safeAreaInset(edge: .top, spacing: 0) { needsYou }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let notice { NoticeCapsule(text: notice.text) }
+        }
+        .animation(.easeInOut(duration: 0.2), value: notice)
         .navigationTitle(String(localized: "workspaces.title"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -135,12 +141,7 @@ struct WorkspaceListScreen: View {
         } message: { _ in
             Text(LocalizedStringResource("workspaces.close.confirm"))
         }
-        .alert(
-            alert?.message ?? "",
-            isPresented: Binding(get: { alert != nil }, set: { if !$0 { alert = nil } })
-        ) {
-            Button(String(localized: "common.ok")) {}
-        }
+        .workspaceAlert($alert)
     }
 
     // MARK: - Top
