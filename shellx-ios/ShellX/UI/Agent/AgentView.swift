@@ -7,9 +7,9 @@ import SwiftUI
 /// bar of the session's workspace). The model follows the hub while the screen is shown and writes
 /// its chat copy when the screen goes or the app leaves the foreground.
 ///
-/// The composer offers attachments when the session's Mac takes them, or while some wait in it. A message with attachments stays in the composer, locked, until
-/// the Mac answers; what went is cleared unless the result keeps it (`ComposerDraft`,
-/// `AgentSendResult.keepsDraft`).
+/// The composer offers attachments when the session's Mac takes them, or while some wait in it. A
+/// message with attachments stays in the composer, locked, until the Mac answers; what went is
+/// cleared unless the result keeps it (`ComposerDraft`, `AgentSendResult.keepsDraft`).
 struct AgentView: View {
     let scope: SignedInScope
     /// A pane of the workspace screen, not a screen of its own.

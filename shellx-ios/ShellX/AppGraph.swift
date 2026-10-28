@@ -5,7 +5,7 @@ import ShellXAppTestSupport
 #endif
 
 /// What the app's screens are built from: the coordinator, and the signed-in account's scope (its
-/// hub, decision center, home model and pairing model), made with each hub the coordinator makes.
+/// hub, decision center, pairing model and history), made with each hub the coordinator makes.
 @MainActor
 struct AppGraph {
     let coordinator: AppCoordinator
