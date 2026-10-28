@@ -159,9 +159,14 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
 
     // MARK: - Serving
 
+    /// How long the host waits before it reads the keys again after the person turned down the login
+    /// keychain's prompt: each read of a locked login keychain asks again.
+    nonisolated static let declinedPromptRetry: Duration = .seconds(600)
+
     /// Loads the host key and the trusted list. A transient Keychain error (locked or not yet available) is
-    /// retried on the reconnect backoff; anything else, such as corrupt data, is logged as `link_keys_corrupt`
-    /// and thrown at once: the host fails closed and never replaces the key or the list.
+    /// retried on the reconnect backoff, or after ``declinedPromptRetry`` when the person cancelled the login
+    /// keychain's prompt or its password failed; anything else, such as corrupt data, is logged as
+    /// `link_keys_corrupt` and thrown at once: the host fails closed and never replaces the key or the list.
     ///
     /// - Parameter sleep: Waits between attempts; tests pass a recorder.
     nonisolated static func loadKeys(_ keys: ShellXLinkKeyStore,
@@ -175,7 +180,8 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
                 }
             } catch ShellXLinkSecretError.transient(let status) {
                 log.notice("link keys not available yet (\(status)); retrying")
-                try await sleep(.seconds(ReconnectBackoff.delay(attempt: attempt)))
+                try await sleep(KeychainLinkSecretStorage.isDeclinedPrompt(status)
+                    ? declinedPromptRetry : .seconds(ReconnectBackoff.delay(attempt: attempt)))
                 attempt += 1
             } catch ShellXLinkSecretError.unavailable(let status) {
                 log.error("link host stopped: keychain_unavailable (\(status))")

@@ -5,8 +5,10 @@ import ShellXRemoteCore
 
 /// Why a secret read or write failed.
 enum ShellXLinkSecretError: Error, Equatable, Sendable {
-    /// The Keychain is not available right now (`errSecInteractionNotAllowed`, e.g. before the first unlock).
-    /// Retrying later can succeed.
+    /// The Keychain is not available right now; retrying later can succeed. Either it is locked and may not
+    /// ask (`errSecInteractionNotAllowed`, e.g. before the first unlock), or the login keychain was locked and
+    /// the person cancelled its password prompt (`errSecUserCanceled`) or the password failed
+    /// (`errSecAuthFailed`). Neither says anything about the stored keys.
     case transient(OSStatus)
     /// The data-protection Keychain refuses this build (`errSecMissingEntitlement`, -34018): ad-hoc signed
     /// tagged and dev builds carry no keychain entitlement authorized by a provisioning profile. Not
@@ -71,12 +73,20 @@ struct KeychainLinkSecretStorage: ShellXLinkSecretStorage {
     }
 
     /// What a Keychain status other than success or not-found means for the link keys.
+    ///
+    /// The login keychain cannot be told not to prompt: `kSecUseAuthenticationUIFail` still shows the unlock
+    /// dialog for a locked file-based keychain. So the answers of that dialog are transient too.
     static func secretError(for status: OSStatus) -> ShellXLinkSecretError {
         switch status {
-        case errSecInteractionNotAllowed: return .transient(status)
+        case errSecInteractionNotAllowed, errSecUserCanceled, errSecAuthFailed: return .transient(status)
         case errSecMissingEntitlement: return .unavailable(status)
         default: return .failed(status)
         }
+    }
+
+    /// Whether `status` is a keychain prompt the person turned down: cancelled, or a wrong password.
+    static func isDeclinedPrompt(_ status: OSStatus) -> Bool {
+        status == errSecUserCanceled || status == errSecAuthFailed
     }
 
     func read(account: String) throws -> Data? {
