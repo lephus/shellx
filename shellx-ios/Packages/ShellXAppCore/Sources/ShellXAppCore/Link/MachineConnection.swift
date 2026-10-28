@@ -8,12 +8,13 @@ import os
 /// drops.
 ///
 /// One round: connect, `snapshot()`, `sessions()` (a Mac without a session list answers
-/// `unsupported`, which is not a failure), report `.online`, then read `changes`, `sessionChanges`
-/// and `chatEntries` until `changes` ends. A revision gap resyncs inside the live session. When the
-/// session ends the items stay but are reported not actionable (`.reconnecting`); when the first
-/// attempt after that fails they are dropped (`.offline`). Waits follow `ReconnectSchedule`; the
-/// failure count starts over at every `welcome`. A refused token (`.signedOut` event), a revoked
-/// grant, a changed host key and a protocol mismatch stop the loop for good and finish `events`.
+/// `unsupported`, which is not a failure), report the client's `hostFeatures` and `.online`, then
+/// read `changes`, `sessionChanges` and `chatEntries` until `changes` ends. A revision gap resyncs
+/// inside the live session. When the session ends the items stay but are reported not actionable
+/// (`.reconnecting`); when the first attempt after that fails they are dropped (`.offline`). Waits
+/// follow `ReconnectSchedule`; the failure count starts over at every `welcome`. A refused token
+/// (`.signedOut` event), a revoked grant, a changed host key and a protocol mismatch stop the loop
+/// for good and finish `events`.
 public actor MachineConnection {
     /// Every state and data change, in order. Single consumer; it finishes when the loop stops.
     public nonisolated let events: AsyncStream<MachineEvent>
@@ -159,6 +160,7 @@ public actor MachineConnection {
         state = .online
         output.yield(.pending(pending, actionable: true))
         output.yield(.sessions(sessions, supported: sessionsSupported))
+        output.yield(.features(client.hostFeatures))
         output.yield(.state(.online))
     }
 

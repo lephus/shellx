@@ -149,6 +149,7 @@ final class EventLog: @unchecked Sendable {
         lock.withLock {
             switch event {
             case let .state(state): stateList.append(state)
+            case .features: break
             case let .pending(set, actionable): pendingList.append((set, actionable))
             case let .sessions(set, supported): sessionList.append((set, supported))
             case let .chat(sessionId, entries):

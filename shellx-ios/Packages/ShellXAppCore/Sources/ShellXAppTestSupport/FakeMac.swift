@@ -57,6 +57,9 @@ public actor FakeMac {
     public nonisolated let machine: PairedMachine
     /// False: the host has no session list and no chat, like a ShellX from before agent sessions.
     public nonisolated let servesSessionsAndChat: Bool
+    /// False: the chat takes no attachments (no `attachments` feature in `welcome`), like a ShellX
+    /// from before them.
+    public nonisolated let acceptsAttachments: Bool
     /// How many times a phone tried to connect, failed attempts included.
     public private(set) var connectCount = 0
 
@@ -64,17 +67,19 @@ public actor FakeMac {
     private let trusted = TrustedPhones()
     private let feed = FakeMacFeed()
     private let sessionSource = FakeMacSessions()
-    private let chat = FakeMacChat()
+    private let chat: FakeMacChat
     private var failure: (any Error)?
     private var failuresLeft = 0
     private var live: [UUID: (circuit: any RelayCircuit, task: Task<Void, Never>)] = [:]
 
     /// `id` names the Mac (`mac-<id>`) and its slot; a new random one by default. The Debug demo
     /// passes a fixed one, so what the phone keeps about the Mac survives a relaunch.
-    public init(name: String, id: String? = nil, servesSessionsAndChat: Bool = true) {
+    public init(name: String, id: String? = nil, servesSessionsAndChat: Bool = true, acceptsAttachments: Bool = true) {
         let key = NoiseStaticKey()
         hostKey = key
         self.servesSessionsAndChat = servesSessionsAndChat
+        self.acceptsAttachments = acceptsAttachments
+        chat = FakeMacChat(acceptsAttachments: acceptsAttachments)
         let id = id ?? UUID().uuidString.lowercased()
         machine = PairedMachine(
             machineID: "mac-\(id)", name: name, linkSlot: "slot-\(id)", hostKey: key.publicKey)
@@ -188,6 +193,8 @@ public actor FakeMac {
     /// nil goes back to `submitted` for a known session and `not_found` otherwise.
     public func setSendOutcome(_ outcome: ChatSendOutcome?) { chat.setSendOutcome(outcome) }
     public var sentTexts: [SentText] { chat.sentTexts }
+    /// The attachments of every message the Mac took, in order (their messages are in `sentTexts`).
+    public var receivedAttachments: [ChatAttachment] { chat.receivedAttachments }
     /// nil goes back to `sent` for a known session and `not_found` otherwise.
     public func setInterruptOutcome(_ outcome: ChatInterruptOutcome?) { chat.setInterruptOutcome(outcome) }
     public var interrupts: [Interrupt] { chat.interrupts }

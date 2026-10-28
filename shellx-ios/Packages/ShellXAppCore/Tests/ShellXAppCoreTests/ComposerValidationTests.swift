@@ -41,7 +41,7 @@ final class ComposerValidationTests: XCTestCase {
 
         let result = await rig.home.submit(text, to: rig.home.messageTarget, viaVoice: true)
 
-        XCTAssertEqual(result, .tooLong(bytes: 16_385))
+        XCTAssertEqual(result, .refused(.tooLong(bytes: 16_385)))
         XCTAssertEqual(rig.home.entries, [])
         let sent = await mac.sentTexts
         XCTAssertEqual(sent, [])

@@ -9,8 +9,8 @@ import ShellXLinkCore
 /// A message goes to the session the "Send to:" chip showed when it began (`beginMessage()`: the
 /// mic pressed, the field focused), not to whichever session is the target when it is sent: with
 /// several agents running, another one can become the newest while the user talks.
-/// `submit(_:to:viaVoice:)` sends to that one session and notes the outcome; when it no longer runs,
-/// or its Mac cannot take it, the note says so and nothing goes elsewhere.
+/// `submit(_:attachments:to:viaVoice:)` sends to that one session and notes the outcome; when it no
+/// longer runs, or its Mac cannot take it, the note says so and nothing goes elsewhere.
 ///
 /// `run()` watches the hub and notes each session that finishes a turn, with the first line of its
 /// final reply: it waits `finishSettle`, reads the history, and keeps the note up to date for
@@ -41,6 +41,9 @@ public final class HomeModel {
     }
     /// True once `load()` read the stored timeline.
     public private(set) var isLoaded = false
+    /// How far the attachments of the message being sent got (bytes sent over bytes to send); nil
+    /// while none go up.
+    public var uploadProgress: Double? { upload.fraction }
     /// The session the last message went to.
     private var lastUsed: SessionRef?
     /// A message is under way (`beginMessage()` until `endMessage()`).
@@ -81,6 +84,7 @@ public final class HomeModel {
     @ObservationIgnored private var finishing: [SessionRef: Task<Void, Never>] = [:]
     @ObservationIgnored private var follows: [SessionRef: FinishFollow] = [:]
     @ObservationIgnored private var observers = 0
+    @ObservationIgnored private let upload = UploadProgress()
 
     /// `sleep` waits out `saveDelay`, `finishSettle` and `finishFollow`; tests pass one they release
     /// by hand. `finishSettle` zero writes a finish note without waiting.
@@ -206,26 +210,72 @@ public final class HomeModel {
         held = nil
     }
 
-    /// Sends `text` to `target`, the session the chip showed when the message began
-    /// (`messageTarget`, read by the caller when the user sends), and notes what happened (D7, spec
-    /// section 7.5):
-    /// - empty: nothing; too long: nothing is sent or noted, the result says so;
-    /// - otherwise the message is added, then one note: no target (the default Mac offline or to be
+    /// Sends `text` with `attachments` to `target`, the session the chip showed when the message
+    /// began (`messageTarget`, read by the caller when the user sends), and notes what happened (D7,
+    /// spec section 7.5):
+    /// - nothing to send, too long, too many attachments or one too big: nothing is sent or noted,
+    ///   the result says so;
+    /// - text only: the message is added, then one note: no target (the default Mac offline or to be
     ///   paired again, or no running session); the target's Mac offline or to be paired again, or the
-    ///   session no longer running (nothing sent, queued, or sent elsewhere); or the Mac's answer.
+    ///   session no longer running (nothing sent, queued, or sent elsewhere); or the Mac's answer;
+    /// - with attachments: the same notes, but the message is added (with the attachments' names)
+    ///   only once the Mac typed it, or when no answer came (it may have arrived). When it surely did
+    ///   not reach the session, the result is `.kept`: the composer still holds it to send again.
+    ///   `uploadProgress` follows the upload meanwhile.
     /// The target becomes the session last messaged.
-    public func submit(_ text: String, to target: SessionRef?, viaVoice: Bool) async -> ComposerValidation {
-        let validation = ComposerValidation(text)
-        guard case let .ok(message) = validation else { return validation }
-        append(.userSaid(text: message, target: target, viaVoice: viaVoice))
+    public func submit(
+        _ text: String, attachments: [OutgoingAttachment] = [], to target: SessionRef?, viaVoice: Bool
+    ) async -> HomeSubmitResult {
+        let validation = ComposerValidation.message(text, attachments: attachments)
+        guard case let .ok(message) = validation else { return .refused(validation) }
+        guard !attachments.isEmpty else {
+            await submitText(message, to: target, viaVoice: viaVoice)
+            return .added(message)
+        }
         guard let target else {
             append(.note(noTargetNote()))
-            return validation
+            return .kept
         }
         lastUsed = target
         if let blocked = blockedNote(for: target) {
             append(.note(blocked))
-            return validation
+            return .kept
+        }
+        let hub = self.hub
+        do {
+            let outcome = try await upload.track { progress in
+                try await hub.chatSend(target, text: message, attachments: attachments, progress: progress)
+            }
+            guard outcome == .submitted else {
+                append(.note(HomeNote(sendOutcome: outcome, to: target)))
+                return .kept
+            }
+        } catch is AttachmentSendError {
+            append(.note(.sendFailed(target, .failed)))
+            return .kept
+        } catch let error as LinkCallError {
+            append(.note(HomeNote(sendError: error, to: target)))
+            return .kept
+        } catch {
+            // The message left and no answer came: it may be in the session, so it is not kept.
+            added(message, attachments, to: target, viaVoice: viaVoice, note: HomeNote(sendError: error, to: target))
+            return .added(message)
+        }
+        added(message, attachments, to: target, viaVoice: viaVoice, note: .sent(target))
+        return .added(message)
+    }
+
+    /// A text-only message: added at once, then its note.
+    private func submitText(_ message: String, to target: SessionRef?, viaVoice: Bool) async {
+        append(.userSaid(text: message, target: target, viaVoice: viaVoice))
+        guard let target else {
+            append(.note(noTargetNote()))
+            return
+        }
+        lastUsed = target
+        if let blocked = blockedNote(for: target) {
+            append(.note(blocked))
+            return
         }
         let note: HomeNote
         do {
@@ -234,7 +284,14 @@ public final class HomeModel {
             note = HomeNote(sendError: error, to: target)
         }
         append(.note(note))
-        return validation
+    }
+
+    /// A message with attachments that left the phone, and its note.
+    private func added(
+        _ message: String, _ attachments: [OutgoingAttachment], to target: SessionRef, viaVoice: Bool, note: HomeNote
+    ) {
+        append(.userSaid(text: message, target: target, viaVoice: viaVoice, attachments: attachments.map(\.name)))
+        append(.note(note))
     }
 
     /// Writes every pending change now.

@@ -17,6 +17,9 @@ public final class MachineModel: Identifiable {
     public internal(set) var sessions = SessionSet()
     /// False when the Mac has no session list (an older ShellX). True until known.
     public internal(set) var sessionsSupported = true
+    /// What the Mac listed in `welcome.features` when it was last online (empty until then): it
+    /// stays while the Mac reconnects, so what depends on it does not flicker.
+    public internal(set) var hostFeatures: Set<String> = []
 
     public init(machine: PairedMachine) {
         id = machine.machineID
@@ -33,5 +36,6 @@ public final class MachineModel: Identifiable {
         pendingActionable = false
         sessions = SessionSet()
         sessionsSupported = true
+        hostFeatures = []
     }
 }

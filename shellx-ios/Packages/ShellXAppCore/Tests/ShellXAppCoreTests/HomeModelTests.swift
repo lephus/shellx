@@ -47,7 +47,7 @@ final class HomeModelTests: XCTestCase {
 
         let result = await rig.home.submit("  Chạy lại test giúp mình \n", to: rig.home.messageTarget, viaVoice: true)
 
-        XCTAssertEqual(result, .ok("Chạy lại test giúp mình"))
+        XCTAssertEqual(result, .added("Chạy lại test giúp mình"))
         XCTAssertEqual(rig.home.entries.map(\.content), [
             .userSaid(text: "Chạy lại test giúp mình", target: ref(mac, "s1"), viaVoice: true),
             .note(.sent(ref(mac, "s1"))),
@@ -115,14 +115,14 @@ final class HomeModelTests: XCTestCase {
         XCTAssertNil(rig.home.effectiveTarget)
         let result = await rig.home.submit("Làm issue 12 đi", to: rig.home.messageTarget, viaVoice: false)
 
-        XCTAssertEqual(result, .ok("Làm issue 12 đi"))
+        XCTAssertEqual(result, .added("Làm issue 12 đi"))
         XCTAssertEqual(rig.home.entries.map(\.content), [
             .userSaid(text: "Làm issue 12 đi", target: nil, viaVoice: false),
             .note(.noLiveSession),
         ])
         // Empty text does nothing at all.
         let empty = await rig.home.submit(" \n ", to: rig.home.messageTarget, viaVoice: false)
-        XCTAssertEqual(empty, .empty)
+        XCTAssertEqual(empty, .refused(.empty))
         XCTAssertEqual(rig.home.entries.count, 2)
     }
 
@@ -635,6 +635,30 @@ final class HomeModelTests: XCTestCase {
 
         let stored = await rig.storedDetector()
         XCTAssertEqual(stored, saved)
+    }
+
+    func testOldHistoryWithoutAttachmentsStillLoads() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        // `home.json` as a build before attachments wrote it: no `attachments` key.
+        let old = #"""
+            {"entries":[{"id":"e1","at":721692000,"content":{"userSaid":{"text":"Chạy lại test","viaVoice":true,\#
+            "target":{"machineID":"m1","sessionId":"s1","agent":"claude","workspaceTitle":"shellx"}}}},\#
+            {"id":"e2","at":721692001,"content":{"note":{"_0":{"noLiveSession":{}}}}}]}
+            """#
+        try FileManager.default.createDirectory(at: rig.directory, withIntermediateDirectories: true)
+        try Data(old.utf8).write(to: rig.directory.appendingPathComponent("home.json"))
+
+        await rig.home.load()
+
+        let s1 = SessionRef(machineID: "m1", sessionId: "s1", agent: "claude", workspaceTitle: "shellx")
+        XCTAssertEqual(rig.home.entries.map(\.content), [
+            .userSaid(text: "Chạy lại test", target: s1, viaVoice: true, attachments: nil), .note(.noLiveSession),
+        ])
+        guard case let .userSaid(_, _, _, attachments) = rig.home.entries.first?.content else {
+            return XCTFail("the old message loads as a message")
+        }
+        XCTAssertNil(attachments)
     }
 
     func testEntriesCappedAt2000() async throws {

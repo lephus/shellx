@@ -101,7 +101,8 @@ struct AgentView: View {
     static func text(for result: AgentSendResult, ref: SessionRef, machineName: String) -> String? {
         let agent = AgentLabel(agent: ref.agent).text
         switch result {
-        case .refused(.empty), .refused(.ok):
+        case .refused(.empty), .refused(.ok), .refused(.tooManyAttachments), .refused(.attachmentTooLarge):
+            // Nothing happened, or the composer already says why under its field.
             return nil
         case let .refused(.tooLong(bytes)):
             let used = ComposerValidation.byteCount(bytes)
@@ -113,7 +114,7 @@ struct AgentView: View {
             return String(localized: "agent.busy")
         case .sent(.notFound):
             return String(localized: "agent.gone")
-        case .sent(.failed), .sent(.other):
+        case .sent(.failed), .sent(.other), .notSent:
             return String(localized: "home.note.failed \(agent) \(ref.workspaceTitle)")
         case .offline:
             return String(localized: "home.note.offline \(machineName)")

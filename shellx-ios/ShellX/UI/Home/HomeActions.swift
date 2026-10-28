@@ -13,7 +13,7 @@ enum HomeActions {
     /// `sent` gets the task of each send, so a caller (a test) can wait for it.
     static func make(
         scope: SignedInScope, open: @escaping (HomeRoute) -> Void,
-        sent: @escaping (Task<ComposerValidation, Never>) -> Void = { _ in }
+        sent: @escaping (Task<HomeSubmitResult, Never>) -> Void = { _ in }
     ) -> HomeScreen.Actions {
         let home = scope.home
         return HomeScreen.Actions(

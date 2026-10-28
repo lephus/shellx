@@ -338,6 +338,68 @@ public final class MachineHub {
         try await withLink(ref.machineID) { try await $0.chatSend(sessionId: ref.sessionId, text: text) }
     }
 
+    /// True when the Mac listed the `attachments` feature when it was last online: the composer
+    /// offers photos and files for its sessions only then. False for a Mac never online yet.
+    public func acceptsAttachments(_ machineID: String) -> Bool {
+        machines.first { $0.id == machineID }?.hostFeatures.contains(ShellXLink.attachmentsFeature) ?? false
+    }
+
+    /// Sends `text` with `attachments` (none: as `chatSend(_:text:)`). Each attachment is uploaded in
+    /// turn, then one `chat.send` names them all, inside one call on the Mac's session: an upload id
+    /// is valid only in the session that made it. Nothing is uploaded to a Mac whose session did not
+    /// list the `attachments` feature.
+    ///
+    /// `progress` gets the bytes uploaded so far over the bytes of every attachment, after each
+    /// chunk the Mac took (1 once the last one is up). It runs on the Link client's actor.
+    ///
+    /// Throws `LinkCallError` when nothing was sent, as `chatSend(_:text:)` does, and
+    /// `AttachmentSendError` when the message surely did not reach the session: an upload failed,
+    /// or the Mac refused an upload or the message (it then types nothing), or it does not take
+    /// attachments. Any other error comes after the message left: it may have arrived.
+    public func chatSend(
+        _ ref: SessionRef, text: String, attachments: [OutgoingAttachment], progress: @Sendable (Double) -> Void
+    ) async throws -> ChatSendOutcome {
+        guard !attachments.isEmpty else { return try await chatSend(ref, text: text) }
+        let total = attachments.reduce(0) { $0 + $1.data.count }
+        do {
+            return try await withLink(ref.machineID) { client in
+                guard client.hostFeatures.contains(ShellXLink.attachmentsFeature) else {
+                    throw AttachmentSendError.refused(code: "unsupported")
+                }
+                var ids: [String] = []
+                var uploaded = 0
+                for attachment in attachments {
+                    let before = uploaded
+                    do {
+                        let id = try await client.uploadAttachment(
+                            kind: attachment.kind, name: attachment.name, data: attachment.data
+                        ) { sent in
+                            progress(total > 0 ? Double(before + sent) / Double(total) : 1)
+                        }
+                        ids.append(id)
+                    } catch let LinkClientError.remote(code, _) {
+                        throw AttachmentSendError.refused(code: code)
+                    } catch {
+                        // A timeout, the session closed, or this task cancelled: the message never left.
+                        throw AttachmentSendError.uploadFailed
+                    }
+                    uploaded += attachment.data.count
+                }
+                do {
+                    return try await client.chatSend(sessionId: ref.sessionId, text: text, attachments: ids)
+                } catch let LinkClientError.remote(code, _) {
+                    // An error answer comes before anything is typed (an id expired or unknown, say).
+                    throw AttachmentSendError.refused(code: code)
+                }
+            }
+        } catch let error as AttachmentSendError {
+            // Counts and sizes only: never a name or a byte of the attachments.
+            let reason = String(describing: error)
+            log.notice("attach_send_failed count=\(attachments.count) bytes=\(total) \(reason, privacy: .public)")
+            throw error
+        }
+    }
+
     public func chatInterrupt(_ ref: SessionRef, hard: Bool) async throws -> ChatInterruptOutcome {
         try await withLink(ref.machineID) { try await $0.chatInterrupt(sessionId: ref.sessionId, hard: hard) }
     }
@@ -410,6 +472,8 @@ public final class MachineHub {
         // A connection that was replaced or stopped no longer speaks for the Mac.
         guard connections[model.id] === connection else { return }
         switch event {
+        case let .features(features):
+            if model.hostFeatures != features { model.hostFeatures = features }
         case let .state(state):
             model.state = state
             for (id, continuation) in stateSubscribers {

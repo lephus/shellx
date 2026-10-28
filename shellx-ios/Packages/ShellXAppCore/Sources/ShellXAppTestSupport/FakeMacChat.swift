@@ -3,10 +3,12 @@ import ShellXLinkCore
 import ShellXLinkSession
 
 /// `FakeMac`'s chat: an `AgentChatSource` in memory. A session has a transcript once `setHistory`
-/// or `push` named it; others answer `not_found`.
+/// or `push` named it; others answer `not_found`. It takes attachments unless made with
+/// `acceptsAttachments` false, and records them as they arrive with a message.
 final class FakeMacChat: AgentChatSource, @unchecked Sendable {
     typealias Push = ChatPush
 
+    let acceptsAttachments: Bool
     private let lock = NSLock()
     /// Entries by session, then by `ChatEntry.id` (upserts).
     private var transcripts: [String: [String: ChatEntry]] = [:]
@@ -14,12 +16,18 @@ final class FakeMacChat: AgentChatSource, @unchecked Sendable {
     private var sendOutcome: ChatSendOutcome?
     private var interruptOutcome: ChatInterruptOutcome?
     private var sends: [FakeMac.SentText] = []
+    private var attachments: [ChatAttachment] = []
     private var interruptCalls: [FakeMac.Interrupt] = []
     private var historyCalls: [FakeMac.HistoryRequest] = []
     private var holding = false
     private var held: [CheckedContinuation<Void, Never>] = []
 
     var sentTexts: [FakeMac.SentText] { lock.withLock { sends } }
+    var receivedAttachments: [ChatAttachment] { lock.withLock { attachments } }
+
+    init(acceptsAttachments: Bool) {
+        self.acceptsAttachments = acceptsAttachments
+    }
     var interrupts: [FakeMac.Interrupt] { lock.withLock { interruptCalls } }
     var historyRequests: [FakeMac.HistoryRequest] { lock.withLock { historyCalls } }
 
@@ -102,6 +110,12 @@ final class FakeMacChat: AgentChatSource, @unchecked Sendable {
             if let sendOutcome { return sendOutcome }
             return transcripts[sessionId] == nil ? .notFound : .submitted
         }
+    }
+
+    /// A message with attachments: recorded like a text (`sentTexts`), its attachments in order.
+    func send(sessionId: String, text: String, attachments: [ChatAttachment]) async -> ChatSendOutcome {
+        lock.withLock { self.attachments.append(contentsOf: attachments) }
+        return await send(sessionId: sessionId, text: text)
     }
 
     func interrupt(sessionId: String, hard: Bool) async -> ChatInterruptOutcome {

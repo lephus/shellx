@@ -34,6 +34,7 @@ public final class AgentThreadModel {
     private var latestFailed = false
     /// The last older page failed.
     private var olderFailed = false
+    @ObservationIgnored private let upload = UploadProgress()
 
     @ObservationIgnored private let hub: MachineHub
     @ObservationIgnored private let store: ConversationStore
@@ -252,19 +253,37 @@ public final class AgentThreadModel {
 
     // MARK: - Send and stop
 
-    /// Sends `text` to this session: refused on the phone when empty or too long; `.offline` at once
-    /// when the Mac is not online. `viaVoice` is how the user said it (Task 9); the Mac gets the same
-    /// text either way.
-    public func send(_ text: String, viaVoice: Bool) async -> AgentSendResult {
-        let validation = ComposerValidation(text)
+    /// How far the attachments of the message being sent got (bytes sent over bytes to send); nil
+    /// while none go up.
+    public var uploadProgress: Double? { upload.fraction }
+
+    /// Sends `text` with `attachments` to this session: refused on the phone when there is nothing
+    /// to send, the text is too long, or the attachments are too many or one is too big; `.offline`
+    /// at once when the Mac is not online. The attachments go up first, then the message names them
+    /// (`MachineHub.chatSend(_:text:attachments:progress:)`); `.notSent` when they surely did not
+    /// reach the session. `viaVoice` is how the user said it (Task 9); the Mac gets the same text
+    /// either way.
+    public func send(_ text: String, attachments: [OutgoingAttachment] = [], viaVoice: Bool) async -> AgentSendResult {
+        let validation = ComposerValidation.message(text, attachments: attachments)
         guard case let .ok(message) = validation else { return .refused(validation) }
         guard !offline else { return .offline }
         do {
-            let outcome = try await hub.chatSend(ref, text: message)
+            let outcome: ChatSendOutcome
+            if attachments.isEmpty {
+                outcome = try await hub.chatSend(ref, text: message)
+            } else {
+                let hub = self.hub
+                let ref = self.ref
+                outcome = try await upload.track { progress in
+                    try await hub.chatSend(ref, text: message, attachments: attachments, progress: progress)
+                }
+            }
             if outcome == .notFound { answeredNotFound = true }
             return .sent(outcome)
         } catch LinkCallError.offline, LinkCallError.needsPairing {
             return .offline
+        } catch is AttachmentSendError {
+            return .notSent
         } catch {
             return .noAnswer
         }

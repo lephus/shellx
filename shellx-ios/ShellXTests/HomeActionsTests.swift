@@ -82,7 +82,7 @@ final class HomeActionsTests: XCTestCase {
         let scope = try await makeScope(mac)
         let online = await eventually { scope.hub.liveSessions.first?.online == true }
         XCTAssertTrue(online)
-        var sends: [Task<ComposerValidation, Never>] = []
+        var sends: [Task<HomeSubmitResult, Never>] = []
         let actions = HomeActions.make(
             scope: scope, open: { _ in },
             sent: { sends.append($0) })
@@ -91,7 +91,7 @@ final class HomeActionsTests: XCTestCase {
 
         XCTAssertEqual(sends.count, 1)
         let result = await sends[0].value
-        XCTAssertEqual(result, .ok("Chạy lại test"))
+        XCTAssertEqual(result, .added("Chạy lại test"))
         let s1 = SessionRef(machineID: mac.machine.machineID, sessionId: "s1", agent: "claude", workspaceTitle: "shellx")
         XCTAssertEqual(scope.home.entries.map(\.content), [
             .userSaid(text: "Chạy lại test", target: s1, viaVoice: false), .note(.sent(s1)),
@@ -107,7 +107,7 @@ final class HomeActionsTests: XCTestCase {
         let scope = try await makeScope(mac)
         let online = await eventually { scope.hub.liveSessions.first?.online == true }
         XCTAssertTrue(online)
-        var sends: [Task<ComposerValidation, Never>] = []
+        var sends: [Task<HomeSubmitResult, Never>] = []
         let actions = HomeActions.make(
             scope: scope, open: { _ in },
             sent: { sends.append($0) })
@@ -116,7 +116,7 @@ final class HomeActionsTests: XCTestCase {
 
         XCTAssertEqual(sends.count, 1)
         let result = await sends[0].value
-        XCTAssertEqual(result, .ok("Tạo PR cho branch develop"))
+        XCTAssertEqual(result, .added("Tạo PR cho branch develop"))
         let s1 = SessionRef(machineID: mac.machine.machineID, sessionId: "s1", agent: "claude", workspaceTitle: "shellx")
         XCTAssertEqual(scope.home.entries.map(\.content), [
             .userSaid(text: "Tạo PR cho branch develop", target: s1, viaVoice: true), .note(.sent(s1)),
@@ -138,7 +138,7 @@ final class HomeActionsTests: XCTestCase {
         XCTAssertTrue(online)
         let s1 = SessionRef(machineID: mac.machine.machineID, sessionId: "s1", agent: "claude", workspaceTitle: "shellx")
         let s2 = SessionRef(machineID: mac.machine.machineID, sessionId: "s2", agent: "claude", workspaceTitle: "shellx")
-        var sends: [Task<ComposerValidation, Never>] = []
+        var sends: [Task<HomeSubmitResult, Never>] = []
         let actions = HomeActions.make(
             scope: scope, open: { _ in },
             sent: { sends.append($0) })

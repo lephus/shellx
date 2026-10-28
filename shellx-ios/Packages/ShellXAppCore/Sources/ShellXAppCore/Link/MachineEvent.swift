@@ -4,6 +4,9 @@ import ShellXLinkCore
 /// What a `MachineConnection` reports, in order.
 public enum MachineEvent: Sendable {
     case state(MachineLinkState)
+    /// The optional capabilities the Mac listed in `welcome.features` for the new session, sent
+    /// just before its `.online` (`LinkClient.hostFeatures`).
+    case features(Set<String>)
     /// The pending set. `actionable` is false whenever the set is not backed by a live, synced session.
     case pending(PendingSet, actionable: Bool)
     /// The session list. `supported` is false when the Mac has no session list (an older ShellX).

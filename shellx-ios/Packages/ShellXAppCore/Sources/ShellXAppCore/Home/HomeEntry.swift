@@ -5,8 +5,9 @@ import Foundation
 public struct HomeEntry: Codable, Equatable, Identifiable, Sendable {
     public enum Content: Codable, Equatable, Sendable {
         /// A message the user sent (or tried to send) and the session it went to; nil when none was
-        /// running.
-        case userSaid(text: String, target: SessionRef?, viaVoice: Bool)
+        /// running. `attachments` names the photos and files it carried; nil when none (and in what
+        /// a build before attachments stored). `text` is empty for a message of attachments only.
+        case userSaid(text: String, target: SessionRef?, viaVoice: Bool, attachments: [String]? = nil)
         /// A canned line from ShellX: what became of a message, or a session that finished.
         case note(HomeNote)
     }

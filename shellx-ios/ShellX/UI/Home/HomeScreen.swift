@@ -132,7 +132,7 @@ struct HomeScreen: View {
 
     @ViewBuilder private func row(_ entry: HomeEntry) -> some View {
         switch entry.content {
-        case let .userSaid(text, target, viaVoice):
+        case let .userSaid(text, target, viaVoice, _):
             UserMessageBubble(text: text, target: target, viaVoice: viaVoice)
         case let .note(note):
             if case let .agentFinished(ref, _) = note {
