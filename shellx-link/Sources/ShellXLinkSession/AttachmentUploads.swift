@@ -27,17 +27,29 @@ struct AttachmentRefusal: Error, Equatable {
 ///
 /// Bytes stay in memory: at most `ShellXLink.maxPendingUploads` uploads of at most `ShellXLink.maxAttachmentBytes`
 /// each. Nothing here logs a name or any bytes.
+///
+/// A phone uploads one attachment at a time, so no upload outlives its usefulness by holding a place:
+/// * an `attach.begin` first drops every upload that has not had its `attach.end` (one the phone gave up on);
+/// * a finished upload that no `chat.send` names within `ShellXLink.unsentUploadLifetime` of its `attach.end` is
+///   dropped. This is checked lazily, at each `attach.begin` and `chat.send`, against the injected clock.
 struct AttachmentUploads {
     private struct Upload {
         let kind: AttachmentKind
         let name: String
         let size: Int
         var data = Data()
-        /// True once `attach.end` accepted the digest: only then can a `chat.send` name it.
-        var finished = false
+        /// When `attach.end` accepted the digest; nil until then. Only a finished upload can be named by a `chat.send`.
+        var endedAt: ContinuousClock.Instant?
+
+        var finished: Bool { endedAt != nil }
     }
 
     private var uploads: [String: Upload] = [:]
+    private let now: @Sendable () -> ContinuousClock.Instant
+
+    init(now: @escaping @Sendable () -> ContinuousClock.Instant = { .now }) {
+        self.now = now
+    }
 
     /// Answers one `attach.begin`, `attach.chunk` or `attach.end` from the phone: the host's reply, or an `error`
     /// that carries the call's `call_id`.
@@ -72,6 +84,7 @@ struct AttachmentUploads {
     /// fails the checks nothing is removed. The checks are PROTOCOL.md section 5's: at most
     /// `ShellXLink.maxAttachmentsPerMessage` ids, each held, finished, and named once.
     mutating func take(_ ids: [String]) throws(AttachmentRefusal) -> [ChatAttachment] {
+        dropExpired()
         guard ids.count <= ShellXLink.maxAttachmentsPerMessage else {
             throw .badRequest("at most \(ShellXLink.maxAttachmentsPerMessage) attachments per message")
         }
@@ -88,6 +101,9 @@ struct AttachmentUploads {
     }
 
     private mutating func begin(kind: AttachmentKind, name: String, size: Int) throws(AttachmentRefusal) -> String {
+        // One upload at a time: whatever is not finished was given up, and must not hold a place.
+        uploads = uploads.filter { $0.value.finished }
+        dropExpired()
         switch kind {
         case .image, .file: break
         case .other: throw .badRequest("this host takes only image and file attachments")
@@ -131,6 +147,15 @@ struct AttachmentUploads {
             uploads[id] = nil
             throw .badRequest("the digest does not match the bytes")
         }
-        uploads[id]?.finished = true
+        uploads[id]?.endedAt = now()
+    }
+
+    /// Drops the finished uploads that were not named in time.
+    private mutating func dropExpired() {
+        let current = now()
+        uploads = uploads.filter { upload in
+            guard let endedAt = upload.value.endedAt else { return true }
+            return current - endedAt <= ShellXLink.unsentUploadLifetime
+        }
     }
 }

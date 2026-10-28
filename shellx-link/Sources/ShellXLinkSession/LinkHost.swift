@@ -185,7 +185,7 @@ public actor LinkHost {
         let sessions = self.sessions
         let chat = self.chat
         // The uploads of this session: an id means nothing in another one, and they end with this scope.
-        var uploads = AttachmentUploads()
+        var uploads = AttachmentUploads(now: timings.now)
         while true {
             let message: LinkMessage
             do {

@@ -134,21 +134,112 @@ final class AttachmentSessionTests: XCTestCase {
         let chat = FakeChatSource(["s1": []], acceptsAttachments: true)
         let client = try await connect(makeHost(chat: chat))
         var ids: [String] = []
-        for number in 0..<4 {
+        for number in 0..<ShellXLink.maxPendingUploads {
             let bytes = Data([UInt8(number)])
             ids.append(try await within { try await client.uploadAttachment(kind: .file, name: "f\(number)", data: bytes) })
         }
-        // The fifth is only begun: an unfinished upload holds its place too.
-        let fifth = try await within {
-            try await client.call { .attachBegin(callId: $0, kind: .file, name: "f4", size: 1) }
-        }
-        guard case .attachReady = fifth else { return XCTFail("expected attach.ready, got \(fifth)") }
         await expectRemote("bad_request") { try await client.uploadAttachment(kind: .file, name: "f5", data: Data([5])) }
 
         // A chat.send that uses one frees its place.
         let firstId = ids[0]
         let outcome = try await within { try await client.chatSend(sessionId: "s1", text: "go", attachments: [firstId]) }
         XCTAssertEqual(outcome, .submitted)
+        _ = try await within { try await client.uploadAttachment(kind: .file, name: "f5", data: Data([5])) }
+    }
+
+    // MARK: - Abandoned and stale uploads
+
+    func testBeginDropsAnUnfinishedUpload() async throws {
+        let chat = FakeChatSource(["s1": []], acceptsAttachments: true)
+        let client = try await connect(makeHost(chat: chat))
+        // An upload given up after its first chunk.
+        let abandoned = try await within {
+            try await client.call { .attachBegin(callId: $0, kind: .file, name: "old", size: 3) }
+        }
+        guard case let .attachReady(_, oldId) = abandoned else { return XCTFail("expected attach.ready") }
+        _ = try await within {
+            try await client.call { .attachChunk(callId: $0, attachmentId: oldId, offset: 0, data: Data([1, 2])) }
+        }
+
+        // The next upload starts and finishes.
+        let newId = try await within { try await client.uploadAttachment(kind: .file, name: "new", data: Data([9])) }
+
+        // The old one is gone: no chunk completes it, and no message can name it.
+        await expectRemote("bad_request") {
+            try await client.call { .attachChunk(callId: $0, attachmentId: oldId, offset: 2, data: Data([3])) }
+        }
+        await expectRemote("bad_request") { try await client.chatSend(sessionId: "s1", text: "x", attachments: [oldId]) }
+        let outcome = try await within { try await client.chatSend(sessionId: "s1", text: "", attachments: [newId]) }
+        XCTAssertEqual(outcome, .submitted)
+        XCTAssertEqual(chat.attachmentSends.first?.attachments.map(\.name), ["new"])
+    }
+
+    func testFiveAbandonedUploadsDoNotBlockTheSixth() async throws {
+        let chat = FakeChatSource(["s1": []], acceptsAttachments: true)
+        let client = try await connect(makeHost(chat: chat))
+        // Six begins and no end: each one drops the one before, so none is refused.
+        var last = ""
+        for number in 0...ShellXLink.maxPendingUploads {
+            let answer = try await within {
+                try await client.call { .attachBegin(callId: $0, kind: .file, name: "f\(number)", size: 4) }
+            }
+            guard case let .attachReady(_, id) = answer else { return XCTFail("begin \(number) got \(answer)") }
+            last = id
+        }
+        XCTAssertFalse(last.isEmpty)
+        // And a whole upload still goes through afterwards.
+        let id = try await within { try await client.uploadAttachment(kind: .file, name: "ok", data: Data([1])) }
+        let outcome = try await within { try await client.chatSend(sessionId: "s1", text: "", attachments: [id]) }
+        XCTAssertEqual(outcome, .submitted)
+    }
+
+    func testEndedUploadExpiresAfterFiveMinutes() async throws {
+        let clock = UploadTestClock()
+        let chat = FakeChatSource(["s1": []], acceptsAttachments: true)
+        let client = try await connect(makeHost(chat: chat, clock: clock))
+        let early = try await within { try await client.uploadAttachment(kind: .file, name: "early", data: Data([1])) }
+        let late = try await within { try await client.uploadAttachment(kind: .file, name: "late", data: Data([2])) }
+
+        clock.advance(.seconds(299))
+        let used = try await within { try await client.chatSend(sessionId: "s1", text: "", attachments: [early]) }
+        XCTAssertEqual(used, .submitted, "4 min 59 s after its end an upload can still be named")
+        clock.advance(.seconds(2))
+        await expectRemote("bad_request") { try await client.chatSend(sessionId: "s1", text: "", attachments: [late]) }
+        XCTAssertEqual(chat.attachmentSends.map { $0.attachments.map(\.name) }, [["early"]])
+    }
+
+    func testTheLifetimeCountsFromTheEndOfTheUpload() async throws {
+        let clock = UploadTestClock()
+        let chat = FakeChatSource(["s1": []], acceptsAttachments: true)
+        let client = try await connect(makeHost(chat: chat, clock: clock))
+        let begun = try await within {
+            try await client.call { .attachBegin(callId: $0, kind: .file, name: "slow", size: 2) }
+        }
+        guard case let .attachReady(_, id) = begun else { return XCTFail("expected attach.ready") }
+        // A slow upload: 4 min between begin and end does not count against it.
+        clock.advance(.seconds(240))
+        let bytes = Data([1, 2])
+        _ = try await within {
+            try await client.call { .attachChunk(callId: $0, attachmentId: id, offset: 0, data: bytes) }
+        }
+        let sha = digest(bytes)
+        _ = try await within { try await client.call { .attachEnd(callId: $0, attachmentId: id, sha256: sha) } }
+        clock.advance(.seconds(240))
+        let outcome = try await within { try await client.chatSend(sessionId: "s1", text: "", attachments: [id]) }
+        XCTAssertEqual(outcome, .submitted)
+    }
+
+    func testExpiredUploadsFreeTheirPlaces() async throws {
+        let clock = UploadTestClock()
+        let chat = FakeChatSource(["s1": []], acceptsAttachments: true)
+        let client = try await connect(makeHost(chat: chat, clock: clock))
+        for number in 0..<ShellXLink.maxPendingUploads {
+            let bytes = Data([UInt8(number)])
+            _ = try await within { try await client.uploadAttachment(kind: .file, name: "f\(number)", data: bytes) }
+        }
+        await expectRemote("bad_request") { try await client.uploadAttachment(kind: .file, name: "f5", data: Data([5])) }
+        clock.advance(.seconds(301))
+        // The check runs at `attach.begin`: the five expired uploads are dropped there.
         _ = try await within { try await client.uploadAttachment(kind: .file, name: "f5", data: Data([5])) }
     }
 
@@ -404,13 +495,15 @@ final class AttachmentSessionTests: XCTestCase {
         let clientKey: NoiseStaticKey
     }
 
-    private func makeHost(chat: (any AgentChatSource)?) -> Rig {
+    private func makeHost(chat: (any AgentChatSource)?, clock: UploadTestClock? = nil) -> Rig {
         let hostKey = NoiseStaticKey()
         let clientKey = NoiseStaticKey()
         let trusted: Set<Data> = [clientKey.publicKey]
+        var timings = LinkTimings.standard
+        if let clock { timings.now = { clock.now() } }
         let host = LinkHost(
             key: hostKey, trustedClients: { trusted }, feed: FakeFeedSource(), sessions: nil, chat: chat,
-            hostVersion: "test-host", machineName: "Test Mac", timings: .standard)
+            hostVersion: "test-host", machineName: "Test Mac", timings: timings)
         return Rig(host: host, hostKey: hostKey, clientKey: clientKey)
     }
 
@@ -483,5 +576,20 @@ final class AttachmentSessionTests: XCTestCase {
 
     private func digest(_ bytes: Data) -> Data {
         Data(SHA256.hash(data: bytes))
+    }
+}
+
+/// A clock the test moves by hand, for the host's upload expiry.
+final class UploadTestClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private let start = ContinuousClock.now
+    private var elapsed = Duration.zero
+
+    func advance(_ duration: Duration) {
+        lock.withLock { elapsed += duration }
+    }
+
+    func now() -> ContinuousClock.Instant {
+        lock.withLock { start + elapsed }
     }
 }

@@ -11,6 +11,8 @@ struct LinkTimings: Sendable {
     var idleTimeout: Duration
     /// How long `LinkClient.snapshot()` and `reply()` wait for their answer.
     var requestTimeout: Duration = .seconds(10)
+    /// The clock a host ages finished uploads by (`ShellXLink.unsentUploadLifetime`). Tests move it by hand.
+    var now: @Sendable () -> ContinuousClock.Instant = { .now }
 
     static let standard = LinkTimings(pingInterval: .seconds(20), idleTimeout: .seconds(45))
 }

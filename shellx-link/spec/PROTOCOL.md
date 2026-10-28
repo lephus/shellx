@@ -356,8 +356,14 @@ Rules:
   (a new session, even of the same phone, cannot use it).
 - An upload is used by one `chat.send` only. Once the host accepts a `chat.send` that names it, it removes the
   upload at once, whatever outcome the `chat.send.result` then reports.
-- A session holds at most 5 uploads that no `chat.send` has used yet. An `attach.begin` past that is
-  answered `error` `bad_request`.
+- A client uploads one attachment at a time. An `attach.begin` therefore first drops every upload of the
+  session that has not had its `attach.end`, whatever its progress, so an upload that failed or was given up
+  never holds a place.
+- A session holds at most 5 uploads that no `chat.send` has used yet, counted after that drop. An
+  `attach.begin` past that is answered `error` `bad_request`.
+- An upload that no `chat.send` has named within 5 minutes of its `attach.end` is dropped. A host may check
+  this only when it handles an `attach.begin` or a `chat.send`; an expired id is answered `bad_request` like
+  any id the host does not hold.
 - A `chat.send` that names an `attachment_id` the host does not hold, an upload that has not had its
   `attach.end`, or the same id twice, is answered `error` `bad_request`; it is not accepted, so it uses none
   of the uploads.
@@ -606,8 +612,9 @@ nothing is written until a `chat.send` carries the upload to a live session (the
 above applies to the paths exactly as it does to `text`). The paths are typed, escaped for the shell, only
 into the terminal of that live session, as the text is, and never into another terminal. The size
 limits (5 uploads of at most 10 MiB per Link session in memory, at most 5 files of 10 MiB per message on
-disk) bound the memory and disk a phone can use, and an upload dies with its session or with the
-`chat.send` that uses it. What the agent then does with the path is the agent's own business, as with any path the user types at its
+disk) bound the memory and disk a phone can use, and an upload dies with its session, with the
+`chat.send` that uses it, with the next `attach.begin` if it was not finished, or 5 minutes after its
+`attach.end`. What the agent then does with the path is the agent's own business, as with any path the user types at its
 prompt, and a paired phone is trusted like the user (below). The host never logs attachment names or bytes.
 
 **Why the rest is acceptable.** A paired phone is trusted like the user sitting at the Mac: it is signed in

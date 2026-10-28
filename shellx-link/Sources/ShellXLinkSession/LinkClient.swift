@@ -210,8 +210,9 @@ public actor LinkClient {
     /// each used by one message only). Not safe to repeat: a timeout leaves it unknown whether the host
     /// delivered it. Errors as for `chatHistory`, except `"not_found"` comes as the outcome `.notFound`; also
     /// `.remote(code: "bad_request", ...)` for an id the host does not hold (it ended with its session, was used
-    /// already, or never finished) and `"unsupported"` for attachments to a host without the feature. The host
-    /// removes the uploads of an accepted message whatever the outcome; a refused message uses none of them.
+    /// already, expired, was dropped by a later upload, or never finished) and `"unsupported"` for attachments to
+    /// a host without the feature. The host removes the uploads of an accepted message whatever the outcome; a
+    /// refused message uses none of them.
     public func chatSend(sessionId: String, text: String, attachments: [String] = []) async throws -> ChatSendOutcome {
         let answer = try await call {
             .chatSend(callId: $0, sessionId: sessionId, text: text, attachments: attachments)
@@ -231,8 +232,12 @@ public actor LinkClient {
     /// Each step is a call with the usual 10 s timeout. Throws `.remote(code: ...)` when the host refuses a
     /// step: `"too_large"` or `"bad_request"` for a size outside 1 to `ShellXLink.maxAttachmentBytes`,
     /// `"bad_request"` for a kind other than `.image` and `.file` or a sixth unsent upload, `"unsupported"`
-    /// without the feature. A failed upload leaves its unfinished part on the host until the session ends, and
-    /// it counts against the 5 unsent uploads a session holds.
+    /// without the feature.
+    ///
+    /// Upload one attachment at a time: the host drops an unfinished upload when the next `attach.begin` arrives,
+    /// so a failed or cancelled upload needs no cleanup, but two uploads running at once would drop each other.
+    /// A finished upload waits for a `chat.send` for `ShellXLink.unsentUploadLifetime` (5 minutes) after its
+    /// `attach.end`; later its id is `bad_request` and the attachment must be uploaded again.
     public func uploadAttachment(
         kind: AttachmentKind, name: String, data: Data, progress: @Sendable (Int) -> Void = { _ in }
     ) async throws -> String {
