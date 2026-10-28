@@ -1,0 +1,393 @@
+import Foundation
+import ShellXAppTestSupport
+import ShellXLinkCore
+import XCTest
+
+@testable import ShellXAppCore
+
+/// The workspace screen's model: which chip shows first, what happens when the workspace or the
+/// chip being viewed leaves the Mac's list, and the wait for a workspace the Mac has not listed yet.
+@MainActor
+final class WorkspaceScreenModelTests: XCTestCase {
+    private func ref(_ mac: FakeMac, _ workspace: String = "shellx") -> WorkspaceRef {
+        WorkspaceRef(machineID: mac.machine.machineID, workspaceId: "ws-\(workspace)")
+    }
+
+    /// Whether the hub's list for `mac` has the workspace `ws-<name>`.
+    private func listed(_ name: String, by hub: MachineHub, of mac: FakeMac) -> Bool {
+        hub.workspaceRows(machineID: mac.machine.machineID).contains { $0.id.workspaceId == "ws-\(name)" }
+    }
+
+    private func terminals(_ ids: String..., agent: [String: String] = [:], selected: String? = nil) -> [LinkTerminal] {
+        ids.enumerated().map { index, id in
+            LinkTerminal(terminalId: id, title: id, order: index, selected: id == selected, sessionId: agent[id])
+        }
+    }
+
+    private func pending(workspace: String = "shellx", machine: String = "m1") -> MachinePendingItem {
+        MachinePendingItem(
+            machineID: machine, machineName: "Mac", item: pendingItem("r1", workspace: workspace), actionable: true)
+    }
+
+    /// A model over a hub that is online with `mac`'s workspaces in; `patience` is the model's own wait.
+    private func makeModel(
+        _ mac: FakeMac, workspace: String = "shellx", sleeper: ManualSleeper = ManualSleeper(), sessions: Int = 0
+    ) async throws -> (model: WorkspaceScreenModel, hub: MachineHub, run: Task<Void, Never>) {
+        let rig = try await HubRig.make([mac], in: self)
+        let online = await rig.online(sessions: sessions)
+        XCTAssertTrue(online)
+        let listed = await eventually { rig.hub.machines.first?.workspacesSupported == true }
+        XCTAssertTrue(listed)
+        let model = WorkspaceScreenModel(ref: ref(mac, workspace), hub: rig.hub, sleep: sleeper.sleep)
+        let run = Task { await model.run() }
+        addTeardownBlock { run.cancel() }
+        return (model, rig.hub, run)
+    }
+
+    // MARK: - The chip shown first
+
+    func testDefaultTerminalPrefersPending() {
+        let workspace = linkWorkspace(
+            terminals: terminals("shell", "claude", "dev", agent: ["claude": "s1"], selected: "shell"))
+
+        XCTAssertEqual(
+            WorkspaceScreenModel.defaultTerminal(in: workspace, pending: [pending()]), "claude",
+            "a request waits on the agent: its chip, whatever the Mac has selected")
+        XCTAssertEqual(
+            WorkspaceScreenModel.defaultTerminal(in: workspace, pending: []), "shell",
+            "nothing waits: the chip the Mac has selected")
+        XCTAssertEqual(
+            WorkspaceScreenModel.defaultTerminal(in: workspace, pending: [pending(workspace: "other")]), "shell",
+            "a request of another workspace does not count")
+    }
+
+    func testDefaultTerminalFallsBackToTheFirstChip() {
+        // Chips go by `order`, not by the order they came in.
+        let unsorted = linkWorkspace(terminals: [
+            LinkTerminal(terminalId: "b", title: "b", order: 1, selected: false),
+            LinkTerminal(terminalId: "a", title: "a", order: 0, selected: false),
+        ])
+        XCTAssertEqual(WorkspaceScreenModel.defaultTerminal(in: unsorted, pending: []), "a")
+        XCTAssertNil(WorkspaceScreenModel.defaultTerminal(in: linkWorkspace(terminals: []), pending: []))
+
+        // A request waits but no chip runs an agent: the Mac's selection decides.
+        let shells = linkWorkspace(terminals: terminals("one", "two", selected: "two"))
+        XCTAssertEqual(WorkspaceScreenModel.defaultTerminal(in: shells, pending: [pending()]), "two")
+    }
+
+    func testDefaultTerminalSkipsAnAgentTheHubNoLongerLists() {
+        let workspace = linkWorkspace(
+            terminals: terminals("gone", "live", "shell", agent: ["gone": "s-gone", "live": "s-live"], selected: "shell"))
+
+        XCTAssertEqual(
+            WorkspaceScreenModel.defaultTerminal(in: workspace, pending: [pending()], liveSessionIds: ["s-live"]),
+            "live")
+        XCTAssertEqual(
+            WorkspaceScreenModel.defaultTerminal(in: workspace, pending: [pending()], liveSessionIds: []), "shell",
+            "no chip is an agent any more")
+    }
+
+    func testPendingChoosesTheAgentThatIsSelectedWhenThereAreSeveral() {
+        let workspace = linkWorkspace(
+            terminals: terminals("a1", "a2", agent: ["a1": "s1", "a2": "s2"], selected: "a2"))
+
+        XCTAssertEqual(WorkspaceScreenModel.defaultTerminal(in: workspace, pending: [pending()]), "a2")
+    }
+
+    // MARK: - Panes
+
+    func testAChipWhoseSessionTheHubDoesNotListIsAShellChip() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([
+            linkWorkspace(terminals: terminals("t1", "t2", "t3", agent: ["t1": "s-live", "t2": "s-gone"]))
+        ])
+        await mac.upsertSession(agentSession("s-live"))
+        let (model, _, _) = try await makeModel(mac, sessions: 1)
+
+        XCTAssertEqual(model.panes.map(\.id), ["t1", "t2", "t3"])
+        XCTAssertEqual(model.panes.map(\.isAgent), [true, false, false])
+        XCTAssertEqual(model.panes.first?.session?.session.sessionId, "s-live")
+        XCTAssertEqual(model.panes.first?.session?.machineName, "MacBook Pro")
+    }
+
+    func testPanesGoByOrder() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([
+            linkWorkspace(terminals: [
+                LinkTerminal(terminalId: "late", title: "late", order: 2, selected: false),
+                LinkTerminal(terminalId: "first", title: "first", order: 0, selected: false),
+                LinkTerminal(terminalId: "mid", title: "mid", order: 1, selected: true),
+            ])
+        ])
+        let (model, _, _) = try await makeModel(mac)
+
+        XCTAssertEqual(model.panes.map(\.id), ["first", "mid", "late"])
+        XCTAssertEqual(model.selectedTerminalId, "mid", "the Mac's selection shows first")
+    }
+
+    func testTheModelStartsOnTheDefaultChipBeforeItRuns() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace(terminals: terminals("t1", "t2", agent: ["t2": "s1"], selected: "t1"))])
+        await mac.upsertSession(agentSession("s1", state: .needsInput))
+        await mac.addPending(pendingItem("r1"))
+        let rig = try await HubRig.make([mac], in: self)
+        _ = await rig.online(sessions: 1)
+        _ = await eventually { rig.hub.pendingItems.count == 1 && rig.hub.machines.first?.workspacesSupported == true }
+
+        let model = WorkspaceScreenModel(ref: ref(mac), hub: rig.hub, sleep: ManualSleeper().sleep)
+
+        XCTAssertEqual(model.phase, .showing, "the first frame already has a workspace")
+        XCTAssertEqual(model.selectedTerminalId, "t2", "the agent that waits for the user")
+    }
+
+    // MARK: - Swiping and a chip that goes
+
+    func testSelectingAChipSticksWhileTheMacChangesItsOwnSelection() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace(terminals: terminals("t1", "t2", "t3", selected: "t1"))])
+        let (model, _, _) = try await makeModel(mac)
+        XCTAssertEqual(model.selectedTerminalId, "t1")
+
+        model.select("t2")
+        model.select("nope")
+        XCTAssertEqual(model.selectedTerminalId, "t2", "an id the workspace does not have is ignored")
+
+        await mac.upsertWorkspace(linkWorkspace(terminals: terminals("t1", "t2", "t3", selected: "t3")))
+        // A later change that the model has surely seen: the extra chip.
+        await mac.upsertWorkspace(linkWorkspace(terminals: terminals("t1", "t2", "t3", "t4", selected: "t3")))
+        let seen = await eventually { model.panes.count == 4 }
+        XCTAssertTrue(seen)
+        XCTAssertEqual(model.selectedTerminalId, "t2", "the phone's chip does not follow the Mac's")
+    }
+
+    func testTheChipBeingViewedGoingAwayMovesOnToTheNextOne() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace(terminals: terminals("t1", "t2", "t3", "t4"))])
+        let (model, _, _) = try await makeModel(mac)
+
+        model.select("t2")
+        await mac.upsertWorkspace(linkWorkspace(terminals: terminals("t1", "t3", "t4")))
+        let next = await eventually { model.selectedTerminalId == "t3" }
+        XCTAssertTrue(next, "the chip after it: \(String(describing: model.selectedTerminalId))")
+
+        model.select("t4")
+        await mac.upsertWorkspace(linkWorkspace(terminals: terminals("t1", "t3")))
+        let last = await eventually { model.selectedTerminalId == "t3" }
+        XCTAssertTrue(last, "the last chip went: the one before it, \(String(describing: model.selectedTerminalId))")
+        XCTAssertEqual(model.phase, .showing)
+    }
+
+    func testAChipThatIsNotBeingViewedGoingAwayChangesNothing() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace(terminals: terminals("t1", "t2", "t3"))])
+        let (model, _, _) = try await makeModel(mac)
+        model.select("t1")
+
+        await mac.upsertWorkspace(linkWorkspace(terminals: terminals("t1", "t3")))
+        let gone = await eventually { model.panes.map(\.id) == ["t1", "t3"] }
+
+        XCTAssertTrue(gone)
+        XCTAssertEqual(model.selectedTerminalId, "t1")
+    }
+
+    func testTheLastChipGoingAwayLeavesNoSelection() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace(terminals: terminals("t1"))])
+        let (model, _, _) = try await makeModel(mac)
+
+        await mac.upsertWorkspace(linkWorkspace(terminals: []))
+        let empty = await eventually { model.panes.isEmpty }
+
+        XCTAssertTrue(empty)
+        XCTAssertNil(model.selectedTerminalId)
+        XCTAssertEqual(model.phase, .showing, "a workspace with no terminal is still a workspace")
+
+        await mac.upsertWorkspace(linkWorkspace(terminals: terminals("t9")))
+        let back = await eventually { model.selectedTerminalId == "t9" }
+        XCTAssertTrue(back, "a chip came: it shows")
+    }
+
+    // MARK: - The workspace leaves, or has not come
+
+    func testClosedWorkspaceDismisses() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace("shellx"), linkWorkspace("web", order: 1)])
+        let (model, _, _) = try await makeModel(mac)
+        XCTAssertEqual(model.phase, .showing)
+
+        await mac.removeWorkspace("ws-web")
+        // The other workspace leaving is not this one's business.
+        let other = await eventually { model.workspace != nil }
+        XCTAssertTrue(other)
+        XCTAssertEqual(model.phase, .showing)
+
+        await mac.removeWorkspace("ws-shellx")
+        let dismissed = await eventually { model.phase == .dismissed }
+        XCTAssertTrue(dismissed, "\(model.phase)")
+    }
+
+    func testDismissedStaysDismissedWhenTheWorkspaceListsAgain() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace("shellx"), linkWorkspace("web", order: 1)])
+        let (model, hub, _) = try await makeModel(mac)
+
+        await mac.removeWorkspace("ws-shellx")
+        _ = await eventually { model.phase == .dismissed }
+        await mac.upsertWorkspace(linkWorkspace("shellx"))
+        await mac.upsertWorkspace(linkWorkspace("docs", order: 5))
+        let relisted = await eventually { listed("docs", by: hub, of: mac) }
+        XCTAssertTrue(relisted)
+
+        XCTAssertEqual(model.phase, .dismissed, "the screen is already on its way out")
+    }
+
+    func testUnseenWorkspaceWaits() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace("shellx")])
+        let sleeper = ManualSleeper()
+        let (model, hub, _) = try await makeModel(mac, workspace: "new", sleeper: sleeper)
+
+        // `workspace.create.result` came before the push that lists the workspace: wait, do not leave.
+        XCTAssertEqual(model.phase, .waiting)
+        XCTAssertNil(model.workspace)
+        let timer = await eventually { sleeper.waiting == [.seconds(5)] }
+        XCTAssertTrue(timer, "\(sleeper.requested)")
+        var lists = await mac.workspaceListCount
+        XCTAssertEqual(lists, 1)
+
+        // Other changes, even a removal, say nothing about a workspace never seen.
+        await mac.upsertWorkspace(linkWorkspace("web", order: 1))
+        await mac.removeWorkspace("ws-web")
+        let removed = await eventually { !listed("web", by: hub, of: mac) }
+        XCTAssertTrue(removed)
+        XCTAssertEqual(model.phase, .waiting)
+
+        // The push arrives within the wait: the screen shows, and the wait ends without asking again.
+        await mac.upsertWorkspace(linkWorkspace("new", order: 2, terminals: terminals("t1")))
+        let showing = await eventually { model.phase == .showing }
+        XCTAssertTrue(showing)
+        XCTAssertEqual(model.selectedTerminalId, "t1")
+        sleeper.release()
+        _ = await eventually(timeout: .milliseconds(200)) { false }
+        lists = await mac.workspaceListCount
+        XCTAssertEqual(lists, 1, "it arrived: no refresh was needed")
+        XCTAssertEqual(model.phase, .showing)
+    }
+
+    func testUnseenWorkspaceAsksTheMacOnceThenGivesUp() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace("shellx")])
+        let sleeper = ManualSleeper()
+        let (model, _, _) = try await makeModel(mac, workspace: "ghost", sleeper: sleeper)
+        XCTAssertEqual(model.phase, .waiting)
+        let timer = await eventually { sleeper.waiting == [.seconds(5)] }
+        XCTAssertTrue(timer)
+
+        sleeper.release()
+
+        let gaveUp = await eventually { model.phase == .notFound }
+        XCTAssertTrue(gaveUp, "\(model.phase)")
+        let lists = await mac.workspaceListCount
+        XCTAssertEqual(lists, 2, "the list was asked for once more, not again and again")
+        XCTAssertEqual(sleeper.requested, [.seconds(5)])
+
+        // A late push still shows the workspace.
+        await mac.upsertWorkspace(linkWorkspace("ghost", order: 3, terminals: terminals("t1")))
+        let late = await eventually { model.phase == .showing }
+        XCTAssertTrue(late)
+    }
+
+    func testTheRefreshCanFindTheWorkspaceItself() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace("shellx")])
+        let sleeper = ManualSleeper()
+        let (model, _, _) = try await makeModel(mac, workspace: "missed", sleeper: sleeper)
+        let timer = await eventually { sleeper.waiting == [.seconds(5)] }
+        XCTAssertTrue(timer)
+
+        // The push was lost: the Mac's list moved on without telling the phone.
+        await mac.skipNextWorkspaceRevision()
+        await mac.upsertWorkspace(linkWorkspace("missed", order: 1, terminals: terminals("t1")))
+        sleeper.release()
+
+        let found = await eventually { model.phase == .showing }
+        XCTAssertTrue(found, "\(model.phase)")
+    }
+
+    func testWorkspaceOfAnUnknownMacNeverDismissesFromNothing() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace("shellx")])
+        let rig = try await HubRig.make([mac], in: self)
+        _ = await rig.online(sessions: 0)
+        let sleeper = ManualSleeper()
+        let model = WorkspaceScreenModel(
+            ref: WorkspaceRef(machineID: "mac-nobody", workspaceId: "ws-shellx"), hub: rig.hub, sleep: sleeper.sleep)
+        let run = Task { await model.run() }
+        addTeardownBlock { run.cancel() }
+
+        XCTAssertEqual(model.phase, .waiting)
+        XCTAssertTrue(model.panes.isEmpty)
+    }
+
+    // MARK: - The Mac goes away
+
+    func testTheLastKnownChipsStayWhileTheMacIsOffline() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace(terminals: terminals("t1", "t2", agent: ["t1": "s1"]))])
+        await mac.upsertSession(agentSession("s1"))
+        let backoff = ManualSleeper()
+        let rig = try await HubRig.make([mac], in: self)
+        _ = await rig.online(sessions: 1)
+        _ = await eventually { rig.hub.machines.first?.workspacesSupported == true }
+        let model = WorkspaceScreenModel(ref: ref(mac), hub: rig.hub, sleep: backoff.sleep)
+        let run = Task { await model.run() }
+        addTeardownBlock { run.cancel() }
+        model.select("t2")
+
+        await mac.dropLiveSessions()
+        let down = await eventually { rig.hub.machines.first?.state != .online }
+        XCTAssertTrue(down)
+
+        XCTAssertEqual(model.phase, .showing)
+        XCTAssertEqual(model.panes.map(\.id), ["t1", "t2"])
+        XCTAssertEqual(model.panes.map(\.isAgent), [true, false], "the agent pane stays; its screen says the Mac is away")
+        XCTAssertEqual(model.selectedTerminalId, "t2")
+    }
+
+    // MARK: - Seen
+
+    func testRunningMarksTheWorkspaceSeen() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace(terminals: terminals("t1", agent: ["t1": "s1"]))])
+        await mac.upsertSession(agentSession("s1", state: .working))
+        let rig = try await HubRig.make([mac], in: self)
+        _ = await rig.online(sessions: 1)
+        _ = await eventually { rig.hub.machines.first?.workspacesSupported == true }
+        // The turn ends while the user is on the list: the workspace is "done".
+        await mac.upsertSession(agentSession("s1", state: .idle))
+        let id = mac.machine.machineID
+        let done = await eventually { rig.hub.workspaceRows(machineID: id).first?.state == .done }
+        XCTAssertTrue(done)
+
+        let model = WorkspaceScreenModel(ref: ref(mac), hub: rig.hub, sleep: ManualSleeper().sleep)
+        let run = Task { await model.run() }
+        addTeardownBlock { run.cancel() }
+
+        let seen = await eventually { rig.hub.workspaceRows(machineID: id).first?.state == .idle }
+        XCTAssertTrue(seen, "opening the screen means the user looked")
+    }
+
+    func testRunStopsWhenCancelled() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace("shellx")])
+        let sleeper = ManualSleeper()
+        let (_, _, run) = try await makeModel(mac, workspace: "ghost", sleeper: sleeper)
+        let timer = await eventually { sleeper.waiting.count == 1 }
+        XCTAssertTrue(timer)
+
+        run.cancel()
+        await run.value
+
+        XCTAssertEqual(sleeper.cancelled, 1, "the wait for the workspace ended with the screen")
+    }
+}

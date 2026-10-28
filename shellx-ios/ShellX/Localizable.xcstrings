@@ -3385,6 +3385,168 @@
         }
       }
     },
+    "workspace.chip.shell": {
+      "comment": "Name of a terminal chip whose tab has no name on the Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal"
+          }
+        }
+      }
+    },
+    "workspace.closedOnMac": {
+      "comment": "A short line the workspace list shows after the open workspace was closed on the Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace closed on the Mac"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace đã đóng trên Mac"
+          }
+        }
+      }
+    },
+    "workspace.menu": {
+      "comment": "The ••• button on a workspace screen: spoken label (VoiceOver); it opens rename and close.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace actions"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tác vụ workspace"
+          }
+        }
+      }
+    },
+    "workspace.menu.close": {
+      "comment": "Item of the ••• menu on a workspace screen (shown red): close the workspace; it asks to confirm first.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close Workspace…"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đóng workspace…"
+          }
+        }
+      }
+    },
+    "workspace.menu.rename": {
+      "comment": "Item of the ••• menu on a workspace screen: rename the workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename Workspace"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đổi tên workspace"
+          }
+        }
+      }
+    },
+    "workspace.noTerminals": {
+      "comment": "On a workspace screen whose workspace has no terminal (only panes this app does not show).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This workspace has no terminal."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace này chưa có terminal nào."
+          }
+        }
+      }
+    },
+    "workspace.notFound": {
+      "comment": "On a workspace screen: the Mac does not have the workspace that was opened.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace not found"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không tìm thấy workspace"
+          }
+        }
+      }
+    },
+    "workspace.notFound.back": {
+      "comment": "Button under 'Workspace not found': go back to the workspace list.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quay lại"
+          }
+        }
+      }
+    },
+    "workspace.shell.placeholder": {
+      "comment": "On a workspace screen, in place of a terminal chip's content: the terminal itself comes in a later version.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Viewing and typing in the terminal comes in a later version."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xem và gõ terminal có ở bản sau"
+          }
+        }
+      }
+    },
     "workspaces.alert.failed": {
       "comment": "Alert: a workspace command did not work.",
       "extractionState": "manual",

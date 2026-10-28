@@ -51,8 +51,7 @@ struct SignedInView: View {
                         hub: hub, center: scope.decisions,
                         only: { $0.isIn(machineID: machineID, workspaceId: workspaceId) })
                 case let .workspace(ref):
-                    // Temporary: the workspace screen replaces it.
-                    Text(verbatim: ref.workspaceId)
+                    WorkspaceView(scope: scope, ref: ref, open: { path.append($0) })
                 case let .otherSessions(machineID):
                     OtherSessionsView(hub: hub, machineID: machineID)
                 }

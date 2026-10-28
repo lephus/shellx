@@ -7,3 +7,4 @@ common.ok
 pending.plan.title
 pending.plan.ultraplan
 workspaces.title
+workspace.chip.shell

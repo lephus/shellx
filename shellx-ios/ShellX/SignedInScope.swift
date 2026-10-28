@@ -16,6 +16,8 @@ final class SignedInScope {
     let voice: VoiceService?
     /// The pending sheets open now: a pairing link waits until none is.
     let sheets: SheetPresence
+    /// What the workspace list says once more: a workspace screen that closed itself leaves a line here.
+    let listNotice = ListNotice()
     private let launch: LaunchMark
 
     init(

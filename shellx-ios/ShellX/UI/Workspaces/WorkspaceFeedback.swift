@@ -1,4 +1,5 @@
 import ShellXAppCore
+import SwiftUI
 
 /// The workspace commands of the list.
 enum WorkspaceCommand: Equatable {
@@ -55,6 +56,19 @@ enum WorkspaceFeedback: Equatable {
             return .alert(.offline)
         case .unknown:
             return .alert(.unknown)
+        }
+    }
+}
+
+extension View {
+    /// Shows `alert`, when there is one, as an alert with "OK"; closing it clears the binding. The list
+    /// and the workspace screen say the same words for the same answer.
+    func workspaceAlert(_ alert: Binding<WorkspaceAlert?>) -> some View {
+        self.alert(
+            alert.wrappedValue?.message ?? "",
+            isPresented: Binding(get: { alert.wrappedValue != nil }, set: { if !$0 { alert.wrappedValue = nil } })
+        ) {
+            Button(String(localized: "common.ok")) {}
         }
     }
 }
