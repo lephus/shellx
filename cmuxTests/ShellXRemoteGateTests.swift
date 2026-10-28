@@ -38,7 +38,9 @@ struct ShellXRemoteGateTests {
     /// A process hosting tests never starts the remote service: it would sign in and register this Mac with the
     /// production relay.
     @Test func processHostingTestsNeverStartsTheRemoteService() {
-        #expect(!ShellXRemoteGate.startsAtLaunch(environment: ProcessInfo.processInfo.environment))
+        // Evaluated first, so a failure does not print this process's environment.
+        let startsInThisProcess = ShellXRemoteGate.startsAtLaunch(environment: ProcessInfo.processInfo.environment)
+        #expect(!startsInThisProcess)
         let xctest = ["XCTestConfigurationFilePath": "/tmp/cmuxTests.xctestconfiguration"]
         #expect(!ShellXRemoteGate.startsAtLaunch(servesPhones: true, environment: xctest))
     }

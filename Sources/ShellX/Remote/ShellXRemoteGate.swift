@@ -39,13 +39,15 @@ enum ShellXRemoteGate {
         phonePairing || isEnabled(remoteMachines: remoteMachines, environment: environment)
     }
 
-    /// Whether the app starts the remote service at launch in a process with `environment`.
+    /// Whether the app starts the remote service at launch in a process with `environment`: while it serves
+    /// phones, and never in a process hosting tests, which would sign in and register this Mac with the
+    /// production relay (`MacSentryStartupPolicy.isRunningUnderXCTest`, as the rest of launch uses).
     static func startsAtLaunch(environment: [String: String]) -> Bool {
         startsAtLaunch(servesPhones: servesPhones, environment: environment)
     }
 
     /// ``startsAtLaunch(environment:)`` for the given ``servesPhones``.
     static func startsAtLaunch(servesPhones: Bool, environment: [String: String]) -> Bool {
-        servesPhones
+        servesPhones && !MacSentryStartupPolicy.isRunningUnderXCTest(environment: environment)
     }
 }
