@@ -19,6 +19,12 @@ const FAKE_DOCKER = `#!/usr/bin/env bash
 echo "docker $* [IMAGE_TAG=\${IMAGE_TAG:-}]" >> "$CALLS"
 if [[ "$1 $2" == "compose pull" && "\${IMAGE_TAG:-}" == unpullable ]]; then exit 1; fi
 if [[ "$1 $2" == "compose build" && -e relay2-build-broken ]]; then exit 1; fi
+if [[ "$1 $2" == "image inspect" ]]; then
+  # SHELLX_LOCAL_IMAGES=1: a marker file in the app dir makes one image "not built on this host".
+  if [[ "\${@: -1}" == */shellx-relay:* && -e local-relay-missing ]]; then exit 1; fi
+  if [[ "\${@: -1}" == */shellx-web:* && -e local-web-missing ]]; then exit 1; fi
+  exit 0
+fi
 if [[ "$1 $2" == "compose up" ]] && grep -q '^IMAGE_TAG=crash' .env; then exit 17; fi
 if [[ "$1 $2" == "compose ps" ]]; then echo "\${@: -1}-container-id"; exit 0; fi
 if [[ "$1" == inspect ]]; then
@@ -68,11 +74,11 @@ function setup({
   writeFileSync(calls, '');
   if (live) writeConfigAt(app, live);
   if (incoming) writeConfigAt(join(app, '.incoming'), incoming);
-  const run = (tag, appDir = 'phu/shellx', relayUid = String(process.getuid())) =>
+  const run = (tag, appDir = 'phu/shellx', relayUid = String(process.getuid()), extraEnv = {}) =>
     spawnSync('bash', [script, tag, appDir], {
       encoding: 'utf8',
       env: {
-        PATH: `${bin}:${process.env.PATH}`, HOME: home, CALLS: calls, HEALTH_TIMEOUT_SECONDS: '3', RELAY_UID: relayUid,
+        PATH: `${bin}:${process.env.PATH}`, HOME: home, CALLS: calls, HEALTH_TIMEOUT_SECONDS: '3', RELAY_UID: relayUid, ...extraEnv,
       },
     });
   return {
@@ -477,5 +483,104 @@ test('relay2 profile off (or a different profile): no build, bare pull, old succ
     assert.match(result.stdout, /^relay and web are healthy on abc123$/m);
     assert.doesNotMatch(s.calls(), /compose build|relay2/);
     assert.match(s.calls(), /^docker compose pull \[IMAGE_TAG=abc123\]$/m);
+  }
+});
+
+// --- local images: SHELLX_LOCAL_IMAGES=1, relay and web were built on the VPS (deploy/vps-deploy.sh) ---
+
+const LOCAL = { SHELLX_LOCAL_IMAGES: '1' };
+const runLocal = (s, tag) => s.run(tag, 'phu/shellx', String(process.getuid()), LOCAL);
+const pulls = (s) => s.calls().split('\n').filter((line) => line.includes('compose pull'));
+
+test('local images, healthy: checks both images exist, pulls only backup, same success line and prune', () => {
+  const s = setup();
+  const result = runLocal(s, 'abc123');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /^relay and web are healthy on abc123$/m);
+  assert.equal(s.env(), 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=abc123\n');
+  const calls = s.calls();
+  assert.match(calls, /^docker image inspect ghcr\.io\/lephus\/shellx-relay:abc123 \[IMAGE_TAG=\]$/m);
+  assert.match(calls, /^docker image inspect ghcr\.io\/lephus\/shellx-web:abc123 \[IMAGE_TAG=\]$/m);
+  // backup (alpine) still comes from the registry; relay and web are never pulled.
+  assert.deepEqual(pulls(s), ['docker compose pull backup [IMAGE_TAG=abc123]']);
+  assert.equal(calls.match(/compose up -d --remove-orphans --force-recreate/g).length, 1);
+  assert.match(calls, /compose ps -q relay/);
+  assert.match(calls, /compose ps -q web/);
+  assert.equal(calls.match(/image prune/g).length, 1);
+  // The images are checked before anything is pulled or restarted.
+  assert.ok(calls.indexOf('image inspect') < calls.indexOf('compose pull'));
+  assert.ok(calls.indexOf('compose pull') < calls.indexOf('compose up'));
+});
+
+test('local images, unhealthy: still rolls back to the previous tag', () => {
+  const s = setup();
+  const result = runLocal(s, 'broken');
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /not healthy within 3s on broken; rolling back to old/);
+  assert.equal(s.env(), 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\n');
+  assert.equal(s.calls().match(/compose up -d --remove-orphans/g).length, 2);
+  assert.doesNotMatch(s.calls(), /image prune/);
+});
+
+for (const [which, marker] of [['relay', 'local-relay-missing'], ['web', 'local-web-missing']]) {
+  test(`local images, ${which} image missing on the host: same path as a failed pull (env untouched, nothing pulled or restarted)`, () => {
+    const s = setup();
+    writeFileSync(join(s.app, marker), '');
+    const result = runLocal(s, 'abc123');
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, new RegExp(`::error::.*ghcr\\.io/lephus/shellx-${which}:abc123 does not exist on this host`));
+    assert.equal(s.env(), 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\n');
+    assert.doesNotMatch(s.calls(), /compose (pull|up|build)/);
+    assert.doesNotMatch(s.calls(), /image prune/);
+  });
+
+  test(`local images, ${which} image missing after a real config swap: restores the config and recreates backup (R3)`, () => {
+    const s = setup({ live: OLD_CONFIG, incoming: NEW_CONFIG });
+    writeFileSync(join(s.app, marker), '');
+    const result = runLocal(s, 'abc123');
+    assert.equal(result.status, 1);
+    assert.equal(s.read('docker-compose.yml'), OLD_CONFIG.compose);
+    assert.equal(s.read('relay.env'), OLD_CONFIG.relayEnv);
+    assert.equal(s.read('nginx-proxy/marker'), OLD_CONFIG.nginxMarker);
+    assert.equal(s.read('backup/marker'), OLD_CONFIG.backupMarker);
+    assert.equal(s.env(), 'PROXY_NETWORK=proxy-net\nIMAGE_TAG=old\n');
+    const ups = s.calls().split('\n').filter((line) => line.includes('compose up'));
+    assert.deepEqual(ups, ['docker compose up -d --no-deps --force-recreate backup [IMAGE_TAG=]']);
+  });
+}
+
+test('local images + relay2: pulls only backup, still builds relay2 from relay2-src, three-service success line', () => {
+  const s = relay2Setup();
+  const result = runLocal(s, 'abc123');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /relay, relay2 and web are healthy on abc123/);
+  assert.deepEqual(pulls(s), ['docker compose pull backup [IMAGE_TAG=abc123]']);
+  assert.match(s.calls(), /^docker compose build relay2 \[IMAGE_TAG=abc123\]$/m);
+  assert.ok(s.calls().indexOf('compose build relay2') < s.calls().indexOf('compose up'));
+});
+
+test('local images + relay2: a missing source or a failed build is still a failed pull', () => {
+  const noSource = relay2Setup({ stageSource: false });
+  const noSourceResult = runLocal(noSource, 'abc123');
+  assert.equal(noSourceResult.status, 1);
+  assert.match(noSourceResult.stderr, new RegExp(`relay2-src/${R}/scripts/shellx/relay2/Dockerfile`));
+  assert.doesNotMatch(noSource.calls(), /compose (pull|build|up)/);
+
+  const brokenBuild = relay2Setup();
+  writeFileSync(join(brokenBuild.app, 'relay2-build-broken'), '');
+  const brokenResult = runLocal(brokenBuild, 'abc123');
+  assert.equal(brokenResult.status, 1);
+  assert.equal(brokenBuild.env(), RELAY2_ENV);
+  assert.doesNotMatch(brokenBuild.calls(), /compose up/);
+});
+
+test('SHELLX_LOCAL_IMAGES unset, empty, 0 or anything but 1: registry pull, no image check', () => {
+  for (const value of [undefined, '', '0', 'true', 'yes']) {
+    const s = setup();
+    const extra = value === undefined ? {} : { SHELLX_LOCAL_IMAGES: value };
+    const result = s.run('abc123', 'phu/shellx', String(process.getuid()), extra);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(pulls(s), ['docker compose pull [IMAGE_TAG=abc123]']);
+    assert.doesNotMatch(s.calls(), /image inspect/);
   }
 });

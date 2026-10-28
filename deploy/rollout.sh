@@ -17,6 +17,12 @@
 # restarts again and fails. On success, best-effort prunes older ShellX images so the disk does not
 # fill up. Touches nothing outside <app-dir> (relative paths are under $HOME).
 #
+# Local images (SHELLX_LOCAL_IMAGES=1 in the environment, set by deploy/vps-deploy.sh; any other value
+# or none leaves every path exactly as described above): relay and web were built ON THIS HOST as
+# ghcr.io/lephus/shellx-relay:<tag> and ghcr.io/lephus/shellx-web:<tag> (no GitHub Actions, no
+# registry), so they are not pulled. Both must exist locally (`docker image inspect`); a missing one
+# takes the same path as a failed pull. `backup` (alpine) is still pulled, and relay2 is still built.
+#
 # The `backup` container bind-mounts backup/, i.e. the directory inode it saw when it was created. The
 # swap and the restore replace backup/ (rm -rf + mv), so the running container would be left with a
 # deleted, empty directory and its cron job would silently stop (C2). Keeping that inode stable would
@@ -50,6 +56,11 @@ main() {
   local app_dir="$2"
   local health_timeout="${HEALTH_TIMEOUT_SECONDS:-60}"
   local relay_uid="${RELAY_UID:-1000}"
+  # 1 when relay and web are already on this host (see the header): nothing to pull for them.
+  local local_images=0
+  if [[ "${SHELLX_LOCAL_IMAGES:-}" == 1 ]]; then
+    local_images=1
+  fi
   # 1 once stage_config has really swapped the staged config in; only then is there anything of this
   # run's to restore (R3).
   local swapped=0
@@ -246,21 +257,39 @@ main() {
   # the pull names the registry services explicitly (bare `compose pull` would try relay2's
   # shellx-relay2:<sha> tag, and `--ignore-buildable` needs a newer Compose than the VPS is known to
   # have). A missing source or a failed build ends exactly like a failed pull.
-  local pull_ok=1
-  if relay2_enabled; then
-    local relay2_rev
-    relay2_rev="$(sed -n 's#^ *context: \./relay2-src/\([0-9a-f]\{40\}\) *$#\1#p' docker-compose.yml | head -n 1)"
-    if [[ -z "$relay2_rev" || ! -f "relay2-src/$relay2_rev/scripts/shellx/relay2/Dockerfile" ]]; then
-      echo "::error::COMPOSE_PROFILES has relay2 but relay2-src/${relay2_rev:-<sha>}/scripts/shellx/relay2/Dockerfile is missing in $app_dir: stage the source (deploy/README.md, \"Relay v2\"): on the Mac scripts/shellx/relay2/source-tarball.sh ${relay2_rev:-<sha>} /tmp, scp the tarball to $app_dir, then on the VPS: cd $app_dir && mkdir -p relay2-src && tar -xzf relay2-src-${relay2_rev:-<sha>}.tar.gz -C relay2-src" >&2
-      pull_ok=0
-    elif ! IMAGE_TAG="$new_tag" docker compose pull relay web backup \
-      || ! IMAGE_TAG="$new_tag" docker compose build relay2; then
-      pull_ok=0
+  # With local images (see the header) relay and web are not pulled: only `backup` is, and a relay or
+  # web image missing on this host ends exactly like a failed pull too.
+  # Every step is `|| return 1`: set -e does not apply inside a function that is an `if` condition.
+  fetch_images() {
+    if ((local_images)); then
+      local image
+      for image in ghcr.io/lephus/shellx-relay ghcr.io/lephus/shellx-web; do
+        if ! docker image inspect "$image:$new_tag" >/dev/null 2>&1; then
+          echo "::error::SHELLX_LOCAL_IMAGES=1 but $image:$new_tag does not exist on this host: build it first (deploy/vps-deploy.sh does)" >&2
+          return 1
+        fi
+      done
     fi
-  elif ! IMAGE_TAG="$new_tag" docker compose pull; then
-    pull_ok=0
-  fi
-  if ((! pull_ok)); then
+    if relay2_enabled; then
+      local relay2_rev
+      relay2_rev="$(sed -n 's#^ *context: \./relay2-src/\([0-9a-f]\{40\}\) *$#\1#p' docker-compose.yml | head -n 1)"
+      if [[ -z "$relay2_rev" || ! -f "relay2-src/$relay2_rev/scripts/shellx/relay2/Dockerfile" ]]; then
+        echo "::error::COMPOSE_PROFILES has relay2 but relay2-src/${relay2_rev:-<sha>}/scripts/shellx/relay2/Dockerfile is missing in $app_dir: stage the source (deploy/README.md, \"Relay v2\"): on the Mac scripts/shellx/relay2/source-tarball.sh ${relay2_rev:-<sha>} /tmp, scp the tarball to $app_dir, then on the VPS: cd $app_dir && mkdir -p relay2-src && tar -xzf relay2-src-${relay2_rev:-<sha>}.tar.gz -C relay2-src" >&2
+        return 1
+      fi
+      if ((local_images)); then
+        IMAGE_TAG="$new_tag" docker compose pull backup || return 1
+      else
+        IMAGE_TAG="$new_tag" docker compose pull relay web backup || return 1
+      fi
+      IMAGE_TAG="$new_tag" docker compose build relay2 || return 1
+    elif ((local_images)); then
+      IMAGE_TAG="$new_tag" docker compose pull backup || return 1
+    else
+      IMAGE_TAG="$new_tag" docker compose pull || return 1
+    fi
+  }
+  if ! fetch_images; then
     if ((swapped)); then
       restore_config
       recreate_backup
