@@ -60,6 +60,11 @@ public actor FakeMac {
     /// False: the chat takes no attachments (no `attachments` feature in `welcome`), like a ShellX
     /// from before them.
     public nonisolated let acceptsAttachments: Bool
+    /// False: the host lists no workspaces and takes no workspace control (no `workspaces` or
+    /// `workspace_control` feature in `welcome`), like a ShellX from before them.
+    public nonisolated let servesWorkspaces: Bool
+    /// False: the host lists workspaces but takes no control of them (no `workspace_control` feature).
+    public nonisolated let acceptsWorkspaceControl: Bool
     /// How many times a phone tried to connect, failed attempts included.
     public private(set) var connectCount = 0
 
@@ -67,6 +72,7 @@ public actor FakeMac {
     private let trusted = TrustedPhones()
     private let feed = FakeMacFeed()
     private let sessionSource = FakeMacSessions()
+    private let workspaceSource = FakeMacWorkspaces()
     private let chat: FakeMacChat
     private var failure: (any Error)?
     private var failuresLeft = 0
@@ -74,11 +80,16 @@ public actor FakeMac {
 
     /// `id` names the Mac (`mac-<id>`) and its slot; a new random one by default. The Debug demo
     /// passes a fixed one, so what the phone keeps about the Mac survives a relaunch.
-    public init(name: String, id: String? = nil, servesSessionsAndChat: Bool = true, acceptsAttachments: Bool = true) {
+    public init(
+        name: String, id: String? = nil, servesSessionsAndChat: Bool = true, acceptsAttachments: Bool = true,
+        servesWorkspaces: Bool = true, acceptsWorkspaceControl: Bool = true
+    ) {
         let key = NoiseStaticKey()
         hostKey = key
         self.servesSessionsAndChat = servesSessionsAndChat
         self.acceptsAttachments = acceptsAttachments
+        self.servesWorkspaces = servesWorkspaces
+        self.acceptsWorkspaceControl = acceptsWorkspaceControl
         chat = FakeMacChat(acceptsAttachments: acceptsAttachments)
         let id = id ?? UUID().uuidString.lowercased()
         machine = PairedMachine(
@@ -139,6 +150,8 @@ public actor FakeMac {
         let host = LinkHost(
             key: hostKey, trustedClients: { trusted.keys }, feed: feed,
             sessions: servesSessionsAndChat ? sessionSource : nil, chat: servesSessionsAndChat ? chat : nil,
+            workspaces: servesWorkspaces ? workspaceSource : nil,
+            workspaceControl: servesWorkspaces && acceptsWorkspaceControl ? workspaceSource : nil,
             hostVersion: "fake", machineName: machine.name)
         let id = UUID()
         live[id] = (macEnd, Task {
@@ -182,6 +195,27 @@ public actor FakeMac {
     public func skipNextSessionRevision() { sessionSource.skipRevision() }
     /// How many `agent.sessions.get` the Mac answered.
     public var sessionListCount: Int { sessionSource.listCount }
+
+    // MARK: - Workspaces
+
+    /// The Mac's workspaces become `workspaces`; phones get what differs as one change.
+    public func setWorkspaces(_ workspaces: [LinkWorkspace]) { workspaceSource.set(workspaces) }
+    public func upsertWorkspace(_ workspace: LinkWorkspace) { workspaceSource.upsert(workspace) }
+    public func removeWorkspace(_ workspaceId: String) { workspaceSource.remove(workspaceId) }
+    /// The next workspace change arrives one revision too far, so the phone sees a gap.
+    public func skipNextWorkspaceRevision() { workspaceSource.skipRevision() }
+    /// How many `workspace.list.get` the Mac answered.
+    public var workspaceListCount: Int { workspaceSource.listCount }
+    /// Every control call the Mac received, in order: `create`, `rename:<id>:<title>`, `close:<id>`.
+    public var workspaceCalls: [String] { workspaceSource.controlCalls }
+    /// The next control call answers `outcome` and, unless it is `ok`, changes nothing. Without it the
+    /// Mac acts as the real one does: it makes the workspace, renames or closes one it has (`not_found`
+    /// otherwise) and keeps its last workspace (`refused`).
+    public func setNextWorkspaceOutcome(_ outcome: WorkspaceControlOutcome) { workspaceSource.setNextOutcome(outcome) }
+    /// From now on control calls are recorded but not answered until `releaseWorkspaceControl()`, as
+    /// when the Mac is slow.
+    public func holdWorkspaceControl() { workspaceSource.hold() }
+    public func releaseWorkspaceControl() { workspaceSource.release() }
 
     // MARK: - Chat
 

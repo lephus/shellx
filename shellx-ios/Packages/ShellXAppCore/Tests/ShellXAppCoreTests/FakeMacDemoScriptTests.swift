@@ -47,6 +47,26 @@ final class FakeMacDemoScriptTests: XCTestCase {
         XCTAssertEqual(entryKinds, ["prose", "thought", "tool_use", "status"])
     }
 
+    func testSetUpServesWorkspacesThatHoldBothSessions() async throws {
+        let mac = FakeMac(name: "Mac giả")
+        let script = FakeMacDemoScript(mac: mac)
+        await script.setUp()
+        let hub = try await hub(for: mac)
+        let id = mac.machine.machineID
+
+        let ready = await eventually { hub.workspaceRows(machineID: id).count == 3 && hub.liveSessions.count == 2 }
+
+        XCTAssertTrue(ready)
+        XCTAssertEqual(hub.workspaceRows(machineID: id).map(\.title), ["shellx", "web", "docs"])
+        XCTAssertEqual(hub.workspaceRows(machineID: id).map(\.state), [.running, .running, .idle])
+        // Both sessions sit in a terminal, so none is left for the "other sessions" list.
+        XCTAssertEqual(hub.otherSessions(machineID: id), [])
+
+        await script.step(0)
+        let asks = await eventually { hub.workspaceRows(machineID: id).map(\.state) == [.needsYou, .running, .idle] }
+        XCTAssertTrue(asks, "a pending request names the workspace of its session")
+    }
+
     func testStepsAddPermissionQuestionPlanInTurnAndFlipSessions() async throws {
         let mac = FakeMac(name: "Mac giả")
         let script = FakeMacDemoScript(mac: mac)

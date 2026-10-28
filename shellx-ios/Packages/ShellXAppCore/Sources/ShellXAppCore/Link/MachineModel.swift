@@ -17,6 +17,11 @@ public final class MachineModel: Identifiable {
     public internal(set) var sessions = SessionSet()
     /// False when the Mac has no session list (an older ShellX). True until known.
     public internal(set) var sessionsSupported = true
+    /// The Mac's workspaces; the last known list while the Mac reconnects.
+    public internal(set) var workspaces = WorkspaceSet()
+    /// True when the Mac listed the `workspaces` feature when it was last online and answered with its
+    /// list. False until then, and for a Mac that lists none (an older ShellX).
+    public internal(set) var workspacesSupported = false
     /// What the Mac listed in `welcome.features` when it was last online (empty until then): it
     /// stays while the Mac reconnects, so what depends on it does not flicker.
     public internal(set) var hostFeatures: Set<String> = []
@@ -36,6 +41,8 @@ public final class MachineModel: Identifiable {
         pendingActionable = false
         sessions = SessionSet()
         sessionsSupported = true
+        workspaces = WorkspaceSet()
+        workspacesSupported = false
         hostFeatures = []
     }
 }

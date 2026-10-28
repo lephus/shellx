@@ -25,6 +25,9 @@ public final class MachineHub {
     /// Items that left a Mac's list while the Mac was live and synced, newest last
     /// (`leftWhileSynced(_:)`).
     private var handledKeys: [PendingKey] = []
+    /// Per Mac, the sessions that finished a turn and that the user has not looked at since
+    /// (`finishedSessionIds(machineID:)`). In memory only: a launch starts with none.
+    private var finishedIds: [String: Set<String>] = [:]
 
     @ObservationIgnored private let vault: AccountVault
     @ObservationIgnored private let relay: any RelayAccountCalling
@@ -54,6 +57,8 @@ public final class MachineHub {
     @ObservationIgnored private var unauthorizedReported = false
     /// Transcript resets (`chat.reset`) per session since the hub started (`transcriptResets(of:)`).
     @ObservationIgnored private var resetCounts: [SessionRef: Int] = [:]
+    /// Tells which sessions finished a turn, from every session list a Mac sends (`finishedIds`).
+    @ObservationIgnored private var finishDetector = SessionFinishDetector()
 
     public init(
         vault: AccountVault, relay: any RelayAccountCalling, connector: any MachineLinkConnecting,
@@ -124,6 +129,57 @@ public final class MachineHub {
         }
     }
 
+    // MARK: - Workspaces
+
+    /// The Mac's workspaces as rows, in the Mac's order, each with the state worked out from the Mac's
+    /// sessions, pending requests and `finishedSessionIds(machineID:)`. An offline Mac's rows are its
+    /// last known ones. Empty for a Mac that lists no workspaces, and for an unknown one.
+    public func workspaceRows(machineID: String) -> [WorkspaceRow] {
+        guard let model = machines.first(where: { $0.id == machineID }) else { return [] }
+        let pending = model.pending.items.map {
+            MachinePendingItem(machineID: model.id, machineName: model.name, item: $0, actionable: model.pendingActionable)
+        }
+        return WorkspaceRow.rows(
+            workspaces: model.workspaces, sessions: model.sessions.sessions, pending: pending,
+            finished: finishedSessionIds(machineID: machineID), machineID: machineID)
+    }
+
+    /// The Mac's sessions, live and ended, that no terminal of its workspaces names
+    /// (`LinkTerminal.sessionId`): the ones with no terminal chip, among them sessions whose workspace
+    /// is gone or was never named. Most recent activity first.
+    public func otherSessions(machineID: String) -> [MachineSession] {
+        guard let model = machines.first(where: { $0.id == machineID }) else { return [] }
+        let named = Set(model.workspaces.workspaces.flatMap(\.terminals).compactMap(\.sessionId))
+        return model.sessions.sessions.filter { !named.contains($0.sessionId) }.map {
+            MachineSession(machineID: model.id, machineName: model.name, online: model.state == .online, session: $0)
+        }
+    }
+
+    /// The Mac's sessions that finished a turn (went from working or waiting to idle) and have not
+    /// started again since, until `markSeen(_:)` clears their workspace. `WorkspaceRow` shows them as
+    /// `.done`. Only what this launch saw; nothing is saved.
+    public func finishedSessionIds(machineID: String) -> Set<String> {
+        finishedIds[machineID] ?? []
+    }
+
+    /// The user looked at the workspace (its screen opened): its finished sessions stop counting as
+    /// `.done`, until one of them finishes again.
+    public func markSeen(_ ref: WorkspaceRef) {
+        guard let model = machines.first(where: { $0.id == ref.machineID }), let finished = finishedIds[ref.machineID]
+        else { return }
+        let terminals = model.workspaces.workspace(ref.workspaceId)?.terminals ?? []
+        let mine = WorkspaceRow.sessionIds(
+            workspaceId: ref.workspaceId, terminals: terminals, among: model.sessions.sessions)
+        let rest = finished.subtracting(mine)
+        if rest != finished { finishedIds[ref.machineID] = rest.isEmpty ? nil : rest }
+    }
+
+    /// True when the Mac listed the `workspace_control` feature when it was last online: the app offers
+    /// to make, rename and close workspaces for it only then. False for a Mac never online yet.
+    public func supportsWorkspaceControl(_ machineID: String) -> Bool {
+        machines.first { $0.id == machineID }?.hostFeatures.contains(ShellXLink.workspaceControlFeature) ?? false
+    }
+
     // MARK: - Lifecycle
 
     /// Reads the paired Macs from the vault and connects to each. Runs once.
@@ -187,6 +243,7 @@ public final class MachineHub {
             // A sign-out may have stopped the hub while the old connection closed.
             guard !stopped else { return }
             model.replace(with: machine)
+            forgetFinishes(of: model.id)
             connect(model)
         } else {
             let model = MachineModel(machine: machine)
@@ -398,6 +455,36 @@ public final class MachineHub {
         try await withLink(ref.machineID) { try await $0.chatInterrupt(sessionId: ref.sessionId, hard: hard) }
     }
 
+    /// Makes a workspace on the Mac, which chooses its directory. `.ok` carries the new workspace's id;
+    /// it joins `workspaceRows(machineID:)` when the Mac's list change arrives.
+    ///
+    /// The three workspace commands are sent once, never again: when the link drops while waiting the
+    /// result is `.unknown` (the Mac may have acted: look at the list), and nothing is sent to a Mac that
+    /// is not `.online` (`.offline`) or that did not list `workspace_control` (`.failed`).
+    public func createWorkspace(machineID: String) async -> WorkspaceCommandResult {
+        await workspaceCommand(machineID) { client in
+            let answer = try await client.createWorkspace()
+            return WorkspaceCommandResult(outcome: answer.outcome, workspaceId: answer.workspaceId)
+        }
+    }
+
+    /// Renames a workspace on its Mac. `title` is at most `ShellXLink.maxWorkspaceTitleBytes` UTF-8
+    /// bytes (a longer one is `.failed`). See `createWorkspace(machineID:)`.
+    public func renameWorkspace(_ ref: WorkspaceRef, title: String) async -> WorkspaceCommandResult {
+        await workspaceCommand(ref.machineID) { client in
+            WorkspaceCommandResult(outcome: try await client.renameWorkspace(workspaceId: ref.workspaceId, title: title))
+        }
+    }
+
+    /// Closes a workspace and its terminals on its Mac, which keeps its own rules (`.refused` for its
+    /// last workspace, for one). The row leaves when the Mac's list change arrives, not before. See
+    /// `createWorkspace(machineID:)`.
+    public func closeWorkspace(_ ref: WorkspaceRef) async -> WorkspaceCommandResult {
+        await workspaceCommand(ref.machineID) { client in
+            WorkspaceCommandResult(outcome: try await client.closeWorkspace(workspaceId: ref.workspaceId))
+        }
+    }
+
     /// Chat pushes from every Mac as they arrive, in order: entries, and transcript resets. Each call
     /// adds a subscriber, dropped when its reader stops. Nothing is kept for a later subscriber.
     public func chatUpdates() -> AsyncStream<ChatUpdate> {
@@ -480,9 +567,13 @@ public final class MachineHub {
         case let .sessions(set, supported):
             model.sessions = set
             model.sessionsSupported = supported
+            noteFinishes(in: set.sessions, of: model)
             for (id, continuation) in sessionSubscribers {
                 if case .terminated = continuation.yield((model.id, set.sessions)) { sessionSubscribers[id] = nil }
             }
+        case let .workspaces(set, supported):
+            model.workspaces = set
+            model.workspacesSupported = supported
         case let .chat(sessionId, entries):
             publishChat(sessionId, of: model) { .upsert($0, entries) }
         case let .chatReset(sessionId):
@@ -491,6 +582,22 @@ public final class MachineHub {
         case .signedOut:
             Task { await self.reportUnauthorized() }
         }
+    }
+
+    /// Takes the Mac's session list into the finish detector: the sessions it reports finished are
+    /// `finishedIds` until they work again (or leave the list, or the user marks them seen).
+    private func noteFinishes(in sessions: [AgentSession], of model: MachineModel) {
+        let finished = finishDetector.observe(machineID: model.id, sessions: sessions)
+        let idle = Set(sessions.filter { $0.state == .idle }.map(\.sessionId))
+        let before = finishedIds[model.id] ?? []
+        let now = before.intersection(idle).union(finished.map(\.sessionId))
+        if now != before { finishedIds[model.id] = now.isEmpty ? nil : now }
+    }
+
+    /// Forgets what the finish detector knew of the Mac: its link is new, or gone.
+    private func forgetFinishes(of machineID: String) {
+        finishDetector.retain(machineIDs: Set(machines.map(\.id)).subtracting([machineID]))
+        finishedIds[machineID] = nil
     }
 
     /// Records the items that leave `old` for `new`, a list backed by a live, synced session.
@@ -540,6 +647,7 @@ public final class MachineHub {
         if storedDefaultMachineID == machineID { defaultMachineID = nil }
         guard let model = machines.first(where: { $0.id == machineID }) else { return }
         machines.removeAll { $0 === model }
+        forgetFinishes(of: machineID)
         await disconnect(model)
     }
 
@@ -549,6 +657,8 @@ public final class MachineHub {
         model.pending = PendingSet()
         model.pendingActionable = false
         model.sessions = SessionSet()
+        model.workspaces = WorkspaceSet()
+        forgetFinishes(of: model.id)
     }
 
     private func suspend() async {
@@ -589,6 +699,27 @@ public final class MachineHub {
             return try await connection.call(body)
         } catch LinkCallError.offline {
             throw LinkCallError.offline(machineName: model.name)
+        }
+    }
+
+    /// Runs one workspace command on the Mac's live session, and says how it went. It is never sent
+    /// twice: after a timeout or a lost link the Mac may or may not have acted (PROTOCOL.md section 7).
+    private func workspaceCommand(
+        _ machineID: String, _ body: @Sendable (LinkClient) async throws -> WorkspaceCommandResult
+    ) async -> WorkspaceCommandResult {
+        guard let model = machines.first(where: { $0.id == machineID }), model.state == .online else { return .offline }
+        guard model.hostFeatures.contains(ShellXLink.workspaceControlFeature) else { return .failed }
+        do {
+            return try await withLink(machineID, body)
+        } catch LinkCallError.offline, LinkCallError.needsPairing, LinkCallError.unknownMachine {
+            // Nothing was sent.
+            return .offline
+        } catch LinkClientError.remote {
+            // The Mac answered with an error (`unsupported`, `bad_request`): it did not act.
+            return .failed
+        } catch {
+            // The request timed out, the session closed, or this task was cancelled while waiting.
+            return .unknown
         }
     }
 
