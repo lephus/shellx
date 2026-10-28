@@ -130,21 +130,43 @@ final class AttachmentSessionTests: XCTestCase {
         }
     }
 
-    func testSixthPendingUploadIsRefused() async throws {
+    /// At the cap of 5 unsent uploads, a new upload drops the one that finished first instead of being refused.
+    func testASixthUploadDropsTheOldestUnsentOne() async throws {
         let chat = FakeChatSource(["s1": []], acceptsAttachments: true)
         let client = try await connect(makeHost(chat: chat))
         var ids: [String] = []
-        for number in 0..<ShellXLink.maxPendingUploads {
+        for number in 0...ShellXLink.maxPendingUploads {
             let bytes = Data([UInt8(number)])
             ids.append(try await within { try await client.uploadAttachment(kind: .file, name: "f\(number)", data: bytes) })
         }
-        await expectRemote("bad_request") { try await client.uploadAttachment(kind: .file, name: "f5", data: Data([5])) }
 
-        // A chat.send that uses one frees its place.
-        let firstId = ids[0]
-        let outcome = try await within { try await client.chatSend(sessionId: "s1", text: "go", attachments: [firstId]) }
+        let oldest = ids[0]
+        await expectRemote("bad_request") { try await client.chatSend(sessionId: "s1", text: "", attachments: [oldest]) }
+        let rest = Array(ids.dropFirst())
+        let outcome = try await within { try await client.chatSend(sessionId: "s1", text: "go", attachments: rest) }
         XCTAssertEqual(outcome, .submitted)
-        _ = try await within { try await client.uploadAttachment(kind: .file, name: "f5", data: Data([5])) }
+        XCTAssertEqual(chat.attachmentSends.first?.attachments.map(\.name), ["f1", "f2", "f3", "f4", "f5"])
+    }
+
+    /// Finding I1: a message whose send failed after three of its uploads finished is sent again whole. Those three
+    /// still hold places, and the retry's five uploads must not be refused for them.
+    func testARetryAfterAFailedAttemptIsNotRefused() async throws {
+        let chat = FakeChatSource(["s1": []], acceptsAttachments: true)
+        let client = try await connect(makeHost(chat: chat))
+        for number in 0..<3 {
+            let bytes = Data([UInt8(number)])
+            _ = try await within { try await client.uploadAttachment(kind: .file, name: "old\(number)", data: bytes) }
+        }
+
+        var ids: [String] = []
+        for number in 0..<ShellXLink.maxAttachmentsPerMessage {
+            let bytes = Data([UInt8(10 + number)])
+            ids.append(try await within { try await client.uploadAttachment(kind: .file, name: "new\(number)", data: bytes) })
+        }
+        let retry = ids
+        let outcome = try await within { try await client.chatSend(sessionId: "s1", text: "again", attachments: retry) }
+        XCTAssertEqual(outcome, .submitted)
+        XCTAssertEqual(chat.attachmentSends.first?.attachments.map(\.name), ["new0", "new1", "new2", "new3", "new4"])
     }
 
     // MARK: - Abandoned and stale uploads
@@ -208,39 +230,80 @@ final class AttachmentSessionTests: XCTestCase {
         XCTAssertEqual(chat.attachmentSends.map { $0.attachments.map(\.name) }, [["early"]])
     }
 
-    func testTheLifetimeCountsFromTheEndOfTheUpload() async throws {
+    /// Finding I2: a slow message uploads its attachments minutes apart. The first one must still be there when the
+    /// last one is up and the message names them all.
+    func testUploadsMinutesApartAreSentTogether() async throws {
         let clock = UploadTestClock()
         let chat = FakeChatSource(["s1": []], acceptsAttachments: true)
         let client = try await connect(makeHost(chat: chat, clock: clock))
+        let first = try await within { try await client.uploadAttachment(kind: .file, name: "first", data: Data([1])) }
+        clock.advance(.seconds(240))
+        let second = try await within { try await client.uploadAttachment(kind: .file, name: "second", data: Data([2])) }
+        clock.advance(.seconds(240))
+
+        let outcome = try await within {
+            try await client.chatSend(sessionId: "s1", text: "both", attachments: [first, second])
+        }
+        XCTAssertEqual(outcome, .submitted, "8 min after the first upload ended, 4 min after the last upload call")
+        XCTAssertEqual(chat.attachmentSends.first?.attachments.map(\.name), ["first", "second"])
+    }
+
+    /// Every accepted `attach.*` call, a chunk or an end as much as a begin, keeps the session's uploads alive.
+    func testTheLifetimeCountsFromTheLastAcceptedUploadCall() async throws {
+        let clock = UploadTestClock()
+        let chat = FakeChatSource(["s1": []], acceptsAttachments: true)
+        let client = try await connect(makeHost(chat: chat, clock: clock))
+        let early = try await within { try await client.uploadAttachment(kind: .file, name: "early", data: Data([9])) }
+        clock.advance(.seconds(200))
         let begun = try await within {
             try await client.call { .attachBegin(callId: $0, kind: .file, name: "slow", size: 2) }
         }
-        guard case let .attachReady(_, id) = begun else { return XCTFail("expected attach.ready") }
-        // A slow upload: 4 min between begin and end does not count against it.
-        clock.advance(.seconds(240))
+        guard case let .attachReady(_, slow) = begun else { return XCTFail("expected attach.ready") }
+        clock.advance(.seconds(200))
         let bytes = Data([1, 2])
         _ = try await within {
-            try await client.call { .attachChunk(callId: $0, attachmentId: id, offset: 0, data: bytes) }
+            try await client.call { .attachChunk(callId: $0, attachmentId: slow, offset: 0, data: bytes) }
         }
+        clock.advance(.seconds(200))
         let sha = digest(bytes)
-        _ = try await within { try await client.call { .attachEnd(callId: $0, attachmentId: id, sha256: sha) } }
-        clock.advance(.seconds(240))
-        let outcome = try await within { try await client.chatSend(sessionId: "s1", text: "", attachments: [id]) }
+        _ = try await within { try await client.call { .attachEnd(callId: $0, attachmentId: slow, sha256: sha) } }
+        clock.advance(.seconds(50))
+
+        let outcome = try await within { try await client.chatSend(sessionId: "s1", text: "", attachments: [early, slow]) }
         XCTAssertEqual(outcome, .submitted)
     }
 
-    func testExpiredUploadsFreeTheirPlaces() async throws {
+    /// A call the host refused is not activity: it does not keep the uploads alive.
+    func testARefusedCallDoesNotKeepUploadsAlive() async throws {
         let clock = UploadTestClock()
         let chat = FakeChatSource(["s1": []], acceptsAttachments: true)
         let client = try await connect(makeHost(chat: chat, clock: clock))
+        let id = try await within { try await client.uploadAttachment(kind: .file, name: "a", data: Data([1])) }
+        clock.advance(.seconds(200))
+        await expectRemote("bad_request") {
+            try await client.call { .attachChunk(callId: $0, attachmentId: "nope", offset: 0, data: Data([1])) }
+        }
+        clock.advance(.seconds(200))
+        await expectRemote("bad_request") { try await client.chatSend(sessionId: "s1", text: "", attachments: [id]) }
+    }
+
+    /// Five minutes with no accepted upload call drop every unsent upload, which then holds no place.
+    func testAnIdleSessionDropsEveryUnsentUpload() async throws {
+        let clock = UploadTestClock()
+        let chat = FakeChatSource(["s1": []], acceptsAttachments: true)
+        let client = try await connect(makeHost(chat: chat, clock: clock))
+        var ids: [String] = []
         for number in 0..<ShellXLink.maxPendingUploads {
             let bytes = Data([UInt8(number)])
-            _ = try await within { try await client.uploadAttachment(kind: .file, name: "f\(number)", data: bytes) }
+            ids.append(try await within { try await client.uploadAttachment(kind: .file, name: "f\(number)", data: bytes) })
         }
-        await expectRemote("bad_request") { try await client.uploadAttachment(kind: .file, name: "f5", data: Data([5])) }
         clock.advance(.seconds(301))
-        // The check runs at `attach.begin`: the five expired uploads are dropped there.
-        _ = try await within { try await client.uploadAttachment(kind: .file, name: "f5", data: Data([5])) }
+        let fresh = try await within { try await client.uploadAttachment(kind: .file, name: "f5", data: Data([5])) }
+        for id in ids {
+            await expectRemote("bad_request") { try await client.chatSend(sessionId: "s1", text: "", attachments: [id]) }
+        }
+        let outcome = try await within { try await client.chatSend(sessionId: "s1", text: "", attachments: [fresh]) }
+        XCTAssertEqual(outcome, .submitted)
     }
 
     // MARK: - chunks
