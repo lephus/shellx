@@ -107,6 +107,87 @@ final class VoiceInputModelTests: XCTestCase {
         XCTAssertFalse(rig.model.wantsKeyboard)
     }
 
+    // MARK: - The hold gesture (MicHold)
+
+    /// Does what `MicButton` does for a step of its hold; returns the words it would send.
+    private func perform(_ step: MicHold.Step, on model: VoiceInputModel) async -> String? {
+        switch step {
+        case .press:
+            await model.press()
+            return nil
+        case .release:
+            return await model.release()
+        case .cancel:
+            model.drag(dx: -VoiceInputModel.cancelDistance, dy: 0)
+            return await model.release()
+        case .none:
+            return nil
+        }
+    }
+
+    /// The workspace pager (or a scroll view) takes the touch mid-dictation: SwiftUI resets the gesture's
+    /// state without `onEnded`. Half-spoken words must not reach the agent.
+    func testAHoldTakenAwayBeforeTheLiftSendsNothing() async {
+        let rig = makeRig()
+        var hold = MicHold()
+        let pressed = await perform(hold.holdingChanged(true), on: rig.model)
+        XCTAssertNil(pressed)
+        rig.transcriber.say("xoá nhánh")
+        await waitForPhase(rig.model, .listening(text: "xoá nhánh"))
+        rig.transcriber.finalText = "xoá nhánh"
+
+        // The state is reset, and no `onEnded` comes.
+        let reset = hold.holdingChanged(false)
+        let sentOnReset = await perform(reset, on: rig.model)
+        let settled = hold.settle()
+        let sentOnSettle = await perform(settled, on: rig.model)
+
+        XCTAssertEqual([reset, settled], [.none, .cancel], "only a lift sends")
+        XCTAssertNil(sentOnReset ?? sentOnSettle, "nothing goes to the agent")
+        XCTAssertEqual(rig.model.phase, .idle)
+        XCTAssertEqual(rig.transcriber.finishCalls, 0)
+        XCTAssertEqual(rig.transcriber.cancelCalls, 1, "the microphone is given back")
+    }
+
+    /// The finger lifts: `onEnded` sends, whichever of the two signals SwiftUI delivers first, and the reset
+    /// state that follows (or comes before) does nothing more.
+    func testTheLiftSendsOnceWhicheverSignalComesFirst() async {
+        for endedFirst in [true, false] {
+            let rig = makeRig()
+            var hold = MicHold()
+            _ = await perform(hold.holdingChanged(true), on: rig.model)
+            rig.transcriber.say("chạy test")
+            await waitForPhase(rig.model, .listening(text: "chạy test"))
+            rig.transcriber.finalText = "chạy test"
+
+            var steps: [MicHold.Step] = []
+            var sent: [String] = []
+            // The mic settles on the main actor's next turn after the reset, so after both signals.
+            for signal in (endedFirst ? ["ended", "reset"] : ["reset", "ended"]) + ["settle"] {
+                let step =
+                    switch signal {
+                    case "ended": hold.ended()
+                    case "reset": hold.holdingChanged(false)
+                    default: hold.settle()
+                    }
+                steps.append(step)
+                if let words = await perform(step, on: rig.model) { sent.append(words) }
+            }
+
+            XCTAssertEqual(sent, ["chạy test"], "ended first: \(endedFirst), steps \(steps)")
+            XCTAssertEqual(rig.transcriber.finishCalls, 1)
+        }
+    }
+
+    func testTheHoldIgnoresSignalsWithoutAPress() {
+        var hold = MicHold()
+        XCTAssertEqual(hold.ended(), .none, "a lift with no hold before it")
+        XCTAssertEqual(hold.holdingChanged(false), .none)
+        XCTAssertEqual(hold.settle(), .none)
+        XCTAssertEqual(hold.holdingChanged(true), .press)
+        XCTAssertEqual(hold.holdingChanged(true), .none, "already down")
+    }
+
     func testSwipeUpBeforeWordsAsksKeyboard() async {
         let rig = makeRig()
         await rig.model.press()
