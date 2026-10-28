@@ -203,7 +203,7 @@ public actor LinkClient {
     /// unknown whether the host delivered it. Errors as for `chatHistory`, except `"not_found"` comes
     /// as the outcome `.notFound`.
     public func chatSend(sessionId: String, text: String) async throws -> ChatSendOutcome {
-        let answer = try await call { .chatSend(callId: $0, sessionId: sessionId, text: text) }
+        let answer = try await call { .chatSend(callId: $0, sessionId: sessionId, text: text, attachments: []) }
         guard case let .chatSendResult(_, outcome) = answer else { throw LinkClientError.unexpectedAnswer }
         return outcome
     }
@@ -234,7 +234,7 @@ public actor LinkClient {
                 continue
             }
             switch message {
-            case let .welcome(protocolVersion, _, _):
+            case let .welcome(protocolVersion, _, _, _):
                 guard protocolVersion == ShellXLink.protocolVersion else {
                     throw LinkClientError.protocolMismatch(message: "the host speaks protocol \(protocolVersion)")
                 }
@@ -284,7 +284,8 @@ public actor LinkClient {
         }
         switch message {
         case let .snapshot(callId, _, _), let .replyResult(callId, _, _), let .sessions(callId, _, _),
-             let .chatHistory(callId, _, _, _), let .chatSendResult(callId, _), let .chatInterruptResult(callId, _):
+             let .chatHistory(callId, _, _, _), let .chatSendResult(callId, _), let .chatInterruptResult(callId, _),
+             let .attachReady(callId, _), let .attachChunkResult(callId, _, _), let .attachEndResult(callId, _):
             // A late answer (its call timed out or was cancelled) finds no waiter and is dropped.
             waiters.removeValue(forKey: callId)?.resume(returning: message)
         case let .sessionsChanged(revision, upserted, removed):
@@ -308,7 +309,7 @@ public actor LinkClient {
             }
             linkLog.info("host reported error \(code, privacy: .public)")
         case .pong, .unknown, .hello, .welcome, .snapshotGet, .reply, .sessionsGet, .chatHistoryGet, .chatSend,
-             .chatInterrupt:
+             .chatInterrupt, .attachBegin, .attachChunk, .attachEnd:
             break
         }
         return true

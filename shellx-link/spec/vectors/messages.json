@@ -1,5 +1,5 @@
 {
-  "comment": "ShellX Link v1 golden vectors. For each entry: decoding `json` must yield `message`; encoding `message` must yield JSON that is semantically equal to `json` (key order and whitespace do not matter; absent optional keys are omitted, never null). `message.case` names the message; all other `message` keys carry the field values using the JSON key names. `nonce` is a plain JSON number; 18446744073709551615 must be parsed as an unsigned 64-bit integer, never through a double. `decode_errors` entries may carry `call_id`: the call id the decoder reports with the error (absent means none).",
+  "comment": "ShellX Link v1 golden vectors. For each entry: decoding `json` must yield `message`; encoding `message` must yield JSON that is semantically equal to `json` (key order and whitespace do not matter; absent optional keys are omitted, never null). `message.case` names the message; all other `message` keys carry the field values using the JSON key names. `nonce` is a plain JSON number; 18446744073709551615 must be parsed as an unsigned 64-bit integer, never through a double. `decode_errors` entries may carry `call_id`: the call id the decoder reports with the error (absent means none). In `message`, `attach_chunk.data` and `attach_end.sha256` carry the wire strings (standard base64 with padding; 64 lowercase hex characters), which an implementation turns into bytes; `welcome.features` and `chat_send.attachments` are omitted when empty and decode to an empty list when absent.",
   "vectors": [
     {
       "name": "hello",
@@ -29,6 +29,28 @@
         "protocol_version": 1,
         "host_version": "1.3.0",
         "machine_name": "Phu's MacBook"
+      }
+    },
+    {
+      "name": "welcome_with_features",
+      "message": {
+        "case": "welcome",
+        "protocol_version": 1,
+        "host_version": "1.5.0",
+        "machine_name": "Phu's MacBook",
+        "features": [
+          "attachments"
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "welcome",
+        "protocol_version": 1,
+        "host_version": "1.5.0",
+        "machine_name": "Phu's MacBook",
+        "features": [
+          "attachments"
+        ]
       }
     },
     {
@@ -1030,6 +1052,52 @@
       }
     },
     {
+      "name": "chat_send_with_attachments",
+      "message": {
+        "case": "chat_send",
+        "call_id": "c60",
+        "session_id": "s-1",
+        "text": "fix this error",
+        "attachments": [
+          "a1",
+          "a2"
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.send",
+        "call_id": "c60",
+        "session_id": "s-1",
+        "text": "fix this error",
+        "attachments": [
+          "a1",
+          "a2"
+        ]
+      }
+    },
+    {
+      "name": "chat_send_attachments_only",
+      "message": {
+        "case": "chat_send",
+        "call_id": "c61",
+        "session_id": "s-1",
+        "text": "",
+        "attachments": [
+          "a1"
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "chat.send",
+        "call_id": "c61",
+        "session_id": "s-1",
+        "text": "",
+        "attachments": [
+          "a1"
+        ]
+      }
+    },
+    {
       "name": "chat_send_result_submitted",
       "message": {
         "case": "chat_send_result",
@@ -1157,6 +1225,138 @@
         "t": "chat.interrupt.result",
         "call_id": "c14",
         "outcome": "failed"
+      }
+    },
+    {
+      "name": "attach_begin_image",
+      "message": {
+        "case": "attach_begin",
+        "call_id": "c62",
+        "kind": "image",
+        "name": "screenshot.jpg",
+        "size": 482113
+      },
+      "json": {
+        "v": 1,
+        "t": "attach.begin",
+        "call_id": "c62",
+        "kind": "image",
+        "name": "screenshot.jpg",
+        "size": 482113
+      }
+    },
+    {
+      "name": "attach_begin_file",
+      "message": {
+        "case": "attach_begin",
+        "call_id": "c63",
+        "kind": "file",
+        "name": "build log.txt",
+        "size": 10485760
+      },
+      "json": {
+        "v": 1,
+        "t": "attach.begin",
+        "call_id": "c63",
+        "kind": "file",
+        "name": "build log.txt",
+        "size": 10485760
+      }
+    },
+    {
+      "name": "attach_ready",
+      "message": {
+        "case": "attach_ready",
+        "call_id": "c62",
+        "attachment_id": "a1"
+      },
+      "json": {
+        "v": 1,
+        "t": "attach.ready",
+        "call_id": "c62",
+        "attachment_id": "a1"
+      }
+    },
+    {
+      "name": "attach_chunk_first",
+      "message": {
+        "case": "attach_chunk",
+        "call_id": "c64",
+        "attachment_id": "a1",
+        "offset": 0,
+        "data": "aGVsbG8gd29ybGQ="
+      },
+      "json": {
+        "v": 1,
+        "t": "attach.chunk",
+        "call_id": "c64",
+        "attachment_id": "a1",
+        "offset": 0,
+        "data": "aGVsbG8gd29ybGQ="
+      }
+    },
+    {
+      "name": "attach_chunk_two_padding_characters",
+      "message": {
+        "case": "attach_chunk",
+        "call_id": "c65",
+        "attachment_id": "a1",
+        "offset": 11,
+        "data": "QQ=="
+      },
+      "json": {
+        "v": 1,
+        "t": "attach.chunk",
+        "call_id": "c65",
+        "attachment_id": "a1",
+        "offset": 11,
+        "data": "QQ=="
+      }
+    },
+    {
+      "name": "attach_chunk_result",
+      "message": {
+        "case": "attach_chunk_result",
+        "call_id": "c64",
+        "attachment_id": "a1",
+        "received": 11
+      },
+      "json": {
+        "v": 1,
+        "t": "attach.chunk.result",
+        "call_id": "c64",
+        "attachment_id": "a1",
+        "received": 11
+      }
+    },
+    {
+      "name": "attach_end",
+      "message": {
+        "case": "attach_end",
+        "call_id": "c66",
+        "attachment_id": "a1",
+        "sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+      },
+      "json": {
+        "v": 1,
+        "t": "attach.end",
+        "call_id": "c66",
+        "attachment_id": "a1",
+        "sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+      }
+    },
+    {
+      "name": "attach_end_result",
+      "message": {
+        "case": "attach_end_result",
+        "call_id": "c66",
+        "attachment_id": "a1"
+      },
+      "json": {
+        "v": 1,
+        "t": "attach.end.result",
+        "call_id": "c66",
+        "attachment_id": "a1"
       }
     }
   ],
@@ -1396,6 +1596,82 @@
           }
         ]
       }
+    },
+    {
+      "name": "attach_begin_unknown_kind",
+      "json": {
+        "v": 1,
+        "t": "attach.begin",
+        "call_id": "c67",
+        "kind": "audio",
+        "name": "memo.m4a",
+        "size": 9
+      },
+      "message": {
+        "case": "attach_begin",
+        "call_id": "c67",
+        "kind": "audio",
+        "name": "memo.m4a",
+        "size": 9
+      }
+    },
+    {
+      "name": "welcome_unknown_feature_is_kept",
+      "json": {
+        "v": 1,
+        "t": "welcome",
+        "protocol_version": 1,
+        "host_version": "1.5.0",
+        "machine_name": "Mac",
+        "features": [
+          "attachments",
+          "teleport"
+        ]
+      },
+      "message": {
+        "case": "welcome",
+        "protocol_version": 1,
+        "host_version": "1.5.0",
+        "machine_name": "Mac",
+        "features": [
+          "attachments",
+          "teleport"
+        ]
+      }
+    },
+    {
+      "name": "welcome_empty_features",
+      "json": {
+        "v": 1,
+        "t": "welcome",
+        "protocol_version": 1,
+        "host_version": "1.5.0",
+        "machine_name": "Mac",
+        "features": []
+      },
+      "message": {
+        "case": "welcome",
+        "protocol_version": 1,
+        "host_version": "1.5.0",
+        "machine_name": "Mac"
+      }
+    },
+    {
+      "name": "chat_send_empty_attachments",
+      "json": {
+        "v": 1,
+        "t": "chat.send",
+        "call_id": "c68",
+        "session_id": "s-1",
+        "text": "hi",
+        "attachments": []
+      },
+      "message": {
+        "case": "chat_send",
+        "call_id": "c68",
+        "session_id": "s-1",
+        "text": "hi"
+      }
     }
   ],
   "decode_errors": [
@@ -1556,6 +1832,103 @@
         "t": "chat.reset"
       },
       "error": "bad_json"
+    },
+    {
+      "name": "attach_chunk_data_not_base64",
+      "json": {
+        "v": 1,
+        "t": "attach.chunk",
+        "call_id": "c70",
+        "attachment_id": "a1",
+        "offset": 0,
+        "data": "%%%"
+      },
+      "error": "bad_json",
+      "call_id": "c70"
+    },
+    {
+      "name": "attach_chunk_data_missing_padding",
+      "json": {
+        "v": 1,
+        "t": "attach.chunk",
+        "call_id": "c70",
+        "attachment_id": "a1",
+        "offset": 0,
+        "data": "QQ"
+      },
+      "error": "bad_json",
+      "call_id": "c70"
+    },
+    {
+      "name": "attach_chunk_data_url_safe_alphabet",
+      "json": {
+        "v": 1,
+        "t": "attach.chunk",
+        "call_id": "c70",
+        "attachment_id": "a1",
+        "offset": 0,
+        "data": "-_8="
+      },
+      "error": "bad_json",
+      "call_id": "c70"
+    },
+    {
+      "name": "attach_end_sha256_uppercase",
+      "json": {
+        "v": 1,
+        "t": "attach.end",
+        "call_id": "c71",
+        "attachment_id": "a1",
+        "sha256": "B94D27B9934D3E08A52E52D7DA7DABFAC484EFE37A5380EE9088F7ACE2EFCDE9"
+      },
+      "error": "bad_json",
+      "call_id": "c71"
+    },
+    {
+      "name": "attach_end_sha256_63_characters",
+      "json": {
+        "v": 1,
+        "t": "attach.end",
+        "call_id": "c71",
+        "attachment_id": "a1",
+        "sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde"
+      },
+      "error": "bad_json",
+      "call_id": "c71"
+    },
+    {
+      "name": "attach_end_sha256_not_hex",
+      "json": {
+        "v": 1,
+        "t": "attach.end",
+        "call_id": "c71",
+        "attachment_id": "a1",
+        "sha256": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+      },
+      "error": "bad_json",
+      "call_id": "c71"
+    },
+    {
+      "name": "attach_begin_missing_kind",
+      "json": {
+        "v": 1,
+        "t": "attach.begin",
+        "call_id": "c72",
+        "name": "a.jpg",
+        "size": 3
+      },
+      "error": "bad_json",
+      "call_id": "c72"
+    },
+    {
+      "name": "attach_ready_missing_attachment_id",
+      "json": {
+        "v": 1,
+        "t": "attach.ready",
+        "call_id": "c73"
+      },
+      "error": "bad_json",
+      "call_id": "c73"
     }
   ],
   "boundary_frames": {

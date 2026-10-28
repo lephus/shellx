@@ -5,7 +5,8 @@ import Foundation
 /// Every request/answer pair carries the client's `callId` (PROTOCOL.md section 3).
 public enum LinkMessage: Equatable, Sendable {
     case hello(clientVersion: String, deviceName: String)
-    case welcome(protocolVersion: Int, hostVersion: String, machineName: String)
+    /// `features` lists what the host offers beyond the base protocol (PROTOCOL.md section 4); empty when none.
+    case welcome(protocolVersion: Int, hostVersion: String, machineName: String, features: [String])
     /// `callId` is set when the error answers one specific client call.
     case error(code: String, message: String, callId: String?)
     case snapshotGet(callId: String)
@@ -23,10 +24,21 @@ public enum LinkMessage: Equatable, Sendable {
     case chatEntries(sessionId: String, entries: [ChatEntry])
     /// The session's transcript was replaced: the client drops its entries and pages again (PROTOCOL.md 4).
     case chatReset(sessionId: String)
-    case chatSend(callId: String, sessionId: String, text: String)
+    /// `attachments` names uploads made with `attach.*` (PROTOCOL.md section 5); empty for a text-only message.
+    case chatSend(callId: String, sessionId: String, text: String, attachments: [String])
     case chatSendResult(callId: String, outcome: ChatSendOutcome)
     case chatInterrupt(callId: String, sessionId: String, hard: Bool)
     case chatInterruptResult(callId: String, outcome: ChatInterruptOutcome)
+    /// Starts an upload of `size` bytes (PROTOCOL.md section 5, "Attachments"); the host answers `attachReady`.
+    case attachBegin(callId: String, kind: AttachmentKind, name: String, size: Int)
+    case attachReady(callId: String, attachmentId: String)
+    /// `data` is raw bytes in memory; on the wire it is standard base64 with padding.
+    case attachChunk(callId: String, attachmentId: String, offset: Int, data: Data)
+    /// `received` is the number of bytes the host holds so far.
+    case attachChunkResult(callId: String, attachmentId: String, received: Int)
+    /// `sha256` is the 32-byte digest of the whole upload; on the wire it is 64 lowercase hex characters.
+    case attachEnd(callId: String, attachmentId: String, sha256: Data)
+    case attachEndResult(callId: String, attachmentId: String)
     /// Decode-only: a well-formed frame whose `t` this version does not know. `callId` is the frame's `call_id`
     /// when it is a valid one (1 to 64 UTF-8 bytes): such a frame is a call of a later version, which a host
     /// answers `error` `unsupported` (PROTOCOL.md section 3).

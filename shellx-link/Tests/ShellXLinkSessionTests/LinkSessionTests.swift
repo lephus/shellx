@@ -213,7 +213,7 @@ final class LinkSessionTests: XCTestCase {
             let raw = try await rawChannel(end, rig)
             try await raw.send(.hello(clientVersion: "raw", deviceName: "raw"))
             let first = try await raw.receive()
-            guard case let .welcome(_, _, name) = first, name == machineName else {
+            guard case let .welcome(_, _, name, _) = first, name == machineName else {
                 XCTFail("the first frame after hello was \(String(describing: first).prefix(80)), not welcome")
                 return
             }
@@ -274,7 +274,7 @@ final class LinkSessionTests: XCTestCase {
             let ch = try await SecureChannel.open(
                 hostEnd, role: .responder, key: hostKey, trusts: { $0 == clientKey.publicKey })
             guard case .hello = try await ch.receive() else { throw RelayError.closed }
-            try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac"))
+            try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac", features: []))
             try await ch.send(frame: Data(#"{"v":1,"t":"agent.changed","revision":1}"#.utf8))
             try await ch.send(.changed(revision: 2, added: [permissionItem("r9")], resolved: []))
             return ch
@@ -410,7 +410,7 @@ final class LinkSessionTests: XCTestCase {
         let rawHost = Task {
             let ch = try await SecureChannel.open(hostEnd, role: .responder, key: hostKey, trusts: { _ in true })
             _ = try await ch.receive()
-            try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac"))
+            try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac", features: []))
             for _ in 0..<2 {
                 let message = try await ch.receive()
                 seen.append(message)
@@ -444,7 +444,7 @@ final class LinkSessionTests: XCTestCase {
         let rawHost = Task {
             let ch = try await SecureChannel.open(hostEnd, role: .responder, key: hostKey, trusts: { _ in true })
             _ = try await ch.receive()
-            try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac"))
+            try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac", features: []))
             guard case let .reply(first, _, _) = try await ch.receive() else { throw RelayError.closed }
             guard case let .reply(second, _, _) = try await ch.receive() else { throw RelayError.closed }
             try await ch.send(.replyResult(callId: first, requestId: "r1", outcome: .delivered))
@@ -521,7 +521,7 @@ final class LinkSessionTests: XCTestCase {
         let rawHost = Task {
             let ch = try await SecureChannel.open(hostEnd, role: .responder, key: hostKey, trusts: { _ in true })
             _ = try await ch.receive()
-            try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac"))
+            try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac", features: []))
             guard case let .reply(callId, _, _) = try await ch.receive() else { throw RelayError.closed }
             try await ch.send(.error(code: "bad_request", message: "nope", callId: callId))
             guard case let .snapshotGet(next) = try await ch.receive() else { throw RelayError.closed }
@@ -836,6 +836,80 @@ final class LinkSessionTests: XCTestCase {
         XCTAssertEqual(page.entries.map(\.text), ["forked head", "new turn"])
     }
 
+    /// Until the host takes attachments (it offers no feature), every `attach.*` call is `unsupported` with its
+    /// `call_id`, like a host without the feature; the host-only answers sent by a client are `bad_request`
+    /// (PROTOCOL.md sections 5 and 7).
+    func testAttachFramesAreUnsupportedOrMisdirected() async throws {
+        let rig = makeHost(FakeFeedSource(), chat: FakeChatSource(["s1": []]))
+        let (end, served) = startServe(rig.host)
+        let raw = try await rawEstablished(end, rig)
+        let calls: [(LinkMessage, String)] = [
+            (.attachBegin(callId: "u1", kind: .image, name: "a.jpg", size: 3), "u1"),
+            (.attachChunk(callId: "u2", attachmentId: "a1", offset: 0, data: Data([1, 2, 3])), "u2"),
+            (.attachEnd(callId: "u3", attachmentId: "a1", sha256: Data(count: 32)), "u3"),
+        ]
+        for (call, expectedId) in calls {
+            try await raw.send(call)
+            let answer = try await within { try await raw.receive() }
+            guard case let .error(code, _, callId) = answer else { return XCTFail("expected an error, got \(answer)") }
+            XCTAssertEqual(code, "unsupported", "\(call)")
+            XCTAssertEqual(callId, expectedId)
+        }
+        let misdirected: [(LinkMessage, String)] = [
+            (.attachReady(callId: "m1", attachmentId: "a1"), "m1"),
+            (.attachChunkResult(callId: "m2", attachmentId: "a1", received: 3), "m2"),
+            (.attachEndResult(callId: "m3", attachmentId: "a1"), "m3"),
+        ]
+        for (frame, expectedId) in misdirected {
+            try await raw.send(frame)
+            let answer = try await within { try await raw.receive() }
+            guard case let .error(code, _, callId) = answer else { return XCTFail("expected an error, got \(answer)") }
+            XCTAssertEqual(code, "bad_request", "\(frame)")
+            XCTAssertEqual(callId, expectedId)
+        }
+        // A message that names attachments is still sent as text: the attachments are not used yet.
+        try await raw.send(.chatSend(callId: "u4", sessionId: "s1", text: "see this", attachments: ["a1"]))
+        let sent = try await within { try await raw.receive() }
+        XCTAssertEqual(sent, .chatSendResult(callId: "u4", outcome: .submitted))
+        XCTAssertFalse(served.isSet)
+    }
+
+    /// A client resolves a waiting `attach.*` call with the host's answer, and ignores the client-only frames a
+    /// host should never send.
+    func testClientResolvesAttachAnswersAndIgnoresClientOnlyFrames() async throws {
+        let hostKey = NoiseStaticKey()
+        let clientKey = NoiseStaticKey()
+        let (clientEnd, hostEnd) = makeInMemoryCircuitPair()
+        let rawHost = Task {
+            let ch = try await SecureChannel.open(hostEnd, role: .responder, key: hostKey, trusts: { _ in true })
+            _ = try await ch.receive()
+            try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac", features: ["attachments"]))
+            guard case let .attachBegin(first, _, _, _) = try await ch.receive() else { throw RelayError.closed }
+            // Frames a host does not send are ignored; they do not answer the call.
+            try await ch.send(.attachBegin(callId: first, kind: .file, name: "x", size: 1))
+            try await ch.send(.attachChunk(callId: first, attachmentId: "a1", offset: 0, data: Data([1])))
+            try await ch.send(.attachEnd(callId: first, attachmentId: "a1", sha256: Data(count: 32)))
+            try await ch.send(.attachReady(callId: first, attachmentId: "a1"))
+            guard case let .attachChunk(second, _, _, _) = try await ch.receive() else { throw RelayError.closed }
+            try await ch.send(.attachChunkResult(callId: second, attachmentId: "a1", received: 1))
+            guard case let .attachEnd(third, _, _) = try await ch.receive() else { throw RelayError.closed }
+            try await ch.send(.attachEndResult(callId: third, attachmentId: "a1"))
+        }
+        let client = try await LinkClient.connect(
+            clientEnd, key: clientKey, hostKey: hostKey.publicKey, clientVersion: "1", deviceName: "phone",
+            timings: .standard)
+        clients.append(client)
+        let ready = try await within { try await client.call { .attachBegin(callId: $0, kind: .file, name: "x", size: 1) } }
+        guard case .attachReady(_, "a1") = ready else { return XCTFail("unexpected answer \(ready)") }
+        let chunk = try await within {
+            try await client.call { .attachChunk(callId: $0, attachmentId: "a1", offset: 0, data: Data([1])) }
+        }
+        guard case .attachChunkResult(_, "a1", 1) = chunk else { return XCTFail("unexpected answer \(chunk)") }
+        let end = try await within { try await client.call { .attachEnd(callId: $0, attachmentId: "a1", sha256: Data(count: 32)) } }
+        guard case .attachEndResult(_, "a1") = end else { return XCTFail("unexpected answer \(end)") }
+        try await rawHost.value
+    }
+
     /// `chat.reset` is a host push: it goes out as its own frame, and a client that sends one gets `bad_request`.
     func testChatResetIsAHostPush() async throws {
         let chat = FakeChatSource(["s1": []])
@@ -892,14 +966,14 @@ final class LinkSessionTests: XCTestCase {
         let raw = try await rawEstablished(end, rig)
         let tooLong = String(repeating: "t", count: 16_385)
         for (callId, text) in [("t1", ""), ("t2", tooLong)] {
-            try await raw.send(.chatSend(callId: callId, sessionId: "s1", text: text))
+            try await raw.send(.chatSend(callId: callId, sessionId: "s1", text: text, attachments: []))
             let answer = try await within { try await raw.receive() }
             XCTAssertEqual(errorCode(answer), "bad_request")
             guard case let .error(_, _, id) = answer else { return XCTFail("unexpected answer \(answer)") }
             XCTAssertEqual(id, callId)
         }
         let longest = String(repeating: "t", count: 16_384)
-        try await raw.send(.chatSend(callId: "t3", sessionId: "s1", text: longest))
+        try await raw.send(.chatSend(callId: "t3", sessionId: "s1", text: longest, attachments: []))
         let ok = try await within { try await raw.receive() }
         XCTAssertEqual(ok, .chatSendResult(callId: "t3", outcome: .submitted))
         for (callId, limit) in [("t4", 0), ("t5", 51)] {
@@ -997,7 +1071,7 @@ final class LinkSessionTests: XCTestCase {
         let rawHost = Task {
             let ch = try await SecureChannel.open(hostEnd, role: .responder, key: hostKey, trusts: { _ in true })
             _ = try await ch.receive()
-            try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac"))
+            try await ch.send(.welcome(protocolVersion: 1, hostVersion: "test", machineName: "mac", features: []))
             guard case let .snapshotGet(callId) = try await ch.receive() else { throw RelayError.closed }
             try await ch.send(.chatSendResult(callId: callId, outcome: .submitted))
         }
@@ -1071,7 +1145,7 @@ final class LinkSessionTests: XCTestCase {
         let raw = try await rawChannel(end, rig)
         try await raw.send(.hello(clientVersion: "raw", deviceName: "raw"))
         let welcome = try await raw.receive()
-        XCTAssertEqual(welcome, .welcome(protocolVersion: 1, hostVersion: "test-host", machineName: "Test Mac"))
+        XCTAssertEqual(welcome, .welcome(protocolVersion: 1, hostVersion: "test-host", machineName: "Test Mac", features: []))
         return raw
     }
 

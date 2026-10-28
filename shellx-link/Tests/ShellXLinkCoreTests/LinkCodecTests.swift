@@ -267,10 +267,131 @@ final class LinkCodecTests: XCTestCase {
 
     func testChatMessagesNeedValidCallIds() throws {
         let long = String(repeating: "c", count: 65)
-        XCTAssertThrowsError(try LinkCodec.encode(.chatSend(callId: long, sessionId: "s", text: "x")))
+        XCTAssertThrowsError(try LinkCodec.encode(.chatSend(callId: long, sessionId: "s", text: "x", attachments: [])))
         XCTAssertThrowsError(try LinkCodec.encode(.sessionsGet(callId: "")))
         let json = Data(#"{"v":1,"t":"chat.history.get","session_id":"s","limit":5}"#.utf8)
         XCTAssertThrowsError(try LinkCodec.decode(json)) { XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: nil)) }
+    }
+
+    // MARK: - Attachments (PROTOCOL.md section 5, "Attachments")
+
+    private static let digest = Data((0..<32).map { UInt8($0) })
+
+    func testAttachmentFramesRoundTrip() throws {
+        let chunk = Data("hello world".utf8)
+        let messages: [LinkMessage] = [
+            .welcome(protocolVersion: 1, hostVersion: "1.5.0", machineName: "Mac", features: [ShellXLink.attachmentsFeature]),
+            .chatSend(callId: "c1", sessionId: "s-1", text: "fix this", attachments: ["a1", "a2"]),
+            .chatSend(callId: "c2", sessionId: "s-1", text: "", attachments: ["a1"]),
+            .attachBegin(callId: "c3", kind: .image, name: "shot.jpg", size: 1_234),
+            .attachBegin(callId: "c3", kind: .file, name: "notes.txt", size: ShellXLink.maxAttachmentBytes),
+            .attachBegin(callId: "c3", kind: .other("audio"), name: "memo.m4a", size: 1),
+            .attachReady(callId: "c3", attachmentId: "a1"),
+            .attachChunk(callId: "c4", attachmentId: "a1", offset: 0, data: chunk),
+            .attachChunk(callId: "c4", attachmentId: "a1", offset: 11, data: Data("A".utf8)),
+            .attachChunkResult(callId: "c4", attachmentId: "a1", received: 12),
+            .attachEnd(callId: "c5", attachmentId: "a1", sha256: Self.digest),
+            .attachEndResult(callId: "c5", attachmentId: "a1"),
+        ]
+        for message in messages {
+            XCTAssertEqual(try LinkCodec.decode(try LinkCodec.encode(message)), message, "\(message)")
+        }
+    }
+
+    func testAttachmentWireForms() throws {
+        func object(_ m: LinkMessage) throws -> [String: Any] {
+            try XCTUnwrap(JSONSerialization.jsonObject(with: try LinkCodec.encode(m)) as? [String: Any])
+        }
+        let chunk = try object(.attachChunk(callId: "c1", attachmentId: "a1", offset: 0, data: Data([0x41])))
+        XCTAssertEqual(chunk["t"] as? String, "attach.chunk")
+        XCTAssertEqual(chunk["data"] as? String, "QQ==", "standard base64 with padding")
+        let end = try object(.attachEnd(callId: "c1", attachmentId: "a1", sha256: Self.digest))
+        XCTAssertEqual(end["sha256"] as? String, "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+                       "64 lowercase hex characters")
+        let begin = try object(.attachBegin(callId: "c1", kind: .image, name: "a.jpg", size: 3))
+        XCTAssertEqual(begin["kind"] as? String, "image")
+        XCTAssertEqual(AttachmentKind(wire: "file"), .file)
+        XCTAssertEqual(AttachmentKind(wire: "hologram"), .other("hologram"))
+        XCTAssertEqual(AttachmentKind.other("hologram").wire, "hologram")
+    }
+
+    func testWelcomeAndSendWithoutNewFieldsStillDecode() throws {
+        func decode(_ text: String) throws -> LinkMessage { try LinkCodec.decode(Data(text.utf8)) }
+        XCTAssertEqual(
+            try decode(#"{"v":1,"t":"welcome","protocol_version":1,"host_version":"1","machine_name":"Mac"}"#),
+            .welcome(protocolVersion: 1, hostVersion: "1", machineName: "Mac", features: []))
+        XCTAssertEqual(
+            try decode(#"{"v":1,"t":"chat.send","call_id":"c1","session_id":"s","text":"x"}"#),
+            .chatSend(callId: "c1", sessionId: "s", text: "x", attachments: []))
+        // Empty arrays are not written.
+        func keys(_ m: LinkMessage) throws -> Set<String> {
+            Set(try XCTUnwrap(JSONSerialization.jsonObject(with: try LinkCodec.encode(m)) as? [String: Any]).keys)
+        }
+        XCTAssertEqual(try keys(.welcome(protocolVersion: 1, hostVersion: "1", machineName: "Mac", features: [])),
+                       ["v", "t", "protocol_version", "host_version", "machine_name"])
+        XCTAssertEqual(try keys(.chatSend(callId: "c1", sessionId: "s", text: "x", attachments: [])),
+                       ["v", "t", "call_id", "session_id", "text"])
+        XCTAssertTrue(try keys(.welcome(protocolVersion: 1, hostVersion: "1", machineName: "Mac", features: ["attachments"]))
+            .contains("features"))
+        XCTAssertTrue(try keys(.chatSend(callId: "c1", sessionId: "s", text: "x", attachments: ["a1"])).contains("attachments"))
+    }
+
+    func testFullChunkFitsAFrame() throws {
+        let id = String(repeating: "i", count: LinkCodec.maxCallIdBytes)
+        let data = Data((0..<ShellXLink.maxAttachmentChunkBytes).map { UInt8(truncatingIfNeeded: $0) })
+        let message = LinkMessage.attachChunk(
+            callId: id, attachmentId: id, offset: ShellXLink.maxAttachmentBytes, data: data)
+        let frame = try LinkCodec.encode(message)
+        XCTAssertLessThanOrEqual(frame.count, LinkCodec.maxFrameBytes)
+        XCTAssertEqual(try LinkCodec.decode(frame), message)
+    }
+
+    func testChunkDataMustBeBase64() {
+        func failure(_ data: String) -> LinkCodecError? {
+            let text = #"{"v":1,"t":"attach.chunk","call_id":"c1","attachment_id":"a1","offset":0,"data":"\#(data)"}"#
+            do { _ = try LinkCodec.decode(Data(text.utf8)); return nil } catch { return error as? LinkCodecError }
+        }
+        for bad in ["%%%", "QQ", "QQ=", "Q Q==", "QQ==\\n", "-_8=", "QR=="] {
+            XCTAssertEqual(failure(bad), .badJSON(callId: "c1"), bad)
+        }
+        XCTAssertNil(failure("QQ=="))
+        XCTAssertNil(failure(""), "an empty chunk is a rule of the host (section 5), not of the codec")
+        // A data field that is not a string at all.
+        let number = Data(#"{"v":1,"t":"attach.chunk","call_id":"c1","attachment_id":"a1","offset":0,"data":7}"#.utf8)
+        XCTAssertThrowsError(try LinkCodec.decode(number)) { XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: "c1")) }
+    }
+
+    func testEndDigestMustBe64LowercaseHex() {
+        func failure(_ sha: String) -> LinkCodecError? {
+            let text = #"{"v":1,"t":"attach.end","call_id":"c1","attachment_id":"a1","sha256":"\#(sha)"}"#
+            do { _ = try LinkCodec.decode(Data(text.utf8)); return nil } catch { return error as? LinkCodecError }
+        }
+        let good = String(repeating: "ab", count: 32)
+        XCTAssertNil(failure(good))
+        for bad in [String(good.dropLast()), good + "0", good.uppercased(), String(repeating: "zz", count: 32), ""] {
+            XCTAssertEqual(failure(bad), .badJSON(callId: "c1"), bad)
+        }
+        // A digest that is not 32 bytes cannot be encoded.
+        XCTAssertThrowsError(try LinkCodec.encode(.attachEnd(callId: "c1", attachmentId: "a1", sha256: Data(count: 31)))) {
+            XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: nil))
+        }
+    }
+
+    func testAttachmentCallsNeedValidCallIds() {
+        let long = String(repeating: "c", count: LinkCodec.maxCallIdBytes + 1)
+        XCTAssertThrowsError(try LinkCodec.encode(.attachBegin(callId: long, kind: .file, name: "n", size: 1)))
+        XCTAssertThrowsError(try LinkCodec.encode(.attachReady(callId: "", attachmentId: "a1")))
+        let json = Data(#"{"v":1,"t":"attach.chunk.result","attachment_id":"a1","received":1}"#.utf8)
+        XCTAssertThrowsError(try LinkCodec.decode(json)) { XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: nil)) }
+        let noId = Data(#"{"v":1,"t":"attach.ready","call_id":"c1"}"#.utf8)
+        XCTAssertThrowsError(try LinkCodec.decode(noId)) { XCTAssertEqual($0 as? LinkCodecError, .badJSON(callId: "c1")) }
+    }
+
+    func testAttachmentConstants() {
+        XCTAssertEqual(ShellXLink.maxAttachmentBytes, 10_485_760)
+        XCTAssertEqual(ShellXLink.maxAttachmentsPerMessage, 5)
+        XCTAssertEqual(ShellXLink.maxAttachmentChunkBytes, 45_000)
+        XCTAssertEqual(ShellXLink.attachmentsFeature, "attachments")
     }
 
     // MARK: - helpers
@@ -353,6 +474,19 @@ final class LinkCodecTests: XCTestCase {
         }
     }
 
+    static func hexData(_ hex: String) -> Data? {
+        guard hex.utf8.count.isMultiple(of: 2) else { return nil }
+        var bytes: [UInt8] = []
+        var index = hex.startIndex
+        while index < hex.endIndex {
+            let next = hex.index(index, offsetBy: 2)
+            guard let byte = UInt8(hex[index..<next], radix: 16) else { return nil }
+            bytes.append(byte)
+            index = next
+        }
+        return Data(bytes)
+    }
+
     static func message(from m: [String: Any], _ name: String) throws -> LinkMessage {
         func s(_ k: String) throws -> String { try XCTUnwrap(m[k] as? String, "\(name).\(k)") }
         func n(_ k: String) throws -> NSNumber { try XCTUnwrap(m[k] as? NSNumber, "\(name).\(k)") }
@@ -360,7 +494,7 @@ final class LinkCodecTests: XCTestCase {
         case "hello": return .hello(clientVersion: try s("client_version"), deviceName: try s("device_name"))
         case "welcome":
             return .welcome(protocolVersion: try n("protocol_version").intValue, hostVersion: try s("host_version"),
-                            machineName: try s("machine_name"))
+                            machineName: try s("machine_name"), features: m["features"] as? [String] ?? [])
         case "error": return .error(code: try s("code"), message: try s("message"), callId: m["call_id"] as? String)
         case "snapshot_get": return .snapshotGet(callId: try s("call_id"))
         case "snapshot":
@@ -394,13 +528,34 @@ final class LinkCodecTests: XCTestCase {
                 hasMore: try XCTUnwrap(m["has_more"] as? Bool))
         case "chat_entries": return .chatEntries(sessionId: try s("session_id"), entries: try entries(m["entries"]))
         case "chat_reset": return .chatReset(sessionId: try s("session_id"))
-        case "chat_send": return .chatSend(callId: try s("call_id"), sessionId: try s("session_id"), text: try s("text"))
+        case "chat_send":
+            return .chatSend(
+                callId: try s("call_id"), sessionId: try s("session_id"), text: try s("text"),
+                attachments: m["attachments"] as? [String] ?? [])
         case "chat_send_result": return .chatSendResult(callId: try s("call_id"), outcome: ChatSendOutcome(wire: try s("outcome")))
         case "chat_interrupt":
             return .chatInterrupt(
                 callId: try s("call_id"), sessionId: try s("session_id"), hard: try XCTUnwrap(m["hard"] as? Bool))
         case "chat_interrupt_result":
             return .chatInterruptResult(callId: try s("call_id"), outcome: ChatInterruptOutcome(wire: try s("outcome")))
+        case "attach_begin":
+            return .attachBegin(
+                callId: try s("call_id"), kind: AttachmentKind(wire: try s("kind")), name: try s("name"),
+                size: try n("size").intValue)
+        case "attach_ready": return .attachReady(callId: try s("call_id"), attachmentId: try s("attachment_id"))
+        case "attach_chunk":
+            return .attachChunk(
+                callId: try s("call_id"), attachmentId: try s("attachment_id"), offset: try n("offset").intValue,
+                data: try XCTUnwrap(Data(base64Encoded: try s("data")), "\(name).data"))
+        case "attach_chunk_result":
+            return .attachChunkResult(
+                callId: try s("call_id"), attachmentId: try s("attachment_id"), received: try n("received").intValue)
+        case "attach_end":
+            return .attachEnd(
+                callId: try s("call_id"), attachmentId: try s("attachment_id"),
+                sha256: try XCTUnwrap(hexData(try s("sha256")), "\(name).sha256"))
+        case "attach_end_result":
+            return .attachEndResult(callId: try s("call_id"), attachmentId: try s("attachment_id"))
         default:
             XCTFail("unknown vector case in \(name)")
             throw LinkCodecError.badJSON(callId: nil)

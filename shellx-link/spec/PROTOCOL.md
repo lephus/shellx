@@ -62,7 +62,7 @@ A frame is one UTF-8 JSON object:
 
 ### Extension
 
-- Every string enum field is an open enum: `kind` (of a PendingItem, of a decision and of a ChatEntry), `mode`,
+- Every string enum field is an open enum: `kind` (of a PendingItem, of a decision, of a ChatEntry and of an `attach.begin`), `mode`,
   `outcome`, `state` (of an AgentSession), `role` (of a ChatEntry), and the enum fields later versions add. A value this version does not know still
   decodes (an implementation keeps the raw string, for example as `.other(raw)`); it is never
   `bad_json`.
@@ -77,14 +77,15 @@ A frame is one UTF-8 JSON object:
 ### Call ids
 
 Every request that expects exactly one answer carries a `call_id`: `agent.snapshot.get`,
-`agent.reply`, `agent.sessions.get`, `chat.history.get`, `chat.send` and `chat.interrupt` (and the
-requests later versions add on the same pattern).
+`agent.reply`, `agent.sessions.get`, `chat.history.get`, `chat.send`, `chat.interrupt`, `attach.begin`,
+`attach.chunk` and `attach.end` (and the requests later versions add on the same pattern).
 
 - The client chooses it: a string of 1 to 64 UTF-8 bytes, different from every other call of
   that client that is still waiting in the session.
 - The host answers a call with exactly one message carrying the same `call_id`: the matching
   answer (`agent.snapshot`, `agent.reply.result`, `agent.sessions`, `chat.history`,
-  `chat.send.result`, `chat.interrupt.result`), or an `error` that carries it.
+  `chat.send.result`, `chat.interrupt.result`, `attach.ready`, `attach.chunk.result`, `attach.end.result`), or an
+  `error` that carries it.
 - A client drops an answer whose `call_id` it is no longer waiting for (for example because the
   call timed out).
 - A missing, empty or longer-than-64-byte `call_id` on a message that requires one is `bad_json`.
@@ -100,7 +101,7 @@ requests later versions add on the same pattern).
 | `t` | Sender | When | Fields |
 | --- | --- | --- | --- |
 | `hello` | client | First frame after the handshake | `client_version` string, `device_name` string |
-| `welcome` | host | Reply to an acceptable `hello` | `protocol_version` int, `host_version` string, `machine_name` string |
+| `welcome` | host | Reply to an acceptable `hello` | `protocol_version` int, `host_version` string, `machine_name` string, `features` array of strings (optional, omitted when empty; see Features) |
 | `error` | either | A request cannot be honored | `code` string, `message` string (human readable), `call_id` string, optional: set when the error answers that call |
 | `agent.snapshot.get` | client | After `welcome`, and whenever it wants a full resync | `call_id` string |
 | `agent.snapshot` | host | Reply to `agent.snapshot.get` | `call_id` string, `revision` int, `pending` array of PendingItem |
@@ -114,21 +115,30 @@ requests later versions add on the same pattern).
 | `chat.history` | host | Reply to `chat.history.get` | `call_id` string, `session_id` string, `entries` array of ChatEntry (oldest first), `has_more` bool |
 | `chat.entries` | host | A transcript entry is added or changes | `session_id` string, `entries` array of ChatEntry (upsert by `id`) |
 | `chat.reset` | host | The session's transcript was replaced: the entries the client holds for it are gone (see ChatEntry) | `session_id` string |
-| `chat.send` | client | The user sends a message to a session | `call_id` string, `session_id` string, `text` string (1 to 16 384 UTF-8 bytes) |
+| `chat.send` | client | The user sends a message to a session | `call_id` string, `session_id` string, `text` string (0 to 16 384 UTF-8 bytes; at least 1 unless `attachments` is present), `attachments` array of 1 to 5 `attachment_id` strings (optional, omitted when none; section 5) |
 | `chat.send.result` | host | Reply to every acceptable `chat.send` | `call_id` string, `outcome` string |
 | `chat.interrupt` | client | The user stops the session's current turn | `call_id` string, `session_id` string, `hard` bool |
 | `chat.interrupt.result` | host | Reply to every `chat.interrupt` | `call_id` string, `outcome` string |
+| `attach.begin` | client | The user attaches a photo or file to a message: first step of an upload (section 5) | `call_id` string, `kind` string, `name` string, `size` int (1 to 10 485 760) |
+| `attach.ready` | host | Reply to an acceptable `attach.begin` | `call_id` string, `attachment_id` string (chosen by the host: 1 to 64 UTF-8 bytes) |
+| `attach.chunk` | client | The next piece of an upload, after `attach.ready` | `call_id` string, `attachment_id` string, `offset` int, `data` string (standard base64 with padding of 1 to 45 000 bytes) |
+| `attach.chunk.result` | host | Reply to every acceptable `attach.chunk` | `call_id` string, `attachment_id` string, `received` int (bytes the host holds so far) |
+| `attach.end` | client | Every byte has been sent | `call_id` string, `attachment_id` string, `sha256` string (64 lowercase hex characters: the SHA-256 of all bytes) |
+| `attach.end.result` | host | Reply to an acceptable `attach.end`: the upload is complete and can be named in a `chat.send` | `call_id` string, `attachment_id` string |
 | `ping` | either | Keep-alive / latency probe | `nonce` uint64 |
 | `pong` | either | Immediately after `ping`, echoing it | `nonce` uint64 (same value) |
 
-Error codes in use: `protocol_mismatch`, `bad_request`, `too_large`, `unsupported` (the host has no
-session list or no chat, or does not know the call's `t`: it answers each such call with this code and
-its `call_id`), `not_found`
+Error codes in use: `protocol_mismatch`, `bad_request`, `too_large` (an answer that does not fit a frame,
+section 6, or an `attach.begin` whose `size` is above the limit, section 5), `unsupported` (the host has no
+session list or no chat, takes no attachments, or does not know the call's `t`: it answers each such call
+with this code and its `call_id`), `not_found`
 (`chat.history.get` for a `session_id` the host does not have). Others MAY be added; receivers treat
 an unrecognized code as a generic error.
 
 A host answers a `chat.history.get` whose `limit` is outside 1 to 50, and a `chat.send` whose `text` is
-empty or longer than 16 384 UTF-8 bytes, with `error` `bad_request` carrying the `call_id`.
+longer than 16 384 UTF-8 bytes, or empty without `attachments`, with `error` `bad_request` carrying the
+`call_id`. With `attachments` (1 to 5 ids) the `text` MAY be empty: a message can be only a photo or a file.
+More than 5 ids is `bad_request` too.
 
 `revision` counts changes of the pending set. A host MUST raise it by exactly 1 with each
 `agent.changed`, and an `agent.snapshot` at revision r includes every change up to r. A client
@@ -145,6 +155,14 @@ rules: a host MUST raise it by exactly 1 with each `agent.sessions.changed`, an 
 revision r includes every change up to r, and the client compares each `agent.sessions.changed` with
 the revision of its last `agent.sessions` or applied change as above (ignore, apply, or resync with
 `agent.sessions.get`).
+
+### Features
+
+`welcome.features` lists the optional capabilities the host offers; it is omitted when the host offers none,
+and a receiver reads an absent `features` as an empty list. A client uses a capability only when the host
+lists it, and ignores a string it does not know. One feature is defined:
+
+- `attachments`: the host takes `attach.*` uploads and `chat.send.attachments` (section 5).
 
 ### PendingItem
 
@@ -266,6 +284,7 @@ it opens the session again.
   `session_id` the host does not have gets the outcome `not_found`, not an `error`; so does one for a listed
   session whose agent is not live, an `ended` one for example (section 10).
 - `outcome` of `chat.interrupt.result`: `sent`, `not_found`, `failed`, with the same `not_found` rule.
+- `kind` (`attach.begin`): `image`, `file`.
 
 ## 5. Rules
 
@@ -304,6 +323,44 @@ item is no longer pending: in every case it leaves the pending set, and clients 
 through an `agent.changed` that lists its `request_id` in `resolved` (or from a later
 snapshot). The host does not order that change against the `agent.reply.result`: either may
 arrive first.
+
+### Attachments
+
+A phone attaches photos and files to a `chat.send` by uploading them first. The host offers this only when
+`welcome.features` lists `attachments` (Features, section 4); a host without it answers every `attach.*`
+call `error` `unsupported` with its `call_id`, so a phone never needs to try. One upload runs in these
+steps, each a call (section 3):
+
+1. `attach.begin` states the `kind` (`image` or `file`, an open enum), the `name` and the `size` in bytes.
+   The host answers `attach.ready` with an `attachment_id` it chose, a string of 1 to 64 UTF-8 bytes.
+2. `attach.chunk` carries the bytes in order. The client sends the next chunk only after the
+   `attach.chunk.result` of the previous one.
+3. `attach.end` carries the SHA-256 of all the bytes. The host answers `attach.end.result`.
+4. `chat.send` names the finished uploads in `attachments`.
+
+Rules:
+
+- `size` is 1 to 10 485 760 (10 MiB). A larger `size` is answered `error` `too_large`, a smaller one
+  `bad_request`, and nothing is stored.
+- Chunks arrive in order. `offset` MUST equal the number of bytes the host holds for that upload, `data` is
+  1 to 45 000 bytes before base64, and the total never passes `size`. A chunk that breaks any of these is
+  answered `error` `bad_request` and is not applied.
+- `data` is standard base64 (RFC 4648 section 4) with padding, with no line breaks and no other characters.
+  `sha256` is 64 lowercase hex characters. Anything else there is `bad_json` (section 3). A full chunk is
+  60 000 base64 characters, which fits a frame with room for 64-byte ids (section 3).
+- `attach.end` before `size` bytes have arrived, or with a digest that is not the SHA-256 of the bytes, is
+  answered `error` `bad_request`, and the host drops the upload.
+- An `attachment_id` means something only in the Link session that made it, and ends with that session
+  (a new session, even of the same phone, cannot use it).
+- An upload is used by one `chat.send` only. Once the host accepts a `chat.send` that names it, it removes the
+  upload at once, whatever outcome the `chat.send.result` then reports.
+- A session holds at most 5 uploads that no `chat.send` has used yet. An `attach.begin` past that is
+  answered `error` `bad_request`.
+- A `chat.send` that names an `attachment_id` the host does not hold, an upload that has not had its
+  `attach.end`, or the same id twice, is answered `error` `bad_request`; it is not accepted, so it uses none
+  of the uploads.
+- `name` is only a label that the phone suggests. The host never uses it as a path; section 10 says how it
+  stores a file.
 
 ## 6. Preview truncation and oversize frames
 
@@ -391,12 +448,12 @@ Rules:
   succeed or fail the same way.
 
 `message.case` names the message; the other `message` keys use the JSON field names (`decision`
-and PendingItem objects use their wire form). All 22 cases:
+and PendingItem objects use their wire form). All 28 cases:
 
 | `message.case` | Wire `t` | Other keys |
 | --- | --- | --- |
 | `hello` | `hello` | `client_version`, `device_name` |
-| `welcome` | `welcome` | `protocol_version`, `host_version`, `machine_name` |
+| `welcome` | `welcome` | `protocol_version`, `host_version`, `machine_name`, `features` (optional) |
 | `error` | `error` | `code`, `message`, `call_id` (optional) |
 | `snapshot_get` | `agent.snapshot.get` | `call_id` |
 | `snapshot` | `agent.snapshot` | `call_id`, `revision`, `pending` |
@@ -412,10 +469,16 @@ and PendingItem objects use their wire form). All 22 cases:
 | `chat_history` | `chat.history` | `call_id`, `session_id`, `entries` (ChatEntry objects), `has_more` |
 | `chat_entries` | `chat.entries` | `session_id`, `entries` |
 | `chat_reset` | `chat.reset` | `session_id` |
-| `chat_send` | `chat.send` | `call_id`, `session_id`, `text` |
+| `chat_send` | `chat.send` | `call_id`, `session_id`, `text`, `attachments` (optional) |
 | `chat_send_result` | `chat.send.result` | `call_id`, `outcome` |
 | `chat_interrupt` | `chat.interrupt` | `call_id`, `session_id`, `hard` |
 | `chat_interrupt_result` | `chat.interrupt.result` | `call_id`, `outcome` |
+| `attach_begin` | `attach.begin` | `call_id`, `kind`, `name`, `size` |
+| `attach_ready` | `attach.ready` | `call_id`, `attachment_id` |
+| `attach_chunk` | `attach.chunk` | `call_id`, `attachment_id`, `offset`, `data` (the base64 text) |
+| `attach_chunk_result` | `attach.chunk.result` | `call_id`, `attachment_id`, `received` |
+| `attach_end` | `attach.end` | `call_id`, `attachment_id`, `sha256` (the hex text) |
+| `attach_end_result` | `attach.end.result` | `call_id`, `attachment_id` |
 | `unknown` | any unrecognized `t` | `type` (the `t` value), `call_id` (optional: the frame's valid `call_id`); decode-only |
 
 ## 9. Pairing and trust
@@ -499,8 +562,9 @@ objects the caller may touch, and never let a call execute or open arbitrary con
 **Default deny.** A host acts only on the calls in the table below. Every other `t` gets no effect: a
 call of a later version is answered `error` `unsupported` (section 3), any other unknown frame is
 ignored, and a host frame type sent by a client is ignored or answered `bad_request` (section 7). No
-field of any message names a command line, a path, a URL, a workspace or a terminal for the host to
-open, run or type into.
+field of any message names a command line, a path on the host, a URL, a workspace or a terminal for the
+host to open, run or type into. (`attach.begin.name` is a label that the host sanitises, never a path: see
+Attachments below.)
 
 **Allowed calls.**
 
@@ -508,7 +572,8 @@ open, run or type into.
 | --- | --- | --- |
 | `agent.snapshot.get`, `agent.sessions.get`, `chat.history.get` | None (reads) | The pending requests and sessions of this Mac's Claude Code agents; the transcripts of listed sessions |
 | `agent.reply` | Gives a decision to an agent hook that is waiting for it | One pending request, by `request_id`. Only the item's `modes` (never `bypass` or `bypassPermissions`, which stay on the Mac), at most once (section 5) |
-| `chat.send` | Pastes `text` (1 to 16 384 bytes) at the agent's prompt in its terminal and submits it | One live Claude Code session, by `session_id` |
+| `chat.send` | Pastes `text` (0 to 16 384 bytes) at the agent's prompt in its terminal and submits it. With `attachments`, first types the paths of the files the host saved from those uploads (below) | One live Claude Code session, by `session_id`; the uploads of this Link session, by `attachment_id` |
+| `attach.begin`, `attach.chunk`, `attach.end` | Keeps the uploaded bytes in the host's memory. Writes no file: files are written only when a `chat.send` carries the upload to a *live* session | The uploads of this Link session, by `attachment_id`; at most 5 unsent, each at most 10 MiB |
 | `chat.interrupt` | Sends Esc, or ctrl-C when `hard`, to that agent's terminal | One live Claude Code session, by `session_id` |
 | `ping` | None | |
 
@@ -530,6 +595,19 @@ and still hosts the agent; it never sends the text to another terminal. What rem
 between that check and the typing: an agent that exits within it can still let one message reach the
 terminal, the same window the Mac's own remote-control path has.
 
+**Attachments.** `attach.*` lets a phone put files on the Mac, so what it may choose is narrow. The phone
+never picks a path: the host names the directory (a new UUID directory for every file, inside a temporary
+directory that is its own) and the file mode (0600), and it builds the file name from `name` by removing
+`/`, `\`, control characters and leading dots, cutting it to 100 UTF-8 bytes, and using `file` when nothing
+is left, so the name cannot leave its directory. The host never opens, previews or runs an attachment, and
+nothing is written until a `chat.send` carries the upload to a live session (the shell fall-through rule
+above applies to the paths exactly as it does to `text`). The paths are typed, escaped for the shell, only
+into the terminal of that live session, as the text is, and never into another terminal. The size
+limits (5 uploads of at most 10 MiB per Link session in memory, at most 5 files of 10 MiB per message on
+disk) bound the memory and disk a phone can use, and an upload dies with its session or with the
+`chat.send` that uses it. What the agent then does with the path is the agent's own business, as with any path the user types at its
+prompt, and a paired phone is trusted like the user (below). The host never logs attachment names or bytes.
+
 **Why the rest is acceptable.** A paired phone is trusted like the user sitting at the Mac: it is signed in
 to the user's account, and the user allowed that phone on that Mac in person; the relay can neither create
 that trust nor widen it (section 9). Removing the phone on the Mac untrusts its key at once: its live
@@ -540,4 +618,4 @@ could do at the keyboard; the allowed calls limit *which objects* a phone reache
 sessions and their pending requests), not what the user may do with them. Out of reach for a phone in v1:
 spawning or respawning terminals, keys or text for anything but a live agent, opening URLs or files, the
 Mac's settings, the `bypass` modes, other machines and other accounts. The host never logs message text,
-tool inputs, keys, tickets or tokens.
+attachment names or bytes, tool inputs, keys, tickets or tokens.

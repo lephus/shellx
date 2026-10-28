@@ -130,7 +130,8 @@ public actor LinkHost {
         let chatPushes = chat?.entries()
         do {
             try await channel.send(.welcome(
-                protocolVersion: ShellXLink.protocolVersion, hostVersion: hostVersion, machineName: machineName))
+                protocolVersion: ShellXLink.protocolVersion, hostVersion: hostVersion, machineName: machineName,
+                features: []))
         } catch {
             return
         }
@@ -244,7 +245,7 @@ public actor LinkHost {
                             page: (page.entries.map { $0.withTextCap() }, page.hasMore)),
                         what: "chat.history", answering: callId)
                 }
-            case let .chatSend(callId, sessionId, text):
+            case let .chatSend(callId, sessionId, text, _):
                 guard let chat else {
                     await Self.sendError(on: channel, "unsupported", "this host has no chat", callId: callId)
                     continue
@@ -272,6 +273,9 @@ public actor LinkHost {
                     let outcome = await chat.interrupt(sessionId: sessionId, hard: hard)
                     try? await channel.send(.chatInterruptResult(callId: callId, outcome: outcome))
                 }
+            case let .attachBegin(callId, _, _, _), let .attachChunk(callId, _, _, _), let .attachEnd(callId, _, _):
+                // This host takes no attachments yet: answered like a host without the feature (PROTOCOL.md 5).
+                await Self.sendError(on: channel, "unsupported", "this host takes no attachments", callId: callId)
             case let .ping(nonce):
                 try? await channel.send(.pong(nonce: nonce))
             case let .unknown(_, callId?):
@@ -284,7 +288,8 @@ public actor LinkHost {
                 // Not allowed from a client once established: ignored, and answered (PROTOCOL.md 7).
                 await Self.sendError(on: channel, "bad_request", "unexpected frame from a client")
             case let .snapshot(callId, _, _), let .replyResult(callId, _, _), let .sessions(callId, _, _),
-                 let .chatHistory(callId, _, _, _), let .chatSendResult(callId, _), let .chatInterruptResult(callId, _):
+                 let .chatHistory(callId, _, _, _), let .chatSendResult(callId, _), let .chatInterruptResult(callId, _),
+                 let .attachReady(callId, _), let .attachChunkResult(callId, _, _), let .attachEndResult(callId, _):
                 await Self.sendError(on: channel, "bad_request", "unexpected frame from a client", callId: callId)
             }
         }

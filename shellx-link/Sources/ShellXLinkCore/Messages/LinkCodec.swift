@@ -26,12 +26,18 @@ public enum LinkCodec {
         static let chatReset = "chat.reset"
         static let chatSend = "chat.send", chatSendResult = "chat.send.result"
         static let chatInterrupt = "chat.interrupt", chatInterruptResult = "chat.interrupt.result"
+        static let attachBegin = "attach.begin", attachReady = "attach.ready"
+        static let attachChunk = "attach.chunk", attachChunkResult = "attach.chunk.result"
+        static let attachEnd = "attach.end", attachEndResult = "attach.end.result"
     }
 
     // Per-message bodies (keys are snake_case on the wire).
     private struct Empty: Codable {}
     private struct Hello: Codable { var clientVersion: String; var deviceName: String }
-    private struct Welcome: Codable { var protocolVersion: Int; var hostVersion: String; var machineName: String }
+    /// `features` is omitted when empty (nil), and absent decodes to nil.
+    private struct Welcome: Codable {
+        var protocolVersion: Int; var hostVersion: String; var machineName: String; var features: [String]?
+    }
     private struct Err: Codable { var code: String; var message: String; var callId: String? }
     private struct CallOnly: Codable { var callId: String }
     private struct Snapshot: Codable { var callId: String; var revision: Int; var pending: [PendingItem] }
@@ -45,10 +51,19 @@ public enum LinkCodec {
     private struct History: Codable { var callId: String; var sessionId: String; var entries: [ChatEntry]; var hasMore: Bool }
     private struct Entries: Codable { var sessionId: String; var entries: [ChatEntry] }
     private struct Reset: Codable { var sessionId: String }
-    private struct Send: Codable { var callId: String; var sessionId: String; var text: String }
+    /// `attachments` is omitted when empty (nil), and absent decodes to nil.
+    private struct Send: Codable { var callId: String; var sessionId: String; var text: String; var attachments: [String]? }
     private struct SendResult: Codable { var callId: String; var outcome: ChatSendOutcome }
     private struct Interrupt: Codable { var callId: String; var sessionId: String; var hard: Bool }
     private struct InterruptResult: Codable { var callId: String; var outcome: ChatInterruptOutcome }
+    private struct AttachBegin: Codable { var callId: String; var kind: AttachmentKind; var name: String; var size: Int }
+    /// `attach.ready` and `attach.end.result`.
+    private struct AttachRef: Codable { var callId: String; var attachmentId: String }
+    /// `data` is the base64 text, converted by `base64Bytes`.
+    private struct AttachChunk: Codable { var callId: String; var attachmentId: String; var offset: Int; var data: String }
+    private struct AttachChunkResult: Codable { var callId: String; var attachmentId: String; var received: Int }
+    /// `sha256` is the hex text, converted by `hexDigest`.
+    private struct AttachEnd: Codable { var callId: String; var attachmentId: String; var sha256: String }
 
     private struct Envelope { var v: Int; var t: String }
 
@@ -90,7 +105,9 @@ public enum LinkCodec {
         do {
             switch m {
             case let .hello(cv, dn): data = try enc(T.hello, Hello(clientVersion: cv, deviceName: dn))
-            case let .welcome(pv, hv, mn): data = try enc(T.welcome, Welcome(protocolVersion: pv, hostVersion: hv, machineName: mn))
+            case let .welcome(pv, hv, mn, features):
+                data = try enc(T.welcome, Welcome(
+                    protocolVersion: pv, hostVersion: hv, machineName: mn, features: features.isEmpty ? nil : features))
             case let .error(code, message, callId):
                 if let callId { try requireValid(callId) }
                 data = try enc(T.error, Err(code: code, message: message, callId: callId))
@@ -125,9 +142,10 @@ public enum LinkCodec {
                 data = try enc(T.chatHistory, History(callId: callId, sessionId: sid, entries: entries, hasMore: more))
             case let .chatEntries(sid, entries): data = try enc(T.chatEntries, Entries(sessionId: sid, entries: entries))
             case let .chatReset(sid): data = try enc(T.chatReset, Reset(sessionId: sid))
-            case let .chatSend(callId, sid, text):
+            case let .chatSend(callId, sid, text, attachments):
                 try requireValid(callId)
-                data = try enc(T.chatSend, Send(callId: callId, sessionId: sid, text: text))
+                data = try enc(T.chatSend, Send(
+                    callId: callId, sessionId: sid, text: text, attachments: attachments.isEmpty ? nil : attachments))
             case let .chatSendResult(callId, outcome):
                 try requireValid(callId)
                 data = try enc(T.chatSendResult, SendResult(callId: callId, outcome: outcome))
@@ -137,6 +155,27 @@ public enum LinkCodec {
             case let .chatInterruptResult(callId, outcome):
                 try requireValid(callId)
                 data = try enc(T.chatInterruptResult, InterruptResult(callId: callId, outcome: outcome))
+            case let .attachBegin(callId, kind, name, size):
+                try requireValid(callId)
+                data = try enc(T.attachBegin, AttachBegin(callId: callId, kind: kind, name: name, size: size))
+            case let .attachReady(callId, attachmentId):
+                try requireValid(callId)
+                data = try enc(T.attachReady, AttachRef(callId: callId, attachmentId: attachmentId))
+            case let .attachChunk(callId, attachmentId, offset, bytes):
+                try requireValid(callId)
+                data = try enc(T.attachChunk, AttachChunk(
+                    callId: callId, attachmentId: attachmentId, offset: offset, data: bytes.base64EncodedString()))
+            case let .attachChunkResult(callId, attachmentId, received):
+                try requireValid(callId)
+                data = try enc(T.attachChunkResult, AttachChunkResult(
+                    callId: callId, attachmentId: attachmentId, received: received))
+            case let .attachEnd(callId, attachmentId, sha256):
+                try requireValid(callId)
+                guard sha256.count == sha256Bytes else { throw LinkCodecError.badJSON(callId: nil) }
+                data = try enc(T.attachEnd, AttachEnd(callId: callId, attachmentId: attachmentId, sha256: hexString(sha256)))
+            case let .attachEndResult(callId, attachmentId):
+                try requireValid(callId)
+                data = try enc(T.attachEndResult, AttachRef(callId: callId, attachmentId: attachmentId))
             case .unknown: throw LinkCodecError.cannotEncodeUnknown
             }
         } catch let e as LinkCodecError {
@@ -168,7 +207,9 @@ public enum LinkCodec {
         case T.hello: let b = try body(Hello.self); return .hello(clientVersion: b.clientVersion, deviceName: b.deviceName)
         case T.welcome:
             let b = try body(Welcome.self)
-            return .welcome(protocolVersion: b.protocolVersion, hostVersion: b.hostVersion, machineName: b.machineName)
+            return .welcome(
+                protocolVersion: b.protocolVersion, hostVersion: b.hostVersion, machineName: b.machineName,
+                features: b.features ?? [])
         case T.error:
             let b = try body(Err.self)
             if let id = b.callId, !validCallId(id) { throw LinkCodecError.badJSON(callId: nil) }
@@ -207,7 +248,7 @@ public enum LinkCodec {
         case T.chatReset: return .chatReset(sessionId: try body(Reset.self).sessionId)
         case T.chatSend:
             let b = try call(Send.self, \.callId)
-            return .chatSend(callId: b.callId, sessionId: b.sessionId, text: b.text)
+            return .chatSend(callId: b.callId, sessionId: b.sessionId, text: b.text, attachments: b.attachments ?? [])
         case T.chatSendResult:
             let b = try call(SendResult.self, \.callId)
             return .chatSendResult(callId: b.callId, outcome: b.outcome)
@@ -217,8 +258,70 @@ public enum LinkCodec {
         case T.chatInterruptResult:
             let b = try call(InterruptResult.self, \.callId)
             return .chatInterruptResult(callId: b.callId, outcome: b.outcome)
+        case T.attachBegin:
+            let b = try call(AttachBegin.self, \.callId)
+            return .attachBegin(callId: b.callId, kind: b.kind, name: b.name, size: b.size)
+        case T.attachReady:
+            let b = try call(AttachRef.self, \.callId)
+            return .attachReady(callId: b.callId, attachmentId: b.attachmentId)
+        case T.attachChunk:
+            let b = try call(AttachChunk.self, \.callId)
+            guard let bytes = base64Bytes(b.data) else { throw LinkCodecError.badJSON(callId: b.callId) }
+            return .attachChunk(callId: b.callId, attachmentId: b.attachmentId, offset: b.offset, data: bytes)
+        case T.attachChunkResult:
+            let b = try call(AttachChunkResult.self, \.callId)
+            return .attachChunkResult(callId: b.callId, attachmentId: b.attachmentId, received: b.received)
+        case T.attachEnd:
+            let b = try call(AttachEnd.self, \.callId)
+            guard let digest = hexDigest(b.sha256) else { throw LinkCodecError.badJSON(callId: b.callId) }
+            return .attachEnd(callId: b.callId, attachmentId: b.attachmentId, sha256: digest)
+        case T.attachEndResult:
+            let b = try call(AttachRef.self, \.callId)
+            return .attachEndResult(callId: b.callId, attachmentId: b.attachmentId)
         default: return .unknown(type: env.t, callId: readCallId(d))
         }
+    }
+
+    /// Length of a SHA-256 digest, in bytes.
+    private static let sha256Bytes = 32
+
+    /// Standard base64 (RFC 4648 section 4) with padding, no line breaks and no other characters. Foundation
+    /// alone accepts more (missing padding, whitespace), so the text must also be what encoding the bytes gives.
+    private static func base64Bytes(_ text: String) -> Data? {
+        guard let bytes = Data(base64Encoded: text), bytes.base64EncodedString() == text else { return nil }
+        return bytes
+    }
+
+    private static let hexDigits = Array("0123456789abcdef".utf8)
+
+    private static func hexString(_ bytes: Data) -> String {
+        var out = [UInt8]()
+        out.reserveCapacity(bytes.count * 2)
+        for byte in bytes {
+            out.append(hexDigits[Int(byte >> 4)])
+            out.append(hexDigits[Int(byte & 0x0F)])
+        }
+        return String(decoding: out, as: UTF8.self)
+    }
+
+    /// 64 lowercase hex characters (0-9, a-f) to 32 bytes; anything else is nil.
+    private static func hexDigest(_ text: String) -> Data? {
+        let chars = Array(text.utf8)
+        guard chars.count == sha256Bytes * 2 else { return nil }
+        func nibble(_ c: UInt8) -> UInt8? {
+            switch c {
+            case UInt8(ascii: "0")...UInt8(ascii: "9"): return c - UInt8(ascii: "0")
+            case UInt8(ascii: "a")...UInt8(ascii: "f"): return c - UInt8(ascii: "a") + 10
+            default: return nil
+            }
+        }
+        var out = Data()
+        out.reserveCapacity(sha256Bytes)
+        for i in stride(from: 0, to: chars.count, by: 2) {
+            guard let high = nibble(chars[i]), let low = nibble(chars[i + 1]) else { return nil }
+            out.append(high << 4 | low)
+        }
+        return out
     }
 
     private static func requireValid(_ callId: String) throws {
