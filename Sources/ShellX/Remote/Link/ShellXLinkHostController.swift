@@ -1,3 +1,4 @@
+import CmuxSettings
 import Foundation
 import os
 import ShellXLinkCore
@@ -12,8 +13,20 @@ import ShellXRemoteCore
 /// `ShellXRemoteService` starts it once `machines.register` returned a `link_slot`, which happens only while
 /// `ShellXRemoteGate.servesPhones` is on, and stops it when the host session ends. Logs carry slots, codes and
 /// counts, never a ticket or a key.
+///
+/// A configuration profile that disables remote control or incoming device access
+/// (``MobileRemoteControlPolicy/isDisabled``) keeps it from serving: it does not start, a running host stops
+/// when the profile arrives (`ManagedDevicePolicy.didChangeNotification`), and the session still signed in is
+/// served again once the profile is removed.
 @MainActor
 final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
+    /// What the service asked to serve.
+    private struct Assignment {
+        let machineID: String
+        let linkSlot: String
+        let accountID: String
+    }
+
     private struct Running {
         let machineID: String
         let linkSlot: String
@@ -34,8 +47,11 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
     private let hostVersion: String
     private let machineName: String
     private let isBlockedByPolicy: @MainActor () -> Bool
-    private let notificationCenter: NotificationCenter
+    /// The session the service started, until it stops it. Kept while a managed policy holds the host stopped,
+    /// so lifting the policy serves the same session again.
+    private var assignment: Assignment?
     private var running: Running?
+    private var policyObservation: ManagedPolicyObservation?
 
     /// - Parameters:
     ///   - core: shellx-core, for link-lane tickets.
@@ -60,27 +76,57 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
         self.hostVersion = hostVersion
         self.machineName = machineName
         self.isBlockedByPolicy = isBlockedByPolicy
-        self.notificationCenter = notificationCenter
+        policyObservation = ManagedPolicyObservation(center: notificationCenter) { [weak self] in
+            self?.managedPolicyChanged()
+        }
     }
 
     func start(machineID: String, linkSlot: String, accountID: String) {
         stop()
         // The service already runs only while it serves phones; the link host never outlives that rule.
         guard ShellXRemoteGate.servesPhones else { return }
+        let assignment = Assignment(machineID: machineID, linkSlot: linkSlot, accountID: accountID)
+        self.assignment = assignment
+        guard !isBlockedByPolicy() else {
+            Self.log.notice("link host not started: remote control is turned off by a managed policy")
+            return
+        }
+        launch(assignment)
+    }
+
+    func stop() {
+        assignment = nil
+        halt()
+    }
+
+    /// A managed policy changed: a profile that now forbids serving phones stops the running host, and once
+    /// it is removed the session still assigned is served again.
+    func managedPolicyChanged() {
+        if isBlockedByPolicy() {
+            guard running != nil else { return }
+            halt()
+            Self.log.notice("link host stopped: remote control is turned off by a managed policy")
+        } else if running == nil, let assignment {
+            Self.log.info("managed policy allows remote control again")
+            launch(assignment)
+        }
+    }
+
+    private func launch(_ assignment: Assignment) {
         let core = core, feed = feed, sessions = sessions, chat = chat
-        let hostVersion = hostVersion, machineName = machineName
-        let keys = ShellXLinkKeyStore(storage: storage, accountID: accountID)
+        let hostVersion = hostVersion, machineName = machineName, linkSlot = assignment.linkSlot
+        let keys = ShellXLinkKeyStore(storage: storage, accountID: assignment.accountID)
         let liveHost = LiveLinkHost()
         let task = Task.detached {
             await Self.serve(linkSlot: linkSlot, core: core, keys: keys, liveHost: liveHost, feed: feed,
                              sessions: sessions, chat: chat, hostVersion: hostVersion, machineName: machineName)
         }
-        running = Running(machineID: machineID, linkSlot: linkSlot, accountID: accountID, keys: keys,
-                          liveHost: liveHost, task: task)
+        running = Running(machineID: assignment.machineID, linkSlot: linkSlot, accountID: assignment.accountID,
+                          keys: keys, liveHost: liveHost, task: task)
         Self.log.info("link host starting on slot \(linkSlot, privacy: .public)")
     }
 
-    func stop() {
+    private func halt() {
         guard let running else { return }
         running.task.cancel()
         self.running = nil
@@ -254,6 +300,23 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
             DispatchQueue.global(qos: .utility).async { continuation.resume(with: Result { try work() }) }
         }
     }
+}
+
+/// Runs `handler` on the main actor for every `ManagedDevicePolicy.didChangeNotification`, until released.
+/// `ManagedPolicyEnforcementObserver` posts it on the main thread whenever a profile's policy flips.
+private final class ManagedPolicyObservation {
+    private let center: NotificationCenter
+    private let token: any NSObjectProtocol
+
+    init(center: NotificationCenter, handler: @escaping @MainActor @Sendable () -> Void) {
+        self.center = center
+        token = center.addObserver(forName: ManagedDevicePolicy.didChangeNotification, object: nil,
+                                   queue: .main) { _ in
+            MainActor.assumeIsolated { handler() }
+        }
+    }
+
+    deinit { center.removeObserver(token) }
 }
 
 /// The `LinkHost` of the current registration attempt, for `revoke` and the grants check.
