@@ -2,6 +2,7 @@ import AppKit
 import CMUXAgentLaunch
 import CmuxAgentChat
 import CmuxMobileHost
+import CmuxSidebar
 import Foundation
 import ShellXLinkCore
 import ShellXLinkSession
@@ -40,6 +41,16 @@ struct ShellXLinkWorkspaceSourceTests {
             try? await Task.sleep(nanoseconds: 10_000_000)
         }
         return condition()
+    }
+
+    /// Waits until `count` stops moving for 300 ms, so what follows is not mixed up with an earlier change's
+    /// trailing signal.
+    private static func waitUntilQuiet(_ count: @MainActor () -> Int) async {
+        for _ in 0..<20 {
+            let before = count()
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            if count() == before { return }
+        }
     }
 
     private static func makeMainWindow(id: UUID) -> NSWindow {
@@ -186,7 +197,8 @@ struct ShellXLinkWorkspaceSourceTests {
     }
 
     /// The live change signal follows the main windows and their workspaces: a workspace added in a window, a window
-    /// opened later, and a workspace added there each fire it.
+    /// opened later, a workspace added there, and a new git branch (kept in the sidebar metadata model, which
+    /// `objectWillChange` does not cover) each fire it.
     @Test func liveSignalFollowsWindowsAndWorkspaces() async throws {
         try await AppContextSerialGate.withExclusiveAppContext {
             _ = NSApplication.shared
@@ -230,6 +242,13 @@ struct ShellXLinkWorkspaceSourceTests {
             _ = try #require(
                 managerB.addWorkspaceIfActive(select: false, autoWelcomeIfNeeded: false, autoRefreshMetadata: false)
             )
+            #expect(await Self.waitUntil { fired.count > seen })
+
+            // A `git checkout` in the same directory changes only the branch.
+            let first = try #require(managerA.tabs.first)
+            await Self.waitUntilQuiet { fired.count }
+            seen = fired.count
+            first.gitBranch = SidebarGitBranchState(branch: "feature/phone", isDirty: false)
             #expect(await Self.waitUntil { fired.count > seen })
         }
     }
