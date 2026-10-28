@@ -19,7 +19,7 @@ import ShellXLinkSession
 ///   pushed content (and a new `rev`), so a stale copy never outranks the push on the phone.
 /// * A listed session whose agent has not written its transcript yet has an empty history; `nil` (the
 ///   phone's `not_found`) is for sessions the Mac does not have or cannot read.
-/// * Send and interrupt run ``TerminalController/agentChatSend(sessionID:text:attachments:)`` and
+/// * Send and interrupt run ``TerminalController/agentChatSend(sessionID:text:items:)`` and
 ///   ``TerminalController/agentChatInterrupt(sessionID:hard:)``, the paths behind `mobile.chat.send` and
 ///   `mobile.chat.interrupt`, and only for a session whose agent still runs (not ended, a known live pid);
 ///   any other session is `not_found` before a terminal is touched (PROTOCOL.md section 10).
@@ -65,7 +65,7 @@ final class ShellXLinkChatSource: AgentChatSource {
         service: @escaping @MainActor () -> AgentChatTranscriptService? = { TerminalController.shared.agentChatTranscriptService },
         send: @escaping Send = {
             await TerminalController.shared.agentChatSend(
-                sessionID: $0, text: $1, attachments: ShellXLinkChatSource.terminalAttachments($2)
+                sessionID: $0, text: $1, items: ShellXLinkChatSource.pasteItems($2)
             )
         },
         interrupt: @escaping Interrupt = { await TerminalController.shared.agentChatInterrupt(sessionID: $0, hard: $1) }
@@ -301,21 +301,22 @@ final class ShellXLinkChatSource: AgentChatSource {
         String(text.prefix { $0 != "\n" && $0 != "\r" })
     }
 
-    /// The attachments as the dictionaries of ``TerminalController/agentChatSend(sessionID:text:attachments:)``:
-    /// an image carries the extension of the name the phone gave (`jpg` without one) and is pasted like a
-    /// clipboard image; anything else is a file with its name, which the Mac sanitizes before it stores it.
-    nonisolated static func terminalAttachments(_ attachments: [Attachment]) -> [[String: Any]] {
-        attachments.map { attachment in
-            var item: [String: Any] = ["data_b64": attachment.data.base64EncodedString()]
+    /// The attachments as the typed items ``TerminalController/agentChatSend(sessionID:text:items:)`` pastes, in
+    /// the order the phone sent them: an image carries the extension of the name the phone gave (`jpg` without
+    /// one) and is pasted like a clipboard image; anything else is a file with its name, which the Mac sanitizes
+    /// before it stores it. Only this path pastes files: `mobile.chat.send` refuses them.
+    nonisolated static func pasteItems(_ attachments: [Attachment]) -> [TerminalController.AgentChatPasteItem] {
+        attachments.map { attachment -> TerminalController.AgentChatPasteItem in
             switch attachment.kind {
             case .image:
                 let fileExtension = (attachment.name as NSString).pathExtension.lowercased()
-                item["format"] = fileExtension.isEmpty ? "jpg" : fileExtension
+                return .image(
+                    base64: attachment.data.base64EncodedString(),
+                    format: fileExtension.isEmpty ? "jpg" : fileExtension
+                )
             case .file, .other:
-                item["kind"] = "file"
-                item["name"] = attachment.name
+                return .file(name: attachment.name, data: attachment.data)
             }
-            return item
         }
     }
 

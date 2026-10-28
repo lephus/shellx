@@ -16650,23 +16650,24 @@ class TerminalController {
         }
     }
 
-    /// The file counterpart of ``v2MobileTerminalPasteImage(params:)``, for a paired client's file attachment
-    /// (`file_base64`, `file_name`): saves the bytes under a name the Mac sanitizes, in a folder it names
+    /// The file counterpart of ``v2MobileTerminalPasteImage(params:)``, for a file ShellX Link's phone attached:
+    /// saves the bytes under a name the Mac sanitizes, in a folder it names
     /// (``TerminalPasteboardService/saveAttachmentData(_:fileName:)``), and injects the shell-escaped path as
-    /// terminal input. Called only by ``agentChatSend(sessionID:text:attachments:)``; no socket method reaches it.
-    func v2MobileTerminalPasteFile(params: [String: Any]) -> V2CallResult {
-        guard let base64 = v2RawString(params, "file_base64"),
-              let fileData = Data(base64Encoded: base64), !fileData.isEmpty else {
-            return .err(code: "invalid_params", message: "Missing or invalid file_base64", data: nil)
+    /// terminal input into the terminal `terminalParams` names (the binding of a chat session).
+    ///
+    /// Typed values only, and called only by ``agentChatSend(sessionID:text:items:)``: no socket method reaches
+    /// this function and no socket parameter becomes its name or bytes.
+    func v2MobileTerminalPasteFile(name: String, data: Data, terminalParams: [String: Any]) -> V2CallResult {
+        guard !data.isEmpty else {
+            return .err(code: "invalid_params", message: "Missing file data", data: nil)
         }
-        let fileName = v2RawString(params, "file_name") ?? ""
         return mobileTerminalPasteSavedAttachment(
-            params: params,
+            params: terminalParams,
             debugEvent: "mobile.terminal.paste_file",
-            debugDetail: "bytes=\(fileData.count)",
+            debugDetail: "bytes=\(data.count)",
             rejectionMessage: "File payload was empty or exceeded the size limit"
         ) {
-            GhosttyApp.terminalPasteboard.saveAttachmentData(fileData, fileName: fileName)
+            GhosttyApp.terminalPasteboard.saveAttachmentData(data, fileName: name)
         }
     }
 

@@ -255,32 +255,70 @@ extension TerminalController {
         return .ok(payload)
     }
 
+    /// One thing a chat send pastes ahead of the message text, in the order the client sent it.
+    enum AgentChatPasteItem: Equatable {
+        /// An image, as the `data_b64` and `format` of a socket attachment. `base64` is nil when the attachment
+        /// has no payload; that is refused when the item's turn comes, after the prompt is cleared.
+        case image(base64: String?, format: String)
+        /// A file, as typed values. Only ShellX Link builds one: no socket parameter becomes a file.
+        case file(name: String, data: Data)
+    }
+
     /// `mobile.chat.send`: deliver attachments then inject the prompt into
     /// the session's terminal (bracketed paste + submit key), through
-    /// ``agentChatSend(sessionID:text:attachments:)``.
+    /// ``agentChatSend(sessionID:text:attachments:)``. Images only: see
+    /// ``mobileChatSendAttachmentsError(_:)``.
     func v2MobileChatSend(params: [String: Any]) async -> V2CallResult {
         guard let sessionID = v2RawString(params, "session_id") else {
             return .err(code: "invalid_params", message: "Missing session_id", data: nil)
         }
         let text = v2RawString(params, "text") ?? ""
         let attachments = params["attachments"] as? [[String: Any]] ?? []
+        if let error = mobileChatSendAttachmentsError(attachments) {
+            return error
+        }
         guard !text.isEmpty || !attachments.isEmpty else {
             return .err(code: "invalid_params", message: "Nothing to send", data: nil)
         }
         return await agentChatSend(sessionID: sessionID, text: text, attachments: attachments)
     }
 
+    /// `mobile.chat.send` pastes images only. A socket attachment of `kind` `file` is refused with
+    /// `invalid_params` before the prompt is cleared, anything is typed or any file is written: a file reaches a
+    /// terminal only as an ``AgentChatPasteItem/file(name:data:)`` that ShellX Link builds from its own typed
+    /// values, never from socket parameters.
+    func mobileChatSendAttachmentsError(_ attachments: [[String: Any]]) -> V2CallResult? {
+        guard attachments.contains(where: { ($0["kind"] as? String) == "file" }) else { return nil }
+        return .err(code: "invalid_params", message: "mobile.chat.send takes image attachments only", data: nil)
+    }
+
     /// Types a message into an agent session's terminal: clears the agent's prompt, pastes each attachment,
-    /// then pastes `text` and submits it. The one send path behind `mobile.chat.send` and ShellX Link's
-    /// `chat.send`.
+    /// then pastes `text` and submits it. The send path behind `mobile.chat.send`.
     ///
     /// - Parameters:
     ///   - sessionID: The chat session to type into.
     ///   - text: The message; may be empty only when `attachments` is not.
-    ///   - attachments: Images (`data_b64`, optional `format`) and files (`kind` `file`, `data_b64`, `name`) to
-    ///     paste first, in order. A file's path is typed the way an image's is; its name is only a label the Mac
-    ///     sanitizes.
+    ///   - attachments: Images to paste first (`data_b64`, optional `format`). Every attachment is pasted as an
+    ///     image, whatever its `kind`: a file cannot arrive as a dictionary.
     func agentChatSend(sessionID: String, text: String, attachments: [[String: Any]] = []) async -> V2CallResult {
+        await agentChatSend(sessionID: sessionID, text: text, items: attachments.map { attachment in
+            .image(
+                base64: attachment["data_b64"] as? String,
+                format: (attachment["format"] as? String) ?? "png"
+            )
+        })
+    }
+
+    /// Types a message into an agent session's terminal: clears the agent's prompt, pastes each item in order
+    /// (separated by spaces), then pastes `text` and submits it. The one send path behind
+    /// `mobile.chat.send` and ShellX Link's `chat.send`.
+    ///
+    /// - Parameters:
+    ///   - sessionID: The chat session to type into.
+    ///   - text: The message; may be empty only when `items` is not.
+    ///   - items: The images and files to paste first, in the order the client sent them. A file's path is typed
+    ///     the way an image's is; its name is only a label the Mac sanitizes.
+    func agentChatSend(sessionID: String, text: String, items: [AgentChatPasteItem]) async -> V2CallResult {
         guard let terminalParams = await mobileChatTerminalParams(sessionID: sessionID) else {
             return .err(code: "not_found", message: Self.chatTerminalBindingErrorMessage, data: [
                 "session_id": sessionID
@@ -295,20 +333,19 @@ extension TerminalController {
         guard clearResult.accepted else {
             return mobileChatInputError(clearResult)
         }
-        for (index, attachment) in attachments.enumerated() {
-            guard let base64 = attachment["data_b64"] as? String else {
-                return .err(code: "invalid_params", message: "Attachment missing data_b64", data: nil)
-            }
-            var pasteParams = terminalParams
+        for (index, item) in items.enumerated() {
             let result: V2CallResult
-            if (attachment["kind"] as? String) == "file" {
-                pasteParams["file_base64"] = base64
-                pasteParams["file_name"] = (attachment["name"] as? String) ?? ""
-                result = v2MobileTerminalPasteFile(params: pasteParams)
-            } else {
-                pasteParams["image_base64"] = base64
-                pasteParams["image_format"] = (attachment["format"] as? String) ?? "png"
-                result = v2MobileTerminalPasteImage(params: pasteParams)
+            switch item {
+            case .image(let base64, let format):
+                guard let base64 else {
+                    return .err(code: "invalid_params", message: "Attachment missing data_b64", data: nil)
+                }
+                var imageParams = terminalParams
+                imageParams["image_base64"] = base64
+                imageParams["image_format"] = format
+                result = v2MobileTerminalPasteImage(params: imageParams)
+            case .file(let name, let data):
+                result = v2MobileTerminalPasteFile(name: name, data: data, terminalParams: terminalParams)
             }
             if case .err = result {
                 return result
@@ -318,7 +355,7 @@ extension TerminalController {
             // detects the paths and the echo is "<path> <path> <text>" —
             // the shape the client's pending-row reconcile matches. A
             // dropped separator corrupts that shape; surface it.
-            let needsSeparator = index < attachments.count - 1 || !text.isEmpty
+            let needsSeparator = index < items.count - 1 || !text.isEmpty
             if needsSeparator {
                 guard let currentTarget = mobileCanonicalTerminalTarget(params: terminalParams)?.target else {
                     return .err(code: "not_found", message: Self.chatTerminalBindingErrorMessage, data: [

@@ -620,7 +620,8 @@ files of 10 MiB per message on disk) bound the memory and disk a phone can use, 
 its session, with the `chat.send` that uses it, with the next `attach.begin` if it was not finished, or
 5 minutes after its `attach.end`. What the agent then does with the path is the agent's own business, as
 with any path the user types at its prompt, and a paired phone is trusted like the user (below). The host
-never logs attachment names or bytes.
+never logs attachment names or bytes. The cmux socket method `mobile.chat.send` does not accept files (it
+answers `invalid_params`); only ShellX Link does.
 
 **Why the rest is acceptable.** A paired phone is trusted like the user sitting at the Mac: it is signed in
 to the user's account, and the user allowed that phone on that Mac in person; the relay can neither create

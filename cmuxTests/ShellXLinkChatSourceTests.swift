@@ -329,24 +329,65 @@ struct ShellXLinkChatSourceTests {
         #expect(calls[2].attachments.isEmpty)
     }
 
-    /// The terminal's attachment dictionaries: an image keeps the extension of the name the phone gave
-    /// (`jpg` without one), a file carries its name, and both carry the bytes as base64.
-    @Test func testAttachmentsBecomeTerminalAttachments() {
+    /// The items the shared send path pastes, in the order the phone sent them: an image keeps the extension of
+    /// the name the phone gave (`jpg` without one) and carries its bytes as base64; a file carries its name and
+    /// its bytes as typed values.
+    @Test func testAttachmentsBecomePasteItemsInOrder() {
         let bytes = Data([0x01, 0x02, 0x03])
-        let dicts = ShellXLinkChatSource.terminalAttachments([
+        let items = ShellXLinkChatSource.pasteItems([
             LinkAttachment(kind: .image, name: "Photo.PNG", data: bytes),
-            LinkAttachment(kind: .image, name: "no-extension", data: bytes),
             LinkAttachment(kind: .file, name: "report.pdf", data: bytes),
+            LinkAttachment(kind: .image, name: "no-extension", data: bytes),
         ])
-        #expect(dicts.count == 3)
-        #expect(dicts[0]["format"] as? String == "png")
-        #expect(dicts[0]["kind"] == nil)
-        #expect(dicts[0]["data_b64"] as? String == bytes.base64EncodedString())
-        #expect(dicts[1]["format"] as? String == "jpg")
-        #expect(dicts[2]["kind"] as? String == "file")
-        #expect(dicts[2]["name"] as? String == "report.pdf")
-        #expect(dicts[2]["format"] == nil)
-        #expect(dicts[2]["data_b64"] as? String == bytes.base64EncodedString())
+        #expect(items == [
+            .image(base64: bytes.base64EncodedString(), format: "png"),
+            .file(name: "report.pdf", data: bytes),
+            .image(base64: bytes.base64EncodedString(), format: "jpg"),
+        ])
+    }
+
+    /// `mobile.chat.send` pastes images only: a `file` attachment is `invalid_params`, before the session is
+    /// even looked up (the session here is unbound, which would be `not_found`), so nothing is cleared, typed
+    /// or written. An image attachment still goes on to the session lookup, as before. A file reaches a terminal
+    /// only through ShellX Link's typed items.
+    @Test func testMobileChatSendRefusesFileAttachments() async throws {
+        let mobile = await MainActor.run { TerminalController.shared }
+        let attachmentsRoot = FileManager.default.temporaryDirectory.appendingPathComponent("shellx-attachments")
+        let before = (try? FileManager.default.contentsOfDirectory(atPath: attachmentsRoot.path)) ?? []
+        let file: [String: Any] = ["kind": "file", "name": "notes.txt", "data_b64": Data("hello".utf8).base64EncodedString()]
+        let image: [String: Any] = ["data_b64": Data([0x01]).base64EncodedString(), "format": "png"]
+
+        for attachments in [[file], [image, file], [file, image]] {
+            let result = await mobile.v2MobileChatSend(params: [
+                "session_id": "unbound-session", "text": "look", "attachments": attachments,
+            ])
+            guard case .err(let code, _, _) = result else {
+                Issue.record("mobile.chat.send must refuse a file attachment")
+                continue
+            }
+            #expect(code == "invalid_params")
+        }
+        // Only a file with no text is refused too, not reported as "nothing to send" or as a missing session.
+        let fileOnly = await mobile.v2MobileChatSend(params: ["session_id": "unbound-session", "attachments": [file]])
+        guard case .err(let fileOnlyCode, let fileOnlyMessage, _) = fileOnly else {
+            Issue.record("mobile.chat.send must refuse a file-only message")
+            return
+        }
+        #expect(fileOnlyCode == "invalid_params")
+        #expect(fileOnlyMessage.contains("image attachments only"))
+
+        // Images are unchanged: the unbound session is what stops them.
+        let imageResult = await mobile.v2MobileChatSend(params: [
+            "session_id": "unbound-session", "text": "look", "attachments": [image],
+        ])
+        guard case .err(let imageCode, _, _) = imageResult else {
+            Issue.record("an unbound session must not take an image")
+            return
+        }
+        #expect(imageCode == "not_found")
+
+        let after = (try? FileManager.default.contentsOfDirectory(atPath: attachmentsRoot.path)) ?? []
+        #expect(Set(after) == Set(before), "a refused file attachment wrote \(Set(after).subtracting(before))")
     }
 
     /// Attachments follow the text's rule: a session without a live agent is `not_found` before anything
