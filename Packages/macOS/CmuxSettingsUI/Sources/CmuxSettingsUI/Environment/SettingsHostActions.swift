@@ -193,6 +193,18 @@ public protocol SettingsHostActions: AnyObject, CloudMachinesSettingsActions {
     /// can't open it directly.
     func openMobilePairingWindow()
 
+    /// Whether this host pairs phones through ShellX Link. When true,
+    /// Settings › Mobile shows one "Pair iPhone" row that opens the pairing
+    /// QR (``openPhonePairing()``) and hides the iOS pairing host and phone
+    /// push rows, which have no backend in that host. False (the default)
+    /// keeps the cmux rows.
+    var pairsPhonesThroughShellXLink: Bool { get }
+
+    /// Opens the phone pairing sheet: the QR to scan with ShellX on iPhone,
+    /// the phones asking to pair, and the paired phones. Settings calls it
+    /// only when ``pairsPhonesThroughShellXLink`` is true.
+    func openPhonePairing()
+
     /// Plays the currently configured notification sound so the user
     /// can preview it from the Settings UI.
     func previewNotificationSound(value: String, customFilePath: String)
@@ -567,6 +579,11 @@ public extension SettingsHostActions {
     func applyLanguageOverride(_ language: AppLanguage) {}
 
     func openMobilePairingWindow() {}
+
+    /// cmux pairs phones through its own pairing host, so the cmux rows stay.
+    var pairsPhonesThroughShellXLink: Bool { false }
+
+    func openPhonePairing() {}
 
     /// Default no-op preview action for hosts without a Sleepy Mode overlay.
     func sleepyModePreview() {}

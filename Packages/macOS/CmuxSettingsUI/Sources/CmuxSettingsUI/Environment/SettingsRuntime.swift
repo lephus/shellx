@@ -56,7 +56,8 @@ public final class SettingsRuntime: @unchecked Sendable {
     ///   - shortcutDefaultResolver: Value-typed defaults supplied by the host;
     ///     defaults to the package table for previews and package-only hosts.
     ///   - searchIndex: Prebuilt search index to share across settings roots. When `nil`,
-    ///     the runtime builds one index from `catalog` and keeps it for its own lifetime.
+    ///     the runtime builds one index from `catalog` and the rows `hostActions` shows,
+    ///     and keeps it for its own lifetime.
     @MainActor
     public init(
         catalog: SettingCatalog,
@@ -70,7 +71,11 @@ public final class SettingsRuntime: @unchecked Sendable {
         searchIndex: SettingsSearchIndex? = nil
     ) {
         self.catalog = catalog
-        self.searchIndex = searchIndex ?? SettingsSearchIndex(catalog: catalog)
+        self.searchIndex = searchIndex ?? SettingsSearchIndex(
+            catalog: catalog,
+            curatedEntries: .cmuxDefault(catalog: catalog)
+                .forMobilePairing(throughShellXLink: hostActions.pairsPhonesThroughShellXLink)
+        )
         self.userDefaultsStore = userDefaultsStore
         self.jsonStore = jsonStore
         self.secretStore = secretStore
