@@ -325,6 +325,24 @@
         }
       }
     },
+    "agent.state.error": {
+      "comment": "A workspace's agent failed (state label on its row).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lỗi"
+          }
+        }
+      }
+    },
     "agent.state.needsYou": {
       "comment": "An agent session waits for the user.",
       "extractionState": "manual",
@@ -793,60 +811,6 @@
         }
       }
     },
-    "composer.target %@": {
-      "comment": "Chip above the message field: where the message goes (\"Claude Code · shellx\").",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Send to: %@"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gửi tới: %@"
-          }
-        }
-      }
-    },
-    "composer.target.automatic": {
-      "comment": "Menu choice: send to the session messaged last, or the newest on the default Mac.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Automatic"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tự động"
-          }
-        }
-      }
-    },
-    "composer.target.none": {
-      "comment": "Where the message goes when no session is running.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "no running session"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "chưa có phiên nào"
-          }
-        }
-      }
-    },
     "composer.tooLong %@ %@": {
       "comment": "The message is over the byte limit. 1: its length, 2: the limit (16,384), both formatted.",
       "extractionState": "manual",
@@ -919,78 +883,6 @@
         }
       }
     },
-    "home.attachments %lld": {
-      "comment": "Line in a message bubble on the home screen: how many photos and files the message carried.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "📎 %lld file"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "📎 %lld files"
-                }
-              }
-            }
-          }
-        },
-        "vi": {
-          "variations": {
-            "plural": {
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "📎 %lld tệp"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "home.empty": {
-      "comment": "The home conversation before anything was said.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Send work to a Claude Code session running on your Mac. Anything that needs you is pinned at the top."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nhắn việc cho một phiên Claude Code đang chạy trên Mac. Việc nào cần bạn sẽ được ghim ở trên cùng."
-          }
-        }
-      }
-    },
-    "home.macPill.hint": {
-      "comment": "VoiceOver hint of the default Mac at the top of the home.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Opens Your Macs."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mở Máy của bạn."
-          }
-        }
-      }
-    },
     "home.needsYou.hint": {
       "comment": "VoiceOver hint of the \"Needs you · N\" bar over a conversation: activating it opens the page with the pending requests.",
       "extractionState": "manual",
@@ -1027,42 +919,6 @@
         }
       }
     },
-    "home.note.busy %@ %@": {
-      "comment": "ShellX note: the agent was busy and did not take the message. 1: agent name, 2: workspace.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not sent: %1$@ in %2$@ is busy. Try again later."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chưa gửi: %1$@ ở %2$@ đang bận. Thử lại sau."
-          }
-        }
-      }
-    },
-    "home.note.ended %@ %@": {
-      "comment": "ShellX note: the session the message was started for stopped running before it was sent; it was sent nowhere else. 1: agent name, 2: workspace.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not sent: %1$@ in %2$@ is no longer running."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chưa gửi: %1$@ ở %2$@ không còn chạy."
-          }
-        }
-      }
-    },
     "home.note.failed %@ %@": {
       "comment": "ShellX note: the Mac could not type the message in. 1: agent name, 2: workspace.",
       "extractionState": "manual",
@@ -1077,60 +933,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Không gửi được tới %1$@ ở %2$@."
-          }
-        }
-      }
-    },
-    "home.note.finished %@ %@ %@": {
-      "comment": "ShellX note: an agent finished. 1: agent name, 2: workspace, 3: first line of its last reply.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ in %2$@ is done: %3$@"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ ở %2$@ đã xong: %3$@"
-          }
-        }
-      }
-    },
-    "home.note.finished.noSummary %@ %@": {
-      "comment": "ShellX note: an agent finished (its reply is not known). 1: agent name, 2: workspace.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ in %2$@ is done."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ ở %2$@ đã xong."
-          }
-        }
-      }
-    },
-    "home.note.needsPairing %@": {
-      "comment": "ShellX note: nothing was sent because the Mac removed this iPhone or its key changed; it will not come back by itself. The argument is the Mac's name.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not sent: %@ needs to be paired again."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chưa gửi: cần ghép cặp lại %@."
           }
         }
       }
@@ -1153,42 +955,6 @@
         }
       }
     },
-    "home.note.noLiveSession": {
-      "comment": "ShellX note: no agent session is running to send the message to.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No Claude Code session is running. Start Claude Code in ShellX on your Mac, then try again."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chưa có phiên Claude Code nào đang chạy. Mở Claude Code trong ShellX trên Mac rồi nhắn lại."
-          }
-        }
-      }
-    },
-    "home.note.notFound %@ %@": {
-      "comment": "ShellX note: the session is gone from the Mac. 1: agent name, 2: workspace.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not sent: %1$@ in %2$@ is no longer on the Mac."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Chưa gửi: %1$@ ở %2$@ không còn trên Mac."
-          }
-        }
-      }
-    },
     "home.note.offline %@": {
       "comment": "ShellX note: the Mac is offline, nothing was sent. The argument is the Mac's name.",
       "extractionState": "manual",
@@ -1207,24 +973,6 @@
         }
       }
     },
-    "home.note.sent %@ %@": {
-      "comment": "ShellX note: a message reached an agent. 1: agent name (Claude Code), 2: workspace.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sent to %1$@ in %2$@."
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Đã gửi tới %1$@ ở %2$@."
-          }
-        }
-      }
-    },
     "home.sender.you": {
       "comment": "VoiceOver: who said a message in the home conversation.",
       "extractionState": "manual",
@@ -1239,24 +987,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bạn"
-          }
-        }
-      }
-    },
-    "home.voice": {
-      "comment": "VoiceOver: the message was spoken, not typed.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Spoken"
-          }
-        },
-        "vi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bằng giọng nói"
           }
         }
       }
@@ -3651,6 +3381,456 @@
           "stringUnit": {
             "state": "translated",
             "value": "Thả để huỷ"
+          }
+        }
+      }
+    },
+    "workspaces.alert.failed": {
+      "comment": "Alert: a workspace command did not work.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't do that. Try again later"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không làm được, thử lại sau"
+          }
+        }
+      }
+    },
+    "workspaces.alert.offline": {
+      "comment": "Alert: a workspace command found the Mac offline; nothing was sent.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac is offline"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac đang ngoại tuyến"
+          }
+        }
+      }
+    },
+    "workspaces.alert.refused.close": {
+      "comment": "Alert: the Mac refused to close a workspace (it keeps its last one).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac won't close its last workspace"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac không cho đóng workspace cuối cùng"
+          }
+        }
+      }
+    },
+    "workspaces.alert.refused.control": {
+      "comment": "Alert: the Mac refused to make or rename a workspace because it blocks remote control.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Mac is blocking remote control"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac đang chặn điều khiển từ xa"
+          }
+        }
+      }
+    },
+    "workspaces.alert.unknown": {
+      "comment": "Alert: a workspace command was sent but the answer is not known (the link dropped); it is not sent again.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sure the command reached the Mac. Check the list"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chưa rõ lệnh đã tới Mac chưa, hãy xem lại danh sách"
+          }
+        }
+      }
+    },
+    "workspaces.bell": {
+      "comment": "Name of the bell button at the top of the workspace list, which opens the requests waiting for the user.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs you"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cần bạn"
+          }
+        }
+      }
+    },
+    "workspaces.close": {
+      "comment": "Swipe action on a workspace row, and the confirm button: close the workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đóng"
+          }
+        }
+      }
+    },
+    "workspaces.close.confirm": {
+      "comment": "Message of the confirmation before closing a workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The terminals in this workspace will be shut down on the Mac."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Các terminal trong workspace sẽ bị tắt trên Mac."
+          }
+        }
+      }
+    },
+    "workspaces.close.title %@": {
+      "comment": "Title of the confirmation before closing a workspace; the argument is its name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close “%@”?"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đóng “%@”?"
+          }
+        }
+      }
+    },
+    "workspaces.create": {
+      "comment": "Button at the top of the workspace list: make a new workspace on a Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Workspace"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tạo workspace"
+          }
+        }
+      }
+    },
+    "workspaces.create.pickMac": {
+      "comment": "Heading of the menu that asks on which Mac to make a new workspace; the Macs follow.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create on"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tạo trên"
+          }
+        }
+      }
+    },
+    "workspaces.empty": {
+      "comment": "Shown under a Mac that is online and has no workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No workspaces on this Mac yet."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac này chưa có workspace nào."
+          }
+        }
+      }
+    },
+    "workspaces.group.count %lld": {
+      "comment": "VoiceOver: how many workspaces a Mac has, after its name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld workspace"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld workspaces"
+                }
+              }
+            }
+          }
+        },
+        "vi": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld workspace"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "workspaces.group.hint": {
+      "comment": "VoiceOver hint of a Mac's heading in the workspace list: activating it opens the list of paired Macs.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens Your Macs."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mở Máy của bạn."
+          }
+        }
+      }
+    },
+    "workspaces.group.offline %@": {
+      "comment": "Under a Mac's name in the workspace list when it cannot be reached; the argument is the time it was last reachable (08:12).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "offline · last seen %@"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ngoại tuyến · lần cuối %@"
+          }
+        }
+      }
+    },
+    "workspaces.oldMac": {
+      "comment": "Shown in place of the workspaces of a Mac whose ShellX is too old to list them.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update ShellX on your Mac to manage workspaces"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cập nhật ShellX trên Mac để quản lý workspace"
+          }
+        }
+      }
+    },
+    "workspaces.other %lld": {
+      "comment": "Last row of a Mac's group in the workspace list: agent sessions that belong to no workspace row; the argument is how many. Opens their list.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other agent sessions · %lld"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên agent khác · %lld"
+          }
+        }
+      }
+    },
+    "workspaces.other.empty": {
+      "comment": "Shown when a Mac has no other agent sessions.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No other agent sessions."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Không còn phiên agent nào khác."
+          }
+        }
+      }
+    },
+    "workspaces.other.title": {
+      "comment": "Title of the list of a Mac's agent sessions that belong to no workspace row.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other Agent Sessions"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Phiên agent khác"
+          }
+        }
+      }
+    },
+    "workspaces.rename": {
+      "comment": "Swipe action on a workspace row, and nothing else: rename the workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đổi tên"
+          }
+        }
+      }
+    },
+    "workspaces.rename.placeholder": {
+      "comment": "Placeholder of the field with a workspace's name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tên"
+          }
+        }
+      }
+    },
+    "workspaces.rename.save": {
+      "comment": "Button that saves a workspace's new name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lưu"
+          }
+        }
+      }
+    },
+    "workspaces.rename.title": {
+      "comment": "Title of the sheet that renames a workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename Workspace"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Đổi tên workspace"
+          }
+        }
+      }
+    },
+    "workspaces.title": {
+      "comment": "Title of the home screen: the list of workspaces on the paired Macs.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace"
           }
         }
       }

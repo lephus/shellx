@@ -1,11 +1,13 @@
 import ShellXAppCore
 import SwiftUI
 
-/// The signed-in screens: `FirstMacView` while no Mac is paired, otherwise the home, with "Your
-/// Macs", Settings and every pending card pushed over it, and the pairing sheet.
+/// The signed-in screens: `FirstMacView` while no Mac is paired, otherwise the workspace list (the
+/// home), with "Your Macs", Settings, every pending card, a workspace and the other agent sessions
+/// pushed over it, and the pairing sheet.
 ///
 /// It owns the account's background work while it is on screen: the decision center follows the
-/// hub's pending items here (the one place that calls `sync`), and the home model watches the hub.
+/// hub's pending items here (the one place that calls `sync`), and the chat copy sweeper watches the
+/// hub for transcript resets.
 struct SignedInView: View {
     let scope: SignedInScope
     let email: String
@@ -24,7 +26,7 @@ struct SignedInView: View {
                 if hub.machines.isEmpty {
                     FirstMacView(pair: openPairing)
                         .toolbar {
-                            // Where the home has it.
+                            // Where the list has it.
                             ToolbarItem(placement: .topBarTrailing) {
                                 Button { path.append(HomeRoute.settings) } label: {
                                     Label(String(localized: "settings.title"), systemImage: "gearshape")
@@ -33,7 +35,7 @@ struct SignedInView: View {
                             }
                         }
                 } else {
-                    HomeView(scope: scope, open: { path.append($0) })
+                    WorkspaceListView(scope: scope, open: { path.append($0) })
                 }
             }
             .navigationDestination(for: HomeRoute.self) { route in
@@ -48,6 +50,11 @@ struct SignedInView: View {
                     PendingListView(
                         hub: hub, center: scope.decisions,
                         only: { $0.isIn(machineID: machineID, workspaceId: workspaceId) })
+                case let .workspace(ref):
+                    // Temporary: the workspace screen replaces it.
+                    Text(verbatim: ref.workspaceId)
+                case let .otherSessions(machineID):
+                    OtherSessionsView(hub: hub, machineID: machineID)
                 }
             }
         }
@@ -69,7 +76,7 @@ struct SignedInView: View {
         }
         // The center follows the hub's whole list here, outside any body; the cards only read it.
         .onChange(of: hub.pendingItems) { _, items in scope.decisions.sync(items) }
-        .task { await scope.home.run() }
+        .task { await scope.chatCopies.run() }
         // Leaving the foreground stops every mic, in touch and in VoiceOver tap mode alike.
         .onChange(of: scenePhase) { _, phase in
             guard phase == .background, let voice = scope.voice else { return }

@@ -1,13 +1,12 @@
 import ShellXAppCore
 import SwiftUI
 
-/// One agent's screen, pushed from the home's agent rows and "done" notes: `AgentScreen` fed by the
+/// One agent's screen, pushed from the list of other agent sessions: `AgentScreen` fed by the
 /// session's `AgentThreadModel` (its chat, sends and stops), the hub and the decision center (the
 /// "Needs you" bar of the session's workspace). The model follows the hub while the screen is shown
 /// and writes its chat copy when the screen goes or the app leaves the foreground.
 ///
-/// The composer offers attachments as the home's does (`HomeView`): when the session's Mac takes
-/// them, or while some wait in it. A message with attachments stays in the composer, locked, until
+/// The composer offers attachments when the session's Mac takes them, or while some wait in it. A message with attachments stays in the composer, locked, until
 /// the Mac answers; what went is cleared unless the result keeps it (`ComposerDraft`,
 /// `AgentSendResult.keepsDraft`).
 struct AgentView: View {

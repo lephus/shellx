@@ -32,6 +32,7 @@ enum AppComposition {
         let latency = LatencyLog()
         // History lives in Application Support/ShellX and is wiped on sign-out.
         let historyDirectory = URL.applicationSupportDirectory.appendingPathComponent("ShellX", isDirectory: true)
+        removeMergedChatData(in: historyDirectory, defaults: .standard)
         let history = ConversationStore(directory: historyDirectory)
         let launch = LaunchMark(latency: latency)
         let scopes = SignedInScope.Slot()
@@ -54,8 +55,8 @@ enum AppComposition {
         return AppGraph(coordinator: coordinator, scopes: scopes, launch: launch)
     }
 
-    /// One sign-in's scope over `hub`; the home's and each agent's history live in `history`.
-    /// `voice` nil shows no mic.
+    /// One sign-in's scope over `hub`; each agent's chat copy lives in `history`. `voice` nil shows no
+    /// mic.
     static func makeScope(
         hub: MachineHub, history: ConversationStore, latency: LatencyLog, launch: LaunchMark, pairing: PairingModel,
         voice: VoiceService? = nil
@@ -63,8 +64,29 @@ enum AppComposition {
         SignedInScope(
             hub: hub,
             decisions: DecisionCenter(sender: hub, latency: latency, sleep: { try await Task.sleep(for: $0) }),
-            home: HomeModel(hub: hub, store: history, now: { Date() }),
             pairing: pairing, history: history, launch: launch, voice: voice)
+    }
+
+    /// The `UserDefaults` flag that says the merged chat's files are gone.
+    static let mergedChatRemovedKey = "shellx.mergedChatRemoved"
+
+    /// Deletes what the merged "ShellX" chat kept in `directory` (the conversation, `home.json`, and the
+    /// last seen session states, `last-sessions.json`). The first launch of a version without that chat
+    /// does it; `defaults` remembers that it did, so later launches touch nothing. The chat copies of
+    /// single agents (`threads/`) stay. A file that cannot be deleted leaves the flag off: the next
+    /// launch tries again.
+    static func removeMergedChatData(in directory: URL, defaults: UserDefaults, fileManager: FileManager = .default) {
+        guard !defaults.bool(forKey: mergedChatRemovedKey) else { return }
+        for name in ["home.json", "last-sessions.json"] {
+            let url = directory.appendingPathComponent(name)
+            guard fileManager.fileExists(atPath: url.path) else { continue }
+            do {
+                try fileManager.removeItem(at: url)
+            } catch {
+                return
+            }
+        }
+        defaults.set(true, forKey: mergedChatRemovedKey)
     }
 }
 

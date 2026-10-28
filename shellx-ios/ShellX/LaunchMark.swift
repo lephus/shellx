@@ -1,7 +1,7 @@
 import ShellXAppCore
 
-/// Measures `launchToHome` (spec section 7.4: opening the app shows the conversation in under 1 s):
-/// from when the app built its object graph to when the home first shows its stored conversation.
+/// Measures `launchToHome` (spec section 7.4: opening the app shows the home in under 1 s): from when
+/// the app built its object graph to when the home, the workspace list, first shows.
 /// One sample per launch, and none for a launch that had to sign in or pair first.
 @MainActor
 final class LaunchMark {

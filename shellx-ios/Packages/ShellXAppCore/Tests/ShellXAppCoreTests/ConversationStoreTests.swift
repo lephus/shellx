@@ -74,9 +74,20 @@ final class ConversationStoreTests: XCTestCase {
         await newer.remove(.thread(ref("never-written")))
     }
 
+    /// A thread document the tests that do not care which one use.
+    private var doc: StoreDocument { .thread(ref("s0")) }
+
+    /// The one file in the threads directory.
+    private func onlyThreadFile() throws -> URL {
+        let threads = directory.appendingPathComponent("threads")
+        let names = try FileManager.default.contentsOfDirectory(atPath: threads.path)
+        XCTAssertEqual(names.count, 1)
+        return threads.appendingPathComponent(try XCTUnwrap(names.first))
+    }
+
     func testRoundTripEachDocument() async {
         let store = makeStore()
-        let docs: [StoreDocument] = [.home, .lastSessions, .thread(ref("s1"))]
+        let docs: [StoreDocument] = [.thread(ref("s0")), .thread(ref("s1")), .thread(ref("s2"))]
         for (index, doc) in docs.enumerated() {
             await store.writer().save(Doc(items: ["a\(index)"]), to: doc)
         }
@@ -89,36 +100,34 @@ final class ConversationStoreTests: XCTestCase {
         // A thread is found by machine and session id, not by the title or agent.
         let renamed = SessionRef(machineID: "m1", sessionId: "s1", agent: "codex", workspaceTitle: "other")
         let again = await store.load(.thread(renamed), as: Doc.self)
-        XCTAssertEqual(again, Doc(items: ["a2"]))
+        XCTAssertEqual(again, Doc(items: ["a1"]))
         let otherMachine = await store.load(.thread(ref("s1", machine: "m2")), as: Doc.self)
         XCTAssertNil(otherMachine)
     }
 
     func testFileNames() async throws {
         let store = makeStore()
-        await store.writer().save(Doc(items: []), to: .home)
-        await store.writer().save(Doc(items: []), to: .lastSessions)
         await store.writer().save(Doc(items: []), to: .thread(ref("s1")))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appendingPathComponent("home.json").path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.appendingPathComponent("last-sessions.json").path))
-        let threads = try FileManager.default.contentsOfDirectory(atPath: directory.appendingPathComponent("threads").path)
-        XCTAssertEqual(threads.count, 1)
+        // The merged chat's `home.json` and `last-sessions.json` are gone for good.
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("home.json").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("last-sessions.json").path))
+        let thread = try onlyThreadFile()
         // sha256("m1\0s1") in hex plus ".json"; no session id in the name.
-        XCTAssertEqual(threads[0].count, 64 + 5)
-        XCTAssertFalse(threads[0].contains("s1"))
+        XCTAssertEqual(thread.lastPathComponent.count, 64 + 5)
+        XCTAssertFalse(thread.lastPathComponent.contains("s1"))
     }
 
     func testCorruptFileLoadsNilAndIsRemoved() async throws {
         let store = makeStore()
-        await store.writer().save(Doc(items: ["x"]), to: .home)
-        let file = directory.appendingPathComponent("home.json")
+        await store.writer().save(Doc(items: ["x"]), to: doc)
+        let file = try onlyThreadFile()
         try Data("{ not json".utf8).write(to: file)
-        let loaded = await store.load(.home, as: Doc.self)
+        let loaded = await store.load(doc, as: Doc.self)
         XCTAssertNil(loaded)
         XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
         // The store keeps working afterwards.
-        await store.writer().save(Doc(items: ["y"]), to: .home)
-        let again = await store.load(.home, as: Doc.self)
+        await store.writer().save(Doc(items: ["y"]), to: doc)
+        let again = await store.load(doc, as: Doc.self)
         XCTAssertEqual(again, Doc(items: ["y"]))
     }
 
@@ -138,34 +147,34 @@ final class ConversationStoreTests: XCTestCase {
 
     func testWipeRemovesEverything() async throws {
         let store = makeStore()
-        await store.writer().save(Doc(items: ["a"]), to: .home)
+        await store.writer().save(Doc(items: ["a"]), to: doc)
         await store.writer().save(Doc(items: ["b"]), to: .thread(ref("s1")))
         try await store.wipe()
-        let home = await store.load(.home, as: Doc.self)
+        let first = await store.load(doc, as: Doc.self)
         let thread = await store.load(.thread(ref("s1")), as: Doc.self)
-        XCTAssertNil(home)
+        XCTAssertNil(first)
         XCTAssertNil(thread)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("home.json").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("threads").path))
         // Saving works again after a wipe.
-        await store.writer().save(Doc(items: ["c"]), to: .home)
-        let again = await store.load(.home, as: Doc.self)
+        await store.writer().save(Doc(items: ["c"]), to: doc)
+        let again = await store.load(doc, as: Doc.self)
         XCTAssertEqual(again, Doc(items: ["c"]))
     }
 
     func testStaleWriterSaveAfterWipeWritesNothing() async throws {
         let store = makeStore()
         let stale = await store.writer()
-        await stale.save(Doc(items: ["old"]), to: .home)
+        await stale.save(Doc(items: ["old"]), to: doc)
         try await store.wipe()
-        await stale.save(Doc(items: ["late"]), to: .home)
+        await stale.save(Doc(items: ["late"]), to: doc)
         await stale.save(Doc(items: ["late"]), to: .thread(ref("s1")))
         XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
-        let home = await store.load(.home, as: Doc.self)
-        XCTAssertNil(home)
+        let afterWipe = await store.load(doc, as: Doc.self)
+        XCTAssertNil(afterWipe)
         // A writer made after the wipe works.
         let fresh = await store.writer()
-        await fresh.save(Doc(items: ["new"]), to: .home)
-        let loaded = await store.load(.home, as: Doc.self)
+        await fresh.save(Doc(items: ["new"]), to: doc)
+        let loaded = await store.load(doc, as: Doc.self)
         XCTAssertEqual(loaded, Doc(items: ["new"]))
     }
 
@@ -176,7 +185,7 @@ final class ConversationStoreTests: XCTestCase {
         let inner = locked.appendingPathComponent("ShellX", isDirectory: true)
         let lockedStore = ConversationStore(directory: inner)
         let lockedWriter = await lockedStore.writer()
-        await lockedWriter.save(Doc(items: ["a"]), to: .home)
+        await lockedWriter.save(Doc(items: ["a"]), to: doc)
         try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: locked.path)
         defer {
             try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: locked.path)
@@ -186,18 +195,18 @@ final class ConversationStoreTests: XCTestCase {
             try await lockedStore.wipe()
             XCTFail("wipe should throw when the delete fails")
         } catch {}
-        await lockedWriter.save(Doc(items: ["late"]), to: .home)
+        await lockedWriter.save(Doc(items: ["late"]), to: doc)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: locked.path)
         // The delete emptied the directory before failing to unlink it; the stale write added nothing.
-        let after = await lockedStore.load(.home, as: Doc.self)
+        let after = await lockedStore.load(doc, as: Doc.self)
         XCTAssertNil(after)
     }
 
     func testBackupExclusionIsSetAgainAfterWipe() async throws {
         let store = makeStore()
-        await store.writer().save(Doc(items: []), to: .home)
+        await store.writer().save(Doc(items: []), to: doc)
         try await store.wipe()
-        await store.writer().save(Doc(items: []), to: .home)
+        await store.writer().save(Doc(items: []), to: doc)
         let values = try directory.resourceValues(forKeys: [.isExcludedFromBackupKey])
         XCTAssertEqual(values.isExcludedFromBackup, true)
         // File protection (completeUntilFirstUserAuthentication) cannot be asserted under macOS
@@ -217,7 +226,7 @@ final class ConversationStoreTests: XCTestCase {
 
     func testDirectoryExcludedFromBackup() async throws {
         let store = makeStore()
-        await store.writer().save(Doc(items: []), to: .home)
+        await store.writer().save(Doc(items: []), to: doc)
         let values = try directory.resourceValues(forKeys: [.isExcludedFromBackupKey])
         XCTAssertEqual(values.isExcludedFromBackup, true)
     }

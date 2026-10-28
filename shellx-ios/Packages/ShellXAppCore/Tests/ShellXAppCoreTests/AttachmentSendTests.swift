@@ -6,8 +6,8 @@ import XCTest
 
 @testable import ShellXAppCore
 
-/// Photos and files sent with a message, from the home and from an agent's screen, through a real
-/// Link session to a `FakeMac`: what reaches the Mac, what the phone refuses before any call, and
+/// Photos and files sent with a message from an agent's screen, through a real Link session to a
+/// `FakeMac`: what reaches the Mac, what the phone refuses before any call, and
 /// what the composer gets back when the Mac surely did not take the message.
 @MainActor
 final class AttachmentSendTests: XCTestCase {
@@ -28,7 +28,7 @@ final class AttachmentSendTests: XCTestCase {
         kind: .image, name: "shot.jpg", data: Data((0..<100_000).map { UInt8(truncatingIfNeeded: $0 &* 31) }))
     private let log = OutgoingAttachment(kind: .file, name: "build.log", data: Data("error: missing import\n".utf8))
 
-    private func model(_ ref: SessionRef, _ rig: HomeRig) -> AgentThreadModel {
+    private func model(_ ref: SessionRef, _ rig: HubRig) -> AgentThreadModel {
         let model = AgentThreadModel(ref: ref, hub: rig.hub, store: rig.store, sleep: ManualSleeper().sleep)
         addTeardownBlock { @MainActor in await model.close() }
         return model
@@ -38,27 +38,22 @@ final class AttachmentSendTests: XCTestCase {
 
     func testPhotoAndTextReachTheMac() async throws {
         let mac = await macWithSession()
-        let rig = try await HomeRig.make([mac], in: self)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
 
-        let result = await rig.home.submit(
-            "  sửa lỗi này \n", attachments: [shot], to: rig.home.messageTarget, viaVoice: false)
+        let model = model(ref(mac), rig)
+        let result = await model.send("  sửa lỗi này \n", attachments: [shot], viaVoice: false)
 
-        XCTAssertEqual(result, .added("sửa lỗi này"))
+        XCTAssertEqual(result, .sent(.submitted))
         XCTAssertFalse(result.keepsDraft)
         let received = await mac.receivedAttachments
         XCTAssertEqual(received, [ChatAttachment(kind: .image, name: "shot.jpg", data: shot.data)])
         let sent = await mac.sentTexts
         XCTAssertEqual(sent, [FakeMac.SentText(sessionId: "s1", text: "sửa lỗi này")])
-        XCTAssertEqual(rig.home.entries.map(\.content), [
-            .userSaid(text: "sửa lỗi này", target: ref(mac), viaVoice: false, attachments: ["shot.jpg"]),
-            .note(.sent(ref(mac))),
-        ])
-        XCTAssertNil(rig.home.uploadProgress, "no progress once the message is sent")
+        XCTAssertNil(model.uploadProgress, "no progress once the message is sent")
 
-        // From the agent's screen too.
-        let model = model(ref(mac), rig)
+        // A second message, with two attachments.
         let agentResult = await model.send("còn file này", attachments: [log, shot], viaVoice: false)
         XCTAssertEqual(agentResult, .sent(.submitted))
         XCTAssertNil(model.uploadProgress)
@@ -71,23 +66,19 @@ final class AttachmentSendTests: XCTestCase {
 
     func testAttachmentOnlyMessageIsSent() async throws {
         let mac = await macWithSession()
-        let rig = try await HomeRig.make([mac], in: self)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
 
-        let result = await rig.home.submit(" \n ", attachments: [log], to: rig.home.messageTarget, viaVoice: false)
+        let model = model(ref(mac), rig)
+        let result = await model.send(" \n ", attachments: [log], viaVoice: false)
 
-        XCTAssertEqual(result, .added(""))
+        XCTAssertEqual(result, .sent(.submitted))
         var sent = await mac.sentTexts
         XCTAssertEqual(sent, [FakeMac.SentText(sessionId: "s1", text: "")])
         let received = await mac.receivedAttachments
         XCTAssertEqual(received, [ChatAttachment(kind: .file, name: "build.log", data: log.data)])
-        XCTAssertEqual(rig.home.entries.map(\.content), [
-            .userSaid(text: "", target: ref(mac), viaVoice: false, attachments: ["build.log"]),
-            .note(.sent(ref(mac))),
-        ])
 
-        let model = model(ref(mac), rig)
         let agentResult = await model.send("", attachments: [shot], viaVoice: false)
         XCTAssertEqual(agentResult, .sent(.submitted))
         sent = await mac.sentTexts
@@ -99,7 +90,7 @@ final class AttachmentSendTests: XCTestCase {
 
     func testProgressCountsTheBytesOfEveryAttachment() async throws {
         let mac = await macWithSession()
-        let rig = try await HomeRig.make([mac], in: self)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         let seen = FractionLog()
@@ -119,35 +110,33 @@ final class AttachmentSendTests: XCTestCase {
 
     func testUploadProgressShowsUntilTheMacAnswers() async throws {
         let mac = await macWithSession()
-        let rig = try await HomeRig.make([mac], in: self)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
-        XCTAssertNil(rig.home.uploadProgress)
+        let model = model(ref(mac), rig)
+        XCTAssertNil(model.uploadProgress)
         // The uploads finish; the Mac holds the message itself.
         await mac.holdChat()
 
-        let home = rig.home
-        let target = home.messageTarget
-        let sending = Task { await home.submit("xem ảnh", attachments: [shot], to: target, viaVoice: false) }
-        let uploaded = await eventually { home.uploadProgress == 1 }
+        let sending = Task { await model.send("xem ảnh", attachments: [shot], viaVoice: false) }
+        let uploaded = await eventually { model.uploadProgress == 1 }
         XCTAssertTrue(uploaded, "every byte is up while the Mac has not answered")
-        XCTAssertEqual(home.entries, [], "the message shows once the Mac took it")
         await mac.releaseChat()
         let result = await sending.value
 
-        XCTAssertEqual(result, .added("xem ảnh"))
-        XCTAssertNil(home.uploadProgress)
+        XCTAssertEqual(result, .sent(.submitted))
+        XCTAssertNil(model.uploadProgress)
         // A late progress value of the finished send changes nothing.
         try await Task.sleep(for: .milliseconds(50))
-        XCTAssertNil(home.uploadProgress)
+        XCTAssertNil(model.uploadProgress)
     }
 
-    /// Ruling R14(a): two messages of five attachments sent at once to one Mac (the home and an agent's screen,
+    /// Ruling R14(a): two messages of five attachments sent at once to one Mac (two agent screens,
     /// say) both arrive whole. Each holds the upload turn until its `chat.send` is answered, so the Mac never
     /// drops one of a message's uploads to make room for the other's.
     func testTwoMessagesOfFiveAttachmentsAtOnceBothArrive() async throws {
         let mac = await macWithSession()
-        let rig = try await HomeRig.make([mac], in: self)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         func five(_ prefix: String) -> [OutgoingAttachment] {
@@ -172,7 +161,7 @@ final class AttachmentSendTests: XCTestCase {
 
     func testSixAttachmentsAreRefusedOnThePhone() async throws {
         let mac = await macWithSession()
-        let rig = try await HomeRig.make([mac], in: self)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         let six = (1...6).map { OutgoingAttachment(kind: .file, name: "f\($0).txt", data: Data("\($0)".utf8)) }
@@ -181,11 +170,6 @@ final class AttachmentSendTests: XCTestCase {
         XCTAssertEqual(ComposerValidation("xem", attachmentCount: 5), .ok("xem"))
         XCTAssertEqual(ComposerValidation.check(six), .tooManyAttachments)
         XCTAssertNil(ComposerValidation.check(Array(six.prefix(5))))
-
-        let result = await rig.home.submit("xem 6 file", attachments: six, to: rig.home.messageTarget, viaVoice: false)
-        XCTAssertEqual(result, .refused(.tooManyAttachments))
-        XCTAssertTrue(result.keepsDraft)
-        XCTAssertEqual(rig.home.entries, [], "nothing is noted")
 
         let agentResult = await model(ref(mac), rig).send("xem 6 file", attachments: six, viaVoice: false)
         XCTAssertEqual(agentResult, .refused(.tooManyAttachments))
@@ -199,7 +183,7 @@ final class AttachmentSendTests: XCTestCase {
 
     func testOversizeAttachmentIsRefusedOnThePhone() async throws {
         let mac = await macWithSession()
-        let rig = try await HomeRig.make([mac], in: self)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         let big = OutgoingAttachment(kind: .file, name: "video.mov", data: Data(count: ShellXLink.maxAttachmentBytes + 1))
@@ -208,12 +192,7 @@ final class AttachmentSendTests: XCTestCase {
         XCTAssertEqual(ComposerValidation.check([log, big]), .attachmentTooLarge(name: "video.mov"))
         XCTAssertNil(ComposerValidation.check([atLimit]), "10 MiB exactly is allowed")
 
-        let result = await rig.home.submit("xem video", attachments: [log, big], to: rig.home.messageTarget, viaVoice: false)
-        XCTAssertEqual(result, .refused(.attachmentTooLarge(name: "video.mov")))
-        XCTAssertTrue(result.keepsDraft)
-        XCTAssertEqual(rig.home.entries, [])
-
-        let agentResult = await model(ref(mac), rig).send("xem video", attachments: [big], viaVoice: false)
+        let agentResult = await model(ref(mac), rig).send("xem video", attachments: [log, big], viaVoice: false)
         XCTAssertEqual(agentResult, .refused(.attachmentTooLarge(name: "video.mov")))
         XCTAssertTrue(agentResult.keepsDraft)
 
@@ -227,7 +206,7 @@ final class AttachmentSendTests: XCTestCase {
 
     func testFailedSendGivesTheAttachmentsBack() async throws {
         let mac = await macWithSession()
-        let rig = try await HomeRig.make([mac], in: self)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         let model = model(ref(mac), rig)
@@ -242,45 +221,17 @@ final class AttachmentSendTests: XCTestCase {
         XCTAssertTrue(agentResult.keepsDraft)
         XCTAssertNil(model.uploadProgress)
 
-        // The user picked that session: only the note, no message the composer still holds.
-        rig.home.target = ref(mac)
-        let result = await rig.home.submit(
-            "sửa lỗi này", attachments: [shot], to: rig.home.messageTarget, viaVoice: false)
-        XCTAssertEqual(result, .kept)
-        XCTAssertTrue(result.keepsDraft)
-        XCTAssertEqual(rig.home.entries.map(\.content), [.note(.machineOffline(machineName: "MacBook Pro"))])
-        XCTAssertNil(rig.home.uploadProgress)
-
-        // Nowhere to send it: the same.
-        let nowhere = await rig.home.submit("sửa lỗi này", attachments: [shot], to: nil, viaVoice: false)
-        XCTAssertEqual(nowhere, .kept)
-        XCTAssertEqual(rig.home.entries.map(\.content).last, .note(.machineOffline(machineName: "MacBook Pro")))
-        XCTAssertEqual(rig.home.entries.count, 2)
-
         let received = await mac.receivedAttachments
         XCTAssertEqual(received, [])
-        // A text-only message still goes into the conversation as before.
-        _ = await rig.home.submit("có ai không?", to: ref(mac), viaVoice: false)
-        XCTAssertEqual(
-            Array(rig.home.entries.suffix(2)).map(\.content),
-            [
-                .userSaid(text: "có ai không?", target: ref(mac), viaVoice: false),
-                .note(.machineOffline(machineName: "MacBook Pro")),
-            ])
     }
 
     func testMessageTheMacDidNotTypeKeepsTheDraft() async throws {
         let mac = await macWithSession()
-        let rig = try await HomeRig.make([mac], in: self)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         await mac.setSendOutcome(.busy)
 
-        let result = await rig.home.submit(
-            "sửa lỗi này", attachments: [shot], to: rig.home.messageTarget, viaVoice: false)
-
-        XCTAssertEqual(result, .kept)
-        XCTAssertEqual(rig.home.entries.map(\.content), [.note(.sendFailed(ref(mac), .busy))])
         let agentResult = await model(ref(mac), rig).send("sửa lỗi này", attachments: [shot], viaVoice: false)
         XCTAssertEqual(agentResult, .sent(.busy))
         XCTAssertTrue(agentResult.keepsDraft)
@@ -288,16 +239,11 @@ final class AttachmentSendTests: XCTestCase {
 
     func testMacWithoutTheFeatureGetsNothing() async throws {
         let mac = await macWithSession(acceptsAttachments: false)
-        let rig = try await HomeRig.make([mac], in: self)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
 
-        let result = await rig.home.submit(
-            "sửa lỗi này", attachments: [shot], to: rig.home.messageTarget, viaVoice: false)
-
-        XCTAssertEqual(result, .kept)
         // Finding M4: said apart from a send that failed and can be tried again.
-        XCTAssertEqual(rig.home.entries.map(\.content), [.note(.sendFailed(ref(mac), .attachmentsUnsupported))])
         let agentResult = await model(ref(mac), rig).send("sửa lỗi này", attachments: [shot], viaVoice: false)
         XCTAssertEqual(agentResult, .attachmentsUnsupported)
         XCTAssertTrue(agentResult.keepsDraft)
@@ -313,7 +259,7 @@ final class AttachmentSendTests: XCTestCase {
 
     func testRefusedUploadKeepsTheDraft() async throws {
         let mac = await macWithSession()
-        let rig = try await HomeRig.make([mac], in: self)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         // An empty file: the Mac takes 1 byte to 10 MiB, so it refuses the upload.
@@ -324,9 +270,6 @@ final class AttachmentSendTests: XCTestCase {
         // A refusal other than `unsupported` is a plain failure, to try again.
         XCTAssertEqual(agentResult, .notSent)
         XCTAssertTrue(agentResult.keepsDraft)
-        let result = await rig.home.submit("xem", attachments: [empty], to: rig.home.messageTarget, viaVoice: false)
-        XCTAssertEqual(result, .kept)
-        XCTAssertEqual(rig.home.entries.map(\.content), [.note(.sendFailed(ref(mac), .failed))])
         let sent = await mac.sentTexts
         XCTAssertEqual(sent, [])
     }
@@ -337,7 +280,7 @@ final class AttachmentSendTests: XCTestCase {
         let takes = await macWithSession(name: "MacBook Pro")
         let refuses = FakeMac(name: "Mac mini", acceptsAttachments: false)
         let old = FakeMac(name: "iMac", servesSessionsAndChat: false)
-        let rig = try await HomeRig.make([takes, refuses, old], in: self)
+        let rig = try await HubRig.make([takes, refuses, old], in: self)
         let synced = await eventually { rig.hub.machines.allSatisfy { $0.state == .online } }
         XCTAssertTrue(synced)
 

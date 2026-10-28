@@ -2,8 +2,8 @@ import Foundation
 import ShellXLinkCore
 
 /// Tells which sessions just finished a turn: working, or waiting on the user, when last seen, and
-/// idle now. `HomeModel` saves it as `StoreDocument.lastSessions`, so a session that finished while
-/// the app was closed is still reported on the next launch.
+/// idle now. `MachineHub` runs one over every session list a Mac sends, in memory only: what finished
+/// while the app was closed is not reported on the next launch.
 ///
 /// Each finish, a session's `(sessionId, stateSinceMs)` on one Mac, is reported once: a resync that
 /// replays an older list and then the same finish (a reconnect, a restarted Mac app) stays quiet.

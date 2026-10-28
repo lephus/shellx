@@ -131,8 +131,6 @@ public actor ConversationStore: LocalDataWiping {
 
     private func fileURL(_ doc: StoreDocument) -> URL {
         switch doc {
-        case .home: return directory.appendingPathComponent("home.json")
-        case .lastSessions: return directory.appendingPathComponent("last-sessions.json")
         case .thread(let ref):
             let digest = SHA256.hash(data: Data("\(ref.machineID)\0\(ref.sessionId)".utf8))
             let name = digest.map { String(format: "%02x", $0) }.joined()

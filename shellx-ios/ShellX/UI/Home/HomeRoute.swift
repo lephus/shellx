@@ -1,10 +1,16 @@
-/// The screens pushed over the home.
+import ShellXAppCore
+
+/// The screens pushed over the workspace list.
 enum HomeRoute: Hashable {
-    /// "Your Macs", from the Mac in the toolbar.
+    /// "Your Macs", from a Mac's header in the list and from Settings.
     case machines
     case settings
-    /// Every pending card, from the home's "Needs you" bar.
+    /// Every pending card, from the "Needs you" bar and the bell.
     case pending
     /// One workspace's pending cards, from an agent screen's "Needs you" bar.
     case pendingIn(machineID: String, workspaceId: String)
+    /// One workspace of a Mac.
+    case workspace(WorkspaceRef)
+    /// The sessions of a Mac that no workspace row accounts for.
+    case otherSessions(machineID: String)
 }
