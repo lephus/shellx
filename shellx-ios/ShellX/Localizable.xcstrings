@@ -3529,6 +3529,24 @@
         }
       }
     },
+    "workspace.paneClosedOnMac": {
+      "comment": "A short line on the workspace screen: the terminal being viewed was closed on the Mac, so the next one shows.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal closed on the Mac"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal đã đóng trên Mac"
+          }
+        }
+      }
+    },
     "workspace.shell.placeholder": {
       "comment": "On a workspace screen, in place of a terminal chip's content: the terminal itself comes in a later version.",
       "extractionState": "manual",

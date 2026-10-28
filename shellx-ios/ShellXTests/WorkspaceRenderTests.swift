@@ -92,12 +92,12 @@ final class WorkspaceRenderTests: XCTestCase {
     private func screen(
         selected: String?, panes: [WorkspacePane] = WorkspaceRenderTests.panes, title: String = "shellx-ios",
         branch: String? = "feat/workspaces", canControl: Bool = true, alert: WorkspaceAlert? = nil,
-        requested: Requested = Requested()
+        notice: AgentScreen.Notice? = nil, requested: Requested = Requested()
     ) -> some View {
         NavigationStack {
             WorkspaceScreen(
                 title: title, branch: branch, panes: panes, selected: selected, now: Self.now, canControl: canControl,
-                alert: .constant(alert),
+                notice: notice, alert: .constant(alert),
                 agent: { session in
                     let _ = requested.sessions.append(session.session.sessionId)
                     self.agentPane(session, pending: session.session.sessionId == "s-claude" ? [Self.request] : [])
@@ -162,6 +162,15 @@ final class WorkspaceRenderTests: XCTestCase {
     func testRendersWhileTheMacIsAway() throws {
         try assertRenders(screen(selected: "t-zsh", canControl: false), name: "workspace-no-control")
         try assertRenders(screen(selected: "t-zsh", alert: .refusedClose), name: "workspace-alert")
+    }
+
+    /// Spec section 6.2: the pane shown was closed on the Mac, the next chip shows, and a short line says why.
+    func testRendersThePaneClosedNotice() throws {
+        let notice = AgentScreen.Notice(text: WorkspaceView.paneClosedNotice)
+        XCTAssertEqual(notice.text, String(localized: "workspace.paneClosedOnMac"))
+        let withNotice = try SnapshotWriter().write(screen(selected: "t-zsh", notice: notice), name: "workspace-pane-closed")
+        let without = try SnapshotWriter().write(screen(selected: "t-zsh"), name: "workspace-shell")
+        XCTAssertNotEqual(withNotice.first?.pngData(), without.first?.pngData(), "the line shows over the pages")
     }
 
     func testRendersTheWaitingAndMissingStates() throws {

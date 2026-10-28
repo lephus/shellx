@@ -5,7 +5,8 @@ import SwiftUI
 /// `WorkspaceScreenModel` and the hub. A chip that runs an agent shows the existing agent screen as its
 /// pane (`AgentView`, embedded); the commands in `•••` are the hub's (`WorkspaceScreenActions`).
 ///
-/// It leaves on its own when the workspace it showed is closed on the Mac: it pops, and the list says so
+/// When the pane shown is closed on the Mac, the next chip shows and a short line says why
+/// (`paneClosedNotice`). It leaves on its own when the workspace it showed is closed on the Mac: it pops, and the list says so
 /// in a short line. When the Mac is removed from this iPhone it pops without a word; a list emptied for
 /// any other reason (the Mac offline, no longer reachable) keeps the last chips. A workspace the Mac has
 /// not listed yet (a create answers before the list that holds it) shows a spinner; one that does not
@@ -20,6 +21,8 @@ struct WorkspaceView: View {
     @State private var alert: WorkspaceAlert?
     /// The user confirmed closing the workspace here: its leaving needs no word of explanation.
     @State private var closedHere = false
+    /// The line over the pages, for `AgentView.noticeDuration`.
+    @State private var notice: AgentScreen.Notice?
     @Environment(\.dismiss) private var dismiss
     @Environment(VoiceService.self) private var voiceService: VoiceService?
 
@@ -38,7 +41,7 @@ struct WorkspaceView: View {
                 WorkspaceScreen(
                     title: model.workspace?.title ?? "", branch: model.workspace?.branch, panes: model.panes,
                     selected: model.selectedTerminalId, canControl: model.canControl,
-                    pagingLocked: voiceService?.isListening ?? false,
+                    pagingLocked: voiceService?.isListening ?? false, notice: notice,
                     actions: WorkspaceScreenActions.make(
                         scope: scope, model: model,
                         alert: {
@@ -68,6 +71,16 @@ struct WorkspaceView: View {
             case .waiting, .showing, .notFound: break
             }
         }
+        .onChange(of: model.shownPaneClosed) { _, _ in
+            let text = Self.paneClosedNotice
+            notice = AgentScreen.Notice(text: text)
+            AccessibilityNotification.Announcement(text).post()
+        }
+        .task(id: notice?.id) {
+            guard notice != nil else { return }
+            do { try await Task.sleep(for: AgentView.noticeDuration) } catch { return }
+            notice = nil
+        }
         // Whatever finished while the user was here, the user saw.
         .onDisappear { scope.hub.markSeen(ref) }
     }
@@ -80,6 +93,9 @@ struct WorkspaceView: View {
         }
         dismiss()
     }
+
+    /// What the screen says when the pane shown was closed on the Mac and the next chip shows.
+    static var paneClosedNotice: String { String(localized: "workspace.paneClosedOnMac") }
 
     /// What the list says after this screen left because its workspace is gone; nothing when the user
     /// closed the workspace here.

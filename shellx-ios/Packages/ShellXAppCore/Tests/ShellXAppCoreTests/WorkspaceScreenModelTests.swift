@@ -266,6 +266,7 @@ final class WorkspaceScreenModelTests: XCTestCase {
         let last = await eventually { model.selectedTerminalId == "t3" }
         XCTAssertTrue(last, "the last chip went: the one before it, \(String(describing: model.selectedTerminalId))")
         XCTAssertEqual(model.phase, .showing)
+        XCTAssertEqual(model.shownPaneClosed, 2, "each time, the screen says the pane was closed on the Mac")
     }
 
     func testAChipThatIsNotBeingViewedGoingAwayChangesNothing() async throws {
@@ -279,6 +280,7 @@ final class WorkspaceScreenModelTests: XCTestCase {
 
         XCTAssertTrue(gone)
         XCTAssertEqual(model.selectedTerminalId, "t1")
+        XCTAssertEqual(model.shownPaneClosed, 0, "the pane shown is still there: nothing to say")
     }
 
     func testTheLastChipGoingAwayLeavesNoSelection() async throws {

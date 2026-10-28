@@ -33,6 +33,7 @@ enum WorkspaceMenuItem: CaseIterable {
 /// - Below, one page per chip, swiped sideways like the chips are tapped: a chip that runs an agent
 ///   shows the agent's chat (`agent`: the existing agent screen as a pane); any other shows
 ///   `ShellPanePlaceholder`. While a mic listens (`pagingLocked`) the pages stay put.
+/// - `notice`, when there is one, floats over the top of the pages (the pane shown was closed on the Mac).
 struct WorkspaceScreen<AgentPane: View>: View {
     let title: String
     /// The git branch, when the Mac gave one.
@@ -47,6 +48,8 @@ struct WorkspaceScreen<AgentPane: View>: View {
     /// A mic is listening: the pages do not follow a sideways drag, so a drag to the left on the mic (its
     /// cancel) never turns the page instead.
     var pagingLocked = false
+    /// A short line over the pages, such as "Terminal closed on the Mac".
+    var notice: AgentScreen.Notice?
     var actions = WorkspaceScreenActions()
     /// Why the last command did not work; the screen shows it until it is dismissed.
     @Binding var alert: WorkspaceAlert?
@@ -60,6 +63,13 @@ struct WorkspaceScreen<AgentPane: View>: View {
         VStack(spacing: 0) {
             PaneChips(panes: panes, selected: selected, now: now, select: actions.select)
             pager
+                .overlay(alignment: .top) {
+                    if let notice {
+                        NoticeCapsule(text: notice.text)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.2), value: notice)
         }
         .background(Color.appBackground)
         .navigationTitle(Text(verbatim: title))

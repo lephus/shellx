@@ -41,6 +41,9 @@ public final class WorkspaceScreenModel {
     public private(set) var phase: Phase = .waiting
     /// The terminal id of the chip shown; nil while the workspace has no terminal.
     public private(set) var selectedTerminalId: String?
+    /// How many times the chip shown left the Mac's list while the workspace stayed (it was closed on the
+    /// Mac): the screen moved to the next chip, and says so in a short line (spec section 6.2).
+    public private(set) var shownPaneClosed = 0
 
     @ObservationIgnored private let hub: MachineHub
     @ObservationIgnored private let sleep: @Sendable (Duration) async throws -> Void
@@ -214,6 +217,7 @@ public final class WorkspaceScreenModel {
         if let selected = selectedTerminalId, !ids.contains(selected) {
             selectedTerminalId = Self.successor(of: selected, before: knownTerminalIds, now: ids)
             settled = true
+            shownPaneClosed += 1
         } else if selectedTerminalId == nil {
             let choice = Self.defaultChoice(in: workspace, pending: pendingHere, sessions: sessionsHere)
             selectedTerminalId = choice.terminalId
