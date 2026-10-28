@@ -764,8 +764,8 @@ final class HostSettingsActions: SettingsHostActions {
     }
 
     /// ShellX pairs phones only through ShellX Link: cmux's iOS pairing host and phone push have no backend
-    /// here, so Settings › Mobile shows just the "Pair iPhone" row.
-    var pairsPhonesThroughShellXLink: Bool { true }
+    /// here, so Settings › Mobile shows just the "Pair iPhone" row, while this Mac serves phones.
+    var pairsPhonesThroughShellXLink: Bool { servesPhones() }
 
     /// Settings › Mobile › "Show QR Code…": the pairing sheet over this Mac's ShellX Link host.
     func openPhonePairing() {
