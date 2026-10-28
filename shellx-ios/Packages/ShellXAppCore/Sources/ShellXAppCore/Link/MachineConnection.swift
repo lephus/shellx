@@ -264,6 +264,10 @@ public actor MachineConnection {
     private func applyWorkspaces(
         _ change: (revision: Int, upserted: [LinkWorkspace], removed: [String]), from client: LinkClient
     ) async {
+        // A Mac whose list could not be read (`workspaceList(of:)`) may still push changes: without a
+        // list to apply them to, the first one looks like a gap and its refetch would fail again, which
+        // would end the session at every change (or show a partial list, at revision 0).
+        guard workspacesSupported else { return }
         switch workspaces.apply(revision: change.revision, upserted: change.upserted, removed: change.removed) {
         case .applied:
             output.yield(.workspaces(workspaces, supported: workspacesSupported))

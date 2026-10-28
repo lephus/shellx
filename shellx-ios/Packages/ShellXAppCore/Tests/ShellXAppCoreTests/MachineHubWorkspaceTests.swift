@@ -76,6 +76,43 @@ final class MachineHubWorkspaceTests: XCTestCase {
         XCTAssertEqual(hub.otherSessions(machineID: id).map(\.session.sessionId), ["s1"])
     }
 
+    func testListThatDoesNotFitLeavesTheSessionOnlineAndUnsupported() async throws {
+        // One workspace too big for a frame even after the Mac's shrink steps: `workspace.list` answers
+        // `too_large`. That must not cost the phone the Mac (the pending requests ride the same session).
+        let huge = LinkWorkspace(
+            workspaceId: "ws-huge", title: String(repeating: "w", count: 70_000), order: 0, terminals: [])
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([huge])
+        await mac.addPending(pendingItem("r1", createdAtMs: 10))
+        let hub = try await makeHub(mac)
+        let id = mac.machine.machineID
+
+        let online = await eventually { isOnline(hub) && hub.pendingItems.count == 1 }
+        XCTAssertTrue(online, "\(String(describing: hub.machines.first?.state))")
+        XCTAssertEqual(hub.machines.first?.workspacesSupported, false)
+        XCTAssertEqual(hub.workspaceRows(machineID: id), [])
+        let lists = await mac.workspaceListCount
+        XCTAssertEqual(lists, 1, "the list was asked for once and refused")
+
+        // The Mac still pushes its changes (the small ones fit a frame). With no list to apply them to,
+        // they are left alone: no refetch, no dropped session, no partial list.
+        await mac.upsertWorkspace(linkWorkspace("web", order: 1))
+        await mac.upsertWorkspace(linkWorkspace("docs", order: 2))
+        await mac.addPending(pendingItem("r2", createdAtMs: 20))
+        let later = await eventually { hub.pendingItems.count == 2 }
+        XCTAssertTrue(later)
+        let reacted = await eventually(timeout: .milliseconds(300)) {
+            let lists = await mac.workspaceListCount
+            let connects = await mac.connectCount
+            return lists > 1 || connects > 1
+        }
+        XCTAssertFalse(reacted, "a change of a list the phone cannot read does not end the session")
+        XCTAssertTrue(isOnline(hub))
+        XCTAssertEqual(hub.pendingItems.map(\.actionable), [true, true])
+        XCTAssertEqual(hub.machines.first?.workspacesSupported, false)
+        XCTAssertEqual(hub.workspaceRows(machineID: id), [])
+    }
+
     func testChangesArriveAsTheyHappen() async throws {
         let mac = FakeMac(name: "MacBook Pro")
         await mac.setWorkspaces([linkWorkspace("shellx")])
