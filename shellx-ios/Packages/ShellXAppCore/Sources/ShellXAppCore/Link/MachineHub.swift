@@ -346,8 +346,10 @@ public final class MachineHub {
 
     /// Sends `text` with `attachments` (none: as `chatSend(_:text:)`). Each attachment is uploaded in
     /// turn, then one `chat.send` names them all, inside one call on the Mac's session: an upload id
-    /// is valid only in the session that made it. Nothing is uploaded to a Mac whose session did not
-    /// list the `attachments` feature.
+    /// is valid only in the session that made it. The Link client holds its upload turn for the whole
+    /// message (`LinkClient.chatSend(sessionId:text:uploading:progress:)`), so two messages sent at once
+    /// go one after the other. Nothing is uploaded to a Mac whose session did not list the
+    /// `attachments` feature.
     ///
     /// `progress` gets the bytes uploaded so far over the bytes of every attachment, after each
     /// chunk the Mac took (1 once the last one is up). It runs on the Link client's actor.
@@ -366,27 +368,19 @@ public final class MachineHub {
                 guard client.hostFeatures.contains(ShellXLink.attachmentsFeature) else {
                     throw AttachmentSendError.refused(code: "unsupported")
                 }
-                var ids: [String] = []
-                var uploaded = 0
-                for attachment in attachments {
-                    let before = uploaded
-                    do {
-                        let id = try await client.uploadAttachment(
-                            kind: attachment.kind, name: attachment.name, data: attachment.data
-                        ) { sent in
-                            progress(total > 0 ? Double(before + sent) / Double(total) : 1)
-                        }
-                        ids.append(id)
-                    } catch let LinkClientError.remote(code, _) {
-                        throw AttachmentSendError.refused(code: code)
-                    } catch {
-                        // A timeout, the session closed, or this task cancelled: the message never left.
-                        throw AttachmentSendError.uploadFailed
-                    }
-                    uploaded += attachment.data.count
-                }
+                let uploads = attachments.map { ChatAttachment(kind: $0.kind, name: $0.name, data: $0.data) }
                 do {
-                    return try await client.chatSend(sessionId: ref.sessionId, text: text, attachments: ids)
+                    // One call: the client keeps its upload turn until the Mac answers the message, so another
+                    // message to this Mac never makes the Mac drop one of these uploads.
+                    return try await client.chatSend(sessionId: ref.sessionId, text: text, uploading: uploads) { sent in
+                        progress(total > 0 ? Double(sent) / Double(total) : 1)
+                    }
+                } catch let error as MessageUploadError {
+                    if case let LinkClientError.remote(code, _) = error.cause {
+                        throw AttachmentSendError.refused(code: code)
+                    }
+                    // A timeout, the session closed, or this task cancelled: the message never left.
+                    throw AttachmentSendError.uploadFailed
                 } catch let LinkClientError.remote(code, _) {
                     // An error answer comes before anything is typed (an id expired or unknown, say).
                     throw AttachmentSendError.refused(code: code)
