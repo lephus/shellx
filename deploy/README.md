@@ -480,8 +480,12 @@ ssh -S ~/.ssh/cm-shellx-vps -O check higio@42.115.41.70                       # 
 ssh -S ~/.ssh/cm-shellx-vps -O exit higio@42.115.41.70                        # close it when done
 ```
 
-With a key login, `export SHELLX_VPS_SSH_OPTS=''` (or `'-i ~/.ssh/key'`) is enough. The scripts stop
-with this same hint if they cannot connect without a prompt.
+With a key login, `export SHELLX_VPS_SSH_OPTS=''` (or `'-i ~/.ssh/key'`) is enough. Every ssh and
+rsync of both scripts runs with `-o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4`:
+they never stop to ask for a password (they stop with this same hint instead), and a dead connection is
+noticed within a minute. That default `ControlPath` is production's socket, so it only applies to the
+default target: with another `SHELLX_VPS` the scripts refuse until you also set `SHELLX_VPS_SSH_OPTS`
+(`''` for plain ssh), so the production master is never reused for a different host.
 
 **2. Deploy the checked-out commit: `deploy/vps-deploy.sh`.**
 
@@ -493,25 +497,52 @@ deploy/vps-deploy.sh
 | Variable | Default | |
 |---|---|---|
 | `SHELLX_VPS` | `higio@42.115.41.70` | ssh target |
-| `SHELLX_VPS_SSH_OPTS` | `-o ControlPath=~/.ssh/cm-shellx-vps` | ssh options; empty string = plain ssh |
+| `SHELLX_VPS_SSH_OPTS` | `-o ControlPath=~/.ssh/cm-shellx-vps`, for the default target only | ssh options; empty string = plain ssh |
 | `APP_DIR` | `phu/shellx` | ShellX's folder, relative to the ssh user's home (same rules as `VPS_APP_DIR`) |
 | `RELAY2_ENABLED` | asked of the VPS | `true`/`false`: also check `GET /v2/relay` (see "Relay v2 without Actions") |
+| `SHELLX_ALLOW_NON_MAIN` | unset | `1`: deploy a `HEAD` that is not on `origin/main` (prints a loud warning) |
+| `SHELLX_ROLLOUT_TIMEOUT`, `SHELLX_ROLLOUT_POLL` | `1500`, `5` | seconds the script waits for the rollout, and between two looks at it |
 
-It refuses to start if `relay/`, `web/` or `deploy/` has uncommitted changes (the VPS gets exactly
-`HEAD`; it does not check that `HEAD` is on `main`, so deploy from `main` unless you mean otherwise).
-Then, in the order of deploy.yml: rsync the tracked build sources (`relay/`, `web/`, `deploy/web/`; never
-`node_modules`, build output or any ignored file) to `~/phu/shellx/.build-src/<sha>/`; on the VPS
-`docker build` both images (relay tests included) and run deploy.yml's preflight (the compose file
-resolves, the new relay image loads `relay.env`); rsync `docker-compose.yml`, `relay.env`,
-`nginx-proxy/` and `backup/` into `.incoming/`; stream `rollout.sh` with `SHELLX_LOCAL_IMAGES=1`; check
-`relay.shellx.pro/v1/version`, `shellx.pro`, `admin.shellx.pro/api/session`, the tickets route (and
-`/v2/relay` when relay2 is on) with deploy.yml's 10 attempts, 15 s apart; and remove
-`.build-src/<sha>`. A failed run leaves `.build-src/<sha>` behind to look at (`rm -rf
-~/phu/shellx/.build-src` is always safe); a failed build changes nothing that runs. Every file it
-writes or removes on the VPS is inside `~/phu/shellx` (the images live in Docker, as always). It prints step names, build output and the checks; never a log's
-content (`rollout.sh` only names the `docker compose logs` command to run). Differences from CI: the
-macOS `rsync` does not understand `--chmod=D755,F644`, so the same modes are set on the VPS after the
-copy; and there is no GHCR login, push or concurrency lock (do not run two deploys at once).
+What it does, in this order (it prints each step's name):
+
+1. **Refuses** a dirty `relay/`, `web/` or `deploy/` (the VPS gets exactly `HEAD`), and a `HEAD` that is
+   not an ancestor of `origin/main`: it runs `git fetch origin main` first, so "on main" is judged
+   against the real main. `SHELLX_ALLOW_NON_MAIN=1` overrides (and also covers a failed fetch).
+2. **Checks the connection and the folder, takes two locks, checks the room.** A `mkdir` lock on the Mac
+   (a leftover of a dead run is replaced; another live run is refused) and `~/phu/shellx/.deploy.lock` on
+   the VPS (a directory; its `owner` file names the holder). If the VPS lock is held the script prints who
+   and how to clear a stale one: check `pgrep -af rollout` and `docker compose ps`, then
+   `ssh <opts> <vps> rm -rf phu/shellx/.deploy.lock`. Then it refuses unless there are at least 4 GB free
+   under Docker's root dir (`docker info --format '{{.DockerRootDir}}'`) and 1.5 GB of `MemAvailable`.
+3. **Copies the build sources**: the tracked files of `relay/`, `web/`, `deploy/web/` (never
+   `node_modules`, build output or any ignored file) to `~/phu/shellx/.build-src/<sha>/`.
+4. **Builds on the VPS**: `docker build` of both images, each under `timeout 30m` (the relay build runs
+   its tests), then deploy.yml's preflight (the compose file resolves, the new relay image loads
+   `relay.env`). Nothing that runs is touched yet.
+5. **Stages the config** into `.incoming/` like deploy.yml.
+6. **Rolls out, detached.** `rollout.sh` is copied (not streamed) to `~/phu/shellx/.rollout/<sha>.sh` and
+   started with `setsid nohup`, `SHELLX_LOCAL_IMAGES=1`, output in `.rollout/<sha>.log`, the exit code in
+   `.rollout/<sha>.exit` and the lock given back when it ends. So a dropped ssh session cannot kill
+   compose half way through a recreate or a rollback. The script polls the exit marker every
+   `SHELLX_ROLLOUT_POLL` seconds and shows the log as it grows (rollout.sh's own lines and compose's
+   output; no secret is in them), for at most `SHELLX_ROLLOUT_TIMEOUT` seconds. The Mac is kept awake with
+   `caffeinate -i` meanwhile (closing the lid still sleeps it).
+   **If the connection is lost** (three polls in a row fail), or the timeout passes, the rollout carries
+   on by itself (or has finished) and the script says so, with the commands to look:
+   `ssh <opts> <vps> 'cd phu/shellx && docker compose ps'` and
+   `ssh <opts> <vps> 'tail -n 50 phu/shellx/.rollout/<sha>.log; cat phu/shellx/.rollout/<sha>.exit'`.
+   **Running the script again heals**: once the rollout is over (its lock is gone) it rebuilds, re-stages
+   and rolls out again; rollout.sh recovers from a half-done swap by itself.
+7. **Checks the public endpoints** (`relay.shellx.pro/v1/version`, `shellx.pro`,
+   `admin.shellx.pro/api/session`, the tickets route, and `/v2/relay` when relay2 is on) with deploy.yml's
+   10 attempts, 15 s apart.
+8. **Cleans up**: removes `.build-src/<sha>` and the rollout files. A failed run leaves them to look at
+   (`rm -rf ~/phu/shellx/.build-src` is always safe); a failed build changes nothing that runs.
+
+Every file it writes or removes on the VPS is inside `~/phu/shellx` (the images live in Docker, as
+always). It prints step names, build output, rollout.sh's lines and the checks; never a secret or any other
+log's content. Differences from CI: the macOS `rsync` does not understand `--chmod=D755,F644`, so the same
+modes are set on the VPS after the copy, and there is no GHCR login or push.
 
 `SHELLX_LOCAL_IMAGES=1` is what makes `rollout.sh` skip the pull of `relay` and `web`: it checks that
 both `ghcr.io/lephus/shellx-{relay,web}:<sha>` exist on the VPS (a missing one ends like a failed pull:
@@ -522,11 +553,22 @@ does exactly what it did before.
 `<dist-dir>` is what `make-feeds.sh` wrote next to the installers. The script runs the same checks as
 `shellx-publish.yml` (`SHA256SUMS`, feeds against installers), refuses a version that
 `~/phu/shellx/downloads/desktop/<version>/` or `download.shellx.pro` already has (installers are
-immutable: release X.Y.(Z+1) instead), rsyncs the installers (folders 755, files 644), checks their
-size over HTTPS, and only then uploads the feeds, `appcast.xml`, `latest-macos.json` and `SHA256SUMS` last
-(`latest-windows.json` before them, when there is an exe), and checks the appcast serves the new version.
-It uses the same `SHELLX_VPS`, `SHELLX_VPS_SSH_OPTS` and `APP_DIR`, and `--dry-run` runs the local
-checks and prints the rest.
+immutable: release X.Y.(Z+1) instead), rsyncs the installers (`--ignore-existing`; folders 755, files
+644), checks their size over HTTPS, and only then uploads the feeds, `appcast.xml`, `latest-macos.json`
+and `SHA256SUMS` last (`latest-windows.json` before them, when there is an exe), and checks the appcast
+serves the new version. The `SHA256SUMS` it uploads is a copy with only the lines of the files it uploads.
+The feeds are checked against `https://download.shellx.pro`, the address the apps read; another
+`DOWNLOAD_BASE_URL` is refused unless `SHELLX_ALLOW_OTHER_DOWNLOAD_URL=1` is set too. It uses the same
+`SHELLX_VPS`, `SHELLX_VPS_SSH_OPTS` and `APP_DIR` (and the same ssh options and ControlPath rule), takes a
+per-version lock on the Mac, and `--dry-run` runs the local checks and prints the rest.
+
+**An interrupted upload.** If the connection dies while the installers are going up, the next run
+refuses ("already has files"; a version folder it cannot list counts as not free too). It then reads the
+LIVE `appcast.xml`, `latest-macos.json` and `latest-windows.json` from the website: if none points at the
+version, the folder is a leftover and the message gives the exact `ssh ... rm -rf
+phu/shellx/downloads/desktop/<version>` that is safe; if one does, the version is published and the
+only way forward is the next version; if a feed cannot be read, it tells you to look before removing
+anything. Nothing is removed for you.
 
 **Mac-only release.** Without `ShellX-Setup-<version>.exe` in `<dist-dir>` nothing of Windows is
 uploaded and the live `latest-windows.json` stays, so Windows machines are not told about a version
@@ -542,7 +584,8 @@ that has both installers until the Windows exe of the new version is published t
 **`.env`** (the file `rollout.sh` and `docker compose` read; not `relay.env`, which is only the relay
 container's environment and is overwritten by every deploy). `RELAY2_ENABLED` is read by nothing on
 the VPS: it is the GitHub variable that told deploy.yml to also check `GET /v2/relay`. `vps-deploy.sh`
-answers that question itself by looking for `relay2` in the VPS's `COMPOSE_PROFILES`; set
+answers that question itself by reading `COMPOSE_PROFILES` in the VPS's `.env` as a comma list, the way
+`rollout.sh` does (`relay2` in the list; `relay20` or `my-relay2` is not it); set
 `RELAY2_ENABLED=true` or `false` in your shell to override. The "Relay v2" section above has the reasons
 and the nginx step; from the Mac, with the shared connection open, the whole procedure is:
 
@@ -552,10 +595,11 @@ PIN=$(sed -n 's#^ *context: \./relay2-src/\([0-9a-f]\{40\}\) *$#\1#p' deploy/doc
 scripts/shellx/relay2/source-tarball.sh "$PIN" /tmp            # prints the path, its sha256 and the sha
 scp $S "/tmp/relay2-src-$PIN.tar.gz" "$V:phu/shellx/"
 ssh $S $V "cd phu/shellx && sha256sum relay2-src-$PIN.tar.gz && mkdir -p relay2-src && tar -xzf relay2-src-$PIN.tar.gz -C relay2-src"
-#   compare that sha256 with the one the script printed, then (the secret is never printed):
-ssh $S $V 'cd phu/shellx && grep -q "^CMUX_RELAY_HMAC_SECRET=" .env || printf "CMUX_RELAY_HMAC_SECRET=%s\n" "$(openssl rand -hex 32)" >> .env; chmod 600 .env'
+#   compare that sha256 with the one the script printed, then (the secret is never printed; a missing
+#   final newline in .env is added first, so the new line is not glued to the last one):
+ssh $S $V 'cd phu/shellx && touch .env && { [ -z "$(tail -c1 .env)" ] || echo >> .env; } && { grep -q "^CMUX_RELAY_HMAC_SECRET=" .env || printf "CMUX_RELAY_HMAC_SECRET=%s\n" "$(openssl rand -hex 32)" >> .env; } && chmod 600 .env'
 #   edit nginx-proxy's copy of relay.shellx.pro by hand (Relay v2, step 4), then build once and switch on:
-ssh $S $V 'cd phu/shellx && docker compose --profile relay2 build relay2 && { grep -q "^COMPOSE_PROFILES=" .env || echo COMPOSE_PROFILES=relay2 >> .env; }'
+ssh $S $V 'cd phu/shellx && docker compose --profile relay2 build relay2 && { [ -z "$(tail -c1 .env)" ] || echo >> .env; } && { grep -q "^COMPOSE_PROFILES=" .env || echo COMPOSE_PROFILES=relay2 >> .env; }'
 deploy/vps-deploy.sh                                            # now builds, rolls out and checks relay2 too
 ```
 
@@ -563,7 +607,8 @@ To switch it off, follow "Relay v2", step 7 (remove the container first, then th
 line); `vps-deploy.sh` then stops checking `/v2/relay` by itself.
 
 **Rollback.** A deploy whose relay or web is not healthy within 60 s rolls itself back (config and
-`IMAGE_TAG`, as in "Operations"). To go back after a *good* deploy:
+`IMAGE_TAG`, as in "Operations"); the detached rollout's own lines are in `.rollout/<sha>.log` and
+its exit code in `.rollout/<sha>.exit`. To go back after a *good* deploy:
 
 - *The previous release's images are still on the VPS* (they are kept for 7 days after a healthy
   deploy; `docker image ls | grep shellx-`): on the VPS, `cd ~/phu/shellx`, put the old sha in `.env`
@@ -587,7 +632,13 @@ no pull of relay and web, `backup` still pulled, a missing local image taking th
 with the local `sqlite3` (rotation, missing and unreadable databases, 0600 file mode, handing each
 file to the owner of `backups/`). `compose.test.mjs` checks `docker-compose.yml` (memory ceiling,
 push and admin settings) and that every name it routes has its `nginx-proxy/` file in step 5.
-`vps-scripts.test.mjs` runs `vps-deploy.sh` (in a throwaway git repository) and `publish-to-vps.sh`
-against a fake `ssh`, `rsync` and `curl`: dirty-tree refusal, the order of the steps, what is sent,
-nothing outside `phu/shellx`, `--dry-run`, input validation, the immutable-version refusal, feeds last and
-the Mac-only release.
+`vps-deploy.test.mjs`, `vps-deploy-options.test.mjs` and `publish-to-vps.test.mjs` (fakes in
+`vps-fakes.mjs`) run `vps-deploy.sh` (in a throwaway git repository with an `origin`) and
+`publish-to-vps.sh` against a fake `ssh`, `rsync`, `curl`, `docker`, `timeout` and `caffeinate`. The fake
+`ssh` and `rsync` work on a sandbox "remote home", so the scripts sent to the VPS (locks, launcher, poll,
+relay2 question, version-folder check) and `rollout.sh` itself really run: the detached rollout surviving
+a dropped connection, a failing and a slow rollout, the origin/main check and its override, the room check,
+both locks and their release on every path, the order of the steps, what is sent, nothing outside
+`phu/shellx`, the fixed ssh options, the ControlPath rule, relay2 detection, `--dry-run`, input
+validation, the immutable-version refusal and its recovery message, feeds last, the filtered
+`SHA256SUMS`, and the Mac-only release.
