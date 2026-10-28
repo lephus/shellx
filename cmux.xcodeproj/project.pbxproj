@@ -3377,6 +3377,7 @@
 		5E11A10000000000000000C3 /* ShellXLinkSession in Frameworks */ = {isa = PBXBuildFile; productRef = 5E11A10000000000000000A3 /* ShellXLinkSession */; };
 		D7D8ECF76D016AF9BAF4CCDF /* ShellXLinkSessionSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3951343772D06EA84F8DFB /* ShellXLinkSessionSource.swift */; };
 		5D693441A945A84AB92EDCC0 /* ShellXLinkSessionSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C4FA75B16A59721F4A0DDFD /* ShellXLinkSessionSourceTests.swift */; };
+		83308C65B38A70628A5D4A2D /* ShellXLinkWorkspaceSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0376F5560BF8B22CE6EB2DD3 /* ShellXLinkWorkspaceSourceTests.swift */; };
 		068517128CB0B3002C263E47 /* ShellXNoPhoneHomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 670CA928F698AA3B4424ED2D /* ShellXNoPhoneHomeTests.swift */; };
 		7413037583554EAA6E41D32F /* ShellXPathsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A657627F06A42A092E1F085 /* ShellXPathsTests.swift */; };
 		067A3A09F525B237CBC042CE /* ShellXPhoneHandoffPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ED77518C2AC614A20D35B29 /* ShellXPhoneHandoffPopover.swift */; };
@@ -8011,6 +8012,7 @@
 		A7C3D91E5B2F48A6908E1D02 /* ShellXLinkSecretStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkSecretStorage.swift; sourceTree = "<group>"; };
 		0D3951343772D06EA84F8DFB /* ShellXLinkSessionSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Remote/Link/ShellXLinkSessionSource.swift; sourceTree = "<group>"; };
 		5C4FA75B16A59721F4A0DDFD /* ShellXLinkSessionSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkSessionSourceTests.swift"; sourceTree = "<group>"; };
+		0376F5560BF8B22CE6EB2DD3 /* ShellXLinkWorkspaceSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXLinkWorkspaceSourceTests.swift"; sourceTree = "<group>"; };
 		670CA928F698AA3B4424ED2D /* ShellXNoPhoneHomeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXNoPhoneHomeTests.swift"; sourceTree = "<group>"; };
 		8A657627F06A42A092E1F085 /* ShellXPathsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ShellXPathsTests.swift"; sourceTree = "<group>"; };
 		7ED77518C2AC614A20D35B29 /* ShellXPhoneHandoffPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellX/Share/ShellXPhoneHandoffPopover.swift; sourceTree = "<group>"; };
@@ -14200,6 +14202,7 @@
 				2C6EEC449F68101F20F61E30 /* ShellXWorkspaceSetTests.swift */,
 				F1B507FD57203BB0E2A9E30D /* ShellXRemoteGateTests.swift */,
 				DE5C4F1C209C32BE95E97448 /* ShellXLinkHostPolicyTests.swift */,
+				0376F5560BF8B22CE6EB2DD3 /* ShellXLinkWorkspaceSourceTests.swift */,
 			);
 			path = cmuxTests;
 			sourceTree = "<group>";
@@ -19233,6 +19236,7 @@
 				593001A30A7C992F6A0507BA /* ShellXLinkHostPolicyTests.swift in Sources */,
 				8228ADD7A74BFCB3F916A6A0 /* ShellXLinkKeyStoreTests.swift in Sources */,
 				5D693441A945A84AB92EDCC0 /* ShellXLinkSessionSourceTests.swift in Sources */,
+				83308C65B38A70628A5D4A2D /* ShellXLinkWorkspaceSourceTests.swift in Sources */,
 				068517128CB0B3002C263E47 /* ShellXNoPhoneHomeTests.swift in Sources */,
 				7413037583554EAA6E41D32F /* ShellXPathsTests.swift in Sources */,
 				7EE7B9BC69774E0B60D4C1B2 /* ShellXPhonePairingCoordinatorTests.swift in Sources */,
