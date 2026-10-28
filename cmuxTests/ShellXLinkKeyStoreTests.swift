@@ -269,10 +269,17 @@ struct ShellXLinkKeyStoreTests {
         #expect(keychain.baseQuery("host-key.acct")[kSecUseDataProtectionKeychain as String] as? Bool == true)
     }
 
+    /// Opt-in: set for the real login keychain round trip below. Through xcodebuild, pass it to the test host as
+    /// `TEST_RUNNER_SHELLX_TEST_LOGIN_KEYCHAIN=1`.
+    static let loginKeychainOptIn = "SHELLX_TEST_LOGIN_KEYCHAIN"
+
     /// The real Keychain, from this test host: its signature carries no provisioning profile either, so the
     /// production storage must work here without `errSecMissingEntitlement`. Uses a throwaway service and
-    /// deletes its item.
-    @Test func testProductionKeychainNeedsNoKeychainEntitlement() throws {
+    /// deletes its item. Opt-in, because it writes to the developer's login keychain and a locked one would
+    /// stop the run on its unlock prompt.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment[ShellXLinkKeyStoreTests.loginKeychainOptIn] == "1",
+                   "writes to the login keychain; set SHELLX_TEST_LOGIN_KEYCHAIN=1 to run it"))
+    func testProductionKeychainNeedsNoKeychainEntitlement() throws {
         let kind = FallbackLinkSecretStorage.keychain(bundleID: shellXProductionBundleID).kind
         let storage = KeychainLinkSecretStorage(service: "pro.shellx.desktop.tests.\(UUID().uuidString).shellx-link",
                                                 kind: kind)
