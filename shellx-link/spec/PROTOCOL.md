@@ -356,14 +356,20 @@ Rules:
   (a new session, even of the same phone, cannot use it).
 - An upload is used by one `chat.send` only. Once the host accepts a `chat.send` that names it, it removes the
   upload at once, whatever outcome the `chat.send.result` then reports.
-- A client uploads one attachment at a time. An `attach.begin` therefore first drops every upload of the
-  session that has not had its `attach.end`, whatever its progress, so an upload that failed or was given up
-  never holds a place.
-- A session holds at most 5 uploads that no `chat.send` has used yet, counted after that drop. An
-  `attach.begin` past that is answered `error` `bad_request`.
-- An upload that no `chat.send` has named within 5 minutes of its `attach.end` is dropped. A host may check
-  this only when it handles an `attach.begin` or a `chat.send`; an expired id is answered `bad_request` like
-  any id the host does not hold.
+- A client uploads one attachment at a time, and sends one message's uploads and its `chat.send` with no upload
+  of another message in between: it starts the next message's first `attach.begin` only once that `chat.send`
+  is answered. An `attach.begin` therefore first drops every upload of the session that has not had its
+  `attach.end`, whatever its progress, so an upload that failed or was given up never holds a place.
+- A session holds at most 5 finished uploads that no `chat.send` has used yet, counted after that drop. An
+  `attach.begin` that the host accepts while it holds 5 first drops the one whose `attach.end` came first.
+  Under the rule above that is never an upload of the message going up (it has at most 5, and they ended last),
+  only one left by a message that failed or was given up, so a phone's retry is never refused for its own
+  earlier attempt.
+- Once 5 minutes pass with no `attach.*` call that the host accepted (answered with anything but `error`),
+  the host drops every upload of the session. The time counts from the session's last accepted call, not from
+  each upload, so a slow message whose first upload ended long before its last keeps them all. A host may defer
+  this check until it handles the next `attach.*` call or `chat.send`; a dropped id is answered `bad_request`
+  like any id the host does not hold.
 - A `chat.send` that names an `attachment_id` the host does not hold, an upload that has not had its
   `attach.end`, or the same id twice, is answered `error` `bad_request`; it is not accepted, so it uses none
   of the uploads.
@@ -580,8 +586,8 @@ Attachments below.)
 | --- | --- | --- |
 | `agent.snapshot.get`, `agent.sessions.get`, `chat.history.get` | None (reads) | The pending requests and sessions of this Mac's Claude Code agents; the transcripts of listed sessions |
 | `agent.reply` | Gives a decision to an agent hook that is waiting for it | One pending request, by `request_id`. Only the item's `modes` (never `bypass` or `bypassPermissions`, which stay on the Mac), at most once (section 5) |
-| `chat.send` | Pastes `text` (0 to 16 384 bytes) at the agent's prompt in its terminal and submits it. With `attachments`, first types the paths of the files the host saved from those uploads (below) | One live Claude Code session, by `session_id`; the uploads of this Link session, by `attachment_id` |
-| `attach.begin`, `attach.chunk`, `attach.end` | Keeps the uploaded bytes in the host's memory. Writes no file: files are written only when a `chat.send` carries the upload to a *live* session | The uploads of this Link session, by `attachment_id`; at most 5 unsent, each at most 10 MiB |
+| `chat.send` | Pastes `text` (0 to 16 384 bytes) at the agent's prompt in its terminal and submits it. With `attachments`, the host saves those uploads as files and types their paths too: the images' before the text, the other files' after it (below) | One live Claude Code session, by `session_id`; the uploads of this Link session, by `attachment_id` |
+| `attach.begin`, `attach.chunk`, `attach.end` | Keeps the uploaded bytes in the host's memory. Writes no file: files are written only when a `chat.send` carries the upload to a *live* session | The uploads of this Link session, by `attachment_id`; at most 5 finished and unsent plus the one going up, each at most 10 MiB |
 | `chat.interrupt` | Sends Esc, or ctrl-C when `hard`, to that agent's terminal | One live Claude Code session, by `session_id` |
 | `ping` | None | |
 
@@ -608,19 +614,40 @@ never picks a path: the host names the directory, the file name and the file mod
 way a pasted clipboard image is, in the host's own temporary directory under a name the host chooses; the
 extension is the only part taken from `name`, and only when it is a known image type (`png` otherwise).
 A file goes in `shellx-attachments/<UUID>/<sanitized name>` inside that directory, a new UUID directory
-for every file, with mode 0600. The host builds `<sanitized name>` from `name` by removing `/`, `\`, control
-characters and leading dots, cutting it to 100 UTF-8 bytes (keeping the extension), and using `file` when
-nothing is left, so the name cannot leave its directory. The host registers every file it saves (and the
-directory of a file) for the temporary-file cleanup it already runs for pasted images. It never opens,
-previews or runs an attachment, and nothing is written until a `chat.send` carries the upload to a live
-session (the shell fall-through rule above applies to the paths exactly as it does to `text`). The paths
-are typed, escaped for the shell, only into the terminal of that live session, as the text is, and never
-into another terminal. The size limits (5 uploads of at most 10 MiB per Link session in memory, at most 5
-files of 10 MiB per message on disk) bound the memory and disk a phone can use, and an upload dies with
-its session, with the `chat.send` that uses it, with the next `attach.begin` if it was not finished, or
-5 minutes after its `attach.end`. What the agent then does with the path is the agent's own business, as
-with any path the user types at its prompt, and a paired phone is trusted like the user (below). The host
-never logs attachment names or bytes. The cmux socket method `mobile.chat.send` does not accept files (it
+for every file, with mode 0600 (the directories 0700). The host builds `<sanitized name>` from `name` by
+removing `/`, `\`, control characters, line and paragraph separators and leading dots, cutting it so that
+its canonically decomposed form (NFD) is at most 100 UTF-8 bytes (keeping the extension), and using `file`
+when nothing is left, so the name cannot leave its directory, and a file system that stores names
+decomposed cannot grow it past the 255 bytes a path component may take. The host registers every file it
+saves (and the directory of a file) for the temporary-file cleanup it already runs for pasted images. It
+never opens, previews or runs an attachment, and nothing is written until a `chat.send` carries the upload
+to a live session (the shell fall-through rule above applies to the paths exactly as it does to `text`). The
+paths are typed, escaped for the shell, only into the terminal of that live session, as the text is, and
+never into another terminal: the images' paths first (the agent turns each into an attached image), then
+the text, then the other files' paths, then the submit key. A message with text therefore never starts with
+the raw path of a file, which an agent could take for one of its slash commands; a message of files only
+does start with one.
+
+What a phone can make the Mac hold is bounded, though not by a single figure:
+
+- Memory, per Link session: at most 5 finished uploads that no `chat.send` has used plus the one going up,
+  each at most 10 MiB. An upload dies with its session, with the `chat.send` that uses it, with the next
+  `attach.begin` if it was not finished or if it is the oldest of 5, or once 5 minutes pass with no accepted
+  `attach.*` call. A `chat.send` the host accepted takes its uploads (at most 5 of 10 MiB) out of that count
+  and holds them until it is typed; one waiting behind an earlier message to the same session (sends to one
+  session are typed one after another) keeps holding them meanwhile. The ShellX phone starts the next message
+  with attachments only once the last one is answered (or its answer timed out), so it has about one such
+  message in flight per Mac; a client that pipelines more makes the host hold up to 50 MiB more for each
+  until the messages ahead of it are typed.
+- Disk: each message writes at most 5 files of at most 10 MiB in the host's temporary directory. They are
+  not removed when the agent has read them: they stay until the Mac app quits, which removes every file it
+  registered (after a crash, the system's own clean-up of temporary files takes them). Disk use therefore
+  grows with the messages a phone sends while the app runs, as it does with images the user pastes at the
+  Mac.
+
+What the agent then does with the path is the agent's own business, as with any path the user types at
+its prompt, and a paired phone is trusted like the user (below). The host never logs attachment names or
+bytes. The cmux socket method `mobile.chat.send` does not accept files (it
 answers `invalid_params`); only ShellX Link does.
 
 **Why the rest is acceptable.** A paired phone is trusted like the user sitting at the Mac: it is signed in

@@ -593,6 +593,91 @@ final class AttachmentSessionTests: XCTestCase {
         XCTAssertEqual(outcome, .submitted)
     }
 
+    // MARK: - One message at a time
+
+    /// Ruling R14(a): a message keeps the upload turn from its first `attach.begin` until its `chat.send` is
+    /// answered, so another message's uploads never come between them.
+    func testAMessageHoldsTheUploadTurnUntilItsSendIsAnswered() async throws {
+        let sendArrived = Flag()
+        let client = try await connectToAHostThatStallsTheFirstUpload(stalls: false, sendArrived: sendArrived)
+        let message = Task {
+            try await client.chatSend(
+                sessionId: "s1", text: "look", uploading: [ChatAttachment(kind: .file, name: "a", data: Data([1]))])
+        }
+        // Its upload is done, and its `chat.send`, which this host never answers, has reached the host.
+        let sent = await eventually { sendArrived.isSet }
+        XCTAssertTrue(sent, "the message's chat.send did not arrive")
+
+        let other = Task { try await client.uploadAttachment(kind: .file, name: "b", data: Data([2])) }
+        let queued = await waitForQueue(of: client, toReach: 1)
+        XCTAssertTrue(queued, "another upload went ahead while the message waited for its answer")
+
+        message.cancel()
+        do {
+            let outcome = try await within { try await message.value }
+            XCTFail("the cancelled message returned \(outcome)")
+        } catch is CancellationError {
+        } catch {
+            XCTFail("expected CancellationError, got \(error)")
+        }
+        let id = try await within { try await other.value }
+        XCTAssertEqual(id, "U2")
+    }
+
+    /// Two messages of five attachments sent at once from one phone both arrive whole: with the turn held per
+    /// message, neither's upload is dropped to make room for the other's.
+    func testTwoMessagesOfFiveAttachmentsAtOnceBothArrive() async throws {
+        let chat = FakeChatSource(["s1": []], acceptsAttachments: true)
+        let client = try await connect(makeHost(chat: chat))
+        func five(_ prefix: String) -> [ChatAttachment] {
+            (0..<ShellXLink.maxAttachmentsPerMessage).map {
+                ChatAttachment(kind: .file, name: "\(prefix)\($0)", data: Data(count: 50_000))
+            }
+        }
+
+        async let first = client.chatSend(sessionId: "s1", text: "one", uploading: five("a"))
+        async let second = client.chatSend(sessionId: "s1", text: "two", uploading: five("b"))
+        let outcomes = try await [first, second]
+
+        XCTAssertEqual(outcomes, [.submitted, .submitted])
+        let byText = Dictionary(uniqueKeysWithValues: chat.attachmentSends.map { ($0.text, $0.attachments.map(\.name)) })
+        XCTAssertEqual(byText["one"], ["a0", "a1", "a2", "a3", "a4"])
+        XCTAssertEqual(byText["two"], ["b0", "b1", "b2", "b3", "b4"])
+    }
+
+    /// The bytes of every attachment, counted over the whole message; a refused upload stops the message before
+    /// its `chat.send`, as a `MessageUploadError` that carries the host's refusal.
+    func testAMessageReportsItsProgressAndStopsAtARefusedUpload() async throws {
+        let chat = FakeChatSource(["s1": []], acceptsAttachments: true)
+        let client = try await connect(makeHost(chat: chat))
+        let progress = Collector<Int>()
+        let outcome = try await within {
+            try await client.chatSend(sessionId: "s1", text: "both", uploading: [
+                ChatAttachment(kind: .file, name: "big", data: Data(count: 100_000)),
+                ChatAttachment(kind: .image, name: "small.jpg", data: Data([1, 2, 3])),
+            ]) { progress.append($0) }
+        }
+        XCTAssertEqual(outcome, .submitted)
+        XCTAssertEqual(progress.items, [45_000, 90_000, 100_000, 100_003])
+        XCTAssertEqual(chat.attachmentSends.first?.attachments.map(\.name), ["big", "small.jpg"])
+
+        do {
+            let refused = try await within {
+                try await client.chatSend(sessionId: "s1", text: "x", uploading: [
+                    ChatAttachment(kind: .file, name: "fine", data: Data([1])),
+                    ChatAttachment(kind: .file, name: "empty", data: Data()),
+                ])
+            }
+            XCTFail("a message with an empty attachment returned \(refused)")
+        } catch let error as MessageUploadError {
+            guard case let LinkClientError.remote(code, _) = error.cause else {
+                return XCTFail("expected a refusal, got \(error.cause)")
+            }
+            XCTAssertEqual(code, "bad_request")
+        }
+        XCTAssertEqual(chat.attachmentSends.count, 1, "the refused message was not sent")
+    }
+
     // MARK: - Hosts without attachments
 
     func testHostWithoutAttachmentsAdvertisesNothing() async throws {
@@ -696,9 +781,12 @@ final class AttachmentSessionTests: XCTestCase {
         return raw
     }
 
-    /// A client connected to a scripted host that takes uploads as `U1`, `U2`, ... and never answers the second chunk
-    /// of `U1`, so the first upload stays running until the test cancels it.
-    private func connectToAHostThatStallsTheFirstUpload() async throws -> LinkClient {
+    /// A client connected to a scripted host that takes uploads as `U1`, `U2`, ... and never answers a `chat.send`
+    /// (it sets `sendArrived` when one comes). Unless `stalls` is false, it never answers the second chunk of `U1`
+    /// either, so the first upload stays running until the test cancels it.
+    private func connectToAHostThatStallsTheFirstUpload(
+        stalls: Bool = true, sendArrived: Flag = Flag()
+    ) async throws -> LinkClient {
         let hostKey = NoiseStaticKey()
         let clientKey = NoiseStaticKey()
         let (clientEnd, hostEnd) = makeInMemoryCircuitPair()
@@ -717,11 +805,13 @@ final class AttachmentSessionTests: XCTestCase {
                         held["U\(begun)"] = 0
                         try await channel.send(.attachReady(callId: callId, attachmentId: "U\(begun)"))
                     case let .attachChunk(callId, id, offset, data):
-                        if id == "U1", offset > 0 { continue }
+                        if stalls, id == "U1", offset > 0 { continue }
                         held[id, default: 0] += data.count
                         try await channel.send(.attachChunkResult(callId: callId, attachmentId: id, received: held[id] ?? 0))
                     case let .attachEnd(callId, id, _):
                         try await channel.send(.attachEndResult(callId: callId, attachmentId: id))
+                    case .chatSend:
+                        sendArrived.set()
                     default:
                         continue
                     }

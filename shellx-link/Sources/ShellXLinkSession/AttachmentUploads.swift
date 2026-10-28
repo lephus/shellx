@@ -25,26 +25,33 @@ struct AttachmentRefusal: Error, Equatable {
 /// The uploads of one Link session that no `chat.send` has used yet (PROTOCOL.md section 5, "Attachments"). It is
 /// a value in the host's session loop, so it lives and dies with the session: an id means nothing in another one.
 ///
-/// Bytes stay in memory: at most `ShellXLink.maxPendingUploads` uploads of at most `ShellXLink.maxAttachmentBytes`
-/// each. Nothing here logs a name or any bytes.
+/// Bytes stay in memory: at most `ShellXLink.maxPendingUploads` finished uploads of at most
+/// `ShellXLink.maxAttachmentBytes` each, plus the one going up. Nothing here logs a name or any bytes.
 ///
-/// A phone uploads one attachment at a time, so no upload outlives its usefulness by holding a place:
+/// A phone uploads one attachment at a time and runs a message's uploads and its `chat.send` with no other message's
+/// uploads in between, so no upload outlives its usefulness by holding a place:
 /// * an `attach.begin` first drops every upload that has not had its `attach.end` (one the phone gave up on);
-/// * a finished upload that no `chat.send` names within `ShellXLink.unsentUploadLifetime` of its `attach.end` is
-///   dropped. This is checked lazily, at each `attach.begin` and `chat.send`, against the injected clock.
+/// * an `attach.begin` that would make a sixth unsent upload drops the one that finished first: an upload left by a
+///   message that failed, never one of the message going up (it has at most 5, and they finished last);
+/// * once `ShellXLink.unsentUploadLifetime` passes with no `attach.*` call accepted, every upload is dropped. This
+///   is checked lazily, at each `attach.*` call and `chat.send`, against the injected clock.
 struct AttachmentUploads {
     private struct Upload {
         let kind: AttachmentKind
         let name: String
         let size: Int
         var data = Data()
-        /// When `attach.end` accepted the digest; nil until then. Only a finished upload can be named by a `chat.send`.
-        var endedAt: ContinuousClock.Instant?
+        /// The order `attach.end` accepted the digest in; nil until then. Only a finished upload can be named by a
+        /// `chat.send`.
+        var finishOrder: Int?
 
-        var finished: Bool { endedAt != nil }
+        var finished: Bool { finishOrder != nil }
     }
 
     private var uploads: [String: Upload] = [:]
+    /// When the host last accepted an `attach.*` call of this session; nil before the first one.
+    private var lastAccepted: ContinuousClock.Instant?
+    private var finishedCount = 0
     private let now: @Sendable () -> ContinuousClock.Instant
 
     init(now: @escaping @Sendable () -> ContinuousClock.Instant = { .now }) {
@@ -54,6 +61,13 @@ struct AttachmentUploads {
     /// Answers one `attach.begin`, `attach.chunk` or `attach.end` from the phone: the host's reply, or an `error`
     /// that carries the call's `call_id`.
     mutating func serve(_ message: LinkMessage) -> LinkMessage {
+        dropIfIdle()
+        let answer = answer(message)
+        if case .error = answer {} else { lastAccepted = now() }
+        return answer
+    }
+
+    private mutating func answer(_ message: LinkMessage) -> LinkMessage {
         switch message {
         case let .attachBegin(callId, kind, name, size):
             do throws(AttachmentRefusal) {
@@ -84,7 +98,7 @@ struct AttachmentUploads {
     /// fails the checks nothing is removed. The checks are PROTOCOL.md section 5's: at most
     /// `ShellXLink.maxAttachmentsPerMessage` ids, each held, finished, and named once.
     mutating func take(_ ids: [String]) throws(AttachmentRefusal) -> [ChatAttachment] {
-        dropExpired()
+        dropIfIdle()
         guard ids.count <= ShellXLink.maxAttachmentsPerMessage else {
             throw .badRequest("at most \(ShellXLink.maxAttachmentsPerMessage) attachments per message")
         }
@@ -103,7 +117,6 @@ struct AttachmentUploads {
     private mutating func begin(kind: AttachmentKind, name: String, size: Int) throws(AttachmentRefusal) -> String {
         // One upload at a time: whatever is not finished was given up, and must not hold a place.
         uploads = uploads.filter { $0.value.finished }
-        dropExpired()
         switch kind {
         case .image, .file: break
         case .other: throw .badRequest("this host takes only image and file attachments")
@@ -112,8 +125,12 @@ struct AttachmentUploads {
         guard size <= ShellXLink.maxAttachmentBytes else {
             throw AttachmentRefusal(code: "too_large", message: "size is above \(ShellXLink.maxAttachmentBytes) bytes")
         }
-        guard uploads.count < ShellXLink.maxPendingUploads else {
-            throw .badRequest("at most \(ShellXLink.maxPendingUploads) unsent uploads")
+        // Full: the upload that finished first makes room. It is never one of the message going up, whose
+        // uploads finished after it and number at most `maxAttachmentsPerMessage`.
+        while uploads.count >= ShellXLink.maxPendingUploads,
+              let oldest = uploads.min(by: { ($0.value.finishOrder ?? 0) < ($1.value.finishOrder ?? 0) })?.key
+        {
+            uploads[oldest] = nil
         }
         let id = UUID().uuidString
         uploads[id] = Upload(kind: kind, name: name, size: size)
@@ -147,15 +164,14 @@ struct AttachmentUploads {
             uploads[id] = nil
             throw .badRequest("the digest does not match the bytes")
         }
-        uploads[id]?.endedAt = now()
+        finishedCount += 1
+        uploads[id]?.finishOrder = finishedCount
     }
 
-    /// Drops the finished uploads that were not named in time.
-    private mutating func dropExpired() {
-        let current = now()
-        uploads = uploads.filter { upload in
-            guard let endedAt = upload.value.endedAt else { return true }
-            return current - endedAt <= ShellXLink.unsentUploadLifetime
-        }
+    /// Drops every upload once `ShellXLink.unsentUploadLifetime` has passed since the last accepted `attach.*` call.
+    private mutating func dropIfIdle() {
+        guard let lastAccepted, now() - lastAccepted > ShellXLink.unsentUploadLifetime else { return }
+        uploads.removeAll()
+        self.lastAccepted = nil
     }
 }

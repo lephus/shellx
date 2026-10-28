@@ -20,6 +20,17 @@ public enum LinkClientError: Error, Equatable, Sendable {
     case unexpectedAnswer
 }
 
+/// An attachment of a message failed to go up, so the message's `chat.send` was never sent
+/// (``LinkClient/chatSend(sessionId:text:uploading:progress:)``): nothing was typed, and sending it again is safe.
+public struct MessageUploadError: Error {
+    /// What the upload threw: `LinkClientError` (`.remote` when the host refused a step) or `CancellationError`.
+    public let cause: any Error
+
+    public init(cause: any Error) {
+        self.cause = cause
+    }
+}
+
 /// The phone side of ShellX Link: one established session with one host.
 public actor LinkClient {
     private typealias Change = (revision: Int, added: [PendingItem], resolved: [String])
@@ -71,11 +82,13 @@ public actor LinkClient {
     /// `call_id` is not here (the call timed out or was cancelled) is dropped.
     private var waiters: [String: Waiter] = [:]
     private var endError: LinkClientError?
-    /// The callers of ``uploadAttachment(kind:name:data:progress:)`` waiting for their turn, oldest first. An
-    /// upload runs from `attach.begin` to its end with no other upload in between (the host drops an unfinished
-    /// upload at every `attach.begin`), and this actor is reentrant at every `await`: hence a gate.
+    /// The callers of ``uploadAttachment(kind:name:data:progress:)`` and of
+    /// ``chatSend(sessionId:text:uploading:progress:)`` waiting for their turn, oldest first. An upload runs from
+    /// `attach.begin` to its end, and a message from its first upload to its `chat.send`'s answer, with no other
+    /// upload in between (the host drops an unfinished upload at every `attach.begin`, and the oldest finished one
+    /// when it holds five), and this actor is reentrant at every `await`: hence a gate.
     private var uploadWaiters: [(ticket: Int, continuation: CheckedContinuation<Void, any Error>)] = []
-    /// True while an upload holds the turn, from the moment it gets it until ``releaseUploadTurn()``.
+    /// True while an upload or a message holds the turn, from the moment it gets it until ``releaseUploadTurn()``.
     private var uploadBusy = false
     private var nextUploadTicket = 0
 
@@ -241,19 +254,29 @@ public actor LinkClient {
     ///
     /// Each step is a call with the usual 10 s timeout. Throws `.remote(code: ...)` when the host refuses a
     /// step: `"too_large"` or `"bad_request"` for a size outside 1 to `ShellXLink.maxAttachmentBytes`,
-    /// `"bad_request"` for a kind other than `.image` and `.file` or a sixth unsent upload, `"unsupported"`
-    /// without the feature.
+    /// `"bad_request"` for a kind other than `.image` and `.file`, `"unsupported"` without the feature.
     ///
     /// Uploads of one client run one at a time, in the order they were called: a caller waits for the upload
     /// before it to finish or fail (the host drops an unfinished upload at the next `attach.begin`, so two at once
-    /// would drop each other). A failed or cancelled upload needs no cleanup and gives up its turn; so does a caller
-    /// cancelled while it waits. A finished upload waits for a `chat.send` for `ShellXLink.unsentUploadLifetime` (5 minutes) after its
-    /// `attach.end`; later its id is `bad_request` and the attachment must be uploaded again.
+    /// would drop each other), and for a message of ``chatSend(sessionId:text:uploading:progress:)`` to be
+    /// answered. A failed or cancelled upload needs no cleanup and gives up its turn; so does a caller cancelled
+    /// while it waits. The host keeps at most `ShellXLink.maxPendingUploads` finished uploads, dropping the one that
+    /// finished first to make room, and drops them all once `ShellXLink.unsentUploadLifetime` (5 minutes) passes
+    /// with no upload call; a dropped id is `bad_request` and the attachment must be uploaded again. To send
+    /// attachments with a message, prefer ``chatSend(sessionId:text:uploading:progress:)``, which keeps them safe
+    /// from both.
     public func uploadAttachment(
         kind: AttachmentKind, name: String, data: Data, progress: @Sendable (Int) -> Void = { _ in }
     ) async throws -> String {
         try await acquireUploadTurn()
         defer { releaseUploadTurn() }
+        return try await upload(kind: kind, name: name, data: data, progress: progress)
+    }
+
+    /// One upload, `attach.begin` to `attach.end`. The caller holds the upload turn.
+    private func upload(
+        kind: AttachmentKind, name: String, data: Data, progress: @Sendable (Int) -> Void
+    ) async throws -> String {
         let size = data.count
         let ready = try await call { .attachBegin(callId: $0, kind: kind, name: name, size: size) }
         guard case let .attachReady(_, attachmentId) = ready else { throw LinkClientError.unexpectedAnswer }
@@ -277,6 +300,44 @@ public actor LinkClient {
             throw LinkClientError.unexpectedAnswer
         }
         return attachmentId
+    }
+
+    /// Uploads `attachments` in order, then types `text` with them into a session: one message, the way a phone
+    /// sends photos and files with a message. Call it only when ``hostFeatures`` lists
+    /// `ShellXLink.attachmentsFeature`.
+    ///
+    /// The message holds this client's upload turn from its first `attach.begin` until its `chat.send` is answered,
+    /// so no other upload of this client comes in between (PROTOCOL.md section 5): the host then never drops one of
+    /// this message's uploads to make room, and two messages sent at once both arrive whole. `progress` gets the
+    /// bytes of all the attachments sent so far after each chunk's result; it runs on this actor.
+    ///
+    /// Throws ``MessageUploadError`` when an upload failed or was refused: the `chat.send` never left, so nothing
+    /// was typed. Otherwise as ``chatSend(sessionId:text:attachments:)``: an error from the `chat.send` itself
+    /// (a timeout, say) leaves it unknown whether the message arrived.
+    public func chatSend(
+        sessionId: String, text: String, uploading attachments: [ChatAttachment],
+        progress: @Sendable (Int) -> Void = { _ in }
+    ) async throws -> ChatSendOutcome {
+        do {
+            try await acquireUploadTurn()
+        } catch {
+            throw MessageUploadError(cause: error)
+        }
+        defer { releaseUploadTurn() }
+        var ids: [String] = []
+        var sent = 0
+        for attachment in attachments {
+            let before = sent
+            do {
+                ids.append(try await upload(kind: attachment.kind, name: attachment.name, data: attachment.data) {
+                    progress(before + $0)
+                })
+            } catch {
+                throw MessageUploadError(cause: error)
+            }
+            sent += attachment.data.count
+        }
+        return try await chatSend(sessionId: sessionId, text: text, attachments: ids)
     }
 
     /// Interrupts a session's current turn; `hard` asks for a stronger stop. Errors as for `chatSend`.
