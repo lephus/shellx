@@ -1,11 +1,12 @@
+import ShellXAppCore
 import SwiftUI
 
 /// "Rename Workspace": a field filled with the current name, Cancel and Save. Save is off while the
 /// name, trimmed, is empty (an empty name would only mean "go back to the automatic one", which
 /// this sheet does not offer).
 struct WorkspaceRenameSheet: View {
-    /// The most characters of a name; 128 characters never exceed `ShellXLink.maxWorkspaceTitleBytes`.
-    static let maxLength = 128
+    /// The most characters of a name (`WorkspaceTitle.maxCharacters`).
+    static let maxLength = WorkspaceTitle.maxCharacters
 
     let current: String
     /// Gets the trimmed name.
@@ -22,13 +23,13 @@ struct WorkspaceRenameSheet: View {
         _title = State(initialValue: String(current.prefix(Self.maxLength)))
     }
 
-    /// The name as sent: surrounding spaces and line breaks gone.
+    /// The name as sent (`WorkspaceTitle.cleaned(_:)`).
     static func cleaned(_ title: String) -> String {
-        title.trimmingCharacters(in: .whitespacesAndNewlines)
+        WorkspaceTitle.cleaned(title)
     }
 
     static func canSave(_ title: String) -> Bool {
-        !cleaned(title).isEmpty
+        WorkspaceTitle.canSave(title)
     }
 
     var body: some View {
