@@ -717608,6 +717608,71 @@
           }
         }
       }
+    },
+    "remote.phonePairing.signInFirst": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in under Settings › Account to pair an iPhone with this Mac."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "سجّل الدخول من الإعدادات › حساب لإقران iPhone بجهاز Mac هذا."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Melde dich unter Einstellungen › Konto an, um ein iPhone mit diesem Mac zu koppeln."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inicia sesión en Ajustes › Cuenta para vincular un iPhone con este Mac."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connectez-vous dans Réglages › Compte pour jumeler un iPhone avec ce Mac."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この Mac と iPhone をペアリングするには、設定 › アカウントでサインインしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 Mac과 iPhone을 페어링하려면 설정 › 계정에서 로그인하세요."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hãy đăng nhập trong Cài đặt › Tài khoản để ghép cặp iPhone với Mac này."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在设置 › 账户中登录，以便将 iPhone 与这台 Mac 配对。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請在設定 › 帳戶中登入，以便將 iPhone 與這台 Mac 配對。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

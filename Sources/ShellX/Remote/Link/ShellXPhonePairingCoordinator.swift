@@ -166,6 +166,7 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
         errorText = nil
         errorKind = nil
         isReady = host.pairingHost != nil
+        needsSignIn = !isReady && !isSignedIn()
         let interval = pollInterval, sleep = sleep
         poller = Task { [weak self] in
             while !Task.isCancelled {
@@ -207,6 +208,7 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
         }
         lastHost = current
         if !isReady { isReady = true }
+        if needsSignIn { needsSignIn = false }
         if needsOffer(for: current) { await makeOfferOnce(for: current) }
         guard isOpen, generation == session, let offer else { return }
         await readPending(against: offer, session: session)
@@ -238,6 +240,8 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
 
     private func becomeNotReady() async {
         if isReady { isReady = false }
+        let signedOut = !isSignedIn()
+        if needsSignIn != signedOut { needsSignIn = signedOut }
         let waiting = retireOffer()
         candidates = []
         await refuse(waiting)
@@ -590,8 +594,11 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
 
 extension ShellXPhonePairingCoordinator {
     /// The app's coordinator over this Mac's link host and shellx-core; nil when the app has no link host.
+    /// Signed in means Settings › Account shows an account, or the remote service runs a session.
     static func forApp() -> ShellXPhonePairingCoordinator? {
         guard let host = ShellXRemoteService.shared.linkHost as? ShellXLinkHostController else { return nil }
-        return ShellXPhonePairingCoordinator(host: host, relay: host.core)
+        return ShellXPhonePairingCoordinator(host: host, relay: host.core, isSignedIn: {
+            ShellXRemoteService.shared.isSignedIn || ShellXAccountFlow.shared.currentIdentity != nil
+        })
     }
 }

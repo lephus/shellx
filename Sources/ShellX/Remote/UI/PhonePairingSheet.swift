@@ -58,8 +58,12 @@ struct PhonePairingSheet: View {
         .environment(\.colorScheme, .dark)
     }
 
+    /// Why no QR shows: signed out, where to sign in; otherwise that the Mac is not serving yet.
     private var notReady: some View {
-        Text(String(localized: "remote.phonePairing.notReady", defaultValue: "This Mac is not ready to serve phones yet"))
+        Text(coordinator.needsSignIn
+            ? String(localized: "remote.phonePairing.signInFirst",
+                     defaultValue: "Sign in under Settings › Account to pair an iPhone with this Mac.")
+            : String(localized: "remote.phonePairing.notReady", defaultValue: "This Mac is not ready to serve phones yet"))
             .font(.system(size: 12))
             .foregroundColor(ShellXPalette.text.color)
             .fixedSize(horizontal: false, vertical: true)
