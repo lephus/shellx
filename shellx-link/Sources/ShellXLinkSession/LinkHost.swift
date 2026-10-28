@@ -15,6 +15,8 @@ public actor LinkHost {
     private nonisolated let feed: any AgentFeedSource
     private nonisolated let sessions: (any AgentSessionSource)?
     private nonisolated let chat: (any AgentChatSource)?
+    private nonisolated let workspaces: (any WorkspaceSource)?
+    private nonisolated let workspaceControl: (any WorkspaceControl)?
     private nonisolated let hostVersion: String
     private nonisolated let machineName: String
     private nonisolated let timings: LinkTimings
@@ -26,19 +28,27 @@ public actor LinkHost {
     ///     `acceptsAttachments` is true the host also offers the `attachments` feature and takes `attach.*` uploads
     ///     (kept in memory for the session, handed to `send(sessionId:text:attachments:)`); otherwise `attach.*` and a
     ///     `chat.send` with attachments are answered `unsupported`.
+    ///   - workspaces: the workspace list; with it the host offers the `workspaces` feature, without it
+    ///     `workspace.list.get` is answered `unsupported`.
+    ///   - workspaceControl: creating, renaming and closing workspaces; with it the host offers the
+    ///     `workspace_control` feature, without it `workspace.create`, `workspace.rename` and `workspace.close` are
+    ///     answered `unsupported`.
     public init(
         key: NoiseStaticKey, trustedClients: @escaping @Sendable () -> Set<Data>,
         feed: any AgentFeedSource, sessions: (any AgentSessionSource)? = nil, chat: (any AgentChatSource)? = nil,
+        workspaces: (any WorkspaceSource)? = nil, workspaceControl: (any WorkspaceControl)? = nil,
         hostVersion: String, machineName: String
     ) {
         self.init(
             key: key, trustedClients: trustedClients, feed: feed, sessions: sessions, chat: chat,
+            workspaces: workspaces, workspaceControl: workspaceControl,
             hostVersion: hostVersion, machineName: machineName, timings: .standard)
     }
 
     init(
         key: NoiseStaticKey, trustedClients: @escaping @Sendable () -> Set<Data>,
         feed: any AgentFeedSource, sessions: (any AgentSessionSource)?, chat: (any AgentChatSource)?,
+        workspaces: (any WorkspaceSource)? = nil, workspaceControl: (any WorkspaceControl)? = nil,
         hostVersion: String, machineName: String, timings: LinkTimings
     ) {
         self.key = key
@@ -46,6 +56,8 @@ public actor LinkHost {
         self.feed = feed
         self.sessions = sessions
         self.chat = chat
+        self.workspaces = workspaces
+        self.workspaceControl = workspaceControl
         self.hostVersion = hostVersion
         self.machineName = machineName
         self.timings = timings
@@ -55,8 +67,8 @@ public actor LinkHost {
     ///
     /// Flow: Noise handshake (responder), `hello` -> `welcome`, then `agent.changed` pushes for
     /// every feed change and answers to `agent.snapshot.get`, `agent.reply`, `ping` and, with the
-    /// sources, the session and chat calls (`agent.sessions.get`, `chat.*`), plus pushes for every
-    /// session change, chat entry and transcript reset (`chat.reset`).
+    /// sources, the session, chat and workspace calls (`agent.sessions.get`, `chat.*`, `workspace.*`), plus pushes
+    /// for every session change, chat entry, transcript reset (`chat.reset`) and workspace change.
     /// Cancelling the calling task ends the session.
     public func serve(_ circuit: any RelayCircuit) async {
         await runSession(circuit)
@@ -131,12 +143,17 @@ public actor LinkHost {
         let changes = feed.changes()
         let sessionChanges = sessions?.sessionChanges()
         let chatPushes = chat?.entries()
+        let workspaceChanges = workspaces?.workspaceChanges()
         // Read once: what `welcome` offers is what this session enforces.
         let takesAttachments = chat?.acceptsAttachments == true
+        var features: [String] = []
+        if takesAttachments { features.append(ShellXLink.attachmentsFeature) }
+        if workspaces != nil { features.append(ShellXLink.workspacesFeature) }
+        if workspaceControl != nil { features.append(ShellXLink.workspaceControlFeature) }
         do {
             try await channel.send(.welcome(
                 protocolVersion: ShellXLink.protocolVersion, hostVersion: hostVersion, machineName: machineName,
-                features: takesAttachments ? [ShellXLink.attachmentsFeature] : []))
+                features: features))
         } catch {
             return
         }
@@ -156,6 +173,16 @@ public actor LinkHost {
                         on: channel, frame: Self.shrunkSessions(change.upserted) {
                             .sessionsChanged(revision: change.revision, upserted: $0, removed: change.removed)
                         }, what: "agent.sessions.changed")
+                }
+            }
+        }
+        if let workspaceChanges {
+            group.addTask {
+                for await change in workspaceChanges {
+                    await Self.deliver(
+                        on: channel, frame: Self.shrunkWorkspaces(change.upserted) {
+                            .workspacesChanged(revision: change.revision, upserted: $0, removed: change.removed)
+                        }, what: "workspace.changed")
                 }
             }
         }
@@ -184,6 +211,8 @@ public actor LinkHost {
         let sendOrder = ReplyOrder()
         let sessions = self.sessions
         let chat = self.chat
+        let workspaces = self.workspaces
+        let workspaceControl = self.workspaceControl
         // The uploads of this session: an id means nothing in another one, and they end with this scope.
         var uploads = AttachmentUploads(now: timings.now)
         while true {
@@ -313,10 +342,54 @@ public actor LinkHost {
                 // A call of a later version (PROTOCOL.md section 3): answered at once, so the phone does not
                 // wait out its timeout. One without a call_id is ignored below.
                 await Self.sendError(on: channel, "unsupported", "this host does not know this call", callId: callId)
-            case let .workspacesGet(callId), let .workspaceCreate(callId), let .workspaceRename(callId, _, _),
-                 let .workspaceClose(callId, _):
-                // No workspace source is wired yet: answered like a host without the feature (PROTOCOL.md section 3).
-                await Self.sendError(on: channel, "unsupported", "this host lists no workspaces", callId: callId)
+            case let .workspacesGet(callId):
+                guard let workspaces else {
+                    await Self.sendError(on: channel, "unsupported", "this host lists no workspaces", callId: callId)
+                    continue
+                }
+                let list = await workspaces.workspaces()
+                await Self.deliver(
+                    on: channel, frame: Self.shrunkWorkspaces(list.workspaces) {
+                        .workspaces(callId: callId, revision: list.revision, workspaces: $0)
+                    }, what: "workspace.list", answering: callId)
+            case let .workspaceCreate(callId):
+                guard let workspaceControl else {
+                    await Self.sendError(on: channel, "unsupported", "this host takes no workspace control", callId: callId)
+                    continue
+                }
+                // Acting on the Mac may take a while; keep reading meanwhile.
+                group.addTask {
+                    let result = await workspaceControl.createWorkspace()
+                    // The new id goes out only with `ok` (PROTOCOL.md section 4, Workspace).
+                    let workspaceId = result.outcome == .ok ? result.workspaceId : nil
+                    try? await channel.send(
+                        .workspaceCreateResult(callId: callId, outcome: result.outcome, workspaceId: workspaceId))
+                }
+            case let .workspaceRename(callId, workspaceId, title):
+                guard let workspaceControl else {
+                    await Self.sendError(on: channel, "unsupported", "this host takes no workspace control", callId: callId)
+                    continue
+                }
+                // Checked before the source is called, in bytes (PROTOCOL.md section 4, Workspace).
+                guard title.utf8.count <= ShellXLink.maxWorkspaceTitleBytes else {
+                    await Self.sendError(
+                        on: channel, "bad_request", "title must be at most \(ShellXLink.maxWorkspaceTitleBytes) bytes",
+                        callId: callId)
+                    continue
+                }
+                group.addTask {
+                    let outcome = await workspaceControl.renameWorkspace(workspaceId: workspaceId, title: title)
+                    try? await channel.send(.workspaceRenameResult(callId: callId, outcome: outcome))
+                }
+            case let .workspaceClose(callId, workspaceId):
+                guard let workspaceControl else {
+                    await Self.sendError(on: channel, "unsupported", "this host takes no workspace control", callId: callId)
+                    continue
+                }
+                group.addTask {
+                    let outcome = await workspaceControl.closeWorkspace(workspaceId: workspaceId)
+                    try? await channel.send(.workspaceCloseResult(callId: callId, outcome: outcome))
+                }
             case .pong, .unknown, .error:
                 break
             case .hello, .welcome, .changed, .sessionsChanged, .chatEntries, .chatReset, .workspacesChanged:
@@ -379,6 +452,24 @@ public actor LinkHost {
         for dropTitles in [false, true] {
             do {
                 return try LinkCodec.encode(make(dropTitles ? sessions.map { $0.withoutTitle() } : sessions))
+            } catch LinkCodecError.frameTooLarge {
+                continue
+            } catch {
+                linkLog.error("cannot encode a host frame: \(String(describing: error), privacy: .public)")
+                return nil
+            }
+        }
+        return nil
+    }
+
+    /// PROTOCOL.md section 6: the workspace list as is, else with shrink steps 1 to 4 (`LinkWorkspace.shrunk(step:)`)
+    /// applied to every workspace in turn, the first encoding that fits wins. Never a list with a workspace left out:
+    /// nil when even step 4 does not fit.
+    static func shrunkWorkspaces(_ workspaces: [LinkWorkspace], _ make: ([LinkWorkspace]) -> LinkMessage) -> Data? {
+        for step in 0...4 {
+            let list = step == 0 ? workspaces : workspaces.map { $0.shrunk(step: step) ?? $0 }
+            do {
+                return try LinkCodec.encode(make(list))
             } catch LinkCodecError.frameTooLarge {
                 continue
             } catch {

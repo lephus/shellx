@@ -539,7 +539,7 @@ Rules:
   succeed or fail the same way.
 
 `message.case` names the message; the other `message` keys use the JSON field names (`decision`
-and PendingItem objects use their wire form). All 28 cases:
+and PendingItem objects use their wire form). All 37 cases:
 
 | `message.case` | Wire `t` | Other keys |
 | --- | --- | --- |
@@ -570,6 +570,15 @@ and PendingItem objects use their wire form). All 28 cases:
 | `attach_chunk_result` | `attach.chunk.result` | `call_id`, `attachment_id`, `received` |
 | `attach_end` | `attach.end` | `call_id`, `attachment_id`, `sha256` (the hex text) |
 | `attach_end_result` | `attach.end.result` | `call_id`, `attachment_id` |
+| `workspaces_get` | `workspace.list.get` | `call_id` |
+| `workspaces` | `workspace.list` | `call_id`, `revision`, `workspaces` (Workspace objects, each with its Terminal objects) |
+| `workspaces_changed` | `workspace.changed` | `revision`, `upserted`, `removed` |
+| `workspace_create` | `workspace.create` | `call_id` |
+| `workspace_create_result` | `workspace.create.result` | `call_id`, `outcome`, `workspace_id` (optional) |
+| `workspace_rename` | `workspace.rename` | `call_id`, `workspace_id`, `title` |
+| `workspace_rename_result` | `workspace.rename.result` | `call_id`, `outcome` |
+| `workspace_close` | `workspace.close` | `call_id`, `workspace_id` |
+| `workspace_close_result` | `workspace.close.result` | `call_id`, `outcome` |
 | `unknown` | any unrecognized `t` | `type` (the `t` value), `call_id` (optional: the frame's valid `call_id`); decode-only |
 
 ## 9. Pairing and trust
@@ -646,16 +655,20 @@ accepts a pairing request for a machine of the phone's own account.
 ## 10. Phone commands
 
 A phone can make the Mac act: decide an agent's pending request, type into an agent session, interrupt
-it. This section is the safety analysis for those commands. It follows the rules a remote command
-channel must meet: deny by default, allow only the calls a product flow needs, scope every call to
-objects the caller may touch, and never let a call execute or open arbitrary content on the Mac.
+it, and make, rename or close a workspace. This section is the safety analysis for those commands. It
+follows the rules a remote command channel must meet: deny by default, allow only the calls a product flow
+needs, scope every call to objects the caller may touch, and never let a call execute or open arbitrary
+content on the Mac.
 
 **Default deny.** A host acts only on the calls in the table below. Every other `t` gets no effect: a
 call of a later version is answered `error` `unsupported` (section 3), any other unknown frame is
 ignored, and a host frame type sent by a client is ignored or answered `bad_request` (section 7). No
-field of any message names a command line, a path on the host, a URL, a workspace or a terminal for the
-host to open, run or type into. (`attach.begin.name` is a label that the host sanitises, never a path: see
-Attachments below.)
+field of any message names a command line, a program, a directory or other path on the host, or a URL for
+the host to open or run, and none names a terminal to type into (`chat.send` and `chat.interrupt` name an
+agent session, and the host types only into that session's terminal: see Shell fall-through below). A call
+names a workspace only to rename or close one that the host's own list holds (`workspace.rename`,
+`workspace.close`), and `workspace.create` names nothing: the host chooses where the new workspace goes.
+(`attach.begin.name` is a label that the host sanitises, never a path: see Attachments below.)
 
 **Allowed calls.**
 
@@ -666,13 +679,18 @@ Attachments below.)
 | `chat.send` | Pastes `text` (0 to 16 384 bytes) at the agent's prompt in its terminal and submits it. With `attachments`, the host saves those uploads as files and types their paths too: the images' before the text, the other files' after it (below) | One live Claude Code session, by `session_id`; the uploads of this Link session, by `attachment_id` |
 | `attach.begin`, `attach.chunk`, `attach.end` | Keeps the uploaded bytes in the host's memory. Writes no file: files are written only when a `chat.send` carries the upload to a *live* session | The uploads of this Link session, by `attachment_id`; at most 5 finished and unsent plus the one going up, each at most 10 MiB |
 | `chat.interrupt` | Sends Esc, or ctrl-C when `hard`, to that agent's terminal | One live Claude Code session, by `session_id` |
+| `workspace.list.get` | None (read) | The host's own local workspaces and their terminals: titles, display directories, git branches, listening ports, tab titles |
+| `workspace.create` | Makes a workspace on the Mac, in a directory the Mac chooses as when the user adds a workspace there, and starts the user's default shell in it. Does not change the Mac's selection or bring its window to the front | None named: the call carries only `call_id`, no path, command, program, URL or environment |
+| `workspace.rename` | Sets the workspace's title (at most 512 UTF-8 bytes) | One local workspace in the host's list, by `workspace_id` |
+| `workspace.close` | Closes that workspace and its terminals, ending what runs in them, as when the user closes it there. The Mac keeps its own rule: it refuses to close its last workspace | One local workspace in the host's list, by `workspace_id` |
 | `ping` | None | |
 
-**Scope.** The host serves only its own Claude Code agent sessions and their pending requests.
-`session_id` and `request_id` are looked up in the host's own lists; an id it does not have is
-`not_found` (`unknown` for a reply). A phone cannot name another workspace, terminal, file, machine or
-account. Only a phone the Mac trusts gets this far: signed in to the same account, holding a proof from a
-QR code the Mac showed, and allowed by the user on that Mac (section 9).
+**Scope.** The host serves only its own Claude Code agent sessions and their pending requests, and its own
+local workspaces. `session_id`, `request_id` and `workspace_id` are looked up in the host's own lists; an id
+it does not have is `not_found` (`unknown` for a reply). A phone cannot name a workspace that is not in the
+list (an SSH or other remote workspace never is), nor a terminal, file, machine or account. Only a phone the
+Mac trusts gets this far: signed in to the same account, holding a proof from a QR code the Mac showed, and
+allowed by the user on that Mac (section 9).
 
 **Shell fall-through.** `chat.send` and `chat.interrupt` type into the terminal the agent runs in. Once the
 agent has exited, that terminal runs the user's shell or whatever started next: a message would run there
@@ -727,14 +745,41 @@ its prompt, and a paired phone is trusted like the user (below). The host never 
 bytes. The cmux socket method `mobile.chat.send` does not accept files (it
 answers `invalid_params`); only ShellX Link does.
 
+**Workspaces.** `workspace.*` is the one place where a phone makes the Mac start something, so it answers the
+three questions a remote command channel must answer, one by one.
+
+- Does it run commands or open content on the Mac? Only `workspace.create` starts anything: a workspace with
+  the user's default shell, in a directory the Mac chooses, exactly as when the user presses the add button on
+  the Mac. No call carries a command line, path, directory, environment variable, URL or program name, and no
+  call types into that shell: `chat.send` still reaches only the terminal of a live agent (Shell fall-through
+  above). The phone does not select the new workspace on the Mac, nor bring a window forward.
+- Does it change or destroy what the phone does not own? The only objects are this Mac's own local workspaces,
+  found by `workspace_id` in the host's list; any other id is `not_found`, and SSH or other remote workspaces
+  are not listed, so they can be neither renamed nor closed. `workspace.close` keeps the Mac's rules: the Mac
+  answers `refused` for its last workspace. A rename is bounded by 512 UTF-8 bytes, which the host checks
+  before it asks the Mac.
+- Does it read state the phone has no business seeing? `workspace.list` carries what the user sees in the
+  Mac's sidebar and tab bar (names, display directories with `~` for the home directory, branches, ports),
+  and which agent session runs in which terminal. It carries no screen content, file, environment variable or
+  setting.
+
+More rules: a Mac whose device management (MDM) blocks remote control does not run a Link host at all, and a
+host that sees that policy change during a session answers every `workspace.create`, `workspace.rename` and
+`workspace.close` with `refused` without acting. Removing a phone on the Mac closes its sessions at once
+(above). A control call runs on its own, so a slow Mac does not hold up the session's other calls. The host
+never logs a workspace title, directory, branch or tab title. These are ShellX Link calls, not cmux socket
+methods: the allowlist of the `cmux ssh` relay does not change.
+
 **Why the rest is acceptable.** A paired phone is trusted like the user sitting at the Mac: it is signed in
 to the user's account, and the user allowed that phone on that Mac in person; the relay can neither create
 that trust nor widen it (section 9). Removing the phone on the Mac untrusts its key at once: its live
 sessions close and its next handshake is refused. Removing it on the phone deletes the grant, so the relay
 mints it no new connect ticket, and the Mac drops the key when it next checks the grants. Within that
-trust, typing into the user's own agent session, stopping it, and answering its requests are what the user
-could do at the keyboard; the allowed calls limit *which objects* a phone reaches (this Mac's live agent
-sessions and their pending requests), not what the user may do with them. Out of reach for a phone in v1:
-spawning or respawning terminals, keys or text for anything but a live agent, opening URLs or files, the
-Mac's settings, the `bypass` modes, other machines and other accounts. The host never logs message text,
-attachment names or bytes, tool inputs, keys, tickets or tokens.
+trust, typing into the user's own agent session, stopping it, answering its requests, and making, renaming
+and closing its workspaces are what the user could do at the keyboard; the allowed calls limit *which
+objects* a phone reaches (this Mac's live agent sessions and their pending requests, and its local
+workspaces), not what the user may do with them. Out of reach for a phone in this version: spawning or
+respawning terminals (a new workspace's first terminal apart), keys or text for anything but a live agent,
+opening URLs or files, the Mac's settings, the `bypass` modes, other machines and other accounts. The host
+never logs message text, attachment names or bytes, tool inputs, workspace or tab names, keys, tickets or
+tokens.

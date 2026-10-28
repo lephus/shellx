@@ -1358,6 +1358,294 @@
         "call_id": "c66",
         "attachment_id": "a1"
       }
+    },
+    {
+      "name": "workspaces_get",
+      "message": {
+        "case": "workspaces_get",
+        "call_id": "c70"
+      },
+      "json": {
+        "v": 1,
+        "t": "workspace.list.get",
+        "call_id": "c70"
+      }
+    },
+    {
+      "name": "workspaces_empty",
+      "message": {
+        "case": "workspaces",
+        "call_id": "c71",
+        "revision": 0,
+        "workspaces": []
+      },
+      "json": {
+        "v": 1,
+        "t": "workspace.list",
+        "call_id": "c71",
+        "revision": 0,
+        "workspaces": []
+      }
+    },
+    {
+      "name": "workspaces",
+      "message": {
+        "case": "workspaces",
+        "call_id": "c72",
+        "revision": 6,
+        "workspaces": [
+          {
+            "workspace_id": "ws-1",
+            "title": "shellx",
+            "order": 0,
+            "directory": "~/code/shellx",
+            "branch": "main",
+            "ports": [
+              3000,
+              5173
+            ],
+            "terminals": [
+              {
+                "terminal_id": "t-1",
+                "title": "claude",
+                "order": 0,
+                "selected": true,
+                "session_id": "s-1"
+              },
+              {
+                "terminal_id": "t-2",
+                "title": "zsh",
+                "order": 1,
+                "selected": false
+              }
+            ]
+          },
+          {
+            "workspace_id": "ws-2",
+            "title": "docs",
+            "order": 1,
+            "terminals": []
+          }
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "workspace.list",
+        "call_id": "c72",
+        "revision": 6,
+        "workspaces": [
+          {
+            "workspace_id": "ws-1",
+            "title": "shellx",
+            "order": 0,
+            "directory": "~/code/shellx",
+            "branch": "main",
+            "ports": [
+              3000,
+              5173
+            ],
+            "terminals": [
+              {
+                "terminal_id": "t-1",
+                "title": "claude",
+                "order": 0,
+                "selected": true,
+                "session_id": "s-1"
+              },
+              {
+                "terminal_id": "t-2",
+                "title": "zsh",
+                "order": 1,
+                "selected": false
+              }
+            ]
+          },
+          {
+            "workspace_id": "ws-2",
+            "title": "docs",
+            "order": 1,
+            "terminals": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "workspaces_changed",
+      "message": {
+        "case": "workspaces_changed",
+        "revision": 7,
+        "upserted": [
+          {
+            "workspace_id": "ws-2",
+            "title": "docs",
+            "order": 1,
+            "directory": "~/docs",
+            "terminals": [
+              {
+                "terminal_id": "t-3",
+                "title": "",
+                "order": 0,
+                "selected": true
+              }
+            ]
+          }
+        ],
+        "removed": [
+          "ws-1"
+        ]
+      },
+      "json": {
+        "v": 1,
+        "t": "workspace.changed",
+        "revision": 7,
+        "upserted": [
+          {
+            "workspace_id": "ws-2",
+            "title": "docs",
+            "order": 1,
+            "directory": "~/docs",
+            "terminals": [
+              {
+                "terminal_id": "t-3",
+                "title": "",
+                "order": 0,
+                "selected": true
+              }
+            ]
+          }
+        ],
+        "removed": [
+          "ws-1"
+        ]
+      }
+    },
+    {
+      "name": "workspace_create",
+      "message": {
+        "case": "workspace_create",
+        "call_id": "c73"
+      },
+      "json": {
+        "v": 1,
+        "t": "workspace.create",
+        "call_id": "c73"
+      }
+    },
+    {
+      "name": "workspace_create_result_ok",
+      "message": {
+        "case": "workspace_create_result",
+        "call_id": "c73",
+        "outcome": "ok",
+        "workspace_id": "ws-3"
+      },
+      "json": {
+        "v": 1,
+        "t": "workspace.create.result",
+        "call_id": "c73",
+        "outcome": "ok",
+        "workspace_id": "ws-3"
+      }
+    },
+    {
+      "name": "workspace_create_result_refused",
+      "message": {
+        "case": "workspace_create_result",
+        "call_id": "c74",
+        "outcome": "refused"
+      },
+      "json": {
+        "v": 1,
+        "t": "workspace.create.result",
+        "call_id": "c74",
+        "outcome": "refused"
+      }
+    },
+    {
+      "name": "workspace_rename",
+      "message": {
+        "case": "workspace_rename",
+        "call_id": "c75",
+        "workspace_id": "ws-2",
+        "title": "Docs \u2014 v2"
+      },
+      "json": {
+        "v": 1,
+        "t": "workspace.rename",
+        "call_id": "c75",
+        "workspace_id": "ws-2",
+        "title": "Docs \u2014 v2"
+      }
+    },
+    {
+      "name": "workspace_rename_result_ok",
+      "message": {
+        "case": "workspace_rename_result",
+        "call_id": "c75",
+        "outcome": "ok"
+      },
+      "json": {
+        "v": 1,
+        "t": "workspace.rename.result",
+        "call_id": "c75",
+        "outcome": "ok"
+      }
+    },
+    {
+      "name": "workspace_rename_result_not_found",
+      "message": {
+        "case": "workspace_rename_result",
+        "call_id": "c76",
+        "outcome": "not_found"
+      },
+      "json": {
+        "v": 1,
+        "t": "workspace.rename.result",
+        "call_id": "c76",
+        "outcome": "not_found"
+      }
+    },
+    {
+      "name": "workspace_close",
+      "message": {
+        "case": "workspace_close",
+        "call_id": "c77",
+        "workspace_id": "ws-2"
+      },
+      "json": {
+        "v": 1,
+        "t": "workspace.close",
+        "call_id": "c77",
+        "workspace_id": "ws-2"
+      }
+    },
+    {
+      "name": "workspace_close_result_ok",
+      "message": {
+        "case": "workspace_close_result",
+        "call_id": "c77",
+        "outcome": "ok"
+      },
+      "json": {
+        "v": 1,
+        "t": "workspace.close.result",
+        "call_id": "c77",
+        "outcome": "ok"
+      }
+    },
+    {
+      "name": "workspace_close_result_refused",
+      "message": {
+        "case": "workspace_close_result",
+        "call_id": "c78",
+        "outcome": "refused"
+      },
+      "json": {
+        "v": 1,
+        "t": "workspace.close.result",
+        "call_id": "c78",
+        "outcome": "refused"
+      }
     }
   ],
   "decode_only": [

@@ -25,6 +25,10 @@ $probe pair --state $state --offer-file offer.txt   # prints the pairing id; pre
 $probe machines --state $state
 $probe watch --state $state [--seconds 600] [--recheck]
 $probe sessions --state $state
+$probe workspaces --state $state [--seconds 60]
+$probe workspace-create --state $state
+$probe workspace-rename <workspace_id> "<title>" --state $state
+$probe workspace-close <workspace_id> --state $state
 $probe approve <request_id> --state $state [--mode once|always|all|deny]
 $probe answer <request_id> --state $state --select "<label or free text>" [--select ...]
 $probe plan <request_id> --state $state --mode manual|auto_accept|ultraplan|deny [--feedback-file <file>]

@@ -35,6 +35,7 @@ public struct MessageUploadError: Error {
 public actor LinkClient {
     private typealias Change = (revision: Int, added: [PendingItem], resolved: [String])
     private typealias SessionChange = (revision: Int, upserted: [AgentSession], removed: [String])
+    private typealias WorkspaceChange = (revision: Int, upserted: [LinkWorkspace], removed: [String])
 
     /// Every `agent.changed` from the host, in order. Single consumer. It finishes when the
     /// session ends.
@@ -49,6 +50,13 @@ public actor LinkClient {
     /// session ends. The caller applies the revision rule of PROTOCOL.md section 4 against the
     /// revision of its last `sessions()` result or applied change, exactly as for `changes`.
     public nonisolated let sessionChanges: AsyncStream<(revision: Int, upserted: [AgentSession], removed: [String])>
+
+    /// Every `workspace.changed` from the host, in order. Single consumer. It finishes when the session ends. The
+    /// caller applies the revision rule of PROTOCOL.md section 4 against the revision of its last `workspaces()`
+    /// result or applied change, exactly as for `changes`: `upserted` adds a workspace or replaces the one with the
+    /// same `workspaceId` (with all its terminals), `removed` lists the ids of workspaces that are gone. A host that
+    /// does not list `ShellXLink.workspacesFeature` pushes none.
+    public nonisolated let workspaceChanges: AsyncStream<(revision: Int, upserted: [LinkWorkspace], removed: [String])>
 
     /// Every `chat.entries` and `chat.reset` push from the host, in the order they arrived. Single consumer. It
     /// finishes when the session ends.
@@ -66,11 +74,14 @@ public actor LinkClient {
 
     /// The optional capabilities the host listed in `welcome.features` (PROTOCOL.md section 4, Features). Use a
     /// capability only when it is here: for `ShellXLink.attachmentsFeature`, `uploadAttachment` and
-    /// `chatSend(attachments:)`. A string this version does not know is kept, and ignored.
+    /// `chatSend(attachments:)`; for `ShellXLink.workspacesFeature`, `workspaces()` and `workspaceChanges`; for
+    /// `ShellXLink.workspaceControlFeature`, `createWorkspace`, `renameWorkspace` and `closeWorkspace`. A string this
+    /// version does not know is kept, and ignored.
     public nonisolated let hostFeatures: Set<String>
 
     private let changesContinuation: AsyncStream<Change>.Continuation
     private let sessionChangesContinuation: AsyncStream<SessionChange>.Continuation
+    private let workspaceChangesContinuation: AsyncStream<WorkspaceChange>.Continuation
     private let chatEntriesContinuation: AsyncStream<ChatPush>.Continuation
     private let channel: SecureChannel
     private let pinger: Task<Void, Never>
@@ -121,6 +132,9 @@ public actor LinkClient {
         let (sessionStream, sessionContinuation) = AsyncStream.makeStream(of: SessionChange.self)
         sessionChanges = sessionStream
         sessionChangesContinuation = sessionContinuation
+        let (workspaceStream, workspaceContinuation) = AsyncStream.makeStream(of: WorkspaceChange.self)
+        workspaceChanges = workspaceStream
+        workspaceChangesContinuation = workspaceContinuation
         let (chatStream, chatContinuation) = AsyncStream.makeStream(of: ChatPush.self)
         chatEntries = chatStream
         chatEntriesContinuation = chatContinuation
@@ -134,6 +148,7 @@ public actor LinkClient {
         watchdog.cancel()
         changesContinuation.finish()
         sessionChangesContinuation.finish()
+        workspaceChangesContinuation.finish()
         chatEntriesContinuation.finish()
         let channel = self.channel
         Task { await channel.close() }
@@ -347,6 +362,51 @@ public actor LinkClient {
         return outcome
     }
 
+    /// Asks the host for the full list of workspaces, in the Mac's sidebar order. Call it only when ``hostFeatures``
+    /// lists `ShellXLink.workspacesFeature`.
+    ///
+    /// Throws `.remote(code: "unsupported", ...)` when the host lists no workspaces, `.remote(code: "too_large", ...)`
+    /// when it could not fit the list in one frame even with the shrink steps of PROTOCOL.md section 6, `.timedOut`
+    /// after the request timeout, and `.sessionClosed` when the session ends first.
+    public func workspaces() async throws -> (revision: Int, workspaces: [LinkWorkspace]) {
+        let answer = try await call { .workspacesGet(callId: $0) }
+        guard case let .workspaces(_, revision, workspaces) = answer else { throw LinkClientError.unexpectedAnswer }
+        return (revision, workspaces)
+    }
+
+    /// Makes a workspace on the Mac, which chooses its directory; `workspaceId` is the new workspace's id when the
+    /// outcome is `.ok`, and nil otherwise. Call it only when ``hostFeatures`` lists
+    /// `ShellXLink.workspaceControlFeature`.
+    ///
+    /// Not safe to repeat: after a timeout or a lost connection it is unknown whether the Mac acted, so read the list
+    /// again instead. Throws `.remote(code: "unsupported", ...)` when the host takes no workspace control, `.timedOut`
+    /// after the request timeout, and `.sessionClosed` when the session ends first.
+    public func createWorkspace() async throws -> (outcome: WorkspaceControlOutcome, workspaceId: String?) {
+        let answer = try await call { .workspaceCreate(callId: $0) }
+        guard case let .workspaceCreateResult(_, outcome, workspaceId) = answer else {
+            throw LinkClientError.unexpectedAnswer
+        }
+        return (outcome, workspaceId)
+    }
+
+    /// Renames a workspace. `title` is at most `ShellXLink.maxWorkspaceTitleBytes` UTF-8 bytes. An id the Mac does
+    /// not have comes as the outcome `.notFound`, and one it refuses to act on (remote control blocked) as
+    /// `.refused`. Errors and repeating as for ``createWorkspace()``; also `.remote(code: "bad_request", ...)` for a
+    /// `title` that is too long.
+    public func renameWorkspace(workspaceId: String, title: String) async throws -> WorkspaceControlOutcome {
+        let answer = try await call { .workspaceRename(callId: $0, workspaceId: workspaceId, title: title) }
+        guard case let .workspaceRenameResult(_, outcome) = answer else { throw LinkClientError.unexpectedAnswer }
+        return outcome
+    }
+
+    /// Closes a workspace and its terminals on the Mac, which keeps its own rules: it answers `.refused` for its last
+    /// workspace, for example. Outcomes, errors and repeating as for ``renameWorkspace(workspaceId:title:)``.
+    public func closeWorkspace(workspaceId: String) async throws -> WorkspaceControlOutcome {
+        let answer = try await call { .workspaceClose(callId: $0, workspaceId: workspaceId) }
+        guard case let .workspaceCloseResult(_, outcome) = answer else { throw LinkClientError.unexpectedAnswer }
+        return outcome
+    }
+
     /// Waits for the turn to upload. Throws `CancellationError` when the caller is cancelled first, and the session's
     /// end error when it ends first; either way the caller holds no turn.
     private func acquireUploadTurn() async throws {
@@ -465,6 +525,8 @@ public actor LinkClient {
             waiters.removeValue(forKey: callId)?.resume(returning: message)
         case let .sessionsChanged(revision, upserted, removed):
             sessionChangesContinuation.yield((revision, upserted, removed))
+        case let .workspacesChanged(revision, upserted, removed):
+            workspaceChangesContinuation.yield((revision, upserted, removed))
         case let .chatEntries(sessionId, entries):
             chatEntriesContinuation.yield(.upsert(sessionId: sessionId, entries: entries))
         case let .chatReset(sessionId):
@@ -484,8 +546,8 @@ public actor LinkClient {
             }
             linkLog.info("host reported error \(code, privacy: .public)")
         case .pong, .unknown, .hello, .welcome, .snapshotGet, .reply, .sessionsGet, .chatHistoryGet, .chatSend,
-             .chatInterrupt, .attachBegin, .attachChunk, .attachEnd, .workspacesGet, .workspacesChanged,
-             .workspaceCreate, .workspaceRename, .workspaceClose:
+             .chatInterrupt, .attachBegin, .attachChunk, .attachEnd, .workspacesGet, .workspaceCreate,
+             .workspaceRename, .workspaceClose:
             break
         }
         return true
@@ -503,6 +565,7 @@ public actor LinkClient {
         for waiter in queued { waiter.continuation.resume(throwing: error) }
         changesContinuation.finish()
         sessionChangesContinuation.finish()
+        workspaceChangesContinuation.finish()
         chatEntriesContinuation.finish()
         pinger.cancel()
         watchdog.cancel()

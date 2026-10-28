@@ -616,6 +616,21 @@ final class LinkCodecTests: XCTestCase {
         }
     }
 
+    static func workspaces(_ o: Any?) throws -> [LinkWorkspace] {
+        try XCTUnwrap(o as? [[String: Any]]).map { d in
+            LinkWorkspace(
+                workspaceId: try XCTUnwrap(d["workspace_id"] as? String), title: try XCTUnwrap(d["title"] as? String),
+                order: try XCTUnwrap((d["order"] as? NSNumber)?.intValue), directory: d["directory"] as? String,
+                branch: d["branch"] as? String, ports: (d["ports"] as? [NSNumber])?.map(\.intValue),
+                terminals: try XCTUnwrap(d["terminals"] as? [[String: Any]]).map { t in
+                    LinkTerminal(
+                        terminalId: try XCTUnwrap(t["terminal_id"] as? String), title: try XCTUnwrap(t["title"] as? String),
+                        order: try XCTUnwrap((t["order"] as? NSNumber)?.intValue),
+                        selected: try XCTUnwrap(t["selected"] as? Bool), sessionId: t["session_id"] as? String)
+                })
+        }
+    }
+
     static func entries(_ o: Any?) throws -> [ChatEntry] {
         try XCTUnwrap(o as? [[String: Any]]).map { d in
             ChatEntry(
@@ -710,6 +725,26 @@ final class LinkCodecTests: XCTestCase {
                 sha256: try XCTUnwrap(hexData(try s("sha256")), "\(name).sha256"))
         case "attach_end_result":
             return .attachEndResult(callId: try s("call_id"), attachmentId: try s("attachment_id"))
+        case "workspaces_get": return .workspacesGet(callId: try s("call_id"))
+        case "workspaces":
+            return .workspaces(
+                callId: try s("call_id"), revision: try n("revision").intValue, workspaces: try workspaces(m["workspaces"]))
+        case "workspaces_changed":
+            return .workspacesChanged(
+                revision: try n("revision").intValue, upserted: try workspaces(m["upserted"]),
+                removed: try XCTUnwrap(m["removed"] as? [String]))
+        case "workspace_create": return .workspaceCreate(callId: try s("call_id"))
+        case "workspace_create_result":
+            return .workspaceCreateResult(
+                callId: try s("call_id"), outcome: WorkspaceControlOutcome(wire: try s("outcome")),
+                workspaceId: m["workspace_id"] as? String)
+        case "workspace_rename":
+            return .workspaceRename(callId: try s("call_id"), workspaceId: try s("workspace_id"), title: try s("title"))
+        case "workspace_rename_result":
+            return .workspaceRenameResult(callId: try s("call_id"), outcome: WorkspaceControlOutcome(wire: try s("outcome")))
+        case "workspace_close": return .workspaceClose(callId: try s("call_id"), workspaceId: try s("workspace_id"))
+        case "workspace_close_result":
+            return .workspaceCloseResult(callId: try s("call_id"), outcome: WorkspaceControlOutcome(wire: try s("outcome")))
         default:
             XCTFail("unknown vector case in \(name)")
             throw LinkCodecError.badJSON(callId: nil)

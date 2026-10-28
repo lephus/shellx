@@ -142,6 +142,20 @@ enum Log {
                 + (session.title.map { " title=\"\(short($0))\"" } ?? ""))
     }
 
+    static func workspace(_ workspace: LinkWorkspace) {
+        print(
+            "    workspace \(shown(workspace.workspaceId)) order=\(workspace.order) \"\(short(workspace.title))\""
+                + (workspace.directory.map { " dir=\"\(short($0))\"" } ?? "")
+                + (workspace.branch.map { " branch=\"\(short($0))\"" } ?? "")
+                + (workspace.ports.map { " ports=\($0)" } ?? "") + " terminals=\(workspace.terminals.count)")
+        for terminal in workspace.terminals {
+            print(
+                "      terminal \(shown(terminal.terminalId)) order=\(terminal.order) \"\(short(terminal.title))\""
+                    + (terminal.selected ? " selected" : "")
+                    + (terminal.sessionId.map { " session=\(shown($0))" } ?? ""))
+        }
+    }
+
     static func entry(_ entry: ChatEntry) {
         print(
             "    #\(entry.seq) \(shown(entry.role.wire))/\(shown(entry.kind.wire))"

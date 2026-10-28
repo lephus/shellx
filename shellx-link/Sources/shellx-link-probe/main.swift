@@ -18,6 +18,10 @@ enum Probe {
           shellx-link-probe logout --state <dir>
           shellx-link-probe watch --state <dir> [--machine <id>] [--seconds <n>] [--recheck]
           shellx-link-probe sessions --state <dir> [--machine <id>]
+          shellx-link-probe workspaces --state <dir> [--machine <id>] [--seconds <n>]
+          shellx-link-probe workspace-create --state <dir> [--machine <id>]
+          shellx-link-probe workspace-rename <workspace_id> <title> --state <dir> [--machine <id>]
+          shellx-link-probe workspace-close <workspace_id> --state <dir> [--machine <id>]
           shellx-link-probe approve <request_id> --state <dir> [--machine <id>] [--mode <mode>]
           shellx-link-probe answer <request_id> --state <dir> [--machine <id>] --select <label> [--select <label>]...
           shellx-link-probe plan <request_id> --state <dir> [--machine <id>] --mode <plan mode> [--feedback-file <file>]
@@ -36,6 +40,10 @@ enum Probe {
         ultraplan or deny.
         answer takes one --select per question, in order: an option's label picks that option,
         any other text is a free-text answer; join the labels of a multi-select question with ", ".
+        workspaces logs the Mac's workspaces (with their terminals), then every change until the session
+        ends (exit 4) or --seconds pass (exit 0). workspace-create makes a workspace in a directory the
+        Mac chooses; workspace-rename and workspace-close take the workspace_id from that list. They exit 2
+        unless the Mac answers ok.
         watch logs pending requests, session states and chat entries until the session ends
         (exit 4) or --seconds pass (exit 0). With --recheck it then tries to connect again twice:
         with a ticket minted before the end (the Mac's handshake check) and with a new ticket (the
@@ -70,6 +78,18 @@ enum Probe {
         case "sessions":
             try args.expect(positional: 0, options: ["state", "machine"])
             try await Commands.sessions(args)
+        case "workspaces":
+            try args.expect(positional: 0, options: ["state", "machine", "seconds"])
+            try await Commands.workspaces(args)
+        case "workspace-create":
+            try args.expect(positional: 0, options: ["state", "machine"])
+            try await Commands.workspaceCreate(args)
+        case "workspace-rename":
+            try args.expect(positional: 2, options: ["state", "machine"])
+            try await Commands.workspaceRename(args)
+        case "workspace-close":
+            try args.expect(positional: 1, options: ["state", "machine"])
+            try await Commands.workspaceClose(args)
         case "approve":
             try args.expect(positional: 1, options: ["state", "machine", "mode"])
             try await Commands.approve(args)
