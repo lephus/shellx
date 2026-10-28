@@ -140,6 +140,50 @@ final class WorkspaceScreenModelTests: XCTestCase {
         XCTAssertEqual(model.selectedTerminalId, "t2", "the agent that waits for the user")
     }
 
+    /// Spec section 6.2: the screen opens on the pane waiting for the user. With two Claude agents, the one
+    /// whose session needs input, not the one the Mac has selected.
+    func testTheAgentThatNeedsInputIsTheDefaultOverTheMacsSelection() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([
+            linkWorkspace(terminals: terminals("a1", "a2", agent: ["a1": "s1", "a2": "s2"], selected: "a1"))
+        ])
+        await mac.upsertSession(agentSession("s1", state: .working))
+        await mac.upsertSession(agentSession("s2", state: .needsInput))
+        await mac.addPending(pendingItem("r1"))
+        let rig = try await HubRig.make([mac], in: self)
+        _ = await rig.online(sessions: 2)
+        _ = await eventually { rig.hub.pendingItems.count == 1 && rig.hub.machines.first?.workspacesSupported == true }
+
+        let model = WorkspaceScreenModel(ref: ref(mac), hub: rig.hub, sleep: ManualSleeper().sleep)
+
+        XCTAssertEqual(model.selectedTerminalId, "a2", "the agent that asks, not the Mac's selection")
+    }
+
+    /// The list can come before the sessions and the request it names: until the user picks a chip, the
+    /// chip shown follows what the screen learns.
+    func testTheDefaultChipIsChosenAgainWhenTheSessionsArriveAfterTheList() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([
+            linkWorkspace(terminals: terminals("zsh", "claude", agent: ["claude": "s1"], selected: "zsh"))
+        ])
+        let (model, hub, _) = try await makeModel(mac)
+        XCTAssertEqual(model.selectedTerminalId, "zsh", "no session listed yet: the Mac's selection")
+
+        await mac.upsertSession(agentSession("s1", state: .needsInput))
+        await mac.addPending(pendingItem("r1"))
+        let moved = await eventually { model.selectedTerminalId == "claude" }
+        XCTAssertTrue(moved, "\(String(describing: model.selectedTerminalId))")
+
+        // Once the user picked a chip, what arrives later does not move it.
+        model.select("zsh")
+        await mac.upsertSession(agentSession("s1", state: .working))
+        await mac.upsertSession(agentSession("s1", state: .needsInput))
+        await mac.addPending(pendingItem("r2"))
+        let seen = await eventually { hub.pendingItems.count == 2 }
+        XCTAssertTrue(seen)
+        XCTAssertEqual(model.selectedTerminalId, "zsh")
+    }
+
     // MARK: - Swiping and a chip that goes
 
     func testSelectingAChipSticksWhileTheMacChangesItsOwnSelection() async throws {
