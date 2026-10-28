@@ -333,6 +333,35 @@ struct ShellXLinkKeyStoreTests {
         #expect(delays.all == [.seconds(1), .seconds(2)])
     }
 
+    // MARK: A locked login keychain
+
+    /// A locked login keychain asks for its password. A cancelled prompt, a wrong password or no prompt allowed
+    /// say nothing about the stored keys: they are transient, never `link_keys_corrupt`.
+    @Test(arguments: [errSecUserCanceled, errSecAuthFailed, errSecInteractionNotAllowed])
+    func testLockedKeychainAnswersAreTransient(status: OSStatus) {
+        #expect(KeychainLinkSecretStorage.secretError(for: status) == .transient(status))
+    }
+
+    @Test func testOtherKeychainFailuresKeepTheirKind() {
+        #expect(KeychainLinkSecretStorage.secretError(for: errSecMissingEntitlement) == .unavailable(errSecMissingEntitlement))
+        #expect(KeychainLinkSecretStorage.secretError(for: errSecDecode) == .failed(errSecDecode))
+    }
+
+    /// The person cancelled the keychain prompt: the host keeps its keys and tries again later, without asking
+    /// again at once.
+    @MainActor
+    @Test func testCancelledKeychainPromptIsRetriedLater() async throws {
+        let storage = InMemoryLinkSecretStorage(readFailures: [KeychainLinkSecretStorage.secretError(for: errSecUserCanceled)])
+        let store = ShellXLinkKeyStore(storage: storage, accountID: "acct")
+        let delays = Box<Duration>()
+
+        let key = try await ShellXLinkHostController.loadKeys(store, sleep: { delays.add($0) })
+
+        #expect(key.publicKey.count == 32)
+        #expect(delays.all.count == 1)
+        #expect(delays.all.allSatisfy { $0 >= .seconds(60) })
+    }
+
     @MainActor
     @Test func testCorruptKeysStopWithoutRetry() async throws {
         let storage = InMemoryLinkSecretStorage()

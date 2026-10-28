@@ -398,6 +398,42 @@ struct ShellXPhonePairingCoordinatorTests {
         rig.coordinator.close()
     }
 
+    /// Signed out, this Mac serves no phones until someone signs in under Settings › Account, and the sheet
+    /// says so instead of only "not ready".
+    @Test func testSignedOutMacAsksToSignIn() async throws {
+        let rig = Rig(hostRunning: false, signedIn: false)
+        rig.coordinator.open()
+        await rig.ticker.waitUntilSleeping()
+        #expect(!rig.coordinator.isReady)
+        #expect(rig.coordinator.needsSignIn)
+
+        // Signed in from Settings while the sheet is open: the link host starts and a QR shows.
+        rig.account.signedIn = true
+        rig.host.pairingHost = rig.hostInfo
+        await rig.coordinator.pollNow()
+        #expect(rig.coordinator.isReady)
+        #expect(!rig.coordinator.needsSignIn)
+        #expect(rig.coordinator.offer != nil)
+
+        // Signed out again: the hint comes back.
+        rig.account.signedIn = false
+        rig.host.pairingHost = nil
+        await rig.coordinator.pollNow()
+        #expect(!rig.coordinator.isReady)
+        #expect(rig.coordinator.needsSignIn)
+        rig.coordinator.close()
+    }
+
+    /// Signed in but the link host is not running yet (still registering): no sign-in hint.
+    @Test func testSignedInMacNotReadyYetDoesNotAskToSignIn() async {
+        let rig = Rig(hostRunning: false, signedIn: true)
+        rig.coordinator.open()
+        await rig.ticker.waitUntilSleeping()
+        #expect(!rig.coordinator.isReady)
+        #expect(!rig.coordinator.needsSignIn)
+        rig.coordinator.close()
+    }
+
     // MARK: - Machine name in the QR
 
     @Test func testOfferNameIsSanitizedForThePhoneParser() async throws {
@@ -464,7 +500,9 @@ private final class Rig {
     let hostInfo: PhonePairingHost
     let coordinator: ShellXPhonePairingCoordinator
 
-    init(hostRunning: Bool = true, machineName: String = "Phu's MacBook Pro") {
+    let account: AccountState
+
+    init(hostRunning: Bool = true, signedIn: Bool = true, machineName: String = "Phu's MacBook Pro") {
         let journal = Recorder<String>(), storage = InMemoryLinkSecretStorage(), clock = TestClock()
         let ticker = ManualTicker()
         let keys = ShellXLinkKeyStore(storage: storage, accountID: Self.accountID)
@@ -481,10 +519,19 @@ private final class Rig {
         self.relay = relay
         self.hostInfo = hostInfo
         self.host = host
+        let account = AccountState(signedIn: signedIn)
+        self.account = account
         coordinator = ShellXPhonePairingCoordinator(
             host: host, relay: relay, pollInterval: .seconds(2), now: { clock.now },
-            sleep: { try await ticker.sleep($0) }, fallbackName: "Mac")
+            sleep: { try await ticker.sleep($0) }, fallbackName: "Mac", isSignedIn: { account.signedIn })
     }
+}
+
+/// Whether a ShellX account is signed in on this Mac, as the coordinator reads it.
+@MainActor
+private final class AccountState {
+    var signedIn: Bool
+    init(signedIn: Bool) { self.signedIn = signedIn }
 }
 
 /// `ShellXLinkHostController` as pairing sees it: `revoke` drops trust, then ends the phone's sessions.

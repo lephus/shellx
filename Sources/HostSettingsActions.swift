@@ -55,6 +55,8 @@ final class HostSettingsActions: SettingsHostActions {
     /// task behind.
     private var notificationSoundPreviewTask: Task<Void, Never>?
     private var customSidebarPreview: (id: String, providerId: String, previousProviderId: String)?
+    /// ShellX: whether this Mac serves phones over ShellX Link (``ShellXRemoteGate/servesPhones``).
+    private let servesPhones: @MainActor () -> Bool
 
     init(
         configFileURL: URL,
@@ -79,8 +81,10 @@ final class HostSettingsActions: SettingsHostActions {
         computersActions: ComputersSettingsActions? = nil,
         cloudActivationCoordinator: CloudActivationCoordinator? = nil,
         runComputerUseOnboardingAction:
-            @escaping @MainActor (ComputerUseOnboardingWindowController.StartingPoint) -> Void
+            @escaping @MainActor (ComputerUseOnboardingWindowController.StartingPoint) -> Void,
+        servesPhones: @escaping @MainActor () -> Bool = { ShellXRemoteGate.servesPhones }
     ) {
+        self.servesPhones = servesPhones
         self.computersActions = computersActions ?? ComputersSettingsActions()
         self.cloudActivationCoordinator = cloudActivationCoordinator
         self.configFileURL = configFileURL

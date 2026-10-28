@@ -70,7 +70,8 @@ struct KeychainLinkSecretStorage: ShellXLinkSecretStorage {
         return insert
     }
 
-    private static func error(_ status: OSStatus) -> ShellXLinkSecretError {
+    /// What a Keychain status other than success or not-found means for the link keys.
+    static func secretError(for status: OSStatus) -> ShellXLinkSecretError {
         switch status {
         case errSecInteractionNotAllowed: return .transient(status)
         case errSecMissingEntitlement: return .unavailable(status)
@@ -85,7 +86,7 @@ struct KeychainLinkSecretStorage: ShellXLinkSecretStorage {
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         if status == errSecItemNotFound { return nil }
-        guard status == errSecSuccess else { throw Self.error(status) }
+        guard status == errSecSuccess else { throw Self.secretError(for: status) }
         guard let data = result as? Data else { throw ShellXLinkSecretError.failed(errSecDecode) }
         return data
     }
@@ -93,13 +94,13 @@ struct KeychainLinkSecretStorage: ShellXLinkSecretStorage {
     func add(_ data: Data, account: String) throws -> Bool {
         let status = SecItemAdd(addQuery(data, account: account) as CFDictionary, nil)
         if status == errSecDuplicateItem { return false }
-        guard status == errSecSuccess else { throw Self.error(status) }
+        guard status == errSecSuccess else { throw Self.secretError(for: status) }
         return true
     }
 
     func update(_ data: Data, account: String) throws {
         let status = SecItemUpdate(baseQuery(account) as CFDictionary, [kSecValueData as String: data] as CFDictionary)
-        guard status == errSecSuccess else { throw Self.error(status) }
+        guard status == errSecSuccess else { throw Self.secretError(for: status) }
     }
 }
 

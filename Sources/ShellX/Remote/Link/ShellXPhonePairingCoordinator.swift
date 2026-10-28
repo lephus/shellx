@@ -93,6 +93,8 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
     @Published private(set) var errorText: String?
     /// False while this Mac's link host does not run: no QR can be made.
     @Published private(set) var isReady = false
+    /// True while not ready because no account is signed in: the sheet then says where to sign in.
+    @Published private(set) var needsSignIn = false
     /// Pairing ids and grant ids with a decision or removal in flight.
     @Published private(set) var busy: Set<String> = []
     /// The pairing id being allowed. Only one at a time, so one QR never pairs two phones.
@@ -107,6 +109,7 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
     private let now: @Sendable () -> Date
     private let sleep: @Sendable (Duration) async throws -> Void
     private let fallbackName: String
+    private let isSignedIn: @MainActor () -> Bool
 
     private var isOpen = false
     /// Bumped by `open()` and `close()`: work begun in another session drops its result.
@@ -136,18 +139,21 @@ final class ShellXPhonePairingCoordinator: ObservableObject {
     ///   - now: The clock offers age by.
     ///   - sleep: Waits between rounds; tests drive it by hand.
     ///   - fallbackName: The machine name the QR carries when this Mac's own name has nothing usable.
+    ///   - isSignedIn: Whether a ShellX account is signed in on this Mac.
     init(host: any PhonePairingHosting,
          relay: any PhonePairingCalling,
          pollInterval: Duration = .seconds(ShellXRemoteService.pollInterval),
          now: @escaping @Sendable () -> Date = { Date() },
          sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
-         fallbackName: String = String(localized: "terminalSharing.device.mac", defaultValue: "Mac")) {
+         fallbackName: String = String(localized: "terminalSharing.device.mac", defaultValue: "Mac"),
+         isSignedIn: @escaping @MainActor () -> Bool = { true }) {
         self.host = host
         self.relay = relay
         self.pollInterval = pollInterval
         self.now = now
         self.sleep = sleep
         self.fallbackName = fallbackName
+        self.isSignedIn = isSignedIn
     }
 
     // MARK: - Open and close

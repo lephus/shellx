@@ -38,4 +38,14 @@ enum ShellXRemoteGate {
     static func servesPhones(remoteMachines: Bool, phonePairing: Bool, environment: [String: String]) -> Bool {
         phonePairing || isEnabled(remoteMachines: remoteMachines, environment: environment)
     }
+
+    /// Whether the app starts the remote service at launch in a process with `environment`.
+    static func startsAtLaunch(environment: [String: String]) -> Bool {
+        startsAtLaunch(servesPhones: servesPhones, environment: environment)
+    }
+
+    /// ``startsAtLaunch(environment:)`` for the given ``servesPhones``.
+    static func startsAtLaunch(servesPhones: Bool, environment: [String: String]) -> Bool {
+        servesPhones
+    }
 }

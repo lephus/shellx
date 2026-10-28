@@ -33,6 +33,8 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
     private let chat: (any AgentChatSource)?
     private let hostVersion: String
     private let machineName: String
+    private let isBlockedByPolicy: @MainActor () -> Bool
+    private let notificationCenter: NotificationCenter
     private var running: Running?
 
     /// - Parameters:
@@ -43,9 +45,13 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
     ///   - chat: Transcripts and chat commands (the app passes ``ShellXLinkChatSource``).
     ///   - hostVersion: The app version sent in `welcome`.
     ///   - machineName: This Mac's name sent in `welcome`.
+    ///   - isBlockedByPolicy: Whether a configuration profile forbids serving phones (`DisableRemoteControl`
+    ///     or `DisableIncomingDeviceAccess`).
+    ///   - notificationCenter: Where `ManagedDevicePolicy.didChangeNotification` is posted.
     init(core: ShellXCoreClient, storage: any ShellXLinkSecretStorage, feed: any AgentFeedSource,
          sessions: (any AgentSessionSource)? = nil, chat: (any AgentChatSource)? = nil, hostVersion: String,
-         machineName: String) {
+         machineName: String, isBlockedByPolicy: @escaping @MainActor () -> Bool = { MobileRemoteControlPolicy.isDisabled },
+         notificationCenter: NotificationCenter = .default) {
         self.core = core
         self.storage = storage
         self.feed = feed
@@ -53,6 +59,8 @@ final class ShellXLinkHostController: RemoteLinkHosting, PhonePairingHosting {
         self.chat = chat
         self.hostVersion = hostVersion
         self.machineName = machineName
+        self.isBlockedByPolicy = isBlockedByPolicy
+        self.notificationCenter = notificationCenter
     }
 
     func start(machineID: String, linkSlot: String, accountID: String) {

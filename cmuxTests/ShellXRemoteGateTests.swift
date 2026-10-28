@@ -1,3 +1,4 @@
+@testable import CmuxComputerUse
 import Foundation
 import ShellXBrand
 import Testing
@@ -30,6 +31,40 @@ struct ShellXRemoteGateTests {
         let environment = [ShellXRemoteGate.remoteMachinesEnvironmentKey: "1"]
         #expect(ShellXRemoteGate.isEnabled(remoteMachines: false, environment: environment))
         #expect(ShellXRemoteGate.servesPhones(remoteMachines: false, phonePairing: false, environment: environment))
+    }
+
+    // MARK: Launch
+
+    /// A process hosting tests never starts the remote service: it would sign in and register this Mac with the
+    /// production relay.
+    @Test func processHostingTestsNeverStartsTheRemoteService() {
+        #expect(!ShellXRemoteGate.startsAtLaunch(environment: ProcessInfo.processInfo.environment))
+        let xctest = ["XCTestConfigurationFilePath": "/tmp/cmuxTests.xctestconfiguration"]
+        #expect(!ShellXRemoteGate.startsAtLaunch(servesPhones: true, environment: xctest))
+    }
+
+    @Test func appStartsTheRemoteServiceWhileItServesPhones() {
+        #expect(ShellXRemoteGate.startsAtLaunch(servesPhones: true, environment: [:]))
+        #expect(!ShellXRemoteGate.startsAtLaunch(servesPhones: false, environment: [:]))
+    }
+
+    // MARK: Settings › Mobile
+
+    /// Settings › Mobile shows the "Pair iPhone" row only while this Mac serves phones over ShellX Link.
+    @MainActor
+    @Test func settingsPairsPhonesOnlyWhileThisMacServesPhones() {
+        #expect(!Self.settingsHost(servesPhones: false).pairsPhonesThroughShellXLink)
+        #expect(Self.settingsHost(servesPhones: true).pairsPhonesThroughShellXLink)
+    }
+
+    @MainActor
+    static func settingsHost(servesPhones: Bool) -> HostSettingsActions {
+        HostSettingsActions(
+            configFileURL: FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).json"),
+            computerUseRuntimeService: ComputerUseRuntimeService(),
+            browserDataImportCoordinator: BrowserDataImportCoordinator(),
+            runComputerUseOnboardingAction: { _ in },
+            servesPhones: { servesPhones })
     }
 
     /// The flags this build ships with: phones are served, remote machines are not.
