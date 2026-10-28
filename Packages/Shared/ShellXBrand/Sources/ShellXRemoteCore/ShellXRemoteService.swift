@@ -175,18 +175,24 @@ public final class ShellXRemoteService: ObservableObject {
     }
 
     /// `links.json` belongs to one account, whose `user_id` is kept in `links-owner` beside it (only `auth.login`
-    /// tells the user id, so a session restored at launch keeps the owner of its last sign-in). Signing in
+    /// tells the user id, so a session restored at launch keeps the owner of its last sign-in, or takes the
+    /// one in `account.json` when none was kept: ``adoptRestoredAccount()``). Signing in
     /// as a different account, or with no owner on record (links saved before owners were kept), drops every
     /// record and this Mac's invite files, so no link of another account is reconnected. Runs on the links
     /// queue after the last session's links stopped. A failure is logged and returns false; the new account's
     /// links stay usable, but the ShellX Link host does not start in this session (`accountAdoptionFailed`).
+    ///
+    /// - Parameter onlyWithoutOwner: True for a session restored at launch: an owner already on record is kept.
     @discardableResult
-    func adoptAccount(_ userID: String) async -> Bool {
+    func adoptAccount(_ userID: String, onlyWithoutOwner: Bool = false) async -> Bool {
         let store = env.store
         let tickets = env.paths.coreStateDir.appendingPathComponent("tickets", isDirectory: true)
         do {
             try await Self.onLinkStore {
-                if (try? store.loadOwner()) != userID {
+                let owner = try? store.loadOwner()
+                // Read on the links queue, after any sign-in queued before it saved its owner.
+                if onlyWithoutOwner, owner != nil { return }
+                if owner != userID {
                     let dropped = try store.removeAll()
                     let invites = RemoteInviteSweep.sweep(ticketsDir: tickets, now: Date())
                     if dropped + invites > 0 {
@@ -199,6 +205,22 @@ public final class ShellXRemoteService: ObservableObject {
         } catch {
             RemoteLog.service.error("link owner not updated: \(RemoteLog.code(error), privacy: .public)")
             return false
+        }
+    }
+
+    /// A session restored at launch with no owner on record: ShellX 1.4.0 and 1.5.0 signed in from Settings ›
+    /// Account with the remote service off and kept only `account.json`, whose user id is saved after a
+    /// successful `auth.login`, the one the core's session came from. That id is adopted. Without the record
+    /// nothing is guessed and the link host waits for a sign-in.
+    func adoptRestoredAccount() async {
+        let store = env.store, file = ShellXAccount.recordFile(stateRoot: env.paths.stateRoot)
+        let found = try? await Self.offMain { () -> String? in
+            guard (try? store.loadOwner()) == nil else { return nil }
+            return ShellXAccount.readRecord(file)?.userID
+        }
+        guard let userID = found ?? nil, !userID.isEmpty else { return }
+        if await adoptAccount(userID, onlyWithoutOwner: true) {
+            RemoteLog.service.notice("restored session: link owner taken from the account record")
         }
     }
 
@@ -217,6 +239,8 @@ public final class ShellXRemoteService: ObservableObject {
         do {
             let list = try await call("machines.list", as: MachineListReply.self)
             guard !terminated, !isSignedIn else { return }
+            await adoptRestoredAccount()
+            guard !terminated, !isSignedIn else { return }
             startSession(list: list)
         } catch {
             guard !terminated, !isSignedIn else { return }
@@ -233,6 +257,8 @@ public final class ShellXRemoteService: ObservableObject {
             // The core answers not_logged_in without a local session, so any other error means a session
             // exists and the API is unreachable: keep going, the timers retry.
             RemoteLog.service.error("machines.list failed at launch: \(code, privacy: .public)")
+            await adoptRestoredAccount()
+            guard !terminated, !isSignedIn else { return }
             startSession(list: nil, listImmediately: false)
         }
     }

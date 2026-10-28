@@ -33,8 +33,18 @@ public final class ShellXAccount {
 
     public init(service: ShellXRemoteService) {
         self.service = service
-        file = service.env.paths.stateRoot.appendingPathComponent("account.json")
-        identity = (try? OwnerOnlyFile.read(file)).flatMap { $0 }.flatMap { try? JSONDecoder().decode(Identity.self, from: $0) }
+        file = Self.recordFile(stateRoot: service.env.paths.stateRoot)
+        identity = Self.readRecord(file)
+    }
+
+    /// `account.json` under `stateRoot`.
+    nonisolated static func recordFile(stateRoot: URL) -> URL {
+        stateRoot.appendingPathComponent("account.json")
+    }
+
+    /// The identity saved in `file`, or nil when there is none or it cannot be read.
+    nonisolated static func readRecord(_ file: URL) -> Identity? {
+        (try? OwnerOnlyFile.read(file)).flatMap { $0 }.flatMap { try? JSONDecoder().decode(Identity.self, from: $0) }
     }
 
     /// Throws the core's error (`invalid_credentials`, `rate_limited`, `network`, …); the identity is
