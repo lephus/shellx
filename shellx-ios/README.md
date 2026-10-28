@@ -1,6 +1,6 @@
 # ShellX for iPhone
 
-The native ShellX iOS app (2.0.0, replacing the Flutter 1.0.0 app): Swift 6, SwiftUI, iOS 17+,
+The native ShellX iOS app (1.0.0, replacing the Flutter 1.0.0 app): Swift 6, SwiftUI, iOS 17+,
 iPhone only. It pairs with a Mac running ShellX over ShellX Link.
 
 ## Licence boundary

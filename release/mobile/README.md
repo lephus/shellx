@@ -18,7 +18,8 @@ Run them from the repo root. Full `xcodebuild` logs go to `build/release/ios/log
 
 1. Raise `CURRENT_PROJECT_VERSION` in `shellx-ios/Config/Version.xcconfig` before **every** upload,
    even a rebuild of the same version: App Store Connect refuses a build number it has already
-   seen. `MARKETING_VERSION` is the store version (2.0.0 for P3). Commit the change.
+   seen. `MARKETING_VERSION` is the store version (1.0.0 for P3; the first native upload is
+   1.0.0 (5)). Commit the change.
 2. `release/mobile/ios.sh`. It archives the `ShellX` scheme in Release for a generic iPhone with
    automatic signing (`-allowProvisioningUpdates`), exports it with `ExportOptions.plist`, and
    refuses the ipa when:
@@ -44,13 +45,17 @@ Run them from the repo root. Full `xcodebuild` logs go to `build/release/ios/log
    TestFlight lists the build after processing (5–30 minutes).
 4. Test the TestFlight build on a real iPhone against a Mac running ShellX, then submit it for
    review.
-5. Keep `MIN_MOBILE` in `deploy/relay.env` (now `1.0.0`) as it is until 2.0.0 is live on the
-   store. Raising it earlier sends every Flutter 1.0.0 user to an update that does not exist yet.
+5. Keep `MIN_MOBILE` in `deploy/relay.env` at `1.0.0`. The native app ships as 1.0.0, the same
+   version as the Flutter app, so the relay cannot tell the two apart by version: moving Flutter
+   users onto the native app through `MIN_MOBILE` needs a later native version (1.0.1 or above)
+   live on the store first. Raising it earlier sends them to an update that does not exist yet.
 
 ## App Store Connect
 
-- **Same app.** 2.0.0 replaces the Flutter 1.0.0 on the same App Store Connect app (bundle id
-  `com.shellx.prod`): a new version of that app, not a new app.
+- **Same app.** The native 1.0.0 replaces the Flutter 1.0.0 on the same App Store Connect app
+  (bundle id `com.shellx.prod`): a higher build number of the same version, not a new app. This
+  works only while version 1.0.0 has not been released on the store; once it has, App Store
+  Connect refuses new 1.0.0 builds and the next upload needs 1.0.1 or above.
 - **Export compliance.** The maintainer answers the encryption question in App Store Connect (the
   build → **Manage**). What to know: besides the HTTPS iOS provides, the app implements the Noise
   protocol itself (`Noise_XX_25519_ChaChaPoly_SHA256`, in `shellx-link`) on top of CryptoKit's
