@@ -56,12 +56,14 @@ Run them from the repo root. Full `xcodebuild` logs go to `build/release/ios/log
   (bundle id `com.shellx.prod`): a higher build number of the same version, not a new app. This
   works only while version 1.0.0 has not been released on the store; once it has, App Store
   Connect refuses new 1.0.0 builds and the next upload needs 1.0.1 or above.
-- **Export compliance.** The maintainer answers the encryption question in App Store Connect (the
-  build → **Manage**). What to know: besides the HTTPS iOS provides, the app implements the Noise
-  protocol itself (`Noise_XX_25519_ChaChaPoly_SHA256`, in `shellx-link`) on top of CryptoKit's
-  standard algorithms. `Info.plist` does not set
-  `ITSAppUsesNonExemptEncryption`, so the question comes back for each build until the answer is
-  settled and that key (and `ITSEncryptionExportComplianceCode` if Apple issues one) is added.
+- **Export compliance.** `shellx-ios/Config/Info.plist` sets `ITSAppUsesNonExemptEncryption` to
+  `NO`, so App Store Connect does not ask the encryption question for each build. The maintainer
+  settled on this for 1.0.0 (5): besides the HTTPS iOS provides, the app builds the Noise protocol
+  (`Noise_XX_25519_ChaChaPoly_SHA256`, in `shellx-link`), a published protocol, only from
+  CryptoKit's algorithms (X25519, ChaChaPoly, SHA-256, HMAC-SHA256) and implements no algorithm
+  itself. That is Apple's "encryption limited to that within the Apple operating system", which
+  needs no documentation in App Store Connect. An algorithm the app implements itself, or a
+  library that brings its own, changes the answer: revisit the key before shipping one.
 - **App Review** needs a demo account and a video in the review notes: the app does nothing until
   it is paired with a Mac running ShellX, and a reviewer has no such Mac. The video shows sign-in,
   pairing by QR, an agent session, answering a pending request and voice input.
