@@ -50,8 +50,9 @@ extension ShellXRemoteEnvironment {
             appVersion: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0",
             osVersion: "\(system.majorVersion).\(system.minorVersion).\(system.patchVersion)")
         let core = ShellXCoreClient(ShellXCoreFFI.shared)
-        // ShellX Link: the agent Feed, sessions and chat for phones. The service starts it only while it serves
-        // phones (`ShellXRemoteGate.servesPhones`) and has a `link_slot` from `machines.register`.
+        // ShellX Link: the agent Feed, sessions, chat and workspaces for phones. The service starts it only while
+        // it serves phones (`ShellXRemoteGate.servesPhones`) and has a `link_slot` from `machines.register`.
+        let workspaces = ShellXLinkWorkspaceSource()
         let linkHost = ShellXLinkHostController(
             core: core,
             storage: FallbackLinkSecretStorage.standard(onFallback: {
@@ -60,6 +61,8 @@ extension ShellXRemoteEnvironment {
             feed: ShellXLinkFeedSource(coordinator: .shared),
             sessions: ShellXLinkSessionSource(),
             chat: ShellXLinkChatSource(),
+            workspaces: workspaces,
+            workspaceControl: workspaces,
             hostVersion: device.appVersion,
             machineName: device.machineName)
         return ShellXRemoteEnvironment(
