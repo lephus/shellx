@@ -253,11 +253,14 @@ struct WorkspaceListScreen: View {
                 .listRowBackground(Color.clear)
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     if group.canControl {
-                        Button(role: .destructive) {
+                        // Not `.destructive`: that role lets iOS animate the row away before the
+                        // confirmation the button only opens.
+                        Button {
                             closing = row
                         } label: {
                             Label(String(localized: "workspaces.close"), systemImage: "xmark")
                         }
+                        .tint(Color("StatusError"))
                         Button {
                             renaming = row
                         } label: {
