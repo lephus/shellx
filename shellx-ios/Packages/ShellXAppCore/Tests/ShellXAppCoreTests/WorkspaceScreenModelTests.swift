@@ -1,5 +1,6 @@
 import Foundation
 import ShellXAppTestSupport
+import ShellXLinkAccount
 import ShellXLinkCore
 import XCTest
 
@@ -442,6 +443,54 @@ final class WorkspaceScreenModelTests: XCTestCase {
         XCTAssertEqual(model.panes.map(\.id), ["t1", "t2"])
         XCTAssertEqual(model.panes.map(\.isAgent), [true, false], "the agent pane stays; its screen says the Mac is away")
         XCTAssertEqual(model.selectedTerminalId, "t2")
+    }
+
+    /// The relay no longer grants the Mac (`MachineHub.revoke`): the hub empties the Mac's list, but nothing was
+    /// closed on the Mac. The screen keeps its last chips; it does not leave saying the workspace was closed.
+    func testTheChipsStayWhenTheRelayNoLongerGrantsTheMac() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace(terminals: terminals("t1", "t2"))])
+        let (model, hub, _) = try await makeModel(mac)
+        XCTAssertEqual(model.phase, .showing)
+
+        // The rig's relay grants nothing: the Mac is revoked.
+        await hub.refreshGrants()
+        let revoked = await eventually { hub.machines.first?.state == .revoked }
+        XCTAssertTrue(revoked)
+        XCTAssertTrue(hub.workspaceRows(machineID: mac.machine.machineID).isEmpty, "the hub forgot the list")
+        // Whatever the model would do with that, it has had the time to.
+        _ = await eventually(timeout: .milliseconds(200)) { false }
+
+        XCTAssertEqual(model.phase, .showing, "nothing was closed on the Mac")
+        XCTAssertEqual(model.panes.map(\.id), ["t1", "t2"], "the last chips stay")
+    }
+
+    /// The Mac removed this iPhone (the connection stops for good, `revoked`): the same, through the
+    /// connection's own stop.
+    func testTheChipsStayWhenTheMacRemovesThisIPhone() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace(terminals: terminals("t1", "t2"))])
+        let rig = try await HubRig.make([mac], in: self)
+        _ = await rig.online(sessions: 0)
+        _ = await eventually { rig.hub.machines.first?.workspacesSupported == true }
+        let model = WorkspaceScreenModel(ref: ref(mac), hub: rig.hub, sleep: ManualSleeper().sleep)
+        let run = Task { await model.run() }
+        addTeardownBlock { run.cancel() }
+        XCTAssertEqual(model.phase, .showing)
+
+        await mac.failNextConnects(RelayAPIError.http(status: 403, code: "not_granted"), count: 5)
+        await mac.dropLiveSessions()
+        let retrying = await eventually { rig.backoff.waiting.count == 1 }
+        XCTAssertTrue(retrying)
+        rig.backoff.release()
+        let revoked = await eventually { rig.hub.machines.first?.state == .revoked }
+        XCTAssertTrue(revoked)
+        let emptied = await eventually { rig.hub.workspaceRows(machineID: mac.machine.machineID).isEmpty }
+        XCTAssertTrue(emptied)
+        _ = await eventually(timeout: .milliseconds(200)) { false }
+
+        XCTAssertEqual(model.phase, .showing, "nothing was closed on the Mac")
+        XCTAssertEqual(model.panes.map(\.id), ["t1", "t2"], "the last chips stay")
     }
 
     // MARK: - Seen
