@@ -7,8 +7,8 @@ public enum WorkspaceCommandResult: Equatable, Sendable {
     case ok(workspaceId: String?)
     /// The Mac has no workspace with that id.
     case notFound
-    /// The Mac does not allow it: remote control is blocked, or its own rule says no (its last
-    /// workspace stays).
+    /// The Mac does not allow it: remote control is blocked, or its own rule says no (a pinned workspace,
+    /// or the last workspace of a window, stays).
     case refused
     /// The Mac could not do it, or took no such command.
     case failed

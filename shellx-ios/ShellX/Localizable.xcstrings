@@ -3602,19 +3602,19 @@
       }
     },
     "workspaces.alert.refused.close": {
-      "comment": "Alert: the Mac refused to close a workspace (it keeps its last one).",
+      "comment": "Alert: the Mac refused to close a workspace (its own rules keep pinned workspaces and the last workspace of a window).",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The Mac won't close its last workspace"
+            "value": "The Mac won't close this workspace (it's pinned or the last one in its window)."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac không cho đóng workspace cuối cùng"
+            "value": "Mac không cho đóng workspace này (đang ghim, hoặc là workspace cuối của cửa sổ)."
           }
         }
       }
