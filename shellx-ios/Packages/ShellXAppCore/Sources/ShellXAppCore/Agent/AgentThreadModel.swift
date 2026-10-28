@@ -70,7 +70,7 @@ public final class AgentThreadModel {
         self.hub = hub
         self.store = store
         self.sleep = sleep
-        // Resets before the screen existed: the home already dropped their stored copy.
+        // Resets before the screen existed: `ChatCopySweeper` already dropped their stored copy.
         resetsSeen = hub.transcriptResets(of: ref)
     }
 

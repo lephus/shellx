@@ -107,6 +107,22 @@ public actor MachineConnection {
         return try await body(client)
     }
 
+    /// Asks the live session for the workspace list again, and takes the answer when it is newer than
+    /// the list held (a pull to refresh). Does nothing unless the Mac is `.online` and lists
+    /// workspaces. A failed call leaves the list as it was and the session open.
+    public func refreshWorkspaces() async {
+        guard state == .online, workspacesSupported, let client else { return }
+        do {
+            let list = try await client.workspaces()
+            // A change may have been applied while waiting: never go back to an older list.
+            guard list.revision > workspaces.revision else { return }
+            workspaces.reset(revision: list.revision, workspaces: list.workspaces)
+            output.yield(.workspaces(workspaces, supported: workspacesSupported))
+        } catch {
+            log.info("link_workspaces_refresh_failed")
+        }
+    }
+
     // MARK: - Loop
 
     private func run() async {

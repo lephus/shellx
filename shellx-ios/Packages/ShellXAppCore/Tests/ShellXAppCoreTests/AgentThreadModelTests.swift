@@ -31,7 +31,7 @@ final class AgentThreadModelTests: XCTestCase {
     }
 
     /// The model's waits (the 0.5 s save) wait on the returned sleeper.
-    private func model(_ ref: SessionRef, _ rig: HomeRig) -> (AgentThreadModel, ManualSleeper) {
+    private func model(_ ref: SessionRef, _ rig: HubRig) -> (AgentThreadModel, ManualSleeper) {
         let timers = ManualSleeper()
         let model = AgentThreadModel(ref: ref, hub: rig.hub, store: rig.store, sleep: timers.sleep)
         addTeardownBlock { @MainActor in await model.close() }
@@ -45,7 +45,7 @@ final class AgentThreadModelTests: XCTestCase {
         return await eventually { model.isObserving }
     }
 
-    private func stored(_ ref: SessionRef, _ rig: HomeRig) async -> ChatThread? {
+    private func stored(_ ref: SessionRef, _ rig: HubRig) async -> ChatThread? {
         await rig.store.load(.thread(ref), as: ChatThread.self)
     }
 
@@ -55,8 +55,8 @@ final class AgentThreadModelTests: XCTestCase {
         let mac = await mac(history: entries(1...30, rev: 2))
         let s1 = ref(mac)
         let cached = ChatThread(entries: entries(1...5, text: "cached"), hasMore: false)
-        let rig = try await HomeRig.make(
-            [mac], in: self, seed: { await $0.writer().save(cached, to: .thread(s1)) }, loads: false)
+        let rig = try await HubRig.make(
+            [mac], in: self, seed: { await $0.writer().save(cached, to: .thread(s1)) })
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         let (model, timers) = model(s1, rig)
@@ -97,7 +97,7 @@ final class AgentThreadModelTests: XCTestCase {
     func testLoadOlderUsesSmallestSeq() async throws {
         let mac = await mac(history: entries(1...120))
         let s1 = ref(mac)
-        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         let (model, _) = model(s1, rig)
@@ -124,7 +124,7 @@ final class AgentThreadModelTests: XCTestCase {
     func testLoadOlderStopsAtThePhonesCap() async throws {
         let mac = await mac(history: entries(1...700))
         let s1 = ref(mac)
-        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         let (model, _) = model(s1, rig)
@@ -145,7 +145,7 @@ final class AgentThreadModelTests: XCTestCase {
         await mac.upsertSession(agentSession("s2", workspace: "web"))
         await mac.setHistory(sessionId: "s2", entries: [])
         let s1 = ref(mac)
-        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 2)
         XCTAssertTrue(online)
         let (model, timers) = model(s1, rig)
@@ -186,7 +186,7 @@ final class AgentThreadModelTests: XCTestCase {
     func testRunAgainCatchesUpOnWhatCameWhileCovered() async throws {
         let mac = await mac(history: entries(1...3))
         let s1 = ref(mac)
-        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         let (model, _) = model(s1, rig)
@@ -222,8 +222,8 @@ final class AgentThreadModelTests: XCTestCase {
         await mac.upsertSession(agentSession("s2", workspace: "web"))
         let s2 = ref(mac, "s2", workspace: "web")
         let cached = ChatThread(entries: entries(40...45), hasMore: true)
-        let rig = try await HomeRig.make(
-            [mac], in: self, seed: { await $0.writer().save(cached, to: .thread(s2)) }, loads: false)
+        let rig = try await HubRig.make(
+            [mac], in: self, seed: { await $0.writer().save(cached, to: .thread(s2)) })
         let online = await rig.online(sessions: 2)
         XCTAssertTrue(online)
 
@@ -260,7 +260,7 @@ final class AgentThreadModelTests: XCTestCase {
             entries: (1...20).map {
                 ChatEntry(id: "big-\($0)", rev: 1, seq: 1, role: .agent, kind: .prose, text: big, tsMs: 1)
             })
-        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 2)
         XCTAssertTrue(online)
 
@@ -297,7 +297,7 @@ final class AgentThreadModelTests: XCTestCase {
     func testEmptyStateWhileTheMacIsOffline() async throws {
         let mac = await mac(history: [])
         await mac.failNextConnects(URLError(.notConnectedToInternet), count: 1_000)
-        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let rig = try await HubRig.make([mac], in: self)
         let (model, _) = model(ref(mac), rig)
         await model.open()
         if case .offline = rig.hub.machines.first?.state {
@@ -316,7 +316,7 @@ final class AgentThreadModelTests: XCTestCase {
     func testOlderRowHidesOfflineAndOffersRetryAfterAFailure() async throws {
         let mac = await mac(history: entries(1...120))
         let s1 = ref(mac)
-        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         let (model, _) = model(s1, rig)
@@ -351,7 +351,7 @@ final class AgentThreadModelTests: XCTestCase {
     func testClosedScreenStopsWorkAndANewerScreenWins() async throws {
         let mac = await mac(history: entries(1...3))
         let s1 = ref(mac)
-        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         let (first, firstTimers) = model(s1, rig)
@@ -421,7 +421,7 @@ final class AgentThreadModelTests: XCTestCase {
     func testResetReplacesTheChatAndIgnoresAnswersStartedBefore() async throws {
         let mac = await mac(history: entries(1...60, text: "old"))
         let s1 = ref(mac)
-        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         let (model, _) = model(s1, rig)
@@ -461,7 +461,7 @@ final class AgentThreadModelTests: XCTestCase {
         await mac.upsertSession(agentSession("s2", workspace: "web"))
         await mac.setHistory(sessionId: "s2", entries: [])
         let s1 = ref(mac)
-        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 2)
         XCTAssertTrue(online)
         let (model, timers) = model(s1, rig)
@@ -506,17 +506,28 @@ final class AgentThreadModelTests: XCTestCase {
         let mac = await mac(history: entries(1...300, text: "old"))
         let s1 = ref(mac)
         let cached = ChatThread(entries: entries(1...300, text: "old"), hasMore: false)
-        let rig = try await HomeRig.make([mac], in: self, seed: { await $0.writer().save(cached, to: .thread(s1)) })
+        let other = ref(mac, "s-other")
+        let rig = try await HubRig.make(
+            [mac], in: self,
+            seed: {
+                await $0.writer().save(cached, to: .thread(s1))
+                await $0.writer().save(cached, to: .thread(other))
+            })
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
-        // The home follows the hub for the whole sign-in, as `SignedInView` runs it.
-        let homeRunning = await rig.startRunning(in: self)
-        XCTAssertTrue(homeRunning)
+        // The sweeper follows the hub for the whole sign-in, as `SignedInView` runs it.
+        let sweeper = ChatCopySweeper(hub: rig.hub, store: rig.store)
+        let sweeping = Task { await sweeper.run() }
+        addTeardownBlock { sweeping.cancel() }
+        let subscribed = await eventually { rig.hub.chatSubscriberCount == 1 }
+        XCTAssertTrue(subscribed)
 
         // The Mac reloads the transcript (a resume or /compact): its seq starts over.
         await mac.resetChat(sessionId: "s1", entries: reloaded(1...20))
         let dropped = await eventually { await self.stored(s1, rig) == nil }
         XCTAssertTrue(dropped, "the old transcript's copy goes although no screen follows the session")
+        let kept = await stored(other, rig)
+        XCTAssertEqual(kept, cached, "another session's copy stays")
 
         let (model, _) = model(s1, rig)
         let running = await startRunning(model)
@@ -531,7 +542,7 @@ final class AgentThreadModelTests: XCTestCase {
     func testResetWhileCoveredReplacesTheCopyWhenShownAgain() async throws {
         let mac = await mac(history: entries(1...60, text: "old"))
         let s1 = ref(mac)
-        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         let (model, _) = model(s1, rig)
@@ -564,7 +575,7 @@ final class AgentThreadModelTests: XCTestCase {
     func testSendMapsOutcomes() async throws {
         let mac = await mac(history: [])
         let s1 = ref(mac)
-        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         let (model, _) = model(s1, rig)
@@ -626,7 +637,7 @@ final class AgentThreadModelTests: XCTestCase {
     func testStopSoftAndHard() async throws {
         let mac = await mac(history: [])
         let s1 = ref(mac)
-        let rig = try await HomeRig.make([mac], in: self, loads: false)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
         let (model, _) = model(s1, rig)
@@ -681,8 +692,8 @@ final class AgentThreadModelTests: XCTestCase {
         let s1 = ref(mac)
         let cached = ChatThread(entries: entries(1...2, text: "cached"), hasMore: false)
         await mac.failNextConnects(URLError(.notConnectedToInternet), count: 1_000)
-        let rig = try await HomeRig.make(
-            [mac], in: self, seed: { await $0.writer().save(cached, to: .thread(s1)) }, loads: false)
+        let rig = try await HubRig.make(
+            [mac], in: self, seed: { await $0.writer().save(cached, to: .thread(s1)) })
         let unreachable = await eventually {
             if case .offline = rig.hub.machines.first?.state { return true }
             return false
@@ -736,7 +747,7 @@ final class AgentThreadModelTests: XCTestCase {
         let second = FakeMac(name: "Mac mini")
         await second.upsertSession(agentSession("s1", workspace: "shellx"))
         await second.addPending(pendingItem("p4", createdAtMs: 0, workspace: "shellx"))
-        let rig = try await HomeRig.make([first, second], in: self, loads: false)
+        let rig = try await HubRig.make([first, second], in: self)
         let synced = await eventually {
             rig.hub.machines.allSatisfy { $0.state == .online } && rig.hub.liveSessions.count == 3
                 && rig.hub.pendingItems.count == 4

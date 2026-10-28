@@ -180,6 +180,17 @@ public final class MachineHub {
         machines.first { $0.id == machineID }?.hostFeatures.contains(ShellXLink.workspaceControlFeature) ?? false
     }
 
+    /// Asks the Mac (`machineID`), or every online Mac, for its workspace list again: a pull to refresh,
+    /// or a command that found its workspace gone. The list is kept in sync by pushes, so this changes
+    /// something only when one was missed. Returns when the answers are in.
+    public func refreshWorkspaces(machineID: String? = nil) async {
+        let live = machines.filter { $0.state == .online && (machineID == nil || $0.id == machineID) }
+            .compactMap { connections[$0.id] }
+        await withTaskGroup(of: Void.self) { group in
+            for connection in live { group.addTask { await connection.refreshWorkspaces() } }
+        }
+    }
+
     // MARK: - Lifecycle
 
     /// Reads the paired Macs from the vault and connects to each. Runs once.

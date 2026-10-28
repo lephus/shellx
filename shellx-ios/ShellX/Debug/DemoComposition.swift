@@ -9,9 +9,8 @@ import UIKit
 /// `DemoScript`. A second fake Mac, "Mac giả 2", is not paired: its (fake) pairing code is put on
 /// the pasteboard, so "Paste Pairing Code" pairs it; the fake relay approves after `approvalDelay`.
 ///
-/// The home's conversation is kept in `Application Support/ShellXDemo`, apart from a real run's,
-/// and the fake Macs keep fixed ids, so the conversation and the session last messaged survive a
-/// relaunch of the demo.
+/// The agents' chat copies are kept in `Application Support/ShellXDemo`, apart from a real run's, and
+/// the fake Macs keep fixed ids, so they survive a relaunch of the demo.
 @MainActor
 enum DemoComposition {
     static let firstName = "Mac giả"
@@ -19,7 +18,7 @@ enum DemoComposition {
     static let defaultHistory = URL.applicationSupportDirectory.appendingPathComponent("ShellXDemo", isDirectory: true)
 
     /// `pasteboard` receives the second Mac's code; `runsScript` false keeps the first Mac still
-    /// (tests); `history` holds the home's conversation.
+    /// (tests); `history` holds the agents' chat copies.
     static func make(
         approvalDelay: Duration = .seconds(2), pasteboard: UIPasteboard = .general, runsScript: Bool = true,
         history historyDirectory: URL = defaultHistory
@@ -32,9 +31,10 @@ enum DemoComposition {
         let latency = LatencyLog()
         let launch = LaunchMark(latency: latency)
         let scopes = SignedInScope.Slot()
-        let history = ConversationStore(directory: historyDirectory)
         // Its own defaults, so the demo's default Mac never leaks into a real run.
         let defaults = UserDefaults(suiteName: "com.shellx.dev.demo") ?? .standard
+        AppComposition.removeMergedChatData(in: historyDirectory, defaults: defaults)
+        let history = ConversationStore(directory: historyDirectory)
         let coordinator = AppCoordinator(
             vault: vault, relay: relay, deviceName: "iPhone", wipers: [history],
             makeHub: {
@@ -69,9 +69,36 @@ enum DemoComposition {
                 await relay.setApprovalDelay(approvalDelay)
                 let code = await second.pairingCode()
                 pasteboard.string = code
-                if runsScript { await script.start() }
+                if runsScript {
+                    await script.start()
+                    // The Mac's sidebar as the design shows it, over the script's two sessions.
+                    await first.setWorkspaces(Self.workspaces)
+                }
             })
     }
+
+    /// "Mac giả" has four workspaces: `shellx-ios` and `web` hold the script's two Claude Code sessions
+    /// (their ids are the ones the sessions and requests carry), `relay` a dev server and `notes` a shell.
+    static let workspaces: [LinkWorkspace] = [
+        LinkWorkspace(
+            workspaceId: "ws-shellx", title: "shellx-ios", order: 0, directory: "~/shellx/shellx-ios",
+            branch: "feat/workspaces",
+            terminals: [
+                LinkTerminal(terminalId: "demo-shellx-t1", title: "claude", order: 0, selected: true, sessionId: "demo-shellx"),
+                LinkTerminal(terminalId: "demo-shellx-t2", title: "zsh", order: 1, selected: false),
+            ]),
+        LinkWorkspace(
+            workspaceId: "ws-relay", title: "relay", order: 1, directory: "~/shellx/relay", branch: "main",
+            ports: [8787], terminals: [LinkTerminal(terminalId: "demo-relay-t1", title: "npm", order: 0, selected: true)]),
+        LinkWorkspace(
+            workspaceId: "ws-web", title: "web", order: 2, directory: "~/shellx/web", branch: "develop", ports: [3000],
+            terminals: [
+                LinkTerminal(terminalId: "demo-web-t1", title: "claude", order: 0, selected: true, sessionId: "demo-web")
+            ]),
+        LinkWorkspace(
+            workspaceId: "ws-notes", title: "notes", order: 3, directory: "~",
+            terminals: [LinkTerminal(terminalId: "demo-notes-t1", title: "zsh", order: 0, selected: true)]),
+    ]
 }
 
 /// True on the first call only.

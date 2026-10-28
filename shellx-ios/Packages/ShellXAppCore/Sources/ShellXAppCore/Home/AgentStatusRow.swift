@@ -1,8 +1,7 @@
 import Foundation
 import ShellXLinkCore
 
-/// One live session in the home's "Agents · N" strip: where it runs, its state, and how long that
-/// state has lasted.
+/// One session as a line of status: where it runs, its state, and how long that state has lasted.
 public struct AgentStatusRow: Equatable, Identifiable, Sendable {
     public var ref: SessionRef
     public var machineName: String

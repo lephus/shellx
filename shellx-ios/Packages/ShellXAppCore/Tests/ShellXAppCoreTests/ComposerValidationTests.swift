@@ -30,19 +30,20 @@ final class ComposerValidationTests: XCTestCase {
         XCTAssertEqual(text.utf8.count, 16_385)
         XCTAssertEqual(ComposerValidation(text), .tooLong(bytes: 16_385))
 
-        // With a live session to send to, the home model still sends nothing and notes nothing.
+        // With a live session to send to, an agent's screen still sends nothing.
         let mac = FakeMac(name: "MacBook Pro")
         await mac.upsertSession(agentSession("s1"))
         await mac.setHistory(sessionId: "s1", entries: [])
-        let rig = try await HomeRig.make([mac], in: self)
+        let rig = try await HubRig.make([mac], in: self)
         let online = await rig.online(sessions: 1)
         XCTAssertTrue(online)
-        XCTAssertNotNil(rig.home.effectiveTarget)
+        let ref = SessionRef(machineID: mac.machine.machineID, sessionId: "s1", agent: "claude", workspaceTitle: "shellx")
+        let model = AgentThreadModel(ref: ref, hub: rig.hub, store: rig.store, sleep: ManualSleeper().sleep)
+        addTeardownBlock { @MainActor in await model.close() }
 
-        let result = await rig.home.submit(text, to: rig.home.messageTarget, viaVoice: true)
+        let result = await model.send(text, viaVoice: true)
 
         XCTAssertEqual(result, .refused(.tooLong(bytes: 16_385)))
-        XCTAssertEqual(rig.home.entries, [])
         let sent = await mac.sentTexts
         XCTAssertEqual(sent, [])
     }

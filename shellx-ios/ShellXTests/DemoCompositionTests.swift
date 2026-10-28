@@ -81,32 +81,22 @@ final class DemoCompositionTests: XCTestCase {
         XCTAssertEqual(hub.machines.map(\.state), [.online, .online])
     }
 
-    func testDemoHomeKeepsItsConversationAcrossRelaunch() async throws {
-        let history = makeHistoryDirectory()
+    func testDemoMacListsTheFourWorkspacesOfTheDesign() async throws {
+        let graph = DemoComposition.make(
+            approvalDelay: .zero, pasteboard: makePasteboard(), runsScript: true, history: makeHistoryDirectory())
+        await graph.prepare()
+        await graph.coordinator.launch()
+        let hub = try XCTUnwrap(graph.coordinator.hub)
+        addTeardownBlock { @MainActor in await hub.stopAll() }
+        let id = try XCTUnwrap(hub.machines.first?.id)
 
-        let first = DemoComposition.make(
-            approvalDelay: .zero, pasteboard: makePasteboard(), runsScript: false, history: history)
-        await first.prepare()
-        await first.coordinator.launch()
-        let firstHub = try XCTUnwrap(first.coordinator.hub)
-        let home = try XCTUnwrap(first.scopes.scope(for: firstHub)?.home)
-        await home.load()
-        _ = await home.submit("Xin chào", to: home.messageTarget, viaVoice: false)
-        await home.flush()
-        await firstHub.stopAll()
-        XCTAssertEqual(home.entries.count, 2)
+        let listed = await eventually { hub.workspaceRows(machineID: id).count == 4 }
 
-        let second = DemoComposition.make(
-            approvalDelay: .zero, pasteboard: makePasteboard(), runsScript: false, history: history)
-        await second.prepare()
-        await second.coordinator.launch()
-        let secondHub = try XCTUnwrap(second.coordinator.hub)
-        addTeardownBlock { @MainActor in await secondHub.stopAll() }
-        let reopened = try XCTUnwrap(second.scopes.scope(for: secondHub)?.home)
-        await reopened.load()
-
-        XCTAssertEqual(reopened.entries, home.entries)
-        XCTAssertEqual(secondHub.machines.map(\.id), firstHub.machines.map(\.id), "the fake Mac keeps its id")
+        XCTAssertTrue(listed, "\(hub.workspaceRows(machineID: id).map(\.title))")
+        XCTAssertEqual(hub.workspaceRows(machineID: id).map(\.title), ["shellx-ios", "relay", "web", "notes"])
+        XCTAssertTrue(hub.supportsWorkspaceControl(id))
+        // The script's two sessions are in `shellx-ios` and `web`; nothing is left over.
+        XCTAssertEqual(hub.otherSessions(machineID: id), [])
     }
 
     func testDemoAgentScreenShowsTheScriptedChatAndStops() async throws {

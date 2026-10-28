@@ -139,6 +139,48 @@ final class MachineHubWorkspaceTests: XCTestCase {
         XCTAssertEqual(connects, 2)
     }
 
+    // MARK: - Refresh
+
+    func testRefreshAsksTheMacAgainAndTakesItsRevision() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace("shellx")])
+        let hub = try await makeHub(mac)
+        let id = mac.machine.machineID
+        _ = await eventually { hub.workspaceRows(machineID: id).count == 1 }
+
+        // The Mac's list moved on without telling the phone.
+        await mac.skipNextWorkspaceRevision()
+        await hub.refreshWorkspaces()
+
+        var lists = await mac.workspaceListCount
+        XCTAssertEqual(lists, 2, "the refresh asked for the list")
+        // The next change is the revision after the refreshed list: applied on its own, no gap.
+        await mac.upsertWorkspace(linkWorkspace("web", order: 1))
+        let followed = await eventually { hub.workspaceRows(machineID: id).map(\.title) == ["shellx", "web"] }
+        XCTAssertTrue(followed)
+        lists = await mac.workspaceListCount
+        XCTAssertEqual(lists, 2, "no second refetch for a gap")
+    }
+
+    func testRefreshLeavesAMacThatIsNotOnlineAlone() async throws {
+        let mac = FakeMac(name: "MacBook Pro")
+        await mac.setWorkspaces([linkWorkspace("shellx")])
+        let sleeper = ManualSleeper()
+        let hub = try await makeHub(mac, sleep: sleeper.sleep)
+        let id = mac.machine.machineID
+        _ = await eventually { hub.workspaceRows(machineID: id).count == 1 }
+        await mac.dropLiveSessions()
+        let down = await eventually { hub.machines.first?.state == .reconnecting }
+        XCTAssertTrue(down)
+
+        await hub.refreshWorkspaces()
+        await hub.refreshWorkspaces(machineID: "mac-unknown")
+
+        let lists = await mac.workspaceListCount
+        XCTAssertEqual(lists, 1, "nothing is asked of a Mac that is out of reach")
+        XCTAssertEqual(hub.workspaceRows(machineID: id).map(\.title), ["shellx"])
+    }
+
     // MARK: - Control
 
     func testCreateRenameCloseCallMac() async throws {
