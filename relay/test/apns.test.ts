@@ -106,16 +106,24 @@ describe("ApnsClient", () => {
     expect(await new ApnsClient({ key: KEY, transport }).send(ALERT)).toBe(result);
   });
 
-  it("signs a new token after APNs refuses the cached one", async () => {
+  it("retries once with a fresh provider token when APNs refuses the cached one", async () => {
     const { transport, requests } = recording([{ status: 403, body: JSON.stringify({ reason: "ExpiredProviderToken" }) }]);
     let now = 1_700_000_000_000;
-    const client = new ApnsClient({ key: KEY, transport, now: () => now });
+    // Each reading is a second later, so a token signed again differs from the refused one.
+    const client = new ApnsClient({ key: KEY, transport, now: () => (now += 1_000) });
 
-    expect(await client.send(ALERT)).toBe("error");
-    now += 1_000;
     expect(await client.send(ALERT)).toBe("ok");
 
+    expect(requests).toHaveLength(2);
     expect(requests[1]!.headers.authorization).not.toBe(requests[0]!.headers.authorization);
+  });
+
+  it("retries a refused provider token only once", async () => {
+    const refused = { status: 403, body: JSON.stringify({ reason: "InvalidProviderToken" }) };
+    const { transport, requests } = recording([refused, refused, refused]);
+    const client = new ApnsClient({ key: KEY, transport });
+    expect(await client.send(ALERT)).toBe("error");
+    expect(requests).toHaveLength(2);
   });
 
   it("answers error when the connection fails", async () => {
@@ -150,6 +158,22 @@ describe("http2Transport", () => {
     expect(answer).toEqual({ status: 410, body: JSON.stringify({ reason: "Unregistered" }) });
     expect(seen).toEqual({ path: "/3/device/abc", topic: "com.shellx.dev", body: "{}" });
     transport.close();
+  });
+
+  it("rejects with apns_timeout when APNs never answers", async () => {
+    server = createServer(() => { /* never respond */ });
+    await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+    const transport = http2Transport({ timeoutMs: 100 });
+    try {
+      await expect(Promise.race([
+        transport({ origin: `http://127.0.0.1:${port}`, path: "/3/device/abc", headers: {}, body: "{}" }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("transport hung")), 3_000)),
+      ])).rejects.toThrow("apns_timeout");
+    } finally {
+      transport.close();
+      server.closeAllConnections();
+    }
   });
 });
 
