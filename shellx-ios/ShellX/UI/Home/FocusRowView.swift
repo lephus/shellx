@@ -110,7 +110,8 @@ struct FocusRowView: View {
             Text(verbatim: Self.subLine(for: item, kind: kind, now: now, showsMachineName: showsMachineName))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-                .lineLimit(large ? 3 : 1)
+                // Two lines: the time at the end ("8 hours, 20 minutes ago") wraps by words, never cut.
+                .lineLimit(large ? 4 : 2)
                 .truncationMode(.tail)
             if let question = Self.quotedQuestion(for: item, kind: kind) {
                 Text(verbatim: question)
