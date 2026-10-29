@@ -316,10 +316,65 @@ final class WorkspaceListRenderTests: XCTestCase {
         func session(_ state: AgentState) -> AgentSession {
             AgentSession(sessionId: "s", agent: "claude", workspaceId: "", workspaceTitle: "", state: state)
         }
-        XCTAssertEqual(OtherSessionsView.kind(of: session(.needsInput), finished: []), .needsYou)
-        XCTAssertEqual(OtherSessionsView.kind(of: session(.working), finished: []), .running)
-        XCTAssertEqual(OtherSessionsView.kind(of: session(.idle), finished: ["s"]), .justDone)
-        XCTAssertEqual(OtherSessionsView.kind(of: session(.idle), finished: []), .ended)
+        let now = Self.now
+        let fresh = now.addingTimeInterval(-10 * 60)
+        let old = now.addingTimeInterval(-(HomeFocus.justDoneFor + 60))
+        XCTAssertEqual(OtherSessionsView.kind(of: session(.needsInput), finishedAt: nil, now: now), .needsYou)
+        XCTAssertEqual(OtherSessionsView.kind(of: session(.working), finishedAt: nil, now: now), .running)
+        XCTAssertEqual(OtherSessionsView.kind(of: session(.idle), finishedAt: fresh, now: now), .justDone)
+        XCTAssertEqual(OtherSessionsView.kind(of: session(.idle), finishedAt: old, now: now), .idle, "an hour on, it is idle")
+        XCTAssertEqual(OtherSessionsView.kind(of: session(.idle), finishedAt: nil, now: now), .idle)
+        XCTAssertEqual(OtherSessionsView.kind(of: session(.ended), finishedAt: nil, now: now), .ended)
+        XCTAssertEqual(
+            OtherSessionsView.kind(of: session(.idle), finishedAt: now.addingTimeInterval(5), now: now), .justDone,
+            "a finish newer than the clock is not an error")
+    }
+
+    func testEverySubLineEndsWithATimeExceptRunning() {
+        let now = Self.now
+        func minutes(_ n: Int) -> String { AgentStateStyle.elapsedText(.seconds(n * 60)) }
+        func ago(_ n: Int) -> String { String(localized: "home.ago \(minutes(n))") }
+        func line(_ item: FocusItem, _ kind: FocusRowView.Kind) -> String {
+            FocusRowView.subLine(for: item, kind: kind, now: now, showsMachineName: false)
+        }
+        XCTAssertEqual(line(Self.mockup.needsYou[0], .needsYou), "shellx · Claude Code · \(minutes(2))")
+        XCTAssertEqual(line(Self.mockup.running[0], .running), "shellx · Claude Code")
+        XCTAssertEqual(line(Self.mockup.justDone[0], .justDone), "shellx · Claude Code · \(ago(12))")
+        XCTAssertEqual(line(Self.mockup.ended[0], .ended), "shellx · Claude Code · \(ago(30))")
+        XCTAssertEqual(line(Self.mockup.ended[1], .idle), "relay · Claude Code · \(ago(95))")
+
+        // Without the Mac's time there is none; needs you falls back to the last activity.
+        var bare = Self.mockup.ended[0]
+        bare.session.session.stateSinceMs = nil
+        bare.session.session.lastActivityMs = nil
+        XCTAssertEqual(line(bare, .ended), "shellx · Claude Code")
+        XCTAssertEqual(line(bare, .idle), "shellx · Claude Code")
+        var waiting = Self.mockup.needsYou[0]
+        waiting.session.session.stateSinceMs = nil
+        XCTAssertEqual(line(waiting, .needsYou), "shellx · Claude Code · \(minutes(2))")
+        waiting.session.session.lastActivityMs = nil
+        XCTAssertEqual(line(waiting, .needsYou), "shellx · Claude Code")
+        var unfinished = Self.mockup.justDone[0]
+        unfinished.finishedAt = nil
+        XCTAssertEqual(line(unfinished, .justDone), "shellx · Claude Code")
+    }
+
+    func testTimesUnderAMinuteAreOneMinuteAndNeverNegative() {
+        let now = Self.now
+        let oneMinute = AgentStateStyle.elapsedText(.seconds(60))
+        var finished = Self.mockup.justDone[0]
+        for offset in [-30.0, 0, 20, 59] {  // the clock behind the finish, at it, and under a minute after
+            finished.finishedAt = now.addingTimeInterval(-offset)
+            XCTAssertEqual(
+                FocusRowView.subLine(for: finished, kind: .justDone, now: now, showsMachineName: false),
+                "shellx · Claude Code · " + String(localized: "home.ago \(oneMinute)"), "offset \(offset)")
+        }
+        var running = Self.mockup.running[1]
+        running.session.session.stateSinceMs = Int64(now.timeIntervalSince1970 * 1000) - 25_000
+        XCTAssertEqual(FocusRowView.tag(for: running, kind: .running, now: now), oneMinute)
+        running.session.session.stateSinceMs = Int64(now.timeIntervalSince1970 * 1000) + 5_000
+        XCTAssertEqual(FocusRowView.tag(for: running, kind: .running, now: now), oneMinute)
+        XCTAssertNil(FocusRowView.tag(for: running, kind: .idle, now: now))
     }
 
     func testRenameSheetRenders() throws {
@@ -327,18 +382,6 @@ final class WorkspaceListRenderTests: XCTestCase {
     }
 
     // MARK: - Words
-
-    func testEveryStateHasWordsExceptIdle() {
-        let styles = [WorkspaceState.needsYou, .running, .done, .error].map { AgentStateStyle($0) }
-        for style in styles {
-            XCTAssertFalse(style.text?.isEmpty ?? true)
-            XCTAssertNotNil(style.color)
-        }
-        XCTAssertEqual(Set(styles.compactMap(\.text)).count, 4, "each state says something different")
-        XCTAssertEqual(styles.map(\.colorName), ["StatusNeedsYou", "StatusRunning", "StatusDone", "StatusError"])
-        XCTAssertNil(AgentStateStyle(.idle).text, "an idle workspace has no label")
-        XCTAssertNil(AgentStateStyle(.idle).colorName)
-    }
 
     func testGroupCaptionSaysWhyThereAreNoRows() {
         let offline = MachineGroupHeader.caption(for: .offline(since: Self.eightTwelve), machineName: "Mac mini")

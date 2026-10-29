@@ -3,14 +3,17 @@ import SwiftUI
 
 /// One agent session as a card, on the home and in the session lists (mockup A): a dot coloured by the
 /// group the session is in, its name (`SessionName`) and, to the right, a tag ("Needs you", how long
-/// it has run, "Done", none once it ended); under them `workspace · agent`, the Mac when several are
-/// paired and, for a session that just finished, how long ago; and, while it waits for the user, its
-/// question in quotes. A needs-you card has the accent colour as its outline, and a card from a Mac
+/// it has run, "Done", none once it ended or went idle); under them `workspace · agent`, the Mac when
+/// several are paired and how long: since it began to wait ("2 minutes"), or ago for a session that
+/// just finished, ended or went idle (a running one has its time in the tag); and, while it waits for
+/// the user, its question in quotes. A needs-you card has the accent colour as its outline, and a card from a Mac
 /// that is not online fades. The card is not a button itself: the list wraps it in a link.
 struct FocusRowView: View {
     /// The group the session is in: it sets the dot, the tag and the outline.
     enum Kind: Equatable {
         case needsYou, running, justDone, ended
+        /// A live session that finished its turn more than an hour ago (`OtherSessionsView`).
+        case idle
     }
 
     let item: FocusItem
@@ -31,7 +34,7 @@ struct FocusRowView: View {
         case .needsYou: "StatusNeedsYou"
         case .running: "StatusRunning"
         case .justDone: "StatusDone"
-        case .ended: "StatusIdle"
+        case .ended, .idle: "StatusIdle"
         }
     }
 
@@ -42,25 +45,55 @@ struct FocusRowView: View {
         case .needsYou:
             return String(localized: "agent.state.needsYou")
         case .running:
-            return AgentStatusRow(session: item.session, now: now).elapsed.map { AgentStateStyle.elapsedText($0) }
+            return AgentStatusRow(session: item.session, now: now).elapsed.map { ageText($0) }
                 ?? String(localized: "agent.state.running")
         case .justDone:
             return String(localized: "agent.state.done")
-        case .ended:
+        case .ended, .idle:
             return nil
         }
     }
 
-    /// "shellx · Claude Code", then the Mac's name when `showsMachineName`, then, for a session that just
-    /// finished, "12 minutes ago". A session outside any workspace starts at the agent.
+    /// A duration in whole minutes, at least one: the rows redraw every 30 seconds, so a seconds count
+    /// would freeze between redraws, and a `now` older than the start would show a negative age.
+    static func ageText(_ elapsed: Duration) -> String {
+        let seconds = max(0, elapsed.components.seconds)
+        return AgentStateStyle.elapsedText(.seconds(max(1, seconds / 60) * 60))
+    }
+
+    /// The time at the end of the sub line, nil when the Mac gave none: needs you counts from when the
+    /// agent began to wait ("2 minutes"); just done, ended and idle say "12 minutes ago"; running has
+    /// its time in the tag.
+    static func timeText(for item: FocusItem, kind: Kind, now: Date) -> String? {
+        let session = item.session.session
+        func since(_ ms: Int64?) -> Duration? {
+            ms.map { .seconds(max(0, now.timeIntervalSince(Date(timeIntervalSince1970: Double($0) / 1000)))) }
+        }
+        switch kind {
+        case .running:
+            return nil
+        case .needsYou:
+            return (since(session.stateSinceMs) ?? since(session.lastActivityMs)).map { ageText($0) }
+        case .justDone:
+            return item.finishedAt.map { ago(.seconds(max(0, now.timeIntervalSince($0)))) }
+        case .ended:
+            return (since(session.stateSinceMs) ?? since(session.lastActivityMs)).map { ago($0) }
+        case .idle:
+            return since(session.lastActivityMs).map { ago($0) }
+        }
+    }
+
+    private static func ago(_ elapsed: Duration) -> String {
+        String(localized: "home.ago \(ageText(elapsed))")
+    }
+
+    /// "shellx · Claude Code", then the Mac's name when `showsMachineName`, then the time
+    /// (`timeText(for:kind:now:)`). A session outside any workspace starts at the agent.
     static func subLine(for item: FocusItem, kind: Kind, now: Date, showsMachineName: Bool) -> String {
         let session = item.session
         var parts = [session.session.workspaceTitle, AgentLabel(agent: session.session.agent).text]
         if showsMachineName { parts.append(session.machineName) }
-        if kind == .justDone, let finishedAt = item.finishedAt {
-            let elapsed = Duration.seconds(max(0, now.timeIntervalSince(finishedAt)))
-            parts.append(String(localized: "home.ago \(AgentStateStyle.elapsedText(elapsed))"))
-        }
+        if let time = timeText(for: item, kind: kind, now: now) { parts.append(time) }
         return parts.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 

@@ -2,8 +2,8 @@ import Foundation
 import ShellXAppCore
 import SwiftUI
 
-/// How a session's state looks in the agent screen's header and the other sessions list, and how a
-/// workspace's state looks on its row: the colour and the words next to it. The words always carry
+/// How a session's state looks in the agent screen's header and the pane chips: the colour and the
+/// words next to it. The words always carry
 /// the state, so the colour is never the only cue. A state this app does not know shows neither
 /// (PROTOCOL.md: no state badge).
 struct AgentStateStyle: Equatable {
@@ -14,28 +14,6 @@ struct AgentStateStyle: Equatable {
     let colorName: String?
 
     var color: Color? { colorName.map { Color($0) } }
-
-    /// A workspace row's label. An idle workspace has none.
-    init(_ state: WorkspaceState) {
-        switch state {
-        case .needsYou:
-            text = String(localized: "agent.state.needsYou")
-            colorName = "StatusNeedsYou"
-        case .running:
-            text = String(localized: "agent.state.running")
-            colorName = "StatusRunning"
-        case .done:
-            text = String(localized: "agent.state.done")
-            colorName = "StatusDone"
-        case .error:
-            text = String(localized: "agent.state.error")
-            colorName = "StatusError"
-        case .idle:
-            text = nil
-            colorName = nil
-        }
-        shortText = text
-    }
 
     init(_ row: AgentStatusRow) {
         guard row.online else {

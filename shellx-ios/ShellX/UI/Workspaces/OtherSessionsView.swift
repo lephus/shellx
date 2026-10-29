@@ -12,27 +12,28 @@ struct OtherSessionsView: View {
         let name = hub.machines.first { $0.id == machineID }?.name ?? ""
         let sessions = hub.otherSessions(machineID: machineID)
         let names = SessionName.distinct(sessions)
-        let finished = hub.finishedSessionIds(machineID: machineID)
+        // Read here, not in the closure: the hub is observed whatever SwiftUI does with the closure.
+        let finishTimes = hub.finishTimes[machineID] ?? [:]
+        let items = sessions.map {
+            FocusItem(session: $0, name: names[$0.ref] ?? $0.session.sessionId, finishedAt: finishTimes[$0.session.sessionId])
+        }
         TimelineView(.periodic(from: .now, by: 30)) { context in
             SessionListScreen(
-                title: String(localized: "workspaces.other.title"), header: name,
-                items: sessions.map {
-                    FocusItem(
-                        session: $0, name: names[$0.ref] ?? $0.session.sessionId,
-                        finishedAt: hub.finishTimes[machineID]?[$0.session.sessionId])
-                },
-                kind: { Self.kind(of: $0.session.session, finished: finished) },
+                title: String(localized: "workspaces.other.title"), header: name, items: items,
+                kind: { Self.kind(of: $0.session.session, finishedAt: $0.finishedAt, now: context.date) },
                 now: context.date, showsMachineName: false, empty: LocalizedStringResource("workspaces.other.empty"))
         }
     }
 
-    /// The group a session is drawn in: by its state, a finished one as "done".
-    static func kind(of session: AgentSession, finished: Set<String>) -> FocusRowView.Kind {
+    /// The group a session is drawn in: by its state; a finished one as "done" for `HomeFocus.justDoneFor`
+    /// after it finished (measured from `finishedAt` to `now`), then as idle. An ended session is "ended".
+    static func kind(of session: AgentSession, finishedAt: Date?, now: Date) -> FocusRowView.Kind {
         switch session.state {
         case .needsInput: .needsYou
         case .working: .running
-        case .idle where finished.contains(session.sessionId): .justDone
-        case .idle, .ended, .other: .ended
+        case .idle:
+            if let finishedAt, max(0, now.timeIntervalSince(finishedAt)) < HomeFocus.justDoneFor { .justDone } else { .idle }
+        case .ended, .other: .ended
         }
     }
 }
