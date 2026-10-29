@@ -12,6 +12,10 @@ struct SignedInView: View {
     let scope: SignedInScope
     let email: String
     let inbox: PairingInbox
+    /// A tap on a "needs you" alert opens every waiting request.
+    let pushTaps: PushTapInbox
+    /// The relay's copy of this phone's APNs token; nil in the demo.
+    let push: PushRegistration?
     let signOut: () async -> Void
 
     @State private var path = NavigationPath()
@@ -76,11 +80,24 @@ struct SignedInView: View {
         // The center follows the hub's whole list here, outside any body; the cards only read it.
         .onChange(of: hub.pendingItems) { _, items in scope.decisions.sync(items) }
         .task { await scope.chatCopies.run() }
+        .onChange(of: pushTaps.hasTap, initial: true) { takePushTap() }
+        // Alerts are worth asking for once a Mac can send them; iOS asks the user only the first time.
+        .task(id: hub.machines.isEmpty) {
+            guard push != nil, !hub.machines.isEmpty else { return }
+            await push?.signedIn()
+            await PushAppDelegate.registerIfAllowed()
+        }
         // Leaving the foreground stops every mic, in touch and in VoiceOver tap mode alike.
         .onChange(of: scenePhase) { _, phase in
             guard phase == .background, let voice = scope.voice else { return }
             Task { await voice.cancelAll() }
         }
+    }
+
+    /// The waiting requests, over the home, for a tapped alert.
+    private func takePushTap() {
+        guard pushTaps.take(), !hub.machines.isEmpty else { return }
+        path = NavigationPath([HomeRoute.pending])
     }
 
     private func openPairing() {

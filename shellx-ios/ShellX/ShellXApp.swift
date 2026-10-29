@@ -1,9 +1,11 @@
 import ShellXAppCore
 import SwiftUI
 import UIKit
+import UserNotifications
 
 @main
 struct ShellXApp: App {
+    @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var appDelegate
     @State private var graph = AppComposition.make()
     @State private var inbox = PairingInbox()
     @State private var networkPath = NetworkPathWatcher()
@@ -14,8 +16,9 @@ struct ShellXApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView(graph: graph, inbox: inbox)
+            RootView(graph: graph, inbox: inbox, pushTaps: appDelegate.taps)
                 .task {
+                    appDelegate.registration = graph.push
                     networkPath.start { [coordinator] in coordinator.hub?.networkChanged() }
                     await graph.prepare()
                     await coordinator.launch()
@@ -43,6 +46,8 @@ struct ShellXApp: App {
                         AppAppearance(stored: appearance).apply()
                         Task { await coordinator.protectedDataBecameAvailable() }
                         if let prompt = graph.updatePrompt { Task { await prompt.check() } }
+                        // The user is in the app, which shows what waits: the alerts on the lock screen go.
+                        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
                         if let hub = coordinator.hub {
                             hub.appDidBecomeActive()
                             Task { await hub.refreshGrants() }

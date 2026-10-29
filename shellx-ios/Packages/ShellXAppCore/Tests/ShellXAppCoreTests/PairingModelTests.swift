@@ -409,4 +409,7 @@ private struct HeldPairRelay: RelayAccountCalling {
         await gate.wait()
         return try await base.pair(offerURI: offerURI, clientKey: clientKey, token: token)
     }
+    func setPushToken(_ hexToken: String, topic: String, environment: APNsEnvironment, token: String) async throws {
+        try await base.setPushToken(hexToken, topic: topic, environment: environment, token: token)
+    }
 }

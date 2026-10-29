@@ -8,4 +8,6 @@ public protocol RelayAccountCalling: Sendable {
     func machines(token: String) async throws -> [PairedMachineListing]
     func unpair(grantID: String, token: String) async throws
     func pair(offerURI: String, clientKey: Data, token: String) async throws -> PairedMachine
+    /// This phone's APNs token, hex, for the app `topic` on the APNs host `environment`.
+    func setPushToken(_ hexToken: String, topic: String, environment: APNsEnvironment, token: String) async throws
 }

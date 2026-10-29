@@ -16,9 +16,10 @@ public actor FakeRelayAccount: RelayAccountCalling {
         case machines(token: String)
         case unpair(grantID: String, token: String)
         case pair(offerURI: String, clientKey: Data, token: String)
+        case setPushToken(hexToken: String, topic: String, environment: APNsEnvironment, token: String)
     }
 
-    public enum Function: Sendable { case login, logout, machines, unpair, pair }
+    public enum Function: Sendable { case login, logout, machines, unpair, pair, setPushToken }
 
     public private(set) var calls: [Call] = []
     private var loginResult: Result<AccountSession, Error> = .success(
@@ -79,6 +80,11 @@ public actor FakeRelayAccount: RelayAccountCalling {
         calls.append(.unpair(grantID: grantID, token: token))
         if let error = errors[.unpair] { throw error }
         grants.removeAll { $0.grantID == grantID }
+    }
+
+    public func setPushToken(_ hexToken: String, topic: String, environment: APNsEnvironment, token: String) async throws {
+        calls.append(.setPushToken(hexToken: hexToken, topic: topic, environment: environment, token: token))
+        if let error = errors[.setPushToken] { throw error }
     }
 
     public func pair(offerURI: String, clientKey: Data, token: String) async throws -> PairedMachine {

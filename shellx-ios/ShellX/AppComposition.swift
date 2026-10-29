@@ -57,7 +57,12 @@ enum AppComposition {
         #else
         let updatePrompt = makeUpdatePrompt(bundleID: bundle.bundleIdentifier, version: version)
         #endif
-        return AppGraph(coordinator: coordinator, scopes: scopes, launch: launch, updatePrompt: updatePrompt)
+        // Debug builds (com.shellx.dev) get sandbox APNs tokens, App Store builds production ones.
+        let push = PushRegistration(
+            relay: relay, vault: vault, topic: bundle.bundleIdentifier ?? "com.shellx.prod",
+            environment: debugBuild ? .sandbox : .production)
+        return AppGraph(
+            coordinator: coordinator, scopes: scopes, launch: launch, updatePrompt: updatePrompt, push: push)
     }
 
     /// The App Store popup: asks the store of the phone's region about this app. Nil without a bundle id.

@@ -660,6 +660,9 @@ private struct GatedGrantsRelay: RelayAccountCalling {
     func pair(offerURI: String, clientKey: Data, token: String) async throws -> PairedMachine {
         try await base.pair(offerURI: offerURI, clientKey: clientKey, token: token)
     }
+    func setPushToken(_ hexToken: String, topic: String, environment: APNsEnvironment, token: String) async throws {
+        try await base.setPushToken(hexToken, topic: topic, environment: environment, token: token)
+    }
 }
 
 /// Lets a hub's `onUnauthorized` reach the coordinator that owns the hub, as the app's composition does.

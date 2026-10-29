@@ -16,6 +16,8 @@ struct AppGraph {
     var prepare: @MainActor () async -> Void = {}
     /// Offers a newer App Store version; nil in Debug builds, which are not on the store.
     var updatePrompt: UpdatePrompt?
+    /// Keeps the relay holding this phone's APNs token; nil in the demo and previews.
+    var push: PushRegistration?
 }
 
 #if DEBUG

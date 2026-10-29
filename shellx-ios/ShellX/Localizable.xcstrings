@@ -2647,6 +2647,55 @@
         }
       }
     },
+    "push.needsYou": {
+      "comment": "Alert a paired Mac sends when an agent waits for the user, never saying what it asks (APNs loc-key); the argument is the agent, like Claude Code.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is waiting for you"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ đang chờ bạn xác nhận"
+          }
+        }
+      }
+    },
+    "push.needsYou.workspace": {
+      "comment": "Alert a paired Mac sends when an agent waits for the user, never saying what it asks (APNs loc-key); the arguments are the agent, like Claude Code, and the workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ in %2$@ is waiting for you"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ở %2$@ đang chờ bạn xác nhận"
+          }
+        }
+      }
+    },
+    "push.title": {
+      "comment": "Title of the alert a paired Mac sends when an agent waits for the user (APNs title-loc-key). The product name, never translated.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ShellX"
+          }
+        }
+      },
+      "shouldTranslate": false
+    },
     "root.title": {
       "comment": "The app's name, shown under the logo on the first screen.",
       "extractionState": "manual",

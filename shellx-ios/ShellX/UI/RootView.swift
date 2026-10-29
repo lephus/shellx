@@ -7,6 +7,8 @@ struct RootView: View {
     let graph: AppGraph
     /// A `shellx-link://` link opened from outside, held until a signed-in screen takes it.
     let inbox: PairingInbox
+    /// Taps on a "needs you" alert, opened once signed in.
+    var pushTaps = PushTapInbox()
 
     private var coordinator: AppCoordinator { graph.coordinator }
 
@@ -18,7 +20,9 @@ struct RootView: View {
             SignInView(coordinator: coordinator, expired: expired)
         case let .signedIn(email):
             if let hub = coordinator.hub, hub.isLoaded, let scope = graph.scopes.scope(for: hub) {
-                SignedInView(scope: scope, email: email, inbox: inbox, signOut: { await coordinator.signOut() })
+                SignedInView(
+                    scope: scope, email: email, inbox: inbox, pushTaps: pushTaps, push: graph.push,
+                    signOut: { await coordinator.signOut() })
                     .id(ObjectIdentifier(hub))
             } else {
                 LaunchView()
