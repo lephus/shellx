@@ -572,6 +572,7 @@ fn route(rec: &Recorded, raw: &[u8], opts: &FakeOptions, st: &mut State) -> Repl
             deny_phone_pairing(rec, id, st)
         }
         ("GET", "/v2/phone-grants") => list_phone_grants(rec, st),
+        ("POST", "/v2/notifications") => notify_phones(rec, st),
         ("DELETE", p) if p.starts_with("/v2/phone-grants/") => delete_phone_grant(rec, &p["/v2/phone-grants/".len()..], st),
         ("POST", "/v2/pairings") => create_pairing(rec, st),
         ("GET", "/v2/pairings") => list_pairings(rec, st),
@@ -1170,6 +1171,14 @@ fn list_phone_grants(rec: &Recorded, st: &State) -> Reply {
         })
         .collect();
     Reply::json(200, json!({"grants": grants}))
+}
+
+/// `POST /v2/notifications`: answers how many phones are granted the caller's machine (no push is sent).
+fn notify_phones(rec: &Recorded, st: &State) -> Reply {
+    let Some(who) = caller(rec, st) else { return unauthorized() };
+    let Some(own) = own_machine_id(&who, st) else { return Reply::error(404, "not_found", "Not found") };
+    let sent = st.phone_grants.values().filter(|g| g.machine_id == own && g.user_id == who.user_id).count();
+    Reply::json(202, json!({"sent": sent}))
 }
 
 fn delete_phone_grant(rec: &Recorded, id: &str, st: &mut State) -> Reply {

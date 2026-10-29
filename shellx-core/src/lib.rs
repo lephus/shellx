@@ -11,6 +11,7 @@ pub mod ffi;
 pub mod fingerprint;
 pub mod http;
 pub mod machines;
+pub mod notify;
 pub mod pairing;
 pub mod phones;
 pub mod seal;
@@ -51,12 +52,13 @@ pub const KNOWN_METHODS: &[&str] = &[
     "phones.deny",
     "phones.grants",
     "phones.revoke",
+    "notify.phones",
     "version.check",
 ];
 
 /// Methods that need `session.json` (Ruling R1: checked before dispatch).
 fn needs_session(method: &str) -> bool {
-    method.starts_with("machines.") || method.starts_with("tickets.") || method.starts_with("pair.") || method.starts_with("phones.") || method.starts_with("shares.")
+    method.starts_with("machines.") || method.starts_with("tickets.") || method.starts_with("pair.") || method.starts_with("phones.") || method.starts_with("shares.") || method.starts_with("notify.")
 }
 
 #[derive(Default)]
@@ -178,6 +180,7 @@ impl Core {
             "phones.deny" => phones::deny(self.agent(), cfg, store, params),
             "phones.grants" => phones::grants(self.agent(), cfg, store),
             "phones.revoke" => phones::revoke(self.agent(), cfg, store, params),
+            "notify.phones" => notify::phones(self.agent(), cfg, store, params),
             _ => Err(CoreError::new("unknown_method", format!("method not implemented: {method}"))),
         }
     }
